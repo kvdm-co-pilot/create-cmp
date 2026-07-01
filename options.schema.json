@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/create-cmp/create-cmp/options.schema.json",
+  "title": "create-cmp engine config",
+  "description": "The config object built by the CLI/plugin front door and consumed by the scaffold engine.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "appName",
+    "package",
+    "iosBundleId",
+    "region",
+    "themePrefix",
+    "platforms",
+    "firebase",
+    "room",
+    "appium",
+    "tabs",
+    "targetDir"
+  ],
+  "properties": {
+    "appName": {
+      "type": "string",
+      "description": "Human display name.",
+      "minLength": 1,
+      "pattern": "^[^\\n\\r]+$"
+    },
+    "package": {
+      "type": "string",
+      "description": "Reverse-DNS package id, e.g. com.acme.app.",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "iosBundleId": {
+      "type": "string",
+      "description": "iOS bundle id, e.g. com.acme.app.",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*(\\.[A-Za-z0-9][A-Za-z0-9-]*)+$"
+    },
+    "region": {
+      "type": "string",
+      "description": "Firebase region, e.g. us-central1.",
+      "minLength": 1,
+      "pattern": "^[a-z]+(-[a-z]+[0-9]+)?$|^[a-z-]+[0-9]+$"
+    },
+    "themePrefix": {
+      "type": "string",
+      "description": "PascalCase theme symbol prefix, e.g. Acme.",
+      "pattern": "^[A-Z][A-Za-z0-9]*$"
+    },
+    "platforms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["android", "ios"],
+      "properties": {
+        "android": {
+          "type": "boolean",
+          "const": true,
+          "description": "Android is always enabled."
+        },
+        "ios": { "type": "boolean" }
+      }
+    },
+    "firebase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "auth": {
+          "type": "string",
+          "enum": ["email", "phone", "both", "none"]
+        },
+        "firestore": { "type": "boolean" },
+        "storage": { "type": "boolean" },
+        "functions": { "type": "boolean" },
+        "fcm": { "type": "boolean" }
+      }
+    },
+    "room": { "type": "boolean" },
+    "appium": { "type": "boolean" },
+    "tabs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "icon"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "icon": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "targetDir": {
+      "type": "string",
+      "description": "Destination directory for the stamped project.",
+      "minLength": 1
+    }
+  }
+}

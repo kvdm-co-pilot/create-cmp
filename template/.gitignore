@@ -1,0 +1,21 @@
+*.iml
+.gradle
+/local.properties
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+*.log
+
+# Kotlin
+.kotlin/
+
+# iOS / CocoaPods / XcodeGen
+iosApp/Pods/
+iosApp/Podfile.lock
+iosApp/*.xcodeproj/
+iosApp/*.xcworkspace/
+iosApp/build/
+xcuserdata/
+*.xcuserstate

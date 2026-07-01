@@ -1,0 +1,221 @@
+import org.jetbrains.compose.resources.ResourcesExtension
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+plugins {
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.compose.multiplatform)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.android.application)
+    // >>> cmp:feature firebase
+    alias(libs.plugins.google.services)
+    // <<< cmp:feature firebase
+    // >>> cmp:feature room
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
+    // <<< cmp:feature room
+}
+
+kotlin {
+    compilerOptions {
+        // kotlinx-datetime 0.7.x Clock/Instant delegate to the experimental kotlin.time
+        // types on Kotlin 2.2.20; opt in project-wide.
+        optIn.add("kotlin.time.ExperimentalTime")
+        // >>> cmp:feature ios
+        // iosMain cinterop Foreign APIs (NWPathMonitor, NSHomeDirectory, etc.)
+        optIn.add("kotlinx.cinterop.ExperimentalForeignApi")
+        // <<< cmp:feature ios
+    }
+
+    androidTarget {
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
+
+    // >>> cmp:feature ios
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "ComposeApp"
+            isStatic = true
+        }
+    }
+    // <<< cmp:feature ios
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
+            implementation(compose.ui)
+            implementation(compose.components.resources)
+
+            // Lifecycle / ViewModel
+            implementation(libs.lifecycle.viewmodel)
+            implementation(libs.lifecycle.viewmodel.compose)
+            implementation(libs.lifecycle.runtime.compose)
+
+            // Navigation
+            implementation(libs.navigation.compose)
+
+            // Koin DI
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
+
+            // Ktor
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
+
+            // >>> cmp:feature firebase
+            implementation(libs.firebase.auth)
+            implementation(libs.firebase.firestore)
+            implementation(libs.firebase.functions)
+            implementation(libs.firebase.storage)
+            implementation(libs.firebase.messaging)
+            implementation(libs.firebase.config)
+            // <<< cmp:feature firebase
+
+            // >>> cmp:feature room
+            implementation(libs.room.runtime)
+            implementation(libs.sqlite.bundled)
+            // <<< cmp:feature room
+
+            // Kotlinx
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.coroutines.core)
+
+            // Coil image loading
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor)
+        }
+
+        androidMain.dependencies {
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.ktor.client.cio)
+            implementation(libs.koin.android)
+            implementation(libs.kotlinx.coroutines.android)
+            // >>> cmp:feature room
+            implementation(libs.room.runtime.android)
+            // <<< cmp:feature room
+        }
+
+        // >>> cmp:feature ios
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+        }
+        // <<< cmp:feature ios
+
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.koin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
+    }
+}
+
+android {
+    namespace = "__PACKAGE__"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "__PACKAGE__"
+        minSdk = 24
+        targetSdk = 35
+        versionCode = 1
+        versionName = "1.0.0"
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    buildTypes {
+        // >>> cmp:feature firebase
+        getByName("debug") {
+            // Debug builds point GitLive Firebase at the local emulators (see Application/KoinHelper).
+            // 10.0.2.2 is the Android emulator's host-loopback alias.
+            buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "true")
+            buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"10.0.2.2\"")
+            buildConfigField("int", "FIREBASE_AUTH_PORT", "9099")
+            buildConfigField("int", "FIREBASE_FIRESTORE_PORT", "8080")
+            buildConfigField("int", "FIREBASE_FUNCTIONS_PORT", "5001")
+            buildConfigField("int", "FIREBASE_STORAGE_PORT", "9199")
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+        }
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "false")
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        // <<< cmp:feature firebase
+        // >>> cmp:feature !firebase
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        getByName("debug") {
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+        }
+        // <<< cmp:feature !firebase
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
+    }
+}
+
+dependencies {
+    // >>> cmp:feature room
+    add("kspAndroid", libs.room.compiler)
+    // >>> cmp:feature ios
+    add("kspIosSimulatorArm64", libs.room.compiler)
+    add("kspIosX64", libs.room.compiler)
+    add("kspIosArm64", libs.room.compiler)
+    // <<< cmp:feature ios
+    // <<< cmp:feature room
+    add("coreLibraryDesugaring", libs.android.desugar.jdk)
+}
+
+// Pin the generated resources accessor package so `__PACKAGE__.generated.resources.Res`
+// is stable regardless of the Gradle project name. The default would derive from
+// rootProject.name (slugified), which couples imports to the app-name token.
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "__PACKAGE__.generated.resources"
+    generateResClass = ResourcesExtension.ResourceClassGeneration.Always
+}
+
+// >>> cmp:feature room
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+// <<< cmp:feature room

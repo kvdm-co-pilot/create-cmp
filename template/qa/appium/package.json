@@ -1,0 +1,8 @@
+{
+  "name": "__APP_NAME__-appium",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node run-android-smoke.mjs"
+  }
+}

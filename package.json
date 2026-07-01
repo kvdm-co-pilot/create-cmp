@@ -1,0 +1,49 @@
+{
+  "name": "create-cmp",
+  "version": "0.1.0",
+  "description": "Scaffold a production-ready Kotlin/Compose Multiplatform app (Android + iOS) that builds green in minutes — toolchain auto-bootstrapped, navigation/insets pre-solved, Clean Architecture wired, Appium harness ready.",
+  "type": "module",
+  "bin": {
+    "create-cmp": "bin/create-cmp.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin",
+    "src",
+    "template",
+    "options.schema.json"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "doctor": "node bin/create-cmp.mjs doctor"
+  },
+  "keywords": [
+    "create-cmp",
+    "compose-multiplatform",
+    "kotlin-multiplatform",
+    "kmp",
+    "cmp",
+    "scaffold",
+    "android",
+    "ios"
+  ],
+  "license": "MIT",
+  "author": "Karel van der Merwe",
+  "homepage": "https://github.com/kvdm-co-pilot/create-cmp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kvdm-co-pilot/create-cmp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kvdm-co-pilot/create-cmp/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "prompts": "^2.4.2",
+    "picocolors": "^1.1.1"
+  }
+}

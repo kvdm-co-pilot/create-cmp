@@ -1,0 +1,56 @@
+name: iosApp
+options:
+  bundleIdPrefix: __IOS_BUNDLE_ID__
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: iosApp
+    info:
+      path: iosApp/Info.plist
+      properties:
+        CFBundleDisplayName: __APP_NAME__
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        # Required by Compose Multiplatform on iOS (high-refresh-rate displays);
+        # the app crashes at launch (PlistSanityCheck) without it.
+        CADisableMinimumFrameDurationOnPhone: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        NSCameraUsageDescription: "__APP_NAME__ uses the camera to capture photos."
+        NSPhotoLibraryUsageDescription: "__APP_NAME__ lets you attach photos to your profile."
+        NSLocationWhenInUseUsageDescription: "__APP_NAME__ uses your location to show nearby content."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: __IOS_BUNDLE_ID__
+        PRODUCT_NAME: iosApp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        # KMP framework search path (populated by embedAndSignAppleFrameworkForXcode)
+        FRAMEWORK_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -framework
+          - ComposeApp
+    preBuildScripts:
+      - name: "Compile & embed KMP framework (ComposeApp)"
+        basedOnDependencyAnalysis: false
+        script: |
+          cd "$SRCROOT/.."
+          ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode

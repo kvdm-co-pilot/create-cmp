@@ -1,0 +1,69 @@
+package __PACKAGE__.presentation.home
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
+import org.koin.compose.viewmodel.koinViewModel
+
+@Composable
+fun HomeScreen(
+    onItemClick: (String) -> Unit,
+    viewModel: HomeViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+
+    Column(Modifier.fillMaxSize().padding(__THEME_PREFIX__Tokens.PaddingPage)) {
+        Text(
+            text = "Home",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.semantics { testTag = "home_title" }.padding(bottom = 12.dp),
+        )
+
+        if (state.isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(__THEME_PREFIX__Tokens.GapCard)) {
+                items(state.items, key = { it.id }) { item ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = MaterialTheme.shapes.medium,
+                        tonalElevation = __THEME_PREFIX__Tokens.ElevationCard,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onItemClick(item.id) },
+                    ) {
+                        Column(Modifier.padding(__THEME_PREFIX__Tokens.PaddingCard)) {
+                            Text(item.title, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                item.subtitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

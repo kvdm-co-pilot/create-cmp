@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "create-cmp",
+  "version": "0.1.0",
+  "description": "Scaffold and stand up a production-ready Kotlin/Compose Multiplatform app (Android + iOS) — conversational interview, toolchain auto-bootstrap, and an Appium test harness. Wraps the same deterministic engine as `npx create-cmp`.",
+  "author": {
+    "name": "create-cmp contributors",
+    "url": "https://github.com/kvdm-co-pilot/create-cmp"
+  },
+  "homepage": "https://github.com/kvdm-co-pilot/create-cmp",
+  "repository": "https://github.com/kvdm-co-pilot/create-cmp",
+  "license": "MIT",
+  "keywords": [
+    "kotlin-multiplatform",
+    "compose-multiplatform",
+    "kmp",
+    "cmp",
+    "scaffold",
+    "android",
+    "ios",
+    "appium"
+  ],
+  "skills": [
+    "./skills/cmp-new",
+    "./skills/cmp-doctor",
+    "./skills/cmp-qa-prep"
+  ]
+}

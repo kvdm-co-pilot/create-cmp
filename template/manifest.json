@@ -1,0 +1,105 @@
+{
+  "templateVersion": "1.0.0",
+  "description": "Golden Compose Multiplatform skeleton (green on Android + iOS). Stamp via token replacement + package-dir rename + feature-marker stripping.",
+  "placeholders": [
+    "__APP_NAME__",
+    "__PACKAGE__",
+    "__PACKAGE_PATH__",
+    "__IOS_BUNDLE_ID__",
+    "__REGION__",
+    "__THEME_PREFIX__"
+  ],
+  "placeholderNotes": {
+    "__APP_NAME__": "Human display name (Android label, iOS CFBundleDisplayName, Gradle rootProject.name). NOTE: rootProject.name in settings.gradle.kts cannot contain spaces — the engine must slugify the app name there (e.g. 'My App' -> 'MyApp' or 'my-app'). Used as a plain string elsewhere.",
+    "__PACKAGE__": "Reverse-DNS package id, e.g. com.acme.app. Replaces BOTH the Android namespace/applicationId AND every Kotlin `package`/`import` statement in file CONTENTS. Also used as iOS bundle id default.",
+    "__PACKAGE_PATH__": "Slash form of __PACKAGE__ (com/acme/app). Appears only inside string replacements where a path is needed; package SOURCE DIRECTORIES are stored literally as com/example/app and renamed by the engine (see packageSourceRoots + renameDirs).",
+    "__IOS_BUNDLE_ID__": "iOS bundle id (project.yml PRODUCT_BUNDLE_IDENTIFIER + bundleIdPrefix, Info.plist, GoogleService-Info.plist).",
+    "__REGION__": "Firebase Cloud Functions region, e.g. us-central1 (data/remote/FirebaseConfig.kt FIREBASE_FUNCTIONS_REGION).",
+    "__THEME_PREFIX__": "PascalCase theme symbol prefix (e.g. AcmeTheme, AcmeColors, AcmeTokens, AcmeShapes, rememberAcmeTypography)."
+  },
+  "tokenizationNotes": [
+    "Replace tokens in BOTH file contents and file/dir paths.",
+    "Package source directories are stored literally as `.../kotlin/com/example/app`. The engine renames the `com/example/app` segment to __PACKAGE_PATH__ for each root in packageSourceRoots. File CONTENTS use __PACKAGE__ in package/import lines (already tokenized).",
+    "The generated Compose resources accessor package is PINNED in composeApp/build.gradle.kts via `compose.resources { packageOfResClass = \"__PACKAGE__.generated.resources\" }`, so resource imports are stable and do NOT depend on rootProject.name. Do not remove that block.",
+    "Replacement order is safe because all tokens are distinct literals; replace __PACKAGE_PATH__ and __PACKAGE__ independently."
+  ],
+  "packageSourceRoots": [
+    "composeApp/src/commonMain/kotlin",
+    "composeApp/src/androidMain/kotlin",
+    "composeApp/src/iosMain/kotlin"
+  ],
+  "renameDirs": {
+    "literalSegment": "com/example/app",
+    "replaceWith": "__PACKAGE_PATH__",
+    "appliesTo": "each entry in packageSourceRoots"
+  },
+  "binaryAssets": [
+    "gradle/wrapper/gradle-wrapper.jar",
+    "composeApp/src/commonMain/composeResources/font/DMSans_Regular.ttf",
+    "composeApp/src/commonMain/composeResources/font/DMSans_Medium.ttf",
+    "composeApp/src/commonMain/composeResources/font/DMSans_SemiBold.ttf",
+    "composeApp/src/commonMain/composeResources/font/DMSans_Bold.ttf",
+    "composeApp/src/androidMain/res/mipmap-*/ic_launcher*.png",
+    "iosApp/iosApp/Assets.xcassets/**/*.png"
+  ],
+  "featureMarkers": {
+    "syntax": "// >>> cmp:feature <name>  ...  // <<< cmp:feature <name>",
+    "negation": "A name prefixed with ! (e.g. `cmp:feature !firebase`) marks a block kept ONLY when that feature is DISABLED. When the feature is ENABLED, the engine removes the whole negated block (markers + body); when DISABLED, it strips just the negated markers and keeps the body. Plain (non-negated) blocks are the inverse.",
+    "nesting": "Blocks may nest (e.g. `room` containing `ios` in composeApp/build.gradle.kts and KoinHelper.kt). Process as a stack: a child block is dropped if it OR any ancestor is dropped.",
+    "commentStyles": "Markers appear as Kotlin/Swift `//` comments, Ruby `#` comments (iosApp/Podfile), and could be any line-comment; match on the `cmp:feature` substring, not a fixed comment prefix.",
+    "whenEnabled": "Strip only the two marker lines, keep the body.",
+    "whenDisabled": "Remove the marker lines AND the body between them."
+  },
+  "features": {
+    "ios": {
+      "enabledByDefault": true,
+      "paths": [
+        "iosApp",
+        "composeApp/src/iosMain"
+      ],
+      "notes": "When off: delete the listed paths AND strip the `ios` marker blocks from composeApp/build.gradle.kts (iosX64/iosArm64/iosSimulatorArm64 targets, iosMain deps, ios KSP room.compiler rows, ExperimentalForeignApi optIn). Also drop iosApp from the build/verify."
+    },
+    "firebase": {
+      "enabledByDefault": true,
+      "paths": [
+        "composeApp/google-services.json",
+        "iosApp/iosApp/GoogleService-Info.plist"
+      ],
+      "notes": "GitLive deps + emulator wiring. When off: strip `firebase` marker blocks in composeApp/build.gradle.kts (GitLive deps + the google-services plugin + the firebase debug/release buildTypes), build.gradle.kts (google-services plugin), AppApplication.kt, KoinHelper.kt, iOSApp.swift, iosApp/Podfile; and KEEP the `!firebase` blocks in composeApp/build.gradle.kts (the no-Firebase debug/release buildTypes). Remove google-services.json + GoogleService-Info.plist. data/remote/FirebaseConfig.kt holds only a const and is harmless to leave, but may be removed. The google-services plugin REQUIRES a google-services.json whose client.android_client_info.package_name matches applicationId — the template ships a structurally-valid placeholder with __PACKAGE__ already in that field; instruct the user to replace it with the real file from the Firebase console."
+    },
+    "room": {
+      "enabledByDefault": true,
+      "paths": [
+        "composeApp/src/commonMain/kotlin/com/example/app/data/local",
+        "composeApp/src/androidMain/kotlin/com/example/app/data/local",
+        "composeApp/src/iosMain/kotlin/com/example/app/data/local",
+        "composeApp/schemas"
+      ],
+      "notes": "When off: strip `room` marker blocks in build.gradle.kts (ksp + room plugins), composeApp/build.gradle.kts (room/sqlite deps, kspAndroid/kspIos room.compiler, the room {} schema block), AppApplication.kt and KoinHelper.kt (AppDatabase single + appContext). Delete the data/local dirs. The example `home` feature does NOT depend on Room (its ItemRepositoryImpl is in-memory), so it keeps building with Room off."
+    },
+    "appium": {
+      "enabledByDefault": true,
+      "paths": [
+        "qa/appium",
+        "tests/appium"
+      ],
+      "notes": "Appium harness (Python conftest + smoke, JS client + smoke runner). No in-file markers; toggled by deleting the listed paths."
+    }
+  },
+  "verify": {
+    "android": "./gradlew :composeApp:assembleDebug",
+    "androidSmoke": "./gradlew :composeApp:installDebug && node qa/appium/run-android-smoke.mjs",
+    "iosLink": "./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64",
+    "ios": "cd iosApp && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && xcodegen generate && pod install && SIM_UDID=$(xcrun simctl list devices available | grep -Eo '[0-9A-F-]{36}' | head -1) && xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64 -destination \"id=$SIM_UDID\" build",
+    "iosNote": "On Apple Silicon, the KMP embedAndSignAppleFrameworkForXcode prebuild phase produces ONLY the active-arch (arm64) slice of ComposeApp.framework. A `-destination generic/platform=iOS Simulator` build demands a universal arm64+x86_64 binary and FAILS at CreateUniversalBinary. Constrain to arm64 (ARCHS=arm64 EXCLUDED_ARCHS=x86_64) and target a concrete arm64 simulator UDID — matching the linkDebugFrameworkIosSimulatorArm64 gate."
+  },
+  "stampPipeline": [
+    "1. Copy template/ -> targetDir (preserve binary files).",
+    "2. Strip/keep feature-marker blocks per the enabled feature set (stack-based; handle ! negation).",
+    "3. Replace placeholder tokens in all text-file CONTENTS.",
+    "4. Rename package source dirs com/example/app -> __PACKAGE_PATH__ under each packageSourceRoots entry.",
+    "5. Slugify __APP_NAME__ for settings.gradle.kts rootProject.name (no spaces).",
+    "6. Delete disabled-feature paths.",
+    "7. Write local.properties (sdk.dir) and run verify.android (+ verify.ios on macOS when ios enabled)."
+  ]
+}

@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Test / coverage / scratch
+coverage/
+.nyc_output/
+/tmp-*/
+
+# Kotlin / Gradle build artifacts (if the template dir is built locally)
+**/build/
+**/.gradle/
+**/.kotlin/
+**/local.properties
+
+# iOS build artifacts (Pods & generated Xcode project are not committed)
+**/Pods/
+**/*.xcworkspace
+**/DerivedData/
+iosApp/*.xcodeproj
+
+# NOTE: the template ships *placeholder* google-services.json / GoogleService-Info.plist
+# on purpose (the stamped build needs them to stay green), so they are intentionally
+# NOT ignored here. Downstream generated projects should ignore their real ones.
+
+# Internal working docs — not for the public repo
+docs/DESIGN.md
+docs/CONTRACT.md
