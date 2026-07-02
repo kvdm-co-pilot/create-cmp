@@ -41,26 +41,24 @@ reports success.
 
 ## Quick start
 
-Works today, straight from GitHub (no install, no clone):
-
 ```bash
-npx github:kvdm-co-pilot/create-cmp
+npx create-cmp-cli@latest
 ```
 
 …or non-interactively:
 
 ```bash
-npx github:kvdm-co-pilot/create-cmp --name Acme --package com.acme.app --yes --verify
+npx create-cmp-cli@latest --name Acme --package com.acme.app --yes --verify
 ```
 
 The scaffolder interviews you (or takes flags), runs the toolchain doctor, stamps the template, and
 builds the app to prove it's green.
 
-> **Heads up on the short name:** `npm publish` is pending (needs an interactive `npm login`). The
-> npm package will be `create-cmp-cli` — the bare name `create-cmp` is held by an unrelated
-> placeholder, and `create-cmp-app` is a real, unrelated CMP generator, so we didn't reuse either.
-> The installed *command* is still `create-cmp`. Once published: `npx create-cmp-cli@latest`. Until
-> then, use the `github:` form above, or the [Claude Code plugin](#use-it-from-claude-code).
+> **On the package name:** it publishes as `create-cmp-cli` — the bare name `create-cmp` is held by
+> an unrelated placeholder, and `create-cmp-app` is a real, unrelated CMP generator, so we didn't
+> reuse either. The installed *command* is still `create-cmp`. You can also run straight from GitHub
+> with no install: `npx github:kvdm-co-pilot/create-cmp`, or use the
+> [Claude Code plugin](#use-it-from-claude-code).
 
 > **North-star (a goal, measured honestly — not a benchmark):** *time-to-green* — a running app on
 > the Android emulator **and** the iOS simulator, smoke-passing, with zero manual steps modulo the
@@ -169,7 +167,7 @@ contents *and* paths, atomically renames package directories, toggles features (
 
 ## Roadmap
 
-- [ ] Publish to npm as `create-cmp-cli` (`npx create-cmp-cli`).
+- [x] Publish to npm as `create-cmp-cli` (`npx create-cmp-cli`).
 - [ ] Record the asciinema demo (`npx create-cmp-cli` → green Android + iOS).
 - [ ] Full Android + iOS build matrix in CI (currently CI runs the engine unit tests).
 - [ ] More example features and nav shapes.

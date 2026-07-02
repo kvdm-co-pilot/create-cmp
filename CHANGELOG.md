@@ -6,11 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-03
+
+First published release (npm registry).
+
 ### Changed
 
-- The npm package will publish as `create-cmp-cli` (the bare `create-cmp` name is an unrelated
+- The npm package publishes as `create-cmp-cli` (the bare `create-cmp` name is an unrelated
   placeholder and `create-cmp-app` is a real, unrelated CMP generator). The installed command
-  remains `create-cmp`.
+  remains `create-cmp` — `npx create-cmp-cli@latest` works today.
+- Added `.claude/skills/npm-publish`, the documented release procedure used to ship this version.
 
 ## [0.1.0] - 2026-06-18
 
@@ -33,5 +38,6 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kvdm-co-pilot/create-cmp/releases/tag/v0.1.0
