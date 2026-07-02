@@ -13,7 +13,7 @@
     {
       "name": "create-cmp",
       "source": "./",
-      "description": "Start a new Kotlin/Compose Multiplatform app (Android + iOS) by conversation. Interviews you for platforms, package, Firebase/auth, Room, and bottom-nav tabs, then shells out to the deterministic create-cmp engine to stamp a frozen, version-locked golden template — navigation/insets pre-solved, Clean Architecture wired, Appium harness included — and proves a GREEN build before reporting success. Bundles three skills: cmp-new (scaffold by interview), cmp-doctor (install the JDK/Android SDK/AVD/Xcode/CocoaPods/XcodeGen/Appium toolchain, consent-gated), and cmp-qa-prep (bring up the emulator + Appium session + smoke). Same engine as `npx create-cmp`.",
+      "description": "Start a new Kotlin/Compose Multiplatform app (Android + iOS) by conversation. Interviews you for platforms, package, Firebase/auth, Room, and bottom-nav tabs, then shells out to the deterministic create-cmp engine to stamp a frozen, version-locked golden template — navigation/insets pre-solved, Clean Architecture wired, Appium harness included — and proves a GREEN build before reporting success. Bundles three skills: cmp-new (scaffold by interview), cmp-doctor (install the JDK/Android SDK/AVD/Xcode/CocoaPods/XcodeGen/Appium toolchain, consent-gated), and cmp-qa-prep (bring up the emulator + Appium session + smoke). Same engine as the `create-cmp-cli` npm package (`npx create-cmp-cli`).",
       "version": "0.1.0",
       "license": "MIT",
       "keywords": [

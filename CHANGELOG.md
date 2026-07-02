@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- The npm package will publish as `create-cmp-cli` (the bare `create-cmp` name is an unrelated
+  placeholder and `create-cmp-app` is a real, unrelated CMP generator). The installed command
+  remains `create-cmp`.
+
 ## [0.1.0] - 2026-06-18
 
 Initial release.

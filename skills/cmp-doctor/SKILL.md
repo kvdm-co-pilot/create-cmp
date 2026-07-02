@@ -44,7 +44,7 @@ node <repo>/bin/create-cmp.mjs doctor
 node <repo>/bin/create-cmp.mjs doctor --yes
 ```
 
-(If invoked from the published package: `npx create-cmp@latest doctor`.)
+(If invoked from the published package: `npx create-cmp-cli@latest doctor`.)
 
 ## Consent gating — the hard rule
 

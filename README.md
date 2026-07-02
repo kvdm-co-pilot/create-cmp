@@ -56,9 +56,11 @@ npx github:kvdm-co-pilot/create-cmp --name Acme --package com.acme.app --yes --v
 The scaffolder interviews you (or takes flags), runs the toolchain doctor, stamps the template, and
 builds the app to prove it's green.
 
-> **Heads up on the short name:** the bare `npx create-cmp` form (and npm publish) is pending — the
-> `create-cmp` name on npm is currently held by an unrelated placeholder package. Until that's
-> resolved, use the `github:` form above, or the [Claude Code plugin](#use-it-from-claude-code).
+> **Heads up on the short name:** `npm publish` is pending (needs an interactive `npm login`). The
+> npm package will be `create-cmp-cli` — the bare name `create-cmp` is held by an unrelated
+> placeholder, and `create-cmp-app` is a real, unrelated CMP generator, so we didn't reuse either.
+> The installed *command* is still `create-cmp`. Once published: `npx create-cmp-cli@latest`. Until
+> then, use the `github:` form above, or the [Claude Code plugin](#use-it-from-claude-code).
 
 > **North-star (a goal, measured honestly — not a benchmark):** *time-to-green* — a running app on
 > the Android emulator **and** the iOS simulator, smoke-passing, with zero manual steps modulo the
@@ -146,7 +148,7 @@ the same for multiplatform mobile.
 ## How it works
 
 ```
-Front doors:  npx create-cmp   +   Claude Code plugin (cmp-new / cmp-doctor / cmp-qa-prep)
+Front doors:  npx create-cmp-cli   +   Claude Code plugin (cmp-new / cmp-doctor / cmp-qa-prep)
                                   │  one shared engine, two front doors
 Engine (Node, deterministic):     copy → token-replace → rename packages → toggle features → VERIFY
 Golden template (frozen, CI'd):   pinned versions · iOS shell · nav+insets · Clean Arch · DI · Appium
@@ -167,8 +169,8 @@ contents *and* paths, atomically renames package directories, toggles features (
 
 ## Roadmap
 
-- [ ] Secure the `create-cmp` npm name and publish (`npx create-cmp`).
-- [ ] Record the asciinema demo (`npx create-cmp` → green Android + iOS).
+- [ ] Publish to npm as `create-cmp-cli` (`npx create-cmp-cli`).
+- [ ] Record the asciinema demo (`npx create-cmp-cli` → green Android + iOS).
 - [ ] Full Android + iOS build matrix in CI (currently CI runs the engine unit tests).
 - [ ] More example features and nav shapes.
 

@@ -83,8 +83,8 @@ node <repo>/bin/create-cmp.mjs \
   --verify \
   --yes
 
-# Or, for any machine, via npm:
-npx create-cmp@latest --name "Acme" --package com.acme.app --yes
+# Or, for any machine, via npm (once published):
+npx create-cmp-cli@latest --name "Acme" --package com.acme.app --yes
 ```
 
 Notes:

@@ -1,10 +1,11 @@
 {
-  "name": "create-cmp",
+  "name": "create-cmp-cli",
   "version": "0.1.0",
-  "description": "Scaffold a production-ready Kotlin/Compose Multiplatform app (Android + iOS) that builds green in minutes — toolchain auto-bootstrapped, navigation/insets pre-solved, Clean Architecture wired, Appium harness ready.",
+  "description": "Scaffold a production-ready Kotlin/Compose Multiplatform app (Android + iOS) that builds green in minutes — toolchain auto-bootstrapped, navigation/insets pre-solved, Clean Architecture wired, Appium harness ready. Installs the `create-cmp` command.",
   "type": "module",
   "bin": {
-    "create-cmp": "bin/create-cmp.mjs"
+    "create-cmp": "bin/create-cmp.mjs",
+    "create-cmp-cli": "bin/create-cmp.mjs"
   },
   "engines": {
     "node": ">=18"
@@ -17,10 +18,12 @@
   ],
   "scripts": {
     "test": "node --test",
+    "prepublishOnly": "node --test",
     "doctor": "node bin/create-cmp.mjs doctor"
   },
   "keywords": [
     "create-cmp",
+    "create-cmp-cli",
     "compose-multiplatform",
     "kotlin-multiplatform",
     "kmp",
