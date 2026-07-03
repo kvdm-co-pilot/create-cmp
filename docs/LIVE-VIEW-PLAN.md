@@ -41,6 +41,24 @@ Rides on Phase 2's in-app debug server (port 9500, adb forward):
 - Doubles as the host for Track A's renderer and the inspector's Tier 0 (one module, three jobs).
 - Ships as a template module + `create-cmp add dev-client` for existing apps.
 
+## The verified dev loop (the product's core workflow — not just the demo)
+
+The demo sequence IS the daily development cycle. For any UI change in a create-cmp app:
+
+1. **Snapshot** — `snapshot_save` the current tree (live source) before editing.
+2. **Prompt → edit** — Claude changes the code.
+3. **Watch it change** — hot reload (dev-client) or reinstall (device); the human sees it in the
+   window / live view.
+4. **Prove it** — `prove_change { before: snapshot, after: live }` → one call returns the
+   structural diff (what actually changed), plus design-token drift and a11y regressions on the
+   after-state, with a verdict: `proven-clean` / `changed-with-regressions` / `no-change`.
+5. **Show it** — the structural diff is the proof-of-done; `render_tree` gives the human the
+   after-state wireframe.
+
+**A change without a `prove_change` verdict is not done.** This encodes the observe-don't-assume
+discipline into the tooling itself: the agent never claims "I changed it" — it demonstrates the
+change from the rendered tree, and demonstrates that nothing else regressed.
+
 ## Sequencing
 
 1. Phase 2 lands (in flight) → commit.
