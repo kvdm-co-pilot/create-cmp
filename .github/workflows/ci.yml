@@ -74,8 +74,10 @@ jobs:
     name: stamp + iOS xcodebuild
     runs-on: macos-15 # Apple Silicon — matches the arm64-only simulator build; newer image = newer default Xcode
     needs: test
-    # macOS minutes are expensive: main + manual only, never per-PR.
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # iOS CI is PARKED for now (founder call, 2026-07-03): manual-dispatch only.
+    # The leg is proven green (run 28683486610); re-enable per-push by restoring
+    # the `|| (push && main)` clause when iOS returns to scope.
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
