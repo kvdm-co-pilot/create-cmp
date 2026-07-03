@@ -1,9 +1,15 @@
 package __PACKAGE__.inspector
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
+import android.view.MotionEvent
+import androidx.core.view.drawToBitmap
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.InputStreamReader
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -12,19 +18,31 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.math.roundToInt
 
 /**
  * Debug-only, zero-dependency inspection server: a hand-rolled HTTP/1.1 responder over a
  * plain [ServerSocket]. Binds LOOPBACK ONLY (never on the LAN); the host reaches it via
  * `adb forward tcp:9500 tcp:9500`.
  *
- * Routes (all `application/json; charset=utf-8`, `Connection: close`):
- *   GET /inspect/health         → { status, schemaVersion, source, appId, buildType }
- *   GET /inspect/tree           → the semantics-tree contract document (source "live-android"),
- *                                 read from the topmost Compose root ON THE MAIN THREAD.
- *                                 503 while no Compose root is attached yet (cold start).
- *   GET /inspect/design-system  → the declared token catalog { colors, dimens }.
+ * Routes (JSON unless noted, `Connection: close`):
+ *   GET  /inspect/health         → { status, schemaVersion, source, appId, buildType }
+ *   GET  /inspect/tree           → the semantics-tree contract document (source "live-android"),
+ *                                  read from the topmost Compose root ON THE MAIN THREAD.
+ *                                  503 while no Compose root is attached yet (cold start).
+ *   GET  /inspect/design-system  → the declared token catalog { colors, dimens }.
+ *   GET  /inspect/screenshot     → PNG bytes of the current Compose root (`image/png`) —
+ *                                  pixels for the HUMAN's live view, never for model context.
+ *   POST /inspect/tap            → body {"x":<px>,"y":<px>} (root-relative px, exactly as the
+ *                                  tree's bounds report them) → dispatches a down+up MotionEvent
+ *                                  pair to the root view → {"tapped":true,"x":…,"y":…}.
+ *   GET  /inspect/remote         → the self-contained remote-control HTML page (same-origin,
+ *                                  zero CORS): live screenshot + click-to-tap in a browser.
  *
  * Single-threaded accept loop on a daemon thread = one client at a time = bounded by design.
  * Failure to bind logs a warning and gives up — the inspector must never crash or block
@@ -38,6 +56,14 @@ object InspectorHttpServer {
 
     // The main thread is busy during cold start (first setContent/layout) — be generous.
     private const val MAIN_THREAD_TIMEOUT_MS = 5_000L
+
+    // Gap between the synthetic ACTION_DOWN and ACTION_UP — a natural, unambiguous tap
+    // (well under the long-press timeout).
+    private const val TAP_UP_DELAY_MS = 50L
+
+    private const val JSON_TYPE = "application/json; charset=utf-8"
+    private const val HTML_TYPE = "text/html; charset=utf-8"
+    private const val PNG_TYPE = "image/png"
 
     @Volatile private var started = false
 
@@ -77,23 +103,54 @@ object InspectorHttpServer {
         client.soTimeout = 5_000
         val reader = BufferedReader(InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8))
         val requestLine = reader.readLine() ?: return
-        // Drain headers (we never need them).
+        // Drain headers; the only one we ever need is Content-Length (POST /inspect/tap).
+        var contentLength = 0
         while (true) {
             val line = reader.readLine() ?: break
             if (line.isEmpty()) break
+            if (line.startsWith("Content-Length:", ignoreCase = true)) {
+                contentLength = line.substringAfter(':').trim().toIntOrNull() ?: 0
+            }
         }
         val parts = requestLine.split(" ")
         val method = parts.getOrNull(0) ?: ""
         val path = (parts.getOrNull(1) ?: "").substringBefore('?')
 
-        val (status, body) = when {
-            method != "GET" -> 405 to errorJson("method not allowed")
-            path == "/inspect/health" -> 200 to healthJson(appId)
-            path == "/inspect/tree" -> treeResponse()
-            path == "/inspect/design-system" -> 200 to InspectorCatalog.json()
-            else -> 404 to errorJson("unknown path")
+        when {
+            method == "GET" && path == "/inspect/health" ->
+                writeJson(client, 200, healthJson(appId))
+            method == "GET" && path == "/inspect/tree" ->
+                treeResponse().let { (s, b) -> writeJson(client, s, b) }
+            method == "GET" && path == "/inspect/design-system" ->
+                writeJson(client, 200, InspectorCatalog.json())
+            method == "GET" && path == "/inspect/screenshot" ->
+                screenshotResponse(client)
+            method == "GET" && path == "/inspect/remote" ->
+                writeResponse(client, 200, RemoteControlPage.html(appId).toByteArray(StandardCharsets.UTF_8), HTML_TYPE)
+            method == "POST" && path == "/inspect/tap" ->
+                tapResponse(readBody(reader, contentLength)).let { (s, b) -> writeJson(client, s, b) }
+            method != "GET" && method != "POST" ->
+                writeJson(client, 405, errorJson("method not allowed"))
+            else ->
+                writeJson(client, 404, errorJson("unknown path"))
         }
-        writeResponse(client, status, body)
+    }
+
+    /**
+     * Read the request body. The stream is already wrapped in a UTF-8 reader, so we read
+     * [contentLength] CHARS — exact for the ASCII JSON `{"x":…,"y":…}` this route accepts
+     * (and never under-reads it), which is all this debug server needs.
+     */
+    private fun readBody(reader: BufferedReader, contentLength: Int): String {
+        if (contentLength <= 0) return ""
+        val buf = CharArray(contentLength.coerceAtMost(8_192))
+        var read = 0
+        while (read < buf.size) {
+            val n = reader.read(buf, read, buf.size - read)
+            if (n < 0) break
+            read += n
+        }
+        return String(buf, 0, read)
     }
 
     private fun healthJson(appId: String): String =
@@ -126,21 +183,133 @@ object InspectorHttpServer {
         }
     }
 
+    /**
+     * PNG of the current Compose root. The Bitmap is rendered on the MAIN thread (views are
+     * not thread-safe); PNG compression — tens of ms for a full screen — happens back on the
+     * server thread so the UI never pays for it.
+     */
+    private fun screenshotResponse(client: Socket) {
+        val root = ComposeRootRegistry.current()
+        if (root == null) {
+            writeJson(
+                client, 503,
+                errorJson("compose root not ready yet — no Compose root attached (cold start?). Retry shortly.")
+            )
+            return
+        }
+        val bitmapRef = AtomicReference<Bitmap?>()
+        val errorRef = AtomicReference<String?>()
+        val latch = CountDownLatch(1)
+        Handler(Looper.getMainLooper()).post {
+            try {
+                val view = root.view
+                bitmapRef.set(
+                    try {
+                        // androidx.core.view.drawToBitmap (core-ktx — already an androidMain dep).
+                        view.drawToBitmap()
+                    } catch (t: Throwable) {
+                        // Not laid out yet / hardware path refused — plain Canvas draw fallback.
+                        Bitmap.createBitmap(
+                            view.width.coerceAtLeast(1),
+                            view.height.coerceAtLeast(1),
+                            Bitmap.Config.ARGB_8888,
+                        ).also { view.draw(Canvas(it)) }
+                    }
+                )
+            } catch (t: Throwable) {
+                errorRef.set("failed to render screenshot: ${t.message}")
+            }
+            latch.countDown()
+        }
+        if (!latch.await(MAIN_THREAD_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            writeJson(client, 503, errorJson("main thread did not respond within ${MAIN_THREAD_TIMEOUT_MS}ms — app busy (cold start?). Retry."))
+            return
+        }
+        errorRef.get()?.let {
+            writeJson(client, 500, errorJson(it))
+            return
+        }
+        val bitmap = bitmapRef.get()
+        if (bitmap == null) {
+            writeJson(client, 500, errorJson("failed to render screenshot: no bitmap produced"))
+            return
+        }
+        val bytes = ByteArrayOutputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }
+        bitmap.recycle()
+        writeResponse(client, 200, bytes, PNG_TYPE)
+    }
+
+    /**
+     * Dispatch a synthetic tap (ACTION_DOWN, then ACTION_UP ~50ms later) to the topmost
+     * Compose root, on the MAIN thread. Coordinates are root-relative px — exactly the
+     * space the tree's `bounds` report, so callers can tap what they just inspected.
+     */
+    private fun tapResponse(body: String): Pair<Int, String> {
+        val (x, y) = try {
+            val obj = Json.parseToJsonElement(body).jsonObject
+            val px = obj["x"]?.jsonPrimitive?.floatOrNull
+            val py = obj["y"]?.jsonPrimitive?.floatOrNull
+            if (px == null || py == null) {
+                return 400 to errorJson("""tap body must be {"x":<px>,"y":<px>} (root-relative px).""")
+            }
+            px to py
+        } catch (t: Throwable) {
+            return 400 to errorJson("""tap body must be {"x":<px>,"y":<px>} (root-relative px).""")
+        }
+        val root = ComposeRootRegistry.current()
+            ?: return 503 to errorJson(
+                "compose root not ready yet — no Compose root attached (cold start?). Retry shortly."
+            )
+        val latch = CountDownLatch(1)
+        val handler = Handler(Looper.getMainLooper())
+        handler.post {
+            try {
+                val view = root.view
+                val downTime = SystemClock.uptimeMillis()
+                val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
+                view.dispatchTouchEvent(down)
+                down.recycle()
+                handler.postDelayed({
+                    try {
+                        val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, x, y, 0)
+                        view.dispatchTouchEvent(up)
+                        up.recycle()
+                    } finally {
+                        latch.countDown()
+                    }
+                }, TAP_UP_DELAY_MS)
+            } catch (t: Throwable) {
+                latch.countDown()
+            }
+        }
+        return if (latch.await(MAIN_THREAD_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            200 to """{"tapped":true,"x":${x.roundToInt()},"y":${y.roundToInt()}}"""
+        } else {
+            503 to errorJson("main thread did not respond within ${MAIN_THREAD_TIMEOUT_MS}ms — app busy (cold start?). Retry.")
+        }
+    }
+
     private fun errorJson(message: String): String =
         """{"error":${JsonPrimitive(message)}}"""
 
-    private fun writeResponse(client: Socket, status: Int, body: String) {
+    private fun writeJson(client: Socket, status: Int, body: String) =
+        writeResponse(client, status, body.toByteArray(StandardCharsets.UTF_8), JSON_TYPE)
+
+    private fun writeResponse(client: Socket, status: Int, bytes: ByteArray, contentType: String) {
         val reason = when (status) {
             200 -> "OK"
+            400 -> "Bad Request"
             404 -> "Not Found"
             405 -> "Method Not Allowed"
             503 -> "Service Unavailable"
             else -> "Internal Server Error"
         }
-        val bytes = body.toByteArray(StandardCharsets.UTF_8)
         val head = buildString {
             append("HTTP/1.1 ").append(status).append(' ').append(reason).append("\r\n")
-            append("Content-Type: application/json; charset=utf-8\r\n")
+            append("Content-Type: ").append(contentType).append("\r\n")
             append("Content-Length: ").append(bytes.size).append("\r\n")
             append("Connection: close\r\n")
             append("\r\n")

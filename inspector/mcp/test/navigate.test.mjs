@@ -1,0 +1,252 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import http from "node:http";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  resolveTapTarget,
+  navSummary,
+  navigateAndInspect,
+  writeLiveScreenshot,
+  DEFAULT_SETTLE_MS,
+} from "../src/lib/navigate.mjs";
+import { postTap, fetchLiveScreenshot } from "../src/lib/live.mjs";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const tinyPng = fs.readFileSync(path.join(here, "..", "fixtures", "tiny-2x2.png"));
+
+const node = (over = {}) => ({
+  testTag: null,
+  text: null,
+  contentDescription: null,
+  bounds: { x: 0, y: 0, width: 100, height: 40 },
+  designToken: null,
+  children: [],
+  ...over,
+});
+
+const homeTree = {
+  schemaVersion: 1,
+  source: "live-android",
+  root: node({
+    bounds: { x: 0, y: 0, width: 360, height: 800 },
+    children: [
+      node({ testTag: "home_title", text: "Home", bounds: { x: 16, y: 16, width: 328, height: 40 } }),
+      node({ text: "Card One", clickable: true, bounds: { x: 16, y: 72, width: 328, height: 80 } }),
+      node({ testTag: "app_bottom_nav", bounds: { x: 0, y: 728, width: 360, height: 72 } }),
+    ],
+  }),
+};
+
+const detailTree = {
+  schemaVersion: 1,
+  source: "live-android",
+  root: node({
+    bounds: { x: 0, y: 0, width: 360, height: 800 },
+    children: [
+      node({ text: "Detail", bounds: { x: 16, y: 16, width: 328, height: 40 } }),
+      node({ text: "Item id: 1", bounds: { x: 16, y: 64, width: 328, height: 24 } }),
+    ],
+  }),
+};
+
+// Stateful stub of the on-device inspector server: GET routes serve queued tree
+// payloads; POST /inspect/tap records the exact request (payload shape proof);
+// GET /inspect/screenshot serves real PNG bytes.
+function startStub({ trees = [], screenshot = tinyPng } = {}) {
+  const seen = { taps: [], treeFetches: 0 };
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      if (req.method === "GET" && req.url.startsWith("/inspect/tree")) {
+        const tree = trees[Math.min(seen.treeFetches, trees.length - 1)];
+        seen.treeFetches++;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(tree));
+        return;
+      }
+      if (req.method === "GET" && req.url.startsWith("/inspect/screenshot")) {
+        res.writeHead(200, { "Content-Type": "image/png" });
+        res.end(screenshot);
+        return;
+      }
+      if (req.method === "POST" && req.url === "/inspect/tap") {
+        let body = "";
+        req.on("data", (c) => (body += c));
+        req.on("end", () => {
+          seen.taps.push({ body, contentType: req.headers["content-type"] });
+          const { x, y } = JSON.parse(body);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ tapped: true, x, y }));
+        });
+        return;
+      }
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "unknown path" }));
+    });
+    server.listen(0, "127.0.0.1", () => resolve({ server, port: server.address().port, seen }));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// resolveTapTarget — coordinate resolution
+// ---------------------------------------------------------------------------
+
+test("resolveTapTarget: testTag resolves to the center of the node's bounds", () => {
+  const target = resolveTapTarget(homeTree, { testTag: "home_title" });
+  assert.deepEqual(target, { x: 16 + 328 / 2, y: 16 + 20, testTag: "home_title" });
+});
+
+test("resolveTapTarget: unknown testTag errors listing the available tags", () => {
+  assert.throws(
+    () => resolveTapTarget(homeTree, { testTag: "nope" }),
+    (err) => {
+      assert.match(err.message, /No node found with testTag 'nope'/);
+      assert.match(err.message, /Available tags: home_title, app_bottom_nav/);
+      return true;
+    }
+  );
+});
+
+test("resolveTapTarget: explicit x/y pass through (rounded)", () => {
+  assert.deepEqual(resolveTapTarget(homeTree, { x: 100.6, y: 40.2 }), { x: 101, y: 40 });
+});
+
+test("resolveTapTarget: neither testTag nor x/y is a clear error", () => {
+  assert.throws(() => resolveTapTarget(homeTree, {}), /either `testTag`.*or explicit numeric `x` and `y`/s);
+  assert.throws(() => resolveTapTarget(homeTree, { x: 10 }), /`x` and `y`/);
+});
+
+test("navSummary: tags, textSample and nodeCount", () => {
+  const s = navSummary(homeTree);
+  assert.deepEqual(s.tags, ["home_title", "app_bottom_nav"]);
+  assert.deepEqual(s.textSample, ["Home", "Card One"]);
+  assert.equal(s.nodeCount, 4);
+});
+
+// ---------------------------------------------------------------------------
+// navigateAndInspect — the full loop against the stub
+// ---------------------------------------------------------------------------
+
+test("navigateAndInspect: taps by tag, waits settleMs, reports before/after and changed:true", async () => {
+  const { server, port, seen } = await startStub({ trees: [homeTree, detailTree] });
+  const slept = [];
+  try {
+    const result = await navigateAndInspect({
+      testTag: "home_title",
+      port,
+      settleMs: 5,
+      sleep: (ms) => (slept.push(ms), Promise.resolve()),
+    });
+    assert.deepEqual(result.tapped, { x: 180, y: 36, testTag: "home_title" });
+    assert.deepEqual(slept, [5], "waits exactly settleMs between tap and re-fetch");
+    assert.equal(seen.treeFetches, 2, "one tree fetch before, one after");
+    assert.deepEqual(result.before.tags, ["home_title", "app_bottom_nav"]);
+    assert.deepEqual(result.after.textSample, ["Detail", "Item id: 1"]);
+    assert.equal(result.after.nodeCount, 3);
+    assert.equal(result.changed, true);
+  } finally {
+    server.close();
+  }
+});
+
+test("navigateAndInspect: POST /inspect/tap payload is exactly {x,y} JSON", async () => {
+  const { server, port, seen } = await startStub({ trees: [homeTree, detailTree] });
+  try {
+    await navigateAndInspect({ x: 120, y: 340, port, settleMs: 0, sleep: () => Promise.resolve() });
+    assert.equal(seen.taps.length, 1);
+    assert.match(seen.taps[0].contentType, /application\/json/);
+    assert.deepEqual(JSON.parse(seen.taps[0].body), { x: 120, y: 340 });
+  } finally {
+    server.close();
+  }
+});
+
+test("navigateAndInspect: identical tree after the tap reports changed:false", async () => {
+  const { server, port } = await startStub({ trees: [homeTree, homeTree] });
+  try {
+    const result = await navigateAndInspect({
+      testTag: "app_bottom_nav",
+      port,
+      settleMs: 0,
+      sleep: () => Promise.resolve(),
+    });
+    assert.equal(result.changed, false);
+  } finally {
+    server.close();
+  }
+});
+
+test("navigateAndInspect: default settleMs is 1500", async () => {
+  const { server, port } = await startStub({ trees: [homeTree, detailTree] });
+  const slept = [];
+  try {
+    await navigateAndInspect({ x: 1, y: 1, port, sleep: (ms) => (slept.push(ms), Promise.resolve()) });
+    assert.deepEqual(slept, [DEFAULT_SETTLE_MS]);
+    assert.equal(DEFAULT_SETTLE_MS, 1500);
+  } finally {
+    server.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// live screenshot — path-only pixel contract
+// ---------------------------------------------------------------------------
+
+test("writeLiveScreenshot: writes the PNG to `out` and returns path-only metadata (no bytes)", async () => {
+  const { server, port } = await startStub({});
+  const out = path.join(os.tmpdir(), `cmp-nav-test-${Date.now()}`, "live.png");
+  try {
+    const meta = await writeLiveScreenshot({ port, out });
+    assert.equal(meta.path, path.resolve(out));
+    assert.equal(meta.width, 2);
+    assert.equal(meta.height, 2);
+    assert.equal(meta.sizeBytes, tinyPng.length);
+    assert.deepEqual(
+      Object.keys(meta).sort(),
+      ["height", "path", "sizeBytes", "width"],
+      "metadata only — never bytes/base64"
+    );
+    assert.ok(fs.readFileSync(out).equals(tinyPng), "file on disk is the exact PNG served");
+  } finally {
+    server.close();
+    fs.rmSync(path.dirname(out), { recursive: true, force: true });
+  }
+});
+
+test("writeLiveScreenshot: defaults to a temp file when out is omitted", async () => {
+  const { server, port } = await startStub({});
+  try {
+    const meta = await writeLiveScreenshot({ port });
+    assert.ok(meta.path.includes("cmp-inspector"), "temp path under a cmp-inspector dir");
+    assert.equal(meta.width, 2);
+    fs.rmSync(meta.path, { force: true });
+  } finally {
+    server.close();
+  }
+});
+
+test("fetchLiveScreenshot: non-PNG error responses surface the server's JSON error", async () => {
+  const seen = await new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "compose root not ready yet — retry shortly." }));
+    });
+    server.listen(0, "127.0.0.1", () => resolve({ server, port: server.address().port }));
+  });
+  try {
+    await assert.rejects(
+      () => fetchLiveScreenshot({ port: seen.port }),
+      /live inspector not ready: compose root not ready/
+    );
+  } finally {
+    seen.server.close();
+  }
+});
+
+test("postTap: rejects non-numeric coordinates before any network call", () => {
+  assert.throws(() => postTap({ x: "12", y: 5 }), /numeric x and y/);
+  assert.throws(() => postTap({ x: 12 }), /numeric x and y/);
+});

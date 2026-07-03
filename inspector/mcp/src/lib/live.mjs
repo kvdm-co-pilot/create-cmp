@@ -34,14 +34,13 @@ export function validateSerial(serial) {
   return s;
 }
 
-async function fetchJson(pathName, { host = DEFAULT_HOST, port = DEFAULT_PORT, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl } = {}) {
+async function fetchRaw(pathName, init, { host = DEFAULT_HOST, port = DEFAULT_PORT, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl } = {}) {
   const doFetch = fetchImpl || fetch;
   const url = `http://${host}:${validatePort(port)}${pathName}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  let res;
   try {
-    res = await doFetch(url, { signal: controller.signal });
+    return { url, res: await doFetch(url, { ...init, signal: controller.signal }) };
   } catch (err) {
     const cause = err && err.cause && err.cause.code ? ` (${err.cause.code})` : "";
     const reason = err && err.name === "AbortError"
@@ -55,6 +54,10 @@ async function fetchJson(pathName, { host = DEFAULT_HOST, port = DEFAULT_PORT, t
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchJson(pathName, opts = {}, init = undefined) {
+  const { url, res } = await fetchRaw(pathName, init, opts);
 
   let body;
   const text = await res.text();
@@ -87,4 +90,43 @@ export function fetchLiveTree(opts = {}) {
 /** GET /inspect/design-system → the declared catalog { colors, dimens }. */
 export function fetchLiveCatalog(opts = {}) {
   return fetchJson("/inspect/design-system", opts);
+}
+
+/**
+ * GET /inspect/screenshot → the raw PNG bytes as a Buffer.
+ *
+ * TRANSPORT ONLY — callers must write the bytes to a FILE and hand back the path
+ * (pixels flow to the HUMAN, never into model context). Non-200 responses carry a
+ * JSON {error} body, which is surfaced as a clean Error.
+ */
+export async function fetchLiveScreenshot(opts = {}) {
+  const { url, res } = await fetchRaw("/inspect/screenshot", undefined, opts);
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = JSON.parse(await res.text());
+      if (body && body.error) detail = body.error;
+    } catch {
+      /* keep the status-code detail */
+    }
+    if (res.status === 503) throw new Error(`live inspector not ready: ${detail}`);
+    throw new Error(`live inspector error at ${url}: ${detail}`);
+  }
+  return Buffer.from(await res.arrayBuffer());
+}
+
+/**
+ * POST /inspect/tap with {"x":<px>,"y":<px>} (root-relative px, the same space the
+ * tree's bounds report) → {"tapped":true,"x":…,"y":…}. HTTP, not adb — one less
+ * host dependency for driving the app.
+ */
+export function postTap({ x, y, ...opts } = {}) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    throw new Error(`postTap requires numeric x and y (got x=${x}, y=${y}).`);
+  }
+  return fetchJson("/inspect/tap", opts, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ x, y }),
+  });
 }

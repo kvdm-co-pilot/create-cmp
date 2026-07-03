@@ -14,7 +14,9 @@ description: >-
   with the harness (tier 0) or connect to the RUNNING debug app's live endpoint (tier 1:
   connect_live + source {kind:"live"} — real data, real nav state), then query with the
   cmp-inspector MCP tools (get_node, assert_token, layout_gaps, diff_against_design_system,
-  find_drift, snapshot_save, snapshot_diff, audit_a11y, render_tree, render_screen, prove_change).
+  find_drift, snapshot_save, snapshot_diff, audit_a11y, render_tree, render_screen, prove_change,
+  navigate_and_inspect). Also covers "drive the running app", "tap the app and check the screen",
+  "let me watch/click the app from my browser" (connect_live's remoteUrl live device view).
   Asserts on the rendered STRUCTURE, not pixels — catches token drift (raw values where a token
   belongs), layout faults, UI regressions, and a11y faults mechanically — and proves every UI
   change with prove_change (the verified dev loop).
@@ -106,7 +108,8 @@ old trees): `role` (`"Button"`, `"Checkbox"`, … or null), `clickable` (has an 
 | `snapshot_save` | write the normalized tree as a **golden-tree snapshot** (commit it — it's the regression fixture) |
 | `snapshot_diff` | structurally diff the current tree vs a golden: `{path, kind, before, after}` entries; empty = pass |
 | `audit_a11y` | audit touch targets (< 48px clickables), missing labels on clickables, empty contentDescription |
-| `connect_live` | tier-1 handshake: one bounded `adb forward` + `/inspect/health`; sets the session default source |
+| `connect_live` | tier-1 handshake: one bounded `adb forward` + `/inspect/health`; sets the session default source and returns the human's `remoteUrl` live view |
+| `navigate_and_inspect` | tap the RUNNING app (coords resolved from the live tree by `testTag`, or explicit x/y) via POST /inspect/tap, wait, re-fetch → `{ tapped, before, after, changed }` |
 | `render_tree` | draw the tree as a deterministic **SVG wireframe** (any source, incl. live) — structure you AND the human can see |
 | `render_screen` | pixel preview with a **path-only contract** — returns the PNG's path + metadata, never bytes; for the HUMAN |
 | `prove_change` | the verified dev loop: diff a BEFORE tree vs an AFTER tree + regression-check drift/a11y → one verdict |
@@ -143,10 +146,40 @@ raw hex where `Surface` belongs, or a `24dp` radius where `RadiusCard` is `16dp`
    file itself is human-readable JSON, unlike a pixel snapshot.
 
 **"What is the running app actually showing? / did navigation work?"** — the tier-1 loop:
-`connect_live`, then `inspect_tree` (no `source` needed — session default). Drive the app (Appium
-MCP tap / `adb shell input tap` on coordinates read FROM THE LIVE TREE's bounds), then
-`inspect_tree` again and assert the structural change: the old screen's testTag/text is gone, the
-new screen's content is present. Real navigation state, observed live, zero screenshots.
+`connect_live`, then `inspect_tree` (no `source` needed — session default). Drive the app with
+`navigate_and_inspect` (below — one tool call taps AND re-inspects), or Appium MCP / `adb shell
+input tap` when you need gestures beyond a tap, then assert the structural change: the old
+screen's testTag/text is gone, the new screen's content is present. Real navigation state,
+observed live, zero screenshots.
+
+## Drive it — the live device view (human) + navigate_and_inspect (agent)
+
+Track B of Live View: the human watches and drives the REAL app from a browser while you assert
+on the tree — same app, two audiences, zero pixels in model context.
+
+1. **`connect_live`** — its result now includes `remoteUrl`
+   (`http://127.0.0.1:9500/inspect/remote`). **Offer to open it for the human** (e.g. `open
+   <remoteUrl>` on macOS): it is a self-contained live device view — the current screen re-fetched
+   ~every 700ms, and clicking the image taps the real device (click coords are scaled to device px
+   and POSTed to `/inspect/tap`). Do NOT fetch or read that page's screenshot yourself.
+2. **You navigate structurally** with **`navigate_and_inspect { testTag?, x?, y?, settleMs? }`**:
+   it resolves the tap point FROM THE LIVE TREE (center of `testTag`'s bounds — a not-found error
+   lists the available tags; or pass explicit root-relative `x`/`y` read from any node's bounds),
+   delivers the tap over HTTP (`POST /inspect/tap` — no adb shell needed), waits `settleMs`
+   (default 1500), re-fetches the tree, and returns
+   `{ tapped, before:{tags,textSample,nodeCount}, after:{…}, changed }`. Assert on it: `changed:
+   true` plus the new screen's tags/text in `after` IS the navigation proof.
+3. **Prove edits as usual** — `snapshot_save` → edit → reload → `prove_change` — while the human
+   literally watches the change land in the remote view.
+4. **Live pixels for the human**: `render_screen { source: {kind:"live"} }` captures the CURRENT
+   device screen via `GET /inspect/screenshot` and writes it to a file (`out` optional), returning
+   the same path-only metadata as ever — never bytes.
+
+The `/inspect/screenshot`, `/inspect/tap` and `/inspect/remote` routes carry the same guarantees
+as the rest of the inspector server: **debug builds only** (androidDebug source set — structurally
+absent from release), **loopback only**, reached through one bounded `adb forward`. And the
+no-pixels rule holds: the screenshot route exists so pixels can flow to the HUMAN's browser/disk;
+your reasoning stays on `inspect_tree` / `render_tree` / `navigate_and_inspect`.
 
 **"Audit accessibility"** — `audit_a11y { treePath }`. Violations: `touch-target-too-small`
 (clickable under `minTouchTargetPx`, default 48 — harness dumps are density-1 so px == dp there;

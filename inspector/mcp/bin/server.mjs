@@ -28,7 +28,8 @@ import {
   resolveCatalog,
   requireInstrumentedTree,
 } from "../src/lib/source.mjs";
-import { fetchHealth, validatePort, validateSerial } from "../src/lib/live.mjs";
+import { fetchHealth, validatePort, validateSerial, DEFAULT_HOST } from "../src/lib/live.mjs";
+import { navigateAndInspect, writeLiveScreenshot, DEFAULT_SETTLE_MS } from "../src/lib/navigate.mjs";
 import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
 import { readPngMeta } from "../src/lib/png.mjs";
 import { proveChange } from "../src/lib/prove.mjs";
@@ -98,7 +99,7 @@ function guarded(fn) {
 
 const server = new McpServer({
   name: "cmp-inspector",
-  version: "0.3.0",
+  version: "0.4.0",
 });
 
 const treePathArg = z
@@ -388,7 +389,54 @@ server.registerTool(
       forwarded: `tcp:${p} -> tcp:${p}`,
       sessionDefaultSource,
       health,
+      remoteUrl: `http://127.0.0.1:${p}/inspect/remote`,
+      remoteUrlHint:
+        "Offer to open remoteUrl in the HUMAN's browser — it is the live device view: they " +
+        "watch and click-to-drive the real app while you inspect the tree (navigate_and_inspect / " +
+        "prove_change). Do not fetch it yourself.",
     });
+  })
+);
+
+server.registerTool(
+  "navigate_and_inspect",
+  {
+    title: "Tap the running app and re-inspect (the navigation primitive)",
+    description:
+      "Drive the LIVE app one tap at a time, no pixels needed: resolves the tap point from the live " +
+      "tree (center of `testTag`'s bounds — or pass explicit root-relative `x`/`y` read from bounds), " +
+      "delivers it via the inspector's POST /inspect/tap (HTTP, not adb), waits `settleMs` for the UI " +
+      "to settle, then re-fetches the tree. Returns { tapped:{x,y,testTag?}, before:{tags,textSample," +
+      "nodeCount}, after:{tags,textSample,nodeCount}, changed } — assert the navigation structurally " +
+      "(old screen's tags gone, new content present). Requires connect_live (or a reachable forward).",
+    inputSchema: {
+      testTag: z
+        .string()
+        .optional()
+        .describe("Tap the center of this node's bounds (resolved from the live tree)."),
+      x: z.number().optional().describe("Explicit tap x in root-relative px (with `y`, instead of testTag)."),
+      y: z.number().optional().describe("Explicit tap y in root-relative px (with `x`, instead of testTag)."),
+      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
+      settleMs: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(`How long to wait after the tap before re-fetching the tree (default ${DEFAULT_SETTLE_MS}ms).`),
+    },
+  },
+  guarded(async ({ testTag, x, y, port, settleMs }) => {
+    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
+    return ok(
+      await navigateAndInspect({
+        testTag,
+        x,
+        y,
+        host: live.host || DEFAULT_HOST,
+        port: validatePort(port ?? live.port),
+        settleMs,
+      })
+    );
   })
 );
 
@@ -461,12 +509,26 @@ server.registerTool(
   {
     title: "Render the screen as pixels (path-only, for the human)",
     description:
-      "Tier 0 pixel preview with a PATH-ONLY contract: returns { path, width, height, sizeBytes, " +
+      "Pixel preview with a PATH-ONLY contract: returns { path, width, height, sizeBytes, " +
       "displayHint } parsed from the PNG header — NEVER the image bytes/base64 (pixels flow to the " +
-      "human, structure flows to the AI). Pass `pngPath` for a PNG the harness already produced, or " +
-      "`harness:true` to run the headless harness (`./gradlew run`) which renders the sample screen " +
-      "to out/screen.png alongside its tree. Pair it with render_tree for the structural twin.",
+      "human, structure flows to the AI). Sources: `source:{kind:'live',port?}` fetches the RUNNING " +
+      "app's current screen from GET /inspect/screenshot and writes it to `out` (or a temp file); " +
+      "`pngPath` points at a PNG the harness already produced; `harness:true` runs the headless " +
+      "harness (`./gradlew run`) which renders the sample screen to out/screen.png alongside its " +
+      "tree. Pair it with render_tree for the structural twin.",
     inputSchema: {
+      source: z
+        .object({
+          kind: z.literal("live"),
+          host: z.string().optional().describe("Inspector host (default 127.0.0.1)."),
+          port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
+        })
+        .optional()
+        .describe("Tier 1: capture the RUNNING app's screen via GET /inspect/screenshot."),
+      out: z
+        .string()
+        .optional()
+        .describe("Where to write a live capture (default: a temp file). Ignored for pngPath/harness."),
       pngPath: z.string().optional().describe("Path to an existing PNG (e.g. the harness's out/screen.png)."),
       harness: z
         .boolean()
@@ -478,13 +540,22 @@ server.registerTool(
         .describe("Harness project directory (default: the create-cmp checkout's inspector/harness)."),
     },
   },
-  guarded(async ({ pngPath, harness, harnessDir }) => {
+  guarded(async ({ source, out, pngPath, harness, harnessDir }) => {
+    if (source && source.kind === "live") {
+      const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
+      const meta = await writeLiveScreenshot({
+        host: source.host || live.host || DEFAULT_HOST,
+        port: validatePort(source.port ?? live.port),
+        out,
+      });
+      return ok({ ...meta, displayHint: RENDER_SCREEN_DISPLAY_HINT });
+    }
     let target = pngPath;
     if (!target) {
       if (!harness) {
         return fail(
-          "render_screen needs either `pngPath` (an existing PNG) or `harness:true` " +
-            "(run the tier-0 headless harness to produce one)."
+          "render_screen needs `source:{kind:'live'}` (capture the running app), `pngPath` " +
+            "(an existing PNG), or `harness:true` (run the tier-0 headless harness to produce one)."
         );
       }
       const dir = resolvePath(harnessDir || DEFAULT_HARNESS_DIR);
