@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import __PACKAGE__.presentation.theme.designToken
 
 /**
  * The insets moat, pre-solved. Every screen wraps its content in [BaseScreen] instead of
@@ -51,6 +52,16 @@ fun BaseScreen(
                 .consumeWindowInsets(innerPadding)
                 .then(if (applyStatusBarPadding) Modifier.statusBarsPadding() else Modifier)
                 .then(if (applyNavBarPadding) Modifier.navigationBarsPadding() else Modifier)
+                // Inspector: self-report the inset facts this Box actually applies. No dimen
+                // token is used here — the padding comes from Scaffold insets, not the design
+                // system — so the tokens list is empty and only the resolved facts are emitted.
+                .designToken(
+                    tokens = emptyList(),
+                    resolved = mapOf(
+                        "statusBarPadding" to applyStatusBarPadding.toString(),
+                        "navBarPadding" to applyNavBarPadding.toString(),
+                    ),
+                )
         ) {
             content(innerPadding)
         }

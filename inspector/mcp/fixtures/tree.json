@@ -28,6 +28,9 @@
         "testTag": "card_one",
         "text": null,
         "contentDescription": "First card",
+        "role": "Button",
+        "clickable": true,
+        "disabled": false,
         "bounds": { "x": 16, "y": 100, "width": 328, "height": 120 },
         "designToken": {
           "tokens": ["Surface", "RadiusCard"],
@@ -48,6 +51,9 @@
         "testTag": "card_two",
         "text": null,
         "contentDescription": "Second card",
+        "role": "Button",
+        "clickable": true,
+        "disabled": true,
         "bounds": { "x": 16, "y": 240, "width": 328, "height": 120 },
         "designToken": {
           "tokens": ["Surface", "RadiusCard"],

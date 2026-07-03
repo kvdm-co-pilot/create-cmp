@@ -13,12 +13,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
+import __PACKAGE__.presentation.theme.designToken
 
 // Feature stub. Copy the `home` feature's data→domain→presentation→DI wiring to flesh this out.
 @Composable
 fun ProfileScreen() {
     Column(
-        modifier = Modifier.fillMaxSize().padding(__THEME_PREFIX__Tokens.PaddingPage),
+        modifier = Modifier
+            .fillMaxSize()
+            .designToken(
+                tokens = listOf("PaddingPage"),
+                resolved = mapOf("padding" to "16dp"),
+            )
+            .padding(__THEME_PREFIX__Tokens.PaddingPage),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.Start,
     ) {

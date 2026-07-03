@@ -15,7 +15,10 @@ import { z } from "zod";
 import { loadTree, walk } from "../src/lib/tree.mjs";
 import { getNode, assertToken, layoutGaps } from "../src/lib/query.mjs";
 import { findDrift, diffAgainstDesignSystem } from "../src/lib/drift.mjs";
-import { readFileSync } from "node:fs";
+import { normalizeTree, diffTrees } from "../src/lib/snapshot.mjs";
+import { auditA11y } from "../src/lib/a11y.mjs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -212,6 +215,83 @@ server.registerTool(
     const tree = resolveTree(treePath);
     const drift = findDrift(tree);
     return ok({ clean: drift.length === 0, driftCount: drift.length, drift });
+  })
+);
+
+server.registerTool(
+  "snapshot_save",
+  {
+    title: "Save a golden-tree snapshot",
+    description:
+      "Normalize the current tree (round bounds to integers, drop `source`, sort designToken.resolved keys) " +
+      "and write it to `snapshotPath` as the golden regression file. Commit the golden: diffs against it are " +
+      "human-readable JSON, not pixels.",
+    inputSchema: {
+      treePath: treePathArg,
+      snapshotPath: z.string().describe("Where to write the normalized golden snapshot JSON."),
+    },
+  },
+  guarded(async ({ treePath, snapshotPath }) => {
+    const tree = resolveTree(treePath);
+    const normalized = normalizeTree(tree);
+    const dir = dirname(snapshotPath);
+    if (dir && dir !== ".") mkdirSync(dir, { recursive: true });
+    writeFileSync(snapshotPath, JSON.stringify(normalized, null, 2) + "\n");
+    return ok({ saved: true, snapshotPath, summary: summarize(normalized) });
+  })
+);
+
+server.registerTool(
+  "snapshot_diff",
+  {
+    title: "Diff the current tree against a golden snapshot",
+    description:
+      "Structurally compare the current tree with a saved golden: node added/removed (by path), text/testTag/" +
+      "contentDescription changed, designToken changed, role/clickable/disabled changed, bounds moved beyond " +
+      "`tolerancePx` (default 1). Returns { pass, diffCount, diffs:[{path, kind, before, after}] }; empty diffs = pass. " +
+      "This is the CI regression primitive — JSON diffs instead of pixel flakiness.",
+    inputSchema: {
+      treePath: treePathArg,
+      snapshotPath: z.string().describe("Path to the golden snapshot written by snapshot_save."),
+      tolerancePx: z
+        .number()
+        .min(0)
+        .optional()
+        .describe("Max allowed bounds movement per axis in px before a 'bounds-moved' diff (default 1)."),
+    },
+  },
+  guarded(async ({ treePath, snapshotPath, tolerancePx }) => {
+    const tree = resolveTree(treePath);
+    const golden = loadTree(snapshotPath);
+    const diffs = diffTrees(tree, golden, tolerancePx ?? 1);
+    return ok({ pass: diffs.length === 0, diffCount: diffs.length, diffs });
+  })
+);
+
+server.registerTool(
+  "audit_a11y",
+  {
+    title: "Audit the tree for accessibility faults",
+    description:
+      "Check every node: clickable nodes smaller than `minTouchTargetPx` (default 48) in width or height, " +
+      "clickable nodes with no text/contentDescription/descendant text (missing label), and empty-string " +
+      "contentDescription (warning). Returns { violations:[{path,testTag,rule,detail,bounds}], warnings, " +
+      "warningCount, passCount }. Note: the headless harness dumps at density 1, so px == dp there; pass a " +
+      "device-density-scaled minTouchTargetPx for on-device trees. Old trees without the optional " +
+      "clickable/role fields are skipped gracefully.",
+    inputSchema: {
+      treePath: treePathArg,
+      minTouchTargetPx: z
+        .number()
+        .positive()
+        .optional()
+        .describe("Minimum touch-target size in px (default 48; px == dp on density-1 harness output)."),
+    },
+  },
+  guarded(async ({ treePath, minTouchTargetPx }) => {
+    const tree = resolveTree(treePath);
+    const result = auditA11y(tree, { minTouchTargetPx });
+    return ok({ pass: result.violations.length === 0, violationCount: result.violations.length, ...result });
   })
 );
 

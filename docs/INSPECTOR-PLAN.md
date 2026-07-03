@@ -1,12 +1,17 @@
 # create-cmp Inspector — plan of record
 
-> **Status:** **Phase 0 built + verified (2026-07-03).** The headless render → semantics-dump →
-> structured-inspect loop works end-to-end on the host JVM (no emulator): a Compose Desktop harness
-> (`inspector/harness/`) renders a screen and emits the design-token-annotated semantics tree as
-> JSON; the `cmp-inspector` MCP (`inspector/mcp/`) consumes it and exposes six query/assert/drift
-> tools. Phases 1–3 remain proposed. Scope for now is **Android + host-JVM only** — iOS is
-> explicitly deferred. Companion docs: [`ARCHITECTURE.md`](./ARCHITECTURE.md) (the scaffolder
-> engine), and the internal strategy notes (not in the public repo).
+> **Status:** **Phase 0 built + verified (2026-07-03). Phase 1 (template token-annotation) +
+> contract extension + golden-tree snapshots + a11y audit built + verified (2026-07-03).** The
+> headless render → semantics-dump → structured-inspect loop works end-to-end on the host JVM (no
+> emulator): a Compose Desktop harness (`inspector/harness/`) renders a screen and emits the
+> design-token-annotated semantics tree as JSON; the `cmp-inspector` MCP (`inspector/mcp/`)
+> consumes it and exposes nine query/assert/drift/snapshot/a11y tools. The node contract carries
+> optional `role`/`clickable`/`disabled` fields (additive, schemaVersion 1), the template kit
+> (BaseScreen/AppShell/Home/Detail/Profile) self-reports design tokens by default, and
+> `snapshot_save`/`snapshot_diff`/`audit_a11y` provide the pixel-free regression + accessibility
+> gates (39/39 MCP tests green). Phases 2–3 remain proposed. Scope for now is **Android +
+> host-JVM only** — iOS is explicitly deferred. Companion docs: [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+> (the scaffolder engine), and the internal strategy notes (not in the public repo).
 
 ## The problem
 
@@ -113,8 +118,24 @@ platform coupling are inspected on Tier 1 instead.
   / `find_drift`. Proven end-to-end: fresh render → MCP verifies padding=16dp, measures the 12dp card
   gap, reports a clean design-system diff, and flags un-tokenized nodes. No emulator, no device.
   21/21 MCP tests green.
-- **Phase 1 — token-enriched semantics** in the generated Kit + `diff_against_design_system` /
-  `find_drift`. The dump becomes design-system-aware. Catches drift.
+- **Phase 1 — token-enriched semantics in the generated Kit. ✅ BUILT + VERIFIED (2026-07-03).**
+  The template kit self-reports tokens by default: `BaseScreen` emits its inset facts,
+  `AppShell`'s bottom nav emits `BottomNavHeight` (+ stable `app_bottom_nav` testTag + 48dp-minimum
+  nav tap targets), `HomeScreen`/`DetailScreen`/`ProfileScreen` emit `PaddingPage`/card tokens —
+  so every generated app is design-system-aware out of the box. Compile-correctness proven via
+  concrete-package mirrors in the harness (`SampleScreen.kt` build green), as in Phase 0.
+  Built alongside it (same date):
+  - **Contract extension (additive, schemaVersion 1):** optional `role` / `clickable` / `disabled`
+    node fields, emitted by the harness from the semantics Role / OnClick / Disabled properties.
+  - **Golden-tree snapshots** (`snapshot_save` / `snapshot_diff` + `src/lib/snapshot.mjs`): commit
+    the normalized semantics JSON as the regression fixture; diffs are human-readable
+    `{path, kind, before, after}` entries (node added/removed, text/testTag/designToken/interaction
+    changed, bounds moved beyond a px tolerance) — the CI regression primitive, no pixels.
+    Verified: two independent harness renders diff EMPTY against the saved golden.
+  - **A11y auditor** (`audit_a11y` + `src/lib/a11y.mjs`): touch targets below 48px (density-1 px==dp
+    on harness output; parameterizable for device trees), clickables with no label anywhere, empty
+    contentDescription. Its first real catch: the template's bottom-nav tap targets measured ~36px
+    tall — fixed in the kit with `defaultMinSize(48.dp)` and re-verified clean.
 - **Phase 2 — live on-device inspector.** Same JSON schema, sourced from the app's debug Ktor
   endpoint over `adb forward`. Inspect the real app with real data and real navigation state.
 - **Phase 3 — ship as the `cmp-inspector` plugin** — MCP server + a driving skill + the template's

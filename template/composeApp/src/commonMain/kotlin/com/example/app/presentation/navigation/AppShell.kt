@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,12 +24,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import __PACKAGE__.presentation.components.BaseScreen
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Colors
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
+import __PACKAGE__.presentation.theme.designToken
 
 /**
  * Generic bottom-nav shell. Parameterized by a [tabs] list — NOT role-hardcoded.
@@ -76,6 +80,12 @@ private fun AppBottomNav(
                 // Lift tabs above the gesture pill / 3-button nav (maps to iOS safe area).
                 .navigationBarsPadding()
                 .height(__THEME_PREFIX__Tokens.BottomNavHeight)
+                // Inspector: the bottom-nav container self-reports its height token.
+                .designToken(
+                    tokens = listOf("BottomNavHeight"),
+                    resolved = mapOf("height" to "72dp"),
+                )
+                .semantics { testTag = "app_bottom_nav" }
                 .padding(bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -110,6 +120,9 @@ private fun NavItem(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
+            // a11y: guarantee the 48dp minimum touch target regardless of label width
+            // (the inspector's audit_a11y flags anything smaller).
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

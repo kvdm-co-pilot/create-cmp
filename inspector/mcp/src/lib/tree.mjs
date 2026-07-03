@@ -6,6 +6,12 @@
 //   Node = { testTag, text, contentDescription, bounds:{x,y,width,height},
 //            designToken: { tokens:string[], resolved:{[k]:string} } | null,
 //            children: Node[] }
+//
+// Additive optional fields (still schemaVersion 1 — absent on old trees, so every
+// consumer must treat them as optional):
+//   role:      string|null  — semantics Role (e.g. "Button", "Checkbox")
+//   clickable: boolean      — presence of the OnClick semantics action
+//   disabled:  boolean      — presence of the Disabled semantics property
 
 import { readFileSync } from "node:fs";
 

@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import __PACKAGE__.presentation.components.BaseScreen
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
+import __PACKAGE__.presentation.theme.designToken
 
 @Composable
 fun DetailScreen(
@@ -17,7 +18,15 @@ fun DetailScreen(
     onBack: () -> Unit,
 ) {
     BaseScreen {
-        Column(Modifier.fillMaxSize().padding(__THEME_PREFIX__Tokens.PaddingPage)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .designToken(
+                    tokens = listOf("PaddingPage"),
+                    resolved = mapOf("padding" to "16dp"),
+                )
+                .padding(__THEME_PREFIX__Tokens.PaddingPage),
+        ) {
             TextButton(onClick = onBack) { Text("← Back") }
             Text("Detail", style = MaterialTheme.typography.headlineMedium)
             Text(

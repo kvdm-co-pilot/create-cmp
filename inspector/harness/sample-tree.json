@@ -5,6 +5,9 @@
         "testTag": null,
         "text": null,
         "contentDescription": null,
+        "role": null,
+        "clickable": false,
+        "disabled": false,
         "bounds": {
             "x": 0,
             "y": 0,
@@ -17,83 +20,215 @@
                 "testTag": null,
                 "text": null,
                 "contentDescription": null,
+                "role": null,
+                "clickable": false,
+                "disabled": false,
                 "bounds": {
                     "x": 0,
                     "y": 0,
                     "width": 1024,
                     "height": 768
                 },
-                "designToken": {
-                    "tokens": [
-                        "PaddingPage"
-                    ],
-                    "resolved": {
-                        "padding": "16dp"
-                    }
-                },
+                "designToken": null,
                 "children": [
-                    {
-                        "testTag": "home_title",
-                        "text": "Home",
-                        "contentDescription": null,
-                        "bounds": {
-                            "x": 16,
-                            "y": 16,
-                            "width": 78,
-                            "height": 48
-                        },
-                        "designToken": null,
-                        "children": []
-                    },
                     {
                         "testTag": null,
                         "text": null,
                         "contentDescription": null,
+                        "role": null,
+                        "clickable": false,
+                        "disabled": false,
                         "bounds": {
-                            "x": 16,
-                            "y": 76,
-                            "width": 992,
-                            "height": 76
+                            "x": 0,
+                            "y": 0,
+                            "width": 1024,
+                            "height": 695
                         },
                         "designToken": {
-                            "tokens": [
-                                "RadiusCard",
-                                "ElevationCard",
-                                "PaddingCard"
-                            ],
+                            "tokens": [],
                             "resolved": {
-                                "radius": "16dp",
-                                "elevation": "2dp",
-                                "padding": "16dp",
-                                "color": "#FFFFFFFF"
+                                "statusBarPadding": "true",
+                                "navBarPadding": "false"
                             }
                         },
                         "children": [
                             {
                                 "testTag": null,
-                                "text": "First card",
+                                "text": null,
                                 "contentDescription": null,
+                                "role": null,
+                                "clickable": false,
+                                "disabled": false,
                                 "bounds": {
-                                    "x": 32,
-                                    "y": 92,
-                                    "width": 76,
-                                    "height": 24
+                                    "x": 0,
+                                    "y": 0,
+                                    "width": 1024,
+                                    "height": 695
                                 },
-                                "designToken": null,
-                                "children": []
-                            },
-                            {
-                                "testTag": null,
-                                "text": "A representative card subtitle",
-                                "contentDescription": null,
-                                "bounds": {
-                                    "x": 32,
-                                    "y": 116,
-                                    "width": 201,
-                                    "height": 20
+                                "designToken": {
+                                    "tokens": [
+                                        "PaddingPage"
+                                    ],
+                                    "resolved": {
+                                        "padding": "16dp"
+                                    }
                                 },
-                                "designToken": null,
-                                "children": []
+                                "children": [
+                                    {
+                                        "testTag": "home_title",
+                                        "text": "Home",
+                                        "contentDescription": null,
+                                        "role": null,
+                                        "clickable": false,
+                                        "disabled": false,
+                                        "bounds": {
+                                            "x": 16,
+                                            "y": 22,
+                                            "width": 78,
+                                            "height": 36
+                                        },
+                                        "designToken": null,
+                                        "children": []
+                                    },
+                                    {
+                                        "testTag": "home_action",
+                                        "text": "+",
+                                        "contentDescription": "Add item",
+                                        "role": "Button",
+                                        "clickable": true,
+                                        "disabled": false,
+                                        "bounds": {
+                                            "x": 960,
+                                            "y": 16,
+                                            "width": 48,
+                                            "height": 48
+                                        },
+                                        "designToken": null,
+                                        "children": []
+                                    },
+                                    {
+                                        "testTag": null,
+                                        "text": null,
+                                        "contentDescription": null,
+                                        "role": null,
+                                        "clickable": false,
+                                        "disabled": false,
+                                        "bounds": {
+                                            "x": 16,
+                                            "y": 88,
+                                            "width": 992,
+                                            "height": 76
+                                        },
+                                        "designToken": {
+                                            "tokens": [
+                                                "RadiusCard",
+                                                "ElevationCard",
+                                                "PaddingCard"
+                                            ],
+                                            "resolved": {
+                                                "radius": "16dp",
+                                                "elevation": "2dp",
+                                                "padding": "16dp",
+                                                "color": "#FFFFFFFF"
+                                            }
+                                        },
+                                        "children": [
+                                            {
+                                                "testTag": null,
+                                                "text": "First card",
+                                                "contentDescription": null,
+                                                "role": null,
+                                                "clickable": false,
+                                                "disabled": false,
+                                                "bounds": {
+                                                    "x": 32,
+                                                    "y": 104,
+                                                    "width": 76,
+                                                    "height": 24
+                                                },
+                                                "designToken": null,
+                                                "children": []
+                                            },
+                                            {
+                                                "testTag": null,
+                                                "text": "A representative card subtitle",
+                                                "contentDescription": null,
+                                                "role": null,
+                                                "clickable": false,
+                                                "disabled": false,
+                                                "bounds": {
+                                                    "x": 32,
+                                                    "y": 128,
+                                                    "width": 201,
+                                                    "height": 20
+                                                },
+                                                "designToken": null,
+                                                "children": []
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "testTag": null,
+                                        "text": null,
+                                        "contentDescription": null,
+                                        "role": null,
+                                        "clickable": false,
+                                        "disabled": false,
+                                        "bounds": {
+                                            "x": 16,
+                                            "y": 176,
+                                            "width": 992,
+                                            "height": 76
+                                        },
+                                        "designToken": {
+                                            "tokens": [
+                                                "RadiusCard",
+                                                "ElevationCard",
+                                                "PaddingCard"
+                                            ],
+                                            "resolved": {
+                                                "radius": "16dp",
+                                                "elevation": "2dp",
+                                                "padding": "16dp",
+                                                "color": "#FFFFFFFF"
+                                            }
+                                        },
+                                        "children": [
+                                            {
+                                                "testTag": null,
+                                                "text": "Second card",
+                                                "contentDescription": null,
+                                                "role": null,
+                                                "clickable": false,
+                                                "disabled": false,
+                                                "bounds": {
+                                                    "x": 32,
+                                                    "y": 192,
+                                                    "width": 100,
+                                                    "height": 24
+                                                },
+                                                "designToken": null,
+                                                "children": []
+                                            },
+                                            {
+                                                "testTag": null,
+                                                "text": "Another representative subtitle",
+                                                "contentDescription": null,
+                                                "role": null,
+                                                "clickable": false,
+                                                "disabled": false,
+                                                "bounds": {
+                                                    "x": 32,
+                                                    "y": 216,
+                                                    "width": 211,
+                                                    "height": 20
+                                                },
+                                                "designToken": null,
+                                                "children": []
+                                            }
+                                        ]
+                                    }
+                                ]
                             }
                         ]
                     },
@@ -101,48 +236,68 @@
                         "testTag": null,
                         "text": null,
                         "contentDescription": null,
+                        "role": null,
+                        "clickable": false,
+                        "disabled": false,
                         "bounds": {
-                            "x": 16,
-                            "y": 164,
-                            "width": 992,
-                            "height": 76
+                            "x": 0,
+                            "y": 695,
+                            "width": 1024,
+                            "height": 1
+                        },
+                        "designToken": null,
+                        "children": []
+                    },
+                    {
+                        "testTag": "app_bottom_nav",
+                        "text": null,
+                        "contentDescription": null,
+                        "role": null,
+                        "clickable": false,
+                        "disabled": false,
+                        "bounds": {
+                            "x": 0,
+                            "y": 696,
+                            "width": 1024,
+                            "height": 72
                         },
                         "designToken": {
                             "tokens": [
-                                "RadiusCard",
-                                "ElevationCard",
-                                "PaddingCard"
+                                "BottomNavHeight"
                             ],
                             "resolved": {
-                                "radius": "16dp",
-                                "elevation": "2dp",
-                                "padding": "16dp",
-                                "color": "#FFFFFFFF"
+                                "height": "72dp"
                             }
                         },
                         "children": [
                             {
                                 "testTag": null,
-                                "text": "Second card",
+                                "text": "Home",
                                 "contentDescription": null,
+                                "role": null,
+                                "clickable": true,
+                                "disabled": false,
                                 "bounds": {
-                                    "x": 32,
-                                    "y": 180,
-                                    "width": 100,
-                                    "height": 24
+                                    "x": 308,
+                                    "y": 704,
+                                    "width": 48,
+                                    "height": 48
                                 },
                                 "designToken": null,
                                 "children": []
                             },
                             {
                                 "testTag": null,
-                                "text": "Another representative subtitle",
+                                "text": "Profile",
                                 "contentDescription": null,
+                                "role": null,
+                                "clickable": true,
+                                "disabled": false,
                                 "bounds": {
-                                    "x": 32,
-                                    "y": 204,
-                                    "width": 211,
-                                    "height": 20
+                                    "x": 664,
+                                    "y": 704,
+                                    "width": 52,
+                                    "height": 48
                                 },
                                 "designToken": null,
                                 "children": []

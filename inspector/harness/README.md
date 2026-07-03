@@ -34,10 +34,13 @@ intact; some shells word-split it, so the two default output files above are the
   "schemaVersion": 1,
   "source": "headless-jvm",
   "root": {
-    "testTag": "home_title",
-    "text": "Home",
-    "contentDescription": null,
-    "bounds": { "x": 16, "y": 16, "width": 328, "height": 40 },
+    "testTag": "home_action",
+    "text": "+",
+    "contentDescription": "Add item",
+    "role": "Button",
+    "clickable": true,
+    "disabled": false,
+    "bounds": { "x": 960, "y": 16, "width": 48, "height": 48 },
     "designToken": { "tokens": ["PaddingPage"], "resolved": { "padding": "16dp" } },
     "children": []
   }
@@ -47,10 +50,30 @@ intact; some shells word-split it, so the two default output files above are the
 Every node has `bounds` (pixel, root-relative) and `children` (array, possibly empty).
 `testTag` / `text` / `contentDescription` / `designToken` are nullable.
 
+**Additive contract extension (still schemaVersion 1)** — optional interaction fields, emitted by
+this harness and safely absent on older trees:
+
+- `role` — `string|null`, the semantics `Role` (e.g. `"Button"`, `"Checkbox"`).
+- `clickable` — `boolean`, presence of the `OnClick` semantics action.
+- `disabled` — `boolean`, presence of the `Disabled` semantics property.
+
+These power the MCP's `audit_a11y` (touch targets / missing labels) and make golden-tree
+snapshot diffs catch interaction regressions (a node silently losing its click handler).
+
 ## Committed fixtures
 
-- `sample-tree.json` — a produced tree, the MCP track validates against it.
+- `sample-tree.json` — a produced tree (carries `role`/`clickable`/`disabled` on the interactive
+  nodes: the `home_action` icon-button and the bottom-nav items), the MCP track validates against it.
 - `sample-design-system.json` — the produced catalog.
+
+## What the sample renders
+
+`SampleScreen` mirrors the **annotated template kit** in a concrete package — this is the compile
+proof for the template's placeholder-form Kotlin: `BaseScreenMirror` (= template `BaseScreen`,
+inset-fact designToken on the content Box), `SampleBottomNav` (= template `AppBottomNav`,
+`BottomNavHeight` token + `app_bottom_nav` testTag + 48dp-minimum nav items), the HomeScreen-style
+page padding/card tokens, and a 48dp clickable icon-button (`home_action`) so the dump exercises
+`role`/`clickable`.
 
 ## Phase 1
 

@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "source": "headless-jvm",
+  "root": {
+    "testTag": "screen_root",
+    "text": null,
+    "contentDescription": null,
+    "role": null,
+    "clickable": false,
+    "disabled": false,
+    "bounds": { "x": 0, "y": 0, "width": 360, "height": 800 },
+    "designToken": { "tokens": ["PaddingPage"], "resolved": { "padding": "16dp" } },
+    "children": [
+      {
+        "testTag": "icon_unlabeled",
+        "text": null,
+        "contentDescription": null,
+        "role": "Button",
+        "clickable": true,
+        "disabled": false,
+        "bounds": { "x": 304, "y": 16, "width": 40, "height": 40 },
+        "designToken": null,
+        "children": []
+      },
+      {
+        "testTag": "primary_button",
+        "text": "Continue",
+        "contentDescription": null,
+        "role": "Button",
+        "clickable": true,
+        "disabled": false,
+        "bounds": { "x": 16, "y": 96, "width": 328, "height": 56 },
+        "designToken": { "tokens": ["RadiusPill"], "resolved": { "radius": "999dp" } },
+        "children": []
+      },
+      {
+        "testTag": "nav_item_labeled_by_child",
+        "text": null,
+        "contentDescription": null,
+        "role": null,
+        "clickable": true,
+        "disabled": false,
+        "bounds": { "x": 16, "y": 176, "width": 96, "height": 56 },
+        "designToken": null,
+        "children": [
+          {
+            "testTag": null,
+            "text": "Home",
+            "contentDescription": null,
+            "role": null,
+            "clickable": false,
+            "disabled": false,
+            "bounds": { "x": 32, "y": 192, "width": 48, "height": 20 },
+            "designToken": null,
+            "children": []
+          }
+        ]
+      },
+      {
+        "testTag": "decor_badge",
+        "text": null,
+        "contentDescription": "",
+        "role": null,
+        "clickable": false,
+        "disabled": false,
+        "bounds": { "x": 16, "y": 260, "width": 24, "height": 24 },
+        "designToken": null,
+        "children": []
+      },
+      {
+        "testTag": "legacy_node_no_optional_fields",
+        "text": null,
+        "contentDescription": null,
+        "bounds": { "x": 16, "y": 300, "width": 20, "height": 20 },
+        "designToken": null,
+        "children": []
+      }
+    ]
+  }
+}

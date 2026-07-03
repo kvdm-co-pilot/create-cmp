@@ -6,11 +6,13 @@ description: >-
   "inspect the Compose UI", "read the design tokens", asks "why is this padding wrong", "check for
   token drift", "is this screen matching the design system", "debug this Compose layout without
   screenshots", "what colour/radius/spacing did this actually render", "assert the resolved tokens",
-  or "diff this screen against the design system". Drives the create-cmp inspector: render a screen
-  with the harness to produce a JSON tree, then query it with the cmp-inspector MCP tools
-  (get_node, assert_token, layout_gaps, diff_against_design_system, find_drift). Asserts on the
-  rendered STRUCTURE, not pixels — catches token drift (raw values where a token belongs) and layout
-  faults mechanically.
+  "diff this screen against the design system", "snapshot this screen as a regression golden",
+  "did this UI change / regress", or "audit this screen for accessibility (touch targets, missing
+  labels)". Drives the create-cmp inspector: render a screen with the harness to produce a JSON
+  tree, then query it with the cmp-inspector MCP tools (get_node, assert_token, layout_gaps,
+  diff_against_design_system, find_drift, snapshot_save, snapshot_diff, audit_a11y). Asserts on the
+  rendered STRUCTURE, not pixels — catches token drift (raw values where a token belongs), layout
+  faults, UI regressions, and a11y faults mechanically.
 ---
 
 # cmp-inspect — read a live Compose UI as structured design data
@@ -55,6 +57,10 @@ Every node has `bounds` (pixels, root-relative) and `children`. `testTag`, `text
 `{ tokens: string[], resolved: { key: value } }` — the component *self-reporting* its resolved token,
 which is only possible because create-cmp owns the theme and the component kit.
 
+Nodes may also carry **optional interaction fields** (additive, still schemaVersion 1; absent on
+old trees): `role` (`"Button"`, `"Checkbox"`, … or null), `clickable` (has an OnClick action),
+`disabled` (Disabled semantics present). These feed the a11y audit and interaction-regression diffs.
+
 ## The MCP tools
 
 | Tool | Use it to… |
@@ -65,6 +71,9 @@ which is only possible because create-cmp owns the theme and the component kit.
 | `layout_gaps` | compute real spacing between two nodes: `{ gapX, gapY, dxLeft, dyTop }` — this is how you verify padding/margins |
 | `diff_against_design_system` | flag every node whose resolved value contradicts the declared catalog |
 | `find_drift` | sweep for nodes that render but carry **no** token (raw value / un-tokenized) |
+| `snapshot_save` | write the normalized tree as a **golden-tree snapshot** (commit it — it's the regression fixture) |
+| `snapshot_diff` | structurally diff the current tree vs a golden: `{path, kind, before, after}` entries; empty = pass |
+| `audit_a11y` | audit touch targets (< 48px clickables), missing labels on clickables, empty contentDescription |
 
 All take an optional `treePath`; omit it if `CMP_INSPECTOR_TREE` is set. Errors (missing file, bad
 JSON, node not found) come back as a clean `{ error }` — read it and fix the input.
@@ -82,8 +91,26 @@ raw values with no token), then `diff_against_design_system` with the declared c
 raw hex where `Surface` belongs, or a `24dp` radius where `RadiusCard` is `16dp`, is caught for free.
 
 **"Assert this screen renders correctly"** — `inspect_tree` for the shape, then a handful of
-`assert_token` / `layout_gaps` assertions on the key nodes. Commit the tree JSON as a golden-tree
-snapshot if you want a regression fixture — the diffs are human-readable, unlike pixels.
+`assert_token` / `layout_gaps` assertions on the key nodes.
+
+**"Snapshot this screen / did it regress?"** — the golden-tree loop, the CI regression primitive:
+
+1. Render the screen with the harness → `snapshot_save { treePath, snapshotPath }`. Commit the
+   golden (it's normalized: integer bounds, no `source`, sorted resolved keys — stable and reviewable).
+2. After any change: re-render → `snapshot_diff { treePath, snapshotPath }`. Empty `diffs` = pass.
+   A non-empty diff is a compact list of `{path, kind, before, after}` — node added/removed, text/
+   testTag/designToken changed, `clickable-changed` (a button silently losing its handler!),
+   `bounds-moved` beyond `tolerancePx` (default 1px, so sub-pixel jitter never flakes).
+3. Intentional change? Re-run `snapshot_save` to re-bless the golden. The review diff of the golden
+   file itself is human-readable JSON, unlike a pixel snapshot.
+
+**"Audit accessibility"** — `audit_a11y { treePath }`. Violations: `touch-target-too-small`
+(clickable under `minTouchTargetPx`, default 48 — harness dumps are density-1 so px == dp there;
+scale it for device-density trees) and `missing-label` (clickable with no text, no
+contentDescription, no descendant text — invisible to screen readers). Warning:
+`empty-content-description`. Old trees without the `clickable`/`role` fields are skipped, not
+crashed on. Fix violations in the kit (e.g. `defaultMinSize(48.dp)` on tap targets), re-render,
+re-audit until `pass: true`.
 
 ## Three tiers, one interface
 

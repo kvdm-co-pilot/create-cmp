@@ -31,6 +31,19 @@ Every node has `bounds` (numbers, pixels, root-relative) and `children`.
 `testTag` / `text` / `contentDescription` / `designToken` are nullable.
 `designToken` is `{ tokens: string[], resolved: { [k]: string } }` or `null`.
 
+**Additive contract extension (still schemaVersion 1)** — OPTIONAL fields; absent on trees
+produced before the extension, so every consumer treats them as optional:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `role` | `string\|null` | semantics `Role` (e.g. `"Button"`, `"Checkbox"`) |
+| `clickable` | `boolean` | presence of the `OnClick` semantics action |
+| `disabled` | `boolean` | presence of the `Disabled` semantics property |
+
+These power `audit_a11y` and let `snapshot_diff` catch interaction regressions. Old trees keep
+working everywhere: tools skip nodes that lack the fields, and snapshot diffs treat an absent
+field as its neutral value (`null` / `false`).
+
 The **declared design-system catalog** (input to `diff_against_design_system`):
 
 ```json
@@ -48,6 +61,9 @@ The **declared design-system catalog** (input to `diff_against_design_system`):
 | `layout_gaps` | `{ treePath?, testTagA, testTagB }` | `{ gapX, gapY, dxLeft, dyTop }` |
 | `diff_against_design_system` | `{ treePath?, catalogPath }` | drift list `{ path, token, declared, resolved }` (empty = clean) |
 | `find_drift` | `{ treePath? }` | un-tokenized-node list (visual footprint, no token) |
+| `snapshot_save` | `{ treePath?, snapshotPath }` | normalizes the tree (integer bounds, no `source`, sorted `resolved` keys) and writes the golden file |
+| `snapshot_diff` | `{ treePath?, snapshotPath, tolerancePx? }` | structural diff vs the golden: `{ pass, diffCount, diffs:[{path, kind, before, after}] }` — kinds: `node-added/-removed`, `text-/testTag-/contentDescription-changed`, `designToken-changed`, `role-/clickable-/disabled-changed`, `bounds-moved` (beyond `tolerancePx`, default 1). Empty = pass — the CI regression primitive: JSON diffs, not pixels |
+| `audit_a11y` | `{ treePath?, minTouchTargetPx? }` | `{ pass, violations:[{path,testTag,rule,detail,bounds}], warnings, warningCount, passCount }` — rules: `touch-target-too-small` (clickable below `minTouchTargetPx`, default 48), `missing-label` (clickable with no text/contentDescription/descendant text), warn `empty-content-description`. Harness output is density-1, so px == dp there; pass a scaled minimum for device-density trees |
 
 `treePath` is optional everywhere: if omitted it falls back to the **`CMP_INSPECTOR_TREE`**
 environment variable, and errors clearly if neither is set (render a tree with the harness first).
@@ -61,7 +77,10 @@ inspector/mcp/
   src/lib/tree.mjs       # loadTree, walk (stable dotted paths), findByTestTag
   src/lib/query.mjs      # getNode, assertToken, layoutGaps
   src/lib/drift.mjs      # findDrift, diffAgainstDesignSystem
+  src/lib/snapshot.mjs   # normalizeTree, diffTrees (golden-tree snapshots)
+  src/lib/a11y.mjs       # auditA11y (touch targets, missing labels, empty descriptions)
   fixtures/tree.json     # example tree (one un-tokenized node + one drifting radius)
+  fixtures/a11y-tree.json# planted a11y cases (tiny unlabeled icon, clean button, legacy node)
   fixtures/design-system.json
   test/*.test.mjs        # node --test coverage of every lib function
 ```

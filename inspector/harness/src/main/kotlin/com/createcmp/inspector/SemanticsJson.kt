@@ -1,5 +1,6 @@
 package com.createcmp.inspector
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -18,6 +19,12 @@ import kotlin.math.roundToInt
  * contract (schemaVersion 1, source "headless-jvm"). Every node carries pixel, root-relative
  * [bounds] and a (possibly empty) `children` array; testTag/text/contentDescription/designToken
  * are nullable.
+ *
+ * Additive contract extension (still schemaVersion 1 — optional fields, absent/null-safe for
+ * old consumers):
+ *  - `role`      string|null — [SemanticsProperties.Role] (e.g. "Button", "Checkbox").
+ *  - `clickable` boolean     — presence of [SemanticsActions.OnClick].
+ *  - `disabled`  boolean     — presence of [SemanticsProperties.Disabled].
  */
 object SemanticsJson {
 
@@ -37,6 +44,9 @@ object SemanticsJson {
         put("testTag", node.testTag().toJson())
         put("text", node.text().toJson())
         put("contentDescription", node.contentDescription().toJson())
+        put("role", node.roleName().toJson())
+        put("clickable", JsonPrimitive(node.isClickable()))
+        put("disabled", JsonPrimitive(node.isDisabled()))
         put("bounds", node.boundsJson())
         put("designToken", node.designTokenJson())
         put("children", buildJsonArray {
@@ -56,6 +66,15 @@ object SemanticsJson {
         config.getOrNull(SemanticsProperties.ContentDescription)
             ?.joinToString(separator = " ")
             ?.takeIf { it.isNotEmpty() }
+
+    private fun SemanticsNode.roleName(): String? =
+        config.getOrNull(SemanticsProperties.Role)?.toString()
+
+    private fun SemanticsNode.isClickable(): Boolean =
+        config.contains(SemanticsActions.OnClick)
+
+    private fun SemanticsNode.isDisabled(): Boolean =
+        config.contains(SemanticsProperties.Disabled)
 
     private fun SemanticsNode.boundsJson(): JsonObject {
         val rect = boundsInRoot
