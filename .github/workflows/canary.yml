@@ -1,0 +1,165 @@
+name: Canary
+
+# The frozen version set must never rot silently, and we want to know the day
+# a NEWER set goes green (it feeds the future `create-cmp upgrade` registry).
+#
+# Three jobs:
+#   1. check         — scripts/canary.mjs --check-only: current-vs-latest per
+#                      pinned coordinate (bounded ~10 Maven metadata GETs).
+#   2. frozen-build  — stamp + assembleDebug with the FROZEN set. This is the
+#                      only job whose failure marks the workflow red; it also
+#                      opens/updates an alarm issue.
+#   3. latest-probe  — stamp, rewrite the catalog to the latest stable set,
+#                      attempt assembleDebug. Failure is EXPECTED and never
+#                      reds the workflow (continue-on-error) — the outcome is
+#                      recorded in an artifact.
+#
+# Reporting choice (v1): artifacts + a single alarm issue. No `canary-results`
+# branch — pushing from CI needs write auth + history churn and adds a failure
+# mode; artifacts have 90-day retention and issues alert humans, which is all
+# v1 needs. Revisit when the public compatibility dashboard is built.
+
+on:
+  schedule:
+    - cron: "17 2 * * *" # nightly, off the :00 rush
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write # frozen-build opens/updates the alarm issue
+
+jobs:
+  check:
+    name: version drift report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Query Maven metadata (bounded, ~10 GETs)
+        run: node scripts/canary.mjs --check-only --report canary-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canary-report
+          path: canary-report.json
+
+  frozen-build:
+    name: frozen set still builds
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true # nightly must prove a cold-ish path, never poison caches
+      - uses: actions/download-artifact@v4
+        with:
+          name: canary-report
+      - name: Stamp project (frozen set)
+        run: >
+          node bin/create-cmp.mjs "$RUNNER_TEMP/canary-frozen"
+          --name CanaryFrozen --package com.canary.frozen
+          --no-ios --no-verify --yes
+      - name: Build (frozen set)
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/canary-frozen"
+          ./gradlew :composeApp:assembleDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/frozen-build.log"
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-frozen-build-log
+          path: ${{ runner.temp }}/frozen-build.log
+          if-no-files-found: ignore
+      - name: Open/update alarm issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="CANARY: frozen set no longer builds"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          {
+            echo "The nightly canary failed to build a freshly stamped project with the FROZEN version set."
+            echo ""
+            echo "- Run: $run_url"
+            echo "- Build log + drift report: artifacts on that run"
+            echo ""
+            echo "Drift report summary:"
+            echo '```json'
+            node -e "const r=require('./canary-report.json'); console.log(JSON.stringify(r.summary,null,2))" || echo "(report unavailable)"
+            echo '```'
+          } > /tmp/issue-body.md
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body-file /tmp/issue-body.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/issue-body.md
+          fi
+
+  latest-probe:
+    name: is the next set green yet?
+    runs-on: ubuntu-latest
+    needs: check
+    continue-on-error: true # failures are EXPECTED — never mark the workflow red
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: canary-report
+      - name: Stamp project
+        run: >
+          node bin/create-cmp.mjs "$RUNNER_TEMP/canary-latest"
+          --name CanaryLatest --package com.canary.latest
+          --no-ios --no-verify --yes
+      - name: Apply latest stable pins (reuses the check job's report)
+        run: node scripts/canary.mjs --write-latest "$RUNNER_TEMP/canary-latest" --report canary-report.json
+      - name: Build (latest set)
+        id: probe
+        continue-on-error: true # step-level too, so the outcome step always runs
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/canary-latest"
+          ./gradlew :composeApp:assembleDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/latest-build.log"
+      - name: Record probe outcome
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('canary-report.json','utf8'));
+            fs.writeFileSync('canary-latest-probe.json', JSON.stringify({
+              probedAt: new Date().toISOString(),
+              latestSetGreen: '${{ steps.probe.outcome }}' === 'success',
+              appliedSet: Object.fromEntries(report.deps.filter(d=>d.latestStable).map(d=>[d.key,d.latestStable])),
+              frozenSet: Object.fromEntries(report.deps.map(d=>[d.key,d.current])),
+            }, null, 2) + '\n');
+          "
+          cat canary-latest-probe.json
+      - name: Upload probe result + build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-latest-probe
+          path: |
+            canary-latest-probe.json
+            ${{ runner.temp }}/latest-build.log
+          if-no-files-found: ignore

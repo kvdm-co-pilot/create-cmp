@@ -1,10 +1,17 @@
 name: CI
 
+# Cost-aware matrix:
+#   - every PR + push:  engine unit tests (Node 18/20/22) + stamp-android (ubuntu)
+#   - main pushes + manual runs only:  stamp-ios (macOS minutes are ~10x ubuntu)
+# The stamp jobs prove the CURRENT checkout's engine + template produce a
+# project that actually builds — the reproducibility moat's gate.
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -22,3 +29,101 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Run tests
         run: node --test
+
+  stamp-android:
+    name: stamp + Android assembleDebug
+    runs-on: ubuntu-latest # JDK + Android SDK preinstalled; licenses accepted
+    needs: test # don't burn a Gradle build on a broken engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      # Gradle build/config caches, auto-keyed on gradle files (incl. the
+      # template's version catalog once stamped). PRs read-only so they can't
+      # poison the main cache.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      # Engine is zero-dep in non-interactive mode (prompts/picocolors are
+      # optional imports) — no npm install needed to stamp.
+      - name: Stamp project (verify off — the build IS the verification here)
+        run: >
+          node bin/create-cmp.mjs "$RUNNER_TEMP/ci-smoke"
+          --name CiSmoke --package com.ci.smoke
+          --no-ios --no-verify --yes
+      - name: Build stamped project (Android)
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/ci-smoke"
+          ./gradlew :composeApp:assembleDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stamp-android-build-log
+          path: ${{ runner.temp }}/android-build.log
+          if-no-files-found: ignore
+
+  stamp-ios:
+    name: stamp + iOS xcodebuild
+    runs-on: macos-14 # Apple Silicon — matches the arm64-only simulator build
+    needs: test
+    # macOS minutes are expensive: main + manual only, never per-PR.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      - name: Install XcodeGen (CocoaPods is preinstalled on macos-14)
+        run: brew install xcodegen
+      - name: Stamp project (iOS on)
+        run: >
+          node bin/create-cmp.mjs "$RUNNER_TEMP/ci-smoke-ios"
+          --name CiSmoke --package com.ci.smoke
+          --no-verify --yes
+      # Exact proven path from template/manifest.json `verify.iosLink` + `verify.ios`:
+      # XcodeGen -> pod install (LANG=en_US.UTF-8 or CocoaPods trips on encoding)
+      # -> xcodebuild constrained to arm64 + a concrete simulator UDID (the KMP
+      # embed phase emits only the active-arch slice; a generic destination
+      # fails at CreateUniversalBinary).
+      - name: Link KMP framework (fast, isolates Kotlin/native failures)
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/ci-smoke-ios"
+          ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64 --stacktrace 2>&1 | tee "$RUNNER_TEMP/ios-link.log"
+      - name: Build stamped project (iOS simulator)
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/ci-smoke-ios/iosApp"
+          export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+          xcodegen generate
+          pod install
+          SIM_UDID=$(xcrun simctl list devices available | grep -Eo '[0-9A-F-]{36}' | head -1)
+          xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator \
+            -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64 \
+            -destination "id=$SIM_UDID" build 2>&1 | tee "$RUNNER_TEMP/ios-build.log"
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stamp-ios-build-logs
+          path: |
+            ${{ runner.temp }}/ios-link.log
+            ${{ runner.temp }}/ios-build.log
+          if-no-files-found: ignore

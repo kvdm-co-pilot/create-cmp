@@ -1,0 +1,70 @@
+# CI for your Compose Multiplatform app — stamped in by create-cmp.
+#
+# What runs on every push/PR: a toolchain report (advisory) and the Android
+# debug build — the same "verify gate" create-cmp ran when it generated this
+# project. Green here = your frozen version set still builds.
+#
+# iOS: a ready-to-enable macOS job is included (commented out) at the bottom.
+# macOS runners cost ~10x Linux minutes, so it's opt-in.
+
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest # ships with JDK + Android SDK preinstalled
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17 # the version set is pinned against JDK 17
+
+      # Caches Gradle + the configuration cache between runs (big speedup).
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Advisory toolchain report from create-cmp's doctor. Non-blocking:
+      # doctor also checks emulator/AVD bits that assembleDebug doesn't need,
+      # so a red doctor on a CI runner is informative, not fatal.
+      - name: Toolchain doctor (advisory)
+        continue-on-error: true
+        run: npx --yes create-cmp-cli@latest doctor --yes --no-install --no-ios
+
+      # The verify gate. If this fails after a dependency bump, remember:
+      # Kotlin / KSP / Compose / Room / AGP move as ONE set (see the comments
+      # in gradle/libs.versions.toml).
+      - name: Build Android (debug)
+        run: ./gradlew :composeApp:assembleDebug --stacktrace
+
+  # ── iOS (opt-in) ──────────────────────────────────────────────────────────
+  # Uncomment to build the iOS app on every push to main. Uses the exact
+  # command set create-cmp verified this template with: XcodeGen + CocoaPods
+  # (LANG must be UTF-8) + an arm64-only simulator build (the Kotlin framework
+  # embed phase emits only the active arch — a generic destination fails).
+  #
+  # ios:
+  #   runs-on: macos-14
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-java@v4
+  #       with:
+  #         distribution: temurin
+  #         java-version: 17
+  #     - uses: gradle/actions/setup-gradle@v4
+  #     - run: brew install xcodegen   # CocoaPods is preinstalled on macos-14
+  #     - name: Build iOS (simulator)
+  #       run: |
+  #         cd iosApp
+  #         export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+  #         xcodegen generate
+  #         pod install
+  #         SIM_UDID=$(xcrun simctl list devices available | grep -Eo '[0-9A-F-]{36}' | head -1)
+  #         xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator \
+  #           -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64 \
+  #           -destination "id=$SIM_UDID" build
