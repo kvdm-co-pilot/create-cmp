@@ -253,6 +253,14 @@ export async function scaffold(config, opts = {}) {
   step(`Copying template → ${colors.cyan(projectDir)}`);
   copyDir(templateDir, projectDir);
 
+  // (b.1) `npm pack` ALWAYS strips files named `.gitignore` from published
+  // tarballs, so the template ships it as `gitignore` (no dot) and the stamp
+  // restores the real name here (the standard scaffolder workaround).
+  const bareGitignore = path.join(projectDir, "gitignore");
+  if (fs.existsSync(bareGitignore)) {
+    fs.renameSync(bareGitignore, path.join(projectDir, ".gitignore"));
+  }
+
   const tokenMap = buildTokenMap(config);
 
   // (c) token-replace contents AND paths

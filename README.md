@@ -30,6 +30,7 @@ reports success.
 ## Contents
 
 - [Quick start](#quick-start)
+- [Commands](#commands)
 - [What you get](#what-you-get-the-pre-solved-moat)
 - [Options](#options)
 - [Use it from Claude Code](#use-it-from-claude-code)
@@ -59,6 +60,19 @@ builds the app to prove it's green.
 > reuse either. The installed *command* is still `create-cmp`. You can also run straight from GitHub
 > with no install: `npx github:kvdm-co-pilot/create-cmp`, or use the
 > [Claude Code plugin](#use-it-from-claude-code).
+
+## Commands
+
+`create-cmp` is useful across the whole life of a project, not just day one — and every command
+except `create` works on **any** KMP project, not only ones it scaffolded:
+
+| Command | What it does |
+|---|---|
+| `create-cmp [dir]` / `create-cmp create` | Scaffold a new app from the frozen golden template (the default command). |
+| `create-cmp doctor [--fix]` | Toolchain preflight (JDK/SDK/Xcode/Appium, consent-gated installs) **plus** project diagnosis when run inside a Gradle project: kotlin↔ksp lockstep, drift vs proven-green sets, the KSP2/iOS catch-22, sdk.dir, `~/.konan` bloat, disk space. `--fix` applies the safe heals. |
+| `create-cmp upgrade [--dry-run]` | Migrate `gradle/libs.versions.toml` to the next proven-green version set — diff table first, surgical in-place edits with `.bak-upgrade` backups, kotlin↔ksp lockstep guardrail, `--verify` to prove the result. |
+| `create-cmp clean` | Cache & build-output hygiene: stale `~/.konan` toolchains + project `build/`/`.gradle/` dirs (sizes shown, consent-gated); `~/.gradle/caches` is size-reported only. |
+| `create-cmp verify [--target-dir .]` | Run the green-build gate (Android, and iOS on macOS) against an existing project. |
 
 > **North-star (a goal, measured honestly — not a benchmark):** *time-to-green* — a running app on
 > the Android emulator **and** the iOS simulator, smoke-passing, with zero manual steps modulo the
@@ -119,11 +133,15 @@ shared engine, two front doors. Install from the bundled marketplace:
 /plugin install create-cmp
 ```
 
-It bundles three skills, each with a deterministic engine behind it:
+It bundles five skills (plus the `cmp-inspector` MCP server), each with a deterministic engine
+behind it:
 
 - **cmp-new** — conversational interview, then shells out to the same engine to scaffold, and
   generates your tab screens from the example-feature pattern.
-- **cmp-doctor** — runs the toolchain bootstrap (consent-gated).
+- **cmp-doctor** — toolchain bootstrap + project diagnosis on any KMP project (consent-gated).
+- **cmp-upgrade** — migrate to the next proven-green version set (diff → apply → verify).
+- **cmp-inspect** — read a rendered Compose UI as structured JSON: hierarchy, geometry, resolved
+  design tokens, token-drift diffs, golden-tree snapshots, a11y audit — no screenshots.
 - **cmp-qa-prep** — brings up the emulator + Appium session + smoke.
 
 ## Why CMP, not React Native

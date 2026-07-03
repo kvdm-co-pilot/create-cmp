@@ -1,0 +1,32 @@
+[versions]
+# A deliberately quirky catalog for upgrade tests: comments, odd spacing,
+# trailing comments, single quotes, and keys the registry does not manage.
+kotlin = "2.1.0"
+agp    =   "8.5.2"
+google-services = "4.4.2"
+compose-multiplatform = "1.8.0"   # trailing comment must survive a rewrite
+koin = '4.0.0'
+ktor = "3.0.0"
+room = "2.7.0"
+sqlite = "2.5.0"
+
+# ksp is in lockstep with the OLD kotlin here.
+ksp = "2.1.0-1.0.29"
+kotlinx-serialization = "1.7.3"
+kotlinx-datetime = "0.6.1"
+lifecycle = "2.8.4"
+navigation = "2.8.0"
+firebase-gitlive = "2.1.0"
+coil = "3.0.4"
+androidx-core = "1.15.0"
+androidx-activity = "1.9.3"
+moko-resources = "0.24.4"
+
+[libraries]
+# The value "2.1.0" also appears below — a naive string replace would corrupt it.
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+some-lib = { module = "com.example:some-lib", version = "2.1.0" }
+
+[plugins]
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
