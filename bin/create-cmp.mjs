@@ -75,6 +75,7 @@ function printHelp() {
       `  --name --package --bundle-id --region --theme-prefix\n` +
       `  --ios/--no-ios  --firebase/--no-firebase  --auth <email|phone|both|none>\n` +
       `  --room/--no-room  --appium/--no-appium  --inspector/--no-inspector\n` +
+      `  --dev-client/--no-dev-client   (desktop JVM window + Compose Hot Reload)\n` +
       `  --tabs Home:home,Profile:person\n` +
       `  --target-dir  --verify/--no-verify  --yes  --force  --dry-run-verify\n\n` +
       `doctor flags:  --yes  --dry-run  --no-ios  --no-install  --target-dir <dir>  --fix\n` +

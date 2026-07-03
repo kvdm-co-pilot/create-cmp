@@ -31,6 +31,7 @@ function baseConfig(targetDir, overrides = {}) {
     room: true,
     appium: true,
     inspector: true,
+    devClient: true,
     tabs: [{ label: "Home", icon: "home" }],
     targetDir,
     ...overrides,
@@ -110,6 +111,94 @@ test("--no-inspector: inspector sources deleted and zero startInspector//inspect
   for (const re of [/startInspector/, /\/inspect\//, /ViewRootForTest/, /InspectorHttpServer/]) {
     assert.deepEqual(grepSources(out, re), [], `no reference may survive: ${re}`);
   }
+
+  fs.rmSync(out, { recursive: true, force: true });
+});
+
+test("--no-dev-client: desktop sources deleted and zero desktop-target/hot-reload references remain", async () => {
+  const out = await stamp({ devClient: false });
+
+  assert.ok(!fs.existsSync(path.join(out, "composeApp", "src", "desktopMain")), "desktopMain must be gone");
+  assert.ok(!fs.existsSync(path.join(out, "docs", "dev-client.md")), "docs/dev-client.md must be gone");
+
+  for (const re of [
+    /jvm\("desktop"\)/,
+    /hot[.-]reload/i,
+    /foojay/,
+    /kspDesktop/,
+    /desktopMain/,
+    /compose\.desktop/,
+    /initDesktopKoin/,
+  ]) {
+    assert.deepEqual(grepSources(out, re), [], `no reference may survive: ${re}`);
+  }
+
+  // The stamped app must still be a complete Android(+iOS) build surface:
+  const build = fs.readFileSync(path.join(out, "composeApp", "build.gradle.kts"), "utf8");
+  assert.match(build, /androidTarget/);
+  assert.match(build, /iosSimulatorArm64/);
+  assert.ok(!build.includes("cmp:feature"), "no marker noise");
+
+  fs.rmSync(out, { recursive: true, force: true });
+});
+
+test("default (dev-client ON): desktop target, hot reload plugin and desktop sources stamped under the renamed package", async () => {
+  const out = await stamp({});
+
+  const desktopPkg = path.join(out, "composeApp/src/desktopMain/kotlin/com/acme/demo");
+  for (const f of [
+    "main.kt",
+    "di/DesktopModule.kt",
+    "core/connectivity/NetworkMonitor.desktop.kt",
+    "data/local/DatabaseBuilder.desktop.kt",
+  ]) {
+    assert.ok(fs.existsSync(path.join(desktopPkg, f)), `desktopMain must ship ${f}`);
+  }
+
+  const main = fs.readFileSync(path.join(desktopPkg, "main.kt"), "utf8");
+  assert.match(main, /package com\.acme\.demo/);
+  assert.match(main, /title = "Acme dev-client"/);
+  assert.match(main, /DpSize\(411\.dp, 891\.dp\)/);
+  assert.ok(!main.includes("cmp:feature"), "no marker noise");
+
+  const build = fs.readFileSync(path.join(out, "composeApp", "build.gradle.kts"), "utf8");
+  assert.match(build, /jvm\("desktop"\)/);
+  assert.match(build, /libs\.plugins\.compose\.hot\.reload/);
+  assert.match(build, /add\("kspDesktop", libs\.room\.compiler\)/);
+  assert.match(build, /mainClass = "com\.acme\.demo\.MainKt"/);
+
+  const rootBuild = fs.readFileSync(path.join(out, "build.gradle.kts"), "utf8");
+  assert.match(rootBuild, /libs\.plugins\.compose\.hot\.reload\) apply false/);
+
+  const settings = fs.readFileSync(path.join(out, "settings.gradle.kts"), "utf8");
+  assert.match(settings, /foojay-resolver-convention/);
+
+  // The dev-client must never wire Firebase: no GitLive import in any desktop source.
+  const desktopHits = grepSources(path.join(out, "composeApp", "src", "desktopMain"), /dev\.gitlive/);
+  assert.deepEqual(desktopHits, [], "desktopMain must carry zero GitLive/Firebase imports");
+
+  assert.ok(fs.existsSync(path.join(out, "docs", "dev-client.md")), "docs/dev-client.md must ship");
+
+  fs.rmSync(out, { recursive: true, force: true });
+});
+
+test("--no-room with dev-client ON: desktop Room seam stripped but the dev-client survives", async () => {
+  const out = await stamp({ room: false });
+
+  assert.ok(
+    !fs.existsSync(path.join(out, "composeApp/src/desktopMain/kotlin/com/acme/demo/data/local")),
+    "desktop data/local must be gone with Room off"
+  );
+  const build = fs.readFileSync(path.join(out, "composeApp", "build.gradle.kts"), "utf8");
+  assert.ok(!build.includes("kspDesktop"), "kspDesktop room.compiler row stripped (nested marker)");
+  assert.match(build, /jvm\("desktop"\)/, "desktop target survives Room off");
+
+  const desktopModule = fs.readFileSync(
+    path.join(out, "composeApp/src/desktopMain/kotlin/com/acme/demo/di/DesktopModule.kt"),
+    "utf8"
+  );
+  assert.ok(!desktopModule.includes("AppDatabase"), "AppDatabase binding stripped from desktop DI");
+  assert.match(desktopModule, /NetworkMonitor\(null\)/, "desktop DI still binds NetworkMonitor");
 
   fs.rmSync(out, { recursive: true, force: true });
 });

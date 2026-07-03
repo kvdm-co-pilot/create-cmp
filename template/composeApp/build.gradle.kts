@@ -15,6 +15,9 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
     // <<< cmp:feature room
+    // >>> cmp:feature dev-client
+    alias(libs.plugins.compose.hot.reload)
+    // <<< cmp:feature dev-client
 }
 
 kotlin {
@@ -47,6 +50,17 @@ kotlin {
         }
     }
     // <<< cmp:feature ios
+
+    // >>> cmp:feature dev-client
+    // Desktop dev-client: runs the shared commonMain UI in a live JVM window — the daily dev
+    // loop. Compose Hot Reload attaches to this target (task: hotRunDesktop). See docs/dev-client.md.
+    jvm("desktop") {
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
+    // <<< cmp:feature dev-client
 
     sourceSets {
         commonMain.dependencies {
@@ -115,6 +129,16 @@ kotlin {
             implementation(libs.ktor.client.darwin)
         }
         // <<< cmp:feature ios
+
+        // >>> cmp:feature dev-client
+        val desktopMain by getting {
+            dependencies {
+                implementation(compose.desktop.currentOs)
+                implementation(libs.kotlinx.coroutines.swing)
+                implementation(libs.ktor.client.cio)
+            }
+        }
+        // <<< cmp:feature dev-client
 
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -201,6 +225,9 @@ dependencies {
     add("kspIosX64", libs.room.compiler)
     add("kspIosArm64", libs.room.compiler)
     // <<< cmp:feature ios
+    // >>> cmp:feature dev-client
+    add("kspDesktop", libs.room.compiler)
+    // <<< cmp:feature dev-client
     // <<< cmp:feature room
     add("coreLibraryDesugaring", libs.android.desugar.jdk)
 }
@@ -219,3 +246,12 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 // <<< cmp:feature room
+
+// >>> cmp:feature dev-client
+// Entry point for the desktop dev-client window (and the class Compose Hot Reload launches).
+compose.desktop {
+    application {
+        mainClass = "__PACKAGE__.MainKt"
+    }
+}
+// <<< cmp:feature dev-client

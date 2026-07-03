@@ -63,6 +63,7 @@ function buildConfigFromFlags(flags, positional) {
     room: flagBool(flags, "room", true),
     appium: flagBool(flags, "appium", true),
     inspector: flagBool(flags, "inspector", true),
+    devClient: flagBool(flags, "dev-client", true),
     tabs: parseTabs(flags.tabs) || [
       { label: "Home", icon: "home" },
       { label: "Profile", icon: "person" },
@@ -142,6 +143,12 @@ async function interactiveConfig(positional) {
         initial: true,
       },
       {
+        type: "confirm",
+        name: "devClient",
+        message: "Desktop dev-client (JVM window + Compose Hot Reload)?",
+        initial: true,
+      },
+      {
         type: "text",
         name: "tabs",
         message: "Bottom-nav tabs (label:icon, comma-separated)",
@@ -168,6 +175,7 @@ async function interactiveConfig(positional) {
     room: extras.room,
     appium: extras.appium,
     inspector: extras.inspector,
+    devClient: extras.devClient,
     tabs: parseTabs(extras.tabs) || [{ label: "Home", icon: "home" }],
     targetDir: extras.targetDir,
   };

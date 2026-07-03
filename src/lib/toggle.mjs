@@ -86,7 +86,7 @@ export function stripFeatureBlocks(content, disabledFeatures) {
 
 /**
  * Map an engine config object to the set of DISABLED feature names that the
- * manifest understands: ios, firebase, room, appium, inspector.
+ * manifest understands: ios, firebase, room, appium, inspector, dev-client.
  * @param {object} config
  * @returns {Set<string>}
  */
@@ -97,6 +97,7 @@ export function disabledFeaturesFromConfig(config) {
   if (!config.room) disabled.add("room");
   if (!config.appium) disabled.add("appium");
   if (!config.inspector) disabled.add("inspector");
+  if (!config.devClient) disabled.add("dev-client");
   return disabled;
 }
 

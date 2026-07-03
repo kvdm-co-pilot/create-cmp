@@ -28,7 +28,8 @@
     "composeApp/src/androidMain/kotlin",
     "composeApp/src/androidDebug/kotlin",
     "composeApp/src/androidRelease/kotlin",
-    "composeApp/src/iosMain/kotlin"
+    "composeApp/src/iosMain/kotlin",
+    "composeApp/src/desktopMain/kotlin"
   ],
   "renameDirs": {
     "literalSegment": "com/example/app",
@@ -75,9 +76,10 @@
         "composeApp/src/commonMain/kotlin/com/example/app/data/local",
         "composeApp/src/androidMain/kotlin/com/example/app/data/local",
         "composeApp/src/iosMain/kotlin/com/example/app/data/local",
+        "composeApp/src/desktopMain/kotlin/com/example/app/data/local",
         "composeApp/schemas"
       ],
-      "notes": "When off: strip `room` marker blocks in build.gradle.kts (ksp + room plugins), composeApp/build.gradle.kts (room/sqlite deps, kspAndroid/kspIos room.compiler, the room {} schema block), AppApplication.kt and KoinHelper.kt (AppDatabase single + appContext). Delete the data/local dirs. The example `home` feature does NOT depend on Room (its ItemRepositoryImpl is in-memory), so it keeps building with Room off."
+      "notes": "When off: strip `room` marker blocks in build.gradle.kts (ksp + room plugins), composeApp/build.gradle.kts (room/sqlite deps, kspAndroid/kspIos/kspDesktop room.compiler, the room {} schema block), AppApplication.kt, KoinHelper.kt and DesktopModule.kt (AppDatabase single + appContext). Delete the data/local dirs (incl. the desktopMain one when dev-client is on). The example `home` feature does NOT depend on Room (its ItemRepositoryImpl is in-memory), so it keeps building with Room off."
     },
     "appium": {
       "enabledByDefault": true,
@@ -94,6 +96,14 @@
         "composeApp/src/androidRelease/kotlin/com/example/app/inspector"
       ],
       "notes": "Live on-device inspector: debug-only loopback HTTP server on 127.0.0.1:9500 (GET /inspect/health|tree|design-system) serving the semantics tree + design-token catalog to the cmp-inspector MCP via `adb forward tcp:9500 tcp:9500`. The androidRelease dir holds only the no-op startInspector() twin — release builds contain no inspector code structurally. When off: delete both inspector dirs AND strip the `inspector` marker blocks in AppApplication.kt (import + startInspector() call) and composeApp/src/androidDebug/AndroidManifest.xml (INTERNET permission). Zero dependencies (java.net.ServerSocket + kotlinx-serialization from commonMain); no build-file markers needed."
+    },
+    "dev-client": {
+      "enabledByDefault": true,
+      "paths": [
+        "composeApp/src/desktopMain",
+        "docs/dev-client.md"
+      ],
+      "notes": "Desktop dev-client: a jvm(\"desktop\") target inside composeApp running the shared commonMain UI in a phone-sized JVM window (main.kt: __APP_NAME__ dev-client, 411x891dp), with Compose Hot Reload 1.1.1 attached (task hotRunDesktop; plain run task needs no JBR). GitLive Firebase 2.1.0 publishes JVM artifacts so commonMain deps resolve for the desktop target, but the dev-client NEVER initializes/contacts Firebase — desktopMain DI (DesktopModule.kt) binds only NetworkMonitor (always-online) + Room (BundledSQLiteDriver into the OS temp dir); the example ItemRepositoryImpl is in-memory on every platform. When off: delete the desktopMain dir + docs/dev-client.md AND strip the `dev-client` marker blocks in build.gradle.kts (hot-reload plugin apply false), settings.gradle.kts (foojay-resolver-convention for JBR auto-provisioning), composeApp/build.gradle.kts (hot-reload plugin, jvm(\"desktop\") target, desktopMain deps, kspDesktop room.compiler row — nested inside the room block, compose.desktop application block). The catalog keeps the declared coordinates by design (declared-but-unused)."
     }
   },
   "verify": {

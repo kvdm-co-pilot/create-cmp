@@ -14,6 +14,14 @@ pluginManagement {
     }
 }
 
+// >>> cmp:feature dev-client
+plugins {
+    // Compose Hot Reload runs the desktop dev-client on the JetBrains Runtime; this resolver
+    // lets Gradle auto-provision it (one-time download) when no local JBR is found.
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+// <<< cmp:feature dev-client
+
 dependencyResolutionManagement {
     repositories {
         google()

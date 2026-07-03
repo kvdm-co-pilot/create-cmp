@@ -81,6 +81,7 @@ function baseConfig(targetDir, overrides = {}) {
     room: true,
     appium: true,
     inspector: true,
+    devClient: true,
     tabs: [{ label: "Home", icon: "home" }],
     targetDir,
     ...overrides,

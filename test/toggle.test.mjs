@@ -135,9 +135,26 @@ test("disabledFeaturesFromConfig maps config to feature names", () => {
     room: false,
     appium: true,
     inspector: true,
+    devClient: true,
   };
   const d = disabledFeaturesFromConfig(cfg);
   assert.deepEqual([...d].sort(), ["ios", "room"]);
+});
+
+test("disabledFeaturesFromConfig: devClient off (or absent) disables the dev-client feature", () => {
+  const base = {
+    platforms: { android: true, ios: true },
+    firebase: { enabled: true },
+    room: true,
+    appium: true,
+    inspector: true,
+  };
+  const off = disabledFeaturesFromConfig({ ...base, devClient: false });
+  assert.ok(off.has("dev-client"));
+  const on = disabledFeaturesFromConfig({ ...base, devClient: true });
+  assert.ok(!on.has("dev-client"));
+  const absent = disabledFeaturesFromConfig(base);
+  assert.ok(absent.has("dev-client"), "absent devClient key = disabled (schema requires it explicitly)");
 });
 
 test("disabledFeaturesFromConfig: inspector off (or absent) disables the inspector feature", () => {

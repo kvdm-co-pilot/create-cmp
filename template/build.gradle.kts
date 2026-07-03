@@ -11,4 +11,7 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.room) apply false
     // <<< cmp:feature room
+    // >>> cmp:feature dev-client
+    alias(libs.plugins.compose.hot.reload) apply false
+    // <<< cmp:feature dev-client
 }

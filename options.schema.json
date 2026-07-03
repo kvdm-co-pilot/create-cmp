@@ -16,6 +16,7 @@
     "room",
     "appium",
     "inspector",
+    "devClient",
     "tabs",
     "targetDir"
   ],
@@ -81,6 +82,10 @@
     "inspector": {
       "type": "boolean",
       "description": "Live on-device inspector: debug-only loopback HTTP server (127.0.0.1:9500) serving the Compose semantics tree + design-token catalog to the cmp-inspector MCP. Structurally absent from release builds."
+    },
+    "devClient": {
+      "type": "boolean",
+      "description": "Desktop dev-client: a jvm(\"desktop\") target running the shared commonMain UI in a phone-sized JVM window with Compose Hot Reload attached (./gradlew :composeApp:hotRunDesktop --auto). Firebase is never initialized on desktop; platform seams get JVM fakes/impls in desktopMain."
     },
     "tabs": {
       "type": "array",

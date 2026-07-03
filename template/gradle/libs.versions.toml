@@ -16,6 +16,9 @@ kotlinx-datetime = "0.7.0"
 lifecycle = "2.10.0"
 navigation = "2.9.2"
 firebase-gitlive = "2.1.0"
+# Desktop dev-client. CHR 1.1.1 (latest stable) needs Kotlin >= 2.1.20 + CMP >= 1.8.2 — satisfied
+# by this set. The 1.2.x line (beta) additionally requires CMP 1.10+; safe to move to when stable.
+compose-hot-reload = "1.1.1"
 coil = "3.1.0"
 androidx-core = "1.15.0"
 androidx-activity = "1.10.1"
@@ -67,6 +70,8 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.9.0" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version = "1.9.0" }
+# Desktop dev-client: Dispatchers.Main for Compose on the JVM (Swing event loop).
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version = "1.9.0" }
 
 # Coil (image loading KMP)
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
@@ -92,3 +97,4 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 room = { id = "androidx.room", version.ref = "room" }
+compose-hot-reload = { id = "org.jetbrains.compose.hot-reload", version.ref = "compose-hot-reload" }
