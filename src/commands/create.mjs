@@ -62,6 +62,7 @@ function buildConfigFromFlags(flags, positional) {
     },
     room: flagBool(flags, "room", true),
     appium: flagBool(flags, "appium", true),
+    inspector: flagBool(flags, "inspector", true),
     tabs: parseTabs(flags.tabs) || [
       { label: "Home", icon: "home" },
       { label: "Profile", icon: "person" },
@@ -135,6 +136,12 @@ async function interactiveConfig(positional) {
       { type: "confirm", name: "room", message: "Room local cache?", initial: true },
       { type: "confirm", name: "appium", message: "Appium test harness?", initial: true },
       {
+        type: "confirm",
+        name: "inspector",
+        message: "Live on-device inspector (debug builds only)?",
+        initial: true,
+      },
+      {
         type: "text",
         name: "tabs",
         message: "Bottom-nav tabs (label:icon, comma-separated)",
@@ -160,6 +167,7 @@ async function interactiveConfig(positional) {
     firebase: { enabled: base.firebase, auth, firestore, storage, functions, fcm },
     room: extras.room,
     appium: extras.appium,
+    inspector: extras.inspector,
     tabs: parseTabs(extras.tabs) || [{ label: "Home", icon: "home" }],
     targetDir: extras.targetDir,
   };

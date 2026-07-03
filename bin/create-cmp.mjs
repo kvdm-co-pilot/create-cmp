@@ -74,7 +74,8 @@ function printHelp() {
       `create (scaffold) flags:\n` +
       `  --name --package --bundle-id --region --theme-prefix\n` +
       `  --ios/--no-ios  --firebase/--no-firebase  --auth <email|phone|both|none>\n` +
-      `  --room/--no-room  --appium/--no-appium  --tabs Home:home,Profile:person\n` +
+      `  --room/--no-room  --appium/--no-appium  --inspector/--no-inspector\n` +
+      `  --tabs Home:home,Profile:person\n` +
       `  --target-dir  --verify/--no-verify  --yes  --force  --dry-run-verify\n\n` +
       `doctor flags:  --yes  --dry-run  --no-ios  --no-install  --target-dir <dir>  --fix\n` +
       `upgrade flags: --target-dir <dir>  --set <id>  --dry-run  --yes  --verify\n` +

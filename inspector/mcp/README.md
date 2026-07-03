@@ -2,7 +2,9 @@
 
 Read a **running Compose Multiplatform UI as structured JSON** — hierarchy + geometry +
 resolved design tokens — and query/assert on it. **Never screenshots.** This is the
-Claude-side of Phase 0 of the create-cmp inspector (see [`../../docs/INSPECTOR-PLAN.md`](../../docs/INSPECTOR-PLAN.md)).
+Claude-side of the create-cmp inspector (see [`../../docs/INSPECTOR-PLAN.md`](../../docs/INSPECTOR-PLAN.md)):
+Phase 0 (headless harness trees) + Phase 2 (LIVE on-device source over `adb forward`, plus the
+uiautomator fallback).
 
 AI coding agents are effectively blind to Compose UI: a screenshot burns tokens and can't read
 theme tokens; the source can't see what actually *rendered*. This MCP consumes a fixed JSON tree
@@ -51,6 +53,33 @@ The **declared design-system catalog** (input to `diff_against_design_system`):
   "dimens": { "PaddingPage": "16dp", "RadiusCard": "16dp" } }
 ```
 
+## Choosing a source: the `source` union
+
+Every tool accepts an optional **`source`** discriminated union (the legacy bare `treePath`
+still works everywhere and equals `{kind:"file"}`):
+
+```
+source?: { kind:"file",        path: string }                      // tier 0 — harness JSON on disk
+        | { kind:"live",       host?: string, port?: number }     // tier 1 — the RUNNING app (default 127.0.0.1:9500)
+        | { kind:"uiautomator", xml?: string, xmlPath?: string }  // tier 2 — Appium page-source XML
+```
+
+Resolution order: explicit `source` → legacy `treePath` → the `connect_live` session default →
+`$CMP_INSPECTOR_LIVE` (`host:port` or `port`) → `$CMP_INSPECTOR_TREE` (file) → a clear error.
+
+- **`kind:"live"`** re-fetches `http://host:port/inspect/tree` on EVERY call — that is the
+  pull-on-demand realtime model: each tool call sees the app's *current* screen (real data, real
+  navigation state). Trees come back with `source:"live-android"`. Requires a create-cmp **debug**
+  build running (the inspector server is structurally absent from release builds) and the port
+  forwarded — run **`connect_live`** first. `diff_against_design_system` with a live source and no
+  `catalogPath` fetches the declared catalog from `/inspect/design-system` automatically.
+- **`kind:"uiautomator"`** converts Appium `getPageSource` XML to the contract: bounds
+  (root-relative), `resource-id` tail → `testTag`, text/content-desc, class tail → `role`,
+  clickable/enabled — but **`designToken` is always `null`** (custom semantics keys do not cross
+  the accessibility bridge). Token/drift tools (`assert_token`, `diff_against_design_system`,
+  `find_drift`) reject uiautomator trees with a clear "requires an instrumented source" error.
+  Use this tier for non-instrumented / third-party apps, or when tier 1 is unreachable.
+
 ## Tools
 
 | Tool | Input | Returns |
@@ -64,10 +93,11 @@ The **declared design-system catalog** (input to `diff_against_design_system`):
 | `snapshot_save` | `{ treePath?, snapshotPath }` | normalizes the tree (integer bounds, no `source`, sorted `resolved` keys) and writes the golden file |
 | `snapshot_diff` | `{ treePath?, snapshotPath, tolerancePx? }` | structural diff vs the golden: `{ pass, diffCount, diffs:[{path, kind, before, after}] }` — kinds: `node-added/-removed`, `text-/testTag-/contentDescription-changed`, `designToken-changed`, `role-/clickable-/disabled-changed`, `bounds-moved` (beyond `tolerancePx`, default 1). Empty = pass — the CI regression primitive: JSON diffs, not pixels |
 | `audit_a11y` | `{ treePath?, minTouchTargetPx? }` | `{ pass, violations:[{path,testTag,rule,detail,bounds}], warnings, warningCount, passCount }` — rules: `touch-target-too-small` (clickable below `minTouchTargetPx`, default 48), `missing-label` (clickable with no text/contentDescription/descendant text), warn `empty-content-description`. Harness output is density-1, so px == dp there; pass a scaled minimum for device-density trees |
+| `connect_live` | `{ port?, serial? }` | Tier-1 handshake: runs ONE bounded `adb [-s serial] forward tcp:port tcp:port`, GETs `/inspect/health`, returns `{ status:"connected", health }` and sets the session default source to `{kind:"live", port}` so subsequent calls can omit `source`. Never launches apps or emulators |
 
-`treePath` is optional everywhere: if omitted it falls back to the **`CMP_INSPECTOR_TREE`**
-environment variable, and errors clearly if neither is set (render a tree with the harness first).
-Missing files / bad JSON return a clean `{ error }` payload, never a stack dump.
+Every tool above also accepts the **`source`** union (previous section); `treePath` remains the
+tier-0 shorthand and falls back to **`CMP_INSPECTOR_TREE`**. Missing files / bad JSON / unreachable
+live servers return a clean, actionable `{ error }` payload, never a stack dump.
 
 ## Layout
 
@@ -79,9 +109,13 @@ inspector/mcp/
   src/lib/drift.mjs      # findDrift, diffAgainstDesignSystem
   src/lib/snapshot.mjs   # normalizeTree, diffTrees (golden-tree snapshots)
   src/lib/a11y.mjs       # auditA11y (touch targets, missing labels, empty descriptions)
+  src/lib/source.mjs     # the source union: resolveTree/resolveCatalog/requireInstrumentedTree
+  src/lib/live.mjs       # tier 1: fetchHealth/fetchLiveTree/fetchLiveCatalog (+ port/serial validation)
+  src/lib/uiautomator.mjs# tier 2: Appium page-source XML → contract converter
   fixtures/tree.json     # example tree (one un-tokenized node + one drifting radius)
   fixtures/a11y-tree.json# planted a11y cases (tiny unlabeled icon, clean button, legacy node)
   fixtures/design-system.json
+  fixtures/uiautomator-page.xml  # real-shaped uiautomator2 page source for converter tests
   test/*.test.mjs        # node --test coverage of every lib function
 ```
 
@@ -128,9 +162,11 @@ The MCP is source-agnostic. It always consumes the same JSON tree; only who *pro
 
 | Tier | Source | Yields | Status |
 |---|---|---|---|
-| **0 — Headless render** | `ImageComposeScene` / `runComposeUiTest` on the host JVM | tree + geometry + tokens, no emulator, milliseconds | **now** (Phase 0) |
-| **1 — Live app** | debug-only Ktor endpoint in the app, reached via `adb forward`, walking `SemanticsOwner` | same tree **+ real data + nav state** | later |
-| **2 — Zero-instrument** | `uiautomator` / Appium | geometry + text only, any app | fallback |
+| **0 — Headless render** | `ImageComposeScene` / `runComposeUiTest` on the host JVM | tree + geometry + tokens, no emulator, milliseconds | **live** (Phase 0) |
+| **1 — Live app** | debug-only in-app HTTP server (`127.0.0.1:9500`, ServerSocket, zero deps), reached via `adb forward`, walking `SemanticsOwner` from the `ViewRootForTest` root registry | same tree **+ real data + nav state**, `source:"live-android"` | **live** (Phase 2 — `connect_live` + `source:{kind:"live"}`) |
+| **2 — Zero-instrument** | `uiautomator` / Appium page-source XML via `{kind:"uiautomator"}` | geometry + text only, any app, `designToken:null` | **live** (fallback) |
 
-The tree-producing harness lives in [`../harness/`](../harness) (owned by a separate track). Point
-these tools at the JSON it emits.
+The tier-0 tree-producing harness lives in [`../harness/`](../harness). The tier-1 server is
+stamped into every generated app's `composeApp/src/androidDebug/kotlin/<pkg>/inspector/` (feature
+`--inspector`, on by default; the androidRelease twin is a no-op, so release builds contain no
+inspector code structurally).

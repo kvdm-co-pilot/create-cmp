@@ -33,6 +33,12 @@ export const DISK_WARN_BYTES = 3 * GIB;
  * @param {object|null} input.registry       version-set registry (null = skip drift check)
  * @param {number|null} input.konanBytes     ~/.konan size in bytes (null = unknown/absent)
  * @param {number|null} input.freeDiskBytes  free disk space in bytes (null = unknown)
+ * @param {string[]|null} [input.inspectorHits] relative (posix) paths of Kotlin sources that
+ *        reference the live-inspector endpoint (`/inspect/` or `InspectorHttpServer`);
+ *        null = scan skipped (no composeApp sources), [] = project has no inspector code.
+ * @param {{catalog:string, theme:string}|null} [input.inspectorCatalog] the stamped
+ *        InspectorCatalog.kt content + concatenated theme sources (Tokens.kt/Theme.kt) for
+ *        the declared-token drift tripwire; null = skip.
  * @returns {Finding[]}
  */
 export function diagnoseProject(input) {
@@ -47,6 +53,8 @@ export function diagnoseProject(input) {
     registry,
     konanBytes,
     freeDiskBytes,
+    inspectorHits = null,
+    inspectorCatalog = null,
   } = input;
 
   // --- version catalog ------------------------------------------------------
@@ -246,7 +254,70 @@ export function diagnoseProject(input) {
     }
   }
 
+  // --- live inspector placement (must never be reachable in release) ---------
+  // Static check by design: no network probe, no adb — the release guarantee is
+  // STRUCTURAL (inspector code lives only in the androidDebug source set), so we
+  // verify structure. inspectorHits are Kotlin sources referencing the inspector
+  // endpoint ("/inspect/" or InspectorHttpServer).
+  if (Array.isArray(inspectorHits) && inspectorHits.length > 0) {
+    const leaks = inspectorHits.filter((p) => !normalizePath(p).includes("/androidDebug/"));
+    if (leaks.length === 0) {
+      findings.push({
+        id: "inspector-placement",
+        level: "ok",
+        title: "Live inspector is debug-only",
+        detail:
+          "All inspector endpoint code lives in the androidDebug source set — structurally absent from release builds.",
+      });
+    } else {
+      findings.push({
+        id: "inspector-placement",
+        level: "warn",
+        title: "Inspector endpoint may be reachable in RELEASE builds",
+        detail:
+          `Inspector code referenced outside androidDebug: ${leaks.join(", ")}. ` +
+          "The live inspector server must never ship in release — keep the server, root registry " +
+          "and catalog in composeApp/src/androidDebug/kotlin only (the androidRelease twin must stay a no-op).",
+        fix: {
+          auto: false,
+          description:
+            "Move the offending code back to composeApp/src/androidDebug/kotlin (release keeps only the no-op startInspector() twin).",
+        },
+      });
+    }
+  }
+
+  // --- inspector catalog drift tripwire ---------------------------------------
+  // The design-system catalog is a hand-registry: a token ADDED to the theme but
+  // missing from InspectorCatalog.kt silently vanishes from /inspect/design-system.
+  if (inspectorCatalog && inspectorCatalog.catalog && inspectorCatalog.theme) {
+    const declared = [...inspectorCatalog.theme.matchAll(/^\s*val\s+([A-Z]\w*)\s*=/gm)].map((m) => m[1]);
+    const missing = declared.filter((name) => !inspectorCatalog.catalog.includes(`"${name}"`));
+    if (missing.length === 0) {
+      findings.push({
+        id: "inspector-catalog-drift",
+        level: "ok",
+        title: "Inspector catalog covers all declared tokens",
+        detail: `Every theme token (${declared.length}) appears in InspectorCatalog.kt.`,
+      });
+    } else {
+      findings.push({
+        id: "inspector-catalog-drift",
+        level: "warn",
+        title: `Inspector catalog is missing ${missing.length} declared token${missing.length === 1 ? "" : "s"}`,
+        detail:
+          `Declared in the theme but absent from InspectorCatalog.kt: ${missing.join(", ")}. ` +
+          "These tokens will not appear on /inspect/design-system, so drift on them goes uncaught.",
+        fix: { auto: false, description: "Add the missing entries to InspectorCatalog.kt (read from the real theme objects)." },
+      });
+    }
+  }
+
   return findings;
+}
+
+function normalizePath(p) {
+  return String(p).split("\\").join("/");
 }
 
 /** Human-readable byte size (GB/MB). */

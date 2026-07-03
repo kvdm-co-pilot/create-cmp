@@ -1,17 +1,26 @@
 # create-cmp Inspector — plan of record
 
 > **Status:** **Phase 0 built + verified (2026-07-03). Phase 1 (template token-annotation) +
-> contract extension + golden-tree snapshots + a11y audit built + verified (2026-07-03).** The
+> contract extension + golden-tree snapshots + a11y audit built + verified (2026-07-03).
+> Phase 2 (LIVE on-device inspector) BUILT + VERIFIED (2026-07-03).** The
 > headless render → semantics-dump → structured-inspect loop works end-to-end on the host JVM (no
 > emulator): a Compose Desktop harness (`inspector/harness/`) renders a screen and emits the
 > design-token-annotated semantics tree as JSON; the `cmp-inspector` MCP (`inspector/mcp/`)
-> consumes it and exposes nine query/assert/drift/snapshot/a11y tools. The node contract carries
-> optional `role`/`clickable`/`disabled` fields (additive, schemaVersion 1), the template kit
-> (BaseScreen/AppShell/Home/Detail/Profile) self-reports design tokens by default, and
+> consumes it and exposes ten query/assert/drift/snapshot/a11y/connect tools. The node contract
+> carries optional `role`/`clickable`/`disabled` fields (additive, schemaVersion 1), the template
+> kit (BaseScreen/AppShell/Home/Detail/Profile) self-reports design tokens by default, and
 > `snapshot_save`/`snapshot_diff`/`audit_a11y` provide the pixel-free regression + accessibility
-> gates (39/39 MCP tests green). Phases 2–3 remain proposed. Scope for now is **Android +
-> host-JVM only** — iOS is explicitly deferred. Companion docs: [`ARCHITECTURE.md`](./ARCHITECTURE.md)
-> (the scaffolder engine), and the internal strategy notes (not in the public repo).
+> gates. **Phase 2**: every generated app ships a debug-only loopback HTTP server
+> (`composeApp/src/androidDebug/.../inspector/`, 127.0.0.1:9500, zero deps, `--inspector` feature
+> on by default, androidRelease no-op twin = structurally absent from release) serving
+> `/inspect/health|tree|design-system`; the MCP gained the `source` union
+> (`file`|`live`|`uiautomator`) + `connect_live`, proven live on an emulator: health → tree
+> (`source:"live-android"`, real data) → clean design-system diff → a11y pass → **nav-state proof**
+> (tap a card at live-tree coordinates → re-fetch → `home_title` gone, Detail content present).
+> Phase 3 remains proposed. Scope for now is **Android + host-JVM only** — iOS is explicitly
+> deferred. Companion docs: [`INSPECTOR-PHASE2-DESIGN.md`](./INSPECTOR-PHASE2-DESIGN.md) (the
+> Phase 2 spec), [`ARCHITECTURE.md`](./ARCHITECTURE.md) (the scaffolder engine), and the internal
+> strategy notes (not in the public repo).
 
 ## The problem
 
@@ -136,8 +145,21 @@ platform coupling are inspected on Tier 1 instead.
     on harness output; parameterizable for device trees), clickables with no label anywhere, empty
     contentDescription. Its first real catch: the template's bottom-nav tap targets measured ~36px
     tall — fixed in the kit with `defaultMinSize(48.dp)` and re-verified clean.
-- **Phase 2 — live on-device inspector.** Same JSON schema, sourced from the app's debug Ktor
-  endpoint over `adb forward`. Inspect the real app with real data and real navigation state.
+- **Phase 2 — live on-device inspector. ✅ BUILT + VERIFIED (2026-07-03).** Same JSON schema,
+  sourced LIVE from the running app: the template stamps a debug-only, zero-dependency
+  `ServerSocket` HTTP responder (`androidDebug` source set only; `androidRelease` ships a no-op
+  twin, so release builds contain no inspector code structurally) bound to `127.0.0.1:9500`,
+  reading the semantics tree from the topmost Compose root (public `ViewRootForTest.
+  onViewCreatedCallback` registry + main-thread bridge) and the declared token catalog from a
+  hand-registry (`InspectorCatalog.kt`). MCP side: `source` union
+  (`{kind:"file"|"live"|"uiautomator"}`) on all nine tools + `connect_live` (one bounded
+  `adb forward` + health check, sets the session default) + the tier-2 uiautomator XML converter.
+  Feature-toggled (`--inspector`/`--no-inspector`, default on); `create-cmp doctor` statically
+  warns if inspector code leaks outside `androidDebug` and when a declared theme token is missing
+  from the catalog. Verified end-to-end on an emulator: `/inspect/health|tree|design-system` live,
+  MCP tools green against `source:{kind:"live"}` (clean design-system diff, a11y pass), and the
+  headline nav-state proof — tap a card at coordinates read from the live tree, re-fetch,
+  `home_title` gone / Detail content present. No screenshots at any step.
 - **Phase 3 — ship as the `cmp-inspector` plugin** — MCP server + a driving skill + the template's
   debug module, on by default in generated apps.
 

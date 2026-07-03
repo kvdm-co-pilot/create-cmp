@@ -8,11 +8,13 @@ description: >-
   screenshots", "what colour/radius/spacing did this actually render", "assert the resolved tokens",
   "diff this screen against the design system", "snapshot this screen as a regression golden",
   "did this UI change / regress", or "audit this screen for accessibility (touch targets, missing
-  labels)". Drives the create-cmp inspector: render a screen with the harness to produce a JSON
-  tree, then query it with the cmp-inspector MCP tools (get_node, assert_token, layout_gaps,
-  diff_against_design_system, find_drift, snapshot_save, snapshot_diff, audit_a11y). Asserts on the
-  rendered STRUCTURE, not pixels — catches token drift (raw values where a token belongs), layout
-  faults, UI regressions, and a11y faults mechanically.
+  labels)", "inspect the RUNNING app", "what's on the screen right now", or "check the real
+  navigation state". Drives the create-cmp inspector: either render a screen headlessly with the
+  harness (tier 0) or connect to the RUNNING debug app's live endpoint (tier 1: connect_live +
+  source {kind:"live"} — real data, real nav state), then query with the cmp-inspector MCP tools
+  (get_node, assert_token, layout_gaps, diff_against_design_system, find_drift, snapshot_save,
+  snapshot_diff, audit_a11y). Asserts on the rendered STRUCTURE, not pixels — catches token drift
+  (raw values where a token belongs), layout faults, UI regressions, and a11y faults mechanically.
 ---
 
 # cmp-inspect — read a live Compose UI as structured design data
@@ -26,14 +28,41 @@ theme tokens at all. This skill drives the `cmp-inspector` MCP over a fixed JSON
 > the semantics tree and assert on it. The tree carries the *resolved* design token — strictly
 > better than sampling an image, and 100% structured.
 
-## The loop: render → dump → inspect
+## Two loops — pick the right tier first
 
-1. **Render** the screen with the inspector **harness** (in `inspector/harness/`, owned by the
-   harness track). It composes a `commonMain` screen on the host JVM (headless — no emulator, no
-   device) and writes the semantics tree to a JSON file. This is Tier 0; it runs in milliseconds.
-2. **Dump** — the harness output is a JSON file matching the tree contract (below). Note its path.
-3. **Inspect** — call the `cmp-inspector` MCP tools against that JSON, passing `treePath` (or export
-   `CMP_INSPECTOR_TREE` once and omit it).
+**Tier 0 (headless) — render → dump → inspect.** Fast (milliseconds), no device. Use for
+layout/token assertions on `commonMain` screens with fake data:
+
+1. **Render** the screen with the inspector **harness** (in `inspector/harness/`). It composes a
+   `commonMain` screen on the host JVM and writes the semantics tree to a JSON file.
+2. **Inspect** — call the `cmp-inspector` MCP tools against that JSON, passing `treePath` (or
+   `source:{kind:"file",path}`, or export `CMP_INSPECTOR_TREE` once and omit it).
+
+**Tier 1 (LIVE) — build → connect → inspect the running app.** Use when the question involves
+*real data, real navigation state, or "what is on screen right now"*:
+
+1. **Build + install + launch the DEBUG app** on an emulator/device (`./gradlew
+   :composeApp:installDebug`, then launch it). Every create-cmp app scaffolded with the default
+   `--inspector` feature ships a debug-only loopback HTTP server on `127.0.0.1:9500`
+   (androidDebug source set only — release builds contain no inspector code).
+2. **`connect_live { port?: 9500, serial? }`** — runs one bounded `adb forward tcp:9500 tcp:9500`
+   and health-checks `/inspect/health`. On success it sets the session default source, so every
+   subsequent tool call can just omit `source`.
+3. **Inspect** — call any tool with `source:{kind:"live"}` (or nothing, after connect_live). Each
+   call re-fetches the tree, so it always reflects the CURRENT screen: navigate the app (Appium
+   MCP / adb), call `inspect_tree` again, and assert the nav-state change structurally (e.g.
+   `home_title` gone, detail content present). Trees carry `source:"live-android"`.
+   `diff_against_design_system` needs no `catalogPath` live — the declared catalog is fetched
+   from `/inspect/design-system`.
+
+   Cold start: if you get "compose root not ready / not reachable", the app is still launching —
+   retry after a second or two. If `connect_live` fails, check `adb devices` and that the app is a
+   DEBUG build of a create-cmp app (the server is structurally absent from release).
+
+**Tier 2 (uiautomator fallback)** — when the app is NOT a create-cmp debug build (third-party,
+release build) or tier 1 is unreachable: get Appium `getPageSource` XML and pass
+`source:{kind:"uiautomator", xml}` (or `xmlPath`). You get geometry + text + clickability for any
+app, but `designToken` is always null — token/drift tools reject these trees by design.
 
 ## The tree contract you assert on
 
@@ -74,9 +103,12 @@ old trees): `role` (`"Button"`, `"Checkbox"`, … or null), `clickable` (has an 
 | `snapshot_save` | write the normalized tree as a **golden-tree snapshot** (commit it — it's the regression fixture) |
 | `snapshot_diff` | structurally diff the current tree vs a golden: `{path, kind, before, after}` entries; empty = pass |
 | `audit_a11y` | audit touch targets (< 48px clickables), missing labels on clickables, empty contentDescription |
+| `connect_live` | tier-1 handshake: one bounded `adb forward` + `/inspect/health`; sets the session default source |
 
-All take an optional `treePath`; omit it if `CMP_INSPECTOR_TREE` is set. Errors (missing file, bad
-JSON, node not found) come back as a clean `{ error }` — read it and fix the input.
+All take an optional `source` (`{kind:"file"|"live"|"uiautomator"}`) and the legacy `treePath`;
+omit both after `connect_live` (or if `CMP_INSPECTOR_TREE`/`CMP_INSPECTOR_LIVE` is set). Errors
+(missing file, bad JSON, node not found, live server unreachable) come back as a clean, actionable
+`{ error }` — read it and fix the input.
 
 ## Typical workflows
 
@@ -104,6 +136,12 @@ raw hex where `Surface` belongs, or a `24dp` radius where `RadiusCard` is `16dp`
 3. Intentional change? Re-run `snapshot_save` to re-bless the golden. The review diff of the golden
    file itself is human-readable JSON, unlike a pixel snapshot.
 
+**"What is the running app actually showing? / did navigation work?"** — the tier-1 loop:
+`connect_live`, then `inspect_tree` (no `source` needed — session default). Drive the app (Appium
+MCP tap / `adb shell input tap` on coordinates read FROM THE LIVE TREE's bounds), then
+`inspect_tree` again and assert the structural change: the old screen's testTag/text is gone, the
+new screen's content is present. Real navigation state, observed live, zero screenshots.
+
 **"Audit accessibility"** — `audit_a11y { treePath }`. Violations: `touch-target-too-small`
 (clickable under `minTouchTargetPx`, default 48 — harness dumps are density-1 so px == dp there;
 scale it for device-density trees) and `missing-label` (clickable with no text, no
@@ -117,14 +155,16 @@ re-audit until `pass: true`.
 The tools are identical regardless of where the tree comes from, so work done against the fast
 headless loop transfers to the live app:
 
-- **Tier 0 — headless render** (now): `ImageComposeScene` / `runComposeUiTest` on the host JVM. Fast,
+- **Tier 0 — headless render**: `ImageComposeScene` / `runComposeUiTest` on the host JVM. Fast,
   no device. Only renders `commonMain` composables whose deps resolve on the JVM; anything behind an
   Android `actual` (Firebase, platform APIs) needs a DI fake (the template's Koin makes this trivial).
-- **Tier 1 — live app** (later): a debug-only Ktor endpoint inside the running app, reached via
-  `adb forward`, walking `SemanticsOwner.getAllSemanticsNodes` — same tree, **plus real data and real
-  nav state**.
-- **Tier 2 — zero-instrument fallback**: `uiautomator` / Appium — geometry + text only, any app, no
-  tokens. Use when you can't instrument.
+- **Tier 1 — live app**: the debug-only in-app HTTP server (zero-dep ServerSocket on
+  `127.0.0.1:9500`, androidDebug source set only), reached via `adb forward`, walking the
+  `SemanticsOwner` of the topmost Compose root — same tree, **plus real data and real nav state**.
+  `connect_live` then `source:{kind:"live"}` (pull-on-demand: every call re-reads the screen).
+- **Tier 2 — zero-instrument fallback**: `uiautomator` / Appium page-source via
+  `source:{kind:"uiautomator"}` — geometry + text only, any app, no tokens ever. Use when you
+  can't instrument.
 
 ## Registering the MCP
 

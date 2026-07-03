@@ -26,6 +26,8 @@
   "packageSourceRoots": [
     "composeApp/src/commonMain/kotlin",
     "composeApp/src/androidMain/kotlin",
+    "composeApp/src/androidDebug/kotlin",
+    "composeApp/src/androidRelease/kotlin",
     "composeApp/src/iosMain/kotlin"
   ],
   "renameDirs": {
@@ -84,6 +86,14 @@
         "tests/appium"
       ],
       "notes": "Appium harness (Python conftest + smoke, JS client + smoke runner). No in-file markers; toggled by deleting the listed paths."
+    },
+    "inspector": {
+      "enabledByDefault": true,
+      "paths": [
+        "composeApp/src/androidDebug/kotlin/com/example/app/inspector",
+        "composeApp/src/androidRelease/kotlin/com/example/app/inspector"
+      ],
+      "notes": "Live on-device inspector: debug-only loopback HTTP server on 127.0.0.1:9500 (GET /inspect/health|tree|design-system) serving the semantics tree + design-token catalog to the cmp-inspector MCP via `adb forward tcp:9500 tcp:9500`. The androidRelease dir holds only the no-op startInspector() twin — release builds contain no inspector code structurally. When off: delete both inspector dirs AND strip the `inspector` marker blocks in AppApplication.kt (import + startInspector() call) and composeApp/src/androidDebug/AndroidManifest.xml (INTERNET permission). Zero dependencies (java.net.ServerSocket + kotlinx-serialization from commonMain); no build-file markers needed."
     }
   },
   "verify": {
@@ -95,11 +105,11 @@
   },
   "stampPipeline": [
     "1. Copy template/ -> targetDir (preserve binary files).",
-    "2. Strip/keep feature-marker blocks per the enabled feature set (stack-based; handle ! negation).",
-    "3. Replace placeholder tokens in all text-file CONTENTS.",
-    "4. Rename package source dirs com/example/app -> __PACKAGE_PATH__ under each packageSourceRoots entry.",
-    "5. Slugify __APP_NAME__ for settings.gradle.kts rootProject.name (no spaces).",
-    "6. Delete disabled-feature paths.",
+    "2. Delete disabled-feature paths. MUST happen BEFORE the package-dir rename: feature paths are declared with the literal com/example/app segment, so deleting after the rename silently misses package-rooted paths (the --no-room stale-sources bug).",
+    "3. Strip/keep feature-marker blocks per the enabled feature set (stack-based; handle ! negation).",
+    "4. Replace placeholder tokens in all text-file CONTENTS.",
+    "5. Rename package source dirs com/example/app -> __PACKAGE_PATH__ under each packageSourceRoots entry.",
+    "6. Slugify __APP_NAME__ for settings.gradle.kts rootProject.name (no spaces).",
     "7. Write local.properties (sdk.dir) and run verify.android (+ verify.ios on macOS when ios enabled)."
   ]
 }

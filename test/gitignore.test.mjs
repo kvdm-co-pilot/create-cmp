@@ -54,6 +54,7 @@ function config(targetDir) {
     firebase: { enabled: true, auth: "both", firestore: true, storage: true, functions: true, fcm: true },
     room: true,
     appium: true,
+    inspector: true,
     tabs: [{ label: "Home", icon: "home" }],
     targetDir,
   };

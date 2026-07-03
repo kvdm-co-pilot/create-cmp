@@ -134,9 +134,28 @@ test("disabledFeaturesFromConfig maps config to feature names", () => {
     firebase: { enabled: true },
     room: false,
     appium: true,
+    inspector: true,
   };
   const d = disabledFeaturesFromConfig(cfg);
   assert.deepEqual([...d].sort(), ["ios", "room"]);
+});
+
+test("disabledFeaturesFromConfig: inspector off (or absent) disables the inspector feature", () => {
+  const off = disabledFeaturesFromConfig({
+    platforms: { android: true, ios: true },
+    firebase: { enabled: true },
+    room: true,
+    appium: true,
+    inspector: false,
+  });
+  assert.ok(off.has("inspector"));
+  const absent = disabledFeaturesFromConfig({
+    platforms: { android: true, ios: true },
+    firebase: { enabled: true },
+    room: true,
+    appium: true,
+  });
+  assert.ok(absent.has("inspector"), "absent inspector key = disabled (schema requires it explicitly)");
 });
 
 test("deleteDisabledFeaturePaths removes manifest paths for disabled features", () => {

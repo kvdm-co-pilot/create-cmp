@@ -103,6 +103,11 @@ per run, so it can't silently drift:
   renders, so "done" can be proven on a device.
 - **A toolchain doctor** — diagnoses *and* heals JDK, Android SDK + AVD, Xcode/CLT, CocoaPods,
   XcodeGen, Appium + drivers, Node. Idempotent, OS-aware, consent-gated.
+- **AI-inspectable by default** — every generated app ships a debug-only live inspector
+  (`127.0.0.1:9500`, loopback, structurally absent from release). An agent runs `connect_live` and
+  reads the running UI as JSON — hierarchy, geometry, resolved design tokens, real navigation
+  state. Never screenshots. Toggle with `--no-inspector`; `create-cmp doctor` verifies it stays
+  debug-only and that every declared theme token is served on `/inspect/design-system`.
 
 `google-services.json` / `GoogleService-Info.plist` are intentionally **not** real — you get
 placeholders and clear "drop your Firebase config here" instructions.

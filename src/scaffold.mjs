@@ -1,9 +1,11 @@
 // Scaffold pipeline (CONTRACT §"Scaffold pipeline"):
 //   (a) validate config against options.schema.json
 //   (b) copy template/ → targetDir
+//   (b.2) delete disabled-feature paths (MUST precede the package rename —
+//         feature paths are declared against the literal com/example/app)
 //   (c) token-replace contents AND paths
 //   (d) rename package source dirs com/example/app → __PACKAGE_PATH__ (atomic)
-//   (e) toggle features (strip cmp:feature blocks + delete manifest paths)
+//   (e) toggle features (strip cmp:feature marker blocks)
 //   (f) run the verify gate
 //
 // No LLM in this hot path — pure deterministic Node.
@@ -261,6 +263,19 @@ export async function scaffold(config, opts = {}) {
     fs.renameSync(bareGitignore, path.join(projectDir, ".gitignore"));
   }
 
+  // (b.2) Delete disabled-feature PATHS now, BEFORE the package-dir rename.
+  // Manifest feature paths are declared with the literal `com/example/app`
+  // segment; deleting after renamePackageDirs silently missed every
+  // package-rooted path (the --no-room bug: Room deps/plugin stripped but the
+  // data/local sources left behind → unresolved androidx.room at build time).
+  const disabled = disabledFeaturesFromConfig(config);
+  if (disabled.size > 0) {
+    step(`Deleting disabled-feature paths: ${[...disabled].join(", ")}`);
+    deleteDisabledFeaturePaths(projectDir, manifest, disabled, (m) =>
+      process.stdout.write(`${m}\n`)
+    );
+  }
+
   const tokenMap = buildTokenMap(config);
 
   // (c) token-replace contents AND paths
@@ -287,20 +302,15 @@ export async function scaffold(config, opts = {}) {
   // must not. See manifest stampPipeline step 5.
   applyAppNameSlug(projectDir, config.appName);
 
-  // (e) toggle features. Always strip marker comments (even for enabled
-  // features) so no marker noise ships; delete paths only for disabled ones.
-  const disabled = disabledFeaturesFromConfig(config);
+  // (e) toggle feature MARKER BLOCKS. Always strip marker comments (even for
+  // enabled features) so no marker noise ships. (Disabled-feature paths were
+  // already deleted in (b.2), before the package rename — see above.)
   step(
     disabled.size > 0
       ? `Toggling features off: ${[...disabled].join(", ")}`
       : "Cleaning feature markers…"
   );
   stripDisabledBlocks(projectDir, disabled);
-  if (disabled.size > 0) {
-    deleteDisabledFeaturePaths(projectDir, manifest, disabled, (m) =>
-      process.stdout.write(`${m}\n`)
-    );
-  }
 
   // Write local.properties (sdk.dir) so the Gradle build can find the Android
   // SDK even when ANDROID_HOME/ANDROID_SDK_ROOT aren't exported (manifest

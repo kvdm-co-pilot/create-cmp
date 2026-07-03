@@ -20,6 +20,7 @@ import { doctor as toolchainDoctor } from "../doctor.mjs";
 import { diagnoseProject } from "../lib/project-doctor.mjs";
 import { parseProperties, upsertProperty, parseVersions } from "../lib/toml.mjs";
 import { loadRegistry } from "../lib/registry.mjs";
+import { listFiles } from "../lib/fsutil.mjs";
 
 function readIfExists(p) {
   try {
@@ -97,6 +98,8 @@ export function gatherProjectInputs(projectDir) {
     // corrupt registry should not break doctor — drift check is skipped
   }
 
+  const { inspectorHits, inspectorCatalog } = scanInspectorSources(projectDir);
+
   return {
     toml,
     gradleProperties,
@@ -107,6 +110,38 @@ export function gatherProjectInputs(projectDir) {
     registry,
     konanBytes: konanSizeBytes(),
     freeDiskBytes: freeDiskBytes(),
+    inspectorHits,
+    inspectorCatalog,
+  };
+}
+
+/**
+ * Static scan for the live-inspector release-safety check: which Kotlin sources
+ * reference the inspector endpoint, and (for the catalog drift tripwire) the
+ * stamped InspectorCatalog.kt + theme sources. Purely filesystem — doctor never
+ * probes the network for this (the release guarantee is structural).
+ */
+function scanInspectorSources(projectDir) {
+  const srcRoot = path.join(projectDir, "composeApp", "src");
+  if (!fs.existsSync(srcRoot)) return { inspectorHits: null, inspectorCatalog: null };
+
+  const hits = [];
+  let catalog = null;
+  let theme = "";
+  for (const file of listFiles(srcRoot)) {
+    if (!file.endsWith(".kt")) continue;
+    const content = readIfExists(file);
+    if (content === null) continue;
+    const rel = path.relative(projectDir, file).split(path.sep).join("/");
+    if (content.includes("/inspect/") || content.includes("InspectorHttpServer")) {
+      hits.push(rel);
+    }
+    if (path.basename(file) === "InspectorCatalog.kt") catalog = content;
+    if (/\/presentation\/theme\/(Tokens|Theme)\.kt$/.test(rel)) theme += `${content}\n`;
+  }
+  return {
+    inspectorHits: hits,
+    inspectorCatalog: catalog && theme ? { catalog, theme } : null,
   };
 }
 

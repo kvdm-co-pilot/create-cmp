@@ -15,6 +15,7 @@
     "firebase",
     "room",
     "appium",
+    "inspector",
     "tabs",
     "targetDir"
   ],
@@ -77,6 +78,10 @@
     },
     "room": { "type": "boolean" },
     "appium": { "type": "boolean" },
+    "inspector": {
+      "type": "boolean",
+      "description": "Live on-device inspector: debug-only loopback HTTP server (127.0.0.1:9500) serving the Compose semantics tree + design-token catalog to the cmp-inspector MCP. Structurally absent from release builds."
+    },
     "tabs": {
       "type": "array",
       "minItems": 1,

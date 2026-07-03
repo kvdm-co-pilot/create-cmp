@@ -143,3 +143,67 @@ test("formatBytes renders GB and MB sensibly", () => {
   assert.equal(formatBytes(10 * GIB), "10.0 GB");
   assert.equal(formatBytes(512 * 1024 ** 2), "512 MB");
 });
+
+// --- live inspector placement + catalog drift (Phase 2) ------------------------
+
+test("inspector code confined to androidDebug → ok finding", () => {
+  const findings = diagnoseProject(
+    baseInput({
+      inspectorHits: [
+        "composeApp/src/androidDebug/kotlin/com/acme/app/inspector/InspectorHttpServer.kt",
+        "composeApp/src/androidDebug/kotlin/com/acme/app/inspector/InspectorInit.kt",
+      ],
+    })
+  );
+  const f = byId(findings, "inspector-placement");
+  assert.equal(f.level, "ok");
+});
+
+test("inspector reference outside androidDebug → WARN naming the leak", () => {
+  const findings = diagnoseProject(
+    baseInput({
+      inspectorHits: [
+        "composeApp/src/androidDebug/kotlin/com/acme/app/inspector/InspectorHttpServer.kt",
+        "composeApp/src/androidMain/kotlin/com/acme/app/AppApplication.kt",
+      ],
+    })
+  );
+  const f = byId(findings, "inspector-placement");
+  assert.equal(f.level, "warn");
+  assert.ok(f.detail.includes("AppApplication.kt"));
+  assert.ok(!f.detail.includes("InspectorHttpServer.kt"), "debug-set file is not a leak");
+});
+
+test("no inspector code / scan skipped → no inspector finding", () => {
+  assert.equal(byId(diagnoseProject(baseInput({ inspectorHits: [] })), "inspector-placement"), undefined);
+  assert.equal(byId(diagnoseProject(baseInput({ inspectorHits: null })), "inspector-placement"), undefined);
+  assert.equal(byId(diagnoseProject(baseInput({})), "inspector-placement"), undefined);
+});
+
+test("catalog drift tripwire: token declared in theme but missing from catalog → WARN", () => {
+  const theme = [
+    "object AcmeTokens {",
+    "    val PaddingPage = 16.dp",
+    "    val RadiusCard  = 16.dp",
+    "    val BrandNewToken = 42.dp",
+    "}",
+  ].join("\n");
+  const catalog = 'put("PaddingPage", ...)\nput("RadiusCard", ...)\n';
+  const findings = diagnoseProject(baseInput({ inspectorCatalog: { catalog, theme } }));
+  const f = byId(findings, "inspector-catalog-drift");
+  assert.equal(f.level, "warn");
+  assert.ok(f.detail.includes("BrandNewToken"));
+  assert.ok(!f.detail.includes("PaddingPage,"), "covered tokens not listed");
+});
+
+test("catalog drift tripwire: full coverage → ok; private vals ignored", () => {
+  const theme = [
+    "object AcmeColors {",
+    "    val Primary = Color(0xFF0A2540)",
+    "}",
+    "private val AcmeColorScheme = lightColorScheme()",
+  ].join("\n");
+  const catalog = 'put("Primary", AcmeColors.Primary.toHex())';
+  const findings = diagnoseProject(baseInput({ inspectorCatalog: { catalog, theme } }));
+  assert.equal(byId(findings, "inspector-catalog-drift").level, "ok");
+});
