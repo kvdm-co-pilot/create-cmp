@@ -167,10 +167,17 @@ contents *and* paths, atomically renames package directories, toggles features (
 
 ## Roadmap
 
-- [x] Publish to npm as `create-cmp-cli` (`npx create-cmp-cli`).
+The full plan — six pillars from scaffold to store release, and the sequencing — lives in
+[`docs/ROADMAP.md`](./docs/ROADMAP.md). Near-term:
+
+- [ ] Publish to npm as `create-cmp-cli` (`npx create-cmp-cli`) — release cut, publish pending.
 - [ ] Record the asciinema demo (`npx create-cmp-cli` → green Android + iOS).
 - [ ] Full Android + iOS build matrix in CI (currently CI runs the engine unit tests).
 - [ ] More example features and nav shapes.
+- **AI-native Compose inspector** — read a running app's hierarchy, geometry, and *resolved design
+  tokens* as structured JSON (no screenshots). **Phase 0 (headless host-JVM render → inspect) is
+  built and verified**; live-emulator inspection is next. See
+  [`docs/INSPECTOR-PLAN.md`](./docs/INSPECTOR-PLAN.md).
 
 ## Contributing
 
