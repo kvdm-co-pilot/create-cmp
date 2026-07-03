@@ -8,13 +8,16 @@ description: >-
   screenshots", "what colour/radius/spacing did this actually render", "assert the resolved tokens",
   "diff this screen against the design system", "snapshot this screen as a regression golden",
   "did this UI change / regress", or "audit this screen for accessibility (touch targets, missing
-  labels)", "inspect the RUNNING app", "what's on the screen right now", or "check the real
-  navigation state". Drives the create-cmp inspector: either render a screen headlessly with the
-  harness (tier 0) or connect to the RUNNING debug app's live endpoint (tier 1: connect_live +
-  source {kind:"live"} — real data, real nav state), then query with the cmp-inspector MCP tools
-  (get_node, assert_token, layout_gaps, diff_against_design_system, find_drift, snapshot_save,
-  snapshot_diff, audit_a11y). Asserts on the rendered STRUCTURE, not pixels — catches token drift
-  (raw values where a token belongs), layout faults, UI regressions, and a11y faults mechanically.
+  labels)", "inspect the RUNNING app", "what's on the screen right now", "check the real
+  navigation state", "show me the screen / a preview / a wireframe of the UI", or "prove this UI
+  change did what it should". Drives the create-cmp inspector: either render a screen headlessly
+  with the harness (tier 0) or connect to the RUNNING debug app's live endpoint (tier 1:
+  connect_live + source {kind:"live"} — real data, real nav state), then query with the
+  cmp-inspector MCP tools (get_node, assert_token, layout_gaps, diff_against_design_system,
+  find_drift, snapshot_save, snapshot_diff, audit_a11y, render_tree, render_screen, prove_change).
+  Asserts on the rendered STRUCTURE, not pixels — catches token drift (raw values where a token
+  belongs), layout faults, UI regressions, and a11y faults mechanically — and proves every UI
+  change with prove_change (the verified dev loop).
 ---
 
 # cmp-inspect — read a live Compose UI as structured design data
@@ -104,6 +107,9 @@ old trees): `role` (`"Button"`, `"Checkbox"`, … or null), `clickable` (has an 
 | `snapshot_diff` | structurally diff the current tree vs a golden: `{path, kind, before, after}` entries; empty = pass |
 | `audit_a11y` | audit touch targets (< 48px clickables), missing labels on clickables, empty contentDescription |
 | `connect_live` | tier-1 handshake: one bounded `adb forward` + `/inspect/health`; sets the session default source |
+| `render_tree` | draw the tree as a deterministic **SVG wireframe** (any source, incl. live) — structure you AND the human can see |
+| `render_screen` | pixel preview with a **path-only contract** — returns the PNG's path + metadata, never bytes; for the HUMAN |
+| `prove_change` | the verified dev loop: diff a BEFORE tree vs an AFTER tree + regression-check drift/a11y → one verdict |
 
 All take an optional `source` (`{kind:"file"|"live"|"uiautomator"}`) and the legacy `treePath`;
 omit both after `connect_live` (or if `CMP_INSPECTOR_TREE`/`CMP_INSPECTOR_LIVE` is set). Errors
@@ -149,6 +155,51 @@ contentDescription, no descendant text — invisible to screen readers). Warning
 `empty-content-description`. Old trees without the `clickable`/`role` fields are skipped, not
 crashed on. Fix violations in the kit (e.g. `defaultMinSize(48.dp)` on tap targets), re-render,
 re-audit until `pass: true`.
+
+## See it — wireframes for anyone, pixels for the human
+
+**The architecture rule, stated plainly: pixels flow to the HUMAN, structure flows to the AI.**
+No tool ever returns image bytes/base64 into model context. When you (the agent) need to *see*
+the screen, see it structurally; when the human needs to see it, hand them a file.
+
+- **`render_tree { source?, out?, a11y? }`** — the structural wireframe. Works for **any** source,
+  including `{kind:"live"}` while you develop: every footprint node drawn as a rect, tokenized
+  nodes highlighted with a resolved-values chip (`radius 16 · pad 16`), clickable nodes with a
+  distinct dashed outline, testTags as mono labels, text shown, legend + a footer
+  (`<n> nodes · <source> · schemaVersion <v>`). Pass `a11y:true` to overlay audit violations in a
+  danger style. The result includes the SVG **text** — SVG is structured text, not pixels, so you
+  may read and reason over it, and the human can open the written `.svg` file too. Deterministic:
+  the same tree always renders byte-identical SVG (diffable, cacheable).
+- **`render_screen { pngPath }` or `{ harness: true }`** — real pixels, **path-only contract**
+  (tier 0). Returns `{ path, width, height, sizeBytes, displayHint }` parsed from the PNG header —
+  NEVER the image data. `harness:true` runs the headless harness (`./gradlew run`), which writes
+  `out/screen.png` (1024x768) alongside its tree, so every preview has its structural twin from the
+  same viewport. To show the human: follow the `displayHint` — write a tiny HTML wrapper embedding
+  `<img src="file://…">` and open it (or attach the file in the host UI). Do **not** Read the PNG.
+
+Pair them: `render_screen` for the human's eyes, `render_tree` + the query tools for your
+assertions — same screen, two audiences.
+
+## The verified dev loop — how UI changes get proven (the core workflow)
+
+For **any** UI change in a create-cmp app, "it compiles and looks right" is not done — **a change
+without a `prove_change` verdict is not done.** The loop:
+
+1. **Before editing:** `snapshot_save { source: {kind:"live"}, snapshotPath }` (or a tier-0 harness
+   tree) — capture the pre-change state as the BEFORE golden.
+2. **Make the code change.**
+3. **Reload:** dev-client hot reload on desktop, or rebuild/reinstall on the device, until the app
+   shows the new state.
+4. **`prove_change { before: <snapshotPath>, after: {kind:"live"} }`** — ONE call that structurally
+   diffs before→after AND regression-checks the AFTER tree (design-system drift with the live
+   catalog auto-fetched, plus the a11y audit). Read the verdict:
+   - `proven-clean` — the change landed and nothing regressed. Done.
+   - `no-change` — the edit didn't reach the screen (wrong screen? stale build? not reloaded?).
+   - `changed-with-regressions` — the change landed but introduced drift and/or a11y faults: fix,
+     reload, re-prove.
+5. **Present the proof:** the `changes` list is the evidence of what the edit did (human-readable
+   `{path, kind, before, after}` entries); pair it with `render_tree` of the after-state so the
+   human sees the result structurally (and `render_screen` when they want real pixels).
 
 ## Three tiers, one interface
 

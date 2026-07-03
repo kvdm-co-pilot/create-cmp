@@ -7,7 +7,7 @@ with resolved **design tokens**. This proves the "inspect a running Compose UI a
 structured design data, never pixels" thesis using APIs that already exist
 (`runComposeUiTest` + the semantics interaction API).
 
-## Render + dump JSON
+## Render + dump JSON (+ PNG preview)
 
 ```bash
 ./gradlew run
@@ -16,12 +16,17 @@ structured design data, never pixels" thesis using APIs that already exist
 Writes:
 - `out/tree.json` — the enriched semantics tree (contract below), also printed to stdout.
 - `out/design-system.json` — the declared token catalog (colors + dimens) the MCP diffs against.
+- `out/screen.png` — a 1024x768 pixel render of the SAME screen via `ImageComposeScene`
+  (`--png <path>` to redirect). **Pixels are for the HUMAN** (open the file); agents keep
+  asserting on the tree JSON — never read the image bytes into model context. The tree still
+  comes from `runComposeUiTest` (same 1024x768 density-1 viewport), so the committed
+  `sample-tree.json` golden stays byte-identical.
 
 Custom output paths (invoke the app directly so the `--args` spaces survive shell splitting):
 
 ```bash
 ./gradlew installDist
-./build/install/cmp-inspector-harness/bin/cmp-inspector-harness --out out/tree.json --tokens-out out/design-system.json
+./build/install/cmp-inspector-harness/bin/cmp-inspector-harness --out out/tree.json --tokens-out out/design-system.json --png out/screen.png
 ```
 
 `./gradlew run --args="..."` also works when the shell passes the quoted value through

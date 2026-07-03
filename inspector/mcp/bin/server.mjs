@@ -24,12 +24,21 @@ import { normalizeTree, diffTrees } from "../src/lib/snapshot.mjs";
 import { auditA11y } from "../src/lib/a11y.mjs";
 import {
   resolveTree as resolveTreeFromSource,
+  resolveSourceDescriptor,
   resolveCatalog,
   requireInstrumentedTree,
 } from "../src/lib/source.mjs";
 import { fetchHealth, validatePort, validateSerial } from "../src/lib/live.mjs";
+import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
+import { readPngMeta } from "../src/lib/png.mjs";
+import { proveChange } from "../src/lib/prove.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+// The tier-0 harness lives alongside the MCP in the create-cmp checkout.
+const DEFAULT_HARNESS_DIR = join(HERE, "..", "..", "harness");
 
 const execFileAsync = promisify(execFile);
 
@@ -89,7 +98,7 @@ function guarded(fn) {
 
 const server = new McpServer({
   name: "cmp-inspector",
-  version: "0.2.0",
+  version: "0.3.0",
 });
 
 const treePathArg = z
@@ -380,6 +389,178 @@ server.registerTool(
       sessionDefaultSource,
       health,
     });
+  })
+);
+
+server.registerTool(
+  "render_tree",
+  {
+    title: "Render the tree as an SVG wireframe",
+    description:
+      "Render the semantics tree (ANY source, including live) as a deterministic SVG wireframe: every " +
+      "node with a footprint as a rect, token-annotated nodes highlighted with a resolved-values chip " +
+      "('radius 16 · pad 16'), clickable nodes with a distinct outline, testTags as mono labels, text " +
+      "shown, plus a legend and a footer (nodeCount · source · schemaVersion). Writes the SVG to `out` " +
+      "and returns { svgPath, nodeCount, width, height } AND the SVG text — SVG is structured text, " +
+      "not pixels, so it is safe for model context. Set a11y:true to overlay audit violations in a " +
+      "danger style.",
+    inputSchema: {
+      source: sourceArg,
+      treePath: treePathArg,
+      out: z
+        .string()
+        .optional()
+        .describe(
+          "Where to write the SVG. Default: next to a file-source tree (tree.json -> tree.svg), " +
+            "else ./render-tree.svg in the caller's cwd."
+        ),
+      a11y: z.boolean().optional().describe("Overlay audit_a11y violations in the danger style."),
+      maxDepth: z.number().int().min(0).optional().describe("Only draw nodes up to this depth (root = 0)."),
+      scale: z.number().positive().optional().describe("Explicit px scale (default fits width to ~740)."),
+    },
+  },
+  guarded(async ({ source, treePath, out, a11y, maxDepth, scale }) => {
+    const tree = await resolveTree({ source, treePath });
+    const audit = a11y ? auditA11y(tree) : undefined;
+    const svg = renderTreeSvg(tree, { a11y: audit, maxDepth, scale });
+
+    let svgPath;
+    if (out) {
+      svgPath = resolvePath(out);
+    } else {
+      const desc = resolveSourceDescriptor({ source, treePath, sessionDefault: sessionDefaultSource });
+      svgPath =
+        desc.kind === "file" && desc.path
+          ? resolvePath(desc.path.replace(/\.json$/i, "") + ".svg")
+          : resolvePath(join(process.cwd(), "render-tree.svg"));
+    }
+    const dir = dirname(svgPath);
+    if (dir && dir !== ".") mkdirSync(dir, { recursive: true });
+    writeFileSync(svgPath, svg);
+
+    const { total } = countRenderable(tree, { maxDepth });
+    const [, w, h] = svg.match(/<svg[^>]* width="(\d+)" height="(\d+)"/) || [];
+    return ok({
+      svgPath,
+      nodeCount: total,
+      width: Number(w),
+      height: Number(h),
+      svg,
+    });
+  })
+);
+
+const RENDER_SCREEN_DISPLAY_HINT =
+  "Pixels are for the HUMAN, structure is for the AI: do NOT read this PNG's bytes into model " +
+  "context. To show it, write a small HTML file embedding <img src=\"file://<path>\"> and open it " +
+  "(e.g. `open preview.html` on macOS), or attach the file through the host UI. For your own " +
+  "reasoning, use render_tree / inspect_tree on the same screen instead.";
+
+server.registerTool(
+  "render_screen",
+  {
+    title: "Render the screen as pixels (path-only, for the human)",
+    description:
+      "Tier 0 pixel preview with a PATH-ONLY contract: returns { path, width, height, sizeBytes, " +
+      "displayHint } parsed from the PNG header — NEVER the image bytes/base64 (pixels flow to the " +
+      "human, structure flows to the AI). Pass `pngPath` for a PNG the harness already produced, or " +
+      "`harness:true` to run the headless harness (`./gradlew run`) which renders the sample screen " +
+      "to out/screen.png alongside its tree. Pair it with render_tree for the structural twin.",
+    inputSchema: {
+      pngPath: z.string().optional().describe("Path to an existing PNG (e.g. the harness's out/screen.png)."),
+      harness: z
+        .boolean()
+        .optional()
+        .describe("Run the tier-0 harness headless render to produce the PNG first."),
+      harnessDir: z
+        .string()
+        .optional()
+        .describe("Harness project directory (default: the create-cmp checkout's inspector/harness)."),
+    },
+  },
+  guarded(async ({ pngPath, harness, harnessDir }) => {
+    let target = pngPath;
+    if (!target) {
+      if (!harness) {
+        return fail(
+          "render_screen needs either `pngPath` (an existing PNG) or `harness:true` " +
+            "(run the tier-0 headless harness to produce one)."
+        );
+      }
+      const dir = resolvePath(harnessDir || DEFAULT_HARNESS_DIR);
+      // The documented reliable invocation: plain `./gradlew run` writes the default
+      // outputs (out/tree.json, out/design-system.json, out/screen.png) — --args
+      // word-splitting makes explicit flags unreliable across shells.
+      try {
+        await execFileAsync("./gradlew", ["run", "-q"], { cwd: dir, timeout: 300000 });
+      } catch (err) {
+        return fail(
+          `harness render failed in '${dir}': ${err && err.message ? err.message : err}. ` +
+            "Is this the inspector/harness directory of a create-cmp checkout?"
+        );
+      }
+      target = join(dir, "out", "screen.png");
+    }
+    const meta = readPngMeta(target); // throws a clear error if missing / not a PNG
+    return ok({ ...meta, displayHint: RENDER_SCREEN_DISPLAY_HINT });
+  })
+);
+
+// before/after accept the full source union, or a bare string as a file-path
+// shorthand (the typical `before` is a snapshot file saved pre-edit).
+const treeRefArg = (name) =>
+  z
+    .union([z.string().describe("File-path shorthand (= {kind:'file'})."), sourceArg.unwrap()])
+    .describe(
+      `The ${name} tree: a source union ({kind:"file"|"live"|"uiautomator"}) or a file path. ` +
+        `Typical use: before = a snapshot saved pre-edit, after = {kind:"live"} post-reload.`
+    );
+
+server.registerTool(
+  "prove_change",
+  {
+    title: "Prove what a change did (the verified dev loop)",
+    description:
+      "After editing code and reloading the app, ONE call proves what changed and that nothing " +
+      "regressed: structurally diffs the BEFORE tree (typically a pre-edit snapshot file) against the " +
+      "AFTER tree (typically {kind:'live'}), then regression-checks the AFTER tree with " +
+      "diff_against_design_system (catalog auto-fetched from /inspect/design-system when after is " +
+      "live) and audit_a11y. Returns { changes, regressions:{drift, driftChecked, a11y}, verdict: " +
+      "'proven-clean' | 'changed-with-regressions' | 'no-change' }.",
+    inputSchema: {
+      before: treeRefArg("BEFORE"),
+      after: treeRefArg("AFTER"),
+      catalogPath: z
+        .string()
+        .optional()
+        .describe("Declared design-system catalog JSON; optional when `after` is live (auto-fetched)."),
+      tolerancePx: z.number().min(0).optional().describe("Bounds-move tolerance in px (default 1)."),
+      minTouchTargetPx: z.number().positive().optional().describe("a11y touch-target minimum (default 48)."),
+    },
+  },
+  guarded(async ({ before, after, catalogPath, tolerancePx, minTouchTargetPx }) => {
+    const toSource = (ref) => (typeof ref === "string" ? { kind: "file", path: ref } : ref);
+    const beforeSource = toSource(before);
+    const afterSource = toSource(after);
+    const beforeTree = await resolveTree({ source: beforeSource });
+    const afterTree = await resolveTree({ source: afterSource });
+
+    // Catalog: explicit path wins; a live AFTER source auto-fetches the declared
+    // catalog; otherwise the drift check is skipped (driftChecked:false).
+    let catalog;
+    const afterDesc = resolveSourceDescriptor({
+      source: afterSource,
+      sessionDefault: sessionDefaultSource,
+    });
+    if (catalogPath || afterDesc.kind === "live") {
+      catalog = await resolveCatalog({
+        source: afterSource,
+        catalogPath,
+        sessionDefault: sessionDefaultSource,
+      });
+    }
+
+    return ok(proveChange({ beforeTree, afterTree, catalog, tolerancePx, minTouchTargetPx }));
   })
 );
 

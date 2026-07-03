@@ -1,26 +1,37 @@
 package com.createcmp.inspector
 
+import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.Density
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 
 /**
  * Headless CLI entrypoint. Composes [SampleScreen] with no window/emulator/device via
  * `runComposeUiTest`, walks the semantics tree, and writes the contract JSON. Also emits
- * the declared design-system catalog. Exits 0 with no manual interaction.
+ * the declared design-system catalog, and a pixel render of the SAME content via
+ * [ImageComposeScene] (`--png`) — the human-facing preview twin of the tree.
+ * Exits 0 with no manual interaction.
+ *
+ * NOTE: the tree path stays on `runComposeUiTest` on purpose — `sample-tree.json` is a
+ * committed golden fixture and must stay byte-identical. Pixels come from a second,
+ * independent [ImageComposeScene] composition of the same [SampleScreen] at the same
+ * 1024x768 density-1 viewport, so tree geometry and PNG agree.
  *
  * Usage:
- *   ./gradlew run --args="--out out/tree.json --tokens-out out/design-system.json"
+ *   ./gradlew run --args="--out out/tree.json --tokens-out out/design-system.json --png out/screen.png"
  */
 @OptIn(ExperimentalTestApi::class)
 fun main(args: Array<String>) {
     val outPath = args.argValue("--out") ?: "out/tree.json"
     val tokensOutPath = args.argValue("--tokens-out") ?: "out/design-system.json"
+    val pngPath = args.argValue("--png") ?: "out/screen.png"
 
     var treeJson = ""
     runComposeUiTest {
@@ -31,11 +42,34 @@ fun main(args: Array<String>) {
 
     writeFile(outPath, treeJson)
     writeFile(tokensOutPath, designSystemCatalog())
+    renderPng(pngPath)
 
     // Print the tree to stdout for immediate inspection.
     println(treeJson)
     System.err.println("Wrote tree      -> ${File(outPath).absolutePath}")
     System.err.println("Wrote catalog   -> ${File(tokensOutPath).absolutePath}")
+    System.err.println("Wrote png       -> ${File(pngPath).absolutePath}")
+}
+
+/**
+ * Pixel render of [SampleScreen] — same viewport as the `runComposeUiTest` tree dump
+ * (1024x768, density 1), encoded as PNG. Pixels are for the HUMAN (open the file);
+ * the agent keeps asserting on the tree JSON.
+ */
+private fun renderPng(path: String, width: Int = 1024, height: Int = 768) {
+    val scene = ImageComposeScene(width = width, height = height, density = Density(1f)) {
+        SampleScreen()
+    }
+    try {
+        val image = scene.render()
+        val data = image.encodeToData(EncodedImageFormat.PNG)
+            ?: error("Skia failed to encode the rendered scene as PNG")
+        val file = File(path)
+        file.parentFile?.mkdirs()
+        file.writeBytes(data.bytes)
+    } finally {
+        scene.close()
+    }
 }
 
 private fun Array<String>.argValue(flag: String): String? {

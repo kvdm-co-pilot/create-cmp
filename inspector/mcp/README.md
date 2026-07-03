@@ -94,6 +94,9 @@ Resolution order: explicit `source` → legacy `treePath` → the `connect_live`
 | `snapshot_diff` | `{ treePath?, snapshotPath, tolerancePx? }` | structural diff vs the golden: `{ pass, diffCount, diffs:[{path, kind, before, after}] }` — kinds: `node-added/-removed`, `text-/testTag-/contentDescription-changed`, `designToken-changed`, `role-/clickable-/disabled-changed`, `bounds-moved` (beyond `tolerancePx`, default 1). Empty = pass — the CI regression primitive: JSON diffs, not pixels |
 | `audit_a11y` | `{ treePath?, minTouchTargetPx? }` | `{ pass, violations:[{path,testTag,rule,detail,bounds}], warnings, warningCount, passCount }` — rules: `touch-target-too-small` (clickable below `minTouchTargetPx`, default 48), `missing-label` (clickable with no text/contentDescription/descendant text), warn `empty-content-description`. Harness output is density-1, so px == dp there; pass a scaled minimum for device-density trees |
 | `connect_live` | `{ port?, serial? }` | Tier-1 handshake: runs ONE bounded `adb [-s serial] forward tcp:port tcp:port`, GETs `/inspect/health`, returns `{ status:"connected", health }` and sets the session default source to `{kind:"live", port}` so subsequent calls can omit `source`. Never launches apps or emulators |
+| `render_tree` | `{ source?/treePath?, out?, a11y?, maxDepth?, scale? }` | deterministic **SVG wireframe** of the tree (ANY source, incl. live): every footprint node as a rect, tokenized nodes highlighted + a resolved-values chip (`radius 16 · pad 16`), clickable nodes with a distinct dashed outline, testTags as mono labels, text shown, legend + footer (`<n> nodes · <source> · schemaVersion <v>`); `a11y:true` overlays audit violations in a danger style. Writes the SVG to `out` (default: `tree.json` → `tree.svg`, else `./render-tree.svg`) and returns `{ svgPath, nodeCount, width, height, svg }` — SVG is structured text, allowed in model context |
+| `render_screen` | `{ pngPath }` OR `{ harness:true, harnessDir? }` | tier-0 **pixel preview with a path-only contract**: returns `{ path, width, height, sizeBytes, displayHint }` parsed from the PNG header — **never** bytes/base64 (pixels flow to the HUMAN, structure flows to the AI). `harness:true` shells the headless harness (`./gradlew run`) to produce `out/screen.png` first; `displayHint` tells the agent how to show the file to the human without ingesting pixels |
+| `prove_change` | `{ before, after, catalogPath?, tolerancePx?, minTouchTargetPx? }` | the **verified dev loop** in one call: `before`/`after` each take the source union or a file path (typical: before = a pre-edit snapshot, after = `{kind:"live"}` post-reload). Structurally diffs them, then regression-checks the AFTER tree with the design-system diff (catalog auto-fetched live) + a11y audit. Returns `{ changes, regressions:{drift, driftChecked, a11y}, verdict: "proven-clean"\|"changed-with-regressions"\|"no-change" }` |
 
 Every tool above also accepts the **`source`** union (previous section); `treePath` remains the
 tier-0 shorthand and falls back to **`CMP_INSPECTOR_TREE`**. Missing files / bad JSON / unreachable
@@ -112,10 +115,14 @@ inspector/mcp/
   src/lib/source.mjs     # the source union: resolveTree/resolveCatalog/requireInstrumentedTree
   src/lib/live.mjs       # tier 1: fetchHealth/fetchLiveTree/fetchLiveCatalog (+ port/serial validation)
   src/lib/uiautomator.mjs# tier 2: Appium page-source XML → contract converter
+  src/lib/render.mjs     # renderTreeSvg — deterministic SVG wireframe (any source)
+  src/lib/png.mjs        # parsePngHeader/readPngMeta — PNG metadata, never pixels
+  src/lib/prove.mjs      # proveChange — snapshot diff + drift + a11y composed into one verdict
   fixtures/tree.json     # example tree (one un-tokenized node + one drifting radius)
   fixtures/a11y-tree.json# planted a11y cases (tiny unlabeled icon, clean button, legacy node)
   fixtures/design-system.json
   fixtures/uiautomator-page.xml  # real-shaped uiautomator2 page source for converter tests
+  fixtures/tiny-2x2.png  # minimal valid PNG for the header-parse tests
   test/*.test.mjs        # node --test coverage of every lib function
 ```
 
