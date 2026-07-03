@@ -73,15 +73,39 @@ Cheap, high-value additions on the same tree contract:
   verify gate on every push, so *their* green build is protected too.
 - **Time-to-green benchmark** published from CI, so the north-star claim is measured, not asserted.
 
+## Research-validated additions (2026-07)
+
+An evidence pass over the ecosystem (JetBrains survey data, YouTrack vote counts, competitor
+motion) confirmed the pillars above and added the following:
+
+- **Desktop dev-client with Compose Hot Reload** *(new; low effort, daily-use)* — pre-wire the
+  separate JVM run target that JetBrains' own docs tell every mobile CMP dev to hand-assemble, with
+  Compose Hot Reload 1.0 configured. The closest thing KMP has to an Expo-style dev loop — and the
+  same JVM module hosts the inspector's headless tier. Slots alongside the inspector work.
+- **RevenueCat paywall promoted to first recipe** — the KMP SDK is stable and demand is proven.
+- **Brownfield `add shared-module`** — add a KMP shared module to an *existing* native Android+iOS
+  app, with the XCFramework/SPM publishing lane wired. The largest underserved audience (the
+  enterprise adoption path has docs, not tooling). High effort; scheduled after `upgrade`.
+- **Version-pinned AI knowledge pack** — ship `llms-full.txt` + docs for the exact pinned stack
+  with the plugin, so assistants reason about the template from ground truth.
+- **Small high-demand recipes** — locale switching, `testTagsAsResourceId` QA wiring.
+- **Explicit non-goals (published as docs, honesty as a feature):** OTA/code-push for Compose
+  (structurally unavailable: Kotlin/Native AOT on iOS has no patchable interpreter tier, and
+  store policy forbids the workaround — we document why and point to a server-driven-UI recipe
+  instead) and a hosted build farm (CI templates capture the value without the company-sized
+  liability).
+- **Watch items:** JetBrains' new default KMP project structure (template conformance review) and
+  the Kotlin Toolchain/Amper evolution (keep the engine's build-system assumptions isolated).
+
 ## Sequencing
 
 | Order | Work | Why first |
 |---|---|---|
 | 1 | npm publish + release hygiene | Nothing else matters while it's uninstallable |
 | 2 | CI matrix + canary + shipped CI workflow | Protects the moat; starts the compounding install base |
-| 3 | `upgrade` | The recurring-use engine (fed by the canary's proven-green sets) |
-| 4 | `add` generators + first recipes (auth, push, paywall) | Serves existing projects, not just greenfield |
-| 5 | Inspector Phases 1–2, snapshot + a11y tools | Deepens the AI-native differentiator |
+| 3 | **Inspector complete: Phase 1 (token-enriched kit), snapshots + a11y, then Phase 2 (live on-device inspection) + the uiautomator fallback tier** | **The product-maker: AI that can *see* a running Compose app as structured design data — no one else has this** |
+| 4 | `upgrade` | The recurring-use engine (fed by the canary's proven-green sets) |
+| 5 | `add` generators + first recipes (auth, push, paywall) | Serves existing projects, not just greenfield |
 | 6 | Release lane + docs site + demo + announcements | Distribution wave once the surface is strong |
 
 ## Contributing
