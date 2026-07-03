@@ -2,7 +2,7 @@ name: CI
 
 # Cost-aware matrix:
 #   - every PR + push:  engine unit tests (Node 18/20/22) + stamp-android (ubuntu)
-#   - main pushes + manual runs only:  stamp-ios (macOS minutes are ~10x ubuntu)
+#   - manual dispatch only (parked):   stamp-ios (iOS out of active scope for now)
 # The stamp jobs prove the CURRENT checkout's engine + template produce a
 # project that actually builds — the reproducibility moat's gate.
 
