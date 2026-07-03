@@ -72,7 +72,7 @@ jobs:
 
   stamp-ios:
     name: stamp + iOS xcodebuild
-    runs-on: macos-14 # Apple Silicon — matches the arm64-only simulator build
+    runs-on: macos-15 # Apple Silicon — matches the arm64-only simulator build; newer image = newer default Xcode
     needs: test
     # macOS minutes are expensive: main + manual only, never per-PR.
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -88,8 +88,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-      - name: Install XcodeGen (CocoaPods is preinstalled on macos-14)
+      - name: Install XcodeGen (CocoaPods is preinstalled on macOS runners)
         run: brew install xcodegen
+      # Latest-brew XcodeGen + CocoaPods emit projects in the newest Xcode object
+      # format; the image's *default* Xcode can lag and then xcodebuild fails with
+      # "future Xcode project file format" (exactly what broke run #1 on macos-14:
+      # format 77 vs Xcode 15.4). Always select the newest Xcode on the runner so
+      # generator and builder agree.
+      - name: Select newest installed Xcode
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Selecting $NEWEST"
+          sudo xcode-select -s "$NEWEST/Contents/Developer"
+          xcodebuild -version
       - name: Stamp project (iOS on)
         run: >
           node bin/create-cmp.mjs "$RUNNER_TEMP/ci-smoke-ios"
