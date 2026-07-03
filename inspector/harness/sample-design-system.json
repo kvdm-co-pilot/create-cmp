@@ -1,0 +1,33 @@
+{
+    "colors": {
+        "Primary": "#0A2540",
+        "OnPrimary": "#FFFFFF",
+        "Accent": "#00E676",
+        "OnAccent": "#0A2540",
+        "Secondary": "#00B96B",
+        "Error": "#DC2626",
+        "Success": "#16A34A",
+        "Warning": "#F59E0B",
+        "Info": "#2563EB",
+        "Background": "#F7F9FC",
+        "Surface": "#FFFFFF",
+        "SurfaceVariant": "#E8EDF3",
+        "OnSurface": "#1A1A1A",
+        "OnSurfaceVariant": "#6B7280",
+        "Outline": "#9CA3AF",
+        "OutlineVariant": "#E5E7EB",
+        "Divider": "#E5E7EB"
+    },
+    "dimens": {
+        "ElevationCard": "2dp",
+        "ElevationModal": "8dp",
+        "PaddingPage": "16dp",
+        "PaddingCard": "16dp",
+        "GapCard": "12dp",
+        "BottomNavHeight": "72dp",
+        "RadiusCard": "16dp",
+        "RadiusPill": "999dp",
+        "RadiusModal": "24dp",
+        "RadiusInput": "14dp"
+    }
+}

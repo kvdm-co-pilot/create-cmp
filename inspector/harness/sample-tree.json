@@ -1,0 +1,156 @@
+{
+    "schemaVersion": 1,
+    "source": "headless-jvm",
+    "root": {
+        "testTag": null,
+        "text": null,
+        "contentDescription": null,
+        "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1024,
+            "height": 768
+        },
+        "designToken": null,
+        "children": [
+            {
+                "testTag": null,
+                "text": null,
+                "contentDescription": null,
+                "bounds": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1024,
+                    "height": 768
+                },
+                "designToken": {
+                    "tokens": [
+                        "PaddingPage"
+                    ],
+                    "resolved": {
+                        "padding": "16dp"
+                    }
+                },
+                "children": [
+                    {
+                        "testTag": "home_title",
+                        "text": "Home",
+                        "contentDescription": null,
+                        "bounds": {
+                            "x": 16,
+                            "y": 16,
+                            "width": 78,
+                            "height": 48
+                        },
+                        "designToken": null,
+                        "children": []
+                    },
+                    {
+                        "testTag": null,
+                        "text": null,
+                        "contentDescription": null,
+                        "bounds": {
+                            "x": 16,
+                            "y": 76,
+                            "width": 992,
+                            "height": 76
+                        },
+                        "designToken": {
+                            "tokens": [
+                                "RadiusCard",
+                                "ElevationCard",
+                                "PaddingCard"
+                            ],
+                            "resolved": {
+                                "radius": "16dp",
+                                "elevation": "2dp",
+                                "padding": "16dp",
+                                "color": "#FFFFFFFF"
+                            }
+                        },
+                        "children": [
+                            {
+                                "testTag": null,
+                                "text": "First card",
+                                "contentDescription": null,
+                                "bounds": {
+                                    "x": 32,
+                                    "y": 92,
+                                    "width": 76,
+                                    "height": 24
+                                },
+                                "designToken": null,
+                                "children": []
+                            },
+                            {
+                                "testTag": null,
+                                "text": "A representative card subtitle",
+                                "contentDescription": null,
+                                "bounds": {
+                                    "x": 32,
+                                    "y": 116,
+                                    "width": 201,
+                                    "height": 20
+                                },
+                                "designToken": null,
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "testTag": null,
+                        "text": null,
+                        "contentDescription": null,
+                        "bounds": {
+                            "x": 16,
+                            "y": 164,
+                            "width": 992,
+                            "height": 76
+                        },
+                        "designToken": {
+                            "tokens": [
+                                "RadiusCard",
+                                "ElevationCard",
+                                "PaddingCard"
+                            ],
+                            "resolved": {
+                                "radius": "16dp",
+                                "elevation": "2dp",
+                                "padding": "16dp",
+                                "color": "#FFFFFFFF"
+                            }
+                        },
+                        "children": [
+                            {
+                                "testTag": null,
+                                "text": "Second card",
+                                "contentDescription": null,
+                                "bounds": {
+                                    "x": 32,
+                                    "y": 180,
+                                    "width": 100,
+                                    "height": 24
+                                },
+                                "designToken": null,
+                                "children": []
+                            },
+                            {
+                                "testTag": null,
+                                "text": "Another representative subtitle",
+                                "contentDescription": null,
+                                "bounds": {
+                                    "x": 32,
+                                    "y": 204,
+                                    "width": 211,
+                                    "height": 20
+                                },
+                                "designToken": null,
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

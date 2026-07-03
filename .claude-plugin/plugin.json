@@ -23,6 +23,8 @@
   "skills": [
     "./skills/cmp-new",
     "./skills/cmp-doctor",
-    "./skills/cmp-qa-prep"
-  ]
+    "./skills/cmp-qa-prep",
+    "./skills/cmp-inspect"
+  ],
+  "mcpServers": "./.mcp.json"
 }

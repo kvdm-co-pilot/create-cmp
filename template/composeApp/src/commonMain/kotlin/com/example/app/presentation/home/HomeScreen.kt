@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
+import __PACKAGE__.presentation.theme.designToken
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -31,7 +32,15 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    Column(Modifier.fillMaxSize().padding(__THEME_PREFIX__Tokens.PaddingPage)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .designToken(
+                tokens = listOf("PaddingPage"),
+                resolved = mapOf("padding" to "16dp"),
+            )
+            .padding(__THEME_PREFIX__Tokens.PaddingPage),
+    ) {
         Text(
             text = "Home",
             style = MaterialTheme.typography.headlineMedium,
@@ -51,6 +60,15 @@ fun HomeScreen(
                         tonalElevation = __THEME_PREFIX__Tokens.ElevationCard,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .designToken(
+                                tokens = listOf("RadiusCard", "ElevationCard", "PaddingCard"),
+                                resolved = mapOf(
+                                    "radius" to "16dp",
+                                    "elevation" to "2dp",
+                                    "padding" to "16dp",
+                                    "color" to "#FFFFFFFF",
+                                ),
+                            )
                             .clickable { onItemClick(item.id) },
                     ) {
                         Column(Modifier.padding(__THEME_PREFIX__Tokens.PaddingCard)) {

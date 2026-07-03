@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "source": "headless-jvm",
+  "root": {
+    "testTag": "home_root",
+    "text": null,
+    "contentDescription": "Home screen",
+    "bounds": { "x": 0, "y": 0, "width": 360, "height": 800 },
+    "designToken": { "tokens": ["PaddingPage"], "resolved": { "padding": "16dp" } },
+    "children": [
+      {
+        "testTag": "home_title",
+        "text": "Home",
+        "contentDescription": null,
+        "bounds": { "x": 16, "y": 16, "width": 328, "height": 40 },
+        "designToken": { "tokens": ["TitleLarge"], "resolved": { "fontSize": "22sp" } },
+        "children": []
+      },
+      {
+        "testTag": "home_subtitle_raw",
+        "text": "Untokenized subtitle",
+        "contentDescription": null,
+        "bounds": { "x": 16, "y": 64, "width": 328, "height": 20 },
+        "designToken": null,
+        "children": []
+      },
+      {
+        "testTag": "card_one",
+        "text": null,
+        "contentDescription": "First card",
+        "bounds": { "x": 16, "y": 100, "width": 328, "height": 120 },
+        "designToken": {
+          "tokens": ["Surface", "RadiusCard"],
+          "resolved": { "color": "#FFFFFF", "radius": "16dp" }
+        },
+        "children": [
+          {
+            "testTag": "card_one_label",
+            "text": "Card One",
+            "contentDescription": null,
+            "bounds": { "x": 32, "y": 116, "width": 200, "height": 24 },
+            "designToken": { "tokens": ["BodyMedium"], "resolved": { "fontSize": "14sp" } },
+            "children": []
+          }
+        ]
+      },
+      {
+        "testTag": "card_two",
+        "text": null,
+        "contentDescription": "Second card",
+        "bounds": { "x": 16, "y": 240, "width": 328, "height": 120 },
+        "designToken": {
+          "tokens": ["Surface", "RadiusCard"],
+          "resolved": { "color": "#FFFFFF", "radius": "24dp" }
+        },
+        "children": [
+          {
+            "testTag": "card_two_label",
+            "text": "Card Two",
+            "contentDescription": null,
+            "bounds": { "x": 32, "y": 256, "width": 200, "height": 24 },
+            "designToken": { "tokens": ["BodyMedium"], "resolved": { "fontSize": "14sp" } },
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

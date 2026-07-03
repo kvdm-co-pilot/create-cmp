@@ -1,0 +1,13 @@
+{
+  "colors": {
+    "Primary": "#0A2540",
+    "Surface": "#FFFFFF",
+    "AccentGreen": "#00E676",
+    "Error": "#DC2626"
+  },
+  "dimens": {
+    "PaddingPage": "16dp",
+    "RadiusCard": "16dp",
+    "ElevationCard": "2dp"
+  }
+}

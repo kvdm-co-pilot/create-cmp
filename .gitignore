@@ -36,3 +36,9 @@ iosApp/*.xcodeproj
 # Internal working docs — not for the public repo
 docs/DESIGN.md
 docs/CONTRACT.md
+docs/GROWTH-STRATEGY.md
+docs/research/
+
+# Inspector — generated headless-render output (the committed fixtures are
+# inspector/harness/sample-*.json, not the per-run out/ dir).
+inspector/harness/out/
