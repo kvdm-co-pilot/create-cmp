@@ -1,6 +1,6 @@
 {
   "name": "create-cmp-cli",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Scaffold a production-ready Kotlin/Compose Multiplatform app (Android + iOS) that builds green in minutes — toolchain auto-bootstrapped, navigation/insets pre-solved, Clean Architecture wired, Appium harness ready. Installs the `create-cmp` command.",
   "type": "module",
   "bin": {
