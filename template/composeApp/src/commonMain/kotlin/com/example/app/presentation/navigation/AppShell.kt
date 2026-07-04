@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import __PACKAGE__.presentation.components.BaseScreen
+import __PACKAGE__.presentation.components.exposeTestTagsForAutomation
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Colors
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
 import __PACKAGE__.presentation.theme.designToken
@@ -44,6 +45,10 @@ fun AppShell(tabs: List<AppTab>) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
 
     BaseScreen(
+        // Expose Compose testTags to the platform automation layer (Android resource-ids /
+        // iOS accessibilityIdentifiers) so Appium/uiautomator id-selectors and the
+        // cmp-test-generated suites find them; covers the whole subtree. Desktop: no-op.
+        modifier = Modifier.exposeTestTagsForAutomation(),
         // The bottom bar owns the navigation-bar inset; the body must not also pad it.
         applyNavBarPadding = false,
         bottomBar = {

@@ -1,8 +1,12 @@
 # Live View — plan of record (founder priority: ALL THREE are must-haves)
 
-> **Status:** committed direction (2026-07-03), builds start the moment Inspector Phase 2 lands
-> (shared files). Goal: Android-Studio-grade *seeing* inside the Claude Code workflow — preview,
-> live device view with navigation, and an interactive hot-reload dev loop.
+> **Status: ALL THREE TRACKS BUILT + VERIFIED (2026-07-04).** Track A — `render_tree` /
+> `render_screen` / `prove_change` (MCP v0.3.0). Track B — live device view: `/inspect/screenshot`
+> + `POST /inspect/tap` (HTTP, superseding the adb sketch) + the same-origin `/inspect/remote`
+> control page + `navigate_and_inspect` (MCP v0.4.0, 14 tools) — proven live on the emulator
+> (card tap → Detail → back, from the tree). Track C — desktop dev-client with Compose Hot Reload
+> 1.1.1 (`hotRunDesktop`), default-on feature. Goal achieved: Android-Studio-grade *seeing* inside
+> the Claude Code workflow — preview, live device view with navigation, and a hot-reload dev loop.
 >
 > **Architecture rule that makes this compatible with structured-only AI vision: pixels flow to
 > the HUMAN, structure flows to the AI.** Screenshots/previews are piped straight from the app to

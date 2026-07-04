@@ -101,28 +101,15 @@ New files: `qa/appium/<flow>.spec.mjs` (add a matching script to `qa/appium/pack
 3. **text xpath** (`waitForText`, `clickByText`) — works out of the box; last resort for untagged,
    description-less nodes, and brittle against copy changes.
 
-> **`testTagsAsResourceId` — the template does NOT set it (verified).** Compose testTags only
-> reach Appium as `resource-id` when the app opts in; the stock template applies tags via
-> `Modifier.semantics { testTag = "…" }` but never sets the flag, so `id`-based selectors find
-> nothing until you add **one line** on the shell root. In
-> `composeApp/src/commonMain/kotlin/<pkg>/presentation/navigation/AppShell.kt`, pass a modifier
-> to the `BaseScreen` call (it already accepts one and forwards it to its `Scaffold`, so the flag
-> covers the whole subtree — tabs, content, and bottom nav):
->
-> ```kotlin
-> import androidx.compose.ui.ExperimentalComposeUiApi
-> import androidx.compose.ui.semantics.testTagsAsResourceId
->
-> @OptIn(ExperimentalComposeUiApi::class)   // on AppShell
-> BaseScreen(
->     modifier = Modifier.semantics { testTagsAsResourceId = true },
->     applyNavBarPadding = false,
->     …
-> ```
->
-> (`semantics` and `Modifier` are already imported there.) Make this edit as part of test
-> generation when you need tag selectors — it is semantics-only, invisible to users. If you must
-> not touch source, fall back to selectors 2–3 (raw UiAutomator equivalent:
+> **`testTagsAsResourceId` — stock apps HAVE it (via the shim).** The template's `AppShell` passes
+> `Modifier.exposeTestTagsForAutomation()` to `BaseScreen` — an expect/actual shim
+> (`presentation/components/TestTagAutomation.kt`) whose Android actual sets
+> `semantics { testTagsAsResourceId = true }` for the whole subtree (desktop/iOS actuals are
+> no-ops; the flag is Android-only at CMP 1.10.3, so do NOT set it in common code — it won't
+> compile for the other targets). Verified live: `uiautomator dump` resolves `home_title` /
+> `app_bottom_nav` as `resource-id`s on a stock stamp, so `id`-based selectors work out of the box.
+> On an app stamped BEFORE the shim existed (no `TestTagAutomation.kt`), either port the shim in
+> or fall back to selectors 2–3 (raw UiAutomator equivalent:
 > `new UiSelector().description("…")`), and say so in the generated file's header.
 
 ## 4. Missing-tag protocol

@@ -108,6 +108,13 @@ per run, so it can't silently drift:
   reads the running UI as JSON — hierarchy, geometry, resolved design tokens, real navigation
   state. Never screenshots. Toggle with `--no-inspector`; `create-cmp doctor` verifies it stays
   debug-only and that every declared theme token is served on `/inspect/design-system`.
+- **Live device view** — with the debug app running, open `http://127.0.0.1:9500/inspect/remote`
+  (after `adb forward tcp:9500 tcp:9500`) to watch the real device and click the image to tap it,
+  while the agent drives `navigate_and_inspect` on the semantics tree and proves every change with
+  `prove_change`. Pixels for the human, structure for the AI.
+- **Desktop dev-client** — a phone-sized JVM window running the shared UI with Compose Hot Reload
+  attached (`./gradlew :composeApp:hotRunDesktop --auto`); Firebase never initializes on desktop
+  (offline DI fakes). Toggle with `--no-dev-client`.
 
 `google-services.json` / `GoogleService-Info.plist` are intentionally **not** real — you get
 placeholders and clear "drop your Firebase config here" instructions.
@@ -138,15 +145,23 @@ shared engine, two front doors. Install from the bundled marketplace:
 /plugin install create-cmp
 ```
 
-It bundles five skills (plus the `cmp-inspector` MCP server), each with a deterministic engine
+It bundles eight skills (plus the `cmp-inspector` MCP server), each with a deterministic engine
 behind it:
 
 - **cmp-new** — conversational interview, then shells out to the same engine to scaffold, and
   generates your tab screens from the example-feature pattern.
 - **cmp-doctor** — toolchain bootstrap + project diagnosis on any KMP project (consent-gated).
 - **cmp-upgrade** — migrate to the next proven-green version set (diff → apply → verify).
-- **cmp-inspect** — read a rendered Compose UI as structured JSON: hierarchy, geometry, resolved
-  design tokens, token-drift diffs, golden-tree snapshots, a11y audit — no screenshots.
+- **cmp-inspect** — see and drive a rendered Compose UI as structured JSON: hierarchy, geometry,
+  resolved design tokens, drift diffs, golden-tree snapshots, a11y audit, live navigation
+  (`navigate_and_inspect`), wireframe rendering, and `prove_change` — the verified dev loop.
+- **cmp-dev-client** — run the shared UI in a phone-sized desktop window with Compose Hot Reload
+  (`./gradlew :composeApp:hotRunDesktop --auto`) — the Expo-style dev loop for KMP.
+- **cmp-firebase-connect** — post-scaffold onboarding: create/reuse a Firebase project, register
+  the app, and replace the placeholder config via the Firebase CLI (consent-gated), proven by a
+  green build.
+- **cmp-test** — generate the Appium regression suite by *observing* the app: read the running
+  UI's semantics tree and emit tests in the shipped harness style.
 - **cmp-qa-prep** — brings up the emulator + Appium session + smoke.
 
 ## Why CMP, not React Native

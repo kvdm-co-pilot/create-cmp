@@ -25,7 +25,10 @@
     "./skills/cmp-doctor",
     "./skills/cmp-qa-prep",
     "./skills/cmp-inspect",
-    "./skills/cmp-upgrade"
+    "./skills/cmp-upgrade",
+    "./skills/cmp-dev-client",
+    "./skills/cmp-firebase-connect",
+    "./skills/cmp-test"
   ],
   "mcpServers": "./.mcp.json"
 }
