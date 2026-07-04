@@ -40,6 +40,10 @@ reports success.
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 
+> **Full usage in one place:** [`docs/USAGE.md`](./docs/USAGE.md) is the single entry point — setup,
+> every CLI command, all 8 skills, the 14-tool `cmp-inspector` MCP, and the workflows that tie them
+> together. Read it and you can drive create-cmp end to end (agents included).
+
 ## Quick start
 
 ```bash
