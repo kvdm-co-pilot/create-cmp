@@ -9,8 +9,11 @@
 
 ## 1. What it is (the mental model)
 
-create-cmp makes a Kotlin/Compose Multiplatform (Android + iOS) app **that builds green**, and then
-stays useful for the whole life of the project. Three ideas explain everything:
+create-cmp is the **AI delivery harness for Kotlin/Compose Multiplatform**: it makes an
+(Android + iOS) app **that builds green**, encodes industry best practices at every layer as
+executable patterns and gates, binds Claude Code to them, and stays useful for the whole life of
+the project (product definition: [`HARNESS-PLAN.md`](./HARNESS-PLAN.md)). Four ideas explain
+everything:
 
 1. **Determinism over generation.** The 90% of a CMP project that's identical every time is a
    **frozen, CI-verified golden template** the engine *stamps* (copy → token-replace → toggle
@@ -20,6 +23,11 @@ stays useful for the whole life of the project. Three ideas explain everything:
    server. The agent reads structure, never screenshots.
 3. **Pixels for the human, structure for the AI.** Where a human needs to *see* (previews, the live
    device view), pixels are written to a file the human opens — they never enter model context.
+4. **Verification is the contract.** The generated project carries its own definition of done —
+   pattern exemplars with tests, executable conformance checks, and a verify lane that produces a
+   typed verdict with evidence. An AI working in the project is not done until the lane passes.
+   *(The harness layers are being built out — see [`HARNESS-PLAN.md`](./HARNESS-PLAN.md) for what
+   ships today vs next.)*
 
 **Two front doors, one engine:** the `create-cmp` CLI (`npx`) and the Claude Code plugin (8 skills +
 the MCP). Same deterministic Node engine behind both.
@@ -56,6 +64,34 @@ npx github:kvdm-co-pilot/create-cmp --help        # zero-install
 /plugin marketplace add kvdm-co-pilot/create-cmp
 /plugin install create-cmp
 ```
+
+**No `/plugin` command available** (non-interactive/headless sessions — e.g. `claude -p`, CI, or an
+agent session that can't open the terminal-dialog UI): `/plugin` is a UI-only command and has no
+CLI equivalent. Add both keys directly to `.claude/settings.local.json` (personal) or
+`.claude/settings.json` (team-wide) instead:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "create-cmp": {
+      "source": { "source": "github", "repo": "kvdm-co-pilot/create-cmp" }
+    }
+  },
+  "enabledPlugins": {
+    "create-cmp@create-cmp": true
+  }
+}
+```
+
+This is not a one-line prompt fix — confirmed by driving it end-to-end. The marketplace clone and
+the actual plugin install are two separate steps that happen on Claude Code's startup/config-sync
+pass, not the instant the JSON is written: expect a short lag while
+`~/.claude/plugins/known_marketplaces.json` (marketplace registered) and then
+`~/.claude/plugins/installed_plugins.json` (plugin actually installed, pinned to a resolved
+`gitCommitSha`) get populated. Skills only show up in a session that started *after* the install
+row exists; MCP tools (`cmp-inspector`) can pick up mid-session once installed, since they're
+resolved lazily via tool search rather than baked into the system prompt at session start. If a
+session's skill list still looks stale after installedPlugins shows the entry, restart the session.
 
 **Register the MCP standalone** (outside the plugin):
 

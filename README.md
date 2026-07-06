@@ -2,11 +2,12 @@
 
 # create-cmp
 
-**Scaffold a green-building Kotlin/Compose Multiplatform app (Android + iOS) in minutes — not hours.**
+**The AI delivery harness for Kotlin/Compose Multiplatform — scaffold a green-building app (Android + iOS) in minutes, with best practices your AI is mechanically held to.**
 
-Toolchain auto-bootstrapped · Navigation & insets pre-solved · Clean Architecture wired · Appium harness ready.
+Toolchain auto-bootstrapped · Navigation & insets pre-solved · Clean Architecture wired · Appium harness ready · AI-native inspector & verification lane.
 
 [![CI](https://github.com/kvdm-co-pilot/create-cmp/actions/workflows/ci.yml/badge.svg)](https://github.com/kvdm-co-pilot/create-cmp/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/create-cmp-cli.svg)](https://www.npmjs.com/package/create-cmp-cli)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
@@ -26,6 +27,14 @@ to React Native.
 **`create-cmp` removes the friction.** It *stamps* a frozen, CI-verified golden template (it does not
 freehand-generate your project), bootstraps the toolchain, and **proves a green build** before it
 reports success.
+
+And it goes further than scaffolding: `create-cmp` is an **AI delivery harness**. In the age of
+AI-driven development, the scarce thing isn't code — it's a machine-enforceable definition of
+*correct*. Every generated project ships the architecture patterns as running exemplars (with
+tests), the best practices as executable conformance checks, generation tools so the AI extends
+the app right-by-construction, an AI-native structural inspector, and a verification lane that
+refuses "done" without evidence. See [`docs/HARNESS-PLAN.md`](./docs/HARNESS-PLAN.md) for the
+full product definition.
 
 ## Contents
 
@@ -149,6 +158,10 @@ shared engine, two front doors. Install from the bundled marketplace:
 /plugin install create-cmp
 ```
 
+No `/plugin` UI available (headless/non-interactive sessions)? See
+[the settings.json fallback in `docs/USAGE.md`](./docs/USAGE.md#2-setup) — it's a real two-step
+install (marketplace registration, then plugin install), not a one-line tweak.
+
 It bundles eight skills (plus the `cmp-inspector` MCP server), each with a deterministic engine
 behind it:
 
@@ -212,14 +225,13 @@ contents *and* paths, atomically renames package directories, toggles features (
 The full plan — six pillars from scaffold to store release, and the sequencing — lives in
 [`docs/ROADMAP.md`](./docs/ROADMAP.md). Near-term:
 
-- [ ] Publish to npm as `create-cmp-cli` (`npx create-cmp-cli`) — release cut, publish pending.
+- [x] Publish to npm as `create-cmp-cli` (`npx create-cmp-cli@latest`) — **live on the registry**.
 - [ ] Record the asciinema demo (`npx create-cmp-cli` → green Android + iOS).
-- [ ] Full Android + iOS build matrix in CI (currently CI runs the engine unit tests).
+- [x] Android build matrix in CI on every push; iOS matrix runs on manual dispatch.
 - [ ] More example features and nav shapes.
 - **AI-native Compose inspector** — read a running app's hierarchy, geometry, and *resolved design
-  tokens* as structured JSON (no screenshots). **Phase 0 (headless host-JVM render → inspect) is
-  built and verified**; live-emulator inspection is next. See
-  [`docs/INSPECTOR-PLAN.md`](./docs/INSPECTOR-PLAN.md).
+  tokens* as structured JSON (no screenshots), including **live on-device inspection** over a
+  loopback debug server. See [`docs/INSPECTOR-PLAN.md`](./docs/INSPECTOR-PLAN.md).
 
 ## Contributing
 

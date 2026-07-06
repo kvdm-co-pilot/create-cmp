@@ -1,13 +1,15 @@
 # create-cmp Roadmap
 
-> **The goal:** make Kotlin/Compose Multiplatform the obvious choice for cross-platform mobile by
-> removing every point of friction — from first scaffold to store release — and make `create-cmp`
-> the tool the ecosystem reaches for by default. Not just at project creation: across the whole
-> life of the project.
+> **The goal:** make `create-cmp` the **complete AI delivery harness for Kotlin/Compose
+> Multiplatform** — industry best practices at every layer, from the UI tools to the verification
+> layer to the testing architecture base, encoded as executable patterns and gates that AI
+> assistants are mechanically bound to. Scaffolding (removing every point of friction from first
+> scaffold to store release) is how the harness arrives; the harness is the product. Full product
+> definition: [`HARNESS-PLAN.md`](./HARNESS-PLAN.md).
 
-The roadmap is organised as six pillars. The strategic through-line: `create-cmp` must be useful
-**repeatedly** (maintenance, generators, CI gates, inspection) and useful to **existing** KMP
-projects, not only greenfield ones.
+The roadmap is organised as seven pillars. The strategic through-line: `create-cmp` must be useful
+**repeatedly** (maintenance, generators, CI gates, inspection, verification) and useful to
+**existing** KMP projects, not only greenfield ones.
 
 ## Pillars
 
@@ -57,13 +59,31 @@ Cheap, high-value additions on the same tree contract:
 - **Accessibility auditor** — the tree already carries geometry + text: check touch targets
   (≥ 48dp), contentDescription coverage, and text-contrast against the declared token catalog.
 
-### 5. Ship 📦 *(planned)*
+### 5. Verify 🧭 *(the harness — CURRENT FOCUS)*
+
+The layer that makes this an **AI delivery harness** rather than a toolbox — see
+[`HARNESS-PLAN.md`](./HARNESS-PLAN.md) for the full design. In the generated project:
+
+- **Exemplars** — the example feature carries idiomatic tests at every architectural layer, so
+  "follow the pattern" includes the tests.
+- **Conformance gates** — best practices as executable checks (Konsist dependency-direction and
+  layer rules, testTag/golden-tree/ViewModel-test presence, no hardcoded design values), green at
+  scaffold time.
+- **In-project generation skills** — `add-feature` / `add-screen` / `add-repository` shipped into
+  the generated repo's `.claude/skills/`, stamping pattern + test skeletons + golden baseline:
+  right-by-construction.
+- **The verify lane** — one command: build → tests → conformance → golden-tree diff → token
+  drift → a11y → smoke, producing a typed PASS/FAIL verdict + **evidence-pack JSON**.
+- **Claude Code binding** — generated `CLAUDE.md` contract ("not done until the verify lane
+  passes") + Stop-hook enforcement in the generated `.claude/settings.json`.
+
+### 6. Ship 📦 *(planned)*
 
 - **`create-cmp release`** — the store-release lane: keystore/signing setup, versionCode/semver
   bump, Play Console / TestFlight / Firebase App Distribution upload, store-listing metadata
   scaffold. Painful, recurring, and mostly mechanical — exactly what this tool is for.
 
-### 6. Trust 🔒 *(the moat's maintenance machinery)*
+### 7. Trust 🔒 *(the moat's maintenance machinery)*
 
 - **Full Android + iOS build matrix in CI** — every PR stamps and builds a real app on both
   platforms (currently CI runs the engine unit tests).
@@ -101,12 +121,13 @@ motion) confirmed the pillars above and added the following:
 
 | Order | Work | Why first |
 |---|---|---|
-| 1 | npm publish + release hygiene | Nothing else matters while it's uninstallable |
-| 2 | CI matrix + canary + shipped CI workflow | Protects the moat; starts the compounding install base |
-| 3 | **Inspector complete: Phase 1 (token-enriched kit), snapshots + a11y, then Phase 2 (live on-device inspection) + the uiautomator fallback tier** | **The product-maker: AI that can *see* a running Compose app as structured design data — no one else has this** |
-| 4 | `upgrade` | The recurring-use engine (fed by the canary's proven-green sets) |
-| 5 | `add` generators + first recipes (auth, push, paywall) | Serves existing projects, not just greenfield |
-| 6 | Release lane + docs site + demo + announcements | Distribution wave once the surface is strong |
+| 1 | ~~npm publish + release hygiene~~ ✅ | Shipped (`create-cmp-cli@0.2.0`) |
+| 2 | ~~CI matrix + canary + shipped CI workflow~~ ✅ | Shipped (Android per push; iOS manual dispatch) |
+| 3 | ~~Inspector: token-enriched kit, snapshots + a11y, live on-device inspection~~ ✅ | Shipped — AI that *sees* a running Compose app as structured design data |
+| 4 | **The harness (pillar 5): contract → conformance gates → in-project skills → enforcement** | **The product: AI-driven delivery with independent, evidenced verification — see [`HARNESS-PLAN.md`](./HARNESS-PLAN.md)** |
+| 5 | Docs site + demo + announcements | Distribution wave, told as the harness story |
+| 6 | `add` generators + first recipes (auth, push, paywall) | Parked until demand is proven externally |
+| 7 | Release lane | Parked |
 
 ## Contributing
 

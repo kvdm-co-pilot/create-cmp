@@ -38,6 +38,8 @@ docs/DESIGN.md
 docs/CONTRACT.md
 docs/GROWTH-STRATEGY.md
 docs/research/
+docs/SESSION-STATE.md
+docs/HARNESS-ROADMAP.md
 
 # Inspector — generated headless-render output (the committed fixtures are
 # inspector/harness/sample-*.json, not the per-run out/ dir).
