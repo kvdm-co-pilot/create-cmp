@@ -30,5 +30,8 @@
     "./skills/cmp-firebase-connect",
     "./skills/cmp-test"
   ],
+  "agents": [
+    "./agents/cmp-orchestrator.md"
+  ],
   "mcpServers": "./.mcp.json"
 }
