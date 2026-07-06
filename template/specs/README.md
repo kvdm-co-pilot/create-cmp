@@ -9,7 +9,13 @@ id, and every durable test cites the clause it verifies.
 1. **New behavior begins as a spec clause.** Before writing code, add a clause to the feature's
    spec (AI proposes, human confirms). Changing behavior = changing the clause first.
 2. Implement, mirroring the exemplar. Write/update the durable tests **tagged with the clause
-   id** (`// SPEC: HOME-02`).
+   id** (`// SPEC: HOME-02`). The `// SPEC:` tag convention applies to **all durable tests** —
+   not just Compose UI Tests and E2E flows, but `commonTest` unit tests too (ViewModel/UseCase/
+   Repository tests carry the tag on the behavior they verify). Conformance tests carry both
+   the `// SPEC:` tag comment above the `@Test` annotation **and** the clause id inside the
+   failure message's `[CLAUSE-ID]` bracket (see `violation()` in
+   `ArchitectureConformanceTest.kt`) — the tag makes the clause greppable from source, the
+   bracketed id makes it visible in a failing test's output.
 3. `node qa/verify.mjs` — the lane checks the tests; the spec-coverage gate (when it ships)
    fails orphan clauses (no test) and orphan tests (no clause).
 

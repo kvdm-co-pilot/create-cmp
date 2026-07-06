@@ -44,6 +44,7 @@ class HomeViewModelTest {
 
     private fun viewModel() = HomeViewModel(GetItemsUseCase(repository))
 
+    // SPEC: HOME-01
     @Test
     fun `starts in loading state`() = runTest(dispatcher) {
         viewModel().state.test {
@@ -80,6 +81,7 @@ class HomeViewModelTest {
         }
     }
 
+    // SPEC: HOME-04
     @Test
     fun `reload after failure clears the error and loads items`() = runTest(dispatcher) {
         repository.shouldFail = true

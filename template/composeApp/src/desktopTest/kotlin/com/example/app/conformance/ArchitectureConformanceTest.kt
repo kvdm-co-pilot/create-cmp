@@ -33,6 +33,7 @@ class ArchitectureConformanceTest {
     private fun violation(clause: String, rule: String, offenders: List<String>, fix: String): String =
         "[$clause] $rule\n  Offending: ${offenders.joinToString("\n             ")}\n  Fix: $fix"
 
+    // SPEC: ARCH-01
     @Test
     fun `ARCH-01 presentation never imports the data layer`() {
         val offenders = sources(commonMain)
@@ -48,6 +49,7 @@ class ArchitectureConformanceTest {
         )
     }
 
+    // SPEC: ARCH-02
     @Test
     fun `ARCH-02 domain is pure - no app layers, no frameworks`() {
         val banned = listOf(
@@ -67,6 +69,7 @@ class ArchitectureConformanceTest {
         )
     }
 
+    // SPEC: ARCH-03
     @Test
     fun `ARCH-03 every ViewModel has a test`() {
         val testNames = sources(commonTest).map { it.name }.toSet()
@@ -83,6 +86,7 @@ class ArchitectureConformanceTest {
         )
     }
 
+    // SPEC: ARCH-04
     @Test
     fun `ARCH-04 every Screen composable declares a testTag`() {
         val offenders = sources(commonMain)
@@ -99,6 +103,7 @@ class ArchitectureConformanceTest {
         )
     }
 
+    // SPEC: ARCH-05
     @Test
     fun `ARCH-05 no hardcoded Color literals outside the theme`() {
         val colorLiteral = Regex("""Color\(0x""")
@@ -111,6 +116,27 @@ class ArchitectureConformanceTest {
                 "ARCH-05", "design colors come from the token catalog, never Color(0x…) literals.",
                 offenders,
                 "add/use a token in presentation/theme instead of the literal.",
+            )
+        )
+    }
+
+    // SPEC: SHELL-03
+    @Test
+    fun `SHELL-03 insets are owned by BaseScreen - screens never touch inset APIs`() {
+        val insetApi = Regex(
+            "WindowInsets|safeDrawingPadding|safeContentPadding|systemBarsPadding|" +
+                "statusBarsPadding|navigationBarsPadding|imePadding"
+        )
+        val offenders = sources(commonMain)
+            .filterNot { under(it, "components") }
+            .filterNot { under(it, "navigation") }
+            .filter { insetApi.containsMatchIn(it.readText()) }
+            .map { it.path }
+        if (offenders.isNotEmpty()) fail(
+            violation(
+                "SHELL-03", "window insets are solved once, in BaseScreen/AppShell — screens never call inset APIs directly.",
+                offenders,
+                "compose your content inside BaseScreen (or the shell) and remove the direct inset call.",
             )
         )
     }
