@@ -1,8 +1,9 @@
 # CI for your Compose Multiplatform app — stamped in by create-cmp.
 #
-# What runs on every push/PR: a toolchain report (advisory) and the Android
-# debug build — the same "verify gate" create-cmp ran when it generated this
-# project. Green here = your frozen version set still builds.
+# What runs on every push/PR: a toolchain report (advisory) and the VERIFY LANE
+# (qa/verify.mjs) — build + unit tests + every other gate this project carries,
+# producing the evidence receipt. Green here = your frozen version set still
+# builds AND the harness's checks pass.
 #
 # iOS: a ready-to-enable macOS job is included (commented out) at the bottom.
 # macOS runners cost ~10x Linux minutes, so it's opt-in.
@@ -35,11 +36,22 @@ jobs:
         continue-on-error: true
         run: npx --yes create-cmp-cli@latest doctor --yes --no-install --no-ios
 
-      # The verify gate. If this fails after a dependency bump, remember:
-      # Kotlin / KSP / Compose / Room / AGP move as ONE set (see the comments
-      # in gradle/libs.versions.toml).
-      - name: Build Android (debug)
-        run: ./gradlew :composeApp:assembleDebug --stacktrace
+      # The verify lane: build + unit tests + all shipped gates, with a typed
+      # verdict and an evidence receipt. If the build step fails after a
+      # dependency bump, remember: Kotlin / KSP / Compose / Room / AGP move as
+      # ONE set (see the comments in gradle/libs.versions.toml).
+      - name: Verify lane
+        run: node qa/verify.mjs --profile ci
+
+      # The receipt this run produced, kept as a build artifact. The receipt
+      # committed by the author (qa/evidence/latest.json) lives in the repo —
+      # this artifact is CI's independent re-verification of the same change.
+      - name: Upload evidence receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-evidence
+          path: qa/evidence/latest.json
 
   # ── iOS (opt-in) ──────────────────────────────────────────────────────────
   # Uncomment to build the iOS app on every push to main. Uses the exact

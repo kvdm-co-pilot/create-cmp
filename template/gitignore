@@ -11,6 +11,10 @@
 # Kotlin
 .kotlin/
 
+# Verify-lane binary evidence (screenshots, reports, page sources). The RECEIPT
+# (qa/evidence/latest.json) IS committed — these artifacts are hashed into it instead.
+qa-artifacts/
+
 # iOS / CocoaPods / XcodeGen
 iosApp/Pods/
 iosApp/Podfile.lock
