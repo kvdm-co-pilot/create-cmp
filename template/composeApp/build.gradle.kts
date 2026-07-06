@@ -51,16 +51,16 @@ kotlin {
     }
     // <<< cmp:feature ios
 
-    // >>> cmp:feature dev-client
-    // Desktop dev-client: runs the shared commonMain UI in a live JVM window — the daily dev
-    // loop. Compose Hot Reload attaches to this target (task: hotRunDesktop). See docs/dev-client.md.
+    // The JVM tier — harness infrastructure, NOT feature-gated. This target hosts the fast
+    // verification loop: unit tests, conformance gates, golden-tree renders, and Compose UI
+    // Tests all run here (`:composeApp:desktopTest`), device-free. The dev-client window
+    // feature merely reuses it.
     jvm("desktop") {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
-    // <<< cmp:feature dev-client
 
     sourceSets {
         commonMain.dependencies {
@@ -130,7 +130,7 @@ kotlin {
         }
         // <<< cmp:feature ios
 
-        // >>> cmp:feature dev-client
+        // JVM tier deps (harness infrastructure — see the jvm("desktop") target note).
         val desktopMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)
@@ -138,13 +138,21 @@ kotlin {
                 implementation(libs.ktor.client.cio)
             }
         }
-        // <<< cmp:feature dev-client
 
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.koin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.turbine)
+        }
+
+        // JVM-tier test deps: Compose UI Tests, the golden-tree serializer, and the
+        // conformance gates all run here (the verify lane's fast, device-free steps).
+        val desktopTest by getting {
+            dependencies {
+                implementation(compose.desktop.uiTestJUnit4)
+                implementation(compose.desktop.currentOs)
+            }
         }
     }
 }
@@ -226,9 +234,7 @@ dependencies {
     add("kspIosX64", libs.room.compiler)
     add("kspIosArm64", libs.room.compiler)
     // <<< cmp:feature ios
-    // >>> cmp:feature dev-client
     add("kspDesktop", libs.room.compiler)
-    // <<< cmp:feature dev-client
     // <<< cmp:feature room
     add("coreLibraryDesugaring", libs.android.desugar.jdk)
 }

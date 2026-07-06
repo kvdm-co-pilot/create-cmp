@@ -115,26 +115,33 @@ test("--no-inspector: inspector sources deleted and zero startInspector//inspect
   fs.rmSync(out, { recursive: true, force: true });
 });
 
-test("--no-dev-client: desktop sources deleted and zero desktop-target/hot-reload references remain", async () => {
+test("--no-dev-client: window/hot-reload stripped but the JVM harness tier SURVIVES", async () => {
   const out = await stamp({ devClient: false });
 
-  assert.ok(!fs.existsSync(path.join(out, "composeApp", "src", "desktopMain")), "desktopMain must be gone");
+  // The dev-client WINDOW is gone: entry point, desktop DI, doc, hot-reload, foojay,
+  // and the compose.desktop application block.
+  const desktopPkg = path.join(out, "composeApp/src/desktopMain/kotlin/com/acme/demo");
+  assert.ok(!fs.existsSync(path.join(desktopPkg, "main.kt")), "main.kt must be gone");
+  assert.ok(!fs.existsSync(path.join(desktopPkg, "di/DesktopModule.kt")), "DesktopModule.kt must be gone");
   assert.ok(!fs.existsSync(path.join(out, "docs", "dev-client.md")), "docs/dev-client.md must be gone");
-
-  for (const re of [
-    /jvm\("desktop"\)/,
-    /hot[.-]reload/i,
-    /foojay/,
-    /kspDesktop/,
-    /desktopMain/,
-    /compose\.desktop/,
-    /initDesktopKoin/,
-  ]) {
+  for (const re of [/hot[.-]reload/i, /foojay/, /initDesktopKoin/]) {
     assert.deepEqual(grepSources(out, re), [], `no reference may survive: ${re}`);
   }
 
-  // The stamped app must still be a complete Android(+iOS) build surface:
+  // The JVM tier is harness infrastructure and MUST survive (2026-07-06 decoupling):
+  // the verify lane's unit/conformance/golden/UI tests run on :composeApp:desktopTest
+  // in every feature combination.
   const build = fs.readFileSync(path.join(out, "composeApp", "build.gradle.kts"), "utf8");
+  assert.match(build, /jvm\("desktop"\)/, "jvm desktop target must survive");
+  assert.match(build, /kspDesktop/, "desktop Room compiler wiring must survive (room on)");
+  for (const f of [
+    "core/connectivity/NetworkMonitor.desktop.kt",
+    "presentation/components/TestTagAutomation.desktop.kt",
+  ]) {
+    assert.ok(fs.existsSync(path.join(desktopPkg, f)), `platform actual must survive: ${f}`);
+  }
+
+  // Still a complete Android(+iOS) build surface, no marker noise:
   assert.match(build, /androidTarget/);
   assert.match(build, /iosSimulatorArm64/);
   assert.ok(!build.includes("cmp:feature"), "no marker noise");

@@ -26,6 +26,7 @@
   "packageSourceRoots": [
     "composeApp/src/commonMain/kotlin",
     "composeApp/src/commonTest/kotlin",
+    "composeApp/src/desktopTest/kotlin",
     "composeApp/src/androidMain/kotlin",
     "composeApp/src/androidDebug/kotlin",
     "composeApp/src/androidRelease/kotlin",
@@ -85,10 +86,9 @@
     "appium": {
       "enabledByDefault": true,
       "paths": [
-        "qa/appium",
-        "tests/appium"
+        "qa/e2e"
       ],
-      "notes": "Appium harness (Python conftest + smoke, JS client + smoke runner). No in-file markers; toggled by deleting the listed paths."
+      "notes": "Device-level E2E harness — Maestro flows (qa/e2e/*.yaml; replaced the Appium Node+pytest runners 2026-07-06; feature key stays `appium` for CLI-flag compat until the 0.3.0 breaking rename to `e2e`). testTag selectors via TestTagAutomation resource-ids. No in-file markers except the docs sections; toggled by deleting qa/e2e."
     },
     "inspector": {
       "enabledByDefault": true,
@@ -101,15 +101,17 @@
     "dev-client": {
       "enabledByDefault": true,
       "paths": [
-        "composeApp/src/desktopMain",
+        "composeApp/src/desktopMain/kotlin/com/example/app/main.kt",
+        "composeApp/src/desktopMain/kotlin/com/example/app/di/DesktopModule.kt",
         "docs/dev-client.md"
       ],
-      "notes": "Desktop dev-client: a jvm(\"desktop\") target inside composeApp running the shared commonMain UI in a phone-sized JVM window (main.kt: __APP_NAME__ dev-client, 411x891dp), with Compose Hot Reload 1.1.1 attached (task hotRunDesktop; plain run task needs no JBR). GitLive Firebase 2.1.0 publishes JVM artifacts so commonMain deps resolve for the desktop target, but the dev-client NEVER initializes/contacts Firebase — desktopMain DI (DesktopModule.kt) binds only NetworkMonitor (always-online) + Room (BundledSQLiteDriver into the OS temp dir); the example ItemRepositoryImpl is in-memory on every platform. When off: delete the desktopMain dir + docs/dev-client.md AND strip the `dev-client` marker blocks in build.gradle.kts (hot-reload plugin apply false), settings.gradle.kts (foojay-resolver-convention for JBR auto-provisioning), composeApp/build.gradle.kts (hot-reload plugin, jvm(\"desktop\") target, desktopMain deps, kspDesktop room.compiler row — nested inside the room block, compose.desktop application block). The catalog keeps the declared coordinates by design (declared-but-unused)."
+      "notes": "Desktop dev-client: the hot-reload WINDOW on top of the always-present JVM tier. IMPORTANT (changed 2026-07-06): the jvm(\"desktop\") target, desktopMain deps, platform actuals (NetworkMonitor/DatabaseBuilder/TestTagAutomation .desktop.kt), and the kspDesktop room.compiler row are HARNESS INFRASTRUCTURE and are NOT gated by this feature — the verify lane's unit/conformance/golden/UI tests run on :composeApp:desktopTest in every feature combination. This feature gates only the interactive window: main.kt (411x891dp __APP_NAME__ dev-client window) + DesktopModule.kt (initDesktopKoin), the compose-hot-reload plugin (build.gradle.kts + composeApp/build.gradle.kts markers), the settings.gradle.kts foojay-resolver (JBR auto-provisioning), and the compose.desktop application block. The dev-client NEVER initializes/contacts Firebase — desktop DI binds NetworkMonitor (always-online) + Room (BundledSQLiteDriver into the OS temp dir); the example ItemRepositoryImpl is in-memory on every platform."
     }
   },
   "verify": {
-    "android": "./gradlew :composeApp:assembleDebug",
-    "androidSmoke": "./gradlew :composeApp:installDebug && node qa/appium/run-android-smoke.mjs",
+    "android": "node qa/verify.mjs --profile scaffold",
+    "androidBuildOnly": "./gradlew :composeApp:assembleDebug",
+    "androidSmoke": "./gradlew :composeApp:installDebug && maestro test qa/e2e/smoke.yaml",
     "iosLink": "./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64",
     "ios": "cd iosApp && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && xcodegen generate && pod install && SIM_UDID=$(xcrun simctl list devices available | grep -Eo '[0-9A-F-]{36}' | head -1) && xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64 -destination \"id=$SIM_UDID\" build",
     "iosNote": "On Apple Silicon, the KMP embedAndSignAppleFrameworkForXcode prebuild phase produces ONLY the active-arch (arm64) slice of ComposeApp.framework. A `-destination generic/platform=iOS Simulator` build demands a universal arm64+x86_64 binary and FAILS at CreateUniversalBinary. Constrain to arm64 (ARCHS=arm64 EXCLUDED_ARCHS=x86_64) and target a concrete arm64 simulator UDID — matching the linkDebugFrameworkIosSimulatorArm64 gate."
