@@ -36,8 +36,8 @@ invariants the conformance gates enforce.
   kotlin-test + coroutines-test + Turbine. **Hand-written fakes** in `testing/fakes/` — never
   mocking frameworks. Every new ViewModel/UseCase/Repository gets a test in the exemplar's
   style: Arrange-Act-Assert, behavior-named backtick tests, one behavior per test.
-- **Conformance + screen tests** (`composeApp/src/desktopTest`): Konsist architecture gates
-  (they enforce `specs/app-base.spec.md`'s ARCH clauses) + Compose UI Tests (durable,
+- **Conformance + screen tests** (`composeApp/src/desktopTest`): dependency-free
+  source-scanning architecture gates (they enforce `specs/app-base.spec.md`'s ARCH clauses) + Compose UI Tests (durable,
   spec-cited, testTag selectors) + the golden-tree structural baseline (`qa/golden/`). Golden
   drift you did not intend = fix your change; intended drift = regenerate explicitly
   (`UPDATE_GOLDEN=1`) and declare it.

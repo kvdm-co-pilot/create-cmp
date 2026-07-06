@@ -25,3 +25,8 @@ One file per feature: `specs/<feature>.spec.md`. Clauses are Given/When/Then wit
 ids** (`<FEATURE>-<NN>`) — ids are never renumbered or reused; a withdrawn clause is struck
 through and kept. `app-base.spec.md` covers the base architecture and the app shell the
 scaffold itself ships.
+
+> **Why no Cucumber?** We adopt the Given/When/Then *grammar* but reject the Cucumber
+> *runtime*: step-definition glue is a third artifact that drifts from both the spec and the
+> tests. Spec and test are bound by **clause id** instead (`// SPEC:` tag + `[CLAUSE-ID]` in
+> failure messages) — greppable, machine-checkable, no glue to maintain.

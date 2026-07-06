@@ -211,7 +211,9 @@ Golden template (frozen, CI'd):   pinned versions · iOS shell · nav+insets · 
 The engine never puts an LLM in the hot path: it copies the template, replaces placeholders in file
 contents *and* paths, atomically renames package directories, toggles features (Firebase / auth type
 / Room / Appium), and runs the verify build. Determinism is the moat. See
-[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full design.
+[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full design, and
+[`docs/DOCUMENTATION.md`](./docs/DOCUMENTATION.md) for the map of every doc — what's
+authoritative for what, and the standards each implements.
 
 ## Requirements
 
