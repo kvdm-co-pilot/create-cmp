@@ -36,6 +36,16 @@ jobs:
         continue-on-error: true
         run: npx --yes create-cmp-cli@latest doctor --yes --no-install --no-ios
 
+      # Receipt attests HEAD: the committed evidence receipt (qa/evidence/latest.json)
+      # must validly attest the checked-out tree — verdict PASS and the inputs-hash
+      # still matching the verified surface — BEFORE we spend a runner re-running the
+      # lane. Robust to rebase/merge/squash: validity is a content hash of the inputs,
+      # not a parent SHA (docs/adr/0005). This is the same predicate the local Stop
+      # hook runs (qa/receipt-check.mjs) — one check, two locations — so a stale or
+      # hand-edited receipt fails here even if the author bypassed the local hook.
+      - name: Receipt attests HEAD
+        run: node qa/receipt-check.mjs
+
       # The verify lane: build + unit tests + all shipped gates, with a typed
       # verdict and an evidence receipt. If the build step fails after a
       # dependency bump, remember: Kotlin / KSP / Compose / Room / AGP move as

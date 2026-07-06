@@ -72,3 +72,32 @@ docs/                        architecture, testing, ADRs
 Every change must pass the verify lane (`node qa/verify.mjs`) and commit its updated receipt
 (`qa/evidence/latest.json`). CI re-runs the same lane on every push — see
 [`.github/workflows/verify.yml`](./.github/workflows/verify.yml).
+
+## Verification enforcement
+
+This project ships a **Stop hook** (`.claude/settings.json`) that makes `CLAUDE.md`'s definition
+of done mechanical instead of honor-system, for AI sessions using Claude Code.
+
+**What it does:** when a session tries to end, the hook runs `node qa/receipt-check.mjs --hook`.
+That script recomputes a sha256 hash over this project's "verified surface" (`composeApp/`,
+`specs/`, `qa/`, and the Gradle build files — see `qa/lib/inputs-hash.mjs`) and compares it to the
+`inputs.hash` recorded in the committed `qa/evidence/latest.json`. If the receipt is a `PASS` and
+its hash matches the current tree, the session ends silently. If source changed without a fresh
+`PASS` receipt — or the receipt is missing, a `FAIL`, or predates this mechanism — the hook blocks
+with the specific reason and asks you to run `node qa/verify.mjs` and commit the receipt. **It runs
+no build and no tests — only file hashing —** so it costs milliseconds, and it never fires twice in
+a row for the same stop.
+
+Doc-only edits (`*.md`, `README`, `.github/`, `.claude/`) are deliberately **outside** the verified
+surface, so editing docs never invalidates a good receipt or forces a needless re-run — the intent
+is transparent enforcement, not a hostile one.
+
+**Why:** `CLAUDE.md` already says a change is "not done" without a `PASS` receipt committed. The
+Stop hook is what makes that check happen automatically instead of relying on the AI session to
+remember to run it.
+
+**Escape hatch:** this is your project. If you don't want the hook, delete or comment out the
+`Stop` block in [`.claude/settings.json`](./.claude/settings.json) — nothing else depends on it
+locally. Note that CI independently enforces the same "receipt attests HEAD" check on every push
+(see `.github/workflows/verify.yml`), so disabling the local hook only trades an immediate local
+signal for a later one in CI.

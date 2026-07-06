@@ -50,6 +50,7 @@ merged.
 | [TESTING-ARCHITECTURE.md](./TESTING-ARCHITECTURE.md) | **Normative** test-pyramid specification every generated project implements (frameworks, patterns, evidence packs, spec-driven workflow). Sister of `template/docs/TESTING.md`. | living |
 | [USAGE.md](./USAGE.md) | End-to-end usage guide — setup, engine CLI, skills, inspector tools, verified dev loop. | living |
 | [M3-ADD-FEATURE-DESIGN.md](./M3-ADD-FEATURE-DESIGN.md) | Buildable spec for the `add-feature` generator (the in-project stamper) — rename contract, anchor injection, spec-first flow, C5 gate. | plan/spec |
+| [M4-ENFORCEMENT-DESIGN.md](./M4-ENFORCEMENT-DESIGN.md) | Buildable spec for M4 mechanical enforcement — the `inputs.hash` evidence-binding primitive, the Stop hook, the C7 refusal demo, receipt-matches-HEAD CI. Underpinned by [ADR-0005](./adr/0005-evidence-binding-by-inputs-hash.md). | plan/spec |
 | [INSPECTOR-PLAN.md](./INSPECTOR-PLAN.md) | Plan of record for the AI-native inspector (phases 0–2). Overview; PHASE2-DESIGN is the buildable spec. | living |
 | [INSPECTOR-PHASE2-DESIGN.md](./INSPECTOR-PHASE2-DESIGN.md) | Detailed build spec for the live on-device inspector. | living |
 | [LIVE-VIEW-PLAN.md](./LIVE-VIEW-PLAN.md) | Plan of record for live-view tracks A/B/C (pixels → human, structure → AI). | living |
@@ -58,7 +59,7 @@ merged.
 
 | Doc | Purpose | Lifecycle |
 |---|---|---|
-| [adr/](./adr/) | The harness repo's own decision records (MADR-trimmed): 0001 contract-in-generated-project · 0002 Maestro-over-Appium · 0003 jvm("desktop")-as-infrastructure · 0004 no-Konsist. | append-only |
+| [adr/](./adr/) | The harness repo's own decision records (MADR-trimmed): 0001 contract-in-generated-project · 0002 Maestro-over-Appium · 0003 jvm("desktop")-as-infrastructure · 0004 no-Konsist · 0005 evidence-binding-by-inputs-hash. | append-only |
 | [SESSION-STATE.md](./SESSION-STATE.md) | Dated cross-session log — read first when resuming work. Internal (gitignored). | session-log |
 | [TEST-DRIVE.md](./TEST-DRIVE.md) | Founder pre-publication test-drive checklist (UX validation, not correctness). | frozen/reference |
 | [research/](./research/) | Internal product audits and market research memos. | frozen/reference |

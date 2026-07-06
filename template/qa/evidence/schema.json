@@ -16,6 +16,15 @@
         "dirty": { "type": "array", "items": { "type": "string" } }
       }
     },
+    "inputs": {
+      "type": "object",
+      "description": "Content-hash binding of the receipt to the verified surface (ADR-0005). Absent on receipts predating evidence binding.",
+      "required": ["hash", "fileCount"],
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "fileCount": { "type": "number" }
+      }
+    },
     "steps": {
       "type": "array",
       "items": {

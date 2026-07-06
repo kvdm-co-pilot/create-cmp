@@ -24,6 +24,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { computeInputsHash } from "./lib/inputs-hash.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EVIDENCE_DIR = path.join(ROOT, "qa", "evidence");
 const ARTIFACTS_DIR = path.join(ROOT, "qa-artifacts");
@@ -317,6 +319,11 @@ if (fs.existsSync(ARTIFACTS_DIR)) {
   artifacts.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+// Bind the receipt to the content of the verified surface (ADR-0005), NOT the
+// parent SHA (rebase/merge-fragile). Must be computed before latest.json is
+// written — the receipt is an output and must never hash itself.
+const inputs = computeInputsHash(ROOT);
+
 // The receipt. Deterministic key order; ONE volatile timestamp field.
 // commit.sha is the parent HEAD at run time (you cannot know the sha of the
 // commit the receipt will be part of); commit.dirty lists what was uncommitted.
@@ -327,6 +334,10 @@ const receipt = {
   commit: {
     sha: tryGit("rev-parse HEAD"),
     dirty: (tryGit("status --porcelain") ?? "").split("\n").filter(Boolean).map((l) => l.slice(3)).sort(),
+  },
+  inputs: {
+    hash: inputs.hash,
+    fileCount: inputs.fileCount,
   },
   steps,
   artifacts,
