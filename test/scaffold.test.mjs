@@ -20,7 +20,11 @@ function makeTemplate() {
     "manifest.json",
     JSON.stringify({
       placeholders: ["__APP_NAME__", "__PACKAGE__", "__PACKAGE_PATH__", "__IOS_BUNDLE_ID__", "__REGION__", "__THEME_PREFIX__"],
-      packageSourceRoots: ["composeApp/src/commonMain/kotlin", "composeApp/src/iosMain/kotlin"],
+      packageSourceRoots: [
+        "composeApp/src/commonMain/kotlin",
+        "composeApp/src/commonTest/kotlin",
+        "composeApp/src/iosMain/kotlin",
+      ],
       features: {
         ios: { enabledByDefault: true, paths: ["iosApp", "composeApp/src/iosMain"] },
         firebase: { enabledByDefault: true, paths: [] },
@@ -41,6 +45,11 @@ function makeTemplate() {
   );
   // iosMain source (will be removed when ios disabled)
   w("composeApp/src/iosMain/kotlin/com/example/app/IosMain.kt", "package __PACKAGE__\n");
+  // commonTest source — the harness's exemplar tests are stamped like any other package root
+  w(
+    "composeApp/src/commonTest/kotlin/com/example/app/home/HomeViewModelTest.kt",
+    "package __PACKAGE__.home\nimport __PACKAGE__.home.HomeViewModel\nclass HomeViewModelTest\n"
+  );
   // settings file with display name + bundle id
   w("settings.gradle.kts", 'rootProject.name = "__APP_NAME__"\n// bundle __IOS_BUNDLE_ID__\n');
   // build file with a feature-marked ios block
@@ -109,6 +118,11 @@ test("full scaffold (iOS on): tokens, package rename, markers stripped, verify G
     fs.existsSync(path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/theme/AcmeTokens.kt")),
     "__THEME_PREFIX__ file path replaced"
   );
+
+  // commonTest root stamped: dir renamed + package token replaced in the test source
+  const testKt = path.join(out, "composeApp/src/commonTest/kotlin/com/acme/demo/home/HomeViewModelTest.kt");
+  assert.ok(fs.existsSync(testKt), "commonTest package dir renamed");
+  assert.match(fs.readFileSync(testKt, "utf8"), /package com\.acme\.demo\.home/);
 
   // settings tokens
   const settings = fs.readFileSync(path.join(out, "settings.gradle.kts"), "utf8");

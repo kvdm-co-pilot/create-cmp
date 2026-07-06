@@ -47,9 +47,19 @@ fun HomeScreen(
             modifier = Modifier.semantics { testTag = "home_title" }.padding(bottom = 12.dp),
         )
 
+        val errorMessage = state.errorMessage
         if (state.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
+            }
+        } else if (errorMessage != null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { testTag = "home_error" },
+                )
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(__THEME_PREFIX__Tokens.GapCard)) {

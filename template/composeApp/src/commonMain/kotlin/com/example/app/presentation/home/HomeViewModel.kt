@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 data class HomeUiState(
     val isLoading: Boolean = true,
     val items: List<Item> = emptyList(),
+    val errorMessage: String? = null,
 )
 
 class HomeViewModel(
@@ -28,8 +29,11 @@ class HomeViewModel(
     fun load() {
         viewModelScope.launch {
             _state.value = HomeUiState(isLoading = true)
-            val items = getItems()
-            _state.value = HomeUiState(isLoading = false, items = items)
+            _state.value = try {
+                HomeUiState(isLoading = false, items = getItems())
+            } catch (e: Exception) {
+                HomeUiState(isLoading = false, errorMessage = e.message ?: "Something went wrong")
+            }
         }
     }
 }

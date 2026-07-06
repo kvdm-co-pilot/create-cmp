@@ -25,6 +25,7 @@
   ],
   "packageSourceRoots": [
     "composeApp/src/commonMain/kotlin",
+    "composeApp/src/commonTest/kotlin",
     "composeApp/src/androidMain/kotlin",
     "composeApp/src/androidDebug/kotlin",
     "composeApp/src/androidRelease/kotlin",

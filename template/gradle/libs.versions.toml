@@ -86,6 +86,8 @@ android-desugar-jdk = { module = "com.android.tools:desugar_jdk_libs", version =
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 koin-test = { module = "io.insert-koin:koin-test", version.ref = "koin" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.9.0" }
+# Turbine — Flow/StateFlow assertion library (CashApp). KMP-safe; the exemplar ViewModel tests use it.
+turbine = { module = "app.cash.turbine:turbine", version = "1.2.0" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
