@@ -207,13 +207,31 @@ In a freshly scaffolded app, a plain Claude Code session (no plugin) runs `add-f
 binds `FAVORITES-01..06`, lane PASS. This is the M3 acceptance test and a direct rehearsal of the
 canonical scenario (HARNESS-ROADMAP §1, C5).
 
-## 9. What this session delivers vs defers
+## 9. Delivered vs deferred
 
-- **This session:** `qa/scaffold-feature.mjs` + anchors in the three shared files +
-  `add-feature/SKILL.md` + the C5 gate proven on a fresh scaffold.
-- **Deferred:** `--tab` promotion (edit `appTabs()` signature + AppShell wiring); `add-screen`
-  (presentation-only subset); `add-repository` (data-only subset); "tap → detail" route for
-  generated features.
+- **Delivered (M3):** `qa/scaffold-feature.mjs` + anchors in the three shared files +
+  `add-feature/SKILL.md`, C5 proven clean-room (`add-feature Favorites` → lane PASS, 6 clauses
+  bound).
+- **Delivered (M3 subsets, `--preset`):** `add-screen` and `add-repository` as filter presets on
+  the *same* stamper (one mechanism, three front-doors; `feature` = `repository` + `screen` +
+  spanning nav):
+  - `--preset repository <Entity>` — the 5 data/domain files + repo/usecase DI only. **Zero
+    clauses, zero SPEC tags** (a bare repository has no behavior to specify) → cannot orphan
+    specCoverage in either direction. Gate: `add-repository Tag` → lane PASS, clause/tag count
+    unchanged (0-delta).
+  - `--preset screen <Feature> --entity <E>` — presentation + tests + spec only; viewModel DI +
+    nav; binds `<F>-01..06`. **Validates the entity's data layer exists before writing** (die
+    early, no half-stamp). Gate: `add-repository Tag` then `add-screen Tags --entity Tag` → lane
+    PASS, +6 clauses/+6 tags bound; missing-entity → exit 1, clean tree.
+  - Ships as `add-screen/SKILL.md` + `add-repository/SKILL.md` (thin preset drivers).
+- **Deferred:** `--tab` promotion (edit `appTabs()` signature + AppShell wiring); "tap → detail"
+  route for generated features; standalone use-case/repository unit test (the exemplar covers the
+  use case via the VM test + fake, so the subset mirrors that rather than diverging).
+
+> Env note: under this sandbox's Node 24.7.0 the stamper occasionally exits 139 (segfault) *after*
+> `process.exit(0)` has already run and printed — pre-existing/environmental (the unmodified
+> script does it too, nondeterministically), not a code defect. File-state is the source of
+> truth; the skills gate on the verify lane, not on the stamper's exit code.
 
 [ADR-0001]: ./adr/0001-the-contract-lives-in-the-generated-project.md
 [ADR-0004]: ./adr/0004-conformance-gates-without-konsist.md

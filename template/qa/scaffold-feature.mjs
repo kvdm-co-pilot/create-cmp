@@ -2,6 +2,8 @@
 // The `add-feature` stamper — deterministic vertical-slice generator.
 //
 //   node qa/scaffold-feature.mjs <FeatureName> [--entity <EntityName>] [--dry-run]
+//   node qa/scaffold-feature.mjs <Entity> --preset repository [--dry-run]
+//   node qa/scaffold-feature.mjs <FeatureName> --entity <EntityName> --preset screen [--dry-run]
 //
 // Copies the `home` exemplar file set, applies a curated WHOLE-WORD identifier
 // rename (never a blind substring replace — see the rename map below), injects
@@ -10,6 +12,23 @@
 //
 // Philosophy: skills instruct, scripts stamp (HARNESS-ROADMAP M3). The AI only
 // refines spec wording after this runs; the file set + wiring are mechanical.
+//
+// --preset (default `feature`, unchanged behavior): one stamping mechanic,
+// three front-doors. Every FILES entry and every injection step below is
+// tagged with the set of presets it belongs to; the active preset filters
+// both lists before anything is written. There is no forked copy of this
+// script per preset — `feature` is simply `repository` + `screen` + nav wiring
+// that spans both, applied together.
+//
+//   feature    (default) — all 11 files; DI repo+usecase+viewModel; nav
+//              route+import; spec FEATURE-01..06.
+//   repository <Entity>  — ONLY the 5 data/domain files; DI repo+usecase ONLY;
+//              no nav, no viewModel, no spec file, zero SPEC tags. The
+//              positional arg IS the entity (no --entity, no feature name).
+//   screen     <Feature> --entity <E> — ONLY presentation + tests + spec (3
+//              test files carry all 6 SPEC tags); DI viewModel ONLY; nav
+//              route+import. Requires the entity's data layer to already
+//              exist (validated before anything is written — see below).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -30,18 +49,28 @@ const dryRun = args.includes("--dry-run");
 const entityFlagIdx = args.indexOf("--entity");
 const entityArg = entityFlagIdx !== -1 ? args[entityFlagIdx + 1] : undefined;
 
-const featureName = positional[0];
-if (!featureName) {
-  die(
-    "usage: node qa/scaffold-feature.mjs <FeatureName> [--entity <EntityName>] [--dry-run]\n" +
-      "  <FeatureName> is required, e.g. `Favorites`.",
-  );
+const PRESETS = new Set(["feature", "screen", "repository"]);
+const presetFlagIdx = args.indexOf("--preset");
+const preset = presetFlagIdx !== -1 ? args[presetFlagIdx + 1] : "feature";
+if (!PRESETS.has(preset)) {
+  die(`"${preset}" is not a valid --preset — choose one of: feature, screen, repository.`);
+}
+
+const USAGE =
+  "usage:\n" +
+  "  node qa/scaffold-feature.mjs <FeatureName> [--entity <EntityName>] [--dry-run]\n" +
+  "  node qa/scaffold-feature.mjs <Entity> --preset repository [--dry-run]\n" +
+  "  node qa/scaffold-feature.mjs <FeatureName> --entity <EntityName> --preset screen [--dry-run]";
+
+const positionalName = positional[0];
+if (!positionalName) {
+  die(`${USAGE}\n  The positional name is required, e.g. \`Favorites\`.`);
 }
 
 const IDENTIFIER_RE = /^[A-Z][A-Za-z0-9]*$/;
-if (!IDENTIFIER_RE.test(featureName)) {
+if (!IDENTIFIER_RE.test(positionalName)) {
   die(
-    `"${featureName}" is not a valid PascalCase Kotlin identifier. Use e.g. "Favorites", "Bookmarks".`,
+    `"${positionalName}" is not a valid PascalCase Kotlin identifier. Use e.g. "Favorites", "Bookmarks".`,
   );
 }
 
@@ -53,12 +82,20 @@ function defaultEntity(feature) {
   return feature;
 }
 
-const entityName = entityArg ?? defaultEntity(featureName);
+// `repository` preset: the positional arg IS the entity — no feature name, no
+// nav/presentation slice at all. `feature`/`screen`: positional is the feature
+// name; --entity defaults via de-pluralization if omitted.
+const featureName = preset === "repository" ? undefined : positionalName;
+const entityName = preset === "repository" ? positionalName : (entityArg ?? defaultEntity(positionalName));
 if (!IDENTIFIER_RE.test(entityName)) {
   die(`"${entityName}" is not a valid PascalCase Kotlin identifier for --entity.`);
 }
 
-const F = featureName; // PascalCase feature, e.g. Favorites
+// `repository` preset has no feature name (no nav/presentation/spec slice), so
+// F/f/F_UPPER are never read for it — the rename map still needs harmless
+// values to build (its feature-shaped entries never match repository-preset
+// file contents, which only reference Item/ItemRepository/GetItemsUseCase).
+const F = featureName ?? entityName; // PascalCase feature, e.g. Favorites
 const f = F[0].toLowerCase() + F.slice(1); // camelCase/package segment, e.g. favorites
 const F_UPPER = F.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase(); // FAVORITES
 const E = entityName; // PascalCase entity, e.g. Favorite
@@ -165,19 +202,25 @@ function applyRename(text) {
 
 const SRC = (sourceSet) => path.join(ROOT, "composeApp/src", sourceSet, "kotlin", PACKAGE_DIR);
 
-const FILES = [
-  { from: path.join(SRC("commonMain"), "domain/model/Item.kt"), to: path.join(SRC("commonMain"), `domain/model/${E}.kt`) },
-  { from: path.join(SRC("commonMain"), "domain/repository/ItemRepository.kt"), to: path.join(SRC("commonMain"), `domain/repository/${E}Repository.kt`) },
-  { from: path.join(SRC("commonMain"), "domain/usecase/GetItemsUseCase.kt"), to: path.join(SRC("commonMain"), `domain/usecase/Get${E}sUseCase.kt`) },
-  { from: path.join(SRC("commonMain"), "data/remote/ItemRepositoryImpl.kt"), to: path.join(SRC("commonMain"), `data/remote/${E}RepositoryImpl.kt`) },
-  { from: path.join(SRC("commonMain"), "presentation/home/HomeScreen.kt"), to: path.join(SRC("commonMain"), `presentation/${f}/${F}Screen.kt`) },
-  { from: path.join(SRC("commonMain"), "presentation/home/HomeViewModel.kt"), to: path.join(SRC("commonMain"), `presentation/${f}/${F}ViewModel.kt`) },
-  { from: path.join(SRC("commonTest"), "presentation/home/HomeViewModelTest.kt"), to: path.join(SRC("commonTest"), `presentation/${f}/${F}ViewModelTest.kt`) },
-  { from: path.join(SRC("commonTest"), "testing/fakes/FakeItemRepository.kt"), to: path.join(SRC("commonTest"), `testing/fakes/Fake${E}Repository.kt`) },
-  { from: path.join(SRC("desktopTest"), "presentation/home/HomeScreenTest.kt"), to: path.join(SRC("desktopTest"), `presentation/${f}/${F}ScreenTest.kt`) },
-  { from: path.join(SRC("desktopTest"), "presentation/home/HomeGoldenTreeTest.kt"), to: path.join(SRC("desktopTest"), `presentation/${f}/${F}GoldenTreeTest.kt`) },
-  { from: path.join(ROOT, "specs/home.spec.md"), to: path.join(ROOT, `specs/${f}.spec.md`), isDefaultSpec: true },
+// Every entry is tagged with the presets it belongs to. `feature` gets all 11
+// (the union); `repository` gets just the 5 data/domain files; `screen` gets
+// just the 6 presentation+tests+spec files. Filtered by the active preset
+// right after definition — nothing below this point sees the untagged list.
+const ALL_FILES = [
+  { from: path.join(SRC("commonMain"), "domain/model/Item.kt"), to: path.join(SRC("commonMain"), `domain/model/${E}.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonMain"), "domain/repository/ItemRepository.kt"), to: path.join(SRC("commonMain"), `domain/repository/${E}Repository.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonMain"), "domain/usecase/GetItemsUseCase.kt"), to: path.join(SRC("commonMain"), `domain/usecase/Get${E}sUseCase.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonMain"), "data/remote/ItemRepositoryImpl.kt"), to: path.join(SRC("commonMain"), `data/remote/${E}RepositoryImpl.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonTest"), "testing/fakes/FakeItemRepository.kt"), to: path.join(SRC("commonTest"), `testing/fakes/Fake${E}Repository.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonMain"), "presentation/home/HomeScreen.kt"), to: path.join(SRC("commonMain"), `presentation/${f}/${F}Screen.kt`), presets: ["feature", "screen"] },
+  { from: path.join(SRC("commonMain"), "presentation/home/HomeViewModel.kt"), to: path.join(SRC("commonMain"), `presentation/${f}/${F}ViewModel.kt`), presets: ["feature", "screen"] },
+  { from: path.join(SRC("commonTest"), "presentation/home/HomeViewModelTest.kt"), to: path.join(SRC("commonTest"), `presentation/${f}/${F}ViewModelTest.kt`), presets: ["feature", "screen"] },
+  { from: path.join(SRC("desktopTest"), "presentation/home/HomeScreenTest.kt"), to: path.join(SRC("desktopTest"), `presentation/${f}/${F}ScreenTest.kt`), presets: ["feature", "screen"] },
+  { from: path.join(SRC("desktopTest"), "presentation/home/HomeGoldenTreeTest.kt"), to: path.join(SRC("desktopTest"), `presentation/${f}/${F}GoldenTreeTest.kt`), presets: ["feature", "screen"] },
+  { from: path.join(ROOT, "specs/home.spec.md"), to: path.join(ROOT, `specs/${f}.spec.md`), isDefaultSpec: true, presets: ["feature", "screen"] },
 ];
+
+const FILES = ALL_FILES.filter((file) => file.presets.includes(preset));
 
 // Golden baseline: NOT copied (a feature's golden tree is captured fresh via
 // UPDATE_GOLDEN=1, per the skill's step 5), but we still verify the source
@@ -192,17 +235,36 @@ for (const file of FILES) {
   }
 }
 
+// `screen` preset composes on top of an existing entity's data layer — the
+// stamped ViewModel test references Get<E>sUseCase/Fake<E>Repository and the
+// screen references <E>, so those must already exist. Validate BEFORE writing
+// anything (die early, no half-stamp).
+if (preset === "screen") {
+  const requiredExisting = [
+    path.join(SRC("commonMain"), `domain/usecase/Get${E}sUseCase.kt`),
+    path.join(SRC("commonTest"), `testing/fakes/Fake${E}Repository.kt`),
+    path.join(SRC("commonMain"), `domain/model/${E}.kt`),
+  ];
+  const missing = requiredExisting.filter((p) => !fs.existsSync(p));
+  if (missing.length > 0) {
+    die(
+      `entity "${E}" not found — run \`node qa/scaffold-feature.mjs ${E} --preset repository\` first, ` +
+        "or use --preset feature to generate the data layer too.",
+    );
+  }
+}
+
 // Name-taken check.
 const existing = FILES.filter((file) => fs.existsSync(file.to) && !file.isDefaultSpec).map((file) =>
   path.relative(ROOT, file.to),
 );
 if (existing.length > 0) {
   die(
-    `feature "${featureName}" appears to already exist — these target files are already present:\n` +
+    `"${preset === "repository" ? E : featureName}" appears to already exist — these target files are already present:\n` +
       existing.map((p) => `  ${p}`).join("\n"),
   );
 }
-if (fs.existsSync(path.join(ROOT, `specs/${f}.spec.md`))) {
+if (FILES.some((file) => file.isDefaultSpec) && fs.existsSync(path.join(ROOT, `specs/${f}.spec.md`))) {
   die(`specs/${f}.spec.md already exists — feature "${featureName}" appears to already exist.`);
 }
 
@@ -322,34 +384,45 @@ const APP_MODULE = path.join(SRC("commonMain"), "di/AppModule.kt");
 const SCREEN_KT = path.join(SRC("commonMain"), "presentation/navigation/Screen.kt");
 const APP_NAV_HOST = path.join(SRC("commonMain"), "presentation/navigation/AppNavHost.kt");
 
-const fileInjectionPlans = [
+// Each step is tagged with the presets it belongs to, same mechanism as
+// FILES above: `repository` gets repo+usecase DI (+ imports) only; `screen`
+// gets viewModel DI (+ import) + nav route + import only; `feature` gets the
+// union (unchanged).
+const ALL_INJECTION_PLANS = [
   {
     filePath: APP_MODULE,
     steps: [
-      (c) => injectImport(c, APP_MODULE, `import ${PACKAGE}.data.remote.${E}RepositoryImpl`),
-      (c) => injectImport(c, APP_MODULE, `import ${PACKAGE}.domain.repository.${E}Repository`),
-      (c) => injectImport(c, APP_MODULE, `import ${PACKAGE}.domain.usecase.Get${E}sUseCase`),
-      (c) => injectImport(c, APP_MODULE, `import ${PACKAGE}.presentation.${f}.${F}ViewModel`),
-      (c) => injectAtAnchor(c, APP_MODULE, "di-repositories", `single<${E}Repository> { ${E}RepositoryImpl() }`),
-      (c) => injectAtAnchor(c, APP_MODULE, "di-usecases", `factory { Get${E}sUseCase(get()) }`),
-      (c) => injectAtAnchor(c, APP_MODULE, "di-viewmodels", `viewModelOf(::${F}ViewModel)`),
+      { presets: ["feature", "repository"], apply: (c) => injectImport(c, APP_MODULE, `import ${PACKAGE}.data.remote.${E}RepositoryImpl`) },
+      { presets: ["feature", "repository"], apply: (c) => injectImport(c, APP_MODULE, `import ${PACKAGE}.domain.repository.${E}Repository`) },
+      { presets: ["feature", "repository"], apply: (c) => injectImport(c, APP_MODULE, `import ${PACKAGE}.domain.usecase.Get${E}sUseCase`) },
+      { presets: ["feature", "screen"], apply: (c) => injectImport(c, APP_MODULE, `import ${PACKAGE}.presentation.${f}.${F}ViewModel`) },
+      { presets: ["feature", "repository"], apply: (c) => injectAtAnchor(c, APP_MODULE, "di-repositories", `single<${E}Repository> { ${E}RepositoryImpl() }`) },
+      { presets: ["feature", "repository"], apply: (c) => injectAtAnchor(c, APP_MODULE, "di-usecases", `factory { Get${E}sUseCase(get()) }`) },
+      { presets: ["feature", "screen"], apply: (c) => injectAtAnchor(c, APP_MODULE, "di-viewmodels", `viewModelOf(::${F}ViewModel)`) },
     ],
   },
   {
     filePath: SCREEN_KT,
     steps: [
-      (c) => injectAtAnchor(c, SCREEN_KT, "screen-objects", `data object ${F} : Screen(Routes.${F_UPPER})`),
-      (c) => injectAtAnchor(c, SCREEN_KT, "route-consts", `const val ${F_UPPER} = "${f}"`),
+      { presets: ["feature", "screen"], apply: (c) => injectAtAnchor(c, SCREEN_KT, "screen-objects", `data object ${F} : Screen(Routes.${F_UPPER})`) },
+      { presets: ["feature", "screen"], apply: (c) => injectAtAnchor(c, SCREEN_KT, "route-consts", `const val ${F_UPPER} = "${f}"`) },
     ],
   },
   {
     filePath: APP_NAV_HOST,
     steps: [
-      (c) => injectImport(c, APP_NAV_HOST, `import ${PACKAGE}.presentation.${f}.${F}Screen`),
-      (c) => injectAtAnchor(c, APP_NAV_HOST, "nav-destinations", `composable(Screen.${F}.route) { ${F}Screen(onItemClick = {}) }`),
+      { presets: ["feature", "screen"], apply: (c) => injectImport(c, APP_NAV_HOST, `import ${PACKAGE}.presentation.${f}.${F}Screen`) },
+      { presets: ["feature", "screen"], apply: (c) => injectAtAnchor(c, APP_NAV_HOST, "nav-destinations", `composable(Screen.${F}.route) { ${F}Screen(onItemClick = {}) }`) },
     ],
   },
 ];
+
+// Filter steps by active preset; drop any file plan left with zero steps
+// (e.g. Screen.kt / AppNavHost.kt entirely for `repository`).
+const fileInjectionPlans = ALL_INJECTION_PLANS.map((p) => ({
+  filePath: p.filePath,
+  steps: p.steps.filter((s) => s.presets.includes(preset)).map((s) => s.apply),
+})).filter((p) => p.steps.length > 0);
 
 const fileResults = fileInjectionPlans.map((p) => applyInjectionSteps(p.filePath, p.steps));
 
@@ -359,11 +432,18 @@ plan.injections = fileResults.flatMap((r) =>
 
 // ── Dry-run: print the plan and exit ────────────────────────────────────────
 
+const writesSpec = FILES.some((file) => file.isDefaultSpec);
+const planLabel =
+  preset === "repository"
+    ? `entity "${E}"`
+    : `feature "${F}" (entity "${E}")`;
+
 if (dryRun) {
-  console.log(`Plan for feature "${F}" (entity "${E}", package "${PACKAGE}"):\n`);
+  console.log(`Plan for ${planLabel}, package "${PACKAGE}", preset "${preset}":\n`);
   console.log("Files to create:");
-  for (const f of plan.files) console.log(`  ${f.from}\n    -> ${f.to}`);
+  for (const pf of plan.files) console.log(`  ${pf.from}\n    -> ${pf.to}`);
   console.log("\nAnchor injections:");
+  if (plan.injections.length === 0) console.log("  (none for this preset)");
   for (const inj of plan.injections) {
     if (inj.skipped) {
       console.log(`  ${inj.file}: (already present, skip)`);
@@ -372,7 +452,11 @@ if (dryRun) {
       for (const line of inj.diff.split("\n").filter(Boolean)) console.log(`    + ${line}`);
     }
   }
-  console.log(`\nspecs/${f}.spec.md will be written with default clauses ${F_UPPER}-01..06.`);
+  if (writesSpec) {
+    console.log(`\nspecs/${f}.spec.md will be written with default clauses ${F_UPPER}-01..06.`);
+  } else {
+    console.log("\nNo spec file written by this preset (zero SPEC clauses/tags added).");
+  }
   console.log("\n(dry run — nothing written)");
   process.exit(0);
 }
@@ -395,6 +479,10 @@ for (const result of fileResults) {
   injectionsApplied += result.log.filter((entry) => !entry.skipped).length;
 }
 
-console.log(`✓ Scaffolded feature "${F}" (entity "${E}") — ${filesWritten} files written, ${injectionsApplied} anchor injections applied.`);
-console.log(`  specs/${f}.spec.md written with default clauses ${F_UPPER}-01..06 — refine the prose next.`);
-console.log(`  Next: capture the golden tree, then run node qa/verify.mjs.`);
+console.log(`✓ Scaffolded ${planLabel} [preset: ${preset}] — ${filesWritten} files written, ${injectionsApplied} anchor injections applied.`);
+if (writesSpec) {
+  console.log(`  specs/${f}.spec.md written with default clauses ${F_UPPER}-01..06 — refine the prose next.`);
+} else {
+  console.log("  No spec file written by this preset (zero SPEC clauses/tags added).");
+}
+console.log(`  Next: ${preset === "repository" ? "customize the entity + repository impl, then" : "capture the golden tree, then"} run node qa/verify.mjs.`);
