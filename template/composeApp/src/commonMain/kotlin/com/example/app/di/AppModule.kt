@@ -4,19 +4,23 @@ import __PACKAGE__.data.remote.ItemRepositoryImpl
 import __PACKAGE__.domain.repository.ItemRepository
 import __PACKAGE__.domain.usecase.GetItemsUseCase
 import __PACKAGE__.presentation.home.HomeViewModel
+// cmp:anchor di-imports
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 val repositoryModule = module {
     single<ItemRepository> { ItemRepositoryImpl() }
+    // cmp:anchor di-repositories
 }
 
 val useCaseModule = module {
     factory { GetItemsUseCase(get()) }
+    // cmp:anchor di-usecases
 }
 
 val viewModelModule = module {
     viewModelOf(::HomeViewModel)
+    // cmp:anchor di-viewmodels
 }
 
 // Aggregated common modules, started from AppApplication (Android) and KoinHelper (iOS).

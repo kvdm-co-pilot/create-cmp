@@ -49,6 +49,7 @@ merged.
 | [CONTRACT.md](./CONTRACT.md) | Integration contract between template, engine, and plugin — layout ownership, token definitions, manifest schema. | frozen/reference |
 | [TESTING-ARCHITECTURE.md](./TESTING-ARCHITECTURE.md) | **Normative** test-pyramid specification every generated project implements (frameworks, patterns, evidence packs, spec-driven workflow). Sister of `template/docs/TESTING.md`. | living |
 | [USAGE.md](./USAGE.md) | End-to-end usage guide — setup, engine CLI, skills, inspector tools, verified dev loop. | living |
+| [M3-ADD-FEATURE-DESIGN.md](./M3-ADD-FEATURE-DESIGN.md) | Buildable spec for the `add-feature` generator (the in-project stamper) — rename contract, anchor injection, spec-first flow, C5 gate. | plan/spec |
 | [INSPECTOR-PLAN.md](./INSPECTOR-PLAN.md) | Plan of record for the AI-native inspector (phases 0–2). Overview; PHASE2-DESIGN is the buildable spec. | living |
 | [INSPECTOR-PHASE2-DESIGN.md](./INSPECTOR-PHASE2-DESIGN.md) | Detailed build spec for the live on-device inspector. | living |
 | [LIVE-VIEW-PLAN.md](./LIVE-VIEW-PLAN.md) | Plan of record for live-view tracks A/B/C (pixels → human, structure → AI). | living |

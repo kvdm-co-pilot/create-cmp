@@ -39,5 +39,6 @@ fun AppNavHost() {
                 onBack = { navController.popBackStack() },
             )
         }
+        // cmp:anchor nav-destinations
     }
 }
