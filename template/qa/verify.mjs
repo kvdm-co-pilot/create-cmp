@@ -87,6 +87,23 @@ function stepBuild() {
   };
 }
 
+// Runs a filtered slice of the JVM test tier and names the verdict after the gate it proves.
+// The full suite already ran in unitTests; these re-runs are cheap (compiled, cached) and give
+// each gate its own named verdict + failure text in the receipt.
+function gradleTestStep(name, testsFilter, failHint) {
+  return () => {
+    const res = sh(`${GRADLEW} :composeApp:desktopTest --tests "${testsFilter}" --console=plain`);
+    return {
+      name,
+      verdict: res.ok ? "PASS" : "FAIL",
+      reason: res.ok
+        ? undefined
+        : `${failHint}\n${res.out.split("\n").filter((l) => /FAILED|\[(ARCH|SHELL|HOME)-\d+\]|error:/i.test(l)).slice(0, 15).join("\n")}`,
+      durationMs: res.durationMs,
+    };
+  };
+}
+
 function stepUnitTests() {
   const res = sh(`${GRADLEW} :composeApp:desktopTest --console=plain`);
   const summary = junitSummary(path.join(ROOT, "composeApp/build/test-results/desktopTest"));
@@ -101,26 +118,54 @@ function stepUnitTests() {
   };
 }
 
-function stepNotYetShipped(name, milestone) {
-  return { name, verdict: "SKIP", reason: `not yet shipped in this template (arrives with harness ${milestone})`, durationMs: 0 };
+const stepConformance = gradleTestStep(
+  "conformance",
+  "*ArchitectureConformanceTest",
+  "Architecture conformance violated (specs/app-base.spec.md ARCH clauses). The failing rule names the clause, files, and fix:",
+);
+const stepGoldenTrees = gradleTestStep(
+  "goldenTrees",
+  "*GoldenTreeTest",
+  "Golden-tree drift: a screen's rendered STRUCTURE no longer matches qa/golden/. Unintended → fix your change; intended → regenerate with UPDATE_GOLDEN=1 and declare it:",
+);
+const stepA11y = gradleTestStep(
+  "a11y",
+  "*A11yConformanceTest",
+  "A11y gate failed (SHELL-04): interactive nodes must expose a testTag, text, or contentDescription:",
+);
+
+function stepTokenDrift() {
+  return {
+    name: "tokenDrift",
+    verdict: "SKIP",
+    reason: "static color-literal rule runs in conformance (ARCH-05); runtime resolved-token drift needs the live inspector tier (harness M4)",
+    durationMs: 0,
+  };
+}
+
+function maestroAvailable() {
+  return sh("maestro --version", { timeout: 15_000 }).ok;
 }
 
 function stepE2eSmoke() {
-  if (!fs.existsSync(path.join(ROOT, "qa/appium"))) {
-    return { name: "e2eSmoke", verdict: "SKIP", reason: "appium harness not included in this project (--no-appium)", durationMs: 0 };
+  if (!fs.existsSync(path.join(ROOT, "qa/e2e"))) {
+    return { name: "e2eSmoke", verdict: "SKIP", reason: "e2e harness not included in this project (--no-appium)", durationMs: 0 };
   }
   if (!deviceAttached()) {
     return { name: "e2eSmoke", verdict: "SKIP", reason: "no Android device/emulator attached (adb)", durationMs: 0 };
+  }
+  if (!maestroAvailable()) {
+    return { name: "e2eSmoke", verdict: "SKIP", reason: "maestro CLI not installed — curl -fsSL https://get.maestro.mobile.dev | bash", durationMs: 0 };
   }
   const install = sh(`${GRADLEW} :composeApp:installDebug --console=plain`);
   if (!install.ok) {
     return { name: "e2eSmoke", verdict: "FAIL", reason: "installDebug failed — the APK could not be installed on the attached device", durationMs: install.durationMs };
   }
-  const res = sh("node qa/appium/run-android-smoke.mjs");
+  const res = sh("maestro test qa/e2e/smoke.yaml");
   return {
     name: "e2eSmoke",
     verdict: res.ok ? "PASS" : "FAIL",
-    reason: res.ok ? undefined : `smoke run failed:\n${res.out.split("\n").slice(-12).join("\n")}`,
+    reason: res.ok ? undefined : `Maestro smoke failed (flow cites the SHELL spec clauses it proves):\n${res.out.split("\n").slice(-15).join("\n")}`,
     durationMs: install.durationMs + res.durationMs,
   };
 }
@@ -128,14 +173,16 @@ function stepE2eSmoke() {
 // ── Lane ───────────────────────────────────────────────────────────────────
 
 const stepsForProfile = {
+  // scaffold: what `create-cmp --verify` proves at stamp time — the full JVM tier
+  // (unit + conformance + golden + UI tests) plus the Android build.
   scaffold: [stepBuild, stepUnitTests],
   local: [
     stepBuild,
     stepUnitTests,
-    () => stepNotYetShipped("conformance", "M2"),
-    () => stepNotYetShipped("goldenTrees", "M2"),
-    () => stepNotYetShipped("tokenDrift", "M2"),
-    () => stepNotYetShipped("a11y", "M2"),
+    stepConformance,
+    stepGoldenTrees,
+    stepTokenDrift,
+    stepA11y,
     stepE2eSmoke,
   ],
 };

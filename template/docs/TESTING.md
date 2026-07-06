@@ -6,10 +6,16 @@ copy their shape.
 | Layer | Where | Run |
 |---|---|---|
 | Unit (majority) | `composeApp/src/commonTest` | `./gradlew :composeApp:desktopTest` |
+| Conformance gates (ARCH clauses) | `composeApp/src/desktopTest/…/conformance` | same task |
+| Screen behavior — Compose UI Test (spec-cited) | `composeApp/src/desktopTest/…/presentation` | same task |
+| Golden trees (structure) | `qa/golden/` + `HomeGoldenTreeTest` | same task |
 <!-- >>> cmp:feature appium -->
-| E2E smoke (few) | `tests/appium`, `qa/appium` | see `qa/appium/README.md` |
+| E2E smoke (few) | `qa/e2e/*.yaml` (Maestro) | `maestro test qa/e2e/smoke.yaml` |
 <!-- <<< cmp:feature appium -->
 | The lane (all of it) | `qa/verify.mjs` | `node qa/verify.mjs` |
+
+Every durable test cites the spec clause it verifies (`// SPEC: HOME-02` — see
+[`specs/`](../specs/README.md)); **new behavior begins as a spec clause.**
 
 ## Unit conventions
 
@@ -41,9 +47,10 @@ test is genuinely wrong, change it and say so explicitly in your PR/summary.
 <!-- >>> cmp:feature appium -->
 ## E2E
 
-Appium smoke covers boot + bottom-nav. Selectors go by **testTag** (surfaced as resource-ids
-on Android via `TestTagAutomation`), never by display text. Extend with intent-level page
-objects; keep the E2E tip small — behavior belongs in unit tests.
+Maestro flows (`qa/e2e/*.yaml`) cover boot + bottom-nav — install the free CLI once
+(`curl -fsSL "https://get.maestro.mobile.dev" | bash`). Selectors go by **testTag** (`id:` —
+surfaced as resource-ids via `TestTagAutomation`), never by display text. One flow per
+journey, spec-clause cited; keep the E2E tip small — behavior belongs in unit tests.
 <!-- <<< cmp:feature appium -->
 
 ## The verify lane

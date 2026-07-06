@@ -37,8 +37,10 @@ before shipping — from Claude Code, the `cmp-firebase-connect` skill drives it
 ## Project structure
 
 ```
+specs/                       behavior specifications — new behavior starts here
 composeApp/src/commonMain/   shared UI + logic (presentation / domain / data / di)
 composeApp/src/commonTest/   unit tests — exemplar pattern in presentation/home
+composeApp/src/desktopTest/  conformance gates + Compose UI tests + golden trees (JVM tier)
 composeApp/src/androidMain/  Android entry point + platform actuals
 <!-- >>> cmp:feature ios -->
 composeApp/src/iosMain/      iOS actuals · iosApp/ is the Xcode shell
@@ -49,7 +51,7 @@ composeApp/src/desktopMain/  desktop dev-client (see docs/dev-client.md)
 qa/verify.mjs                the verify lane — this repo's definition of done
 qa/evidence/latest.json      the committed evidence receipt (see CONTRIBUTING.md)
 <!-- >>> cmp:feature appium -->
-qa/appium/ · tests/appium/   Appium E2E harness
+qa/e2e/                      Maestro E2E flows (device smoke)
 <!-- <<< cmp:feature appium -->
 docs/                        architecture, testing, ADRs
 ```

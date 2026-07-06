@@ -4,7 +4,7 @@
 
 **The AI delivery harness for Kotlin/Compose Multiplatform — scaffold a green-building app (Android + iOS) in minutes, with best practices your AI is mechanically held to.**
 
-Toolchain auto-bootstrapped · Navigation & insets pre-solved · Clean Architecture wired · Appium harness ready · AI-native inspector & verification lane.
+Toolchain auto-bootstrapped · Navigation & insets pre-solved · Clean Architecture wired · Test pyramid + E2E flows included · AI-native inspector & verification lane.
 
 [![CI](https://github.com/kvdm-co-pilot/create-cmp/actions/workflows/ci.yml/badge.svg)](https://github.com/kvdm-co-pilot/create-cmp/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/create-cmp-cli.svg)](https://www.npmjs.com/package/create-cmp-cli)
@@ -112,8 +112,9 @@ per run, so it can't silently drift:
   presentation{components,theme,navigation,<feature>} / di` with Koin modules registered and **one
   example feature wired end-to-end** as the copy-paste pattern.
 - **Theme & tokens** — `<Prefix>Theme`, `<Prefix>Tokens`, `<Prefix>Colors`, DM Sans.
-- **An Appium harness** — an Appium client + smoke runner and a sample smoke asserting the bottom nav
-  renders, so "done" can be proven on a device.
+- **The test pyramid, pre-built** — unit exemplars (Turbine + fakes), architecture conformance
+  gates, Compose UI Tests, golden-tree structural baselines, and Maestro E2E flows — plus the
+  verify lane (`qa/verify.mjs`) that runs it all and emits an evidence receipt.
 - **A toolchain doctor** — diagnoses *and* heals JDK, Android SDK + AVD, Xcode/CLT, CocoaPods,
   XcodeGen, Appium + drivers, Node. Idempotent, OS-aware, consent-gated.
 - **AI-inspectable by default** — every generated app ships a debug-only live inspector
@@ -143,7 +144,7 @@ placeholders and clear "drop your Firebase config here" instructions.
 | Auth | `email` / `phone` / `both` / `none` | `both` |
 | Firebase services | Firestore · Storage · Functions · FCM | all on |
 | Room local cache | on / off | on |
-| Appium harness | on / off | on |
+| E2E flows (Maestro) | on / off | on |
 | Bottom-nav tabs | label + icon, any count | Home, Profile |
 
 _(Web/PWA is intentionally out of scope — Android + iOS only.)_
@@ -192,8 +193,8 @@ app is **time-to-first-green-build**, and that's a tooling problem, not a merits
 - **Native performance and platform access** without the RN bridge tax.
 - **Reproducible by construction.** A frozen, version-locked, CI-gated template means the build that
   was green yesterday is green today — the exact property ad-hoc CMP setups lack.
-- **Proven, not assumed.** Every scaffold ends on a real build (and an Appium smoke), with a
-  GREEN/FAIL verdict.
+- **Proven, not assumed.** Every scaffold ends on the verify lane — real build + the full JVM
+  test tier — with a typed GREEN/FAIL verdict and an evidence receipt.
 
 If `create-next-app` made React the default for the web by removing setup friction, the goal here is
 the same for multiplatform mobile.
@@ -204,7 +205,7 @@ the same for multiplatform mobile.
 Front doors:  npx create-cmp-cli   +   Claude Code plugin (cmp-new / cmp-doctor / cmp-qa-prep)
                                   │  one shared engine, two front doors
 Engine (Node, deterministic):     copy → token-replace → rename packages → toggle features → VERIFY
-Golden template (frozen, CI'd):   pinned versions · iOS shell · nav+insets · Clean Arch · DI · Appium
+Golden template (frozen, CI'd):   pinned versions · iOS shell · nav+insets · Clean Arch · DI · test pyramid
 ```
 
 The engine never puts an LLM in the hot path: it copies the template, replaces placeholders in file

@@ -1,0 +1,30 @@
+# E2E smoke — Maestro flow. SPEC: SHELL-01, SHELL-02.
+#
+# Proves the real app boots on a device/emulator and the bottom-nav shell works.
+# Selectors go by testTag (surfaced as resource-ids on Android via TestTagAutomation),
+# falling back to visible text only for content assertions.
+#
+# Run:  maestro test qa/e2e/smoke.yaml      (device/emulator attached)
+# The verify lane's e2eSmoke step runs this automatically when maestro + a device are present.
+appId: __PACKAGE__
+---
+- launchApp:
+    clearState: true
+
+# SPEC: SHELL-01 — first tab renders inside the shell, bottom nav visible
+- assertVisible:
+    id: "home_title"
+- assertVisible:
+    id: "app_bottom_nav"
+
+# SPEC: SHELL-02 — switching tabs keeps the shell
+- tapOn: "Profile"
+- assertVisible:
+    id: "profile_title"
+- assertVisible:
+    id: "app_bottom_nav"
+
+# and back
+- tapOn: "Home"
+- assertVisible:
+    id: "home_title"
