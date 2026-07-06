@@ -15,10 +15,22 @@
 |---|---|---|---|---|
 | 1 | **Unit** (majority) | ViewModel state, UseCase logic, Repository contracts | `kotlin-test` + `kotlinx-coroutines-test` + **Turbine**, hand-written **fakes** | ms · `commonTest`, run on JVM (`desktopTest`) |
 | 2 | **Architecture conformance** | Dependency direction, layer placement, naming, test-presence, no hardcoded design values | **Konsist** (runs as unit tests) | ms · same source set *(M2)* |
-| 3 | **Structural / golden** | Rendered screen structure + resolved design tokens match committed baselines | Inspector tier 0 headless render → golden-tree JSON diff | sec · JVM, no device |
-| 4 | **E2E smoke** (tip: few, critical flows) | The real app boots and core journeys work on a real OS | **Appium + pytest**, Page Object Model, testTag selectors | min · headless emulator/simulator |
+| 3a | **Structural / golden — inner loop** | Rendered screen structure + resolved design tokens match committed baselines | **cmp-inspector** golden-tree JSON diff (`snapshot_diff` / `prove_change`) | sec · JVM, no device |
+| 3b | **Screen behavior — durable** | A screen renders and reacts (clicks, state) as specified | **Compose UI Test** (first-party `runComposeUiTest`), testTag selectors, **spec-driven** | sec · JVM/instrumented |
+| 4 | **E2E smoke** (tip: few, critical flows) | The real app boots and core journeys work on a real OS | **Maestro** (Apache-2.0 CLI, free local+CI), YAML flows, testTag selectors, one flow drives Android + iOS | min · headless emulator/simulator |
 
-The AI-specific twist vs a classic pyramid: layer 3 does the job screenshot-testing does
+**The two-tier structural model (founder decision, 2026-07-06).** Layers 3a and 3b are
+complementary, not redundant, and serve different moments:
+
+- **3a — inner loop / dev workflow:** the AI's fast, device-free instrument. It *reads* the
+  running/rendered UI as a semantics tree and diffs structure + tokens. No interaction, no
+  compile step — this is what `prove_change` and the dev loop use while iterating.
+- **3b — durable regression:** first-party Compose UI Test — compile-checked, committed, can
+  *interact* (click, assert reactions). These are the long-lived tests, and they are
+  **specification-driven** (see §7): each derives from a committed behavior spec clause, not
+  from ad-hoc observation.
+
+The AI-specific twist vs a classic pyramid: layer 3a does the job screenshot-testing does
 elsewhere — but structurally (semantics-tree JSON, deterministic, no pixel flake) — and layer 2
 exists because AI collaborators drift from unenforced conventions. Pixels appear only as
 *evidence attachments* at layer 4, never as assertions.
@@ -72,26 +84,27 @@ class HomeViewModelTest {
 
 ## 3. E2E layer — Appium, headless, cross-platform, evidence-first
 
-### 3.1 One runner: Kotlin E2E module (consolidation decision, amended 2026-07-06)
+### 3.1 One runner: Maestro (consolidation decision, re-amended 2026-07-06)
 
-The template today ships two runners — Node `qa/appium` smoke (used Node because the engine
-guarantees that runtime) and pytest `tests/appium` (Appium's largest ecosystem) — legacy of two
-phases. **Consolidate on a Kotlin `e2e/` Gradle module** (JUnit 5 + Appium `java-client`,
-isolated from the app's classpath):
+The template today ships two runners — Node `qa/appium` smoke and pytest `tests/appium` —
+legacy of two phases. Earlier this doc proposed a Kotlin `e2e/` Appium module; that was
+superseded after weighing the actual industry + AI standards per layer:
 
-- **Compile-checked selectors** — page objects import the same `TestTags` constants the
-  composables use (via the desktop-target artifact): rename a tag and E2E fails to *compile*.
-  Mechanical, not conventional — the harness philosophy applied to selectors.
-- **No third runtime** — JDK 17 is already required; Python would be a new toolchain burden in
-  a product whose pitch is removing toolchain friction.
-- **Reporting native** — JUnit XML from the JUnit platform, Gradle HTML report free, Allure via
-  its standard JUnit 5 adapter (the approved CI report).
-- **One language** — the team's and `cmp-test`'s generated tests read like the app code.
-- Cost: E2E iteration pays a compile step; accepted.
+- Device E2E is the *least* AI-load-bearing layer here — the AI's real instrument is the
+  structural inspector (3a), not black-box UI driving. So the E2E layer should optimize for
+  **least brittleness and cross-platform reach**, not language uniformity.
+- **Maestro** is the current low-brittleness standard: Apache-2.0 CLI, **free** to run locally
+  and in CI on Android *and* iOS simulators (only the hosted Maestro Cloud device farm is
+  paid — we bring our own emulator, so we never need it). Auto-waits eliminate most flake; one
+  YAML flow drives both platforms; trivial to invoke from the verify lane.
+- Trade-off accepted: YAML flows are not compile-checked. We compensate by keeping E2E *thin*
+  (boot + a few critical journeys) and putting compile-checked, interaction-level assertions in
+  Compose UI Test (3b) instead.
 
-Both the Node runner and the pytest suite retire (their jobs — boot smoke + generated suites —
-move into `e2e/`). Sections below referring to pytest fixtures/markers map to their JUnit 5
-equivalents (extensions, `@Tag("quarantine")`, `--platform` via a Gradle property).
+**Both the Node runner and the pytest suite retire.** Flows live in `qa/e2e/*.yaml`; selectors
+reference testTags (surfaced as resource-ids on Android / accessibility ids on iOS via
+`TestTagAutomation`). Sections below referring to pytest fixtures/markers map to Maestro flow
+equivalents (a shared setup flow, tags via flow config, `--platform` via the launch profile).
 
 ### 3.2 Page Object Model + testTag selectors (the cross-platform key)
 
@@ -233,11 +246,49 @@ layers, DI, navigation, tests at every layer, golden baseline. Do not hand-roll 
 (screenshots/reports) are hashed into the receipt; do not commit them.
 ```
 
-## 7. What this adds to M0/M1 scope
+## 7. Specification-driven testing (the durable layer's source of truth)
 
-- M0 gains: pytest E2E consolidation groundwork is **deferred to its own workstream inside M1**
-  (lane needs a single runner to call), but M0's unit/golden layers are unchanged.
-- M1 gains: evidence-receipt CI check (receipt-matches-HEAD), pytest evidence fixtures
-  (screenshot/page-source/JUnit XML/pytest-html), headless emulator profile in the lane,
-  SKIP semantics + profiles. Allure lands as the optional CI report if approved.
-- Retirement: `qa/appium` Node runner (pending approval).
+> **Founder decision, 2026-07-06:** the durable tests (3b Compose UI Test, and the E2E flows)
+> are not authored ad-hoc — they are **derived from and checked against a committed behavior
+> specification.** This gets its own roadmap pillar and workflow integration
+> (see `HARNESS-ROADMAP.md` → "Specification-driven testing"). It is the create-cmp-scoped
+> instance of the platform thesis's machine-readable behavior contract (the Domain Ledger idea
+> in miniature): the spec is the durable artifact, tests are its executable projection.
+
+**The artifact.** Each feature carries `specs/<feature>.spec.md` — behavior clauses in
+Given/When/Then form, each with a **stable clause id** (e.g. `HOME-03`). The spec is the source
+of truth for *intended* behavior; humans and AI extend the spec first, code and tests follow.
+
+**The projection.** Every clause maps to at least one durable test:
+- screen-behavior clauses → a Compose UI Test (3b) tagged with the clause id,
+- journey clauses → a Maestro flow (4) tagged with the clause id.
+The inspector (3a) closes the loop: it confirms the *rendered structure* the test drives
+matches what the spec asserts — spec → test → running app → structural proof.
+
+**The gate (in the verify lane).** A `specCoverage` step: every clause has ≥1 linked test, and
+every durable test links to a live clause. Orphans fail — a clause with no test (unverified
+behavior) or a test with no clause (untraceable assertion) both break the lane. This is what
+makes the spec *load-bearing* rather than decorative.
+
+**Workflow integration.**
+- `add-feature` (M3) writes the spec clauses first (AI proposes, human confirms), then
+  generates durable test stubs bound to those ids.
+- `cmp-test` is elevated: from *"derive tests from observed structure"* to *"derive tests from
+  the spec, and verify them against observed structure."*
+- The generated `CLAUDE.md` contract gains a line: **new behavior begins as a spec clause.**
+- Reporting: spec clauses become the report's spine (living documentation — the Allure/BDD
+  report reads as the spec with pass/fail per clause).
+
+**Sequencing note.** M2 ships Compose UI Test capability with a *hand-written* exemplar durable
+test so the layer exists and the lane can run it. The spec layer (its own pillar, after the
+core harness) then makes those tests *generated-from-spec* and adds the coverage gate. Build
+the durable tests "spec-shaped" (one behavior per test, clause-id-taggable) from M2 so the
+later spec binding is mechanical, not a rewrite.
+
+## 8. What this added to M0/M1 scope (historical)
+
+- M0: unit + fakes foundation shipped (unchanged by later decisions).
+- M1: verify lane + committed receipts + honest SKIPs shipped. The device-E2E consolidation
+  (→ Maestro) and the receipt-matches-HEAD CI check are deferred to M2/M4 respectively.
+- Retired (superseded, not yet deleted from the template): `qa/appium` Node runner and
+  `tests/appium` pytest suite — both replaced by Maestro flows in M2.

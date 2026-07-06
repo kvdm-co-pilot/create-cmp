@@ -10,6 +10,14 @@ You are **not done until `node qa/verify.mjs` reports PASS** and the receipt it 
 receipt is a failure. SKIPped steps are recorded in the receipt — never present green-with-gaps
 as fully verified.
 
+## Specifications — behavior starts here
+
+**New behavior begins as a spec clause** in `specs/<feature>.spec.md` (Given/When/Then with a
+stable id — see [`specs/README.md`](./specs/README.md)). Propose the clause, get it confirmed,
+then implement. Durable tests cite their clause (`// SPEC: HOME-02`).
+[`specs/app-base.spec.md`](./specs/app-base.spec.md) states the architecture and shell
+invariants the conformance gates enforce.
+
 ## Architecture (violations will be named by the conformance gates)
 
 - **Layers:** `presentation` → `domain` ← `data`. `domain` imports nothing app-internal;
@@ -28,8 +36,13 @@ as fully verified.
   kotlin-test + coroutines-test + Turbine. **Hand-written fakes** in `testing/fakes/` — never
   mocking frameworks. Every new ViewModel/UseCase/Repository gets a test in the exemplar's
   style: Arrange-Act-Assert, behavior-named backtick tests, one behavior per test.
-- **E2E** (`tests/appium`, `qa/appium`): the Appium harness; smoke covers app boot + bottom
-  nav. Extend with intent-level page objects, selectors by testTag — never by display text.
+- **Conformance + screen tests** (`composeApp/src/desktopTest`): Konsist architecture gates
+  (they enforce `specs/app-base.spec.md`'s ARCH clauses) + Compose UI Tests (durable,
+  spec-cited, testTag selectors) + the golden-tree structural baseline (`qa/golden/`). Golden
+  drift you did not intend = fix your change; intended drift = regenerate explicitly
+  (`UPDATE_GOLDEN=1`) and declare it.
+- **E2E** (`qa/e2e/*.yaml`): Maestro flows; smoke covers boot + bottom nav. Selectors by
+  testTag — never by display text.
 - Do not delete, weaken, or `@Ignore` a failing test to get to green. Fix the behavior, or if
   the test itself is wrong, say so explicitly in your summary and justify the change.
 
