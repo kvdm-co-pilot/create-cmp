@@ -8,6 +8,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import __PACKAGE__.presentation.components.BaseScreen
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
 import __PACKAGE__.presentation.theme.designToken
@@ -27,8 +29,14 @@ fun DetailScreen(
                 )
                 .padding(__THEME_PREFIX__Tokens.PaddingPage),
         ) {
-            TextButton(onClick = onBack) { Text("← Back") }
-            Text("Detail", style = MaterialTheme.typography.headlineMedium)
+            TextButton(onClick = onBack, modifier = Modifier.semantics { testTag = "detail_back" }) {
+                Text("← Back")
+            }
+            Text(
+                "Detail",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.semantics { testTag = "detail_title" },
+            )
             Text(
                 "Item id: $itemId",
                 style = MaterialTheme.typography.bodyLarge,
