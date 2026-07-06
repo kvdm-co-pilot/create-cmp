@@ -41,7 +41,7 @@ interrogate. Defaults shown in brackets.
 | `firebase.auth` | Auth: `email` / `phone` / `both` / `none`? | `both` |
 | `firebase.firestore/storage/functions/fcm` | Which Firebase services? | all on if Firebase on |
 | `room` | Room local cache? | `true` |
-| `appium` | Appium test harness? | `true` |
+| `appium` | E2E test harness (Maestro flows in `qa/e2e/`; key `appium` is the legacy name, renamed in 0.3.0)? | `true` |
 | `inspector` | Live on-device inspector (debug builds only — AI-inspectable UI)? | `true` |
 | `devClient` | Desktop dev-client window with Compose Hot Reload? | `true` |
 | `tabs` | Bottom-nav tabs — label + icon each (e.g. Home/home, Profile/person)? | `[Home, Profile]` |

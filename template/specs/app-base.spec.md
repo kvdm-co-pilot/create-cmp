@@ -1,7 +1,7 @@
 # Spec: app base — architecture & shell
 
 > Clauses the scaffold itself guarantees. ARCH clauses are enforced by the conformance gates
-> (Konsist); SHELL clauses by UI tests and the E2E smoke flow.
+> (dependency-free source scans); SHELL clauses by UI tests and the E2E smoke flow.
 
 ## Architecture invariants
 

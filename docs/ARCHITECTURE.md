@@ -15,7 +15,7 @@ reproducible — the property ad-hoc CMP setups lack.
 ├─ Engine (Node, deterministic — no LLM in the hot path) ──────────────┤
 │   doctor → bootstrap → verify   +   scaffold pipeline                 │
 ├─ Golden template (frozen, CI-verified) ── the moat ──────────────────┤
-│   pinned versions · iOS shell · nav+insets · Clean Arch · DI · Appium │
+│   pinned versions · iOS shell · nav+insets · Clean Arch · DI · Maestro│
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -45,9 +45,11 @@ Optional regions are wrapped in `// >>> cmp:feature <name>` / `// <<< cmp:featur
 ## Layer 2 — the engine
 
 **Toolchain doctor** (`doctor → bootstrap → verify`): detects JDK 17, Android SDK + cmdline-tools +
-system image + AVD, Xcode + CLT, CocoaPods, XcodeGen, Node, Appium 3.x + uiautomator2/xcuitest.
-Missing dependencies print the exact install command and are **consent-gated** (`--yes` for CI);
-idempotent; OS-aware (Linux → Android-only). Ends with a per-dependency GREEN/FAIL verdict.
+system image + AVD, Xcode + CLT, CocoaPods, XcodeGen, Node, Appium 3.x + uiautomator2/xcuitest (the
+legacy e2e path). Missing dependencies print the exact install command and are **consent-gated**
+(`--yes` for CI); idempotent; OS-aware (Linux → Android-only). Ends with a per-dependency GREEN/FAIL
+verdict. The E2E flows themselves run on Maestro, installed separately
+(`curl -fsSL https://get.maestro.mobile.dev | bash`).
 
 **Scaffold pipeline:** validate config against `options.schema.json` → copy template → token-replace
 (contents *and* paths) → atomically rename package source directories → strip disabled feature
@@ -61,7 +63,7 @@ and returns GREEN/FAIL. The CLI refuses to claim success without it unless `--no
 The CLI and the Claude Code plugin share one engine. The plugin's `cmp-new` skill runs the interview,
 builds the engine config, invokes the engine, then generates the requested tab screens from the
 example-feature pattern. `cmp-doctor` wraps the toolchain bootstrap; `cmp-qa-prep` brings up the
-emulator + Appium session + smoke.
+emulator + Maestro flow run + smoke.
 
 ## Reproducibility guarantee
 

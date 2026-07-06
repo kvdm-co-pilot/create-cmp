@@ -16,8 +16,9 @@ id, and every durable test cites the clause it verifies.
    failure message's `[CLAUSE-ID]` bracket (see `violation()` in
    `ArchitectureConformanceTest.kt`) — the tag makes the clause greppable from source, the
    bracketed id makes it visible in a failing test's output.
-3. `node qa/verify.mjs` — the lane checks the tests; the spec-coverage gate (when it ships)
-   fails orphan clauses (no test) and orphan tests (no clause).
+3. `node qa/verify.mjs` — the lane's `specCoverage` step fails orphan clauses (a live clause
+   with no citing test) and orphan tags (a `// SPEC:`/`# SPEC:` tag with no matching clause, or
+   one citing a withdrawn clause). Withdrawn clauses are exempt from coverage.
 
 ## Format
 

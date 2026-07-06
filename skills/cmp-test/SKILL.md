@@ -4,18 +4,26 @@ description: >-
   Generate a regression test suite for a Compose Multiplatform app by OBSERVING it — read the
   running app's semantics tree as structured JSON via the cmp-inspector MCP (testTags, text,
   clickables, bounds, nav state), derive a test plan from what actually rendered, and write
-  Appium tests into the app's shipped harness. Use this when the user says "write tests for my
+  tests into the app's shipped harness. Use this when the user says "write tests for my
   app", "generate appium tests", "create a regression suite", "test this screen", "BDD tests for
   my CMP app", "cover this flow with tests", "add UI tests to my CMP app", or "generate tests
   from the running app". Tests are derived from the rendered structure — never guessed from
-  source, never from screenshots — and land in the template's Appium harness style (the
-  qa/appium AppiumClient runner or the tests/appium pytest suite), complemented by golden-tree
+  source, never from screenshots — and land in the shipped harness: current scaffolds carry
+  Maestro flows (qa/e2e/*.yaml, testTag selectors); legacy pre-Maestro scaffolds carry the
+  qa/appium AppiumClient runner or tests/appium pytest suite. Both are complemented by golden-tree
   snapshots (snapshot_save / snapshot_diff / prove_change) as the device-free CI regression layer.
 ---
 
 # cmp-test — generate the regression suite from the rendered tree
 
-Your job: turn "write tests for my app" into a committed, passing Appium suite — by **observing
+> **Which harness? Look before you write.** Current scaffolds ship **Maestro** flows
+> (`qa/e2e/*.yaml` — `# SPEC:`-cited, testTag `id:` selectors; see `smoke.yaml` for the shape)
+> and NO Appium directories. The Appium mechanics below apply only to **legacy pre-Maestro
+> projects** that actually contain `qa/appium/` or `tests/appium/` — check which exists in the
+> target repo first and emit tests for THAT harness. Durable screen behavior belongs in Compose
+> UI Tests (spec-cited) either way; E2E stays a thin smoke layer.
+
+Your job: turn "write tests for my app" into a committed, passing E2E suite — by **observing
 the app, not guessing from source**. Every create-cmp app is AI-inspectable: the `cmp-inspector`
 MCP reads the running UI as structured JSON (testTags, text, clickable nodes, bounds, navigation
 state). You read that tree, enumerate what's actually on screen, derive the assertions, and emit
@@ -73,8 +81,10 @@ Rules that make the plan durable:
 
 ## 3. Generate — match the shipped harness exactly
 
-Every scaffolded app ships two harnesses; write into whichever the app uses (default: the JS
-runner — it's what `npm --prefix qa/appium run smoke` executes):
+Current scaffolds ship Maestro only (`qa/e2e/*.yaml`) — write flows there. The mechanics below
+(JS runner / pytest suite) apply only to **legacy pre-Maestro** projects that still carry
+`qa/appium/` or `tests/appium/`; write into whichever the app actually uses (legacy default: the
+JS runner — it's what `npm --prefix qa/appium run smoke` executes):
 
 - **JS runner** — `qa/appium/run-android-smoke.mjs` + `qa/appium/lib/appium-client.mjs`: a plain
   Node script (no test framework), `new AppiumClient({ serverUrl, capabilities })` with
@@ -132,7 +142,7 @@ Naming: `<screen>_<element>` snake_case, matching the shipped `home_title` / `ho
 `app_bottom_nav` / `profile_title` convention. Rebuild, re-fetch the tree, confirm the tag
 appears, then reference it. One tag per marker node — don't carpet-tag every Text.
 
-## 5. Run + heal
+## 5. Run + heal (legacy Appium path)
 
 Run through the harness's own front door — Appium 3.x server on `:4723`, `emulator-5554`, debug
 APK installed (the `cmp-qa-prep` skill brings all of this up):
@@ -151,7 +161,8 @@ bug with the before/after trees as evidence, don't weaken the assertion to force
 
 ## 6. Golden-tree CI tie-in — regression without a device
 
-The Appium suite proves flows on a device. The **golden-tree layer** catches structural
+The Maestro suite (or, on legacy projects, the Appium suite) proves flows on a device. The
+**golden-tree layer** catches structural
 regressions in CI with no emulator at all — generate it alongside:
 
 1. Per screen: render headlessly (or fetch live once) → `snapshot_save { treePath, snapshotPath:
@@ -165,8 +176,8 @@ regressions in CI with no emulator at all — generate it alongside:
 4. Intentional UI change → re-bless with `snapshot_save`; the golden's git diff is
    human-readable JSON, unlike a pixel snapshot.
 
-The two layers complement: golden trees are fast, device-free, and structural; Appium proves the
-app really launches, navigates, and responds on device. Ship both.
+The two layers complement: golden trees are fast, device-free, and structural; the E2E suite
+proves the app really launches, navigates, and responds on device. Ship both.
 
 ## Worked example
 

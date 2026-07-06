@@ -36,7 +36,7 @@ build dies**. Planned commands:
 - **`create-cmp add <thing>`** — additive generators for existing apps: `add ios` (wire the
   XcodeGen/Pods shell into an Android-only app), `add feature <Name>` (screen + ViewModel + state +
   DI + navigation + test, following the template's example-feature pattern), `add firebase`,
-  `add room`, `add appium`.
+  `add room`, `add appium` (the e2e harness — feature key `appium`, legacy name, renamed in 0.3.0).
 - **Recipes** — individually CI-verified, additive feature packs: auth flows, push notifications +
   deep links end-to-end, permission patterns (camera/location/notifications), RevenueCat paywall,
   maps, localization, analytics, crash reporting (with the Crashlytics plugin wired correctly).

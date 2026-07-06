@@ -47,8 +47,9 @@ Kotlin `2.2.20` · KSP `2.2.20-2.0.4` · Compose MP `1.10.3` · Room `2.8.4` · 
 
 **Requirements:** Node ≥ 18 to run the engine. JDK 17, Android SDK + an emulator/AVD, and (for the
 inspector's live tier) `adb` for the app itself. macOS only for iOS output. Everything else — the
-Android SDK, Appium + drivers, CocoaPods/XcodeGen — the built-in **doctor** detects and (with
-consent) installs.
+Android SDK, Appium + drivers (the legacy e2e path), CocoaPods/XcodeGen — the built-in **doctor**
+detects and (with consent) installs. The E2E flows themselves run on Maestro, installed separately
+with `curl -fsSL https://get.maestro.mobile.dev | bash`.
 
 **Get the tool:**
 
@@ -111,7 +112,7 @@ Every command except `create` works on **any** KMP project, not only ones create
 
 | Command | Purpose | Key flags |
 |---|---|---|
-| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --region --theme-prefix` · `--ios/--no-ios` · `--firebase/--no-firebase --auth <email\|phone\|both\|none>` · `--room/--no-room` · `--appium/--no-appium` · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
+| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --region --theme-prefix` · `--ios/--no-ios` · `--firebase/--no-firebase --auth <email\|phone\|both\|none>` · `--room/--no-room` · `--appium/--no-appium` (the e2e harness — feature key `appium`, legacy name, renamed in 0.3.0) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
 | `doctor` | Toolchain preflight **+** project diagnosis (kotlin↔ksp lockstep, drift vs the proven set, the KSP2/iOS catch-22, `sdk.dir`, `~/.konan` bloat, disk, and an inspector-stays-debug-only check). | `--fix` (safe heals) · `--yes --no-install --no-ios --target-dir <dir>` |
 | `upgrade` | Migrate `gradle/libs.versions.toml` to the next **proven-green** version set: diff table → surgical in-place edits (comments/format preserved) with `.bak-upgrade` backups → optional verify. Lockstep guardrail refuses a broken kotlin↔ksp pairing. | `--target-dir <dir> --set <id> --dry-run --yes --verify` |
 | `clean` | Cache & build-output hygiene: stale `~/.konan` toolchains + project `build/`/`.gradle/` (sizes shown, consent-gated); global Gradle caches are size-reported only. | `--target-dir <dir> --dry-run --yes` |
@@ -135,8 +136,8 @@ intent — the descriptions carry rich triggers.
 | **cmp-firebase-connect** | Wire a fresh app to its **own** Firebase (the #1 post-scaffold manual step). | Firebase CLI: login → project create/reuse → app register → real `google-services.json` replaces the placeholder → green build proves it. Consent-gated per cloud write. |
 | **cmp-dev-client** | Run the shared UI in a desktop window with Compose Hot Reload. | `:composeApp:hotRunDesktop --auto` / `:composeApp:run`. |
 | **cmp-inspect** | See/drive a running Compose UI as JSON; check tokens, drift, a11y; the verified dev loop. | The `cmp-inspector` MCP (§5). |
-| **cmp-test** | Generate an Appium regression suite by **observing** the app. | Reads the live tree via the MCP → derives a plan → writes tests in the shipped harness style. |
-| **cmp-qa-prep** | Bring up emulator + Appium session + the bottom-nav smoke. | Emulator + Appium harness. |
+| **cmp-test** | Generate a regression suite by **observing** the app. | Reads the live tree via the MCP → derives a plan → writes Maestro E2E flows + golden-tree snapshots in the shipped harness style. |
+| **cmp-qa-prep** | Bring up emulator + Maestro flow run + the bottom-nav smoke (legacy Appium bring-up path also supported). | Emulator + Maestro harness. |
 
 ---
 
@@ -223,7 +224,7 @@ human's live device view page — watch + click-to-tap the real app). Reach it w
 ### A. New app → green
 
 `cmp-new` (or `create --verify`) → interview/flags → stamp → **GREEN build verdict** → generate tab
-screens. Output ships `.gitignore`, a CI `verify.yml`, the Appium harness, the inspector, and the
+screens. Output ships `.gitignore`, a CI `verify.yml`, the Maestro E2E harness, the inspector, and the
 desktop dev-client. Next: `cmp-firebase-connect`, then run it.
 
 ### B. Connect your own backend
@@ -262,8 +263,8 @@ tap). Agent side: `inspect_tree`, `get_node`, `navigate_and_inspect {testTag}` t
 ### F. Tests that write themselves
 
 `cmp-test` → observe the live tree (tags, clickables, reachable screens) → derive existence /
-interaction / navigation / golden-tree assertions → write Appium tests in the shipped harness style
-(id-selectors work out of the box — the template exposes testTags as resource-ids via the
+interaction / navigation / golden-tree assertions → write Maestro E2E flows in the shipped harness
+style (id-selectors work out of the box — the template exposes testTags as resource-ids via the
 `exposeTestTagsForAutomation()` shim) → run + heal.
 
 ### G. Maintenance (any KMP project, for the life of the repo)

@@ -85,7 +85,7 @@ the behavioral suite from the *observed running UI* afterward.
   lane, so "no done without verdict" is mechanical, not honor-system.
 - **The verify lane** — one command in the generated repo (`qa/verify.mjs`, surfaced as
   `npm run verify` / a Gradle task) aggregating: build green → unit tests → conformance tests
-  (Layer 2) → golden-tree snapshot diffs → token drift → a11y audit → (device present) Appium
+  (Layer 2) → golden-tree snapshot diffs → token drift → a11y audit → (device present) Maestro
   smoke — into a single **typed PASS/FAIL verdict + evidence-pack JSON** (what changed, what was
   checked, each verdict). The evidence pack is the harness's receipt artifact.
 - **Committed golden baselines from scaffold time**, so drift is detectable from commit #1.

@@ -57,6 +57,7 @@ merged.
 
 | Doc | Purpose | Lifecycle |
 |---|---|---|
+| [adr/](./adr/) | The harness repo's own decision records (MADR-trimmed): 0001 contract-in-generated-project · 0002 Maestro-over-Appium · 0003 jvm("desktop")-as-infrastructure · 0004 no-Konsist. | append-only |
 | [SESSION-STATE.md](./SESSION-STATE.md) | Dated cross-session log — read first when resuming work. Internal (gitignored). | session-log |
 | [TEST-DRIVE.md](./TEST-DRIVE.md) | Founder pre-publication test-drive checklist (UX validation, not correctness). | frozen/reference |
 | [research/](./research/) | Internal product audits and market research memos. | frozen/reference |
@@ -125,7 +126,7 @@ This table is the record; the cited files are the implementation.
 |---|---|---|---|
 | **Gherkin / BDD Given-When-Then** (Cucumber) | **Adopted the grammar, rejected the runtime** | `template/specs/*.spec.md`, grammar defined in `template/specs/README.md` | Cucumber step-definition glue is a maintenance tax: regex-matched step code that drifts from both the spec and the tests. We bind spec↔test by **stable clause id** instead — a comment tag and a failure-message citation are cheaper, grep-able, and machine-checkable. |
 | **Specification by Example / living documentation** (Adzic) | **Adopted** — sequenced as SD4 | Design in [TESTING-ARCHITECTURE.md](./TESTING-ARCHITECTURE.md) §spec-driven; roadmap item SD4 in [HARNESS-ROADMAP.md](./HARNESS-ROADMAP.md) | Implementation pending: today's evidence receipt is a JSON pack; SD4 makes the test report *read as the spec* with pass/fail per clause. Deliberate sequencing, not a rejection. |
-| **Requirements traceability matrix** (regulated-industry) | **Adopted, automated** — gate pending as SD2 | Clause↔test links **are** the RTM (no separate matrix document to rot); SD2 `specCoverage` gate designed in [HARNESS-ROADMAP.md](./HARNESS-ROADMAP.md) | We deviate from the traditional *document* RTM: a hand-maintained matrix goes stale silently. Ours is derived from source (`// SPEC:` tags) and will be enforced by the lane — orphan clauses (unverified behavior) and orphan tests (untraceable assertions) both FAIL. The manual audit prototype (2026-07-06) found a real untested clause (SHELL-03) on day one — the argument for automating it. |
+| **Requirements traceability matrix** (regulated-industry) | **Adopted, automated** — live as the `specCoverage` lane step | Clause↔test links **are** the RTM (no separate matrix document to rot); enforced first in every lane profile by `template/qa/verify.mjs` (SD2, shipped 2026-07-06) | We deviate from the traditional *document* RTM: a hand-maintained matrix goes stale silently. Ours is derived from source (`// SPEC:` tags) and enforced by the lane — orphan clauses (unverified behavior) and orphan tags (untraceable assertions) both FAIL with two-sided actionable messages; withdrawn clauses exempt. The manual audit prototype found a real untested clause (SHELL-03) on day one — the argument that won automation. |
 | **Stable requirement ids, never renumbered** (RFC / aerospace) | **Adopted** | `template/specs/README.md` — "ids are never renumbered or reused; a withdrawn clause is struck through and kept" | None. |
 | **AI-era spec-driven development** (GitHub Spec Kit, Kiro-style specs) | **Aligned** — convergent, home-grown | `template/specs/README.md` (AI proposes, human confirms), `template/CLAUDE.md` (new behavior begins as a spec clause), [HARNESS-PLAN.md](./HARNESS-PLAN.md) | Same posture as the emerging standard — markdown, in-repo, machine-parseable, AI-proposes/human-confirms — arrived at independently from our verification thesis. We keep our clause-id grammar rather than adopting a third-party spec format: our ids are load-bearing (gates parse them). |
 | **ADRs** (Nygard / MADR) | **Adopted, kept separate from specs** | `template/docs/adr/` — trimmed-MADR template + ADR-0001 | ADRs record *decisions*, specs record *behavior*; different artifacts, both shipped. We trimmed MADR (no options-matrix boilerplate) — a one-page record beats an unfilled template. |
@@ -140,21 +141,25 @@ changelogs), **Contributor Covenant** (CODE_OF_CONDUCT.md), **evidence packs / r
 
 Tracked here so the charter never claims more than the repo delivers:
 
-1. **Appium → Maestro doc sweep (M5).** The E2E decision is Maestro, but `README.md`
-   (repo), `docs/USAGE.md`, and the cmp-test / cmp-qa-prep / cmp-doctor skills still
-   present Appium as current. Historical/comparative mentions (e.g. TESTING-ARCHITECTURE's
-   "why Maestro") are fine and stay.
-2. **SD2 specCoverage gate** — RTM enforcement designed, manually prototyped, not yet a
-   lane step in `qa/verify.mjs`.
-3. **SD4 living-doc report** — receipt exists; spec-organized report pending.
-4. **No repo-level ADRs.** The *generated project* has ADRs; the harness repo's own
-   pivotal decisions (contract-lives-in-generated-project, Maestro-over-Appium,
-   jvm("desktop")-as-harness-infrastructure) live in plan prose. Candidate fix: seed
-   `docs/adr/` in the repo universe with those three.
-5. **Say-it-out-loud sentences.** The Cucumber-runtime rejection and the Spec Kit/Kiro
-   alignment were implicit in the docs until this charter; §5 is now the explicit record.
-   `template/specs/README.md` should carry the one-line Cucumber note too (it's the doc a
-   generated-app team actually reads).
+1. **SD4 living-doc report** — receipt exists; spec-organized report (the test report reads
+   as the spec, pass/fail per clause) pending, sequenced post-M5.
+2. **Feature-key rename `appium` → `e2e`** — the key still carries the legacy name; renaming
+   is a breaking CLI change deferred to 0.3.0 (recorded in
+   [ADR-0002](./adr/0002-maestro-over-appium-for-e2e.md)). Docs annotate it as legacy.
+3. **cmp-test / cmp-qa-prep deep rework** — the skills now correctly frame Maestro as
+   current and Appium as legacy, but their step-by-step *mechanics* remain Appium-first;
+   teaching them native Maestro flow generation is follow-on skill work (M5+).
+
+Closed (kept one release for the record, then prune):
+
+- ~~Appium → Maestro doc sweep~~ — done 2026-07-06 (all universes; remaining mentions are
+  justified historical / legacy-key / mechanics).
+- ~~SD2 specCoverage gate~~ — live in `template/qa/verify.mjs`, first step in every
+  profile; negative-proven both directions.
+- ~~No repo-level ADRs~~ — `docs/adr/` seeded with
+  [0001](./adr/0001-the-contract-lives-in-the-generated-project.md)–[0004](./adr/0004-conformance-gates-without-konsist.md).
+- ~~Say-it-out-loud sentences~~ — Cucumber-runtime rejection now explicit in
+  `template/specs/README.md`; the Spec Kit/Kiro alignment recorded in §5.
 
 ---
 

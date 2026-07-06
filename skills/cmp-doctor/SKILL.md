@@ -18,7 +18,9 @@ description: >-
 # cmp-doctor — bootstrap the CMP toolchain & diagnose the project
 
 Your job: get the machine to a state where a CMP/KMP project can build (Android, and iOS on macOS)
-and run Appium tests — and, when run inside a project, get the *project* to a buildable state too.
+and run device tests — and, when run inside a project, get the *project* to a buildable state too.
+(The stamped E2E harness is Maestro — `curl -fsSL https://get.maestro.mobile.dev | bash`; the
+Appium drivers below serve the legacy pre-Maestro path.)
 You wrap the engine's bootstrap (`src/doctor.mjs` per CONTRACT/DESIGN; exposed on the CLI as the
 `doctor` subcommand). **Do not hand-roll installs in bash** when the engine can do
 it — the engine is idempotent and verifies each tool. Use this skill to drive it and to relay its
@@ -33,7 +35,7 @@ consent prompts.
   CLI; the App Store step is surfaced as the *one* unavoidable manual action and handled gracefully.
 - **CocoaPods** and **XcodeGen** (Homebrew).
 - **Node + Appium 3.x** and its **drivers** (`appium driver install uiautomator2`, and `xcuitest`
-  on macOS), each verified.
+  on macOS), each verified — legacy e2e path only; Maestro is a separate one-line install.
 - **adb / emulator reverse-port** wiring for the test harness.
 
 On **Linux**, it scopes to Android-only and says so explicitly (no iOS toolchain).

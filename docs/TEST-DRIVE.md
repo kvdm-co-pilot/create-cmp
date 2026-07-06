@@ -24,7 +24,7 @@ node bin/create-cmp.mjs ~/dev/testdrive-app \
 
 - [ ] Interview/flags feel right; `--verify` ends in a **GREEN** verdict, not a claim.
 - [ ] Stamped app has: `.gitignore`, `.github/workflows/verify.yml`, `docs/dev-client.md`,
-      inspector under `androidDebug/`, desktop target, Appium harness.
+      inspector under `androidDebug/`, desktop target, Maestro E2E harness.
 - [ ] Time-to-green felt: note the wall-clock.
 
 ## 2. The dev-client (Track C) (~10 min)
@@ -91,7 +91,7 @@ running it; project creation is the one real cloud write (Spark plan, no billing
 With the app running + connected: *"generate a regression suite for this app"*.
 
 - [ ] Generated tests use testTag/id selectors (they work out of the box — the shim exposes
-      tags as resource-ids), match the shipped harness style, and run via the Appium harness.
+      tags as resource-ids), match the shipped harness style, and run via the Maestro harness.
 
 ## 8. Meta-quality (~5 min)
 

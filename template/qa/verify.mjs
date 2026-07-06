@@ -14,7 +14,7 @@
 // silent. Exit code: 0 = PASS, 1 = FAIL.
 //
 // Profiles:
-//   scaffold — build + unit tests (what `create-cmp --verify` proves at stamp time)
+//   scaffold — spec coverage + build + unit tests (what `create-cmp --verify` proves at stamp time)
 //   local    — everything; device-dependent steps SKIP when no device is attached
 //   ci       — everything; SKIPs are recorded so the pipeline stays honest
 
@@ -73,9 +73,105 @@ function deviceAttached() {
   return res.out.split("\n").slice(1).some((l) => /\tdevice$/.test(l.trim().replace(/\s+/g, "\t")));
 }
 
+// Recursive directory walker (no glob dependency) — returns files under `dir`
+// whose name ends with one of `exts`.
+function walkFiles(dir, exts) {
+  const out = [];
+  if (!fs.existsSync(dir)) return out;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walkFiles(p, exts));
+    else if (exts.some((ext) => entry.name.endsWith(ext))) out.push(p);
+  }
+  return out;
+}
+
 // ── Steps ──────────────────────────────────────────────────────────────────
 // Each returns { name, verdict, reason?, durationMs, details? }. Failure
 // reasons are worded for an AI collaborator to act on.
+
+// Spec ↔ test drift gate — pure Node, no Gradle. Parses clause ids out of
+// specs/*.spec.md (live: `- **ID**`, withdrawn: `- ~~**ID**~~`, exempt from
+// coverage) and `// SPEC:` / `# SPEC:` citation tags out of composeApp/src and
+// qa/e2e, then fails on orphans in either direction.
+function stepSpecCoverage() {
+  const started = Date.now();
+  const specsDir = path.join(ROOT, "specs");
+  if (!fs.existsSync(specsDir)) {
+    return { name: "specCoverage", verdict: "SKIP", reason: "no specs/ directory in this project", durationMs: Date.now() - started };
+  }
+
+  const CLAUSE_LINE_RE = /^-\s+(~~)?\*\*([A-Z][A-Z0-9]*-\d{2,})\*\*/;
+  const clauses = new Map(); // id -> { file, withdrawn }
+  const specFiles = fs.readdirSync(specsDir).filter((f) => f.endsWith(".spec.md")).map((f) => path.join(specsDir, f));
+  for (const f of specFiles) {
+    for (const line of fs.readFileSync(f, "utf8").split("\n")) {
+      const m = line.match(CLAUSE_LINE_RE);
+      if (!m) continue;
+      clauses.set(m[2], { file: path.relative(ROOT, f), withdrawn: Boolean(m[1]) });
+    }
+  }
+
+  const TAG_LINE_RE = /^(?:\/\/|#)\s*SPEC:/;
+  const TAG_IDS_RE = /SPEC:\s*([A-Z0-9,\s-]+)/;
+  const searchDirs = [path.join(ROOT, "composeApp/src"), path.join(ROOT, "qa/e2e")];
+  const files = searchDirs.flatMap((d) => walkFiles(d, [".kt", ".kts", ".yaml", ".yml"]));
+  const tags = [];
+  for (const f of files) {
+    fs.readFileSync(f, "utf8").split("\n").forEach((line, i) => {
+      const trimmed = line.trim();
+      if (!TAG_LINE_RE.test(trimmed)) return;
+      const m = trimmed.match(TAG_IDS_RE);
+      if (!m) return;
+      const ids = m[1].split(/[,\s]+/).map((s) => s.trim()).filter((s) => /^[A-Z][A-Z0-9]*-\d{2,}$/.test(s));
+      for (const id of ids) tags.push({ id, file: path.relative(ROOT, f), line: i + 1 });
+    });
+  }
+
+  const citedIds = new Set(tags.map((t) => t.id));
+  const orphanClauses = [...clauses.entries()].filter(([, c]) => !c.withdrawn).filter(([id]) => !citedIds.has(id));
+  const orphanTags = tags.filter((t) => !clauses.has(t.id) || clauses.get(t.id).withdrawn);
+
+  if (orphanClauses.length === 0 && orphanTags.length === 0) {
+    return {
+      name: "specCoverage",
+      verdict: "PASS",
+      durationMs: Date.now() - started,
+      details: {
+        clauses: [...clauses.values()].filter((c) => !c.withdrawn).length,
+        withdrawn: [...clauses.values()].filter((c) => c.withdrawn).length,
+        tags: tags.length,
+        files: files.length,
+      },
+    };
+  }
+
+  const lines = ["Spec coverage broken — the spec and the tests have drifted apart:"];
+  for (const [id, c] of orphanClauses) {
+    lines.push(`  [${id}] ${c.file} — no durable test cites this clause. Write the test (tag it '// SPEC: ${id}') or withdraw the clause (strike it through).`);
+  }
+  for (const t of orphanTags) {
+    const known = clauses.get(t.id);
+    if (known?.withdrawn) {
+      lines.push(`  // SPEC: ${t.id} at ${t.file}:${t.line} — the test verifies withdrawn behavior (clause ${t.id} in ${known.file} is struck through). Remove the test or un-withdraw the clause.`);
+    } else {
+      lines.push(`  // SPEC: ${t.id} at ${t.file}:${t.line} — no such clause in specs/. Add the clause (AI proposes, human confirms) or fix the id.`);
+    }
+  }
+
+  return {
+    name: "specCoverage",
+    verdict: "FAIL",
+    reason: lines.join("\n"),
+    durationMs: Date.now() - started,
+    details: {
+      clauses: [...clauses.values()].filter((c) => !c.withdrawn).length,
+      withdrawn: [...clauses.values()].filter((c) => c.withdrawn).length,
+      tags: tags.length,
+      files: files.length,
+    },
+  };
+}
 
 function stepBuild() {
   const res = sh(`${GRADLEW} :composeApp:assembleDebug --console=plain`);
@@ -173,10 +269,11 @@ function stepE2eSmoke() {
 // ── Lane ───────────────────────────────────────────────────────────────────
 
 const stepsForProfile = {
-  // scaffold: what `create-cmp --verify` proves at stamp time — the full JVM tier
-  // (unit + conformance + golden + UI tests) plus the Android build.
-  scaffold: [stepBuild, stepUnitTests],
+  // scaffold: what `create-cmp --verify` proves at stamp time — specCoverage,
+  // the full JVM tier (unit + conformance + golden + UI tests) plus the Android build.
+  scaffold: [stepSpecCoverage, stepBuild, stepUnitTests],
   local: [
+    stepSpecCoverage,
     stepBuild,
     stepUnitTests,
     stepConformance,

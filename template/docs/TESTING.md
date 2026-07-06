@@ -15,7 +15,9 @@ copy their shape.
 | The lane (all of it) | `qa/verify.mjs` | `node qa/verify.mjs` |
 
 Every durable test cites the spec clause it verifies (`// SPEC: HOME-02` — see
-[`specs/`](../specs/README.md)); **new behavior begins as a spec clause.**
+[`specs/`](../specs/README.md)); **new behavior begins as a spec clause.** The lane's
+`specCoverage` step enforces this: it fails on orphan clauses (no citing test) and orphan tags
+(no matching clause, or one citing a withdrawn clause).
 
 ## Unit conventions
 
@@ -55,7 +57,8 @@ journey, spec-clause cited; keep the E2E tip small — behavior belongs in unit 
 
 ## The verify lane
 
-`node qa/verify.mjs` is the definition of done: build → unit tests → (conformance, golden
-trees, token drift, a11y — as they ship) → E2E smoke when a device is attached. It writes the
-evidence receipt to `qa/evidence/latest.json`; **commit the receipt with your change.**
-SKIPped steps are recorded honestly — green-with-gaps is visible, never silent.
+`node qa/verify.mjs` is the definition of done: spec coverage → build → unit tests →
+(conformance, golden trees, token drift, a11y — as they ship) → E2E smoke when a device is
+attached. It writes the evidence receipt to `qa/evidence/latest.json`; **commit the receipt
+with your change.** SKIPped steps are recorded honestly — green-with-gaps is visible, never
+silent.

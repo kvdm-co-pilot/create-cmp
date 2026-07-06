@@ -82,7 +82,7 @@ except `create` works on **any** KMP project, not only ones it scaffolded:
 | Command | What it does |
 |---|---|
 | `create-cmp [dir]` / `create-cmp create` | Scaffold a new app from the frozen golden template (the default command). |
-| `create-cmp doctor [--fix]` | Toolchain preflight (JDK/SDK/Xcode/Appium, consent-gated installs) **plus** project diagnosis when run inside a Gradle project: kotlin↔ksp lockstep, drift vs proven-green sets, the KSP2/iOS catch-22, sdk.dir, `~/.konan` bloat, disk space. `--fix` applies the safe heals. |
+| `create-cmp doctor [--fix]` | Toolchain preflight (JDK/SDK/Xcode/Appium — legacy driver install for the pre-Maestro path, consent-gated installs) **plus** project diagnosis when run inside a Gradle project: kotlin↔ksp lockstep, drift vs proven-green sets, the KSP2/iOS catch-22, sdk.dir, `~/.konan` bloat, disk space. `--fix` applies the safe heals. |
 | `create-cmp upgrade [--dry-run]` | Migrate `gradle/libs.versions.toml` to the next proven-green version set — diff table first, surgical in-place edits with `.bak-upgrade` backups, kotlin↔ksp lockstep guardrail, `--verify` to prove the result. |
 | `create-cmp clean` | Cache & build-output hygiene: stale `~/.konan` toolchains + project `build/`/`.gradle/` dirs (sizes shown, consent-gated); `~/.gradle/caches` is size-reported only. |
 | `create-cmp verify [--target-dir .]` | Run the green-build gate (Android, and iOS on macOS) against an existing project. |
@@ -116,7 +116,9 @@ per run, so it can't silently drift:
   gates, Compose UI Tests, golden-tree structural baselines, and Maestro E2E flows — plus the
   verify lane (`qa/verify.mjs`) that runs it all and emits an evidence receipt.
 - **A toolchain doctor** — diagnoses *and* heals JDK, Android SDK + AVD, Xcode/CLT, CocoaPods,
-  XcodeGen, Appium + drivers, Node. Idempotent, OS-aware, consent-gated.
+  XcodeGen, Appium + drivers (the legacy pre-Maestro path), Node. Idempotent, OS-aware, consent-gated.
+  The E2E flows themselves run on Maestro — install with
+  `curl -fsSL https://get.maestro.mobile.dev | bash`.
 - **AI-inspectable by default** — every generated app ships a debug-only live inspector
   (`127.0.0.1:9500`, loopback, structurally absent from release). An agent runs `connect_live` and
   reads the running UI as JSON — hierarchy, geometry, resolved design tokens, real navigation
@@ -178,9 +180,10 @@ behind it:
 - **cmp-firebase-connect** — post-scaffold onboarding: create/reuse a Firebase project, register
   the app, and replace the placeholder config via the Firebase CLI (consent-gated), proven by a
   green build.
-- **cmp-test** — generate the Appium regression suite by *observing* the app: read the running
-  UI's semantics tree and emit tests in the shipped harness style.
-- **cmp-qa-prep** — brings up the emulator + Appium session + smoke.
+- **cmp-test** — generate the regression suite by *observing* the app: read the running UI's
+  semantics tree and emit Maestro E2E flows plus golden-tree snapshots in the shipped harness style.
+- **cmp-qa-prep** — brings up the emulator + Maestro flow run + smoke (legacy Appium bring-up
+  path also supported).
 
 ## Why CMP, not React Native
 
@@ -210,7 +213,8 @@ Golden template (frozen, CI'd):   pinned versions · iOS shell · nav+insets · 
 
 The engine never puts an LLM in the hot path: it copies the template, replaces placeholders in file
 contents *and* paths, atomically renames package directories, toggles features (Firebase / auth type
-/ Room / Appium), and runs the verify build. Determinism is the moat. See
+/ Room / the e2e harness — feature key `appium`, legacy name, renamed in 0.3.0), and runs the verify
+build. Determinism is the moat. See
 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full design, and
 [`docs/DOCUMENTATION.md`](./docs/DOCUMENTATION.md) for the map of every doc — what's
 authoritative for what, and the standards each implements.
@@ -219,9 +223,11 @@ authoritative for what, and the standards each implements.
 
 - **Node.js ≥ 18** to run the scaffolder.
 - **macOS** for iOS output (Xcode, CocoaPods, XcodeGen). Android output works on macOS or Linux.
-- Everything else — JDK 17, Android SDK + emulator, CocoaPods, XcodeGen, Appium + drivers — the
-  built-in `doctor` detects and (with your consent) installs. Xcode itself must be installed from the
-  App Store; the doctor surfaces that as the one manual step.
+- Everything else — JDK 17, Android SDK + emulator, CocoaPods, XcodeGen, Appium + drivers (legacy
+  e2e path) — the built-in `doctor` detects and (with your consent) installs. The E2E flows
+  themselves run on Maestro, installed separately with
+  `curl -fsSL https://get.maestro.mobile.dev | bash`. Xcode itself must be installed from the App
+  Store; the doctor surfaces that as the one manual step.
 
 ## Roadmap
 

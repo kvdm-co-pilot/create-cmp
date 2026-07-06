@@ -1,21 +1,28 @@
 ---
 name: cmp-qa-prep
 description: >-
-  Bring up the Appium test harness for a Kotlin/Compose Multiplatform (CMP/KMP) app — start the
-  Android emulator, install the debug build, launch an Appium session, and run the bottom-nav smoke
-  test. Use this when the user wants to run Appium tests on their CMP/KMP app, prepare or set up the
+  Bring up the E2E test harness for a Kotlin/Compose Multiplatform (CMP/KMP) app — start the
+  Android emulator, install the debug build, and run the bottom-nav smoke (Maestro flows on
+  current scaffolds; a legacy Appium session on pre-Maestro projects). Use this when the user
+  wants to run E2E/device tests on their CMP/KMP app, prepare or set up the
   KMP test environment, smoke-test a Compose Multiplatform app on an emulator, or asks "run Appium
-  tests on my CMP app", "prep my KMP test environment", "smoke test my Compose Multiplatform app",
-  "start the emulator and Appium for my KMP project", or "verify my CMP app runs on a device".
+  tests on my CMP app", "run maestro on my CMP app", "prep my KMP test environment", "smoke test
+  my Compose Multiplatform app", or "verify my CMP app runs on a device".
   Assumes the toolchain is already installed (see cmp-doctor) and an app already exists (see
   cmp-new).
 ---
 
-# cmp-qa-prep — Appium harness bring-up for a CMP app
+# cmp-qa-prep — E2E harness bring-up for a CMP app
+
+> **Which harness? Check the repo first.** Current scaffolds ship **Maestro** (`qa/e2e/*.yaml`) —
+> bring-up is: emulator + `installDebug` + `maestro test qa/e2e/smoke.yaml` (CLI:
+> `curl -fsSL https://get.maestro.mobile.dev | bash`), or simply `node qa/verify.mjs` which runs
+> the whole lane including e2eSmoke. The Appium mechanics below apply only to **legacy
+> pre-Maestro projects** that actually contain `qa/appium/` / `tests/appium/`.
 
 Your job: take an already-scaffolded CMP/KMP project to a running, smoke-passing app on an Android
-emulator, driven by Appium. This wraps the template's `qa/appium/` client + smoke runner and the
-`tests/appium/cmp/` config the engine ships.
+emulator. On legacy projects this wraps the template's old `qa/appium/` client + smoke runner and
+`tests/appium/cmp/` config.
 
 ## Preconditions
 
@@ -24,7 +31,7 @@ emulator, driven by Appium. This wraps the template's `qa/appium/` client + smok
 - A scaffolded project with the Appium harness enabled (the `appium` toggle in **cmp-new**). If the
   project was scaffolded with Appium off, say so — there is no harness to bring up.
 
-## Bring-up sequence
+## Bring-up sequence (legacy Appium path)
 
 1. **Disk check first** (builds fail with "No space left on device"): `df -h ~` — want ≥ 3 GB free.
 2. **Boot an emulator** from the AVD that `cmp-doctor` created (`emulator -avd <name>` /
