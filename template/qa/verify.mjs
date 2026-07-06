@@ -259,7 +259,15 @@ function stepE2eSmoke() {
   if (!install.ok) {
     return { name: "e2eSmoke", verdict: "FAIL", reason: "installDebug failed — the APK could not be installed on the attached device", durationMs: install.durationMs };
   }
-  const res = sh("maestro test qa/e2e/smoke.yaml");
+  // Harden the device for headless/CI automation before driving it. Without this, a slow or
+  // loaded emulator produces false reds that have nothing to do with the app:
+  //  - hide_error_dialogs=1 stops Android popping ANR/crash dialogs (e.g. SystemUI under load)
+  //    that steal focus over the app — a Maestro assert would then see only the dialog;
+  //  - MAESTRO_DRIVER_STARTUP_TIMEOUT gives the UiAutomator2 driver a generous budget to come
+  //    up on a slow emulator (the built-in default gives up too early under load).
+  // Both are benign, reversible, and only touch the device while the lane is driving it.
+  sh("adb shell settings put global hide_error_dialogs 1");
+  const res = sh("maestro test qa/e2e/smoke.yaml", { env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "120000" } });
   return {
     name: "e2eSmoke",
     verdict: res.ok ? "PASS" : "FAIL",

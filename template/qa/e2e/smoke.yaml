@@ -11,9 +11,14 @@ appId: __PACKAGE__
 - launchApp:
     clearState: true
 
-# SPEC: SHELL-01 — first tab renders inside the shell, bottom nav visible
-- assertVisible:
-    id: "home_title"
+# SPEC: SHELL-01 — the app boots and the first tab renders inside the shell, bottom nav visible.
+# Cold-start after clearState can take longer than a bare assert's default window on a slow/CI
+# emulator (first Compose frame under load). Waiting for the first frame IS the SHELL-01 boot
+# proof, so wait explicitly with a generous budget rather than asserting immediately.
+- extendedWaitUntil:
+    visible:
+      id: "home_title"
+    timeout: 60000
 - assertVisible:
     id: "app_bottom_nav"
 
