@@ -274,6 +274,36 @@ style (id-selectors work out of the box — the template exposes testTags as res
 nightly canary re-verifies the frozen set and probes the next upstream set (feeding `upgrade`'s
 registry).
 
+### H. Extend a generated app with Claude Code (no plugin needed)
+
+The harness's real point: a generated project carries its own definition of done, so any Claude
+Code session can extend it correctly — **the create-cmp plugin is not required.**
+
+1. Open the scaffolded app in Claude Code — a plain session, no plugin installed, works.
+2. Ask for a feature ("add a Favorites feature with a list screen"). Claude reads the generated
+   `CLAUDE.md` contract and, because new behavior begins as a spec clause, proposes the clause
+   first (human confirms) before generating anything. It then fires the in-project `add-feature`
+   skill (`add-screen`/`add-repository` for narrower cuts — presentation-only or data-only) —
+   which shells to `qa/scaffold-feature.mjs`, a deterministic stamper (whole-word rename map,
+   anchor injection) that clones the `home` exemplar: Screen + ViewModel + UseCase + Repository +
+   DI + navigation, with tests at every layer and a golden-tree baseline, spec-linked from birth.
+3. Claude runs `node qa/verify.mjs` — the lane: specCoverage → build → unitTests → conformance →
+   goldenTrees → tokenDrift → a11y → (device present) e2eSmoke — into one typed PASS/FAIL/SKIP
+   verdict + a schema-validated evidence-pack JSON (`qa/evidence/latest.json`).
+4. The PASS receipt gets committed. The generated `.claude/settings.json` **Stop hook**
+   (`qa/receipt-check.mjs`) blocks "done" if the verified surface has changed since the last PASS
+   receipt — validity is a content hash of that surface (`inputs.hash`; see
+   [ADR-0005](./adr/0005-evidence-binding-by-inputs-hash.md)), so a later rebase/merge doesn't
+   invalidate an honest receipt. CI re-checks the committed receipt still attests `HEAD` on every push.
+5. **Refusal is named, not silent.** If Claude hardcodes a color, imports the data layer from UI,
+   deletes or weakens a spec-linked test, or regresses a screen's structure, the matching gate
+   fails and cites the clause: `ARCH-05` (hardcoded color), `ARCH-01` (illegal import),
+   `HOME-01`/`specCoverage` (weakened test), `HOME-06` (structural regression) — rehearsed as a
+   scripted 4/4 in `qa/refusal-demo.mjs`.
+
+Rehearsed for real (C5): a plain session with no plugin installed ran `add-feature` end to end —
+conforming slice, green tests at every layer, lane PASS.
+
 ---
 
 ## 7. Invariants (never violate these)

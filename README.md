@@ -112,9 +112,21 @@ per run, so it can't silently drift:
   presentation{components,theme,navigation,<feature>} / di` with Koin modules registered and **one
   example feature wired end-to-end** as the copy-paste pattern.
 - **Theme & tokens** — `<Prefix>Theme`, `<Prefix>Tokens`, `<Prefix>Colors`, DM Sans.
-- **The test pyramid, pre-built** — unit exemplars (Turbine + fakes), architecture conformance
-  gates, Compose UI Tests, golden-tree structural baselines, and Maestro E2E flows — plus the
-  verify lane (`qa/verify.mjs`) that runs it all and emits an evidence receipt.
+- **The test pyramid, pre-built** — unit exemplars (Turbine + fakes), dependency-free architecture
+  conformance gates, Compose UI Tests, golden-tree structural baselines, and Maestro E2E flows —
+  bound to a committed behavior spec (`specs/*.spec.md`, Given/When/Then, stable clause ids) so a
+  `specCoverage` gate catches untested or untraceable behavior — plus the verify lane
+  (`qa/verify.mjs`) that runs it all and emits a typed PASS/FAIL/SKIP verdict + evidence receipt.
+- **Extend it with Claude Code, no plugin required** — every generated project ships its own
+  `add-feature`/`add-screen`/`add-repository` skills (backed by the deterministic
+  `qa/scaffold-feature.mjs` stamper) that clone the exemplar feature end-to-end: Screen →
+  ViewModel → UseCase → Repository → DI → nav, tests at every layer, golden baseline included.
+- **Mechanically enforced, not honor-system** — a generated `.claude/settings.json` Stop hook
+  refuses "done" unless a fresh, evidence-bound PASS receipt covers the changed surface (content-
+  hash bound, rebase/merge-proof), and CI independently re-checks the committed receipt still
+  attests `HEAD`. Proven against real violations: hardcoded colors, illegal layer imports, deleted
+  spec tests, and structural regressions are each refused and named by clause, 4/4 in the
+  repo's refusal-demo script.
 - **A toolchain doctor** — diagnoses *and* heals JDK, Android SDK + AVD, Xcode/CLT, CocoaPods,
   XcodeGen, Appium + drivers (the legacy pre-Maestro path), Node. Idempotent, OS-aware, consent-gated.
   The E2E flows themselves run on Maestro — install with
@@ -233,15 +245,19 @@ authoritative for what, and the standards each implements.
 ## Roadmap
 
 The full plan — six pillars from scaffold to store release, and the sequencing — lives in
-[`docs/ROADMAP.md`](./docs/ROADMAP.md). Near-term:
+[`docs/ROADMAP.md`](./docs/ROADMAP.md). The AI delivery harness itself (exemplars → conformance
+gates → in-project generation → mechanical enforcement → observability) is **complete** — see
+[`docs/HARNESS-PLAN.md`](./docs/HARNESS-PLAN.md) for the per-layer detail. Near-term:
 
-- [x] Publish to npm as `create-cmp-cli` (`npx create-cmp-cli@latest`) — **live on the registry**.
-- [ ] Record the asciinema demo (`npx create-cmp-cli` → green Android + iOS).
+- [x] Publish to npm as `create-cmp-cli` (`npx create-cmp-cli@latest`) — **live on the registry**;
+      `0.3.0` (the harness release) is prepared and pending its own publish.
+- [x] AI-native Compose inspector — read a running app's hierarchy, geometry, and *resolved design
+      tokens* as structured JSON (no screenshots), including **live on-device inspection** over a
+      loopback debug server. See [`docs/INSPECTOR-PLAN.md`](./docs/INSPECTOR-PLAN.md).
 - [x] Android build matrix in CI on every push; iOS matrix runs on manual dispatch.
+- [ ] Publish `create-cmp-cli@0.3.0` to npm (needs an interactive OTP session) + record the
+      asciinema demo (scaffold → `add-feature` → gate refuses a violation → fix → PASS).
 - [ ] More example features and nav shapes.
-- **AI-native Compose inspector** — read a running app's hierarchy, geometry, and *resolved design
-  tokens* as structured JSON (no screenshots), including **live on-device inspection** over a
-  loopback debug server. See [`docs/INSPECTOR-PLAN.md`](./docs/INSPECTOR-PLAN.md).
 
 ## Contributing
 

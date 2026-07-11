@@ -34,7 +34,7 @@ verifies structure, conformance, and behavior — with evidence — before "done
 
 ## 2. The five layers
 
-### Layer 1 — Exemplars: "what right looks like," as running code
+### Layer 1 — Exemplars: "what right looks like," as running code — ✅ **DONE 2026-07-06 (M0)**
 
 The template's example feature is the canonical pattern: one feature implemented through every
 architectural layer — Screen → ViewModel → UseCase → Repository → fake/desktop DI — **with its
@@ -42,59 +42,86 @@ tests at every layer, green at creation**. Not documentation of the pattern; a r
 of it. AI learns the pattern by reading the exemplar; conformance (Layer 2) is measured against
 it.
 
-Ships in the template today (example feature + tab generation). Gap: the per-layer test
-exemplars must be complete — every layer of the example feature needs a visible, idiomatic test
-so "copy the pattern" includes copying the test.
+Ships in the template (example feature + tab generation), with a complete per-layer test set:
+`HomeViewModelTest`, `GetItemsUseCaseTest`, `ItemRepositoryImplTest` (Turbine + `FakeItemRepository`),
+plus the golden-tree/UI/a11y tests added in Layer 2. Gate run: fresh scaffold →
+`:composeApp:desktopTest` green (M0).
 
-### Layer 2 — Conformance gates: best practices as executable checks
+### Layer 2 — Conformance gates: best practices as executable checks — ✅ **DONE 2026-07-06 (M2)**
 
 Architecture rules become tests that run in the verify lane and are **green on day one**:
 
-- **Dependency direction** — UI never imports the data layer; domain depends on nothing
-  (Konsist architecture tests, run as plain unit tests).
-- **Layer naming & placement** — ViewModels/UseCases/Repositories live where the pattern says,
-  named how the pattern says.
-- **Every Screen** has a `testTag`ged root and a committed golden semantics tree.
-- **Every ViewModel** has a test file.
-- **No hardcoded design values** — colors/spacing/typography resolve from the token catalog
-  (`find_drift` already checks this structurally at runtime; the conformance test checks it
-  statically).
+- **Dependency direction** — UI never imports the data layer; domain depends on nothing.
+  Implemented as **dependency-free** `ArchitectureConformanceTest` checks (ARCH-01/02), not
+  Konsist — see [ADR-0004](./adr/0004-conformance-gates-without-konsist.md) (Konsist would pull
+  a kotlin-compiler-embeddable pin, the exact lockstep fragility this template removes).
+- **Layer naming & placement / every ViewModel has a test** — ARCH-03.
+- **Every Screen** has a `testTag`ged root (ARCH-04) and a committed golden semantics tree
+  (`StructuralTree` serializer + `HomeGoldenTreeTest` against `qa/golden/home.json`).
+- **No hardcoded design values** — ARCH-05 (static color-literal check); `find_drift` covers the
+  runtime resolved-token case (live tier, Layer 5).
+- **A11y** — `A11yConformanceTest` (SHELL-04: every clickable perceivable).
+
+Negative-proof: each of ARCH-01/ARCH-05/HOME-06 demonstrably FAILs a real violation with the
+clause named — see Layer 4's refusal demo (C7), which supersedes the earlier ad-hoc M2 scratch
+runs.
 
 **Admission rule: a best practice that is not mechanically checkable stays out of the contract.**
 Prose guidance drifts silently under AI-speed change; only executable rules hold.
 
-### Layer 3 — Generation tools: right-by-construction, shipped INTO the project
+### Layer 3 — Generation tools: right-by-construction, shipped INTO the project — ✅ **DONE 2026-07-06/07 (M3)**
 
 Skills the template installs into the generated repo's own `.claude/skills/` (they travel with
 the project, independent of our plugin):
 
 - `add-feature` — stamps the full exemplar pattern for a new feature: all layers, DI wiring,
-  navigation, **test skeletons at every layer**, and a golden-tree baseline.
-- `add-screen`, `add-repository` — the smaller cuts of the same pattern.
+  navigation, **test skeletons at every layer**, and a golden-tree baseline. Backed by the
+  deterministic `qa/scaffold-feature.mjs` stamper (whole-word rename map, anchor injection).
+- `add-screen`, `add-repository` — the smaller cuts of the same pattern, as `--preset` modes on
+  the same stamper (landed 2026-07-07).
 
 This resolves the "we can't write their tests" problem: we don't write their tests — we make
 every unit of new work arrive with its test scaffold attached and green, and `cmp-test` derives
 the behavioral suite from the *observed running UI* afterward.
 
-### Layer 4 — Enforcement: binding Claude Code to the contract
+Rehearsed (C5): a plain Claude Code session, no plugin installed, ran `add-feature` in a
+scaffolded app → conforming feature, green tests every layer, lane PASS.
+
+### Layer 4 — Enforcement: binding Claude Code to the contract — ✅ **DONE 2026-07-06/07 (M4, M4-D)**
 
 - **Generated `CLAUDE.md`** — the contract: the patterns, the definition of done, how features
   are added (use the skills), and the rule that *"you are not done until the verify lane passes
   and produces a receipt."*
-- **Generated `.claude/settings.json` hooks** — a Stop hook that runs (or demands) the verify
-  lane, so "no done without verdict" is mechanical, not honor-system.
+- **Generated `.claude/settings.json` Stop hook** — runs `qa/receipt-check.mjs --hook`, a
+  content-hash predicate (not a full lane re-run) that blocks "done" iff the verified surface
+  changed since the last PASS receipt. Evidence binding is a hash of the verified surface
+  (`inputs.hash`), not a parent SHA, so rebase/merge is proof-preserving —
+  [ADR-0005](./adr/0005-evidence-binding-by-inputs-hash.md). Consent + escape hatch documented in
+  the generated README.
 - **The verify lane** — one command in the generated repo (`qa/verify.mjs`, surfaced as
-  `npm run verify` / a Gradle task) aggregating: build green → unit tests → conformance tests
-  (Layer 2) → golden-tree snapshot diffs → token drift → a11y audit → (device present) Maestro
-  smoke — into a single **typed PASS/FAIL verdict + evidence-pack JSON** (what changed, what was
-  checked, each verdict). The evidence pack is the harness's receipt artifact.
+  `npm run verify` / a Gradle task) aggregating: specCoverage → build → unit tests → conformance
+  tests (Layer 2) → golden-tree snapshot diffs → token drift (live tier, M4-D) → a11y audit →
+  (device present) Maestro smoke — into a single **typed PASS/FAIL/SKIP verdict + evidence-pack
+  JSON** (schema-validated, `qa/evidence/latest.json`). The evidence pack is the harness's receipt
+  artifact.
+- **`stepTokenDrift` live tier (M4-D, 2026-07-07)** — queries the running debug app's inspector
+  (`:9500`) and embeds `{checked, drifted}` in the receipt; an honest SKIP without a device/app.
 - **Committed golden baselines from scaffold time**, so drift is detectable from commit #1.
+- **Negative proof (C7)** — `qa/refusal-demo.mjs` scripts four violations, each caught and named
+  by clause: `ARCH-05`, `ARCH-01`, `HOME-01`/`specCoverage`, `HOME-06` — 4/4 PASS
+  (`docs/research/harness-refusal-demo.md`).
+- **CI enforcement** — the generated `verify.yml` re-runs the lane and independently checks the
+  committed receipt still attests `HEAD` before trusting it.
+- **On-device proof** — the first all-steps-real evidence pack (no SKIPs beyond `tokenDrift`) ran
+  on a real emulator, `e2eSmoke` PASS via Maestro (`docs/research/harness-e2e-proof.md`); the run
+  surfaced and fixed three CI-emulator hardening gaps (driver startup timeout, ANR-dialog
+  suppression, cold-start assert window) now baked into the template.
 
-### Layer 5 — Observability: cmp-inspector (shipped)
+### Layer 5 — Observability: cmp-inspector — ✅ **DONE (shipped ahead of this plan; live tier wired into the lane as M4-D, 2026-07-07)**
 
 The AI's instrument for verifying **structure, not appearance**: hierarchy, geometry, resolved
 design tokens as JSON — file, live-on-device, and uiautomator tiers; `prove_change` as the
-verified dev loop. Already built and verified.
+verified dev loop. Already built and verified; `stepTokenDrift` (Layer 4) now queries it live.
 
 ## 3. The key architectural decision
 
@@ -107,6 +134,10 @@ of the agent. (This is deliberately the shape of system-level verification think
 miniature.)
 
 ## 4. Phases (each independently shippable)
+
+> **All four phases below landed 2026-07-06/07** (M1–M4 in `HARNESS-ROADMAP.md`); kept verbatim
+> here as the historical plan. Phase 2 shipped as dependency-free conformance gates, not Konsist —
+> see [ADR-0004](./adr/0004-conformance-gates-without-konsist.md).
 
 ### Phase 1 — Codify the contract *(cheapest, highest leverage)*
 
