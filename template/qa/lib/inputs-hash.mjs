@@ -33,9 +33,16 @@ function isExcluded(relPath) {
   return EXCLUDED_PREFIXES.some((prefix) => relPath === prefix || relPath.startsWith(`${prefix}/`));
 }
 
+// The verified surface is the set of files that WILL be committed: tracked files
+// PLUS untracked-but-not-ignored files (`--others --exclude-standard`). A freshly
+// generated feature's files are untracked when the lane runs and the receipt is
+// written, yet they land in the very same commit as the receipt — so they must be
+// hashed, or the committed receipt would never attest its own commit (and CI's
+// receipt-matches-HEAD gate would false-fail on every change). Gitignored scratch
+// (build outputs, qa-artifacts) is still excluded via --exclude-standard.
 function tryGitLsFiles(root) {
   try {
-    const out = execSync("git ls-files -z", { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const out = execSync("git ls-files -z --cached --others --exclude-standard", { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
     return out.split("\0").filter(Boolean);
   } catch {
     return null;

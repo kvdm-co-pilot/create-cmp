@@ -2,7 +2,10 @@
 .gradle
 /local.properties
 .DS_Store
-/build
+# Gradle build outputs — unanchored so module dirs (composeApp/build/, …) match too,
+# not just a root-level build/. Anchored `/build` misses composeApp/build/, which would
+# then get committed and destabilise the evidence receipt's inputs hash.
+build/
 /captures
 .externalNativeBuild
 .cxx

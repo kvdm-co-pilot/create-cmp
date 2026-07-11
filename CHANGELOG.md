@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-12
+
+### Fixed
+
+- **Evidence receipts now attest their own commit** — two gaps in the generated `.gitignore` +
+  verify lane meant the committed receipt could never match `HEAD`, so CI's receipt-matches-HEAD
+  gate would false-fail on the first change in any real repo. Found by dogfooding a full
+  generated app (scaffold → add-feature → commit).
+  - `.gitignore` ignored `/build` (root-anchored) — it missed module build dirs like
+    `composeApp/build/`, which then got committed and destabilised the receipt's inputs hash.
+    Now `build/` (unanchored) ignores build outputs at every level.
+  - `qa/lib/inputs-hash.mjs` hashed only git-tracked files, so a freshly generated feature's
+    files — untracked when the lane runs but committed *with* the receipt — were excluded. Now
+    the surface is the **to-be-committed** set (`git ls-files --cached --others --exclude-standard`):
+    tracked + untracked-not-ignored, still excluding gitignored scratch.
+
 ## [0.3.0] - 2026-07-11
 
 create-cmp repositions from a scaffolder to an **AI CMP delivery harness**: every generated

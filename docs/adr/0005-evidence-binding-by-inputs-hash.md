@@ -31,7 +31,7 @@ Bind the receipt to a **content hash of the verified inputs**, recorded in the r
 > A receipt validly attests a working tree **iff** `receipt.verdict === "PASS"` **and**
 > `receipt.inputs.hash === recompute(tree)`.
 
-`recompute(tree)` is a sha256 over the sorted `(path, sha256(content))` list of the git-tracked
+`recompute(tree)` is a sha256 over the sorted `(path, sha256(content))` list of the to-be-committed
 files on the **verified surface** — the files whose content can change the lane's verdict:
 `composeApp/`, `specs/`, `qa/` (excluding lane *outputs*: `qa/evidence/` and `qa-artifacts/`),
 `gradle/libs.versions.toml`, and the root Gradle build/settings files. Docs, README, and other
