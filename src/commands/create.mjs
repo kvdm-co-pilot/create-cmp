@@ -4,6 +4,29 @@
 
 import { flagBool } from "../lib/args.mjs";
 
+// --- deprecated-flag compat -------------------------------------------------
+
+/**
+ * Tri-state boolean flag with a deprecated alias: prefers `name`/`no-name`;
+ * if that's absent but the alias is present, uses it and prints a one-line
+ * deprecation warning. `--appium/--no-appium` was renamed to `--e2e/--no-e2e`
+ * in 0.3.0 (ADR-0002) — this keeps the old flag working.
+ */
+function flagBoolWithAlias(flags, name, aliasName, dflt) {
+  const primarySet = flags[name] !== undefined || flags[`no-${name}`] !== undefined;
+  if (primarySet) return flagBool(flags, name, dflt);
+
+  const aliasSet = flags[aliasName] !== undefined || flags[`no-${aliasName}`] !== undefined;
+  if (aliasSet) {
+    process.stderr.write(
+      `Warning: --${aliasName}/--no-${aliasName} is deprecated; use --${name}/--no-${name} instead.\n`
+    );
+    return flagBool(flags, aliasName, dflt);
+  }
+
+  return dflt;
+}
+
 // --- name helpers ------------------------------------------------------------
 
 function parseTabs(str) {
@@ -61,7 +84,7 @@ function buildConfigFromFlags(flags, positional) {
       fcm: flagBool(flags, "fcm", firebase),
     },
     room: flagBool(flags, "room", true),
-    appium: flagBool(flags, "appium", true),
+    e2e: flagBoolWithAlias(flags, "e2e", "appium", true),
     inspector: flagBool(flags, "inspector", true),
     devClient: flagBool(flags, "dev-client", true),
     tabs: parseTabs(flags.tabs) || [
@@ -135,7 +158,7 @@ async function interactiveConfig(positional) {
   const extras = await prompts(
     [
       { type: "confirm", name: "room", message: "Room local cache?", initial: true },
-      { type: "confirm", name: "appium", message: "Appium test harness?", initial: true },
+      { type: "confirm", name: "e2e", message: "E2E test harness (Maestro)?", initial: true },
       {
         type: "confirm",
         name: "inspector",
@@ -173,7 +196,7 @@ async function interactiveConfig(positional) {
     platforms: { android: true, ios: base.ios },
     firebase: { enabled: base.firebase, auth, firestore, storage, functions, fcm },
     room: extras.room,
-    appium: extras.appium,
+    e2e: extras.e2e,
     inspector: extras.inspector,
     devClient: extras.devClient,
     tabs: parseTabs(extras.tabs) || [{ label: "Home", icon: "home" }],

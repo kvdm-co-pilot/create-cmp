@@ -32,7 +32,7 @@ function makeTemplate() {
         ios: { enabledByDefault: true, paths: [] },
         firebase: { enabledByDefault: true, paths: [] },
         room: { enabledByDefault: true, paths: [] },
-        appium: { enabledByDefault: true, paths: [] },
+        e2e: { enabledByDefault: true, paths: [] },
       },
       verify: { android: "true" },
     })
@@ -53,7 +53,7 @@ function config(targetDir) {
     platforms: { android: true, ios: true },
     firebase: { enabled: true, auth: "both", firestore: true, storage: true, functions: true, fcm: true },
     room: true,
-    appium: true,
+    e2e: true,
     inspector: true,
     devClient: true,
     tabs: [{ label: "Home", icon: "home" }],

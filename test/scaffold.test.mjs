@@ -29,7 +29,7 @@ function makeTemplate() {
         ios: { enabledByDefault: true, paths: ["iosApp", "composeApp/src/iosMain"] },
         firebase: { enabledByDefault: true, paths: [] },
         room: { enabledByDefault: true, paths: [] },
-        appium: { enabledByDefault: true, paths: ["qa"] },
+        e2e: { enabledByDefault: true, paths: ["qa"] },
       },
       verify: { android: "true", ios: "true" },
     })
@@ -68,7 +68,7 @@ function makeTemplate() {
   w("composeApp/src/commonMain/kotlin/com/example/app/theme/__THEME_PREFIX__Tokens.kt", "// tokens\n");
   // feature dirs
   w("iosApp/project.yml", "name: ios\n");
-  w("qa/appium/smoke.py", "# smoke\n");
+  w("qa/e2e/smoke.py", "# smoke\n");
   // a fake binary that embeds the literal token __PACKAGE__ in its bytes; the
   // engine must NOT rewrite binary content, so the token must survive verbatim.
   fs.writeFileSync(
@@ -88,7 +88,7 @@ function baseConfig(targetDir, overrides = {}) {
     platforms: { android: true, ios: true },
     firebase: { enabled: true, auth: "both", firestore: true, storage: true, functions: true, fcm: true },
     room: true,
-    appium: true,
+    e2e: true,
     inspector: true,
     devClient: true,
     tabs: [{ label: "Home", icon: "home" }],
@@ -153,12 +153,12 @@ test("full scaffold (iOS on): tokens, package rename, markers stripped, verify G
   fs.rmSync(out, { recursive: true, force: true });
 });
 
-test("scaffold with iOS + appium disabled removes their files and bodies", async () => {
+test("scaffold with iOS + e2e disabled removes their files and bodies", async () => {
   const tpl = makeTemplate();
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-out-"));
   const config = baseConfig(out, {
     platforms: { android: true, ios: false },
-    appium: false,
+    e2e: false,
   });
 
   await scaffold(config, { templateDir: tpl, verify: true });
@@ -166,7 +166,7 @@ test("scaffold with iOS + appium disabled removes their files and bodies", async
   // ios feature paths removed
   assert.ok(!fs.existsSync(path.join(out, "iosApp")), "iosApp removed");
   assert.ok(!fs.existsSync(path.join(out, "composeApp/src/iosMain")), "iosMain removed");
-  // appium feature path removed
+  // e2e feature path removed
   assert.ok(!fs.existsSync(path.join(out, "qa")), "qa removed");
 
   // ios marker BODY stripped from build file

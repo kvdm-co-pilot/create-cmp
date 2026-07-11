@@ -20,7 +20,7 @@ function validConfig() {
     platforms: { android: true, ios: true },
     firebase: { enabled: true, auth: "both", firestore: true, storage: true, functions: true, fcm: true },
     room: true,
-    appium: true,
+    e2e: true,
     inspector: true,
     devClient: true,
     tabs: [{ label: "Home", icon: "home" }, { label: "Profile", icon: "person" }],

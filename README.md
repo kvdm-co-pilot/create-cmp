@@ -213,7 +213,8 @@ Golden template (frozen, CI'd):   pinned versions · iOS shell · nav+insets · 
 
 The engine never puts an LLM in the hot path: it copies the template, replaces placeholders in file
 contents *and* paths, atomically renames package directories, toggles features (Firebase / auth type
-/ Room / the e2e harness — feature key `appium`, legacy name, renamed in 0.3.0), and runs the verify
+/ Room / the e2e harness — feature key `e2e`, renamed from `appium` in 0.3.0; the old
+`--no-appium` flag still works as a deprecated alias), and runs the verify
 build. Determinism is the moat. See
 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full design, and
 [`docs/DOCUMENTATION.md`](./docs/DOCUMENTATION.md) for the map of every doc — what's

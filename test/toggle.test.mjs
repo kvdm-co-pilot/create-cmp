@@ -39,12 +39,12 @@ test("keeps an enabled feature's body but removes its marker lines", () => {
 test("handles non-// comment leaders (# and <!-- -->)", () => {
   const input = [
     "keep1",
-    "# >>> cmp:feature appium",
-    "appium: true",
-    "# <<< cmp:feature appium",
+    "# >>> cmp:feature e2e",
+    "e2e: true",
+    "# <<< cmp:feature e2e",
     "keep2",
   ].join("\n");
-  const { content } = stripFeatureBlocks(input, new Set(["appium"]));
+  const { content } = stripFeatureBlocks(input, new Set(["e2e"]));
   assert.equal(content, "keep1\nkeep2");
 });
 
@@ -133,7 +133,7 @@ test("disabledFeaturesFromConfig maps config to feature names", () => {
     platforms: { android: true, ios: false },
     firebase: { enabled: true },
     room: false,
-    appium: true,
+    e2e: true,
     inspector: true,
     devClient: true,
   };
@@ -146,7 +146,7 @@ test("disabledFeaturesFromConfig: devClient off (or absent) disables the dev-cli
     platforms: { android: true, ios: true },
     firebase: { enabled: true },
     room: true,
-    appium: true,
+    e2e: true,
     inspector: true,
   };
   const off = disabledFeaturesFromConfig({ ...base, devClient: false });
@@ -162,7 +162,7 @@ test("disabledFeaturesFromConfig: inspector off (or absent) disables the inspect
     platforms: { android: true, ios: true },
     firebase: { enabled: true },
     room: true,
-    appium: true,
+    e2e: true,
     inspector: false,
   });
   assert.ok(off.has("inspector"));
@@ -170,7 +170,7 @@ test("disabledFeaturesFromConfig: inspector off (or absent) disables the inspect
     platforms: { android: true, ios: true },
     firebase: { enabled: true },
     room: true,
-    appium: true,
+    e2e: true,
   });
   assert.ok(absent.has("inspector"), "absent inspector key = disabled (schema requires it explicitly)");
 });
@@ -185,20 +185,20 @@ test("deleteDisabledFeaturePaths removes manifest paths for disabled features", 
   const manifest = {
     features: {
       ios: { paths: ["iosApp"] },
-      appium: { paths: ["qa", "tests/appium"] },
+      e2e: { paths: ["qa", "tests/e2e"] },
       firebase: { paths: ["..."] }, // contract placeholder — must be ignored
     },
   };
   const deleted = deleteDisabledFeaturePaths(
     dir,
     manifest,
-    new Set(["ios", "appium", "firebase"])
+    new Set(["ios", "e2e", "firebase"])
   );
   assert.ok(deleted.includes("iosApp"));
   assert.ok(deleted.includes("qa"));
   assert.ok(!fs.existsSync(path.join(dir, "iosApp")));
   assert.ok(!fs.existsSync(path.join(dir, "qa")));
-  // "..." placeholder and missing tests/appium are silently skipped.
+  // "..." placeholder and missing tests/e2e are silently skipped.
   assert.ok(!deleted.includes("..."));
   fs.rmSync(dir, { recursive: true, force: true });
 });

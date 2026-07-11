@@ -145,15 +145,15 @@ Tracked here so the charter never claims more than the repo delivers:
 
 1. **SD4 living-doc report** — receipt exists; spec-organized report (the test report reads
    as the spec, pass/fail per clause) pending, sequenced post-M5.
-2. **Feature-key rename `appium` → `e2e`** — the key still carries the legacy name; renaming
-   is a breaking CLI change deferred to 0.3.0 (recorded in
-   [ADR-0002](./adr/0002-maestro-over-appium-for-e2e.md)). Docs annotate it as legacy.
-3. **cmp-test / cmp-qa-prep deep rework** — the skills now correctly frame Maestro as
+2. **cmp-test / cmp-qa-prep deep rework** — the skills now correctly frame Maestro as
    current and Appium as legacy, but their step-by-step *mechanics* remain Appium-first;
    teaching them native Maestro flow generation is follow-on skill work (M5+).
 
 Closed (kept one release for the record, then prune):
 
+- ~~Feature-key rename `appium` → `e2e`~~ — done in 0.3.0 (CLI flag, interview prompt,
+  manifest key, and template markers all renamed; `--no-appium` kept as a deprecated alias
+  for `--no-e2e`; recorded in [ADR-0002](./adr/0002-maestro-over-appium-for-e2e.md)).
 - ~~Appium → Maestro doc sweep~~ — done 2026-07-06 (all universes; remaining mentions are
   justified historical / legacy-key / mechanics).
 - ~~SD2 specCoverage gate~~ — live in `template/qa/verify.mjs`, first step in every

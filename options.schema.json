@@ -14,7 +14,7 @@
     "platforms",
     "firebase",
     "room",
-    "appium",
+    "e2e",
     "inspector",
     "devClient",
     "tabs",
@@ -78,7 +78,10 @@
       }
     },
     "room": { "type": "boolean" },
-    "appium": { "type": "boolean" },
+    "e2e": {
+      "type": "boolean",
+      "description": "Device-level E2E harness (Maestro flows in qa/e2e/). Feature key renamed from `appium` to `e2e` in 0.3.0."
+    },
     "inspector": {
       "type": "boolean",
       "description": "Live on-device inspector: debug-only loopback HTTP server (127.0.0.1:9500) serving the Compose semantics tree + design-token catalog to the cmp-inspector MCP. Structurally absent from release builds."

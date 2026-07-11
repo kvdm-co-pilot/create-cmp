@@ -389,7 +389,7 @@ Scaffolder plumbing:
   `composeApp/src/androidRelease/kotlin` (required for the package-dir rename);
   `features.inspector = { enabledByDefault: true, paths: [both inspector dirs, the androidDebug
   manifest], notes: "strip `inspector` markers in AppApplication.kt when off" }`.
-- **`options.schema.json`:** `inspector: boolean` following the `room`/`appium` pattern (added to
+- **`options.schema.json`:** `inspector: boolean` following the `room`/`e2e` pattern (added to
   `required` like its siblings — the CLI front door defaults it to `true`; engine callers are
   in-repo and updated in the same change).
 - **`verify`:** stamped-app verify must stay green with the feature ON (default) and OFF; add the

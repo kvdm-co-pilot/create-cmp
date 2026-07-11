@@ -83,12 +83,12 @@
       ],
       "notes": "When off: strip `room` marker blocks in build.gradle.kts (ksp + room plugins), composeApp/build.gradle.kts (room/sqlite deps, kspAndroid/kspIos/kspDesktop room.compiler, the room {} schema block), AppApplication.kt, KoinHelper.kt and DesktopModule.kt (AppDatabase single + appContext). Delete the data/local dirs (incl. the desktopMain one when dev-client is on). The example `home` feature does NOT depend on Room (its ItemRepositoryImpl is in-memory), so it keeps building with Room off."
     },
-    "appium": {
+    "e2e": {
       "enabledByDefault": true,
       "paths": [
         "qa/e2e"
       ],
-      "notes": "Device-level E2E harness — Maestro flows (qa/e2e/*.yaml; replaced the Appium Node+pytest runners 2026-07-06; feature key stays `appium` for CLI-flag compat until the 0.3.0 breaking rename to `e2e`). testTag selectors via TestTagAutomation resource-ids. No in-file markers except the docs sections; toggled by deleting qa/e2e."
+      "notes": "Device-level E2E harness — Maestro flows (qa/e2e/*.yaml; replaced the Appium Node+pytest runners 2026-07-06). Feature key renamed from `appium` to `e2e` in 0.3.0 (old `--no-appium` CLI flag kept as a deprecated alias for `--no-e2e`). testTag selectors via TestTagAutomation resource-ids. No in-file markers except the docs sections; toggled by deleting qa/e2e."
     },
     "inspector": {
       "enabledByDefault": true,

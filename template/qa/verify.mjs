@@ -247,7 +247,7 @@ function maestroAvailable() {
 
 function stepE2eSmoke() {
   if (!fs.existsSync(path.join(ROOT, "qa/e2e"))) {
-    return { name: "e2eSmoke", verdict: "SKIP", reason: "e2e harness not included in this project (--no-appium)", durationMs: 0 };
+    return { name: "e2eSmoke", verdict: "SKIP", reason: "e2e harness not included in this project (--no-e2e)", durationMs: 0 };
   }
   if (!deviceAttached()) {
     return { name: "e2eSmoke", verdict: "SKIP", reason: "no Android device/emulator attached (adb)", durationMs: 0 };

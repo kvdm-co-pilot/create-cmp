@@ -28,8 +28,9 @@ emulator. On legacy projects this wraps the template's old `qa/appium/` client +
 
 - Toolchain present (JDK, Android SDK + AVD, Appium 3.x + `uiautomator2` driver). If not, run
   **cmp-doctor** first.
-- A scaffolded project with the Appium harness enabled (the `appium` toggle in **cmp-new**). If the
-  project was scaffolded with Appium off, say so — there is no harness to bring up.
+- A scaffolded project with the E2E harness enabled (the `e2e` toggle in **cmp-new** — renamed
+  from `appium` in 0.3.0). If the project was scaffolded with the harness off, say so — there is
+  no harness to bring up.
 
 ## Bring-up sequence (legacy Appium path)
 

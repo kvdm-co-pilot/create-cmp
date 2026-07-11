@@ -50,9 +50,9 @@ composeApp/src/desktopMain/  desktop dev-client (see docs/dev-client.md)
 <!-- <<< cmp:feature dev-client -->
 qa/verify.mjs                the verify lane — this repo's definition of done
 qa/evidence/latest.json      the committed evidence receipt (see CONTRIBUTING.md)
-<!-- >>> cmp:feature appium -->
+<!-- >>> cmp:feature e2e -->
 qa/e2e/                      Maestro E2E flows (device smoke)
-<!-- <<< cmp:feature appium -->
+<!-- <<< cmp:feature e2e -->
 docs/                        architecture, testing, ADRs
 ```
 

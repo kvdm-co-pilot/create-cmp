@@ -6,6 +6,43 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-11
+
+create-cmp repositions from a scaffolder to an **AI CMP delivery harness**: every generated
+project now ships a spec-driven verify lane, mechanical enforcement of the evidence contract, and
+in-project generators so an AI session can extend the app without the plugin installed.
+
+### Added
+
+- **Spec-driven foundation** — `specs/*.spec.md` (Given/When/Then, stable clause ids) with the
+  `home` feature as the fully-cited exemplar; the verify lane's new `specCoverage` step fails on
+  orphan clauses (unverified behavior) and orphan tags (untraceable test citations).
+- **Conformance + test pyramid (harness M0–M2)** — dependency-free architecture gates enforcing
+  the layer boundaries, Compose UI Tests (spec-cited), golden-tree structural baselines, and a11y
+  checks, all running on `:composeApp:desktopTest`.
+- **In-project generation skills** — `add-feature`, `add-screen`, `add-repository` ship inside
+  every generated project (`.claude/skills/`, backed by `qa/scaffold-feature.mjs` and its
+  `--preset screen|repository` modes) and clone the `home` exemplar deterministically — no
+  create-cmp plugin required to extend the app.
+- **Mechanical enforcement (harness M4)** — an evidence-bound Stop hook that refuses to let a
+  session end on unproven claims, evidence receipts bound to an inputs hash, CI that checks the
+  committed receipt matches `HEAD`, and a refusal demo proving the gate actually blocks.
+- **Maestro E2E hardened** — the `e2eSmoke` verify step tolerates slow/CI emulators, and the
+  harness has its first green pack proven on-device.
+- **`cmp-orchestrator` agent** — delegates low-level generation work and gates every hand-off
+  through the verify lane before reporting done.
+- **Repo-level ADRs** (`docs/adr/`) and a documentation charter/standards ledger recording where
+  the project adopted, adapted, or rejected industry testing/spec practices.
+
+### Changed
+
+- **BREAKING (soft): feature key `appium` renamed to `e2e`.** The CLI flag (`--e2e/--no-e2e`),
+  interview prompt, `options.schema.json` property, `template/manifest.json` feature key, and
+  template `cmp:feature` markers all use the new name. The old `--appium`/`--no-appium` flags
+  keep working as **deprecated aliases** for `--e2e`/`--no-e2e` (a one-line warning is printed);
+  no existing script breaks. Recorded in
+  [ADR-0002](docs/adr/0002-maestro-over-appium-for-e2e.md).
+
 ## [0.2.0] - 2026-07-04
 
 **First release on the npm registry**, and the first feature-complete one: create-cmp goes from a
@@ -85,7 +122,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kvdm-co-pilot/create-cmp/releases/tag/v0.1.0

@@ -41,7 +41,7 @@ interrogate. Defaults shown in brackets.
 | `firebase.auth` | Auth: `email` / `phone` / `both` / `none`? | `both` |
 | `firebase.firestore/storage/functions/fcm` | Which Firebase services? | all on if Firebase on |
 | `room` | Room local cache? | `true` |
-| `appium` | E2E test harness (Maestro flows in `qa/e2e/`; key `appium` is the legacy name, renamed in 0.3.0)? | `true` |
+| `e2e` | E2E test harness (Maestro flows in `qa/e2e/`; key renamed from `appium` in 0.3.0)? | `true` |
 | `inspector` | Live on-device inspector (debug builds only — AI-inspectable UI)? | `true` |
 | `devClient` | Desktop dev-client window with Compose Hot Reload? | `true` |
 | `tabs` | Bottom-nav tabs — label + icon each (e.g. Home/home, Profile/person)? | `[Home, Profile]` |
@@ -60,7 +60,7 @@ Build exactly the shape from `docs/CONTRACT.md` (validated by `options.schema.js
   "region": "us-central1", "themePrefix": "Acme",
   "platforms": { "android": true, "ios": true },
   "firebase": { "enabled": true, "auth": "both", "firestore": true, "storage": true, "functions": true, "fcm": true },
-  "room": true, "appium": true, "inspector": true, "devClient": true,
+  "room": true, "e2e": true, "inspector": true, "devClient": true,
   "tabs": [{ "label": "Home", "icon": "home" }, { "label": "Profile", "icon": "person" }],
   "targetDir": "./acme"
 }
@@ -79,7 +79,7 @@ node <repo>/bin/create-cmp.mjs \
   --bundle-id com.acme.app \
   --region us-central1 \
   --theme-prefix Acme \
-  --ios --firebase --auth both --room --appium --inspector --dev-client \
+  --ios --firebase --auth both --room --e2e --inspector --dev-client \
   --tabs "Home:home,Profile:person" \
   --target-dir ./acme \
   --verify \
@@ -95,7 +95,7 @@ Notes:
   (`./gradlew :composeApp:assembleDebug`, plus the iOS build on macOS when iOS is enabled) and
   reports **GREEN/FAIL**. Do not claim success without this verdict.
 - For toggles that are off, pass the negative flag (e.g. `--no-ios`, `--no-firebase`, `--no-room`,
-  `--no-appium`, `--no-inspector`, `--no-dev-client`) or `--auth none`.
+  `--no-e2e`, `--no-inspector`, `--no-dev-client`) or `--auth none`.
 - If the engine exposes a config-file entry instead of flags, write the config object from §2 to a
   temp JSON and pass it through the engine's config flag. **Reconcile the exact flag spelling with
   the engine's `--help` / `options.schema.json`** before depending on a specific flag name; the
