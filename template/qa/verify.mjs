@@ -25,6 +25,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
+import { compareTokenDrift } from "./lib/token-drift.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EVIDENCE_DIR = path.join(ROOT, "qa", "evidence");
@@ -232,13 +233,114 @@ const stepA11y = gradleTestStep(
   "A11y gate failed (SHELL-04): interactive nodes must expose a testTag, text, or contentDescription:",
 );
 
+// Live tokenDrift tier (harness M4-D): when a debug app + device are available,
+// fetches the declared catalog and the live semantics tree off the debug-only
+// inspector server (127.0.0.1:9500, see composeApp/src/androidDebug/.../
+// InspectorHttpServer.kt) and runs compareTokenDrift() over them — real runtime
+// drift detection, embedded in the evidence receipt.
+//
+// Infrastructure absence (no device, app not running) is NEVER a FAIL — only
+// actual drift is. curl (via the existing synchronous sh() helper) stands in for
+// an HTTP client here because every step in this lane runs synchronously; a
+// couple of short retries cover the debug app's cold start.
+const INSPECTOR_PORT = 9500;
+
+function curlJson(url, timeoutSec = 5) {
+  const res = sh(`curl -s -m ${timeoutSec} -w "\\n%{http_code}" "${url}"`);
+  if (!res.ok) return { ok: false };
+  const out = res.out;
+  const idx = out.lastIndexOf("\n");
+  const code = (idx >= 0 ? out.slice(idx + 1) : "").trim();
+  const bodyText = idx >= 0 ? out.slice(0, idx) : "";
+  if (code !== "200") return { ok: false };
+  try {
+    return { ok: true, body: JSON.parse(bodyText) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function pollHealth(port, attempts, delaySec) {
+  let health = curlJson(`http://127.0.0.1:${port}/inspect/health`);
+  for (let tries = 1; !health.ok && tries < attempts; tries += 1) {
+    sh(`sleep ${delaySec}`);
+    health = curlJson(`http://127.0.0.1:${port}/inspect/health`);
+  }
+  return health;
+}
+
 function stepTokenDrift() {
-  return {
+  const started = Date.now();
+  const elapsed = () => Date.now() - started;
+
+  if (!deviceAttached()) {
+    return {
+      name: "tokenDrift",
+      verdict: "SKIP",
+      reason: "no Android device/emulator attached (adb) — runtime token drift needs the live inspector tier",
+      durationMs: elapsed(),
+    };
+  }
+
+  const unreachable = () => ({
     name: "tokenDrift",
     verdict: "SKIP",
-    reason: "static color-literal rule runs in conformance (ARCH-05); runtime resolved-token drift needs the live inspector tier (harness M4)",
-    durationMs: 0,
-  };
+    reason: "inspector endpoint not reachable on :9500 (debug app not running?) — launch the debug build to enable the live tier",
+    durationMs: elapsed(),
+  });
+
+  sh(`adb forward tcp:${INSPECTOR_PORT} tcp:${INSPECTOR_PORT}`);
+  try {
+    let health = curlJson(`http://127.0.0.1:${INSPECTOR_PORT}/inspect/health`);
+    if (!health.ok) {
+      // Debug app may not be running — try to launch it (best-effort: parse the
+      // applicationId out of the Android build config), then give it a moment
+      // to cold-start before giving up.
+      let applicationId = null;
+      try {
+        const gradle = fs.readFileSync(path.join(ROOT, "composeApp/build.gradle.kts"), "utf8");
+        applicationId = gradle.match(/applicationId\s*=\s*"([^"]+)"/)?.[1] ?? null;
+      } catch {
+        applicationId = null;
+      }
+      if (applicationId) {
+        sh(`adb shell am start -n ${applicationId}/.MainActivity`);
+      }
+      health = pollHealth(INSPECTOR_PORT, 5, 2);
+    }
+    if (!health.ok) return unreachable();
+
+    const designSystem = curlJson(`http://127.0.0.1:${INSPECTOR_PORT}/inspect/design-system`);
+    const tree = curlJson(`http://127.0.0.1:${INSPECTOR_PORT}/inspect/tree`);
+    if (!designSystem.ok || !tree.ok) return unreachable();
+
+    const { checked, drifted } = compareTokenDrift(designSystem.body, tree.body);
+
+    if (drifted.length === 0) {
+      return {
+        name: "tokenDrift",
+        verdict: "PASS",
+        durationMs: elapsed(),
+        details: { checked, drifted: 0 },
+      };
+    }
+
+    const lines = ["Runtime token drift — a component's resolved value contradicts the declared design-system catalog:"];
+    for (const d of drifted) {
+      lines.push(
+        `  [${d.node}] token '${d.token}' (${d.facet}) — expected ${d.expected}, resolved ${d.actual}. Update the component to use the token, or update the catalog if the token itself changed.`,
+      );
+    }
+    return {
+      name: "tokenDrift",
+      verdict: "FAIL",
+      reason: lines.join("\n"),
+      durationMs: elapsed(),
+      details: { checked, drifted },
+    };
+  } finally {
+    sh(`adb forward --remove tcp:${INSPECTOR_PORT}`);
+  }
 }
 
 function maestroAvailable() {
