@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "create-cmp",
   "version": "0.1.0",
-  "description": "Scaffold AND maintain production-ready Kotlin/Compose Multiplatform apps (Android + iOS) — conversational interview, toolchain auto-bootstrap, proven-green version-set upgrades, a doctor that heals any KMP project, an AI-native Compose inspector (structured JSON, no screenshots), and a Maestro E2E test harness. Wraps the same deterministic engine as `npx create-cmp-cli` (published npm name; installs the `create-cmp` command).",
+  "description": "The AI delivery harness for Kotlin/Compose Multiplatform: scaffolds a green-building app (Android + iOS) by conversational interview, then holds any AI coding agent (Claude Code) to a machine-enforced definition of correct — a spec-driven verify lane that refuses \"done\" without a committed evidence receipt, dependency-free conformance gates, in-project generation skills that extend the app right-by-construction, a Stop-hook enforcement layer, and an AI-native Compose inspector (structured JSON, no screenshots) for catching design-token drift. Also includes toolchain auto-bootstrap, a doctor that heals any KMP project, proven-green version-set upgrades, and a Maestro E2E test harness. Wraps the same deterministic engine as `npx create-cmp-cli` (published npm name; installs the `create-cmp` command).",
   "author": {
     "name": "create-cmp contributors",
     "url": "https://github.com/kvdm-co-pilot/create-cmp"

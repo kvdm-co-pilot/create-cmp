@@ -59,7 +59,7 @@ merged.
 
 | Doc | Purpose | Lifecycle |
 |---|---|---|
-| [adr/](./adr/) | The harness repo's own decision records (MADR-trimmed): 0001 contract-in-generated-project · 0002 Maestro-over-Appium · 0003 jvm("desktop")-as-infrastructure · 0004 no-Konsist · 0005 evidence-binding-by-inputs-hash. | append-only |
+| [adr/](./adr/) | The harness repo's own decision records (MADR-trimmed): 0001 contract-in-generated-project · 0002 Maestro-over-Appium · 0003 jvm("desktop")-as-infrastructure · 0004 no-Konsist · 0005 evidence-binding-by-inputs-hash · 0006 package-name-and-harness-positioning. | append-only |
 | [SESSION-STATE.md](./SESSION-STATE.md) | Dated cross-session log — read first when resuming work. Internal (gitignored). | session-log |
 | [TEST-DRIVE.md](./TEST-DRIVE.md) | Founder pre-publication test-drive checklist (UX validation, not correctness). | frozen/reference |
 | [research/](./research/) | Internal product audits and market research memos. | frozen/reference |

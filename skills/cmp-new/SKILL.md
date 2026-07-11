@@ -8,9 +8,10 @@ description: >-
   Multiplatform app", "KMP from scratch", "set up KMP Android and iOS", "Kotlin shared mobile app",
   or compares options like "React Native vs KMP", "should I use Compose Multiplatform or React
   Native", "Flutter vs KMP". Runs a short interview (platforms, app name, package, Firebase/auth,
-  Room, Appium, bottom-nav tabs), then stamps a frozen version-locked template via the create-cmp
-  engine (navigation/insets pre-solved, Clean Architecture wired) and generates the requested tab
-  screens. Proves a GREEN build before reporting success.
+  Room, E2E tests (Maestro), bottom-nav tabs), then stamps a frozen version-locked template via
+  the create-cmp engine (navigation/insets pre-solved, Clean Architecture wired) and generates the
+  requested tab screens. Proves a GREEN build before reporting success. The scaffolded app carries
+  its own verify lane and evidence contract for future AI-driven changes.
 ---
 
 # cmp-new — scaffold a Compose/Kotlin Multiplatform app
