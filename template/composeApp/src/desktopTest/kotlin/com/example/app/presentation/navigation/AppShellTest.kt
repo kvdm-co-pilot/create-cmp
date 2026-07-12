@@ -11,7 +11,6 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import __PACKAGE__.testing.awaitNode
@@ -66,12 +65,14 @@ class AppShellTest {
 
         awaitNode(hasTestTag("tab_one_content"))
 
-        onNodeWithText("Tab Two").performClick()
+        // Nav items carry a derived nav_<label-slug> tag (AppShell's navItemTag) —
+        // select by it, never by display text.
+        onNodeWithTag("nav_tab_two").performClick()
         awaitNode(hasTestTag("tab_two_content"))
         onNodeWithTag("tab_two_content").assertIsDisplayed()
         onNodeWithTag("app_bottom_nav").assertIsDisplayed()
 
-        onNodeWithText("Tab One").performClick()
+        onNodeWithTag("nav_tab_one").performClick()
         awaitNode(hasTestTag("tab_one_content"))
         onNodeWithTag("tab_one_content").assertIsDisplayed()
         onNodeWithTag("app_bottom_nav").assertIsDisplayed()

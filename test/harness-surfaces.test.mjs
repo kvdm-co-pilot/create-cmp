@@ -140,6 +140,16 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.match(smoke, /extendedWaitUntil/);
     });
 
+    await t.test("qa/e2e/smoke.yaml nav taps select by nav_<slug> testTag id, never display text", () => {
+      // Durable-test rule (template CLAUDE.md): E2E selectors go by testTag. The nav
+      // tags are derived in AppShell.kt (navItemTag: "nav_" + label slug) — this pins
+      // the smoke flow to that id scheme so a regression back to text taps is caught.
+      const smoke = fs.readFileSync(path.join(out, "qa/e2e/smoke.yaml"), "utf8");
+      assert.match(smoke, /id:\s*"nav_profile"/, "taps the Profile tab by nav_profile id");
+      assert.match(smoke, /id:\s*"nav_home"/, "taps the Home tab by nav_home id");
+      assert.ok(!/tapOn:\s*"/.test(smoke), "no tapOn by bare display text remains");
+    });
+
     await t.test("qa/evidence/schema.json parses and identifies as cmp-evidence", () => {
       const raw = fs.readFileSync(path.join(out, "qa/evidence/schema.json"), "utf8");
       const schema = JSON.parse(raw);

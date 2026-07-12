@@ -114,6 +114,10 @@ private fun AppBottomNav(
     }
 }
 
+/** Deterministic automation tag for a nav item: `nav_` + the label lowercased with every non-[a-z0-9] run collapsed to `_` and trimmed (e.g. "My Stuff!" → `nav_my_stuff`). Mirrored by the id selectors in `qa/e2e/smoke.yaml` — keep the two in sync. */
+private fun navItemTag(label: String): String =
+    "nav_" + label.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+
 @Composable
 private fun NavItem(
     label: String,
@@ -128,6 +132,8 @@ private fun NavItem(
             // a11y: guarantee the 48dp minimum touch target regardless of label width
             // (the inspector's audit_a11y flags anything smaller).
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            // Durable selection handle (tests/E2E select by testTag, never display text).
+            .semantics { testTag = navItemTag(label) }
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
