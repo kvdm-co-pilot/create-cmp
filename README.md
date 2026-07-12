@@ -101,7 +101,7 @@ Everything except `create` works on **any** KMP project, not just ones this tool
 Hit a KMP build error? [Common CMP/KMP build errors and fixes](docs/errors/README.md) — kotlin↔KSP
 mismatch, the KSP2/iOS catch-22, `SDK location not found`, `No space left on device`, version drift.
 
-## The Claude Code plugin (8 skills)
+## The Claude Code plugin (9 skills)
 
 ```text
 /plugin marketplace add kvdm-co-pilot/create-cmp
@@ -115,13 +115,14 @@ Same engine as the CLI, conversational front door. Each skill is a guided flow, 
 | `cmp-new` | "Make me an app." Interviews you in chat, scaffolds via the engine, generates your bottom-nav tab screens from the exemplar pattern, proves the build green. |
 | `cmp-doctor` | "Why won't my KMP project build?" Runs the doctor, explains the findings, applies consented fixes. |
 | `cmp-upgrade` | "Bump my dependencies safely." Diff → apply → verify, with the lockstep guardrails. |
+| `cmp-preview` | "Show me my screens." Live gallery of every screen at a local URL — real DI/theme/data, no device, no emulator, no manual Gradle. Edit → save → the page re-renders itself; changed screens get flagged; a11y violations show per screen. |
 | `cmp-inspect` | "What did the UI actually render?" Reads a **running** app as structured JSON — hierarchy, geometry, resolved design tokens, navigation state. Never screenshots. Can assert tokens, find drift against your design system, audit accessibility, diff before/after. |
 | `cmp-dev-client` | "Let me iterate fast." Runs your shared UI in a phone-sized desktop window with hot reload — save a file, see it change. No emulator needed. Firebase stays off on desktop (offline fakes). |
 | `cmp-firebase-connect` | "Wire up my real Firebase." Drives the Firebase CLI: create/reuse a project, register the app, drop the real `google-services.json` over the placeholder, prove it with a green build. Every cloud action asks first. |
 | `cmp-test` | "Write tests for my app." *Observes* the running app's semantics tree — what's actually on screen, what's tappable, where navigation goes — and derives the regression suite from that. Tests come from rendered reality, not guesses. |
 | `cmp-qa-prep` | "Get my test environment up." Emulator + app install + E2E smoke run, with the gotchas handled. |
 
-Plus the **`cmp-inspector` MCP server** (14 tools) — the machine-readable window into a running
+Plus the **`cmp-inspector` MCP server** (16 tools) — the machine-readable window into a running
 Compose UI that `cmp-inspect`, `cmp-test`, and the verified dev loop are built on. One tree
 contract, three sources: render a screen headlessly, connect to the live app, or read a device
 via UIAutomator.
@@ -208,8 +209,9 @@ Agents read structure; humans see pixels.
 
 **The daily UI loop.** `./gradlew :composeApp:hotRunDesktop --auto` → edit Compose → save → see
 it. No emulator, no Firebase, sub-second feedback. Want stills of every screen instead of a
-window? `./gradlew :composeApp:renderScreens && node qa/preview-gallery.mjs` → open
-`composeApp/build/previews/index.html`.
+window? Say "preview my app" (the cmp-preview skill / `preview` MCP tool) → a live local
+gallery URL that re-renders on every save. Command-line fallback:
+`./gradlew :composeApp:renderScreens && node qa/preview-gallery.mjs`.
 
 **The verified dev loop (the flagship).** For any UI change: snapshot the live tree → make the
 edit → reload → `prove_change` compares before/after structure, token drift, and a11y, and returns

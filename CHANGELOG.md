@@ -30,6 +30,18 @@ All notable changes to this project are documented here. The format is based on
   - MCP: `render_screen` gains `projectDir` + `screen` — runs the generated task and returns
     the PNG metadata plus `treePath`/`previewsDir`; the bundled-SampleScreen `harness:true`
     path remains as the demo fallback and is labeled as such.
+- **`preview` / `preview_stop` MCP tools + the `cmp-preview` skill (ninth skill) — the
+  AI-native preview loop ("Storybook for CMP", phase 1)** — nobody runs Gradle or node
+  scripts by hand: `preview { projectDir }` starts a resident service owned by the MCP
+  server that renders every registry screen headlessly, serves a LIVE gallery at a local
+  URL (pixels + inline wireframe SVG + a11y per screen; SSE-driven self-reload; changed
+  screens flagged; render failures shown as a banner while the last good state stays up),
+  and watches `composeApp/src` so every save re-renders automatically (debounced,
+  serialized, one queued follow-up; recursive fs.watch with an mtime-poll fallback). The
+  tool returns the same state structurally (`screens` with node/token/a11y counts + tree
+  paths, `changedLastRender`) so the agent asserts while the human watches — pixels to
+  the human, structure to the AI. Unit-tested via an injected render runner
+  (`inspector/mcp/test/preview-service.test.mjs`).
 
 ## [0.5.0] - 2026-07-12
 

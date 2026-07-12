@@ -33,6 +33,7 @@ import { navigateAndInspect, writeLiveScreenshot, DEFAULT_SETTLE_MS } from "../s
 import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
 import { readPngMeta } from "../src/lib/png.mjs";
 import { proveChange } from "../src/lib/prove.mjs";
+import { createPreviewService } from "../src/lib/preview-service.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -677,6 +678,87 @@ server.registerTool(
     return ok(proveChange({ beforeTree, afterTree, catalog, tolerancePx, minTouchTargetPx }));
   })
 );
+
+// ---------------------------------------------------------------------------
+// preview — the resident live-preview loop (phase 1 of "Storybook for CMP")
+// ---------------------------------------------------------------------------
+
+// One active service per MCP server. Calling preview for a different project stops
+// the old one; calling it again for the same project returns the same URL.
+let previewService = null;
+let previewProjectDir = null;
+
+server.registerTool(
+  "preview",
+  {
+    title: "Start the live preview gallery (watch + render + serve)",
+    description:
+      "AI-native previews of a create-cmp app's REAL screens with NO device, emulator, or " +
+      "manual Gradle: starts (or reuses) a resident service that renders every screen in " +
+      "inspector/PreviewRegistry.kt headlessly, serves a LIVE gallery for the human at a local " +
+      "URL (pixels + wireframe + a11y per screen; the page reloads itself via SSE after every " +
+      "re-render), and watches composeApp/src so every save re-renders automatically. Returns " +
+      "{ url, screens:[{id, nodes, tokenized, tagged, a11yPass, tree, png}], version, " +
+      "changedLastRender } — give the human the url (open it for them if you can); assert on " +
+      "the returned structure or the per-screen tree paths yourself. The service is owned by " +
+      "this MCP server; call preview_stop to shut it down. First render includes a Gradle " +
+      "compile (tens of seconds); subsequent saves re-render warm in a few seconds.",
+    inputSchema: {
+      projectDir: z
+        .string()
+        .describe("Root of the create-cmp app (the directory containing composeApp/)."),
+      port: z
+        .number()
+        .int()
+        .optional()
+        .describe("First port to try for the gallery server (default 9600, probes upward)."),
+    },
+  },
+  guarded(async ({ projectDir, port }) => {
+    const dir = resolvePath(projectDir);
+    if (previewService && previewProjectDir === dir) {
+      return ok({ ...previewService.status(), note: "already running (same project) — URL unchanged." });
+    }
+    if (previewService) {
+      previewService.stop();
+      previewService = null;
+    }
+    const service = createPreviewService({
+      projectDir: dir,
+      port,
+      log: (m) => process.stderr.write(`[preview] ${m}\n`),
+    });
+    const st = await service.start();
+    previewService = service;
+    previewProjectDir = dir;
+    return ok(st);
+  })
+);
+
+server.registerTool(
+  "preview_stop",
+  {
+    title: "Stop the live preview gallery",
+    description:
+      "Stops the resident preview service started by `preview` (file watcher + gallery server). " +
+      "Returns the final status. The Gradle daemon it used stays warm (that's desirable).",
+    inputSchema: {},
+  },
+  guarded(async () => {
+    if (!previewService) return fail("No preview service is running.");
+    const final = previewService.stop();
+    previewService = null;
+    previewProjectDir = null;
+    return ok({ ...final, stopped: true });
+  })
+);
+
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    if (previewService) previewService.stop();
+    process.exit(0);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // wire up stdio transport

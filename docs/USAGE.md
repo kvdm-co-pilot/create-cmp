@@ -136,6 +136,7 @@ intent — the descriptions carry rich triggers.
 | **cmp-firebase-connect** | Wire a fresh app to its **own** Firebase (the #1 post-scaffold manual step). | Firebase CLI: login → project create/reuse → app register → real `google-services.json` replaces the placeholder → green build proves it. Consent-gated per cloud write. |
 | **cmp-dev-client** | Run the shared UI in a desktop window with Compose Hot Reload. | `:composeApp:hotRunDesktop --auto` / `:composeApp:run`. |
 | **cmp-inspect** | See/drive a running Compose UI as JSON; check tokens, drift, a11y; the verified dev loop. | The `cmp-inspector` MCP (§5). |
+| **cmp-preview** | Live previews of REAL screens, zero commands. | `preview {projectDir}` → live gallery URL; watches sources, re-renders on save; structural summaries for the agent. |
 | **cmp-test** | Generate a regression suite by **observing** the app. | Reads the live tree via the MCP → derives a plan → writes Maestro E2E flows + golden-tree snapshots in the shipped harness style. |
 | **cmp-qa-prep** | Bring up emulator + Maestro flow run + the bottom-nav smoke (legacy Appium bring-up path also supported). | Emulator + Maestro harness. |
 
@@ -184,7 +185,7 @@ Resolution: explicit `source` → `treePath` → the `connect_live` session defa
 - **uiautomator (tier 2):** any app, zero instrumentation — but `designToken` is always `null`
   (tokens don't cross the accessibility bridge), so token/drift tools reject it.
 
-### The 14 tools
+### The 16 tools
 
 **Read & assert:** `inspect_tree` (full tree + counts) · `get_node {testTag}` · `assert_token
 {testTag,key,expected}` · `layout_gaps {testTagA,testTagB}` (computed spacing).
@@ -208,6 +209,11 @@ text, so it's returned inline · `render_screen` — **pixel preview, path-only*
 `{path,width,height,sizeBytes,displayHint}` from the PNG header, never bytes. From
 `projectDir` (+ `screen?` registry id — runs the app's own `:composeApp:renderScreens`, also
 returns `treePath`), live (`/inspect/screenshot`), a `pngPath`, or the demo harness.
+
+**Preview service:** `preview {projectDir, port?}` — resident live-preview loop: headless render
+of every registry screen, live gallery URL (SSE self-reload, changed-screen flags), source watch
+with auto re-render; returns per-screen structural summaries + tree paths · `preview_stop` —
+shut the service down (the Gradle daemon stays warm).
 
 **Verify:** `prove_change {before, after, catalogPath?}` — the verified-dev-loop keystone in one
 call: diffs before/after, regression-checks the after tree (drift + a11y), returns

@@ -35,6 +35,7 @@
     "./skills/cmp-doctor",
     "./skills/cmp-qa-prep",
     "./skills/cmp-inspect",
+    "./skills/cmp-preview",
     "./skills/cmp-upgrade",
     "./skills/cmp-dev-client",
     "./skills/cmp-firebase-connect",
