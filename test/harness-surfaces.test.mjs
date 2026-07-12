@@ -118,6 +118,22 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.match(receiptCheck, /\.\/lib\/inputs-hash\.mjs/);
     });
 
+    await t.test("evidence attests EXECUTION: lane forces --rerun, build script declares golden/UPDATE_GOLDEN as test inputs", () => {
+      // Regression guard for the cache-poisoning bug: Gradle's build cache replayed a PASS
+      // from a different tree state (byte-identical re-scaffold; golden baselines and the
+      // UPDATE_GOLDEN env var were undeclared inputs), so a lane receipt attested tests that
+      // never ran and a missing golden baseline sailed through locally while failing in CI.
+      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      const testInvocations = verify.split("\n").filter((l) => l.includes(":composeApp:desktopTest"));
+      assert.ok(testInvocations.length >= 2, "lane has desktopTest invocations");
+      for (const line of testInvocations) {
+        assert.match(line, /--rerun/, `desktopTest invocation forces --rerun: ${line.trim()}`);
+      }
+      const buildGradle = fs.readFileSync(path.join(out, "composeApp/build.gradle.kts"), "utf8");
+      assert.match(buildGradle, /goldenBaselines/, "golden baselines declared as a Test input");
+      assert.match(buildGradle, /inputs\.property\("updateGolden"/, "UPDATE_GOLDEN declared as a Test input");
+    });
+
     await t.test("qa/e2e/smoke.yaml cites SHELL-01 and uses extendedWaitUntil", () => {
       const smoke = fs.readFileSync(path.join(out, "qa/e2e/smoke.yaml"), "utf8");
       assert.match(smoke, /SPEC:\s*SHELL-01/);
