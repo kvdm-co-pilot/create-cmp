@@ -63,7 +63,9 @@ async function main() {
 
 function printHelp() {
   process.stdout.write(
-    `create-cmp — scaffold & maintain Kotlin/Compose Multiplatform apps (Android + iOS)\n\n` +
+    `create-cmp — the AI delivery harness for Kotlin/Compose Multiplatform (Android + iOS)\n` +
+      `Scaffolds a green-building app in minutes; every generated project carries a spec-driven\n` +
+      `verify lane, evidence receipts, and mechanical enforcement of "done".\n\n` +
       `Usage:\n` +
       `  npx create-cmp [target-dir] [flags]    scaffold a new app (default command)\n` +
       `  npx create-cmp create [target-dir]     same, explicit\n` +

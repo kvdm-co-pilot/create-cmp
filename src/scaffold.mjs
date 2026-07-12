@@ -181,9 +181,8 @@ function writeLocalProperties(projectDir) {
 
 /**
  * Replace the (already token-substituted) app display name with a slugified,
- * identifier-safe form in the few files that demand it: Gradle's
- * rootProject.name and the appium npm package name. Idempotent and a no-op when
- * the name is already slug-safe.
+ * identifier-safe form in the one file that demands it: Gradle's
+ * rootProject.name. Idempotent and a no-op when the name is already slug-safe.
  * @param {string} projectDir
  * @param {string} appName raw display name (may contain spaces)
  */
@@ -200,20 +199,6 @@ function applyAppNameSlug(projectDir, appName) {
       (_m, a, _name, c) => `${a}${slug}${c}`
     );
     if (out !== src) fs.writeFileSync(settings, out);
-  }
-
-  // qa/appium/package.json: "name": "Demo App-appium" -> "demo-app-appium"
-  const pkg = path.join(projectDir, "qa", "appium", "package.json");
-  if (fs.existsSync(pkg)) {
-    try {
-      const json = JSON.parse(fs.readFileSync(pkg, "utf8"));
-      if (typeof json.name === "string" && json.name.includes(appName)) {
-        json.name = json.name.split(appName).join(slug).toLowerCase();
-        fs.writeFileSync(pkg, `${JSON.stringify(json, null, 2)}\n`);
-      }
-    } catch {
-      // leave as-is on parse failure
-    }
   }
 }
 
