@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-12
+
+### Fixed
+
+- **Evidence receipts now attest test *execution*, not Gradle cache reuse** — the second shipped
+  correctness bug caught by dogfooding the public showcase (the first was 0.3.1's inputs-hash gap).
+  The verify lane trusted Gradle exit codes, but the build cache can restore a `desktopTest` PASS
+  recorded against a *different* tree state: a deterministic re-scaffold produces byte-identical
+  sources, and neither `qa/golden/` baselines nor the `UPDATE_GOLDEN` env var were declared task
+  inputs. Observed live: an `UPDATE_GOLDEN` capture run was served from cache (so it never wrote
+  the new feature's golden baseline), the lane then emitted a zero-SKIP PASS receipt in 81 seconds
+  for tests that never executed — and CI, with a cold cache, correctly failed on the missing
+  baseline.
+  - `qa/verify.mjs`: both `desktopTest` invocations force `--rerun` — compilation stays cached,
+    test execution is forced.
+  - `composeApp/build.gradle.kts`: `qa/golden/*.json` and `UPDATE_GOLDEN` are declared `Test` task
+    inputs, so Gradle caching is honest even outside the lane.
+  - Engine regression guard pins both surfaces.
+
 ## [0.3.1] - 2026-07-12
 
 ### Fixed
@@ -138,7 +157,9 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.1.0...v0.1.1
