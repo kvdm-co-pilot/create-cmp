@@ -6,6 +6,44 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+Findings from a full field run of the plugin (HealthStack app: 5 tabs, Room, no Firebase,
+Android + iOS) — each gap below was hit live, then reproduced and fixed against a stamped
+fixture with negative proofs (injected violations caught by their named clauses).
+
+### Added
+
+- **`create-cmp.json` spec-of-record** — the scaffold persists the fully-resolved config
+  (name, package, platforms, features, tabs, engine version, timestamp) into the project
+  root. Until now the only pre-code spec in the system was validated, consumed, and
+  discarded at stamp time; consistency tooling, `upgrade` intent, and re-stamp/resume all
+  need it durable.
+- **`core/format` KMP-safe helpers** (`pad2`, `clockLabel`, `fixed`) + tests — the
+  `"%02d".format(...)` JVM-only trap is the most common first-week `commonMain` porting
+  mistake; the template now ships the safe versions.
+- **SHELL-05 conformance rule** — every non-shell NavHost destination must compose inside
+  `BaseScreen`. A bare destination that never touches inset APIs passes SHELL-03 while
+  rendering under the status bar; observed in the field on a generated app's Settings screen.
+- **Machine-readable verify verdict** — `::create-cmp-verdict::{json}` as the last verify
+  line (+ per-platform durations). Verify logs can exceed 170k lines where `-Werror=` clang
+  flags and Xcode phase names false-positive naive error greps; agents anchor on the marker.
+
+### Fixed
+
+- **Room per-target schema directories** — the single shared `schemaDirectory` tripped
+  `Inconsistency detected exporting Room schema files` on the *first entity edit after
+  scaffold* (stale cross-target intermediates), i.e. for every user on the happy path.
+  Schemas now export to `schemas/<target>/`.
+- **ARCH-04 scoped by content, not filename** — `*Screen.kt` scoping missed untagged
+  `FooContent.kt` split files and false-positived ViewModel-only `FooScreen.kt` files.
+  Any presentation-feature file containing `@Composable` must declare a `testTag`.
+- **ARCH-01/02 match fully-qualified inline references** — import-only matching left a
+  one-edit evasion open (delete the import, qualify the name inline; gate stays green).
+- **Non-empty target check allowlists harmless entries** (`.git`, `.claude`, `.DS_Store`,
+  `.idea`, `.vscode`) and names the blocking entries — the documented doctor→create flow
+  no longer poisons its own target dir into requiring `--force`.
+- **Doctor JDK row label** states the actual requirement (`JDK (17+ required)`) and reports
+  the resolved major — it previously read "JDK 17 (Temurin)" while accepting JDK 21.
+
 ## [0.4.0] - 2026-07-12
 
 ### Added
