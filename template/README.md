@@ -101,3 +101,7 @@ remember to run it.
 locally. Note that CI independently enforces the same "receipt attests HEAD" check on every push
 (see `.github/workflows/verify.yml`), so disabling the local hook only trades an immediate local
 signal for a later one in CI.
+
+---
+
+Built with [create-cmp](https://github.com/kvdm-co-pilot/create-cmp) — the AI delivery harness for Compose Multiplatform.

@@ -29,6 +29,10 @@ All notable changes to this project are documented here. The format is based on
   published shims delegating to `create-cmp-cli`, so `npm create compose-multiplatform` /
   `npm create kmp` land in this tool. Published separately from the main package (see the
   npm-publish skill's Alias packages section).
+- **Attribution line in generated READMEs** — generated projects' README now ends with a single
+  plain-markdown line, `Built with [create-cmp](…) — the AI delivery harness for Compose
+  Multiplatform.`, below a `---` rule. One line, no image badge, no tracking, trivially
+  deletable; README is outside the verified surface, so removing it never invalidates a receipt.
 - **Error-message pages** (`docs/errors/`) — one page per real KMP/CMP build failure the doctor
   diagnoses (kotlin↔KSP lockstep, the KSP2/iOS `ClassNotFoundException: …MainKt` catch-22,
   `SDK location not found`, `~/.konan` disk exhaustion, version-catalog drift): the exact error
