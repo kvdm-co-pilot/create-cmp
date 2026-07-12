@@ -71,7 +71,11 @@ export const checks = [
   },
   {
     id: "jdk",
-    label: "JDK 17 (Temurin)",
+    // Label states the actual requirement (17+), and detect() reports the
+    // resolved major — previously the row read "JDK 17 (Temurin)" while
+    // happily accepting JDK 21, a label/evidence contradiction that erodes
+    // trust in every other row (field-report finding 2.6).
+    label: "JDK (17+ required)",
     platforms: ["darwin", "linux"],
     detect() {
       const r = probe("javac", ["-version"]);
@@ -80,7 +84,10 @@ export const checks = [
       const m = out.match(/(\d+)(\.\d+)?/);
       const major = m ? parseInt(m[1], 10) : 0;
       if (!out) return { present: false, detail: "not found" };
-      return { present: major >= 17, detail: out.split("\n")[0] };
+      return {
+        present: major >= 17,
+        detail: `resolved major ${major} — ${out.split("\n")[0]}`,
+      };
     },
     installCommand: () =>
       isMac ? "brew install --cask temurin@17" : "sdk install java 17.0.13-tem  # (sdkman)",

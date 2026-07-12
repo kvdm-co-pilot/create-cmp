@@ -206,6 +206,46 @@ function applyAppNameSlug(projectDir, appName) {
 }
 
 /**
+ * Persist the fully-resolved engine config as `create-cmp.json` in the project
+ * root — the durable spec-of-record (field-report finding 5.5-1 / D6). The
+ * conformance/consistency tooling compares code against whatever this file
+ * currently says, so a hand-edit is a visible spec change rather than drift.
+ * @param {string} projectDir
+ * @param {object} config validated engine config
+ */
+function writeSpecOfRecord(projectDir, config) {
+  let engineVersion = "unknown";
+  try {
+    engineVersion = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")
+    ).version;
+  } catch {
+    /* best-effort — never fail the stamp over version metadata */
+  }
+  const record = {
+    schemaVersion: 1,
+    name: config.appName,
+    package: config.package,
+    bundleId: config.iosBundleId,
+    themePrefix: config.themePrefix,
+    region: config.region,
+    platforms: config.platforms,
+    firebase: config.firebase,
+    room: config.room,
+    e2e: config.e2e,
+    inspector: config.inspector,
+    devClient: config.devClient,
+    tabs: config.tabs,
+    engineVersion,
+    stampedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(
+    path.join(projectDir, "create-cmp.json"),
+    JSON.stringify(record, null, 2) + "\n"
+  );
+}
+
+/**
  * Run the full scaffold pipeline.
  * @param {object} config engine config object (CONTRACT)
  * @param {object} [opts]
@@ -231,10 +271,20 @@ export async function scaffold(config, opts = {}) {
 
   const projectDir = path.resolve(config.targetDir);
   if (fs.existsSync(projectDir)) {
+    // Harmless entries must not force `--force`: our own doctor/session
+    // droppings (.claude), VCS metadata, and OS/editor noise. The documented
+    // doctor→create flow used to poison its own target dir this way. Anything
+    // else is real user content and still refuses — naming the offenders so
+    // the caller can decide without an `ls` round-trip.
+    const HARMLESS = new Set([".git", ".claude", ".DS_Store", ".idea", ".vscode"]);
     const entries = fs.readdirSync(projectDir).filter((e) => e !== "." && e !== "..");
-    if (entries.length > 0 && !opts.force) {
+    const blocking = entries.filter((e) => !HARMLESS.has(e) && !e.endsWith(".swp"));
+    if (blocking.length > 0 && !opts.force) {
+      const ignored = entries.filter((e) => !blocking.includes(e));
       throw new Error(
-        `target directory ${projectDir} is not empty (pass force to overwrite)`
+        `target directory ${projectDir} is not empty (pass force to overwrite)\n` +
+          `  Blocking entries: ${blocking.join(", ")}` +
+          (ignored.length > 0 ? `\n  (ignored as harmless: ${ignored.join(", ")})` : "")
       );
     }
   }
@@ -321,6 +371,14 @@ export async function scaffold(config, opts = {}) {
     const abs = path.join(projectDir, artifact);
     if (fs.existsSync(abs)) fs.rmSync(abs);
   }
+
+  // Persist the resolved config as the project's spec-of-record. Until now the
+  // config was validated, consumed, and discarded — the only pre-code spec in
+  // the system evaporated at stamp time, so nothing could later answer "was
+  // this app built to its spec?" (tabs ↔ AppTab ↔ smoke consistency, upgrade
+  // intent, re-stamp/resume all need it). Committed with the app; hand-edits
+  // are visible spec changes, not drift.
+  writeSpecOfRecord(projectDir, config);
 
   ok("Scaffold complete.");
 
