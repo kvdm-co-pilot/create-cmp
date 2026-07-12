@@ -94,9 +94,11 @@
       "enabledByDefault": true,
       "paths": [
         "composeApp/src/androidDebug/kotlin/com/example/app/inspector",
-        "composeApp/src/androidRelease/kotlin/com/example/app/inspector"
+        "composeApp/src/androidRelease/kotlin/com/example/app/inspector",
+        "composeApp/src/desktopMain/kotlin/com/example/app/inspector",
+        "qa/preview-gallery.mjs"
       ],
-      "notes": "Live on-device inspector: debug-only loopback HTTP server on 127.0.0.1:9500 (GET /inspect/health|tree|design-system) serving the semantics tree + design-token catalog to the cmp-inspector MCP via `adb forward tcp:9500 tcp:9500`. The androidRelease dir holds only the no-op startInspector() twin — release builds contain no inspector code structurally. When off: delete both inspector dirs AND strip the `inspector` marker blocks in AppApplication.kt (import + startInspector() call) and composeApp/src/androidDebug/AndroidManifest.xml (INTERNET permission). Zero dependencies (java.net.ServerSocket + kotlinx-serialization from commonMain); no build-file markers needed."
+      "notes": "Two loops in one feature. (1) Live on-device inspector: debug-only loopback HTTP server on 127.0.0.1:9500 (GET /inspect/health|tree|design-system) serving the semantics tree + design-token catalog to the cmp-inspector MCP via `adb forward tcp:9500 tcp:9500`. The androidRelease dir holds only the no-op startInspector() twin — release builds contain no inspector code structurally. (2) Headless preview harness (tier 0): the desktopMain inspector dir (PreviewRegistry/PreviewHarness/PreviewSemanticsJson) + the :composeApp:renderScreens task render every registered screen to PNG + contract tree JSON with no device; qa/preview-gallery.mjs builds a self-contained index.html from the output (vendored pure-logic render libs live in qa/lib and stay when the feature is off — they are inert without the harness). The harness starts its OWN Koin (independent of the dev-client feature's DesktopModule) and its PreviewRegistry tab entries are regenerated from the configured `tabs` by the scaffolder (pipeline step b.3). When off: delete all three inspector dirs + qa/preview-gallery.mjs, strip the `inspector` marker blocks in AppApplication.kt (import + startInspector() call), composeApp/src/androidDebug/AndroidManifest.xml (INTERNET permission), and composeApp/build.gradle.kts (desktopMain compose.uiTest dep + the renderScreens task). On-device server: zero dependencies (java.net.ServerSocket + kotlinx-serialization from commonMain)."
     },
     "dev-client": {
       "enabledByDefault": true,

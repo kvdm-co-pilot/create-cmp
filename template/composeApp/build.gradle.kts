@@ -136,6 +136,13 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.ktor.client.cio)
+                // >>> cmp:feature inspector
+                // Headless semantics API (runDesktopComposeUiTest / onRoot) for the preview
+                // harness (inspector/PreviewHarness.kt) — renders real screens with no window.
+                // Desktop is a dev-only target, so shipping the test artifact here is deliberate.
+                @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+                implementation(compose.uiTest)
+                // <<< cmp:feature inspector
             }
         }
 
@@ -274,6 +281,35 @@ compose.desktop {
     }
 }
 // <<< cmp:feature dev-client
+
+// >>> cmp:feature inspector
+// Headless screen previews — the project-wired tier-0 loop of the create-cmp inspector.
+// Renders every screen in inspector/PreviewRegistry.kt (real DI, real theme, real data)
+// to build/previews/<id>/{screen.png, tree.json} with NO device, emulator, or window,
+// then qa/preview-gallery.mjs turns the output into one self-contained index.html:
+//
+//   ./gradlew :composeApp:renderScreens                      # all screens
+//   ./gradlew :composeApp:renderScreens -Pscreen=home        # one screen
+//   node qa/preview-gallery.mjs                              # build the gallery
+//
+// Parameters travel as -P properties -> system properties, NEVER via --args (Gradle's CLI
+// parsing splits space-separated --args values into task names).
+tasks.register<JavaExec>("renderScreens") {
+    group = "verification"
+    description = "Render registered screens headlessly to PNG + inspector-contract tree JSON."
+    val desktopCompilation = kotlin.targets.getByName("desktop").compilations.getByName("main")
+    classpath(desktopCompilation.output.allOutputs, desktopCompilation.runtimeDependencyFiles)
+    mainClass.set("__PACKAGE__.inspector.PreviewHarnessKt")
+    systemProperty("java.awt.headless", "true")
+    systemProperty("screen", providers.gradleProperty("screen").getOrElse("all"))
+    systemProperty(
+        "out",
+        providers.gradleProperty("previewOut")
+            .getOrElse(layout.buildDirectory.dir("previews").get().asFile.absolutePath),
+    )
+    systemProperty("pngScale", providers.gradleProperty("pngScale").getOrElse("2"))
+}
+// <<< cmp:feature inspector
 
 // Evidence integrity: golden-tree baselines (qa/golden) and the UPDATE_GOLDEN capture flag are
 // REAL inputs of the JVM test tier, but Gradle can't see either on its own — baselines are read

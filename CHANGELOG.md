@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Headless screen previews of the app's REAL screens (tier 0, "Android Studio previews"
+  without the IDE)** — closing the gap where `render_screen` could only render the bundled
+  demo SampleScreen. Every app scaffolded with the inspector feature now ships:
+  - `inspector/PreviewRegistry.kt` (desktopMain) — the `@Preview` analog: a `ScreenPreview`
+    entry for the shell, every bottom-nav tab, and the detail destination. Regenerated from
+    the configured `--tabs` by pipeline step b.3 (default config reproduces the static
+    template byte-for-byte, pinned by `test/tab-surfaces.test.mjs`).
+  - `inspector/PreviewHarness.kt` + a `:composeApp:renderScreens` Gradle task — renders each
+    registry entry with the app's real Koin DI, theme, and data (own Koin start, independent
+    of the dev-client feature; provides the Lifecycle/ViewModelStore owners `koinViewModel()`
+    and `collectAsStateWithLifecycle` need) to `composeApp/build/previews/<id>/`: the
+    inspector-contract `tree.json` (phone viewport 411x891, density 1, px == dp, resolved
+    design tokens via the PROJECT's DesignTokenKey) plus a `screen.png` pixel twin (@2x) from
+    the same composition sources — no device, no emulator, no window. Parameters travel as
+    `-P` properties (`-Pscreen=<id|all>`, `-PpreviewOut`, `-PpngScale`), never `--args`
+    (Gradle's CLI parsing word-splits `--args` values into task names).
+  - `qa/preview-gallery.mjs` — builds ONE self-contained `index.html` from the output
+    (embedded PNGs for humans, wireframe SVG + a11y overlay per screen via the vendored
+    pure-logic render libs in `qa/lib/`), dependency-free like the rest of `qa/`.
+  - MCP: `render_screen` gains `projectDir` + `screen` — runs the generated task and returns
+    the PNG metadata plus `treePath`/`previewsDir`; the bundled-SampleScreen `harness:true`
+    path remains as the demo fallback and is labeled as such.
+
 ## [0.5.0] - 2026-07-12
 
 Findings from a full field run of the plugin (HealthStack app: 5 tabs, Room, no Firebase,

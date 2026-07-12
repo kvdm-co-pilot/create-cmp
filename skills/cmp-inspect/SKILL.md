@@ -35,13 +35,28 @@ theme tokens at all. This skill drives the `cmp-inspector` MCP over a fixed JSON
 
 ## Two loops — pick the right tier first
 
-**Tier 0 (headless) — render → dump → inspect.** Fast (milliseconds), no device. Use for
-layout/token assertions on `commonMain` screens with fake data:
+**Tier 0 (headless) — render → dump → inspect.** Fast (seconds, incl. compile), no device.
+Use for previews and layout/token assertions on the app's real screens:
 
-1. **Render** the screen with the inspector **harness** (in `inspector/harness/`). It composes a
-   `commonMain` screen on the host JVM and writes the semantics tree to a JSON file.
-2. **Inspect** — call the `cmp-inspector` MCP tools against that JSON, passing `treePath` (or
-   `source:{kind:"file",path}`, or export `CMP_INSPECTOR_TREE` once and omit it).
+1. **Render** with the app's own generated harness — every create-cmp app scaffolded with the
+   inspector feature ships `inspector/PreviewRegistry.kt` (the `@Preview` analog: shell, one
+   entry per tab, detail) and a `:composeApp:renderScreens` Gradle task:
+
+       ./gradlew :composeApp:renderScreens                 # all screens
+       ./gradlew :composeApp:renderScreens -Pscreen=home   # one screen (registry id)
+
+   Real DI, real theme, real data — each screen lands in `composeApp/build/previews/<id>/`
+   as `tree.json` (inspector contract, density 1, px == dp) + `screen.png` (@2x pixel twin,
+   same viewport), plus `design-system.json` and a `manifest.json`. Parameters are `-P`
+   properties, NEVER `--args` (Gradle word-splits it into task names). Or in one MCP call:
+   `render_screen { projectDir, screen? }` runs the task and returns the PNG metadata +
+   `treePath`. (The create-cmp checkout also has a standalone demo harness in
+   `inspector/harness/` rendering a bundled SampleScreen — for real apps use the project task.)
+2. **Show the human** — `node qa/preview-gallery.mjs` builds one self-contained
+   `composeApp/build/previews/index.html`: pixels + wireframe + a11y per screen. Open it in a
+   browser; regenerate after any edit. No device, no emulator, no app launch.
+3. **Inspect** — call the `cmp-inspector` MCP tools against a screen's tree, passing
+   `treePath` (or `source:{kind:"file",path}`, or export `CMP_INSPECTOR_TREE` once and omit it).
 
 **Tier 1 (LIVE) — build → connect → inspect the running app.** Use when the question involves
 *real data, real navigation state, or "what is on screen right now"*:
@@ -203,12 +218,15 @@ the screen, see it structurally; when the human needs to see it, hand them a fil
   danger style. The result includes the SVG **text** — SVG is structured text, not pixels, so you
   may read and reason over it, and the human can open the written `.svg` file too. Deterministic:
   the same tree always renders byte-identical SVG (diffable, cacheable).
-- **`render_screen { pngPath }` or `{ harness: true }`** — real pixels, **path-only contract**
-  (tier 0). Returns `{ path, width, height, sizeBytes, displayHint }` parsed from the PNG header —
-  NEVER the image data. `harness:true` runs the headless harness (`./gradlew run`), which writes
-  `out/screen.png` (1024x768) alongside its tree, so every preview has its structural twin from the
-  same viewport. To show the human: follow the `displayHint` — write a tiny HTML wrapper embedding
-  `<img src="file://…">` and open it (or attach the file in the host UI). Do **not** Read the PNG.
+- **`render_screen { projectDir, screen? }`, `{ pngPath }` or `{ harness: true }`** — real pixels,
+  **path-only contract** (tier 0). Returns `{ path, width, height, sizeBytes, displayHint }` parsed
+  from the PNG header — NEVER the image data. `projectDir` runs the app's own
+  `:composeApp:renderScreens` task for one registry `screen` (default `shell`) and additionally
+  returns `treePath` + `previewsDir`, so every preview has its structural twin from the same
+  viewport; `harness:true` runs the checkout's demo harness (bundled SampleScreen only). To show
+  the human: prefer the gallery (`node qa/preview-gallery.mjs`), or follow the `displayHint` —
+  write a tiny HTML wrapper embedding `<img src="file://…">` and open it (or attach the file in
+  the host UI). Do **not** Read the PNG.
 
 Pair them: `render_screen` for the human's eyes, `render_tree` + the query tools for your
 assertions — same screen, two audiences.
@@ -239,9 +257,11 @@ without a `prove_change` verdict is not done.** The loop:
 The tools are identical regardless of where the tree comes from, so work done against the fast
 headless loop transfers to the live app:
 
-- **Tier 0 — headless render**: `ImageComposeScene` / `runComposeUiTest` on the host JVM. Fast,
-  no device. Only renders `commonMain` composables whose deps resolve on the JVM; anything behind an
-  Android `actual` (Firebase, platform APIs) needs a DI fake (the template's Koin makes this trivial).
+- **Tier 0 — headless render**: `ImageComposeScene` / `runDesktopComposeUiTest` on the host JVM
+  via the generated `:composeApp:renderScreens` task + `inspector/PreviewRegistry.kt`. Fast, no
+  device. Only renders `commonMain` composables whose deps resolve on the JVM; anything behind an
+  Android `actual` (Firebase, platform APIs) needs a DI fake (the harness starts the app's real
+  Koin modules; add desktop fakes for remote-backed repositories, as the dev-client does).
 - **Tier 1 — live app**: the debug-only in-app HTTP server (zero-dep ServerSocket on
   `127.0.0.1:9500`, androidDebug source set only), reached via `adb forward`, walking the
   `SemanticsOwner` of the topmost Compose root — same tree, **plus real data and real nav state**.

@@ -182,11 +182,16 @@ stamper (`qa/scaffold-feature.mjs`):
 Any plain Claude Code session — no create-cmp plugin installed — finds these and extends the app
 correctly by construction.
 
-### 6. The live inspector — AI-readable UI
-Every debug build serves `127.0.0.1:9500` (loopback-only, structurally absent from release): the
-UI tree as JSON, the design-token catalog, a screenshot route, a tap route, and a live device
-view for humans (`/inspect/remote` — watch the real device in a browser, click to tap). Agents
-read structure; humans see pixels.
+### 6. The inspector — AI-readable UI, previews without a device
+Two loops, one contract. **Live (tier 1):** every debug build serves `127.0.0.1:9500`
+(loopback-only, structurally absent from release): the UI tree as JSON, the design-token catalog,
+a screenshot route, a tap route, and a live device view for humans (`/inspect/remote` — watch the
+real device in a browser, click to tap). **Headless previews (tier 0):** every app ships
+`inspector/PreviewRegistry.kt` (the `@Preview` analog — shell, every tab, detail) and a
+`:composeApp:renderScreens` task that renders each screen with real DI/theme/data to
+`screen.png` + its contract `tree.json` — no device, no emulator; `node qa/preview-gallery.mjs`
+turns the output into one self-contained `index.html` (pixels + wireframe + a11y per screen).
+Agents read structure; humans see pixels.
 
 ### 7. The daily-driver extras
 - **Desktop dev-client** — shared UI in a phone-sized JVM window, Compose Hot Reload attached.
@@ -202,7 +207,9 @@ read structure; humans see pixels.
 → tab screens generated. Then `cmp-firebase-connect` to wire your real backend.
 
 **The daily UI loop.** `./gradlew :composeApp:hotRunDesktop --auto` → edit Compose → save → see
-it. No emulator, no Firebase, sub-second feedback.
+it. No emulator, no Firebase, sub-second feedback. Want stills of every screen instead of a
+window? `./gradlew :composeApp:renderScreens && node qa/preview-gallery.mjs` → open
+`composeApp/build/previews/index.html`.
 
 **The verified dev loop (the flagship).** For any UI change: snapshot the live tree → make the
 edit → reload → `prove_change` compares before/after structure, token drift, and a11y, and returns

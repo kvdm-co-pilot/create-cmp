@@ -67,6 +67,8 @@ const NAVHOST_REL = `${NAV_DIR}/AppNavHost.kt`;
 const PLACEHOLDER_REL =
   "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/components/PlaceholderScreen.kt";
 const SMOKE_REL = "qa/e2e/smoke.yaml";
+const PREVIEW_REGISTRY_REL =
+  "composeApp/src/desktopMain/kotlin/com/acme/demo/inspector/PreviewRegistry.kt";
 
 function read(out, rel) {
   return fs.readFileSync(path.join(out, rel), "utf8");
@@ -113,6 +115,13 @@ test("default tabs reproduce the static template surfaces byte-for-byte", async 
       read(out, SMOKE_REL),
       expectFromTemplate("qa/e2e/smoke.yaml"),
       "smoke.yaml is byte-identical to the stamped static template file"
+    );
+    assert.equal(
+      read(out, PREVIEW_REGISTRY_REL),
+      expectFromTemplate(
+        "composeApp/src/desktopMain/kotlin/com/example/app/inspector/PreviewRegistry.kt"
+      ),
+      "PreviewRegistry.kt is byte-identical to the stamped static template file"
     );
     assert.ok(
       !fs.existsSync(path.join(out, PLACEHOLDER_REL)),
@@ -174,6 +183,25 @@ test("custom tabs rewrite AppTab.kt, AppNavHost, and smoke.yaml", async (t) => {
       assert.match(placeholder, /fun PlaceholderScreen\(title: String, titleTag: String\)/);
       assert.match(placeholder, /AcmeTokens\.PaddingPage/, "theme prefix token stamped");
       assert.ok(!placeholder.includes("__PACKAGE__"), "no leftover tokens");
+    });
+
+    await t.test("PreviewRegistry mirrors the configured tabs (shell wiring + per-tab entries)", () => {
+      const registry = read(out, PREVIEW_REGISTRY_REL);
+      assert.match(registry, /package com\.acme\.demo\.inspector/);
+      // Shell entry wires appTabs(...) with the same placeholder args as AppNavHost.
+      assert.match(registry, /feed = \{ PlaceholderScreen\(title = "Feed", titleTag = "feed_title"\) \},/);
+      assert.match(registry, /myStuff = \{ PlaceholderScreen\(title = "My Stuff!", titleTag = "my_stuff_title"\) \},/);
+      // One ScreenPreview per tab, by slug id.
+      assert.match(registry, /ScreenPreview\("feed", "Feed tab"\)/);
+      assert.match(registry, /ScreenPreview\("my_stuff", "My Stuff! tab"\)/);
+      assert.match(registry, /ScreenPreview\("settings", "Settings tab"\)/);
+      // Shell + detail entries always present; no stale default-tab entries.
+      assert.match(registry, /ScreenPreview\("shell", /);
+      assert.match(registry, /ScreenPreview\("detail", /);
+      assert.ok(!registry.includes('ScreenPreview("home"'), "no stale home entry");
+      assert.ok(!registry.includes('ScreenPreview("profile"'), "no stale profile entry");
+      assert.ok(!registry.includes("HomeScreen("), "no stale HomeScreen wiring");
+      assert.ok(!registry.includes("__PACKAGE__"), "no leftover tokens");
     });
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
