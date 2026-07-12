@@ -1,6 +1,6 @@
 {
   "name": "create-cmp-cli",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "The AI delivery harness for Kotlin/Compose Multiplatform — scaffolds a green-building app (Android + iOS) in minutes and holds AI-driven changes to a machine-enforced verify lane with a committed evidence receipt. Installs the `create-cmp` command.",
   "type": "module",
   "bin": {
