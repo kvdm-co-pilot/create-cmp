@@ -38,8 +38,8 @@ import kotlin.system.exitProcess
 
 // Phone-shaped viewport, density 1 — px == dp in the dumped tree (matches the dev-client
 // window and keeps the inspector's a11y/touch-target math exact).
-private const val WIDTH = 411
-private const val HEIGHT = 891
+internal const val WIDTH = 411
+internal const val HEIGHT = 891
 
 /**
  * Headless preview harness — the project-wired tier-0 loop of the create-cmp inspector.
@@ -96,7 +96,7 @@ fun main() {
  * Preview-harness DI — intentionally independent of the dev-client feature (which owns
  * DesktopModule): the same platform bindings, started once for the render run.
  */
-private fun initPreviewKoin() {
+internal fun initPreviewKoin() {
     startKoin {
         modules(
             module {
@@ -117,7 +117,7 @@ private fun initPreviewKoin() {
  * gets fresh ViewModels), then the app theme.
  */
 @Composable
-private fun PreviewRoot(content: @Composable () -> Unit) {
+internal fun PreviewRoot(content: @Composable () -> Unit) {
     val owner = remember { PreviewOwner() }
     CompositionLocalProvider(
         LocalLifecycleOwner provides owner,
@@ -127,7 +127,7 @@ private fun PreviewRoot(content: @Composable () -> Unit) {
     }
 }
 
-private class PreviewOwner : LifecycleOwner, ViewModelStoreOwner {
+internal class PreviewOwner : LifecycleOwner, ViewModelStoreOwner {
     private val registry = LifecycleRegistry.createUnsafe(this).apply {
         currentState = Lifecycle.State.RESUMED
     }
@@ -135,19 +135,28 @@ private class PreviewOwner : LifecycleOwner, ViewModelStoreOwner {
     override val viewModelStore = ViewModelStore()
 }
 
-/** Semantics tree at the phone viewport, density 1. Settles so async emissions land. */
+/**
+ * Semantics tree at the phone viewport, density 1. ADAPTIVE settle: async data arrives in
+ * real time, so keep sampling until two consecutive dumps are identical (bounded) — static
+ * screens finish in ~300ms instead of paying the full window.
+ */
 @OptIn(ExperimentalTestApi::class)
-private fun renderTree(entry: ScreenPreview, outFile: File) {
+internal fun renderTree(entry: ScreenPreview, outFile: File) {
     var json = ""
     runDesktopComposeUiTest(width = WIDTH, height = HEIGHT) {
         setContent { PreviewRoot { entry.content() } }
         waitForIdle()
-        // Data arrives from repositories/coroutines in real time; bounded settle window.
-        repeat(8) {
+        var prev: String? = null
+        var stable = 0
+        var iterations = 0
+        while (iterations < 8 && stable < 2) {
             Thread.sleep(150)
             waitForIdle()
+            val dump = PreviewSemanticsJson.dumpTree(onRoot(useUnmergedTree = true).fetchSemanticsNode())
+            if (dump == prev) stable++ else { stable = 0; prev = dump }
+            iterations++
         }
-        json = PreviewSemanticsJson.dumpTree(onRoot(useUnmergedTree = true).fetchSemanticsNode())
+        json = prev ?: PreviewSemanticsJson.dumpTree(onRoot(useUnmergedTree = true).fetchSemanticsNode())
     }
     outFile.writeText(json)
 }
@@ -156,7 +165,7 @@ private fun renderTree(entry: ScreenPreview, outFile: File) {
  * Pixel twin of the tree: same content, same dp viewport, density [scale] for sharpness.
  * Frames are re-rendered while invalidations arrive so async data reaches the pixels too.
  */
-private fun renderPng(entry: ScreenPreview, outFile: File, scale: Float) {
+internal fun renderPng(entry: ScreenPreview, outFile: File, scale: Float) {
     val scene = ImageComposeScene(
         width = (WIDTH * scale).toInt(),
         height = (HEIGHT * scale).toInt(),
@@ -167,10 +176,18 @@ private fun renderPng(entry: ScreenPreview, outFile: File, scale: Float) {
     try {
         var elapsedNanos = 0L
         var image = scene.render(elapsedNanos)
-        repeat(8) {
-            Thread.sleep(150)
-            elapsedNanos += 150_000_000L
-            if (scene.hasInvalidations()) image = scene.render(elapsedNanos)
+        var quiet = 0
+        var iterations = 0
+        while (iterations < 12 && quiet < 2) {
+            Thread.sleep(100)
+            elapsedNanos += 100_000_000L
+            if (scene.hasInvalidations()) {
+                image = scene.render(elapsedNanos)
+                quiet = 0
+            } else {
+                quiet++
+            }
+            iterations++
         }
         val data = image.encodeToData(EncodedImageFormat.PNG)
             ?: error("Skia failed to encode ${entry.id} as PNG")
@@ -181,7 +198,7 @@ private fun renderPng(entry: ScreenPreview, outFile: File, scale: Float) {
 }
 
 /** The declared design-system catalog — generated FROM the theme objects, so it can't drift. */
-private fun designSystemCatalog(): String {
+internal fun designSystemCatalog(): String {
     val pretty = Json { prettyPrint = true }
     fun hex(color: androidx.compose.ui.graphics.Color): JsonElement =
         JsonPrimitive("#%06X".format(color.toArgb() and 0xFFFFFF))
@@ -224,7 +241,7 @@ private fun designSystemCatalog(): String {
     return pretty.encodeToString(JsonElement.serializer(), doc)
 }
 
-private fun manifestJson(entries: List<ScreenPreview>, pngScale: Float): String {
+internal fun manifestJson(entries: List<ScreenPreview>, pngScale: Float): String {
     val pretty = Json { prettyPrint = true }
     val doc = buildJsonObject {
         put("viewport", buildJsonObject {

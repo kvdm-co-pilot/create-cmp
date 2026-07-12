@@ -29,7 +29,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { renderTreeSvg } from "./render.mjs";
 import { auditA11y } from "./a11y.mjs";
@@ -37,9 +37,38 @@ import { auditA11y } from "./a11y.mjs";
 const execFileAsync = promisify(execFile);
 
 const DEFAULT_PORT = 9600;
+const DEFAULT_DAEMON_PORT = 9601;
 const PORT_ATTEMPTS = 10;
 const DEBOUNCE_MS = 400;
+// Classes events arrive DURING recompile; the hot swap applies shortly after the last
+// write. A longer trailing debounce here avoids rendering once with pre-swap code.
+const CLASSES_DEBOUNCE_MS = 1500;
 const POLL_FALLBACK_MS = 2000;
+const DAEMON_BOOT_TIMEOUT_MS = 240000; // first boot may compile + download a JBR
+const DAEMON_RENDER_TIMEOUT_MS = 120000;
+
+/**
+ * The app's base package — needed to address the daemon main class
+ * (<package>.inspector.PreviewDaemonKt). create-cmp >= 0.5 apps carry it in
+ * create-cmp.json; older apps fall back to the Android namespace declaration.
+ */
+export function detectAppPackage(projectDir) {
+  const spec = path.join(projectDir, "create-cmp.json");
+  if (fs.existsSync(spec)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(spec, "utf8")).package;
+      if (pkg) return pkg;
+    } catch {}
+  }
+  const gradle = path.join(projectDir, "composeApp", "build.gradle.kts");
+  if (fs.existsSync(gradle)) {
+    const m = fs.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
+    if (m) return m[1];
+  }
+  throw new Error(
+    "cannot detect the app package (no create-cmp.json `package`, no `namespace` in composeApp/build.gradle.kts)",
+  );
+}
 
 // --- pure helpers (unit-tested) ----------------------------------------------------
 
@@ -174,6 +203,8 @@ export function createPreviewService(opts) {
   const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
   const srcDir = path.join(projectDir, "composeApp", "src");
   const log = opts.log || (() => {});
+  const hot = opts.hot !== false; // phase 2 on by default; falls back to gradle transparently
+  const daemonUrl = opts.daemonUrl || `http://127.0.0.1:${opts.daemonPort || DEFAULT_DAEMON_PORT}`;
   const runRender =
     opts.runRender ||
     (async (dir) => {
@@ -187,6 +218,10 @@ export function createPreviewService(opts) {
   let server = null;
   let port = null;
   let watcher = null;
+  let classesWatcher = null;
+  let mode = "gradle"; // "gradle" (task per render) | "daemon" (resident hot JVM)
+  let daemonChild = null;
+  let daemonBootDeadline = null;
   let pollTimer = null;
   let debounceTimer = null;
   let rendering = false;
@@ -228,6 +263,112 @@ export function createPreviewService(opts) {
     version++;
   }
 
+  async function daemonFetch(pathname, timeoutMs) {
+    const res = await fetch(`${daemonUrl}${pathname}`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) {
+      let detail = "";
+      try {
+        detail = (await res.json()).error || "";
+      } catch {}
+      throw new Error(`daemon ${pathname} -> HTTP ${res.status}${detail ? `: ${detail}` : ""}`);
+    }
+    return res.json();
+  }
+
+  async function daemonHealthy() {
+    try {
+      await daemonFetch("/health", 2000);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const spawnDaemon =
+    opts.spawnDaemon ||
+    (() => {
+      const appPackage = detectAppPackage(projectDir);
+      const child = spawn(
+        "./gradlew",
+        [
+          ":composeApp:hotRunDesktop",
+          `--mainClass=${appPackage}.inspector.PreviewDaemonKt`,
+          "--auto",
+          "--console=plain",
+          "-q",
+        ],
+        { cwd: projectDir, stdio: ["ignore", "pipe", "pipe"] },
+      );
+      child.stdout.on("data", (d) => log(`[daemon] ${String(d).trimEnd()}`));
+      child.stderr.on("data", (d) => log(`[daemon] ${String(d).trimEnd()}`));
+      child.on("exit", (code) => {
+        log(`daemon gradle client exited (${code})`);
+        if (mode === "daemon") {
+          mode = "gradle";
+          if (classesWatcher) {
+            classesWatcher.close();
+            classesWatcher = null;
+          }
+        }
+        daemonChild = null;
+      });
+      return child;
+    });
+
+  /**
+   * Bring the resident daemon up in the BACKGROUND: reuse a healthy one on the port,
+   * else spawn `hotRunDesktop --mainClass=<pkg>.inspector.PreviewDaemonKt --auto` and
+   * poll /health. Until it's up, renders take the gradle path; once up, the classes
+   * dir becomes the render trigger (the hot agent recompiles on save; freshly written
+   * classes are the "code landed" signal).
+   */
+  async function ensureDaemon() {
+    if (await daemonHealthy()) {
+      enterDaemonMode("reusing already-running daemon");
+      return;
+    }
+    try {
+      daemonChild = spawnDaemon();
+    } catch (err) {
+      log(`daemon spawn failed (${err.message}) — staying on the gradle path`);
+      return;
+    }
+    daemonBootDeadline = Date.now() + DAEMON_BOOT_TIMEOUT_MS;
+    while (Date.now() < daemonBootDeadline) {
+      await new Promise((r) => setTimeout(r, 2000));
+      if (!daemonChild) return; // exited during boot
+      if (await daemonHealthy()) {
+        enterDaemonMode("daemon booted");
+        return;
+      }
+    }
+    log("daemon did not become healthy in time — staying on the gradle path");
+  }
+
+  function enterDaemonMode(why) {
+    mode = "daemon";
+    log(`${why} — warm renders via ${daemonUrl}`);
+    watchClasses();
+    // A hot swap may already have landed while we were booting; render once now.
+    scheduleRender();
+  }
+
+  function watchClasses() {
+    if (classesWatcher) return;
+    const classesDir = path.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
+    try {
+      classesWatcher = fs.watch(classesDir, { recursive: true }, () => scheduleRender(CLASSES_DEBOUNCE_MS));
+      log(`watching ${classesDir} (post-hot-swap render trigger)`);
+    } catch {
+      // Classes dir not there yet (or recursive unsupported): the src watcher still
+      // triggers renders; the daemon serves them warm either way.
+      classesWatcher = null;
+      log("classes dir not watchable — src watcher remains the trigger");
+    }
+  }
+
   async function renderCycle() {
     if (rendering) {
       renderQueued = true;
@@ -236,7 +377,18 @@ export function createPreviewService(opts) {
     rendering = true;
     broadcast({ type: "rendering" });
     try {
-      await runRender(projectDir);
+      if (mode === "daemon") {
+        try {
+          const r = await daemonFetch("/render?screen=all", DAEMON_RENDER_TIMEOUT_MS);
+          log(`daemon rendered ${r.rendered.length} screens in ${r.ms}ms`);
+        } catch (err) {
+          log(`daemon render failed (${err.message}) — falling back to the gradle path`);
+          mode = "gradle";
+          await runRender(projectDir);
+        }
+      } else {
+        await runRender(projectDir);
+      }
       loadPreviews();
       lastError = null;
       log(`render #${version} ok${lastChanged.length ? ` (changed: ${lastChanged.join(", ")})` : ""}`);
@@ -254,9 +406,9 @@ export function createPreviewService(opts) {
     }
   }
 
-  function scheduleRender() {
+  function scheduleRender(delayMs = DEBOUNCE_MS) {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => void renderCycle(), DEBOUNCE_MS);
+    debounceTimer = setTimeout(() => void renderCycle(), delayMs);
   }
 
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
@@ -265,6 +417,9 @@ export function createPreviewService(opts) {
     try {
       watcher = fs.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
+        // Daemon mode: the hot agent recompiles on save and the classes watcher fires
+        // AFTER the swap lands — rendering now would race it with stale code.
+        if (mode === "daemon" && classesWatcher) return;
         scheduleRender();
       });
       log(`watching ${srcDir} (fs events)`);
@@ -389,6 +544,8 @@ export function createPreviewService(opts) {
       projectDir,
       url: port ? `http://127.0.0.1:${port}/` : null,
       previewsDir,
+      mode,
+      daemon: { url: daemonUrl, active: mode === "daemon" },
       version,
       rendering,
       lastError,
@@ -421,11 +578,17 @@ export function createPreviewService(opts) {
       await listen(opts.port || DEFAULT_PORT);
       startWatching();
       void renderCycle();
+      if (hot) void ensureDaemon();
       return status();
     },
     stop() {
       clearTimeout(debounceTimer);
       clearInterval(pollTimer);
+      daemonBootDeadline = 0; // abort any in-flight boot poll
+      if (classesWatcher) classesWatcher.close();
+      // Best-effort daemon teardown: ask the JVM to exit, then kill the gradle client.
+      fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {});
+      if (daemonChild) daemonChild.kill("SIGTERM");
       if (watcher) watcher.close();
       for (const res of sseClients) res.end();
       sseClients.clear();

@@ -712,9 +712,17 @@ server.registerTool(
         .int()
         .optional()
         .describe("First port to try for the gallery server (default 9600, probes upward)."),
+      hot: z
+        .boolean()
+        .optional()
+        .describe(
+          "Phase 2 (default true): boot the resident preview daemon under Compose Hot Reload " +
+            "(hotRunDesktop --mainClass=<pkg>.inspector.PreviewDaemonKt --auto) so warm saves " +
+            "re-render in seconds; falls back to the gradle path transparently if it can't boot."
+        ),
     },
   },
-  guarded(async ({ projectDir, port }) => {
+  guarded(async ({ projectDir, port, hot }) => {
     const dir = resolvePath(projectDir);
     if (previewService && previewProjectDir === dir) {
       return ok({ ...previewService.status(), note: "already running (same project) — URL unchanged." });
@@ -726,6 +734,7 @@ server.registerTool(
     const service = createPreviewService({
       projectDir: dir,
       port,
+      hot,
       log: (m) => process.stderr.write(`[preview] ${m}\n`),
     });
     const st = await service.start();

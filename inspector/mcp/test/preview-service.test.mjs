@@ -5,11 +5,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import http from "node:http";
 import {
   summarizeTree,
   diffScreenTrees,
   galleryHtml,
   createPreviewService,
+  detectAppPackage,
 } from "../src/lib/preview-service.mjs";
 
 const NODE = (over = {}) => ({
@@ -185,6 +187,119 @@ test("service: render failure keeps previous state and reports lastError", async
     const page = await (await fetch(status.url)).text();
     assert.match(page, /last render FAILED/, "gallery shows the failure banner");
     assert.match(page, /shell screen/, "previous cards still shown");
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+// --- phase 2: daemon fast path --------------------------------------------------------
+
+test("detectAppPackage: create-cmp.json wins, namespace fallback, clear error", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-pkg-"));
+  try {
+    assert.throws(() => detectAppPackage(dir), /cannot detect the app package/);
+    fs.mkdirSync(path.join(dir, "composeApp"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "composeApp", "build.gradle.kts"),
+      'android {\n    namespace = "com.acme.demo"\n}\n',
+    );
+    assert.equal(detectAppPackage(dir), "com.acme.demo");
+    fs.writeFileSync(path.join(dir, "create-cmp.json"), JSON.stringify({ package: "io.spec.app" }));
+    assert.equal(detectAppPackage(dir), "io.spec.app");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("service: daemon fast path renders via HTTP and falls back to gradle when it dies", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+
+  // Fake resident daemon: /health ok, /render writes previews like the real JVM would.
+  let daemonRenders = 0;
+  const daemon = http.createServer((req, res) => {
+    if (req.url === "/health") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, screens: ["shell"] }));
+      return;
+    }
+    if (req.url.startsWith("/render")) {
+      daemonRenders++;
+      writeFakePreviews(previewsDir, ["shell"], { shell: daemonRenders });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ rendered: ["shell"], ms: 42 }));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise((r) => daemon.listen(19740, "127.0.0.1", r));
+
+  let gradleRenders = 0;
+  const service = createPreviewService({
+    projectDir,
+    port: 19730,
+    hot: true,
+    daemonUrl: "http://127.0.0.1:19740",
+    spawnDaemon: () => {
+      throw new Error("should reuse the healthy daemon, not spawn");
+    },
+    runRender: async () => {
+      gradleRenders++;
+      writeFakePreviews(previewsDir, ["shell"], { shell: 100 + gradleRenders });
+    },
+  });
+
+  try {
+    await service.start();
+    // First render races daemon discovery — wait for both to settle.
+    await new Promise((r) => setTimeout(r, 300));
+
+    let status = service.status();
+    assert.equal(status.mode, "daemon", "healthy daemon on the port is adopted");
+
+    const before = daemonRenders;
+    await service._renderCycle();
+    assert.equal(daemonRenders, before + 1, "renders go through the daemon");
+    assert.equal(service.status().lastError, null);
+
+    // Daemon dies → next render falls back to gradle and mode flips.
+    await new Promise((r) => daemon.close(r));
+    await service._renderCycle();
+    status = service.status();
+    assert.equal(status.mode, "gradle", "fallback after daemon failure");
+    assert.ok(gradleRenders >= 1, "gradle runner took over");
+    assert.equal(status.lastError, null, "fallback render succeeded");
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: hot=false never touches the daemon", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+
+  const service = createPreviewService({
+    projectDir,
+    port: 19750,
+    hot: false,
+    daemonUrl: "http://127.0.0.1:19999", // nothing listens; must never matter
+    spawnDaemon: () => {
+      throw new Error("hot=false must not spawn");
+    },
+    runRender: async () => writeFakePreviews(previewsDir, ["shell"]),
+  });
+
+  try {
+    await service.start();
+    await new Promise((r) => setTimeout(r, 200));
+    const status = service.status();
+    assert.equal(status.mode, "gradle");
+    assert.equal(status.version, 1);
   } finally {
     service.stop();
     fs.rmSync(projectDir, { recursive: true, force: true });

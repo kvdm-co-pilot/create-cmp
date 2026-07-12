@@ -42,6 +42,21 @@ All notable changes to this project are documented here. The format is based on
   paths, `changedLastRender`) so the agent asserts while the human watches — pixels to
   the human, structure to the AI. Unit-tested via an injected render runner
   (`inspector/mcp/test/preview-service.test.mjs`).
+- **Resident preview daemon (phase 2 — `@Preview` parity)** — the template ships
+  `inspector/PreviewDaemon.kt`: a long-lived headless JVM serving loopback
+  `/health|/screens|/render?screen=|/shutdown`, launched by the preview service under
+  **Compose Hot Reload** (`hotRunDesktop --mainClass=<pkg>.inspector.PreviewDaemonKt
+  --auto`; plain `runPreviewDaemon` JavaExec as the no-hot-swap variant). Saves recompile
+  incrementally and hot-swap into the RUNNING daemon; `/render` re-reads the registry per
+  request so fresh scenes compose from the swapped classes. The node service prefers the
+  daemon when healthy (spawns it in the background, reuses an already-running one, falls
+  back to the Gradle task transparently on any failure) and switches its render trigger
+  to the compiled-classes dir so renders never race the swap (1.5s trailing debounce).
+  Render settle is now ADAPTIVE (stop when two consecutive tree dumps match / two quiet
+  invalidation checks) instead of fixed sleeps. Measured on a real 7-screen app: ~900ms
+  single-screen, ~7s all screens, ~10s save→gallery-shows-the-change, vs 25–40s per
+  change on the task path. `preview` gains `hot` (default true); `detectAppPackage`
+  reads create-cmp.json (the 0.5.0 spec-of-record) with a namespace fallback.
 
 ## [0.5.0] - 2026-07-12
 

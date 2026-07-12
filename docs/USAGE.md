@@ -210,9 +210,11 @@ text, so it's returned inline · `render_screen` — **pixel preview, path-only*
 `projectDir` (+ `screen?` registry id — runs the app's own `:composeApp:renderScreens`, also
 returns `treePath`), live (`/inspect/screenshot`), a `pngPath`, or the demo harness.
 
-**Preview service:** `preview {projectDir, port?}` — resident live-preview loop: headless render
-of every registry screen, live gallery URL (SSE self-reload, changed-screen flags), source watch
-with auto re-render; returns per-screen structural summaries + tree paths · `preview_stop` —
+**Preview service:** `preview {projectDir, port?, hot?}` — resident live-preview loop: headless
+render of every registry screen, live gallery URL (SSE self-reload, changed-screen flags), source
+watch with auto re-render; `hot` (default true) boots the resident preview daemon under Compose
+Hot Reload so saves hot-swap into a warm JVM (~1s/screen renders; Gradle-path fallback is
+transparent); returns per-screen structural summaries + tree paths · `preview_stop` —
 shut the service down (the Gradle daemon stays warm).
 
 **Verify:** `prove_change {before, after, catalogPath?}` — the verified-dev-loop keystone in one
