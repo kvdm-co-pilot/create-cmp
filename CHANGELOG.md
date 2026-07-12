@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [0.3.2] - 2026-07-12
 
+### Added
+
+- **Bottom-nav testTags** — nav items derive a deterministic `nav_<label-slug>` testTag from
+  their label at runtime, and both `qa/e2e/smoke.yaml` and `AppShellTest` now select by tag —
+  bringing the shell in line with the template's own durable-test rule (never select by display
+  text). Works for any `--tabs` configuration; golden trees unaffected.
+
 ### Fixed
 
 - **Evidence receipts now attest test *execution*, not Gradle cache reuse** — the second shipped
@@ -24,6 +31,16 @@ All notable changes to this project are documented here. The format is based on
   - `composeApp/build.gradle.kts`: `qa/golden/*.json` and `UPDATE_GOLDEN` are declared `Test` task
     inputs, so Gradle caching is honest even outside the lane.
   - Engine regression guard pins both surfaces.
+- **`qa/refusal-demo.mjs` now works in real generated repos** — it scaffolded its throwaway app
+  via `<repo-parent>/bin/create-cmp.mjs`, a path that only exists inside the create-cmp dev tree;
+  it now falls back to `npx --yes create-cmp-cli@latest`. Caught by the negative-proofs walk on
+  the public showcase.
+
+### Changed
+
+- The CLI's `--help` banner leads with the AI-delivery-harness identity (matching README, plugin
+  and package manifests — ADR-0006), and a long-dead `qa/appium/package.json` rename block was
+  removed from the scaffolder (retired by the Maestro migration, ADR-0002).
 
 ## [0.3.1] - 2026-07-12
 
