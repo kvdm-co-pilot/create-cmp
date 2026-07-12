@@ -3,6 +3,8 @@
 //   (b) copy template/ → targetDir
 //   (b.2) delete disabled-feature paths (MUST precede the package rename —
 //         feature paths are declared against the literal com/example/app)
+//   (b.3) regenerate tab-driven surfaces (AppTab.kt, AppNavHost wiring,
+//         qa/e2e/smoke.yaml) from config.tabs, in template-token form
 //   (c) token-replace contents AND paths
 //   (d) rename package source dirs com/example/app → __PACKAGE_PATH__ (atomic)
 //   (e) toggle features (strip cmp:feature marker blocks)
@@ -23,6 +25,7 @@ import {
   disabledFeaturesFromConfig,
   deleteDisabledFeaturePaths,
 } from "./lib/toggle.mjs";
+import { rewriteTabSurfaces } from "./lib/tabs.mjs";
 import { copyDir, listFiles, listDirsDeepestFirst } from "./lib/fsutil.mjs";
 import { runVerify, printVerifyVerdict } from "./lib/verify.mjs";
 import { colors, step, ok, warn } from "./lib/log.mjs";
@@ -260,6 +263,14 @@ export async function scaffold(config, opts = {}) {
       process.stdout.write(`${m}\n`)
     );
   }
+
+  // (b.3) Regenerate the tab-driven surfaces from config.tabs BEFORE token
+  // replacement and the package rename: the rewriter addresses files at their
+  // literal com/example/app template paths and writes template-token contents,
+  // so the pipeline below stamps them like any other template file. For the
+  // default tabs this reproduces the static template files byte-for-byte.
+  step("Regenerating tab surfaces from configured tabs…");
+  rewriteTabSurfaces(projectDir, config.tabs, (m) => process.stdout.write(`${m}\n`));
 
   const tokenMap = buildTokenMap(config);
 

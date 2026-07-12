@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Tab surfaces are generated, not static** — the engine (new pipeline step b.3,
+  `src/lib/tabs.mjs`) rewrites the tab-driven surfaces from the configured `--tabs` at stamp
+  time, so a non-default tabs config can no longer ship stale defaults:
+  - `AppTab.kt`: one `appTabs(...)` entry per configured tab (label + Material icon).
+  - `AppNavHost.kt`: the `appTabs(...)` call site is wired per tab — `home`/`profile` slugs get
+    the shipped feature screens, anything else gets a generated `PlaceholderScreen` stub carrying
+    the `<slug>_title` testTag.
+  - `qa/e2e/smoke.yaml`: Maestro taps/asserts per tab by `nav_<label-slug>` id; the JS slug rule
+    (`navSlug`) mirrors `AppShell.kt`'s `navItemTag` and the two point at each other.
+  The default tabs config (`Home:home,Profile:person`) reproduces the static template files
+  byte-for-byte — pinned by `test/tab-surfaces.test.mjs`.
+
 ## [0.3.2] - 2026-07-12
 
 ### Added

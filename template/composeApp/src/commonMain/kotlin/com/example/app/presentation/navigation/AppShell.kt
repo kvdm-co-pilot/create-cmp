@@ -114,7 +114,7 @@ private fun AppBottomNav(
     }
 }
 
-/** Deterministic automation tag for a nav item: `nav_` + the label lowercased with every non-[a-z0-9] run collapsed to `_` and trimmed (e.g. "My Stuff!" → `nav_my_stuff`). Mirrored by the id selectors in `qa/e2e/smoke.yaml` — keep the two in sync. */
+/** Deterministic automation tag for a nav item: `nav_` + the label lowercased with every non-[a-z0-9] run collapsed to `_` and trimmed (e.g. "My Stuff!" → `nav_my_stuff`). Must mirror `navSlug` in create-cmp's engine (src/lib/tabs.mjs), which generates `qa/e2e/smoke.yaml`'s id selectors from the configured tabs — keep the two in sync. */
 private fun navItemTag(label: String): String =
     "nav_" + label.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
 

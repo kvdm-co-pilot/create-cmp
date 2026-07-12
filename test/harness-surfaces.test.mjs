@@ -38,7 +38,13 @@ function baseConfig(targetDir, overrides = {}) {
     [E2E_FEATURE_KEY]: true,
     inspector: true,
     devClient: true,
-    tabs: [{ label: "Home", icon: "home" }],
+    // The CLI's default tabs — smoke.yaml's nav taps are now GENERATED from
+    // this list (src/lib/tabs.mjs), so the nav_home/nav_profile assertions
+    // below require the default two-tab config.
+    tabs: [
+      { label: "Home", icon: "home" },
+      { label: "Profile", icon: "person" },
+    ],
     targetDir,
     ...overrides,
   };
