@@ -66,8 +66,15 @@ export async function runVerify({ projectDir, manifest, config, dryRun = false }
       results.push({ platform: item.platform, command: item.command, code: 0, ran: false });
       continue;
     }
+    const startedAt = Date.now();
     const { code } = await runCommand(item.command, projectDir);
-    results.push({ platform: item.platform, command: item.command, code, ran: true });
+    results.push({
+      platform: item.platform,
+      command: item.command,
+      code,
+      ran: true,
+      durationMs: Date.now() - startedAt,
+    });
     if (code !== 0) green = false;
   }
 
@@ -93,5 +100,21 @@ export function printVerifyVerdict(verdict) {
     verdict.green
       ? `\n${colors.green("GREEN — build proven.")}\n`
       : `\n${colors.red("FAIL — build did not go green.")}\n`
+  );
+
+  // Machine-readable verdict, one greppable line (field-report finding 2.3):
+  // a verify run can exceed 170k log lines, where "-Werror=" clang flags and
+  // Xcode phase names false-positive naive error greps. Agents anchor on this
+  // marker instead of parsing raw Gradle/xcodebuild output.
+  process.stdout.write(
+    `::create-cmp-verdict::${JSON.stringify({
+      green: verdict.green,
+      results: verdict.results.map((r) => ({
+        platform: r.platform,
+        green: r.code === 0,
+        ran: r.ran,
+        durationMs: r.durationMs ?? null,
+      })),
+    })}\n`
   );
 }

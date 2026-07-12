@@ -205,3 +205,73 @@ test("scaffold is idempotent on a fresh dir and refuses non-empty without force"
   fs.rmSync(tpl, { recursive: true, force: true });
   fs.rmSync(out, { recursive: true, force: true });
 });
+
+test("non-empty check: harmless entries (.claude, .DS_Store, .git) never force --force", async () => {
+  const tpl = makeTemplate();
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-out-"));
+  // The documented doctor→create flow drops .claude/ into the target; OS and
+  // VCS noise is equally inevitable. None of it is user content.
+  fs.mkdirSync(path.join(out, ".claude"), { recursive: true });
+  fs.writeFileSync(path.join(out, ".claude", "settings.local.json"), "{}");
+  fs.writeFileSync(path.join(out, ".DS_Store"), "");
+  fs.mkdirSync(path.join(out, ".git"), { recursive: true });
+
+  // must scaffold WITHOUT force
+  await scaffold(baseConfig(out), { templateDir: tpl, verify: false });
+  assert.ok(
+    fs.existsSync(path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/Main.kt")),
+    "scaffolded despite harmless entries"
+  );
+
+  fs.rmSync(tpl, { recursive: true, force: true });
+  fs.rmSync(out, { recursive: true, force: true });
+});
+
+test("non-empty check: real content still refuses and NAMES the blocking entries", async () => {
+  const tpl = makeTemplate();
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-out-"));
+  fs.mkdirSync(path.join(out, ".claude"), { recursive: true }); // harmless
+  fs.writeFileSync(path.join(out, "my-notes.txt"), "precious"); // real content
+
+  await assert.rejects(
+    () => scaffold(baseConfig(out), { templateDir: tpl, verify: false }),
+    (err) => {
+      assert.match(err.message, /not empty/);
+      assert.match(err.message, /my-notes\.txt/, "blocking entry is named");
+      assert.match(err.message, /harmless: \.claude/, "harmless entry listed as ignored");
+      return true;
+    }
+  );
+
+  fs.rmSync(tpl, { recursive: true, force: true });
+  fs.rmSync(out, { recursive: true, force: true });
+});
+
+test("spec-of-record: create-cmp.json is persisted with the resolved config", async () => {
+  const tpl = makeTemplate();
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-out-"));
+  const config = baseConfig(out, {
+    tabs: [
+      { label: "Today", icon: "today" },
+      { label: "Train", icon: "fitness_center" },
+    ],
+  });
+
+  await scaffold(config, { templateDir: tpl, verify: false });
+
+  const recordPath = path.join(out, "create-cmp.json");
+  assert.ok(fs.existsSync(recordPath), "create-cmp.json written to project root");
+  const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
+  assert.equal(record.schemaVersion, 1);
+  assert.equal(record.name, "Acme");
+  assert.equal(record.package, "com.acme.demo");
+  assert.deepEqual(
+    record.tabs.map((t) => t.label),
+    ["Today", "Train"],
+    "tabs manifest matches config — the spec-of-record for consistency checks"
+  );
+  assert.equal(typeof record.engineVersion, "string");
+  assert.ok(record.stampedAt.includes("T"), "ISO stampedAt");
+  fs.rmSync(tpl, { recursive: true, force: true });
+  fs.rmSync(out, { recursive: true, force: true });
+});

@@ -250,7 +250,19 @@ compose.resources {
 
 // >>> cmp:feature room
 room {
-    schemaDirectory("$projectDir/schemas")
+    // Per-target schema directories, NOT one shared dir. With a single directory the
+    // copyRoomSchemas aggregation task requires every target's exported schema to be
+    // byte-identical — and the first entity edit after scaffold trips a cross-target
+    // checksum conflict against the stale intermediate of whichever target built last
+    // ("Inconsistency detected exporting Room schema files"). Per-target locations are
+    // exactly what that error's remediation asks for.
+    schemaDirectory("android", "$projectDir/schemas/android")
+    schemaDirectory("desktop", "$projectDir/schemas/desktop")
+    // >>> cmp:feature ios
+    schemaDirectory("iosSimulatorArm64", "$projectDir/schemas/iosSimulatorArm64")
+    schemaDirectory("iosX64", "$projectDir/schemas/iosX64")
+    schemaDirectory("iosArm64", "$projectDir/schemas/iosArm64")
+    // <<< cmp:feature ios
 }
 // <<< cmp:feature room
 

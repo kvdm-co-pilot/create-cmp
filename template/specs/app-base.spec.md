@@ -5,15 +5,19 @@
 
 ## Architecture invariants
 
-- **ARCH-01** — Given any file in `presentation`, When its imports are inspected, Then none
-  resolve into the `data` layer (presentation depends on domain only).
-- **ARCH-02** — Given any file in `domain`, When its imports are inspected, Then none resolve
-  into `presentation`, `data`, or `di`, and none import Compose, Koin, or platform types
-  (domain is pure Kotlin).
+- **ARCH-01** — Given any file in `presentation`, When its imports **and fully-qualified
+  inline references** are inspected, Then none resolve into the `data` layer (presentation
+  depends on domain only; qualifying the name inline instead of importing is the same
+  violation).
+- **ARCH-02** — Given any file in `domain`, When its imports **and fully-qualified inline
+  references** are inspected, Then none resolve into `presentation`, `data`, or `di`, and
+  none reference Compose, Koin, or platform types (domain is pure Kotlin).
 - **ARCH-03** — Given any ViewModel class, When the test sources are inspected, Then a
   corresponding `*ViewModelTest` exists (no untested presentation state).
-- **ARCH-04** — Given any file containing a `*Screen` composable, When its source is
-  inspected, Then it declares at least one `testTag` (every screen is automation-reachable).
+- **ARCH-04** — Given any file in a `presentation` feature package that contains a
+  `@Composable` function, When its source is inspected, Then it declares at least one
+  `testTag` (scoped by content, not `*Screen.kt` filename — split `Content.kt` UI files are
+  covered, ViewModel-only files are exempt).
 - **ARCH-05** — Given any file outside `presentation/theme`, When its source is inspected,
   Then it constructs no literal `Color(0x…)` values (design colors come from the token
   catalog).
@@ -28,3 +32,7 @@
   the safe-area insets owned by `BaseScreen` (edge-to-edge without overlap).
 - **SHELL-04** — Given the app renders any screen, When interactive elements are present,
   Then each is perceivable by automation: it exposes a testTag, text, or content description.
+- **SHELL-05** — Given any screen registered directly on the NavHost (not a shell tab), When
+  it renders, Then its content is composed inside `BaseScreen` — a bare destination that
+  never touches inset APIs still renders under the status bar, which SHELL-03 alone cannot
+  catch.

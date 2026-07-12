@@ -27,22 +27,47 @@ class ArchitectureConformanceTest {
     private fun imports(file: File): List<String> =
         file.readLines().filter { it.trimStart().startsWith("import ") }.map { it.trim() }
 
+    /**
+     * Source lines with comment lines stripped. Layer-boundary rules scan these for BOTH
+     * `import x.y.` statements AND fully-qualified inline references (`x.y.Type(...)`) —
+     * import-only matching leaves a one-edit evasion open: delete the import, qualify the
+     * name inline, and the gate goes green while the violation remains.
+     */
+    private fun nonCommentLines(file: File): List<String> =
+        file.readLines().filterNot {
+            val t = it.trimStart()
+            t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")
+        }
+
+    private fun bannedReference(file: File, banned: List<String>): Boolean =
+        nonCommentLines(file).any { line -> banned.any { line.contains(it) } }
+
     private fun under(file: File, segment: String): Boolean =
         file.path.replace(File.separatorChar, '/').contains("/$segment/")
+
+    /**
+     * True when the file sits in a feature subpackage (presentation/<feature>/…) rather than
+     * at the presentation root (App.kt) — the scope for the composable-file rules.
+     */
+    private fun inPresentationFeatureDir(file: File): Boolean {
+        val rel = file.path.replace(File.separatorChar, '/').substringAfter("/presentation/", "")
+        return rel.isNotEmpty() && rel.contains('/')
+    }
 
     private fun violation(clause: String, rule: String, offenders: List<String>, fix: String): String =
         "[$clause] $rule\n  Offending: ${offenders.joinToString("\n             ")}\n  Fix: $fix"
 
     // SPEC: ARCH-01
     @Test
-    fun `ARCH-01 presentation never imports the data layer`() {
+    fun `ARCH-01 presentation never references the data layer`() {
         val offenders = sources(commonMain)
             .filter { under(it, "presentation") }
-            .filter { file -> imports(file).any { it.startsWith("import __PACKAGE__.data.") } }
+            .filter { bannedReference(it, listOf("__PACKAGE__.data.")) }
             .map { it.path }
         if (offenders.isNotEmpty()) fail(
             violation(
-                "ARCH-01", "presentation depends on domain only — it never imports the data layer.",
+                "ARCH-01", "presentation depends on domain only — it never references the data layer " +
+                    "(neither imports nor fully-qualified inline names).",
                 offenders,
                 "depend on a domain interface (domain/repository) and let di/ wire the data implementation.",
             )
@@ -53,16 +78,17 @@ class ArchitectureConformanceTest {
     @Test
     fun `ARCH-02 domain is pure - no app layers, no frameworks`() {
         val banned = listOf(
-            "import __PACKAGE__.presentation.", "import __PACKAGE__.data.", "import __PACKAGE__.di.",
-            "import androidx.compose.", "import org.koin.",
+            "__PACKAGE__.presentation.", "__PACKAGE__.data.", "__PACKAGE__.di.",
+            "androidx.compose.", "org.koin.",
         )
         val offenders = sources(commonMain)
             .filter { under(it, "domain") }
-            .filter { file -> imports(file).any { imp -> banned.any { imp.startsWith(it) } } }
+            .filter { bannedReference(it, banned) }
             .map { it.path }
         if (offenders.isNotEmpty()) fail(
             violation(
-                "ARCH-02", "domain imports nothing app-internal and no UI/DI frameworks.",
+                "ARCH-02", "domain references nothing app-internal and no UI/DI frameworks " +
+                    "(neither imports nor fully-qualified inline names).",
                 offenders,
                 "move framework-touching code out to presentation/data; domain stays pure Kotlin.",
             )
@@ -88,17 +114,23 @@ class ArchitectureConformanceTest {
 
     // SPEC: ARCH-04
     @Test
-    fun `ARCH-04 every Screen composable declares a testTag`() {
+    fun `ARCH-04 every feature composable file declares a testTag`() {
+        // Scoped by CONTENT (contains @Composable), not by *Screen.kt filename: real apps
+        // split features into Screen.kt (often ViewModel-only) and Content.kt (the UI).
+        // Filename scoping produced both false negatives (untagged FooContent.kt slid
+        // through) and false positives (VM-only FooScreen.kt was flagged) in the field.
         val offenders = sources(commonMain)
-            .filter { it.name != "Screen.kt" && it.name.endsWith("Screen.kt") }
-            .filterNot { under(it, "components") || under(it, "navigation") }
+            .filter { inPresentationFeatureDir(it) }
+            .filterNot { under(it, "components") || under(it, "navigation") || under(it, "theme") }
+            .filter { it.readText().contains("@Composable") }
             .filterNot { it.readText().contains("testTag") }
             .map { it.path }
         if (offenders.isNotEmpty()) fail(
             violation(
-                "ARCH-04", "every screen is automation-reachable: *Screen files declare at least one testTag.",
+                "ARCH-04", "every feature UI file is automation-reachable: files containing a " +
+                    "@Composable declare at least one testTag.",
                 offenders,
-                "add Modifier.semantics { testTag = \"<feature>_<element>\" } to the screen's key nodes.",
+                "add Modifier.semantics { testTag = \"<feature>_<element>\" } to the file's key nodes.",
             )
         )
     }
@@ -116,6 +148,45 @@ class ArchitectureConformanceTest {
                 "ARCH-05", "design colors come from the token catalog, never Color(0x…) literals.",
                 offenders,
                 "add/use a token in presentation/theme instead of the literal.",
+            )
+        )
+    }
+
+    // SPEC: SHELL-05
+    @Test
+    fun `SHELL-05 every non-shell nav destination wraps its content in BaseScreen`() {
+        // SHELL-03 bans direct inset-API calls, but a destination that simply never handles
+        // insets at all (bare Column at the nav layer) passes that rule while rendering
+        // under the status bar. Tab screens are exempt — AppShell wraps them — so the rule
+        // targets exactly the destinations registered directly on the NavHost.
+        val navHost = sources(commonMain).firstOrNull { it.name == "AppNavHost.kt" } ?: return
+        val text = navHost.readText()
+        val screenCall = Regex("""([A-Z][A-Za-z0-9]*Screen)\s*\(""")
+        // A call with only a trailing lambda has no paren — `BaseScreen { … }` — so match both.
+        val baseScreenCall = Regex("""BaseScreen\s*[({]""")
+        val allSources = sources(commonMain)
+
+        val offenders = mutableListOf<String>()
+        val chunks = text.split("composable(").drop(1)
+        for (chunk in chunks) {
+            if (chunk.contains("AppShell(")) continue // shell destination: tabs inherit BaseScreen
+            for (m in screenCall.findAll(chunk)) {
+                val name = m.groupValues[1]
+                if (name == "BaseScreen") continue
+                val defining = allSources.firstOrNull { f ->
+                    Regex("""fun\s+$name\s*\(""").containsMatchIn(f.readText())
+                } ?: continue
+                if (!baseScreenCall.containsMatchIn(defining.readText())) {
+                    offenders.add("${defining.path} ($name is a NavHost destination without BaseScreen)")
+                }
+            }
+        }
+        if (offenders.isNotEmpty()) fail(
+            violation(
+                "SHELL-05", "every screen registered directly on the NavHost composes inside " +
+                    "BaseScreen — otherwise it renders edge-to-edge with no inset handling.",
+                offenders.distinct(),
+                "wrap the destination's content in BaseScreen { … } (see DetailScreen).",
             )
         )
     }
