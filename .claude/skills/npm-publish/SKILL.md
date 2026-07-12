@@ -121,3 +121,27 @@ release body instead.
 - Do not force-publish over a version/package you don't own.
 - Do not skip the registry verification step — "the command exited 0" is not the same as "the
   package is live and correct."
+
+## Alias packages (create-compose-multiplatform, create-kmp)
+
+Two thin alias packages live in this repo under `packages/aliases/` —
+`create-compose-multiplatform` and `create-kmp`. Each is a delegating shim: its bin resolves the
+installed `create-cmp-cli` dependency's bin entry and re-executes it (argv forwarded, stdio
+inherited, exit code propagated). No logic of their own — they exist so `npm create
+compose-multiplatform` and `npm create kmp` land users in our tool.
+
+They version independently of the main package and depend on `create-cmp-cli` with a **caret
+range** (`^0.3.2`), so a fresh `npm create compose-multiplatform` picks up new main releases
+automatically. **They only need republishing when the caret range must move past a major bump or
+the shim/README itself changes** — not on every `create-cmp-cli` release.
+
+To publish (same auth rules as above — interactive session, OTP is Karel's step; `npm view <name>`
+first to confirm ownership on repeat publishes):
+
+```bash
+cd packages/aliases/create-compose-multiplatform && npm publish
+cd packages/aliases/create-kmp && npm publish
+```
+
+Verify each afterwards the same way as the main package: `npm view <name> version`, then
+`npx <name>@latest --help` must print the real create-cmp banner.

@@ -1,0 +1,27 @@
+# create-cmp
+
+> The AI delivery harness for Kotlin/Compose Multiplatform (Android + iOS): scaffolds a deterministic, green-building app in which every project carries a spec-driven verify lane, evidence receipts, and mechanical enforcement of "done".
+
+create-cmp (npm package: `create-cmp-cli`) stamps a frozen, CI-verified template — it never asks an LLM to freehand project code, so every scaffold is identical and every scaffold builds. It runs fully non-interactively with flags, validates them against a machine-readable schema (`options.schema.json`), and exits non-zero on failure. The `--verify` flag builds the generated app before reporting success.
+
+Non-interactive one-liner (flags per `options.schema.json` and `create-cmp --help`):
+
+```bash
+npx create-cmp-cli@latest my-app --name Acme --package com.acme.app --yes --verify
+```
+
+Other flags: `--bundle-id`, `--region`, `--theme-prefix`, `--ios/--no-ios`, `--firebase/--no-firebase`, `--auth <email|phone|both|none>`, `--room/--no-room`, `--e2e/--no-e2e`, `--inspector/--no-inspector`, `--dev-client/--no-dev-client`, `--tabs Home:home,Profile:person`, `--target-dir`, `--force`. Subcommands `doctor`, `upgrade`, `clean`, and `verify` work on any KMP project.
+
+create-cmp is also invokable as a Claude Code plugin (`/plugin marketplace add kvdm-co-pilot/create-cmp`, then `/plugin install create-cmp`) with eight skills and the `cmp-inspector` MCP server. Generated projects self-verify without the plugin installed: `node qa/verify.mjs` runs 8 gates (spec coverage, build, unit tests, conformance, golden trees, token drift, a11y, on-device E2E) and writes a content-hash-bound evidence receipt; a Stop hook and CI both refuse "done" without a fresh PASS receipt.
+
+## Docs
+
+- [README](https://github.com/kvdm-co-pilot/create-cmp/blob/main/README.md): full feature tour — CLI commands, plugin skills, and the harness every generated project carries
+- [Usage guide](https://github.com/kvdm-co-pilot/create-cmp/blob/main/docs/USAGE.md): every command, skill, MCP tool, and workflow in detail
+- [Options schema](https://github.com/kvdm-co-pilot/create-cmp/blob/main/options.schema.json): machine-readable JSON Schema for the engine config the flags build
+- [Changelog](https://github.com/kvdm-co-pilot/create-cmp/blob/main/CHANGELOG.md): release history, Keep-a-Changelog format
+
+## Examples
+
+- [create-cmp-showcase](https://github.com/kvdm-co-pilot/create-cmp-showcase): public repo built entirely by this tool, every commit carrying its evidence receipt
+- [Refusal PR #1](https://github.com/kvdm-co-pilot/create-cmp-showcase/pull/1): live proof of the harness blocking a bad change and naming the violated rule

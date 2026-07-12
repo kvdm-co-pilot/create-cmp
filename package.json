@@ -1,7 +1,7 @@
 {
   "name": "create-cmp-cli",
   "version": "0.3.2",
-  "description": "The AI delivery harness for Kotlin/Compose Multiplatform — scaffolds a green-building app (Android + iOS) in minutes and holds AI-driven changes to a machine-enforced verify lane with a committed evidence receipt. Installs the `create-cmp` command.",
+  "description": "The AI delivery harness for Kotlin/Compose Multiplatform — a deterministic, non-interactive project generator that scaffolds a green-building app (Android + iOS) in minutes, then holds AI-driven changes to a machine-enforced verify lane with a committed evidence receipt. Installs the `create-cmp` command.",
   "type": "module",
   "bin": {
     "create-cmp": "bin/create-cmp.mjs",
@@ -14,7 +14,8 @@
     "bin",
     "src",
     "template",
-    "options.schema.json"
+    "options.schema.json",
+    "llms.txt"
   ],
   "scripts": {
     "test": "node --test",
@@ -24,13 +25,23 @@
   "keywords": [
     "create-cmp",
     "create-cmp-cli",
+    "compose multiplatform",
     "compose-multiplatform",
+    "kotlin multiplatform",
     "kotlin-multiplatform",
+    "kotlin",
+    "compose",
     "kmp",
     "cmp",
     "scaffold",
+    "project generator",
+    "cli",
+    "claude code",
+    "ai agent",
     "android",
-    "ios"
+    "ios",
+    "verify",
+    "e2e"
   ],
   "license": "MIT",
   "author": "Karel van der Merwe",

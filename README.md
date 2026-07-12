@@ -18,6 +18,15 @@ machine-enforced definition of done.
 
 ---
 
+```bash
+npx create-cmp-cli@latest my-app --name Acme --package com.acme.app --yes --verify
+```
+
+Deterministic (stamps a frozen, CI-verified template), fully non-interactive with flags, and
+exits non-zero on failure. Every generated project ships its own verify lane — `node qa/verify.mjs`,
+8 gates, evidence receipts — with nothing installed. Agent-readable: [llms.txt](./llms.txt) ·
+[options.schema.json](./options.schema.json).
+
 ## What is this, in plain words
 
 **Day one, it's a scaffolder.** One command gives you a working Compose Multiplatform app —
@@ -87,6 +96,9 @@ Everything except `create` works on **any** KMP project, not just ones this tool
 | `create-cmp upgrade [--dry-run]` | Moves your `libs.versions.toml` to the next **proven-green** version set. Shows a diff first, edits surgically with backups, guards the Kotlin↔KSP lockstep, and can re-verify the build after. |
 | `create-cmp clean` | Reclaims disk: stale Kotlin/Native toolchains, `build/` dirs. Shows sizes, asks before deleting. |
 | `create-cmp verify` | Runs the green-build gate against an existing project. Exit 0 = green. Useful in scripts and CI. |
+
+Hit a KMP build error? [Common CMP/KMP build errors and fixes](docs/errors/README.md) — kotlin↔KSP
+mismatch, the KSP2/iOS catch-22, `SDK location not found`, `No space left on device`, version drift.
 
 ## The Claude Code plugin (8 skills)
 

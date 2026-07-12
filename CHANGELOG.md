@@ -19,6 +19,27 @@ All notable changes to this project are documented here. The format is based on
     (`navSlug`) mirrors `AppShell.kt`'s `navItemTag` and the two point at each other.
   The default tabs config (`Home:home,Profile:person`) reproduces the static template files
   byte-for-byte — pinned by `test/tab-surfaces.test.mjs`.
+- **Agent discoverability pass** — `llms.txt` at the repo root (llmstxt.org convention: identity,
+  the non-interactive one-liner, flag reference, doc/showcase links), shipped in the npm tarball
+  and linked from the README. `package.json` and the plugin/marketplace manifests now carry the
+  literal multi-word search keywords agents emit ("compose multiplatform", "kotlin multiplatform",
+  "project generator", "claude code", "ai agent", …), and the npm description states the
+  deterministic, non-interactive contract up front.
+- **Alias packages** `create-compose-multiplatform` and `create-kmp` (`packages/aliases/`) — thin
+  published shims delegating to `create-cmp-cli`, so `npm create compose-multiplatform` /
+  `npm create kmp` land in this tool. Published separately from the main package (see the
+  npm-publish skill's Alias packages section).
+- **Error-message pages** (`docs/errors/`) — one page per real KMP/CMP build failure the doctor
+  diagnoses (kotlin↔KSP lockstep, the KSP2/iOS `ClassNotFoundException: …MainKt` catch-22,
+  `SDK location not found`, `~/.konan` disk exhaustion, version-catalog drift): the exact error
+  text, why it happens, the manual fix, and the doctor/scaffold one-liners. Linked from the
+  README and USAGE.
+
+### Changed
+
+- **README first screenful** now passes the 3-second agent test: the copy-pasteable
+  non-interactive one-liner plus the deterministic / exits-non-zero / ships-its-own-verify-lane
+  contract sit directly under the badges. Everything below is unchanged from the 0.3.2 rewrite.
 
 ## [0.3.2] - 2026-07-12
 

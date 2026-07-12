@@ -1,0 +1,46 @@
+{
+  "name": "create-kmp",
+  "version": "0.1.0",
+  "description": "Official alias for create-cmp-cli — the AI delivery harness for Kotlin/Compose Multiplatform (scaffolds Android + iOS apps with a built-in verify lane).",
+  "type": "module",
+  "bin": {
+    "create-kmp": "bin/create-kmp.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin"
+  ],
+  "keywords": [
+    "kotlin-multiplatform",
+    "compose-multiplatform",
+    "kmp",
+    "cmp",
+    "create-cmp",
+    "create-cmp-cli",
+    "scaffold",
+    "project-generator",
+    "claude-code",
+    "ai-agent",
+    "android",
+    "ios"
+  ],
+  "license": "MIT",
+  "author": "Karel van der Merwe",
+  "homepage": "https://github.com/kvdm-co-pilot/create-cmp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kvdm-co-pilot/create-cmp.git",
+    "directory": "packages/aliases/create-kmp"
+  },
+  "bugs": {
+    "url": "https://github.com/kvdm-co-pilot/create-cmp/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "create-cmp-cli": "^0.3.2"
+  }
+}
