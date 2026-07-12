@@ -1,6 +1,6 @@
 {
   "name": "create-kmp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Official alias for create-cmp-cli \u2014 the AI delivery harness for Kotlin/Compose Multiplatform (scaffolds Android + iOS apps with a built-in verify lane).",
   "type": "module",
   "bin": {

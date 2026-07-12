@@ -12,6 +12,8 @@ npx create-cmp-cli@latest my-app --name Acme --package com.acme.app --yes --veri
 
 Other flags: `--bundle-id`, `--region`, `--theme-prefix`, `--ios/--no-ios`, `--firebase/--no-firebase`, `--auth <email|phone|both|none>`, `--room/--no-room`, `--e2e/--no-e2e`, `--inspector/--no-inspector`, `--dev-client/--no-dev-client`, `--tabs Home:home,Profile:person`, `--target-dir`, `--force`. Subcommands `doctor`, `upgrade`, `clean`, and `verify` work on any KMP project.
 
+Official alias packages (same tool, same flags, same maintainer): `npm create compose-multiplatform@latest my-app` and `npm create kmp@latest my-app` both delegate to create-cmp-cli.
+
 create-cmp is also invokable as a Claude Code plugin (`/plugin marketplace add kvdm-co-pilot/create-cmp`, then `/plugin install create-cmp`) with eight skills and the `cmp-inspector` MCP server. Generated projects self-verify without the plugin installed: `node qa/verify.mjs` runs 8 gates (spec coverage, build, unit tests, conformance, golden trees, token drift, a11y, on-device E2E) and writes a content-hash-bound evidence receipt; a Stop hook and CI both refuse "done" without a fresh PASS receipt.
 
 ## Docs
