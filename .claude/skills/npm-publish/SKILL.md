@@ -68,6 +68,18 @@ npm version patch   # or: minor / major
 This updates `package.json` and creates a git commit + tag (`vX.Y.Z`) locally — it does not push or
 publish anything yet.
 
+**Also bump the Claude Code plugin manifests to the same version** — they do NOT track
+`package.json` automatically, and skipping this is exactly how the installed plugin once lagged the
+registry by three minor versions (0.1.0 vs 0.4.0, caught by a field report):
+
+```bash
+# .claude-plugin/plugin.json        -> "version": "X.Y.Z"
+# .claude-plugin/marketplace.json   -> metadata.version AND plugins[*].version -> "X.Y.Z"
+```
+
+Commit these with the changelog fold (step 5). A release is not done while the plugin manifests
+disagree with the npm version.
+
 ### 5. Update the changelog
 
 Move the `## [Unreleased]` entries in `CHANGELOG.md` into a new `## [X.Y.Z] - <date>` section (use
