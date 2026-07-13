@@ -17,6 +17,11 @@ follow the contract in [`CLAUDE.md`](./CLAUDE.md).
 ./gradlew :composeApp:hotRunDesktop --auto
 <!-- <<< cmp:feature dev-client -->
 
+<!-- >>> cmp:feature inspector -->
+# Preview EVERY screen headlessly — no device, no emulator (agents: CLAUDE.md "UI feedback loop")
+./gradlew :composeApp:renderScreens && node qa/preview-gallery.mjs
+<!-- <<< cmp:feature inspector -->
+
 # Unit tests (fast inner loop)
 ./gradlew :composeApp:desktopTest
 

@@ -101,7 +101,7 @@ Everything except `create` works on **any** KMP project, not just ones this tool
 Hit a KMP build error? [Common CMP/KMP build errors and fixes](docs/errors/README.md) — kotlin↔KSP
 mismatch, the KSP2/iOS catch-22, `SDK location not found`, `No space left on device`, version drift.
 
-## The Claude Code plugin (8 skills)
+## The Claude Code plugin (9 skills)
 
 ```text
 /plugin marketplace add kvdm-co-pilot/create-cmp
@@ -115,13 +115,14 @@ Same engine as the CLI, conversational front door. Each skill is a guided flow, 
 | `cmp-new` | "Make me an app." Interviews you in chat, scaffolds via the engine, generates your bottom-nav tab screens from the exemplar pattern, proves the build green. |
 | `cmp-doctor` | "Why won't my KMP project build?" Runs the doctor, explains the findings, applies consented fixes. |
 | `cmp-upgrade` | "Bump my dependencies safely." Diff → apply → verify, with the lockstep guardrails. |
+| `cmp-preview` | "Show me my screens." Live gallery of every screen at a local URL — real DI/theme/data, no device, no emulator, no manual Gradle. Edit → save → the page re-renders itself; changed screens get flagged; a11y violations show per screen. |
 | `cmp-inspect` | "What did the UI actually render?" Reads a **running** app as structured JSON — hierarchy, geometry, resolved design tokens, navigation state. Never screenshots. Can assert tokens, find drift against your design system, audit accessibility, diff before/after. |
 | `cmp-dev-client` | "Let me iterate fast." Runs your shared UI in a phone-sized desktop window with hot reload — save a file, see it change. No emulator needed. Firebase stays off on desktop (offline fakes). |
 | `cmp-firebase-connect` | "Wire up my real Firebase." Drives the Firebase CLI: create/reuse a project, register the app, drop the real `google-services.json` over the placeholder, prove it with a green build. Every cloud action asks first. |
 | `cmp-test` | "Write tests for my app." *Observes* the running app's semantics tree — what's actually on screen, what's tappable, where navigation goes — and derives the regression suite from that. Tests come from rendered reality, not guesses. |
 | `cmp-qa-prep` | "Get my test environment up." Emulator + app install + E2E smoke run, with the gotchas handled. |
 
-Plus the **`cmp-inspector` MCP server** (14 tools) — the machine-readable window into a running
+Plus the **`cmp-inspector` MCP server** (18 tools) — the machine-readable window into a running
 Compose UI that `cmp-inspect`, `cmp-test`, and the verified dev loop are built on. One tree
 contract, three sources: render a screen headlessly, connect to the live app, or read a device
 via UIAutomator.
@@ -182,13 +183,21 @@ stamper (`qa/scaffold-feature.mjs`):
 Any plain Claude Code session — no create-cmp plugin installed — finds these and extends the app
 correctly by construction.
 
-### 6. The live inspector — AI-readable UI
-Every debug build serves `127.0.0.1:9500` (loopback-only, structurally absent from release): the
-UI tree as JSON, the design-token catalog, a screenshot route, a tap route, and a live device
-view for humans (`/inspect/remote` — watch the real device in a browser, click to tap). Agents
-read structure; humans see pixels.
+### 6. The inspector — AI-readable UI, previews without a device
+Two loops, one contract. **Live (tier 1):** every debug build serves `127.0.0.1:9500`
+(loopback-only, structurally absent from release): the UI tree as JSON, the design-token catalog,
+a screenshot route, a tap route, and a live device view for humans (`/inspect/remote` — watch the
+real device in a browser, click to tap). **Headless previews (tier 0):** every app ships
+`inspector/PreviewRegistry.kt` (the `@Preview` analog — shell, every tab, detail) and a
+`:composeApp:renderScreens` task that renders each screen with real DI/theme/data to
+`screen.png` + its contract `tree.json` — no device, no emulator; `node qa/preview-gallery.mjs`
+turns the output into one self-contained `index.html` (pixels + wireframe + a11y per screen).
+Agents read structure; humans see pixels.
 
 ### 7. The daily-driver extras
+- **Live preview loop** — every real screen rendered headlessly on save (resident hot-reload
+  daemon, ~1s warm renders); a self-updating gallery for the human, changed-screen attribution
+  and compile-error surfacing for the agent. The agent sees what it builds.
 - **Desktop dev-client** — shared UI in a phone-sized JVM window, Compose Hot Reload attached.
 - **CI workflow** — Android job on every push; iOS job ready to un-comment.
 - **`CLAUDE.md`** — the AI delivery contract itself, stating everything above as rules any AI
@@ -201,8 +210,15 @@ read structure; humans see pixels.
 **New app → green.** `cmp-new` (or `npx create-cmp-cli`) → interview → stamp → green build proven
 → tab screens generated. Then `cmp-firebase-connect` to wire your real backend.
 
-**The daily UI loop.** `./gradlew :composeApp:hotRunDesktop --auto` → edit Compose → save → see
-it. No emulator, no Firebase, sub-second feedback.
+**The daily UI loop.** Say "preview my app" (the cmp-preview skill / `preview` MCP tool) → a
+live local gallery of EVERY real screen that re-renders on save — no device, no emulator, no
+manual Gradle. The agent runs the same loop to check its own work while it builds: edit →
+`preview_status { waitForRender: true }` → which screens changed (or the compile error, or the
+failed hot swap) → `preview_diff { screen }` for a proven verdict — feedback in seconds instead
+of a 25–40s build or an emulator round-trip. One interactive window instead of stills:
+`./gradlew :composeApp:hotRunDesktop --auto`. Command-line fallback (no plugin needed — the
+scaffolded app carries the whole loop):
+`./gradlew :composeApp:renderScreens && node qa/preview-gallery.mjs`.
 
 **The verified dev loop (the flagship).** For any UI change: snapshot the live tree → make the
 edit → reload → `prove_change` compares before/after structure, token drift, and a11y, and returns

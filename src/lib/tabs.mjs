@@ -317,6 +317,109 @@ fun PlaceholderScreen(title: String, titleTag: String) {
 `;
 }
 
+/** Preview content lambda for one tab in the registry's appTabs(...) call — no-op navigation. */
+function previewTabArg(tab) {
+  if (tab.slug === "home") {
+    return `                ${tab.param} = { HomeScreen(onItemClick = {}) },`;
+  }
+  if (tab.slug === "profile") {
+    return `                ${tab.param} = { ProfileScreen() },`;
+  }
+  return `                ${tab.param} = { PlaceholderScreen(title = "${kotlinString(tab.label)}", titleTag = "${tab.slug}_title") },`;
+}
+
+/** Per-tab ScreenPreview entry (single tab hosted in TabHost, as AppShell hosts it). */
+function previewEntry(tab) {
+  if (tab.slug === "home") {
+    return `    ScreenPreview("home", "${kotlinString(tab.label)} tab") { TabHost { HomeScreen(onItemClick = {}) } },`;
+  }
+  if (tab.slug === "profile") {
+    return `    ScreenPreview("profile", "${kotlinString(tab.label)} tab") { TabHost { ProfileScreen() } },`;
+  }
+  return `    ScreenPreview("${tab.slug}", "${kotlinString(tab.label)} tab") { TabHost { PlaceholderScreen(title = "${kotlinString(tab.label)}", titleTag = "${tab.slug}_title") } },`;
+}
+
+/**
+ * Render inspector/PreviewRegistry.kt (template-token form) — the `@Preview` analog the
+ * renderScreens harness enumerates: one shell entry wiring appTabs(...) like AppNavHost,
+ * one entry per tab, plus the shipped Detail destination. For the default tabs this
+ * reproduces the static template file byte-for-byte.
+ * @param {ReturnType<typeof tabInfos>} infos
+ */
+export function renderPreviewRegistryKt(infos) {
+  const imports = [
+    "import androidx.compose.foundation.layout.Box",
+    "import androidx.compose.foundation.layout.fillMaxSize",
+    "import androidx.compose.runtime.Composable",
+    "import androidx.compose.ui.Modifier",
+    "import __PACKAGE__.presentation.components.BaseScreen",
+  ];
+  if (infos.some((t) => t.slug !== "home" && t.slug !== "profile")) {
+    imports.push("import __PACKAGE__.presentation.components.PlaceholderScreen");
+  }
+  imports.push("import __PACKAGE__.presentation.home.DetailScreen");
+  if (infos.some((t) => t.slug === "home")) {
+    imports.push("import __PACKAGE__.presentation.home.HomeScreen");
+  }
+  imports.push("import __PACKAGE__.presentation.navigation.AppShell");
+  imports.push("import __PACKAGE__.presentation.navigation.appTabs");
+  if (infos.some((t) => t.slug === "profile")) {
+    imports.push("import __PACKAGE__.presentation.profile.ProfileScreen");
+  }
+
+  return `package __PACKAGE__.inspector
+
+${imports.join("\n")}
+
+/**
+ * One previewable screen: a stable [id] (the \`-Pscreen=\` selector and output directory
+ * name), a human [title] for the gallery, and the composable [content] exactly as the
+ * app hosts it.
+ *
+ * The \`@Preview\` analog for the create-cmp inspector: the registry makes "render screen
+ * X" a closed, enumerable operation. The scaffolder regenerates the tab entries from the
+ * configured \`tabs\`; when you add a screen by hand, add it here — the renderScreens
+ * harness, the gallery, and golden baselines pick it up by id.
+ *
+ * State variants (the Storybook "story" analog): a screen in a specific UI state is just
+ * another entry with a derived id — e.g. \`ScreenPreview("home@empty", "Home — empty")\`
+ * hosting the screen with that state forced (a state-first overload of the screen, or
+ * preview-only fakes behind its usual parameters). Every entry renders the same way
+ * (gallery card, \`-Pscreen=\` selector, golden baseline), so loading/empty/error states
+ * sit side by side with the default seeded state.
+ */
+data class ScreenPreview(
+    val id: String,
+    val title: String,
+    val content: @Composable () -> Unit,
+)
+
+/** Every registered screen, in gallery order. Ids must be unique and filesystem-safe. */
+fun previewRegistry(): List<ScreenPreview> = listOf(
+    ScreenPreview("shell", "App shell — bottom nav (first tab selected)") {
+        AppShell(
+            tabs = appTabs(
+${infos.map(previewTabArg).join("\n")}
+            ),
+        )
+    },
+${infos.map(previewEntry).join("\n")}
+    ScreenPreview("detail", "Detail (nav destination)") { DetailScreen(itemId = "1", onBack = {}) },
+)
+
+/**
+ * Hosts a single tab's content the way [AppShell] does — inside [BaseScreen] — minus the
+ * bottom bar, so a tab previews with the same insets/background it gets in the shell.
+ */
+@Composable
+private fun TabHost(content: @Composable () -> Unit) {
+    BaseScreen {
+        Box(Modifier.fillMaxSize()) { content() }
+    }
+}
+`;
+}
+
 // --- pipeline entry --------------------------------------------------------------
 
 const APPTAB_REL =
@@ -325,6 +428,8 @@ const NAVHOST_REL =
   "composeApp/src/commonMain/kotlin/com/example/app/presentation/navigation/AppNavHost.kt";
 const PLACEHOLDER_REL =
   "composeApp/src/commonMain/kotlin/com/example/app/presentation/components/PlaceholderScreen.kt";
+const PREVIEW_REGISTRY_REL =
+  "composeApp/src/desktopMain/kotlin/com/example/app/inspector/PreviewRegistry.kt";
 const SMOKE_REL = "qa/e2e/smoke.yaml";
 
 /**
@@ -360,6 +465,14 @@ export function rewriteTabSurfaces(projectDir, tabs, log = () => {}) {
       fs.writeFileSync(placeholderPath, renderPlaceholderScreenKt());
       log(`  tabs → ${PLACEHOLDER_REL}`);
     }
+  }
+
+  // Present only when the inspector feature is on (the harness's desktopMain dir);
+  // absent → skipped, same contract as the other feature-stripped surfaces.
+  const previewRegistryPath = path.join(projectDir, PREVIEW_REGISTRY_REL);
+  if (fs.existsSync(previewRegistryPath)) {
+    fs.writeFileSync(previewRegistryPath, renderPreviewRegistryKt(infos));
+    log(`  tabs → ${PREVIEW_REGISTRY_REL}`);
   }
 
   const smokePath = path.join(projectDir, SMOKE_REL);

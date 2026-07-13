@@ -33,7 +33,8 @@ import { navigateAndInspect, writeLiveScreenshot, DEFAULT_SETTLE_MS } from "../s
 import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
 import { readPngMeta } from "../src/lib/png.mjs";
 import { proveChange } from "../src/lib/prove.mjs";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { createPreviewService } from "../src/lib/preview-service.mjs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -97,9 +98,32 @@ function guarded(fn) {
 // server + tools
 // ---------------------------------------------------------------------------
 
+const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+
 const server = new McpServer({
   name: "cmp-inspector",
-  version: "0.4.0",
+  version: pkg.version,
+  // Injected into the connected agent's context — the discovery surface for the
+  // default workflow. Front-loaded: the edit loop first, everything else after.
+  instructions:
+    "cmp-inspector: the AI-native window into a Compose Multiplatform app's UI — " +
+    "structured JSON trees, never screenshots (pixels flow to the human, structure " +
+    "flows to you).\n\n" +
+    "DEFAULT UI LOOP — use while building or editing ANY screen of a create-cmp app; " +
+    "no device, no emulator, no manual Gradle:\n" +
+    "1. preview { projectDir }  → live self-updating gallery URL for the human; keep " +
+    "it running for the whole session.\n" +
+    "2. Edit code, then preview_status { waitForRender: true }  → blocks until the " +
+    "outcome: changedLastRender names the screens your edit touched (empty = it " +
+    "reached no screen); lastErrorSource \"compile\" = the edit didn't build (the " +
+    "compiler's e: lines are in lastError).\n" +
+    "3. preview_diff { screen }  → verdict: proven-clean | changed-with-regressions | " +
+    "no-change. Zero snapshot bookkeeping.\n" +
+    "4. preview_stop {} when the session ends.\n\n" +
+    "One-off render: render_screen { projectDir, screen } (~1s warm via the resident " +
+    "daemon). Inspect the RUNNING app (tier 1): connect_live, then get_node / " +
+    "assert_token / audit_a11y / find_drift / navigate_and_inspect / prove_change. " +
+    "Always assert on tree JSON; never read PNG bytes into context.",
 });
 
 const treePathArg = z
@@ -511,11 +535,16 @@ server.registerTool(
     description:
       "Pixel preview with a PATH-ONLY contract: returns { path, width, height, sizeBytes, " +
       "displayHint } parsed from the PNG header — NEVER the image bytes/base64 (pixels flow to the " +
-      "human, structure flows to the AI). Sources: `source:{kind:'live',port?}` fetches the RUNNING " +
-      "app's current screen from GET /inspect/screenshot and writes it to `out` (or a temp file); " +
-      "`pngPath` points at a PNG the harness already produced; `harness:true` runs the headless " +
-      "harness (`./gradlew run`) which renders the sample screen to out/screen.png alongside its " +
-      "tree. Pair it with render_tree for the structural twin.",
+      "human, structure flows to the AI). Sources: `projectDir` (+ optional `screen` id, default " +
+      "'shell') renders a REAL screen of a create-cmp app headlessly — through the resident " +
+      "preview daemon when one is running (~1s warm) else via its generated " +
+      "`:composeApp:renderScreens` task — no device/emulator — and also returns `treePath` (the " +
+      "structural twin), `previewsDir`, and `via` ('daemon'|'gradle'); " +
+      "`source:{kind:'live',port?}` fetches the RUNNING app's " +
+      "current screen from GET /inspect/screenshot and writes it to `out` (or a temp file); " +
+      "`pngPath` points at a PNG a harness already produced; `harness:true` runs the create-cmp " +
+      "checkout's demo harness (bundled SampleScreen — use `projectDir` for real apps). Pair it " +
+      "with render_tree for the structural twin.",
     inputSchema: {
       source: z
         .object({
@@ -530,17 +559,28 @@ server.registerTool(
         .optional()
         .describe("Where to write a live capture (default: a temp file). Ignored for pngPath/harness."),
       pngPath: z.string().optional().describe("Path to an existing PNG (e.g. the harness's out/screen.png)."),
+      projectDir: z
+        .string()
+        .optional()
+        .describe(
+          "Root of a create-cmp app: runs its generated `:composeApp:renderScreens` task (tier 0, " +
+            "real screens from inspector/PreviewRegistry.kt) and reads the PNG + tree it wrote."
+        ),
+      screen: z
+        .string()
+        .optional()
+        .describe("Registry id to render with projectDir (default 'shell'; e.g. 'home', a tab slug)."),
       harness: z
         .boolean()
         .optional()
-        .describe("Run the tier-0 harness headless render to produce the PNG first."),
+        .describe("Run the create-cmp checkout's DEMO harness (bundled SampleScreen) to produce the PNG first."),
       harnessDir: z
         .string()
         .optional()
         .describe("Harness project directory (default: the create-cmp checkout's inspector/harness)."),
     },
   },
-  guarded(async ({ source, out, pngPath, harness, harnessDir }) => {
+  guarded(async ({ source, out, pngPath, projectDir, screen, harness, harnessDir }) => {
     if (source && source.kind === "live") {
       const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
       const meta = await writeLiveScreenshot({
@@ -551,11 +591,69 @@ server.registerTool(
       return ok({ ...meta, displayHint: RENDER_SCREEN_DISPLAY_HINT });
     }
     let target = pngPath;
+    if (!target && projectDir) {
+      // Project mode: the generated per-project harness renders REAL screens.
+      const dir = resolvePath(projectDir);
+      const id = screen || "shell";
+      // Warm path first: a resident preview daemon (phase 2) renders one screen in
+      // ~1s vs a 25–40s task cycle. Use the running preview service's daemon if it's
+      // this project's, else probe the default daemon port; fall back to Gradle.
+      let via = "gradle";
+      const daemonUrl =
+        previewService && previewProjectDir === dir && previewService.status().daemon.active
+          ? previewService.status().daemon.url
+          : "http://127.0.0.1:9601";
+      try {
+        const health = await fetch(`${daemonUrl}/health`, { signal: AbortSignal.timeout(1500) });
+        if (health.ok) {
+          const r = await fetch(`${daemonUrl}/render?screen=${encodeURIComponent(id)}`, {
+            signal: AbortSignal.timeout(120000),
+          });
+          if (r.ok) {
+            via = "daemon";
+          } else if (r.status === 404) {
+            const body = await r.json().catch(() => ({}));
+            return fail(`daemon render failed: ${body.error || `unknown screen '${id}'`}`);
+          }
+          // other daemon errors: fall through to the gradle path
+        }
+      } catch {
+        // no daemon listening (or it died mid-render) — gradle path below
+      }
+      if (via === "gradle") {
+        // Parameters travel as -P properties (never --args, which Gradle's CLI
+        // parsing word-splits).
+        try {
+          await execFileAsync(
+            "./gradlew",
+            [":composeApp:renderScreens", `-Pscreen=${id}`, "-q"],
+            { cwd: dir, timeout: 600000 }
+          );
+        } catch (err) {
+          return fail(
+            `renderScreens failed in '${dir}' (screen '${id}'): ${err && err.message ? err.message : err}. ` +
+              "Is this a create-cmp app scaffolded with the inspector feature? (The task and " +
+              "inspector/PreviewRegistry.kt are generated by create-cmp >= 0.6; run the cmp-upgrade " +
+              "skill or re-stamp to adopt them.) Check the screen id against previewRegistry()."
+          );
+        }
+      }
+      const previewsDir = join(dir, "composeApp", "build", "previews");
+      const meta = readPngMeta(join(previewsDir, id, "screen.png"));
+      return ok({
+        ...meta,
+        treePath: join(previewsDir, id, "tree.json"),
+        previewsDir,
+        via,
+        displayHint: RENDER_SCREEN_DISPLAY_HINT,
+      });
+    }
     if (!target) {
       if (!harness) {
         return fail(
-          "render_screen needs `source:{kind:'live'}` (capture the running app), `pngPath` " +
-            "(an existing PNG), or `harness:true` (run the tier-0 headless harness to produce one)."
+          "render_screen needs `projectDir` (render a real screen of a create-cmp app), " +
+            "`source:{kind:'live'}` (capture the running app), `pngPath` " +
+            "(an existing PNG), or `harness:true` (run the demo headless harness to produce one)."
         );
       }
       const dir = resolvePath(harnessDir || DEFAULT_HARNESS_DIR);
@@ -634,6 +732,180 @@ server.registerTool(
     return ok(proveChange({ beforeTree, afterTree, catalog, tolerancePx, minTouchTargetPx }));
   })
 );
+
+// ---------------------------------------------------------------------------
+// preview — the resident live-preview loop (phase 1 of "Storybook for CMP")
+// ---------------------------------------------------------------------------
+
+// One active service per MCP server. Calling preview for a different project stops
+// the old one; calling it again for the same project returns the same URL.
+let previewService = null;
+let previewProjectDir = null;
+
+server.registerTool(
+  "preview",
+  {
+    title: "Start the live preview gallery (watch + render + serve)",
+    description:
+      "AI-native previews of a create-cmp app's REAL screens with NO device, emulator, or " +
+      "manual Gradle: starts (or reuses) a resident service that renders every screen in " +
+      "inspector/PreviewRegistry.kt headlessly, serves a LIVE gallery for the human at a local " +
+      "URL (pixels + wireframe + a11y per screen; the page reloads itself via SSE after every " +
+      "re-render), and watches composeApp/src so every save re-renders automatically. Returns " +
+      "{ url, screens:[{id, nodes, tokenized, tagged, a11yPass, tree, png}], version, " +
+      "changedLastRender } — give the human the url (open it for them if you can); assert on " +
+      "the returned structure or the per-screen tree paths yourself. After edits use " +
+      "preview_status { waitForRender: true } (blocks until the render/compile outcome) and " +
+      "preview_diff { screen } (one-call verified change). The service is owned by " +
+      "this MCP server; call preview_stop to shut it down. First render includes a Gradle " +
+      "compile (tens of seconds); subsequent saves re-render warm in a few seconds.",
+    inputSchema: {
+      projectDir: z
+        .string()
+        .describe("Root of the create-cmp app (the directory containing composeApp/)."),
+      port: z
+        .number()
+        .int()
+        .optional()
+        .describe("First port to try for the gallery server (default 9600, probes upward)."),
+      hot: z
+        .boolean()
+        .optional()
+        .describe(
+          "Phase 2 (default true): boot the resident preview daemon under Compose Hot Reload " +
+            "(hotRunDesktop --mainClass=<pkg>.inspector.PreviewDaemonKt --auto) so warm saves " +
+            "re-render in seconds; falls back to the gradle path transparently if it can't boot."
+        ),
+    },
+  },
+  guarded(async ({ projectDir, port, hot }) => {
+    const dir = resolvePath(projectDir);
+    if (previewService && previewProjectDir === dir) {
+      return ok({ ...previewService.status(), note: "already running (same project) — URL unchanged." });
+    }
+    if (previewService) {
+      previewService.stop();
+      previewService = null;
+    }
+    const service = createPreviewService({
+      projectDir: dir,
+      port,
+      hot,
+      log: (m) => process.stderr.write(`[preview] ${m}\n`),
+    });
+    const st = await service.start();
+    previewService = service;
+    previewProjectDir = dir;
+    return ok(st);
+  })
+);
+
+server.registerTool(
+  "preview_stop",
+  {
+    title: "Stop the live preview gallery",
+    description:
+      "Stops the resident preview service started by `preview` (file watcher + gallery server). " +
+      "Returns the final status. The Gradle daemon it used stays warm (that's desirable).",
+    inputSchema: {},
+  },
+  guarded(async () => {
+    if (!previewService) return fail("No preview service is running.");
+    const final = previewService.stop();
+    previewService = null;
+    previewProjectDir = null;
+    return ok({ ...final, stopped: true });
+  })
+);
+
+server.registerTool(
+  "preview_status",
+  {
+    title: "Preview status — optionally WAIT for the next render",
+    description:
+      "The agent's post-edit feedback call. Without arguments: returns the preview service's " +
+      "current status (mode, version, rendering, lastError/lastErrorSource, lastActivity, " +
+      "changedLastRender, per-screen summaries incl. lastChangedVersion). With " +
+      "waitForRender:true it BLOCKS until the next render cycle completes (success or failure) " +
+      "or a hot-recompile failure is detected, then returns the same status plus `timedOut` — " +
+      "so the edit loop is: edit → preview_status{waitForRender:true} → read changedLastRender " +
+      "(empty = the edit reached no screen) and lastError (source 'compile' = the edit didn't " +
+      "even build). No polling, no sleeps.",
+    inputSchema: {
+      waitForRender: z
+        .boolean()
+        .optional()
+        .describe("Block until the next render/compile outcome instead of returning immediately."),
+      timeoutMs: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("waitForRender timeout (default 120000; result carries timedOut:true on expiry)."),
+    },
+  },
+  guarded(async ({ waitForRender, timeoutMs }) => {
+    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
+    if (waitForRender) return ok(await previewService.waitForRender(timeoutMs));
+    return ok(previewService.status());
+  })
+);
+
+server.registerTool(
+  "preview_diff",
+  {
+    title: "Diff a screen across the last two renders (one-call verified edit)",
+    description:
+      "prove_change with ZERO bookkeeping: the preview service already retains the previous " +
+      "generation of every screen's tree, so this diffs a screen's LAST render against its " +
+      "CURRENT one — no pre-edit snapshot_save needed. Returns { changes, regressions:{drift, " +
+      "driftChecked, a11y}, verdict } like prove_change (drift is checked against the " +
+      "previews dir's design-system.json when present). Typical loop: edit → " +
+      "preview_status{waitForRender:true} → preview_diff{screen:<a changed id>}. Use " +
+      "snapshot_save + prove_change instead when the baseline must survive sessions/renders.",
+    inputSchema: {
+      screen: z.string().describe("Registry screen id (see preview_status screens[].id)."),
+      tolerancePx: z.number().min(0).optional().describe("Bounds-move tolerance in px (default 1)."),
+      minTouchTargetPx: z.number().positive().optional().describe("a11y touch-target minimum (default 48)."),
+    },
+  },
+  guarded(async ({ screen, tolerancePx, minTouchTargetPx }) => {
+    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
+    const { before, after, version } = previewService.treesFor(screen);
+    if (!after) {
+      const known = previewService.status().screens.map((s) => s.id).join(", ");
+      return fail(`Screen '${screen}' is not in the current render. Known screens: ${known || "(none yet)"}.`);
+    }
+    if (!before) {
+      return fail(
+        `No previous generation for '${screen}' yet — preview_diff compares the last two renders. ` +
+          "Edit code, then preview_status { waitForRender: true }, then call this again."
+      );
+    }
+    let catalog;
+    const catalogPath = join(previewService.status().previewsDir, "design-system.json");
+    if (existsSync(catalogPath)) catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
+    return ok({
+      screen,
+      fromVersion: version - 1,
+      toVersion: version,
+      ...proveChange({
+        beforeTree: JSON.parse(before),
+        afterTree: JSON.parse(after),
+        catalog,
+        tolerancePx,
+        minTouchTargetPx,
+      }),
+    });
+  })
+);
+
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    if (previewService) previewService.stop();
+    process.exit(0);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // wire up stdio transport

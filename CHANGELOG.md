@@ -4,7 +4,130 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-07-13
+
+### Added
+
+- **Headless screen previews of the app's REAL screens (tier 0, "Android Studio previews"
+  without the IDE)** — closing the gap where `render_screen` could only render the bundled
+  demo SampleScreen. Every app scaffolded with the inspector feature now ships:
+  - `inspector/PreviewRegistry.kt` (desktopMain) — the `@Preview` analog: a `ScreenPreview`
+    entry for the shell, every bottom-nav tab, and the detail destination. Regenerated from
+    the configured `--tabs` by pipeline step b.3 (default config reproduces the static
+    template byte-for-byte, pinned by `test/tab-surfaces.test.mjs`).
+  - `inspector/PreviewHarness.kt` + a `:composeApp:renderScreens` Gradle task — renders each
+    registry entry with the app's real Koin DI, theme, and data (own Koin start, independent
+    of the dev-client feature; provides the Lifecycle/ViewModelStore owners `koinViewModel()`
+    and `collectAsStateWithLifecycle` need) to `composeApp/build/previews/<id>/`: the
+    inspector-contract `tree.json` (phone viewport 411x891, density 1, px == dp, resolved
+    design tokens via the PROJECT's DesignTokenKey) plus a `screen.png` pixel twin (@2x) from
+    the same composition sources — no device, no emulator, no window. Parameters travel as
+    `-P` properties (`-Pscreen=<id|all>`, `-PpreviewOut`, `-PpngScale`), never `--args`
+    (Gradle's CLI parsing word-splits `--args` values into task names).
+  - `qa/preview-gallery.mjs` — builds ONE self-contained `index.html` from the output
+    (embedded PNGs for humans, wireframe SVG + a11y overlay per screen via the vendored
+    pure-logic render libs in `qa/lib/`), dependency-free like the rest of `qa/`.
+  - MCP: `render_screen` gains `projectDir` + `screen` — runs the generated task and returns
+    the PNG metadata plus `treePath`/`previewsDir`; the bundled-SampleScreen `harness:true`
+    path remains as the demo fallback and is labeled as such.
+- **`preview` / `preview_stop` MCP tools + the `cmp-preview` skill (ninth skill) — the
+  AI-native preview loop ("Storybook for CMP", phase 1)** — nobody runs Gradle or node
+  scripts by hand: `preview { projectDir }` starts a resident service owned by the MCP
+  server that renders every registry screen headlessly, serves a LIVE gallery at a local
+  URL (pixels + inline wireframe SVG + a11y per screen; SSE-driven self-reload; changed
+  screens flagged; render failures shown as a banner while the last good state stays up),
+  and watches `composeApp/src` so every save re-renders automatically (debounced,
+  serialized, one queued follow-up; recursive fs.watch with an mtime-poll fallback). The
+  tool returns the same state structurally (`screens` with node/token/a11y counts + tree
+  paths, `changedLastRender`) so the agent asserts while the human watches — pixels to
+  the human, structure to the AI. Unit-tested via an injected render runner
+  (`inspector/mcp/test/preview-service.test.mjs`).
+- **Resident preview daemon (phase 2 — `@Preview` parity)** — the template ships
+  `inspector/PreviewDaemon.kt`: a long-lived headless JVM serving loopback
+  `/health|/screens|/render?screen=|/shutdown`, launched by the preview service under
+  **Compose Hot Reload** (`hotRunDesktop --mainClass=<pkg>.inspector.PreviewDaemonKt
+  --auto`; plain `runPreviewDaemon` JavaExec as the no-hot-swap variant). Saves recompile
+  incrementally and hot-swap into the RUNNING daemon; `/render` re-reads the registry per
+  request so fresh scenes compose from the swapped classes. The node service prefers the
+  daemon when healthy (spawns it in the background, reuses an already-running one, falls
+  back to the Gradle task transparently on any failure) and switches its render trigger
+  to the compiled-classes dir so renders never race the swap (1.5s trailing debounce).
+  Render settle is now ADAPTIVE (stop when two consecutive tree dumps match / two quiet
+  invalidation checks) instead of fixed sleeps. Measured on a real 7-screen app: ~900ms
+  single-screen, ~7s all screens, ~10s save→gallery-shows-the-change, vs 25–40s per
+  change on the task path. `preview` gains `hot` (default true); `detectAppPackage`
+  reads create-cmp.json (the 0.5.0 spec-of-record) with a namespace fallback.
+- **Agent feedback loop hardening (dogfood review of the preview loop)** — the two P0
+  gaps found by using the loop as an agent, plus the P1/P2 follow-ups:
+  - **Compile failures are no longer silent in daemon mode** (P0): a broken edit under
+    Compose Hot Reload produces no render (no classes written → no trigger), and the
+    hot recompiler is a SEPARATE Gradle daemon whose output is unobservable — verified
+    live, previously zero signal. The service now runs a **compile watchdog**: a save
+    that produces no in-JVM reload within 20s triggers its own
+    `:composeApp:compileKotlinDesktop` check, promoting the compiler's `e:` lines into
+    `lastError` with `lastErrorSource: "compile"`, an SSE error broadcast (gallery pill
+    "compile failed"), and immediate settlement of pending waiters (daemon-child output
+    is also scanned for failure markers as belt-and-braces). `status()` also carries
+    `lastActivity` ({what, at}: src-change / compile-failed / render-ok / render-stale…)
+    so "quiet" and "stuck" are distinguishable.
+  - **Swap-aware renders** (P0, found live): classes appearing on disk PRECEDE the
+    in-JVM hot swap, so a classes-triggered render could compose pre-swap code and
+    report a false `changed: []`. The daemon now registers an after-reload callback by
+    reflecting on the Compose Hot Reload AGENT
+    (`org.jetbrains.compose.reload.agent.ReloadHooksKt.invokeAfterHotReload` — the
+    `-javaagent` jar is app-visible; the runtime-api facade is NOT, verified by CNFE.
+    No compile-time dependency, so inspector stays independent of dev-client; plain
+    JVMs report `reloadHooked: false`). `/health` and `/render` expose
+    `reloadCount`/`reloadErrors`, and `GET /render?afterReload=<n>` holds the render
+    (≤10s) until the swap actually lands. After every save the service passes its last
+    seen reload count, retries stale renders on a bounded cadence (time-based when the
+    hook is absent), and only settles waiters with the post-swap outcome — `changed:
+    []` now really means "your edit reached no screen". A swap the agent REJECTS
+    (structural change) bumps `reloadErrors` and surfaces as `lastErrorSource:
+    "reload"` with a restart-to-heal message instead of silently rendering stale code.
+  - **`preview_status` MCP tool** (P0): the agent's post-edit call.
+    `{ waitForRender: true, timeoutMs? }` blocks until the next render cycle completes
+    (success or failure) or a hot-recompile failure is detected — edit → one call →
+    `changedLastRender`/`lastError` verdict; no HTTP polling, no sleeps. Result carries
+    `timedOut` on expiry; waiters are settled (never left hanging) on `preview_stop`.
+  - **`preview_diff` MCP tool** (P1): `prove_change` with zero bookkeeping — the service
+    retains the previous generation of every screen's tree, so `{ screen }` diffs the
+    last two renders and returns the full prove_change contract ({changes, regressions,
+    verdict}), drift-checked against the previews dir's `design-system.json` when
+    present. `snapshot_save` + `prove_change` remain for cross-session goldens.
+  - **`render_screen` warm path** (P1): with `projectDir`, the tool now renders through
+    the resident preview daemon when one is healthy (~1s vs the 25–40s task cycle) and
+    reports `via: "daemon" | "gradle"`; unknown-screen errors surface the daemon's
+    message instead of falling through.
+  - **Gallery polish** (P2): per-card persistent "changed #N" badge (attribution
+    outlives the next render; `lastChangedVersion` per screen in `/status` too), hover
+    before/after compare on changed cards (`screen.prev.png` snapshotted before each
+    render), and a screen filter box that survives the SSE self-reloads.
+  - **State variants documented** (P2): the registry doc (template + `--tabs` codegen)
+    now spells out the Storybook-"story" analog — a forced-state screen is just another
+    `ScreenPreview("home@empty", …)` entry; loading/empty/error states render side by
+    side with the default seeded state.
+- **Agent discoverability pass — a clean-install agent now learns the preview loop from
+  every surface it auto-loads** (industry anchors: the AGENTS.md open standard, MCP
+  server `instructions`, task-shaped tool/skill descriptions with the key info first):
+  - Generated **`CLAUDE.md`** gains a "UI feedback loop" section — the exact
+    plugin-tool loop (`preview` → `preview_status {waitForRender:true}` →
+    `preview_diff`) AND the no-plugin Gradle fallback, feature-markered so
+    `--no-inspector` / `--no-dev-client` stamps stay truthful; generated **`AGENTS.md`**
+    (new) points every non-Claude agent (Codex/Cursor/Copilot/…) at the same contract.
+  - The **cmp-inspector MCP server now ships `instructions`** (injected into every
+    connected agent's context): the default UI loop first, tier-1 inspection after;
+    server version now read from package.json instead of a stale hardcode.
+  - **cmp-preview's skill description is task-shaped**: it triggers on the agent's own
+    workflow ("while building or editing ANY CMP screen", "verify a UI change") — not
+    only on user phrases like "preview my app".
+  - **cmp-new's report step hands over the daily loop** (offer to start `preview` right
+    after scaffolding); **cmp-dev-client** cross-links the preview loop; the
+    **cmp-orchestrator** agent gates delegated UI changes through
+    `preview_status`/`preview_diff` alongside the verify lane.
+  - Template README quick-start gains the headless preview one-liner; plugin +
+    marketplace descriptions and the root README/USAGE now headline the loop
+    ("the agent sees what it builds").
 
 ## [0.5.0] - 2026-07-12
 

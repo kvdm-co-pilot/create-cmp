@@ -136,6 +136,7 @@ intent — the descriptions carry rich triggers.
 | **cmp-firebase-connect** | Wire a fresh app to its **own** Firebase (the #1 post-scaffold manual step). | Firebase CLI: login → project create/reuse → app register → real `google-services.json` replaces the placeholder → green build proves it. Consent-gated per cloud write. |
 | **cmp-dev-client** | Run the shared UI in a desktop window with Compose Hot Reload. | `:composeApp:hotRunDesktop --auto` / `:composeApp:run`. |
 | **cmp-inspect** | See/drive a running Compose UI as JSON; check tokens, drift, a11y; the verified dev loop. | The `cmp-inspector` MCP (§5). |
+| **cmp-preview** | Live previews of REAL screens, zero commands. | `preview {projectDir}` → live gallery URL; watches sources, re-renders on save; structural summaries for the agent. |
 | **cmp-test** | Generate a regression suite by **observing** the app. | Reads the live tree via the MCP → derives a plan → writes Maestro E2E flows + golden-tree snapshots in the shipped harness style. |
 | **cmp-qa-prep** | Bring up emulator + Maestro flow run + the bottom-nav smoke (legacy Appium bring-up path also supported). | Emulator + Maestro harness. |
 
@@ -173,14 +174,18 @@ source? = { kind:"file",        path }                    // tier 0 — headless
 Resolution: explicit `source` → `treePath` → the `connect_live` session default →
 `$CMP_INSPECTOR_LIVE` → `$CMP_INSPECTOR_TREE` → clear error.
 
-- **file (tier 0):** the desktop harness renders `commonMain` screens headlessly (no emulator, ms
-  fast) → JSON. Best for the fast inner loop.
+- **file (tier 0):** the app's generated harness renders its REAL screens headlessly (no
+  emulator) → JSON + PNG. `./gradlew :composeApp:renderScreens [-Pscreen=<id>]` renders every
+  `inspector/PreviewRegistry.kt` entry (real DI/theme/data) to `composeApp/build/previews/<id>/
+  {tree.json, screen.png}`; `node qa/preview-gallery.mjs` builds a self-contained gallery
+  `index.html` from it. Parameters are `-P` properties, never `--args`. Best for the fast inner
+  loop and for humans who want previews without running the app.
 - **live (tier 1):** the RUNNING app. Each call re-fetches `/inspect/tree` (pull-on-demand: always
   the current screen, real data + nav state). Needs a **debug** build running + `connect_live`.
 - **uiautomator (tier 2):** any app, zero instrumentation — but `designToken` is always `null`
   (tokens don't cross the accessibility bridge), so token/drift tools reject it.
 
-### The 14 tools
+### The 18 tools
 
 **Read & assert:** `inspect_tree` (full tree + counts) · `get_node {testTag}` · `assert_token
 {testTag,key,expected}` · `layout_gaps {testTagA,testTagB}` (computed spacing).
@@ -201,8 +206,29 @@ settleMs?}` — resolves a tap from the live tree, taps via `POST /inspect/tap`,
 **Render:** `render_tree {source?,a11y?}` — deterministic **SVG wireframe** (any source; tokenized
 nodes highlighted with resolved-value chips, clickable outlines, optional a11y overlay); SVG is
 text, so it's returned inline · `render_screen` — **pixel preview, path-only**: returns
-`{path,width,height,sizeBytes,displayHint}` from the PNG header, never bytes. From live
-(`/inspect/screenshot`), a `pngPath`, or the harness.
+`{path,width,height,sizeBytes,displayHint}` from the PNG header, never bytes. From
+`projectDir` (+ `screen?` registry id — through the resident preview daemon when one is running
+(`via:"daemon"`, ~1s warm) else the app's own `:composeApp:renderScreens`, also returns
+`treePath`), live (`/inspect/screenshot`), a `pngPath`, or the demo harness.
+
+**The agent edit loop** (the reason these tools exist — use it while BUILDING, not only when
+asked): 1) `preview {projectDir}` once; 2) edit code; 3) `preview_status {waitForRender:true}` —
+blocks until the outcome: which screens changed, or the compile error, or the failed hot swap;
+4) `preview_diff {screen}` — proven verdict. Feedback in seconds, no device, no polling.
+
+**Preview service:** `preview {projectDir, port?, hot?}` — resident live-preview loop: headless
+render of every registry screen, live gallery URL (SSE self-reload, changed-screen flags), source
+watch with auto re-render; `hot` (default true) boots the resident preview daemon under Compose
+Hot Reload so saves hot-swap into a warm JVM (~1s/screen renders; Gradle-path fallback is
+transparent); returns per-screen structural summaries + tree paths · `preview_status
+{waitForRender?, timeoutMs?}` — the agent's post-edit call: with `waitForRender:true` it BLOCKS
+until the next render or hot-recompile outcome, then returns `changedLastRender`,
+`lastError`/`lastErrorSource` (`"compile"` = the edit didn't build — a watchdog compile check
+surfaces daemon-mode failures the hot recompiler hides), `lastActivity`, and per-screen summaries (`lastChangedVersion` keeps
+attribution across renders) · `preview_diff {screen}` — prove_change between a screen's last two
+renders with ZERO snapshot bookkeeping (the service retains the previous generation; drift checked
+against the previews dir's design-system.json) · `preview_stop` —
+shut the service down (the Gradle daemon stays warm).
 
 **Verify:** `prove_change {before, after, catalogPath?}` — the verified-dev-loop keystone in one
 call: diffs before/after, regression-checks the after tree (drift + a11y), returns
