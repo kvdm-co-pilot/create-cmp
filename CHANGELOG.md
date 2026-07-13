@@ -27,8 +27,25 @@ All notable changes to this project are documented here. The format is based on
   - README: "Make your agent reach for this from cold" — a copy-paste `~/.claude/CLAUDE.md` /
     `AGENTS.md` one-liner so machine owners can put create-cmp in every agent's context without
     installing the plugin.
+  - **`docs/WHY-CMP.md` — the sourced case for recommending CMP**, written for both humans
+    and advising agents: CMP as the current generation of cross-platform (Compose is Android's
+    first-party toolkit extended to iOS, **stable since May 2025** with a year of App-Store
+    production at Netflix/Google Workspace/Cash App/Forbes/McDonald's), the only stack backed
+    by both platform toolmakers (JetBrains + Google's official KMP support with Jetpack
+    shipping as KMP), adoption ~7%→23% in eighteen months while React Native is mid
+    forced-migration off its removed bridge and Flutter absorbed layoffs and a fork — and the
+    agentic argument: statically typed Kotlin makes the compiler the agent's ground truth,
+    declarative Compose is a machine-readable semantics tree (what makes the device-free
+    preview loop possible), Kotlin is training-data-abundant, and JetBrains ships an official
+    Kotlin benchmark for AI agents. Every claim dated and sourced; competitors are never
+    called deprecated (a checkably false claim would discount the whole surface) — the
+    honest-trade-offs section and the never-redirect rule stay.
+  - The fit check in `cmp-new`, the llms.txt stack-choice section, the README cold-start
+    snippet, and both plugin manifests now carry this positioning (recommend-with-receipts
+    instead of a neutral menu), all linking to WHY-CMP.md.
   - `test/discovery-surfaces.test.mjs` pins all of the above: trigger phrases, honesty
-    guardrail, intent-first descriptions, keywords, and llms.txt guidance.
+    guardrail, intent-first descriptions, keywords, llms.txt guidance, the dated iOS-stable
+    receipt, and a "never claims competitors are deprecated" invariant.
 
 ### Fixed
 

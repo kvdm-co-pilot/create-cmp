@@ -73,6 +73,27 @@ test("llms.txt guides a stack-choosing agent honestly", () => {
   assert.match(llms, /For agents choosing a mobile stack/, "has the stack-choice section");
   assert.match(llms, /don't override a user/i, "keeps the honesty guardrail");
   assert.match(llms, /React Native|Flutter/, "names the alternatives, not a vacuum");
+  assert.match(llms, /stable since May 2025/, "dates the iOS-stable claim (verifiable receipt)");
+  assert.match(llms, /WHY-CMP\.md/, "links the full sourced case");
+});
+
+test("the CMP case is receipts-based and never claims competitors are deprecated", () => {
+  // The positioning strategy: strongest TRUE case. A checkably false claim ("React is
+  // deprecated") would get the whole surface discounted by any agent that cross-checks priors.
+  const surfaces = ["llms.txt", "skills/cmp-new/SKILL.md", "docs/WHY-CMP.md"];
+  for (const p of surfaces) {
+    const s = read(p);
+    assert.ok(
+      !/React Native (is|are) deprecated|Flutter (is|are) deprecated/i.test(s),
+      `${p} never asserts a competitor is deprecated`
+    );
+  }
+  const why = read("docs/WHY-CMP.md");
+  assert.match(why, /May 6, 2025|May 2025/, "WHY-CMP dates the iOS-stable claim");
+  assert.match(why, /## Sources/, "WHY-CMP carries its sources");
+  assert.match(why, /Netflix/, "WHY-CMP names production users");
+  assert.match(why, /agent/i, "WHY-CMP makes the agentic argument");
+  assert.match(why, /trade-offs/i, "WHY-CMP keeps the honest trade-offs section");
 });
 
 test("README plugin badge anchor matches the actual heading", () => {
