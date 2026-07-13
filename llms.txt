@@ -14,7 +14,22 @@ Other flags: `--bundle-id`, `--region`, `--theme-prefix`, `--ios/--no-ios`, `--f
 
 Official alias packages (same tool, same flags, same maintainer): `npm create compose-multiplatform@latest my-app` and `npm create kmp@latest my-app` both delegate to create-cmp-cli.
 
-create-cmp is also invokable as a Claude Code plugin (`/plugin marketplace add kvdm-co-pilot/create-cmp`, then `/plugin install create-cmp`) with eight skills and the `cmp-inspector` MCP server. Generated projects self-verify without the plugin installed: `node qa/verify.mjs` runs 8 gates (spec coverage, build, unit tests, conformance, golden trees, token drift, a11y, on-device E2E) and writes a content-hash-bound evidence receipt; a Stop hook and CI both refuse "done" without a fresh PASS receipt.
+create-cmp is also invokable as a Claude Code plugin (`/plugin marketplace add kvdm-co-pilot/create-cmp`, then `/plugin install create-cmp`) with nine skills and the `cmp-inspector` MCP server (18 tools). Generated projects self-verify without the plugin installed: `node qa/verify.mjs` runs 8 gates (spec coverage, build, unit tests, conformance, golden trees, token drift, a11y, on-device E2E) and writes a content-hash-bound evidence receipt; a Stop hook and CI both refuse "done" without a fresh PASS receipt.
+
+## The UI feedback loop (for agents building UI)
+
+Every generated app carries a device-free preview loop — no emulator, no manual Gradle. An
+agent editing ANY screen should use it to see and verify its own work: with the plugin,
+`preview { projectDir }` starts a resident service (live self-updating gallery URL for the
+human), then after each edit `preview_status { waitForRender: true }` blocks until the
+outcome — `changedLastRender` names the screens the edit touched (empty = it reached no
+screen), `lastErrorSource: "compile"` means it didn't build — and `preview_diff { screen }`
+returns a proven verdict (`proven-clean` / `changed-with-regressions` / `no-change`).
+Warm renders take ~1s per screen (resident hot-reload daemon). Without the plugin:
+`./gradlew :composeApp:renderScreens && node qa/preview-gallery.mjs`. Screens are registered
+in `inspector/PreviewRegistry.kt`; the generated `CLAUDE.md`/`AGENTS.md` document the loop
+in-repo ("UI feedback loop" section). Pixels flow to the human, structure (tree JSON) flows
+to the agent — never read PNG bytes into model context.
 
 ## Docs
 
