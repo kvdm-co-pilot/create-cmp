@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **`git init` no longer invalidates a stamp-time receipt (first-touch UX trap).** In a
+  project with no `.git` yet — exactly the state `create-cmp --verify` runs in at stamp
+  time — the inputs-hash walk fallback included `composeApp/build/**`, Gradle/Kotlin
+  scratch, and OS/editor junk (`.DS_Store`, `*.iml`, `.idea/`, `*.log`) that the
+  `git ls-files --exclude-standard` path excludes, so the first `git init` flipped the
+  PASS receipt to "INVALID — source changed" with no source change. The walk fallback now
+  mirrors the template `.gitignore`'s exclusions; pre-git and post-git hashes agree for
+  identical source (pinned by `test/inputs-hash-parity.test.mjs`, which fails against the
+  old code). Reproduced against released 0.6.1 and verified fixed end-to-end:
+  scaffold → verify → `git init` → `receipt-check` now reads VALID.
+
 ### Changed
 
 - **Template README attribution is now a visible badge.** The plain "Built with create-cmp"

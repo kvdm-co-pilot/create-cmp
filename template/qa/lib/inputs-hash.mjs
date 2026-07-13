@@ -49,14 +49,34 @@ function tryGitLsFiles(root) {
   }
 }
 
+// Directory names the walk fallback must skip wherever they appear under a
+// surface root. These mirror what the stamped .gitignore excludes: without
+// this, a pre-`git init` hash (walk mode) includes composeApp/build/** and
+// Gradle/Kotlin scratch that the post-`git init` hash (`git ls-files
+// --exclude-standard`) excludes — so the stamp-time PASS receipt would read
+// "INVALID — source changed" the moment the user runs `git init`, even though
+// no source changed. Pre-git and post-git hashes must agree for identical
+// source; that is the invariant the regression test pins.
+const WALK_EXCLUDED_DIRS = new Set(["build", ".gradle", ".kotlin", ".git", ".idea", "node_modules"]);
+// File-level mirror of the same principle (OS/editor junk the .gitignore covers).
+const WALK_EXCLUDED_FILES = new Set([".DS_Store"]);
+const WALK_EXCLUDED_SUFFIXES = [".iml", ".log"];
+
+function walkIncludesFile(name) {
+  if (WALK_EXCLUDED_FILES.has(name)) return false;
+  return !WALK_EXCLUDED_SUFFIXES.some((suffix) => name.endsWith(suffix));
+}
+
 // Dependency-free recursive walk, used when git is unavailable (non-git scaffold).
 function walkAllFiles(dir) {
   const out = [];
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walkAllFiles(p));
-    else if (entry.isFile()) out.push(p);
+    if (entry.isDirectory()) {
+      if (WALK_EXCLUDED_DIRS.has(entry.name)) continue; // non-source scratch — see note above
+      out.push(...walkAllFiles(p));
+    } else if (entry.isFile() && walkIncludesFile(entry.name)) out.push(p);
   }
   return out;
 }
