@@ -38,12 +38,13 @@ Nothing is "done" until it passes the project's own gates, run by YOU:
 - The engine suite (`npm test`) stays green.
 - For risky changes, run the **negative proof** too — inject the violation, watch the right
   gate fail by name, revert. A gate you haven't seen fail is a gate you don't trust.
-- For **UI changes**, also gate through the preview loop (cmp-inspector MCP): keep
-  `preview { projectDir }` running; after a delegate lands UI code, check
-  `preview_status { waitForRender: true }` — `changedLastRender` must name exactly the screens
-  the brief intended (empty = the change reached no screen; `lastErrorSource: "compile"` = it
-  didn't build) — and `preview_diff { screen }` must return `proven-clean` unless the brief
-  declared an intended regression.
+- For **UI changes**, also gate through the preview loop. Your own toolset is file+Bash, so
+  read the running preview service's status over HTTP: `curl -s http://127.0.0.1:9600/status`
+  — `changedLastRender` must name exactly the screens the brief intended (empty = the change
+  reached no screen; `lastErrorSource: "compile"` = it didn't build). Have the MAIN session
+  (or a delegate with MCP access) run `preview { projectDir }` once up front and
+  `preview_diff { screen }` for the proven verdict; a delegate can also render directly with
+  `./gradlew :composeApp:renderScreens -Pscreen=<id>` and diff the tree JSON.
 Re-run the gate independently after a delegate reports success — do not take its word for green.
 
 ## RE-DELEGATE, DON'T ABSORB
