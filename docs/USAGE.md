@@ -185,7 +185,7 @@ Resolution: explicit `source` → `treePath` → the `connect_live` session defa
 - **uiautomator (tier 2):** any app, zero instrumentation — but `designToken` is always `null`
   (tokens don't cross the accessibility bridge), so token/drift tools reject it.
 
-### The 16 tools
+### The 18 tools
 
 **Read & assert:** `inspect_tree` (full tree + counts) · `get_node {testTag}` · `assert_token
 {testTag,key,expected}` · `layout_gaps {testTagA,testTagB}` (computed spacing).
@@ -207,14 +207,22 @@ settleMs?}` — resolves a tap from the live tree, taps via `POST /inspect/tap`,
 nodes highlighted with resolved-value chips, clickable outlines, optional a11y overlay); SVG is
 text, so it's returned inline · `render_screen` — **pixel preview, path-only**: returns
 `{path,width,height,sizeBytes,displayHint}` from the PNG header, never bytes. From
-`projectDir` (+ `screen?` registry id — runs the app's own `:composeApp:renderScreens`, also
-returns `treePath`), live (`/inspect/screenshot`), a `pngPath`, or the demo harness.
+`projectDir` (+ `screen?` registry id — through the resident preview daemon when one is running
+(`via:"daemon"`, ~1s warm) else the app's own `:composeApp:renderScreens`, also returns
+`treePath`), live (`/inspect/screenshot`), a `pngPath`, or the demo harness.
 
 **Preview service:** `preview {projectDir, port?, hot?}` — resident live-preview loop: headless
 render of every registry screen, live gallery URL (SSE self-reload, changed-screen flags), source
 watch with auto re-render; `hot` (default true) boots the resident preview daemon under Compose
 Hot Reload so saves hot-swap into a warm JVM (~1s/screen renders; Gradle-path fallback is
-transparent); returns per-screen structural summaries + tree paths · `preview_stop` —
+transparent); returns per-screen structural summaries + tree paths · `preview_status
+{waitForRender?, timeoutMs?}` — the agent's post-edit call: with `waitForRender:true` it BLOCKS
+until the next render or hot-recompile outcome, then returns `changedLastRender`,
+`lastError`/`lastErrorSource` (`"compile"` = the edit didn't build — a watchdog compile check
+surfaces daemon-mode failures the hot recompiler hides), `lastActivity`, and per-screen summaries (`lastChangedVersion` keeps
+attribution across renders) · `preview_diff {screen}` — prove_change between a screen's last two
+renders with ZERO snapshot bookkeeping (the service retains the previous generation; drift checked
+against the previews dir's design-system.json) · `preview_stop` —
 shut the service down (the Gradle daemon stays warm).
 
 **Verify:** `prove_change {before, after, catalogPath?}` — the verified-dev-loop keystone in one

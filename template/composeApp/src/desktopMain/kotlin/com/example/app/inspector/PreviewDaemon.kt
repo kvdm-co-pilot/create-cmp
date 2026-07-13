@@ -12,6 +12,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.system.exitProcess
 import kotlin.system.measureTimeMillis
 
@@ -31,9 +32,13 @@ import kotlin.system.measureTimeMillis
  * (resident, but a restart is needed to pick up recompiled classes).
  *
  * Routes (loopback only, mirroring the on-device inspector server's posture):
- *   GET /health                 → { ok, pid, screens, port }
+ *   GET /health                 → { ok, pid, screens, port, reloadCount, reloadHooked }
  *   GET /screens                → the registry (ids + titles)
- *   GET /render?screen=<id|all> → renders to the previews dir; → { rendered, ms, out }
+ *   GET /render?screen=<id|all>[&afterReload=<n>]
+ *       → renders to the previews dir; → { rendered, ms, out, reloadCount, reloadHooked }.
+ *       With afterReload, the render WAITS (≤10s) until reloadCount exceeds <n>: classes
+ *       appearing on disk precede the in-JVM swap, so a caller that just saw a source
+ *       change uses this to avoid composing pre-swap code (a stale render).
  *   GET /shutdown               → 200, then exits
  *
  * Program args (never --args-through-Gradle for the renderScreens task, but ComposeHotRun
@@ -44,6 +49,12 @@ fun main(args: Array<String>) {
     val port = argValue(args, "--port")?.toIntOrNull() ?: 9601
     val outRoot = File(argValue(args, "--out") ?: "build/previews")
     val pngScale = argValue(args, "--pngScale")?.toFloatOrNull()?.takeIf { it > 0f } ?: 2f
+
+    val reloadCount = AtomicLong(0)
+    val reloadErrors = AtomicLong(0)
+    val reloadHooked = hookReloadListener { succeeded ->
+        if (succeeded) reloadCount.incrementAndGet() else reloadErrors.incrementAndGet()
+    }
 
     initPreviewKoin()
     outRoot.mkdirs()
@@ -58,6 +69,9 @@ fun main(args: Array<String>) {
             put("ok", JsonPrimitive(true))
             put("pid", JsonPrimitive(ProcessHandle.current().pid()))
             put("port", JsonPrimitive(port))
+            put("reloadCount", JsonPrimitive(reloadCount.get()))
+            put("reloadErrors", JsonPrimitive(reloadErrors.get()))
+            put("reloadHooked", JsonPrimitive(reloadHooked))
             put("screens", buildJsonArray {
                 previewRegistry().forEach { add(JsonPrimitive(it.id)) }
             })
@@ -78,6 +92,16 @@ fun main(args: Array<String>) {
     }
 
     server.createContext("/render") { exchange ->
+        // Swap-aware rendering: classes on disk precede the in-JVM swap, so a caller
+        // that just observed a source change passes afterReload=<last seen count> and
+        // we wait (bounded) for the swap to actually land before composing.
+        val afterReload = queryParam(exchange, "afterReload")?.toLongOrNull()
+        if (afterReload != null && reloadHooked) {
+            val deadline = System.currentTimeMillis() + 10_000
+            while (reloadCount.get() <= afterReload && System.currentTimeMillis() < deadline) {
+                Thread.sleep(100)
+            }
+        }
         // Re-read the registry PER REQUEST: after a hot swap, this picks up the
         // redefined screen composables (fresh scenes are composed from current classes).
         val all = previewRegistry()
@@ -110,6 +134,9 @@ fun main(args: Array<String>) {
                 put("rendered", buildJsonArray { rendered.forEach { add(JsonPrimitive(it)) } })
                 put("ms", JsonPrimitive(ms))
                 put("out", JsonPrimitive(outRoot.absolutePath))
+                put("reloadCount", JsonPrimitive(reloadCount.get()))
+                put("reloadErrors", JsonPrimitive(reloadErrors.get()))
+                put("reloadHooked", JsonPrimitive(reloadHooked))
             })
         } catch (t: Throwable) {
             respondJson(exchange, 500, buildJsonObject {
@@ -132,6 +159,38 @@ fun main(args: Array<String>) {
             "(previews -> ${outRoot.absolutePath}, pngScale $pngScale)"
     )
     CountDownLatch(1).await() // resident until /shutdown or SIGTERM
+}
+
+/**
+ * Register a Compose Hot Reload after-reload callback via REFLECTION against the
+ * AGENT (`org.jetbrains.compose.reload.agent.ReloadHooksKt`) — the agent jar is what
+ * `hotRunDesktop` loads via -javaagent, so it IS visible to app code, unlike the
+ * runtime-api facade (verified: ClassNotFoundException). No compile-time dependency,
+ * so the inspector feature stays independent of the dev-client feature; plain
+ * `runPreviewDaemon` JVMs return false and just report reloadHooked=false.
+ *
+ * The callback receives Either<Reload, Throwable>: success bumps the reload count,
+ * failure (a swap the agent could not apply) is reported separately so callers can
+ * surface "your edit did not land" instead of rendering pre-swap code forever.
+ */
+private fun hookReloadListener(onReload: (succeeded: Boolean) -> Unit): Boolean = try {
+    val hooks = Class.forName("org.jetbrains.compose.reload.agent.ReloadHooksKt")
+    val isSuccess = runCatching {
+        Class.forName("org.jetbrains.compose.reload.core.TryKt")
+            .getMethod("isSuccess", Class.forName("org.jetbrains.compose.reload.core.Either"))
+    }.getOrNull()
+    val callback: Function2<Any?, Any?, Unit> = { _, either ->
+        val ok = runCatching { isSuccess?.invoke(null, either) as? Boolean }.getOrNull() ?: true
+        onReload(ok)
+    }
+    hooks.getMethod("invokeAfterHotReload", Function2::class.java).invoke(null, callback)
+    true
+} catch (t: Throwable) {
+    System.err.println(
+        "preview daemon: reload hook unavailable (${t.javaClass.simpleName}) — " +
+            "swap-aware renders disabled, callers fall back to time-based settling"
+    )
+    false
 }
 
 private fun argValue(args: Array<String>, flag: String): String? {

@@ -57,6 +57,56 @@ All notable changes to this project are documented here. The format is based on
   single-screen, ~7s all screens, ~10s save→gallery-shows-the-change, vs 25–40s per
   change on the task path. `preview` gains `hot` (default true); `detectAppPackage`
   reads create-cmp.json (the 0.5.0 spec-of-record) with a namespace fallback.
+- **Agent feedback loop hardening (dogfood review of the preview loop)** — the two P0
+  gaps found by using the loop as an agent, plus the P1/P2 follow-ups:
+  - **Compile failures are no longer silent in daemon mode** (P0): a broken edit under
+    Compose Hot Reload produces no render (no classes written → no trigger), and the
+    hot recompiler is a SEPARATE Gradle daemon whose output is unobservable — verified
+    live, previously zero signal. The service now runs a **compile watchdog**: a save
+    that produces no in-JVM reload within 20s triggers its own
+    `:composeApp:compileKotlinDesktop` check, promoting the compiler's `e:` lines into
+    `lastError` with `lastErrorSource: "compile"`, an SSE error broadcast (gallery pill
+    "compile failed"), and immediate settlement of pending waiters (daemon-child output
+    is also scanned for failure markers as belt-and-braces). `status()` also carries
+    `lastActivity` ({what, at}: src-change / compile-failed / render-ok / render-stale…)
+    so "quiet" and "stuck" are distinguishable.
+  - **Swap-aware renders** (P0, found live): classes appearing on disk PRECEDE the
+    in-JVM hot swap, so a classes-triggered render could compose pre-swap code and
+    report a false `changed: []`. The daemon now registers an after-reload callback by
+    reflecting on the Compose Hot Reload AGENT
+    (`org.jetbrains.compose.reload.agent.ReloadHooksKt.invokeAfterHotReload` — the
+    `-javaagent` jar is app-visible; the runtime-api facade is NOT, verified by CNFE.
+    No compile-time dependency, so inspector stays independent of dev-client; plain
+    JVMs report `reloadHooked: false`). `/health` and `/render` expose
+    `reloadCount`/`reloadErrors`, and `GET /render?afterReload=<n>` holds the render
+    (≤10s) until the swap actually lands. After every save the service passes its last
+    seen reload count, retries stale renders on a bounded cadence (time-based when the
+    hook is absent), and only settles waiters with the post-swap outcome — `changed:
+    []` now really means "your edit reached no screen". A swap the agent REJECTS
+    (structural change) bumps `reloadErrors` and surfaces as `lastErrorSource:
+    "reload"` with a restart-to-heal message instead of silently rendering stale code.
+  - **`preview_status` MCP tool** (P0): the agent's post-edit call.
+    `{ waitForRender: true, timeoutMs? }` blocks until the next render cycle completes
+    (success or failure) or a hot-recompile failure is detected — edit → one call →
+    `changedLastRender`/`lastError` verdict; no HTTP polling, no sleeps. Result carries
+    `timedOut` on expiry; waiters are settled (never left hanging) on `preview_stop`.
+  - **`preview_diff` MCP tool** (P1): `prove_change` with zero bookkeeping — the service
+    retains the previous generation of every screen's tree, so `{ screen }` diffs the
+    last two renders and returns the full prove_change contract ({changes, regressions,
+    verdict}), drift-checked against the previews dir's `design-system.json` when
+    present. `snapshot_save` + `prove_change` remain for cross-session goldens.
+  - **`render_screen` warm path** (P1): with `projectDir`, the tool now renders through
+    the resident preview daemon when one is healthy (~1s vs the 25–40s task cycle) and
+    reports `via: "daemon" | "gradle"`; unknown-screen errors surface the daemon's
+    message instead of falling through.
+  - **Gallery polish** (P2): per-card persistent "changed #N" badge (attribution
+    outlives the next render; `lastChangedVersion` per screen in `/status` too), hover
+    before/after compare on changed cards (`screen.prev.png` snapshotted before each
+    render), and a screen filter box that survives the SSE self-reloads.
+  - **State variants documented** (P2): the registry doc (template + `--tabs` codegen)
+    now spells out the Storybook-"story" analog — a forced-state screen is just another
+    `ScreenPreview("home@empty", …)` entry; loading/empty/error states render side by
+    side with the default seeded state.
 
 ## [0.5.0] - 2026-07-12
 

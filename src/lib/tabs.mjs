@@ -380,6 +380,13 @@ ${imports.join("\n")}
  * X" a closed, enumerable operation. The scaffolder regenerates the tab entries from the
  * configured \`tabs\`; when you add a screen by hand, add it here — the renderScreens
  * harness, the gallery, and golden baselines pick it up by id.
+ *
+ * State variants (the Storybook "story" analog): a screen in a specific UI state is just
+ * another entry with a derived id — e.g. \`ScreenPreview("home@empty", "Home — empty")\`
+ * hosting the screen with that state forced (a state-first overload of the screen, or
+ * preview-only fakes behind its usual parameters). Every entry renders the same way
+ * (gallery card, \`-Pscreen=\` selector, golden baseline), so loading/empty/error states
+ * sit side by side with the default seeded state.
  */
 data class ScreenPreview(
     val id: String,

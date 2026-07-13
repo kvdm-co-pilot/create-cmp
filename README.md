@@ -122,7 +122,7 @@ Same engine as the CLI, conversational front door. Each skill is a guided flow, 
 | `cmp-test` | "Write tests for my app." *Observes* the running app's semantics tree — what's actually on screen, what's tappable, where navigation goes — and derives the regression suite from that. Tests come from rendered reality, not guesses. |
 | `cmp-qa-prep` | "Get my test environment up." Emulator + app install + E2E smoke run, with the gotchas handled. |
 
-Plus the **`cmp-inspector` MCP server** (16 tools) — the machine-readable window into a running
+Plus the **`cmp-inspector` MCP server** (18 tools) — the machine-readable window into a running
 Compose UI that `cmp-inspect`, `cmp-test`, and the verified dev loop are built on. One tree
 contract, three sources: render a screen headlessly, connect to the live app, or read a device
 via UIAutomator.

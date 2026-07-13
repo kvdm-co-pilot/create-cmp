@@ -41,21 +41,38 @@ to verify changes. Nobody runs Gradle by hand; the MCP service owns the loop.
    macOS, or the host's browser surface). That's their whole workflow: edit → save →
    watch the gallery update. First render includes a Gradle compile (tens of seconds);
    warm saves re-render in a few seconds.
-3. **You work structurally** — the tool result (and `GET <url>status`) carries
-   `screens: [{ id, nodes, tokenized, tagged, a11yPass, a11yViolations, tree, png }]`
-   and `changedLastRender`. Assert on the `tree` paths with the inspector tools
-   (`get_node`, `assert_token`, `snapshot_diff`, `prove_change { before, after }`) —
-   never read the PNGs.
+3. **You work structurally** — after every edit, ONE call:
+   `preview_status { waitForRender: true }`. It blocks until the render (or the
+   recompile) finishes and returns `changedLastRender` (empty = your edit reached no
+   screen), `lastError`/`lastErrorSource` (`"compile"` = your edit didn't even build —
+   the daemon surfaces hot-recompile failures, you are NOT flying blind), and
+   `screens: [{ id, nodes, tokenized, tagged, a11yPass, a11yViolations,
+   lastChangedVersion, tree, png }]`. No HTTP polling, no sleeps. Assert deeper on the
+   `tree` paths with the inspector tools (`get_node`, `assert_token`) — never read PNGs.
 4. **`preview_stop {}`** when the session is done (the Gradle daemon stays warm — good).
 
 ## The verified edit loop (with the gallery open)
 
 1. `preview { projectDir }` → human watches the gallery.
-2. `snapshot_save { treePath: <screen's tree>, snapshotPath }` — BEFORE golden.
-3. Edit code → the service re-renders automatically → `changedLastRender` names the
-   screens your edit touched (an empty list = the edit didn't reach any screen).
-4. `prove_change { before: <snapshotPath>, after: <screen's tree path> }` → verdict;
-   the human sees the same change land visually, flagged CHANGED, in the gallery.
+2. Edit code → `preview_status { waitForRender: true }` → the result names the changed
+   screens or carries the compile/render error.
+3. `preview_diff { screen: <a changed id> }` → prove_change verdict (`proven-clean` /
+   `changed-with-regressions` / `no-change`) between the last two renders — the service
+   keeps the previous generation, so there is NO snapshot bookkeeping. The human sees
+   the same change land visually: CHANGED flag, hover-to-compare before/after, and a
+   persistent "changed #N" badge per card.
+4. For baselines that must survive sessions (goldens), keep using
+   `snapshot_save` + `prove_change { before, after }`.
+
+Single-screen warm renders: `render_screen { projectDir, screen }` goes through the
+running daemon automatically (`via: "daemon"`, ~1s) and falls back to the Gradle task.
+
+## State variants (the Storybook "story" analog)
+
+A screen in a forced UI state is just another registry entry with a derived id:
+`ScreenPreview("home@empty", "Home — empty") { … }` hosting the screen with that state
+(a state-first overload, or preview-only fakes). Loading/empty/error states then render
+side by side with the default seeded state — same gallery, same selectors, same goldens.
 
 ## Troubleshooting
 
@@ -67,6 +84,14 @@ to verify changes. Nobody runs Gradle by hand; the MCP service owns the loop.
 - **First render slow / red banner "render FAILED"** — the banner carries the Gradle
   error and the gallery keeps the last good state; fix the compile error, save, it
   recovers on the next cycle.
+- **Broken edit in daemon mode** — a failed hot recompile produces no render, but it is
+  NOT silent: when a save yields no reload within ~20s the service runs its own compile
+  check, so the compiler's `e:` lines land in `lastError` with
+  `lastErrorSource: "compile"`, any pending `waitForRender` resolves with them, and the
+  gallery pill shows "compile failed". Expect that verdict to take ~20–40s (watchdog +
+  compile); a successful edit settles much sooner. `lastActivity` tells you what the
+  service last saw (src-change / compile-failed / render-ok / render-stale) if you need
+  to distinguish "quiet" from "stuck".
 - **Daemon quirks** — the daemon listens on 9601; `preview_stop` shuts it down. Rarely, a
   hot swap can't apply a structural change (Compose Hot Reload limitation) — the daemon
   keeps serving pre-change renders; restart the preview to heal. DI-module edits
