@@ -1,7 +1,7 @@
 {
   "name": "create-compose-multiplatform",
-  "version": "0.1.1",
-  "description": "Official alias for create-cmp-cli \u2014 the AI delivery harness for Kotlin/Compose Multiplatform (scaffolds Android + iOS apps with a built-in verify lane).",
+  "version": "0.1.2",
+  "description": "Official alias for create-cmp-cli — create production mobile apps (Android + iOS, one Kotlin codebase) with AI: the delivery harness for Compose Multiplatform, with a built-in verify lane.",
   "type": "module",
   "bin": {
     "create-compose-multiplatform": "bin/create-compose-multiplatform.mjs"
@@ -24,7 +24,13 @@
     "claude-code",
     "ai-agent",
     "android",
-    "ios"
+    "ios",
+    "mobile app",
+    "create mobile app",
+    "cross-platform",
+    "app generator",
+    "react native alternative",
+    "flutter alternative"
   ],
   "license": "MIT",
   "author": "Karel van der Merwe",

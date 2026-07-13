@@ -1,7 +1,7 @@
 # create-cmp — the complete usage guide
 
 > **Read this first.** It is the single entry point to the whole product: setup, the engine CLI,
-> the 8 skills, the `cmp-inspector` MCP (14 tools), and the workflows that tie them together. An
+> the 9 skills, the `cmp-inspector` MCP (18 tools), and the workflows that tie them together. An
 > agent that reads this knows how to drive create-cmp end to end. Concise by section, exhaustive in
 > total. Companion deep-dives are cross-linked; you rarely need them.
 
@@ -29,7 +29,7 @@ everything:
    *(The harness layers are being built out — see [`HARNESS-PLAN.md`](./HARNESS-PLAN.md) for what
    ships today vs next.)*
 
-**Two front doors, one engine:** the `create-cmp` CLI (`npx`) and the Claude Code plugin (8 skills +
+**Two front doors, one engine:** the `create-cmp` CLI (`npx`) and the Claude Code plugin (9 skills +
 the MCP). Same deterministic Node engine behind both.
 
 **The frozen version set** (moved as one unit by `upgrade`; never bump a piece in isolation):
@@ -59,7 +59,7 @@ node bin/create-cmp.mjs --help
 npx github:kvdm-co-pilot/create-cmp --help        # zero-install
 ```
 
-**Claude Code plugin** (adds the 8 skills + the `cmp-inspector` MCP):
+**Claude Code plugin** (adds the 9 skills + the `cmp-inspector` MCP):
 
 ```text
 /plugin marketplace add kvdm-co-pilot/create-cmp
@@ -123,14 +123,14 @@ that's exactly what makes CMP flaky. Stamp with the engine, then author only per
 
 ---
 
-## 4. The 8 skills
+## 4. The 9 skills
 
 Skills are the plugin's conversational front door; each shells the same engine or the MCP. Invoke by
 intent — the descriptions carry rich triggers.
 
 | Skill | Use it to… | Under the hood |
 |---|---|---|
-| **cmp-new** | Start a new CMP/KMP app by interview (also fires on "React Native vs KMP"). | Interviews → `create --verify` → generates tab screens from the example feature. |
+| **cmp-new** | Start a new mobile app (Android + iOS) by interview — fires on framework-undecided "create a mobile app" requests (honest CMP-vs-RN/Flutter fit check first) as well as explicit CMP/KMP asks and comparisons like "React Native vs KMP". | Interviews → `create --verify` → generates tab screens from the example feature. |
 | **cmp-doctor** | Set up or fix the toolchain / diagnose any KMP build. | `doctor` (+ `--fix`). |
 | **cmp-upgrade** | Bump Kotlin/CMP/KSP/Room/AGP safely. | `upgrade` (diff → apply → verify). |
 | **cmp-firebase-connect** | Wire a fresh app to its **own** Firebase (the #1 post-scaffold manual step). | Firebase CLI: login → project create/reuse → app register → real `google-services.json` replaces the placeholder → green build proves it. Consent-gated per cloud write. |
@@ -142,7 +142,7 @@ intent — the descriptions carry rich triggers.
 
 ---
 
-## 5. The `cmp-inspector` MCP (v0.4.0 — 14 tools)
+## 5. The `cmp-inspector` MCP (18 tools)
 
 A stdio server that reads a Compose UI as a **single JSON tree contract** and never returns pixel
 bytes. Node: `node inspector/mcp/bin/server.mjs`.

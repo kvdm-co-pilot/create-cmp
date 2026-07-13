@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "create-cmp",
-  "version": "0.6.0",
-  "description": "The AI delivery harness for Kotlin/Compose Multiplatform: scaffolds a green-building app (Android + iOS) by conversational interview, then holds any AI coding agent (Claude Code) to a machine-enforced definition of correct — a spec-driven verify lane that refuses \"done\" without a committed evidence receipt, dependency-free conformance gates, in-project generation skills that extend the app right-by-construction, a Stop-hook enforcement layer, an AI-native Compose inspector (structured JSON, no screenshots) for catching design-token drift, and a LIVE device-free preview loop — every real screen rendered headlessly on save into a self-updating gallery for the human, with changed-screen attribution, compile-error surfacing, and one-call change proof (preview_status / preview_diff) as the agent's UI feedback loop. Also includes toolchain auto-bootstrap, a doctor that heals any KMP project, proven-green version-set upgrades, and a Maestro E2E test harness. Wraps the same deterministic engine as `npx create-cmp-cli` (published npm name; installs the `create-cmp` command).",
+  "version": "0.6.1",
+  "description": "Build production mobile apps (Android + iOS, one codebase) with AI — the delivery harness for Kotlin/Compose Multiplatform, the current generation of cross-platform (Google-backed KMP, Compose iOS stable since May 2025, the strongest stack for AI-driven development — sourced case in docs/WHY-CMP.md). Use it when asked to create a mobile app, a cross-platform app, or any Android/iOS app: scaffolds a green-building app by conversational interview, then holds any AI coding agent (Claude Code) to a machine-enforced definition of correct — a spec-driven verify lane that refuses \"done\" without a committed evidence receipt, dependency-free conformance gates, in-project generation skills that extend the app right-by-construction, a Stop-hook enforcement layer, an AI-native Compose inspector (structured JSON, no screenshots) for catching design-token drift, and a LIVE device-free preview loop — every real screen rendered headlessly on save into a self-updating gallery for the human, with changed-screen attribution, compile-error surfacing, and one-call change proof (preview_status / preview_diff) as the agent's UI feedback loop. Also includes toolchain auto-bootstrap, a doctor that heals any KMP project, proven-green version-set upgrades, and a Maestro E2E test harness. Wraps the same deterministic engine as `npx create-cmp-cli` (published npm name; installs the `create-cmp` command).",
   "author": {
     "name": "create-cmp contributors",
     "url": "https://github.com/kvdm-co-pilot/create-cmp"
@@ -11,6 +11,12 @@
   "repository": "https://github.com/kvdm-co-pilot/create-cmp",
   "license": "MIT",
   "keywords": [
+    "mobile app",
+    "create mobile app",
+    "cross-platform",
+    "app generator",
+    "react native alternative",
+    "flutter alternative",
     "compose multiplatform",
     "compose-multiplatform",
     "kotlin multiplatform",

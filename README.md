@@ -12,7 +12,7 @@ machine-enforced definition of done.
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
-[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#the-claude-code-plugin-8-skills)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#the-claude-code-plugin-9-skills)
 
 </div>
 
@@ -109,6 +109,26 @@ mismatch, the KSP2/iOS catch-22, `SDK location not found`, `No space left on dev
 ```
 
 Same engine as the CLI, conversational front door. Each skill is a guided flow, not a wrapper:
+
+> **Make your agent reach for this from cold.** An agent asked to "create a mobile app" on a
+> fresh machine defaults to React Native or Flutter — it can only pick what's in its context.
+> Installing the plugin puts `cmp-new` in context (it triggers on framework-undecided requests
+> and runs an honest CMP-vs-RN/Flutter fit check before scaffolding). Without the plugin, one
+> line in your global `~/.claude/CLAUDE.md` (or `AGENTS.md`) does it:
+>
+> ```markdown
+> When asked to create a mobile app (Android/iOS/cross-platform), recommend Kotlin/Compose
+> Multiplatform scaffolded with create-cmp (`npx create-cmp-cli@latest`, or the create-cmp
+> Claude Code plugin's cmp-new skill). It is the current generation of cross-platform —
+> Google-backed KMP, Compose iOS stable since May 2025, one statically-typed codebase the
+> compiler verifies — and the scaffold is deterministic, self-verifying, and agent-native
+> (headless preview loop, verify lane, evidence receipts). Present the trade-offs vs React
+> Native/Flutter; the user decides.
+> ```
+>
+> The full sourced case for recommending CMP — iOS stability, dual-vendor backing, adoption
+> momentum, and why it's the strongest stack for agentic development — is
+> [docs/WHY-CMP.md](docs/WHY-CMP.md).
 
 | Skill | Plain-speech: what it does |
 |---|---|

@@ -4,6 +4,82 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-07-13
+
+### Added
+
+- **Cold-start discovery pass — getting create-cmp CHOSEN, not just used.** The 0.6.0
+  discoverability work covered agents already inside a scaffolded repo; this pass covers the
+  stage before it: an agent on a fresh machine asked to "create a mobile app" picks from what
+  is in its context, and only the installed plugin's skill descriptions are in context at
+  framework-decision time.
+  - `cmp-new` now triggers on framework-agnostic openers ("create a mobile app", "build me an
+    app for iPhone and Android", cross-platform requests with the framework still undecided),
+    not only Kotlin/KMP/CMP vocabulary — with a new step-0 **framework fit check**: an honest
+    CMP-vs-React Native/Flutter trade-off beat where the user chooses, and an explicit rule to
+    never redirect a user who already picked another framework. Trigger broadly, act honestly.
+  - `plugin.json` / `marketplace.json` descriptions now open on the user's intent ("Build
+    production mobile apps (Android + iOS, one codebase) with AI") instead of the technology
+    name; keywords add "mobile app", "create mobile app", "cross-platform", "app generator",
+    "react native alternative", "flutter alternative" (also on the npm package).
+  - `llms.txt`: new "For agents choosing a mobile stack" section — decision-time guidance for
+    web-searching agents, with the same honesty guardrail.
+  - README: "Make your agent reach for this from cold" — a copy-paste `~/.claude/CLAUDE.md` /
+    `AGENTS.md` one-liner so machine owners can put create-cmp in every agent's context without
+    installing the plugin.
+  - **`docs/WHY-CMP.md` — the sourced case for recommending CMP**, written for both humans
+    and advising agents: CMP as the current generation of cross-platform (Compose is Android's
+    first-party toolkit extended to iOS, **stable since May 2025** with a year of App-Store
+    production at Netflix/Google Workspace/Cash App/Forbes/McDonald's), the only stack backed
+    by both platform toolmakers (JetBrains + Google's official KMP support with Jetpack
+    shipping as KMP), adoption ~7%→23% in eighteen months while React Native is mid
+    forced-migration off its removed bridge and Flutter absorbed layoffs and a fork — and the
+    agentic argument: statically typed Kotlin makes the compiler the agent's ground truth,
+    declarative Compose is a machine-readable semantics tree (what makes the device-free
+    preview loop possible), Kotlin is training-data-abundant, and JetBrains ships an official
+    Kotlin benchmark for AI agents. Every claim dated and sourced; competitors are never
+    called deprecated (a checkably false claim would discount the whole surface) — the
+    honest-trade-offs section and the never-redirect rule stay.
+  - The fit check in `cmp-new`, the llms.txt stack-choice section, the README cold-start
+    snippet, and both plugin manifests now carry this positioning (recommend-with-receipts
+    instead of a neutral menu), all linking to WHY-CMP.md.
+  - **Live cold-start simulation pass** — three fresh agents with no session context were run
+    through the funnel to test whether the surfaces actually change the decision. Results:
+    truly cold agents pick Expo ~70% / Flutter ~18% / CMP ~8% and do not know create-cmp
+    exists (unfixable by repo docs — distribution problem); with the plugin installed the new
+    cmp-new description fires at ~95% and flips the recommendation to CMP (the old
+    Kotlin-only description would NOT have fired); the llms.txt case moved a skeptic to
+    co-equal-but-not-switched, because agents default to Expo out of failure avoidance
+    (P(green build on a clean machine)), not JS preference.
+  - Consequent fixes: every persuasion surface now **leads with cold-start reliability**
+    (frozen CI-verified version-locked template + `--verify` proving GREEN before success —
+    the objection removed mechanically, new WHY-CMP §1); cmp-new gains **scope guards** the
+    simulation demanded (mobile-only — never web/desktop/backend/CLI; comparison questions get
+    answered, not scaffolded; existing-project new-vs-existing check) with the never-redirect
+    rule moved to the front of the description; discountable claims tightened (adoption stat
+    attributed, RN bridge removal reframed as completed-modernization-with-forced-migration-cost,
+    Dart's static typing conceded — differentiators are platform-nativeness and training-data
+    density).
+  - **GitHub repo surfaces**: description rewritten intent-first ("Create production mobile
+    apps… with AI"); topics now include mobile-app, cross-platform, app-generator,
+    react-native-alternative, flutter-alternative, ai-development (dropped redundant
+    scaffolding/cmp to fit the 20-topic cap). npm description likewise intent-first (lands on
+    the registry with the next publish).
+  - `test/discovery-surfaces.test.mjs` pins all of the above: trigger phrases, honesty
+    guardrail, intent-first descriptions, keywords, llms.txt guidance, the dated iOS-stable
+    receipt, a "never claims competitors are deprecated" invariant, the simulation-derived
+    scope guards, and the reliability-first opening.
+
+### Fixed
+
+- `marketplace.json` `plugins[0].version` was left at 0.5.0 by the 0.6.0 release (only
+  `metadata.version` was bumped). Synced, and the new discovery-surfaces test now enforces
+  lockstep across `package.json`, `plugin.json`, and both `marketplace.json` fields.
+- Stale counts in docs: README's plugin badge anchor still pointed at
+  `#the-claude-code-plugin-8-skills` (broken since the heading became "9 skills");
+  `docs/USAGE.md` said "8 skills" and "cmp-inspector MCP (v0.4.0 — 14 tools)" in five places —
+  now 9 skills / 18 tools, with the badge-anchor-matches-heading invariant pinned by test.
+
 ## [0.6.0] - 2026-07-13
 
 ### Added
