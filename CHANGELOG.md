@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Template README attribution is now a visible badge.** The plain "Built with create-cmp"
+  backlink at the bottom of the generated project's `README.md` became a static shields.io
+  badge (one line, no tracking, no dynamic endpoints) linking to the create-cmp repo — with an
+  inline note telling the project owner it is safe to delete. Doc-only template surface: not
+  part of the verified inputs hash, so existing receipts stay valid.
+
 ## [0.6.1] - 2026-07-13
 
 ### Added
