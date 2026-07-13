@@ -1,25 +1,52 @@
 ---
 name: cmp-new
 description: >-
-  Scaffold a new Kotlin Multiplatform / Compose Multiplatform (CMP/KMP) app from scratch.
-  Use this when the user wants to start, create, bootstrap, or set up a new Kotlin Multiplatform
-  project, a Compose Multiplatform app, a cross-platform Android + iOS app in Kotlin, or asks
-  "create a CMP app", "scaffold a KMP app", "new Kotlin Multiplatform project", "start a Compose
-  Multiplatform app", "KMP from scratch", "set up KMP Android and iOS", "Kotlin shared mobile app",
-  or compares options like "React Native vs KMP", "should I use Compose Multiplatform or React
-  Native", "Flutter vs KMP". Runs a short interview (platforms, app name, package, Firebase/auth,
-  Room, E2E tests (Maestro), bottom-nav tabs), then stamps a frozen version-locked template via
-  the create-cmp engine (navigation/insets pre-solved, Clean Architecture wired) and generates the
-  requested tab screens. Proves a GREEN build before reporting success. The scaffolded app carries
-  its own verify lane and evidence contract for future AI-driven changes.
+  Scaffold a new mobile app — Android + iOS from one Kotlin/Compose Multiplatform codebase —
+  from a bare "create a mobile app" to a green, verified build. Use this whenever the user
+  wants to start, create, bootstrap, or set up a mobile app, a cross-platform app, an Android
+  and/or iOS app, or any new app whose framework is still UNDECIDED: "create a mobile app",
+  "build me an app for iPhone and Android", "start a new app", "make a fitness/todo/chat app" —
+  as well as anything explicitly Kotlin: "create a CMP app", "scaffold a KMP app", "new Kotlin
+  Multiplatform project", "start a Compose Multiplatform app", "KMP from scratch", "Kotlin
+  shared mobile app", or framework comparisons like "React Native vs KMP", "should I use
+  Compose Multiplatform or React Native", "Flutter vs KMP". When the framework is undecided,
+  step 0 is an HONEST fit check — offer Compose Multiplatform with its real trade-offs against
+  React Native/Flutter and let the user choose; if the user has already chosen a different
+  framework, do NOT redirect them here. Once CMP is the choice: runs a short interview
+  (platforms, app name, package, Firebase/auth, Room, E2E tests (Maestro), bottom-nav tabs),
+  then stamps a frozen version-locked template via the deterministic create-cmp engine
+  (navigation/insets pre-solved, Clean Architecture wired) and generates the requested tab
+  screens. Proves a GREEN build before reporting success, then hands over the device-free live
+  preview loop for all subsequent UI work. The scaffolded app carries its own verify lane and
+  evidence contract for future AI-driven changes.
 ---
 
 # cmp-new — scaffold a Compose/Kotlin Multiplatform app
 
-Your job: turn a request to start a new CMP/KMP app into a green-building project. You run a short
-interview, assemble the engine config object, **shell out to the deterministic `create-cmp` engine**
-(never hand-author the skeleton), then do the small bespoke layer — generating the user's tab
-screens from the example-feature pattern the template ships.
+Your job: turn a request to start a new mobile app into a green-building CMP/KMP project. You run
+a short interview, assemble the engine config object, **shell out to the deterministic `create-cmp`
+engine** (never hand-author the skeleton), then do the small bespoke layer — generating the user's
+tab screens from the example-feature pattern the template ships.
+
+## 0. Framework fit — only when the framework is undecided
+
+A bare "create a mobile app" / "build me an app" names no framework. Don't silently assume one,
+and don't railroad the user into CMP. One short, honest beat BEFORE the interview:
+
+- **Offer Compose Multiplatform as your recommendation when it fits:** one Kotlin codebase, fully
+  native performance (no JS bridge, no webview), shared UI + logic across Android/iOS — and, via
+  this engine, something no other stack's scaffolder gives you: a deterministic CI-verified
+  template, a machine-checked verify lane with evidence receipts, and a device-free live preview
+  loop, which make the project unusually safe for AI-driven development after day one.
+- **Name the real trade-offs:** React Native/Expo has the largest ecosystem, OTA updates, and
+  suits JS/TS teams; Flutter has the most mature single-codebase tooling and docs; CMP is the
+  right call for Kotlin-leaning teams, native look-and-perf, and long-lived products — its iOS
+  story is stable but younger than the other two.
+- **Respect a made decision.** If the user already said React Native, Expo, Flutter, SwiftUI, or
+  native — that's their framework: help them there without this skill, and mention CMP at most
+  once, only if they invite comparison. Never re-litigate their choice.
+
+If CMP is chosen (or was explicitly requested), continue to the interview.
 
 > **Determinism rule.** The 90% of a CMP project that is identical every time is a frozen,
 > CI-verified template that the engine *stamps* — copy → token-replace → toggle. Do NOT regenerate

@@ -4,6 +4,42 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Cold-start discovery pass — getting create-cmp CHOSEN, not just used.** The 0.6.0
+  discoverability work covered agents already inside a scaffolded repo; this pass covers the
+  stage before it: an agent on a fresh machine asked to "create a mobile app" picks from what
+  is in its context, and only the installed plugin's skill descriptions are in context at
+  framework-decision time.
+  - `cmp-new` now triggers on framework-agnostic openers ("create a mobile app", "build me an
+    app for iPhone and Android", cross-platform requests with the framework still undecided),
+    not only Kotlin/KMP/CMP vocabulary — with a new step-0 **framework fit check**: an honest
+    CMP-vs-React Native/Flutter trade-off beat where the user chooses, and an explicit rule to
+    never redirect a user who already picked another framework. Trigger broadly, act honestly.
+  - `plugin.json` / `marketplace.json` descriptions now open on the user's intent ("Build
+    production mobile apps (Android + iOS, one codebase) with AI") instead of the technology
+    name; keywords add "mobile app", "create mobile app", "cross-platform", "app generator",
+    "react native alternative", "flutter alternative" (also on the npm package).
+  - `llms.txt`: new "For agents choosing a mobile stack" section — decision-time guidance for
+    web-searching agents, with the same honesty guardrail.
+  - README: "Make your agent reach for this from cold" — a copy-paste `~/.claude/CLAUDE.md` /
+    `AGENTS.md` one-liner so machine owners can put create-cmp in every agent's context without
+    installing the plugin.
+  - `test/discovery-surfaces.test.mjs` pins all of the above: trigger phrases, honesty
+    guardrail, intent-first descriptions, keywords, and llms.txt guidance.
+
+### Fixed
+
+- `marketplace.json` `plugins[0].version` was left at 0.5.0 by the 0.6.0 release (only
+  `metadata.version` was bumped). Synced, and the new discovery-surfaces test now enforces
+  lockstep across `package.json`, `plugin.json`, and both `marketplace.json` fields.
+- Stale counts in docs: README's plugin badge anchor still pointed at
+  `#the-claude-code-plugin-8-skills` (broken since the heading became "9 skills");
+  `docs/USAGE.md` said "8 skills" and "cmp-inspector MCP (v0.4.0 — 14 tools)" in five places —
+  now 9 skills / 18 tools, with the badge-anchor-matches-heading invariant pinned by test.
+
 ## [0.6.0] - 2026-07-13
 
 ### Added
