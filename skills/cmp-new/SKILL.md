@@ -126,3 +126,10 @@ generated, and the next commands — drop in `google-services.json` / `GoogleSer
 (intentionally not templated), then `./gradlew :composeApp:installDebug` (Android) and, on macOS,
 the iOS build. If they want a device run + smoke, point them at the **cmp-qa-prep** skill; if their
 toolchain is incomplete, point them at **cmp-doctor** first.
+
+**Then establish the daily UI loop** (the single most valuable thing to hand over): offer to start
+`preview { projectDir }` (the **cmp-preview** skill) right away — a live gallery of every screen
+that re-renders on save, no device or emulator. From then on, every UI edit you or they make is
+verified with `preview_status { waitForRender: true }` (which screens changed, or the compile
+error) — this is your feedback loop for ALL subsequent UI work in the app, and it's documented for
+future sessions in the generated `CLAUDE.md` ("UI feedback loop").

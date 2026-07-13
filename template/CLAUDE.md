@@ -52,6 +52,38 @@ invariants the conformance gates enforce.
 Commit it with your change — git history is the audit ledger. Binary artifacts under
 `qa-artifacts/` are hashed into the receipt; never commit them.
 
+## UI feedback loop — see what you build, without a device
+
+<!-- >>> cmp:feature inspector -->
+While building or changing ANY screen, use the preview loop instead of an emulator: it
+renders this app's REAL screens (real DI, real theme, seeded data) headlessly in seconds
+and tells you exactly what your edit changed.
+
+**With the create-cmp plugin (cmp-inspector MCP tools):**
+
+1. `preview { projectDir }` — once per session. Returns a live gallery URL (give it to
+   the human; it re-renders itself on every save) plus per-screen structural summaries
+   for you. Sources are watched; you never run Gradle by hand.
+2. After each edit: `preview_status { waitForRender: true }` — blocks until the
+   render/compile outcome. `changedLastRender` names the screens your edit touched
+   (empty = the edit reached no screen); `lastErrorSource: "compile"` means the edit
+   didn't even build (the compiler's `e:` lines are in `lastError`).
+3. `preview_diff { screen }` — one call proves the change: verdict `proven-clean` /
+   `changed-with-regressions` / `no-change`. No snapshot bookkeeping needed.
+
+**Without the plugin:** `./gradlew :composeApp:renderScreens` renders every screen to
+`composeApp/build/previews/<id>/{screen.png, tree.json}` (`-Pscreen=<id>` for one);
+`node qa/preview-gallery.mjs` builds a self-contained gallery page from the output.
+
+Screens come from `inspector/PreviewRegistry.kt` (desktopMain). **When you add a screen,
+register it there** — a forced-state variant is just another entry (`"home@empty"`).
+Assert on the `tree.json` structure; never read PNG bytes (pixels are for humans).
+<!-- <<< cmp:feature inspector -->
+<!-- >>> cmp:feature dev-client -->
+For one interactive window instead of stills of every screen:
+`./gradlew :composeApp:hotRunDesktop --auto` (Compose Hot Reload dev-client).
+<!-- <<< cmp:feature dev-client -->
+
 ## Docs
 
 [`README.md`](./README.md) (front page) · [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)

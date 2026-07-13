@@ -1,17 +1,21 @@
 ---
 name: cmp-preview
 description: >-
-  Live, AI-native previews of a Compose Multiplatform app's REAL screens — no device, no
-  emulator, no manual Gradle. Use this when the user wants to preview their CMP/KMP app,
-  see their screens, watch UI changes live in a browser, or asks "preview my app", "show
+  THE default UI feedback loop while building or editing ANY Compose Multiplatform
+  screen — use it DURING development, not only when asked: it renders the app's REAL
+  screens headlessly in seconds (no device, no emulator, no manual Gradle) and tells you
+  exactly what each edit changed, so you catch your own mistakes as you build. Use this
+  whenever you are about to write or change CMP/KMP UI code, need quick build/visual
+  feedback, want to verify a UI change landed, or the user asks "preview my app", "show
   me my screens", "open the preview gallery", "Android Studio previews without the IDE",
   "see my UI without running the app", "live preview my compose screens", or "storybook
   for compose". Starts the cmp-inspector MCP's resident preview service: it renders every
   screen in the app's inspector/PreviewRegistry.kt headlessly (real DI, theme, data),
   serves a self-updating gallery at a local URL (pixels + wireframe + a11y per screen),
-  and watches composeApp/src so every save re-renders automatically. The agent gets the
-  same state structurally (per-screen node/token/a11y summaries + tree paths) — pixels
-  flow to the human, structure flows to the AI.
+  and watches composeApp/src so every save re-renders automatically. The agent's loop is
+  edit → preview_status {waitForRender:true} → changedLastRender / compile errors →
+  preview_diff {screen} for a proven verdict — pixels flow to the human, structure flows
+  to the AI.
 ---
 
 # cmp-preview — live previews of real screens, zero commands

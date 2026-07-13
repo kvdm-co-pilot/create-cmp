@@ -195,6 +195,9 @@ turns the output into one self-contained `index.html` (pixels + wireframe + a11y
 Agents read structure; humans see pixels.
 
 ### 7. The daily-driver extras
+- **Live preview loop** — every real screen rendered headlessly on save (resident hot-reload
+  daemon, ~1s warm renders); a self-updating gallery for the human, changed-screen attribution
+  and compile-error surfacing for the agent. The agent sees what it builds.
 - **Desktop dev-client** — shared UI in a phone-sized JVM window, Compose Hot Reload attached.
 - **CI workflow** — Android job on every push; iOS job ready to un-comment.
 - **`CLAUDE.md`** — the AI delivery contract itself, stating everything above as rules any AI
@@ -207,10 +210,14 @@ Agents read structure; humans see pixels.
 **New app → green.** `cmp-new` (or `npx create-cmp-cli`) → interview → stamp → green build proven
 → tab screens generated. Then `cmp-firebase-connect` to wire your real backend.
 
-**The daily UI loop.** `./gradlew :composeApp:hotRunDesktop --auto` → edit Compose → save → see
-it. No emulator, no Firebase, sub-second feedback. Want stills of every screen instead of a
-window? Say "preview my app" (the cmp-preview skill / `preview` MCP tool) → a live local
-gallery URL that re-renders on every save. Command-line fallback:
+**The daily UI loop.** Say "preview my app" (the cmp-preview skill / `preview` MCP tool) → a
+live local gallery of EVERY real screen that re-renders on save — no device, no emulator, no
+manual Gradle. The agent runs the same loop to check its own work while it builds: edit →
+`preview_status { waitForRender: true }` → which screens changed (or the compile error, or the
+failed hot swap) → `preview_diff { screen }` for a proven verdict — feedback in seconds instead
+of a 25–40s build or an emulator round-trip. One interactive window instead of stills:
+`./gradlew :composeApp:hotRunDesktop --auto`. Command-line fallback (no plugin needed — the
+scaffolded app carries the whole loop):
 `./gradlew :composeApp:renderScreens && node qa/preview-gallery.mjs`.
 
 **The verified dev loop (the flagship).** For any UI change: snapshot the live tree → make the

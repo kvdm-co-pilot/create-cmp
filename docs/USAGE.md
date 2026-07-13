@@ -211,6 +211,11 @@ text, so it's returned inline · `render_screen` — **pixel preview, path-only*
 (`via:"daemon"`, ~1s warm) else the app's own `:composeApp:renderScreens`, also returns
 `treePath`), live (`/inspect/screenshot`), a `pngPath`, or the demo harness.
 
+**The agent edit loop** (the reason these tools exist — use it while BUILDING, not only when
+asked): 1) `preview {projectDir}` once; 2) edit code; 3) `preview_status {waitForRender:true}` —
+blocks until the outcome: which screens changed, or the compile error, or the failed hot swap;
+4) `preview_diff {screen}` — proven verdict. Feedback in seconds, no device, no polling.
+
 **Preview service:** `preview {projectDir, port?, hot?}` — resident live-preview loop: headless
 render of every registry screen, live gallery URL (SSE self-reload, changed-screen flags), source
 watch with auto re-render; `hot` (default true) boots the resident preview daemon under Compose

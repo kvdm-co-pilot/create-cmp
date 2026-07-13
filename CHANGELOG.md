@@ -107,6 +107,27 @@ All notable changes to this project are documented here. The format is based on
     now spells out the Storybook-"story" analog — a forced-state screen is just another
     `ScreenPreview("home@empty", …)` entry; loading/empty/error states render side by
     side with the default seeded state.
+- **Agent discoverability pass — a clean-install agent now learns the preview loop from
+  every surface it auto-loads** (industry anchors: the AGENTS.md open standard, MCP
+  server `instructions`, task-shaped tool/skill descriptions with the key info first):
+  - Generated **`CLAUDE.md`** gains a "UI feedback loop" section — the exact
+    plugin-tool loop (`preview` → `preview_status {waitForRender:true}` →
+    `preview_diff`) AND the no-plugin Gradle fallback, feature-markered so
+    `--no-inspector` / `--no-dev-client` stamps stay truthful; generated **`AGENTS.md`**
+    (new) points every non-Claude agent (Codex/Cursor/Copilot/…) at the same contract.
+  - The **cmp-inspector MCP server now ships `instructions`** (injected into every
+    connected agent's context): the default UI loop first, tier-1 inspection after;
+    server version now read from package.json instead of a stale hardcode.
+  - **cmp-preview's skill description is task-shaped**: it triggers on the agent's own
+    workflow ("while building or editing ANY CMP screen", "verify a UI change") — not
+    only on user phrases like "preview my app".
+  - **cmp-new's report step hands over the daily loop** (offer to start `preview` right
+    after scaffolding); **cmp-dev-client** cross-links the preview loop; the
+    **cmp-orchestrator** agent gates delegated UI changes through
+    `preview_status`/`preview_diff` alongside the verify lane.
+  - Template README quick-start gains the headless preview one-liner; plugin +
+    marketplace descriptions and the root README/USAGE now headline the loop
+    ("the agent sees what it builds").
 
 ## [0.5.0] - 2026-07-12
 

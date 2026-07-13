@@ -59,6 +59,7 @@ async function stampDefault() {
 /** Every asserted file, relative to the scaffold output root. */
 const ASSERTED_FILES = [
   "CLAUDE.md",
+  "AGENTS.md",
   ".claude/skills/add-feature/SKILL.md",
   ".claude/skills/add-screen/SKILL.md",
   ".claude/skills/add-repository/SKILL.md",
@@ -84,6 +85,16 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       const claudeMd = fs.readFileSync(path.join(out, "CLAUDE.md"), "utf8");
       assert.match(claudeMd, /Definition of done/);
       assert.match(claudeMd, /qa\/verify\.mjs/);
+    });
+
+    await t.test("CLAUDE.md teaches the UI feedback loop; AGENTS.md points at it", () => {
+      const claudeMd = fs.readFileSync(path.join(out, "CLAUDE.md"), "utf8");
+      assert.match(claudeMd, /UI feedback loop/);
+      assert.match(claudeMd, /preview_status \{ waitForRender: true \}/);
+      assert.match(claudeMd, /renderScreens/, "no-plugin fallback documented");
+      const agentsMd = fs.readFileSync(path.join(out, "AGENTS.md"), "utf8");
+      assert.match(agentsMd, /CLAUDE\.md/);
+      assert.match(agentsMd, /UI feedback loop/);
     });
 
     await t.test("skills exist, non-empty, with name: frontmatter", () => {

@@ -98,9 +98,32 @@ function guarded(fn) {
 // server + tools
 // ---------------------------------------------------------------------------
 
+const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+
 const server = new McpServer({
   name: "cmp-inspector",
-  version: "0.4.0",
+  version: pkg.version,
+  // Injected into the connected agent's context — the discovery surface for the
+  // default workflow. Front-loaded: the edit loop first, everything else after.
+  instructions:
+    "cmp-inspector: the AI-native window into a Compose Multiplatform app's UI — " +
+    "structured JSON trees, never screenshots (pixels flow to the human, structure " +
+    "flows to you).\n\n" +
+    "DEFAULT UI LOOP — use while building or editing ANY screen of a create-cmp app; " +
+    "no device, no emulator, no manual Gradle:\n" +
+    "1. preview { projectDir }  → live self-updating gallery URL for the human; keep " +
+    "it running for the whole session.\n" +
+    "2. Edit code, then preview_status { waitForRender: true }  → blocks until the " +
+    "outcome: changedLastRender names the screens your edit touched (empty = it " +
+    "reached no screen); lastErrorSource \"compile\" = the edit didn't build (the " +
+    "compiler's e: lines are in lastError).\n" +
+    "3. preview_diff { screen }  → verdict: proven-clean | changed-with-regressions | " +
+    "no-change. Zero snapshot bookkeeping.\n" +
+    "4. preview_stop {} when the session ends.\n\n" +
+    "One-off render: render_screen { projectDir, screen } (~1s warm via the resident " +
+    "daemon). Inspect the RUNNING app (tier 1): connect_live, then get_node / " +
+    "assert_token / audit_a11y / find_drift / navigate_and_inspect / prove_change. " +
+    "Always assert on tree JSON; never read PNG bytes into context.",
 });
 
 const treePathArg = z

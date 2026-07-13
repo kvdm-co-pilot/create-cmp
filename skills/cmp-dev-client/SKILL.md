@@ -83,3 +83,13 @@ data while it runs, hand off to **cmp-inspect**.
   `androidMain`/`iosMain` and put a desktop fake behind an interface.
 - Version bumps: Compose Hot Reload 1.1.1 needs Kotlin ≥ 2.1.20 and CMP ≥ 1.8.2; the 1.2.x line
   needs CMP ≥ 1.10. Never bump it in isolation from the pinned set — run `create-cmp upgrade`.
+
+## Related
+
+- **cmp-preview** — stills of EVERY screen at once, auto-refreshed on save, with per-screen
+  changed-attribution and compile-error surfacing for the agent (`preview` →
+  `preview_status {waitForRender:true}` → `preview_diff`). The dev-client is one live clickable
+  window; cmp-preview is the whole app at a glance and the agent's verification loop — most
+  sessions want both.
+- **cmp-inspect** — structured inspection of the RUNNING app (tier 1: real navigation state,
+  on-device data).
