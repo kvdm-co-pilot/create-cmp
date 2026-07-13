@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **The feature stamper now stamps a SHELL-05-conforming screen out of the box.**
+  `qa/scaffold-feature.mjs` clones the `home` exemplar — a tab screen whose BaseScreen
+  comes from AppShell — but registers the clone as a pushed NavHost destination, so the
+  very next `node qa/verify.mjs` failed SHELL-05 naming the new screen (reproduced against
+  released 0.6.1: stamp Favorites → verify → FAIL). The stamper now wraps the cloned
+  screen's root container in `BaseScreen { … }` at stamp time (DetailScreen's pattern),
+  for both the `feature` and `screen` presets, anchored on the exemplar's shape and
+  failing loudly on template drift. The only post-stamp step left is the by-design golden
+  capture: stamp → `UPDATE_GOLDEN=1` → verify now PASSes with zero hand edits (pinned by
+  `test/stamped-feature-conformance.test.mjs`, which fails against the old stamper).
+
 - **`git init` no longer invalidates a stamp-time receipt (first-touch UX trap).** In a
   project with no `.git` yet — exactly the state `create-cmp --verify` runs in at stamp
   time — the inputs-hash walk fallback included `composeApp/build/**`, Gradle/Kotlin

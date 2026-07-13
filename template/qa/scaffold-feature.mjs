@@ -212,7 +212,7 @@ const ALL_FILES = [
   { from: path.join(SRC("commonMain"), "domain/usecase/GetItemsUseCase.kt"), to: path.join(SRC("commonMain"), `domain/usecase/Get${E}sUseCase.kt`), presets: ["feature", "repository"] },
   { from: path.join(SRC("commonMain"), "data/remote/ItemRepositoryImpl.kt"), to: path.join(SRC("commonMain"), `data/remote/${E}RepositoryImpl.kt`), presets: ["feature", "repository"] },
   { from: path.join(SRC("commonTest"), "testing/fakes/FakeItemRepository.kt"), to: path.join(SRC("commonTest"), `testing/fakes/Fake${E}Repository.kt`), presets: ["feature", "repository"] },
-  { from: path.join(SRC("commonMain"), "presentation/home/HomeScreen.kt"), to: path.join(SRC("commonMain"), `presentation/${f}/${F}Screen.kt`), presets: ["feature", "screen"] },
+  { from: path.join(SRC("commonMain"), "presentation/home/HomeScreen.kt"), to: path.join(SRC("commonMain"), `presentation/${f}/${F}Screen.kt`), presets: ["feature", "screen"], wrapInBaseScreen: true },
   { from: path.join(SRC("commonMain"), "presentation/home/HomeViewModel.kt"), to: path.join(SRC("commonMain"), `presentation/${f}/${F}ViewModel.kt`), presets: ["feature", "screen"] },
   { from: path.join(SRC("commonTest"), "presentation/home/HomeViewModelTest.kt"), to: path.join(SRC("commonTest"), `presentation/${f}/${F}ViewModelTest.kt`), presets: ["feature", "screen"] },
   { from: path.join(SRC("desktopTest"), "presentation/home/HomeScreenTest.kt"), to: path.join(SRC("desktopTest"), `presentation/${f}/${F}ScreenTest.kt`), presets: ["feature", "screen"] },
@@ -290,6 +290,69 @@ function defaultSpec() {
   screen matches its committed golden tree (\`qa/golden/${f}.json\`) — structural regressions
   are intentional, declared changes only.
 `;
+}
+
+// ── BaseScreen wrap (SHELL-05) ───────────────────────────────────────────────
+// HomeScreen is a TAB — AppShell provides its BaseScreen at the shell layer.
+// The stamped feature, however, is registered as a PUSHED NavHost destination,
+// and SHELL-05 requires every such destination to compose inside BaseScreen
+// (see DetailScreen for the pattern). Without this transform the stamped slice
+// fails verify out of the box. Anchored on the exemplar's known shape; fails
+// loudly if HomeScreen drifts (same discipline as the cmp:anchor markers).
+function wrapScreenInBaseScreen(content, relPathForErrors) {
+  if (content.includes("BaseScreen")) return content; // already wrapped — idempotent
+
+  const lines = content.split("\n");
+
+  // 1. Import — mirror DetailScreen's ordering: presentation.components.BaseScreen
+  //    sits immediately before the presentation.theme imports.
+  const themeImportIdx = lines.findIndex((l) => /^import .+\.presentation\.theme\./.test(l));
+  if (themeImportIdx === -1) {
+    die(
+      `no presentation.theme import found in ${relPathForErrors} — the HomeScreen exemplar ` +
+        "drifted from the shape this stamper wraps; cannot place the BaseScreen import.",
+    );
+  }
+  const importLine = lines[themeImportIdx].replace(
+    /^import (.+)\.presentation\.theme\..*$/,
+    "import $1.presentation.components.BaseScreen",
+  );
+  lines.splice(themeImportIdx, 0, importLine);
+
+  // 2. Root container start: the exemplar's body root is a top-level `    Column(`.
+  const rootIdx = lines.findIndex((l) => l === "    Column(");
+  if (rootIdx === -1) {
+    die(
+      `root "    Column(" not found in ${relPathForErrors} — the HomeScreen exemplar drifted ` +
+        "from the shape this stamper wraps in BaseScreen.",
+    );
+  }
+
+  // 3. Root container end: the `    }` immediately before the function's closing `}`.
+  let funCloseIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (lines[i] === "}") {
+      funCloseIdx = i;
+      break;
+    }
+  }
+  if (funCloseIdx === -1 || lines[funCloseIdx - 1] !== "    }") {
+    die(
+      `could not locate the root container's closing brace in ${relPathForErrors} — the ` +
+        "HomeScreen exemplar drifted from the shape this stamper wraps in BaseScreen.",
+    );
+  }
+  const rootCloseIdx = funCloseIdx - 1;
+
+  // 4. Wrap: indent the container block one level and enclose it in BaseScreen { }.
+  const indented = lines.slice(rootIdx, rootCloseIdx + 1).map((l) => (l.length ? `    ${l}` : l));
+  return [
+    ...lines.slice(0, rootIdx),
+    "    BaseScreen {",
+    ...indented,
+    "    }",
+    ...lines.slice(rootCloseIdx + 1),
+  ].join("\n");
 }
 
 // ── Anchor injection (§5) ────────────────────────────────────────────────────
@@ -452,6 +515,11 @@ if (dryRun) {
       for (const line of inj.diff.split("\n").filter(Boolean)) console.log(`    + ${line}`);
     }
   }
+  if (FILES.some((file) => file.wrapInBaseScreen)) {
+    console.log(
+      `\n${F}Screen.kt is stamped wrapped in BaseScreen (SHELL-05 — pushed destinations wrap their own content).`,
+    );
+  }
   if (writesSpec) {
     console.log(`\nspecs/${f}.spec.md will be written with default clauses ${F_UPPER}-01..06.`);
   } else {
@@ -465,7 +533,12 @@ if (dryRun) {
 
 let filesWritten = 0;
 for (const file of FILES) {
-  const contents = file.isDefaultSpec ? defaultSpec() : applyRename(fs.readFileSync(file.from, "utf8"));
+  let contents = file.isDefaultSpec ? defaultSpec() : applyRename(fs.readFileSync(file.from, "utf8"));
+  if (file.wrapInBaseScreen) {
+    // Pushed destination: wrap the cloned tab-screen body so SHELL-05 passes
+    // out of the box (the tab exemplar relies on AppShell for its BaseScreen).
+    contents = wrapScreenInBaseScreen(contents, path.relative(ROOT, file.to));
+  }
   fs.mkdirSync(path.dirname(file.to), { recursive: true });
   fs.writeFileSync(file.to, contents);
   filesWritten += 1;
