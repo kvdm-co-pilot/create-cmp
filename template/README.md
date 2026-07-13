@@ -109,4 +109,4 @@ signal for a later one in CI.
 
 ---
 
-Built with [create-cmp](https://github.com/kvdm-co-pilot/create-cmp) — the AI delivery harness for Compose Multiplatform.
+[![Built with create-cmp](https://img.shields.io/badge/Built%20with-create--cmp-7F52FF?logo=kotlin&logoColor=white)](https://github.com/kvdm-co-pilot/create-cmp) — the AI delivery harness for Compose Multiplatform. *(Just a static badge — delete this line if you prefer.)*
