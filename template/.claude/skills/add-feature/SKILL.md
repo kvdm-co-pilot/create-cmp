@@ -62,6 +62,10 @@ at their `// cmp:anchor` markers, and writes `specs/<feature>.spec.md` with a de
 set (`<FEATURE>-01..06`: loading, success, error, reload-after-failure, tap-navigates, golden
 tree) — copied verbatim from the `home` exemplar's shape.
 
+The stamped screen arrives **already wrapped in `BaseScreen { … }`** (SHELL-05): it is a
+pushed NavHost destination, so unlike the tab exemplar it must handle its own insets — the
+stamper does this for you; do not unwrap it.
+
 If it exits non-zero, read the message — it is actionable (name already taken, an anchor marker
 is missing, or a name isn't a valid Kotlin identifier). Do not hand-edit around a stamper
 failure; if an anchor is genuinely missing from a shared file, that is a template defect worth
