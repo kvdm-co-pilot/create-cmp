@@ -41,7 +41,7 @@ test("cmp-new triggers on framework-agnostic mobile-app requests, not only Kotli
 
 test("cmp-new carries the honesty guardrail: fit check + never redirect a made decision", () => {
   const skill = read("skills/cmp-new/SKILL.md");
-  assert.match(skill, /do NOT redirect/i, "description forbids redirecting a decided user");
+  assert.match(skill, /do NOT\s+redirect/i, "description forbids redirecting a decided user");
   assert.match(skill, /## 0\. Framework fit/, "body has the step-0 fit check");
   assert.match(skill, /Respect a made decision/, "fit check respects an existing framework choice");
   assert.match(skill, /trade-offs/i, "fit check names real trade-offs, not a sales pitch");
@@ -75,6 +75,23 @@ test("llms.txt guides a stack-choosing agent honestly", () => {
   assert.match(llms, /React Native|Flutter/, "names the alternatives, not a vacuum");
   assert.match(llms, /stable since May 2025/, "dates the iOS-stable claim (verifiable receipt)");
   assert.match(llms, /WHY-CMP\.md/, "links the full sourced case");
+});
+
+test("cmp-new carries the scope guards found by cold-start simulation", () => {
+  // Live agent simulation (2026-07) found: over-firing on non-mobile apps, comparison
+  // questions routed into a scaffold, and no existing-project check. Pinned here.
+  const skill = read("skills/cmp-new/SKILL.md");
+  assert.match(skill, /never web,\s+desktop-only, backend, or CLI/i, "mobile-only scope guard");
+  assert.match(skill, /comparison question/i, "comparison-only guard (answer, don't scaffold)");
+  assert.match(skill, /new-vs-existing/, "existing-project guard");
+});
+
+test("the case leads with cold-start reliability — the objection that actually drives agents to Expo", () => {
+  // Doc-persuasion simulation: agents default to Expo out of failure avoidance
+  // (P(green build on a clean machine)), not JS preference. The argument must open there.
+  assert.match(read("llms.txt"), /cold-start build reliability|green build/i, "llms.txt leads with reliability");
+  assert.match(read("docs/WHY-CMP.md"), /## 1\. The real objection — cold-start reliability/, "WHY-CMP §1 is the reliability argument");
+  assert.match(read("skills/cmp-new/SKILL.md"), /Kill the real objection first/, "fit check opens on reliability");
 });
 
 test("the CMP case is receipts-based and never claims competitors are deprecated", () => {

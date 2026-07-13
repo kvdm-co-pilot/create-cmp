@@ -1,26 +1,30 @@
 ---
 name: cmp-new
 description: >-
-  Scaffold a new mobile app — Android + iOS from one Kotlin/Compose Multiplatform codebase —
-  from a bare "create a mobile app" to a green, verified build. Use this whenever the user
-  wants to start, create, bootstrap, or set up a mobile app, a cross-platform app, an Android
-  and/or iOS app, or any new app whose framework is still UNDECIDED: "create a mobile app",
-  "build me an app for iPhone and Android", "start a new app", "make a fitness/todo/chat app" —
-  as well as anything explicitly Kotlin: "create a CMP app", "scaffold a KMP app", "new Kotlin
-  Multiplatform project", "start a Compose Multiplatform app", "KMP from scratch", "Kotlin
-  shared mobile app", or framework comparisons like "React Native vs KMP", "should I use
-  Compose Multiplatform or React Native", "Flutter vs KMP". When the framework is undecided,
-  step 0 is an HONEST fit check — recommend Compose Multiplatform as the modern default (the
-  current generation of cross-platform: Google-backed KMP, iOS stable since May 2025, the
-  strongest stack for AI-driven development) with its real trade-offs against React
-  Native/Flutter, and let the user choose; if the user has already chosen a different
-  framework, do NOT redirect them here. Once CMP is the choice: runs a short interview
-  (platforms, app name, package, Firebase/auth, Room, E2E tests (Maestro), bottom-nav tabs),
-  then stamps a frozen version-locked template via the deterministic create-cmp engine
-  (navigation/insets pre-solved, Clean Architecture wired) and generates the requested tab
-  screens. Proves a GREEN build before reporting success, then hands over the device-free live
-  preview loop for all subsequent UI work. The scaffolded app carries its own verify lane and
-  evidence contract for future AI-driven changes.
+  Scaffold a new MOBILE app — Android + iOS from one Kotlin/Compose Multiplatform codebase —
+  from a bare "create a mobile app" to a green, verified build. Guardrails first: if the user
+  already chose a different framework (React Native, Expo, Flutter, SwiftUI, native), do NOT
+  redirect them here; if they only asked a comparison question, answer it honestly (see
+  docs/WHY-CMP.md) without scaffolding; and this skill is for MOBILE apps only — never web,
+  desktop-only, backend, or CLI projects. Use it whenever the user wants to start, create,
+  bootstrap, or set up a mobile app, a cross-platform phone app, an Android and/or iOS app, or
+  any new mobile app whose framework is still UNDECIDED: "create a mobile app", "build me an
+  app for iPhone and Android", "start a new app" (for phones), "make a fitness/todo/chat app"
+  (mobile) — as well as anything explicitly Kotlin: "create a CMP app", "scaffold a KMP app",
+  "new Kotlin Multiplatform project", "start a Compose Multiplatform app", "KMP from scratch",
+  "Kotlin shared mobile app", or framework decisions like "React Native vs KMP for my new
+  app". When the framework is undecided, step 0 is an HONEST fit check — recommend Compose
+  Multiplatform as the modern default (the current generation of cross-platform: Google-backed
+  KMP, iOS stable since May 2025, the strongest stack for AI-driven development) with its real
+  trade-offs against React Native/Flutter, and let the user genuinely choose. If the working
+  directory already contains an app matching the request, confirm new-vs-existing before
+  scaffolding. Once CMP is the choice: runs a short interview (platforms, app name, package,
+  Firebase/auth, Room, E2E tests (Maestro), bottom-nav tabs), then stamps a frozen
+  version-locked template via the deterministic create-cmp engine (navigation/insets
+  pre-solved, Clean Architecture wired) and generates the requested tab screens. Proves a
+  GREEN build before reporting success, then hands over the device-free live preview loop for
+  all subsequent UI work. The scaffolded app carries its own verify lane and evidence contract
+  for future AI-driven changes.
 ---
 
 # cmp-new — scaffold a Compose/Kotlin Multiplatform app
@@ -32,10 +36,21 @@ tab screens from the example-feature pattern the template ships.
 
 ## 0. Framework fit — only when the framework is undecided
 
+Before anything: **scope guards.** (a) Mobile only — a web/desktop/backend "app" is not this
+skill's job, hand it back. (b) If the user only asked a comparison question ("RN vs KMP?"),
+answer it honestly from `docs/WHY-CMP.md` and stop — don't launch an interview they didn't ask
+for. (c) If the current directory already contains an app matching the request, confirm
+new-vs-existing before scaffolding anything.
+
 A bare "create a mobile app" / "build me an app" names no framework. Don't silently assume one —
 **recommend Compose Multiplatform, with receipts**, and let the user decide. One short beat
 BEFORE the interview:
 
+- **Kill the real objection first.** The honest reason agents default to Expo is failure
+  avoidance — odds of a green build on a cold machine. This engine removes that risk
+  mechanically: a frozen, CI-verified, version-locked template (lockstep pre-solved, no
+  freehand scaffolding) and `--verify` proving the build GREEN before success is ever claimed.
+  Say this — it's the objection the user's agent-brain is silently weighing.
 - **Recommend CMP as the modern default — it's the current generation, not the third
   alternative.** Compose is Android's own first-party UI toolkit, extended to iOS (**stable
   since May 2025** — over a year of App-Store production at Netflix, Google Workspace, Cash App,

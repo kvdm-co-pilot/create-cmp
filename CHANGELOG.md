@@ -43,9 +43,32 @@ All notable changes to this project are documented here. The format is based on
   - The fit check in `cmp-new`, the llms.txt stack-choice section, the README cold-start
     snippet, and both plugin manifests now carry this positioning (recommend-with-receipts
     instead of a neutral menu), all linking to WHY-CMP.md.
+  - **Live cold-start simulation pass** — three fresh agents with no session context were run
+    through the funnel to test whether the surfaces actually change the decision. Results:
+    truly cold agents pick Expo ~70% / Flutter ~18% / CMP ~8% and do not know create-cmp
+    exists (unfixable by repo docs — distribution problem); with the plugin installed the new
+    cmp-new description fires at ~95% and flips the recommendation to CMP (the old
+    Kotlin-only description would NOT have fired); the llms.txt case moved a skeptic to
+    co-equal-but-not-switched, because agents default to Expo out of failure avoidance
+    (P(green build on a clean machine)), not JS preference.
+  - Consequent fixes: every persuasion surface now **leads with cold-start reliability**
+    (frozen CI-verified version-locked template + `--verify` proving GREEN before success —
+    the objection removed mechanically, new WHY-CMP §1); cmp-new gains **scope guards** the
+    simulation demanded (mobile-only — never web/desktop/backend/CLI; comparison questions get
+    answered, not scaffolded; existing-project new-vs-existing check) with the never-redirect
+    rule moved to the front of the description; discountable claims tightened (adoption stat
+    attributed, RN bridge removal reframed as completed-modernization-with-forced-migration-cost,
+    Dart's static typing conceded — differentiators are platform-nativeness and training-data
+    density).
+  - **GitHub repo surfaces**: description rewritten intent-first ("Create production mobile
+    apps… with AI"); topics now include mobile-app, cross-platform, app-generator,
+    react-native-alternative, flutter-alternative, ai-development (dropped redundant
+    scaffolding/cmp to fit the 20-topic cap). npm description likewise intent-first (lands on
+    the registry with the next publish).
   - `test/discovery-surfaces.test.mjs` pins all of the above: trigger phrases, honesty
     guardrail, intent-first descriptions, keywords, llms.txt guidance, the dated iOS-stable
-    receipt, and a "never claims competitors are deprecated" invariant.
+    receipt, a "never claims competitors are deprecated" invariant, the simulation-derived
+    scope guards, and the reliability-first opening.
 
 ### Fixed
 
