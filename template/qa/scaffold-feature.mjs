@@ -446,6 +446,11 @@ const plan = {
 const APP_MODULE = path.join(SRC("commonMain"), "di/AppModule.kt");
 const SCREEN_KT = path.join(SRC("commonMain"), "presentation/navigation/Screen.kt");
 const APP_NAV_HOST = path.join(SRC("commonMain"), "presentation/navigation/AppNavHost.kt");
+// Optional (present only when the inspector feature is enabled): the preview
+// registry lives in desktopMain. A stamped pushed-destination screen is
+// registered here so `renderScreens`, the gallery, and golden baselines pick it
+// up with zero hand edits — the same reason we wire nav/DI automatically.
+const PREVIEW_REGISTRY = path.join(SRC("desktopMain"), "inspector/PreviewRegistry.kt");
 
 // Each step is tagged with the presets it belongs to, same mechanism as
 // FILES above: `repository` gets repo+usecase DI (+ imports) only; `screen`
@@ -478,14 +483,30 @@ const ALL_INJECTION_PLANS = [
       { presets: ["feature", "screen"], apply: (c) => injectAtAnchor(c, APP_NAV_HOST, "nav-destinations", `composable(Screen.${F}.route) { ${F}Screen(onItemClick = {}) }`) },
     ],
   },
+  {
+    // Optional: only wired when the inspector feature shipped PreviewRegistry.kt.
+    // Registers the stamped screen exactly as the NavHost hosts it (pushed
+    // destination → standalone, matching DetailScreen), so preview parity holds.
+    filePath: PREVIEW_REGISTRY,
+    optional: true,
+    steps: [
+      { presets: ["feature", "screen"], apply: (c) => injectImport(c, PREVIEW_REGISTRY, `import ${PACKAGE}.presentation.${f}.${F}Screen`) },
+      { presets: ["feature", "screen"], apply: (c) => injectAtAnchor(c, PREVIEW_REGISTRY, "preview-registry", `ScreenPreview("${f}", "${F} (nav destination)") { ${F}Screen(onItemClick = {}) },`) },
+    ],
+  },
 ];
 
 // Filter steps by active preset; drop any file plan left with zero steps
 // (e.g. Screen.kt / AppNavHost.kt entirely for `repository`).
 const fileInjectionPlans = ALL_INJECTION_PLANS.map((p) => ({
   filePath: p.filePath,
+  optional: p.optional === true,
   steps: p.steps.filter((s) => s.presets.includes(preset)).map((s) => s.apply),
-})).filter((p) => p.steps.length > 0);
+}))
+  .filter((p) => p.steps.length > 0)
+  // An optional shared file (PreviewRegistry.kt when the inspector is disabled)
+  // simply isn't wired — a required file that's missing still dies in applyInjectionSteps.
+  .filter((p) => !(p.optional && !fs.existsSync(p.filePath)));
 
 const fileResults = fileInjectionPlans.map((p) => applyInjectionSteps(p.filePath, p.steps));
 
@@ -518,6 +539,11 @@ if (dryRun) {
   if (FILES.some((file) => file.wrapInBaseScreen)) {
     console.log(
       `\n${F}Screen.kt is stamped wrapped in BaseScreen (SHELL-05 — pushed destinations wrap their own content).`,
+    );
+  }
+  if (fileInjectionPlans.some((p) => p.filePath === PREVIEW_REGISTRY)) {
+    console.log(
+      `\n${F}Screen is auto-registered in inspector/PreviewRegistry.kt (renderScreens + gallery + golden baseline pick it up).`,
     );
   }
   if (writesSpec) {

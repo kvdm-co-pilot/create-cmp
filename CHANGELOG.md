@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-07-14
+
+### Fixed
+
+- **The feature stamper now auto-registers a stamped screen in `inspector/PreviewRegistry.kt`.**
+  `add-feature` / `add-screen` (and `qa/scaffold-feature.mjs` directly) previously wired the
+  nav route and DI but left the new screen invisible to the preview loop, the gallery, and the
+  golden baselines until you hand-added a `ScreenPreview(...)` entry — a drift the harness's own
+  philosophy ("extend right-by-construction") shouldn't allow. The stamper now appends that entry
+  and its import at a new `// cmp:anchor preview-registry` marker, for both the `feature` and
+  `screen` presets, mirroring the nav/DI anchor discipline: idempotent, and a clean no-op when the
+  inspector feature is disabled (no `PreviewRegistry.kt`). The engine's generated registry and the
+  static template stay byte-identical (pinned by `test/tab-surfaces.test.mjs`), and a new parity
+  test (`test/stamped-preview-registration.test.mjs`) locks stamp → registration so the two can't
+  drift again.
+
 ## [0.7.0] - 2026-07-14
 
 ### Added
@@ -516,7 +532,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.5.0...v0.6.0

@@ -75,8 +75,10 @@ and tells you exactly what your edit changed.
 `composeApp/build/previews/<id>/{screen.png, tree.json}` (`-Pscreen=<id>` for one);
 `node qa/preview-gallery.mjs` builds a self-contained gallery page from the output.
 
-Screens come from `inspector/PreviewRegistry.kt` (desktopMain). **When you add a screen,
-register it there** — a forced-state variant is just another entry (`"home@empty"`).
+Screens come from `inspector/PreviewRegistry.kt` (desktopMain). The `add-feature`/`add-screen`
+stamper **auto-registers** a stamped screen there (at the `// cmp:anchor preview-registry`
+marker). **When you add a screen by hand, register it there** — a forced-state variant is just
+another entry (`"home@empty"`).
 Assert on the `tree.json` structure; never read PNG bytes (pixels are for humans).
 <!-- <<< cmp:feature inspector -->
 <!-- >>> cmp:feature dev-client -->
