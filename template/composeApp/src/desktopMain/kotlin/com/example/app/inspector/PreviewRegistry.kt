@@ -18,8 +18,10 @@ import __PACKAGE__.presentation.profile.ProfileScreen
  *
  * The `@Preview` analog for the create-cmp inspector: the registry makes "render screen
  * X" a closed, enumerable operation. The scaffolder regenerates the tab entries from the
- * configured `tabs`; when you add a screen by hand, add it here — the renderScreens
- * harness, the gallery, and golden baselines pick it up by id.
+ * configured `tabs`, and the feature stamper (`qa/scaffold-feature.mjs`, via the
+ * `add-feature`/`add-screen` skills) auto-appends a stamped screen at the
+ * `// cmp:anchor preview-registry` marker below; when you add a screen by hand, add it
+ * there too — the renderScreens harness, the gallery, and golden baselines pick it up by id.
  *
  * State variants (the Storybook "story" analog): a screen in a specific UI state is just
  * another entry with a derived id — e.g. `ScreenPreview("home@empty", "Home — empty")`
@@ -47,6 +49,7 @@ fun previewRegistry(): List<ScreenPreview> = listOf(
     ScreenPreview("home", "Home tab") { TabHost { HomeScreen(onItemClick = {}) } },
     ScreenPreview("profile", "Profile tab") { TabHost { ProfileScreen() } },
     ScreenPreview("detail", "Detail (nav destination)") { DetailScreen(itemId = "1", onBack = {}) },
+    // cmp:anchor preview-registry
 )
 
 /**
