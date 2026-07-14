@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`packages/receipts/` — the receipt-validation logic is now ONE package**
+  (`cmp-receipts`, not yet published). The inputs-hash algorithm and the
+  receipt predicate (binding present → not FAIL → hash matches the tree →
+  PASS) were extracted from the template into `packages/receipts/src/`, which
+  is now the single source of truth; the template's `qa/lib/inputs-hash.mjs`
+  and new `qa/lib/receipt-validate.mjs` are byte-identical vendored copies
+  (`node scripts/sync-receipts.mjs` re-vendors; `test/receipts-parity.test.mjs`
+  pins package ↔ template ↔ fresh-scaffold byte-equality), so generated
+  projects stay dependency-free while any hosted validator consumes the exact
+  same logic from the package. `qa/receipt-check.mjs` now imports the vendored
+  predicate — identical CLI behavior, refusal strings, and exit codes. The
+  package adds service-grade checks the local predicate deliberately doesn't
+  enforce: freshness windows, execution plausibility (impossibly-fast receipts
+  are named — evidence must attest execution), SKIP listing, and a composite
+  `validateReceiptForTree()` that reports repos without a receipt as `missing`,
+  never as failing.
+
 ### Fixed
 
 - **The feature stamper now stamps a SHELL-05-conforming screen out of the box.**

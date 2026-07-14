@@ -1,0 +1,36 @@
+{
+  "name": "cmp-receipts",
+  "version": "0.1.0",
+  "description": "Validate create-cmp evidence receipts: inputs-hash recompute, receipt-vs-tree binding, freshness, and execution-plausibility. Dependency-free ESM — the single source of truth vendored into every generated project's qa/lib/ and consumed by the hosted receipt check.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./inputs-hash": "./src/inputs-hash.mjs",
+    "./receipt-validate": "./src/receipt-validate.mjs"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "create-cmp",
+    "evidence",
+    "receipt",
+    "verification",
+    "content-hash"
+  ],
+  "license": "MIT",
+  "author": "Karel van der Merwe",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kvdm-co-pilot/create-cmp.git",
+    "directory": "packages/receipts"
+  }
+}
