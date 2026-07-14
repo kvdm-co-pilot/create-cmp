@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-14
+
 ### Added
 
 - **`packages/receipts/` — the receipt-validation logic is now ONE package**
@@ -24,6 +26,13 @@ All notable changes to this project are documented here. The format is based on
   are named — evidence must attest execution), SKIP listing, and a composite
   `validateReceiptForTree()` that reports repos without a receipt as `missing`,
   never as failing.
+
+### Changed
+
+- **The package README now leads with the one-line promise.** The README (the first thing
+  npm and coding agents read) opens with "gives AI coding agents *eyes* and a
+  *machine-enforced definition of done* on mobile," surfacing the preview/inspector "eyes"
+  and the verify lane's "definition of done" in the subtitle instead of below the fold.
 
 ### Fixed
 
@@ -507,7 +516,10 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.3.1...v0.3.2

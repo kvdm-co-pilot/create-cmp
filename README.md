@@ -4,8 +4,9 @@
 
 **The AI delivery harness for Kotlin/Compose Multiplatform.**
 
-Scaffold a green-building Android + iOS app in minutes — then let AI extend it, held to a
-machine-enforced definition of done.
+Gives AI coding agents *eyes* and a *machine-enforced definition of done* on mobile: scaffold a
+green-building Android + iOS app in minutes, then let AI extend it — seeing every screen it
+renders, and blocked from "done" without proof.
 
 [![CI](https://github.com/kvdm-co-pilot/create-cmp/actions/workflows/ci.yml/badge.svg)](https://github.com/kvdm-co-pilot/create-cmp/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/create-cmp-cli.svg)](https://www.npmjs.com/package/create-cmp-cli)
