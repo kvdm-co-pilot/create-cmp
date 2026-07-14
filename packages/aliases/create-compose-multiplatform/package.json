@@ -1,7 +1,7 @@
 {
   "name": "create-compose-multiplatform",
-  "version": "0.1.2",
-  "description": "Official alias for create-cmp-cli — create production mobile apps (Android + iOS, one Kotlin codebase) with AI: the delivery harness for Compose Multiplatform, with a built-in verify lane.",
+  "version": "0.1.3",
+  "description": "Official alias for create-cmp-cli — the AI delivery harness for Kotlin/Compose Multiplatform: scaffold a green-building Android + iOS app (one Kotlin codebase) in minutes, then hold AI-driven changes to a machine-enforced verify lane (8 gates, evidence receipts) with a device-free preview loop so coding agents see what they build.",
   "type": "module",
   "bin": {
     "create-compose-multiplatform": "bin/create-compose-multiplatform.mjs"
@@ -47,6 +47,6 @@
     "access": "public"
   },
   "dependencies": {
-    "create-cmp-cli": ">=0.4.0"
+    "create-cmp-cli": ">=0.7.1"
   }
 }
