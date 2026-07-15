@@ -87,21 +87,25 @@ await scaffold({
 const tomlPath = path.join(outDir, "gradle", "libs.versions.toml");
 const gpPath = path.join(outDir, "gradle.properties");
 const wrapPath = path.join(outDir, "gradle", "wrapper", "gradle-wrapper.properties");
+const buildGradlePath = path.join(outDir, "composeApp", "build.gradle.kts");
 const readOrNull = (p) => (fs.existsSync(p) ? fs.readFileSync(p, "utf8") : null);
 
 const plan = planUpgrade({
   tomlContent: fs.readFileSync(tomlPath, "utf8"),
   gradlePropertiesContent: readOrNull(gpPath),
   wrapperPropertiesContent: readOrNull(wrapPath),
+  buildGradleContent: readOrNull(buildGradlePath),
   set: candidate,
 });
 if (plan.lockstepError) die(`candidate breaks the kotlin↔ksp lockstep: ${plan.lockstepError}`);
-if (!plan.diff.changes.length) die("candidate is identical to the scaffolded set — nothing to certify.");
+if (!plan.diff.changes.length && !plan.sdkChanges.length) die("candidate is identical to the scaffolded set — nothing to certify.");
 if (plan.newTomlContent) fs.writeFileSync(tomlPath, plan.newTomlContent);
 if (plan.newGradlePropertiesContent) fs.writeFileSync(gpPath, plan.newGradlePropertiesContent);
 if (plan.newWrapperPropertiesContent) fs.writeFileSync(wrapPath, plan.newWrapperPropertiesContent);
-log(`  applied ${plan.diff.changes.length} version change(s):`);
+if (plan.newBuildGradleContent) fs.writeFileSync(buildGradlePath, plan.newBuildGradleContent);
+log(`  applied ${plan.diff.changes.length} version change(s)${plan.sdkChanges.length ? ` + ${plan.sdkChanges.length} SDK change(s)` : ""}:`);
 for (const c of plan.diff.changes) log(`    ${c.key}: ${c.from} → ${c.to}`);
+for (const s of plan.sdkChanges) log(`    ${s.key}: ${s.from} → ${s.to}  (build.gradle.kts)`);
 
 // local.properties so Gradle finds the Android SDK.
 const sdkDir = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || path.join(os.homedir(), "Library/Android/sdk");
@@ -152,6 +156,7 @@ registryDoc.sets.push({
   label: candidate.label,
   status: "proven-green",
   versions: candidate.versions,
+  ...(candidate.androidSdk ? { androidSdk: candidate.androidSdk } : {}),
   ...(candidate.gradleProperties ? { gradleProperties: candidate.gradleProperties } : {}),
   ...(candidate.gradleWrapper ? { gradleWrapper: candidate.gradleWrapper } : {}),
   notes: [

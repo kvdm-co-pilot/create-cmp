@@ -11,13 +11,14 @@ import {
   lockstepViolation,
   planUpgrade,
   looksLikeOurTemplate,
+  applyAndroidSdk,
 } from "../src/lib/upgrade.mjs";
-import { loadRegistry, latestSet } from "../src/lib/registry.mjs";
+import { loadRegistry, getSet } from "../src/lib/registry.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = fs.readFileSync(path.join(__dirname, "fixtures", "libs.versions.toml"), "utf8");
 
-const SET = latestSet(loadRegistry()); // the shipped 2026.06 set
+const SET = getSet(loadRegistry(), "2026.06"); // pin to the frozen baseline for stable value assertions
 
 // --- differ -------------------------------------------------------------------
 
@@ -65,6 +66,34 @@ test("lockstepViolation: consistent pairing passes", () => {
 
 test("lockstepViolation: KSP2 aligned scheme (ksp === kotlin) passes", () => {
   assert.equal(lockstepViolation({ kotlin: "2.3.10", ksp: "2.3.10" }), null);
+});
+
+test("applyAndroidSdk rewrites compileSdk/targetSdk surgically and reports only real changes", () => {
+  const src = "android {\n    compileSdk = 35\n    defaultConfig {\n        minSdk = 24\n        targetSdk = 35\n    }\n}\n";
+  const r = applyAndroidSdk(src, { compileSdk: 36, targetSdk: 35 });
+  assert.match(r.content, /compileSdk = 36/);
+  assert.match(r.content, /targetSdk = 35/);
+  assert.match(r.content, /minSdk = 24/, "unrelated lines preserved");
+  assert.deepEqual(r.changes, [{ key: "compileSdk", from: "35", to: "36" }]);
+});
+
+test("applyAndroidSdk is a no-op when levels already match or androidSdk is absent", () => {
+  const src = "compileSdk = 36\ntargetSdk = 35\n";
+  assert.deepEqual(applyAndroidSdk(src, { compileSdk: 36, targetSdk: 35 }).changes, []);
+  assert.equal(applyAndroidSdk(src, { compileSdk: 36, targetSdk: 35 }).content, src);
+  assert.deepEqual(applyAndroidSdk(src, undefined).changes, []);
+});
+
+test("planUpgrade surfaces build.gradle.kts compileSdk changes from a set's androidSdk", () => {
+  const plan = planUpgrade({
+    tomlContent: '[versions]\nkotlin = "2.2.20"\n',
+    gradlePropertiesContent: null,
+    wrapperPropertiesContent: null,
+    buildGradleContent: "android {\n    compileSdk = 35\n    targetSdk = 35\n}\n",
+    set: { versions: { kotlin: "2.2.20" }, androidSdk: { compileSdk: 36 } },
+  });
+  assert.deepEqual(plan.sdkChanges, [{ key: "compileSdk", from: "35", to: "36" }]);
+  assert.match(plan.newBuildGradleContent, /compileSdk = 36/);
 });
 
 test("lockstepViolation: mismatch is reported", () => {

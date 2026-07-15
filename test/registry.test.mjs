@@ -123,6 +123,37 @@ test("validateRegistry enforces kotlin↔ksp lockstep INSIDE every set", () => {
   );
 });
 
+test("validateRegistry checks the optional androidSdk field, and 2026.06 mirrors the template", () => {
+  // Valid: integer compileSdk/targetSdk.
+  assert.deepEqual(
+    validateRegistry({ sets: [{ id: "a", versions: { kotlin: "2.2.20" }, androidSdk: { compileSdk: 35, targetSdk: 35 } }] }),
+    [],
+  );
+  // Invalid: non-integer level.
+  assert.ok(
+    validateRegistry({ sets: [{ id: "a", versions: { kotlin: "2.2.20" }, androidSdk: { compileSdk: "35" } }] })
+      .some((e) => e.includes("androidSdk.compileSdk")),
+  );
+  // The shipped 2026.06 set's androidSdk mirrors the template's composeApp/build.gradle.kts.
+  const set = getSet(loadRegistry(), "2026.06");
+  assert.ok(set.androidSdk, "2026.06 must declare androidSdk");
+  const bg = fs.readFileSync(
+    path.join(__dirname, "..", "template", "composeApp", "build.gradle.kts"),
+    "utf8",
+  );
+  assert.match(bg, new RegExp(`compileSdk = ${set.androidSdk.compileSdk}\\b`), "template compileSdk matches the set");
+  assert.match(bg, new RegExp(`targetSdk = ${set.androidSdk.targetSdk}\\b`), "template targetSdk matches the set");
+});
+
+test("every shipped proven-green set declares androidSdk (compileSdk is managed, promoter propagates it)", () => {
+  for (const set of loadRegistry().sets) {
+    assert.ok(
+      set.androidSdk && Number.isInteger(set.androidSdk.compileSdk),
+      `${set.id} must declare androidSdk.compileSdk — otherwise upgrade leaves compileSdk stale`,
+    );
+  }
+});
+
 // --- helpers ------------------------------------------------------------------------
 
 test("latestSet returns the last (newest) entry", () => {

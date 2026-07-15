@@ -64,6 +64,17 @@ export function validateRegistry(registry) {
     if (set.gradleWrapper && typeof set.gradleWrapper.distributionUrl !== "string") {
       errors.push(`${where}: gradleWrapper.distributionUrl must be a string`);
     }
+    if (set.androidSdk !== undefined) {
+      if (typeof set.androidSdk !== "object" || Array.isArray(set.androidSdk) || set.androidSdk === null) {
+        errors.push(`${where}: androidSdk must be an object`);
+      } else {
+        for (const k of ["compileSdk", "targetSdk"]) {
+          if (set.androidSdk[k] !== undefined && !Number.isInteger(set.androidSdk[k])) {
+            errors.push(`${where}: androidSdk.${k} must be an integer`);
+          }
+        }
+      }
+    }
     if (set.notes && !Array.isArray(set.notes)) errors.push(`${where}: notes must be an array`);
   });
   return errors;

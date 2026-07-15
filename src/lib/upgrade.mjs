@@ -87,8 +87,35 @@ export function lockstepViolation(versions) {
 }
 
 /**
+ * Apply a set's `androidSdk` levels (compileSdk / targetSdk) to the text of
+ * composeApp/build.gradle.kts. These live in build.gradle.kts, NOT the version
+ * catalog — but they are coupled to the set (a dependency built against a newer
+ * Android API forces a higher compileSdk, which in turn needs a newer AGP), so
+ * the version set manages them too. Surgical, line-preserving replacement of the
+ * `compileSdk = N` / `targetSdk = N` assignments.
+ * @param {string} content build.gradle.kts text
+ * @param {{compileSdk?:number,targetSdk?:number}} androidSdk
+ * @returns {{content:string, changes:Array<{key,from,to}>}}
+ */
+export function applyAndroidSdk(content, androidSdk) {
+  if (!androidSdk || content == null) return { content, changes: [] };
+  const changes = [];
+  let out = content;
+  for (const key of ["compileSdk", "targetSdk"]) {
+    if (androidSdk[key] == null) continue;
+    const re = new RegExp(`(\\b${key}\\s*=\\s*)(\\d+)`);
+    const m = out.match(re);
+    if (m && Number(m[2]) !== Number(androidSdk[key])) {
+      changes.push({ key, from: m[2], to: String(androidSdk[key]) });
+      out = out.replace(re, `$1${androidSdk[key]}`);
+    }
+  }
+  return { content: changes.length ? out : content, changes };
+}
+
+/**
  * Compute the full upgrade plan for one catalog + optional gradle.properties +
- * optional wrapper properties. Pure — no filesystem.
+ * optional wrapper properties + optional composeApp/build.gradle.kts. Pure — no filesystem.
  * @param {object} params
  * @param {string} params.tomlContent gradle/libs.versions.toml text
  * @param {string|null} params.gradlePropertiesContent gradle.properties text (null = absent)
@@ -105,7 +132,7 @@ export function lockstepViolation(versions) {
  *   fromOurTemplate: boolean
  * }}
  */
-export function planUpgrade({ tomlContent, gradlePropertiesContent, wrapperPropertiesContent, set }) {
+export function planUpgrade({ tomlContent, gradlePropertiesContent, wrapperPropertiesContent, buildGradleContent = null, set }) {
   const projectVersions = parseVersions(tomlContent);
   const diff = diffAgainstSet(projectVersions, set);
   const resulting = resultingVersions(projectVersions, diff.changes);
@@ -150,6 +177,17 @@ export function planUpgrade({ tomlContent, gradlePropertiesContent, wrapperPrope
     }
   }
 
+  // Android compileSdk / targetSdk (composeApp/build.gradle.kts), when the set pins them.
+  let sdkChanges = [];
+  let newBuildGradleContent = null;
+  if (!lockstepError && set.androidSdk && buildGradleContent !== null) {
+    const r = applyAndroidSdk(buildGradleContent, set.androidSdk);
+    if (r.changes.length > 0) {
+      sdkChanges = r.changes;
+      newBuildGradleContent = r.content;
+    }
+  }
+
   return {
     diff,
     lockstepError,
@@ -158,6 +196,8 @@ export function planUpgrade({ tomlContent, gradlePropertiesContent, wrapperPrope
     newGradlePropertiesContent,
     wrapperChange,
     newWrapperPropertiesContent,
+    sdkChanges,
+    newBuildGradleContent,
     fromOurTemplate: looksLikeOurTemplate(tomlContent),
   };
 }

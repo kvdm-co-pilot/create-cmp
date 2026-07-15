@@ -339,6 +339,7 @@ by deleting setup friction, the goal here is the same for multiplatform mobile.
 [`docs/USAGE.md`](./docs/USAGE.md) — the complete usage guide (every command, skill, MCP tool,
 workflow) · [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — engine design ·
 [`docs/HARNESS-PLAN.md`](./docs/HARNESS-PLAN.md) — the harness, layer by layer ·
+[`docs/VERSIONS.md`](./docs/VERSIONS.md) — the proven-green version sets (what `upgrade` targets) ·
 [`docs/adr/`](./docs/adr/) — decision records · [`docs/ROADMAP.md`](./docs/ROADMAP.md) — what's next.
 
 ## Contributing
