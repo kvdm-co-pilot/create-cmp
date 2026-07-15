@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **New official alias: `create-mobile`** (`packages/aliases/create-mobile`, published
+  separately, starts at 0.1.0) — the honest front door to a new mobile app. Unlike the
+  pure-passthrough `create-kmp` / `create-compose-multiplatform` shims, `npm create mobile`
+  opens with a fit check: Compose Multiplatform as the modern default, the real trade-offs vs
+  React Native/Flutter (their strengths named too), and a genuine choice — interactive runs get
+  a `Continue with Compose Multiplatform? [Y/n]` prompt that writes nothing and points to Expo /
+  Flutter on decline; `--yes`/CI runs print the note and proceed. The generic name earns itself
+  rather than silently redirecting. README + llms.txt now list it alongside the other aliases.
+
 ## [0.7.1] - 2026-07-14
 
 ### Fixed
