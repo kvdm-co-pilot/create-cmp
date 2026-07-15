@@ -31,6 +31,10 @@
         "version": "8.11.1",
         "distributionUrl": "https://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
       },
+      "androidSdk": {
+        "compileSdk": 35,
+        "targetSdk": 35
+      },
       "notes": [
         "KSP must be `<kotlin>-<kspVersion>`: kotlin 2.2.20 pairs with ksp 2.2.20-2.0.4. Never bump one without the other — Kotlin / KSP / Compose / Room / AGP move as ONE set or the build dies.",
         "ksp.useKSP2=true is REQUIRED when Room's KSP processor runs on Kotlin/Native (iOS): KSP1 fails with `ClassNotFoundException: org.jetbrains.kotlin.cli.utilities.MainKt` (the KSP2/iOS catch-22).",
@@ -68,11 +72,58 @@
         "version": "8.11.1",
         "distributionUrl": "https://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
       },
+      "androidSdk": {
+        "compileSdk": 35,
+        "targetSdk": 35
+      },
       "notes": [
         "Delta vs 2026.06: coil 3.1.0→3.2.0, kotlinx-serialization 1.7.3→1.9.0. Everything else, including the entire Kotlin/KSP/Compose/Room/AGP lockstep, is held identical — the conservative-first strategy: prove the canary + upgrade loop before a risky compiler-version jump.",
         "ktor 3.2.0 was EXCLUDED after the canary caught it: ktor-client-core-jvm 3.2.0 carries a backtick identifier with a space (`use streaming syntax`) that requires DEX version 040, which AGP 8.7.3's bundled R8 (8.7.18) rejects at :composeApp:mergeExtDexDebug. Bumping ktor needs a newer AGP/R8 — deferred to a bold set.",
         "Bumps verified latest via Maven Central 2026-07-15.",
         "Promoted by promote-set.mjs 2026-07-15: green on :composeApp:assembleDebug, :composeApp:desktopTest, :composeApp:linkDebugFrameworkIosSimulatorArm64 (456s). Evidence: qa-artifacts/canary/2026.07c.json"
+      ]
+    },
+    {
+      "id": "2026.07r",
+      "label": "July 2026 recommended standard — Kotlin 2.3.10 / KSP 2.3.10 / Compose 1.11.1 / AGP 8.13.2 / Gradle 8.14.3, compileSdk 36. ktor held at 3.1.0 (3.2.0 not dexable at minSdk 24) and androidx UI libs held at SDK-36-safe versions.",
+      "status": "proven-green",
+      "versions": {
+        "kotlin": "2.3.10",
+        "agp": "8.13.2",
+        "google-services": "4.5.0",
+        "compose-multiplatform": "1.11.1",
+        "koin": "4.2.2",
+        "ktor": "3.1.0",
+        "room": "2.8.4",
+        "sqlite": "2.7.0",
+        "ksp": "2.3.10",
+        "kotlinx-serialization": "1.9.0",
+        "kotlinx-datetime": "0.7.0",
+        "lifecycle": "2.10.0",
+        "navigation": "2.9.2",
+        "firebase-gitlive": "2.4.0",
+        "coil": "3.2.0",
+        "androidx-core": "1.15.0",
+        "androidx-activity": "1.10.1"
+      },
+      "gradleProperties": {
+        "ksp.useKSP2": "true"
+      },
+      "gradleWrapper": {
+        "version": "8.14.3",
+        "distributionUrl": "https://services.gradle.org/distributions/gradle-8.14.3-bin.zip"
+      },
+      "androidSdk": {
+        "compileSdk": 36,
+        "targetSdk": 35
+      },
+      "notes": [
+        "Sourced, mutually-compatible July 2026 set (verified 2026-07-15): Kotlin 2.3.10 is the newest Kotlin with a matching KSP (KSP tops out at 2.3.10; no KSP for Kotlin 2.4.10). KSP2 aligned scheme (ksp == kotlin). Compose Multiplatform 1.11.1 (latest stable) is compatible with Kotlin 2.3.10.",
+        "AGP 8.13.2 is the top of the Kotlin-2.3-supported AGP range (per developer.android.com/build/kotlin-support). Gradle 8.14.3 satisfies AGP 8.13's minimum. compileSdk moves to 36 (Android 16, the latest STABLE API) — now a managed field applied to composeApp/build.gradle.kts.",
+        "ktor HELD at 3.1.0: even AGP 8.13.2's newer R8 (8.13.19) cannot dex ktor-client-core 3.2.0 — its backtick identifier `use streaming syntax` needs DEX version 040, which D8 only emits at a much higher minSdk than 24. Not an R8-version issue; ktor 3.2.0 is not adoptable at a normal minSdk yet.",
+        "HELD ON PURPOSE: androidx-core (1.15.0) and lifecycle (2.10.0) are kept at their SDK-36-safe versions. Their latest (core 1.19.0, lifecycle 2.11.0) require compileSdk 37 — an unreleased-stable API — so 'latest-of-each' is NOT the recommended-stable choice; revisit when a compileSdk-37 set is warranted. targetSdk held at 35 for runtime-behavior stability.",
+        "Verified by the canary: Kotlin 2.3.10 + Compose 1.11.1 + firebase-gitlive 2.4.0 compile the template source and dex cleanly at compileSdk 36.",
+        "Promoted by promote-set.mjs 2026-07-15: green on :composeApp:assembleDebug, :composeApp:desktopTest, :composeApp:linkDebugFrameworkIosSimulatorArm64 (425s). Evidence: qa-artifacts/canary/2026.07r.json"
       ]
     }
   ]

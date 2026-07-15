@@ -8,6 +8,20 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **`create-cmp upgrade` now manages `compileSdk` / `targetSdk`, and ships the July 2026
+  recommended version set (`2026.07r`).** A version set can carry an `androidSdk`
+  block, and `upgrade` rewrites `composeApp/build.gradle.kts` (with a backup) alongside the
+  catalog — because the Android SDK level is coupled to the set (newer AGP + newer androidx
+  force a higher `compileSdk`). The new default upgrade target `2026.07r` is a sourced,
+  canary-certified jump: **Kotlin 2.3.10 / KSP 2.3.10 / Compose Multiplatform 1.11.1 /
+  AGP 8.13.2 / Gradle 8.14.3 / compileSdk 36**, plus koin 4.2.2, sqlite 2.7.0, firebase 2.4.0,
+  google-services 4.5.0 (coil 3.2.0 + serialization 1.9.0 from 2026.07c). Built green on
+  Android + desktop + iOS. The lockstep validator now accepts KSP2's aligned scheme
+  (`ksp == kotlin`, e.g. `2.3.10`) as well as the classic `<kotlin>-<kspVersion>` form.
+  Documented in the new [docs/VERSIONS.md](docs/VERSIONS.md). Deliberate holds, each found by a
+  canary build: ktor stays 3.1.0 (3.2.0 isn't dexable at `minSdk 24`), and androidx-core /
+  lifecycle stay at their SDK-36-safe versions (their latest demand an unreleased `compileSdk 37`).
+
 - **Second proven-green version set (`2026.07c`) + the canary promotion gate.**
   `scripts/promote-set.mjs` scaffolds a full app pinned to a candidate (staged in the new
   `src/versions/candidates.json`), builds it for real — Android `assembleDebug`, the

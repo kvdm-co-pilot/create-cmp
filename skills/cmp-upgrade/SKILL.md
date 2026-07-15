@@ -49,6 +49,9 @@ What the engine does when applying:
   edits; comments, formatting, and every unrelated line are preserved byte-for-byte.
 - Adds/updates the `gradle.properties` flags the set requires (e.g. `ksp.useKSP2=true`).
 - Updates the Gradle wrapper `distributionUrl` when the set pins one.
+- Rewrites `compileSdk` / `targetSdk` in `composeApp/build.gradle.kts` when the set pins them
+  (its `androidSdk` block) — the Android SDK levels are coupled to the set (a newer AGP + newer
+  androidx force a higher `compileSdk`), so the version set manages them too, not just the catalog.
 - Backs up every touched file as `<file>.bak-upgrade` **before** writing and prints the exact
   `mv` commands to revert.
 - Versions the project declares that the set doesn't know are **left untouched** (and warned), so
@@ -56,8 +59,10 @@ What the engine does when applying:
 
 ## The lockstep guardrail — relay it, don't fight it
 
-The engine **refuses to write** any file where the resulting `ksp` is not `<kotlin>-…`. If it
-errors with a lockstep violation, that is the product working as designed: the target set or the
+The engine **refuses to write** any file where the resulting `ksp` is not in lockstep with
+`kotlin` — either `<kotlin>` (the KSP2 aligned scheme, from Kotlin 2.3) or `<kotlin>-<kspVersion>`
+(the classic KSP1 form). If it errors with a lockstep violation, that is the product working as
+designed: the target set or the
 project's partial state would produce a known-dead build. Fix by upgrading kotlin and ksp
 **together** (which is exactly what a registry set does) — never by overriding one of them by hand.
 

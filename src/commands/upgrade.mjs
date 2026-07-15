@@ -83,10 +83,12 @@ export async function runUpgrade(flags, positional) {
 
   const gradlePropsPath = path.join(projectDir, "gradle.properties");
   const wrapperPropsPath = path.join(projectDir, "gradle", "wrapper", "gradle-wrapper.properties");
+  const buildGradlePath = path.join(projectDir, "composeApp", "build.gradle.kts");
   const plan = planUpgrade({
     tomlContent,
     gradlePropertiesContent: readIfExists(gradlePropsPath),
     wrapperPropertiesContent: readIfExists(wrapperPropsPath),
+    buildGradleContent: readIfExists(buildGradlePath),
     set,
   });
 
@@ -124,6 +126,9 @@ export async function runUpgrade(flags, positional) {
   if (plan.wrapperChange) {
     step(`gradle wrapper: ${plan.wrapperChange.from} ${colors.dim("→")} ${plan.wrapperChange.to}`);
   }
+  for (const s of plan.sdkChanges) {
+    step(`composeApp/build.gradle.kts: ${s.key} ${s.from} ${colors.dim("→")} ${s.to}`);
+  }
   if (unmanaged.length > 0) {
     warn(
       `Left untouched (not in set ${set.id}): ${unmanaged.map((u) => `${u.key} ${u.value}`).join(", ")}`
@@ -142,7 +147,8 @@ export async function runUpgrade(flags, positional) {
   const anythingToWrite =
     plan.newTomlContent !== null ||
     plan.newGradlePropertiesContent !== null ||
-    plan.newWrapperPropertiesContent !== null;
+    plan.newWrapperPropertiesContent !== null ||
+    plan.newBuildGradleContent !== null;
   if (!anythingToWrite) {
     ok("Project is fully aligned — nothing to apply.");
     process.exit(0);
@@ -167,6 +173,7 @@ export async function runUpgrade(flags, positional) {
     { path: tomlPath, content: plan.newTomlContent },
     { path: gradlePropsPath, content: plan.newGradlePropertiesContent },
     { path: wrapperPropsPath, content: plan.newWrapperPropertiesContent },
+    { path: buildGradlePath, content: plan.newBuildGradleContent },
   ];
   for (const w of writes) {
     if (w.content === null) continue;
