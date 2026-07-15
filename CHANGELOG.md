@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **Second proven-green version set (`2026.07c`) + the canary promotion gate.**
+  `scripts/promote-set.mjs` scaffolds a full app pinned to a candidate (staged in the new
+  `src/versions/candidates.json`), builds it for real — Android `assembleDebug`, the
+  device-free lane gates (`desktopTest`), and the iOS framework link — and ONLY on all-green
+  appends it into `src/versions/registry.json` as the new default `create-cmp upgrade` target;
+  a red build leaves the registry untouched. The first promoted set, `2026.07c`, bumps
+  coil 3.1.0→3.2.0 and kotlinx-serialization 1.7.3→1.9.0 with the entire Kotlin/KSP/Compose/Room/AGP
+  lockstep held. The gate earned itself on the first run: it caught ktor 3.2.0 shipping a
+  DEX-040 backtick identifier (`use streaming syntax`) that AGP 8.7.3's R8 rejects at
+  `mergeExtDexDebug`, and refused to promote it. `create-cmp upgrade` now has a real target
+  beyond the frozen baseline. (Complements the existing `scripts/canary.mjs` freshness probe.)
+
 - **New official alias: `create-mobile`** (`packages/aliases/create-mobile`, published
   separately, starts at 0.1.0) — the honest front door to a new mobile app. Unlike the
   pure-passthrough `create-kmp` / `create-compose-multiplatform` shims, `npm create mobile`

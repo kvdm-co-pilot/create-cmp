@@ -1,0 +1,4 @@
+{
+  "description": "Staging area for CANDIDATE version sets awaiting canary certification. `scripts/canary.mjs` applies one candidate to a fresh full-featured scaffold, builds it for real (Android assembleDebug + the device-free lane gates + the iOS framework link), and ONLY on all-green promotes it into registry.json as a new proven-green set (the new default `upgrade` target). Red leaves registry.json untouched. Same shape as a registry set, plus `status: candidate` and `baseline` (the proven-green set it derives from). Keys under `versions` mirror the [versions] table of the golden template's gradle/libs.versions.toml — store the FULL resolved set so a promoted entry is a complete snapshot.",
+  "candidates": []
+}
