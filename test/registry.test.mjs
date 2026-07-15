@@ -49,6 +49,33 @@ test("shipped registry's 2026.06 set mirrors the template's [versions] table exa
   }
 });
 
+test("registry carries the canary-promoted 2026.07c set (conservative delta vs 2026.06)", () => {
+  const reg = loadRegistry();
+  const base = getSet(reg, "2026.06");
+  const next = getSet(reg, "2026.07c");
+  assert.ok(next, "2026.07c must exist (promoted by scripts/promote-set.mjs on a green build)");
+  assert.equal(next.status, "proven-green");
+  // Exactly the conservative delta — the whole Kotlin/KSP/Compose/Room/AGP lockstep held.
+  const diff = Object.keys(next.versions).filter((k) => next.versions[k] !== base.versions[k]).sort();
+  assert.deepEqual(diff, ["coil", "kotlinx-serialization"], "only the conservative bumps differ");
+  assert.equal(next.versions.coil, "3.2.0");
+  assert.equal(next.versions["kotlinx-serialization"], "1.9.0");
+  assert.equal(next.versions.kotlin, base.versions.kotlin, "Kotlin lockstep held");
+  assert.equal(next.versions.ksp, base.versions.ksp, "KSP lockstep held");
+  assert.equal(latestSet(reg).status, "proven-green", "newest set is a proven-green upgrade target");
+});
+
+test("candidates.json is valid and every candidate is well-formed", () => {
+  const candPath = path.join(__dirname, "..", "src", "versions", "candidates.json");
+  const doc = JSON.parse(fs.readFileSync(candPath, "utf8"));
+  assert.ok(Array.isArray(doc.candidates), "candidates must be an array");
+  for (const c of doc.candidates) {
+    assert.ok(c.id && c.versions && c.baseline, "each candidate needs id + versions + baseline");
+    // A candidate must itself be lockstep-valid — validated as a one-set registry.
+    assert.deepEqual(validateRegistry({ sets: [{ id: c.id, versions: c.versions }] }), []);
+  }
+});
+
 test("shipped registry file has no trailing surprises (valid strict JSON)", () => {
   const raw = fs.readFileSync(REGISTRY_PATH, "utf8");
   assert.doesNotThrow(() => JSON.parse(raw));

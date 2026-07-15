@@ -37,6 +37,43 @@
         "Room 2.8.4 + sqlite-bundled 2.6.2 is the KMP-native pairing; Room < 2.7 has no Kotlin/Native support at all.",
         "Gradle wrapper 8.11.1 matches AGP 8.7.3 (AGP 8.7 requires Gradle >= 8.9)."
       ]
+    },
+    {
+      "id": "2026.07c",
+      "label": "Conservative bump — coil + kotlinx-serialization to latest; lockstep held at 2026.06 (ktor 3.2.0 excluded: needs DEX 040 / newer AGP R8)",
+      "status": "proven-green",
+      "versions": {
+        "kotlin": "2.2.20",
+        "agp": "8.7.3",
+        "google-services": "4.4.2",
+        "compose-multiplatform": "1.10.3",
+        "koin": "4.1.1",
+        "ktor": "3.1.0",
+        "room": "2.8.4",
+        "sqlite": "2.6.2",
+        "ksp": "2.2.20-2.0.4",
+        "kotlinx-serialization": "1.9.0",
+        "kotlinx-datetime": "0.7.0",
+        "lifecycle": "2.10.0",
+        "navigation": "2.9.2",
+        "firebase-gitlive": "2.1.0",
+        "coil": "3.2.0",
+        "androidx-core": "1.15.0",
+        "androidx-activity": "1.10.1"
+      },
+      "gradleProperties": {
+        "ksp.useKSP2": "true"
+      },
+      "gradleWrapper": {
+        "version": "8.11.1",
+        "distributionUrl": "https://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
+      },
+      "notes": [
+        "Delta vs 2026.06: coil 3.1.0→3.2.0, kotlinx-serialization 1.7.3→1.9.0. Everything else, including the entire Kotlin/KSP/Compose/Room/AGP lockstep, is held identical — the conservative-first strategy: prove the canary + upgrade loop before a risky compiler-version jump.",
+        "ktor 3.2.0 was EXCLUDED after the canary caught it: ktor-client-core-jvm 3.2.0 carries a backtick identifier with a space (`use streaming syntax`) that requires DEX version 040, which AGP 8.7.3's bundled R8 (8.7.18) rejects at :composeApp:mergeExtDexDebug. Bumping ktor needs a newer AGP/R8 — deferred to a bold set.",
+        "Bumps verified latest via Maven Central 2026-07-15.",
+        "Promoted by promote-set.mjs 2026-07-15: green on :composeApp:assembleDebug, :composeApp:desktopTest, :composeApp:linkDebugFrameworkIosSimulatorArm64 (456s). Evidence: qa-artifacts/canary/2026.07c.json"
+      ]
     }
   ]
 }
