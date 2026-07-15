@@ -26,8 +26,10 @@ npx create-cmp-cli@latest my-app --name Acme --package com.acme.app --yes --veri
 Deterministic (stamps a frozen, CI-verified template), fully non-interactive with flags, and
 exits non-zero on failure. Every generated project ships its own verify lane — `node qa/verify.mjs`,
 8 gates, evidence receipts — with nothing installed. Agent-readable: [llms.txt](./llms.txt) ·
-[options.schema.json](./options.schema.json). Also answers to `npm create compose-multiplatform`
-and `npm create kmp` — official aliases ([packages/aliases](packages/aliases)) that delegate here.
+[options.schema.json](./options.schema.json). Also answers to `npm create mobile` (the honest
+front door — opens with a CMP-vs-React Native/Flutter fit check, then delegates),
+`npm create compose-multiplatform`, and `npm create kmp` — official aliases
+([packages/aliases](packages/aliases)) that delegate here.
 
 ## What is this, in plain words
 

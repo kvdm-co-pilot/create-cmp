@@ -1,0 +1,51 @@
+{
+  "name": "create-mobile",
+  "version": "0.1.0",
+  "description": "The honest front door to a new mobile app. `npm create mobile` recommends Kotlin/Compose Multiplatform as the modern default, states the real trade-offs vs React Native/Flutter, and lets you choose — then, if you continue, scaffolds a green-building Android + iOS app (one Kotlin codebase) with a machine-enforced verify lane and evidence receipts. Official alias for create-cmp-cli; not a redirect — a fit check first.",
+  "type": "module",
+  "bin": {
+    "create-mobile": "bin/create-mobile.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin"
+  ],
+  "keywords": [
+    "mobile app",
+    "create mobile app",
+    "new mobile app",
+    "cross-platform",
+    "app generator",
+    "react native alternative",
+    "flutter alternative",
+    "android",
+    "ios",
+    "compose-multiplatform",
+    "kotlin-multiplatform",
+    "kmp",
+    "cmp",
+    "scaffold",
+    "project-generator",
+    "claude-code",
+    "ai-agent"
+  ],
+  "license": "MIT",
+  "author": "Karel van der Merwe",
+  "homepage": "https://github.com/kvdm-co-pilot/create-cmp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kvdm-co-pilot/create-cmp.git",
+    "directory": "packages/aliases/create-mobile"
+  },
+  "bugs": {
+    "url": "https://github.com/kvdm-co-pilot/create-cmp/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "create-cmp-cli": ">=0.7.1"
+  }
+}
