@@ -73,10 +73,14 @@ export function lockstepViolation(versions) {
   const kotlin = versions.kotlin;
   const ksp = versions.ksp;
   if (!kotlin || !ksp) return null;
-  if (!ksp.startsWith(`${kotlin}-`)) {
+  // Two valid schemes: the classic KSP1 form "<kotlin>-<kspVersion>" (e.g.
+  // 2.2.20-2.0.4), and the KSP2 aligned form where the KSP version EQUALS the
+  // Kotlin version (e.g. kotlin 2.3.10 ↔ ksp 2.3.10 — KSP dropped the -<ksp> suffix).
+  if (ksp !== kotlin && !ksp.startsWith(`${kotlin}-`)) {
     return (
-      `kotlin ${kotlin} and ksp ${ksp} are OUT OF LOCKSTEP — ksp must be ` +
-      `"${kotlin}-<kspVersion>" (e.g. "${kotlin}-2.0.4"). Refusing to write a broken pairing.`
+      `kotlin ${kotlin} and ksp ${ksp} are OUT OF LOCKSTEP — ksp must be either ` +
+      `"${kotlin}" (KSP2 aligned) or "${kotlin}-<kspVersion>" (e.g. "${kotlin}-2.0.4"). ` +
+      `Refusing to write a broken pairing.`
     );
   }
   return null;

@@ -112,6 +112,15 @@ test("validateRegistry enforces kotlin↔ksp lockstep INSIDE every set", () => {
     sets: [{ id: "broken", versions: { kotlin: "2.2.20", ksp: "2.1.0-1.0.29" } }],
   });
   assert.ok(errors.some((e) => e.includes("lockstep")));
+  // Both valid schemes pass: KSP1 dash form, and the KSP2 aligned form (ksp === kotlin).
+  assert.deepEqual(
+    validateRegistry({ sets: [{ id: "ksp1", versions: { kotlin: "2.2.20", ksp: "2.2.20-2.0.4" } }] }),
+    [],
+  );
+  assert.deepEqual(
+    validateRegistry({ sets: [{ id: "ksp2", versions: { kotlin: "2.3.10", ksp: "2.3.10" } }] }),
+    [],
+  );
 });
 
 // --- helpers ------------------------------------------------------------------------
