@@ -53,8 +53,10 @@ export function validateRegistry(registry) {
       if (typeof v !== "string" || !v) errors.push(`${where}: versions.${k} must be a non-empty string`);
     }
     const { kotlin, ksp } = set.versions;
-    if (kotlin && ksp && !ksp.startsWith(`${kotlin}-`)) {
-      errors.push(`${where}: ksp "${ksp}" is not in lockstep with kotlin "${kotlin}" (must be "${kotlin}-<kspVersion>")`);
+    // Accept both the KSP1 form "<kotlin>-<kspVersion>" and the KSP2 aligned form
+    // where ksp === kotlin (KSP dropped the -<ksp> suffix in the 2.3.x line).
+    if (kotlin && ksp && ksp !== kotlin && !ksp.startsWith(`${kotlin}-`)) {
+      errors.push(`${where}: ksp "${ksp}" is not in lockstep with kotlin "${kotlin}" (must be "${kotlin}" for KSP2, or "${kotlin}-<kspVersion>")`);
     }
     if (set.gradleProperties && typeof set.gradleProperties !== "object") {
       errors.push(`${where}: gradleProperties must be an object`);

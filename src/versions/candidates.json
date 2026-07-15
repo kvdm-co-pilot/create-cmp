@@ -1,4 +1,42 @@
 {
   "description": "Staging area for CANDIDATE version sets awaiting canary certification. `scripts/canary.mjs` applies one candidate to a fresh full-featured scaffold, builds it for real (Android assembleDebug + the device-free lane gates + the iOS framework link), and ONLY on all-green promotes it into registry.json as a new proven-green set (the new default `upgrade` target). Red leaves registry.json untouched. Same shape as a registry set, plus `status: candidate` and `baseline` (the proven-green set it derives from). Keys under `versions` mirror the [versions] table of the golden template's gradle/libs.versions.toml — store the FULL resolved set so a promoted entry is a complete snapshot.",
-  "candidates": []
+  "candidates": [
+    {
+      "id": "2026.07b",
+      "label": "Bold — Kotlin 2.3.10 + KSP 2.3.10 + Compose 1.11.1. BLOCKED (canary 2026-07-15): KSP 2.3.10 needs a newer AGP than 8.7.3 (see notes). Next attempt must bump AGP (and likely Gradle) with it.",
+      "status": "candidate",
+      "baseline": "2026.07c",
+      "versions": {
+        "kotlin": "2.3.10",
+        "agp": "8.7.3",
+        "google-services": "4.4.2",
+        "compose-multiplatform": "1.11.1",
+        "koin": "4.2.2",
+        "ktor": "3.1.0",
+        "room": "2.8.4",
+        "sqlite": "2.7.0",
+        "ksp": "2.3.10",
+        "kotlinx-serialization": "1.9.0",
+        "kotlinx-datetime": "0.7.0",
+        "lifecycle": "2.10.0",
+        "navigation": "2.9.2",
+        "firebase-gitlive": "2.4.0",
+        "coil": "3.2.0",
+        "androidx-core": "1.15.0",
+        "androidx-activity": "1.10.1"
+      },
+      "gradleProperties": {
+        "ksp.useKSP2": "true"
+      },
+      "gradleWrapper": {
+        "version": "8.11.1",
+        "distributionUrl": "https://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
+      },
+      "notes": [
+        "Bold compiler jump vs 2026.07c: kotlin 2.2.20→2.3.10, ksp 2.2.20-2.0.4→2.3.10 (KSP2 dropped the -<ksp> suffix; ksp now equals the Kotlin version), compose-multiplatform 1.10.3→1.11.1, sqlite 2.6.2→2.7.0, koin 4.1.1→4.2.2, firebase-gitlive 2.1.0→2.4.0.",
+        "Held to isolate risk: AGP 8.7.3 (avoid the AGP-9 major), ktor 3.1.0 (3.2.0 needs DEX 040 / newer R8), gradle wrapper 8.11.1. Kotlin 2.4.10 is available but has NO matching KSP yet (KSP tops out at 2.3.10) — so 2.3.10 is the max Kotlin that can run Room's KSP processor.",
+        "CANARY RESULT (2026-07-15, red at config in 34s): KSP 2.3.10 calls com.android.build.api.variant.AndroidComponentsExtension.addKspConfigurations(boolean), which AGP 8.7.3 does not expose → NoSuchMethodError. The Kotlin-2.3.10/KSP-2.3.10 jump is COUPLED to an AGP bump; holding AGP at 8.7.3 is not an option. Next attempt: bump AGP to a version exposing addKspConfigurations (and the Gradle wrapper it requires), then re-run — Compose 1.11.1 ↔ Kotlin 2.3.10 and compose-hot-reload 1.1.1 compatibility are still unverified (the build died before reaching them)."
+      ]
+    }
+  ]
 }

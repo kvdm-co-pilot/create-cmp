@@ -63,6 +63,10 @@ test("lockstepViolation: consistent pairing passes", () => {
   assert.equal(lockstepViolation({ kotlin: "2.2.20", ksp: "2.2.20-2.0.4" }), null);
 });
 
+test("lockstepViolation: KSP2 aligned scheme (ksp === kotlin) passes", () => {
+  assert.equal(lockstepViolation({ kotlin: "2.3.10", ksp: "2.3.10" }), null);
+});
+
 test("lockstepViolation: mismatch is reported", () => {
   const v = lockstepViolation({ kotlin: "2.2.20", ksp: "2.1.0-1.0.29" });
   assert.ok(v && v.includes("OUT OF LOCKSTEP"));
