@@ -3,10 +3,11 @@ name: npm-publish
 description: >-
   Publish the create-cmp CLI to npm as the `create-cmp-cli` package. Use this when the user asks to
   "publish create-cmp to npm", "release a new version", "ship create-cmp-cli", "npm publish this",
-  "cut a release", or wants `npx create-cmp-cli` to work. Requires an INTERACTIVE session — `npm
-  login` needs a browser/OTP round-trip that cannot run headlessly. Runs the safety gate (clean git
-  tree, tests green, on main), bumps the version, updates the changelog, publishes, verifies on the
-  registry, and pushes the tag + GitHub release.
+  "cut a release", or wants `npx create-cmp-cli` to work. Runs unattended when a granular npm token
+  is installed in the user's `~/.npmrc` (one-time user setup — see Auth); falls back to interactive
+  `npm login` otherwise. Runs the safety gate (clean git tree, tests green, on main), bumps the
+  version, updates the changelog, publishes, verifies on the registry, and pushes the tag + GitHub
+  release.
 ---
 
 # npm-publish — release create-cmp to the npm registry
@@ -16,12 +17,46 @@ placeholder — and not `create-cmp-app` — that's a real, unrelated CMP genera
 *command* stays `create-cmp` regardless; `package.json` maps both `create-cmp` and `create-cmp-cli`
 as bin names so either invocation works.
 
-## Precondition — this must run interactively
+## Auth — token-first, login fallback
 
-`npm login` triggers a browser/OTP flow. **If this session is non-interactive (headless, CI, a
-background agent), stop and tell the user to run this from an interactive terminal.** Do not attempt
-to script around `npm login` — there is no non-interactive credential path here that doesn't involve
-handling a token, and this project doesn't manage npm tokens as secrets.
+Publishing is unattended when a **granular npm access token** lives in Karel's `~/.npmrc`. The
+token is user-managed infrastructure, exactly like his SSH key or `gh` auth: the agent USES the
+ambient auth, it never sees, handles, stores, or moves the token itself.
+
+**Check auth before anything else:**
+
+```bash
+npm whoami
+```
+
+- Prints a username → authed, proceed. Everything below runs without Karel in the loop.
+- Errors (`ENEEDAUTH`) → auth is missing/expired. STOP and tell Karel to refresh it (below). Do
+  not attempt to work around it.
+
+**One-time token setup (Karel does this himself, not the agent):**
+
+1. npmjs.com → avatar → **Access Tokens** → **Generate New Token** → **Granular Access Token**
+2. Permissions: **Read and write**. Packages: only ours — `create-cmp-cli`, `create-mobile`,
+   `create-compose-multiplatform`, `create-kmp` — never "all packages".
+3. Enable **Bypass two-factor authentication** (this is what makes publish non-interactive).
+4. Pick an expiration; when it lapses, `npm whoami` starts failing and publish PUTs return E404 —
+   that's the signal to regenerate.
+5. Add to `~/.npmrc` **by hand** (or via a local installer that prompts with hidden input):
+   `//registry.npmjs.org/:_authToken=npm_XXXX`
+
+**Hard rules for the agent:**
+
+- Never ask for, read, echo, or write the token value. Never `cat`/`grep` the auth line of
+  `~/.npmrc`. `npm whoami` is the only auth probe you need.
+- Never create a repo-level `.npmrc` and never copy auth config into the project — a committed
+  token is a leaked token.
+- If auth is dead, the fix is Karel regenerating the token or running `npm login` interactively.
+  Both are his steps; hand off and wait.
+
+**Known failure signature:** `E404 Not Found - PUT https://registry.npmjs.org/<pkg>` ("could not
+be found or you do not have permission") on a package that provably exists = **expired/revoked
+auth**, not a missing package. npm masks publish auth failures as 404. Confirm with `npm whoami`,
+then hand off for a token refresh.
 
 ## Steps
 
@@ -42,8 +77,8 @@ node --test                     # must be all-green; this also runs as prepublis
 npm whoami
 ```
 
-If this errors (`ENEEDAUTH`), run `npm login` and wait for the user to complete the browser flow
-before continuing. Do not proceed past this step without a confirmed identity.
+Must print a username (see Auth above). Do not proceed past this step without a confirmed
+identity — if it errors, hand off to Karel for a token refresh / `npm login`.
 
 ### 3. Confirm the registry name is still ours to use
 
@@ -97,6 +132,9 @@ npm publish
 an unscoped package. `prepublishOnly` re-runs the test suite as a final gate — if it fails, the
 publish aborts; fix and retry rather than forcing past it.
 
+Publish from the **repo root only** — subpackages like `inspector/mcp` are `private: true` and
+will fail with `EPRIVATE` (that error means wrong directory, not a config problem).
+
 ### 7. Verify on the registry
 
 ```bash
@@ -109,8 +147,11 @@ Confirm the version matches what you just published and the CLI actually runs fr
 
 ### 8. Push the tag and cut a GitHub release
 
+Direct pushes to `main` are blocked by branch protection, so release-prep commits (version bump +
+changelog) land via branch → PR → `gh pr merge --rebase --delete-branch`, then `git pull` on main
+before publishing. By step 8 the commit is already on main; only the tag and release remain:
+
 ```bash
-git push origin main
 git push origin --tags
 gh release create vX.Y.Z --title "vX.Y.Z" --notes-from-tag
 ```
@@ -133,27 +174,34 @@ release body instead.
 - Do not force-publish over a version/package you don't own.
 - Do not skip the registry verification step — "the command exited 0" is not the same as "the
   package is live and correct."
+- Do not touch the token: never read/echo/move it, never put auth config anywhere inside the repo.
 
-## Alias packages (create-compose-multiplatform, create-kmp)
+## Alias packages (create-compose-multiplatform, create-kmp, create-mobile)
 
-Two thin alias packages live in this repo under `packages/aliases/` —
-`create-compose-multiplatform` and `create-kmp`. Each is a delegating shim: its bin resolves the
+Thin alias packages live in this repo under `packages/aliases/` — `create-compose-multiplatform`,
+`create-kmp`, and `create-mobile`. The first two are delegating shims: each bin resolves the
 installed `create-cmp-cli` dependency's bin entry and re-executes it (argv forwarded, stdio
-inherited, exit code propagated). No logic of their own — they exist so `npm create
-compose-multiplatform` and `npm create kmp` land users in our tool.
+inherited, exit code propagated) — so `npm create compose-multiplatform` / `npm create kmp` land
+users straight in our tool. `create-mobile` is the **honest front door**: it prints the CMP-default
++ trade-offs banner and runs an interactive fit check (`Continue with Compose Multiplatform? [Y/n]`)
+before delegating — that fit check is what earns the generic name; never turn it into a silent
+redirect.
 
-They version independently of the main package and depend on `create-cmp-cli` with a **caret
-range** (`^0.3.2`), so a fresh `npm create compose-multiplatform` picks up new main releases
-automatically. **They only need republishing when the caret range must move past a major bump or
-the shim/README itself changes** — not on every `create-cmp-cli` release.
+They version independently of the main package and depend on `create-cmp-cli` with an **open range**
+(`>=X.Y.Z`), so a fresh `npm create <alias>` picks up new main releases automatically. **They only
+need republishing when the range must move past a major bump or the shim/README itself changes** —
+NOT on every `create-cmp-cli` release. (A routine `create-cmp-cli` bump like 0.7.1 → 0.8.0 needs no
+alias republish: the open range already resolves to latest.)
 
-To publish (same auth rules as above — interactive session, OTP is Karel's step; `npm view <name>`
-first to confirm ownership on repeat publishes):
+To publish (same token-first auth rules as above; `npm view <name>` first to confirm ownership on
+repeat publishes):
 
 ```bash
 cd packages/aliases/create-compose-multiplatform && npm publish
 cd packages/aliases/create-kmp && npm publish
+cd packages/aliases/create-mobile && npm publish
 ```
 
 Verify each afterwards the same way as the main package: `npm view <name> version`, then
-`npx <name>@latest --help` must print the real create-cmp banner.
+`npx <name>@latest --help` must print the real create-cmp banner (for `create-mobile`, the fit
+check must still appear on a bare `npx create-mobile` run).
