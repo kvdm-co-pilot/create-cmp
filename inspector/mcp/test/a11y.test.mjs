@@ -72,3 +72,125 @@ test("audit summary counts: fixture yields exactly 2 violations, 1 warning", () 
   // clickable nodes that passed everything: primary_button + nav_item_labeled_by_child
   assert.equal(res.passCount, 2);
 });
+
+// ---------------------------------------------------------------------------
+// contrast — SPEC: VL-EYES (§3.1 audit_a11y contrast). Inline fixture trees
+// (not the shared a11y-tree.json) so this stays independent of its exact counts.
+// ---------------------------------------------------------------------------
+
+const node = (over = {}) => ({
+  testTag: null,
+  text: null,
+  contentDescription: null,
+  role: null,
+  clickable: false,
+  disabled: false,
+  bounds: { x: 0, y: 0, width: 100, height: 40 },
+  designToken: null,
+  children: [],
+  ...over,
+});
+
+test("low-contrast fires when a node resolves both fg and bg below the ratio", () => {
+  const contrastTree = {
+    schemaVersion: 1,
+    root: node({
+      children: [
+        node({
+          testTag: "white_on_white",
+          designToken: { tokens: [], resolved: { color: "#FFFFFF", backgroundColor: "#FFFFFF" } },
+        }),
+      ],
+    }),
+  };
+  const { violations } = auditA11y(contrastTree);
+  const hits = violations.filter((v) => v.testTag === "white_on_white");
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].rule, "low-contrast");
+  assert.match(hits[0].detail, /1\.00:1/);
+  assert.match(hits[0].detail, />= 4\.5:1/);
+});
+
+test("high-contrast (black on white) does not fire", () => {
+  const contrastTree = {
+    schemaVersion: 1,
+    root: node({
+      children: [
+        node({
+          testTag: "black_on_white",
+          designToken: { tokens: [], resolved: { color: "#000000", backgroundColor: "#FFFFFF" } },
+        }),
+      ],
+    }),
+  };
+  const { violations } = auditA11y(contrastTree);
+  assert.equal(violations.filter((v) => v.testTag === "black_on_white").length, 0);
+});
+
+test("low-contrast is skipped when only one of fg/bg is known (never a guess)", () => {
+  const contrastTree = {
+    schemaVersion: 1,
+    root: node({
+      children: [
+        node({
+          testTag: "fg_only",
+          designToken: { tokens: [], resolved: { color: "#FFFFFF" } },
+        }),
+      ],
+    }),
+  };
+  const { violations } = auditA11y(contrastTree);
+  assert.equal(violations.filter((v) => v.rule === "low-contrast").length, 0);
+});
+
+test("low-contrast is skipped when a color value is unparseable (e.g. a dimension)", () => {
+  const contrastTree = {
+    schemaVersion: 1,
+    root: node({
+      children: [
+        node({
+          testTag: "bad_values",
+          designToken: { tokens: [], resolved: { color: "16dp", backgroundColor: "#FFFFFF" } },
+        }),
+      ],
+    }),
+  };
+  const { violations } = auditA11y(contrastTree);
+  assert.equal(violations.filter((v) => v.rule === "low-contrast").length, 0);
+});
+
+test("minContrastRatio is configurable", () => {
+  const contrastTree = {
+    schemaVersion: 1,
+    root: node({
+      children: [
+        node({
+          testTag: "borderline",
+          designToken: { tokens: [], resolved: { color: "#767676", backgroundColor: "#FFFFFF" } },
+        }),
+      ],
+    }),
+  };
+  assert.equal(auditA11y(contrastTree, { minContrastRatio: 4.5 }).violations.length, 0);
+  assert.equal(auditA11y(contrastTree, { minContrastRatio: 7 }).violations.length, 1);
+});
+
+test("a clickable node with low contrast fails its pass too (not just the contrast rule)", () => {
+  const contrastTree = {
+    schemaVersion: 1,
+    root: node({
+      children: [
+        node({
+          testTag: "clickable_low_contrast",
+          clickable: true,
+          text: "Tap me",
+          bounds: { x: 0, y: 0, width: 100, height: 100 },
+          designToken: { tokens: [], resolved: { color: "#FEFEFE", backgroundColor: "#FFFFFF" } },
+        }),
+      ],
+    }),
+  };
+  const { violations, passCount } = auditA11y(contrastTree);
+  assert.equal(violations.filter((v) => v.testTag === "clickable_low_contrast" && v.rule === "low-contrast").length, 1);
+  assert.equal(passCount, 0, "the clickable node has a violation, so it must not count as a pass");
+});

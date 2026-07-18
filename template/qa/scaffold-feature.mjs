@@ -101,16 +101,27 @@ const F_UPPER = F.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase(); // FAVOR
 const E = entityName; // PascalCase entity, e.g. Favorite
 
 // ── Resolve the target project's real package ───────────────────────────────
-// This script runs POST-scaffold, so __PACKAGE__ is already resolved in the
-// target project. Parse it from composeApp/build.gradle.kts (namespace) or,
-// failing that, from any source file's `package` line.
+// This script runs POST-scaffold, so the package placeholder token is already
+// resolved in the target project. Parse it from composeApp/build.gradle.kts
+// (namespace) or, failing that, from any source file's `package` line.
+//
+// Detect "still unresolved" by TOKEN SHAPE (`/^__[A-Z_]+__$/`), never by
+// comparing against the literal placeholder string: this script is itself a
+// template file that goes through the scaffold's own token-replacement pass,
+// which does a blind text substitution of that literal placeholder -> the
+// real package wherever it appears in file CONTENT — including a string
+// literal sitting right here. A literal comparison would silently become
+// `m[1] !== "<the real package>"` post-stamp (always true for the very
+// project it should detect as unresolved) and never fire. A shape regex never
+// spells the placeholder out, so the pipeline has nothing to match.
+const UNRESOLVED_TOKEN_RE = /^__[A-Z_]+__$/;
 
 function resolvePackage() {
   const gradleFile = path.join(ROOT, "composeApp", "build.gradle.kts");
   if (fs.existsSync(gradleFile)) {
     const contents = fs.readFileSync(gradleFile, "utf8");
     const m = contents.match(/namespace\s*=\s*"([^"]+)"/);
-    if (m && m[1] !== "__PACKAGE__") return m[1];
+    if (m && !UNRESOLVED_TOKEN_RE.test(m[1])) return m[1];
   }
   const homeViewModel = path.join(
     ROOT,
@@ -581,6 +592,22 @@ for (const result of fileResults) {
 console.log(`✓ Scaffolded ${planLabel} [preset: ${preset}] — ${filesWritten} files written, ${injectionsApplied} anchor injections applied.`);
 if (writesSpec) {
   console.log(`  specs/${f}.spec.md written with default clauses ${F_UPPER}-01..06 — refine the prose next.`);
+
+  // Approvals seeding (VERIFICATION-LAYER-DESIGN.md §2): the new feature's spec
+  // is a governed artifact (`feature-spec:<name>`) — seed it unreviewed so the
+  // verify lane's `approvals` gate SKIP-warns until a human signs off. v1 does
+  // NOT refuse to stamp over this (warn-then-enforce-at-verify is the honest
+  // default) — a dynamic import wrapped in try/catch means a missing or
+  // out-of-date qa/lib/approvals.mjs (an older, pre-approvals scaffold) never
+  // blocks the stamp itself.
+  try {
+    const { seedUnreviewed } = await import("./lib/approvals.mjs");
+    const artifactId = `feature-spec:${f}`;
+    seedUnreviewed(ROOT, artifactId);
+    console.log(`  Approval: specs/${f}.spec.md is unreviewed — run \`node qa/approve.mjs ${artifactId}\` once you've reviewed it.`);
+  } catch {
+    console.log("  (approvals seeding skipped — qa/lib/approvals.mjs not found in this scaffold)");
+  }
 } else {
   console.log("  No spec file written by this preset (zero SPEC clauses/tags added).");
 }

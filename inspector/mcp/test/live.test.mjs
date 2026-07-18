@@ -6,6 +6,10 @@ import {
   fetchHealth,
   fetchLiveTree,
   fetchLiveCatalog,
+  fetchLiveNav,
+  fetchLiveCrashes,
+  fetchLiveDbSchema,
+  fetchLiveDbQuery,
   validatePort,
   validateSerial,
   DEFAULT_PORT,
@@ -102,6 +106,92 @@ test("non-JSON body is reported, not thrown as a parse stack", async () => {
   });
   try {
     await assert.rejects(() => fetchHealth({ port }), /non-JSON/);
+  } finally {
+    server.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// nav / crashes / db — §3.1/§3.2/§3.3 runtime-eyes fetchers
+// ---------------------------------------------------------------------------
+
+test("fetchLiveNav: parses { currentRoute, backStack }", async () => {
+  const { server, port } = await startStub({
+    "/inspect/nav": [200, { currentRoute: "detail/42", backStack: ["shell", "detail/42"] }],
+  });
+  try {
+    const nav = await fetchLiveNav({ port });
+    assert.equal(nav.currentRoute, "detail/42");
+    assert.deepEqual(nav.backStack, ["shell", "detail/42"]);
+  } finally {
+    server.close();
+  }
+});
+
+test("fetchLiveNav: 404 (older app, no route yet) resolves to null, never throws", async () => {
+  const { server, port } = await startStub({
+    "/inspect/nav": [404, { error: "unknown path" }],
+  });
+  try {
+    assert.equal(await fetchLiveNav({ port }), null);
+  } finally {
+    server.close();
+  }
+});
+
+test("fetchLiveNav: a 503 (not the 404 absence case) still throws", async () => {
+  const { server, port } = await startStub({
+    "/inspect/nav": [503, { error: "compose root not ready yet" }],
+  });
+  try {
+    await assert.rejects(() => fetchLiveNav({ port }), /not ready/);
+  } finally {
+    server.close();
+  }
+});
+
+test("fetchLiveCrashes: parses { crashes:[...] }", async () => {
+  const crash = { timestamp: "2026-07-18T00:00:00.000Z", exception: "java.lang.NullPointerException", message: null, frames: [] };
+  const { server, port } = await startStub({
+    "/inspect/crashes": [200, { crashes: [crash] }],
+  });
+  try {
+    const data = await fetchLiveCrashes({ port });
+    assert.equal(data.crashes.length, 1);
+    assert.equal(data.crashes[0].exception, "java.lang.NullPointerException");
+  } finally {
+    server.close();
+  }
+});
+
+test("fetchLiveDbSchema: parses { tables:[...] }", async () => {
+  const { server, port } = await startStub({
+    "/inspect/db": [200, { tables: [{ name: "items", sql: "CREATE TABLE items (id TEXT)" }] }],
+  });
+  try {
+    const schema = await fetchLiveDbSchema({ port });
+    assert.deepEqual(schema.tables, [{ name: "items", sql: "CREATE TABLE items (id TEXT)" }]);
+  } finally {
+    server.close();
+  }
+});
+
+test("fetchLiveDbQuery: requires a string table before any network call", () => {
+  assert.throws(() => fetchLiveDbQuery({}), /requires a string `table`/);
+  assert.throws(() => fetchLiveDbQuery({ table: 42 }), /requires a string `table`/);
+});
+
+test("fetchLiveDbQuery: builds the querystring with table + limit and parses rows", async () => {
+  const { server, port } = await startStub({
+    "/inspect/db?table=items&limit=10": [
+      200,
+      { table: "items", columns: ["id", "title"], rows: [{ id: "1", title: "A" }], rowCount: 1 },
+    ],
+  });
+  try {
+    const data = await fetchLiveDbQuery({ table: "items", limit: 10, port });
+    assert.equal(data.table, "items");
+    assert.equal(data.rowCount, 1);
   } finally {
     server.close();
   }

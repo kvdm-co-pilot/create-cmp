@@ -1,0 +1,29 @@
+{
+  "schema": "cmp-approvals/1",
+  "artifacts": [
+    {
+      "artifact": "design-system",
+      "status": "unreviewed",
+      "hash": null,
+      "approvedAt": null
+    },
+    {
+      "artifact": "architecture",
+      "status": "unreviewed",
+      "hash": null,
+      "approvedAt": null
+    },
+    {
+      "artifact": "exemplar-feature",
+      "status": "unreviewed",
+      "hash": null,
+      "approvedAt": null
+    },
+    {
+      "artifact": "exemplar-spec",
+      "status": "unreviewed",
+      "hash": null,
+      "approvedAt": null
+    }
+  ]
+}

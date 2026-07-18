@@ -1,5 +1,6 @@
 package __PACKAGE__.inspector
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Handler
@@ -14,6 +15,7 @@ import java.io.InputStreamReader
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -43,6 +45,15 @@ import kotlin.math.roundToInt
  *                                  pair to the root view → {"tapped":true,"x":…,"y":…}.
  *   GET  /inspect/remote         → the self-contained remote-control HTML page (same-origin,
  *                                  zero CORS): live screenshot + click-to-tap in a browser.
+ *   GET  /inspect/nav            → { currentRoute, backStack } — best-effort, reported by the
+ *                                  common `NavInspectionHook` seam; empty snapshot before the
+ *                                  first navigation event (see [NavInspector]).
+ *   GET  /inspect/crashes        → { crashes: [...] } — persisted crash JSON (current boot +
+ *                                  previous ones), newest first (see [CrashRecorder]).
+ *   GET  /inspect/db             → schema: { tables:[{name,sql}] } via `sqlite_master`.
+ *   GET  /inspect/db?table=<n>&limit=<n> → rows for one table (read-only, bounded; see
+ *                                  [DbInspector]). 404 (or empty schema) when the project's
+ *                                  `room` feature is off.
  *
  * Single-threaded accept loop on a daemon thread = one client at a time = bounded by design.
  * Failure to bind logs a warning and gives up — the inspector must never crash or block
@@ -67,9 +78,14 @@ object InspectorHttpServer {
 
     @Volatile private var started = false
 
-    fun start(appId: String) {
+    // Set once in [start]; read from the HTTP thread only (crashes/db routes). applicationContext
+    // is safe to hold — it never leaks an Activity.
+    @Volatile private var appContext: Context? = null
+
+    fun start(appId: String, context: Context) {
         if (started) return
         started = true
+        appContext = context.applicationContext
         val thread = Thread({ serve(appId) }, "cmp-inspector-http")
         thread.isDaemon = true
         thread.start()
@@ -114,7 +130,9 @@ object InspectorHttpServer {
         }
         val parts = requestLine.split(" ")
         val method = parts.getOrNull(0) ?: ""
-        val path = (parts.getOrNull(1) ?: "").substringBefore('?')
+        val rawTarget = parts.getOrNull(1) ?: ""
+        val path = rawTarget.substringBefore('?')
+        val query = rawTarget.substringAfter('?', "")
 
         when {
             method == "GET" && path == "/inspect/health" ->
@@ -129,6 +147,12 @@ object InspectorHttpServer {
                 writeResponse(client, 200, RemoteControlPage.html(appId).toByteArray(StandardCharsets.UTF_8), HTML_TYPE)
             method == "POST" && path == "/inspect/tap" ->
                 tapResponse(readBody(reader, contentLength)).let { (s, b) -> writeJson(client, s, b) }
+            method == "GET" && path == "/inspect/nav" ->
+                writeJson(client, 200, navJson())
+            method == "GET" && path == "/inspect/crashes" ->
+                writeJson(client, 200, crashesJson())
+            method == "GET" && path == "/inspect/db" ->
+                dbResponse(query).let { (s, b) -> writeJson(client, s, b) }
             method != "GET" && method != "POST" ->
                 writeJson(client, 405, errorJson("method not allowed"))
             else ->
@@ -182,6 +206,49 @@ object InspectorHttpServer {
             503 to errorJson("main thread did not respond within ${MAIN_THREAD_TIMEOUT_MS}ms — app busy (cold start?). Retry.")
         }
     }
+
+    /** { currentRoute, backStack } from [NavInspector] — best-effort, never blocks. */
+    private fun navJson(): String {
+        val snapshot = NavInspector.current()
+        val currentRouteJson = snapshot.currentRoute?.let { JsonPrimitive(it).toString() } ?: "null"
+        val backStackJson = snapshot.backStack.joinToString(",") { JsonPrimitive(it).toString() }
+        return """{"currentRoute":$currentRouteJson,"backStack":[$backStackJson]}"""
+    }
+
+    /** { crashes:[...] } — each element is a persisted crash JSON document, verbatim. */
+    private fun crashesJson(): String {
+        val ctx = appContext ?: return """{"crashes":[]}"""
+        val crashes = CrashRecorder.readAll(ctx)
+        return """{"crashes":[${crashes.joinToString(",")}]}"""
+    }
+
+    /** GET /inspect/db dispatch: no `table` → schema, else → rows for that table. */
+    private fun dbResponse(query: String): Pair<Int, String> {
+        val params = parseQuery(query)
+        val table = params["table"]
+        return if (table == null) DbInspector.schema() else DbInspector.rows(table, params["limit"])
+    }
+
+    /** Minimal `a=b&c=d` query-string parser (URL-decoded values). Last value wins on repeats. */
+    private fun parseQuery(query: String): Map<String, String> {
+        if (query.isEmpty()) return emptyMap()
+        val out = mutableMapOf<String, String>()
+        for (pair in query.split("&")) {
+            if (pair.isEmpty()) continue
+            val eq = pair.indexOf('=')
+            val key = if (eq >= 0) pair.substring(0, eq) else pair
+            val value = if (eq >= 0) pair.substring(eq + 1) else ""
+            out[urlDecode(key)] = urlDecode(value)
+        }
+        return out
+    }
+
+    private fun urlDecode(s: String): String =
+        try {
+            URLDecoder.decode(s, "UTF-8")
+        } catch (t: Throwable) {
+            s
+        }
 
     /**
      * PNG of the current Compose root. The Bitmap is rendered on the MAIN thread (views are

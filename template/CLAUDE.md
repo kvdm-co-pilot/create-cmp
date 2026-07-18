@@ -52,6 +52,41 @@ invariants the conformance gates enforce.
 Commit it with your change — git history is the audit ledger. Binary artifacts under
 `qa-artifacts/` are hashed into the receipt; never commit them.
 
+## Approvals — governed artifacts need a human's sign-off
+
+Some artifacts are **governed**: a human must approve them, and approval is bound to
+the artifact's content by hash (`qa/approvals.json`) — the same idea as the evidence
+receipt, applied to a human decision instead of a lane run. The ordered walk (later
+artifacts are expressed in the vocabulary of the ones before them):
+
+1. **Design system** — `presentation/theme/Theme.kt`, `presentation/theme/Tokens.kt`
+2. **Architecture + structure** — `specs/app-base.spec.md`
+3. **Exemplar feature** — the `home` 11-file set the `add-feature` stamper clones from
+4. **Exemplar spec** — `specs/home.spec.md`
+5. **Per-feature spec** — `specs/<feature>.spec.md`, one governed artifact per feature,
+   added as features land
+
+| Command | What |
+|---|---|
+| `node qa/approve.mjs --status` | List every governed artifact + live state (`unreviewed` / `approved` / `changed-since-approval`) + short hash |
+| `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time |
+
+The verify lane's `approvals` gate (a step like any other, in every profile) resolves
+each artifact's live status against `qa/approvals.json`:
+
+- **`unreviewed`** → **SKIP** with a warning line — non-blocking, nothing fails until a
+  human opts in by approving.
+- **`approved`, hash still matches** → **PASS**.
+- **`approved`, hash no longer matches** → **FAIL**, naming the artifact and the
+  re-approval command. The artifact changed after sign-off — re-approve it (or revert
+  the change) before the lane can go green. Invalidation is mechanical, like golden-tree
+  drift, not a judgment call.
+
+A gate FAIL fails the lane verdict, which fails `qa/receipt-check.mjs` (the Stop hook)
+by the same mechanism any other FAIL does — no separate enforcement to maintain.
+`add-feature` seeds each new feature's spec as `unreviewed` automatically and prints the
+approval reminder; it never refuses to stamp over this.
+
 ## UI feedback loop — see what you build, without a device
 
 <!-- >>> cmp:feature inspector -->

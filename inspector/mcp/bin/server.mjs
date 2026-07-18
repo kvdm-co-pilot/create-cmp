@@ -28,11 +28,21 @@ import {
   resolveCatalog,
   requireInstrumentedTree,
 } from "../src/lib/source.mjs";
-import { fetchHealth, validatePort, validateSerial, DEFAULT_HOST } from "../src/lib/live.mjs";
+import {
+  fetchHealth,
+  fetchLiveCrashes,
+  fetchLiveDbSchema,
+  fetchLiveDbQuery,
+  validatePort,
+  validateSerial,
+  DEFAULT_HOST,
+} from "../src/lib/live.mjs";
 import { navigateAndInspect, writeLiveScreenshot, DEFAULT_SETTLE_MS } from "../src/lib/navigate.mjs";
 import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
 import { readPngMeta } from "../src/lib/png.mjs";
 import { proveChange } from "../src/lib/prove.mjs";
+import { attributeCrash } from "../src/lib/attribution.mjs";
+import { parseLogcat } from "../src/lib/logcat.mjs";
 import { createPreviewService } from "../src/lib/preview-service.mjs";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
@@ -94,6 +104,29 @@ function guarded(fn) {
   };
 }
 
+// Recently-changed files for crash attribution: `git status --porcelain` (uncommitted work,
+// the common case mid-session) + `git diff --name-only HEAD` (staged/committed-but-unpushed).
+// Never throws — no repo / no git on PATH just means attribution degrades to "no evidence",
+// which is a legitimate answer, not a tool failure.
+async function gitChangedFiles(cwd) {
+  try {
+    const [status, diff] = await Promise.all([
+      execFileAsync("git", ["status", "--porcelain"], { cwd, timeout: 5000 }),
+      execFileAsync("git", ["diff", "--name-only", "HEAD"], { cwd, timeout: 5000 }).catch(() => ({ stdout: "" })),
+    ]);
+    const fromStatus = status.stdout
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      // porcelain lines are "XY path" (or "XY orig -> new" for renames) — strip the status code.
+      .map((l) => l.replace(/^\S+\s+/, "").split(" -> ").pop());
+    const fromDiff = diff.stdout.split("\n").map((l) => l.trim()).filter(Boolean);
+    return [...new Set([...fromStatus, ...fromDiff])];
+  } catch {
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // server + tools
 // ---------------------------------------------------------------------------
@@ -123,7 +156,9 @@ const server = new McpServer({
     "One-off render: render_screen { projectDir, screen } (~1s warm via the resident " +
     "daemon). Inspect the RUNNING app (tier 1): connect_live, then get_node / " +
     "assert_token / audit_a11y / find_drift / navigate_and_inspect / prove_change. " +
-    "Always assert on tree JSON; never read PNG bytes into context.",
+    "Runtime eyes beyond the tree: runtime_crashes (persisted crashes + cause attribution), " +
+    "runtime_logs (adb logcat, structured + bounded), db_schema / db_query (read-only SQLite " +
+    "state). Always assert on tree JSON; never read PNG bytes into context.",
 });
 
 const treePathArg = z
@@ -357,11 +392,15 @@ server.registerTool(
     title: "Audit the tree for accessibility faults",
     description:
       "Check every node: clickable nodes smaller than `minTouchTargetPx` (default 48) in width or height, " +
-      "clickable nodes with no text/contentDescription/descendant text (missing label), and empty-string " +
-      "contentDescription (warning). Returns { violations:[{path,testTag,rule,detail,bounds}], warnings, " +
-      "warningCount, passCount }. Note: the headless harness dumps at density 1, so px == dp there; pass a " +
-      "device-density-scaled minTouchTargetPx for on-device trees. Old trees without the optional " +
-      "clickable/role fields are skipped gracefully.",
+      "clickable nodes with no text/contentDescription/descendant text (missing label), a node whose " +
+      "designToken.resolved exposes BOTH a foreground and a background color with a WCAG contrast ratio " +
+      "below `minContrastRatio` (default 4.5, AA for normal text — fires ONLY when both colors are " +
+      "genuinely known/parseable, never a guess), and empty-string contentDescription (warning). Returns " +
+      "{ violations:[{path,testTag,rule,detail,bounds}], warnings, warningCount, passCount }. Rules: " +
+      "touch-target-too-small, missing-label, low-contrast, (warn) empty-content-description. Note: the " +
+      "headless harness dumps at density 1, so px == dp there; pass a device-density-scaled " +
+      "minTouchTargetPx for on-device trees. Old trees without the optional clickable/role fields are " +
+      "skipped gracefully.",
     inputSchema: {
       source: sourceArg,
       treePath: treePathArg,
@@ -370,11 +409,16 @@ server.registerTool(
         .positive()
         .optional()
         .describe("Minimum touch-target size in px (default 48; px == dp on density-1 harness output)."),
+      minContrastRatio: z
+        .number()
+        .positive()
+        .optional()
+        .describe("Minimum WCAG contrast ratio for fg/bg color pairs (default 4.5, WCAG AA normal text)."),
     },
   },
-  guarded(async ({ source, treePath, minTouchTargetPx }) => {
+  guarded(async ({ source, treePath, minTouchTargetPx, minContrastRatio }) => {
     const tree = await resolveTree({ source, treePath });
-    const result = auditA11y(tree, { minTouchTargetPx });
+    const result = auditA11y(tree, { minTouchTargetPx, minContrastRatio });
     return ok({ pass: result.violations.length === 0, violationCount: result.violations.length, ...result });
   })
 );
@@ -431,8 +475,11 @@ server.registerTool(
       "tree (center of `testTag`'s bounds — or pass explicit root-relative `x`/`y` read from bounds), " +
       "delivers it via the inspector's POST /inspect/tap (HTTP, not adb), waits `settleMs` for the UI " +
       "to settle, then re-fetches the tree. Returns { tapped:{x,y,testTag?}, before:{tags,textSample," +
-      "nodeCount}, after:{tags,textSample,nodeCount}, changed } — assert the navigation structurally " +
-      "(old screen's tags gone, new content present). Requires connect_live (or a reachable forward).",
+      "nodeCount}, after:{tags,textSample,nodeCount}, changed, route? } — assert the navigation " +
+      "structurally (old screen's tags gone, new content present). `route:{before,after}` (each a " +
+      "currentRoute string) is included ONLY when the running app exposes GET /inspect/nav — omitted " +
+      "entirely for older apps that predate it, never reported as null/failed. Requires connect_live " +
+      "(or a reachable forward).",
     inputSchema: {
       testTag: z
         .string()
@@ -460,6 +507,151 @@ server.registerTool(
         port: validatePort(port ?? live.port),
         settleMs,
       })
+    );
+  })
+);
+
+// ---------------------------------------------------------------------------
+// runtime eyes — §3.2 crashes/logs, §3.3 DB state (VERIFICATION-LAYER-DESIGN.md)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_LOG_LIMIT = 200;
+const MAX_LOG_LIMIT = 2000;
+
+server.registerTool(
+  "runtime_crashes",
+  {
+    title: "Fetch persisted crashes from the running app, with cause attribution",
+    description:
+      "GET /inspect/crashes on the running app (current boot + previous ones; the on-device handler " +
+      "chains to whatever handler was installed before it — it never swallows the crash). Each crash " +
+      "is attributed: its stack frames are intersected with recently-edited files (git status + git " +
+      "diff in `projectDir`, default cwd) to produce a verdict — " +
+      "'likely-caused-by-recent-edit' (with the matching frame(s) as evidence) or " +
+      "'no-recent-edit-implicated'. Returns { crashes:[{timestamp,exception,message,frames,attribution}], " +
+      "changedFilesConsidered }. Requires connect_live.",
+    inputSchema: {
+      since: z.string().optional().describe("ISO timestamp — only crashes at/after this instant."),
+      projectDir: z.string().optional().describe("App repo root for git-based attribution (default: cwd)."),
+      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
+    },
+  },
+  guarded(async ({ since, projectDir, port }) => {
+    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
+    const data = await fetchLiveCrashes({ host: live.host || DEFAULT_HOST, port: validatePort(port ?? live.port) });
+    let crashes = data && Array.isArray(data.crashes) ? data.crashes : [];
+    if (since) crashes = crashes.filter((c) => c && c.timestamp && c.timestamp >= since);
+    const changedFiles = await gitChangedFiles(projectDir ? resolvePath(projectDir) : process.cwd());
+    const attributed = crashes.map((c) => ({ ...c, attribution: attributeCrash(c, changedFiles) }));
+    return ok({ crashes: attributed, changedFilesConsidered: changedFiles });
+  })
+);
+
+server.registerTool(
+  "runtime_logs",
+  {
+    title: "Fetch recent device logs for the running app (adb logcat)",
+    description:
+      "Shells `adb shell pidof <appId>` (appId resolved from the live inspector's GET /inspect/health) " +
+      "then `adb logcat -v threadtime --pid=<pid> -d` and returns STRUCTURED, BOUNDED entries — never a " +
+      "log firehose: default limit " +
+      DEFAULT_LOG_LIMIT +
+      ", max " +
+      MAX_LOG_LIMIT +
+      ", newest-first tail. Optional `level` keeps that severity and above (adb's own ordering); " +
+      "`since` (ISO timestamp) keeps entries at/after it. No on-device log capture — v1 is adb-only, " +
+      "so it needs a device/emulator attached and adb on PATH; errors are actionable (no device, no " +
+      "process running, adb missing).",
+    inputSchema: {
+      since: z.string().optional().describe("ISO timestamp — only entries at/after this instant."),
+      level: z.enum(["V", "D", "I", "W", "E", "F"]).optional().describe("Minimum severity (that level and above)."),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(MAX_LOG_LIMIT)
+        .optional()
+        .describe(`Max entries returned, newest-first (default ${DEFAULT_LOG_LIMIT}, max ${MAX_LOG_LIMIT}).`),
+      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
+      serial: z.string().optional().describe("adb device serial (when several devices are attached)."),
+    },
+  },
+  guarded(async ({ since, level, limit, port, serial }) => {
+    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
+    const health = await fetchHealth({ host: live.host || DEFAULT_HOST, port: validatePort(port ?? live.port) });
+    const appId = health && health.appId;
+    if (!appId) return fail("live inspector health payload has no appId — cannot resolve the device pid.");
+    const s = validateSerial(serial);
+    const withSerial = (extra) => (s ? ["-s", s, ...extra] : extra);
+
+    let pid;
+    try {
+      const { stdout } = await execFileAsync("adb", withSerial(["shell", "pidof", appId]), { timeout: 5000 });
+      pid = stdout.trim().split(/\s+/)[0];
+    } catch (err) {
+      return fail(
+        `adb shell pidof ${appId} failed: ${err && err.message ? err.message : err}. ` +
+          "Is adb on PATH and a device/emulator attached (`adb devices`)?"
+      );
+    }
+    if (!pid) return fail(`no running process found for '${appId}' — is the app in the foreground?`);
+
+    let stdout;
+    try {
+      ({ stdout } = await execFileAsync(
+        "adb",
+        withSerial(["logcat", "-v", "threadtime", `--pid=${pid}`, "-d"]),
+        { timeout: 10000, maxBuffer: 10 * 1024 * 1024 }
+      ));
+    } catch (err) {
+      return fail(`adb logcat failed: ${err && err.message ? err.message : err}`);
+    }
+
+    const entries = parseLogcat(stdout, { since, level });
+    const cap = Math.min(limit || DEFAULT_LOG_LIMIT, MAX_LOG_LIMIT);
+    const tail = entries.slice(Math.max(0, entries.length - cap));
+    return ok({ pid: Number(pid), appId, count: tail.length, truncated: entries.length > tail.length, entries: tail });
+  })
+);
+
+server.registerTool(
+  "db_schema",
+  {
+    title: "List the running app's SQLite tables",
+    description:
+      "GET /inspect/db on the running app: tables via `sqlite_master` as { name, sql } (CREATE TABLE " +
+      "text). Read-only, off the main thread. Returns { tables:[...] }. 404 when the app's `room` " +
+      "feature is off. Requires connect_live.",
+    inputSchema: {
+      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
+    },
+  },
+  guarded(async ({ port }) => {
+    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
+    return ok(await fetchLiveDbSchema({ host: live.host || DEFAULT_HOST, port: validatePort(port ?? live.port) }));
+  })
+);
+
+server.registerTool(
+  "db_query",
+  {
+    title: "Read rows from one SQLite table (read-only, bounded)",
+    description:
+      "GET /inspect/db?table=<name>&limit=<n> on the running app. `table` must be a real name from " +
+      "db_schema — the device validates it strictly against `sqlite_master` before ever touching a " +
+      "query, so an unknown name 404s rather than running arbitrary SQL. Rows are capped by `limit` " +
+      "(device-side default/max apply regardless of what's requested). Returns { table, columns, rows, " +
+      "rowCount }. Requires connect_live.",
+    inputSchema: {
+      table: z.string().describe("Exact table name (see db_schema)."),
+      limit: z.number().int().positive().optional().describe("Row cap (device-side default/max still apply)."),
+      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
+    },
+  },
+  guarded(async ({ table, limit, port }) => {
+    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
+    return ok(
+      await fetchLiveDbQuery({ table, limit, host: live.host || DEFAULT_HOST, port: validatePort(port ?? live.port) })
     );
   })
 );
