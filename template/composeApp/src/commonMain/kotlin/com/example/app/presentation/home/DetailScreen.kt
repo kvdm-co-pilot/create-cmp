@@ -3,6 +3,8 @@ package __PACKAGE__.presentation.home
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,7 +31,12 @@ fun DetailScreen(
                 )
                 .padding(__THEME_PREFIX__Tokens.PaddingPage),
         ) {
-            TextButton(onClick = onBack, modifier = Modifier.semantics { testTag = "detail_back" }) {
+            // sizeIn(48dp): a11y minimum touch target (SHELL-04's audit tier flags anything
+            // smaller) — TextButton's 40dp visual default fails the harness's own audit.
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).semantics { testTag = "detail_back" },
+            ) {
                 Text("← Back")
             }
             Text(

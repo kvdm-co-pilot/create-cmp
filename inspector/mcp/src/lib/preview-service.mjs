@@ -298,7 +298,25 @@ ${specsTabHtml(specs)}
     const msg = JSON.parse(e.data);
     if (msg.type === "rendering") { pill.textContent = "rendering…"; pill.className = "rendering"; }
     if (msg.type === "render") location.reload();
-    if (msg.type === "approval") location.reload();
+    // Approvals refresh IN PLACE (no location.reload()): a full reload on every
+    // approval flashes the page, drops scroll, and blanks assistive/agent views
+    // of the document mid-navigation — an approval only changes the Approvals
+    // tab's markup, so swap exactly that panel from a re-fetched page.
+    if (msg.type === "approval") {
+      fetch("/").then((r) => r.text()).then((html) => {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const fresh = doc.querySelector("#tab-approvals");
+        const cur = document.querySelector("#tab-approvals");
+        if (fresh && cur) {
+          const wasActive = cur.classList.contains("active");
+          cur.innerHTML = fresh.innerHTML;
+          if (wasActive) cur.classList.add("active");
+          wireApproveButtons(cur);
+        } else {
+          location.reload(); // fallback: unexpected markup — the old behavior
+        }
+      }).catch(() => location.reload());
+    }
     if (msg.type === "error") {
       pill.textContent = msg.source === "compile" ? "compile failed" : "render failed";
       pill.className = "error";
@@ -317,20 +335,32 @@ ${specsTabHtml(specs)}
   };
   filter.addEventListener("input", applyFilter);
   applyFilter();
-  // Tabs — persisted like the filter, survives SSE-triggered reloads too.
+  // Tabs — deep-linkable via location.hash (#approvals bookmarks/shares the tab,
+  // and automation can land on any tab by URL), with sessionStorage as the
+  // fallback so SSE-triggered reloads keep the tab even without a hash.
   const tabBtns = [...document.querySelectorAll(".tab-btn")];
   const panels = [...document.querySelectorAll(".tab-panel")];
+  const validTab = (t) => tabBtns.some((b) => b.dataset.tab === t);
   function showTab(tab) {
     sessionStorage.setItem("previewTab", tab);
+    if (("#" + tab) !== location.hash) history.replaceState(null, "", "#" + tab);
     tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
     panels.forEach((p) => p.classList.toggle("active", p.dataset.tab === tab));
   }
   tabBtns.forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
-  showTab(sessionStorage.getItem("previewTab") || "screens");
+  window.addEventListener("hashchange", () => {
+    const t = location.hash.slice(1);
+    if (validTab(t)) showTab(t);
+  });
+  const fromHash = location.hash.slice(1);
+  showTab(validTab(fromHash) ? fromHash : (sessionStorage.getItem("previewTab") || "screens"));
   // Approvals — POST /api/approve; a successful approve is confirmed by the
-  // server's SSE "approval" broadcast above (which reloads the page), not by
-  // this handler reloading itself — the two never race.
-  document.querySelectorAll(".approve-btn").forEach((btn) => {
+  // server's SSE "approval" broadcast above (which swaps the Approvals panel
+  // in place), not by this handler mutating state itself — the two never race.
+  // Wiring lives in a function because the SSE swap replaces the panel's DOM
+  // and must re-attach these listeners to the fresh buttons.
+  function wireApproveButtons(scope) {
+  scope.querySelectorAll(".approve-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const artifact = btn.dataset.artifact;
       const errBox = document.getElementById("approve-error");
@@ -357,6 +387,8 @@ ${specsTabHtml(specs)}
       }
     });
   });
+  }
+  wireApproveButtons(document);
 </script>
 `;
 }
