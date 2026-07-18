@@ -107,6 +107,37 @@ Every tool above also accepts the **`source`** union (previous section); `treePa
 tier-0 shorthand and falls back to **`CMP_INSPECTOR_TREE`**. Missing files / bad JSON / unreachable
 live servers return a clean, actionable `{ error }` payload, never a stack dump.
 
+## The preview loop + console (`preview`, `preview_status`, `preview_diff`, `preview_stop`, `approval_status`)
+
+`preview { projectDir, port?, hot? }` starts (or reuses) a resident service that renders every
+screen in `inspector/PreviewRegistry.kt` headlessly and serves a **live, self-updating gallery**
+at a local URL (default `http://127.0.0.1:9600/`, SSE reload on every re-render). The gallery has
+four tabs, built server-side in `src/lib/preview-service.mjs`'s `galleryHtml` + `src/lib/console-tabs.mjs`:
+
+| Tab | Shows | Source |
+|---|---|---|
+| **Screens** | pixels + structure wireframe + a11y per screen (the original gallery, unchanged) | the resident render loop |
+| **Design System** | color swatches + a dimens table | `composeApp/build/previews/design-system.json` if present, else a best-effort live `GET /inspect/design-system`, else an honest empty-state — never fabricated |
+| **Approvals** | every governed artifact (VERIFICATION-LAYER-DESIGN.md §1/§2): §1 order number, status, file count, hash/approvedAt, and an **Approve** button (disabled + marked "unresolvable" when the artifact can't be fully resolved) | the project's own `qa/lib/approvals.mjs`, called at runtime via `src/lib/approvals-bridge.mjs` — never forked here. `POST /api/approve { artifact }` records the decision (same file `node qa/approve.mjs` writes) and broadcasts an `"approval"` SSE event that reloads the page |
+| **Specs** | per `specs/*.spec.md` file, its clause list (id + prose, struck-through when withdrawn) plus a lightweight "cited by a durable test?" badge | `src/lib/specs.mjs`, mirroring `qa/verify.mjs`'s `stepSpecCoverage` clause/tag grammar (not its full orphan-report logic) |
+
+A project with no `qa/lib/approvals.mjs` (an older, pre-approvals-wave scaffold) gets an honest
+"not available in this project" Approvals tab instead of an error — the gallery still works.
+
+The agent-side calls (`preview_status`, `preview_diff`, `approval_status`) never return HTML —
+structure flows to the AI, pixels flow to the human:
+
+| Tool | Input | Returns |
+|---|---|---|
+| `preview` | `{ projectDir, port?, hot? }` | `{ url, screens:[...], version, changedLastRender }` — give the human the `url` |
+| `preview_status` | `{ waitForRender?, timeoutMs? }` | current status, or (with `waitForRender:true`) **blocks** until the next render/compile outcome |
+| `preview_diff` | `{ screen, tolerancePx?, minTouchTargetPx? }` | one-call verified edit: `{ changes, regressions, verdict }` — no snapshot bookkeeping |
+| `preview_stop` | `{}` | stops the resident service |
+| `approval_status` | `{ waitForDecision?, timeoutMs? }` | `{ available, statuses }` snapshot, or (with `waitForDecision:true`) **blocks** — same shape as `preview_status`'s `waitForRender` — until any governed artifact's status changes, returning `{ timedOut, available, changed:[artifactIds], statuses }`. `{available:false}` (resolves immediately) when the project has no approvals library |
+
+`preview_status`/`preview_diff`/`approval_status` all require a running preview service
+(`preview` first) — that's where the project root comes from.
+
 ## Layout
 
 ```
@@ -128,6 +159,10 @@ inspector/mcp/
   src/lib/render.mjs     # renderTreeSvg — deterministic SVG wireframe (any source)
   src/lib/png.mjs        # parsePngHeader/readPngMeta — PNG metadata, never pixels
   src/lib/prove.mjs      # proveChange — snapshot diff + drift + a11y composed into one verdict
+  src/lib/preview-service.mjs   # the resident preview loop + gallery HTTP server (4 tabs)
+  src/lib/console-tabs.mjs      # pure (data) -> html for the Design System/Approvals/Specs tabs
+  src/lib/approvals-bridge.mjs  # dynamic runtime bridge to a project's OWN qa/lib/approvals.mjs
+  src/lib/specs.mjs             # Specs tab data: clause parsing + a lightweight coverage badge
   fixtures/tree.json     # example tree (one un-tokenized node + one drifting radius)
   fixtures/a11y-tree.json# planted a11y cases (tiny unlabeled icon, clean button, legacy node)
   fixtures/design-system.json

@@ -33,6 +33,10 @@ import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { renderTreeSvg } from "./render.mjs";
 import { auditA11y } from "./a11y.mjs";
+import { fetchLiveCatalog } from "./live.mjs";
+import { getApprovalsData, approveArtifact as approveArtifactViaLib } from "./approvals-bridge.mjs";
+import { getSpecsData } from "./specs.mjs";
+import { designSystemTabHtml, approvalsTabHtml, specsTabHtml } from "./console-tabs.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -142,7 +146,8 @@ const esc = (s) =>
  * Cards changed in THIS render get the CHANGED flag plus a hover before/after compare
  * (screen.prev.png is the pre-render copy); every card keeps a persistent
  * "changed #N" badge from `changedVersions` so attribution outlives the next render.
- * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error }
+ * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error,
+ *   approvals, specs, designSystem }
  */
 export function galleryHtml(state) {
   const {
@@ -153,6 +158,9 @@ export function galleryHtml(state) {
     changed = [],
     changedVersions = {},
     error = null,
+    approvals = { available: false },
+    specs = { available: false },
+    designSystem = { available: false },
   } = state;
   const width = viewport?.width ?? 411;
   const changedSet = new Set(changed);
@@ -173,6 +181,16 @@ export function galleryHtml(state) {
   #pill.error { background: #FDECEC; color: #DC2626; }
   .banner { margin: 10px 28px 0; padding: 10px 14px; border-radius: 12px; background: #FDECEC;
             color: #7F1D1D; font-size: 13px; white-space: pre-wrap; }
+  nav.tabs { display: flex; gap: 4px; padding: 4px 28px 0; border-bottom: 1px solid #E5E7EB; }
+  nav.tabs button { appearance: none; background: none; border: none; padding: 10px 14px;
+                     font: inherit; font-size: 13px; font-weight: 600; color: #6B7280;
+                     cursor: pointer; border-bottom: 2px solid transparent; }
+  nav.tabs button.active { color: #0A2540; border-bottom-color: #00B96B; }
+  .tab-panel { display: none; padding: 20px 28px 40px; }
+  .tab-panel.active { display: block; }
+  #tab-screens.tab-panel { padding: 0; }
+  .empty { padding: 20px 28px; color: #6B7280; font-size: 13px; }
+  .empty-inline { color: #9CA3AF; font-size: 12px; }
   .grid { display: flex; flex-wrap: wrap; gap: 24px; padding: 20px 28px 40px; }
   .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 16px; }
   .card.changed { border-color: #00B96B; box-shadow: 0 0 0 2px rgba(0,185,107,.25); }
@@ -191,6 +209,36 @@ export function galleryHtml(state) {
   .panes .wire svg { width: ${Math.round(width * 0.78)}px; height: auto; display: block; }
   .wire { border: 1px dashed #C8D0DA; border-radius: 12px; overflow: hidden; }
   .lbl { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: #9CA3AF; margin: 0 0 4px; }
+  .swatch-grid { display: flex; flex-wrap: wrap; gap: 16px; }
+  .swatch-card { width: 130px; }
+  .swatch { width: 100%; height: 60px; border-radius: 10px; border: 1px solid #E5E7EB; }
+  .swatch-name { font-size: 12px; font-weight: 600; margin-top: 6px; }
+  .swatch-value { font-size: 11px; color: #6B7280; }
+  .dimens-table, .approvals-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .dimens-table td, .approvals-table td, .approvals-table th {
+    padding: 8px 10px; border-bottom: 1px solid #E5E7EB; text-align: left; vertical-align: top; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .badge-approved { background: #E8F7EF; color: #16A34A; }
+  .badge-unreviewed { background: #EEF2FF; color: #4338CA; }
+  .badge-changed { background: #FDECEC; color: #DC2626; }
+  .artifact-id { font-size: 11px; color: #9CA3AF; }
+  .approved-at { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+  .unresolvable-note, .missing-note { font-size: 11px; color: #B45309; margin: 4px 0 0; }
+  .approve-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
+                 border: 1px solid #0A2540; background: #0A2540; color: #fff; cursor: pointer; }
+  .approve-btn:disabled { background: #E5E7EB; border-color: #E5E7EB; color: #9CA3AF; cursor: not-allowed; }
+  .spec-file h3 { margin: 18px 0 6px; font-size: 14px; }
+  .spec-file:first-child h3 { margin-top: 0; }
+  .clause-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .clause { display: flex; align-items: baseline; gap: 10px; font-size: 13px; padding: 8px 10px;
+            border: 1px solid #E5E7EB; border-radius: 10px; background: #fff; }
+  .clause.withdrawn { opacity: .6; }
+  .clause-id { font-size: 11px; color: #0A2540; font-weight: 700; flex: 0 0 auto; }
+  .clause-prose { flex: 1; }
+  .cov-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; flex: 0 0 auto; white-space: nowrap; }
+  .cov-yes { background: #E8F7EF; color: #16A34A; }
+  .cov-no { background: #FDECEC; color: #DC2626; }
+  .cov-na { background: #F3F4F6; color: #9CA3AF; }
 </style>
 <header>
   <h1>${esc(appName)} — live previews</h1>
@@ -199,6 +247,13 @@ export function galleryHtml(state) {
   <span id="pill">live</span>
 </header>
 ${error ? `<div class="banner">last render FAILED — showing previous state\n${esc(error)}</div>` : ""}
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="screens">Screens</button>
+  <button class="tab-btn" data-tab="design-system">Design System</button>
+  <button class="tab-btn" data-tab="approvals">Approvals</button>
+  <button class="tab-btn" data-tab="specs">Specs</button>
+</nav>
+<div id="tab-screens" class="tab-panel active" data-tab="screens">
 <div class="grid">
 ${cards
   .map(({ screen, svg, summary, a11y }) => {
@@ -226,6 +281,16 @@ ${cards
   })
   .join("\n")}
 </div>
+</div>
+<div id="tab-design-system" class="tab-panel" data-tab="design-system">
+${designSystemTabHtml(designSystem)}
+</div>
+<div id="tab-approvals" class="tab-panel" data-tab="approvals">
+${approvalsTabHtml(approvals)}
+</div>
+<div id="tab-specs" class="tab-panel" data-tab="specs">
+${specsTabHtml(specs)}
+</div>
 <script>
   const pill = document.getElementById("pill");
   const es = new EventSource("/events");
@@ -233,6 +298,7 @@ ${cards
     const msg = JSON.parse(e.data);
     if (msg.type === "rendering") { pill.textContent = "rendering…"; pill.className = "rendering"; }
     if (msg.type === "render") location.reload();
+    if (msg.type === "approval") location.reload();
     if (msg.type === "error") {
       pill.textContent = msg.source === "compile" ? "compile failed" : "render failed";
       pill.className = "error";
@@ -251,6 +317,46 @@ ${cards
   };
   filter.addEventListener("input", applyFilter);
   applyFilter();
+  // Tabs — persisted like the filter, survives SSE-triggered reloads too.
+  const tabBtns = [...document.querySelectorAll(".tab-btn")];
+  const panels = [...document.querySelectorAll(".tab-panel")];
+  function showTab(tab) {
+    sessionStorage.setItem("previewTab", tab);
+    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+    panels.forEach((p) => p.classList.toggle("active", p.dataset.tab === tab));
+  }
+  tabBtns.forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  showTab(sessionStorage.getItem("previewTab") || "screens");
+  // Approvals — POST /api/approve; a successful approve is confirmed by the
+  // server's SSE "approval" broadcast above (which reloads the page), not by
+  // this handler reloading itself — the two never race.
+  document.querySelectorAll(".approve-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const artifact = btn.dataset.artifact;
+      const errBox = document.getElementById("approve-error");
+      if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Approving…";
+      try {
+        const res = await fetch("/api/approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ artifact }),
+        });
+        const body = await res.json();
+        if (!body.ok) {
+          if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "approval refused"; }
+          btn.disabled = false;
+          btn.textContent = original;
+        }
+      } catch (err) {
+        if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  });
 </script>
 `;
 }
@@ -317,6 +423,8 @@ export function createPreviewService(opts) {
   let prevGenTrees = null; // the generation BEFORE that — preview_diff's automatic `before`
   const changedAt = new Map(); // screen id -> render version that last changed it
   const renderWaiters = new Set(); // waitForRender() promises pending a render/compile outcome
+  const approvalWaiters = new Set(); // waitForApprovalDecision() promises pending a status change
+  let approvalPollTimer = null; // only ticks while approvalWaiters is non-empty
   let daemonReloadCount = -1; // last successful-reload count seen from the daemon (-1 = unknown)
   let daemonReloadErrors = -1; // last failed-swap count seen from the daemon
   let daemonReloadHooked = false; // daemon has the in-JVM after-reload hook
@@ -355,6 +463,121 @@ export function createPreviewService(opts) {
       }, timeoutMs);
       renderWaiters.add(w);
     });
+  }
+
+  /**
+   * Every governed artifact's live status, via the project's own qa/lib/approvals.mjs
+   * (approvals-bridge.mjs — never forked here). Same shape the Approvals tab renders:
+   * { available: false } for projects predating the approvals wave, else
+   * { available: true, statuses: [...] }.
+   */
+  function approvalStatusSnapshot() {
+    return getApprovalsData(projectDir);
+  }
+
+  /** Artifact ids whose (status, hash, approvedAt) differ, or that appeared/disappeared. */
+  function diffApprovalStatusIds(beforeStatuses, afterStatuses) {
+    const beforeMap = new Map(beforeStatuses.map((s) => [s.id, `${s.status}|${s.hash}|${s.approvedAt}`]));
+    const changed = [];
+    const afterIds = new Set();
+    for (const s of afterStatuses) {
+      afterIds.add(s.id);
+      if (beforeMap.get(s.id) !== `${s.status}|${s.hash}|${s.approvedAt}`) changed.push(s.id);
+    }
+    for (const s of beforeStatuses) {
+      if (!afterIds.has(s.id)) changed.push(s.id);
+    }
+    return changed;
+  }
+
+  function ensureApprovalPoll() {
+    if (approvalPollTimer) return;
+    approvalPollTimer = setInterval(() => void checkApprovalWaiters(), 1000);
+  }
+  function maybeStopApprovalPoll() {
+    if (approvalWaiters.size === 0 && approvalPollTimer) {
+      clearInterval(approvalPollTimer);
+      approvalPollTimer = null;
+    }
+  }
+
+  /**
+   * Settle any waitForApprovalDecision() calls whose snapshot has since changed.
+   * Called immediately after a successful POST /api/approve (event-driven, near-
+   * instant) AND on a 1s poll while waiters are pending (so an approval recorded
+   * OUTSIDE this server — `node qa/approve.mjs` from a terminal — is caught too;
+   * design doc §4 permits either "poll or event-driven off the POST handler").
+   */
+  async function checkApprovalWaiters() {
+    if (approvalWaiters.size === 0) return;
+    const now = await approvalStatusSnapshot();
+    const nowStatuses = now.available ? now.statuses : [];
+    for (const w of [...approvalWaiters]) {
+      const changed = diffApprovalStatusIds(w.beforeStatuses, nowStatuses);
+      if (changed.length > 0 || now.available !== w.beforeAvailable) {
+        clearTimeout(w.timer);
+        approvalWaiters.delete(w);
+        w.resolve({ timedOut: false, available: now.available, changed, statuses: nowStatuses });
+      }
+    }
+    maybeStopApprovalPoll();
+  }
+
+  /** Resolve every pending waitForApprovalDecision immediately (service stopping). */
+  function settleApprovalWaiters() {
+    for (const w of approvalWaiters) {
+      clearTimeout(w.timer);
+      w.resolve({ timedOut: false, available: w.beforeAvailable, changed: [], statuses: w.beforeStatuses });
+    }
+    approvalWaiters.clear();
+    if (approvalPollTimer) {
+      clearInterval(approvalPollTimer);
+      approvalPollTimer = null;
+    }
+  }
+
+  /**
+   * The agent's approval primitive (VERIFICATION-LAYER-DESIGN.md §4): without
+   * waitForDecision, the current snapshot. With it, blocks until ANY governed
+   * artifact's status CHANGES — exactly waitForRender's blocking+timeout shape,
+   * applied to approvals instead of renders. Resolves immediately with
+   * {available:false} in a project with no approvals library — there is no
+   * decision to wait for.
+   */
+  async function waitForApprovalDecision(timeoutMs = 120000) {
+    const before = await approvalStatusSnapshot();
+    if (!before.available) {
+      return { timedOut: false, available: false, changed: [], statuses: [] };
+    }
+    return new Promise((resolve) => {
+      const w = { resolve, beforeStatuses: before.statuses, beforeAvailable: before.available };
+      w.timer = setTimeout(async () => {
+        approvalWaiters.delete(w);
+        const now = await approvalStatusSnapshot();
+        resolve({ timedOut: true, available: now.available, changed: [], statuses: now.available ? now.statuses : [] });
+        maybeStopApprovalPoll();
+      }, timeoutMs);
+      approvalWaiters.add(w);
+      ensureApprovalPoll();
+    });
+  }
+
+  /** Design System tab data: previews-dir catalog first, else a best-effort live fetch. */
+  async function getDesignSystemData() {
+    const catalogPath = path.join(previewsDir, "design-system.json");
+    if (fs.existsSync(catalogPath)) {
+      try {
+        return { available: true, source: "previews", catalog: JSON.parse(fs.readFileSync(catalogPath, "utf8")) };
+      } catch (err) {
+        log(`design-system.json at ${catalogPath} is not valid JSON (${err.message}) — trying a live session`);
+      }
+    }
+    try {
+      const catalog = await fetchLiveCatalog({ timeoutMs: 800 });
+      return { available: true, source: "live", catalog };
+    } catch {
+      return { available: false };
+    }
   }
 
   /**
@@ -758,61 +981,127 @@ export function createPreviewService(opts) {
     return stamp;
   }
 
-  function handleRequest(req, res) {
-    const url = new URL(req.url, `http://127.0.0.1:${port}`);
-    if (url.pathname === "/") {
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(
-        galleryHtml({
-          appName,
-          viewport,
-          cards,
-          version,
-          changed: lastChanged,
-          changedVersions: Object.fromEntries(changedAt),
-          error: lastError,
-        }),
-      );
-      return;
-    }
-    if (url.pathname === "/events") {
-      res.writeHead(200, {
-        "content-type": "text/event-stream",
-        "cache-control": "no-cache",
-        connection: "keep-alive",
+  /** Buffer a request body (JSON POSTs only — bounded so a bad client can't OOM the service). */
+  function readBody(req, limitBytes = 1_000_000) {
+    return new Promise((resolve, reject) => {
+      let data = "";
+      let size = 0;
+      req.on("data", (chunk) => {
+        size += chunk.length;
+        if (size > limitBytes) {
+          reject(new Error("request body too large"));
+          req.destroy();
+          return;
+        }
+        data += chunk;
       });
-      res.write(`data: ${JSON.stringify({ type: "hello", version })}\n\n`);
-      sseClients.add(res);
-      req.on("close", () => sseClients.delete(res));
-      return;
-    }
-    if (url.pathname === "/status") {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify(status(), null, 2));
-      return;
-    }
-    if (url.pathname.startsWith("/previews/")) {
-      // Static previews: constrain to previewsDir (no traversal).
-      const rel = decodeURIComponent(url.pathname.slice("/previews/".length));
-      const file = path.normalize(path.join(previewsDir, rel));
-      if (!file.startsWith(previewsDir) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-        res.writeHead(404);
-        res.end("not found");
+      req.on("end", () => resolve(data));
+      req.on("error", reject);
+    });
+  }
+
+  async function handleRequest(req, res) {
+    const url = new URL(req.url, `http://127.0.0.1:${port}`);
+    try {
+      if (url.pathname === "/") {
+        const [approvals, designSystem] = await Promise.all([approvalStatusSnapshot(), getDesignSystemData()]);
+        const specs = getSpecsData(projectDir);
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(
+          galleryHtml({
+            appName,
+            viewport,
+            cards,
+            version,
+            changed: lastChanged,
+            changedVersions: Object.fromEntries(changedAt),
+            error: lastError,
+            approvals,
+            specs,
+            designSystem,
+          }),
+        );
         return;
       }
-      const type = file.endsWith(".png")
-        ? "image/png"
-        : file.endsWith(".json")
-          ? "application/json"
-          : file.endsWith(".svg")
-            ? "image/svg+xml"
-            : "application/octet-stream";
-      res.writeHead(200, { "content-type": type });
-      fs.createReadStream(file).pipe(res);
-      return;
+      if (url.pathname === "/events") {
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+        });
+        res.write(`data: ${JSON.stringify({ type: "hello", version })}\n\n`);
+        sseClients.add(res);
+        req.on("close", () => sseClients.delete(res));
+        return;
+      }
+      if (url.pathname === "/status") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(status(), null, 2));
+        return;
+      }
+      if (url.pathname === "/api/approve") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          res.end(JSON.stringify({ ok: false, reason: "method not allowed — use POST" }));
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse((await readBody(req)) || "{}");
+        } catch (err) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: `invalid JSON body: ${err.message}` }));
+          return;
+        }
+        const artifact = body && body.artifact;
+        if (!artifact || typeof artifact !== "string") {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: "missing `artifact` (string) in the request body" }));
+          return;
+        }
+        const result = await approveArtifactViaLib(projectDir, artifact);
+        res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
+        res.end(JSON.stringify(result));
+        if (result.ok) {
+          touch("approval");
+          broadcast({ type: "approval", artifact });
+          void checkApprovalWaiters(); // settle any waitForApprovalDecision() faster than the 1s poll
+        }
+        return;
+      }
+      if (url.pathname.startsWith("/previews/")) {
+        // Static previews: constrain to previewsDir (no traversal).
+        const rel = decodeURIComponent(url.pathname.slice("/previews/".length));
+        const file = path.normalize(path.join(previewsDir, rel));
+        if (!file.startsWith(previewsDir) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+          res.writeHead(404);
+          res.end("not found");
+          return;
+        }
+        const type = file.endsWith(".png")
+          ? "image/png"
+          : file.endsWith(".json")
+            ? "application/json"
+            : file.endsWith(".svg")
+              ? "image/svg+xml"
+              : "application/octet-stream";
+        res.writeHead(200, { "content-type": type });
+        fs.createReadStream(file).pipe(res);
+        return;
+      }
+      res.writeHead(404);
+      res.end("not found");
+    } catch (err) {
+      // A route handler threw (e.g. a filesystem error mid-request) — never let an
+      // async request listener's rejection go unhandled (Node treats that as fatal).
+      log(`request handler error (${req.method} ${req.url}): ${err && err.message ? err.message : err}`);
+      if (!res.headersSent) {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: err && err.message ? err.message : String(err) }));
+      } else {
+        res.end();
+      }
     }
-    res.writeHead(404);
-    res.end("not found");
   }
 
   function listen(startPort) {
@@ -888,6 +1177,7 @@ export function createPreviewService(opts) {
       clearInterval(pollTimer);
       clearTimeout(watchdogTimer);
       settleWaiters(); // don't leave agents hanging on a stopped service
+      settleApprovalWaiters(); // ditto for pending waitForApprovalDecision() calls
       daemonBootDeadline = 0; // abort any in-flight boot poll
       if (classesWatcher) classesWatcher.close();
       // Best-effort daemon teardown: ask the JVM to exit, then kill the gradle client.
@@ -905,6 +1195,10 @@ export function createPreviewService(opts) {
     status,
     waitForRender,
     treesFor,
+    /** Current approval statuses (§4 tab data) — {available:false} with no approvals library. */
+    approvalStatusSnapshot,
+    /** Blocks until any governed artifact's status changes (or timeoutMs elapses). */
+    waitForApprovalDecision,
     /** Test seam: force one render cycle without touching the filesystem watcher. */
     _renderCycle: renderCycle,
     /** Test seam: feed daemon-child output through the compile-failure scanner. */

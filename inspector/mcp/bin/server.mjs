@@ -158,7 +158,11 @@ const server = new McpServer({
     "assert_token / audit_a11y / find_drift / navigate_and_inspect / prove_change. " +
     "Runtime eyes beyond the tree: runtime_crashes (persisted crashes + cause attribution), " +
     "runtime_logs (adb logcat, structured + bounded), db_schema / db_query (read-only SQLite " +
-    "state). Always assert on tree JSON; never read PNG bytes into context.",
+    "state). Human approval gates: the preview gallery's Approvals/Design System/Specs tabs " +
+    "(same URL as `preview`) are where the human reviews and signs governed artifacts; " +
+    "approval_status { waitForDecision: true } blocks on their decision the same way " +
+    "preview_status blocks on a render. Always assert on tree JSON; never read PNG bytes into " +
+    "context.",
 });
 
 const treePathArg = z
@@ -1040,6 +1044,45 @@ server.registerTool(
     if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
     if (waitForRender) return ok(await previewService.waitForRender(timeoutMs));
     return ok(previewService.status());
+  })
+);
+
+server.registerTool(
+  "approval_status",
+  {
+    title: "Governed-artifact approval status — optionally WAIT for a decision",
+    description:
+      "The human-approval half of the console (VERIFICATION-LAYER-DESIGN.md §4): every governed " +
+      "artifact's live status (design system, architecture+structure, exemplar feature, exemplar " +
+      "spec, per-feature specs — the same §1 ordered walk the Approvals tab shows), via the " +
+      "PROJECT'S OWN qa/lib/approvals.mjs (never forked here). Structure only — no HTML; the tab " +
+      "is for the human, this tool is for you. Without waitForDecision: the current snapshot " +
+      "{available, statuses:[{id,label,status,hash,storedHash,approvedAt,fileCount,missing," +
+      "resolvable}]}. With waitForDecision:true: BLOCKS — same shape as preview_status's " +
+      "waitForRender — until ANY governed artifact's status changes (a console Approve click, or " +
+      "`node qa/approve.mjs <artifact>` run in a terminal), then returns {timedOut, available, " +
+      "changed:[artifactIds], statuses}. {available:false} in a project with no approvals library " +
+      "(an older, pre-approvals-wave scaffold) — resolves immediately, there is nothing to wait " +
+      "for. Typical use: propose a change, tell the human to review it in the console, then " +
+      "approval_status{waitForDecision:true} instead of polling. Requires a running preview " +
+      "service (call preview{projectDir} first) — that's where the project root comes from.",
+    inputSchema: {
+      waitForDecision: z
+        .boolean()
+        .optional()
+        .describe("Block until any governed artifact's approval status changes instead of returning immediately."),
+      timeoutMs: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("waitForDecision timeout (default 120000; result carries timedOut:true on expiry)."),
+    },
+  },
+  guarded(async ({ waitForDecision, timeoutMs }) => {
+    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
+    if (waitForDecision) return ok(await previewService.waitForApprovalDecision(timeoutMs));
+    return ok(await previewService.approvalStatusSnapshot());
   })
 );
 

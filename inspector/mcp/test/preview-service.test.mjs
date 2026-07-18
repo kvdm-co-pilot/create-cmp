@@ -6,6 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import http from "node:http";
+import { fileURLToPath } from "node:url";
 import {
   summarizeTree,
   diffScreenTrees,
@@ -14,6 +15,41 @@ import {
   createPreviewService,
   detectAppPackage,
 } from "../src/lib/preview-service.mjs";
+import { resetApprovalsBridgeCache } from "../src/lib/approvals-bridge.mjs";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REAL_APPROVALS_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "approvals.mjs");
+
+/**
+ * A minimal generated-project fixture with a REAL qa/lib/approvals.mjs (copied
+ * from the template, same idea as approvals-bridge.test.mjs) — one resolvable
+ * artifact (`design-system`) is enough to exercise the console's approvals
+ * wiring end-to-end without a real Gradle/Android project.
+ */
+function makeApprovalsFixtureProject() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-approvals-"));
+  fs.mkdirSync(path.join(root, "composeApp", "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "composeApp", "build.gradle.kts"), 'android {\n  namespace = "com.acme.demo"\n}\n');
+  const themeDir = path.join(
+    root,
+    "composeApp",
+    "src",
+    "commonMain",
+    "kotlin",
+    "com",
+    "acme",
+    "demo",
+    "presentation",
+    "theme",
+  );
+  fs.mkdirSync(themeDir, { recursive: true });
+  fs.writeFileSync(path.join(themeDir, "Theme.kt"), "object AcmeColors\n");
+  fs.writeFileSync(path.join(themeDir, "Tokens.kt"), "object AcmeTokens\n");
+  const libDir = path.join(root, "qa", "lib");
+  fs.mkdirSync(libDir, { recursive: true });
+  fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+  return root;
+}
 
 const NODE = (over = {}) => ({
   testTag: null,
@@ -663,6 +699,242 @@ test("service: compile watchdog — silent recompiler failure surfaces via a com
   } finally {
     service.stop();
     await new Promise((r) => daemon.close(r));
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("galleryHtml: tab nav present; approvals/specs/designSystem default to honest empty states when omitted", () => {
+  const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+  assert.match(html, /class="tab-btn active" data-tab="screens"/);
+  assert.match(html, /data-tab="design-system"/);
+  assert.match(html, /data-tab="approvals"/);
+  assert.match(html, /data-tab="specs"/);
+  assert.match(html, /No design-system catalog available yet/);
+  assert.match(html, /not available in this project/);
+  assert.match(html, /No specs\/ directory found/);
+  assert.match(html, /msg\.type === "approval"/, "SSE client reloads on an approval broadcast too");
+});
+
+// --- Approvals wiring (VERIFICATION-LAYER-DESIGN.md §4) --------------------
+
+test("service: approvalStatusSnapshot reflects the project's real qa/lib/approvals.mjs", async () => {
+  const projectDir = makeApprovalsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19860, hot: false, runRender: async () => {} });
+  try {
+    await service.start();
+    const snapshot = await service.approvalStatusSnapshot();
+    assert.equal(snapshot.available, true);
+    const designSystem = snapshot.statuses.find((s) => s.id === "design-system");
+    assert.equal(designSystem.status, "unreviewed");
+    assert.equal(designSystem.resolvable, true);
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: approvalStatusSnapshot is {available:false} for a project with no approvals library", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const service = createPreviewService({ projectDir, port: 19861, hot: false, runRender: async () => {} });
+  try {
+    await service.start();
+    assert.deepEqual(await service.approvalStatusSnapshot(), { available: false });
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: POST /api/approve calls the REAL library, writes qa/approvals.json, and the gallery page reflects it", async () => {
+  const projectDir = makeApprovalsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19862, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const res = await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.ok, true);
+    assert.match(body.hash, /^[0-9a-f]{64}$/);
+
+    const written = JSON.parse(fs.readFileSync(path.join(projectDir, "qa", "approvals.json"), "utf8"));
+    assert.ok(written.artifacts.some((a) => a.artifact === "design-system" && a.status === "approved"));
+
+    const page = await (await fetch(st.url)).text();
+    assert.match(page, /badge-approved/);
+    assert.match(page, /Re-approve/);
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: POST /api/approve surfaces the library's refusal verbatim (vacuous / unknown artifact)", async () => {
+  const projectDir = makeApprovalsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19863, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const unknown = await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "not-a-real-artifact" }),
+    });
+    assert.equal(unknown.status, 409);
+    const unknownBody = await unknown.json();
+    assert.equal(unknownBody.ok, false);
+    assert.match(unknownBody.reason, /unknown artifact/);
+
+    const missingBody = await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not json",
+    });
+    assert.equal(missingBody.status, 400);
+
+    const getInstead = await fetch(`${st.url}api/approve`);
+    assert.equal(getInstead.status, 405);
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: POST /api/approve broadcasts an SSE 'approval' event", async () => {
+  const projectDir = makeApprovalsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19864, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const sseRes = await fetch(`${st.url}events`);
+    const reader = sseRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    async function nextEvent() {
+      while (!buf.includes("\n\n")) {
+        const { value, done } = await reader.read();
+        if (done) throw new Error("SSE stream closed early");
+        buf += decoder.decode(value, { stream: true });
+      }
+      const idx = buf.indexOf("\n\n");
+      const chunk = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      return JSON.parse(chunk.replace(/^data: /, ""));
+    }
+    assert.equal((await nextEvent()).type, "hello");
+
+    await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+
+    const evt = await nextEvent();
+    assert.equal(evt.type, "approval");
+    assert.equal(evt.artifact, "design-system");
+    reader.cancel();
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: waitForApprovalDecision resolves (event-driven) the moment POST /api/approve lands, naming the changed artifact", async () => {
+  const projectDir = makeApprovalsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19865, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const pending = service.waitForApprovalDecision(5000);
+    await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+    const settled = await pending;
+    assert.equal(settled.timedOut, false);
+    assert.equal(settled.available, true);
+    assert.ok(settled.changed.includes("design-system"));
+    assert.equal(settled.statuses.find((s) => s.id === "design-system").status, "approved");
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: waitForApprovalDecision catches a change made OUTSIDE the console (e.g. `node qa/approve.mjs`) via the poll fallback", async () => {
+  const projectDir = makeApprovalsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19866, hot: false, runRender: async () => {} });
+  try {
+    await service.start();
+
+    const pending = service.waitForApprovalDecision(5000);
+    // Simulate an external `node qa/approve.mjs design-system` run: qa/approvals.json
+    // changes on disk without ever going through this server's POST handler.
+    setTimeout(() => {
+      const approvalsPath = path.join(projectDir, "qa", "approvals.json");
+      fs.mkdirSync(path.dirname(approvalsPath), { recursive: true });
+      fs.writeFileSync(
+        approvalsPath,
+        JSON.stringify({
+          schema: "cmp-approvals/1",
+          artifacts: [{ artifact: "design-system", status: "approved", hash: "deadbeef", approvedAt: new Date().toISOString() }],
+        }),
+      );
+    }, 50);
+    const settled = await pending;
+    assert.equal(settled.timedOut, false);
+    assert.ok(settled.changed.includes("design-system"));
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: waitForApprovalDecision times out (not a hang) when nothing changes", async () => {
+  const projectDir = makeApprovalsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19867, hot: false, runRender: async () => {} });
+  try {
+    await service.start();
+    const result = await service.waitForApprovalDecision(200);
+    assert.equal(result.timedOut, true);
+    assert.equal(result.available, true);
+    assert.deepEqual(result.changed, []);
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: waitForApprovalDecision resolves immediately with {available:false} — nothing to wait for", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const service = createPreviewService({ projectDir, port: 19868, hot: false, runRender: async () => {} });
+  try {
+    await service.start();
+    const start = Date.now();
+    const result = await service.waitForApprovalDecision(60000);
+    assert.equal(result.available, false);
+    assert.equal(result.timedOut, false);
+    assert.ok(Date.now() - start < 2000, "must not wait for the full timeout when unavailable");
+  } finally {
+    service.stop();
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });
