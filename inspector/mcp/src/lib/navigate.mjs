@@ -14,7 +14,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { walk, findByTestTag } from "./tree.mjs";
 import { normalizeTree } from "./snapshot.mjs";
-import { fetchLiveTree, fetchLiveScreenshot, postTap } from "./live.mjs";
+import { fetchLiveTree, fetchLiveScreenshot, fetchLiveNav, postTap } from "./live.mjs";
 import { readPngMeta } from "./png.mjs";
 
 export const DEFAULT_SETTLE_MS = 1500;
@@ -84,6 +84,11 @@ export function navSummary(tree) {
  * `changed` compares NORMALIZED trees (integer bounds, no `source`, sorted resolved
  * keys) — the same normalization the snapshot tools use — so sub-pixel jitter never
  * reads as a navigation.
+ *
+ * Route (before/after `currentRoute`) is included ONLY when the app exposes GET /inspect/nav —
+ * older apps (pre eyes-hardening) simply don't have it, so the field is omitted entirely rather
+ * than reported as null/failed. A transient nav-fetch error never fails the whole call: route
+ * data is supplementary evidence, the tag/text-based `changed` verdict is the source of truth.
  */
 export async function navigateAndInspect({
   testTag,
@@ -97,20 +102,29 @@ export async function navigateAndInspect({
 } = {}) {
   const opts = { host, port, fetchImpl };
   const beforeTree = await fetchLiveTree(opts);
+  const beforeNav = await fetchLiveNav(opts).catch(() => null);
   const target = resolveTapTarget(beforeTree, { testTag, x, y });
   await postTap({ ...opts, x: target.x, y: target.y });
   await sleep(settleMs);
   const afterTree = await fetchLiveTree(opts);
+  const afterNav = await fetchLiveNav(opts).catch(() => null);
 
   const changed =
     JSON.stringify(normalizeTree(beforeTree)) !== JSON.stringify(normalizeTree(afterTree));
 
-  return {
+  const result = {
     tapped: target,
     before: navSummary(beforeTree),
     after: navSummary(afterTree),
     changed,
   };
+  if (beforeNav || afterNav) {
+    result.route = {
+      before: beforeNav ? beforeNav.currentRoute : undefined,
+      after: afterNav ? afterNav.currentRoute : undefined,
+    };
+  }
+  return result;
 }
 
 /**

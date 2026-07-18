@@ -56,8 +56,12 @@ async function fetchRaw(pathName, init, { host = DEFAULT_HOST, port = DEFAULT_PO
   }
 }
 
-async function fetchJson(pathName, opts = {}, init = undefined) {
+async function fetchJson(pathName, opts = {}, init = undefined, { notFoundIsNull = false } = {}) {
   const { url, res } = await fetchRaw(pathName, init, opts);
+
+  // Graceful absence: an older app build simply doesn't have this route yet — a 404 here
+  // means "not available", not "error", so callers that opt in get null instead of a throw.
+  if (notFoundIsNull && res.status === 404) return null;
 
   let body;
   const text = await res.text();
@@ -90,6 +94,39 @@ export function fetchLiveTree(opts = {}) {
 /** GET /inspect/design-system → the declared catalog { colors, dimens }. */
 export function fetchLiveCatalog(opts = {}) {
   return fetchJson("/inspect/design-system", opts);
+}
+
+/**
+ * GET /inspect/nav → { currentRoute, backStack } or `null` when the running app predates the
+ * route (a 404 there means "not available", not "error" — graceful absence, per the eyes-
+ * hardening contract). Any OTHER failure (unreachable, 503, malformed body) still throws.
+ */
+export function fetchLiveNav(opts = {}) {
+  return fetchJson("/inspect/nav", opts, undefined, { notFoundIsNull: true });
+}
+
+/** GET /inspect/crashes → { crashes: [...] } — persisted crash JSON, current boot + previous. */
+export function fetchLiveCrashes(opts = {}) {
+  return fetchJson("/inspect/crashes", opts);
+}
+
+/** GET /inspect/db → schema { tables:[{name,sql}] }. */
+export function fetchLiveDbSchema(opts = {}) {
+  return fetchJson("/inspect/db", opts);
+}
+
+/**
+ * GET /inspect/db?table=<name>&limit=<n> → { table, columns, rows, rowCount }.
+ * `table` is required (this is the caller's identifier to read, not free-form SQL — the
+ * device validates it strictly against `sqlite_master` regardless of what's passed here).
+ */
+export function fetchLiveDbQuery({ table, limit, ...opts } = {}) {
+  if (!table || typeof table !== "string") {
+    throw new Error("fetchLiveDbQuery requires a string `table` (see fetchLiveDbSchema for valid names).");
+  }
+  const qs = new URLSearchParams({ table });
+  if (limit != null) qs.set("limit", String(limit));
+  return fetchJson(`/inspect/db?${qs.toString()}`, opts);
 }
 
 /**

@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
 import { compareTokenDrift } from "./lib/token-drift.mjs";
+import { evaluateApprovalsGate } from "./lib/approvals.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EVIDENCE_DIR = path.join(ROOT, "qa", "evidence");
@@ -173,6 +174,22 @@ function stepSpecCoverage() {
       tags: tags.length,
       files: files.length,
     },
+  };
+}
+
+// Human-approval gate (VERIFICATION-LAYER-DESIGN.md §2) — pure Node, no Gradle,
+// same grouping as specCoverage. The decision itself lives in
+// qa/lib/approvals.mjs (evaluateApprovalsGate); this step only adds the
+// name/duration bookkeeping every step in this file carries.
+function stepApprovals() {
+  const started = Date.now();
+  const { verdict, reason, statuses } = evaluateApprovalsGate(ROOT);
+  return {
+    name: "approvals",
+    verdict,
+    reason,
+    durationMs: Date.now() - started,
+    details: { artifacts: statuses.map((s) => ({ id: s.id, status: s.status, hash: s.hash })) },
   };
 }
 
@@ -373,14 +390,32 @@ function stepE2eSmoke() {
   //  - MAESTRO_DRIVER_STARTUP_TIMEOUT gives the UiAutomator2 driver a generous budget to come
   //    up on a slow emulator (the built-in default gives up too early under load).
   // Both are benign, reversible, and only touch the device while the lane is driving it.
+  // hide_error_dialogs suppresses the OS dialog, NEVER the underlying event — so after the
+  // run we grep the device log for ANR/crash lines the dialog would have shown, and FAIL on
+  // them. The eyes must report what automation stability had to hide.
   sh("adb shell settings put global hide_error_dialogs 1");
+  sh("adb logcat -c"); // clear so the post-run dump only reflects this run
   const res = sh("maestro test qa/e2e/smoke.yaml", { env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "120000" } });
-  return {
-    name: "e2eSmoke",
-    verdict: res.ok ? "PASS" : "FAIL",
-    reason: res.ok ? undefined : `Maestro smoke failed (flow cites the SHELL spec clauses it proves):\n${res.out.split("\n").slice(-15).join("\n")}`,
-    durationMs: install.durationMs + res.durationMs,
-  };
+  if (!res.ok) {
+    return {
+      name: "e2eSmoke",
+      verdict: "FAIL",
+      reason: `Maestro smoke failed (flow cites the SHELL spec clauses it proves):\n${res.out.split("\n").slice(-15).join("\n")}`,
+      durationMs: install.durationMs + res.durationMs,
+    };
+  }
+  const anrDump = sh("adb logcat -d -b system,crash,main");
+  const anrRe = /ANR in |FATAL EXCEPTION/i;
+  if (anrDump.ok && anrRe.test(anrDump.out)) {
+    const anrLines = anrDump.out.split("\n").filter((l) => anrRe.test(l)).slice(0, 10).join("\n");
+    return {
+      name: "e2eSmoke",
+      verdict: "FAIL",
+      reason: `Maestro smoke passed, but the device log shows an ANR/crash during the run (hide_error_dialogs only suppresses the OS dialog, never the underlying event):\n${anrLines}`,
+      durationMs: install.durationMs + res.durationMs,
+    };
+  }
+  return { name: "e2eSmoke", verdict: "PASS", durationMs: install.durationMs + res.durationMs };
 }
 
 // ── Lane ───────────────────────────────────────────────────────────────────
@@ -388,9 +423,10 @@ function stepE2eSmoke() {
 const stepsForProfile = {
   // scaffold: what `create-cmp --verify` proves at stamp time — specCoverage,
   // the full JVM tier (unit + conformance + golden + UI tests) plus the Android build.
-  scaffold: [stepSpecCoverage, stepBuild, stepUnitTests],
+  scaffold: [stepSpecCoverage, stepApprovals, stepBuild, stepUnitTests],
   local: [
     stepSpecCoverage,
+    stepApprovals,
     stepBuild,
     stepUnitTests,
     stepConformance,

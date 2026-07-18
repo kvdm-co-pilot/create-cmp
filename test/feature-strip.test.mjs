@@ -220,6 +220,10 @@ test("default (inspector ON): debug module + release no-op twin stamped under th
     "InspectorHttpServer.kt",
     "LiveSemanticsJson.kt",
     "InspectorCatalog.kt",
+    // Runtime eyes (VERIFICATION-LAYER-DESIGN.md §3.1/§3.2/§3.3):
+    "NavInspector.kt",
+    "CrashRecorder.kt",
+    "DbInspector.kt",
   ]) {
     assert.ok(fs.existsSync(path.join(debugDir, f)), `androidDebug must ship ${f}`);
   }

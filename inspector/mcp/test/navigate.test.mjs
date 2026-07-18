@@ -55,9 +55,10 @@ const detailTree = {
 
 // Stateful stub of the on-device inspector server: GET routes serve queued tree
 // payloads; POST /inspect/tap records the exact request (payload shape proof);
-// GET /inspect/screenshot serves real PNG bytes.
-function startStub({ trees = [], screenshot = tinyPng } = {}) {
-  const seen = { taps: [], treeFetches: 0 };
+// GET /inspect/screenshot serves real PNG bytes. `navs` (optional) queues
+// GET /inspect/nav responses in call order; omit to simulate an app without the route (404).
+function startStub({ trees = [], screenshot = tinyPng, navs = null } = {}) {
+  const seen = { taps: [], treeFetches: 0, navFetches: 0 };
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
       if (req.method === "GET" && req.url.startsWith("/inspect/tree")) {
@@ -65,6 +66,18 @@ function startStub({ trees = [], screenshot = tinyPng } = {}) {
         seen.treeFetches++;
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(tree));
+        return;
+      }
+      if (req.method === "GET" && req.url.startsWith("/inspect/nav")) {
+        seen.navFetches++;
+        if (!navs) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "unknown path" }));
+          return;
+        }
+        const nav = navs[Math.min(seen.navFetches - 1, navs.length - 1)];
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(nav));
         return;
       }
       if (req.method === "GET" && req.url.startsWith("/inspect/screenshot")) {
@@ -174,6 +187,29 @@ test("navigateAndInspect: identical tree after the tap reports changed:false", a
       sleep: () => Promise.resolve(),
     });
     assert.equal(result.changed, false);
+  } finally {
+    server.close();
+  }
+});
+
+test("navigateAndInspect: includes route.before/after when the app exposes /inspect/nav", async () => {
+  const { server, port } = await startStub({
+    trees: [homeTree, detailTree],
+    navs: [{ currentRoute: "shell", backStack: ["shell"] }, { currentRoute: "detail/1", backStack: ["shell", "detail/1"] }],
+  });
+  try {
+    const result = await navigateAndInspect({ testTag: "home_title", port, settleMs: 0, sleep: () => Promise.resolve() });
+    assert.deepEqual(result.route, { before: "shell", after: "detail/1" });
+  } finally {
+    server.close();
+  }
+});
+
+test("navigateAndInspect: omits `route` entirely when the app has no /inspect/nav (older app)", async () => {
+  const { server, port } = await startStub({ trees: [homeTree, detailTree] }); // navs: null → 404
+  try {
+    const result = await navigateAndInspect({ testTag: "home_title", port, settleMs: 0, sleep: () => Promise.resolve() });
+    assert.equal("route" in result, false, "no route field at all when the endpoint is absent");
   } finally {
     server.close();
   }
