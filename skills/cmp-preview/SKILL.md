@@ -78,6 +78,25 @@ A screen in a forced UI state is just another registry entry with a derived id:
 (a state-first overload, or preview-only fakes). Loading/empty/error states then render
 side by side with the default seeded state — same gallery, same selectors, same goldens.
 
+## The console — three more tabs on the same gallery
+
+The URL from `preview { projectDir }` is a console, not just a gallery: alongside **Screens**
+(the tab you've been reading about above) it also serves **Design System** (the swatch/dimen
+grid resolved from the app's token catalog), **Approvals** (every governed artifact — design
+system, architecture, exemplar feature/spec, per-feature specs — with its live status and an
+Approve button), and **Specs** (each `specs/*.spec.md`'s clauses with coverage badges). All four
+tabs share the same SSE self-reload as the gallery.
+
+Approving in the console (`POST /api/approve`) writes the exact same `qa/approvals.json` the
+`node qa/approve.mjs <artifact>` CLI writes — same library underneath, either front end works.
+Your side of that loop is `approval_status { waitForDecision: true }`: identical blocking
+pattern to `preview_status { waitForRender: true }` — propose a change, tell the human to look
+at the Approvals tab, then block on the decision instead of polling. Without
+`waitForDecision` it just returns the current snapshot (`{available, statuses:[...]}`). This is
+onboarding territory (the **cmp-new** skill's final step walks the human through the ordered
+approval list); reach for it here whenever a governed artifact changed mid-session and needs
+re-review.
+
 ## Troubleshooting
 
 - **"does not look like a create-cmp app"** — `projectDir` must contain `composeApp/`.

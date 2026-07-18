@@ -1,7 +1,7 @@
 # create-cmp — the complete usage guide
 
 > **Read this first.** It is the single entry point to the whole product: setup, the engine CLI,
-> the 9 skills, the `cmp-inspector` MCP (18 tools), and the workflows that tie them together. An
+> the 9 skills, the `cmp-inspector` MCP (23 tools), and the workflows that tie them together. An
 > agent that reads this knows how to drive create-cmp end to end. Concise by section, exhaustive in
 > total. Companion deep-dives are cross-linked; you rarely need them.
 
@@ -142,7 +142,7 @@ intent — the descriptions carry rich triggers.
 
 ---
 
-## 5. The `cmp-inspector` MCP (18 tools)
+## 5. The `cmp-inspector` MCP (23 tools)
 
 A stdio server that reads a Compose UI as a **single JSON tree contract** and never returns pixel
 bytes. Node: `node inspector/mcp/bin/server.mjs`.
@@ -185,7 +185,7 @@ Resolution: explicit `source` → `treePath` → the `connect_live` session defa
 - **uiautomator (tier 2):** any app, zero instrumentation — but `designToken` is always `null`
   (tokens don't cross the accessibility bridge), so token/drift tools reject it.
 
-### The 18 tools
+### The 23 tools
 
 **Read & assert:** `inspect_tree` (full tree + counts) · `get_node {testTag}` · `assert_token
 {testTag,key,expected}` · `layout_gaps {testTagA,testTagB}` (computed spacing).
@@ -202,6 +202,14 @@ contentDescription/designToken/role/clickable/disabled-changed, bounds-moved) ·
 returns `remoteUrl` and sets the session default source · `navigate_and_inspect {testTag?|x,y,
 settleMs?}` — resolves a tap from the live tree, taps via `POST /inspect/tap`, re-fetches, returns
 `{before, after, changed}` (structural navigation, zero pixels).
+
+**Runtime (the AI half of the verification layer — behavior, not just structure):**
+`runtime_crashes {since?}` — crash JSON written to `filesDir/inspector/crashes/` by the
+uncaught-exception handler (survives the process that crashed), intersected with recently-edited
+files for a `"your edit to X likely caused this"` attribution · `runtime_logs {since?,level?,
+limit?}` — structured `adb logcat --pid=<app pid>` entries, capped + tailed, never a firehose ·
+`db_schema {}` / `db_query {table,limit?}` — the app's Room DB, read-only, table identifier
+validated (never raw SQL from the wire): what tables exist, what's actually in them after a flow.
 
 **Render:** `render_tree {source?,a11y?}` — deterministic **SVG wireframe** (any source; tokenized
 nodes highlighted with resolved-value chips, clickable outlines, optional a11y overlay); SVG is
@@ -230,6 +238,17 @@ renders with ZERO snapshot bookkeeping (the service retains the previous generat
 against the previews dir's design-system.json) · `preview_stop` —
 shut the service down (the Gradle daemon stays warm).
 
+**Approvals (the human half of the verification layer):** `approval_status {waitForDecision?,
+timeoutMs?}` — every governed artifact's live status (design system, architecture+structure,
+exemplar feature, exemplar spec, per-feature specs — §6 below), read via the project's own
+`qa/lib/approvals.mjs`. Without `waitForDecision`: the current snapshot
+`{available, statuses:[{id,label,status,hash,storedHash,approvedAt,fileCount,missing,
+resolvable}]}`. With `waitForDecision:true`: BLOCKS — same pattern as `preview_status`'s
+`waitForRender` — until any artifact's status changes (a console Approve click, or
+`node qa/approve.mjs <artifact>` run in a terminal), then returns `{timedOut, available,
+changed:[artifactIds], statuses}`. Requires a running preview service (`preview {projectDir}`
+first) — that's where the project root comes from.
+
 **Verify:** `prove_change {before, after, catalogPath?}` — the verified-dev-loop keystone in one
 call: diffs before/after, regression-checks the after tree (drift + a11y), returns
 `{changes, regressions, verdict}` with verdict `proven-clean` | `changed-with-regressions` |
@@ -245,7 +264,47 @@ human's live device view page — watch + click-to-tap the real app). Reach it w
 
 ---
 
-## 6. Workflows — how it all fits together
+## 6. Approvals — human sign-off on governed artifacts
+
+Every generated project also carries a human half to the verification layer: five **governed
+artifacts**, approved in order (each is expressed in the vocabulary of the ones before it) and
+hash-bound the same way an evidence receipt is bound to the code it verified.
+
+| # | Artifact | Files |
+|---|---|---|
+| 1 | Design system | `presentation/theme/Theme.kt`, `presentation/theme/Tokens.kt` |
+| 2 | Architecture + structure | `specs/app-base.spec.md` |
+| 3 | Exemplar feature | the `home` 11-file set `add-feature` clones from |
+| 4 | Exemplar spec | `specs/home.spec.md` |
+| 5 | Per-feature spec | `specs/<feature>.spec.md`, one per feature as it lands |
+
+**Commands:**
+
+| Command | What |
+|---|---|
+| `node qa/approve.mjs --status` | List every governed artifact + live state (`unreviewed` / `approved` / `changed-since-approval`) + short hash |
+| `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time |
+
+**The console:** the same preview-service URL from `preview {projectDir}` carries an **Approvals**
+tab (plus **Design System** and **Specs**, next to the **Screens** gallery) — click Approve there
+and it calls `POST /api/approve`, which writes the exact same `qa/approvals.json` the CLI writes.
+An agent blocks on the human's decision with `approval_status {waitForDecision:true}` (§5) instead
+of polling.
+
+**Gate semantics** (the `approvals` step, in every verify-lane profile):
+- **`unreviewed`** → **SKIP** with a warning line — non-blocking; nothing fails until a human
+  opts in.
+- **`approved`, hash still matches** → **PASS**.
+- **`approved`, hash no longer matches** → **FAIL**, naming the artifact and the re-approval
+  command — the artifact changed after sign-off. A gate FAIL fails the lane verdict, which the
+  Stop hook and CI both already refuse "done" over — no separate enforcement to maintain.
+
+`add-feature` seeds each new feature's spec as `unreviewed` automatically and prints the approval
+reminder; it never refuses to stamp over this. Approving zero or partially-resolved files is
+refused outright (a vacuous approval would attest nothing) — see
+[VERIFICATION-LAYER-DESIGN.md](./VERIFICATION-LAYER-DESIGN.md) §2 for the full data model.
+
+## 7. Workflows — how it all fits together
 
 ### A. New app → green
 
@@ -332,7 +391,7 @@ conforming slice, green tests at every layer, lane PASS.
 
 ---
 
-## 7. Invariants (never violate these)
+## 8. Invariants (never violate these)
 
 - **No pixels in model context.** `render_screen` and the screenshot route return **paths**, not
   bytes; `render_tree` returns SVG (text) — fine. The remote page is for the human.
@@ -349,7 +408,7 @@ conforming slice, green tests at every layer, lane PASS.
 
 ---
 
-## 8. Quick reference
+## 9. Quick reference
 
 ```bash
 # scaffold + prove green

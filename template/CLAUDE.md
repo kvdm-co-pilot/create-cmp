@@ -71,6 +71,11 @@ artifacts are expressed in the vocabulary of the ones before them):
 | `node qa/approve.mjs --status` | List every governed artifact + live state (`unreviewed` / `approved` / `changed-since-approval`) + short hash |
 | `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time |
 
+With the create-cmp plugin, the same decisions can be made by clicking Approve on the
+**Approvals** tab of the preview console (`preview {projectDir}`'s URL, alongside Design
+System and Specs) — it calls the same library, so the CLI and the console never disagree.
+An agent blocks on a pending decision with `approval_status {waitForDecision:true}`.
+
 The verify lane's `approvals` gate (a step like any other, in every profile) resolves
 each artifact's live status against `qa/approvals.json`:
 

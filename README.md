@@ -138,17 +138,19 @@ Same engine as the CLI, conversational front door. Each skill is a guided flow, 
 | `cmp-new` | "Make me an app." Interviews you in chat, scaffolds via the engine, generates your bottom-nav tab screens from the exemplar pattern, proves the build green. |
 | `cmp-doctor` | "Why won't my KMP project build?" Runs the doctor, explains the findings, applies consented fixes. |
 | `cmp-upgrade` | "Bump my dependencies safely." Diff → apply → verify, with the lockstep guardrails. |
-| `cmp-preview` | "Show me my screens." Live gallery of every screen at a local URL — real DI/theme/data, no device, no emulator, no manual Gradle. Edit → save → the page re-renders itself; changed screens get flagged; a11y violations show per screen. |
+| `cmp-preview` | "Show me my screens." Live gallery of every screen at a local URL — real DI/theme/data, no device, no emulator, no manual Gradle. Edit → save → the page re-renders itself; changed screens get flagged; a11y violations show per screen. The same console carries Design System, Approvals, and Specs tabs. |
 | `cmp-inspect` | "What did the UI actually render?" Reads a **running** app as structured JSON — hierarchy, geometry, resolved design tokens, navigation state. Never screenshots. Can assert tokens, find drift against your design system, audit accessibility, diff before/after. |
 | `cmp-dev-client` | "Let me iterate fast." Runs your shared UI in a phone-sized desktop window with hot reload — save a file, see it change. No emulator needed. Firebase stays off on desktop (offline fakes). |
 | `cmp-firebase-connect` | "Wire up my real Firebase." Drives the Firebase CLI: create/reuse a project, register the app, drop the real `google-services.json` over the placeholder, prove it with a green build. Every cloud action asks first. |
 | `cmp-test` | "Write tests for my app." *Observes* the running app's semantics tree — what's actually on screen, what's tappable, where navigation goes — and derives the regression suite from that. Tests come from rendered reality, not guesses. |
 | `cmp-qa-prep` | "Get my test environment up." Emulator + app install + E2E smoke run, with the gotchas handled. |
 
-Plus the **`cmp-inspector` MCP server** (18 tools) — the machine-readable window into a running
+Plus the **`cmp-inspector` MCP server** (23 tools) — the machine-readable window into a running
 Compose UI that `cmp-inspect`, `cmp-test`, and the verified dev loop are built on. One tree
 contract, three sources: render a screen headlessly, connect to the live app, or read a device
-via UIAutomator.
+via UIAutomator. It also carries the runtime half of the agent's eyes (crashes, logs, DB state —
+`runtime_crashes`, `runtime_logs`, `db_schema`, `db_query`) and the human-approval console
+(`approval_status`, §8 below).
 
 ## What every generated project carries (the harness itself)
 
@@ -226,6 +228,23 @@ Agents read structure; humans see pixels.
 - **`CLAUDE.md`** — the AI delivery contract itself, stating everything above as rules any AI
   session in the repo must follow.
 
+### 8. Human approval — governed artifacts, signed off by a person
+The verify lane and the exemplar-cloning generators cover *machine* correctness; approvals cover
+the one thing that isn't machine-checkable — whether a human actually looked. Five governed
+artifacts, in order (each is expressed in the vocabulary of the ones before it): the **design
+system**, the **architecture + structure** spec, the **exemplar feature** (`home` — the set every
+`add-feature` clone starts from), the **exemplar spec**, and each **per-feature spec** as it lands.
+Approval is hash-bound to the artifact's content (the same idea as the evidence receipt, applied
+to a human decision): `node qa/approve.mjs <artifact>` records it, `node qa/approve.mjs --status`
+lists every artifact's live state, and the **Approvals tab** on the preview console (alongside
+**Design System** and **Specs** — three new tabs next to the screen gallery) does the same thing
+with a click (`POST /api/approve`, same library underneath). The verify lane's `approvals` gate
+SKIP-warns on `unreviewed` (non-blocking — a fresh scaffold stays green) and FAILs when an
+approved artifact's hash no longer matches, naming the artifact and the re-approval command. The
+`cmp-new` skill's last step walks a human through the order on a fresh scaffold; the
+`approval_status { waitForDecision }` MCP tool lets an agent block on a decision instead of
+polling, the same pattern as `preview_status { waitForRender }`.
+
 ---
 
 # Workflows — how it fits together
@@ -272,7 +291,10 @@ standalone gate. All of it works on any KMP project.
 - **The MCP tools** are how any agent *sees*: `inspect_tree`, `get_node`, `assert_token`,
   `layout_gaps`, `diff_against_design_system`, `find_drift`, `snapshot_save`, `snapshot_diff`,
   `audit_a11y`, `connect_live`, `navigate_and_inspect`, `render_tree`, `render_screen`,
-  `prove_change`. Structure in, structure out — never pixels in model context.
+  `prove_change`. Structure in, structure out — never pixels in model context. The same eyes
+  extend to runtime behavior (`runtime_crashes`, `runtime_logs`, `db_schema`, `db_query`) and to
+  the human side of the loop (`approval_status`, blocking on a console decision the same way
+  `preview_status` blocks on a render).
 
 ## The philosophy (why it's built this way)
 

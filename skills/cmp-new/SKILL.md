@@ -189,3 +189,26 @@ that re-renders on save, no device or emulator. From then on, every UI edit you 
 verified with `preview_status { waitForRender: true }` (which screens changed, or the compile
 error) — this is your feedback loop for ALL subsequent UI work in the app, and it's documented for
 future sessions in the generated `CLAUDE.md` ("UI feedback loop").
+
+## 6. Walk the human through approvals (recommended, not required)
+
+The preview service you just started also carries the **console** — the same URL, three more
+tabs. Close the loop the harness expects: give the human the console and walk the ordered
+approval list (`template/CLAUDE.md`'s "Approvals" section) so they bless the contract the harness
+then enforces. This is optional — `qa/verify.mjs`'s `approvals` gate only SKIP-warns on
+`unreviewed`, it never fails a fresh scaffold — but skipping it means every future change ships
+with an unsigned contract, so recommend it.
+
+1. Hand over the console `url` again and point out the extra tabs: **Design System**, **Approvals**,
+   **Specs** (alongside the **Screens** gallery).
+2. Walk the artifacts **in order** — each is expressed in the vocabulary of the ones before it:
+   1. design system (Design System tab), 2. architecture + structure (Specs tab, `app-base.spec.md`),
+   3. exemplar feature (Screens tab, the `home` card's pixels + structure — the Approvals tab
+   names its file count), 4. exemplar spec (Specs tab, `home.spec.md`), 5. any feature specs
+   already seeded (Specs tab, per-feature clauses).
+3. For each artifact: tell the human what to look at and why, then either they click **Approve** in
+   the console, or — on their confirmed word — you run `node qa/approve.mjs <artifact>`.
+4. Block on each decision with `approval_status { waitForDecision: true }` instead of polling; it
+   returns as soon as the console POSTs the approve or the CLI command runs.
+5. Close with `node qa/approve.mjs --status` so the human sees exactly what's signed and what's
+   still open.

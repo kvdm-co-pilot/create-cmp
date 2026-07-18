@@ -54,6 +54,7 @@ merged.
 | [INSPECTOR-PLAN.md](./INSPECTOR-PLAN.md) | Plan of record for the AI-native inspector (phases 0–2). Overview; PHASE2-DESIGN is the buildable spec. | living |
 | [INSPECTOR-PHASE2-DESIGN.md](./INSPECTOR-PHASE2-DESIGN.md) | Detailed build spec for the live on-device inspector. | living |
 | [LIVE-VIEW-PLAN.md](./LIVE-VIEW-PLAN.md) | Plan of record for live-view tracks A/B/C (pixels → human, structure → AI). | living |
+| [VERIFICATION-LAYER-DESIGN.md](./VERIFICATION-LAYER-DESIGN.md) | Design doc of record for the runtime-eyes + human-approval-gates build — the ordered approval walk, the hash-bound approval data model, crash/log/DB runtime tools, and the console tabs. | living |
 
 ### Process & history
 
