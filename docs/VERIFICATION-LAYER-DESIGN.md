@@ -194,3 +194,93 @@ the seam they pin). All work on one branch, PR to main at the end.
    blocks and returns the decision; SSE refresh works.
 5. **Onboarding:** cmp-new walks the §1 order; generated CLAUDE.md documents the
    contract; docs updated (README feature list, docs/USAGE.md).
+
+## 7. VL-7 — the console becomes two-way (architecture view, components, comments)
+
+Three gaps surfaced by first real console use (user feedback, 2026-07-19):
+the architecture artifact has no screen (humans sign step 2 without *seeing*
+it), the design system shows tokens but not the common components built from
+them, and the console only talks one way — humans can approve but cannot
+*comment*, so review feedback has no path back into plans/specs.
+
+### 7.1 Architecture tab (see what you sign)
+
+New tab between **Design System** and **Approvals** (tab order now mirrors the
+§1 walk: screens → design-system(1) → architecture(2) → approvals → specs).
+Content, all derived — never fabricated:
+
+- **Layer map:** pure HTML/CSS boxes (no CDN) — `presentation` → `domain` →
+  `data`, with `di` and `navigation` as cross-cutting rails. Package/file lists
+  under each box come from a real walk of
+  `composeApp/src/commonMain/kotlin/**`, grouped by top-level package. Missing
+  dirs render an honest empty state.
+- **The governed contract:** `specs/app-base.spec.md` clauses rendered via the
+  existing `specs.mjs` parser (reuse, don't fork).
+- **Feature shape:** the exemplar 11-file layout shown as a tree (from the real
+  `home` feature's files), labeled as the shape `add-feature` stamps.
+
+### 7.2 Design System tab: common components section
+
+A **Components** section under the token grids, from a Node-side static scan
+(no Kotlin/harness changes — component *preview* rendering is deferred,
+documented): scan `presentation/components/*.kt` for `@Composable fun`
+signatures; for each component show name, file, parameter list, and a
+used-in list (grep of call sites across `presentation/**`). This is the
+"common identified components" registry — structural truth, not screenshots.
+
+### 7.3 Comments (the console talks back)
+
+**Principle extension:** pixels flow to the human; structure flows to the AI;
+*judgment flows back through comments.* Approvals stay binding; comments are
+advisory input the agent must read, act on, and close.
+
+- **Ledger (project-side, like approvals):** `qa/comments.json`
+  (`{schema:"cmp-comments/1", comments:[]}`) + `qa/lib/comments.mjs` +
+  `qa/comment.mjs` CLI (`--list [--open]`, `--resolve <id> --note "..."`).
+- **Library contract (the bridge seam — binding for both agents):**
+  - `listComments(root, {status?}) -> {schema, comments: Comment[]}`
+  - `addComment(root, {target, text, author}) -> {ok:true, comment} | {ok:false, reason}`
+    — refuses empty/whitespace text and unknown target types.
+  - `resolveComment(root, id, {note, author}) -> {ok:true, comment} | {ok:false, reason}`
+    — refuses unknown ids and double-resolve.
+  - `Comment = {id, target, text, author, createdAt, status: "open"|"resolved",
+    resolvedAt?, resolvedBy?, resolutionNote?}`; ids `c1, c2, …` monotonic.
+  - `target.type ∈ screen | element | spec-line | design-system | architecture |
+    general` with fields: `{screen}`, `{screen, testTag}`, `{file, clauseId}`,
+    `{token}`, `{path}`, `{}` respectively.
+- **Console affordances:** a 💬 control on every screen card (with optional
+  testTag field for element-level), every spec clause row, every
+  swatch/dimen/component card, and every architecture tree node; plus a new
+  **Comments** tab — the full ledger with status, resolution notes, and an
+  open-count badge in the tab bar. `POST /api/comment { target, text }` →
+  project's own `qa/lib/comments.mjs` via a dynamic bridge
+  (`comments-bridge.mjs`, same degrade-honestly pattern as
+  `approvals-bridge.mjs`) → SSE `comment` event → in-place panel refresh
+  (VL-6 pattern — no full-page reload).
+- **Agent primitives (server.mjs, 23 → 25 tools):**
+  - `review_comments { status?, waitForComment?, timeoutMs? }` — snapshot of
+    the ledger; with `waitForComment` blocks until a new comment lands
+    (mirrors `approval_status { waitForDecision }`).
+  - `resolve_comment { id, note }` — the agent closes the loop *after* acting
+    (updating the spec/plan/code), recording what it did.
+- **Loop of record:** human comments in console → agent observes
+  (`review_comments`) → agent updates the plan/spec/code → agent resolves with
+  a note → console shows `resolved` + note. Humans add/see; agents resolve —
+  the console never edits code, per §4's principle.
+- **Deferred (documented, not built):** comment threads/replies, a verify-lane
+  open-comments warning, human-side resolve/withdraw buttons, component
+  isolated previews.
+
+### 7.4 Ownership & DoD
+
+| Agent | Owns | Must NOT touch |
+|---|---|---|
+| **E — console** | `inspector/mcp/**` (architecture.mjs, components.mjs, comments-bridge.mjs, console-tabs.mjs, preview-service.mjs, bin/server.mjs, tests) | `template/qa/**` (call via bridge, never fork) |
+| **F — template** | `template/qa/lib/comments.mjs`, `template/qa/comment.mjs`, `template/qa/comments.json`, `template/CLAUDE.md`, engine tests, docs sweep (README/llms.txt/docs/USAGE.md: tool count 23→25, comments + architecture tab) | `inspector/mcp/**`, `template/qa/verify.mjs` |
+
+DoD: repo `node --test` green; architecture tab renders real tree + clauses on
+the showcase; components section lists BaseScreen with real signature + call
+sites; a comment added in the browser lands in `qa/comments.json`, is observed
+by a blocked `review_comments { waitForComment }`, and `resolve_comment` writes
+the resolution the console then shows; older scaffolds (no comments lib)
+degrade to an honest empty state, never an error.
