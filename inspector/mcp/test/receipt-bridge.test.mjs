@@ -199,3 +199,77 @@ test("getLastReceipt: reads fresh off disk every call — a re-run's new receipt
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// --- §3.6 Evidence exposure: the full step list + receipt facts --------------
+
+test("getLastReceipt: exposes the receipt's own steps[], profile, commit, and inputs fileCount verbatim — the Evidence page's whole source", async () => {
+  const root = makeFixtureProject({ withInputsHashLib: false });
+  try {
+    writeReceipt(
+      root,
+      makeReceipt({
+        steps: [
+          { name: "specCoverage", verdict: "PASS", durationMs: 40 },
+          { name: "e2eSmoke", verdict: "SKIP", reason: "no Android device/emulator attached (adb)", durationMs: 0 },
+          "not-an-object-entry",
+        ],
+      }),
+    );
+    const result = await getLastReceipt(root);
+    assert.equal(result.available, true);
+    assert.equal(result.profile, "local");
+    assert.equal(result.commitSha, "abc123");
+    assert.deepEqual(result.commitDirty, []);
+    assert.equal(result.inputsFileCount, 3);
+    assert.equal(result.steps.length, 2, "non-object steps[] entries are dropped, not guessed at");
+    assert.deepEqual(result.steps[0], { name: "specCoverage", verdict: "PASS", reason: undefined, durationMs: 40 });
+    assert.equal(result.steps[1].reason, "no Android device/emulator attached (adb)", "SKIP reasons survive the bridge");
+  } finally {
+    resetReceiptBridgeCache(root);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --- listReceiptHistory (§3.6 timeline source) -------------------------------
+
+test("listReceiptHistory: only latest.json (+schema.json) on disk -> the standardized 'no receipt history' absence, never a fabricated timeline", async () => {
+  const { listReceiptHistory } = await import("../src/lib/receipt-bridge.mjs");
+  const root = makeFixtureProject({ withInputsHashLib: false });
+  try {
+    writeReceipt(root, makeReceipt());
+    fs.writeFileSync(path.join(root, "qa", "evidence", "schema.json"), "{}");
+    const history = listReceiptHistory(root);
+    assert.equal(history.available, false);
+    assert.match(history.reason, /no receipt history — only the latest receipt is retained/);
+    assert.equal(listReceiptHistory(fs.mkdtempSync(path.join(os.tmpdir(), "cmp-no-evidence-"))).available, false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("listReceiptHistory: extra receipt files list newest-first with their own facts; non-receipt json is skipped, not guessed at", async () => {
+  const { listReceiptHistory } = await import("../src/lib/receipt-bridge.mjs");
+  const root = makeFixtureProject({ withInputsHashLib: false });
+  try {
+    const evidenceDir = path.join(root, "qa", "evidence");
+    fs.mkdirSync(evidenceDir, { recursive: true });
+    fs.writeFileSync(path.join(evidenceDir, "older.json"), JSON.stringify(makeReceipt({ generatedAt: "2026-07-18T20:00:00.000Z" })));
+    const newer = makeReceipt({ generatedAt: "2026-07-19T05:00:00.000Z" });
+    newer.verdict = "FAIL";
+    fs.writeFileSync(path.join(evidenceDir, "newer.json"), JSON.stringify(newer));
+    fs.writeFileSync(path.join(evidenceDir, "notes.json"), JSON.stringify({ hello: "not a receipt" }));
+    fs.writeFileSync(path.join(evidenceDir, "broken.json"), "{ nope");
+    const history = listReceiptHistory(root);
+    assert.equal(history.available, true);
+    assert.deepEqual(
+      history.receipts.map((r) => r.file),
+      ["qa/evidence/newer.json", "qa/evidence/older.json"],
+      "newest first",
+    );
+    assert.equal(history.receipts[0].verdict, "FAIL");
+    assert.equal(history.receipts[0].profile, "local");
+    assert.equal(typeof history.receipts[0].ageMs, "number");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

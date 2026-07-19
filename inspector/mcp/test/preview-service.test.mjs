@@ -226,9 +226,12 @@ async function makeArchitectureFixtureProject() {
 }
 
 /** The <div class="arch-top-status">...</div> slice of a page, for badge assertions scoped to the Architecture tab (not the Approvals tab, which uses similar badge text elsewhere on the same page). */
-function archTopStatus(page) {
-  const m = page.match(/<div class="arch-top-status">[\s\S]*?<\/div>\s*<\/div>/);
-  return m ? m[0] : "";
+// §3.2 (R4): the architecture artifact's status lives ONLY in the shell's
+// page header now — the body renders no arch-top-status block. This helper
+// extracts the Architecture section's header status line.
+function archHeaderStatus(page) {
+  const m = page.match(/id="tab-architecture"[\s\S]*?<p class="page-status">([\s\S]*?)<\/p>/);
+  return m ? m[1] : "";
 }
 
 test("service: Architecture tab — boots against a real layer tree + the REAL app-base.spec.md/ARCHITECTURE.md/approvals/inputs-hash libraries; doc-shaped structure, a deliberate ARCH-09 violation with file:line, a real receipt's per-clause status + the advisory label, then approve + drift", async () => {
@@ -276,8 +279,10 @@ test("service: Architecture tab — boots against a real layer tree + the REAL a
     // conformance gates + the receipt are the law, not this live scan.
     assert.match(page, /class="dep-advisory">Advisory preview; the lane is the law/);
 
-    // Not yet approved -> an honest "not yet approved" badge at the top of the tab.
-    assert.match(archTopStatus(page), /badge-unreviewed/);
+    // Not yet approved -> the honest "unsigned" status in the section's
+    // HEADER (§2 grammar); the body never re-renders it (no arch-top-status).
+    assert.match(archHeaderStatus(page), /unsigned — not yet approved/);
+    assert.doesNotMatch(page, /arch-top-status/, "R4: the body's duplicate status block is gone — the shell header owns it");
 
     // 4. Approve the architecture artifact via the real POST /api/approve -> real library.
     const approveRes = await fetch(`${st.url}api/approve`, {
@@ -288,15 +293,15 @@ test("service: Architecture tab — boots against a real layer tree + the REAL a
     assert.equal((await approveRes.json()).ok, true);
 
     page = await (await fetch(st.url)).text();
-    assert.match(archTopStatus(page), /badge-approved/);
-    assert.match(archTopStatus(page), /banner-steward/);
+    assert.match(archHeaderStatus(page), /glyph-signed/);
+    assert.match(archHeaderStatus(page), /signed <code>/);
 
     // 5. Drift: edit the REAL governed file after approval; the artifact's own
     //    hash-bound status flips to changed-since-approval, and the tab's own
     //    badge reflects it (not just the Approvals tab's row).
     fs.appendFileSync(specFile, "\n<!-- edited after approval -->\n");
     page = await (await fetch(st.url)).text();
-    assert.match(archTopStatus(page), /drift &middot; architecture artifact changed since approval/);
+    assert.match(archHeaderStatus(page), /status-drift">drifted — changed since approval/);
 
     // 5b. The same edit that drifted the approval also changed the verified
     //     surface's REAL inputsHash — the committed receipt now attests a
@@ -2014,4 +2019,46 @@ test("galleryHtml: a components scan with no story render on disk states the abs
     },
   });
   assert.match(html, /no story render yet &mdash; run the preview render to produce <code>component\.screen-column<\/code>/);
+});
+
+// --- §3.6 Evidence wiring: rail item + section + rail-foot deep link ---------
+
+test("galleryHtml: Evidence is a rail item + section after Specs; with no receipt its glyph is ○ and both status and body state the absence", () => {
+  const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+  assert.match(html, /data-tab="evidence"/, "Evidence participates in the .tab-btn/data-tab wiring (deep-linkable via #evidence)");
+  assert.match(html, /id="tab-evidence"/, "the section panel exists");
+  const specsIdx = html.indexOf('id="tab-specs"');
+  const evidenceIdx = html.indexOf('id="tab-evidence"');
+  const approvalsIdx = html.indexOf('id="tab-approvals"');
+  assert.ok(specsIdx < evidenceIdx && evidenceIdx < approvalsIdx, "section order: Specs -> Evidence -> Approvals");
+  assert.match(html, /No verify receipt yet/);
+  assert.match(html, /no verify receipt yet/, "the status line states the absence too");
+});
+
+test("galleryHtml: the rail foot is the deep link to Evidence — a .tab-btn with data-tab=\"evidence\" wrapping the receipt line, no new JS mechanism", () => {
+  const html = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 1,
+    cards: [],
+    lastReceipt: { available: true, verdict: "PASS", ageMs: 60_000, stale: false, steps: [], generatedAt: "2026-07-19T09:00:00.000Z" },
+  });
+  assert.match(html, /class="rail-foot"><button type="button" class="tab-btn" data-tab="evidence"/);
+  assert.match(html, /verify PASS/);
+  // The Evidence rail item's glyph derives from the receipt: fresh PASS = ✓.
+  assert.match(html, /data-tab="evidence"><span class="glyph glyph-signed" title="verify PASS">✓<\/span><span class="rail-label">Evidence<\/span>/);
+  // Status line carries verdict + age.
+  assert.match(html, /verify PASS &middot; 1m ago/);
+});
+
+test("galleryHtml: a stale receipt demotes the Evidence rail glyph to ⚠ and marks the status line — never presented as a live PASS", () => {
+  const html = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 1,
+    cards: [],
+    lastReceipt: { available: true, verdict: "PASS", ageMs: 60_000, stale: true, steps: [], generatedAt: "2026-07-19T09:00:00.000Z" },
+  });
+  assert.match(html, /data-tab="evidence"><span class="glyph glyph-drift"/);
+  assert.match(html, /stale &mdash; tree changed since/);
 });

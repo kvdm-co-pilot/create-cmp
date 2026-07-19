@@ -101,16 +101,27 @@ async function recomputeStaleness(root, receipt) {
  * carries no such step (e.g. a `scaffold`-profile run, which never executes
  * it) — callers must not invent a verdict in that case either.
  *
+ * `steps` is the receipt's own steps[] verbatim (name/verdict/reason/
+ * durationMs per entry, entries that aren't objects dropped) — the Evidence
+ * section renders the whole lane run, not just the conformance step.
+ * `profile`, `commitSha`, `commitDirty`, and `inputsFileCount` are likewise
+ * the receipt's own fields, `null` when a field is absent — never inferred.
+ *
  * @param {string} root project root
  * @returns {Promise<{
  *   available: boolean,
  *   reason?: string,
  *   relPath?: string,
  *   verdict?: string|null,
+ *   profile?: string|null,
+ *   commitSha?: string|null,
+ *   commitDirty?: string[]|null,
  *   generatedAt?: string|null,
  *   ageMs?: number|null,
+ *   steps?: Array<{name: string, verdict: string, reason?: string, durationMs?: number}>,
  *   conformance?: {verdict: string, reason?: string, durationMs?: number}|null,
  *   inputsHash?: string|null,
+ *   inputsFileCount?: number|null,
  *   currentInputsHash?: string|null,
  *   stale?: boolean|null,
  *   staleReason?: string,
@@ -135,7 +146,10 @@ export async function getLastReceipt(root) {
     return { available: false, reason: `${RECEIPT_REL_PATH} is not a recognizable evidence receipt (no steps[]) — run node qa/verify.mjs to regenerate it` };
   }
 
-  const conformanceStep = receipt.steps.find((s) => s && s.name === "conformance") || null;
+  const steps = receipt.steps
+    .filter((s) => s && typeof s === "object" && typeof s.name === "string")
+    .map((s) => ({ name: s.name, verdict: s.verdict, reason: s.reason, durationMs: s.durationMs }));
+  const conformanceStep = steps.find((s) => s.name === "conformance") || null;
   const conformance = conformanceStep
     ? { verdict: conformanceStep.verdict, reason: conformanceStep.reason, durationMs: conformanceStep.durationMs }
     : null;
@@ -149,12 +163,72 @@ export async function getLastReceipt(root) {
     available: true,
     relPath: RECEIPT_REL_PATH,
     verdict: receipt.verdict ?? null,
+    profile: typeof receipt.profile === "string" ? receipt.profile : null,
+    commitSha: receipt.commit && typeof receipt.commit.sha === "string" ? receipt.commit.sha : null,
+    commitDirty: receipt.commit && Array.isArray(receipt.commit.dirty) ? receipt.commit.dirty : null,
     generatedAt: receipt.generatedAt ?? null,
     ageMs,
+    steps,
     conformance,
     inputsHash: receipt.inputs && typeof receipt.inputs.hash === "string" ? receipt.inputs.hash : null,
+    inputsFileCount: receipt.inputs && typeof receipt.inputs.fileCount === "number" ? receipt.inputs.fileCount : null,
     currentInputsHash,
     stale,
     staleReason,
   };
+}
+
+/**
+ * Prior receipts on disk, newest first — the Evidence timeline's source.
+ * The lane today retains ONLY qa/evidence/latest.json (template/qa/verify.mjs
+ * writes exactly that one file; git history is the ledger of record), so on a
+ * standard project this returns `available: false` with that stated plainly —
+ * the console renders the standardized absence line, never a fabricated
+ * timeline. A project that DOES keep extra receipt files under qa/evidence/
+ * (any *.json besides latest.json and schema.json that parses as a
+ * cmp-evidence receipt, i.e. has steps[]) gets them listed with their own
+ * verdict/profile/age; unparseable or non-receipt files are skipped, not
+ * guessed at.
+ * @param {string} root project root
+ * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, verdict: string|null, profile: string|null, generatedAt: string|null, ageMs: number|null}>}}
+ */
+export function listReceiptHistory(root) {
+  const evidenceDir = path.join(root, "qa", "evidence");
+  if (!fs.existsSync(evidenceDir)) {
+    return { available: false, reason: "no qa/evidence directory" };
+  }
+  let entries;
+  try {
+    entries = fs.readdirSync(evidenceDir);
+  } catch (err) {
+    return { available: false, reason: err && err.message ? err.message : String(err) };
+  }
+  const receipts = [];
+  for (const name of entries) {
+    if (!name.endsWith(".json") || name === "latest.json" || name === "schema.json") continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(fs.readFileSync(path.join(evidenceDir, name), "utf8"));
+    } catch {
+      continue; // not parseable — skipped, never guessed at
+    }
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.steps)) continue;
+    const at = Date.parse(parsed.generatedAt ?? "");
+    receipts.push({
+      file: `qa/evidence/${name}`,
+      verdict: parsed.verdict ?? null,
+      profile: typeof parsed.profile === "string" ? parsed.profile : null,
+      generatedAt: parsed.generatedAt ?? null,
+      ageMs: Number.isNaN(at) ? null : Date.now() - at,
+    });
+  }
+  if (receipts.length === 0) {
+    return { available: false, reason: "no receipt history — only the latest receipt is retained" };
+  }
+  receipts.sort((a, b) => {
+    const ta = Date.parse(a.generatedAt ?? "");
+    const tb = Date.parse(b.generatedAt ?? "");
+    return (Number.isNaN(tb) ? -Infinity : tb) - (Number.isNaN(ta) ? -Infinity : ta);
+  });
+  return { available: true, receipts };
 }

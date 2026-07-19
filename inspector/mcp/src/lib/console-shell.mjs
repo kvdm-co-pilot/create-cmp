@@ -94,25 +94,46 @@ export function formatAgeCoarse(ageMs) {
 }
 
 /**
+ * A verify receipt's state -> its glyph — ONE derivation for everywhere the
+ * receipt shows as a symbol (the rail's Evidence item, the rail foot):
+ * ✓ fresh PASS · ✗ FAIL · ⚠ stale (never presented as a live PASS) · ○ none.
+ * @param {object|null|undefined} receipt receipt-bridge.mjs getLastReceipt() result
+ * @returns {{ch: string, cls: string, label: string}}
+ */
+export function receiptGlyph(receipt) {
+  if (!receipt || !receipt.available) {
+    return { ch: "○", cls: "glyph-unsigned", label: "no verify receipt yet" };
+  }
+  if (receipt.stale) {
+    return { ch: "⚠", cls: "glyph-drift", label: `verify ${receipt.verdict || "?"} — stale, the tree changed since` };
+  }
+  const verdict = receipt.verdict || "?";
+  if (verdict === "PASS") return { ch: "✓", cls: "glyph-signed", label: "verify PASS" };
+  if (verdict === "FAIL") return { ch: "✗", cls: "glyph-drift", label: "verify FAIL" };
+  return { ch: "○", cls: "glyph-unsigned", label: `verify ${verdict}` };
+}
+
+/**
  * The verify-receipt line at the rail's foot (§2: "Bottom of the rail: last
  * verify receipt verdict + age"). Honest about every degraded state: no
  * receipt, unparseable receipt, stale (inputsHash no longer matches the
  * tree), or freshness-unknown — a stale green is NEVER shown as a live PASS.
+ * The glyph itself comes from receiptGlyph, the one shared derivation.
  * @param {object|null|undefined} receipt receipt-bridge.mjs getLastReceipt() result
  */
 export function railReceiptHtml(receipt, formatAge = formatAgeCoarse) {
+  const g = receiptGlyph(receipt);
+  const glyph = `<span class="glyph ${g.cls}">${g.ch}</span>`;
   if (!receipt || !receipt.available) {
-    return `<span class="glyph glyph-unsigned">○</span> no verify receipt yet`;
+    return `${glyph} no verify receipt yet`;
   }
   const verdict = receipt.verdict || "?";
   const age = typeof receipt.ageMs === "number" ? formatAge(receipt.ageMs) : "age unknown";
   if (receipt.stale) {
-    return `<span class="glyph glyph-drift">⚠</span> verify ${esc(verdict)} ${esc(age)} &mdash; stale (tree changed since)`;
+    return `${glyph} verify ${esc(verdict)} ${esc(age)} &mdash; stale (tree changed since)`;
   }
-  const cls = verdict === "PASS" ? "glyph-signed" : verdict === "FAIL" ? "glyph-drift" : "glyph-unsigned";
-  const ch = verdict === "PASS" ? "✓" : verdict === "FAIL" ? "✗" : "○";
   const unknown = receipt.stale === null ? " &middot; freshness unverified" : "";
-  return `<span class="glyph ${cls}">${ch}</span> verify ${esc(verdict)} ${esc(age)}${unknown}`;
+  return `${glyph} verify ${esc(verdict)} ${esc(age)}${unknown}`;
 }
 
 /**
@@ -271,6 +292,12 @@ export const SHELL_CSS = `
   .glyph-none { color: var(--line); }
   .rail-foot { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--line);
                font-size: var(--fs-meta); color: var(--muted); line-height: 1.5; }
+  /* The rail foot doubles as the deep link to Evidence — same .tab-btn/data-tab
+     wiring as the nav items, styled as the quiet meta line it always was. */
+  .rail-foot .tab-btn { padding: 0; border-radius: 6px; font-size: var(--fs-meta);
+                        color: var(--muted); gap: 6px; }
+  .rail-foot .tab-btn:hover { background: none; color: var(--ink-2); text-decoration: underline; }
+  .rail-foot .tab-btn.active { background: none; color: var(--accent); font-weight: 600; }
   .tab-badge { display: inline-block; min-width: 16px; padding: 1px 6px; border-radius: 999px;
                background: var(--drift); color: #fff; font-size: 10px; font-weight: 700; text-align: center; }
   .tab-badge[hidden] { display: none !important; }
@@ -397,7 +424,6 @@ export const SHELL_CSS = `
   .arch-section { margin-bottom: 32px; }
   .arch-section h3 { margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
   .arch-section h4 { margin: 16px 0 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-  .arch-top-status { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; flex-wrap: wrap; }
   .doc-table { width: 100%; border-collapse: collapse; font-size: var(--fs-meta); margin: 4px 0 12px; }
   .doc-table th, .doc-table td { padding: 7px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
   .doc-table th { color: var(--muted); font-weight: 600; }
@@ -430,6 +456,48 @@ export const SHELL_CSS = `
     max-height: 220px; overflow-y: auto; }
   .layer-files li, .feature-tree li { display: flex; align-items: center; gap: 6px; }
   .layer-others { margin-top: 14px; }
+
+  /* --- system context (§3.2: C4 level 1 as clean CSS boxes) --- */
+  .ctx-diagram { display: flex; flex-direction: column; align-items: center; margin: 12px 0 16px; }
+  .ctx-app { padding: 10px 22px; border: 1.5px solid var(--ink-2); border-radius: 10px;
+             background: var(--surface); font-weight: 650; font-size: var(--fs-body); }
+  .ctx-nodes { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 24px; }
+  .ctx-node { position: relative; flex: 1 1 150px; max-width: 210px; border: 1px solid var(--line);
+              border-radius: 10px; padding: 10px 12px; background: var(--paper); }
+  .ctx-node::before { content: ""; position: absolute; top: -24px; left: 50%; width: 1px; height: 24px;
+                      background: var(--line); }
+  .ctx-node h5 { margin: 0 0 4px; font-size: var(--fs-body); font-weight: 650; }
+  .ctx-node p { margin: 0; font-size: var(--fs-meta); color: var(--muted); }
+
+  /* --- specs RTM (§3.5: the QA lead's traceability matrix) --- */
+  .rtm-counts { font-size: var(--fs-meta); color: var(--muted); margin: 2px 0 8px; }
+  .rtm-table td { vertical-align: top; }
+  .rtm-tests { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 10.5px;
+               display: flex; flex-direction: column; gap: 2px; white-space: nowrap; }
+  .rtm-gate { font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
+  .rtm-defect { color: var(--drift); font-weight: 600; font-size: var(--fs-meta); white-space: nowrap; }
+  .rtm-defect-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .rtm-defect-item { font-size: var(--fs-meta); padding: 6px 10px; border: 1px solid var(--drift);
+                     border-radius: 8px; background: var(--drift-bg); display: flex; align-items: center;
+                     gap: 8px; flex-wrap: wrap; }
+
+  /* --- evidence (§3.6: the SDET's release-readiness report) --- */
+  .evidence-headline { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin: 4px 0 16px; }
+  .evidence-headline.evidence-stale { border-color: var(--drift); }
+  .evidence-verdict { font-size: var(--fs-title); font-weight: 700; margin-right: 8px; }
+  .verdict-pass { color: var(--signed); }
+  .verdict-fail { color: var(--drift); }
+  .verdict-muted { color: var(--muted); }
+  .evidence-facts { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 0 0;
+                    padding: 0; font-size: var(--fs-meta); color: var(--ink-2); }
+  .evidence-binding-stale { color: var(--drift); font-weight: 600; }
+  .step-table .step-reason { white-space: pre-wrap; font-size: var(--fs-meta); color: var(--ink-2); }
+  .step-verdict-pass { color: var(--signed); font-weight: 650; }
+  .step-verdict-fail { color: var(--drift); font-weight: 650; }
+  .step-verdict-skip { color: var(--muted); font-weight: 650; }
+  .evidence-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .evidence-timeline li { display: flex; gap: 10px; align-items: baseline; font-size: var(--fs-body);
+                          padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
 
   /* --- components (§3.3: the platform engineer's library reference) --- */
   .component-list { display: flex; flex-direction: column; }
