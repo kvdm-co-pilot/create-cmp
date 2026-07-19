@@ -439,9 +439,9 @@ test("galleryHtml embeds cards, changed flags, version cache-buster, and the err
   assert.match(html, /<title>Acme &middot; studio<\/title>/);
   assert.match(html, /class="rail-app">Acme</, "rail carries the app name");
   assert.match(html, /class="page-foot">.*absence = not derivable/, "provenance footer present");
-  assert.match(html, /card changed/, "changed card is flagged");
+  assert.match(html, /matrix-row changed/, "changed row is flagged");
   assert.match(html, /\/previews\/home\/screen\.png\?v=7/, "png served with version buster");
-  assert.match(html, /1 violation\(s\)/);
+  assert.match(html, /1 violation</);
   assert.match(html, /render FAILED|last render FAILED/, "error banner present");
   assert.match(html, /boom &amp; &lt;bang&gt;/, "error is escaped");
   assert.match(html, /EventSource\("\/events"\)/, "SSE client wired");
@@ -481,6 +481,62 @@ test("galleryHtml: filter box, persistent changed-badge, hover before/after on c
     cards: [card("home")],
   });
   assert.doesNotMatch(first, /screen\.prev\.png/);
+});
+
+test("galleryHtml (§2 rail): sections in the genesis definition order, Intent first, Screens the default active page", () => {
+  const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+  const nav = html.match(/<nav class="rail-nav">([\s\S]*?)<\/nav>/)[1];
+  const order = [...nav.matchAll(/data-tab="([a-z-]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(order, [
+    "intent",
+    "design-system",
+    "architecture",
+    "components",
+    "screens",
+    "specs",
+    "evidence",
+    "approvals",
+    "comments",
+  ]);
+  assert.match(html, /id="tab-screens" class="tab-panel active/, "Screens stays the default page");
+  assert.match(html, /id="tab-intent" class="tab-panel/, "Intent section present");
+  assert.match(html, /Not yet captured &mdash; conversation 0 pending/, "no intent data -> the §3.0 pending state");
+});
+
+test("galleryHtml (§3.0): intent sections render with a fill-count status; spec-line comments on specs/intent.md attribute to Intent, not Specs", () => {
+  const html = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 1,
+    cards: [],
+    intent: {
+      available: true,
+      title: "Intent brief",
+      sections: [
+        { heading: "Purpose", body: "A pocket birding log.", filled: true, guidance: null },
+        { heading: "Audience", body: "_not yet captured — x._", filled: false, guidance: "x." },
+      ],
+    },
+    specs: { available: true, files: [], orphanCitations: [] },
+    comments: {
+      available: true,
+      comments: [
+        {
+          id: "c-1",
+          status: "open",
+          target: { type: "spec-line", file: "specs/intent.md", clauseId: "Purpose" },
+          text: "sharpen this",
+          author: "human",
+          createdAt: "2026-07-19T10:00:00Z",
+        },
+      ],
+    },
+  });
+  assert.match(html, /A pocket birding log\./, "the brief's own prose renders");
+  const statusOf = (id) => html.match(new RegExp(`<section id="tab-${id}"[\\s\\S]*?class="page-status">([\\s\\S]*?)</p>`))[1];
+  assert.match(statusOf("intent"), /1 of 2 sections captured/);
+  assert.match(statusOf("intent"), /1 open comment/, "intent.md spec-line comment counts under Intent");
+  assert.doesNotMatch(statusOf("specs"), /open comment/, "…and not under Specs");
 });
 
 // --- service loop with a fake renderer ---------------------------------------------

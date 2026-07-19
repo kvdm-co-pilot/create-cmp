@@ -338,26 +338,53 @@ export const SHELL_CSS = `
   .badge-open { background: var(--accent-bg); color: var(--accent); }
   .badge-resolved { background: var(--signed-bg); color: var(--signed); }
 
-  /* --- screens gallery --- */
+  /* --- screens (§3.4: the screen × state matrix) --- */
   .screens-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
   #filter { font: inherit; font-size: var(--fs-body); padding: 5px 12px; width: 240px;
             border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: inherit; }
-  .grid { display: flex; flex-wrap: wrap; gap: 24px; }
-  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
-  .card.changed { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
-  .card h2 { margin: 0 0 2px; font-size: var(--fs-head); font-weight: 650; }
-  .card h2 .flag { font-size: 10px; font-weight: 700; color: var(--accent); vertical-align: middle;
-                   margin-left: 6px; letter-spacing: .05em; }
+  .matrix { display: flex; flex-direction: column; }
+  .matrix-head { display: flex; gap: 16px; padding-bottom: 8px; }
+  .matrix-gutter { flex: 0 0 184px; }
+  .matrix-col { flex: none; font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .matrix-row { border-top: 1px solid var(--line); padding: 16px 0; }
+  .matrix-line { display: flex; gap: 16px; align-items: flex-start; }
+  .matrix-rowhead { flex: 0 0 184px; min-width: 0; }
+  .matrix-rowhead h3 { margin: 0 0 2px; }
+  .matrix-rowhead h3 .flag { font-size: 10px; font-weight: 700; color: var(--accent); vertical-align: middle;
+                             margin-left: 6px; letter-spacing: .05em; }
+  .matrix-cells { display: flex; gap: 16px; }
+  .matrix-cell { flex: none; }
+  .matrix-cell img { border: 1px solid var(--line); border-radius: 10px; display: block; }
+  .matrix-cell.changed img { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+  .matrix-cell .lbl { margin: 4px 0 0; }
+  .matrix-none { display: grid; place-items: center; min-height: 96px; border: 1px dashed var(--line);
+                 border-radius: 10px; color: var(--muted); opacity: .6; font-size: 15px; }
+  .matrix-rowend { flex: 0 0 190px; }
+  .matrix-rowend .meta { margin: 0 0 4px; }
+  .matrix-note { margin-top: 16px; max-width: 75ch; }
+  .row-detail { margin-top: 8px; }
+  .row-detail summary { cursor: pointer; font-size: var(--fs-meta); color: var(--ink-2); width: max-content; }
+  .row-detail summary:hover { color: var(--accent); }
+  .row-detail-body { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; margin-top: 12px; }
+  .row-clauses { flex: 1 1 320px; min-width: 0; }
   .meta .fail { color: var(--drift); font-weight: 600; }
   .meta .pass { color: var(--signed); font-weight: 600; }
   .meta .chg { color: var(--accent); font-weight: 600; }
-  .panes { display: flex; gap: 12px; align-items: flex-start; }
-  .panes img { border: 1px solid var(--line); border-radius: 10px; display: block; }
   .cmp img.prev { display: none; }
   .cmp:hover img.prev { display: block; }
   .cmp:hover img.cur { display: none; }
-  .wire { border: 1px dashed var(--line); border-radius: 10px; overflow: hidden; }
+  .wire { border: 1px dashed var(--line); border-radius: 10px; overflow: hidden; flex: none; }
   .wire svg { height: auto; display: block; }
+
+  /* --- intent (§3.0: the product strategist's brief) --- */
+  .brief-section { margin-bottom: 28px; }
+  .brief-section h3 { margin: 0 0 8px; }
+  .brief-unfilled h3 { color: var(--ink-2); }
+  .brief-pending { padding: 24px; border: 1px dashed var(--line); border-radius: 12px; max-width: 66ch; }
+  .brief-pending p { margin: 0 0 8px; color: var(--ink-2); } .brief-pending p:last-child { margin: 0; }
+  .brief-pending-state { font-size: var(--fs-head); font-weight: 650; color: var(--ink) !important; }
+  .brief-pending-inline { margin: 0 0 6px; color: var(--muted); font-style: italic; }
+  .brief-guidance { margin: 0; font-size: var(--fs-meta); color: var(--muted); max-width: 66ch; }
 
   /* --- design language (§3.1: the designer's handoff spec) --- */
   .tok-table, .approvals-table, .comments-table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); margin-top: 8px; }

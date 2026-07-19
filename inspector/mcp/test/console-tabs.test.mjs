@@ -12,6 +12,9 @@ import {
   evidenceBodyHtml,
   commentsTabHtml,
   commentControlHtml,
+  screensBodyHtml,
+  intentBodyHtml,
+  clausesForScreen,
 } from "../src/lib/console-tabs.mjs";
 
 // --- Design language (§3.1: the designer's handoff spec) --------------------
@@ -1509,4 +1512,242 @@ test("evidenceBodyHtml: timeline — prior receipts newest-first when a history 
   const noHistory = evidenceBodyHtml(FRESH_RECEIPT, { available: false, reason: "no receipt history — only the latest receipt is retained" });
   assert.match(noHistory, /no receipt history &mdash; only the latest receipt is retained/);
   assert.doesNotMatch(noHistory, /evidence-timeline/);
+});
+
+// --- Screens (§3.4: the screen × state matrix) -------------------------------
+
+const SCREEN_CARD = (id, over = {}) => ({
+  screen: { id, title: over.title || `${id} screen`, png: `${id}/screen.png` },
+  svg: `<svg xmlns='http://www.w3.org/2000/svg' data-for='${id}'></svg>`,
+  summary: over.summary || { nodes: 12, tokenized: 8, tagged: 5 },
+  a11y: over.a11y || { pass: true, violations: [] },
+});
+
+/** The one row-section substring for a base screen id (rows are `<section … id="card-<id>">…</section>`). */
+function rowOf(html, baseId) {
+  const rows = html.split(/<section class="matrix-row/).slice(1);
+  const row = rows.find((r) => r.includes(`id="card-${baseId}"`));
+  assert.ok(row, `row for ${baseId} present`);
+  return row;
+}
+
+test("screensBodyHtml: no cards yet -> honest empty state naming the registry, no fabricated matrix", () => {
+  const html = screensBodyHtml({ cards: [] });
+  assert.match(html, /No screens rendered yet/);
+  assert.match(html, /PreviewRegistry\.kt/);
+  assert.doesNotMatch(html, /matrix-row/);
+});
+
+test("screensBodyHtml (§3.4 geometry): columns = default + only the states ANY screen registers; a state a screen doesn't register is a quiet dash, not a sentence", () => {
+  const html = screensBodyHtml({
+    version: 3,
+    cards: [
+      SCREEN_CARD("home"),
+      SCREEN_CARD("home@empty"),
+      SCREEN_CARD("settings"),
+      SCREEN_CARD("settings@loading"),
+    ],
+    specs: { available: false },
+  });
+  // Column heads: default + loading + empty (registered somewhere), no error column.
+  const cols = [...html.matchAll(/class="matrix-col">([a-z]+)</g)].map((m) => m[1]);
+  assert.deepEqual(cols, ["default", "loading", "empty"], "fixed column order, only registered states");
+  // home: default + empty renders, loading is the dash.
+  const home = rowOf(html, "home");
+  assert.match(home, /\/previews\/home\/screen\.png\?v=3/);
+  assert.match(home, /\/previews\/home@empty\/screen\.png\?v=3/);
+  assert.match(home, /matrix-none" title="no @loading entry registered/);
+  // settings: default + loading renders, empty is the dash.
+  const settings = rowOf(html, "settings");
+  assert.match(settings, /\/previews\/settings@loading\/screen\.png\?v=3/);
+  assert.match(settings, /matrix-none" title="no @empty entry registered/);
+  // The one explanation line lives under the matrix, not per cell.
+  assert.match(html, /States come from\s*<code>@state<\/code> preview-registry entries/);
+  const absenceSentences = [...html.matchAll(/no @[a-z]+ entry registered/g)];
+  assert.equal(absenceSentences.length, 2, "absence prose only as cell tooltips, one per dash");
+});
+
+test("screensBodyHtml: no @state variants at all -> a single default column, no dashes, nothing fabricated", () => {
+  const html = screensBodyHtml({ version: 1, cards: [SCREEN_CARD("home")] });
+  const cols = [...html.matchAll(/class="matrix-col">([a-z]+)</g)].map((m) => m[1]);
+  assert.deepEqual(cols, ["default"]);
+  assert.doesNotMatch(html, /matrix-none/);
+});
+
+test("screensBodyHtml (§3.4 chips): row-end carries derived counts, drift-colored a11y violations, persistent changed-#N, and the element-capable comment control", () => {
+  const html = screensBodyHtml({
+    version: 5,
+    changedVersions: { home: 4 },
+    cards: [
+      SCREEN_CARD("home", { a11y: { pass: false, violations: [{ rule: "a" }, { rule: "b" }] } }),
+      SCREEN_CARD("settings"),
+    ],
+  });
+  const home = rowOf(html, "home");
+  assert.match(home, /12 nodes &middot; 8 tokenized &middot; 5 tagged/);
+  assert.match(home, /a11y <span class="fail">2 violations<\/span>/);
+  assert.match(home, /class="chg">changed #4</, "attribution outlives the render that made it");
+  assert.match(home, /&quot;type&quot;:&quot;screen&quot;,&quot;screen&quot;:&quot;home&quot;/, "screen comment target");
+  assert.match(home, /comment-testtag/, "optional element-level testTag field kept");
+  const settings = rowOf(html, "settings");
+  assert.match(settings, /a11y <span class="pass">PASS<\/span>/);
+  assert.doesNotMatch(settings, /changed #/);
+});
+
+test("screensBodyHtml: changed rows are flagged; a changed cell keeps the hover before/after compare (never on generation 1, never on unchanged cells)", () => {
+  const html = screensBodyHtml({
+    version: 7,
+    changed: ["home@empty"],
+    cards: [SCREEN_CARD("home"), SCREEN_CARD("home@empty"), SCREEN_CARD("settings")],
+  });
+  const home = rowOf(html, "home");
+  assert.match(home, /class="flag">CHANGED</, "a changed variant flags its row");
+  assert.match(home, /home@empty\/screen\.prev\.png\?v=7/, "changed cell offers the before image");
+  assert.match(home, /hover = before/);
+  assert.doesNotMatch(home, /home\/screen\.prev\.png/, "unchanged default cell has no compare");
+  assert.doesNotMatch(rowOf(html, "settings"), /flag">CHANGED/);
+  // Generation 1: nothing to compare against yet.
+  const first = screensBodyHtml({ version: 1, changed: ["home"], cards: [SCREEN_CARD("home")] });
+  assert.doesNotMatch(first, /screen\.prev\.png/);
+});
+
+test("screensBodyHtml: a @state variant whose base entry isn't registered still gets a row — dash default cell, chips and wireframe state their underivability", () => {
+  const html = screensBodyHtml({ version: 2, cards: [SCREEN_CARD("orphan@error")] });
+  const row = rowOf(html, "orphan");
+  assert.match(row, /matrix-none" title="no @default entry registered|Not derivable statically &mdash; no default render/);
+  assert.match(row, /wireframe: Not derivable statically &mdash; no default render/);
+  assert.match(row, /\/previews\/orphan@error\/screen\.png\?v=2/, "the variant render itself still shows");
+});
+
+// --- Screens (§3.4: expanded row -> wireframe + governing clauses) -----------
+
+const SCREEN_SPECS = {
+  available: true,
+  files: [
+    {
+      file: "home.spec.md",
+      clauses: [
+        {
+          id: "HOME-01",
+          withdrawn: false,
+          prose: "Given the app opens, the home list renders.",
+          cited: true,
+          citedBy: [{ file: "composeApp/src/commonTest/kotlin/com/acme/presentation/home/HomeViewModelTest.kt", line: 12 }],
+        },
+        {
+          id: "HOME-09",
+          withdrawn: true,
+          prose: "Withdrawn behavior.",
+          cited: null,
+          citedBy: [{ file: "composeApp/src/commonTest/kotlin/com/acme/presentation/home/OldTest.kt", line: 3 }],
+        },
+      ],
+    },
+    {
+      file: "app-base.spec.md",
+      clauses: [
+        {
+          id: "ARCH-01",
+          withdrawn: false,
+          prose: "domain imports nothing app-internal.",
+          cited: true,
+          citedBy: [{ file: "composeApp/src/desktopTest/kotlin/com/acme/ArchitectureConformanceTest.kt", line: 40 }],
+        },
+      ],
+    },
+  ],
+};
+
+test("clausesForScreen: a clause governs a screen only when a citing test's path carries the screen id as a segment; withdrawn clauses never govern; unavailable specs -> null, not []", () => {
+  const governing = clausesForScreen(SCREEN_SPECS, "home");
+  assert.deepEqual(governing.map((g) => g.clause.id), ["HOME-01"], "segment match only — withdrawn excluded, ARCH not path-matched");
+  assert.equal(governing[0].file, "home.spec.md");
+  assert.deepEqual(clausesForScreen(SCREEN_SPECS, "settings"), [], "derivable and empty");
+  assert.equal(clausesForScreen({ available: false }, "home"), null, "not derivable at all");
+});
+
+test("screensBodyHtml: the expanded row shows the wireframe + governing clauses with each clause's own gate receipt status and a spec-line comment control", () => {
+  const receipt = {
+    available: true,
+    verdict: "PASS",
+    stale: false,
+    ageMs: 60_000,
+    steps: [{ name: "specCoverage", verdict: "PASS" }],
+  };
+  const html = screensBodyHtml({
+    version: 2,
+    cards: [SCREEN_CARD("home")],
+    specs: SCREEN_SPECS,
+    lastReceipt: receipt,
+  });
+  const home = rowOf(html, "home");
+  assert.match(home, /<details class="row-detail">/);
+  assert.match(home, /data-for='home'/, "the wireframe SVG lives in the expanded row");
+  assert.match(home, /governing clauses &mdash; clauses whose citing tests live under <code>home<\/code>/);
+  assert.match(home, /HOME-01/);
+  assert.doesNotMatch(home, /HOME-09/, "withdrawn clause not attributed");
+  assert.doesNotMatch(home, /ARCH-01/, "no path-segment evidence, no attribution");
+  assert.match(home, /receipt-pass">PASS</, "the clause's own gate step verdict");
+  assert.match(home, /&quot;type&quot;:&quot;spec-line&quot;,&quot;file&quot;:&quot;specs\/home\.spec\.md&quot;,&quot;clauseId&quot;:&quot;HOME-01&quot;/);
+});
+
+test("screensBodyHtml: clause-mapping absences use the standardized form — one for 'no specs/ at all', one for 'no citing-test path segment'", () => {
+  const noSpecs = rowOf(screensBodyHtml({ version: 1, cards: [SCREEN_CARD("home")], specs: { available: false } }), "home");
+  assert.match(noSpecs, /Not derivable statically &mdash; no specs\/ directory found/);
+  const noMatch = rowOf(screensBodyHtml({ version: 1, cards: [SCREEN_CARD("settings")], specs: SCREEN_SPECS }), "settings");
+  assert.match(noMatch, /Not derivable statically &mdash; no spec clause's citing tests carry a <code>settings<\/code> path segment/);
+});
+
+// --- Intent (§3.0: the product strategist's brief) ---------------------------
+
+test("intentBodyHtml: no intent.md -> the §3.0 placeholder as the document's own pending state, never an error box", () => {
+  const html = intentBodyHtml({ available: false, reason: "specs/intent.md not found" });
+  assert.match(html, /class="brief-pending"/);
+  assert.match(html, /Not yet captured &mdash; conversation 0 pending\./);
+  assert.match(html, /specs\/intent\.md/, "says how genesis fills it");
+  assert.doesNotMatch(html, /class="banner"|error/i);
+});
+
+test("intentBodyHtml: sections render in file order — filled prose as the document, unfilled sections state themselves plainly with the seed's own guidance muted", () => {
+  const html = intentBodyHtml({
+    available: true,
+    title: "Intent brief",
+    sections: [
+      { heading: "Purpose", body: "A pocket birding log for **weekend** birders.", filled: true, guidance: null },
+      { heading: "Audience", body: "_not yet captured — filled by the cmp-new interview._ Who uses this app?", filled: false, guidance: "Who uses this app?" },
+    ],
+  });
+  const purposeAt = html.indexOf("Purpose");
+  const audienceAt = html.indexOf("Audience");
+  assert.ok(purposeAt >= 0 && purposeAt < audienceAt, "file order kept");
+  assert.match(html, /pocket birding log for <strong>weekend<\/strong> birders/);
+  assert.match(html, /brief-unfilled/);
+  assert.match(html, /brief-pending-inline">Not yet captured &mdash; conversation 0 pending\./);
+  assert.match(html, /brief-guidance">Who uses this app\?/);
+  // Comment affordance: spec-line on the heading — file + heading-as-clauseId
+  // (both required by the ledger's spec-line contract).
+  assert.match(html, /&quot;type&quot;:&quot;spec-line&quot;,&quot;file&quot;:&quot;specs\/intent\.md&quot;,&quot;clauseId&quot;:&quot;Purpose&quot;/);
+});
+
+test("intentBodyHtml: a `**Term** — definition` glossary renders as a definition table; a prose glossary stays prose (no forced structure)", () => {
+  const tabled = intentBodyHtml({
+    available: true,
+    sections: [
+      {
+        heading: "Glossary",
+        body: "- **Sighting** — one observed bird, time-stamped.\n- **Trip** — a dated outing containing sightings.",
+        filled: true,
+        guidance: null,
+      },
+    ],
+  });
+  assert.match(tabled, /glossary-table/);
+  assert.match(tabled, /<th>Term<\/th><th>Definition<\/th>/);
+  assert.match(tabled, /<strong>Sighting<\/strong><\/td><td>one observed bird, time-stamped\./);
+  const prose = intentBodyHtml({
+    available: true,
+    sections: [{ heading: "Glossary", body: "The domain nouns are still being talked through.", filled: true, guidance: null }],
+  });
+  assert.doesNotMatch(prose, /glossary-table/);
+  assert.match(prose, /domain nouns are still being talked through/);
 });
