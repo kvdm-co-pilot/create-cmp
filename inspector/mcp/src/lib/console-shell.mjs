@@ -449,6 +449,9 @@ export const SHELL_CSS = `
   .component-facts li::before { content: "\\2022"; position: absolute; left: 0; color: var(--muted); }
   .component-kdoc { margin: 4px 0 10px; padding: 8px 10px; border-left: 3px solid var(--line); font-size: var(--fs-meta);
                     color: var(--ink-2); white-space: pre-wrap; }
+  .component-story { margin-bottom: 10px; }
+  .component-story .chg { color: var(--accent); font-weight: 600; }
+  .component-story img { width: 180px; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; display: block; }
   .component-live-variants { margin-bottom: 10px; }
   .state-variant-block { margin-bottom: 8px; }
   .state-variant-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }

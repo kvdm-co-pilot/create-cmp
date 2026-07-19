@@ -15,6 +15,8 @@ import {
   createPreviewService,
   detectAppPackage,
   stateVariantCards,
+  componentStoryCards,
+  isComponentStoryId,
 } from "../src/lib/preview-service.mjs";
 import { resetApprovalsBridgeCache } from "../src/lib/approvals-bridge.mjs";
 import { resetCommentsBridgeCache } from "../src/lib/comments-bridge.mjs";
@@ -1920,4 +1922,96 @@ test("service: the Pick flow — the EXACT payload the strip's Pick button posts
     resetCommentsBridgeCache(projectDir);
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
+});
+
+// --- component stories (§3.3: `component.*` registry entries are component
+// documentation, not screens) ------------------------------------------------
+
+test("isComponentStoryId / componentStoryCards: `component.*` ids group by kebab name; everything else is a screen", () => {
+  assert.equal(isComponentStoryId("component.app-header"), true);
+  assert.equal(isComponentStoryId("home"), false);
+  assert.equal(isComponentStoryId("home@empty"), false);
+  const cards = [
+    { screen: { id: "home", title: "Home tab", png: "home/screen.png" } },
+    { screen: { id: "component.app-header", title: "AppHeader — component story", png: "component.app-header/screen.png" } },
+    { screen: { id: "component.list-item-card", title: "ListItemCard — component story", png: "component.list-item-card/screen.png" } },
+  ];
+  const stories = componentStoryCards(cards);
+  assert.deepEqual(Object.keys(stories).sort(), ["app-header", "list-item-card"]);
+  assert.equal(stories["app-header"].id, "component.app-header");
+  assert.equal(stories["app-header"].png, "component.app-header/screen.png");
+  // Registry predating stories: empty map, never an error.
+  assert.deepEqual(componentStoryCards([{ screen: { id: "home", title: "t", png: "p" } }]), {});
+});
+
+test("galleryHtml: story cards are excluded from the Screens grid and the screen/changed counts, and surface on the Components entry instead", () => {
+  const tree = TREE();
+  const card = (id, title) => ({
+    screen: { id, title, png: `${id}/screen.png` },
+    svg: "<svg xmlns='http://www.w3.org/2000/svg'></svg>",
+    summary: summarizeTree(tree),
+    a11y: { pass: true, violations: [] },
+  });
+  const html = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 5,
+    changed: ["home", "component.app-header"],
+    changedVersions: { home: 5, "component.app-header": 5 },
+    cards: [card("home", "Home tab"), card("component.app-header", "AppHeader — component story")],
+    components: {
+      available: true,
+      components: [
+        {
+          name: "AppHeader",
+          file: "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/components/AppHeader.kt",
+          params: [],
+          paramsParsed: [],
+          parseError: false,
+          kdoc: null,
+          kdocDescription: null,
+          paramDocs: {},
+          facts: {},
+          usedIn: [],
+          usedInScreens: [],
+        },
+      ],
+    },
+  });
+  // Screens grid: no story card, and the counts exclude it.
+  assert.doesNotMatch(html, /id="card-component\.app-header"/, "story card not in the Screens grid");
+  assert.match(html, /render #5 &middot; 1 screen /, "screen count excludes the story");
+  assert.match(html, /1 changed this render/, "changed count excludes the story");
+  // Components entry: the story render, version-busted, with changed attribution.
+  assert.match(html, /story render &mdash; <code>component\.app-header<\/code>/);
+  assert.match(html, /\/previews\/component\.app-header\/screen\.png\?v=5/);
+  assert.match(html, /class="chg">changed #5</);
+});
+
+test("galleryHtml: a components scan with no story render on disk states the absence on the entry", () => {
+  const html = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 1,
+    cards: [],
+    components: {
+      available: true,
+      components: [
+        {
+          name: "ScreenColumn",
+          file: "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/components/ScreenColumn.kt",
+          params: [],
+          paramsParsed: [],
+          parseError: false,
+          kdoc: null,
+          kdocDescription: null,
+          paramDocs: {},
+          facts: {},
+          usedIn: [],
+          usedInScreens: [],
+        },
+      ],
+    },
+  });
+  assert.match(html, /no story render yet &mdash; run the preview render to produce <code>component\.screen-column<\/code>/);
 });

@@ -23,6 +23,23 @@
 import fs from "node:fs";
 import path from "node:path";
 
+/**
+ * PascalCase/camelCase → kebab-case: AppHeader → app-header, ListItemCard →
+ * list-item-card. Mirrors the template's qa/lib/component-stories.mjs (the
+ * lane-side parity gate) — keep the two in sync, same contract as navSlug.
+ */
+export function kebabCase(name) {
+  return String(name)
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+    .toLowerCase();
+}
+
+/** The preview-registry story id a component of this name registers (§3.3): `component.<kebab>`. */
+export function componentStoryId(name) {
+  return `component.${kebabCase(name)}`;
+}
+
 /** Every `.kt` file under `dir` (recursive), as absolute paths. Exported for handrolled-state.mjs's ARCH-11 mirror. */
 export function walkKtFiles(dir) {
   const out = [];

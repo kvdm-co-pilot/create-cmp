@@ -36,6 +36,11 @@ import kotlinx.coroutines.awaitCancellation
  * preview-only fakes behind its usual parameters). Every entry renders the same way
  * (gallery card, `-Pscreen=` selector, golden baseline), so loading/empty/error states
  * sit side by side with the default seeded state.
+ *
+ * Component stories (`component.<kebab-name>` ids, ComponentStories.kt) are appended
+ * below — one isolated render per `presentation/components` composable. The console
+ * keeps them out of the Screens grid and shows each at the top of its Components-page
+ * entry; the verify lane's `componentStories` step enforces one story per component.
  */
 data class ScreenPreview(
     val id: String,
@@ -70,7 +75,7 @@ fun previewRegistry(): List<ScreenPreview> = listOf(
         TabHost { HomeScreen(onItemClick = {}, viewModel = previewHomeViewModel { AppResult.Failure(DomainError.Network) }) }
     },
     // cmp:anchor preview-registry
-)
+) + componentStories()
 
 /**
  * Hosts a single tab's content the way [AppShell] does — inside [BaseScreen] — minus the

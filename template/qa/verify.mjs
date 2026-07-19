@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
 import { compareTokenDrift } from "./lib/token-drift.mjs";
 import { evaluateApprovalsGate } from "./lib/approvals.mjs";
+import { evaluateComponentStoryParity } from "./lib/component-stories.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-doc.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -192,6 +193,16 @@ function stepApprovals() {
     durationMs: Date.now() - started,
     details: { artifacts: statuses.map((s) => ({ id: s.id, status: s.status, hash: s.hash })) },
   };
+}
+
+// Component ↔ story parity gate (STUDIO-REDESIGN.md §3.3) — pure Node, no
+// Gradle, same grouping as specCoverage/approvals. The decision itself lives
+// in qa/lib/component-stories.mjs (evaluateComponentStoryParity); this step
+// only adds the name/duration bookkeeping every step in this file carries.
+function stepComponentStories() {
+  const started = Date.now();
+  const { verdict, reason, details } = evaluateComponentStoryParity(ROOT);
+  return { name: "componentStories", verdict, reason, durationMs: Date.now() - started, details };
 }
 
 // Architecture-doc freshness gate (Wave B, docs/proposals/architecture-document-
@@ -469,10 +480,11 @@ function stepE2eSmoke() {
 const stepsForProfile = {
   // scaffold: what `create-cmp --verify` proves at stamp time — specCoverage,
   // the full JVM tier (unit + conformance + golden + UI tests) plus the Android build.
-  scaffold: [stepSpecCoverage, stepApprovals, stepArchDoc, stepBuild, stepUnitTests],
+  scaffold: [stepSpecCoverage, stepApprovals, stepComponentStories, stepArchDoc, stepBuild, stepUnitTests],
   local: [
     stepSpecCoverage,
     stepApprovals,
+    stepComponentStories,
     stepArchDoc,
     stepBuild,
     stepUnitTests,

@@ -126,6 +126,15 @@ tags) · do/don't · used-in. Approval/drift chips per card. A component the
 scanner half-understands shows name + file + an honest "signature not
 parsed" — never a guess.
 
+Component stories are part of this section's form. Every registry component
+carries its own preview-registry story — id `component.<kebab-name>`, one
+isolated render on a plain tokened surface, variants stacked in one image
+(`inspector/ComponentStories.kt`, rendered by the same pipeline as every
+screen). The console keeps `component.*` entries out of the Screens grid and
+shows each render at the top of its component's entry, with the standard
+changed-attribution chip. The verify lane's `componentStories` step enforces
+one story per component, both directions, naming the missing id.
+
 **4 · Screens — the design-review gallery.**
 The screen × state matrix: rows = screens, columns = states
 (default/loading/empty/error), each cell the live render; row-end chips for

@@ -90,8 +90,11 @@ fun AppBottomBar(
 private fun navItemTag(label: String): String =
     "nav_" + label.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
 
+// Internal (not private) so the desktopMain component story (inspector/
+// ComponentStories.kt, `component.nav-item`) can render it in isolation;
+// still absent from the public API surface.
 @Composable
-private fun NavItem(
+internal fun NavItem(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,

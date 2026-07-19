@@ -13,6 +13,7 @@
 // ("Not derivable statically — <reason>").
 
 import { classifyDimens, deriveContrastPairs } from "./design-language.mjs";
+import { componentStoryId } from "./components.mjs";
 
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -463,6 +464,39 @@ function stateContractHtml(facts, hasScreenTagParam) {
   return `<p class="lbl">state contract</p><ul class="component-facts">${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
 }
 
+/**
+ * The component's OWN story render (§3.3) — the top of every entry's visual
+ * strip: the `component.<kebab-name>` preview-registry entry rendered by the
+ * same pipeline as every screen, labeled with its registry id. Changed
+ * attribution keeps the Screens grid's vocabulary: a persistent
+ * "changed #N" chip from `changedVersions` (no hover-compare here). A story
+ * not in the current render states the absence in the standardized form —
+ * never a broken image, never a fabricated thumbnail.
+ * @param {string} name the component's composable name (AppHeader, …)
+ * @param {Record<string, {id:string,title:string,png:string}>} [componentStories]
+ *   preview-service.mjs's componentStoryCards(cards), keyed by kebab name
+ * @param {number} [version] current render generation (PNG cache-buster)
+ * @param {Record<string, number>} [changedVersions] screen/story id -> render # last changed
+ */
+function componentStoryHtml(name, componentStories, version, changedVersions) {
+  const id = componentStoryId(name);
+  const kebab = id.slice("component.".length);
+  const card = componentStories ? componentStories[kebab] : undefined;
+  if (!card) {
+    return `  <div class="component-story">
+    <p class="lbl">story render &mdash; <code>${esc(id)}</code></p>
+    <p class="empty-inline">no story render yet &mdash; run the preview render to produce <code>${esc(id)}</code></p>
+  </div>`;
+  }
+  const changedIn = changedVersions ? changedVersions[card.id] : undefined;
+  const chip = changedIn ? ` <span class="chg">changed #${Number(changedIn)}</span>` : "";
+  const buster = version ? `?v=${Number(version)}` : "";
+  return `  <div class="component-story">
+    <p class="lbl">story render &mdash; <code>${esc(card.id)}</code>${chip}</p>
+    <img alt="${escAttr(card.id)} story render" src="/previews/${escAttr(card.png)}${buster}">
+  </div>`;
+}
+
 // A component's state suffix -> the preview-registry variant suffix(es) that
 // would exercise it live (CV-1 W3b: "@loading/@empty/@error variants ...
 // integrate defensively"). Keyed off derivedTags (the `${screenTag}_xxx` tag
@@ -543,9 +577,10 @@ function usedInHtml(usedIn, usedInScreens, violationsByFile) {
 
 /**
  * The Components section body (§3.3) — the platform engineer's library
- * reference, one document entry per component in library-docs order: rendered
- * states across the top (live @state previews matched via the component's own
- * derived tags) · the component's own KDoc description verbatim · the
+ * reference, one document entry per component in library-docs order: the
+ * component's own story render first (its `component.<kebab>` registry entry,
+ * componentStoryHtml), then any live @state previews matched via the
+ * component's own derived tags · the component's own KDoc description verbatim · the
  * signature as a params table (notes from KDoc @param) · the state contract
  * and what the component owns (derived facts, evidence-or-silence) ·
  * used-in, screens first, with hand-rolled-state violation chips at the
@@ -578,9 +613,14 @@ export function componentsBodyHtml(components, meta = {}) {
       ${componentApprovalBadgeHtml(meta.approval, meta.drift, c.file)}
     </header>
     <p class="meta component-file"><code>${esc(c.file)}</code></p>`;
+      // The story render is scan-independent evidence (it comes from the
+      // render pipeline, not the signature parser), so it shows on
+      // parse-error entries too.
+      const storyHtml = componentStoryHtml(c.name, meta.componentStories, meta.version, meta.changedVersions);
       if (c.parseError) {
         return `  <article class="component-entry">
     ${head}
+    ${storyHtml}
     <p class="unresolvable-note">signature not parsed &mdash; showing name and file only</p>
   </article>`;
       }
@@ -599,6 +639,7 @@ export function componentsBodyHtml(components, meta = {}) {
       // then the derived contract and call sites.
       return `  <article class="component-entry">
     ${head}
+    ${storyHtml}
     ${liveVariantsHtml(facts.derivedTags, meta.stateVariants)}
     ${kdocHtml}
     <p class="lbl">signature</p>
