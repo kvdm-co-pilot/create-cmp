@@ -100,7 +100,7 @@ function genesisGuide(id) {
  * §2 defines the mapping only for unreviewed/reopened/approved; drift is a
  * different concern (the hash mismatch already speaks for itself in the row).
  */
-function artifactBannerHtml(s) {
+export function artifactBannerHtml(s) {
   if (s.status === "unreviewed" || s.status === "reopened") {
     return `<div class="artifact-banner banner-genesis"><span class="banner-mode">genesis</span> ${esc(genesisGuide(s.id))}</div>`;
   }
@@ -610,7 +610,234 @@ ${items || '      <li class="empty-inline">no clauses parsed</li>'}
     .join("\n");
 }
 
-// --- Architecture tab (§7.1) -------------------------------------------------
+// --- Architecture tab (§7.1, rebuilt to the AD-1 three-in-one standard) -----
+//
+// Mirrors template/docs/ARCHITECTURE.md's own section shape (authored form):
+// purpose & quality goals, system context, platform & deployment view,
+// building blocks (layer map + observed dependency arrows + the governed
+// contract), runtime view, crosscutting policies, decisions, and the exemplar
+// feature shape. Every fact is either a real tree walk (layer map, dependency
+// graph) or a structural parse of the doc itself (tables verbatim, prose
+// rendered through the small markdown-to-html helpers below) — never
+// paraphrased, never fabricated. A missing source degrades to an honest
+// inline note, section by section, so one missing table never hides the rest.
+
+/** Escape, then apply the doc's own inline markdown (bold/code/links) — safe because escaping runs first. */
+function inlineMdHtml(text) {
+  let s = esc(String(text));
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  // Markdown links -> plain text: the console has no route for docs/adr/* files,
+  // so a live link would be dead weight (or worse, a broken href in the console).
+  s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  return s;
+}
+
+/** A GFM table (already parsed by architecture.mjs) as an HTML table — inline markdown per cell. */
+function mdTableHtml(table) {
+  if (!table || !table.available) {
+    return `<p class="empty-inline">${esc((table && table.reason) || "not available")}</p>`;
+  }
+  const head = `<tr>${table.headers.map((h) => `<th>${inlineMdHtml(h)}</th>`).join("")}</tr>`;
+  const body = table.rows
+    .map((r) => `<tr>${r.map((c) => `<td>${inlineMdHtml(c)}</td>`).join("")}</tr>`)
+    .join("\n");
+  return `<table class="doc-table"><thead>${head}</thead><tbody>\n${body}\n</tbody></table>`;
+}
+
+/**
+ * A small, deliberately non-exhaustive markdown block renderer for
+ * doc-section prose (runtime view, crosscutting policies) — paragraphs,
+ * `### ` subheadings, bullet/numbered lists (with indented continuation
+ * lines folded into the current item), fenced code blocks, and blockquotes.
+ * Not a full CommonMark implementation (no nested lists, no tables — those
+ * are parsed structurally by architecture.mjs instead); good enough to
+ * render this project's own doc faithfully without pulling in a markdown
+ * dependency. Every text span still runs through inlineMdHtml, so escaping
+ * is never skipped.
+ */
+function mdProseHtml(md) {
+  if (!md || !md.trim()) return "";
+  const lines = md.split("\n");
+  const out = [];
+  let i = 0;
+  let para = [];
+  const flushPara = () => {
+    if (para.length) {
+      out.push(`<p>${inlineMdHtml(para.join(" "))}</p>`);
+      para = [];
+    }
+  };
+  const consumeList = (marker) => {
+    const items = [];
+    while (i < lines.length) {
+      const raw = lines[i];
+      const t = raw.trim();
+      if (marker === "ul" ? /^[-*]\s+/.test(t) : /^\d+\.\s+/.test(t)) {
+        items.push(t.replace(marker === "ul" ? /^[-*]\s+/ : /^\d+\.\s+/, ""));
+        i++;
+      } else if (t !== "" && /^\s/.test(raw) && items.length) {
+        items[items.length - 1] += ` ${t}`;
+        i++;
+      } else {
+        break;
+      }
+    }
+    return items;
+  };
+  while (i < lines.length) {
+    const line = lines[i];
+    const t = line.trim();
+    if (t === "") {
+      flushPara();
+      i++;
+      continue;
+    }
+    if (t.startsWith("```")) {
+      flushPara();
+      i++;
+      const code = [];
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        code.push(lines[i]);
+        i++;
+      }
+      i++; // closing fence
+      out.push(`<pre class="doc-code">${esc(code.join("\n"))}</pre>`);
+      continue;
+    }
+    if (/^####?\s+/.test(t)) {
+      flushPara();
+      const level = t.startsWith("####") ? 5 : 4;
+      out.push(`<h${level}>${inlineMdHtml(t.replace(/^####?\s+/, ""))}</h${level}>`);
+      i++;
+      continue;
+    }
+    if (/^[-*]\s+/.test(t)) {
+      flushPara();
+      const items = consumeList("ul");
+      out.push(`<ul class="doc-list">${items.map((it) => `<li>${inlineMdHtml(it)}</li>`).join("")}</ul>`);
+      continue;
+    }
+    if (/^\d+\.\s+/.test(t)) {
+      flushPara();
+      const items = consumeList("ol");
+      out.push(`<ol class="doc-list">${items.map((it) => `<li>${inlineMdHtml(it)}</li>`).join("")}</ol>`);
+      continue;
+    }
+    if (t.startsWith(">")) {
+      flushPara();
+      const quote = [];
+      while (i < lines.length && lines[i].trim().startsWith(">")) {
+        quote.push(lines[i].trim().replace(/^>\s?/, ""));
+        i++;
+      }
+      out.push(`<blockquote class="doc-quote">${inlineMdHtml(quote.join(" "))}</blockquote>`);
+      continue;
+    }
+    para.push(t);
+    i++;
+  }
+  flushPara();
+  return out.join("\n");
+}
+
+function docSectionProseHtml(section) {
+  if (!section || !section.available) {
+    return `<p class="empty-inline">${esc((section && section.reason) || "docs/ARCHITECTURE.md not found")}</p>`;
+  }
+  return `<div class="doc-prose">${mdProseHtml(section.body)}</div>`;
+}
+
+function systemContextHtml(sc) {
+  if (!sc || !sc.available) {
+    return `<p class="empty-inline">${esc((sc && sc.reason) || "docs/ARCHITECTURE.md not found")}</p>`;
+  }
+  const intro = sc.intro ? `<p>${inlineMdHtml(sc.intro)}</p>` : "";
+  const table = sc.table
+    ? mdTableHtml({ available: true, headers: sc.table.headers, rows: sc.table.rows })
+    : `<p class="empty-inline">no integration table found under "${esc(sc.heading)}"</p>`;
+  return `${intro}${table}`;
+}
+
+function platformViewHtml(pv) {
+  if (!pv || !pv.available) {
+    return `<p class="empty-inline">${esc((pv && pv.reason) || "docs/ARCHITECTURE.md not found")}</p>`;
+  }
+  const main = mdTableHtml({ available: true, headers: pv.headers, rows: pv.rows });
+  const expectActual = pv.expectActual
+    ? `<h4>Expect/actual boundary</h4>${mdTableHtml({ available: true, headers: pv.expectActual.headers, rows: pv.expectActual.rows })}`
+    : "";
+  return `${main}${expectActual}`;
+}
+
+/**
+ * The dependency graph (drift surface): every observed cross-layer edge, and
+ * — where the governed contract's own clauses resolved forbidden edges (see
+ * architecture.mjs's deriveLayerRules) — a violation badge on the offending
+ * edge PLUS a file:line list underneath, exactly where a lead architect would
+ * mark it up. `rulesApplied:false` (no governed contract to check against) is
+ * shown as "unchecked", never silently reported as "clean".
+ * @param {object} graph architecture.mjs's getDependencyGraph() result
+ */
+function dependencyGraphHtml(graph) {
+  if (!graph || !graph.available) {
+    return `<div class="empty">
+      <p>No dependency graph available.</p>
+      <p>${esc((graph && graph.reason) || "composeApp/src/commonMain/kotlin not found.")}</p>
+    </div>`;
+  }
+  if (graph.edges.length === 0) {
+    return `<p class="empty-inline">no cross-layer imports observed under <code>${esc(graph.appPackage)}</code></p>`;
+  }
+  const rows = graph.edges
+    .map((e) => {
+      const chip = e.violation
+        ? `<span class="badge badge-changed violation-chip">violates ${esc(e.clauseId)}</span>`
+        : "";
+      return `    <li class="dep-edge${e.violation ? " dep-violation" : ""}">
+      <code>${esc(e.from)}</code> &rarr; <code>${esc(e.to)}</code>
+      <span class="dep-count">${e.count} import${e.count === 1 ? "" : "s"}</span>
+      ${chip}
+    </li>`;
+    })
+    .join("\n");
+  const violationsHtml = graph.violations.length
+    ? `  <div class="dep-violations">
+    <p class="lbl">violations &mdash; file:line</p>
+    <ul class="dep-violation-list">
+${graph.violations
+  .map(
+    (v) => `      <li class="dep-violation-item">
+        <code>${esc(v.file)}:${v.line}</code> imports <code>${esc(v.imported)}</code>
+        <span class="badge badge-changed">${esc(v.from)} &rarr; ${esc(v.to)} violates ${esc(v.clauseId)}</span>
+      </li>`,
+  )
+  .join("\n")}
+    </ul>
+  </div>`
+    : graph.rulesApplied
+      ? `  <p class="empty-inline">no layer violations observed</p>`
+      : `  <p class="empty-inline">no governed layer rules could be derived (the governed contract is unavailable) &mdash; violations are unchecked, not clean</p>`;
+  return `  <ul class="dep-edges">
+${rows}
+  </ul>
+${violationsHtml}`;
+}
+
+/** The architecture artifact's own approval badge — same visual vocabulary as componentApprovalBadgeHtml, single-file so no per-file mtime drift is needed. */
+function architectureApprovalBadgeHtml(approval) {
+  if (!approval) return "";
+  const s = approval.status;
+  if (s === "approved") {
+    const unshaped = approval.mode === "defaults-accepted";
+    return `<span class="badge badge-approved${unshaped ? " badge-unshaped" : ""}" title="architecture artifact approved at ${shortDate(approval.approvedAt)}">approved &middot; ${shortHash(approval.hash)}</span>`;
+  }
+  if (s === "changed-since-approval") {
+    return `<span class="badge badge-changed" title="approved ${shortHash(approval.storedHash)} &rarr; now ${shortHash(approval.hash)}">drift &middot; architecture artifact changed since approval</span>`;
+  }
+  if (s === "reopened") return `<span class="badge badge-reopened">reopened for redesign</span>`;
+  return `<span class="badge badge-unreviewed">not yet approved</span>`;
+}
 
 function layerMapHtml(layerMap) {
   if (!layerMap || !layerMap.available) {
@@ -690,25 +917,62 @@ ${items}
 }
 
 /**
- * The Architecture tab (§7.1): the layer map (a real walk of
- * composeApp/src/commonMain/kotlin/**, see architecture.mjs's getLayerMap),
- * the governed contract (specs/app-base.spec.md's clauses, via specs.mjs —
- * reused, not forked), and the exemplar feature shape (the real `home`
- * feature's files on disk). Every section degrades independently — one
- * missing source never hides the other two.
- * @param {{layerMap: object, governedContract: object, featureShape: object}} data
+ * The Architecture tab (§7.1, AD-1 rebuild): mirrors template/docs/
+ * ARCHITECTURE.md's own section shape — purpose & quality goals, system
+ * context, platform & deployment view, building blocks (layer map +
+ * dependency arrows + the governed contract), runtime view, crosscutting
+ * policies, decisions — plus the exemplar feature shape at the end. Every
+ * section degrades independently; one missing source never hides the rest.
+ * `meta.approval` (optional) is the "architecture" governed artifact's own
+ * live status record (approvals-bridge.mjs), rendered as a badge + the same
+ * genesis/steward banner the Approvals tab's rows use — reused via
+ * artifactBannerHtml, not re-implemented.
+ * @param {{layerMap: object, governedContract: object, featureShape: object, dependencyGraph?: object, doc?: object}} data
+ * @param {{approval?: object|null}} [meta]
  */
-export function architectureTabHtml(data) {
-  const { layerMap, governedContract, featureShape } = data || {};
-  return `  <section class="arch-section">
-    <h3>Layer map</h3>
-${layerMapHtml(layerMap)}
+export function architectureTabHtml(data, meta = {}) {
+  const { layerMap, governedContract, featureShape, dependencyGraph, doc } = data || {};
+  const topStatus = meta.approval
+    ? `  <div class="arch-top-status">
+    ${architectureApprovalBadgeHtml(meta.approval)}
+    ${artifactBannerHtml(meta.approval)}
+  </div>`
+    : "";
+  return `${topStatus}
+  <section class="arch-section" id="arch-purpose">
+    <h3>1. Purpose &amp; quality goals</h3>
+${mdTableHtml(doc && doc.qualityAttributes)}
   </section>
-  <section class="arch-section">
-    <h3>The governed contract</h3>
+  <section class="arch-section" id="arch-context">
+    <h3>3. System context</h3>
+${systemContextHtml(doc && doc.systemContext)}
+  </section>
+  <section class="arch-section" id="arch-platform">
+    <h3>4. Platform &amp; deployment view</h3>
+${platformViewHtml(doc && doc.platformView)}
+  </section>
+  <section class="arch-section" id="arch-building-blocks">
+    <h3>5. Building blocks &mdash; the layer model</h3>
+    <h4>Layer map</h4>
+${layerMapHtml(layerMap)}
+    <h4>Dependency arrows (observed from real imports)</h4>
+${dependencyGraphHtml(dependencyGraph)}
+    <h4>The governed contract</h4>
 ${governedContractHtml(governedContract)}
   </section>
-  <section class="arch-section">
+  <section class="arch-section" id="arch-runtime">
+    <h3>6. Runtime view</h3>
+${docSectionProseHtml(doc && doc.runtimeView)}
+  </section>
+  <section class="arch-section" id="arch-crosscutting">
+    <h3>7. Crosscutting policies</h3>
+${docSectionProseHtml(doc && doc.crosscuttingPolicies)}
+  </section>
+  <section class="arch-section" id="arch-decisions">
+    <h3>8. Decisions</h3>
+${mdTableHtml(doc && doc.decisions)}
+  </section>
+  <section class="arch-section" id="arch-feature-shape">
     <h3>Feature shape (what <code>add-feature</code> stamps)</h3>
 ${featureShapeHtml(featureShape)}
   </section>`;

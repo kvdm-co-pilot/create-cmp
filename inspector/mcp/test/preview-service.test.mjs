@@ -21,6 +21,8 @@ import { resetCommentsBridgeCache } from "../src/lib/comments-bridge.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REAL_APPROVALS_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "approvals.mjs");
+const REAL_APP_BASE_SPEC = path.join(HERE, "..", "..", "..", "template", "specs", "app-base.spec.md");
+const REAL_ARCHITECTURE_DOC = path.join(HERE, "..", "..", "..", "template", "docs", "ARCHITECTURE.md");
 const FIXTURE_COMMENTS_LIB = path.join(HERE, "fixtures", "fixture-comments-lib.mjs");
 const FIXTURE_APPROVALS_LIB = path.join(HERE, "fixtures", "fixture-approvals-lib.mjs");
 
@@ -112,6 +114,140 @@ function makeComponentsFixtureProject() {
   fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
   return { root, componentsDir };
 }
+
+/**
+ * A generated-project fixture for the Architecture tab's AD-1 E2E gate: a real
+ * presentation/domain/data/di tree (with ONE DELIBERATE data->presentation
+ * violating import, planted the same way a lead architect would find one —
+ * `ItemRepositoryImpl.kt` reaching up into `presentation/theme`), the REAL
+ * specs/app-base.spec.md (so deriveLayerRules parses the actual ARCH-09
+ * clause, not a paraphrase), the REAL docs/ARCHITECTURE.md (so the doc-mirror
+ * sections are exercised against the real document, not a fixture stand-in),
+ * and the REAL qa/lib/approvals.mjs (so approve/drift wiring hits the actual
+ * governed-artifact registry).
+ */
+function makeArchitectureFixtureProject() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-architecture-"));
+  fs.mkdirSync(path.join(root, "composeApp", "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "composeApp", "build.gradle.kts"), 'android {\n  namespace = "com.acme.demo"\n}\n');
+  const pkgDir = path.join(root, "composeApp", "src", "commonMain", "kotlin", "com", "acme", "demo");
+
+  const themeDir = path.join(pkgDir, "presentation", "theme");
+  fs.mkdirSync(themeDir, { recursive: true });
+  fs.writeFileSync(path.join(themeDir, "Theme.kt"), "package com.acme.demo.presentation.theme\n\nobject AcmeColors\n");
+
+  const homeDir = path.join(pkgDir, "presentation", "home");
+  fs.mkdirSync(homeDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(homeDir, "HomeViewModel.kt"),
+    ["package com.acme.demo.presentation.home", "", "import com.acme.demo.domain.usecase.GetItemsUseCase", "", "class HomeViewModel"].join("\n"),
+  );
+
+  const domainDir = path.join(pkgDir, "domain", "usecase");
+  fs.mkdirSync(domainDir, { recursive: true });
+  fs.writeFileSync(path.join(domainDir, "GetItemsUseCase.kt"), "package com.acme.demo.domain.usecase\n\nclass GetItemsUseCase\n");
+
+  const dataDir = path.join(pkgDir, "data", "remote");
+  fs.mkdirSync(dataDir, { recursive: true });
+  const violatingFile = path.join(dataDir, "ItemRepositoryImpl.kt");
+  fs.writeFileSync(
+    violatingFile,
+    [
+      "package com.acme.demo.data.remote",
+      "",
+      "import com.acme.demo.domain.usecase.GetItemsUseCase",
+      "import com.acme.demo.presentation.theme.Theme", // deliberate ARCH-09 violation
+      "",
+      "class ItemRepositoryImpl",
+    ].join("\n"),
+  );
+
+  const diDir = path.join(pkgDir, "di");
+  fs.mkdirSync(diDir, { recursive: true });
+  fs.writeFileSync(path.join(diDir, "AppModule.kt"), "package com.acme.demo.di\n\nobject AppModule\n");
+
+  const specsDir = path.join(root, "specs");
+  fs.mkdirSync(specsDir, { recursive: true });
+  fs.copyFileSync(REAL_APP_BASE_SPEC, path.join(specsDir, "app-base.spec.md"));
+
+  const docsDir = path.join(root, "docs");
+  fs.mkdirSync(docsDir, { recursive: true });
+  fs.copyFileSync(REAL_ARCHITECTURE_DOC, path.join(docsDir, "ARCHITECTURE.md"));
+
+  const libDir = path.join(root, "qa", "lib");
+  fs.mkdirSync(libDir, { recursive: true });
+  fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+
+  return { root, violatingFile, specFile: path.join(specsDir, "app-base.spec.md") };
+}
+
+/** The <div class="arch-top-status">...</div> slice of a page, for badge assertions scoped to the Architecture tab (not the Approvals tab, which uses similar badge text elsewhere on the same page). */
+function archTopStatus(page) {
+  const m = page.match(/<div class="arch-top-status">[\s\S]*?<\/div>\s*<\/div>/);
+  return m ? m[0] : "";
+}
+
+test("service: Architecture tab — boots against a real layer tree + the REAL app-base.spec.md/ARCHITECTURE.md/approvals library; doc-shaped structure, a deliberate ARCH-09 violation with file:line, then approve + drift", async () => {
+  const { root: projectDir, violatingFile, specFile } = makeArchitectureFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19891, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    // 1. Authored form: the tab mirrors docs/ARCHITECTURE.md's own section shape.
+    let page = await (await fetch(st.url)).text();
+    assert.match(page, /1\. Purpose &amp; quality goals/);
+    assert.match(page, /3\. System context/);
+    assert.match(page, /4\. Platform &amp; deployment view/);
+    assert.match(page, /5\. Building blocks/);
+    assert.match(page, /6\. Runtime view/);
+    assert.match(page, /7\. Crosscutting policies/);
+    assert.match(page, /8\. Decisions/);
+
+    // 2. Derived truth: the real quality-attribute table + platform table
+    //    from the real doc, and the real layer map from the real tree.
+    assert.match(page, /Maintainability/);
+    assert.match(page, /commonMain/);
+    assert.match(page, /GetItemsUseCase\.kt/);
+
+    // 3. Drift surface: the deliberately-injected data->presentation import
+    //    is drawn as a violation, in red, with file:line, naming ARCH-09 —
+    //    the real clause the real spec's prose resolves to.
+    assert.match(page, /class="dep-edge dep-violation"/);
+    assert.match(page, /violates ARCH-09/);
+    assert.match(page, /ItemRepositoryImpl\.kt:4/, "the violating import is on line 4 of the fixture file");
+    assert.doesNotMatch(page, /unchecked, not clean/, "the real spec resolved real rules — violations were actually checked");
+
+    // Not yet approved -> an honest "not yet approved" badge at the top of the tab.
+    assert.match(archTopStatus(page), /badge-unreviewed/);
+
+    // 4. Approve the architecture artifact via the real POST /api/approve -> real library.
+    const approveRes = await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "architecture" }),
+    });
+    assert.equal((await approveRes.json()).ok, true);
+
+    page = await (await fetch(st.url)).text();
+    assert.match(archTopStatus(page), /badge-approved/);
+    assert.match(archTopStatus(page), /banner-steward/);
+
+    // 5. Drift: edit the REAL governed file after approval; the artifact's own
+    //    hash-bound status flips to changed-since-approval, and the tab's own
+    //    badge reflects it (not just the Approvals tab's row).
+    fs.appendFileSync(specFile, "\n<!-- edited after approval -->\n");
+    page = await (await fetch(st.url)).text();
+    assert.match(archTopStatus(page), /drift &middot; architecture artifact changed since approval/);
+
+    // Sanity: the violating file really is where the test thinks it is.
+    assert.ok(fs.existsSync(violatingFile));
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
 
 /**
  * A minimal generated-project fixture with the test fixture's

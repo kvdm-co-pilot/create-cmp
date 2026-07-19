@@ -196,7 +196,8 @@ const esc = (s) =>
  * (screen.prev.png is the pre-render copy); every card keeps a persistent
  * "changed #N" badge from `changedVersions` so attribution outlives the next render.
  * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error,
- *   approvals, specs, designSystem, architecture, components, comments, variants, componentsMeta }
+ *   approvals, specs, designSystem, architecture, components, comments, variants, componentsMeta,
+ *   architectureMeta }
  */
 export function galleryHtml(state) {
   const {
@@ -215,6 +216,7 @@ export function galleryHtml(state) {
     comments = { available: false },
     variants = { available: false },
     componentsMeta = {},
+    architectureMeta = {},
   } = state;
   const width = viewport?.width ?? 411;
   const changedSet = new Set(changed);
@@ -329,7 +331,29 @@ export function galleryHtml(state) {
   .cov-no { background: #FDECEC; color: #DC2626; }
   .cov-na { background: #F3F4F6; color: #9CA3AF; }
   .arch-section { margin-bottom: 28px; }
-  .arch-section h3 { margin: 0 0 10px; font-size: 14px; }
+  .arch-section h3 { margin: 0 0 10px; font-size: 14px; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px; }
+  .arch-section h4 { margin: 16px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6B7280; }
+  .arch-top-status { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; flex-wrap: wrap; }
+  .doc-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 12px; }
+  .doc-table th, .doc-table td { padding: 7px 9px; border-bottom: 1px solid #E5E7EB; text-align: left; vertical-align: top; }
+  .doc-table th { color: #6B7280; font-weight: 600; }
+  .doc-prose { font-size: 13px; line-height: 1.55; }
+  .doc-prose p { margin: 0 0 10px; }
+  .doc-prose h4, .doc-prose h5 { margin: 14px 0 6px; font-size: 12px; color: #0A2540; }
+  .doc-list { margin: 0 0 10px; padding-left: 20px; }
+  .doc-list li { margin-bottom: 4px; }
+  .doc-code { font-size: 11px; line-height: 1.5; background: #F7F9FC; border: 1px solid #E5E7EB; border-radius: 8px;
+              padding: 8px 10px; overflow-x: auto; white-space: pre; }
+  .doc-quote { margin: 0 0 10px; padding: 6px 10px; border-left: 3px solid #E5E7EB; color: #6B7280; }
+  .dep-edges { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .dep-edge { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 10px; border: 1px solid #E5E7EB;
+              border-radius: 8px; background: #fff; }
+  .dep-edge.dep-violation { border-color: #DC2626; background: #FEF2F2; }
+  .dep-count { font-size: 11px; color: #9CA3AF; }
+  .dep-violations { margin-top: 6px; }
+  .dep-violation-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .dep-violation-item { font-size: 12px; padding: 6px 10px; border: 1px solid #DC2626; border-radius: 8px; background: #FEF2F2;
+                         display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .layer-map { display: flex; flex-wrap: wrap; gap: 14px; }
   .layer-box { flex: 1 1 220px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
   .layer-box.layer-empty { opacity: .55; border-style: dashed; }
@@ -436,7 +460,7 @@ ${cards
 ${designSystemTabHtml(designSystem, components, variants, designSystemStatus, componentsMeta)}
 </div>
 <div id="tab-architecture" class="tab-panel" data-tab="architecture">
-${architectureTabHtml(architecture)}
+${architectureTabHtml(architecture, architectureMeta)}
 </div>
 <div id="tab-approvals" class="tab-panel" data-tab="approvals">
 ${approvalsTabHtml(approvals)}
@@ -1536,6 +1560,12 @@ export function createPreviewService(opts) {
           violations: handRolledViolations,
           stateVariants: stateVariantCards(cards),
         };
+        // AD-1: the "architecture" governed artifact's own live status record
+        // (same lookup pattern as componentsApprovalRecord above) — drives the
+        // Architecture tab's own approval badge + genesis/steward banner.
+        const architectureMeta = {
+          approval: approvals.available ? approvals.statuses.find((s) => s.id === "architecture") || null : null,
+        };
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(
           galleryHtml({
@@ -1554,6 +1584,7 @@ export function createPreviewService(opts) {
             comments,
             variants,
             componentsMeta,
+            architectureMeta,
           }),
         );
         return;
