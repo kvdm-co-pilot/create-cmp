@@ -14,14 +14,15 @@ import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
 import __PACKAGE__.presentation.theme.designToken
 
 /**
- * The page container every screen roots itself in — absorbs the thrice-copied
- * `Column(fillMaxSize().designToken(...).padding(PaddingPage))` block (§1 item 2) and
- * finally delivers `template/CLAUDE.md`'s "every screen: a testTag'd root" promise
- * (`home_screen`, `detail_screen`, `profile_screen`, …).
+ * The page container every screen roots itself in. Owns the tagged root
+ * (`<screenTag>_screen`), the page padding from `PaddingPage`, and that token's
+ * inspector self-report — the reported value is derived from the token itself, so it
+ * cannot drift from the catalog. Screens never hand-roll their root column.
  *
- * The `designToken` self-report for `PaddingPage` lives here, once — derived from the
- * token itself rather than a hand-written literal, so it can never drift from the catalog
- * (§1 item 3).
+ * @param screenTag Feature slug ("home"); the root is tagged `<screenTag>_screen`.
+ * @param scrollable True wraps the column in a vertical scroll. Leave false when the
+ *   content scrolls itself (a `LazyColumn`) — nesting the two crashes at runtime.
+ * @param content Column body, laid out inside the page padding.
  */
 @Composable
 fun ScreenColumn(

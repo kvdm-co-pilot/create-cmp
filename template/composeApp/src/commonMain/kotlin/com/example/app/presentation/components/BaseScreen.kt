@@ -15,15 +15,23 @@ import androidx.compose.ui.graphics.Color
 import __PACKAGE__.presentation.theme.designToken
 
 /**
- * The insets moat, pre-solved. Every screen wraps its content in [BaseScreen] instead of
- * re-deriving edge-to-edge padding. The Activity is edge-to-edge (transparent system bars);
- * this Scaffold owns the status-bar / navigation-bar insets in shared code, which also maps
- * to iOS safe areas under Compose Multiplatform.
+ * The edge-to-edge scaffold that owns system-bar insets in shared code. The Activity
+ * draws behind transparent system bars; this component applies status-bar and
+ * navigation-bar padding once (mapping to iOS safe areas under Compose Multiplatform),
+ * consumes what it applies to prevent doubled padding, and self-reports the applied
+ * inset facts to the inspector. Screens wrap their content in it instead of re-deriving
+ * insets.
  *
- * - [topBar] / [bottomBar] draw edge-to-edge (e.g. a nav bar that bleeds behind the gesture
- *   pill) and are responsible for their own inset padding.
- * - The content lambda receives padding already accounting for any bars; by default the body
- *   gets status + navigation bar padding so plain screens are safe with zero ceremony.
+ * @param containerColor Background color; `Color.Unspecified` resolves to the theme background.
+ * @param applyStatusBarPadding False lets the body draw under the status bar, for
+ *   full-bleed content that handles the top inset itself.
+ * @param applyNavBarPadding False lets the body draw under the navigation bar — set it
+ *   when a bottom bar owns that inset instead.
+ * @param topBar Draws edge-to-edge and is responsible for its own inset padding.
+ * @param bottomBar Draws edge-to-edge and is responsible for its own inset padding
+ *   (e.g. a nav bar that bleeds behind the gesture pill).
+ * @param content Screen body. Its padding is already applied by the wrapper; the
+ *   `PaddingValues` are passed through for callers that need the raw values.
  */
 @Composable
 fun BaseScreen(

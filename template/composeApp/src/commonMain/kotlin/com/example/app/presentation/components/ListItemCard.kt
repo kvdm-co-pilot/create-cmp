@@ -17,13 +17,17 @@ import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
 import __PACKAGE__.presentation.theme.designToken
 
 /**
- * The list row (§4.5) — absorbs `HomeScreen`'s hand-rolled `Surface(shape/elevation/
- * designToken/clickable) { Column { Text; Text } }` block, the largest single hand-rolled
- * chunk (27 lines). Binds `RadiusCard`, `ElevationCard`, `PaddingCard`; enforces the 48 dp
- * a11y floor; the `clickable` sits on the `Surface` so the whole row is the target.
+ * The list row: title, optional subtitle, optional leading/trailing slots, on a card
+ * surface bound to `RadiusCard`, `ElevationCard`, and `PaddingCard`. The `clickable`
+ * sits on the `Surface`, so the whole row is the touch target, with a 48 dp minimum
+ * height. Reach for it in any list before hand-rolling a row.
  *
- * Item-level tags stay caller-side (`Modifier.testTag("home_item_$id")`) because ids are
- * domain data, not component structure.
+ * @param onClick Row-level click handler; the whole card is the target.
+ * @param modifier Per-item testTags go here (`Modifier.testTag("home_item_$id")`) — ids
+ *   are domain data, so the component does not derive them.
+ * @param subtitle Optional second line, in the muted variant color.
+ * @param leading Slot before the text column — an icon or avatar.
+ * @param trailing Slot after the text column — a chevron or badge.
  */
 @Composable
 fun ListItemCard(
