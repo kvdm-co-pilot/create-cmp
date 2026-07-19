@@ -14,14 +14,16 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 
 /**
- * The screen header — replaces the three hand-copied headline `Text`s (`home_title`,
- * `detail_title`, `profile_title`) and `DetailScreen`'s back-button-plus-a11y-fix (§1
- * items 1 and 6). Emitted tags reproduce today's names exactly, so existing selectors
- * survive.
+ * The screen header: a headline row with an optional back affordance and a trailing
+ * actions slot, tagged `<screenTag>_title` and `<screenTag>_back`. Deliberately not an
+ * M3 `TopAppBar` — no scroll behaviors, no center-aligned variants, no window-inset
+ * handling (`BaseScreen` owns insets, SHELL-03). A collapsing toolbar would be a
+ * registry addition, not a default.
  *
- * Deliberately **not** an M3 `TopAppBar`: no scroll behaviors, no center-aligned variants,
- * no window-inset handling — `BaseScreen` owns insets (SHELL-03). It is a `Row` with a
- * headline and slots.
+ * @param title Headline text, rendered in `headlineMedium`.
+ * @param screenTag Feature slug; derives the `<screenTag>_title` and `<screenTag>_back` tags.
+ * @param onBack Non-null renders a 48 dp back affordance left of the title.
+ * @param actions Trailing slot at the row's end, for per-screen controls.
  */
 @Composable
 fun AppHeader(

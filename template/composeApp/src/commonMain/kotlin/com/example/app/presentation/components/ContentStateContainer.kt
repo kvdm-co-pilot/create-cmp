@@ -14,15 +14,24 @@ import androidx.compose.ui.semantics.testTag
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
 
 /**
- * The centerpiece of the component vocabulary (§3): a general state container, not a
- * list-specific `ListBase`. Loading/Error/Empty/Content is the lifecycle of any
- * data-backed screen — the container owns the three non-content arms' UI; the screen
- * supplies its own content shape in the trailing slot.
+ * The state dispatcher for any data-backed screen: folds a [ContentUiState] into one of
+ * four rendered arms — loading, error, empty, content. The container owns the three
+ * non-content arms' UI and their derived testTags; the screen supplies only its content
+ * shape in the trailing slot. Every screen that loads data uses it; a feature whose
+ * state machine genuinely outgrows the four arms defines its own sealed type and skips
+ * the container — that divergence is visible in review.
  *
- * `screenTag` is required (a deliberate deviation from "everything else is optional"):
- * the harness's tests, golden trees, Maestro flows, and `audit_a11y` all key on
- * deterministic testTags (`<screenTag>_loading` / `_error` / `_retry` / `_empty`) — leaving
- * tags to each caller is how the template ended up with an untagged Profile body.
+ * @param state Current arm. The fold is exhaustive; exactly one arm renders.
+ * @param screenTag Feature slug ("home"). Required, not defaulted: tests, golden trees,
+ *   and E2E flows all key on the derived tags `<screenTag>_loading` / `_error` /
+ *   `_retry` / `_empty`, so tagging cannot be left to each caller.
+ * @param onRetry Non-null renders a retry control (`<screenTag>_retry`) in the default
+ *   error arm.
+ * @param loading Loading slot; defaults to a list-shaped skeleton
+ *   (`ContentStateDefaults.ListSkeleton`).
+ * @param error Error slot; receives the message carried by [ContentUiState.Error].
+ * @param empty Empty slot; defaults to [EmptyState] with its generic copy.
+ * @param content Content arm; receives the loaded data.
  */
 @Composable
 fun <T> ContentStateContainer(
@@ -45,14 +54,17 @@ fun <T> ContentStateContainer(
     }
 }
 
-/** Namespaced defaults, per the Compose guidelines' `ComponentDefaults` pattern. */
+/** Default slot implementations for [ContentStateContainer]. */
 object ContentStateDefaults {
 
     /**
-     * The default loading slot: a skeleton shaped like [ListItemCard], because the
-     * exemplar is a list (§2: skeletons for content-shaped loads, per NN/g and Chung's
-     * skeleton-screen research). The container carries the tag + a "Loading"
-     * `contentDescription`; the individual bars stay semantics-silent (decorative).
+     * The default loading slot: skeleton rows shaped like [ListItemCard], so the loaded
+     * list replaces them without a layout jump. The container node carries the
+     * `<screenTag>_loading` tag and a "Loading" `contentDescription`; the bars
+     * themselves are decorative and stay semantics-silent.
+     *
+     * @param screenTag Feature slug; tags the container `<screenTag>_loading`.
+     * @param rows Skeleton rows to render while loading.
      */
     @Composable
     fun ListSkeleton(screenTag: String, rows: Int = 3) {
@@ -69,7 +81,13 @@ object ContentStateDefaults {
         }
     }
 
-    /** A centered spinner for non-content-shaped waits (a short, single-module operation). */
+    /**
+     * A centered spinner, for waits that are not content-shaped (a short, single-value
+     * operation where a skeleton would promise the wrong layout). Carries the same
+     * `<screenTag>_loading` tag as the skeleton.
+     *
+     * @param screenTag Feature slug; tags the container `<screenTag>_loading`.
+     */
     @Composable
     fun Spinner(screenTag: String) {
         Box(

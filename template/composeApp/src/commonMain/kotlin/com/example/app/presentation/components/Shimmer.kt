@@ -25,11 +25,10 @@ import androidx.compose.ui.unit.dp
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
 
 /**
- * Left-to-right shimmer sweep on an [androidx.compose.animation.core.InfiniteTransition] +
- * a linear-gradient brush — perceived-faster than a pulse per the skeleton-screen research
- * surveyed in §2 (NN/g, Chung). Hand-rolled, zero new dependencies: Accompanist's
- * `placeholder` artifact is deprecated and Android-only, never an option for this
- * template's commonMain.
+ * A left-to-right shimmer sweep: an infinite transition driving a linear-gradient brush.
+ * Hand-rolled with zero dependencies — Accompanist's `placeholder` artifact is
+ * deprecated and Android-only, so no library option exists for this project's
+ * commonMain. Apply to any box that stands in for loading content.
  */
 fun Modifier.shimmer(): Modifier = composed {
     val transition = rememberInfiniteTransition(label = "shimmer")
@@ -56,11 +55,11 @@ fun Modifier.shimmer(): Modifier = composed {
 }
 
 /**
- * A card-shaped skeleton row mirroring [ListItemCard]'s real geometry (same tokens) so the
- * loaded layout doesn't jump. Decorative and non-interactive: semantics-silent by design —
- * the loading *container* carries the `<screenTag>_loading` tag and a "Loading"
- * `contentDescription` (see `ContentStateDefaults.ListSkeleton`), so `audit_a11y`/SHELL-04
- * (which govern interactive nodes) are untouched.
+ * A skeleton row matching [ListItemCard]'s geometry — same shape, elevation, and padding
+ * tokens — so the loaded list replaces it without a layout jump. Decorative and
+ * semantics-silent by design: the loading container (`ContentStateDefaults.ListSkeleton`)
+ * carries the `<screenTag>_loading` tag and the "Loading" `contentDescription`, so
+ * assistive tech announces one loading state, not a stack of anonymous bars.
  */
 @Composable
 fun ListItemSkeleton(modifier: Modifier = Modifier) {

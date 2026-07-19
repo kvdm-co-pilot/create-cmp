@@ -14,10 +14,15 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 
 /**
- * The Empty arm of the four-state contract (§3, §4.7) — not a standalone invention, but
- * the extraction of the landed EH-1 empty-state UI (`HomeScreen`'s hand-rolled `Box` +
- * `Text`), keeping its `<screenTag>_empty` tag and adding the icon/action anatomy an
- * empty state grows next.
+ * The Empty arm of the four-state contract: shown when a load succeeds with nothing to
+ * list. Tags itself `<screenTag>_empty`, so the state is selectable in tests and E2E
+ * flows. The default copy is deliberately generic — a shaped feature replaces
+ * `title`/`body` with its own domain language.
+ *
+ * @param screenTag Feature slug; the root is tagged `<screenTag>_empty`.
+ * @param title Headline. The default is placeholder copy, meant to be replaced per feature.
+ * @param body Optional supporting line under the title.
+ * @param action Optional call-to-action below the text — an [AppTextButton], for example.
  */
 @Composable
 fun EmptyState(

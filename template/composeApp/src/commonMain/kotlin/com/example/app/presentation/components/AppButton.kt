@@ -9,12 +9,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * Two buttons, no more (§4.9) — justified solely by §1 item 6: M3 buttons fail the
- * harness's own 48 dp `audit_a11y` bar by default, and the fix used to live as a
- * copy-me comment in `DetailScreen`. These wrap M3 once, apply the 48 dp minimum
- * pointer target (WCAG 2.2 SC 2.5.8 AA clears with Material margin), and bind label
- * styling to the theme. A full button system (icons, loading buttons, destructive
- * variants, FABs) is not proposed — no measured pain.
+ * The filled call-to-action button: M3 `Button` with a 48 dp minimum touch target
+ * applied. Stock M3 buttons sit below that floor by default; wrapping them here clears
+ * WCAG 2.2 SC 2.5.8 and the harness's `audit_a11y` bar once, for every call site.
  */
 @Composable
 fun AppPrimaryButton(
@@ -32,6 +29,11 @@ fun AppPrimaryButton(
     }
 }
 
+/**
+ * The low-emphasis text button, with the same 48 dp floor as [AppPrimaryButton]. These
+ * two are the registry's only buttons — a new variant (icon, loading, destructive, FAB)
+ * is a registry addition a human approves, not a local tweak.
+ */
 @Composable
 fun AppTextButton(
     text: String,
@@ -48,7 +50,7 @@ fun AppTextButton(
     }
 }
 
-/** Namespaced defaults, per the Compose guidelines' `ComponentDefaults` pattern. */
+/** Shared button constants, following the `ComponentDefaults` naming convention. */
 object AppButtonDefaults {
     val MinTouchTarget = 48.dp
 }

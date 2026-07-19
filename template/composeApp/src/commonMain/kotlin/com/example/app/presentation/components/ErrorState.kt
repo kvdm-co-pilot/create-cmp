@@ -14,10 +14,14 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 
 /**
- * The Error arm of the four-state contract (§3, §4.8) — closes HOME-04 (`specs/home.spec.md`):
- * when a retry handler is supplied, a `<screenTag>_retry` control at least 48 dp renders
- * (SC 2.5.8 / the harness's `audit_a11y` bar), fixing the defect where the error branch
- * had no rendered affordance at all.
+ * The Error arm of the four-state contract: renders the message and, when a retry
+ * handler is supplied, a `<screenTag>_retry` control with a 48 dp touch target. The
+ * error state is a rendered, testable affordance — not just a ViewModel arm.
+ *
+ * @param message User-facing copy. Presentation maps a `DomainError` kind to it; never
+ *   pass a raw exception string.
+ * @param screenTag Feature slug; derives the `<screenTag>_error` and `<screenTag>_retry` tags.
+ * @param onRetry Non-null renders the retry control; null renders the message alone.
  */
 @Composable
 fun ErrorState(

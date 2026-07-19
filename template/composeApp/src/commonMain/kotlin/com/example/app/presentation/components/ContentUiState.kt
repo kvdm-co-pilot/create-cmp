@@ -1,13 +1,10 @@
 package __PACKAGE__.presentation.components
 
 /**
- * The four-way lifecycle of any data-backed screen. Sealed so a `when` is exhaustive — a
- * screen cannot forget a state, and cannot render two at once.
- *
- * This is the **generalization of the landed EH-1 pattern**: `HomeViewModel`'s
- * pre-generalization `HomeUiState` had exactly these four arms (Loading/Content/Empty/Error) —
- * the same fold, made generic once so a shared container ([ContentStateContainer]) can own
- * the three non-content arms' rendering instead of every feature hand-folding its own copy.
+ * The four-way lifecycle of a data-backed screen: Loading, Error, Empty, Content.
+ * Sealed so a `when` over it is exhaustive — a screen cannot forget a state, and cannot
+ * render two at once. ViewModels fold repository results into this type;
+ * [ContentStateContainer] renders it.
  */
 sealed interface ContentUiState<out T> {
     data object Loading : ContentUiState<Nothing>

@@ -30,11 +30,14 @@ import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
 import __PACKAGE__.presentation.theme.designToken
 
 /**
- * The bottom tab bar, promoted out of `AppShell`'s private composables into the governed
- * registry (§4.3) — it was already a mature component (48 dp targets, deterministic
- * `nav_*` tags, token-bound colors, the `BottomNavHeight` self-report), just invisible to
- * the governed glob and genesis conversation 3 as a `private` composable. This is an
- * extraction, not a redesign — output is byte-identical to the pre-extraction shell.
+ * The bottom tab bar: one item per tab, icon over label. Owns the 48 dp touch targets,
+ * the deterministic `nav_<slug>` testTags, token-bound colors, the navigation-bar inset
+ * padding, and the `BottomNavHeight` inspector self-report. Selection state stays with
+ * the caller; `AppShell` wires it.
+ *
+ * @param tabs Tabs in display order; each label also derives its item's `nav_*` testTag.
+ * @param selectedIndex Index of the selected tab in [tabs].
+ * @param onSelect Called with the index of the tapped tab.
  */
 @Composable
 fun AppBottomBar(
@@ -86,13 +89,23 @@ fun AppBottomBar(
     }
 }
 
-/** Deterministic automation tag for a nav item: `nav_` + the label lowercased with every non-[a-z0-9] run collapsed to `_` and trimmed (e.g. "My Stuff!" → `nav_my_stuff`). Must mirror `navSlug` in create-cmp's engine (src/lib/tabs.mjs), which generates `qa/e2e/smoke.yaml`'s id selectors from the configured tabs — keep the two in sync. */
+/**
+ * Deterministic automation tag for a nav item: `nav_` + the label lowercased with every
+ * non-[a-z0-9] run collapsed to `_` and trimmed (e.g. "My Stuff!" → `nav_my_stuff`).
+ * Must mirror `navSlug` in create-cmp's engine (src/lib/tabs.mjs), which generates
+ * `qa/e2e/smoke.yaml`'s id selectors from the configured tabs — keep the two in sync.
+ */
 private fun navItemTag(label: String): String =
     "nav_" + label.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
 
-// Internal (not private) so the desktopMain component story (inspector/
-// ComponentStories.kt, `component.nav-item`) can render it in isolation;
-// still absent from the public API surface.
+/**
+ * A single tab item: icon over label, a 48 dp minimum touch target, tagged from its
+ * label via [navItemTag]. Internal (not private) so the component story
+ * (`component.nav-item`) can render it in isolation; absent from the public API surface.
+ *
+ * @param selected True renders the item in the selected treatment (primary color, bold label).
+ * @param icon Icon slot, rendered above the label.
+ */
 @Composable
 internal fun NavItem(
     label: String,
