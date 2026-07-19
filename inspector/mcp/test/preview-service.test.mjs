@@ -428,7 +428,10 @@ test("galleryHtml embeds cards, changed flags, version cache-buster, and the err
       },
     ],
   });
-  assert.match(html, /Acme — live previews/);
+  // STUDIO-REDESIGN §2: the shell — title, rail (app name + nav), page grammar.
+  assert.match(html, /<title>Acme &middot; studio<\/title>/);
+  assert.match(html, /class="rail-app">Acme</, "rail carries the app name");
+  assert.match(html, /class="page-foot">.*absence = not derivable/, "provenance footer present");
   assert.match(html, /card changed/, "changed card is flagged");
   assert.match(html, /\/previews\/home\/screen\.png\?v=7/, "png served with version buster");
   assert.match(html, /1 violation\(s\)/);
