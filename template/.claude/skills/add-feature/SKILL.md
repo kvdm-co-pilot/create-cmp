@@ -3,7 +3,8 @@ name: add-feature
 description: >-
   Add a new conforming vertical-slice feature (Screen + ViewModel + UseCase + Repository + spec
   + tests + golden tree + nav route + DI wiring) to this Compose Multiplatform app, cloned
-  deterministically from the `home` exemplar. Use this when the user wants to "add a feature",
+  deterministically from the project's configured exemplar feature (qa/approvals.json's
+  exemplarFeature — `home` by default). Use this when the user wants to "add a feature",
   "add a screen with data", "scaffold a feature", "create a new screen backed by a repository",
   "add a list screen", or names a new domain noun they want a screen for (e.g. "add a Favorites
   feature", "I need a Bookmarks screen"). Works with NO create-cmp plugin installed — the
@@ -13,10 +14,27 @@ description: >-
 # add-feature — stamp a conforming vertical slice
 
 > Spec-first, deterministic-stamp, gate-proven. The script (`qa/scaffold-feature.mjs`) does the
-> mechanical work — copy the `home` exemplar file set, whole-word identifier rename, anchor
+> mechanical work — copy the exemplar file set, whole-word identifier rename, anchor
 > injection into the three shared files. You (the AI) only refine spec wording and adapt the
 > feature to its real shape. You are not done until `node qa/verify.mjs` PASSes and the receipt
 > is committed — see this project's `CLAUDE.md`.
+
+## The clone source is configurable
+
+The stamper clones from the project's **configured exemplar** — `qa/approvals.json`'s
+top-level `"exemplarFeature"` key (absent ⇒ `home`, the shipped exemplar). This is the same
+resolution the approvals registry uses for the governed `exemplar-feature` artifact, so what
+gets stamped is always exactly what the human signed off on. After the genesis walk retargets
+`exemplarFeature` to the user's own first feature, every stamp from then on clones *their*
+pattern in *their* domain language — do not assume `home` still exists as the exemplar; read
+the config (or just run the stamper: it resolves the source itself).
+
+If the configured exemplar has grown files beyond the canonical 11-file shape (an extra
+ViewModel, a helper, a second use case named for its entity), the stamper clones **only the
+canonical set** and prints a `WARNING:` listing exactly what it skipped — never silently.
+When you see that warning, tell the human: the extras are part of the exemplar's pattern in
+spirit but not in mechanism, and porting them into the new feature (or slimming the exemplar
+back to canon) is a deliberate follow-up, not something to ignore.
 
 ## Why a stamper and not hand-written files
 
@@ -60,7 +78,7 @@ This writes the new Screen/ViewModel/UseCase/Repository(+impl)/tests/fake, wires
 `di/AppModule.kt`, `presentation/navigation/Screen.kt`, and `presentation/navigation/AppNavHost.kt`
 at their `// cmp:anchor` markers, and writes `specs/<feature>.spec.md` with a default six-clause
 set (`<FEATURE>-01..06`: loading, success, error, reload-after-failure, tap-navigates, golden
-tree) — copied verbatim from the `home` exemplar's shape.
+tree) — copied verbatim from the configured exemplar's shape.
 
 The stamped screen arrives **already wrapped in `BaseScreen { … }`** (SHELL-05): it is a
 pushed NavHost destination, so unlike the tab exemplar it must handle its own insets — the
@@ -73,7 +91,7 @@ flagging, not something to route around by hand-splicing.
 
 ### 4. Refine the spec, then the behavior
 
-The default spec clauses are placeholders shaped like the `home` exemplar (a plain list of
+The default spec clauses are placeholders shaped like the exemplar (by default a plain list of
 title/subtitle rows). **Rewrite the clause prose** in `specs/<feature>.spec.md` to describe the
 feature's real behavior — the six clause **ids stay fixed** (`specCoverage` binds tests to ids,
 not prose), only the wording changes. Propose the rewritten clauses to the human; get them

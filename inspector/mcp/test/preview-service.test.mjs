@@ -21,6 +21,7 @@ import { resetCommentsBridgeCache } from "../src/lib/comments-bridge.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REAL_APPROVALS_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "approvals.mjs");
 const FIXTURE_COMMENTS_LIB = path.join(HERE, "fixtures", "fixture-comments-lib.mjs");
+const FIXTURE_APPROVALS_LIB = path.join(HERE, "fixtures", "fixture-approvals-lib.mjs");
 
 /**
  * A minimal generated-project fixture with a REAL qa/lib/approvals.mjs AND the
@@ -65,6 +66,22 @@ function makeApprovalsFixtureProject() {
   const libDir = path.join(root, "qa", "lib");
   fs.mkdirSync(libDir, { recursive: true });
   fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+  return root;
+}
+
+/**
+ * A minimal generated-project fixture with the test fixture's
+ * qa/lib/approvals.mjs (test/fixtures/fixture-approvals-lib.mjs — the §3
+ * reopenArtifact/mode contract; see that file's header for why the
+ * /api/reopen tests don't depend on template/qa/lib/approvals.mjs, which
+ * Agent T is landing reopenArtifact into in parallel with this wave).
+ */
+function makeReopenFixtureProject() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-reopen-"));
+  fs.mkdirSync(path.join(root, "composeApp", "src"), { recursive: true });
+  const libDir = path.join(root, "qa", "lib");
+  fs.mkdirSync(libDir, { recursive: true });
+  fs.copyFileSync(FIXTURE_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
   return root;
 }
 
@@ -1255,6 +1272,323 @@ test("service: resolveComment (the agent primitive) writes the resolution via th
     const page = await (await fetch(st.url)).text();
     assert.match(page, /badge-resolved/);
     assert.match(page, /clarified in the spec/);
+  } finally {
+    service.stop();
+    resetCommentsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+// --- Reopen wiring (GENESIS-FLOW-DESIGN.md §2/§3) ---------------------------
+
+test("service: POST /api/reopen moves an approved artifact to reopened, writes the ledger, and the gallery page reflects it", async () => {
+  const projectDir = makeReopenFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19880, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+
+    const res = await fetch(`${st.url}api/reopen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.ok, true);
+
+    const written = JSON.parse(fs.readFileSync(path.join(projectDir, "qa", "approvals.json"), "utf8"));
+    const rec = written.artifacts.find((a) => a.artifact === "design-system");
+    assert.equal(rec.status, "reopened");
+    assert.ok(rec.reopenedAt);
+
+    const page = await (await fetch(st.url)).text();
+    assert.match(page, /badge-reopened/);
+    assert.match(page, /banner-genesis/, "a reopened artifact reads back as genesis mode");
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: POST /api/reopen surfaces the library's refusal verbatim (non-approved / unknown artifact) and rejects non-POST/bad JSON", async () => {
+  const projectDir = makeReopenFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19881, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const neverApproved = await fetch(`${st.url}api/reopen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "architecture" }),
+    });
+    assert.equal(neverApproved.status, 409);
+    const neverApprovedBody = await neverApproved.json();
+    assert.equal(neverApprovedBody.ok, false);
+    assert.match(neverApprovedBody.reason, /not currently approved/);
+
+    const unknown = await fetch(`${st.url}api/reopen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "not-a-real-artifact" }),
+    });
+    assert.equal(unknown.status, 409);
+    assert.match((await unknown.json()).reason, /unknown artifact/);
+
+    const badJson = await fetch(`${st.url}api/reopen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not json",
+    });
+    assert.equal(badJson.status, 400);
+
+    const getInstead = await fetch(`${st.url}api/reopen`);
+    assert.equal(getInstead.status, 405);
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: POST /api/reopen against a project whose lib predates reopenArtifact degrades honestly (409 + reason, no crash)", async () => {
+  // A hand-written stub, NOT template/qa/lib/approvals.mjs — that file has
+  // since gained reopenArtifact (Agent T's parallel wave), so asserting
+  // against it would make this test's outcome depend on merge order. The
+  // stub pins the same SHAPE ("a real library, just an older one") deterministically.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-predates-reopen-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const libDir = path.join(projectDir, "qa", "lib");
+  fs.mkdirSync(libDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(libDir, "approvals.mjs"),
+    "export function getApprovalStatuses() { return []; }\n" +
+      'export function approveArtifact() { return { ok: false, reason: "n/a" }; }\n',
+  );
+  const service = createPreviewService({ projectDir, port: 19882, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const res = await fetch(`${st.url}api/reopen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+    assert.equal(res.status, 409);
+    const body = await res.json();
+    assert.equal(body.ok, false);
+    assert.match(body.reason, /predates the reopen wave/);
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: POST /api/reopen broadcasts the SAME SSE 'approval' event type as /api/approve (§3: existing in-place refresh covers the panel)", async () => {
+  const projectDir = makeReopenFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19883, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+
+    const sseRes = await fetch(`${st.url}events`);
+    const reader = sseRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    async function nextEvent() {
+      while (!buf.includes("\n\n")) {
+        const { value, done } = await reader.read();
+        if (done) throw new Error("SSE stream closed early");
+        buf += decoder.decode(value, { stream: true });
+      }
+      const idx = buf.indexOf("\n\n");
+      const chunk = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      return JSON.parse(chunk.replace(/^data: /, ""));
+    }
+    assert.equal((await nextEvent()).type, "hello");
+
+    await fetch(`${st.url}api/reopen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+
+    const evt = await nextEvent();
+    assert.equal(evt.type, "approval");
+    assert.equal(evt.artifact, "design-system");
+    reader.cancel();
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: waitForApprovalDecision also settles on a reopen (it's just another status change)", async () => {
+  const projectDir = makeReopenFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19884, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+    await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+
+    const pending = service.waitForApprovalDecision(5000);
+    await fetch(`${st.url}api/reopen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+    const settled = await pending;
+    assert.equal(settled.timedOut, false);
+    assert.ok(settled.changed.includes("design-system"));
+    assert.equal(settled.statuses.find((s) => s.id === "design-system").status, "reopened");
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+// --- snapshot_variant / candidates strip (GENESIS-FLOW-DESIGN.md §2) --------
+
+test("service: snapshotVariant refuses an invalid name and refuses when there's no current render yet", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-variants-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const service = createPreviewService({ projectDir, port: 19885, hot: false, runRender: async () => {} });
+  try {
+    await service.start(); // no manifest.json on disk yet -> no render loaded -> cards stays empty
+    const badName = service.snapshotVariant("Warmer V2!");
+    assert.equal(badName.ok, false);
+    assert.match(badName.reason, /\[a-z0-9-\]\+/);
+
+    const noRender = service.snapshotVariant("warmer");
+    assert.equal(noRender.ok, false);
+    assert.match(noRender.reason, /no current render/);
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: snapshotVariant stashes every current screen's PNG + design-system.json under variants/<name>/, and REPLACES an existing variant of the same name", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-variants-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+
+  const service = createPreviewService({
+    projectDir,
+    port: 19886,
+    hot: false,
+    runRender: async () => {
+      writeFakePreviews(previewsDir, ["shell", "home"]);
+      fs.writeFileSync(path.join(previewsDir, "design-system.json"), JSON.stringify({ colors: { Primary: "#111" } }));
+    },
+  });
+  try {
+    await service.start();
+    await new Promise((r) => setTimeout(r, 150)); // let the first render land
+
+    const result = service.snapshotVariant("warmer");
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.screens.sort(), ["home", "shell"]);
+    assert.equal(result.designSystemStashed, true);
+
+    const variantDir = path.join(previewsDir, "variants", "warmer");
+    assert.ok(fs.existsSync(path.join(variantDir, "home", "screen.png")));
+    assert.ok(fs.existsSync(path.join(variantDir, "shell", "screen.png")));
+    assert.ok(fs.existsSync(path.join(variantDir, "design-system.json")));
+
+    // Mark the stash with a sentinel, then re-render + re-snapshot the SAME
+    // name — the old stash must be gone, not merged with the new one.
+    fs.writeFileSync(path.join(variantDir, "sentinel.txt"), "old stash");
+    const replaced = service.snapshotVariant("warmer");
+    assert.equal(replaced.ok, true);
+    assert.equal(fs.existsSync(path.join(variantDir, "sentinel.txt")), false, "the old variant contents are replaced, not merged");
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: the served gallery page's candidates strip appears only in genesis mode, driven by real approvals + stashed variants together", async () => {
+  const projectDir = makeReopenFixtureProject();
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+  const variantDir = path.join(previewsDir, "variants", "warmer");
+  fs.mkdirSync(path.join(variantDir, "home"), { recursive: true });
+  fs.writeFileSync(path.join(variantDir, "home", "screen.png"), Buffer.from([0x89, 0x50]));
+
+  const service = createPreviewService({ projectDir, port: 19887, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    // design-system is unreviewed by default (fixture lib, nothing approved yet) -> genesis mode.
+    const genesisPage = await (await fetch(st.url)).text();
+    assert.match(genesisPage, /class="candidates-strip"/);
+    assert.match(genesisPage, /<h4>warmer<\/h4>/);
+    assert.match(genesisPage, /data-variant="warmer"/);
+
+    // Approve it -> steward mode -> the strip disappears entirely, even though the
+    // SAME stashed variant is still sitting on disk.
+    await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "design-system" }),
+    });
+    const stewardPage = await (await fetch(st.url)).text();
+    assert.doesNotMatch(stewardPage, /class="candidates-strip"/);
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: the Pick flow — the EXACT payload the strip's Pick button posts lands in the comments ledger, observable via waitForNewComment (§2: no new decision machinery)", async () => {
+  const projectDir = makeCommentsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19888, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const pending = service.waitForNewComment(5000);
+    // Mirrors wirePickButtons' exact fetch body (preview-service.mjs's client script).
+    const res = await fetch(`${st.url}api/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: { type: "design-system" }, text: "pick:warmer" }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.comment.author, "human-console");
+
+    const settled = await pending;
+    assert.equal(settled.timedOut, false);
+    assert.equal(settled.added.length, 1);
+    assert.equal(settled.added[0].text, "pick:warmer");
+    assert.deepEqual(settled.added[0].target, { type: "design-system" });
   } finally {
     service.stop();
     resetCommentsBridgeCache(projectDir);

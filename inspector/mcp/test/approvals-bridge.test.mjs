@@ -12,11 +12,13 @@ import { fileURLToPath } from "node:url";
 import {
   getApprovalsData,
   approveArtifact,
+  reopenArtifact,
   resetApprovalsBridgeCache,
 } from "../src/lib/approvals-bridge.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REAL_APPROVALS_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "approvals.mjs");
+const FIXTURE_APPROVALS_LIB = path.join(HERE, "fixtures", "fixture-approvals-lib.mjs");
 
 /**
  * A minimal generated-project fixture: a resolvable package (namespace in
@@ -149,6 +151,92 @@ test("mid-session library install: a library added AFTER a (miss) lookup is pick
     // And the write path works immediately too, on the same un-reset bridge.
     const result = await approveArtifact(root, "design-system");
     assert.equal(result.ok, true);
+  } finally {
+    cleanup(root);
+  }
+});
+
+// --- reopenArtifact (GENESIS-FLOW-DESIGN.md §2/§3) --------------------------
+//
+// Against the FIXTURE lib (test/fixtures/fixture-approvals-lib.mjs), not
+// template/qa/lib/approvals.mjs — Agent T builds reopenArtifact into the real
+// library in parallel with this wave, and these tests must not depend on
+// that landing first (see the fixture's header). The "predates reopen"
+// degrade test below deliberately uses the REAL current template lib instead
+// — today it genuinely has no reopenArtifact export, which is exactly the
+// honest-degrade scenario that test pins.
+
+function makeReopenFixtureProject() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-approvals-reopen-"));
+  const libDir = path.join(root, "qa", "lib");
+  fs.mkdirSync(libDir, { recursive: true });
+  fs.copyFileSync(FIXTURE_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+  return root;
+}
+
+test("reopenArtifact: approved -> reopened, recording reopenedAt, via the fixture library (bridge passthrough, nothing re-implemented here)", async () => {
+  const root = makeReopenFixtureProject();
+  try {
+    const approved = await approveArtifact(root, "design-system");
+    assert.equal(approved.ok, true);
+
+    const result = await reopenArtifact(root, "design-system");
+    assert.equal(result.ok, true);
+    assert.equal(result.artifact, "design-system");
+
+    const data = await getApprovalsData(root);
+    const status = data.statuses.find((s) => s.id === "design-system");
+    assert.equal(status.status, "reopened");
+    assert.ok(status.reopenedAt, "reopenedAt is recorded");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("reopenArtifact: refuses an unreviewed artifact (nothing to reopen) and an unknown id, verbatim from the library", async () => {
+  const root = makeReopenFixtureProject();
+  try {
+    const neverApproved = await reopenArtifact(root, "architecture");
+    assert.equal(neverApproved.ok, false);
+    assert.match(neverApproved.reason, /not currently approved/);
+
+    const unknown = await reopenArtifact(root, "not-a-real-artifact");
+    assert.equal(unknown.ok, false);
+    assert.match(unknown.reason, /unknown artifact/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("reopenArtifact: honest refusal (not a throw) when the project has no approvals library at all", async () => {
+  const root = makeFixtureProject({ withApprovalsLib: false });
+  try {
+    const result = await reopenArtifact(root, "design-system");
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /not present in this project/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("reopenArtifact: honest degrade (not a crash) against a lib that predates the reopen wave (no reopenArtifact export)", async () => {
+  // Deliberately NOT template/qa/lib/approvals.mjs (Agent T lands
+  // reopenArtifact there in parallel with this wave — asserting against it
+  // would make this test's outcome depend on merge order). A hand-written
+  // stub with getApprovalStatuses/approveArtifact but no reopenArtifact
+  // pins the SAME shape ("a real library, just an older one") deterministically.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-approvals-predates-reopen-"));
+  try {
+    const libDir = path.join(root, "qa", "lib");
+    fs.mkdirSync(libDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(libDir, "approvals.mjs"),
+      "export function getApprovalStatuses() { return []; }\n" +
+        'export function approveArtifact() { return { ok: false, reason: "n/a" }; }\n',
+    );
+    const result = await reopenArtifact(root, "design-system");
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /predates the reopen wave/);
   } finally {
     cleanup(root);
   }

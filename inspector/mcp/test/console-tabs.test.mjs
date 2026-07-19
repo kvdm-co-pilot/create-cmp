@@ -103,11 +103,11 @@ test("approvalsTabHtml: §1 order numbers, status badges, short hash, and an App
       },
     ],
   });
-  // §1 ordered-walk numbering.
+  // §1 ordered-walk numbering (GENESIS-FLOW-DESIGN.md §1's registry table).
   assert.match(html, /<td class="order-num">1<\/td>/, "design-system is #1");
   assert.match(html, /<td class="order-num">2<\/td>/, "architecture is #2");
-  assert.match(html, /<td class="order-num">3<\/td>/, "exemplar-feature is #3");
-  assert.match(html, /<td class="order-num">5<\/td>/, "feature-spec:* is #5");
+  assert.match(html, /<td class="order-num">4<\/td>/, "exemplar-feature is #4");
+  assert.match(html, /<td class="order-num">6<\/td>/, "feature-spec:* is #6");
   // Status badges.
   assert.match(html, /badge-approved/);
   assert.match(html, /badge-unreviewed/);
@@ -121,6 +121,157 @@ test("approvalsTabHtml: §1 order numbers, status badges, short hash, and an App
   assert.match(html, /missing: specs\/tags\.spec\.md/);
   // A resolvable artifact's button is NOT disabled.
   assert.doesNotMatch(html, /data-artifact="design-system"[^>]*disabled/);
+  // §3 Reopen control: only on the approved row (design-system), never on the
+  // others (unreviewed/changed-since-approval — reopening either is meaningless).
+  assert.match(html, /<button class="reopen-btn" data-artifact="design-system">Reopen<\/button>/);
+  assert.doesNotMatch(html, /data-artifact="architecture">Reopen/);
+  assert.doesNotMatch(html, /data-artifact="exemplar-feature">Reopen/);
+  // §2 genesis/steward banners: unreviewed -> genesis guide text; approved -> steward.
+  assert.match(html, /banner-genesis">.*layer map and structural decisions/);
+  assert.match(html, /banner-steward">.*frozen — drift is detected automatically/);
+});
+
+// --- §2/§3 GENESIS-FLOW-DESIGN.md additions: reopened, unshaped, banners ----
+
+test("approvalsTabHtml: reopened status gets its own badge, distinct from unreviewed, and a genesis banner", () => {
+  const html = approvalsTabHtml({
+    available: true,
+    statuses: [
+      {
+        id: "design-system",
+        label: "Design system",
+        status: "reopened",
+        hash: "abcdef0123456789",
+        storedHash: "abcdef0123456789",
+        approvedAt: "2026-07-18T09:00:00.000Z",
+        reopenedAt: "2026-07-19T09:00:00.000Z",
+        fileCount: 2,
+        missing: [],
+        resolvable: true,
+      },
+    ],
+  });
+  assert.match(html, /badge-reopened">reopened/, "reopened has its own badge class + label");
+  assert.doesNotMatch(html, /badge-unreviewed">reopened/, "never collapsed into the unreviewed badge");
+  // Reopened behaves like unreviewed for the Approve button (it's back in genesis).
+  assert.match(html, /<button class="approve-btn" data-artifact="design-system">Approve<\/button>/);
+  // No Reopen button on an already-reopened row (only approved rows get one).
+  assert.doesNotMatch(html, /reopen-btn/);
+  // Genesis banner, same as unreviewed.
+  assert.match(html, /banner-genesis">.*palette, type, and shape/);
+});
+
+test("approvalsTabHtml: mode 'defaults-accepted' renders as approved-but-unshaped, distinct from a shaped approval", () => {
+  const shaped = approvalsTabHtml({
+    available: true,
+    statuses: [
+      {
+        id: "design-system",
+        label: "Design system",
+        status: "approved",
+        hash: "abcdef0123456789",
+        storedHash: "abcdef0123456789",
+        approvedAt: "2026-07-18T09:00:00.000Z",
+        fileCount: 2,
+        missing: [],
+        resolvable: true,
+      },
+    ],
+  });
+  assert.doesNotMatch(shaped, /defaults accepted/);
+  assert.match(shaped, /banner-steward">.*frozen — drift is detected automatically/);
+  assert.doesNotMatch(shaped, /banner-unshaped/);
+
+  const unshaped = approvalsTabHtml({
+    available: true,
+    statuses: [
+      {
+        id: "design-system",
+        label: "Design system",
+        status: "approved",
+        mode: "defaults-accepted",
+        hash: "abcdef0123456789",
+        storedHash: "abcdef0123456789",
+        approvedAt: "2026-07-18T09:00:00.000Z",
+        fileCount: 2,
+        missing: [],
+        resolvable: true,
+      },
+    ],
+  });
+  assert.match(unshaped, /approved · defaults accepted — unshaped/);
+  assert.match(unshaped, /badge-approved badge-unshaped/);
+  assert.match(unshaped, /banner-unshaped">.*approved with defaults — unshaped/);
+  // Still gets a Reopen button — it IS approved, just unshaped.
+  assert.match(unshaped, /reopen-btn" data-artifact="design-system"/);
+});
+
+test("approvalsTabHtml: tolerates an older project lib that lacks reopened/mode — absent field never fabricates a state", () => {
+  // Exactly the shape getApprovalStatuses returns from a pre-reopen-wave
+  // qa/lib/approvals.mjs: no `mode`, and `status` can never BE "reopened"
+  // (that value doesn't exist in the older library's vocabulary at all).
+  const html = approvalsTabHtml({
+    available: true,
+    statuses: [
+      {
+        id: "design-system",
+        label: "Design system",
+        status: "approved",
+        hash: "abcdef0123456789",
+        storedHash: "abcdef0123456789",
+        approvedAt: "2026-07-18T09:00:00.000Z",
+        fileCount: 2,
+        missing: [],
+        resolvable: true,
+      },
+    ],
+  });
+  assert.doesNotMatch(html, /defaults accepted/, "no mode field -> never fabricate the unshaped note");
+  assert.doesNotMatch(html, /badge-unshaped/);
+  assert.match(html, /badge-approved">approved/, "plain approved label, unmodified");
+});
+
+test("designSystemTabHtml: candidates strip is genesis-mode-only — absent entirely in steward mode or when status is omitted", () => {
+  const variants = { available: true, variants: [{ name: "warmer", screens: [{ id: "home", png: "variants/warmer/home/screen.png" }], hasDesignSystem: true }] };
+  const steward = designSystemTabHtml({ available: false }, undefined, variants, "approved");
+  assert.doesNotMatch(steward, /candidates-strip/, "steward mode omits the strip entirely");
+  assert.doesNotMatch(steward, /Design-language candidates/);
+
+  const omitted = designSystemTabHtml({ available: false }, undefined, variants); // no artifactStatus arg
+  assert.doesNotMatch(omitted, /candidates-strip/, "an unspecified status is the safe (steward) default");
+});
+
+test("designSystemTabHtml: candidates strip in genesis mode — empty state when nothing stashed, rendered cards + Pick when stashed", () => {
+  const emptyHtml = designSystemTabHtml({ available: false }, undefined, { available: false }, "unreviewed");
+  assert.match(emptyHtml, /Design-language candidates/);
+  assert.match(emptyHtml, /No design-language candidates stashed yet/);
+  assert.match(emptyHtml, /snapshot_variant/);
+
+  const variants = {
+    available: true,
+    variants: [
+      { name: "warmer", screens: [{ id: "home", png: "variants/warmer/home/screen.png" }], hasDesignSystem: true },
+      { name: "rounded-v2", screens: [], hasDesignSystem: false },
+    ],
+  };
+  const html = designSystemTabHtml({ available: false }, undefined, variants, "reopened");
+  assert.match(html, /class="candidates-strip"/);
+  assert.match(html, /<h4>warmer<\/h4>/);
+  assert.match(html, /src="\/previews\/variants\/warmer\/home\/screen\.png"/);
+  assert.match(html, /data-variant="warmer"/);
+  assert.match(html, /Pick &ldquo;warmer&rdquo;/);
+  assert.match(html, /<h4>rounded-v2<\/h4>/);
+  assert.match(html, /no screens stashed for this candidate/, "a variant with zero stashed screens is shown honestly");
+});
+
+test("designSystemTabHtml: candidate name is HTML/attribute escaped (variant names appear in HTML — esc() rigor)", () => {
+  const variants = {
+    available: true,
+    variants: [{ name: 'warmer"><script>x', screens: [], hasDesignSystem: false }],
+  };
+  const html = designSystemTabHtml({ available: false }, undefined, variants, "unreviewed");
+  assert.doesNotMatch(html, /<script>x/, "raw script tag never appears unescaped");
+  assert.match(html, /&lt;script&gt;/);
 });
 
 test("specsTabHtml: unavailable -> honest empty-state", () => {

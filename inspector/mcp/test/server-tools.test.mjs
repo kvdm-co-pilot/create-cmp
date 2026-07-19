@@ -4,7 +4,8 @@
 // directly; this is the one seam that pins bin/server.mjs's tool REGISTRY
 // itself — specifically that review_comments and resolve_comment (VL-7,
 // §7.3) are wired up with valid schemas, taking the count from 23 to 25
-// (VERIFICATION-LAYER-DESIGN.md §7.3's "server.mjs, 23 → 25 tools").
+// (VERIFICATION-LAYER-DESIGN.md §7.3's "server.mjs, 23 → 25 tools"), and that
+// snapshot_variant (GENESIS-FLOW-DESIGN.md §2/§3) takes it from 25 to 26.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
@@ -26,10 +27,10 @@ async function withClient(fn) {
   }
 }
 
-test("bin/server.mjs registers 25 tools, including review_comments and resolve_comment with valid schemas", async () => {
+test("bin/server.mjs registers 26 tools, including review_comments, resolve_comment, and snapshot_variant with valid schemas", async () => {
   await withClient(async (client) => {
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 25, "23 pre-VL-7 tools + review_comments + resolve_comment");
+    assert.equal(tools.length, 26, "23 pre-VL-7 tools + review_comments + resolve_comment + snapshot_variant");
 
     const byName = new Map(tools.map((t) => [t.name, t]));
 
@@ -48,6 +49,21 @@ test("bin/server.mjs registers 25 tools, including review_comments and resolve_c
     assert.deepEqual(resolve.inputSchema.required?.sort(), ["id", "note"]);
     assert.ok(resolve.inputSchema.properties.id);
     assert.ok(resolve.inputSchema.properties.note);
+
+    const snapshotVariant = byName.get("snapshot_variant");
+    assert.ok(snapshotVariant, "snapshot_variant is registered");
+    assert.match(snapshotVariant.description, /variant/i);
+    assert.equal(snapshotVariant.inputSchema.type, "object");
+    assert.deepEqual(snapshotVariant.inputSchema.required, ["name"]);
+    assert.ok(snapshotVariant.inputSchema.properties.name, "name is in the schema");
+  });
+});
+
+test("bin/server.mjs: snapshot_variant refuses cleanly with no preview service running", async () => {
+  await withClient(async (client) => {
+    const result = await client.callTool({ name: "snapshot_variant", arguments: { name: "warmer" } });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, /No preview service is running/);
   });
 });
 
