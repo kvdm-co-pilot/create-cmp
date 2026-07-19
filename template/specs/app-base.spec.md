@@ -37,6 +37,12 @@
   only exception-catching mechanism is the shared `suspendRunCatching` helper
   (`data/AppResultCatching.kt`), and the helper always rethrows `CancellationException` —
   cancellation is never swallowed into a failure state.
+- **ARCH-09** — Given any file in `data`, When its imports and fully-qualified inline
+  references are inspected, Then none resolve into `presentation` or `di` (data serves
+  domain contracts; it never reaches upward).
+- **ARCH-10** — Given any file in `core`, When its imports and fully-qualified inline
+  references are inspected, Then none resolve into `presentation`, `data`, or `di` (core
+  is leaf utility code; `domain` at most).
 - **ARCH-11** — Given any file in a presentation feature package (`components/` excluded),
   When its source is inspected, Then it references neither `CircularProgressIndicator` nor
   `LinearProgressIndicator` directly — loading is presented through the components

@@ -266,6 +266,42 @@ class ArchitectureConformanceTest {
         )
     }
 
+    // SPEC: ARCH-09
+    @Test
+    fun `ARCH-09 data never references presentation or di`() {
+        val offenders = sources(commonMain)
+            .filter { under(it, "data") }
+            .filter { bannedReference(it, listOf("__PACKAGE__.presentation.", "__PACKAGE__.di.")) }
+            .map { it.path }
+        if (offenders.isNotEmpty()) fail(
+            violation(
+                "ARCH-09", "data serves domain contracts — it never references presentation or di " +
+                    "(neither imports nor fully-qualified inline names).",
+                offenders,
+                "move the presentation/di-touching code out of data; data implements domain's repository " +
+                    "interfaces and stops there.",
+            )
+        )
+    }
+
+    // SPEC: ARCH-10
+    @Test
+    fun `ARCH-10 core is leaf utility code - imports domain at most`() {
+        val banned = listOf("__PACKAGE__.presentation.", "__PACKAGE__.data.", "__PACKAGE__.di.")
+        val offenders = sources(commonMain)
+            .filter { under(it, "core") }
+            .filter { bannedReference(it, banned) }
+            .map { it.path }
+        if (offenders.isNotEmpty()) fail(
+            violation(
+                "ARCH-10", "core is leaf utility code, importable by every other layer — it references " +
+                    "nothing in presentation, data, or di (neither imports nor fully-qualified inline names).",
+                offenders,
+                "move the app-layer-touching code out of core; core stays a leaf (domain types at most).",
+            )
+        )
+    }
+
     // SPEC: SHELL-05
     @Test
     fun `SHELL-05 every non-shell nav destination wraps its content in BaseScreen`() {
