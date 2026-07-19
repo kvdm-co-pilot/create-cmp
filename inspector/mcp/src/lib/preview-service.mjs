@@ -51,6 +51,7 @@ import { getComponentsData } from "./components.mjs";
 import { getVariantsData } from "./variants.mjs";
 import { getComponentDriftInfo } from "./component-drift.mjs";
 import { getHandRolledStateViolations } from "./handrolled-state.mjs";
+import { renderShellPage, statusGlyph, artifactStatusHtml, railReceiptHtml } from "./console-shell.mjs";
 import {
   designSystemTabHtml,
   approvalsTabHtml,
@@ -191,14 +192,19 @@ const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /**
- * The live gallery page. Pure: (state) -> html. PNGs are referenced via /previews/…
- * with a version cache-buster; wireframe SVGs are inlined (SVG is structured text).
- * Cards changed in THIS render get the CHANGED flag plus a hover before/after compare
- * (screen.prev.png is the pre-render copy); every card keeps a persistent
- * "changed #N" badge from `changedVersions` so attribution outlives the next render.
+ * The studio console page (docs/STUDIO-REDESIGN.md §2): ONE shell — the
+ * sidebar ordering/coverage rail, the per-page header grammar, and the
+ * provenance footers — with every section contributing only a document body
+ * (console-shell.mjs owns all chrome; sections may not invent their own).
+ * Pure: (state) -> html. PNGs are referenced via /previews/… with a version
+ * cache-buster; wireframe SVGs are inlined (SVG is structured text). Cards
+ * changed in THIS render get the CHANGED flag plus a hover before/after
+ * compare (screen.prev.png is the pre-render copy); every card keeps a
+ * persistent "changed #N" badge from `changedVersions` so attribution
+ * outlives the next render.
  * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error,
  *   approvals, specs, designSystem, architecture, components, comments, variants, componentsMeta,
- *   architectureMeta }
+ *   architectureMeta, lastReceipt, treeHash }
  */
 export function galleryHtml(state) {
   const {
@@ -218,227 +224,58 @@ export function galleryHtml(state) {
     variants = { available: false },
     componentsMeta = {},
     architectureMeta = {},
+    lastReceipt = null,
+    treeHash = null,
   } = state;
   const width = viewport?.width ?? 411;
   const changedSet = new Set(changed);
-  // Tab-bar badge (§7.3): count of OPEN comments, shown next to the Comments
-  // tab. Always renders the badge element (even at 0, just hidden) so the SSE
-  // "comment" handler below can always find #comments-badge to update in place.
+  // Rail badge (§7.3): count of OPEN comments next to the Comments item.
+  // Always rendered (hidden at 0) so the SSE "comment" handler can always
+  // find #comments-badge to update in place.
   const openCommentCount = comments.available ? comments.comments.filter((c) => c.status === "open").length : 0;
-  // §2 mode presentation: the Design System tab's candidates strip is genesis-
+  // §2 mode presentation: the Design-language candidates strip is genesis-
   // mode only — derived from the design-system ARTIFACT's own live status
   // (undefined when approvals data isn't available at all, which reads as
   // steward — the safe default: no strip rather than a fabricated one).
   const designSystemStatus = approvals.available
     ? (approvals.statuses.find((s) => s.id === "design-system") || {}).status
     : undefined;
-  return `<!doctype html>
-<meta charset="utf-8">
-<title>${esc(appName)} — live previews</title>
-<style>
-  :root { color-scheme: light; }
-  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; background: #F7F9FC; color: #1A1A1A; }
-  header { padding: 20px 28px 8px; display: flex; align-items: baseline; gap: 14px; }
-  header h1 { margin: 0; font-size: 20px; }
-  header p { margin: 0; color: #6B7280; font-size: 13px; }
-  #filter { margin-left: auto; font: inherit; font-size: 13px; padding: 4px 10px;
-            border: 1px solid #E5E7EB; border-radius: 999px; background: #fff; color: inherit; }
-  #pill { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 12px;
-          background: #E8F7EF; color: #16A34A; }
-  #pill.rendering { background: #FEF6E7; color: #B45309; }
-  #pill.error { background: #FDECEC; color: #DC2626; }
-  .banner { margin: 10px 28px 0; padding: 10px 14px; border-radius: 12px; background: #FDECEC;
-            color: #7F1D1D; font-size: 13px; white-space: pre-wrap; }
-  nav.tabs { display: flex; gap: 4px; padding: 4px 28px 0; border-bottom: 1px solid #E5E7EB; }
-  nav.tabs button { appearance: none; background: none; border: none; padding: 10px 14px;
-                     font: inherit; font-size: 13px; font-weight: 600; color: #6B7280;
-                     cursor: pointer; border-bottom: 2px solid transparent; }
-  nav.tabs button.active { color: #0A2540; border-bottom-color: #00B96B; }
-  .tab-panel { display: none; padding: 20px 28px 40px; }
-  .tab-panel.active { display: block; }
-  #tab-screens.tab-panel { padding: 0; }
-  .empty { padding: 20px 28px; color: #6B7280; font-size: 13px; }
-  .empty-inline { color: #9CA3AF; font-size: 12px; }
-  .grid { display: flex; flex-wrap: wrap; gap: 24px; padding: 20px 28px 40px; }
-  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 16px; }
-  .card.changed { border-color: #00B96B; box-shadow: 0 0 0 2px rgba(0,185,107,.25); }
-  .card h2 { margin: 0 0 2px; font-size: 15px; }
-  .card h2 .flag { font-size: 10px; font-weight: 700; color: #00B96B; vertical-align: middle;
-                   margin-left: 6px; letter-spacing: .05em; }
-  .meta { color: #6B7280; font-size: 12px; margin: 0 0 10px; }
-  .meta .fail { color: #DC2626; font-weight: 600; }
-  .meta .pass { color: #16A34A; font-weight: 600; }
-  .meta .chg { color: #B45309; font-weight: 600; }
-  .panes { display: flex; gap: 12px; align-items: flex-start; }
-  .panes img { width: ${Math.round(width * 0.62)}px; border: 1px solid #E5E7EB; border-radius: 12px; display: block; }
-  .cmp img.prev { display: none; }
-  .cmp:hover img.prev { display: block; }
-  .cmp:hover img.cur { display: none; }
-  .panes .wire svg { width: ${Math.round(width * 0.78)}px; height: auto; display: block; }
-  .wire { border: 1px dashed #C8D0DA; border-radius: 12px; overflow: hidden; }
-  .lbl { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: #9CA3AF; margin: 0 0 4px; }
-  .swatch-grid { display: flex; flex-wrap: wrap; gap: 16px; }
-  .swatch-card { width: 130px; }
-  .swatch { width: 100%; height: 60px; border-radius: 10px; border: 1px solid #E5E7EB; }
-  .swatch-name { font-size: 12px; font-weight: 600; margin-top: 6px; }
-  .swatch-value { font-size: 11px; color: #6B7280; }
-  .dimens-table, .approvals-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-  .dimens-table td, .approvals-table td, .approvals-table th {
-    padding: 8px 10px; border-bottom: 1px solid #E5E7EB; text-align: left; vertical-align: top; }
-  .badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
-  .badge-approved { background: #E8F7EF; color: #16A34A; }
-  .badge-unreviewed { background: #EEF2FF; color: #4338CA; }
-  .badge-changed { background: #FDECEC; color: #DC2626; }
-  /* reopened (§2 "Reopen for redesign") — a deliberate state, so it gets its own color
-     rather than reusing badge-unreviewed even though the gate treats them the same. */
-  .badge-reopened { background: #FEF6E7; color: #B45309; }
-  /* defaults-accepted (§2 express lane) layers ON TOP of badge-approved — a distinct
-     outline, not a different fill, so "approved" stays legible at a glance. */
-  .badge-unshaped { box-shadow: inset 0 0 0 1px #B45309; }
-  .artifact-id { font-size: 11px; color: #9CA3AF; }
-  .approved-at { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
-  .unresolvable-note, .missing-note { font-size: 11px; color: #B45309; margin: 4px 0 0; }
-  .approve-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
-                 border: 1px solid #0A2540; background: #0A2540; color: #fff; cursor: pointer; }
-  .approve-btn:disabled { background: #E5E7EB; border-color: #E5E7EB; color: #9CA3AF; cursor: not-allowed; }
-  .reopen-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
-                border: 1px solid #B45309; background: #fff; color: #B45309; cursor: pointer; }
-  /* §2 mode presentation: the per-artifact genesis/steward banner, inline under the label. */
-  .artifact-banner { font-size: 11px; margin-top: 4px; padding: 4px 8px; border-radius: 8px; max-width: 320px; }
-  .banner-mode { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
-  .banner-genesis { background: #EEF2FF; color: #312E81; }
-  .banner-steward { background: #F3F4F6; color: #4B5563; }
-  .banner-unshaped { background: #FEF6E7; color: #92400E; }
-  /* §2 candidates strip (Design System tab, genesis mode only). */
-  .candidates-strip { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
-  .candidate-card { flex: 1 1 260px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
-  .candidate-card h4 { margin: 0 0 8px; font-size: 13px; }
-  .candidate-shots { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
-  .candidate-shot { width: 90px; }
-  .candidate-shot img { width: 100%; border: 1px solid #E5E7EB; border-radius: 8px; display: block; }
-  .pick-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
-              border: 1px solid #0A2540; background: #0A2540; color: #fff; cursor: pointer; }
-  .pick-btn:disabled { background: #E5E7EB; border-color: #E5E7EB; color: #9CA3AF; cursor: not-allowed; }
-  .spec-file h3 { margin: 18px 0 6px; font-size: 14px; }
-  .spec-file:first-child h3 { margin-top: 0; }
-  .clause-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .clause { display: flex; align-items: baseline; gap: 10px; font-size: 13px; padding: 8px 10px;
-            border: 1px solid #E5E7EB; border-radius: 10px; background: #fff; }
-  .clause.withdrawn { opacity: .6; }
-  .clause-id { font-size: 11px; color: #0A2540; font-weight: 700; flex: 0 0 auto; }
-  .clause-prose { flex: 1; }
-  .cov-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; flex: 0 0 auto; white-space: nowrap; }
-  .cov-yes { background: #E8F7EF; color: #16A34A; }
-  .cov-no { background: #FDECEC; color: #DC2626; }
-  .cov-na { background: #F3F4F6; color: #9CA3AF; }
-  /* Wave C item 1: per-ARCH-clause last-receipt status (governed contract). */
-  .receipt-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; flex: 0 0 auto; white-space: nowrap; }
-  .receipt-pass { background: #E8F7EF; color: #16A34A; }
-  .receipt-fail { background: #FDECEC; color: #DC2626; }
-  .receipt-stale { background: #FEF6E7; color: #B45309; }
-  .receipt-none { background: #F3F4F6; color: #9CA3AF; }
-  .receipt-age { font-size: 10px; color: #9CA3AF; white-space: nowrap; }
-  .arch-section { margin-bottom: 28px; }
-  .arch-section h3 { margin: 0 0 10px; font-size: 14px; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px; }
-  .arch-section h4 { margin: 16px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6B7280; }
-  .arch-top-status { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; flex-wrap: wrap; }
-  .doc-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 12px; }
-  .doc-table th, .doc-table td { padding: 7px 9px; border-bottom: 1px solid #E5E7EB; text-align: left; vertical-align: top; }
-  .doc-table th { color: #6B7280; font-weight: 600; }
-  .doc-prose { font-size: 13px; line-height: 1.55; }
-  .doc-prose p { margin: 0 0 10px; }
-  .doc-prose h4, .doc-prose h5 { margin: 14px 0 6px; font-size: 12px; color: #0A2540; }
-  .doc-list { margin: 0 0 10px; padding-left: 20px; }
-  .doc-list li { margin-bottom: 4px; }
-  .doc-code { font-size: 11px; line-height: 1.5; background: #F7F9FC; border: 1px solid #E5E7EB; border-radius: 8px;
-              padding: 8px 10px; overflow-x: auto; white-space: pre; }
-  .doc-quote { margin: 0 0 10px; padding: 6px 10px; border-left: 3px solid #E5E7EB; color: #6B7280; }
-  .dep-edges { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .dep-edge { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 10px; border: 1px solid #E5E7EB;
-              border-radius: 8px; background: #fff; }
-  .dep-edge.dep-violation { border-color: #DC2626; background: #FEF2F2; }
-  .dep-count { font-size: 11px; color: #9CA3AF; }
-  .dep-violations { margin-top: 6px; }
-  .dep-violation-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .dep-violation-item { font-size: 12px; padding: 6px 10px; border: 1px solid #DC2626; border-radius: 8px; background: #FEF2F2;
-                         display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  /* Wave C item 2: "advisory preview; the lane is the law" — a caption under the graph, not a banner. */
-  .dep-advisory { font-size: 11px; color: #9CA3AF; margin: 8px 0 0; }
-  .layer-map { display: flex; flex-wrap: wrap; gap: 14px; }
-  .layer-box { flex: 1 1 220px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
-  .layer-box.layer-empty { opacity: .55; border-style: dashed; }
-  .layer-box h4 { margin: 0 0 4px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
-  .layer-desc { font-size: 11px; color: #6B7280; margin: 0 0 8px; }
-  .layer-files, .feature-tree, .component-params, .component-used-in { list-style: none; margin: 0; padding: 0;
-    font-size: 12px; display: flex; flex-direction: column; gap: 3px; max-height: 220px; overflow-y: auto; }
-  .layer-files li, .feature-tree li { display: flex; align-items: center; gap: 6px; }
-  .layer-others { margin-top: 14px; }
-  .component-grid { display: flex; flex-wrap: wrap; gap: 16px; }
-  .component-card { flex: 1 1 320px; max-width: 420px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
-  .component-card h4 { margin: 0 0 4px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
-  .component-sig { font-size: 11px; line-height: 1.5; background: #F7F9FC; border: 1px solid #E5E7EB; border-radius: 8px;
-                    padding: 8px 10px; margin: 4px 0 10px; overflow-x: auto; white-space: pre; }
-  .component-facts { list-style: none; margin: 0 0 10px; padding: 0; font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
-  .component-facts li { padding-left: 14px; position: relative; }
-  .component-facts li::before { content: "\\2022"; position: absolute; left: 0; color: #9CA3AF; }
-  .component-kdoc { margin: 4px 0 10px; padding: 8px 10px; border-left: 3px solid #E5E7EB; font-size: 12px;
-                     color: #4B5563; white-space: pre-wrap; }
-  .component-live-variants { margin-bottom: 10px; }
-  .state-variant-block { margin-bottom: 8px; }
-  .state-variant-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
-  .state-variant-thumb { width: 90px; }
-  .state-variant-thumb img { width: 100%; border: 1px solid #E5E7EB; border-radius: 6px; display: block; }
-  .violation-chip { margin-left: 4px; }
-  .comments-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-  .comments-table td, .comments-table th { padding: 8px 10px; border-bottom: 1px solid #E5E7EB; text-align: left; vertical-align: top; }
-  .comment-text-cell { max-width: 320px; white-space: pre-wrap; }
-  .badge-open { background: #EEF2FF; color: #4338CA; }
-  .badge-resolved { background: #E8F7EF; color: #16A34A; }
-  .comment-resolution { margin-top: 4px; }
-  .comment-resolution-note { font-size: 12px; color: #6B7280; margin: 2px 0 0; }
-  .tab-badge { display: inline-block; min-width: 16px; padding: 1px 6px; margin-left: 4px; border-radius: 999px;
-               background: #DC2626; color: #fff; font-size: 10px; font-weight: 700; text-align: center; }
-  .comment-ctl { position: relative; display: inline-block; }
-  .comment-btn { appearance: none; border: none; background: none; cursor: pointer; font-size: 12px;
-                 padding: 0 2px; line-height: 1; opacity: .6; }
-  .comment-btn:hover { opacity: 1; }
-  .comment-popover { position: absolute; z-index: 20; top: 100%; left: 0; margin-top: 4px; width: 220px;
-                      background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px;
-                      box-shadow: 0 4px 16px rgba(0,0,0,.12); display: flex; flex-direction: column; gap: 6px; }
-  /* The popover and badge are toggled with the hidden ATTRIBUTE, but their author
-     display rules (flex / inline-block) override the UA stylesheet's [hidden]
-     { display: none } — without these guards every "hidden" popover stays painted,
-     and its children (the textarea especially) overflow the 0x0 box and invisibly
-     intercept clicks: on the dense specs tab, clicking one clause's visible Post
-     button actually hit the NEXT clause's hidden textarea (elementFromPoint-verified
-     — the VL-7 browser gate's repro), so the submit never fired. */
-  .comment-popover[hidden] { display: none !important; }
-  .tab-badge[hidden] { display: none !important; }
-  .comment-popover textarea, .comment-popover input { font: inherit; font-size: 12px; padding: 6px 8px;
-                      border: 1px solid #E5E7EB; border-radius: 8px; resize: vertical; width: 100%; box-sizing: border-box; }
-  .comment-popover-actions { display: flex; justify-content: flex-end; gap: 6px; }
-  .comment-popover-actions button { font: inherit; font-size: 11px; padding: 4px 10px; border-radius: 6px;
-                      border: 1px solid #E5E7EB; background: #F7F9FC; cursor: pointer; }
-  .comment-submit { border-color: #0A2540 !important; background: #0A2540 !important; color: #fff; }
-  .comment-error { color: #DC2626; font-size: 11px; margin: 0; }
-</style>
-<header>
-  <h1>${esc(appName)} — live previews</h1>
-  <p>edit code → save → this page re-renders itself · render #${version}</p>
-  <input id="filter" type="search" placeholder="filter screens…">
-  <span id="pill">live</span>
-</header>
-${error ? `<div class="banner">last render FAILED — showing previous state\n${esc(error)}</div>` : ""}
-<nav class="tabs">
-  <button class="tab-btn active" data-tab="screens">Screens</button>
-  <button class="tab-btn" data-tab="design-system">Design System</button>
-  <button class="tab-btn" data-tab="architecture">Architecture</button>
-  <button class="tab-btn" data-tab="approvals">Approvals</button>
-  <button class="tab-btn" data-tab="specs">Specs</button>
-  <button class="tab-btn" data-tab="comments">Comments <span class="tab-badge" id="comments-badge"${openCommentCount === 0 ? " hidden" : ""}>${openCommentCount}</span></button>
-</nav>
-<div id="tab-screens" class="tab-panel active" data-tab="screens">
-<div class="grid">
+
+  // Governed-artifact records: rail glyphs + page status lines (§2 header
+  // grammar). Sections without an exact one-artifact mapping get NO glyph —
+  // never a borrowed status.
+  const artifactRecord = (id) =>
+    approvals.available ? approvals.statuses.find((s) => s.id === id) || null : null;
+  const dsRecord = artifactRecord("design-system");
+  const archRecord = architectureMeta.approval ?? artifactRecord("architecture");
+
+  // Open comments, attributed to the section their target lives in — the §2
+  // header's open-comment count. Unknown/general targets count under Comments.
+  const sectionOfTarget = (t) => {
+    if (!t || typeof t !== "object") return "comments";
+    if (t.type === "design-system") return "design-system";
+    if (t.type === "architecture") return "architecture";
+    if (t.type === "screen" || t.type === "element") return "screens";
+    if (t.type === "spec-line") return "specs";
+    return "comments";
+  };
+  const openBySection = {};
+  if (comments.available) {
+    for (const c of comments.comments) {
+      if (c.status !== "open") continue;
+      const s = sectionOfTarget(c.target);
+      openBySection[s] = (openBySection[s] || 0) + 1;
+    }
+  }
+  const openNote = (id) => {
+    const n = openBySection[id] || 0;
+    return n ? ` &middot; &#9998; ${n} open comment${n === 1 ? "" : "s"}` : "";
+  };
+
+  // --- section bodies (existing generators, unchanged in R2 — the shell is
+  // the frame; R3–R5 rebuild each body to the §3 professional forms) ---------
+
+  const screensBody = `<div class="grid">
 ${cards
   .map(({ screen, svg, summary, a11y }) => {
     const isChanged = changedSet.has(screen.id);
@@ -464,25 +301,104 @@ ${cards
   </div>`;
   })
   .join("\n")}
-</div>
-</div>
-<div id="tab-design-system" class="tab-panel" data-tab="design-system">
-${designSystemTabHtml(designSystem, components, variants, designSystemStatus, componentsMeta)}
-</div>
-<div id="tab-architecture" class="tab-panel" data-tab="architecture">
-${architectureTabHtml(architecture, architectureMeta)}
-</div>
-<div id="tab-approvals" class="tab-panel" data-tab="approvals">
-${approvalsTabHtml(approvals)}
-</div>
-<div id="tab-specs" class="tab-panel" data-tab="specs">
-${specsTabHtml(specs)}
-</div>
-<div id="tab-comments" class="tab-panel" data-tab="comments">
-${commentsTabHtml(comments)}
-</div>
-<script>
+</div>`;
+
+  // --- §2 header status lines: one glance answers "what is this, is it
+  // signed, has it moved". Artifact-governed pages use the artifact grammar;
+  // the rest state only what their own data shows (evidence-or-silence). ----
+
+  const screensStatus = `render #${version} &middot; ${cards.length} screen${cards.length === 1 ? "" : "s"}${
+    changed.length ? ` &middot; <span class="chg">${changed.length} changed this render</span>` : ""
+  }${openNote("screens")}`;
+
+  const dsStatus = (artifactStatusHtml(dsRecord) || "the visual vocabulary — tokens, components, candidates") + openNote("design-system");
+  const archStatus = (artifactStatusHtml(archRecord) || "the layer contract and its live conformance") + openNote("architecture");
+
+  const specsStatus = specs.available
+    ? `${specs.files.length} spec file${specs.files.length === 1 ? "" : "s"} &middot; ${specs.files.reduce((n, f) => n + f.clauses.length, 0)} clauses${openNote("specs")}`
+    : "no specs/ directory found";
+
+  let approvalsStatus = "approvals not available in this project";
+  if (approvals.available && approvals.statuses) {
+    const count = (st) => approvals.statuses.filter((s) => s.status === st).length;
+    const parts = [`${approvals.statuses.length} governed artifact${approvals.statuses.length === 1 ? "" : "s"}`];
+    if (count("approved")) parts.push(`${count("approved")} signed`);
+    if (count("changed-since-approval")) parts.push(`<span class="status-drift">${count("changed-since-approval")} drifted</span>`);
+    if (count("reopened")) parts.push(`<span class="status-reopen">${count("reopened")} reopened</span>`);
+    if (count("unreviewed")) parts.push(`${count("unreviewed")} unsigned`);
+    approvalsStatus = parts.join(" &middot; ");
+  }
+
+  const commentsStatus = comments.available
+    ? `${openCommentCount} open &middot; ${comments.comments.length - openCommentCount} resolved`
+    : "comments ledger not available in this project";
+
+  // Rail + sections share one order: the genesis definition order (§2), with
+  // the cross-cutting ledgers (Approvals, Comments) after the artifact pages.
+  // Screens stays the DEFAULT page — the daily hot-reload surface.
+  const railItems = [
+    { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
+    { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
+    { id: "screens", label: "Screens", glyph: null, active: true },
+    { id: "specs", label: "Specs", glyph: null },
+    { id: "approvals", label: "Approvals", glyph: null },
+    {
+      id: "comments",
+      label: "Comments",
+      glyph: null,
+      badgeHtml: `<span class="tab-badge" id="comments-badge"${openCommentCount === 0 ? " hidden" : ""}>${openCommentCount}</span>`,
+    },
+  ];
+
+  const sections = [
+    {
+      id: "design-system",
+      title: "Design language",
+      statusHtml: dsStatus,
+      bodyHtml: designSystemTabHtml(designSystem, components, variants, designSystemStatus, componentsMeta),
+    },
+    {
+      id: "architecture",
+      title: "Architecture",
+      statusHtml: archStatus,
+      bodyHtml: architectureTabHtml(architecture, architectureMeta),
+    },
+    {
+      id: "screens",
+      title: "Screens",
+      statusHtml: screensStatus,
+      headExtraHtml: `<div class="screens-toolbar"><input id="filter" type="search" placeholder="filter screens&hellip;"></div>`,
+      bodyHtml: screensBody,
+      active: true,
+      fullBleed: true,
+    },
+    { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs) },
+    { id: "approvals", title: "Approvals", statusHtml: approvalsStatus, bodyHtml: approvalsTabHtml(approvals) },
+    { id: "comments", title: "Comments", statusHtml: commentsStatus, bodyHtml: commentsTabHtml(comments) },
+  ];
+
+  const bodyScript = `
   const pill = document.getElementById("pill");
+  // §2: the rail glyphs and page-status lines are drift surfaces — they must
+  // track approval/comment changes without a full reload (the same no-flash
+  // rule the panel swaps follow). Buttons and inputs are never replaced, so
+  // their listeners survive: only glyph spans and status-line innerHTML move.
+  function syncShellFromDoc(doc) {
+    doc.querySelectorAll(".rail-nav .tab-btn").forEach((freshBtn) => {
+      const curGlyph = document.querySelector('.rail-nav .tab-btn[data-tab="' + freshBtn.dataset.tab + '"] .glyph');
+      const freshGlyph = freshBtn.querySelector(".glyph");
+      if (curGlyph && freshGlyph) {
+        curGlyph.className = freshGlyph.className;
+        curGlyph.textContent = freshGlyph.textContent;
+        curGlyph.title = freshGlyph.title || "";
+      }
+    });
+    doc.querySelectorAll(".tab-panel").forEach((freshPanel) => {
+      const curStatus = document.querySelector('.tab-panel[data-tab="' + freshPanel.dataset.tab + '"] .page-status');
+      const freshStatus = freshPanel.querySelector(".page-status");
+      if (curStatus && freshStatus) curStatus.innerHTML = freshStatus.innerHTML;
+    });
+  }
   const es = new EventSource("/events");
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
@@ -503,6 +419,7 @@ ${commentsTabHtml(comments)}
           if (wasActive) cur.classList.add("active");
           wireApproveButtons(cur);
           wireReopenButtons(cur);
+          syncShellFromDoc(doc);
         } else {
           location.reload(); // fallback: unexpected markup — the old behavior
         }
@@ -531,6 +448,7 @@ ${commentsTabHtml(comments)}
           curBadge.textContent = freshBadge.textContent;
           curBadge.hidden = freshBadge.hidden;
         }
+        syncShellFromDoc(doc);
       }).catch(() => location.reload());
     }
     if (msg.type === "error") {
@@ -734,8 +652,19 @@ ${commentsTabHtml(comments)}
     });
   }
   wireCommentButtons(document);
-</script>
 `;
+
+  return renderShellPage({
+    appName,
+    railItems,
+    railFootHtml: railReceiptHtml(lastReceipt || architectureMeta.lastReceipt),
+    sections,
+    error,
+    extraCss: `  .panes img { width: ${Math.round(width * 0.62)}px; }
+  .panes .wire svg { width: ${Math.round(width * 0.78)}px; }`,
+    bodyScript,
+    provenance: { treeHash, version },
+  });
 }
 
 // --- the service --------------------------------------------------------------------
@@ -1581,6 +1510,17 @@ export function createPreviewService(opts) {
           approval: approvals.available ? approvals.statuses.find((s) => s.id === "architecture") || null : null,
           lastReceipt,
         };
+        // §2 provenance footer: the project's git HEAD, when there is one.
+        // Not a git repo (or no git) -> null; the footer then says "the live
+        // tree" without a hash rather than fabricating one.
+        let treeHash = null;
+        try {
+          const { stdout } = await execFileAsync("git", ["rev-parse", "--short", "HEAD"], {
+            cwd: projectDir,
+            timeout: 3000,
+          });
+          treeHash = stdout.trim() || null;
+        } catch {}
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(
           galleryHtml({
@@ -1600,6 +1540,8 @@ export function createPreviewService(opts) {
             variants,
             componentsMeta,
             architectureMeta,
+            lastReceipt,
+            treeHash,
           }),
         );
         return;
