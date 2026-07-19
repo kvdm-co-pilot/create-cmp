@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { validate, formatErrors } from "./lib/schema.mjs";
 import { buildTokenMap, replaceTokens, replacePathTokens, isBinaryPath, slugifyAppName } from "./lib/tokens.mjs";
@@ -152,6 +152,42 @@ function stripDisabledBlocks(projectDir, disabled) {
     if (!content.includes("cmp:feature")) continue;
     const { content: out, changed } = stripFeatureBlocks(content, disabled);
     if (changed) fs.writeFileSync(file, out);
+  }
+}
+
+// Regenerate docs/ARCHITECTURE.md's `cmp:generated` sections against the tree
+// AS STAMPED — after disabled-feature paths are deleted, tab surfaces are
+// rewritten, the package is renamed, and marker blocks are stripped. The
+// template ships the doc true for the RAW template's shape (all features on);
+// any config that changes the tree (--no-ios removes iosMain and its actuals,
+// custom tabs add PlaceholderScreen.kt, …) would otherwise fail the verify
+// lane's archDoc freshness gate on a fresh, untouched app. Same philosophy as
+// rewriteTabSurfaces: derived surfaces are regenerated from what was actually
+// stamped, never hand-corrected afterward.
+//
+// The generator itself is the project's OWN vendored walker
+// (qa/lib/arch-doc.mjs) — imported from the stamped output so the engine can
+// never drift from what the app's `node qa/arch-doc.mjs --check` will verify
+// later. Tolerant by design: a template without the walker or the doc (the
+// synthetic test templates; a --no-e2e config that strips qa/) skips quietly,
+// and a walker failure warns but never blocks the stamp.
+async function regenerateArchDoc(projectDir) {
+  const walkerPath = path.join(projectDir, "qa", "lib", "arch-doc.mjs");
+  const docPath = path.join(projectDir, "docs", "ARCHITECTURE.md");
+  if (!fs.existsSync(walkerPath) || !fs.existsSync(docPath)) return;
+  step("Regenerating docs/ARCHITECTURE.md generated sections for the stamped tree…");
+  try {
+    const { writeArchDoc } = await import(pathToFileURL(walkerPath).href);
+    const result = writeArchDoc(projectDir);
+    if (!result.ok) {
+      warn(`ARCHITECTURE.md regeneration skipped: ${result.reason}`);
+    } else if (result.wrote) {
+      process.stdout.write(`  arch-doc → updated section(s): ${result.changedSections.join(", ")}\n`);
+    } else {
+      process.stdout.write("  arch-doc → already fresh for this configuration\n");
+    }
+  } catch (err) {
+    warn(`ARCHITECTURE.md regeneration failed (stamp continues): ${err?.message ?? err}`);
   }
 }
 
@@ -357,6 +393,10 @@ export async function scaffold(config, opts = {}) {
       : "Cleaning feature markers…"
   );
   stripDisabledBlocks(projectDir, disabled);
+
+  // (e.1) regenerate the architecture doc's derived sections for the tree as
+  // stamped — see regenerateArchDoc above.
+  await regenerateArchDoc(projectDir);
 
   // Write local.properties (sdk.dir) so the Gradle build can find the Android
   // SDK even when ANDROID_HOME/ANDROID_SDK_ROOT aren't exported (manifest

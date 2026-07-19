@@ -664,6 +664,164 @@ test("architectureTabHtml: governed-contract clauses render with comment control
   assert.match(html, /qa\/scaffold-feature\.mjs/);
 });
 
+test("architectureTabHtml: mirrors the doc's own section numbering (1/3/4/5/6/7/8), even with no doc/dependency data", () => {
+  const html = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+  });
+  assert.match(html, /1\. Purpose &amp; quality goals/);
+  assert.match(html, /3\. System context/);
+  assert.match(html, /4\. Platform &amp; deployment view/);
+  assert.match(html, /5\. Building blocks/);
+  assert.match(html, /6\. Runtime view/);
+  assert.match(html, /7\. Crosscutting policies/);
+  assert.match(html, /8\. Decisions/);
+  assert.match(html, /Feature shape/);
+});
+
+test("architectureTabHtml: doc-derived quality-attribute table, system-context table, platform table, and ADR table render verbatim", () => {
+  const html = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+    doc: {
+      available: true,
+      qualityAttributes: {
+        available: true,
+        headers: ["Quality", "Scenario", "Backing"],
+        rows: [["Maintainability", "A violation is named as a clause", "`[enforced: ARCH-01]`"]],
+      },
+      systemContext: {
+        available: true,
+        heading: "3. System context",
+        intro: "This app talks to Firebase.",
+        table: { headers: ["Integration", "What"], rows: [["Firebase", "Auth"]] },
+      },
+      platformView: {
+        available: true,
+        headers: ["Source set", "Role"],
+        rows: [["commonMain", "Shared UI"]],
+        expectActual: null,
+      },
+      runtimeView: { available: true, heading: "6. Runtime view", body: "**Cold start.** The app boots." },
+      crosscuttingPolicies: { available: true, heading: "7. Crosscutting policies", body: "### Error handling `[enforced: ARCH-06]`\n\n- typed results only" },
+      decisions: {
+        available: true,
+        headers: ["ADR", "Title", "Status"],
+        rows: [["[0001](./adr/0001-x.md)", "Adopt the harness", "accepted"]],
+      },
+    },
+  });
+  assert.match(html, /Maintainability/);
+  assert.match(html, /<code>\[enforced: ARCH-01\]<\/code>/);
+  assert.match(html, /This app talks to Firebase/);
+  assert.match(html, /Firebase.*Auth|Auth.*Firebase/s);
+  assert.match(html, /commonMain/);
+  assert.match(html, /<strong>Cold start\.<\/strong>/);
+  assert.match(html, /<h4>Error handling <code>\[enforced: ARCH-06\]<\/code><\/h4>/);
+  assert.match(html, /typed results only/);
+  assert.match(html, /Adopt the harness/);
+  assert.doesNotMatch(html, /adr\/0001-x\.md/, "markdown links render as plain text, never a dead href");
+});
+
+test("architectureTabHtml: doc unavailable -> every doc-derived sub-section shows an honest reason, layer/contract/feature-shape sections are unaffected", () => {
+  const html = architectureTabHtml({
+    layerMap: { available: false, reason: "no 'presentation' directory found" },
+    governedContract: { available: false, reason: "specs/app-base.spec.md not found" },
+    featureShape: { available: false, reason: "no home-feature files found on disk" },
+    doc: { available: false, reason: "docs/ARCHITECTURE.md not found" },
+  });
+  assert.match(html, /docs\/ARCHITECTURE\.md not found/);
+  assert.match(html, /No layer map available/);
+  assert.match(html, /No governed contract available/);
+  assert.match(html, /No feature shape available/);
+});
+
+test("architectureTabHtml: dependency graph — observed edges render, a violation gets a red chip + file:line, an honest 'unchecked' note when no rules resolved", () => {
+  const withViolation = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+    dependencyGraph: {
+      available: true,
+      appPackage: "com.acme.demo",
+      buckets: ["data", "domain", "presentation"],
+      edges: [
+        { from: "presentation", to: "domain", count: 2, violation: false, clauseId: null, occurrences: [] },
+        {
+          from: "data",
+          to: "presentation",
+          count: 1,
+          violation: true,
+          clauseId: "ARCH-09",
+          occurrences: [{ file: "composeApp/src/commonMain/kotlin/com/acme/demo/data/remote/ItemRepositoryImpl.kt", line: 5, imported: "com.acme.demo.presentation.theme.Theme" }],
+        },
+      ],
+      violations: [
+        {
+          from: "data",
+          to: "presentation",
+          clauseId: "ARCH-09",
+          file: "composeApp/src/commonMain/kotlin/com/acme/demo/data/remote/ItemRepositoryImpl.kt",
+          line: 5,
+          imported: "com.acme.demo.presentation.theme.Theme",
+        },
+      ],
+      rulesApplied: true,
+    },
+  });
+  assert.match(withViolation, /presentation.*&rarr;.*domain/s);
+  assert.match(withViolation, /class="dep-edge dep-violation"/);
+  assert.match(withViolation, /violates ARCH-09/);
+  assert.match(withViolation, /ItemRepositoryImpl\.kt:5/);
+
+  const unchecked = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+    dependencyGraph: {
+      available: true,
+      appPackage: "com.acme.demo",
+      buckets: ["presentation", "domain"],
+      edges: [{ from: "presentation", to: "domain", count: 1, violation: false, clauseId: null, occurrences: [] }],
+      violations: [],
+      rulesApplied: false,
+    },
+  });
+  assert.match(unchecked, /unchecked, not clean/);
+});
+
+test("architectureTabHtml: the architecture artifact's own approval badge + genesis/steward banner render at the top when meta.approval is supplied", () => {
+  const approved = architectureTabHtml(
+    { layerMap: { available: false }, governedContract: { available: false }, featureShape: { available: false } },
+    { approval: { id: "architecture", status: "approved", hash: "abc123def456", approvedAt: "2026-07-19T09:00:00.000Z" } },
+  );
+  assert.match(approved, /class="arch-top-status"/);
+  assert.match(approved, /badge-approved/);
+  assert.match(approved, /banner-steward/);
+
+  const drifted = architectureTabHtml(
+    { layerMap: { available: false }, governedContract: { available: false }, featureShape: { available: false } },
+    { approval: { id: "architecture", status: "changed-since-approval", hash: "newhash01", storedHash: "oldhash01" } },
+  );
+  assert.match(drifted, /drift &middot; architecture artifact changed since approval/);
+
+  const reopened = architectureTabHtml(
+    { layerMap: { available: false }, governedContract: { available: false }, featureShape: { available: false } },
+    { approval: { id: "architecture", status: "reopened" } },
+  );
+  assert.match(reopened, /reopened for redesign/);
+  assert.match(reopened, /banner-genesis/);
+
+  const noMeta = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+  });
+  assert.doesNotMatch(noMeta, /class="arch-top-status"/, "no approval record supplied -> no top-status banner at all");
+});
+
 // --- commentsTabHtml (§7.3) --------------------------------------------------
 
 test("commentsTabHtml: unavailable -> honest not-available state, with and without a library error", () => {

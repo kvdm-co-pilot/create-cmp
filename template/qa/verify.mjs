@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
 import { compareTokenDrift } from "./lib/token-drift.mjs";
 import { evaluateApprovalsGate } from "./lib/approvals.mjs";
+import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-doc.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EVIDENCE_DIR = path.join(ROOT, "qa", "evidence");
@@ -190,6 +191,51 @@ function stepApprovals() {
     reason,
     durationMs: Date.now() - started,
     details: { artifacts: statuses.map((s) => ({ id: s.id, status: s.status, hash: s.hash })) },
+  };
+}
+
+// Architecture-doc freshness gate (Wave B, docs/proposals/architecture-document-
+// standard.md §6) — pure Node, no Gradle, same grouping as specCoverage/
+// approvals. The decision itself lives in qa/lib/arch-doc.mjs
+// (regenerateArchDoc); this step only adds the name/duration bookkeeping every
+// step in this file carries, plus wording the FAIL reason for an AI
+// collaborator (name the stale/missing section, name the fix command).
+function stepArchDoc() {
+  const started = Date.now();
+  const elapsed = () => Date.now() - started;
+
+  const result = regenerateArchDoc(ROOT);
+  if (!result.ok) {
+    return { name: "archDoc", verdict: "SKIP", reason: `${result.reason} — nothing to check`, durationMs: elapsed() };
+  }
+  if (result.unknownSections.length > 0) {
+    return {
+      name: "archDoc",
+      verdict: "FAIL",
+      reason: `${ARCH_DOC_REL_PATH} has cmp:generated marker(s) with no registered generator: ${result.unknownSections.join(", ")} — add a generator in qa/lib/arch-doc.mjs or remove the marker.`,
+      durationMs: elapsed(),
+    };
+  }
+
+  const stale = result.changed || result.missingSections.length > 0;
+  if (!stale) {
+    return { name: "archDoc", verdict: "PASS", durationMs: elapsed(), details: { sectionsChecked: SECTION_IDS.length } };
+  }
+
+  const lines = [`${ARCH_DOC_REL_PATH} is stale — a generated section no longer matches the tree:`];
+  for (const id of result.changedSections) {
+    lines.push(`  [${id}] regenerating would change this section.`);
+  }
+  for (const id of result.missingSections) {
+    lines.push(`  [${id}] marker missing from the doc entirely — never generated.`);
+  }
+  lines.push("Run: node qa/arch-doc.mjs");
+  return {
+    name: "archDoc",
+    verdict: "FAIL",
+    reason: lines.join("\n"),
+    durationMs: elapsed(),
+    details: { changedSections: result.changedSections, missingSections: result.missingSections },
   };
 }
 
@@ -423,10 +469,11 @@ function stepE2eSmoke() {
 const stepsForProfile = {
   // scaffold: what `create-cmp --verify` proves at stamp time — specCoverage,
   // the full JVM tier (unit + conformance + golden + UI tests) plus the Android build.
-  scaffold: [stepSpecCoverage, stepApprovals, stepBuild, stepUnitTests],
+  scaffold: [stepSpecCoverage, stepApprovals, stepArchDoc, stepBuild, stepUnitTests],
   local: [
     stepSpecCoverage,
     stepApprovals,
+    stepArchDoc,
     stepBuild,
     stepUnitTests,
     stepConformance,

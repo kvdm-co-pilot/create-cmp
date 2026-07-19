@@ -8,7 +8,16 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getLayerMap, getGovernedContract, getFeatureShape, getArchitectureData } from "../src/lib/architecture.mjs";
+import { fileURLToPath } from "node:url";
+import {
+  getLayerMap,
+  getGovernedContract,
+  getFeatureShape,
+  getArchitectureData,
+  deriveLayerRules,
+  getDependencyGraph,
+  getArchitectureDoc,
+} from "../src/lib/architecture.mjs";
 
 /** A minimal generated-project fixture with a real layer tree + exemplar home feature. */
 function makeFixtureProject({ withSpec = true, withHome = true } = {}) {
@@ -249,13 +258,346 @@ test("getFeatureShape: picks up a REAL extra file under presentation/home that t
   }
 });
 
-test("getArchitectureData: bundles all three sections in one call", () => {
+test("getArchitectureData: bundles all sections in one call, including the new dependency graph + doc mirror", () => {
   const root = makeFixtureProject();
   try {
     const data = getArchitectureData(root);
     assert.equal(data.layerMap.available, true);
     assert.equal(data.governedContract.available, true);
     assert.equal(data.featureShape.available, true);
+    assert.equal(data.dependencyGraph.available, true);
+    assert.equal(data.doc.available, false, "no docs/ARCHITECTURE.md in this fixture — honest, not fabricated");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --- deriveLayerRules (drift surface: forbidden edges FROM the clause prose itself) ---
+
+// Real ARCH-01/02/09/10 prose shapes (template/specs/app-base.spec.md), trimmed to the
+// load-bearing "Given any file in `X` ... Then none resolve into `Y`[, `Z`, or `W`]" shape
+// this parser targets — a change to that shape in the real spec should be caught by the
+// live-doc E2E test (preview-service.test.mjs), not just these controlled fixtures.
+const ARCH_01 = {
+  id: "ARCH-01",
+  withdrawn: false,
+  prose:
+    "Given any file in `presentation`, When its imports are inspected, Then none resolve into the `data` layer (presentation depends on domain only).",
+};
+const ARCH_02 = {
+  id: "ARCH-02",
+  withdrawn: false,
+  prose:
+    "Given any file in `domain`, When its imports are inspected, Then none resolve into `presentation`, `data`, or `di`, and none reference platform types (domain is pure Kotlin).",
+};
+const ARCH_09 = {
+  id: "ARCH-09",
+  withdrawn: false,
+  prose: "Given any file in `data`, When its imports are inspected, Then none resolve into `presentation` or `di` (data never reaches upward).",
+};
+const ARCH_10 = {
+  id: "ARCH-10",
+  withdrawn: false,
+  prose: "Given any file in `core`, When its imports are inspected, Then none resolve into `presentation`, `data`, or `di` (core is leaf utility code; `domain` at most).",
+};
+const ARCH_03 = {
+  id: "ARCH-03",
+  withdrawn: false,
+  prose: "Given any ViewModel class, When the test sources are inspected, Then a corresponding *ViewModelTest exists.",
+};
+
+test("deriveLayerRules: extracts {from,to,clauseId} from the real ARCH-01/02/09/10 clause shape", () => {
+  const rules = deriveLayerRules([ARCH_01, ARCH_02, ARCH_09, ARCH_10]);
+  const pairs = rules.map((r) => `${r.from}->${r.to}`).sort();
+  assert.deepEqual(pairs, [
+    "core->data",
+    "core->di",
+    "core->presentation",
+    "data->di",
+    "data->presentation",
+    "domain->data",
+    "domain->di",
+    "domain->presentation",
+    "presentation->data",
+  ]);
+  assert.ok(rules.every((r) => /^ARCH-\d\d$/.test(r.clauseId)));
+});
+
+test("deriveLayerRules: a clause with a different shape (ARCH-03: test pairing) contributes no rule — never guessed at", () => {
+  assert.deepEqual(deriveLayerRules([ARCH_03]), []);
+});
+
+test("deriveLayerRules: a withdrawn clause is skipped even if it matches the shape", () => {
+  assert.deepEqual(deriveLayerRules([{ ...ARCH_01, withdrawn: true }]), []);
+});
+
+test("deriveLayerRules: empty/undefined clauses -> empty rules, never a crash", () => {
+  assert.deepEqual(deriveLayerRules([]), []);
+  assert.deepEqual(deriveLayerRules(undefined), []);
+});
+
+// --- getDependencyGraph (drift surface: observed edges + violations with file:line) ---
+
+/** A fixture with a real presentation/domain/data/di tree, and an OPTIONAL deliberate data->presentation violating import. */
+function makeDependencyFixtureProject({ withViolation = false } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-dep-graph-"));
+  const pkgDir = path.join(root, "composeApp", "src", "commonMain", "kotlin", "com", "acme", "demo");
+
+  const presentationDir = path.join(pkgDir, "presentation", "home");
+  fs.mkdirSync(presentationDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(presentationDir, "HomeViewModel.kt"),
+    ["package com.acme.demo.presentation.home", "", "import com.acme.demo.domain.usecase.GetItemsUseCase", "", "class HomeViewModel"].join("\n"),
+  );
+
+  const domainDir = path.join(pkgDir, "domain", "usecase");
+  fs.mkdirSync(domainDir, { recursive: true });
+  fs.writeFileSync(path.join(domainDir, "GetItemsUseCase.kt"), "package com.acme.demo.domain.usecase\n\nclass GetItemsUseCase\n");
+
+  const dataDir = path.join(pkgDir, "data", "remote");
+  fs.mkdirSync(dataDir, { recursive: true });
+  const dataImports = ["package com.acme.demo.data.remote", "", "import com.acme.demo.domain.usecase.GetItemsUseCase"];
+  if (withViolation) dataImports.push("import com.acme.demo.presentation.theme.Theme");
+  dataImports.push("", "class ItemRepositoryImpl");
+  fs.writeFileSync(path.join(dataDir, "ItemRepositoryImpl.kt"), dataImports.join("\n"));
+
+  const diDir = path.join(pkgDir, "di");
+  fs.mkdirSync(diDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(diDir, "AppModule.kt"),
+    ["package com.acme.demo.di", "", "import com.acme.demo.data.remote.ItemRepositoryImpl", "import com.acme.demo.domain.usecase.GetItemsUseCase", "", "object AppModule"].join("\n"),
+  );
+
+  return { root, pkgDir };
+}
+
+test("getDependencyGraph: {available:false} when no 'presentation' dir exists", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-dep-graph-empty-"));
+  try {
+    const graph = getDependencyGraph(root, []);
+    assert.equal(graph.available, false);
+    assert.match(graph.reason, /presentation/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getDependencyGraph: observes real edges (presentation->domain, data->domain, di->data, di->domain) with counts and file:line evidence", () => {
+  const { root } = makeDependencyFixtureProject();
+  try {
+    const graph = getDependencyGraph(root, [ARCH_01, ARCH_02, ARCH_09, ARCH_10]);
+    assert.equal(graph.available, true);
+    assert.equal(graph.rulesApplied, true);
+    const byKey = new Map(graph.edges.map((e) => [`${e.from}->${e.to}`, e]));
+    assert.ok(byKey.has("presentation->domain"));
+    assert.equal(byKey.get("presentation->domain").violation, false);
+    assert.ok(byKey.has("data->domain"));
+    assert.ok(byKey.has("di->data"));
+    assert.ok(byKey.has("di->domain"));
+    assert.equal(graph.violations.length, 0, "no violating import was injected in this fixture");
+    const evidence = byKey.get("presentation->domain").occurrences[0];
+    assert.equal(evidence.file, "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/home/HomeViewModel.kt");
+    assert.equal(evidence.line, 3);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getDependencyGraph: a deliberately-injected data->presentation import is flagged violation:true with the clause id and file:line", () => {
+  const { root } = makeDependencyFixtureProject({ withViolation: true });
+  try {
+    const graph = getDependencyGraph(root, [ARCH_01, ARCH_02, ARCH_09, ARCH_10]);
+    const edge = graph.edges.find((e) => e.from === "data" && e.to === "presentation");
+    assert.ok(edge, "the data->presentation edge is observed");
+    assert.equal(edge.violation, true);
+    assert.equal(edge.clauseId, "ARCH-09");
+    assert.equal(graph.violations.length, 1);
+    assert.equal(graph.violations[0].file, "composeApp/src/commonMain/kotlin/com/acme/demo/data/remote/ItemRepositoryImpl.kt");
+    assert.equal(graph.violations[0].clauseId, "ARCH-09");
+    assert.ok(graph.violations[0].line > 0);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getDependencyGraph: rulesApplied:false when no governed clauses resolve any rule — an empty violations list then means 'unchecked', never 'clean'", () => {
+  const { root } = makeDependencyFixtureProject({ withViolation: true });
+  try {
+    const graph = getDependencyGraph(root, []);
+    assert.equal(graph.rulesApplied, false);
+    const edge = graph.edges.find((e) => e.from === "data" && e.to === "presentation");
+    assert.equal(edge.violation, false, "no rule was available to check it against");
+    assert.equal(graph.violations.length, 0);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --- getArchitectureDoc (authored form: mirrors docs/ARCHITECTURE.md's own structure) ---
+
+const DOC_FIXTURE = `# Architecture
+
+## 1. Purpose & quality goals
+
+This app's purpose is recorded elsewhere.
+
+| Quality (ISO/IEC 25010) | Scenario | Backing |
+|---|---|---|
+| Maintainability | A layer violation is named as a clause | \`[enforced: ARCH-01..05]\` |
+| Reliability (offline) | Cached data still renders offline | \`[advisory]\` today |
+
+## 3. System context
+
+This app talks to Firebase and Room.
+
+| Integration | What | Where in the tree | Notes |
+|---|---|---|---|
+| Firebase | Auth/Firestore | data/remote/FirebaseConfig.kt | Emulator-backed in debug |
+
+## 4. Platform & deployment view
+
+| Source set | Role |
+|---|---|
+| commonMain | Shared UI + logic |
+| androidMain | Android entry point |
+
+| Declaration | commonMain (expect) | androidMain |
+|---|---|---|
+| NetworkMonitor | core/connectivity/NetworkMonitor.kt | ConnectivityManager |
+
+## 6. Runtime view
+
+**The UDF loop:** Screen collects state, calls a use case.
+
+1. **Cold start.** The app boots and composes the shell.
+2. **Load.** A screen loads data through a use case.
+
+## 7. Crosscutting policies
+
+### Error handling \`[enforced: ARCH-06/07/08]\`
+
+- **AppResult<T>** is the boundary type.
+- ViewModels contain no try/catch.
+
+## 8. Decisions & glossary
+
+| ADR | Title | Status |
+|---|---|---|
+| [0001](./adr/0001-x.md) | Adopt the harness conventions | accepted |
+`;
+
+function makeDocFixtureProject(docText = DOC_FIXTURE) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-arch-doc-"));
+  fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(root, "docs", "ARCHITECTURE.md"), docText);
+  return root;
+}
+
+test("getArchitectureDoc: {available:false} when docs/ARCHITECTURE.md is missing", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-arch-doc-empty-"));
+  try {
+    const doc = getArchitectureDoc(root);
+    assert.equal(doc.available, false);
+    assert.match(doc.reason, /ARCHITECTURE\.md/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getArchitectureDoc: parses the §1 quality-attribute table verbatim", () => {
+  const root = makeDocFixtureProject();
+  try {
+    const doc = getArchitectureDoc(root);
+    assert.equal(doc.available, true);
+    assert.equal(doc.qualityAttributes.available, true);
+    assert.deepEqual(doc.qualityAttributes.headers, ["Quality (ISO/IEC 25010)", "Scenario", "Backing"]);
+    assert.equal(doc.qualityAttributes.rows.length, 2);
+    assert.equal(doc.qualityAttributes.rows[0][0], "Maintainability");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getArchitectureDoc: parses §3's intro prose + integration table", () => {
+  const root = makeDocFixtureProject();
+  try {
+    const doc = getArchitectureDoc(root);
+    assert.equal(doc.systemContext.available, true);
+    assert.match(doc.systemContext.intro, /Firebase and Room/);
+    assert.deepEqual(doc.systemContext.table.headers, ["Integration", "What", "Where in the tree", "Notes"]);
+    assert.equal(doc.systemContext.table.rows[0][0], "Firebase");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getArchitectureDoc: parses §4's source-set table AND the second (expect/actual) table", () => {
+  const root = makeDocFixtureProject();
+  try {
+    const doc = getArchitectureDoc(root);
+    assert.equal(doc.platformView.available, true);
+    assert.deepEqual(doc.platformView.headers, ["Source set", "Role"]);
+    assert.equal(doc.platformView.rows.length, 2);
+    assert.ok(doc.platformView.expectActual);
+    assert.equal(doc.platformView.expectActual.headers[0], "Declaration");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getArchitectureDoc: §6/§7 hand back raw section markdown (rendering is console-tabs.mjs's job, not this module's)", () => {
+  const root = makeDocFixtureProject();
+  try {
+    const doc = getArchitectureDoc(root);
+    assert.equal(doc.runtimeView.available, true);
+    assert.match(doc.runtimeView.body, /Cold start/);
+    assert.equal(doc.crosscuttingPolicies.available, true);
+    assert.match(doc.crosscuttingPolicies.body, /Error handling/);
+    assert.match(doc.crosscuttingPolicies.body, /ARCH-06\/07\/08/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getArchitectureDoc: parses the §8 ADR index table", () => {
+  const root = makeDocFixtureProject();
+  try {
+    const doc = getArchitectureDoc(root);
+    assert.equal(doc.decisions.available, true);
+    assert.match(doc.decisions.rows[0][0], /0001/);
+    assert.equal(doc.decisions.rows[0][2], "accepted");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getArchitectureDoc: a table-less §1 (edited by hand) degrades that sub-section honestly, without hiding the rest of the doc", () => {
+  const root = makeDocFixtureProject(DOC_FIXTURE.replace(/\| Quality[^]*?\| \`\[advisory\]\` today \|\n\n/, ""));
+  try {
+    const doc = getArchitectureDoc(root);
+    assert.equal(doc.available, true);
+    assert.equal(doc.qualityAttributes.available, false);
+    assert.match(doc.qualityAttributes.reason, /1\. Purpose/);
+    assert.equal(doc.systemContext.available, true, "an unrelated section is unaffected");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getArchitectureDoc: against the REAL template/docs/ARCHITECTURE.md — every sub-section resolves, nothing crashes", () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const templateDoc = path.join(here, "..", "..", "..", "template", "docs", "ARCHITECTURE.md");
+  if (!fs.existsSync(templateDoc)) return; // best-effort — this package doesn't statically depend on template/
+  const root = makeDocFixtureProject(fs.readFileSync(templateDoc, "utf8"));
+  try {
+    const doc = getArchitectureDoc(root);
+    assert.equal(doc.available, true);
+    assert.equal(doc.qualityAttributes.available, true);
+    assert.equal(doc.systemContext.available, true);
+    assert.equal(doc.platformView.available, true);
+    assert.equal(doc.runtimeView.available, true);
+    assert.equal(doc.crosscuttingPolicies.available, true);
+    assert.equal(doc.decisions.available, true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
