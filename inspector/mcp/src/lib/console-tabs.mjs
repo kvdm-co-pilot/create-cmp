@@ -1601,3 +1601,310 @@ ${rows}
     </tbody>
   </table>`;
 }
+
+// --- Screens (§3.4) — the design-review gallery ------------------------------
+//
+// The screen × state matrix: rows = screens (base preview-registry entries),
+// columns = default + whichever @loading/@empty/@error states ANY screen
+// registers, each cell that screen's live render. A cell whose state the
+// screen doesn't register is a quiet dash — the matrix's own geometry states
+// the absence; one line under the matrix says where states come from. Each
+// row ends in the derived chips (nodes/tokenized/tagged, a11y, changed-#N
+// attribution, the comment affordance) and expands (details/summary, pure
+// HTML) into the wireframe SVG plus the screen's governing spec clauses with
+// their receipt status — §3.4's render + wireframe + clauses, without
+// per-screen routing the console doesn't have.
+
+// The same state-suffix grammar preview-service.mjs's stateVariantCards uses
+// (docs/proposals/component-system-deep-dive.md §6.5's `"home@empty"`
+// convention) — duplicated as a literal rather than imported to keep this
+// module free of preview-service imports (it's the other way around).
+const SCREEN_STATE_ID_RE = /^(.+)@(loading|empty|error)$/;
+const SCREEN_STATE_ORDER = ["loading", "empty", "error"];
+
+/**
+ * The spec clauses governing one screen — derived, never asserted: a live
+ * clause governs screen `screenId` when at least one of its citing tests'
+ * paths carries a path segment equal to the screen id (e.g.
+ * `…/presentation/home/HomeScreenTest.kt` has segment `home`). That is the
+ * only mapping the tree itself states (tests live in their feature's
+ * directory); no name-similarity guessing. Returns `null` when specs data is
+ * unavailable (not derivable at all — distinct from "derivable and empty").
+ * @param {{available: boolean, files?: Array<{file: string, clauses: object[]}>}} specs specs.mjs getSpecsData() result
+ * @param {string} screenId a BASE screen id (no @state suffix)
+ * @returns {Array<{file: string, clause: object}>|null}
+ */
+export function clausesForScreen(specs, screenId) {
+  if (!specs || !specs.available || !Array.isArray(specs.files)) return null;
+  const out = [];
+  for (const f of specs.files) {
+    for (const clause of f.clauses) {
+      if (clause.withdrawn) continue;
+      const cites = (clause.citedBy || []).some((site) =>
+        String(site.file).split("/").some((seg) => seg === screenId),
+      );
+      if (cites) out.push({ file: f.file, clause });
+    }
+  }
+  return out;
+}
+
+/** One matrix cell: the live render (changed cells keep the hover before/after compare), or the quiet dash for an unregistered state. */
+function matrixCellHtml(card, state, changedSet, version) {
+  if (!card) {
+    const what = state === "default" ? "no default entry registered" : `no @${escAttr(state)} entry registered`;
+    return `<div class="matrix-cell matrix-none" title="${what} for this screen">&mdash;</div>`;
+  }
+  const id = card.screen.id;
+  const isChanged = changedSet.has(id);
+  const compare = isChanged && version > 1;
+  const buster = `?v=${Number(version)}`;
+  const cur = `<img class="cur" alt="${escAttr(id)} render" src="/previews/${escAttr(card.screen.png)}${buster}">`;
+  let inner = cur;
+  let label = "";
+  if (compare) {
+    const prevPng = String(card.screen.png).replace(/screen\.png$/, "screen.prev.png");
+    inner = `<div class="cmp">${cur}<img class="prev" alt="${escAttr(id)} before" src="/previews/${escAttr(prevPng)}${buster}"></div>`;
+    label = `<p class="lbl">hover = before</p>`;
+  }
+  return `<div class="matrix-cell${isChanged ? " changed" : ""}">${inner}${label}</div>`;
+}
+
+/** The row-end chips: derived counts + a11y from the DEFAULT render, changed-#N attribution, the comment affordance. */
+function matrixRowEndHtml(baseId, baseCard, changedVersions) {
+  const changedIn = changedVersions[baseId];
+  const chgChip = changedIn ? ` &middot; <span class="chg">changed #${Number(changedIn)}</span>` : "";
+  const comment = commentControlHtml({ type: "screen", screen: baseId }, { testTagInput: true });
+  if (!baseCard) {
+    return `<p class="meta">Not derivable statically &mdash; no default render for this screen${chgChip}</p>${comment}`;
+  }
+  const { summary, a11y } = baseCard;
+  const a11yChip = a11y.pass
+    ? `<span class="pass">PASS</span>`
+    : `<span class="fail">${esc(`${a11y.violations.length} violation${a11y.violations.length === 1 ? "" : "s"}`)}</span>`;
+  return `<p class="meta">${summary.nodes} nodes &middot; ${summary.tokenized} tokenized &middot; ${summary.tagged} tagged</p>
+      <p class="meta">a11y ${a11yChip}${chgChip}</p>
+      ${comment}`;
+}
+
+/** The expanded row's governing-clauses block — receipt status per clause via its own gate; honest absences in the standardized form. */
+function rowClausesHtml(specs, baseId, lastReceipt) {
+  const governing = clausesForScreen(specs, baseId);
+  if (governing === null) {
+    return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no specs/ directory found</p>`;
+  }
+  if (governing.length === 0) {
+    return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no spec clause's citing tests carry a <code>${esc(baseId)}</code> path segment</p>`;
+  }
+  const items = governing
+    .map(({ file, clause }) => {
+      const gate = gateForClause(clause);
+      return `      <li class="clause">
+        <span class="clause-id"><code>${esc(clause.id)}</code></span>
+        <span class="clause-prose">${esc(clause.prose)}</span>
+        ${gate ? stepReceiptCellHtml(lastReceipt, gate) : ""}
+        ${commentControlHtml({ type: "spec-line", file: `specs/${file}`, clauseId: clause.id })}
+      </li>`;
+    })
+    .join("\n");
+  return `<p class="lbl">governing clauses &mdash; clauses whose citing tests live under <code>${esc(baseId)}</code></p>
+    <ul class="clause-list">
+${items}
+    </ul>`;
+}
+
+/**
+ * The Screens section body (§3.4): the screen × state matrix. Pure — the
+ * caller (preview-service.mjs's galleryHtml) passes the current render's
+ * screen cards (component stories already excluded), the changed vocabulary,
+ * and the specs/receipt data the expanded rows read.
+ * @param {object} data { cards, changed, changedVersions, version, specs, lastReceipt }
+ *   `cards` = [{screen:{id,title,png}, svg, summary, a11y}], base entries and
+ *   `<base>@<state>` variants alike — the matrix regroups them by base id.
+ */
+export function screensBodyHtml(data) {
+  const {
+    cards = [],
+    changed = [],
+    changedVersions = {},
+    version = 0,
+    specs = { available: false },
+    lastReceipt = null,
+  } = data || {};
+  if (cards.length === 0) {
+    return `<div class="empty">
+      <p>No screens rendered yet.</p>
+      <p>The preview loop fills this page on its first render &mdash; every entry in
+      <code>inspector/PreviewRegistry.kt</code> becomes a row.</p>
+    </div>`;
+  }
+  const changedSet = new Set(changed);
+  // Regroup the flat card list into rows: base id -> its default render +
+  // whichever @state variants are registered. A variant whose base entry
+  // isn't registered still gets a row (its default cell is then the dash and
+  // its chips state their own underivability) — never silently dropped.
+  const byBase = new Map();
+  for (const card of cards) {
+    const m = SCREEN_STATE_ID_RE.exec(card.screen.id);
+    const baseId = m ? m[1] : card.screen.id;
+    if (!byBase.has(baseId)) byBase.set(baseId, { base: null, variants: new Map() });
+    if (m) byBase.get(baseId).variants.set(m[2], card);
+    else byBase.get(baseId).base = card;
+  }
+  // Columns: default + only the states at least one screen registers, in the
+  // fixed loading/empty/error order. No screen registers any state -> the
+  // matrix is a single default column; nothing is fabricated.
+  const stateCols = SCREEN_STATE_ORDER.filter((s) =>
+    [...byBase.values()].some((row) => row.variants.has(s)),
+  );
+  const headCols = ["default", ...stateCols]
+    .map((c) => `<span class="matrix-col">${esc(c)}</span>`)
+    .join("");
+  const rows = [...byBase.entries()]
+    .map(([baseId, row]) => {
+      const title = row.base ? row.base.screen.title : baseId;
+      const rowChanged =
+        changedSet.has(baseId) || [...row.variants.values()].some((c) => changedSet.has(c.screen.id));
+      const cells = [
+        matrixCellHtml(row.base, "default", changedSet, version),
+        ...stateCols.map((s) => matrixCellHtml(row.variants.get(s) || null, s, changedSet, version)),
+      ].join("\n        ");
+      const wire = row.base
+        ? `<div class="wire">${row.base.svg}</div>`
+        : `<p class="empty-inline">wireframe: Not derivable statically &mdash; no default render for this screen</p>`;
+      return `  <section class="matrix-row${rowChanged ? " changed" : ""}" id="card-${esc(baseId)}">
+    <div class="matrix-line">
+      <div class="matrix-rowhead">
+        <h3>${esc(title)}${rowChanged ? '<span class="flag">CHANGED</span>' : ""}</h3>
+        <p class="meta">id <code>${esc(baseId)}</code></p>
+      </div>
+      <div class="matrix-cells">
+        ${cells}
+      </div>
+      <div class="matrix-rowend">
+      ${matrixRowEndHtml(baseId, row.base, changedVersions)}
+      </div>
+    </div>
+    <details class="row-detail">
+      <summary>structure &amp; governing clauses</summary>
+      <div class="row-detail-body">
+        ${wire}
+        <div class="row-clauses">
+    ${rowClausesHtml(specs, baseId, lastReceipt)}
+        </div>
+      </div>
+    </details>
+  </section>`;
+    })
+    .join("\n");
+  return `<div class="matrix">
+  <div class="matrix-head" aria-hidden="true"><span class="matrix-gutter"></span>${headCols}</div>
+${rows}
+</div>
+<p class="meta matrix-note">An empty cell means the screen registers no entry for that state. States come from
+<code>@state</code> preview-registry entries in <code>inspector/PreviewRegistry.kt</code> (e.g. <code>"home@empty"</code>).</p>`;
+}
+
+// --- Intent (§3.0) — the product strategist's brief --------------------------
+//
+// The working-backwards brief rendered from the project's REAL specs/intent.md
+// (intent.mjs), section by section in the file's own order. Sections the
+// interview hasn't filled state themselves plainly — the seed template's own
+// "_not yet captured_" marker is the evidence, and its guidance prose is
+// rendered as the document's own prompt, muted. A project with no intent.md
+// at all gets the §3.0 placeholder styled as the document's own pending
+// state, never an error box. The ## Glossary section renders as a definition
+// table when its body is the template's `**Term** — definition` list (or a
+// GFM table); anything else renders as prose — no forced structure.
+
+const GLOSSARY_ITEM_RE = /^[-*]\s+\*\*(.+?)\*\*\s*[—–-]\s*(.+)$/;
+
+/**
+ * Try to read a glossary body as term/definition rows. Returns null unless
+ * EVERY non-blank line parses as either a `- **Term** — definition` item or a
+ * GFM table row — a mixed body renders as prose instead of a half-parsed
+ * table.
+ * @returns {Array<{term: string, def: string}>|null}
+ */
+function parseGlossaryRows(body) {
+  const rows = [];
+  const lines = String(body).split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+  const tableLines = lines.filter((l) => l.startsWith("|"));
+  if (tableLines.length === lines.length && tableLines.length >= 2) {
+    // GFM table: skip the header + separator rows, take cell 1/2 per row.
+    for (const l of tableLines.slice(2)) {
+      const cells = l.split("|").map((c) => c.trim()).filter((c, i, a) => !(i === 0 && c === "") && !(i === a.length - 1 && c === ""));
+      if (cells.length < 2) return null;
+      rows.push({ term: cells[0], def: cells[1] });
+    }
+    return rows.length ? rows : null;
+  }
+  for (const l of lines) {
+    const m = l.match(GLOSSARY_ITEM_RE);
+    if (!m) return null;
+    rows.push({ term: m[1], def: m[2] });
+  }
+  return rows.length ? rows : null;
+}
+
+function glossaryHtml(body) {
+  const rows = parseGlossaryRows(body);
+  if (!rows) return `<div class="doc-prose">${mdProseHtml(body)}</div>`;
+  const trs = rows
+    .map((r) => `    <tr><td><strong>${inlineMdHtml(r.term)}</strong></td><td>${inlineMdHtml(r.def)}</td></tr>`)
+    .join("\n");
+  return `<table class="doc-table glossary-table">
+    <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+    <tbody>
+${trs}
+    </tbody>
+  </table>`;
+}
+
+/**
+ * The Intent section body (§3.0). Comment affordances target
+ * {type:"spec-line", file:"specs/intent.md", clauseId:<heading>} — the
+ * ledger's spec-line contract requires both fields (qa/lib/comments.mjs), and
+ * for a prose brief the section heading IS the addressable unit.
+ * @param {{available: boolean, reason?: string, sections?: Array<{heading: string, body: string, filled: boolean, guidance: string|null}>}} intent intent.mjs getIntentData() result
+ */
+export function intentBodyHtml(intent) {
+  if (!intent || !intent.available) {
+    return `<div class="brief-pending">
+      <p class="brief-pending-state">Not yet captured &mdash; conversation 0 pending.</p>
+      <p>The genesis walk's first conversation writes <code>specs/intent.md</code> &mdash; purpose,
+      audience, platforms, brand feel, reference apps, first screens, glossary. Every later
+      artifact is expressed in the vocabulary this brief establishes.</p>
+    </div>`;
+  }
+  if (!intent.sections || intent.sections.length === 0) {
+    return `<div class="brief-pending">
+      <p class="brief-pending-state">Not yet captured &mdash; conversation 0 pending.</p>
+      <p><code>specs/intent.md</code> exists but carries no <code>##</code> sections yet.</p>
+    </div>`;
+  }
+  const sections = intent.sections
+    .map((sec) => {
+      const comment = commentControlHtml({ type: "spec-line", file: "specs/intent.md", clauseId: sec.heading });
+      let body;
+      if (sec.filled) {
+        body = /^glossary$/i.test(sec.heading)
+          ? glossaryHtml(sec.body)
+          : `<div class="doc-prose">${mdProseHtml(sec.body)}</div>`;
+      } else {
+        // The seed's own guidance prose (lead-in stripped) is the document's
+        // words for what belongs here — rendered muted, never invented.
+        const guidance = sec.guidance ? `<p class="brief-guidance">${inlineMdHtml(sec.guidance)}</p>` : "";
+        body = `<p class="brief-pending-inline">Not yet captured &mdash; conversation 0 pending.</p>${guidance}`;
+      }
+      return `  <section class="brief-section${sec.filled ? "" : " brief-unfilled"}">
+    <h3>${esc(sec.heading)}${comment}</h3>
+    ${body}
+  </section>`;
+    })
+    .join("\n");
+  return `<div class="brief">
+${sections}
+</div>`;
+}

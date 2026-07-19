@@ -60,9 +60,11 @@ import {
   architectureTabHtml,
   evidenceBodyHtml,
   commentsTabHtml,
-  commentControlHtml,
+  screensBodyHtml,
+  intentBodyHtml,
 } from "./console-tabs.mjs";
 import { getTokenUsage } from "./design-language.mjs";
+import { getIntentData } from "./intent.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -237,7 +239,7 @@ const esc = (s) =>
  * outlives the next render.
  * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error,
  *   approvals, specs, designSystem, architecture, components, comments, variants, componentsMeta,
- *   architectureMeta, lastReceipt, receiptHistory, treeHash, tokenUsage }
+ *   architectureMeta, lastReceipt, receiptHistory, treeHash, tokenUsage, intent }
  */
 export function galleryHtml(state) {
   const {
@@ -261,9 +263,9 @@ export function galleryHtml(state) {
     receiptHistory = { available: false },
     treeHash = null,
     tokenUsage = null,
+    intent = { available: false },
   } = state;
   const width = viewport?.width ?? 411;
-  const changedSet = new Set(changed);
   // §3.3: component stories render through the same pipeline but are not
   // screens — the Screens grid, screen count, and changed-count all exclude
   // them; the Components section picks them up via componentsMeta below.
@@ -289,6 +291,13 @@ export function galleryHtml(state) {
   const dsRecord = artifactRecord("design-system");
   const archRecord = architectureMeta.approval ?? artifactRecord("architecture");
   const componentsRecord = componentsMeta.approval ?? artifactRecord("components");
+  const intentRecord = artifactRecord("intent");
+
+  // Evidence (§3.6): the receipt the whole console leans on. Some callers wire
+  // it via architectureMeta.lastReceipt (the older Wave C path) — one receipt
+  // serves the rail glyph, the rail foot, the status lines, the Screens rows'
+  // clause badges, and the Evidence section.
+  const effectiveReceipt = lastReceipt || architectureMeta.lastReceipt || null;
 
   // Open comments, attributed to the section their target lives in — the §2
   // header's open-comment count. Component comments ride the design-system
@@ -302,7 +311,10 @@ export function galleryHtml(state) {
     }
     if (t.type === "architecture") return "architecture";
     if (t.type === "screen" || t.type === "element") return "screens";
-    if (t.type === "spec-line") return "specs";
+    // §3.0: the Intent brief's comment affordances ride the spec-line type
+    // (file specs/intent.md, clauseId = the section heading) — they attribute
+    // to the Intent section, not Specs.
+    if (t.type === "spec-line") return t.file === "specs/intent.md" ? "intent" : "specs";
     return "comments";
   };
   const openBySection = {};
@@ -318,36 +330,18 @@ export function galleryHtml(state) {
     return n ? ` &middot; &#9998; ${n} open comment${n === 1 ? "" : "s"}` : "";
   };
 
-  // --- section bodies (existing generators, unchanged in R2 — the shell is
-  // the frame; R3–R5 rebuild each body to the §3 professional forms) ---------
+  // --- section bodies (§3 professional forms, console-tabs.mjs) -------------
 
-  const screensBody = `<div class="grid">
-${screenCards
-  .map(({ screen, svg, summary, a11y }) => {
-    const isChanged = changedSet.has(screen.id);
-    const changedIn = changedVersions[screen.id];
-    // hover before/after: screen.prev.png is the pre-render copy (exists once a
-    // second render has happened — the first generation has nothing to compare to)
-    const compare = isChanged && version > 1;
-    const prevPng = String(screen.png).replace(/screen\.png$/, "screen.prev.png");
-    const pixels = compare
-      ? `<div class="cmp"><img class="cur" alt="${esc(screen.id)} pixels" src="/previews/${esc(screen.png)}?v=${version}"><img class="prev" alt="${esc(screen.id)} before" src="/previews/${esc(prevPng)}?v=${version}"></div>`
-      : `<img alt="${esc(screen.id)} pixels" src="/previews/${esc(screen.png)}?v=${version}">`;
-    return `  <div class="card${isChanged ? " changed" : ""}" id="card-${esc(screen.id)}">
-    <h2>${esc(screen.title)}${isChanged ? '<span class="flag">CHANGED</span>' : ""}${commentControlHtml({ type: "screen", screen: screen.id }, { testTagInput: true })}</h2>
-    <p class="meta">id <code>${esc(screen.id)}</code> · ${summary.nodes} nodes ·
-       ${summary.tokenized} tokenized · ${summary.tagged} tagged ·
-       a11y <span class="${a11y.pass ? "pass" : "fail"}">${
-      a11y.pass ? "PASS" : esc(a11y.violations.length + " violation(s)")
-    }</span>${changedIn ? ` · <span class="chg">changed #${Number(changedIn)}</span>` : ""}</p>
-    <div class="panes">
-      <div><p class="lbl">${compare ? "pixels · hover = before" : "pixels"}</p>${pixels}</div>
-      <div><p class="lbl">structure</p><div class="wire">${svg}</div></div>
-    </div>
-  </div>`;
-  })
-  .join("\n")}
-</div>`;
+  // §3.4: the screen × state matrix. The expanded rows read the same specs
+  // data as the RTM and the same receipt as Evidence — one derivation each.
+  const screensBody = screensBodyHtml({
+    cards: screenCards,
+    changed: changedScreens,
+    changedVersions,
+    version,
+    specs,
+    lastReceipt: effectiveReceipt,
+  });
 
   // --- §2 header status lines: one glance answers "what is this, is it
   // signed, has it moved". Artifact-governed pages use the artifact grammar;
@@ -356,6 +350,21 @@ ${screenCards
   const screensStatus = `render #${version} &middot; ${screenCards.length} screen${screenCards.length === 1 ? "" : "s"}${
     changedScreens.length ? ` &middot; <span class="chg">${changedScreens.length} changed this render</span>` : ""
   }${openNote("screens")}`;
+
+  // Intent (§3.0): the artifact status when there is one, plus the brief's
+  // own fill state — both derived, neither borrowed. No intent.md at all
+  // states the §3.0 pending line here too.
+  const intentStatusParts = [];
+  {
+    const rec = artifactStatusHtml(intentRecord);
+    if (rec) intentStatusParts.push(rec);
+    if (intent.available && intent.sections) {
+      const filled = intent.sections.filter((s) => s.filled).length;
+      intentStatusParts.push(`${filled} of ${intent.sections.length} sections captured`);
+    }
+  }
+  const intentStatus =
+    (intentStatusParts.join(" &middot; ") || "not yet captured &mdash; conversation 0 pending") + openNote("intent");
 
   const dsStatus = (artifactStatusHtml(dsRecord) || "the visual vocabulary — tokens, contrast, candidates") + openNote("design-system");
   const archStatus = (artifactStatusHtml(archRecord) || "the layer contract and its live conformance") + openNote("architecture");
@@ -378,10 +387,6 @@ ${screenCards
     ? `${specs.files.length} spec file${specs.files.length === 1 ? "" : "s"} &middot; ${specs.files.reduce((n, f) => n + f.clauses.length, 0)} clauses${openNote("specs")}`
     : "no specs/ directory found";
 
-  // Evidence (§3.6): the receipt the whole console leans on. Some callers wire
-  // it via architectureMeta.lastReceipt (the older Wave C path) — one receipt
-  // serves the rail glyph, the rail foot, the status line, and the section.
-  const effectiveReceipt = lastReceipt || architectureMeta.lastReceipt || null;
   let evidenceStatus = "no verify receipt yet";
   if (effectiveReceipt && effectiveReceipt.available) {
     const age = typeof effectiveReceipt.ageMs === "number" ? formatAgeCoarse(effectiveReceipt.ageMs) : "age unknown";
@@ -409,6 +414,9 @@ ${screenCards
   // the cross-cutting ledgers (Approvals, Comments) after the artifact pages.
   // Screens stays the DEFAULT page — the daily hot-reload surface.
   const railItems = [
+    // §3.0: Intent is genesis order 0 — the root artifact everything else is
+    // expressed in — so it leads the rail.
+    { id: "intent", label: "Intent", glyph: statusGlyph(intentRecord) },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
@@ -428,6 +436,12 @@ ${screenCards
   ];
 
   const sections = [
+    {
+      id: "intent",
+      title: "Intent",
+      statusHtml: intentStatus,
+      bodyHtml: intentBodyHtml(intent),
+    },
     {
       id: "design-system",
       title: "Design language",
@@ -557,12 +571,13 @@ ${screenCards
   };
   es.onerror = () => { pill.textContent = "disconnected"; pill.className = "error"; };
   // Screen filter — survives the SSE-triggered reloads via sessionStorage.
+  // §3.4: it filters matrix ROWS (one row per screen, states stay together).
   const filter = document.getElementById("filter");
   filter.value = sessionStorage.getItem("previewFilter") || "";
   const applyFilter = () => {
     const q = filter.value.trim().toLowerCase();
     sessionStorage.setItem("previewFilter", q);
-    document.querySelectorAll(".card").forEach((c) => {
+    document.querySelectorAll(".matrix-row").forEach((c) => {
       c.style.display = !q || c.textContent.toLowerCase().includes(q) ? "" : "none";
     });
   };
@@ -763,8 +778,12 @@ ${screenCards
     railFootHtml: `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`,
     sections,
     error,
-    extraCss: `  .panes img { width: ${Math.round(width * 0.62)}px; }
-  .panes .wire svg { width: ${Math.round(width * 0.78)}px; }`,
+    // §3.4 geometry from the render viewport: uniform cell width keeps the
+    // matrix's columns aligned without a shared grid; the expanded wireframe
+    // gets the roomier single-pane width.
+    extraCss: `  .matrix-cell img, .matrix-cell.matrix-none { width: ${Math.round(width * 0.38)}px; }
+  .matrix-col { width: ${Math.round(width * 0.38)}px; }
+  .row-detail .wire svg { width: ${Math.round(width * 0.7)}px; }`,
     bodyScript,
     provenance: { treeHash, version },
   });
@@ -1578,6 +1597,8 @@ export function createPreviewService(opts) {
           getLastReceipt(projectDir),
         ]);
         const specs = getSpecsData(projectDir);
+        // §3.0: the product brief — specs/intent.md parsed in its own order.
+        const intent = getIntentData(projectDir);
         // §3.6: prior receipts, if this project keeps any beyond latest.json —
         // the Evidence timeline's source (absence renders the standardized line).
         const receiptHistory = listReceiptHistory(projectDir);
@@ -1658,6 +1679,7 @@ export function createPreviewService(opts) {
             receiptHistory,
             treeHash,
             tokenUsage,
+            intent,
           }),
         );
         return;
