@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getComponentsData } from "../src/lib/components.mjs";
+import { getComponentsData, parseKdocSections } from "../src/lib/components.mjs";
 
 function makeFixtureProject() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-components-"));
@@ -368,6 +368,86 @@ test("getComponentsData: an unclosed signature still reports honest empty facts/
     assert.equal(broken.parseError, true);
     assert.deepEqual(broken.paramsParsed, []);
     assert.deepEqual(broken.facts.derivedTags, []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --- parseKdocSections (§3.3: @param notes for the params table) ------------
+
+test("parseKdocSections: null/empty kdoc -> no description, no paramDocs — never a guess", () => {
+  assert.deepEqual(parseKdocSections(null), { description: null, paramDocs: {} });
+  assert.deepEqual(parseKdocSections(""), { description: null, paramDocs: {} });
+});
+
+test("parseKdocSections: description only (no block tags) passes through verbatim", () => {
+  const { description, paramDocs } = parseKdocSections("Deliberately not an M3 TopAppBar.\nSecond line.");
+  assert.equal(description, "Deliberately not an M3 TopAppBar.\nSecond line.");
+  assert.deepEqual(paramDocs, {});
+});
+
+test("parseKdocSections: @param tags map name -> text; continuation lines fold into the current tag, KDoc-style", () => {
+  const { description, paramDocs } = parseKdocSections(
+    [
+      "The page container every screen roots itself in.",
+      "",
+      "@param screenTag the tag root every derived",
+      "  testTag hangs off",
+      "@param modifier applied to the root-most layout",
+    ].join("\n"),
+  );
+  assert.equal(description, "The page container every screen roots itself in.");
+  assert.equal(paramDocs.screenTag, "the tag root every derived testTag hangs off");
+  assert.equal(paramDocs.modifier, "applied to the root-most layout");
+});
+
+test("parseKdocSections: a documented param with no description text gets an empty string, and bracketed [name] is unwrapped", () => {
+  const { paramDocs } = parseKdocSections("@param onClick\n@param [enabled] gates interaction");
+  assert.equal(paramDocs.onClick, "");
+  assert.equal(paramDocs.enabled, "gates interaction");
+});
+
+test("parseKdocSections: non-param block tags and their continuations are dropped — neither description nor paramDocs, never paraphrased elsewhere", () => {
+  const { description, paramDocs } = parseKdocSections(
+    ["Body prose.", "@sample com.acme.Sample", "  sample continuation", "@param text the label"].join("\n"),
+  );
+  assert.equal(description, "Body prose.");
+  assert.deepEqual(paramDocs, { text: "the label" });
+});
+
+test("getComponentsData: kdocDescription + paramDocs surface on scanned components; a component without @param tags gets an empty map", () => {
+  const { root, componentsDir } = makeFixtureProject();
+  try {
+    fs.writeFileSync(
+      path.join(componentsDir, "AppHeader.kt"),
+      [
+        "package com.acme.demo.presentation.components",
+        "",
+        "/**",
+        " * The screen heading, deliberately not a TopAppBar.",
+        " *",
+        " * @param title rendered in headlineMedium",
+        " */",
+        "@Composable",
+        "fun AppHeader(title: String) {",
+        "  Text(title)",
+        "}",
+        "",
+        "/** No params documented here. */",
+        "@Composable",
+        "fun PlainThing(x: String) {",
+        "  Text(x)",
+        "}",
+      ].join("\n"),
+    );
+    const data = getComponentsData(root);
+    const header = data.components.find((c) => c.name === "AppHeader");
+    assert.equal(header.kdocDescription, "The screen heading, deliberately not a TopAppBar.");
+    assert.deepEqual(header.paramDocs, { title: "rendered in headlineMedium" });
+    assert.match(header.kdoc, /@param title/, "the full kdoc stays verbatim alongside the split");
+    const plain = data.components.find((c) => c.name === "PlainThing");
+    assert.equal(plain.kdocDescription, "No params documented here.");
+    assert.deepEqual(plain.paramDocs, {}, "no @param tags -> empty map, never invented prose");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

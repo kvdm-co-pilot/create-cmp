@@ -332,16 +332,26 @@ export const SHELL_CSS = `
   .wire { border: 1px dashed var(--line); border-radius: 10px; overflow: hidden; }
   .wire svg { height: auto; display: block; }
 
-  /* --- design language --- */
-  .swatch-grid { display: flex; flex-wrap: wrap; gap: 16px; }
-  .swatch-card { width: 128px; }
-  .swatch { width: 100%; height: 56px; border-radius: 8px; border: 1px solid var(--line); }
-  .swatch-name { font-size: var(--fs-meta); font-weight: 600; margin-top: 6px; }
-  .swatch-value { font-size: var(--fs-meta); color: var(--muted); }
-  .dimens-table, .approvals-table, .comments-table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); margin-top: 8px; }
-  .dimens-table td, .approvals-table td, .approvals-table th, .comments-table td, .comments-table th {
+  /* --- design language (§3.1: the designer's handoff spec) --- */
+  .tok-table, .approvals-table, .comments-table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); margin-top: 8px; }
+  .tok-table td, .tok-table th, .approvals-table td, .approvals-table th, .comments-table td, .comments-table th {
     padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-  .approvals-table th, .comments-table th { color: var(--muted); font-weight: 600; font-size: var(--fs-meta); }
+  .tok-table th, .approvals-table th, .comments-table th { color: var(--muted); font-weight: 600; font-size: var(--fs-meta); }
+  .tok-table td { vertical-align: middle; }
+  .tok-swatch-cell { width: 44px; }
+  .tok-swatch { display: block; width: 32px; height: 24px; border-radius: 6px; border: 1px solid var(--line); }
+  .tok-usage { font-size: var(--fs-meta); color: var(--ink-2); white-space: nowrap; }
+  .contrast-sample { display: inline-grid; place-items: center; width: 44px; height: 26px; border-radius: 6px;
+                     border: 1px solid var(--line); font-size: 12px; font-weight: 650; margin-right: 10px;
+                     vertical-align: middle; }
+  .contrast-ratio { font-family: var(--mono); font-size: var(--fs-meta); white-space: nowrap; }
+  .wcag-pass { color: var(--signed); font-weight: 600; font-size: var(--fs-meta); }
+  .wcag-fail { color: var(--drift); font-weight: 600; font-size: var(--fs-meta); }
+  .scale-list { margin-top: 8px; }
+  .scale-row { display: flex; align-items: center; gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .scale-name { flex: 0 0 176px; font-size: var(--fs-meta); }
+  .scale-bar { height: 12px; border-radius: 3px; background: var(--accent); flex: none; max-width: 55%; }
+  .scale-value { font-size: var(--fs-meta); font-family: var(--mono); color: var(--muted); }
   .candidates-strip { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; }
   .candidate-card { flex: 1 1 260px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--paper); }
   .candidate-card h4 { margin: 0 0 8px; font-size: var(--fs-body); }
@@ -421,12 +431,19 @@ export const SHELL_CSS = `
   .layer-files li, .feature-tree li { display: flex; align-items: center; gap: 6px; }
   .layer-others { margin-top: 14px; }
 
-  /* --- components --- */
-  .component-grid { display: flex; flex-wrap: wrap; gap: 16px; }
-  .component-card { flex: 1 1 320px; max-width: 420px; border: 1px solid var(--line); border-radius: 12px;
-                    padding: 12px 14px; background: var(--paper); }
-  .component-card h4 { margin: 0 0 4px; font-size: var(--fs-body); font-weight: 650; display: flex; align-items: center; gap: 6px; }
-  .component-sig { margin: 4px 0 10px; }
+  /* --- components (§3.3: the platform engineer's library reference) --- */
+  .component-list { display: flex; flex-direction: column; }
+  .component-entry { padding: 24px 0 28px; border-bottom: 1px solid var(--line); }
+  .component-entry:first-child { padding-top: 4px; }
+  .component-entry:last-child { border-bottom: none; }
+  .component-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 2px; }
+  .component-head h3 { margin: 0; }
+  .component-file { margin: 2px 0 12px; }
+  .params-table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); margin: 4px 0 12px; }
+  .params-table th, .params-table td { padding: 7px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  .params-table th { color: var(--muted); font-weight: 600; font-size: var(--fs-meta); }
+  .param-required { color: var(--muted); font-size: var(--fs-meta); }
+  .param-note { font-size: var(--fs-meta); color: var(--ink-2); }
   .component-facts { list-style: none; margin: 0 0 10px; padding: 0; font-size: var(--fs-meta); display: flex; flex-direction: column; gap: 4px; }
   .component-facts li { padding-left: 14px; position: relative; }
   .component-facts li::before { content: "\\2022"; position: absolute; left: 0; color: var(--muted); }
