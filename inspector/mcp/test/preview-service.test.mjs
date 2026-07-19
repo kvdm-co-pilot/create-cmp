@@ -1577,7 +1577,9 @@ test("service: the Pick flow — the EXACT payload the strip's Pick button posts
     const res = await fetch(`${st.url}api/comment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target: { type: "design-system" }, text: "pick:warmer" }),
+      // token is REQUIRED for design-system targets (§7.3) — the real library
+      // 409s a token-less pick; the G-gate browser run proved it live.
+      body: JSON.stringify({ target: { type: "design-system", token: "variant:warmer" }, text: "pick:warmer" }),
     });
     assert.equal(res.status, 200);
     const body = await res.json();
@@ -1588,7 +1590,7 @@ test("service: the Pick flow — the EXACT payload the strip's Pick button posts
     assert.equal(settled.timedOut, false);
     assert.equal(settled.added.length, 1);
     assert.equal(settled.added[0].text, "pick:warmer");
-    assert.deepEqual(settled.added[0].target, { type: "design-system" });
+    assert.deepEqual(settled.added[0].target, { type: "design-system", token: "variant:warmer" });
   } finally {
     service.stop();
     resetCommentsBridgeCache(projectDir);

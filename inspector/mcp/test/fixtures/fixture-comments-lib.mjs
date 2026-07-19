@@ -55,10 +55,28 @@ export function listComments(root, { status } = {}) {
   return { schema: state.schema, comments };
 }
 
+// Per-type REQUIRED target fields — mirrors the real template/qa/lib/comments.mjs
+// exactly. The fixture originally skipped this validation, which let a
+// token-less design-system pick pass tests while the real library 409'd it in
+// the browser (the G-gate catch): a contract fixture that validates less than
+// the contract is how seam bugs hide.
+const REQUIRED_TARGET_FIELDS = {
+  screen: ["screen"],
+  element: ["screen", "testTag"],
+  "spec-line": ["file", "clauseId"],
+  "design-system": ["token"],
+  architecture: ["path"],
+  general: [],
+};
+
 export function addComment(root, { target, text, author } = {}) {
   if (!text || !String(text).trim()) return { ok: false, reason: "text must not be empty/whitespace" };
   if (!target || !VALID_TARGET_TYPES.has(target.type)) {
     return { ok: false, reason: `unknown target type "${target && target.type}"` };
+  }
+  const missing = REQUIRED_TARGET_FIELDS[target.type].filter((f) => !target[f] || !String(target[f]).trim());
+  if (missing.length > 0) {
+    return { ok: false, reason: `target type "${target.type}" requires ${REQUIRED_TARGET_FIELDS[target.type].join(", ")} — missing or empty: ${missing.join(", ")}.` };
   }
   const state = load(root);
   const comment = {
