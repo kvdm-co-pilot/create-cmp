@@ -10,7 +10,7 @@ sealed interface ContentUiState<out T> {
     data object Loading : ContentUiState<Nothing>
     data class Error(val message: String) : ContentUiState<Nothing>
     data object Empty : ContentUiState<Nothing>
-    data class Content<T>(val data: T) : ContentUiState<T>
+    data class Content<out T>(val data: T) : ContentUiState<T>
 }
 
 /** ViewModel-side helper: the Empty/Content decision made once, not per screen. */

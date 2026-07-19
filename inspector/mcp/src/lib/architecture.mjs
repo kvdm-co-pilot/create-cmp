@@ -152,16 +152,22 @@ export function getGovernedContract(root) {
   }
 }
 
-// The exemplar `home` feature's own domain/data/test files — mirroring
-// template/qa/lib/approvals.mjs's EXEMPLAR_FEATURE_KOTLIN_FILES (the exact
-// `from:` side of qa/scaffold-feature.mjs's ALL_FILES). NOT imported: this
-// package owns inspector/mcp/**, not template/qa/** (see approvals-bridge.mjs
-// for why a static cross-package import isn't possible), so the filenames
-// are kept here as a small constant — safe because the exemplar is always
-// named `home`/`Item` in every create-cmp scaffold (fixed by the stamper's
-// own `from:` list, not a guess) — and every entry is checked for REAL
-// existence on disk below; a file only appears in the tree if it's actually
-// there.
+// The DEFAULT exemplar (`home`/`Item`) feature's own domain/data/test files —
+// mirroring template/qa/lib/approvals.mjs's EXEMPLAR_FEATURE_KOTLIN_FILES (the
+// exact `from:` side of qa/scaffold-feature.mjs's ALL_FILES). NOT imported:
+// this package owns inspector/mcp/**, not template/qa/** (see
+// approvals-bridge.mjs for why a static cross-package import isn't possible),
+// so the filenames are kept here as a small constant, and every entry is
+// checked for REAL existence on disk below; a file only appears in the tree if
+// it's actually there.
+//
+// KNOWN LIMITATION: qa/approvals.json's `exemplarFeature` key can retarget the
+// clone source away from `home` (GENESIS-FLOW-DESIGN.md's endgame). This
+// section still shows the shipped `home` shape in that case — honest about
+// what's on disk (existence-checked), but no longer the stamper's live clone
+// source. The correct repair is resolving the project's OWN
+// resolveExemplarNames via the approvals bridge (async), which changes this
+// module's sync API — deferred, tracked as a follow-up.
 const EXEMPLAR_FEATURE_FILES = [
   { sourceSet: "commonMain", rel: "domain/model/Item.kt" },
   { sourceSet: "commonMain", rel: "domain/repository/ItemRepository.kt" },

@@ -5,10 +5,10 @@
 // test cites, and a `SPEC:` tag citing a withdrawn or nonexistent clause.
 //
 // The clause-line grammar mirrors qa/verify.mjs's stepSpecCoverage CLAUSE_LINE_RE
-// (template/qa/verify.mjs:108, `- **ID** ...` / withdrawn `- ~~**ID**...~~`) and the
-// citation-tag grammar mirrors its TAG_LINE_RE/TAG_IDS_RE (:119-120, `// SPEC: ID` /
-// `# SPEC: ID`) — same grammar, so a clause or a tag reads identically here and in
-// the verify-lane gate. This is still the console's own advisory scan, not the
+// (`- **ID** ...` / withdrawn `- ~~**ID**...~~`) and the citation-tag grammar
+// mirrors its TAG_LINE_RE/TAG_IDS_RE (`// SPEC: ID` / `# SPEC: ID`) — keep the
+// two in sync BY HAND: stepSpecCoverage's regexes are function-local in a
+// script that runs on import, so no cross-package parity test can pin them. This is still the console's own advisory scan, not the
 // gate: stepSpecCoverage's FAIL construction stays in template/qa/verify.mjs
 // (file ownership: inspector/mcp/**, never template/qa/**); the RTM renders
 // the same facts read-only, and the lane remains the law.

@@ -125,7 +125,11 @@ function resolveSurfaceFiles(root) {
  * @returns {{ hash: string, fileCount: number }}
  */
 export function computeInputsHash(root) {
-  const files = [...new Set(resolveSurfaceFiles(root))].sort((a, b) => a.localeCompare(b));
+  // Code-unit sort (default String sort), NOT localeCompare: the hash depends
+  // on iteration order, and ICU collation varies with the machine's locale
+  // (e.g. a da_DK machine orders "aa" after "z"; en orders case-insensitively
+  // where code units do not) — the same tree must hash identically everywhere.
+  const files = [...new Set(resolveSurfaceFiles(root))].sort();
 
   const overall = createHash("sha256");
   for (const relPath of files) {

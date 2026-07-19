@@ -5,10 +5,9 @@
 // LinearProgressIndicator directly should be going through the components
 // registry (ContentStateContainer / ContentStateDefaults) instead.
 //
-// This is NOT the Kotlin-compiler-enforced gate — that lives (if/when it
-// lands) in the generated project's own ArchitectureConformanceTest,
-// template-side, which this package never forks (inspector/mcp/** owns the
-// console, not template/qa/**). It's a lightweight, honestly-labeled PREVIEW
+// This is NOT the enforcing gate — that landed as ARCH-11 in the generated
+// project's own ArchitectureConformanceTest, template-side, which this
+// package never forks (inspector/mcp/** owns the console, not template/qa/**). It's a lightweight, honestly-labeled PREVIEW
 // of the same rule, so a violation is visible in the console before a build
 // even runs. Absence of the Kotlin gate in an older/newer scaffold doesn't
 // change what this file reports — it derives entirely from source text on
