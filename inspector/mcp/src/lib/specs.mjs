@@ -1,20 +1,17 @@
-// specs.mjs — Specs tab data (VERIFICATION-LAYER-DESIGN.md §4): per spec file,
-// the clause list (id + prose, struck-through when withdrawn) plus a best-effort
-// "is this clause cited by a durable test right now?" badge.
+// specs.mjs — Specs section data (STUDIO-REDESIGN.md §3.5, the QA lead's
+// traceability matrix): per spec file, the clause list (id + prose,
+// struck-through when withdrawn), each live clause's citing tests
+// (file:line), and the orphan defects in BOTH directions — a live clause no
+// test cites, and a `SPEC:` tag citing a withdrawn or nonexistent clause.
 //
 // The clause-line grammar mirrors qa/verify.mjs's stepSpecCoverage CLAUSE_LINE_RE
 // (template/qa/verify.mjs:108, `- **ID** ...` / withdrawn `- ~~**ID**...~~`) and the
 // citation-tag grammar mirrors its TAG_LINE_RE/TAG_IDS_RE (:119-120, `// SPEC: ID` /
 // `# SPEC: ID`) — same grammar, so a clause or a tag reads identically here and in
-// the verify-lane gate.
-//
-// What this file DELIBERATELY does NOT do: reproduce stepSpecCoverage's bidirectional
-// orphan-clause / orphan-tag FAIL-message construction (which clause has no test,
-// which tag cites a withdrawn/nonexistent clause, with file:line detail). That's
-// meaningfully more logic than a "cited yes/no" badge needs, and duplicating it here
-// would fork template/qa/verify.mjs's actual gate logic — out of scope for this
-// package (file ownership: inspector/mcp/**, never template/qa/**). See VL-4's report
-// for the extraction this would need if tighter parity is wanted later.
+// the verify-lane gate. This is still the console's own advisory scan, not the
+// gate: stepSpecCoverage's FAIL construction stays in template/qa/verify.mjs
+// (file ownership: inspector/mcp/**, never template/qa/**); the RTM renders
+// the same facts read-only, and the lane remains the law.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -47,22 +44,33 @@ function walkCodeFiles(dir) {
   return out;
 }
 
-/** Every `// SPEC:`/`# SPEC:` id cited anywhere under composeApp/src or qa/e2e. */
-function citedClauseIds(root) {
+/**
+ * Every `// SPEC:`/`# SPEC:` citation anywhere under composeApp/src or qa/e2e,
+ * indexed by clause id — the id plus WHERE it was cited (file relative to the
+ * project root, 1-based line), so the RTM can name the citing tests rather
+ * than only claim "covered". One scan serves both the per-clause `citedBy`
+ * lists and the orphan-citation check.
+ * @returns {Map<string, Array<{file: string, line: number}>>}
+ */
+function citationIndex(root) {
   const dirs = [path.join(root, "composeApp", "src"), path.join(root, "qa", "e2e")];
-  const cited = new Set();
+  const index = new Map();
   for (const dir of dirs) {
     for (const file of walkCodeFiles(dir)) {
-      for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+      const rel = path.relative(root, file).split(path.sep).join("/");
+      fs.readFileSync(file, "utf8").split("\n").forEach((line, idx) => {
         const trimmed = line.trim();
-        if (!TAG_LINE_RE.test(trimmed)) continue;
+        if (!TAG_LINE_RE.test(trimmed)) return;
         const m = trimmed.match(TAG_IDS_RE);
-        if (!m) continue;
-        for (const id of m[1].split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)) cited.add(id);
-      }
+        if (!m) return;
+        for (const id of m[1].split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)) {
+          if (!index.has(id)) index.set(id, []);
+          index.get(id).push({ file: rel, line: idx + 1 });
+        }
+      });
     }
   }
-  return cited;
+  return index;
 }
 
 /** @returns {string[]} `*.spec.md` file names under specs/, sorted; [] if no specs/ dir. */
@@ -111,24 +119,46 @@ export function parseSpecClauses(root, file) {
 }
 
 /**
- * Specs tab data: every spec file's clauses, each with a best-effort `cited`
- * flag (`true`/`false` for live clauses, `null` — coverage N/A — for withdrawn
- * ones, mirroring stepSpecCoverage's exemption). `available:false` when the
- * project has no specs/ directory at all; values are never fabricated.
+ * Specs section data (the RTM's facts): every spec file's clauses, each with
+ * - `cited`: `true`/`false` for live clauses, `null` — coverage N/A — for
+ *   withdrawn ones, mirroring stepSpecCoverage's exemption;
+ * - `citedBy`: the citing tests as `{file, line}` (empty for an uncited or
+ *   withdrawn clause — a withdrawn clause CAN still carry stale citations,
+ *   which surface as orphanCitations, not as coverage);
+ * plus `orphanCitations` — every `SPEC:` tag whose id resolves to a withdrawn
+ * clause or to no clause in any spec file, each with its file:line and the
+ * derived reason. `available:false` when the project has no specs/ directory
+ * at all; values are never fabricated.
  * @param {string} root
+ * @returns {{available: boolean, files?: Array<{file: string, clauses: Array<{id: string, withdrawn: boolean, prose: string, cited: boolean|null, citedBy: Array<{file: string, line: number}>}>}>, orphanCitations?: Array<{id: string, file: string, line: number, reason: string}>}}
  */
 export function getSpecsData(root) {
   const files = listSpecFiles(root);
   if (files.length === 0) return { available: false };
-  const cited = citedClauseIds(root);
+  const citations = citationIndex(root);
+  const parsed = files.map((file) => ({ file, clauses: parseSpecClauses(root, file) }));
+  const liveIds = new Set();
+  const withdrawnIds = new Set();
+  for (const f of parsed) {
+    for (const c of f.clauses) (c.withdrawn ? withdrawnIds : liveIds).add(c.id);
+  }
+  const orphanCitations = [];
+  for (const [id, sites] of citations) {
+    if (liveIds.has(id)) continue;
+    const reason = withdrawnIds.has(id) ? "cites a withdrawn clause" : "cites no clause in any spec file";
+    for (const site of sites) orphanCitations.push({ id, file: site.file, line: site.line, reason });
+  }
+  orphanCitations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
   return {
     available: true,
-    files: files.map((file) => ({
+    files: parsed.map(({ file, clauses }) => ({
       file,
-      clauses: parseSpecClauses(root, file).map((c) => ({
+      clauses: clauses.map((c) => ({
         ...c,
-        cited: c.withdrawn ? null : cited.has(c.id),
+        cited: c.withdrawn ? null : citations.has(c.id),
+        citedBy: c.withdrawn ? [] : citations.get(c.id) || [],
       })),
     })),
+    orphanCitations,
   };
 }

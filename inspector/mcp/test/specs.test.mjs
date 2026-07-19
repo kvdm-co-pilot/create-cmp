@@ -94,3 +94,48 @@ test("getSpecsData: {available:false} when the project has no specs/ directory �
     fs.rmSync(empty, { recursive: true, force: true });
   }
 });
+
+test("getSpecsData: citedBy names the citing test's file:line (RTM §3.5) — empty for uncited and withdrawn clauses", () => {
+  const root = makeFixture();
+  try {
+    const byId = new Map(getSpecsData(root).files[0].clauses.map((c) => [c.id, c]));
+    assert.deepEqual(byId.get("HOME-01").citedBy, [
+      { file: "composeApp/src/commonTest/kotlin/HomeTest.kt", line: 2 },
+    ]);
+    assert.deepEqual(byId.get("HOME-02").citedBy, []);
+    assert.deepEqual(byId.get("HOME-03").citedBy, []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getSpecsData: orphanCitations surfaces both defect directions — a tag citing a withdrawn clause, and a tag citing no clause at all", () => {
+  const root = makeFixture();
+  try {
+    fs.writeFileSync(
+      path.join(root, "composeApp", "src", "commonTest", "kotlin", "StaleTest.kt"),
+      "class StaleTest {\n  // SPEC: HOME-03, HOME-99\n  fun test() {}\n}\n",
+    );
+    const data = getSpecsData(root);
+    const byId = new Map(data.orphanCitations.map((o) => [o.id, o]));
+    assert.equal(byId.get("HOME-03").reason, "cites a withdrawn clause");
+    assert.equal(byId.get("HOME-99").reason, "cites no clause in any spec file");
+    assert.equal(byId.get("HOME-03").file, "composeApp/src/commonTest/kotlin/StaleTest.kt");
+    assert.equal(byId.get("HOME-03").line, 2);
+    // A citation of a withdrawn clause is an orphan, never coverage.
+    const clause = getSpecsData(root).files[0].clauses.find((c) => c.id === "HOME-03");
+    assert.equal(clause.cited, null);
+    assert.deepEqual(clause.citedBy, []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getSpecsData: a clean tree yields orphanCitations: [] — the scan ran and found nothing, distinct from not running", () => {
+  const root = makeFixture();
+  try {
+    assert.deepEqual(getSpecsData(root).orphanCitations, []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

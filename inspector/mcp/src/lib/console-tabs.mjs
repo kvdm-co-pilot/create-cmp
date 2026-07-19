@@ -1,8 +1,9 @@
 // console-tabs.mjs — pure (data) -> html generators for the console's section
-// bodies: Design language (§3.1) + Components (§3.3) rebuilt to the studio
-// redesign's professional forms, Architecture (§7.1), Approvals (§4),
-// Specs (§4), Comments (§7.3). The Screens body is still built inline by
-// preview-service.mjs's galleryHtml.
+// bodies, each in its profession's §3 form (docs/STUDIO-REDESIGN.md): Design
+// language (§3.1), Architecture (§3.2), Components (§3.3), Specs (§3.5, the
+// traceability matrix), Evidence (§3.6, the release-readiness report), plus
+// the Approvals and Comments ledgers. The Screens body is still built inline
+// by preview-service.mjs's galleryHtml.
 //
 // Pure generators, same style as preview-service.mjs's galleryHtml:
 // (state) -> html string, no DOM, no CDN. Derivation math (contrast pairs,
@@ -752,40 +753,130 @@ ${rows}
   <div id="approve-error" class="banner" hidden></div>`;
 }
 
+// --- Specs (§3.5) — the QA lead's traceability matrix ------------------------
+//
+// One RTM per spec file: clause ↔ prose ↔ citing test(s) ↔ gate ↔ last-receipt
+// verdict, coverage counts stated at the top, withdrawn clauses struck-through
+// and kept, orphans in BOTH directions surfaced as the defects they are. No
+// prose padding — the matrix is the artifact.
+
 /**
- * The Specs tab: per spec file, its clause list — id + prose, struck-through
- * for withdrawn clauses, plus a best-effort coverage badge per live clause
- * (see specs.mjs getSpecsData for what "coverage" means here — a lightweight
- * citation check, not the verify-lane's full orphan-tag report).
- * @param {{available: boolean, files?: Array<{file: string, clauses: object[]}>}} specs
+ * Which verify-lane gate enforces this clause's row — only mappings the lane
+ * itself states, never a guess:
+ * - ARCH-*: the `conformance` step (*ArchitectureConformanceTest — template/
+ *   qa/verify.mjs names it as enforcing "specs/app-base.spec.md ARCH clauses").
+ * - SHELL-04: the `a11y` step (its failure message names SHELL-04 explicitly).
+ * - every other live clause: the `specCoverage` step — the bidirectional
+ *   citation gate is exactly what this row's clause↔test link claims.
+ * - withdrawn: no gate (coverage-exempt, mirroring stepSpecCoverage).
+ * @returns {string|null} the receipt step name, or null for withdrawn clauses
  */
-export function specsTabHtml(specs) {
+function gateForClause(c) {
+  if (c.withdrawn) return null;
+  if (/^ARCH-/i.test(c.id)) return "conformance";
+  if (c.id === "SHELL-04") return "a11y";
+  return "specCoverage";
+}
+
+/** The citing-tests cell: real file:line list, or the honest defect/exemption. */
+function citingTestsCellHtml(c) {
+  if (c.withdrawn) return `<span class="empty-inline">withdrawn &mdash; citation-exempt</span>`;
+  if (c.citedBy && c.citedBy.length) {
+    const items = c.citedBy
+      .map((s) => `<li><code>${esc(s.file)}:${s.line}</code></li>`)
+      .join("");
+    return `<ul class="rtm-tests">${items}</ul>`;
+  }
+  if (c.cited) {
+    // Older data with a `cited` flag but no citedBy sites (a caller that
+    // didn't run the indexed scan): the coverage claim is real, the sites
+    // aren't known here.
+    return `<span class="empty-inline">covered &mdash; citing tests not indexed</span>`;
+  }
+  return `<span class="rtm-defect">defect &mdash; no citing test</span>`;
+}
+
+/**
+ * The Specs section body (§3.5). `meta.lastReceipt` (receipt-bridge.mjs's
+ * getLastReceipt() result) drives the per-clause last-receipt column via each
+ * row's own gate; omitted, every row shows the honest "no receipt yet".
+ * `specs.orphanCitations` (specs.mjs) renders the reverse-direction defects;
+ * when the field is absent (older data), the block is silent rather than
+ * claiming a clean scan that never ran.
+ * @param {{available: boolean, files?: Array<{file: string, clauses: object[]}>, orphanCitations?: object[]}} specs
+ * @param {{lastReceipt?: object|null}} [meta]
+ */
+export function specsTabHtml(specs, meta = {}) {
   if (!specs || !specs.available) {
     return `<div class="empty"><p>No specs/ directory found in this project.</p></div>`;
   }
-  return specs.files
+  const matrices = specs.files
     .map((f) => {
-      const items = f.clauses
+      const live = f.clauses.filter((c) => !c.withdrawn);
+      const covered = live.filter((c) => c.cited).length;
+      const withdrawn = f.clauses.length - live.length;
+      const uncovered = live.length - covered;
+      const counts = [
+        `${f.clauses.length} clause${f.clauses.length === 1 ? "" : "s"}`,
+        `${covered} covered`,
+        `${withdrawn} withdrawn`,
+        uncovered ? `<span class="rtm-defect">${uncovered} uncovered</span>` : null,
+      ]
+        .filter(Boolean)
+        .join(" &middot; ");
+      const rows = f.clauses
         .map((c) => {
-          const covClass = c.cited === null ? "cov-na" : c.cited ? "cov-yes" : "cov-no";
-          const covLabel = c.cited === null ? "withdrawn" : c.cited ? "covered" : "no citing test";
           const prose = esc(c.prose);
-          return `      <li class="clause${c.withdrawn ? " withdrawn" : ""}">
-        <span class="clause-id"><code>${esc(c.id)}</code></span>
-        <span class="clause-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</span>
-        <span class="cov-badge ${covClass}">${covLabel}</span>
-        ${commentControlHtml({ type: "spec-line", file: `specs/${f.file}`, clauseId: c.id })}
-      </li>`;
+          const gate = gateForClause(c);
+          return `    <tr class="rtm-row${c.withdrawn ? " rtm-withdrawn" : ""}">
+      <td><span class="clause-id"><code>${esc(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: `specs/${f.file}`, clauseId: c.id })}</td>
+      <td class="rtm-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</td>
+      <td>${citingTestsCellHtml(c)}</td>
+      <td class="rtm-gate">${gate ? `<code>${esc(gate)}</code>` : `<span class="empty-inline">&mdash;</span>`}</td>
+      <td>${gate ? stepReceiptCellHtml(meta.lastReceipt, gate) : `<span class="empty-inline">&mdash;</span>`}</td>
+    </tr>`;
         })
         .join("\n");
       return `  <div class="spec-file">
-    <h3>${esc(f.file)}</h3>
-    <ul class="clause-list">
-${items || '      <li class="empty-inline">no clauses parsed</li>'}
-    </ul>
+    <h3>specs/${esc(f.file)}</h3>
+    <p class="rtm-counts">${counts}</p>
+    ${
+      rows
+        ? `<table class="doc-table rtm-table">
+    <thead><tr><th>Clause</th><th>Requirement</th><th>Citing tests</th><th>Gate</th><th>Last receipt</th></tr></thead>
+    <tbody>
+${rows}
+    </tbody>
+  </table>`
+        : `<p class="empty-inline">no clauses parsed</p>`
+    }
   </div>`;
     })
     .join("\n");
+
+  // Reverse-direction orphans: a `SPEC:` tag pointing at a withdrawn or
+  // nonexistent clause. `undefined` means the indexed scan didn't run
+  // (older caller data) — silence, never a fabricated "clean".
+  let orphansHtml = "";
+  if (Array.isArray(specs.orphanCitations)) {
+    orphansHtml = specs.orphanCitations.length
+      ? `  <div class="rtm-orphans">
+    <h3>Citation defects</h3>
+    <ul class="rtm-defect-list">
+${specs.orphanCitations
+  .map(
+    (o) => `      <li class="rtm-defect-item">
+        <code>${esc(o.file)}:${o.line}</code> cites <code>${esc(o.id)}</code>
+        <span class="badge badge-changed">${esc(o.reason)}</span>
+      </li>`,
+  )
+  .join("\n")}
+    </ul>
+  </div>`
+      : `  <p class="empty-inline">no citation defects &mdash; every <code>SPEC:</code> tag cites a live clause</p>`;
+  }
+  return `${matrices}
+${orphansHtml}`;
 }
 
 // --- Architecture tab (§7.1, rebuilt to the AD-1 three-in-one standard) -----
@@ -926,15 +1017,46 @@ function docSectionProseHtml(section) {
   return `<div class="doc-prose">${mdProseHtml(section.body)}</div>`;
 }
 
+/**
+ * C4 level 1 as clean CSS boxes (§3.2), derived from the doc's OWN
+ * integration table: the app in the center, one box per integration row
+ * (first cell = the name, second = the doc's own "what" text), connected by
+ * plain stems. No direction is drawn on the connectors — the table states
+ * WHAT each integration is, not who calls whom, and a fabricated arrowhead
+ * would be a claim the source doesn't make. The table itself stays below as
+ * the detailed record; with no table, there is no diagram (the brief's "don't
+ * force a diagram from thin data").
+ */
+function contextDiagramHtml(table) {
+  if (!table || !Array.isArray(table.rows) || table.rows.length === 0) return "";
+  const nodes = table.rows
+    .filter((r) => r[0])
+    .map(
+      (r) => `      <div class="ctx-node">
+        <h5>${inlineMdHtml(r[0])}</h5>
+        ${r[1] ? `<p>${inlineMdHtml(r[1])}</p>` : ""}
+      </div>`,
+    )
+    .join("\n");
+  if (!nodes) return "";
+  return `  <div class="ctx-diagram">
+    <div class="ctx-app">This app</div>
+    <div class="ctx-nodes">
+${nodes}
+    </div>
+  </div>`;
+}
+
 function systemContextHtml(sc) {
   if (!sc || !sc.available) {
     return `<p class="empty-inline">${esc((sc && sc.reason) || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   const intro = sc.intro ? `<p>${inlineMdHtml(sc.intro)}</p>` : "";
+  const diagram = sc.table ? contextDiagramHtml(sc.table) : "";
   const table = sc.table
     ? mdTableHtml({ available: true, headers: sc.table.headers, rows: sc.table.rows })
     : `<p class="empty-inline">no integration table found under "${esc(sc.heading)}"</p>`;
-  return `${intro}${table}`;
+  return `${intro}${diagram}${table}`;
 }
 
 function platformViewHtml(pv) {
@@ -1010,21 +1132,6 @@ ${rows}
   </ul>
 ${violationsHtml}
 ${DEP_GRAPH_ADVISORY_HTML}`;
-}
-
-/** The architecture artifact's own approval badge — same visual vocabulary as componentApprovalBadgeHtml, single-file so no per-file mtime drift is needed. */
-function architectureApprovalBadgeHtml(approval) {
-  if (!approval) return "";
-  const s = approval.status;
-  if (s === "approved") {
-    const unshaped = approval.mode === "defaults-accepted";
-    return `<span class="badge badge-approved${unshaped ? " badge-unshaped" : ""}" title="architecture artifact approved at ${shortDate(approval.approvedAt)}">approved &middot; ${shortHash(approval.hash)}</span>`;
-  }
-  if (s === "changed-since-approval") {
-    return `<span class="badge badge-changed" title="approved ${shortHash(approval.storedHash)} &rarr; now ${shortHash(approval.hash)}">drift &middot; architecture artifact changed since approval</span>`;
-  }
-  if (s === "reopened") return `<span class="badge badge-reopened">reopened for redesign</span>`;
-  return `<span class="badge badge-unreviewed">not yet approved</span>`;
 }
 
 function layerMapHtml(layerMap) {
@@ -1111,6 +1218,35 @@ function clauseReceiptStatusHtml(lastReceipt) {
 }
 
 /**
+ * One receipt STEP's status as a compact matrix cell (the Specs RTM's
+ * last-receipt column) — the same honesty rules as clauseReceiptStatusHtml,
+ * generalized to any step name: no receipt, step-not-in-receipt (e.g. a
+ * scaffold-profile run never executes `conformance`), stale (never presented
+ * as a live verdict), freshness-unknown, or the real verdict + age.
+ * @param {object|null|undefined} lastReceipt receipt-bridge.mjs's getLastReceipt() result
+ * @param {string} stepName a receipt steps[] name (specCoverage, conformance, a11y, …)
+ */
+function stepReceiptCellHtml(lastReceipt, stepName) {
+  if (!lastReceipt || !lastReceipt.available) {
+    const reason = (lastReceipt && lastReceipt.reason) || "no receipt at qa/evidence/latest.json — run node qa/verify.mjs";
+    return `<span class="receipt-badge receipt-none" title="${escAttr(reason)}">no receipt yet</span>`;
+  }
+  const step = (lastReceipt.steps || []).find((s) => s && s.name === stepName);
+  if (!step) {
+    const profile = lastReceipt.profile ? ` (profile ${esc(lastReceipt.profile)})` : "";
+    return `<span class="receipt-badge receipt-none">not in last receipt${profile}</span>`;
+  }
+  const age = formatReceiptAge(lastReceipt.ageMs);
+  if (lastReceipt.stale) {
+    return `<span class="receipt-badge receipt-stale">stale &mdash; was ${esc(step.verdict)} ${age}</span>`;
+  }
+  const cls = step.verdict === "PASS" ? "receipt-pass" : step.verdict === "FAIL" ? "receipt-fail" : "receipt-none";
+  const freshness = lastReceipt.stale === null ? " &middot; freshness unverified" : "";
+  const title = step.reason ? ` title="${escAttr(step.reason)}"` : "";
+  return `<span class="receipt-badge ${cls}"${title}>${esc(step.verdict)}</span><span class="receipt-age">${age}${freshness}</span>`;
+}
+
+/**
  * @param {object} gc getGovernedContract() result
  * @param {object|null|undefined} [lastReceipt] receipt-bridge.mjs's getLastReceipt() result. Omitted (callers that don't wire it) is treated exactly like an explicit `{available: false}` — every ARCH-* clause row still gets the honest "no receipt yet" badge, never silence that could be misread as "unattested" rather than "no receipt at all".
  */
@@ -1162,28 +1298,23 @@ ${items}
  * dependency arrows + the governed contract), runtime view, crosscutting
  * policies, decisions — plus the exemplar feature shape at the end. Every
  * section degrades independently; one missing source never hides the rest.
- * `meta.approval` (optional) is the "architecture" governed artifact's own
- * live status record (approvals-bridge.mjs), rendered as a badge + the same
- * genesis/steward banner the Approvals tab's rows use — reused via
- * artifactBannerHtml, not re-implemented. `meta.lastReceipt` (optional,
- * receipt-bridge.mjs's getLastReceipt() result) drives each ARCH-* clause
- * row's last-receipt status in the governed contract (Wave C item 1) — an
- * omitted `meta.lastReceipt` is treated exactly like "no receipt exists",
- * so every ARCH-* clause row still shows the honest "no receipt yet" badge
- * rather than silently rendering as if receipts don't apply here.
+ * The artifact's approval status is NOT re-rendered in the body: the shell's
+ * page header (§2 grammar, preview-service.mjs's archStatus line) already
+ * carries it, and a second copy here was pure duplication — drift-in-place
+ * for architecture means violations at their edges (dependencyGraphHtml) and
+ * receipt badges on the ARCH-* clauses, not a repeated banner.
+ * `meta.lastReceipt` (optional, receipt-bridge.mjs's getLastReceipt() result)
+ * drives each ARCH-* clause row's last-receipt status in the governed
+ * contract (Wave C item 1) — an omitted `meta.lastReceipt` is treated exactly
+ * like "no receipt exists", so every ARCH-* clause row still shows the honest
+ * "no receipt yet" badge rather than silently rendering as if receipts don't
+ * apply here.
  * @param {{layerMap: object, governedContract: object, featureShape: object, dependencyGraph?: object, doc?: object}} data
- * @param {{approval?: object|null, lastReceipt?: object|null}} [meta]
+ * @param {{approval?: object|null, lastReceipt?: object|null}} [meta] `approval` is accepted for caller compatibility but unused here — the shell header owns that rendering
  */
 export function architectureTabHtml(data, meta = {}) {
   const { layerMap, governedContract, featureShape, dependencyGraph, doc } = data || {};
-  const topStatus = meta.approval
-    ? `  <div class="arch-top-status">
-    ${architectureApprovalBadgeHtml(meta.approval)}
-    ${artifactBannerHtml(meta.approval)}
-  </div>`
-    : "";
-  return `${topStatus}
-  <section class="arch-section" id="arch-purpose">
+  return `  <section class="arch-section" id="arch-purpose">
     <h3>1. Purpose &amp; quality goals</h3>
 ${mdTableHtml(doc && doc.qualityAttributes)}
   </section>
@@ -1220,6 +1351,181 @@ ${mdTableHtml(doc && doc.decisions)}
     <h3>Feature shape (what <code>add-feature</code> stamps)</h3>
 ${featureShapeHtml(featureShape)}
   </section>`;
+}
+
+// --- Evidence (§3.6) — the SDET's release-readiness report -------------------
+//
+// The page a release manager reads before shipping: the latest receipt as the
+// headline (verdict, profile, commit, age, inputs binding vs the CURRENT
+// tree), per-step rows with honest SKIP reasons, and the receipt timeline.
+// The lane is the law: this page renders ONLY what qa/evidence attests —
+// nothing here is a live re-derivation presented as a verdict.
+
+/**
+ * Which console section a receipt step governs — only mappings the lane's own
+ * step definitions state (template/qa/verify.mjs); `build` and `unitTests`
+ * gate the whole tree, not one section, so they get NO link — never a
+ * guessed one.
+ * - specCoverage → Specs (the clause↔test citation gate).
+ * - conformance / archDoc → Architecture (the ARCH-* gates; the doc-drift check).
+ * - componentStories → Components (one story per registry component).
+ * - goldenTrees / a11y / e2eSmoke → Screens (rendered-structure, a11y-floor,
+ *   and on-device checks of the screens themselves).
+ * - tokenDrift → Design language (declared catalog vs live values).
+ * - approvals → Approvals (the governed-artifact hash gate).
+ */
+const STEP_GOVERNS = {
+  specCoverage: { section: "specs", label: "Specs" },
+  conformance: { section: "architecture", label: "Architecture" },
+  archDoc: { section: "architecture", label: "Architecture" },
+  componentStories: { section: "components", label: "Components" },
+  goldenTrees: { section: "screens", label: "Screens" },
+  a11y: { section: "screens", label: "Screens" },
+  e2eSmoke: { section: "screens", label: "Screens" },
+  tokenDrift: { section: "design-system", label: "Design language" },
+  approvals: { section: "approvals", label: "Approvals" },
+};
+
+/** A step duration in human units — "" (silence) when the receipt carries none. */
+function formatDurationMs(ms) {
+  if (typeof ms !== "number" || Number.isNaN(ms) || ms < 0) return "";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const secs = ms / 1000;
+  if (secs < 60) return `${Math.round(secs * 10) / 10}s`;
+  return `${Math.floor(secs / 60)}m ${String(Math.round(secs % 60)).padStart(2, "0")}s`;
+}
+
+/**
+ * The inputs-binding line — three-valued, per receipt-bridge.mjs's staleness
+ * contract: confirmed fresh, confirmed stale (drift-colored, with the fix),
+ * or honestly unknown with the bridge's own reason. Unknown is NEVER rendered
+ * as fresh.
+ */
+function inputsBindingHtml(r) {
+  if (r.stale === true) {
+    const move =
+      r.inputsHash && r.currentInputsHash
+        ? ` (<code>${esc(shortHash(r.inputsHash))}</code> &rarr; <code>${esc(shortHash(r.currentInputsHash))}</code>)`
+        : "";
+    return `<span class="evidence-binding-stale">inputs no longer match the current tree${move} &mdash; re-run <code>node qa/verify.mjs</code></span>`;
+  }
+  if (r.stale === false) {
+    const files = typeof r.inputsFileCount === "number" ? ` over ${r.inputsFileCount} files` : "";
+    return `inputs bound to the current tree &mdash; hash <code>${esc(shortHash(r.inputsHash))}</code> still matches${files}`;
+  }
+  return `inputs binding unknown &mdash; ${esc(r.staleReason || "freshness could not be recomputed")}`;
+}
+
+/** One receipt as a timeline row — verdict colored, stated facts only. */
+function timelineRowHtml(r) {
+  const cls = r.verdict === "PASS" ? "step-verdict-pass" : r.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
+  const age = typeof r.ageMs === "number" ? formatReceiptAge(r.ageMs) : "age unknown";
+  return `    <li>
+      <span class="${cls}">${esc(r.verdict || "?")}</span>
+      ${r.profile ? `<span class="meta">profile <code>${esc(r.profile)}</code></span>` : ""}
+      <span class="meta">${r.generatedAt ? esc(r.generatedAt) : "generatedAt unknown"} &middot; ${esc(age)}</span>
+      <code>${esc(r.file)}</code>
+    </li>`;
+}
+
+/**
+ * The Evidence section body (§3.6). Renders ONLY what the receipt attests:
+ * - headline: verdict (visually demoted, never green, when the receipt is
+ *   stale), profile, commit, generatedAt + age, the three-valued inputs
+ *   binding;
+ * - per-step rows: verdict, honest SKIP/FAIL reasons verbatim, humanized
+ *   duration, and a link to the section the step governs where that mapping
+ *   is real (STEP_GOVERNS — unmapped steps get no link);
+ * - timeline: prior receipts when a history source exists on disk
+ *   (receipt-bridge.mjs listReceiptHistory), else the standardized absence
+ *   line — the lane retains only latest.json today.
+ * @param {object|null|undefined} lastReceipt receipt-bridge.mjs's getLastReceipt() result
+ * @param {{available: boolean, reason?: string, receipts?: object[]}} [history] listReceiptHistory() result
+ */
+export function evidenceBodyHtml(lastReceipt, history) {
+  if (!lastReceipt || !lastReceipt.available) {
+    const reason = (lastReceipt && lastReceipt.reason) || "no receipt at qa/evidence/latest.json";
+    return `<div class="empty">
+      <p>No verify receipt yet.</p>
+      <p>${esc(reason)}</p>
+      <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>qa/evidence/latest.json</code>,
+      and this page renders exactly what that receipt attests. Nothing here is derived any other way.</p>
+    </div>`;
+  }
+  const r = lastReceipt;
+  const stale = r.stale === true;
+  // Stale demotion: the verdict keeps its word (it IS what the lane said) but
+  // loses its color — a stale PASS is never presented as a live green.
+  const verdictCls = stale
+    ? "verdict-muted"
+    : r.verdict === "PASS"
+      ? "verdict-pass"
+      : r.verdict === "FAIL"
+        ? "verdict-fail"
+        : "verdict-muted";
+  const staleChip = stale
+    ? ` <span class="badge badge-changed">STALE &mdash; the tree changed since this run</span>`
+    : r.stale === null
+      ? ` <span class="badge badge-unreviewed">freshness unknown</span>`
+      : "";
+  const age = formatReceiptAge(r.ageMs);
+  const dirty =
+    r.commitDirty && r.commitDirty.length
+      ? ` &middot; ${r.commitDirty.length} uncommitted file${r.commitDirty.length === 1 ? "" : "s"} at run time`
+      : "";
+  const facts = [
+    r.profile ? `<li>profile <code>${esc(r.profile)}</code></li>` : "",
+    r.commitSha ? `<li>commit <code>${esc(shortHash(r.commitSha))}</code>${dirty}</li>` : "",
+    `<li>generated ${r.generatedAt ? esc(r.generatedAt) : "at an unknown time"} &middot; ${esc(age)}</li>`,
+    `<li>${inputsBindingHtml(r)}</li>`,
+  ]
+    .filter(Boolean)
+    .join("\n      ");
+
+  const stepRows = (r.steps || [])
+    .map((s) => {
+      const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
+      const governs = STEP_GOVERNS[s.name];
+      const governsCell = governs ? `<a class="step-link" href="#${esc(governs.section)}">${esc(governs.label)}</a>` : "";
+      const reason = s.reason ? `<span class="step-reason">${esc(s.reason)}</span>` : "";
+      return `    <tr>
+      <td><code>${esc(s.name)}</code></td>
+      <td><span class="${cls}">${esc(s.verdict)}</span></td>
+      <td>${esc(formatDurationMs(s.durationMs))}</td>
+      <td>${governsCell}</td>
+      <td>${reason}</td>
+    </tr>`;
+    })
+    .join("\n");
+  const stepsHtml = stepRows
+    ? `  <table class="doc-table step-table">
+    <thead><tr><th>Step</th><th>Verdict</th><th>Duration</th><th>Governs</th><th>Detail</th></tr></thead>
+    <tbody>
+${stepRows}
+    </tbody>
+  </table>`
+    : `  <p class="empty-inline">the receipt carries no steps</p>`;
+
+  const timelineHtml =
+    history && history.available && history.receipts && history.receipts.length
+      ? `  <ul class="evidence-timeline">
+${history.receipts.map(timelineRowHtml).join("\n")}
+  </ul>`
+      : `  <p class="empty-inline">no receipt history &mdash; only the latest receipt is retained</p>`;
+
+  return `  <p class="meta">Rendered from <code>${esc(r.relPath || "qa/evidence/latest.json")}</code> &mdash; the verify lane's own attestation.
+  The lane is the law: nothing on this page is re-derived live.</p>
+  <div class="evidence-headline${stale ? " evidence-stale" : ""}">
+    <p class="lbl">latest receipt</p>
+    <span class="evidence-verdict ${verdictCls}">${esc(r.verdict || "?")}</span>${staleChip}
+    <ul class="evidence-facts">
+      ${facts}
+    </ul>
+  </div>
+  <h3>Steps</h3>
+${stepsHtml}
+  <h3>Receipt timeline</h3>
+${timelineHtml}`;
 }
 
 // --- Comments tab (§7.3) -----------------------------------------------------

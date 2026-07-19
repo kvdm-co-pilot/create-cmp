@@ -46,18 +46,19 @@ import {
 } from "./comments-bridge.mjs";
 import { getSpecsData } from "./specs.mjs";
 import { getArchitectureData } from "./architecture.mjs";
-import { getLastReceipt } from "./receipt-bridge.mjs";
+import { getLastReceipt, listReceiptHistory } from "./receipt-bridge.mjs";
 import { getComponentsData } from "./components.mjs";
 import { getVariantsData } from "./variants.mjs";
 import { getComponentDriftInfo } from "./component-drift.mjs";
 import { getHandRolledStateViolations } from "./handrolled-state.mjs";
-import { renderShellPage, statusGlyph, artifactStatusHtml, railReceiptHtml } from "./console-shell.mjs";
+import { renderShellPage, statusGlyph, artifactStatusHtml, railReceiptHtml, receiptGlyph, formatAgeCoarse } from "./console-shell.mjs";
 import {
   designLanguageBodyHtml,
   componentsBodyHtml,
   approvalsTabHtml,
   specsTabHtml,
   architectureTabHtml,
+  evidenceBodyHtml,
   commentsTabHtml,
   commentControlHtml,
 } from "./console-tabs.mjs";
@@ -236,7 +237,7 @@ const esc = (s) =>
  * outlives the next render.
  * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error,
  *   approvals, specs, designSystem, architecture, components, comments, variants, componentsMeta,
- *   architectureMeta, lastReceipt, treeHash, tokenUsage }
+ *   architectureMeta, lastReceipt, receiptHistory, treeHash, tokenUsage }
  */
 export function galleryHtml(state) {
   const {
@@ -257,6 +258,7 @@ export function galleryHtml(state) {
     componentsMeta = {},
     architectureMeta = {},
     lastReceipt = null,
+    receiptHistory = { available: false },
     treeHash = null,
     tokenUsage = null,
   } = state;
@@ -376,6 +378,18 @@ ${screenCards
     ? `${specs.files.length} spec file${specs.files.length === 1 ? "" : "s"} &middot; ${specs.files.reduce((n, f) => n + f.clauses.length, 0)} clauses${openNote("specs")}`
     : "no specs/ directory found";
 
+  // Evidence (§3.6): the receipt the whole console leans on. Some callers wire
+  // it via architectureMeta.lastReceipt (the older Wave C path) — one receipt
+  // serves the rail glyph, the rail foot, the status line, and the section.
+  const effectiveReceipt = lastReceipt || architectureMeta.lastReceipt || null;
+  let evidenceStatus = "no verify receipt yet";
+  if (effectiveReceipt && effectiveReceipt.available) {
+    const age = typeof effectiveReceipt.ageMs === "number" ? formatAgeCoarse(effectiveReceipt.ageMs) : "age unknown";
+    evidenceStatus = `verify ${esc(effectiveReceipt.verdict || "?")} &middot; ${esc(age)}${
+      effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""
+    }`;
+  }
+
   let approvalsStatus = "approvals not available in this project";
   if (approvals.available && approvals.statuses) {
     const count = (st) => approvals.statuses.filter((s) => s.status === st).length;
@@ -400,6 +414,10 @@ ${screenCards
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
     { id: "screens", label: "Screens", glyph: null, active: true },
     { id: "specs", label: "Specs", glyph: null },
+    // §3.6: the Evidence item's glyph derives from the latest receipt itself
+    // (✓ fresh PASS · ✗ FAIL · ⚠ stale · ○ none) — receiptGlyph, the same
+    // derivation the rail foot uses.
+    { id: "evidence", label: "Evidence", glyph: receiptGlyph(effectiveReceipt) },
     { id: "approvals", label: "Approvals", glyph: null },
     {
       id: "comments",
@@ -451,7 +469,9 @@ ${screenCards
       active: true,
       fullBleed: true,
     },
-    { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs) },
+    // §3.5: the RTM's last-receipt column reads the same receipt as Evidence.
+    { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt }) },
+    { id: "evidence", title: "Evidence", statusHtml: evidenceStatus, bodyHtml: evidenceBodyHtml(effectiveReceipt, receiptHistory) },
     { id: "approvals", title: "Approvals", statusHtml: approvalsStatus, bodyHtml: approvalsTabHtml(approvals) },
     { id: "comments", title: "Comments", statusHtml: commentsStatus, bodyHtml: commentsTabHtml(comments) },
   ];
@@ -736,7 +756,11 @@ ${screenCards
   return renderShellPage({
     appName,
     railItems,
-    railFootHtml: railReceiptHtml(lastReceipt || architectureMeta.lastReceipt),
+    // §3.6: the rail-foot verify line doubles as the deep link to Evidence —
+    // the same .tab-btn/data-tab wiring the nav items use (showTab picks it
+    // up with no new JS mechanism), styled back to a quiet meta line by the
+    // shell's .rail-foot .tab-btn rules.
+    railFootHtml: `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`,
     sections,
     error,
     extraCss: `  .panes img { width: ${Math.round(width * 0.62)}px; }
@@ -1554,6 +1578,9 @@ export function createPreviewService(opts) {
           getLastReceipt(projectDir),
         ]);
         const specs = getSpecsData(projectDir);
+        // §3.6: prior receipts, if this project keeps any beyond latest.json —
+        // the Evidence timeline's source (absence renders the standardized line).
+        const receiptHistory = listReceiptHistory(projectDir);
         const architecture = getArchitectureData(projectDir);
         const components = getComponentsData(projectDir);
         const variants = getVariantsData(projectDir);
@@ -1628,6 +1655,7 @@ export function createPreviewService(opts) {
             componentsMeta,
             architectureMeta,
             lastReceipt,
+            receiptHistory,
             treeHash,
             tokenUsage,
           }),

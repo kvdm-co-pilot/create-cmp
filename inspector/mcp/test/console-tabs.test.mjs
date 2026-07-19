@@ -9,6 +9,7 @@ import {
   approvalsTabHtml,
   specsTabHtml,
   architectureTabHtml,
+  evidenceBodyHtml,
   commentsTabHtml,
   commentControlHtml,
 } from "../src/lib/console-tabs.mjs";
@@ -389,27 +390,133 @@ test("specsTabHtml: unavailable -> honest empty-state", () => {
   assert.match(specsTabHtml({ available: false }), /No specs\/ directory found/);
 });
 
-test("specsTabHtml: clause list with coverage badges, strikes through withdrawn prose", () => {
+test("specsTabHtml (§3.5 RTM): coverage counts at the top, citing tests named per clause, uncovered = defect, withdrawn struck through and kept", () => {
   const html = specsTabHtml({
     available: true,
     files: [
       {
         file: "home.spec.md",
         clauses: [
-          { id: "HOME-01", withdrawn: false, prose: "Given X, Then Y", cited: true },
-          { id: "HOME-02", withdrawn: false, prose: "Given A, Then B", cited: false },
-          { id: "HOME-03", withdrawn: true, prose: "old behavior", cited: null },
+          { id: "HOME-01", withdrawn: false, prose: "Given X, Then Y", cited: true, citedBy: [{ file: "composeApp/src/commonTest/kotlin/HomeViewModelTest.kt", line: 12 }] },
+          { id: "HOME-02", withdrawn: false, prose: "Given A, Then B", cited: false, citedBy: [] },
+          { id: "HOME-03", withdrawn: true, prose: "old behavior", cited: null, citedBy: [] },
         ],
       },
     ],
   });
-  assert.match(html, /home\.spec\.md/);
-  assert.match(html, /HOME-01/);
-  assert.match(html, /cov-yes">covered/);
-  assert.match(html, /cov-no">no citing test/);
-  assert.match(html, /cov-na">withdrawn/);
-  assert.match(html, /<s>old behavior<\/s>/, "withdrawn prose is struck through");
-  assert.match(html, /class="clause withdrawn"/);
+  assert.match(html, /specs\/home\.spec\.md/);
+  assert.match(html, /3 clauses &middot; 1 covered &middot; 1 withdrawn/, "coverage counts stated at the top of the file's matrix");
+  assert.match(html, /1 uncovered/, "the uncovered clause is counted as the defect it is");
+  assert.match(html, /HomeViewModelTest\.kt:12/, "citing tests are NAMED, not just claimed");
+  assert.match(html, /defect &mdash; no citing test/, "a live clause no test cites is a defect");
+  assert.match(html, /<s>old behavior<\/s>/, "withdrawn prose is struck through and KEPT");
+  assert.match(html, /withdrawn &mdash; citation-exempt/);
+  assert.match(html, /rtm-withdrawn/);
+});
+
+test("specsTabHtml (§3.5): gate attribution per row — ARCH-* rows carry conformance, SHELL-04 carries a11y, other live clauses carry specCoverage, withdrawn none", () => {
+  const html = specsTabHtml({
+    available: true,
+    files: [
+      {
+        file: "app-base.spec.md",
+        clauses: [
+          { id: "ARCH-01", withdrawn: false, prose: "Layers stay separated.", cited: true, citedBy: [{ file: "a.kt", line: 1 }] },
+          { id: "SHELL-04", withdrawn: false, prose: "Interactive nodes expose a tag.", cited: true, citedBy: [{ file: "b.kt", line: 2 }] },
+          { id: "SHELL-01", withdrawn: false, prose: "The first tab renders.", cited: true, citedBy: [{ file: "c.kt", line: 3 }] },
+          { id: "SHELL-09", withdrawn: true, prose: "old rule", cited: null, citedBy: [] },
+        ],
+      },
+    ],
+  });
+  assert.match(html, /<code>conformance<\/code>/);
+  assert.match(html, /<code>a11y<\/code>/);
+  assert.match(html, /<code>specCoverage<\/code>/);
+  // The withdrawn row's gate + receipt cells are both the plain dash.
+  assert.equal((html.match(/rtm-withdrawn/g) || []).length, 1);
+});
+
+test("specsTabHtml (§3.5): the last-receipt column reads each row's own gate step — fresh verdicts colored, stale demoted, missing step honest", () => {
+  const receipt = {
+    available: true,
+    profile: "scaffold",
+    ageMs: 90 * 60 * 1000,
+    stale: false,
+    steps: [
+      { name: "specCoverage", verdict: "PASS", durationMs: 40 },
+      // no conformance step — a scaffold-profile run never executes it
+    ],
+  };
+  const html = specsTabHtml(
+    {
+      available: true,
+      files: [
+        {
+          file: "app-base.spec.md",
+          clauses: [
+            { id: "ARCH-01", withdrawn: false, prose: "Layers stay separated.", cited: true, citedBy: [{ file: "a.kt", line: 1 }] },
+            { id: "SHELL-01", withdrawn: false, prose: "The first tab renders.", cited: true, citedBy: [{ file: "c.kt", line: 3 }] },
+          ],
+        },
+      ],
+    },
+    { lastReceipt: receipt },
+  );
+  assert.match(html, /receipt-pass"[^>]*>PASS</, "specCoverage's real verdict renders for SHELL-01's row");
+  assert.match(html, /receipt-age">1h ago/);
+  assert.match(html, /not in last receipt \(profile scaffold\)/, "conformance absent from a scaffold receipt is stated, never fabricated");
+
+  const staleHtml = specsTabHtml(
+    {
+      available: true,
+      files: [{ file: "home.spec.md", clauses: [{ id: "HOME-01", withdrawn: false, prose: "x", cited: true, citedBy: [{ file: "a.kt", line: 1 }] }] }],
+    },
+    { lastReceipt: { ...receipt, stale: true } },
+  );
+  assert.match(staleHtml, /receipt-stale">stale &mdash; was PASS/);
+  assert.doesNotMatch(staleHtml, /receipt-pass/, "a stale receipt's verdict is never rendered in the live pass color");
+
+  const noReceipt = specsTabHtml(
+    {
+      available: true,
+      files: [{ file: "home.spec.md", clauses: [{ id: "HOME-01", withdrawn: false, prose: "x", cited: false, citedBy: [] }] }],
+    },
+    {},
+  );
+  assert.match(noReceipt, /no receipt yet/);
+});
+
+test("specsTabHtml (§3.5): orphan citations — the reverse-direction defects — render with file:line and reason; a clean indexed scan states it; no scan data = silence", () => {
+  const base = {
+    available: true,
+    files: [{ file: "home.spec.md", clauses: [{ id: "HOME-01", withdrawn: false, prose: "x", cited: true, citedBy: [{ file: "a.kt", line: 1 }] }] }],
+  };
+  const withOrphans = specsTabHtml({
+    ...base,
+    orphanCitations: [
+      { id: "HOME-99", file: "composeApp/src/commonTest/kotlin/OldTest.kt", line: 7, reason: "cites no clause in any spec file" },
+      { id: "HOME-03", file: "qa/e2e/smoke.yaml", line: 2, reason: "cites a withdrawn clause" },
+    ],
+  });
+  assert.match(withOrphans, /Citation defects/);
+  assert.match(withOrphans, /OldTest\.kt:7/);
+  assert.match(withOrphans, /cites no clause in any spec file/);
+  assert.match(withOrphans, /cites a withdrawn clause/);
+
+  const clean = specsTabHtml({ ...base, orphanCitations: [] });
+  assert.match(clean, /no citation defects/);
+
+  const noScan = specsTabHtml(base);
+  assert.doesNotMatch(noScan, /Citation defects/);
+  assert.doesNotMatch(noScan, /no citation defects/, "an unrun scan never claims clean — silence");
+});
+
+test("specsTabHtml (§3.5): every clause row keeps its spec-line comment control (the §7.3 wiring contract)", () => {
+  const html = specsTabHtml({
+    available: true,
+    files: [{ file: "home.spec.md", clauses: [{ id: "HOME-01", withdrawn: false, prose: "x", cited: true, citedBy: [] }] }],
+  });
+  assert.match(html, /class="comment-ctl" data-target="[^"]*spec-line[^"]*HOME-01/);
 });
 
 // --- commentControlHtml (§7.3) ----------------------------------------------
@@ -929,34 +1036,59 @@ test("architectureTabHtml: dependency graph — observed edges render, a violati
   assert.match(unchecked, /unchecked, not clean/);
 });
 
-test("architectureTabHtml: the architecture artifact's own approval badge + genesis/steward banner render at the top when meta.approval is supplied", () => {
-  const approved = architectureTabHtml(
+test("architectureTabHtml (§3.2): NEVER re-renders the artifact's approval status in the body — the shell header owns it (no arch-top-status duplication)", () => {
+  const withApproval = architectureTabHtml(
     { layerMap: { available: false }, governedContract: { available: false }, featureShape: { available: false } },
     { approval: { id: "architecture", status: "approved", hash: "abc123def456", approvedAt: "2026-07-19T09:00:00.000Z" } },
   );
-  assert.match(approved, /class="arch-top-status"/);
-  assert.match(approved, /badge-approved/);
-  assert.match(approved, /banner-steward/);
-
-  const drifted = architectureTabHtml(
-    { layerMap: { available: false }, governedContract: { available: false }, featureShape: { available: false } },
-    { approval: { id: "architecture", status: "changed-since-approval", hash: "newhash01", storedHash: "oldhash01" } },
-  );
-  assert.match(drifted, /drift &middot; architecture artifact changed since approval/);
-
-  const reopened = architectureTabHtml(
-    { layerMap: { available: false }, governedContract: { available: false }, featureShape: { available: false } },
-    { approval: { id: "architecture", status: "reopened" } },
-  );
-  assert.match(reopened, /reopened for redesign/);
-  assert.match(reopened, /banner-genesis/);
+  assert.doesNotMatch(withApproval, /arch-top-status/, "even a supplied approval record renders no top-status block");
+  assert.doesNotMatch(withApproval, /badge-approved/, "no approval badge in the body — the page header already says it");
 
   const noMeta = architectureTabHtml({
     layerMap: { available: false },
     governedContract: { available: false },
     featureShape: { available: false },
   });
-  assert.doesNotMatch(noMeta, /class="arch-top-status"/, "no approval record supplied -> no top-status banner at all");
+  assert.doesNotMatch(noMeta, /arch-top-status/);
+});
+
+test("architectureTabHtml (§3.2): the system-context C4 boxes derive from the doc's own integration table — one node per row, the table kept below, no diagram from thin data", () => {
+  const withTable = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+    doc: {
+      available: true,
+      systemContext: {
+        available: true,
+        heading: "3. System context",
+        intro: "The app talks to these systems.",
+        table: {
+          headers: ["Integration", "What", "Where in the tree", "Notes"],
+          rows: [
+            ["Firebase", "Auth / Firestore via the GitLive KMP SDK", "`data/remote/FirebaseConfig.kt`", "emulator-backed in debug"],
+            ["Room", "On-device SSOT", "`data/local/*.kt`", ""],
+          ],
+        },
+      },
+    },
+  });
+  assert.match(withTable, /class="ctx-diagram"/);
+  assert.match(withTable, /class="ctx-app">This app</);
+  assert.equal((withTable.match(/class="ctx-node"/g) || []).length, 2, "one node per integration row");
+  assert.match(withTable, /<h5>Firebase<\/h5>/);
+  assert.match(withTable, /class="doc-table"/, "the table itself stays below as the detailed record");
+
+  const noTable = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+    doc: {
+      available: true,
+      systemContext: { available: true, heading: "3. System context", intro: "Prose only.", table: null },
+    },
+  });
+  assert.doesNotMatch(noTable, /ctx-diagram/, "no integration table -> no forced diagram");
 });
 
 // --- architectureTabHtml: per-ARCH-clause receipt status (Wave C item 1) ----
@@ -1256,4 +1388,125 @@ test("componentsBodyHtml: a parse-error entry still shows its story render (rend
   );
   assert.match(html, /signature not parsed/);
   assert.match(html, /src="\/previews\/component\.broken\/screen\.png\?v=1"/);
+});
+
+// --- evidenceBodyHtml (§3.6: the SDET's release-readiness report) -----------
+
+const FRESH_RECEIPT = {
+  available: true,
+  relPath: "qa/evidence/latest.json",
+  verdict: "PASS",
+  profile: "local",
+  commitSha: "b2b8da7deadbeef00",
+  commitDirty: ["qa-artifacts/"],
+  generatedAt: "2026-07-19T06:00:00.000Z",
+  ageMs: 2 * 60 * 60 * 1000,
+  inputsHash: "aaaa1111bbbb2222",
+  inputsFileCount: 41,
+  currentInputsHash: "aaaa1111bbbb2222",
+  stale: false,
+  steps: [
+    { name: "specCoverage", verdict: "PASS", durationMs: 38 },
+    { name: "approvals", verdict: "SKIP", reason: "artifact 'design-system' is unreviewed — approve it to opt in", durationMs: 2 },
+    { name: "build", verdict: "PASS", durationMs: 92_000 },
+    { name: "conformance", verdict: "PASS", durationMs: 4210 },
+    { name: "e2eSmoke", verdict: "SKIP", reason: "no Android device/emulator attached (adb)", durationMs: 0 },
+  ],
+};
+
+test("evidenceBodyHtml: no receipt -> honest empty state naming the lane command, never a fabricated report", () => {
+  const html = evidenceBodyHtml({ available: false, reason: "no receipt at qa/evidence/latest.json — run node qa/verify.mjs" });
+  assert.match(html, /No verify receipt yet/);
+  assert.match(html, /node qa\/verify\.mjs/);
+  const omitted = evidenceBodyHtml(undefined);
+  assert.match(omitted, /No verify receipt yet/, "an unwired receipt reads exactly like a missing one");
+});
+
+test("evidenceBodyHtml: headline carries verdict, profile, short commit + dirty count, age, and the confirmed-fresh inputs binding", () => {
+  const html = evidenceBodyHtml(FRESH_RECEIPT, { available: false });
+  assert.match(html, /evidence-verdict verdict-pass">PASS</);
+  assert.match(html, /profile <code>local<\/code>/);
+  assert.match(html, /commit <code>b2b8da7d<\/code>/, "commit sha is shortened");
+  assert.match(html, /1 uncommitted file at run time/);
+  assert.match(html, /2h ago/);
+  assert.match(html, /inputs bound to the current tree/);
+  assert.match(html, /over 41 files/);
+  assert.match(html, /the lane is the law/i, "the page states its epistemic stance");
+});
+
+test("evidenceBodyHtml: per-step rows — verdict colors, honest SKIP reasons verbatim, humanized durations", () => {
+  const html = evidenceBodyHtml(FRESH_RECEIPT, { available: false });
+  assert.match(html, /<code>specCoverage<\/code>/);
+  assert.match(html, /step-verdict-skip">SKIP</);
+  assert.match(html, /no Android device\/emulator attached \(adb\)/, "SKIP reasons are shown, not hidden");
+  assert.match(html, /artifact 'design-system' is unreviewed/);
+  assert.match(html, /1m 32s/, "92000ms humanizes");
+  assert.match(html, /4\.2s/, "4210ms humanizes");
+  assert.match(html, /38ms/);
+});
+
+test("evidenceBodyHtml: step->section links only where the mapping is real — conformance/specCoverage/a11y-family mapped, build and unitTests get NO link", () => {
+  const html = evidenceBodyHtml(
+    {
+      ...FRESH_RECEIPT,
+      steps: [
+        { name: "specCoverage", verdict: "PASS", durationMs: 1 },
+        { name: "conformance", verdict: "PASS", durationMs: 1 },
+        { name: "a11y", verdict: "PASS", durationMs: 1 },
+        { name: "e2eSmoke", verdict: "SKIP", reason: "no device", durationMs: 0 },
+        { name: "build", verdict: "PASS", durationMs: 1 },
+        { name: "unitTests", verdict: "PASS", durationMs: 1 },
+        { name: "someFutureStep", verdict: "PASS", durationMs: 1 },
+      ],
+    },
+    { available: false },
+  );
+  assert.match(html, /href="#specs">Specs</);
+  assert.match(html, /href="#architecture">Architecture</);
+  assert.equal((html.match(/href="#screens"/g) || []).length, 2, "a11y and e2eSmoke both govern Screens");
+  // build/unitTests/unknown steps: no link at all — never a guessed one.
+  assert.equal((html.match(/class="step-link"/g) || []).length, 4);
+});
+
+test("evidenceBodyHtml: a STALE receipt is visually demoted — verdict never in the live pass color, the stale chip in the drift vocabulary, binding names the fix", () => {
+  const html = evidenceBodyHtml(
+    { ...FRESH_RECEIPT, stale: true, currentInputsHash: "cccc3333dddd4444" },
+    { available: false },
+  );
+  assert.match(html, /evidence-headline evidence-stale/);
+  assert.doesNotMatch(html, /evidence-verdict verdict-pass/, "the headline verdict is never presented as a live green when stale");
+  assert.match(html, /evidence-verdict verdict-muted">PASS</, "the verdict keeps its word but loses its color");
+  assert.match(html, /badge-changed">STALE/);
+  assert.match(html, /inputs no longer match the current tree/);
+  assert.match(html, /aaaa1111/);
+  assert.match(html, /cccc3333/);
+  assert.match(html, /re-run <code>node qa\/verify\.mjs<\/code>/);
+});
+
+test("evidenceBodyHtml: freshness unknown (stale:null) is stated as unknown — never rendered as fresh, never as stale", () => {
+  const html = evidenceBodyHtml(
+    { ...FRESH_RECEIPT, stale: null, currentInputsHash: null, staleReason: "qa/lib/inputs-hash.mjs not found or failed to load — cannot recompute the current tree's hash" },
+    { available: false },
+  );
+  assert.match(html, /freshness unknown/);
+  assert.match(html, /inputs binding unknown/);
+  assert.match(html, /inputs-hash\.mjs not found/);
+  assert.doesNotMatch(html, /evidence-stale/);
+});
+
+test("evidenceBodyHtml: timeline — prior receipts newest-first when a history source exists; the standardized absence line when only latest.json is retained", () => {
+  const withHistory = evidenceBodyHtml(FRESH_RECEIPT, {
+    available: true,
+    receipts: [
+      { file: "qa/evidence/2026-07-19T05.json", verdict: "PASS", profile: "local", generatedAt: "2026-07-19T05:00:00.000Z", ageMs: 3 * 60 * 60 * 1000 },
+      { file: "qa/evidence/2026-07-18T20.json", verdict: "FAIL", profile: "ci", generatedAt: "2026-07-18T20:00:00.000Z", ageMs: 12 * 60 * 60 * 1000 },
+    ],
+  });
+  assert.match(withHistory, /evidence-timeline/);
+  assert.match(withHistory, /2026-07-19T05\.json/);
+  assert.match(withHistory, /step-verdict-fail">FAIL</);
+
+  const noHistory = evidenceBodyHtml(FRESH_RECEIPT, { available: false, reason: "no receipt history — only the latest receipt is retained" });
+  assert.match(noHistory, /no receipt history &mdash; only the latest receipt is retained/);
+  assert.doesNotMatch(noHistory, /evidence-timeline/);
 });
