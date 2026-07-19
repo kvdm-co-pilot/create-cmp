@@ -1,29 +1,33 @@
 package __PACKAGE__.testing.fakes
 
+import __PACKAGE__.domain.model.DomainError
 import __PACKAGE__.domain.model.Item
 import __PACKAGE__.domain.repository.ItemRepository
+import __PACKAGE__.domain.result.AppResult
 
 /**
  * Hand-written fake — the template's testing convention (no mocking frameworks: they are
  * JVM-only in KMP, and interface-driven fakes keep the architecture honest).
  *
  * The pattern every fake follows:
- *  - configurable behavior (`items`, `shouldFail`) so a test arranges its scenario,
+ *  - configurable behavior (`items`, `failure`) so a test arranges its scenario,
  *  - recorded interactions (`getItemsCallCount`) so a test can assert usage,
  *  - implements the DOMAIN interface, never a concrete data source.
+ *
+ * Failures are arranged as typed [DomainError] KINDS, mirroring the real contract — the
+ * fake returns [AppResult.Failure]; it never throws (repositories don't, per ARCH-06).
  */
 class FakeItemRepository : ItemRepository {
 
     var items: List<Item> = emptyList()
-    var shouldFail: Boolean = false
-    var failureMessage: String = "fake failure"
+    var failure: DomainError? = null
 
     var getItemsCallCount: Int = 0
         private set
 
-    override suspend fun getItems(): List<Item> {
+    override suspend fun getItems(): AppResult<List<Item>> {
         getItemsCallCount++
-        if (shouldFail) throw IllegalStateException(failureMessage)
-        return items
+        failure?.let { return AppResult.Failure(it) }
+        return AppResult.Success(items)
     }
 }

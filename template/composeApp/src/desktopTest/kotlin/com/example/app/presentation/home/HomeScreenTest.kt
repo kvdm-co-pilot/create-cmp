@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import __PACKAGE__.domain.model.DomainError
 import __PACKAGE__.domain.model.Item
 import __PACKAGE__.domain.usecase.GetItemsUseCase
 import __PACKAGE__.testing.awaitNode
@@ -47,16 +48,27 @@ class HomeScreenTest {
 
     // SPEC: HOME-03
     @Test
-    fun `shows the error message when loading fails`() = runComposeUiTest {
-        repository.shouldFail = true
-        repository.failureMessage = "network down"
+    fun `shows presentation-mapped error copy when loading fails`() = runComposeUiTest {
+        repository.failure = DomainError.Network
 
         setContent {
             MaterialTheme { HomeScreen(onItemClick = {}, viewModel = viewModel()) }
         }
 
         awaitNode(hasTestTag("home_error"))
-        onAllNodesWithText("network down").assertCountEquals(1)
+        onAllNodesWithText(DomainError.Network.toUserMessage()).assertCountEquals(1)
+    }
+
+    // SPEC: HOME-07
+    @Test
+    fun `shows the empty state when the repository returns no items`() = runComposeUiTest {
+        repository.items = emptyList()
+
+        setContent {
+            MaterialTheme { HomeScreen(onItemClick = {}, viewModel = viewModel()) }
+        }
+
+        awaitNode(hasTestTag("home_empty"))
     }
 
     // SPEC: HOME-05

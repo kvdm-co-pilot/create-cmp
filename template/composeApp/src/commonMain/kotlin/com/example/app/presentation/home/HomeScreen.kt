@@ -47,23 +47,33 @@ fun HomeScreen(
             modifier = Modifier.semantics { testTag = "home_title" }.padding(bottom = 12.dp),
         )
 
-        val errorMessage = state.errorMessage
-        if (state.isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // Exhaustive fold over the sealed state — no boolean juggling, no unreachable
+        // combinations. Each branch owns exactly one UI.
+        when (val s = state) {
+            HomeUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-        } else if (errorMessage != null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+
+            is HomeUiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = errorMessage,
+                    text = s.message,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.semantics { testTag = "home_error" },
                 )
             }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(__THEME_PREFIX__Tokens.GapCard)) {
-                items(state.items, key = { it.id }) { item ->
+
+            HomeUiState.Empty -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "Nothing here yet.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { testTag = "home_empty" },
+                )
+            }
+
+            is HomeUiState.Content -> LazyColumn(verticalArrangement = Arrangement.spacedBy(__THEME_PREFIX__Tokens.GapCard)) {
+                items(s.items, key = { it.id }) { item ->
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
                         shape = MaterialTheme.shapes.medium,

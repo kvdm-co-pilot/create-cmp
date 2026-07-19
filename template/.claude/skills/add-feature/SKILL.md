@@ -76,9 +76,9 @@ node qa/scaffold-feature.mjs <FeatureName> --entity <EntityName>
 
 This writes the new Screen/ViewModel/UseCase/Repository(+impl)/tests/fake, wires them into
 `di/AppModule.kt`, `presentation/navigation/Screen.kt`, and `presentation/navigation/AppNavHost.kt`
-at their `// cmp:anchor` markers, and writes `specs/<feature>.spec.md` with a default six-clause
-set (`<FEATURE>-01..06`: loading, success, error, reload-after-failure, tap-navigates, golden
-tree) — copied verbatim from the configured exemplar's shape.
+at their `// cmp:anchor` markers, and writes `specs/<feature>.spec.md` with a default seven-clause
+set (`<FEATURE>-01..07`: loading, success, error, reload-after-failure, tap-navigates, golden
+tree, empty state) — copied verbatim from the configured exemplar's shape.
 
 The stamped screen arrives **already wrapped in `BaseScreen { … }`** (SHELL-05): it is a
 pushed NavHost destination, so unlike the tab exemplar it must handle its own insets — the
@@ -93,7 +93,7 @@ flagging, not something to route around by hand-splicing.
 
 The default spec clauses are placeholders shaped like the exemplar (by default a plain list of
 title/subtitle rows). **Rewrite the clause prose** in `specs/<feature>.spec.md` to describe the
-feature's real behavior — the six clause **ids stay fixed** (`specCoverage` binds tests to ids,
+feature's real behavior — the seven clause **ids stay fixed** (`specCoverage` binds tests to ids,
 not prose), only the wording changes. Propose the rewritten clauses to the human; get them
 confirmed before moving on — this project's contract is spec-first.
 
@@ -131,7 +131,7 @@ copy-paste artifact. Commit it alongside the feature.
 node qa/verify.mjs
 ```
 
-This must PASS. It proves: the spec's six clauses are all bound to a citing test
+This must PASS. It proves: the spec's seven clauses are all bound to a citing test
 (`specCoverage`), the build compiles, unit tests pass (ViewModel + UseCase + Repository +
 fakes), architecture conformance holds (`presentation` doesn't import `data`, the new
 `*Screen.kt` carries a `testTag`, the new `*ViewModel.kt` has a matching test), the golden tree

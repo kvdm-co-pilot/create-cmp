@@ -235,6 +235,7 @@ function referenceHomeRename(text, F, f, F_UPPER, E) {
     ["HomeUiState", `${F}UiState`],
     ["home_title", `${f}_title`],
     ["home_error", `${f}_error`],
+    ["home_empty", `${f}_empty`],
     ["FakeItemRepository", `Fake${E}Repository`],
     ["ItemRepositoryImpl", `${E}RepositoryImpl`],
     ["ItemRepository", `${E}Repository`],
