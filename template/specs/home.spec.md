@@ -15,7 +15,7 @@
 - **HOME-05** — Given items are listed, When the user taps an item, Then the app navigates to
   that item's detail.
 - **HOME-06** — Given the Home screen renders, When its structure is inspected, Then the
-  screen matches its committed golden tree (`qa/golden/home.json`) — structural regressions
-  are intentional, declared changes only.
+  screen matches its committed golden tree (`qa/golden/home.json`) — structural change must
+  be intentional and declared.
 - **HOME-07** — Given the repository succeeds with zero items, When loading completes, Then
   the empty state is shown (`home_empty`) and neither items nor an error are visible.
