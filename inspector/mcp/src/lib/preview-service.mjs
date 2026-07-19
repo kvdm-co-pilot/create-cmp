@@ -35,8 +35,22 @@ import { renderTreeSvg } from "./render.mjs";
 import { auditA11y } from "./a11y.mjs";
 import { fetchLiveCatalog } from "./live.mjs";
 import { getApprovalsData, approveArtifact as approveArtifactViaLib } from "./approvals-bridge.mjs";
+import {
+  getCommentsData,
+  addComment as addCommentViaLib,
+  resolveComment as resolveCommentViaLib,
+} from "./comments-bridge.mjs";
 import { getSpecsData } from "./specs.mjs";
-import { designSystemTabHtml, approvalsTabHtml, specsTabHtml } from "./console-tabs.mjs";
+import { getArchitectureData } from "./architecture.mjs";
+import { getComponentsData } from "./components.mjs";
+import {
+  designSystemTabHtml,
+  approvalsTabHtml,
+  specsTabHtml,
+  architectureTabHtml,
+  commentsTabHtml,
+  commentControlHtml,
+} from "./console-tabs.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -147,7 +161,7 @@ const esc = (s) =>
  * (screen.prev.png is the pre-render copy); every card keeps a persistent
  * "changed #N" badge from `changedVersions` so attribution outlives the next render.
  * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error,
- *   approvals, specs, designSystem }
+ *   approvals, specs, designSystem, architecture, components, comments }
  */
 export function galleryHtml(state) {
   const {
@@ -161,9 +175,16 @@ export function galleryHtml(state) {
     approvals = { available: false },
     specs = { available: false },
     designSystem = { available: false },
+    architecture = { layerMap: { available: false }, governedContract: { available: false }, featureShape: { available: false } },
+    components = { available: false },
+    comments = { available: false },
   } = state;
   const width = viewport?.width ?? 411;
   const changedSet = new Set(changed);
+  // Tab-bar badge (§7.3): count of OPEN comments, shown next to the Comments
+  // tab. Always renders the badge element (even at 0, just hidden) so the SSE
+  // "comment" handler below can always find #comments-badge to update in place.
+  const openCommentCount = comments.available ? comments.comments.filter((c) => c.status === "open").length : 0;
   return `<!doctype html>
 <meta charset="utf-8">
 <title>${esc(appName)} — live previews</title>
@@ -239,6 +260,52 @@ export function galleryHtml(state) {
   .cov-yes { background: #E8F7EF; color: #16A34A; }
   .cov-no { background: #FDECEC; color: #DC2626; }
   .cov-na { background: #F3F4F6; color: #9CA3AF; }
+  .arch-section { margin-bottom: 28px; }
+  .arch-section h3 { margin: 0 0 10px; font-size: 14px; }
+  .layer-map { display: flex; flex-wrap: wrap; gap: 14px; }
+  .layer-box { flex: 1 1 220px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
+  .layer-box.layer-empty { opacity: .55; border-style: dashed; }
+  .layer-box h4 { margin: 0 0 4px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .layer-desc { font-size: 11px; color: #6B7280; margin: 0 0 8px; }
+  .layer-files, .feature-tree, .component-params, .component-used-in { list-style: none; margin: 0; padding: 0;
+    font-size: 12px; display: flex; flex-direction: column; gap: 3px; max-height: 220px; overflow-y: auto; }
+  .layer-files li, .feature-tree li { display: flex; align-items: center; gap: 6px; }
+  .layer-others { margin-top: 14px; }
+  .component-grid { display: flex; flex-wrap: wrap; gap: 16px; }
+  .component-card { flex: 1 1 260px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
+  .component-card h4 { margin: 0 0 4px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .comments-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .comments-table td, .comments-table th { padding: 8px 10px; border-bottom: 1px solid #E5E7EB; text-align: left; vertical-align: top; }
+  .comment-text-cell { max-width: 320px; white-space: pre-wrap; }
+  .badge-open { background: #EEF2FF; color: #4338CA; }
+  .badge-resolved { background: #E8F7EF; color: #16A34A; }
+  .comment-resolution { margin-top: 4px; }
+  .comment-resolution-note { font-size: 12px; color: #6B7280; margin: 2px 0 0; }
+  .tab-badge { display: inline-block; min-width: 16px; padding: 1px 6px; margin-left: 4px; border-radius: 999px;
+               background: #DC2626; color: #fff; font-size: 10px; font-weight: 700; text-align: center; }
+  .comment-ctl { position: relative; display: inline-block; }
+  .comment-btn { appearance: none; border: none; background: none; cursor: pointer; font-size: 12px;
+                 padding: 0 2px; line-height: 1; opacity: .6; }
+  .comment-btn:hover { opacity: 1; }
+  .comment-popover { position: absolute; z-index: 20; top: 100%; left: 0; margin-top: 4px; width: 220px;
+                      background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px;
+                      box-shadow: 0 4px 16px rgba(0,0,0,.12); display: flex; flex-direction: column; gap: 6px; }
+  /* The popover and badge are toggled with the hidden ATTRIBUTE, but their author
+     display rules (flex / inline-block) override the UA stylesheet's [hidden]
+     { display: none } — without these guards every "hidden" popover stays painted,
+     and its children (the textarea especially) overflow the 0x0 box and invisibly
+     intercept clicks: on the dense specs tab, clicking one clause's visible Post
+     button actually hit the NEXT clause's hidden textarea (elementFromPoint-verified
+     — the VL-7 browser gate's repro), so the submit never fired. */
+  .comment-popover[hidden] { display: none !important; }
+  .tab-badge[hidden] { display: none !important; }
+  .comment-popover textarea, .comment-popover input { font: inherit; font-size: 12px; padding: 6px 8px;
+                      border: 1px solid #E5E7EB; border-radius: 8px; resize: vertical; width: 100%; box-sizing: border-box; }
+  .comment-popover-actions { display: flex; justify-content: flex-end; gap: 6px; }
+  .comment-popover-actions button { font: inherit; font-size: 11px; padding: 4px 10px; border-radius: 6px;
+                      border: 1px solid #E5E7EB; background: #F7F9FC; cursor: pointer; }
+  .comment-submit { border-color: #0A2540 !important; background: #0A2540 !important; color: #fff; }
+  .comment-error { color: #DC2626; font-size: 11px; margin: 0; }
 </style>
 <header>
   <h1>${esc(appName)} — live previews</h1>
@@ -250,8 +317,10 @@ ${error ? `<div class="banner">last render FAILED — showing previous state\n${
 <nav class="tabs">
   <button class="tab-btn active" data-tab="screens">Screens</button>
   <button class="tab-btn" data-tab="design-system">Design System</button>
+  <button class="tab-btn" data-tab="architecture">Architecture</button>
   <button class="tab-btn" data-tab="approvals">Approvals</button>
   <button class="tab-btn" data-tab="specs">Specs</button>
+  <button class="tab-btn" data-tab="comments">Comments <span class="tab-badge" id="comments-badge"${openCommentCount === 0 ? " hidden" : ""}>${openCommentCount}</span></button>
 </nav>
 <div id="tab-screens" class="tab-panel active" data-tab="screens">
 <div class="grid">
@@ -267,7 +336,7 @@ ${cards
       ? `<div class="cmp"><img class="cur" alt="${esc(screen.id)} pixels" src="/previews/${esc(screen.png)}?v=${version}"><img class="prev" alt="${esc(screen.id)} before" src="/previews/${esc(prevPng)}?v=${version}"></div>`
       : `<img alt="${esc(screen.id)} pixels" src="/previews/${esc(screen.png)}?v=${version}">`;
     return `  <div class="card${isChanged ? " changed" : ""}" id="card-${esc(screen.id)}">
-    <h2>${esc(screen.title)}${isChanged ? '<span class="flag">CHANGED</span>' : ""}</h2>
+    <h2>${esc(screen.title)}${isChanged ? '<span class="flag">CHANGED</span>' : ""}${commentControlHtml({ type: "screen", screen: screen.id }, { testTagInput: true })}</h2>
     <p class="meta">id <code>${esc(screen.id)}</code> · ${summary.nodes} nodes ·
        ${summary.tokenized} tokenized · ${summary.tagged} tagged ·
        a11y <span class="${a11y.pass ? "pass" : "fail"}">${
@@ -283,13 +352,19 @@ ${cards
 </div>
 </div>
 <div id="tab-design-system" class="tab-panel" data-tab="design-system">
-${designSystemTabHtml(designSystem)}
+${designSystemTabHtml(designSystem, components)}
+</div>
+<div id="tab-architecture" class="tab-panel" data-tab="architecture">
+${architectureTabHtml(architecture)}
 </div>
 <div id="tab-approvals" class="tab-panel" data-tab="approvals">
 ${approvalsTabHtml(approvals)}
 </div>
 <div id="tab-specs" class="tab-panel" data-tab="specs">
 ${specsTabHtml(specs)}
+</div>
+<div id="tab-comments" class="tab-panel" data-tab="comments">
+${commentsTabHtml(comments)}
 </div>
 <script>
   const pill = document.getElementById("pill");
@@ -314,6 +389,31 @@ ${specsTabHtml(specs)}
           wireApproveButtons(cur);
         } else {
           location.reload(); // fallback: unexpected markup — the old behavior
+        }
+      }).catch(() => location.reload());
+    }
+    // Comments refresh IN PLACE too (§7.3, same VL-6 pattern as approvals):
+    // one SSE event covers BOTH a new comment (POST /api/comment, console)
+    // and a resolution (resolve_comment, agent) — either way, only the
+    // Comments tab's markup and the tab-bar open-count badge changed.
+    if (msg.type === "comment") {
+      fetch("/").then((r) => r.text()).then((html) => {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const freshPanel = doc.querySelector("#tab-comments");
+        const curPanel = document.querySelector("#tab-comments");
+        if (freshPanel && curPanel) {
+          const wasActive = curPanel.classList.contains("active");
+          curPanel.innerHTML = freshPanel.innerHTML;
+          if (wasActive) curPanel.classList.add("active");
+        } else {
+          location.reload();
+          return;
+        }
+        const freshBadge = doc.querySelector("#comments-badge");
+        const curBadge = document.querySelector("#comments-badge");
+        if (freshBadge && curBadge) {
+          curBadge.textContent = freshBadge.textContent;
+          curBadge.hidden = freshBadge.hidden;
         }
       }).catch(() => location.reload());
     }
@@ -389,6 +489,55 @@ ${specsTabHtml(specs)}
   });
   }
   wireApproveButtons(document);
+  // Comments (§7.3) — every 💬 control (screens, spec clauses, tokens,
+  // components, architecture nodes) opens the same inline popover and POSTs
+  // to /api/comment; a successful post is confirmed by the server's SSE
+  // "comment" broadcast (which refreshes the Comments tab + badge in place),
+  // not by this handler — same non-racing split as wireApproveButtons.
+  // dataset.wired guards against double-binding across repeated calls
+  // (initial load + no-op re-scans of the same, never-swapped card markup).
+  function wireCommentButtons(scope) {
+    scope.querySelectorAll(".comment-ctl").forEach((ctl) => {
+      const btn = ctl.querySelector(".comment-btn");
+      const pop = ctl.querySelector(".comment-popover");
+      if (!btn || !pop || btn.dataset.wired) return;
+      btn.dataset.wired = "1";
+      btn.addEventListener("click", () => { pop.hidden = !pop.hidden; });
+      const cancelBtn = pop.querySelector(".comment-cancel");
+      if (cancelBtn) cancelBtn.addEventListener("click", () => { pop.hidden = true; });
+      const submitBtn = pop.querySelector(".comment-submit");
+      if (submitBtn) submitBtn.addEventListener("click", async () => {
+        const textEl = pop.querySelector(".comment-text");
+        const ttEl = pop.querySelector(".comment-testtag");
+        const errEl = pop.querySelector(".comment-error");
+        if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
+        let target;
+        try { target = JSON.parse(ctl.dataset.target); } catch { target = { type: "general" }; }
+        if (ttEl && ttEl.value.trim()) target = { type: "element", screen: target.screen, testTag: ttEl.value.trim() };
+        submitBtn.disabled = true;
+        try {
+          const res = await fetch("/api/comment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ target, text: textEl ? textEl.value : "" }),
+          });
+          const body = await res.json();
+          if (!body.ok) {
+            if (errEl) { errEl.hidden = false; errEl.textContent = body.reason || "comment refused"; }
+          } else {
+            pop.hidden = true;
+            if (textEl) textEl.value = "";
+            if (ttEl) ttEl.value = "";
+          }
+        } catch (err) {
+          if (errEl) { errEl.hidden = false; errEl.textContent = String(err); }
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    });
+  }
+  wireCommentButtons(document);
 </script>
 `;
 }
@@ -457,6 +606,8 @@ export function createPreviewService(opts) {
   const renderWaiters = new Set(); // waitForRender() promises pending a render/compile outcome
   const approvalWaiters = new Set(); // waitForApprovalDecision() promises pending a status change
   let approvalPollTimer = null; // only ticks while approvalWaiters is non-empty
+  const commentWaiters = new Set(); // waitForNewComment() promises pending a NEW comment id
+  let commentPollTimer = null; // only ticks while commentWaiters is non-empty
   let daemonReloadCount = -1; // last successful-reload count seen from the daemon (-1 = unknown)
   let daemonReloadErrors = -1; // last failed-swap count seen from the daemon
   let daemonReloadHooked = false; // daemon has the in-JVM after-reload hook
@@ -592,6 +743,109 @@ export function createPreviewService(opts) {
       approvalWaiters.add(w);
       ensureApprovalPoll();
     });
+  }
+
+  // --- comments (§7.3) -------------------------------------------------------------
+
+  /**
+   * The full comment ledger, via the project's own qa/lib/comments.mjs
+   * (comments-bridge.mjs — never forked here). Same shape the Comments tab
+   * renders: { available: false } for projects predating the comments wave,
+   * else { available: true, schema, comments: [...] }.
+   */
+  function commentsSnapshot(status) {
+    return getCommentsData(projectDir, status ? { status } : undefined);
+  }
+
+  function ensureCommentPoll() {
+    if (commentPollTimer) return;
+    commentPollTimer = setInterval(() => void checkCommentWaiters(), 1000);
+  }
+  function maybeStopCommentPoll() {
+    if (commentWaiters.size === 0 && commentPollTimer) {
+      clearInterval(commentPollTimer);
+      commentPollTimer = null;
+    }
+  }
+
+  /**
+   * Settle any waitForNewComment() calls once a comment id appears that
+   * wasn't in their `before` snapshot — mirrors checkApprovalWaiters' split
+   * (event-driven off the POST handler + a 1s poll fallback for a comment
+   * recorded OUTSIDE this server, e.g. `node qa/comment.mjs` from a
+   * terminal), but keyed on NEW ids specifically (unlike approvals, a
+   * resolve() should NOT wake a waitForNewComment() caller — only a fresh
+   * comment landing does).
+   */
+  async function checkCommentWaiters() {
+    if (commentWaiters.size === 0) return;
+    const now = await commentsSnapshot();
+    const nowComments = now.available ? now.comments : [];
+    for (const w of [...commentWaiters]) {
+      const added = nowComments.filter((c) => !w.beforeIds.has(c.id));
+      if (added.length > 0 || now.available !== w.beforeAvailable) {
+        clearTimeout(w.timer);
+        commentWaiters.delete(w);
+        w.resolve({ timedOut: false, available: now.available, added, comments: nowComments });
+      }
+    }
+    maybeStopCommentPoll();
+  }
+
+  /** Resolve every pending waitForNewComment immediately (service stopping). */
+  function settleCommentWaiters() {
+    for (const w of commentWaiters) {
+      clearTimeout(w.timer);
+      w.resolve({ timedOut: false, available: w.beforeAvailable, added: [], comments: [] });
+    }
+    commentWaiters.clear();
+    if (commentPollTimer) {
+      clearInterval(commentPollTimer);
+      commentPollTimer = null;
+    }
+  }
+
+  /**
+   * The agent's comment primitive (VERIFICATION-LAYER-DESIGN.md §7.3): without
+   * waitForComment, the current snapshot. With it, blocks until a NEW comment
+   * lands (an id absent from the `before` snapshot) — same blocking+timeout
+   * shape as waitForApprovalDecision, applied to "a human left feedback"
+   * instead of "a human decided". Resolves immediately with
+   * {available:false} in a project with no comments library.
+   */
+  async function waitForNewComment(timeoutMs = 120000) {
+    const before = await commentsSnapshot();
+    if (!before.available) {
+      return { timedOut: false, available: false, added: [], comments: [] };
+    }
+    const beforeIds = new Set(before.comments.map((c) => c.id));
+    return new Promise((resolve) => {
+      const w = { resolve, beforeIds, beforeAvailable: before.available };
+      w.timer = setTimeout(async () => {
+        commentWaiters.delete(w);
+        const now = await commentsSnapshot();
+        resolve({ timedOut: true, available: now.available, added: [], comments: now.available ? now.comments : [] });
+        maybeStopCommentPoll();
+      }, timeoutMs);
+      commentWaiters.add(w);
+      ensureCommentPoll();
+    });
+  }
+
+  /**
+   * The agent's resolve primitive (§7.3): closes the loop AFTER acting on a
+   * comment, recording author "agent" and the note (what was done). A
+   * successful resolve broadcasts the same SSE "comment" event a new comment
+   * does — the Comments tab shows the resolution either way.
+   */
+  async function resolveCommentById(id, note) {
+    const result = await resolveCommentViaLib(projectDir, id, { note, author: "agent" });
+    if (result.ok) {
+      touch("comment-resolved");
+      broadcast({ type: "comment" });
+      void checkCommentWaiters();
+    }
+    return result;
   }
 
   /** Design System tab data: previews-dir catalog first, else a best-effort live fetch. */
@@ -1036,8 +1290,14 @@ export function createPreviewService(opts) {
     const url = new URL(req.url, `http://127.0.0.1:${port}`);
     try {
       if (url.pathname === "/") {
-        const [approvals, designSystem] = await Promise.all([approvalStatusSnapshot(), getDesignSystemData()]);
+        const [approvals, designSystem, comments] = await Promise.all([
+          approvalStatusSnapshot(),
+          getDesignSystemData(),
+          commentsSnapshot(),
+        ]);
         const specs = getSpecsData(projectDir);
+        const architecture = getArchitectureData(projectDir);
+        const components = getComponentsData(projectDir);
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(
           galleryHtml({
@@ -1051,6 +1311,9 @@ export function createPreviewService(opts) {
             approvals,
             specs,
             designSystem,
+            architecture,
+            components,
+            comments,
           }),
         );
         return;
@@ -1098,6 +1361,44 @@ export function createPreviewService(opts) {
           touch("approval");
           broadcast({ type: "approval", artifact });
           void checkApprovalWaiters(); // settle any waitForApprovalDecision() faster than the 1s poll
+        }
+        return;
+      }
+      if (url.pathname === "/api/comment") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          res.end(JSON.stringify({ ok: false, reason: "method not allowed — use POST" }));
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse((await readBody(req)) || "{}");
+        } catch (err) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: `invalid JSON body: ${err.message}` }));
+          return;
+        }
+        const target = body && body.target;
+        const text = body && body.text;
+        if (!target || typeof target !== "object") {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: "missing `target` (object) in the request body" }));
+          return;
+        }
+        if (typeof text !== "string") {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: "missing `text` (string) in the request body" }));
+          return;
+        }
+        // author is ALWAYS "human-console" here — the console is the only caller of
+        // this route; an agent adds evidence via tools, never via this endpoint.
+        const result = await addCommentViaLib(projectDir, { target, text, author: "human-console" });
+        res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
+        res.end(JSON.stringify(result));
+        if (result.ok) {
+          touch("comment");
+          broadcast({ type: "comment" });
+          void checkCommentWaiters(); // settle any waitForNewComment() faster than the 1s poll
         }
         return;
       }
@@ -1210,6 +1511,7 @@ export function createPreviewService(opts) {
       clearTimeout(watchdogTimer);
       settleWaiters(); // don't leave agents hanging on a stopped service
       settleApprovalWaiters(); // ditto for pending waitForApprovalDecision() calls
+      settleCommentWaiters(); // ditto for pending waitForNewComment() calls
       daemonBootDeadline = 0; // abort any in-flight boot poll
       if (classesWatcher) classesWatcher.close();
       // Best-effort daemon teardown: ask the JVM to exit, then kill the gradle client.
@@ -1231,6 +1533,12 @@ export function createPreviewService(opts) {
     approvalStatusSnapshot,
     /** Blocks until any governed artifact's status changes (or timeoutMs elapses). */
     waitForApprovalDecision,
+    /** Current comment ledger (§7.3 tab data) — {available:false} with no comments library. */
+    commentsSnapshot,
+    /** Blocks until a NEW comment lands (or timeoutMs elapses). */
+    waitForNewComment,
+    /** The agent's resolve primitive — records author "agent" + the note. */
+    resolveComment: resolveCommentById,
     /** Test seam: force one render cycle without touching the filesystem watcher. */
     _renderCycle: renderCycle,
     /** Test seam: feed daemon-child output through the compile-failure scanner. */

@@ -16,9 +16,26 @@ import {
   detectAppPackage,
 } from "../src/lib/preview-service.mjs";
 import { resetApprovalsBridgeCache } from "../src/lib/approvals-bridge.mjs";
+import { resetCommentsBridgeCache } from "../src/lib/comments-bridge.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REAL_APPROVALS_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "approvals.mjs");
+const FIXTURE_COMMENTS_LIB = path.join(HERE, "fixtures", "fixture-comments-lib.mjs");
+
+/**
+ * A minimal generated-project fixture with a REAL qa/lib/approvals.mjs AND the
+ * test fixture's qa/lib/comments.mjs (test/fixtures/fixture-comments-lib.mjs —
+ * a §7.3-contract implementation; see comments-bridge.test.mjs's header for
+ * why this package's tests don't depend on template/qa/lib/comments.mjs).
+ */
+function makeCommentsFixtureProject() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-comments-"));
+  fs.mkdirSync(path.join(root, "composeApp", "src"), { recursive: true });
+  const libDir = path.join(root, "qa", "lib");
+  fs.mkdirSync(libDir, { recursive: true });
+  fs.copyFileSync(FIXTURE_COMMENTS_LIB, path.join(libDir, "comments.mjs"));
+  return root;
+}
 
 /**
  * A minimal generated-project fixture with a REAL qa/lib/approvals.mjs (copied
@@ -963,6 +980,284 @@ test("service: hot=false never touches the daemon", async () => {
     assert.equal(status.version, 1);
   } finally {
     service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+// --- Comments wiring (VERIFICATION-LAYER-DESIGN.md §7.3) --------------------
+
+test("galleryHtml: architecture + comments tabs present; both default to honest empty states when omitted", () => {
+  const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+  assert.match(html, /data-tab="architecture"/);
+  assert.match(html, /data-tab="comments"/);
+  assert.match(html, /No layer map available/);
+  assert.match(html, /not available in this project/);
+  assert.match(html, /id="comments-badge"[^>]* hidden/, "zero open comments -> badge present but hidden");
+});
+
+test("galleryHtml: [hidden] display guards for every hidden-toggled element that carries an author display rule", () => {
+  // Pins the VL-7 browser-gate fix: the popover (display:flex) and the tab badge
+  // (display:inline-block) are toggled with the `hidden` ATTRIBUTE, and an author
+  // display rule overrides the UA stylesheet's [hidden] { display: none }. Without
+  // the guards, every closed popover stayed painted at 0x0 and its overflowing
+  // textarea invisibly intercepted clicks — on the dense specs tab, clicking one
+  // clause's visible Post button actually hit the NEXT clause's hidden textarea
+  // (elementFromPoint-verified), so the submit never fired.
+  const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+  assert.match(
+    html,
+    /\.comment-popover\[hidden\]\s*\{\s*display:\s*none\s*!important/,
+    "a hidden popover must genuinely not render (author display:flex would otherwise win)",
+  );
+  assert.match(
+    html,
+    /\.tab-badge\[hidden\]\s*\{\s*display:\s*none\s*!important/,
+    "a hidden badge must genuinely not render (author display:inline-block would otherwise win)",
+  );
+  // The remaining hidden-toggled elements (#approve-error banner, .comment-error)
+  // deliberately need no guard: neither carries an author `display` rule, so the
+  // UA's [hidden] { display: none } applies. This assertion documents that premise —
+  // if someone later adds `display:` to those selectors, it must fail loudly here.
+  for (const selector of ["banner", "comment-error"]) {
+    const rules = [...html.matchAll(new RegExp(`\\.${selector}[^{]*\\{[^}]*\\}`, "g"))].map((m) => m[0]);
+    assert.ok(rules.length > 0, `.${selector} rule exists`);
+    for (const rule of rules) {
+      assert.doesNotMatch(
+        rule,
+        /[{;]\s*display\s*:/,
+        `.${selector} must stay free of an author display rule OR gain its own [hidden] guard`,
+      );
+    }
+  }
+});
+
+test("service: commentsSnapshot is {available:false} for a project with no comments library", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const service = createPreviewService({ projectDir, port: 19870, hot: false, runRender: async () => {} });
+  try {
+    await service.start();
+    assert.deepEqual(await service.commentsSnapshot(), { available: false });
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: POST /api/comment calls the fixture library, writes qa/comments.json, and the gallery page reflects it", async () => {
+  const projectDir = makeCommentsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19871, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const res = await fetch(`${st.url}api/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: { type: "screen", screen: "home" }, text: "move the CTA up" }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.comment.author, "human-console");
+
+    const written = JSON.parse(fs.readFileSync(path.join(projectDir, "qa", "comments.json"), "utf8"));
+    assert.equal(written.comments.length, 1);
+    assert.equal(written.comments[0].text, "move the CTA up");
+
+    const page = await (await fetch(st.url)).text();
+    assert.match(page, /move the CTA up/);
+    assert.match(page, /id="comments-badge">1</, "open-count badge reflects the new open comment");
+  } finally {
+    service.stop();
+    resetCommentsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: POST /api/comment surfaces the library's refusal verbatim (empty text / bad target) and rejects non-POST/bad JSON", async () => {
+  const projectDir = makeCommentsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19872, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const empty = await fetch(`${st.url}api/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: { type: "general" }, text: "   " }),
+    });
+    assert.equal(empty.status, 409);
+    const emptyBody = await empty.json();
+    assert.equal(emptyBody.ok, false);
+    assert.match(emptyBody.reason, /empty/i);
+
+    const missingTarget = await fetch(`${st.url}api/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "hi" }),
+    });
+    assert.equal(missingTarget.status, 400);
+
+    const badJson = await fetch(`${st.url}api/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not json",
+    });
+    assert.equal(badJson.status, 400);
+
+    const getInstead = await fetch(`${st.url}api/comment`);
+    assert.equal(getInstead.status, 405);
+  } finally {
+    service.stop();
+    resetCommentsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: POST /api/comment broadcasts an SSE 'comment' event", async () => {
+  const projectDir = makeCommentsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19873, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const sseRes = await fetch(`${st.url}events`);
+    const reader = sseRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    async function nextEvent() {
+      while (!buf.includes("\n\n")) {
+        const { value, done } = await reader.read();
+        if (done) throw new Error("SSE stream closed early");
+        buf += decoder.decode(value, { stream: true });
+      }
+      const idx = buf.indexOf("\n\n");
+      const chunk = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      return JSON.parse(chunk.replace(/^data: /, ""));
+    }
+    assert.equal((await nextEvent()).type, "hello");
+
+    await fetch(`${st.url}api/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: { type: "general" }, text: "hi" }),
+    });
+
+    const evt = await nextEvent();
+    assert.equal(evt.type, "comment");
+    reader.cancel();
+  } finally {
+    service.stop();
+    resetCommentsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: waitForNewComment resolves (event-driven) the moment POST /api/comment lands, naming the added comment", async () => {
+  const projectDir = makeCommentsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19874, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const pending = service.waitForNewComment(5000);
+    await fetch(`${st.url}api/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: { type: "general" }, text: "new feedback" }),
+    });
+    const settled = await pending;
+    assert.equal(settled.timedOut, false);
+    assert.equal(settled.available, true);
+    assert.equal(settled.added.length, 1);
+    assert.equal(settled.added[0].text, "new feedback");
+  } finally {
+    service.stop();
+    resetCommentsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: waitForNewComment does NOT resolve on a resolveComment() call — only a NEW comment wakes it", async () => {
+  const projectDir = makeCommentsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19875, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    const added = await fetch(`${st.url}api/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: { type: "general" }, text: "already here" }),
+    }).then((r) => r.json());
+
+    const pending = service.waitForNewComment(500);
+    await service.resolveComment(added.comment.id, "handled it");
+    const settled = await pending;
+    assert.equal(settled.timedOut, true, "a resolve alone must not satisfy waitForNewComment");
+  } finally {
+    service.stop();
+    resetCommentsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: waitForNewComment times out (not a hang) when nothing changes", async () => {
+  const projectDir = makeCommentsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19876, hot: false, runRender: async () => {} });
+  try {
+    await service.start();
+    const result = await service.waitForNewComment(200);
+    assert.equal(result.timedOut, true);
+    assert.equal(result.available, true);
+    assert.deepEqual(result.added, []);
+  } finally {
+    service.stop();
+    resetCommentsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: waitForNewComment resolves immediately with {available:false} — nothing to wait for", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const service = createPreviewService({ projectDir, port: 19877, hot: false, runRender: async () => {} });
+  try {
+    await service.start();
+    const start = Date.now();
+    const result = await service.waitForNewComment(60000);
+    assert.equal(result.available, false);
+    assert.equal(result.timedOut, false);
+    assert.ok(Date.now() - start < 2000, "must not wait for the full timeout when unavailable");
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: resolveComment (the agent primitive) writes the resolution via the library and broadcasts SSE", async () => {
+  const projectDir = makeCommentsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19878, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+    const added = await fetch(`${st.url}api/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: { type: "general" }, text: "please clarify" }),
+    }).then((r) => r.json());
+
+    const result = await service.resolveComment(added.comment.id, "clarified in the spec");
+    assert.equal(result.ok, true);
+    assert.equal(result.comment.resolvedBy, "agent");
+    assert.equal(result.comment.resolutionNote, "clarified in the spec");
+
+    const page = await (await fetch(st.url)).text();
+    assert.match(page, /badge-resolved/);
+    assert.match(page, /clarified in the spec/);
+  } finally {
+    service.stop();
+    resetCommentsBridgeCache(projectDir);
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });

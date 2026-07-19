@@ -1,8 +1,15 @@
 // console-tabs.mjs — pure (data) -> html generators for the Design System,
-// Approvals, and Specs gallery tabs.
+// Architecture, Approvals, Specs, and Comments gallery tabs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { designSystemTabHtml, approvalsTabHtml, specsTabHtml } from "../src/lib/console-tabs.mjs";
+import {
+  designSystemTabHtml,
+  approvalsTabHtml,
+  specsTabHtml,
+  architectureTabHtml,
+  commentsTabHtml,
+  commentControlHtml,
+} from "../src/lib/console-tabs.mjs";
 
 test("designSystemTabHtml: unavailable -> honest empty-state explaining how to produce a catalog", () => {
   const html = designSystemTabHtml({ available: false });
@@ -141,4 +148,185 @@ test("specsTabHtml: clause list with coverage badges, strikes through withdrawn 
   assert.match(html, /cov-na">withdrawn/);
   assert.match(html, /<s>old behavior<\/s>/, "withdrawn prose is struck through");
   assert.match(html, /class="clause withdrawn"/);
+});
+
+// --- commentControlHtml (§7.3) ----------------------------------------------
+
+test("commentControlHtml: target JSON is embedded and HTML/attribute escaped (quotes included)", () => {
+  const html = commentControlHtml({ type: "screen", screen: 'home"><script>x' });
+  assert.match(html, /class="comment-btn"/);
+  assert.match(html, /class="comment-popover" hidden/);
+  // The dangerous characters must be neutralized — no raw '>' breaking out of the attribute,
+  // no unescaped '"' terminating it early.
+  assert.doesNotMatch(html, /data-target="[^"]*"><script>/);
+  assert.match(html, /&quot;/, "double quotes inside the JSON are escaped for attribute safety");
+});
+
+test("commentControlHtml: testTagInput adds an optional testTag field; omitted by default", () => {
+  const withInput = commentControlHtml({ type: "screen", screen: "home" }, { testTagInput: true });
+  assert.match(withInput, /class="comment-testtag"/);
+  const without = commentControlHtml({ type: "screen", screen: "home" });
+  assert.doesNotMatch(without, /class="comment-testtag"/);
+});
+
+// --- designSystemTabHtml Components section (§7.2) -------------------------
+
+test("designSystemTabHtml: Components section unavailable -> honest empty-state, independent of the token catalog's own availability", () => {
+  const html = designSystemTabHtml({ available: false }, { available: false, reason: "no presentation/components directory found" });
+  assert.match(html, /No design-system catalog available yet/, "the token-catalog empty state still renders");
+  assert.match(html, /<h3>Components<\/h3>/);
+  assert.match(html, /No components scan available yet/);
+  assert.match(html, /no presentation\/components directory found/);
+});
+
+test("designSystemTabHtml: Components section renders name/file/params/used-in, flags a parse error honestly", () => {
+  const html = designSystemTabHtml(
+    { available: true, source: "previews", catalog: { colors: {}, dimens: {} } },
+    {
+      available: true,
+      components: [
+        {
+          name: "AppButton",
+          file: "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/components/AppButton.kt",
+          params: ["text: String", "onClick: () -> Unit"],
+          parseError: false,
+          usedIn: ["composeApp/src/commonMain/kotlin/com/acme/demo/presentation/home/HomeScreen.kt"],
+        },
+        {
+          name: "Broken",
+          file: "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/components/Broken.kt",
+          params: [],
+          parseError: true,
+          usedIn: [],
+        },
+      ],
+    },
+  );
+  assert.match(html, /AppButton/);
+  assert.match(html, /text: String/);
+  assert.match(html, /onClick: \(\) -&gt; Unit/);
+  assert.match(html, /HomeScreen\.kt/);
+  assert.match(html, /Broken/);
+  assert.match(html, /signature could not be parsed cleanly/);
+});
+
+test("designSystemTabHtml: Components section — dir present but zero components -> honest empty-inline note", () => {
+  const html = designSystemTabHtml({ available: false }, { available: true, components: [] });
+  assert.match(html, /no @Composable components found/);
+});
+
+// --- architectureTabHtml (§7.1) ---------------------------------------------
+
+test("architectureTabHtml: every section unavailable -> three independent honest empty-states", () => {
+  const html = architectureTabHtml({
+    layerMap: { available: false, reason: "no 'presentation' directory found" },
+    governedContract: { available: false, reason: "specs/app-base.spec.md not found" },
+    featureShape: { available: false, reason: "no home-feature files found on disk" },
+  });
+  assert.match(html, /No layer map available/);
+  assert.match(html, /no 'presentation' directory found/);
+  assert.match(html, /No governed contract available/);
+  assert.match(html, /specs\/app-base\.spec\.md not found/);
+  assert.match(html, /No feature shape available/);
+  assert.match(html, /no home-feature files found on disk/);
+});
+
+test("architectureTabHtml: layer map renders each layer's package + real files, an empty layer honestly, and a comment control per node", () => {
+  const html = architectureTabHtml({
+    layerMap: {
+      available: true,
+      appPackage: "com.acme.demo",
+      layers: [
+        { id: "presentation", label: "presentation (…)", present: true, files: ["theme/Theme.kt", "home/HomeScreen.kt"] },
+        { id: "domain", label: "domain (…)", present: true, files: ["model/Item.kt"] },
+        { id: "data", label: "data (…)", present: false, files: [] },
+        { id: "di", label: "di (…)", present: true, files: ["AppModule.kt"] },
+      ],
+      otherPackages: [{ name: "core", files: ["format/Formatter.kt"] }],
+    },
+    governedContract: { available: false },
+    featureShape: { available: false },
+  });
+  assert.match(html, /com\.acme\.demo/);
+  assert.match(html, /theme\/Theme\.kt/);
+  assert.match(html, /home\/HomeScreen\.kt/);
+  assert.match(html, /class="layer-box layer-empty"/, "the absent data layer is flagged, not hidden");
+  assert.match(html, /directory not present/);
+  assert.match(html, /other top-level packages/);
+  assert.match(html, /core/);
+  assert.match(html, /class="comment-ctl"/, "architecture tree nodes carry a 💬 control");
+});
+
+test("architectureTabHtml: governed-contract clauses render with comment controls, feature shape lists real files", () => {
+  const html = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: {
+      available: true,
+      file: "app-base.spec.md",
+      clauses: [{ id: "ARCH-01", withdrawn: false, prose: "Layers stay separated." }],
+    },
+    featureShape: {
+      available: true,
+      files: [
+        "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/home/HomeScreen.kt",
+        "specs/home.spec.md",
+      ],
+    },
+  });
+  assert.match(html, /ARCH-01/);
+  assert.match(html, /Layers stay separated/);
+  assert.match(html, /specs\/home\.spec\.md/);
+  assert.match(html, /qa\/scaffold-feature\.mjs/);
+});
+
+// --- commentsTabHtml (§7.3) --------------------------------------------------
+
+test("commentsTabHtml: unavailable -> honest not-available state, with and without a library error", () => {
+  const noReason = commentsTabHtml({ available: false });
+  assert.match(noReason, /not available in this project/);
+  assert.match(noReason, /older scaffold/);
+
+  const withReason = commentsTabHtml({ available: false, error: "kaboom" });
+  assert.match(withReason, /kaboom/);
+});
+
+test("commentsTabHtml: no comments yet -> honest empty state", () => {
+  const html = commentsTabHtml({ available: true, comments: [] });
+  assert.match(html, /No comments yet/);
+});
+
+test("commentsTabHtml: ledger renders target/text/author/status, escapes user text, shows the resolution note when resolved", () => {
+  const html = commentsTabHtml({
+    available: true,
+    comments: [
+      {
+        id: "c1",
+        target: { type: "screen", screen: "home" },
+        text: "the CTA is too close <script>",
+        author: "human-console",
+        createdAt: "2026-07-19T09:00:00.000Z",
+        status: "open",
+      },
+      {
+        id: "c2",
+        target: { type: "spec-line", file: "specs/home.spec.md", clauseId: "HOME-01" },
+        text: "clarify this clause",
+        author: "human-console",
+        createdAt: "2026-07-19T08:00:00.000Z",
+        status: "resolved",
+        resolvedAt: "2026-07-19T08:30:00.000Z",
+        resolvedBy: "agent",
+        resolutionNote: "reworded the clause",
+      },
+    ],
+  });
+  assert.match(html, /c1/);
+  assert.match(html, /screen <code>home<\/code>/);
+  assert.match(html, /the CTA is too close &lt;script&gt;/, "comment text is escaped");
+  assert.match(html, /badge-open/);
+  assert.match(html, /spec <code>specs\/home\.spec\.md<\/code>/);
+  assert.match(html, /clause <code>HOME-01<\/code>/);
+  assert.match(html, /badge-resolved/);
+  assert.match(html, /resolved by agent/);
+  assert.match(html, /reworded the clause/);
 });
