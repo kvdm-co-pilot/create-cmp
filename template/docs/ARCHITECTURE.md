@@ -26,11 +26,13 @@ Clean Architecture, three layers, one rule: **dependencies point inward.**
 function → the ViewModel invokes a use case → repository → sources → new immutable `UiState`
 is emitted. No state lives in composables beyond UI-local concerns.
 
-## The exemplar: the `home` feature
+## The exemplar feature (`home` by default, configurable)
 
-`presentation/home` + `domain/{model,repository,usecase}` + `data/remote` is the **reference
-implementation** of the pattern — including its tests (`commonTest`). To add a feature, mirror
-it exactly:
+The **configured exemplar** — `exemplarFeature` in `qa/approvals.json`, `home` on a fresh
+scaffold — is the **reference implementation** of the pattern, including its tests
+(`commonTest`). The genesis walk typically promotes your own first feature to exemplar
+(see `CLAUDE.md`'s genesis section); `qa/scaffold-feature.mjs` then clones from *it*, and
+`home` demotes to a regular feature. To add a feature, mirror the exemplar exactly:
 
 1. Domain: model + repository interface + use case (+ tests).
 2. Data: repository implementation (+ test through the domain contract).
