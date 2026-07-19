@@ -347,7 +347,12 @@ export function galleryHtml(state) {
   // signed, has it moved". Artifact-governed pages use the artifact grammar;
   // the rest state only what their own data shows (evidence-or-silence). ----
 
-  const screensStatus = `render #${version} &middot; ${screenCards.length} screen${screenCards.length === 1 ? "" : "s"}${
+  // The matrix's rows are BASE screens; @state variants render as columns
+  // inside their row — the header count must match the rows the reader sees,
+  // not the raw card count (caught by the wave-final browser walk: "7
+  // screens" over a 4-row matrix).
+  const baseScreenCount = screenCards.filter(({ screen }) => !String(screen.id).includes("@")).length;
+  const screensStatus = `render #${version} &middot; ${baseScreenCount} screen${baseScreenCount === 1 ? "" : "s"}${
     changedScreens.length ? ` &middot; <span class="chg">${changedScreens.length} changed this render</span>` : ""
   }${openNote("screens")}`;
 
