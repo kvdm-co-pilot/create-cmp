@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import __PACKAGE__.domain.model.DomainError
 import __PACKAGE__.domain.model.Item
 import __PACKAGE__.domain.usecase.GetItemsUseCase
+import __PACKAGE__.presentation.components.ContentUiState
 import __PACKAGE__.testing.fakes.FakeItemRepository
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -25,7 +26,9 @@ import kotlinx.coroutines.test.setMain
  *  - Turbine (`state.test { … }`) for StateFlow assertions.
  *  - Hand-written fakes from `testing/fakes` — never mocks.
  *  - Sealed-state assertions: each emission IS one state (`assertEquals` on the state,
- *    `assertIs` on the branch) — no boolean-flag poking.
+ *    `assertIs` on the branch) — no boolean-flag poking. The state type is the shared
+ *    [ContentUiState] (the generalization of this feature's pre-generalization per-feature
+ *    sealed state).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -51,7 +54,7 @@ class HomeViewModelTest {
         repository.items = listOf(Item(id = "1", title = "First", subtitle = "sub"))
 
         viewModel().state.test {
-            assertEquals(HomeUiState.Loading, awaitItem(), "initial state should be Loading")
+            assertEquals(ContentUiState.Loading, awaitItem(), "initial state should be Loading")
         }
     }
 
@@ -62,8 +65,8 @@ class HomeViewModelTest {
         repository.items = items
 
         viewModel().state.test {
-            assertEquals(HomeUiState.Loading, awaitItem())
-            assertEquals(HomeUiState.Content(items), awaitItem())
+            assertEquals(ContentUiState.Loading, awaitItem())
+            assertEquals(ContentUiState.Content(items), awaitItem())
         }
     }
 
@@ -73,8 +76,8 @@ class HomeViewModelTest {
         repository.items = emptyList()
 
         viewModel().state.test {
-            assertEquals(HomeUiState.Loading, awaitItem())
-            assertEquals(HomeUiState.Empty, awaitItem())
+            assertEquals(ContentUiState.Loading, awaitItem())
+            assertEquals(ContentUiState.Empty, awaitItem())
         }
     }
 
@@ -84,9 +87,9 @@ class HomeViewModelTest {
         repository.failure = DomainError.Network
 
         viewModel().state.test {
-            assertEquals(HomeUiState.Loading, awaitItem())
+            assertEquals(ContentUiState.Loading, awaitItem())
 
-            val failed = assertIs<HomeUiState.Error>(awaitItem())
+            val failed = assertIs<ContentUiState.Error>(awaitItem())
             assertEquals(DomainError.Network.toUserMessage(), failed.message)
         }
     }
@@ -98,16 +101,16 @@ class HomeViewModelTest {
         val viewModel = viewModel()
 
         viewModel.state.test {
-            assertEquals(HomeUiState.Loading, awaitItem())
-            assertIs<HomeUiState.Error>(awaitItem(), "first load should fail")
+            assertEquals(ContentUiState.Loading, awaitItem())
+            assertIs<ContentUiState.Error>(awaitItem(), "first load should fail")
 
             repository.failure = null
             repository.items = listOf(Item(id = "1", title = "Recovered", subtitle = "sub"))
             viewModel.load()
 
-            assertEquals(HomeUiState.Loading, awaitItem(), "reload should show loading again")
-            val recovered = assertIs<HomeUiState.Content>(awaitItem())
-            assertEquals(listOf("Recovered"), recovered.items.map { it.title })
+            assertEquals(ContentUiState.Loading, awaitItem(), "reload should show loading again")
+            val recovered = assertIs<ContentUiState.Content<List<Item>>>(awaitItem())
+            assertEquals(listOf("Recovered"), recovered.data.map { it.title })
         }
     }
 }

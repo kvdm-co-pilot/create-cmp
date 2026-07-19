@@ -254,10 +254,11 @@ const RENAME_MAP = [
   [`${SOURCE_F}GoldenTreeTest`, `${F}GoldenTreeTest`],
   [`${SOURCE_F}Screen`, `${F}Screen`],
   [`${SOURCE_F}ViewModel`, `${F}ViewModel`],
-  [`${SOURCE_F}UiState`, `${F}UiState`],
   [`${SOURCE_f}_title`, `${f}_title`],
   [`${SOURCE_f}_error`, `${f}_error`],
   [`${SOURCE_f}_empty`, `${f}_empty`],
+  [`${SOURCE_f}_loading`, `${f}_loading`],
+  [`${SOURCE_f}_retry`, `${f}_retry`],
   [`Fake${SOURCE_E}Repository`, `Fake${E}Repository`],
   [`${SOURCE_E}RepositoryImpl`, `${E}RepositoryImpl`],
   [`${SOURCE_E}Repository`, `${E}Repository`],
@@ -377,7 +378,7 @@ function defaultSpec() {
   error message is shown (\`${f}_error\`) and no ${f} are visible — the copy is mapped in
   presentation from the failure's \`DomainError\` kind, never a raw exception message.
 - **${F_UPPER}-04** — Given a load has failed, When the data source recovers and the user
-  triggers a reload, Then the error clears and the ${f} render.
+  triggers a reload (\`${f}_retry\`), Then the error clears and the ${f} render.
 - **${F_UPPER}-05** — Given ${f} are listed, When the user taps an item, Then the app navigates
   to that item's detail.
 - **${F_UPPER}-06** — Given the ${F} screen renders, When its structure is inspected, Then the
@@ -415,11 +416,14 @@ function wrapScreenInBaseScreen(content, relPathForErrors) {
   );
   lines.splice(themeImportIdx, 0, importLine);
 
-  // 2. Root container start: the exemplar's body root is a top-level `    Column(`.
-  const rootIdx = lines.findIndex((l) => l === "    Column(");
+  // 2. Root container start: the exemplar's body root is a top-level `    ScreenColumn(`
+  //    call (the component-vocabulary rewrite — see docs/proposals/component-system-deep-dive.md
+  //    §5). The tag literal inside the call (`screenTag = "home"`) is renamed separately by
+  //    RENAME_MAP, so match on the call shape only, not the full line.
+  const rootIdx = lines.findIndex((l) => /^ {4}ScreenColumn\(/.test(l));
   if (rootIdx === -1) {
     die(
-      `root "    Column(" not found in ${relPathForErrors} — the ${SOURCE_F}Screen exemplar drifted ` +
+      `root "    ScreenColumn(" not found in ${relPathForErrors} — the ${SOURCE_F}Screen exemplar drifted ` +
         "from the shape this stamper wraps in BaseScreen.",
     );
   }

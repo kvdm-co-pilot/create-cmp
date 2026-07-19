@@ -11,7 +11,7 @@
   error message is shown (`home_error`) and no items are visible — the copy is mapped in
   presentation from the failure's `DomainError` kind, never a raw exception message.
 - **HOME-04** — Given a load has failed, When the data source recovers and the user triggers a
-  reload, Then the error clears and the items render.
+  reload (`home_retry`), Then the error clears and the items render.
 - **HOME-05** — Given items are listed, When the user taps an item, Then the app navigates to
   that item's detail.
 - **HOME-06** — Given the Home screen renders, When its structure is inspected, Then the

@@ -1,28 +1,19 @@
 package __PACKAGE__.presentation.home
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import __PACKAGE__.presentation.components.AppHeader
+import __PACKAGE__.presentation.components.ContentStateContainer
+import __PACKAGE__.presentation.components.ListItemCard
+import __PACKAGE__.presentation.components.ScreenColumn
 import __PACKAGE__.presentation.theme.__THEME_PREFIX__Tokens
-import __PACKAGE__.presentation.theme.designToken
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -32,74 +23,17 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .designToken(
-                tokens = listOf("PaddingPage"),
-                resolved = mapOf("padding" to "16dp"),
-            )
-            .padding(__THEME_PREFIX__Tokens.PaddingPage),
-    ) {
-        Text(
-            text = "Home",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.semantics { testTag = "home_title" }.padding(bottom = 12.dp),
-        )
-
-        // Exhaustive fold over the sealed state — no boolean juggling, no unreachable
-        // combinations. Each branch owns exactly one UI.
-        when (val s = state) {
-            HomeUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-
-            is HomeUiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = s.message,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.semantics { testTag = "home_error" },
-                )
-            }
-
-            HomeUiState.Empty -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = "Nothing here yet.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.semantics { testTag = "home_empty" },
-                )
-            }
-
-            is HomeUiState.Content -> LazyColumn(verticalArrangement = Arrangement.spacedBy(__THEME_PREFIX__Tokens.GapCard)) {
-                items(s.items, key = { it.id }) { item ->
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = MaterialTheme.shapes.medium,
-                        tonalElevation = __THEME_PREFIX__Tokens.ElevationCard,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .designToken(
-                                tokens = listOf("RadiusCard", "ElevationCard", "PaddingCard"),
-                                resolved = mapOf(
-                                    "radius" to "16dp",
-                                    "elevation" to "2dp",
-                                    "padding" to "16dp",
-                                    "color" to "#FFFFFFFF",
-                                ),
-                            )
-                            .clickable { onItemClick(item.id) },
-                    ) {
-                        Column(Modifier.padding(__THEME_PREFIX__Tokens.PaddingCard)) {
-                            Text(item.title, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                item.subtitle,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+    ScreenColumn(screenTag = "home") {
+        AppHeader(title = "Home", screenTag = "home")
+        ContentStateContainer(state = state, screenTag = "home", onRetry = viewModel::load) { items ->
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(__THEME_PREFIX__Tokens.GapCard)) {
+                items(items, key = { it.id }) { item ->
+                    ListItemCard(
+                        title = item.title,
+                        subtitle = item.subtitle,
+                        onClick = { onItemClick(item.id) },
+                        modifier = Modifier.semantics { testTag = "home_item_${item.id}" },
+                    )
                 }
             }
         }

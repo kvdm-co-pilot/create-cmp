@@ -47,3 +47,17 @@
   it renders, Then its content is composed inside `BaseScreen` — a bare destination that
   never touches inset APIs still renders under the status bar, which SHELL-03 alone cannot
   catch.
+
+## Component vocabulary
+
+> Component *contracts* — the shared state/a11y behavior every screen inherits from
+> `presentation/components/*.kt` (the governed `components` artifact). Feature clauses
+> (e.g. `HOME-NN`) keep citing feature behavior; these clauses are covered once, here.
+
+- **COMP-01** — Given any screen with a data-backed state, When it renders, Then
+  loading/error/empty are presented by `ContentStateContainer` with tags
+  `<screen>_loading` / `<screen>_error` / `<screen>_empty`.
+- **COMP-02** — Given a recoverable load failure and a retry handler, When the error state
+  renders, Then a `<screen>_retry` control of at least 48 dp is present.
+- **COMP-03** — Given any interactive registry component, When it renders, Then its
+  pointer target is at least 48×48 dp.
