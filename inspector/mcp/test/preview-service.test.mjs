@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import http from "node:http";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   summarizeTree,
   diffScreenTrees,
@@ -18,11 +18,19 @@ import {
 } from "../src/lib/preview-service.mjs";
 import { resetApprovalsBridgeCache } from "../src/lib/approvals-bridge.mjs";
 import { resetCommentsBridgeCache } from "../src/lib/comments-bridge.mjs";
+import { resetReceiptBridgeCache } from "../src/lib/receipt-bridge.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REAL_APPROVALS_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "approvals.mjs");
+// approvals.mjs statically imports arch-doc.mjs (AD-1 Wave B — the
+// `architecture` artifact's doc-hashing basis) — every fixture below that
+// copies the REAL approvals.mjs must ship this alongside it, or the dynamic
+// import fails at load time (module not found), not at any
+// architecture-artifact-specific call site.
+const REAL_ARCH_DOC_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "arch-doc.mjs");
 const REAL_APP_BASE_SPEC = path.join(HERE, "..", "..", "..", "template", "specs", "app-base.spec.md");
 const REAL_ARCHITECTURE_DOC = path.join(HERE, "..", "..", "..", "template", "docs", "ARCHITECTURE.md");
+const REAL_INPUTS_HASH_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "inputs-hash.mjs");
 const FIXTURE_COMMENTS_LIB = path.join(HERE, "fixtures", "fixture-comments-lib.mjs");
 const FIXTURE_APPROVALS_LIB = path.join(HERE, "fixtures", "fixture-approvals-lib.mjs");
 
@@ -69,6 +77,7 @@ function makeApprovalsFixtureProject() {
   const libDir = path.join(root, "qa", "lib");
   fs.mkdirSync(libDir, { recursive: true });
   fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+  fs.copyFileSync(REAL_ARCH_DOC_LIB, path.join(libDir, "arch-doc.mjs"));
   return root;
 }
 
@@ -112,6 +121,7 @@ function makeComponentsFixtureProject() {
   const libDir = path.join(root, "qa", "lib");
   fs.mkdirSync(libDir, { recursive: true });
   fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+  fs.copyFileSync(REAL_ARCH_DOC_LIB, path.join(libDir, "arch-doc.mjs"));
   return { root, componentsDir };
 }
 
@@ -123,10 +133,14 @@ function makeComponentsFixtureProject() {
  * specs/app-base.spec.md (so deriveLayerRules parses the actual ARCH-09
  * clause, not a paraphrase), the REAL docs/ARCHITECTURE.md (so the doc-mirror
  * sections are exercised against the real document, not a fixture stand-in),
- * and the REAL qa/lib/approvals.mjs (so approve/drift wiring hits the actual
- * governed-artifact registry).
+ * the REAL qa/lib/approvals.mjs (so approve/drift wiring hits the actual
+ * governed-artifact registry), and a REAL evidence receipt (Wave C item 1):
+ * qa/lib/inputs-hash.mjs is the actual template copy, and qa/evidence/latest.json's
+ * inputs.hash is computed with it AFTER every fixture file above is written —
+ * so the receipt genuinely attests this exact tree, the same way a real
+ * `node qa/verify.mjs` run would, instead of a hand-picked hash string.
  */
-function makeArchitectureFixtureProject() {
+async function makeArchitectureFixtureProject() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-architecture-"));
   fs.mkdirSync(path.join(root, "composeApp", "src"), { recursive: true });
   fs.writeFileSync(path.join(root, "composeApp", "build.gradle.kts"), 'android {\n  namespace = "com.acme.demo"\n}\n');
@@ -177,6 +191,34 @@ function makeArchitectureFixtureProject() {
   const libDir = path.join(root, "qa", "lib");
   fs.mkdirSync(libDir, { recursive: true });
   fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+  fs.copyFileSync(REAL_ARCH_DOC_LIB, path.join(libDir, "arch-doc.mjs"));
+  fs.copyFileSync(REAL_INPUTS_HASH_LIB, path.join(libDir, "inputs-hash.mjs"));
+
+  // The evidence receipt: computed with the REAL algorithm over the tree as
+  // it stands right now (every file above already written) — bit-for-bit the
+  // same inputsHash `node qa/verify.mjs` would have produced.
+  const { computeInputsHash } = await import(pathToFileURL(path.join(libDir, "inputs-hash.mjs")).href);
+  const { hash: inputsHash, fileCount } = computeInputsHash(root);
+  const evidenceDir = path.join(root, "qa", "evidence");
+  fs.mkdirSync(evidenceDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(evidenceDir, "latest.json"),
+    JSON.stringify(
+      {
+        schema: "cmp-evidence/1",
+        profile: "local",
+        verdict: "PASS",
+        commit: { sha: "abc123def456", dirty: [] },
+        inputs: { hash: inputsHash, fileCount },
+        steps: [{ name: "conformance", verdict: "PASS", durationMs: 4210 }],
+        artifacts: [],
+        toolVersions: { node: process.version, platform: `${process.platform}-${process.arch}` },
+        generatedAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(), // 90 minutes ago
+      },
+      null,
+      2,
+    ),
+  );
 
   return { root, violatingFile, specFile: path.join(specsDir, "app-base.spec.md") };
 }
@@ -187,8 +229,8 @@ function archTopStatus(page) {
   return m ? m[0] : "";
 }
 
-test("service: Architecture tab — boots against a real layer tree + the REAL app-base.spec.md/ARCHITECTURE.md/approvals library; doc-shaped structure, a deliberate ARCH-09 violation with file:line, then approve + drift", async () => {
-  const { root: projectDir, violatingFile, specFile } = makeArchitectureFixtureProject();
+test("service: Architecture tab — boots against a real layer tree + the REAL app-base.spec.md/ARCHITECTURE.md/approvals/inputs-hash libraries; doc-shaped structure, a deliberate ARCH-09 violation with file:line, a real receipt's per-clause status + the advisory label, then approve + drift", async () => {
+  const { root: projectDir, violatingFile, specFile } = await makeArchitectureFixtureProject();
   const service = createPreviewService({ projectDir, port: 19891, hot: false, runRender: async () => {} });
   try {
     const st = await service.start();
@@ -218,6 +260,20 @@ test("service: Architecture tab — boots against a real layer tree + the REAL a
     assert.match(page, /ItemRepositoryImpl\.kt:4/, "the violating import is on line 4 of the fixture file");
     assert.doesNotMatch(page, /unchecked, not clean/, "the real spec resolved real rules — violations were actually checked");
 
+    // 3b. Wave C item 1: a real receipt (qa/evidence/latest.json, inputsHash
+    //     computed with the REAL qa/lib/inputs-hash.mjs over this exact tree)
+    //     renders each ARCH-* clause's last-receipt status — the real
+    //     "conformance" step verdict, not stale (the tree hasn't changed
+    //     since the receipt was written).
+    assert.match(page, /class="receipt-badge receipt-pass"[^>]*>conformance: PASS</, "ARCH clause rows show the real receipt's conformance verdict");
+    assert.match(page, /class="receipt-age">1h ago</, "receipt age is computed from the real generatedAt");
+    assert.doesNotMatch(page, /stale receipt/, "the tree hasn't changed since the receipt was written — not stale");
+
+    // Wave C item 2: the console's own JS import-scan (the dependency graph
+    // above) is labeled advisory, next to the graph it draws — the Kotlin
+    // conformance gates + the receipt are the law, not this live scan.
+    assert.match(page, /class="dep-advisory">Advisory preview; the lane is the law/);
+
     // Not yet approved -> an honest "not yet approved" badge at the top of the tab.
     assert.match(archTopStatus(page), /badge-unreviewed/);
 
@@ -240,11 +296,20 @@ test("service: Architecture tab — boots against a real layer tree + the REAL a
     page = await (await fetch(st.url)).text();
     assert.match(archTopStatus(page), /drift &middot; architecture artifact changed since approval/);
 
+    // 5b. The same edit that drifted the approval also changed the verified
+    //     surface's REAL inputsHash — the committed receipt now attests a
+    //     tree that no longer exists. The clause rows must say so honestly
+    //     ("stale receipt"), never keep presenting the old PASS as current.
+    assert.doesNotMatch(page, /class="receipt-badge receipt-pass"/, "a stale receipt must not render the pass-colored badge as if it were current");
+    assert.match(page, /class="receipt-badge receipt-stale"[^>]*>stale receipt</);
+    assert.match(page, /conformance was PASS 1h ago &mdash; source changed since/);
+
     // Sanity: the violating file really is where the test thinks it is.
     assert.ok(fs.existsSync(violatingFile));
   } finally {
     service.stop();
     resetApprovalsBridgeCache(projectDir);
+    resetReceiptBridgeCache(projectDir);
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });

@@ -779,6 +779,14 @@ function platformViewHtml(pv) {
  * shown as "unchecked", never silently reported as "clean".
  * @param {object} graph architecture.mjs's getDependencyGraph() result
  */
+// Wave C item 2 (architecture-document-standard.md §6's risk row): the console's
+// dependency graph is a live JS import scan between verify-lane runs — real,
+// but not the gate. It must never be read as a verdict in its own right, so
+// every rendered graph carries this line in the section's own vocabulary,
+// right under the graph itself (never a top-of-tab banner — that visual
+// weight is reserved for the artifact's own approval status).
+const DEP_GRAPH_ADVISORY_HTML = `<p class="dep-advisory">Advisory preview; the lane is the law &mdash; this is a live scan of real imports between <code>node qa/verify.mjs</code> runs, not a verdict. The Kotlin conformance gates (and the receipt they write, below) are authoritative.</p>`;
+
 function dependencyGraphHtml(graph) {
   if (!graph || !graph.available) {
     return `<div class="empty">
@@ -787,7 +795,8 @@ function dependencyGraphHtml(graph) {
     </div>`;
   }
   if (graph.edges.length === 0) {
-    return `<p class="empty-inline">no cross-layer imports observed under <code>${esc(graph.appPackage)}</code></p>`;
+    return `<p class="empty-inline">no cross-layer imports observed under <code>${esc(graph.appPackage)}</code></p>
+${DEP_GRAPH_ADVISORY_HTML}`;
   }
   const rows = graph.edges
     .map((e) => {
@@ -821,7 +830,8 @@ ${graph.violations
   return `  <ul class="dep-edges">
 ${rows}
   </ul>
-${violationsHtml}`;
+${violationsHtml}
+${DEP_GRAPH_ADVISORY_HTML}`;
 }
 
 /** The architecture artifact's own approval badge — same visual vocabulary as componentApprovalBadgeHtml, single-file so no per-file mtime drift is needed. */
@@ -877,7 +887,56 @@ ${boxes}
 ${others}`;
 }
 
-function governedContractHtml(gc) {
+/** How long ago, in the coarse "Xm/Xh/Xd ago" shape used across the console's badges. `null`/NaN renders as "age unknown" rather than a fabricated number. */
+function formatReceiptAge(ageMs) {
+  if (typeof ageMs !== "number" || Number.isNaN(ageMs)) return "age unknown";
+  if (ageMs < 60_000) return "just now";
+  const mins = Math.floor(ageMs / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+/**
+ * Per-ARCH-clause receipt status (architecture-document-standard.md §6, Wave C
+ * item 1): the last verify-lane receipt's "conformance" step — the
+ * *ArchitectureConformanceTest gate that enforces the ARCH-* clauses (see
+ * receipt-bridge.mjs's getLastReceipt) — plus the receipt's age and whether
+ * its inputsHash still matches the current tree. Scoped to ARCH-* clauses
+ * only by the caller (governedContractHtml): SHELL-* clauses are enforced by
+ * a different gate (a11y/e2eSmoke) this one receipt step doesn't attribute
+ * per-clause, so they render without this badge rather than borrow a status
+ * that isn't theirs.
+ *
+ * Never fabricates: no receipt, no conformance step, or a stale inputsHash
+ * all say so explicitly — a stale receipt is labeled "stale receipt", never
+ * presented as a live PASS.
+ * @param {object|null|undefined} lastReceipt receipt-bridge.mjs's getLastReceipt() result
+ */
+function clauseReceiptStatusHtml(lastReceipt) {
+  if (!lastReceipt || !lastReceipt.available) {
+    const reason = (lastReceipt && lastReceipt.reason) || "no receipt at qa/evidence/latest.json — run node qa/verify.mjs";
+    return `<span class="receipt-badge receipt-none" title="${escAttr(reason)}">no receipt yet &mdash; run node qa/verify.mjs</span>`;
+  }
+  if (!lastReceipt.conformance) {
+    return `<span class="receipt-badge receipt-none">last receipt has no conformance step &mdash; run node qa/verify.mjs</span>`;
+  }
+  const age = formatReceiptAge(lastReceipt.ageMs);
+  const generatedTitle = lastReceipt.generatedAt ? ` title="generated ${escAttr(lastReceipt.generatedAt)}"` : "";
+  if (lastReceipt.stale) {
+    return `<span class="receipt-badge receipt-stale"${generatedTitle}>stale receipt</span><span class="receipt-age">conformance was ${esc(lastReceipt.conformance.verdict)} ${age} &mdash; source changed since</span>`;
+  }
+  const verdictClass = lastReceipt.conformance.verdict === "PASS" ? "receipt-pass" : lastReceipt.conformance.verdict === "FAIL" ? "receipt-fail" : "receipt-none";
+  const freshnessNote = lastReceipt.stale === null ? " &middot; freshness unverified" : "";
+  return `<span class="receipt-badge ${verdictClass}"${generatedTitle}>conformance: ${esc(lastReceipt.conformance.verdict)}</span><span class="receipt-age">${age}${freshnessNote}</span>`;
+}
+
+/**
+ * @param {object} gc getGovernedContract() result
+ * @param {object|null|undefined} [lastReceipt] receipt-bridge.mjs's getLastReceipt() result. Omitted (callers that don't wire it) is treated exactly like an explicit `{available: false}` — every ARCH-* clause row still gets the honest "no receipt yet" badge, never silence that could be misread as "unattested" rather than "no receipt at all".
+ */
+function governedContractHtml(gc, lastReceipt) {
   if (!gc || !gc.available) {
     return `<div class="empty">
       <p>No governed contract available.</p>
@@ -887,9 +946,11 @@ function governedContractHtml(gc) {
   const items = gc.clauses
     .map((c) => {
       const prose = esc(c.prose);
+      const receiptStatus = /^ARCH-/i.test(c.id) ? clauseReceiptStatusHtml(lastReceipt) : "";
       return `      <li class="clause${c.withdrawn ? " withdrawn" : ""}">
         <span class="clause-id"><code>${esc(c.id)}</code></span>
         <span class="clause-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</span>
+        ${receiptStatus}
         ${commentControlHtml({ type: "spec-line", file: `specs/${gc.file}`, clauseId: c.id })}
       </li>`;
     })
@@ -926,9 +987,14 @@ ${items}
  * `meta.approval` (optional) is the "architecture" governed artifact's own
  * live status record (approvals-bridge.mjs), rendered as a badge + the same
  * genesis/steward banner the Approvals tab's rows use — reused via
- * artifactBannerHtml, not re-implemented.
+ * artifactBannerHtml, not re-implemented. `meta.lastReceipt` (optional,
+ * receipt-bridge.mjs's getLastReceipt() result) drives each ARCH-* clause
+ * row's last-receipt status in the governed contract (Wave C item 1) — an
+ * omitted `meta.lastReceipt` is treated exactly like "no receipt exists",
+ * so every ARCH-* clause row still shows the honest "no receipt yet" badge
+ * rather than silently rendering as if receipts don't apply here.
  * @param {{layerMap: object, governedContract: object, featureShape: object, dependencyGraph?: object, doc?: object}} data
- * @param {{approval?: object|null}} [meta]
+ * @param {{approval?: object|null, lastReceipt?: object|null}} [meta]
  */
 export function architectureTabHtml(data, meta = {}) {
   const { layerMap, governedContract, featureShape, dependencyGraph, doc } = data || {};
@@ -958,7 +1024,7 @@ ${layerMapHtml(layerMap)}
     <h4>Dependency arrows (observed from real imports)</h4>
 ${dependencyGraphHtml(dependencyGraph)}
     <h4>The governed contract</h4>
-${governedContractHtml(governedContract)}
+${governedContractHtml(governedContract, meta.lastReceipt)}
   </section>
   <section class="arch-section" id="arch-runtime">
     <h3>6. Runtime view</h3>

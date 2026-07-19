@@ -46,6 +46,7 @@ import {
 } from "./comments-bridge.mjs";
 import { getSpecsData } from "./specs.mjs";
 import { getArchitectureData } from "./architecture.mjs";
+import { getLastReceipt } from "./receipt-bridge.mjs";
 import { getComponentsData } from "./components.mjs";
 import { getVariantsData } from "./variants.mjs";
 import { getComponentDriftInfo } from "./component-drift.mjs";
@@ -330,6 +331,13 @@ export function galleryHtml(state) {
   .cov-yes { background: #E8F7EF; color: #16A34A; }
   .cov-no { background: #FDECEC; color: #DC2626; }
   .cov-na { background: #F3F4F6; color: #9CA3AF; }
+  /* Wave C item 1: per-ARCH-clause last-receipt status (governed contract). */
+  .receipt-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; flex: 0 0 auto; white-space: nowrap; }
+  .receipt-pass { background: #E8F7EF; color: #16A34A; }
+  .receipt-fail { background: #FDECEC; color: #DC2626; }
+  .receipt-stale { background: #FEF6E7; color: #B45309; }
+  .receipt-none { background: #F3F4F6; color: #9CA3AF; }
+  .receipt-age { font-size: 10px; color: #9CA3AF; white-space: nowrap; }
   .arch-section { margin-bottom: 28px; }
   .arch-section h3 { margin: 0 0 10px; font-size: 14px; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px; }
   .arch-section h4 { margin: 16px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6B7280; }
@@ -354,6 +362,8 @@ export function galleryHtml(state) {
   .dep-violation-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .dep-violation-item { font-size: 12px; padding: 6px 10px; border: 1px solid #DC2626; border-radius: 8px; background: #FEF2F2;
                          display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  /* Wave C item 2: "advisory preview; the lane is the law" — a caption under the graph, not a banner. */
+  .dep-advisory { font-size: 11px; color: #9CA3AF; margin: 8px 0 0; }
   .layer-map { display: flex; flex-wrap: wrap; gap: 14px; }
   .layer-box { flex: 1 1 220px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
   .layer-box.layer-empty { opacity: .55; border-style: dashed; }
@@ -1529,10 +1539,11 @@ export function createPreviewService(opts) {
     const url = new URL(req.url, `http://127.0.0.1:${port}`);
     try {
       if (url.pathname === "/") {
-        const [approvals, designSystem, comments] = await Promise.all([
+        const [approvals, designSystem, comments, lastReceipt] = await Promise.all([
           approvalStatusSnapshot(),
           getDesignSystemData(),
           commentsSnapshot(),
+          getLastReceipt(projectDir),
         ]);
         const specs = getSpecsData(projectDir);
         const architecture = getArchitectureData(projectDir);
@@ -1563,8 +1574,12 @@ export function createPreviewService(opts) {
         // AD-1: the "architecture" governed artifact's own live status record
         // (same lookup pattern as componentsApprovalRecord above) — drives the
         // Architecture tab's own approval badge + genesis/steward banner.
+        // Wave C item 1: the last verify-lane receipt (receipt-bridge.mjs),
+        // read fresh every request — drives each ARCH-* clause row's
+        // last-receipt status in the governed contract.
         const architectureMeta = {
           approval: approvals.available ? approvals.statuses.find((s) => s.id === "architecture") || null : null,
+          lastReceipt,
         };
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(

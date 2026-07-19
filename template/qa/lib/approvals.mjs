@@ -23,6 +23,21 @@
 //      top-level `exemplarFeature` config key. Absent or corrupt is TOLERATED
 //      (treated as empty / all-unreviewed / default exemplar) — this ledger must
 //      never crash the verify lane or the stamper.
+//
+//      Ledger migration note (architecture-document-standard.md §4.4): there is no
+//      schema-version bump or migration step anywhere in this file today (schema
+//      stays `cmp-approvals/1`, additive-only — see GENESIS-FLOW-DESIGN.md §2's
+//      express-lane note) — a widened hash BASIS (e.g. the `architecture` artifact
+//      growing from spec-only to spec+stripped-doc) is handled the same honest way
+//      every other content change is: `resolveArtifactStatus` recomputes on every
+//      read and compares against the STORED hash. An approval recorded under the
+//      old (narrower) basis simply stops matching the new recompute the first time
+//      it's read after this change ships, and correctly reports
+//      "changed-since-approval" — never a silent, un-re-earned "approved". This is
+//      not a special case: it is the SAME mechanism that already invalidates an
+//      approval when the governed files themselves change; widening what counts as
+//      "the governed files" for one artifact is just another such change. No
+//      separate migration code path exists or is needed.
 //   3. The GATE (`evaluateApprovalsGate`) — combines registry + state into one
 //      per-artifact status (unreviewed / approved / changed-since-approval /
 //      reopened) and one aggregate verdict (PASS/FAIL/SKIP) for the verify-lane step
@@ -37,6 +52,8 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+
+import { ARCH_DOC_REL_PATH, stripGeneratedSections } from "./arch-doc.mjs";
 
 export const APPROVALS_REL_PATH = "qa/approvals.json";
 export const APPROVALS_SCHEMA = "cmp-approvals/1";
@@ -253,8 +270,12 @@ export function listGovernedArtifacts(root) {
 
   artifacts.push({
     id: "architecture",
-    label: `Architecture + structure (${ARCHITECTURE_SPEC_REL})`,
-    files: [ARCHITECTURE_SPEC_REL],
+    label: `Architecture + structure (${ARCHITECTURE_SPEC_REL} + ${ARCH_DOC_REL_PATH}, generated sections stripped)`,
+    // Hashed via hashArchitectureArtifact (spec bytes + stripped-doc content),
+    // NOT the generic hashArtifactFiles — this list is still the artifact's
+    // expected-files surface (missing-file refusal messages, "what governs
+    // this" bookkeeping), just not what gets hashed raw. See computeArtifactHash.
+    files: [ARCHITECTURE_SPEC_REL, ARCH_DOC_REL_PATH],
     complete: true,
   });
 
@@ -339,6 +360,81 @@ export function hashArtifactFiles(root, relFiles) {
     overall.update(`${relPath}\0${fileSha}\n`);
   }
   return { hash: overall.digest("hex"), fileCount: present.length, missing };
+}
+
+/**
+ * The `architecture` artifact's hash basis (docs/proposals/architecture-document-
+ * standard.md §4.4): `${ARCHITECTURE_SPEC_REL}`'s raw bytes + `${ARCH_DOC_REL_PATH}`
+ * with every `cmp:generated` marker's BODY stripped — `arch-doc.mjs`'s
+ * `stripGeneratedSections` is the ONE definition of "generated" for that doc,
+ * reused here rather than forked, so a new/changed marker id is understood
+ * identically by the regenerator and this hash.
+ *
+ * The doc's content is also normalized `\r\n` -> `\n` before hashing (spec
+ * files are hashed as raw bytes like every other artifact — a checkout-induced
+ * EOL difference in a Markdown prose doc is exactly the kind of accident that
+ * must never read as "authored drift", but the .spec.md files this repo ships
+ * are LF already and their exact bytes are what the human actually reviewed).
+ *
+ * Same row-hash shape as `hashArtifactFiles` (`path\0sha256(bytes)\n`, rows
+ * sorted by path) so the two schemes read the same way in a hex dump — this is
+ * a SEPARATE function (not a generic `hashArtifactFiles` call) only because the
+ * doc's bytes must be transformed (stripped + normalized) before hashing, never
+ * hashed raw.
+ *
+ * Regenerating a marker section (`node qa/arch-doc.mjs`) changes only the
+ * stripped-away body, so this hash does not move. Editing authored prose
+ * anywhere else in the doc — including adding, removing, or reordering a
+ * `cmp:generated` marker itself (structural, not generated content) — changes
+ * it, same as editing the spec.
+ * @param {string} root
+ * @returns {{ hash: string, fileCount: number, missing: string[] }}
+ */
+export function hashArchitectureArtifact(root) {
+  const rows = [];
+  const missing = [];
+
+  try {
+    const specBytes = fs.readFileSync(path.join(root, ARCHITECTURE_SPEC_REL));
+    rows.push([ARCHITECTURE_SPEC_REL, createHash("sha256").update(specBytes).digest("hex")]);
+  } catch {
+    missing.push(ARCHITECTURE_SPEC_REL);
+  }
+
+  try {
+    const docRaw = fs.readFileSync(path.join(root, ARCH_DOC_REL_PATH), "utf8");
+    // Normalize line endings BEFORE stripping: the marker grammar
+    // (`arch-doc.mjs`'s MARKER_BLOCK_RE) matches a literal `\n` right after
+    // `-->`, so CRLF content would fail to match at all and nothing would be
+    // stripped — normalize first so the strip is EOL-independent, same as the
+    // hash itself.
+    const docNormalized = docRaw.replace(/\r\n/g, "\n");
+    const docStripped = stripGeneratedSections(docNormalized);
+    rows.push([ARCH_DOC_REL_PATH, createHash("sha256").update(docStripped, "utf8").digest("hex")]);
+  } catch {
+    missing.push(ARCH_DOC_REL_PATH);
+  }
+
+  rows.sort((a, b) => a[0].localeCompare(b[0]));
+  const overall = createHash("sha256");
+  for (const [relPath, fileSha] of rows) {
+    overall.update(`${relPath}\0${fileSha}\n`);
+  }
+  return { hash: overall.digest("hex"), fileCount: rows.length, missing };
+}
+
+/**
+ * Recompute one artifact's hash — `hashArchitectureArtifact` for `architecture`
+ * (spec + stripped doc, its own basis), `hashArtifactFiles(root, artifact.files)`
+ * for every other artifact (raw file bytes). The ONE dispatch point
+ * `resolveArtifactStatus`/`approveArtifact` both call, so the two never
+ * disagree about what "the architecture artifact's hash" means.
+ * @param {string} root
+ * @param {{id: string, files: string[]}} artifact
+ * @returns {{ hash: string, fileCount: number, missing: string[] }}
+ */
+function computeArtifactHash(root, artifact) {
+  return artifact.id === "architecture" ? hashArchitectureArtifact(root) : hashArtifactFiles(root, artifact.files);
 }
 
 // ── State (qa/approvals.json) ─────────────────────────────────────────────────
@@ -459,7 +555,7 @@ function shortHash(hash) {
  * @returns {{id: string, label: string, status: string, hash: string, storedHash: (string|null), approvedAt: (string|null), fileCount: number, missing: string[], resolvable: boolean, mode?: string, reopenedAt?: string}}
  */
 export function resolveArtifactStatus(root, artifact, storedRecord) {
-  const recomputed = hashArtifactFiles(root, artifact.files);
+  const recomputed = computeArtifactHash(root, artifact);
   const resolvable = recomputed.fileCount > 0 && artifact.complete !== false;
 
   if (storedRecord && storedRecord.status === "reopened") {
@@ -550,7 +646,7 @@ export function approveArtifact(root, artifactId, options = {}) {
     const known = registry.map((a) => a.id).join(", ") || "(none — no governed artifacts resolved in this project)";
     return { ok: false, reason: `unknown artifact "${artifactId}" — valid ids: ${known}` };
   }
-  const resolved = hashArtifactFiles(root, artifact.files);
+  const resolved = computeArtifactHash(root, artifact);
   if (artifact.complete === false) {
     return {
       ok: false,

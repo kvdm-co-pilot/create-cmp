@@ -20,6 +20,17 @@ invariants the conformance gates enforce.
 
 ## Architecture (violations will be named by the conformance gates)
 
+[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) is the **doc of record** — purpose & quality
+goals, constraints, system context, the platform/deployment view, the full building-block layer
+model, runtime scenarios, every crosscutting policy, and the ADR index + domain glossary. Every
+normative sentence in it carries a tier tag (`[enforced: CLAUSE-ID]` / `[governed]` /
+`[advisory]`), and its `cmp:generated` sections (expect/actual table, layer file inventory, ADR
+index, glossary) are regenerated from a real tree walk, never hand-maintained — `node
+qa/arch-doc.mjs` refreshes them, `node qa/arch-doc.mjs --check` (also a `verify.mjs` lane step)
+fails the lane if they've drifted from the tree. The governed `architecture` artifact (below)
+hashes this doc alongside `specs/app-base.spec.md`, so approving it is consent to *this document*,
+not a spec file no one reads. The bullets below are a quick-reference summary of what it says.
+
 - **Layers:** `presentation` → `domain` ← `data`. `domain` imports nothing app-internal;
   `presentation` never imports `data`. Koin wires implementations in `di/`.
 - **Every screen:** compose the registry vocabulary (`presentation/components/*.kt` —
@@ -74,10 +85,15 @@ next is written in, so on a fresh app each step is a conversation that *ends* in
 approval (the genesis walk — six conversations):
 
 0. **Intent** — `specs/intent.md`, the root brief everything else traces to (purpose /
-   audience / platforms / brand feel / reference apps / first screens). Filled by the
-   `cmp-new` interview; the seed's placeholder prose is clearly marked unfilled.
+   audience / platforms / brand feel / reference apps / first screens / **glossary**). Filled
+   by the `cmp-new` interview; the seed's placeholder prose is clearly marked unfilled. Its
+   `## Glossary` section is lifted verbatim into `docs/ARCHITECTURE.md` §8 — write it there in
+   the exact form you want published.
 1. **Design system** — `presentation/theme/Theme.kt`, `presentation/theme/Tokens.kt`
-2. **Architecture + structure** — `specs/app-base.spec.md`
+2. **Architecture + structure** — `specs/app-base.spec.md` **and**
+   [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) (its `cmp:generated` sections stripped
+   before hashing, so a mechanical regeneration never invalidates the approval — only an
+   authored-prose edit does)
 3. **Components** — every `presentation/components/*.kt` (a dynamic, sorted glob).
    Once approved, the registry is law: adding or changing a common component
    invalidates the approval until a human re-approves.

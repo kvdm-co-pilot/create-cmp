@@ -39,3 +39,12 @@ interaction patterns this app should be judged against ("closer to X than Y").
 _not yet captured — filled by the cmp-new interview._ What are the first 2–4 screens you see
 in your head? This grounds conversation 4 — the exemplar feature is the user's *actual* first
 feature, not a generic placeholder.
+
+## Glossary
+
+_not yet captured — filled by the cmp-new interview._ The domain nouns specific to this app —
+one line each, in the app's own vocabulary, not generic template terms (e.g. "**Trip** — a
+single planned outing with an itinerary and companions", not "**Item**"). Usually falls out of
+the Purpose/First screens answers above; confirm the list with the human rather than guessing.
+This section is lifted verbatim into `docs/ARCHITECTURE.md` §8 — write it in the form you want
+published: a Markdown bullet list, `**Term** — definition` per line.

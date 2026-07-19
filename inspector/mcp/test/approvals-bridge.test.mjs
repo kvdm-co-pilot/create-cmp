@@ -18,6 +18,12 @@ import {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REAL_APPROVALS_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "approvals.mjs");
+// approvals.mjs statically imports arch-doc.mjs (AD-1 Wave B — the
+// `architecture` artifact's doc-hashing basis) — any fixture that copies the
+// REAL approvals.mjs must ship this alongside it, or the dynamic import in
+// approvals-bridge.mjs fails at load time (module not found), not at any
+// architecture-artifact-specific call site.
+const REAL_ARCH_DOC_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "arch-doc.mjs");
 const FIXTURE_APPROVALS_LIB = path.join(HERE, "fixtures", "fixture-approvals-lib.mjs");
 
 /**
@@ -49,6 +55,7 @@ function makeFixtureProject({ withApprovalsLib = true } = {}) {
     const libDir = path.join(root, "qa", "lib");
     fs.mkdirSync(libDir, { recursive: true });
     fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+    fs.copyFileSync(REAL_ARCH_DOC_LIB, path.join(libDir, "arch-doc.mjs"));
   }
   return root;
 }
@@ -145,6 +152,7 @@ test("mid-session library install: a library added AFTER a (miss) lookup is pick
     const libDir = path.join(root, "qa", "lib");
     fs.mkdirSync(libDir, { recursive: true });
     fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+    fs.copyFileSync(REAL_ARCH_DOC_LIB, path.join(libDir, "arch-doc.mjs"));
     const data = await getApprovalsData(root);
     assert.equal(data.available, true, "the next call must re-probe — misses are never cached");
 

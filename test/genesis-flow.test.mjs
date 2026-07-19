@@ -155,6 +155,102 @@ test("components artifact: order 3, dynamic sorted glob; zero-glob is unresolvab
   }
 });
 
+// ── §1: architecture artifact — doc-bound hash (AD-1 Wave B,
+// docs/proposals/architecture-document-standard.md §4.4) ────────────────────
+
+function runArchDoc(root, args = []) {
+  return execFileSync(process.execPath, [path.join(root, "qa/arch-doc.mjs"), ...args], {
+    cwd: root,
+    encoding: "utf8",
+  });
+}
+
+const ARCH_DOC_REL = "docs/ARCHITECTURE.md";
+
+test("architecture artifact: registry now covers the spec AND docs/ARCHITECTURE.md (generated sections stripped)", async () => {
+  const out = await makeProject("cmp-gen-arch-registry-");
+  try {
+    const { listGovernedArtifacts } = await loadLib(out);
+    const arch = listGovernedArtifacts(out).find((a) => a.id === "architecture");
+    assert.deepEqual(arch.files, ["specs/app-base.spec.md", ARCH_DOC_REL], "the doc joins the spec as a governed file");
+    assert.match(arch.label, /docs\/ARCHITECTURE\.md, generated sections stripped/);
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("architecture artifact: editing AUTHORED prose in docs/ARCHITECTURE.md invalidates the approval (drift)", async () => {
+  const out = await makeProject("cmp-gen-arch-drift-");
+  try {
+    const { approveArtifact, getApprovalStatuses } = await loadLib(out);
+    assert.equal(approveArtifact(out, "architecture").ok, true);
+    assert.equal(getApprovalStatuses(out).find((s) => s.id === "architecture").status, "approved");
+
+    const docPath = path.join(out, ARCH_DOC_REL);
+    fs.appendFileSync(docPath, "\n\nAn authored sentence a human wrote, not derivable from the tree.\n");
+
+    const statuses = getApprovalStatuses(out);
+    const arch = statuses.find((s) => s.id === "architecture");
+    assert.equal(arch.status, "changed-since-approval", "authored prose in the governed doc is drift, same as a spec edit");
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("architecture artifact: regenerating a cmp:generated section (mechanical, tree-derived) does NOT invalidate the approval", async () => {
+  const out = await makeProject("cmp-gen-arch-generated-");
+  try {
+    const { approveArtifact, getApprovalStatuses } = await loadLib(out);
+
+    // Bring the doc's generated sections to their fresh state first, so the
+    // approval below is over exactly what a genesis "approve the architecture
+    // as generated" moment would sign.
+    runArchDoc(out);
+    assert.equal(approveArtifact(out, "architecture").ok, true);
+    assert.equal(getApprovalStatuses(out).find((s) => s.id === "architecture").status, "approved");
+
+    // Touch a source file the layer-file-inventory section walks, then
+    // regenerate mechanically — no human edited the doc's prose.
+    const newModelPath = path.join(
+      out,
+      "composeApp/src/commonMain/kotlin",
+      PKG_DIR,
+      "domain/model/Widget.kt",
+    );
+    fs.writeFileSync(newModelPath, `package com.acme.demo.domain.model\n\ndata class Widget(val id: String)\n`);
+
+    const before = fs.readFileSync(path.join(out, ARCH_DOC_REL), "utf8");
+    const regenStdout = runArchDoc(out);
+    const after = fs.readFileSync(path.join(out, ARCH_DOC_REL), "utf8");
+    assert.notEqual(after, before, "sanity: the new file actually changed the generated layer inventory");
+    assert.match(regenStdout, /layer-file-inventory/, "the regeneration touched the section under test");
+    assert.match(after, /Widget\.kt/, "the new file shows up in the regenerated inventory");
+
+    const statuses = getApprovalStatuses(out);
+    const arch = statuses.find((s) => s.id === "architecture");
+    assert.equal(arch.status, "approved", "a mechanically regenerated section must NOT invalidate the architecture approval");
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("architecture artifact: line-ending normalization — CRLF-ifying the doc's untouched bytes is not drift", async () => {
+  const out = await makeProject("cmp-gen-arch-crlf-");
+  try {
+    const { approveArtifact, getApprovalStatuses } = await loadLib(out);
+    assert.equal(approveArtifact(out, "architecture").ok, true);
+
+    const docPath = path.join(out, ARCH_DOC_REL);
+    const content = fs.readFileSync(docPath, "utf8");
+    fs.writeFileSync(docPath, content.replace(/\n/g, "\r\n"));
+
+    const arch = getApprovalStatuses(out).find((s) => s.id === "architecture");
+    assert.equal(arch.status, "approved", "a pure CRLF/LF checkout difference must never read as authored drift");
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
 // ── §1: legacy-ledger equivalence + configurable exemplar ────────────────────
 
 test("legacy ledger equivalence: a ledger WITHOUT exemplarFeature behaves byte-identically to the shipped 'home' config", async () => {

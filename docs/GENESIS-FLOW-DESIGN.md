@@ -97,7 +97,7 @@ the single source of truth):
 |---|---|---|
 | 0 | `intent` | `specs/intent.md` |
 | 1 | `design-system` | `presentation/theme/Theme.kt`, `Tokens.kt` (unchanged) |
-| 2 | `architecture` | `specs/app-base.spec.md` (unchanged) |
+| 2 | `architecture` | `specs/app-base.spec.md` **+** `docs/ARCHITECTURE.md` (`cmp:generated` sections stripped before hashing — AD-1 Wave B, `docs/proposals/architecture-document-standard.md` §4.4) |
 | 3 | `components` | `presentation/components/*.kt` (dynamic glob, sorted) |
 | 4 | `exemplar-feature` | the 11-file set of the **configured** exemplar |
 | 5 | `exemplar-spec` | `specs/<exemplar>.spec.md` |
@@ -123,6 +123,26 @@ the single source of truth):
   component after approval → `changed-since-approval` → gate FAIL until
   re-approved. (A "no one-off components outside the registry" conformance
   gate is deferred, documented in §6.)
+- **Architecture doc is governed, not just the spec (AD-1 Wave B):** approval
+  #2's hash now covers `docs/ARCHITECTURE.md` alongside `specs/app-base.spec.md`
+  — approving `architecture` is consent to the document a human would actually
+  read, not a spec file no one opens. Only the doc's AUTHORED prose counts:
+  every `<!-- cmp:generated ID -->…<!-- /cmp:generated -->` marker's BODY is
+  stripped before hashing (`qa/lib/arch-doc.mjs`'s `stripGeneratedSections` —
+  the same grammar `node qa/arch-doc.mjs` regenerates from, reused not
+  forked), so a feature landing and mechanically refreshing the layer
+  inventory / expect-actual table / ADR index / glossary never invalidates the
+  approval; staleness of those sections is instead caught by the separate
+  `archDoc` lane gate (regenerate-and-diff, the golden-tree pattern). Line
+  endings are normalized (`\r\n`→`\n`) before stripping so a checkout-induced
+  EOL difference is never mistaken for authored drift either.
+  **Ledger migration:** no schema bump — `cmp-approvals/1` stays as-is, same
+  as every other additive change to this file (see the express lane's note
+  above). An `architecture` approval recorded under the OLD (spec-only) basis
+  simply fails to match the new recompute the next time it's read, and
+  honestly reports `changed-since-approval`: the artifact genuinely grew, and
+  re-approval is one `node qa/approve.mjs architecture` away — no separate
+  migration step exists or is needed.
 
 ## 2. Mechanics
 
