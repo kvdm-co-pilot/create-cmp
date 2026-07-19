@@ -113,8 +113,26 @@ class ArchitectureConformanceTest {
     }
 
     // SPEC: ARCH-04
+    // Component-derived tags (component-system-deep-dive.md §6.4) count as tag provenance:
+    // a screen built entirely from registry components (ScreenColumn/AppHeader/
+    // ContentStateContainer/…) is automation-reachable through the tags THOSE components
+    // emit from their required `screenTag` parameter, even with no literal `testTag` of its
+    // own. The acceptance is narrow by design (mitigates the risk table's sloppy-scan
+    // concern): `screenTag\s*=` in a call-argument position AND the file actually imports
+    // from `presentation.components` — a file that merely contains the substring
+    // "screenTag" in a comment, or that never touches the registry, still fails.
+    private val screenTagArgument = Regex("""screenTag\s*=""")
+
+    private fun hasTagProvenance(file: File): Boolean {
+        val text = file.readText()
+        val importsComponents = text.lines().any {
+            it.trimStart().startsWith("import ") && it.contains(".presentation.components.")
+        }
+        return text.contains("testTag") || (importsComponents && screenTagArgument.containsMatchIn(text))
+    }
+
     @Test
-    fun `ARCH-04 every feature composable file declares a testTag`() {
+    fun `ARCH-04 every feature composable file is automation-reachable - literal testTag or screenTag provenance`() {
         // Scoped by CONTENT (contains @Composable), not by *Screen.kt filename: real apps
         // split features into Screen.kt (often ViewModel-only) and Content.kt (the UI).
         // Filename scoping produced both false negatives (untagged FooContent.kt slid
@@ -123,14 +141,36 @@ class ArchitectureConformanceTest {
             .filter { inPresentationFeatureDir(it) }
             .filterNot { under(it, "components") || under(it, "navigation") || under(it, "theme") }
             .filter { it.readText().contains("@Composable") }
-            .filterNot { it.readText().contains("testTag") }
+            .filterNot { hasTagProvenance(it) }
             .map { it.path }
         if (offenders.isNotEmpty()) fail(
             violation(
                 "ARCH-04", "every feature UI file is automation-reachable: files containing a " +
-                    "@Composable declare at least one testTag.",
+                    "@Composable declare at least one literal testTag OR pass screenTag = to a " +
+                    "registry component imported from presentation.components.",
                 offenders,
-                "add Modifier.semantics { testTag = \"<feature>_<element>\" } to the file's key nodes.",
+                "add Modifier.semantics { testTag = \"<feature>_<element>\" } to the file's key nodes, " +
+                    "or compose it from registry components (e.g. ScreenColumn(screenTag = \"<feature>\") { … }).",
+            )
+        )
+    }
+
+    // SPEC: ARCH-11
+    @Test
+    fun `ARCH-11 screens present loading through the components registry, never a hand-rolled indicator`() {
+        val banned = listOf("CircularProgressIndicator", "LinearProgressIndicator")
+        val offenders = sources(commonMain)
+            .filter { inPresentationFeatureDir(it) }
+            .filterNot { under(it, "components") || under(it, "navigation") || under(it, "theme") }
+            .filter { bannedReference(it, banned) }
+            .map { it.path }
+        if (offenders.isNotEmpty()) fail(
+            violation(
+                "ARCH-11", "screens never reference CircularProgressIndicator/LinearProgressIndicator " +
+                    "directly — loading is presented through ContentStateContainer/ContentStateDefaults.",
+                offenders,
+                "bind the screen's loading arm to ContentStateContainer(state = …, screenTag = …) instead " +
+                    "of drawing a progress indicator by hand (see the exemplar HomeScreen).",
             )
         )
     }

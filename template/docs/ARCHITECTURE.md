@@ -84,9 +84,14 @@ scaffold — is the **reference implementation** of the pattern, including its t
 
 1. Domain: model + repository interface + use case (+ tests).
 2. Data: repository implementation (+ test through the domain contract).
-3. Presentation: `<Feature>Screen` (testTag-rooted) + `<Feature>ViewModel` with a
-   `StateFlow` of a **sealed** UiState (`Loading`/`Content`/`Empty`/`Error` — no
-   `try`/`catch`, fold over `AppResult`) (+ test using a fake from `testing/fakes/`).
+3. Presentation: `<Feature>Screen` composed from the component vocabulary
+   (`presentation/components/*.kt` — `ScreenColumn` for the root, `AppHeader` for the
+   title, `ContentStateContainer` for the loading/content/empty/error dispatch,
+   `ListItemCard` for rows) + `<Feature>ViewModel` with a `StateFlow<ContentUiState<T>>`
+   (the shared sealed lifecycle — no `try`/`catch`, fold over `AppResult`,
+   `List<E>.toContentState()` for the empty/content split) (+ test using a fake from
+   `testing/fakes/`). Don't hand-roll a header, loading spinner, or list row — see
+   `HomeScreen.kt`, the 41-line result of composing the registry instead.
 4. DI: register in `di/AppModule.kt`.
 5. Navigation: add the route in `presentation/navigation/`.
 6. Run `node qa/verify.mjs` — done means PASS + committed receipt.
@@ -94,9 +99,18 @@ scaffold — is the **reference implementation** of the pattern, including its t
 ## Conventions
 
 - **Theme tokens** (`presentation/theme/`) are the only source of design values — no hardcoded
-  colors/spacing/radii in screens.
+  colors/spacing/radii in screens; the registry's own components own the token call sites now
+  (declared once per component, correct everywhere it's used), so a screen almost never touches
+  a token directly.
 - **testTags** on every screen root and interactive element (`TestTagAutomation` exposes them
-  to E2E tooling on both platforms).
+  to E2E tooling on both platforms) — either a literal `testTag`, or (ARCH-04's amendment)
+  `screenTag =` wiring into a registry component, whose derived tags
+  (`<screenTag>_screen`/`_title`/`_loading`/`_error`/`_retry`/`_empty`) count as the same
+  automation-reachability. A screen only needs a literal `testTag` for content the registry
+  doesn't already tag (e.g. per-row ids like `home_item_$id`).
+- **Loading is never hand-rolled** (ARCH-11) — no screen outside `presentation/components/`
+  references `CircularProgressIndicator`/`LinearProgressIndicator` directly; bind the
+  loading arm to `ContentStateContainer` instead.
 - **Insets** are owned by `BaseScreen` — new screens compose inside it and never re-solve
   edge-to-edge padding.
 - Significant decisions get an ADR in [`docs/adr/`](./adr/) — see the template there.

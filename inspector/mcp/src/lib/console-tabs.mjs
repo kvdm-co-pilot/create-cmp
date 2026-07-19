@@ -133,8 +133,13 @@ function artifactBannerHtml(s) {
  * @param {{available: boolean, reason?: string, components?: object[]}} [components]
  * @param {{available: boolean, variants?: Array<{name: string, screens: Array<{id: string, png: string}>, hasDesignSystem: boolean}>}} [variants]
  * @param {string} [artifactStatus] the design-system artifact's live status (see approvalsTabHtml)
+ * @param {{approval?: object|null, drift?: object, violations?: object, stateVariants?: object}} [componentsMeta]
+ *   the components artifact's own approval record + mtime-based drift +
+ *   ARCH-11-style hand-rolled-state violations + any live `@loading/@empty/
+ *   @error` variant renders (CV-1 W3b) — every field optional, every field
+ *   degrades to an honest empty state when absent
  */
-export function designSystemTabHtml(ds, components, variants, artifactStatus) {
+export function designSystemTabHtml(ds, components, variants, artifactStatus, componentsMeta) {
   let dsHtml;
   if (!ds || !ds.available) {
     dsHtml = `<div class="empty">
@@ -181,7 +186,7 @@ ${candidatesStripHtml(variants)}`
     : "";
   return `${dsHtml}
   <h3>Components</h3>
-${componentsSectionHtml(components)}
+${componentsSectionHtml(components, componentsMeta || {})}
 ${candidatesSection}`;
 }
 
@@ -229,16 +234,196 @@ ${cards}
   <div id="pick-error" class="banner" hidden></div>`;
 }
 
+function shortDate(iso) {
+  return iso ? esc(String(iso)) : "";
+}
+
 /**
- * The Components section (§7.2): every `@Composable` found under
- * presentation/components/*.kt (see components.mjs), each with its file,
- * parameter list, and used-in list. A signature the scanner couldn't parse
- * cleanly shows name + file only, with an honest note — never a guessed
- * parameter list. Isolated preview rendering is explicitly deferred (§7.2) —
- * this is structural truth only.
- * @param {{available: boolean, reason?: string, components?: Array<{name: string, file: string, params: string[], parseError: boolean, usedIn: string[]}>}} [components]
+ * The approval/drift badge for a component card — the WHOLE `components`
+ * artifact's live status (one hash covers every file in the registry glob),
+ * plus, when the artifact is `changed-since-approval`, THIS card's own
+ * mtime-based drift evidence (component-drift.mjs) — "shown ON the affected
+ * component cards, not just a banner" (CV-1 W3b). No approval data at all
+ * (older scaffold, or approvals unavailable) renders NOTHING — silence, not
+ * a fabricated "unreviewed" claim.
+ * @param {object|null|undefined} approval the components artifact's status record
+ * @param {{available: boolean, byFile?: object}} [drift]
+ * @param {string} file this card's own file (for the per-file drift lookup)
  */
-function componentsSectionHtml(components) {
+function componentApprovalBadgeHtml(approval, drift, file) {
+  if (!approval) return "";
+  const s = approval.status;
+  if (s === "approved") {
+    const unshaped = approval.mode === "defaults-accepted";
+    return `<span class="badge badge-approved${unshaped ? " badge-unshaped" : ""}" title="components artifact approved at ${shortDate(approval.approvedAt)}">approved &middot; ${shortHash(approval.hash)}</span>`;
+  }
+  if (s === "changed-since-approval") {
+    const perFile = drift && drift.available ? drift.byFile && drift.byFile[file] : null;
+    const fileNote =
+      perFile && perFile.modifiedSinceApproval === true
+        ? `<span class="badge badge-changed" title="this file's mtime is after the components artifact's approvedAt">likely changed (mtime)</span>`
+        : perFile && perFile.modifiedSinceApproval === false
+          ? `<span class="badge badge-approved" title="this file's mtime is at/before the components artifact's approvedAt">unchanged since approval (mtime)</span>`
+          : "";
+    return `<span class="badge badge-changed" title="the components artifact hash no longer matches its stored approval">drift &middot; artifact changed since approval</span>${fileNote}`;
+  }
+  if (s === "reopened") {
+    return `<span class="badge badge-reopened">reopened for redesign</span>`;
+  }
+  return `<span class="badge badge-unreviewed">not yet approved</span>`;
+}
+
+/**
+ * The signature block — `fun Name(param: Type = default, ...)`, one param
+ * per line, straight from `paramsParsed` (parameter ORDER preserved exactly
+ * as scanned — the Compose guidelines ordering `component-system-deep-
+ * dive.md` §2 cites: required -> modifier -> optional -> trailing slot —
+ * this block simply shows what the source actually declares, never a
+ * reordered "ideal" signature).
+ * @param {string} name
+ * @param {Array<{raw: string, name: string, type: (string|null), default: (string|null)}>} paramsParsed
+ */
+function signatureBlockHtml(name, paramsParsed) {
+  if (!paramsParsed || paramsParsed.length === 0) {
+    return `<pre class="component-sig">fun ${esc(name)}()</pre>`;
+  }
+  const lines = paramsParsed
+    .map((p) => {
+      const type = p.type ? `: ${esc(p.type)}` : "";
+      const def = p.default ? ` = ${esc(p.default)}` : "";
+      return `  ${esc(p.name)}${type}${def},`;
+    })
+    .join("\n");
+  return `<pre class="component-sig">fun ${esc(name)}(\n${lines}\n)</pre>`;
+}
+
+/**
+ * The "state contract" bullet list — every fact components.mjs's deriveFacts
+ * found IN THIS COMPONENT'S OWN BODY, positive-evidence-only (§ anti-slop:
+ * evidence-or-silence — a fact not found is simply not listed, never
+ * rendered as a "does NOT" claim). Returns "" when nothing was found, so the
+ * caller can omit the whole subsection rather than showing an empty header.
+ * @param {object} facts components.mjs's per-component `facts`
+ * @param {boolean} hasScreenTagParam derived from paramsParsed, not facts
+ *   (facts only scans the body — the param itself is a signature fact)
+ */
+function stateContractHtml(facts, hasScreenTagParam) {
+  const items = [];
+  if (hasScreenTagParam) {
+    items.push(
+      facts.derivedTags && facts.derivedTags.length
+        ? `owns testTags derived from <code>screenTag</code>: ${facts.derivedTags.map((t) => `<code>&lt;screenTag&gt;_${esc(t)}</code>`).join(", ")}`
+        : `takes a required <code>screenTag</code> parameter (tag suffixes not found in this scan)`,
+    );
+  }
+  if (facts.contentUiStateArms && facts.contentUiStateArms.length) {
+    items.push(`renders <code>ContentUiState</code> arms: ${facts.contentUiStateArms.map((a) => `<code>${esc(a)}</code>`).join(", ")}`);
+  }
+  if (facts.a11yFloorEvidence && facts.a11yFloorEvidence.length) {
+    items.push(`enforces the 48dp a11y touch-target floor (evidence: ${facts.a11yFloorEvidence.map((e) => `<code>${esc(e)}</code>`).join(", ")})`);
+  }
+  if (facts.insetsApis && facts.insetsApis.length) {
+    items.push(`owns insets: ${facts.insetsApis.map((a) => `<code>${esc(a)}</code>`).join(", ")}`);
+  }
+  if (facts.tokensReferenced && facts.tokensReferenced.length) {
+    items.push(`tokens: ${facts.tokensReferenced.map((t) => `<code>${esc(t)}</code>`).join(", ")}`);
+  }
+  if (facts.selfReportsDesignToken) {
+    items.push(`self-reports resolved values to the inspector (<code>designToken(...)</code>)`);
+  }
+  if (items.length === 0) return "";
+  return `<p class="lbl">state contract</p><ul class="component-facts">${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
+}
+
+// A component's state suffix -> the preview-registry variant suffix(es) that
+// would exercise it live (CV-1 W3b: "@loading/@empty/@error variants ...
+// integrate defensively"). Keyed off derivedTags (the `${screenTag}_xxx` tag
+// suffix the component itself emits) rather than a hardcoded component-name
+// map, so a renamed/added component that emits e.g. `_empty` is picked up
+// the same way EmptyState is, with no per-component special-casing.
+const STATE_TAG_TO_VARIANT = { loading: "loading", empty: "empty", error: "error", retry: "error" };
+
+/**
+ * Live variant renders for a state-owning component (CV-1 W3b): thumbnails
+ * from any CURRENTLY RENDERED `<screen>@<state>` preview-registry entry whose
+ * state matches one of this component's own derived tag suffixes. The
+ * `@loading/@empty/@error` variants are being registered by a parallel wave
+ * (docs/proposals/component-system-deep-dive.md §6.5) — this degrades
+ * HONESTLY when none exist yet (never an error, never a fabricated
+ * thumbnail), and picks them up automatically once they land (no re-wiring
+ * needed here). Components with no state-suffix tags at all (e.g.
+ * `ScreenColumn`, `AppHeader`) render nothing — there is no state to show.
+ * @param {string[]} derivedTags this component's own `facts.derivedTags`
+ * @param {{loading: object[], empty: object[], error: object[]}} [stateVariants]
+ *   preview-service.mjs's stateVariantCards(cards) — grouped by state suffix
+ */
+function liveVariantsHtml(derivedTags, stateVariants) {
+  const states = [...new Set((derivedTags || []).map((t) => STATE_TAG_TO_VARIANT[t]).filter(Boolean))].sort();
+  if (states.length === 0) return "";
+  const sv = stateVariants || {};
+  const blocks = states.map((state) => {
+    const entries = sv[state] || [];
+    if (entries.length === 0) {
+      return `    <div class="state-variant-block">
+      <p class="lbl">live &#64;${esc(state)} render</p>
+      <p class="empty-inline">not derivable statically — no <code>@${esc(state)}</code> preview-registry entry has rendered yet</p>
+    </div>`;
+    }
+    const thumbs = entries
+      .map(
+        (v) => `<div class="state-variant-thumb"><img alt="${escAttr(v.id)}" src="/previews/${escAttr(v.png)}"><p class="lbl">${esc(v.id)}</p></div>`,
+      )
+      .join("");
+    return `    <div class="state-variant-block">
+      <p class="lbl">live &#64;${esc(state)} render</p>
+      <div class="state-variant-thumbs">${thumbs}</div>
+    </div>`;
+  });
+  return `  <div class="component-live-variants">\n${blocks.join("\n")}\n  </div>`;
+}
+
+/**
+ * The used-in list, split into screens vs. everything else — "which screens
+ * compose it" is the used-in question a staff-level reference actually
+ * answers first. A screen that ALSO hand-rolls a state this component owns
+ * (the ARCH-11 mirror, handrolled-state.mjs) gets a violation chip inline —
+ * "surfaced as a violation chip on the offending screen reference", never
+ * just a banner.
+ * @param {string[]} usedIn full used-in list
+ * @param {string[]} usedInScreens the screen subset
+ * @param {Map<string, object>} violationsByFile file -> handrolled-state.mjs violation entry
+ */
+function usedInHtml(usedIn, usedInScreens, violationsByFile) {
+  if (!usedIn || usedIn.length === 0) {
+    return `<p class="empty-inline">no call sites found under presentation/**</p>`;
+  }
+  const screenSet = new Set(usedInScreens || []);
+  const items = usedIn
+    .map((f) => {
+      const v = violationsByFile.get(f);
+      const chip = v
+        ? `<span class="badge badge-changed violation-chip" title="hand-rolls ${esc(v.indicators.map((i) => i.name).join(", "))} directly instead of via the components registry">&#9888; hand-rolled state</span>`
+        : "";
+      const kind = screenSet.has(f) ? `<span class="badge badge-open">screen</span>` : "";
+      return `<li><code>${esc(f)}</code> ${kind}${chip}</li>`;
+    })
+    .join("");
+  return `<ul class="component-used-in">${items}</ul>`;
+}
+
+/**
+ * The Components section — the CV-1 three-in-one standard: a staff-level
+ * component library reference (authored form), every fact DERIVED from the
+ * real tree (never hand-written prose that can rot — see components.mjs's
+ * deriveFacts and this file's evidence-or-silence subsections), and the
+ * ordering/drift surface (per-card approval status, mtime-based drift, and
+ * ARCH-11-style hand-rolled-state violations on the offending used-in
+ * screen). A signature the scanner couldn't parse cleanly shows name + file
+ * only, with an honest note — never a guessed parameter list.
+ * @param {{available: boolean, reason?: string, components?: Array<object>}} [components]
+ * @param {{approval?: object|null, drift?: object, violations?: object, stateVariants?: object}} [meta]
+ */
+function componentsSectionHtml(components, meta = {}) {
   if (!components || !components.available) {
     return `<div class="empty">
       <p>No components scan available yet.</p>
@@ -251,28 +436,37 @@ function componentsSectionHtml(components) {
   if (!components.components || components.components.length === 0) {
     return `<div class="empty-inline">no @Composable components found in presentation/components/*.kt</div>`;
   }
+  const violationsByFile = new Map(
+    meta.violations && meta.violations.available ? meta.violations.violations.map((v) => [v.file, v]) : [],
+  );
   const cards = components.components
     .map((c) => {
       const header = `<h4>${esc(c.name)}${commentControlHtml({ type: "design-system", token: `component:${c.name}` })}</h4>`;
+      const badge = componentApprovalBadgeHtml(meta.approval, meta.drift, c.file);
       if (c.parseError) {
         return `    <div class="component-card">
       ${header}
+      ${badge}
       <p class="meta"><code>${esc(c.file)}</code></p>
       <p class="unresolvable-note">signature could not be parsed cleanly — showing name + file only.</p>
     </div>`;
       }
-      const params =
-        c.params && c.params.length
-          ? `<ul class="component-params">${c.params.map((p) => `<li><code>${esc(p)}</code></li>`).join("")}</ul>`
-          : `<p class="empty-inline">no parameters</p>`;
-      const usedIn =
-        c.usedIn && c.usedIn.length
-          ? `<ul class="component-used-in">${c.usedIn.map((f) => `<li><code>${esc(f)}</code></li>`).join("")}</ul>`
-          : `<p class="empty-inline">no call sites found under presentation/**</p>`;
+      const paramsParsed = c.paramsParsed || [];
+      const facts = c.facts || {};
+      const hasScreenTagParam = paramsParsed.some((p) => p.name === "screenTag");
+      const kdocHtml = c.kdoc
+        ? `<p class="lbl">usage notes &mdash; from the component's own doc comment</p><blockquote class="component-kdoc">${esc(c.kdoc)}</blockquote>`
+        : "";
+      const usedIn = usedInHtml(c.usedIn, c.usedInScreens, violationsByFile);
       return `    <div class="component-card">
       ${header}
+      ${badge}
       <p class="meta"><code>${esc(c.file)}</code></p>
-      <p class="lbl">parameters</p>${params}
+      <p class="lbl">signature</p>
+      ${signatureBlockHtml(c.name, paramsParsed)}
+      ${stateContractHtml(facts, hasScreenTagParam)}
+      ${kdocHtml}
+      ${liveVariantsHtml(facts.derivedTags, meta.stateVariants)}
       <p class="lbl">used in</p>${usedIn}
     </div>`;
     })

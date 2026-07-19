@@ -347,24 +347,36 @@ function previewEntry(tab) {
  * @param {ReturnType<typeof tabInfos>} infos
  */
 export function renderPreviewRegistryKt(infos) {
+  const hasHome = infos.some((t) => t.slug === "home");
   const imports = [
     "import androidx.compose.foundation.layout.Box",
     "import androidx.compose.foundation.layout.fillMaxSize",
     "import androidx.compose.runtime.Composable",
     "import androidx.compose.ui.Modifier",
-    "import __PACKAGE__.presentation.components.BaseScreen",
   ];
+  if (hasHome) {
+    imports.push("import __PACKAGE__.domain.model.DomainError");
+    imports.push("import __PACKAGE__.domain.model.Item");
+    imports.push("import __PACKAGE__.domain.repository.ItemRepository");
+    imports.push("import __PACKAGE__.domain.result.AppResult");
+    imports.push("import __PACKAGE__.domain.usecase.GetItemsUseCase");
+  }
+  imports.push("import __PACKAGE__.presentation.components.BaseScreen");
   if (infos.some((t) => t.slug !== "home" && t.slug !== "profile")) {
     imports.push("import __PACKAGE__.presentation.components.PlaceholderScreen");
   }
   imports.push("import __PACKAGE__.presentation.home.DetailScreen");
-  if (infos.some((t) => t.slug === "home")) {
+  if (hasHome) {
     imports.push("import __PACKAGE__.presentation.home.HomeScreen");
+    imports.push("import __PACKAGE__.presentation.home.HomeViewModel");
   }
   imports.push("import __PACKAGE__.presentation.navigation.AppShell");
   imports.push("import __PACKAGE__.presentation.navigation.appTabs");
   if (infos.some((t) => t.slug === "profile")) {
     imports.push("import __PACKAGE__.presentation.profile.ProfileScreen");
+  }
+  if (hasHome) {
+    imports.push("import kotlinx.coroutines.awaitCancellation");
   }
 
   return `package __PACKAGE__.inspector
@@ -406,7 +418,7 @@ ${infos.map(previewTabArg).join("\n")}
         )
     },
 ${infos.map(previewEntry).join("\n")}
-    ScreenPreview("detail", "Detail (nav destination)") { DetailScreen(itemId = "1", onBack = {}) },
+    ScreenPreview("detail", "Detail (nav destination)") { DetailScreen(itemId = "1", onBack = {}) },${homeStateVariantEntries(hasHome)}
     // cmp:anchor preview-registry
 )
 
@@ -420,6 +432,50 @@ private fun TabHost(content: @Composable () -> Unit) {
         Box(Modifier.fillMaxSize()) { content() }
     }
 }
+${homeStateVariantHelper(hasHome)}`;
+}
+
+/**
+ * The `home@loading`/`home@empty`/`home@error` preview registry entries — only when a
+ * `home`-slug tab is configured (the shipped Home screen is what they force state on).
+ * @param {boolean} hasHome
+ */
+function homeStateVariantEntries(hasHome) {
+  if (!hasHome) return "";
+  return `
+    // State variants (§6.5, component-system-deep-dive.md): the same ContentUiState arms
+    // ContentStateContainer dispatches on, forced via a preview-only repository — the
+    // console's genesis workbench and the golden baselines get loading/empty/error as
+    // first-class screens beside the default seeded "home" entry.
+    ScreenPreview("home@loading", "Home — loading") {
+        TabHost { HomeScreen(onItemClick = {}, viewModel = previewHomeViewModel { awaitCancellation() }) }
+    },
+    ScreenPreview("home@empty", "Home — empty") {
+        TabHost { HomeScreen(onItemClick = {}, viewModel = previewHomeViewModel { AppResult.Success(emptyList()) }) }
+    },
+    ScreenPreview("home@error", "Home — error") {
+        TabHost { HomeScreen(onItemClick = {}, viewModel = previewHomeViewModel { AppResult.Failure(DomainError.Network) }) }
+    },`;
+}
+
+/**
+ * The preview-only repository helper backing the state variants above — see
+ * `homeStateVariantEntries`'s doc for why it can't reuse `commonTest`'s `FakeItemRepository`.
+ * @param {boolean} hasHome
+ */
+function homeStateVariantHelper(hasHome) {
+  if (!hasHome) return "";
+  return `
+/**
+ * Forces one \`ContentUiState\` arm on a real [HomeViewModel] for the state-variant previews
+ * above. \`desktopMain\` cannot depend on \`commonTest\`'s \`FakeItemRepository\` (test sources
+ * never leak into main), so this is a minimal, self-contained equivalent — the real
+ * ViewModel and screen render unmodified, only the repository result is forced.
+ */
+private fun previewHomeViewModel(result: suspend () -> AppResult<List<Item>>): HomeViewModel =
+    HomeViewModel(GetItemsUseCase(object : ItemRepository {
+        override suspend fun getItems(): AppResult<List<Item>> = result()
+    }))
 `;
 }
 

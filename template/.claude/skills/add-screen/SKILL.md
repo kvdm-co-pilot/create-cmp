@@ -88,7 +88,11 @@ Then adapt the generated code to match the entity's actual shape (which may diff
 `home` exemplar's `{id, title, subtitle}` list): update the screen's rendering in
 `presentation/<feature>/<Feature>Screen.kt` and the copied tests
 (`<Feature>ViewModelTest.kt`, `<Feature>ScreenTest.kt`) together, consistent with whatever
-`<Entity>.kt` already looks like. The gate (step 6) will name exactly what you missed.
+`<Entity>.kt` already looks like. The stamped screen already **composes the registry
+vocabulary** (`ScreenColumn`/`AppHeader`/`ContentStateContainer`/`ListItemCard`,
+`presentation/components/*.kt`) — adapt the content shape inside `ContentStateContainer`'s
+trailing slot rather than hand-rolling a new header/loading state/list row. The gate (step 6)
+will name exactly what you missed.
 
 ### 5. Capture the golden tree
 
@@ -110,9 +114,11 @@ node qa/verify.mjs
 
 This must PASS. It proves: the spec's six clauses are all bound to a citing test
 (specCoverage — `<FEATURE>-01..07` newly bound), the build compiles, unit tests pass, architecture
-conformance holds, the golden tree matches, and accessibility holds. **Not done until this is
-PASS and the evidence receipt (`qa/evidence/latest.json`) is committed with your change** — this
-project's standing definition of done (see `CLAUDE.md`).
+conformance holds (the screen is automation-reachable via a literal `testTag` or `screenTag =`
+wiring into a registry component, and references no `CircularProgressIndicator`/
+`LinearProgressIndicator` directly), the golden tree matches, and accessibility holds. **Not done
+until this is PASS and the evidence receipt (`qa/evidence/latest.json`) is committed with your
+change** — this project's standing definition of done (see `CLAUDE.md`).
 
 If it fails: read the failing step's reason, fix the actual behavior or spec/test binding, and
 re-run. Do not delete or weaken a test to reach green.

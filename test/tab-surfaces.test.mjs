@@ -127,6 +127,15 @@ test("default tabs reproduce the static template surfaces byte-for-byte", async 
       !fs.existsSync(path.join(out, PLACEHOLDER_REL)),
       "no PlaceholderScreen is generated for the default tabs"
     );
+    // Component-system-deep-dive.md §6.5/§7 W2: home's ContentUiState arms get first-class
+    // preview entries alongside the default seeded "home" screen.
+    const registry = read(out, PREVIEW_REGISTRY_REL);
+    assert.match(registry, /ScreenPreview\("home@loading", "Home — loading"\)/);
+    assert.match(registry, /ScreenPreview\("home@empty", "Home — empty"\)/);
+    assert.match(registry, /ScreenPreview\("home@error", "Home — error"\)/);
+    assert.match(registry, /viewModel = previewHomeViewModel \{ awaitCancellation\(\) \}/);
+    assert.match(registry, /viewModel = previewHomeViewModel \{ AppResult\.Success\(emptyList\(\)\) \}/);
+    assert.match(registry, /viewModel = previewHomeViewModel \{ AppResult\.Failure\(DomainError\.Network\) \}/);
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }
@@ -202,6 +211,14 @@ test("custom tabs rewrite AppTab.kt, AppNavHost, and smoke.yaml", async (t) => {
       assert.ok(!registry.includes('ScreenPreview("profile"'), "no stale profile entry");
       assert.ok(!registry.includes("HomeScreen("), "no stale HomeScreen wiring");
       assert.ok(!registry.includes("__PACKAGE__"), "no leftover tokens");
+      // No home tab configured: no home@ state-variant ENTRIES (the class doc's illustrative
+      // `ScreenPreview("home@empty", "Home — empty")` example is fixed prose and stays either
+      // way — match the real entry shape, trailing " {" and all, not the bare substring).
+      assert.ok(!/ScreenPreview\("home@loading", "Home — loading"\) \{/.test(registry), "no home@loading entry without a home tab");
+      assert.ok(!/ScreenPreview\("home@empty", "Home — empty"\) \{/.test(registry), "no home@empty entry without a home tab");
+      assert.ok(!/ScreenPreview\("home@error", "Home — error"\) \{/.test(registry), "no home@error entry without a home tab");
+      assert.ok(!registry.includes("previewHomeViewModel"), "no preview state-variant helper without a home tab");
+      assert.ok(!registry.includes("HomeViewModel"), "no stale HomeViewModel import without a home tab");
     });
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
@@ -226,6 +243,11 @@ test("home/profile slugs in a custom config keep their real feature screens", as
     assert.match(smoke, /id: "home_title"/);
     assert.match(smoke, /id: "nav_feed"/);
     assert.ok(!smoke.includes("nav_profile"), "no stale nav_profile");
+    // A "home"-slug tab still gets the home@ state-variant entries even amid custom tabs.
+    const registry = read(out, PREVIEW_REGISTRY_REL);
+    assert.match(registry, /ScreenPreview\("home@loading", "Home — loading"\)/);
+    assert.match(registry, /ScreenPreview\("home@empty", "Home — empty"\)/);
+    assert.match(registry, /ScreenPreview\("home@error", "Home — error"\)/);
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }

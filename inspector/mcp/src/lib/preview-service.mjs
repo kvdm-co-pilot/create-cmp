@@ -48,6 +48,8 @@ import { getSpecsData } from "./specs.mjs";
 import { getArchitectureData } from "./architecture.mjs";
 import { getComponentsData } from "./components.mjs";
 import { getVariantsData } from "./variants.mjs";
+import { getComponentDriftInfo } from "./component-drift.mjs";
+import { getHandRolledStateViolations } from "./handrolled-state.mjs";
 import {
   designSystemTabHtml,
   approvalsTabHtml,
@@ -136,6 +138,34 @@ export function diffScreenTrees(prev, next) {
   return changed;
 }
 
+// Preview-registry state-variant id suffix, e.g. "home@empty" -> "empty" (see
+// docs/proposals/component-system-deep-dive.md §6.5's `ScreenPreview("home@empty", …)`
+// convention, and template/CLAUDE.md's UI feedback loop section).
+const STATE_VARIANT_ID_RE = /^(.+)@(loading|empty|error)$/;
+
+/**
+ * Every CURRENTLY RENDERED preview-registry entry whose id carries a
+ * `@loading`/`@empty`/`@error` suffix, grouped by state — the Components
+ * section's "live variant render" evidence (CV-1 W3b). These variants are
+ * ordinary gallery cards (registered in inspector/PreviewRegistry.kt like any
+ * other screen); this just reclassifies the CURRENT render's `cards` by id
+ * shape. Absent variants (no state-suffixed entries registered yet — e.g. a
+ * project whose PreviewRegistry.kt predates §6.5) yields empty arrays per
+ * state, never an error — the console degrades honestly (see
+ * console-tabs.mjs's liveVariantsHtml).
+ * @param {Array<{screen: {id: string, title: string, png: string}}>} cards
+ * @returns {{loading: object[], empty: object[], error: object[]}}
+ */
+export function stateVariantCards(cards) {
+  const out = { loading: [], empty: [], error: [] };
+  for (const { screen } of cards) {
+    const m = STATE_VARIANT_ID_RE.exec(screen.id);
+    if (!m) continue;
+    out[m[2]].push({ id: screen.id, title: screen.title, png: screen.png, baseScreen: m[1] });
+  }
+  return out;
+}
+
 /**
  * Compile-failure lines in Compose Hot Reload / Gradle recompile output. In daemon mode
  * a broken edit produces NO render (no classes are written, so no trigger fires) — these
@@ -166,7 +196,7 @@ const esc = (s) =>
  * (screen.prev.png is the pre-render copy); every card keeps a persistent
  * "changed #N" badge from `changedVersions` so attribution outlives the next render.
  * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error,
- *   approvals, specs, designSystem, architecture, components, comments, variants }
+ *   approvals, specs, designSystem, architecture, components, comments, variants, componentsMeta }
  */
 export function galleryHtml(state) {
   const {
@@ -184,6 +214,7 @@ export function galleryHtml(state) {
     components = { available: false },
     comments = { available: false },
     variants = { available: false },
+    componentsMeta = {},
   } = state;
   const width = viewport?.width ?? 411;
   const changedSet = new Set(changed);
@@ -309,8 +340,21 @@ export function galleryHtml(state) {
   .layer-files li, .feature-tree li { display: flex; align-items: center; gap: 6px; }
   .layer-others { margin-top: 14px; }
   .component-grid { display: flex; flex-wrap: wrap; gap: 16px; }
-  .component-card { flex: 1 1 260px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
+  .component-card { flex: 1 1 320px; max-width: 420px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
   .component-card h4 { margin: 0 0 4px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .component-sig { font-size: 11px; line-height: 1.5; background: #F7F9FC; border: 1px solid #E5E7EB; border-radius: 8px;
+                    padding: 8px 10px; margin: 4px 0 10px; overflow-x: auto; white-space: pre; }
+  .component-facts { list-style: none; margin: 0 0 10px; padding: 0; font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .component-facts li { padding-left: 14px; position: relative; }
+  .component-facts li::before { content: "\\2022"; position: absolute; left: 0; color: #9CA3AF; }
+  .component-kdoc { margin: 4px 0 10px; padding: 8px 10px; border-left: 3px solid #E5E7EB; font-size: 12px;
+                     color: #4B5563; white-space: pre-wrap; }
+  .component-live-variants { margin-bottom: 10px; }
+  .state-variant-block { margin-bottom: 8px; }
+  .state-variant-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .state-variant-thumb { width: 90px; }
+  .state-variant-thumb img { width: 100%; border: 1px solid #E5E7EB; border-radius: 6px; display: block; }
+  .violation-chip { margin-left: 4px; }
   .comments-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
   .comments-table td, .comments-table th { padding: 8px 10px; border-bottom: 1px solid #E5E7EB; text-align: left; vertical-align: top; }
   .comment-text-cell { max-width: 320px; white-space: pre-wrap; }
@@ -389,7 +433,7 @@ ${cards
 </div>
 </div>
 <div id="tab-design-system" class="tab-panel" data-tab="design-system">
-${designSystemTabHtml(designSystem, components, variants, designSystemStatus)}
+${designSystemTabHtml(designSystem, components, variants, designSystemStatus, componentsMeta)}
 </div>
 <div id="tab-architecture" class="tab-panel" data-tab="architecture">
 ${architectureTabHtml(architecture)}
@@ -1470,6 +1514,28 @@ export function createPreviewService(opts) {
         const architecture = getArchitectureData(projectDir);
         const components = getComponentsData(projectDir);
         const variants = getVariantsData(projectDir);
+        // CV-1 W3b: the components artifact's own approval record (drives
+        // the per-card badge), mtime-based per-file drift evidence (only
+        // meaningful once that record is changed-since-approval), the
+        // ARCH-11-style hand-rolled-state scan, and any live state-variant
+        // renders already sitting in the current generation's `cards`.
+        const componentsApprovalRecord = approvals.available
+          ? approvals.statuses.find((s) => s.id === "components") || null
+          : null;
+        const componentsDrift = components.available
+          ? getComponentDriftInfo(
+              projectDir,
+              components.components.map((c) => c.file),
+              componentsApprovalRecord,
+            )
+          : { available: false, reason: "components scan unavailable" };
+        const handRolledViolations = getHandRolledStateViolations(projectDir);
+        const componentsMeta = {
+          approval: componentsApprovalRecord,
+          drift: componentsDrift,
+          violations: handRolledViolations,
+          stateVariants: stateVariantCards(cards),
+        };
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(
           galleryHtml({
@@ -1487,6 +1553,7 @@ export function createPreviewService(opts) {
             components,
             comments,
             variants,
+            componentsMeta,
           }),
         );
         return;

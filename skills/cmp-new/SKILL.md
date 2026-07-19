@@ -259,12 +259,37 @@ scaffold (local DB on/off, auth, which tabs). Approval here means "I understand 
 shape for my app," not "I designed it" — say so plainly. Approve `architecture`.
 
 ### 7.3 Components — propose, shape, approve
-From the brief and the now-frozen design language, propose the component vocabulary this app
-will speak in (`presentation/components/*.kt` — ships with just `BaseScreen`; you'll typically
-add a few: cards, list rows, buttons, whatever the first screens need). Shape each with the human
-in place, using the preview loop to check. Once approved, the registry is law — any component
-added or changed afterward invalidates the approval (`changed-since-approval`) until a human
-re-approves. Approve `components`.
+The template doesn't ship a blank slate here: `presentation/components/*.kt` already carries a
+nine-component vocabulary (page container, header, bottom bar, the loading/empty/error state
+machine, list row, skeleton, and two buttons — see `docs/proposals/component-system-deep-dive.md`
+§4 for the full inventory), proven against the exemplar screen. Your job is not to build it from
+zero; it's to walk the human through what's already there, **per component**, and let them keep,
+rename, or reshape each for their domain — using the preview loop (render the exemplar, or a
+state variant like `home@empty`/`home@error`) so every choice is seen, not described:
+
+- **`ScreenColumn`** — the page container every screen roots in (`<screen>_screen`, page
+  padding). Rarely reshaped; ask if the page padding token feels right.
+- **`AppHeader`** — the title row (+ optional back, + trailing actions slot). Ask about title
+  typography/casing conventions for their brand.
+- **`AppBottomBar`** — the tab bar (already live in the shell from the tabs interview — this is
+  where it's *named* as a component, not built fresh).
+- **`ContentUiState` + `ContentStateContainer`** — the four-arm loading/content/empty/error
+  lifecycle every data-backed screen inherits. This one is rarely reshaped visually; confirm the
+  human understands it's shared (a change here drifts every consuming screen's golden).
+- **`ListItemCard`** — the one list-row shape (leading/trailing slots). Ask whether their data
+  needs a second row variant, or whether one is enough (the registry default: it usually is).
+- **`Shimmer` / `ListItemSkeleton`** — the loading placeholder shown while a list loads.
+- **`EmptyState`** — default copy is generic ("Nothing here yet"). This is exactly where the
+  human's domain language replaces it — ask what their app should say when a list is empty.
+- **`ErrorState`** — the error + retry view; ask about retry copy/tone.
+- **`AppButton`** (`AppPrimaryButton`/`AppTextButton`) — the two buttons, 48dp-enforced. Ask
+  about label casing/weight conventions.
+
+Propose additions the nine don't cover only when a first screen genuinely needs one (a chip, a
+badge) — a new file is a registry *addition*, shaped and approved the same way, not added
+speculatively. Once approved, the registry is law: any component added or changed afterward
+invalidates the approval (`changed-since-approval`) until a human re-approves. Approve
+`components`.
 
 ### 7.4 The exemplar is THEIR first feature
 The exemplar is the DNA every future feature clones from — it must never stay generic `home`

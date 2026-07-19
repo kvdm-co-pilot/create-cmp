@@ -259,6 +259,7 @@ const RENAME_MAP = [
   [`${SOURCE_f}_empty`, `${f}_empty`],
   [`${SOURCE_f}_loading`, `${f}_loading`],
   [`${SOURCE_f}_retry`, `${f}_retry`],
+  [`${SOURCE_f}_item_`, `${f}_item_`],
   [`Fake${SOURCE_E}Repository`, `Fake${E}Repository`],
   [`${SOURCE_E}RepositoryImpl`, `${E}RepositoryImpl`],
   [`${SOURCE_E}Repository`, `${E}Repository`],
