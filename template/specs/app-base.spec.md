@@ -16,8 +16,13 @@
   corresponding `*ViewModelTest` exists (no untested presentation state).
 - **ARCH-04** — Given any file in a `presentation` feature package that contains a
   `@Composable` function, When its source is inspected, Then it declares at least one
-  `testTag` (scoped by content, not `*Screen.kt` filename — split `Content.kt` UI files are
-  covered, ViewModel-only files are exempt).
+  literal `testTag` **or** passes a `screenTag =` argument to a component imported from
+  `presentation.components` (scoped by content, not `*Screen.kt` filename — split
+  `Content.kt` UI files are covered, ViewModel-only files are exempt). Component-derived
+  tags count as tag provenance: a screen built entirely from `ScreenColumn`/`AppHeader`/
+  `ContentStateContainer`/etc. is automation-reachable through the tags those components
+  emit (`<screenTag>_screen`, `<screenTag>_title`, `<screenTag>_loading`, …) even without a
+  literal `testTag` of its own.
 - **ARCH-05** — Given any file outside `presentation/theme`, When its source is inspected,
   Then it constructs no literal `Color(0x…)` values (design colors come from the token
   catalog).
@@ -32,6 +37,10 @@
   only exception-catching mechanism is the shared `suspendRunCatching` helper
   (`data/AppResultCatching.kt`), and the helper always rethrows `CancellationException` —
   cancellation is never swallowed into a failure state.
+- **ARCH-11** — Given any file in a presentation feature package (`components/` excluded),
+  When its source is inspected, Then it references neither `CircularProgressIndicator` nor
+  `LinearProgressIndicator` directly — loading is presented through the components
+  registry (`ContentStateContainer`/`ContentStateDefaults`), never hand-rolled per screen.
 
 ## App shell
 

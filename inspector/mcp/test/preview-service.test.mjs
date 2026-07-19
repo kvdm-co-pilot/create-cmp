@@ -14,6 +14,7 @@ import {
   galleryHtml,
   createPreviewService,
   detectAppPackage,
+  stateVariantCards,
 } from "../src/lib/preview-service.mjs";
 import { resetApprovalsBridgeCache } from "../src/lib/approvals-bridge.mjs";
 import { resetCommentsBridgeCache } from "../src/lib/comments-bridge.mjs";
@@ -67,6 +68,49 @@ function makeApprovalsFixtureProject() {
   fs.mkdirSync(libDir, { recursive: true });
   fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
   return root;
+}
+
+/**
+ * A minimal generated-project fixture with a REAL presentation/components/
+ * directory (one real-shaped component file) AND a REAL qa/lib/approvals.mjs
+ * — enough to boot the console end-to-end against a real `components`
+ * artifact (CV-1 W3b's "boot the console against a scaffolded app" gate):
+ * approve it via the real POST /api/approve -> real library -> real
+ * qa/approvals.json, then drift a real file on disk and prove the Components
+ * section's per-card badge/chip reflect the REAL approval record and REAL
+ * mtime, not a mock.
+ */
+function makeComponentsFixtureProject() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-components-"));
+  fs.mkdirSync(path.join(root, "composeApp", "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "composeApp", "build.gradle.kts"), 'android {\n  namespace = "com.acme.demo"\n}\n');
+  const pkgDir = path.join(root, "composeApp", "src", "commonMain", "kotlin", "com", "acme", "demo");
+  const componentsDir = path.join(pkgDir, "presentation", "components");
+  fs.mkdirSync(componentsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(componentsDir, "ScreenColumn.kt"),
+    [
+      "package com.acme.demo.presentation.components",
+      "",
+      "/**",
+      " * The page container every screen roots itself in.",
+      " */",
+      "@Composable",
+      "fun ScreenColumn(screenTag: String, content: @Composable () -> Unit) {",
+      '  Column(Modifier.semantics { testTag = "${screenTag}_screen" }, content = content)',
+      "}",
+    ].join("\n"),
+  );
+  const homeDir = path.join(pkgDir, "presentation", "home");
+  fs.mkdirSync(homeDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(homeDir, "HomeScreen.kt"),
+    ["@Composable", 'fun HomeScreen() { ScreenColumn(screenTag = "home") { } }'].join("\n"),
+  );
+  const libDir = path.join(root, "qa", "lib");
+  fs.mkdirSync(libDir, { recursive: true });
+  fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
+  return { root, componentsDir };
 }
 
 /**
@@ -124,6 +168,25 @@ test("diffScreenTrees: null prev = no changes; content changes, additions, remov
   assert.ok(changed.includes("home"), "content change detected");
   assert.ok(changed.includes("detail"), "added screen detected");
   assert.ok(changed.includes("shell"), "removed screen detected");
+});
+
+test("stateVariantCards: groups @loading/@empty/@error preview-registry entries by state; plain screen ids are ignored; honest empty groups when none registered", () => {
+  const cards = [
+    { screen: { id: "home", title: "Home tab", png: "home/screen.png" } },
+    { screen: { id: "home@empty", title: "Home — empty", png: "home@empty/screen.png" } },
+    { screen: { id: "home@loading", title: "Home — loading", png: "home@loading/screen.png" } },
+    { screen: { id: "detail@error", title: "Detail — error", png: "detail@error/screen.png" } },
+  ];
+  const grouped = stateVariantCards(cards);
+  assert.deepEqual(grouped.empty, [{ id: "home@empty", title: "Home — empty", png: "home@empty/screen.png", baseScreen: "home" }]);
+  assert.deepEqual(grouped.loading, [{ id: "home@loading", title: "Home — loading", png: "home@loading/screen.png", baseScreen: "home" }]);
+  assert.deepEqual(grouped.error, [{ id: "detail@error", title: "Detail — error", png: "detail@error/screen.png", baseScreen: "detail" }]);
+
+  assert.deepEqual(stateVariantCards([{ screen: { id: "home", title: "Home tab", png: "home/screen.png" } }]), {
+    loading: [],
+    empty: [],
+    error: [],
+  });
 });
 
 test("extractCompileErrors: kotlin e:-lines, task/build FAILED markers; quiet output yields none", () => {
@@ -837,6 +900,58 @@ test("service: POST /api/approve surfaces the library's refusal verbatim (vacuou
 
     const getInstead = await fetch(`${st.url}api/approve`);
     assert.equal(getInstead.status, 405);
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: Components section — boots against a real components dir + the REAL approvals library; approve, then drift a real file, and the card reflects both", async () => {
+  const { root: projectDir, componentsDir } = makeComponentsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19890, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Unapproved: the real components scan renders the full card (signature,
+    // kdoc, state-contract facts, used-in with the screen badge) plus an
+    // honest "not yet approved" badge — the components artifact starts
+    // `unreviewed` in a fresh qa/approvals.json.
+    let page = await (await fetch(st.url)).text();
+    assert.match(page, /ScreenColumn/);
+    assert.match(page, /fun ScreenColumn\(/);
+    assert.match(page, /screenTag: String,/);
+    assert.match(page, /from the component's own doc comment/);
+    assert.match(page, /The page container every screen roots itself in\./);
+    assert.match(page, /owns testTags derived from <code>screenTag<\/code>/);
+    assert.match(page, /&lt;screenTag&gt;_screen/);
+    assert.match(page, /class="badge badge-open">screen/, "HomeScreen.kt is listed as a screen used-in entry");
+    assert.match(page, /badge-unreviewed/);
+
+    const approveRes = await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "components" }),
+    });
+    assert.equal((await approveRes.json()).ok, true);
+
+    page = await (await fetch(st.url)).text();
+    assert.match(page, /badge-approved/);
+    assert.match(page, /approved &middot;/);
+
+    // Drift: edit the real file's content AND push its mtime safely into the
+    // future relative to approvedAt (same-millisecond writes on a fast CI
+    // disk could otherwise land mtime <= approvedAt and flip the assertion).
+    await new Promise((r) => setTimeout(r, 20));
+    const file = path.join(componentsDir, "ScreenColumn.kt");
+    fs.appendFileSync(file, "\n// edited after approval\n");
+    const future = new Date(Date.now() + 60_000);
+    fs.utimesSync(file, future, future);
+
+    page = await (await fetch(st.url)).text();
+    assert.match(page, /drift &middot; artifact changed since approval/);
+    assert.match(page, /likely changed \(mtime\)/);
   } finally {
     service.stop();
     resetApprovalsBridgeCache(projectDir);

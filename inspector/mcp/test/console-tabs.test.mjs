@@ -330,7 +330,7 @@ test("designSystemTabHtml: Components section unavailable -> honest empty-state,
   assert.match(html, /no presentation\/components directory found/);
 });
 
-test("designSystemTabHtml: Components section renders name/file/params/used-in, flags a parse error honestly", () => {
+test("designSystemTabHtml: Components section renders name/file/signature/used-in, flags a parse error honestly", () => {
   const html = designSystemTabHtml(
     { available: true, source: "previews", catalog: { colors: {}, dimens: {} } },
     {
@@ -340,15 +340,26 @@ test("designSystemTabHtml: Components section renders name/file/params/used-in, 
           name: "AppButton",
           file: "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/components/AppButton.kt",
           params: ["text: String", "onClick: () -> Unit"],
+          paramsParsed: [
+            { raw: "text: String", name: "text", type: "String", default: null },
+            { raw: "onClick: () -> Unit", name: "onClick", type: "() -> Unit", default: null },
+          ],
           parseError: false,
+          kdoc: null,
+          facts: {},
           usedIn: ["composeApp/src/commonMain/kotlin/com/acme/demo/presentation/home/HomeScreen.kt"],
+          usedInScreens: ["composeApp/src/commonMain/kotlin/com/acme/demo/presentation/home/HomeScreen.kt"],
         },
         {
           name: "Broken",
           file: "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/components/Broken.kt",
           params: [],
+          paramsParsed: [],
           parseError: true,
+          kdoc: null,
+          facts: {},
           usedIn: [],
+          usedInScreens: [],
         },
       ],
     },
@@ -357,6 +368,7 @@ test("designSystemTabHtml: Components section renders name/file/params/used-in, 
   assert.match(html, /text: String/);
   assert.match(html, /onClick: \(\) -&gt; Unit/);
   assert.match(html, /HomeScreen\.kt/);
+  assert.match(html, /class="badge badge-open">screen/, "the screen used-in entry carries the screen badge");
   assert.match(html, /Broken/);
   assert.match(html, /signature could not be parsed cleanly/);
 });
@@ -364,6 +376,228 @@ test("designSystemTabHtml: Components section renders name/file/params/used-in, 
 test("designSystemTabHtml: Components section — dir present but zero components -> honest empty-inline note", () => {
   const html = designSystemTabHtml({ available: false }, { available: true, components: [] });
   assert.match(html, /no @Composable components found/);
+});
+
+// --- CV-1 W3b: authored form + derived truth + drift surface ---------------
+
+function component(overrides = {}) {
+  return {
+    name: "ScreenColumn",
+    file: "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/components/ScreenColumn.kt",
+    params: ["screenTag: String"],
+    paramsParsed: [{ raw: "screenTag: String", name: "screenTag", type: "String", default: null }],
+    parseError: false,
+    kdoc: null,
+    facts: {},
+    usedIn: [],
+    usedInScreens: [],
+    ...overrides,
+  };
+}
+
+test("designSystemTabHtml: Components section — signature block shows every param, one per line, in scanned order", () => {
+  const html = designSystemTabHtml(
+    { available: false },
+    {
+      available: true,
+      components: [
+        component({
+          name: "ListItemCard",
+          params: ["title: String", "onClick: () -> Unit", "subtitle: String? = null"],
+          paramsParsed: [
+            { raw: "title: String", name: "title", type: "String", default: null },
+            { raw: "onClick: () -> Unit", name: "onClick", type: "() -> Unit", default: null },
+            { raw: "subtitle: String? = null", name: "subtitle", type: "String?", default: "null" },
+          ],
+        }),
+      ],
+    },
+  );
+  assert.match(html, /fun ListItemCard\(/);
+  assert.match(html, /title: String,/);
+  assert.match(html, /subtitle: String\? = null,/);
+});
+
+test("designSystemTabHtml: Components section — state contract renders ONLY facts with positive evidence, never a negative claim", () => {
+  const withFacts = designSystemTabHtml(
+    { available: false },
+    {
+      available: true,
+      components: [
+        component({
+          facts: {
+            derivedTags: ["screen"],
+            contentUiStateArms: [],
+            a11yFloorEvidence: [],
+            insetsApis: [],
+            tokensReferenced: ["Tokens.PaddingPage"],
+            selfReportsDesignToken: true,
+          },
+        }),
+      ],
+    },
+  );
+  assert.match(withFacts, /state contract/);
+  assert.match(withFacts, /owns testTags derived from <code>screenTag<\/code>/);
+  assert.match(withFacts, /&lt;screenTag&gt;_screen/);
+  assert.match(withFacts, /Tokens\.PaddingPage/);
+  assert.match(withFacts, /self-reports resolved values to the inspector/);
+  assert.doesNotMatch(withFacts, /does not|does NOT/i, "no negative claim is ever rendered");
+
+  const noFacts = designSystemTabHtml(
+    { available: false },
+    { available: true, components: [component({ paramsParsed: [], facts: {} })] },
+  );
+  assert.doesNotMatch(noFacts, /state contract/, "an empty facts set omits the whole subsection, not an empty header");
+});
+
+test("designSystemTabHtml: Components section — ContentUiState arms and the 48dp a11y floor render with their evidence", () => {
+  const html = designSystemTabHtml(
+    { available: false },
+    {
+      available: true,
+      components: [
+        component({
+          name: "ContentStateContainer",
+          paramsParsed: [{ raw: "screenTag: String", name: "screenTag", type: "String", default: null }],
+          facts: {
+            derivedTags: [],
+            contentUiStateArms: ["Loading", "Error", "Empty", "Content"],
+            a11yFloorEvidence: ["48.dp"],
+            insetsApis: [],
+            tokensReferenced: [],
+            selfReportsDesignToken: false,
+          },
+        }),
+      ],
+    },
+  );
+  assert.match(html, /renders <code>ContentUiState<\/code> arms:.*Loading.*Error.*Empty.*Content/s);
+  assert.match(html, /enforces the 48dp a11y touch-target floor/);
+  assert.match(html, /48\.dp/);
+});
+
+test("designSystemTabHtml: Components section — kdoc is quoted verbatim and labeled as the component's own doc comment; absent kdoc omits the section", () => {
+  const withKdoc = designSystemTabHtml(
+    { available: false },
+    { available: true, components: [component({ kdoc: "Deliberately not an M3 TopAppBar." })] },
+  );
+  assert.match(withKdoc, /from the component's own doc comment/);
+  assert.match(withKdoc, /Deliberately not an M3 TopAppBar\./);
+
+  const noKdoc = designSystemTabHtml({ available: false }, { available: true, components: [component({ kdoc: null })] });
+  assert.doesNotMatch(noKdoc, /usage notes/, "no kdoc found -> no fabricated usage-notes section");
+});
+
+test("designSystemTabHtml: Components section — approval badge reflects the components artifact's live status", () => {
+  const approved = designSystemTabHtml(
+    { available: false },
+    { available: true, components: [component()] },
+    undefined,
+    undefined,
+    { approval: { status: "approved", hash: "abc123def456", approvedAt: "2026-07-19T00:00:00.000Z" } },
+  );
+  assert.match(approved, /badge-approved/);
+  assert.match(approved, /approved &middot; abc123de/);
+
+  const unreviewed = designSystemTabHtml(
+    { available: false },
+    { available: true, components: [component()] },
+    undefined,
+    undefined,
+    { approval: { status: "unreviewed" } },
+  );
+  assert.match(unreviewed, /badge-unreviewed/);
+  assert.match(unreviewed, /not yet approved/);
+
+  const noApproval = designSystemTabHtml({ available: false }, { available: true, components: [component()] });
+  assert.doesNotMatch(noApproval, /badge-approved|badge-unreviewed|badge-changed|badge-reopened/, "no approvals data -> no fabricated badge");
+});
+
+test("designSystemTabHtml: Components section — drift: artifact-level badge plus a per-card mtime chip when drift data resolves the file", () => {
+  const html = designSystemTabHtml(
+    { available: false },
+    { available: true, components: [component({ file: "a/ScreenColumn.kt" })] },
+    undefined,
+    undefined,
+    {
+      approval: { status: "changed-since-approval", hash: "new", storedHash: "old", approvedAt: "2026-07-19T00:00:00.000Z" },
+      drift: { available: true, byFile: { "a/ScreenColumn.kt": { modifiedSinceApproval: true, mtime: "2026-07-19T01:00:00.000Z" } } },
+    },
+  );
+  assert.match(html, /drift &middot; artifact changed since approval/);
+  assert.match(html, /likely changed \(mtime\)/);
+
+  const unchangedFile = designSystemTabHtml(
+    { available: false },
+    { available: true, components: [component({ file: "a/ScreenColumn.kt" })] },
+    undefined,
+    undefined,
+    {
+      approval: { status: "changed-since-approval", hash: "new", storedHash: "old", approvedAt: "2026-07-19T00:00:00.000Z" },
+      drift: { available: true, byFile: { "a/ScreenColumn.kt": { modifiedSinceApproval: false, mtime: "2026-07-18T01:00:00.000Z" } } },
+    },
+  );
+  assert.match(unchangedFile, /unchanged since approval \(mtime\)/);
+});
+
+test("designSystemTabHtml: Components section — used-in flags a screen that hand-rolls a state this component owns", () => {
+  const html = designSystemTabHtml(
+    { available: false },
+    {
+      available: true,
+      components: [
+        component({
+          name: "ContentStateContainer",
+          usedIn: ["composeApp/src/commonMain/kotlin/com/acme/demo/presentation/home/HomeScreen.kt"],
+          usedInScreens: ["composeApp/src/commonMain/kotlin/com/acme/demo/presentation/home/HomeScreen.kt"],
+        }),
+      ],
+    },
+    undefined,
+    undefined,
+    {
+      violations: {
+        available: true,
+        violations: [
+          {
+            file: "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/home/HomeScreen.kt",
+            indicators: [{ name: "CircularProgressIndicator", lines: [12] }],
+          },
+        ],
+      },
+    },
+  );
+  assert.match(html, /hand-rolled state/);
+  assert.match(html, /hand-rolls CircularProgressIndicator/);
+});
+
+test("designSystemTabHtml: Components section — live variant thumbnails render when a matching @state preview exists; honest degrade when it doesn't", () => {
+  const withThumb = designSystemTabHtml(
+    { available: false },
+    { available: true, components: [component({ name: "EmptyState", facts: { derivedTags: ["empty"] } })] },
+    undefined,
+    undefined,
+    { stateVariants: { loading: [], empty: [{ id: "home@empty", title: "Home — empty", png: "home@empty/screen.png" }], error: [] } },
+  );
+  assert.match(withThumb, /live &#64;empty render/);
+  assert.match(withThumb, /home@empty\/screen\.png/);
+
+  const noThumbYet = designSystemTabHtml(
+    { available: false },
+    { available: true, components: [component({ name: "EmptyState", facts: { derivedTags: ["empty"] } })] },
+    undefined,
+    undefined,
+    { stateVariants: { loading: [], empty: [], error: [] } },
+  );
+  assert.match(noThumbYet, /live &#64;empty render/);
+  assert.match(noThumbYet, /not derivable statically/);
+
+  const noStateTags = designSystemTabHtml(
+    { available: false },
+    { available: true, components: [component({ facts: { derivedTags: ["screen"] } })] },
+  );
+  assert.doesNotMatch(noStateTags, /live &#64;/, "a component with no state-suffix tags shows no live-variant section at all");
 });
 
 // --- architectureTabHtml (§7.1) ---------------------------------------------

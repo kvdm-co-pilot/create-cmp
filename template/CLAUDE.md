@@ -22,7 +22,13 @@ invariants the conformance gates enforce.
 
 - **Layers:** `presentation` → `domain` ← `data`. `domain` imports nothing app-internal;
   `presentation` never imports `data`. Koin wires implementations in `di/`.
-- **Every screen:** a `*Screen` composable with a `testTag`ged root, a ViewModel with a test.
+- **Every screen:** compose the registry vocabulary (`presentation/components/*.kt` —
+  `ScreenColumn`/`AppHeader`/`ContentStateContainer`/`ListItemCard`/…), don't hand-roll a
+  header, loading state, or list row; see the exemplar's `HomeScreen.kt`. A `testTag`ged
+  root comes for free from `ScreenColumn(screenTag = "<feature>")` — ARCH-04 accepts that
+  `screenTag =` wiring as tag provenance, a literal `testTag` is only needed for content
+  the registry doesn't already tag (e.g. per-row ids). Every screen: a `*Screen` composable,
+  a ViewModel with a test.
 - **Errors are typed, never thrown across layers:** repositories return `AppResult`
   (`Failure` carries a `DomainError` kind); the data layer's `suspendRunCatching` is the only
   catch point and always rethrows `CancellationException`; ViewModels have no `try`/`catch` —

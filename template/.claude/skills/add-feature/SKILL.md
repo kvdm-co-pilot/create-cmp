@@ -102,7 +102,12 @@ Then adapt the generated code to match:
 - If the feature isn't shaped like "a list of `{id, title, subtitle}`", update the entity's
   fields in `domain/model/<Entity>.kt`, the sample data in `<Entity>RepositoryImpl.kt`, and the
   screen's rendering in `presentation/<feature>/<Feature>Screen.kt` together — keep them
-  consistent with each other and with the tests.
+  consistent with each other and with the tests. The stamped screen already **composes the
+  registry vocabulary** (`ScreenColumn`/`AppHeader`/`ContentStateContainer`/`ListItemCard`,
+  `presentation/components/*.kt`) — adapt the content shape inside `ContentStateContainer`'s
+  trailing slot, don't hand-roll a new header/loading state/list row on top of it. If the
+  feature's data genuinely needs a component the nine don't cover, propose the addition to the
+  human explicitly (a new file is a registry change — it invalidates the `components` approval).
 - Update the copied tests (`<Feature>ViewModelTest.kt`, `<Feature>ScreenTest.kt`) to match
   whatever you changed. The gate (step 6) will tell you exactly what you missed — a compile
   error names the mismatch; a spec-coverage failure names an orphaned clause or tag.
@@ -134,7 +139,9 @@ node qa/verify.mjs
 This must PASS. It proves: the spec's seven clauses are all bound to a citing test
 (`specCoverage`), the build compiles, unit tests pass (ViewModel + UseCase + Repository +
 fakes), architecture conformance holds (`presentation` doesn't import `data`, the new
-`*Screen.kt` carries a `testTag`, the new `*ViewModel.kt` has a matching test), the golden tree
+`*Screen.kt` is automation-reachable — a literal `testTag` or `screenTag =` wiring into a
+registry component — the new `*ViewModel.kt` has a matching test, and it references no
+`CircularProgressIndicator`/`LinearProgressIndicator` directly), the golden tree
 matches what you just captured, and accessibility holds. **Not done until this is PASS and the
 evidence receipt (`qa/evidence/latest.json`) is committed with your change** — this is this
 project's standing definition of done (see `CLAUDE.md`).

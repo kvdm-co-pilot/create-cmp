@@ -174,3 +174,201 @@ test("getComponentsData: multiple components in one file, used-in excludes the c
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// --- CV-1 W3b: signature extraction (kdoc, paramsParsed, facts, usedInScreens) ---
+
+test("getComponentsData: kdoc is extracted verbatim from the doc comment directly above @Composable; absent when there isn't one", () => {
+  const { root, componentsDir } = makeFixtureProject();
+  try {
+    fs.writeFileSync(
+      path.join(componentsDir, "AppHeader.kt"),
+      [
+        "package com.acme.demo.presentation.components",
+        "",
+        "/**",
+        " * The screen header — replaces the three hand-copied headline `Text`s.",
+        " *",
+        " * Deliberately not an M3 TopAppBar.",
+        " */",
+        "@Composable",
+        "fun AppHeader(title: String, screenTag: String) { Text(title) }",
+        "",
+        "@Composable",
+        "fun Undocumented() { Text(\"hi\") }",
+      ].join("\n"),
+    );
+    const data = getComponentsData(root);
+    const header = data.components.find((c) => c.name === "AppHeader");
+    assert.equal(
+      header.kdoc,
+      "The screen header — replaces the three hand-copied headline `Text`s.\n\nDeliberately not an M3 TopAppBar.",
+    );
+    const undocumented = data.components.find((c) => c.name === "Undocumented");
+    assert.equal(undocumented.kdoc, null, "no comment directly above -> null, never a guess");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getComponentsData: paramsParsed splits name/type/default per parameter, preserving scanned order", () => {
+  const { root, componentsDir } = makeFixtureProject();
+  try {
+    fs.writeFileSync(
+      path.join(componentsDir, "ListItemCard.kt"),
+      [
+        "package com.acme.demo.presentation.components",
+        "@Composable",
+        "fun ListItemCard(",
+        "  title: String,",
+        "  onClick: () -> Unit,",
+        "  modifier: Modifier = Modifier,",
+        "  subtitle: String? = null,",
+        ") { }",
+      ].join("\n"),
+    );
+    const data = getComponentsData(root);
+    const card = data.components.find((c) => c.name === "ListItemCard");
+    assert.deepEqual(card.paramsParsed, [
+      { raw: "title: String", name: "title", type: "String", default: null },
+      { raw: "onClick: () -> Unit", name: "onClick", type: "() -> Unit", default: null },
+      { raw: "modifier: Modifier = Modifier", name: "modifier", type: "Modifier", default: "Modifier" },
+      { raw: "subtitle: String? = null", name: "subtitle", type: "String?", default: "null" },
+    ]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getComponentsData: facts are derived from the component's OWN body — screenTag tags, a11y floor, tokens, designToken self-report", () => {
+  const { root, componentsDir } = makeFixtureProject();
+  try {
+    fs.writeFileSync(
+      path.join(componentsDir, "ScreenColumn.kt"),
+      [
+        "package com.acme.demo.presentation.components",
+        "@Composable",
+        "fun ScreenColumn(screenTag: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {",
+        "  val base = modifier",
+        '    .semantics { testTag = "${screenTag}_screen" }',
+        "    .designToken(tokens = listOf(\"PaddingPage\"), resolved = mapOf(\"padding\" to \"16dp\"))",
+        "    .padding(AppTokens.PaddingPage)",
+        "  Column(base, content = content)",
+        "}",
+      ].join("\n"),
+    );
+    const data = getComponentsData(root);
+    const col = data.components.find((c) => c.name === "ScreenColumn");
+    assert.deepEqual(col.facts.derivedTags, ["screen"]);
+    assert.equal(col.facts.selfReportsDesignToken, true);
+    assert.deepEqual(col.facts.tokensReferenced, ["AppTokens.PaddingPage"]);
+    assert.deepEqual(col.facts.a11yFloorEvidence, [], "no a11y evidence in this body -> empty, not fabricated");
+    assert.deepEqual(col.facts.contentUiStateArms, []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getComponentsData: facts are scoped PER COMPOSABLE — a sibling's a11y floor/tags don't bleed into another composable in the same file", () => {
+  const { root, componentsDir } = makeFixtureProject();
+  try {
+    fs.writeFileSync(
+      path.join(componentsDir, "AppButton.kt"),
+      [
+        "package com.acme.demo.presentation.components",
+        "@Composable",
+        "fun AppPrimaryButton(text: String, onClick: () -> Unit) {",
+        "  Button(onClick = onClick, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text(text) }",
+        "}",
+        "@Composable",
+        "fun Decorative() {",
+        "  Box(Modifier.size(4.dp))",
+        "}",
+      ].join("\n"),
+    );
+    const data = getComponentsData(root);
+    const btn = data.components.find((c) => c.name === "AppPrimaryButton");
+    const decorative = data.components.find((c) => c.name === "Decorative");
+    assert.deepEqual(btn.facts.a11yFloorEvidence, ["48.dp"]);
+    assert.deepEqual(decorative.facts.a11yFloorEvidence, [], "Decorative's own body has no 48dp — not inherited from its sibling");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getComponentsData: facts pick up ContentUiState arms and insets APIs when present in the body", () => {
+  const { root, componentsDir } = makeFixtureProject();
+  try {
+    fs.writeFileSync(
+      path.join(componentsDir, "ContentStateContainer.kt"),
+      [
+        "package com.acme.demo.presentation.components",
+        "@Composable",
+        "fun <T> ContentStateContainer(state: ContentUiState<T>, screenTag: String, content: @Composable (T) -> Unit) {",
+        "  when (state) {",
+        "    is ContentUiState.Loading -> {}",
+        "    is ContentUiState.Error -> {}",
+        "    is ContentUiState.Empty -> {}",
+        "    is ContentUiState.Content -> content(state.data)",
+        "  }",
+        "}",
+        "@Composable",
+        "fun BaseScreen(content: @Composable () -> Unit) {",
+        "  Box(Modifier.statusBarsPadding().navigationBarsPadding()) { content() }",
+        "}",
+      ].join("\n"),
+    );
+    const data = getComponentsData(root);
+    const container = data.components.find((c) => c.name === "ContentStateContainer");
+    assert.deepEqual(container.facts.contentUiStateArms.sort(), ["Content", "Empty", "Error", "Loading"]);
+    const base = data.components.find((c) => c.name === "BaseScreen");
+    assert.deepEqual(base.facts.insetsApis.sort(), ["navigationBarsPadding", "statusBarsPadding"]);
+    assert.deepEqual(base.facts.contentUiStateArms, [], "BaseScreen doesn't reference ContentUiState — none fabricated");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getComponentsData: usedInScreens is the *Screen.kt subset of usedIn", () => {
+  const { root, pkgDir, componentsDir } = makeFixtureProject();
+  try {
+    fs.writeFileSync(
+      path.join(componentsDir, "AppButton.kt"),
+      ["package com.acme.demo.presentation.components", "@Composable", "fun AppButton() { }"].join("\n"),
+    );
+    const homeDir = path.join(pkgDir, "presentation", "home");
+    fs.mkdirSync(homeDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(homeDir, "HomeScreen.kt"),
+      ["@Composable", "fun HomeScreen() { AppButton() }"].join("\n"),
+    );
+    fs.writeFileSync(
+      path.join(homeDir, "HomeViewModel.kt"),
+      ["// not a screen, but could reference the name in a comment: AppButton()"].join("\n"),
+    );
+    const data = getComponentsData(root);
+    const btn = data.components.find((c) => c.name === "AppButton");
+    assert.deepEqual(btn.usedInScreens, [
+      "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/home/HomeScreen.kt",
+    ]);
+    assert.equal(btn.usedIn.length, 2, "usedIn (unfiltered) still includes the non-screen file");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getComponentsData: an unclosed signature still reports honest empty facts/kdoc/paramsParsed, never a guess", () => {
+  const { root, componentsDir } = makeFixtureProject();
+  try {
+    fs.writeFileSync(
+      path.join(componentsDir, "Broken.kt"),
+      ["package com.acme.demo.presentation.components", "@Composable", "fun Broken(text: String"].join("\n"),
+    );
+    const data = getComponentsData(root);
+    const broken = data.components.find((c) => c.name === "Broken");
+    assert.equal(broken.parseError, true);
+    assert.deepEqual(broken.paramsParsed, []);
+    assert.deepEqual(broken.facts.derivedTags, []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
