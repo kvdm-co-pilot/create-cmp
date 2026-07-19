@@ -53,13 +53,15 @@ import { getComponentDriftInfo } from "./component-drift.mjs";
 import { getHandRolledStateViolations } from "./handrolled-state.mjs";
 import { renderShellPage, statusGlyph, artifactStatusHtml, railReceiptHtml } from "./console-shell.mjs";
 import {
-  designSystemTabHtml,
+  designLanguageBodyHtml,
+  componentsBodyHtml,
   approvalsTabHtml,
   specsTabHtml,
   architectureTabHtml,
   commentsTabHtml,
   commentControlHtml,
 } from "./console-tabs.mjs";
+import { getTokenUsage } from "./design-language.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -204,7 +206,7 @@ const esc = (s) =>
  * outlives the next render.
  * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error,
  *   approvals, specs, designSystem, architecture, components, comments, variants, componentsMeta,
- *   architectureMeta, lastReceipt, treeHash }
+ *   architectureMeta, lastReceipt, treeHash, tokenUsage }
  */
 export function galleryHtml(state) {
   const {
@@ -226,6 +228,7 @@ export function galleryHtml(state) {
     architectureMeta = {},
     lastReceipt = null,
     treeHash = null,
+    tokenUsage = null,
   } = state;
   const width = viewport?.width ?? 411;
   const changedSet = new Set(changed);
@@ -248,12 +251,18 @@ export function galleryHtml(state) {
     approvals.available ? approvals.statuses.find((s) => s.id === id) || null : null;
   const dsRecord = artifactRecord("design-system");
   const archRecord = architectureMeta.approval ?? artifactRecord("architecture");
+  const componentsRecord = componentsMeta.approval ?? artifactRecord("components");
 
   // Open comments, attributed to the section their target lives in — the §2
-  // header's open-comment count. Unknown/general targets count under Comments.
+  // header's open-comment count. Component comments ride the design-system
+  // target type with a "component:<Name>" token (the §7.3 contract), so they
+  // attribute to the Components section. Unknown/general targets count under
+  // Comments.
   const sectionOfTarget = (t) => {
     if (!t || typeof t !== "object") return "comments";
-    if (t.type === "design-system") return "design-system";
+    if (t.type === "design-system") {
+      return String(t.token || "").startsWith("component:") ? "components" : "design-system";
+    }
     if (t.type === "architecture") return "architecture";
     if (t.type === "screen" || t.type === "element") return "screens";
     if (t.type === "spec-line") return "specs";
@@ -311,8 +320,22 @@ ${cards
     changed.length ? ` &middot; <span class="chg">${changed.length} changed this render</span>` : ""
   }${openNote("screens")}`;
 
-  const dsStatus = (artifactStatusHtml(dsRecord) || "the visual vocabulary — tokens, components, candidates") + openNote("design-system");
+  const dsStatus = (artifactStatusHtml(dsRecord) || "the visual vocabulary — tokens, contrast, candidates") + openNote("design-system");
   const archStatus = (artifactStatusHtml(archRecord) || "the layer contract and its live conformance") + openNote("architecture");
+
+  // Components: the artifact status when there is one, plus the registry's
+  // live size when the scan resolved — both are facts, neither is borrowed.
+  const componentsStatusParts = [];
+  {
+    const rec = artifactStatusHtml(componentsRecord);
+    if (rec) componentsStatusParts.push(rec);
+    if (components.available && components.components) {
+      const n = components.components.length;
+      componentsStatusParts.push(`${n} component${n === 1 ? "" : "s"} in the registry`);
+    }
+  }
+  const componentsStatus =
+    (componentsStatusParts.join(" &middot; ") || "no components scan available") + openNote("components");
 
   const specsStatus = specs.available
     ? `${specs.files.length} spec file${specs.files.length === 1 ? "" : "s"} &middot; ${specs.files.reduce((n, f) => n + f.clauses.length, 0)} clauses${openNote("specs")}`
@@ -339,6 +362,7 @@ ${cards
   const railItems = [
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
+    { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
     { id: "screens", label: "Screens", glyph: null, active: true },
     { id: "specs", label: "Specs", glyph: null },
     { id: "approvals", label: "Approvals", glyph: null },
@@ -355,13 +379,23 @@ ${cards
       id: "design-system",
       title: "Design language",
       statusHtml: dsStatus,
-      bodyHtml: designSystemTabHtml(designSystem, components, variants, designSystemStatus, componentsMeta),
+      bodyHtml: designLanguageBodyHtml(designSystem, {
+        usage: tokenUsage,
+        variants,
+        artifactStatus: designSystemStatus,
+      }),
     },
     {
       id: "architecture",
       title: "Architecture",
       statusHtml: archStatus,
       bodyHtml: architectureTabHtml(architecture, architectureMeta),
+    },
+    {
+      id: "components",
+      title: "Components",
+      statusHtml: componentsStatus,
+      bodyHtml: componentsBodyHtml(components, componentsMeta),
     },
     {
       id: "screens",
@@ -1494,6 +1528,11 @@ export function createPreviewService(opts) {
             )
           : { available: false, reason: "components scan unavailable" };
         const handRolledViolations = getHandRolledStateViolations(projectDir);
+        // §3.1: per-token usage counts from the real commonMain tree — only
+        // meaningful when there is a catalog to count against.
+        const tokenUsage = designSystem.available
+          ? getTokenUsage(projectDir, designSystem.catalog || {})
+          : { available: false, reason: "no design-system catalog to count against" };
         const componentsMeta = {
           approval: componentsApprovalRecord,
           drift: componentsDrift,
@@ -1542,6 +1581,7 @@ export function createPreviewService(opts) {
             architectureMeta,
             lastReceipt,
             treeHash,
+            tokenUsage,
           }),
         );
         return;

@@ -152,6 +152,52 @@ function extractKdocBefore(text, idx) {
   return joined || null;
 }
 
+/**
+ * Split a KDoc body (extractKdocBefore's output) into its free-text
+ * description and its `@param` tag map — the two places the Components
+ * section renders KDoc: the description verbatim as the component's usage
+ * notes, each `@param`'s text in the params table's notes column. Only
+ * `@param` is mapped; other block tags (`@sample`, `@see`, …) are neither
+ * mapped nor folded into the description — they are simply not rendered,
+ * never paraphrased into something else. A continuation line (any line that
+ * doesn't start a new block tag) folds into the current tag's text,
+ * KDoc-style. No `@param` for a parameter -> that parameter simply has no
+ * entry (renderers show an empty notes cell, never invented prose).
+ * @param {string|null} kdoc
+ * @returns {{description: string|null, paramDocs: Record<string, string>}}
+ */
+export function parseKdocSections(kdoc) {
+  if (!kdoc) return { description: null, paramDocs: {} };
+  const descLines = [];
+  const paramDocs = {};
+  let currentParam = null; // @param currently accepting continuation lines
+  let pastFirstTag = false;
+  for (const line of kdoc.split("\n")) {
+    const tag = line.match(/^@(\w+)(?:\s+(.*))?$/);
+    if (tag) {
+      pastFirstTag = true;
+      currentParam = null;
+      if (tag[1] === "param") {
+        const m = (tag[2] || "").match(/^\[?([A-Za-z_][A-Za-z0-9_]*)\]?\s*(.*)$/);
+        if (m) {
+          currentParam = m[1];
+          paramDocs[currentParam] = m[2] || "";
+        }
+      }
+      continue;
+    }
+    if (currentParam !== null) {
+      paramDocs[currentParam] = `${paramDocs[currentParam]} ${line.trim()}`.trim();
+    } else if (!pastFirstTag) {
+      descLines.push(line);
+    }
+    // A plain line after a non-param tag is that tag's continuation — it
+    // belongs to a tag this scan doesn't render, so it is dropped with it.
+  }
+  const description = descLines.join("\n").trim() || null;
+  return { description, paramDocs };
+}
+
 // How far past an `@Composable` occurrence to look for the `fun Name(` that
 // annotation governs — other annotations (@Preview, etc.) may sit between,
 // but this bounds the search so an @Composable near the end of a file
@@ -251,6 +297,7 @@ function scanComposables(text) {
         }
       }
     }
+    const { description: kdocDescription, paramDocs } = parseKdocSections(kdoc);
     if (closeIdx === -1) {
       out.push({
         name,
@@ -258,6 +305,8 @@ function scanComposables(text) {
         paramsParsed: [],
         parseError: true,
         kdoc,
+        kdocDescription,
+        paramDocs,
         facts: deriveFacts(""),
       });
       continue;
@@ -269,6 +318,8 @@ function scanComposables(text) {
       params: rawParams,
       paramsParsed: rawParams.map(parseParam),
       kdoc,
+      kdocDescription,
+      paramDocs,
       facts: deriveFacts(body ?? ""),
     });
   }
@@ -330,6 +381,8 @@ export function getComponentsData(root) {
         paramsParsed: sig.paramsParsed,
         parseError: sig.parseError === true,
         kdoc: sig.kdoc,
+        kdocDescription: sig.kdocDescription,
+        paramDocs: sig.paramDocs,
         facts: sig.facts,
         usedIn,
         usedInScreens: usedIn.filter((f) => SCREEN_FILE_RE.test(f)),

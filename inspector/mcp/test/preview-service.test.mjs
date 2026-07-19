@@ -1004,13 +1004,16 @@ test("service: compile watchdog — silent recompiler failure surfaces via a com
   }
 });
 
-test("galleryHtml: tab nav present; approvals/specs/designSystem default to honest empty states when omitted", () => {
+test("galleryHtml: tab nav present; approvals/specs/designSystem/components default to honest empty states when omitted", () => {
   const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
   assert.match(html, /class="tab-btn active" data-tab="screens"/);
   assert.match(html, /data-tab="design-system"/);
+  assert.match(html, /data-tab="components"/, "Components is its own rail item (§2 genesis order)");
+  assert.match(html, /id="tab-components"/, "…and its own section panel");
   assert.match(html, /data-tab="approvals"/);
   assert.match(html, /data-tab="specs"/);
   assert.match(html, /No design-system catalog available yet/);
+  assert.match(html, /No components scan available yet/);
   assert.match(html, /not available in this project/);
   assert.match(html, /No specs\/ directory found/);
   assert.match(html, /msg\.type === "approval"/, "SSE client reloads on an approval broadcast too");
@@ -1118,14 +1121,16 @@ test("service: Components section — boots against a real components dir + the 
     const st = await service.start();
     await new Promise((r) => setTimeout(r, 100));
 
-    // Unapproved: the real components scan renders the full card (signature,
-    // kdoc, state-contract facts, used-in with the screen badge) plus an
-    // honest "not yet approved" badge — the components artifact starts
-    // `unreviewed` in a fresh qa/approvals.json.
+    // Unapproved: the real components scan renders the full §3.3 entry
+    // (params table, kdoc usage notes, state-contract facts, used-in with
+    // the screen badge) plus an honest "not yet approved" badge — the
+    // components artifact starts `unreviewed` in a fresh qa/approvals.json.
     let page = await (await fetch(st.url)).text();
+    assert.match(page, /id="tab-components"/, "Components renders as its own section");
     assert.match(page, /ScreenColumn/);
-    assert.match(page, /fun ScreenColumn\(/);
-    assert.match(page, /screenTag: String,/);
+    assert.match(page, /class="params-table"/, "the signature renders as a params table");
+    assert.match(page, /<code>screenTag<\/code><\/td><td><code>String<\/code>/, "name + type from the real scan");
+    assert.match(page, /class="param-required">required/, "no default in the source -> stated required");
     assert.match(page, /from the component's own doc comment/);
     assert.match(page, /The page container every screen roots itself in\./);
     assert.match(page, /owns testTags derived from <code>screenTag<\/code>/);
