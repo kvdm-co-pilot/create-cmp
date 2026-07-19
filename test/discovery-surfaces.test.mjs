@@ -91,7 +91,7 @@ test("the case leads with cold-start reliability — the objection that actually
   // (P(green build on a clean machine)), not JS preference. The argument must open there.
   assert.match(read("llms.txt"), /cold-start build reliability|green build/i, "llms.txt leads with reliability");
   assert.match(read("docs/WHY-CMP.md"), /## 1\. The real objection — cold-start reliability/, "WHY-CMP §1 is the reliability argument");
-  assert.match(read("skills/cmp-new/SKILL.md"), /Kill the real objection first/, "fit check opens on reliability");
+  assert.match(read("skills/cmp-new/SKILL.md"), /Address the real objection first/, "fit check opens on reliability");
 });
 
 test("the CMP case is receipts-based and never claims competitors are deprecated", () => {
