@@ -21,7 +21,7 @@
 // that spans both, applied together.
 //
 //   feature    (default) — all 11 files; DI repo+usecase+viewModel; nav
-//              route+import; spec FEATURE-01..06.
+//              route+import; spec FEATURE-01..07.
 //   repository <Entity>  — ONLY the 5 data/domain files; DI repo+usecase ONLY;
 //              no nav, no viewModel, no spec file, zero SPEC tags. The
 //              positional arg IS the entity (no --entity, no feature name).
@@ -243,7 +243,7 @@ if (exemplarExtras.length > 0) {
 // SOURCE_E/SOURCE_F_UPPER) rather than hardcoded `Home`/`home`/`Item`/`HOME` — when
 // the source is the shipped `home` exemplar these resolve to exactly those
 // literals, so stamping from `home` is byte-identical to before configurability
-// existed (pinned by test/stamper-clone-source.test.mjs). Anything not in this
+// existed (pinned by test/genesis-flow.test.mjs's parity pin). Anything not in this
 // list is left untouched by design (see design doc §3 "LEAVE GENERIC" —
 // awaitItem, items, item, goldenItems, itemId, onItemClick, id, title, subtitle,
 // and every androidx./kotlinx./org.koin./kotlin. token).
@@ -299,7 +299,7 @@ function applyRename(text) {
 // canonical-11-file SHAPE `exemplarKotlinFileSet` in qa/lib/approvals.mjs
 // encodes (that function is the registry's copy; this one is the stamper's,
 // kept independently so the stamper works even without qa/lib/approvals.mjs —
-// see the resolveSourceNames() fallback above). test/stamper-clone-source.test.mjs
+// see the resolveSourceNames() fallback above). test/approvals-exemplar-list.test.mjs
 // pins that the two never disagree for a real project.
 const ALL_FILES = [
   { from: path.join(SRC("commonMain"), `domain/model/${SOURCE_E}.kt`), to: path.join(SRC("commonMain"), `domain/model/${E}.kt`), presets: ["feature", "repository"] },
@@ -648,7 +648,7 @@ if (dryRun) {
     );
   }
   if (writesSpec) {
-    console.log(`\nspecs/${f}.spec.md will be written with default clauses ${F_UPPER}-01..06.`);
+    console.log(`\nspecs/${f}.spec.md will be written with default clauses ${F_UPPER}-01..07.`);
   } else {
     console.log("\nNo spec file written by this preset (zero SPEC clauses/tags added).");
   }
@@ -681,7 +681,7 @@ for (const result of fileResults) {
 
 console.log(`✓ Scaffolded ${planLabel} [preset: ${preset}] — ${filesWritten} files written, ${injectionsApplied} anchor injections applied.`);
 if (writesSpec) {
-  console.log(`  specs/${f}.spec.md written with default clauses ${F_UPPER}-01..06 — refine the prose next.`);
+  console.log(`  specs/${f}.spec.md written with default clauses ${F_UPPER}-01..07 — refine the prose next.`);
 
   // Approvals seeding (VERIFICATION-LAYER-DESIGN.md §2): the new feature's spec
   // is a governed artifact (`feature-spec:<name>`) — seed it unreviewed so the

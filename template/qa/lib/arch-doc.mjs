@@ -128,9 +128,13 @@ function walkKotlinFiles(dir) {
 
 // Column-0 anchored on purpose: nested members of an `expect class { ... }`
 // body (e.g. `    actual val isOnline: ...`) are indented and must NOT be
-// mistaken for a second top-level expect/actual pair.
+// mistaken for a second top-level expect/actual pair. Modifiers between the
+// expect/actual keyword and the declaration kind (`expect suspend fun`,
+// `expect enum class`, `actual data class`, …) are consumed so those
+// declarations are not silently omitted from a table that promises "every
+// top-level expect".
 const DECL_RE =
-  /^(?:public\s+|internal\s+|private\s+)?(expect|actual)\s+(class|fun|object|val|var|interface)\s+(?:([A-Za-z_][\w.]*)\.)?([A-Za-z_]\w*)/;
+  /^(?:public\s+|internal\s+|private\s+)?(expect|actual)\s+(?:(?:suspend|abstract|open|sealed|data|enum|annotation|value|inline|external)\s+)*(class|fun|object|val|var|interface)\s+(?:([A-Za-z_][\w.]*)\.)?([A-Za-z_]\w*)/;
 
 /**
  * Scan every `.kt` file under `dir` for top-level expect/actual declarations.

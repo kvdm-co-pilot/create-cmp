@@ -142,7 +142,7 @@ export function resolveExemplarNames(root) {
 // Backward-compatible constants for the DEFAULT (`home`) exemplar — kept exported
 // because they describe the shipped template's own exemplar shape independent of
 // any project's configuration, and because they're the fixture the "stamping from
-// home must be byte-identical" pin (test/stamper-clone-source.test.mjs) anchors to.
+// home must be byte-identical" pin (test/genesis-flow.test.mjs) anchors to.
 export const EXEMPLAR_FEATURE_KOTLIN_FILES = exemplarKotlinFileSet("Home", "home", "Item");
 export const EXEMPLAR_SPEC_REL = "specs/home.spec.md";
 export const ARCHITECTURE_SPEC_REL = "specs/app-base.spec.md";
@@ -338,7 +338,10 @@ export function listGovernedArtifacts(root) {
  * @returns {{ hash: string, fileCount: number, missing: string[] }}
  */
 export function hashArtifactFiles(root, relFiles) {
-  const files = [...new Set(relFiles)].sort((a, b) => a.localeCompare(b));
+  // Code-unit sort (default String sort), NOT localeCompare: the hash depends
+  // on iteration order and ICU collation varies with the machine's locale —
+  // an approval recorded on one machine must verify on every other.
+  const files = [...new Set(relFiles)].sort();
   const present = [];
   const missing = [];
   for (const relPath of files) {
@@ -415,7 +418,9 @@ export function hashArchitectureArtifact(root) {
     missing.push(ARCH_DOC_REL_PATH);
   }
 
-  rows.sort((a, b) => a[0].localeCompare(b[0]));
+  // Code-unit sort for the same reason as hashArtifactFiles: hash order must
+  // not depend on the machine's locale.
+  rows.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   const overall = createHash("sha256");
   for (const [relPath, fileSha] of rows) {
     overall.update(`${relPath}\0${fileSha}\n`);

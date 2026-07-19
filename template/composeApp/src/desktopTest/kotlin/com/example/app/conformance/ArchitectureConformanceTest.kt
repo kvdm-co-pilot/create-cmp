@@ -28,16 +28,23 @@ class ArchitectureConformanceTest {
         file.readLines().filter { it.trimStart().startsWith("import ") }.map { it.trim() }
 
     /**
-     * Source lines with comment lines stripped. Layer-boundary rules scan these for BOTH
-     * `import x.y.` statements AND fully-qualified inline references (`x.y.Type(...)`) —
-     * import-only matching leaves a one-edit evasion open: delete the import, qualify the
-     * name inline, and the gate goes green while the violation remains.
+     * Source lines with comments stripped — whole comment lines AND trailing `// …` tails
+     * (a `(?<!:)` guard keeps `https://` URLs inside strings intact). Layer-boundary rules
+     * scan these for BOTH `import x.y.` statements AND fully-qualified inline references
+     * (`x.y.Type(...)`) — import-only matching leaves a one-edit evasion open: delete the
+     * import, qualify the name inline, and the gate goes green while the violation remains.
+     * Stripping trailing comments closes the inverse hole: prose like
+     * `get() // wires com.app.data.ItemRepositoryImpl` must not fail a boundary gate.
      */
+    private val trailingLineComment = Regex("""(?<!:)//.*""")
+
     private fun nonCommentLines(file: File): List<String> =
-        file.readLines().filterNot {
-            val t = it.trimStart()
-            t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")
-        }
+        file.readLines()
+            .filterNot {
+                val t = it.trimStart()
+                t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")
+            }
+            .map { it.replace(trailingLineComment, "") }
 
     private fun bannedReference(file: File, banned: List<String>): Boolean =
         nonCommentLines(file).any { line -> banned.any { line.contains(it) } }
@@ -181,7 +188,7 @@ class ArchitectureConformanceTest {
         val colorLiteral = Regex("""Color\(0x""")
         val offenders = sources(commonMain)
             .filterNot { under(it, "theme") }
-            .filter { colorLiteral.containsMatchIn(it.readText()) }
+            .filter { file -> nonCommentLines(file).any { colorLiteral.containsMatchIn(it) } }
             .map { it.path }
         if (offenders.isNotEmpty()) fail(
             violation(
@@ -192,15 +199,46 @@ class ArchitectureConformanceTest {
         )
     }
 
+    /**
+     * Each `suspend fun` declaration in [file] as one whitespace-normalized signature —
+     * from the keyword through its balanced parameter list to the end of that line, so a
+     * multiline (trailing-comma style) signature is judged by its return type, not by
+     * whichever fragment happens to share a line with `suspend fun`.
+     */
+    private fun suspendFunSignatures(file: File): List<String> {
+        val text = nonCommentLines(file).joinToString("\n")
+        val signatures = mutableListOf<String>()
+        var start = text.indexOf("suspend fun")
+        while (start >= 0) {
+            val open = text.indexOf('(', start)
+            if (open == -1) break
+            var depth = 0
+            var i = open
+            while (i < text.length) {
+                val c = text[i]
+                if (c == '(') depth += 1
+                if (c == ')') {
+                    depth -= 1
+                    if (depth == 0) break
+                }
+                i += 1
+            }
+            val end = text.indexOf('\n', i).let { if (it == -1) text.length else it }
+            signatures.add(text.substring(start, end).replace(Regex("\\s+"), " ").trim())
+            start = text.indexOf("suspend fun", end)
+        }
+        return signatures
+    }
+
     // SPEC: ARCH-06
     @Test
     fun `ARCH-06 repository interfaces return AppResult - exceptions never cross the boundary`() {
         val offenders = sources(commonMain)
             .filter { under(it, "domain") && under(it, "repository") }
             .flatMap { file ->
-                nonCommentLines(file)
-                    .filter { it.contains("suspend fun") && !it.contains(": AppResult<") }
-                    .map { "${file.path} — ${it.trim()}" }
+                suspendFunSignatures(file)
+                    .filterNot { it.contains(": AppResult<") }
+                    .map { "${file.path} — $it" }
             }
         if (offenders.isNotEmpty()) fail(
             violation(
@@ -309,7 +347,11 @@ class ArchitectureConformanceTest {
         // insets at all (bare Column at the nav layer) passes that rule while rendering
         // under the status bar. Tab screens are exempt — AppShell wraps them — so the rule
         // targets exactly the destinations registered directly on the NavHost.
-        val navHost = sources(commonMain).firstOrNull { it.name == "AppNavHost.kt" } ?: return
+        // Filename first; a renamed nav host is still found by content (the `composable(`
+        // registrations this rule parses) so the gate cannot go silently vacuous.
+        val navHost = sources(commonMain).firstOrNull { it.name == "AppNavHost.kt" }
+            ?: sources(commonMain).firstOrNull { under(it, "navigation") && it.readText().contains("composable(") }
+            ?: return
         val text = navHost.readText()
         val screenCall = Regex("""([A-Z][A-Za-z0-9]*Screen)\s*\(""")
         // A call with only a trailing lambda has no paren — `BaseScreen { … }` — so match both.
@@ -351,7 +393,7 @@ class ArchitectureConformanceTest {
         val offenders = sources(commonMain)
             .filterNot { under(it, "components") }
             .filterNot { under(it, "navigation") }
-            .filter { insetApi.containsMatchIn(it.readText()) }
+            .filter { file -> nonCommentLines(file).any { insetApi.containsMatchIn(it) } }
             .map { it.path }
         if (offenders.isNotEmpty()) fail(
             violation(
