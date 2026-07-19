@@ -822,6 +822,174 @@ test("architectureTabHtml: the architecture artifact's own approval badge + gene
   assert.doesNotMatch(noMeta, /class="arch-top-status"/, "no approval record supplied -> no top-status banner at all");
 });
 
+// --- architectureTabHtml: per-ARCH-clause receipt status (Wave C item 1) ----
+
+const GOVERNED_CONTRACT_ARCH_AND_SHELL = {
+  available: true,
+  file: "app-base.spec.md",
+  clauses: [
+    { id: "ARCH-01", withdrawn: false, prose: "Layers stay separated." },
+    { id: "SHELL-01", withdrawn: false, prose: "The first tab renders on launch." },
+  ],
+};
+
+test("architectureTabHtml: no meta.lastReceipt supplied -> treated exactly like 'no receipt' (honest badge on ARCH-01), never silently omitted", () => {
+  const html = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: GOVERNED_CONTRACT_ARCH_AND_SHELL,
+    featureShape: { available: false },
+  });
+  assert.match(html, /class="receipt-badge receipt-none"[^>]*>no receipt yet &mdash; run node qa\/verify\.mjs</);
+  assert.equal((html.match(/class="receipt-badge/g) || []).length, 1, "only the ARCH clause gets the badge, not SHELL-01");
+});
+
+test("architectureTabHtml: meta.lastReceipt unavailable -> ARCH-01 gets an honest 'no receipt yet' badge naming the fix; SHELL-01 gets none (different gate, not attributed by this receipt)", () => {
+  const html = architectureTabHtml(
+    {
+      layerMap: { available: false },
+      governedContract: GOVERNED_CONTRACT_ARCH_AND_SHELL,
+      featureShape: { available: false },
+    },
+    { lastReceipt: { available: false, reason: "no receipt at qa/evidence/latest.json — run node qa/verify.mjs" } },
+  );
+  assert.match(html, /class="receipt-badge receipt-none"[^>]*>no receipt yet &mdash; run node qa\/verify\.mjs</);
+  // Scope check: exactly one receipt badge (ARCH-01's), not one per clause.
+  assert.equal((html.match(/class="receipt-badge/g) || []).length, 1);
+});
+
+test("architectureTabHtml: fresh receipt (stale:false) -> ARCH-01 shows the real conformance verdict + age, never a stale label", () => {
+  const html = architectureTabHtml(
+    {
+      layerMap: { available: false },
+      governedContract: GOVERNED_CONTRACT_ARCH_AND_SHELL,
+      featureShape: { available: false },
+    },
+    {
+      lastReceipt: {
+        available: true,
+        conformance: { verdict: "PASS", durationMs: 4210 },
+        ageMs: 90 * 60 * 1000, // 90 minutes
+        generatedAt: "2026-07-19T06:00:00.000Z",
+        stale: false,
+      },
+    },
+  );
+  assert.match(html, /class="receipt-badge receipt-pass"[^>]*>conformance: PASS</);
+  assert.match(html, /class="receipt-age">1h ago</);
+  assert.doesNotMatch(html, /stale receipt/);
+});
+
+test("architectureTabHtml: stale receipt (inputsHash no longer matches the tree) -> labeled 'stale receipt', the old PASS is never presented as current", () => {
+  const html = architectureTabHtml(
+    {
+      layerMap: { available: false },
+      governedContract: GOVERNED_CONTRACT_ARCH_AND_SHELL,
+      featureShape: { available: false },
+    },
+    {
+      lastReceipt: {
+        available: true,
+        conformance: { verdict: "PASS", durationMs: 4210 },
+        ageMs: 3 * 60 * 60 * 1000, // 3 hours
+        generatedAt: "2026-07-19T06:00:00.000Z",
+        stale: true,
+      },
+    },
+  );
+  assert.match(html, /class="receipt-badge receipt-stale"[^>]*>stale receipt</);
+  assert.doesNotMatch(html, /class="receipt-badge receipt-pass"/, "a stale receipt must never render the pass-colored badge as if it were current");
+  assert.match(html, /conformance was PASS 3h ago &mdash; source changed since/);
+});
+
+test("architectureTabHtml: receipt exists but freshness is unverifiable (stale:null, e.g. no qa/lib/inputs-hash.mjs) -> verdict shown with an explicit 'freshness unverified' note, not silently treated as fresh", () => {
+  const html = architectureTabHtml(
+    {
+      layerMap: { available: false },
+      governedContract: GOVERNED_CONTRACT_ARCH_AND_SHELL,
+      featureShape: { available: false },
+    },
+    {
+      lastReceipt: {
+        available: true,
+        conformance: { verdict: "PASS", durationMs: 4210 },
+        ageMs: 60_000,
+        generatedAt: "2026-07-19T06:00:00.000Z",
+        stale: null,
+        staleReason: "qa/lib/inputs-hash.mjs not found or failed to load — cannot recompute the current tree's hash",
+      },
+    },
+  );
+  assert.match(html, /freshness unverified/);
+  assert.doesNotMatch(html, /stale receipt/, "stale:null is 'unknown', not the same as confirmed stale");
+});
+
+test("architectureTabHtml: receipt exists but has no conformance step (e.g. a scaffold-profile run) -> honest 'no conformance step' note, never an invented verdict", () => {
+  const html = architectureTabHtml(
+    {
+      layerMap: { available: false },
+      governedContract: GOVERNED_CONTRACT_ARCH_AND_SHELL,
+      featureShape: { available: false },
+    },
+    { lastReceipt: { available: true, conformance: null, stale: null } },
+  );
+  assert.match(html, /class="receipt-badge receipt-none">last receipt has no conformance step &mdash; run node qa\/verify\.mjs</);
+});
+
+test("architectureTabHtml: FAIL conformance verdict renders the fail-colored badge", () => {
+  const html = architectureTabHtml(
+    {
+      layerMap: { available: false },
+      governedContract: GOVERNED_CONTRACT_ARCH_AND_SHELL,
+      featureShape: { available: false },
+    },
+    {
+      lastReceipt: {
+        available: true,
+        conformance: { verdict: "FAIL", reason: "ARCH-01 violated", durationMs: 900 },
+        ageMs: 60_000,
+        stale: false,
+      },
+    },
+  );
+  assert.match(html, /class="receipt-badge receipt-fail"[^>]*>conformance: FAIL</);
+});
+
+// --- architectureTabHtml: dependency-graph advisory label (Wave C item 2) ---
+
+test("architectureTabHtml: dependency graph carries the 'advisory preview; the lane is the law' label whenever a scan renders — edges present, zero edges, and a resolved-violation graph all carry it", () => {
+  const withEdges = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+    dependencyGraph: {
+      available: true,
+      appPackage: "com.acme.demo",
+      buckets: ["presentation", "domain"],
+      edges: [{ from: "presentation", to: "domain", count: 1, violation: false, clauseId: null, occurrences: [] }],
+      violations: [],
+      rulesApplied: true,
+    },
+  });
+  assert.match(withEdges, /class="dep-advisory">Advisory preview; the lane is the law/);
+  assert.match(withEdges, /Kotlin conformance gates.*authoritative/);
+
+  const zeroEdges = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+    dependencyGraph: { available: true, appPackage: "com.acme.demo", buckets: [], edges: [], violations: [], rulesApplied: true },
+  });
+  assert.match(zeroEdges, /class="dep-advisory">Advisory preview; the lane is the law/);
+
+  const unavailable = architectureTabHtml({
+    layerMap: { available: false },
+    governedContract: { available: false },
+    featureShape: { available: false },
+    dependencyGraph: { available: false, reason: "composeApp/src/commonMain/kotlin not found." },
+  });
+  assert.doesNotMatch(unavailable, /dep-advisory/, "no scan ran -> nothing to caveat as advisory");
+});
+
 // --- commentsTabHtml (§7.3) --------------------------------------------------
 
 test("commentsTabHtml: unavailable -> honest not-available state, with and without a library error", () => {

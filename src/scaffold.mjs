@@ -26,6 +26,7 @@ import {
   deleteDisabledFeaturePaths,
 } from "./lib/toggle.mjs";
 import { rewriteTabSurfaces } from "./lib/tabs.mjs";
+import { seedConfigAdrs } from "./lib/adr-seed.mjs";
 import { copyDir, listFiles, listDirsDeepestFirst } from "./lib/fsutil.mjs";
 import { runVerify, printVerifyVerdict } from "./lib/verify.mjs";
 import { colors, step, ok, warn } from "./lib/log.mjs";
@@ -394,7 +395,17 @@ export async function scaffold(config, opts = {}) {
   );
   stripDisabledBlocks(projectDir, disabled);
 
-  // (e.1) regenerate the architecture doc's derived sections for the tree as
+  // (e.1) Seed one project ADR per configuration decision that deviates from
+  // the interview default (--no-room, --no-ios, a non-"both" auth choice —
+  // see src/lib/adr-seed.mjs for why this is an engine hook, not a SKILL.md
+  // instruction). MUST run before regenerateArchDoc below so the stamped
+  // project's own adr-index walker (qa/lib/arch-doc.mjs, which scans
+  // docs/adr/*.md) picks the seeded files up in the same pass.
+  step("Seeding project ADRs for configuration decisions…");
+  const { seeded } = seedConfigAdrs(projectDir, config, (m) => process.stdout.write(`${m}\n`));
+  if (seeded.length === 0) process.stdout.write("  no configuration deviated from the interview default — nothing to seed\n");
+
+  // (e.2) regenerate the architecture doc's derived sections for the tree as
   // stamped — see regenerateArchDoc above.
   await regenerateArchDoc(projectDir);
 

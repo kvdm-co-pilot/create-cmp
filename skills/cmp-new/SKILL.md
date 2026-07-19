@@ -121,6 +121,7 @@ The answers seed the intent brief written once the scaffold exists (§4) and sha
 | Two or three words for how it should feel (e.g. "calm, trustworthy" vs. "playful, bold")? | Brand feel — seeds the design-language conversation, §7.1 |
 | One to three apps whose look/feel this should be judged against? | Reference apps |
 | What are the first 2–4 screens you see in your head? | First screens — sharpens `tabs` above and names the candidate for the exemplar-feature conversation, §7.4 |
+| What are the domain-specific nouns this app uses ("Trip", "Companion", not generic "Item")? One line each. | Glossary — usually falls out of the Purpose/First-screens answers above; confirm the list rather than inventing it. Feeds `docs/ARCHITECTURE.md` §8 (Wave D — see §4 below) |
 
 (Platforms is already covered by `platforms.ios` in the table above — don't ask it twice.)
 
@@ -180,10 +181,18 @@ Notes:
 
 `specs/intent.md` now exists (the scaffold ships it seeded with `_not yet captured_` markers, one
 per section). Replace each marker with what you captured in the intent round above — Purpose,
-Audience, Platforms, Brand feel, Reference apps, First screens — as plain prose, not clause
-syntax (this file carries no `// SPEC:` tags; `specCoverage` never scans it). This is the root
-artifact every later conversation traces to — don't skip it even on the express lane below (§6);
-the express lane still needs a *filled* brief to approve, defaults-accepted or not.
+Audience, Platforms, Brand feel, Reference apps, First screens, **Glossary** — as plain prose, not
+clause syntax (this file carries no `// SPEC:` tags; `specCoverage` never scans it). This is the
+root artifact every later conversation traces to — don't skip it even on the express lane below
+(§6); the express lane still needs a *filled* brief to approve, defaults-accepted or not.
+
+**Glossary is the one section that's also machine-read**, not just human prose: `docs/
+ARCHITECTURE.md` §8's generated glossary block is a mechanical, verbatim LIFT of `## Glossary`'s
+body (`qa/lib/arch-doc.mjs`'s `generateGlossary` — it never extracts terms from prose itself, on
+purpose, to keep the derivation honest). Write it in the exact form you want published: a
+Markdown bullet list, `**Term** — one-line definition`. Leaving the placeholder text in place is
+fine (it reports "not yet captured" honestly, same as any other unfilled section) — just know
+that's what ships in the architecture doc until it's replaced.
 
 The engine already used your `tabs` answer while scaffolding: `home` and `profile` slugs get
 their real shipped screens; any other configured tab gets a generated `PlaceholderScreen` stub
@@ -253,10 +262,53 @@ If they react in words instead of clicking Pick ("warmer", "rounder"), treat tha
 round — regenerate, snapshot, ask again — until they say "this is mine."
 
 ### 7.2 Architecture — comprehension, not open-ended choice
-The harness *is* the opinion here. Walk the layer map in the console's **Architecture** tab using
-*their* feature names (from the intent brief) and the real decisions already baked into the
-scaffold (local DB on/off, auth, which tabs). Approval here means "I understand and accept this
-shape for my app," not "I designed it" — say so plainly. Approve `architecture`.
+The harness *is* the opinion here, and `docs/ARCHITECTURE.md` is now the actual document that
+opinion lives in — approving `architecture` hashes it alongside `specs/app-base.spec.md`
+(generated `cmp:generated` sections stripped first, so a later feature regenerating them never
+invalidates this approval). Walk it in **its own section order** — each section is the
+vocabulary the next is read in — asking the real questions a lead architect asks at project
+start, not narrating a diagram at them:
+
+1. **Quality goals (§1).** Read the four shipped goals aloud in plain language (maintainability
+   via the lane's clause gates, typed-error reliability, offline reliability, a11y). Ask: does
+   anything here rank differently for *their* app ("offline matters more than a11y for a
+   field-work app")? A promotion/demotion is a real edit to §1's table, made right now, in their
+   words — not a rubber stamp.
+2. **Constraints (§2).** One line: the version set is frozen and moves as one set; upgrades go
+   through `npx create-cmp-cli upgrade`, never a one-off bump.
+3. **System context (§3) — the integration questions.** This is where "what does this app talk
+   to?" gets asked and answered for real, using the choices already made in the interview (§1
+   above), not re-litigated: *Local DB?* — Room is either wired (on-device SSOT) or, if `--no-room`
+   was chosen, absent — point at the seeded `docs/adr/NNNN-no-local-room-persistence.md` (see
+   point 7 below) as the record. *Auth?* — same pattern for a non-default `firebase.auth` choice
+   and its seeded ADR. *Backend/other integrations?* — Firebase services on, the debug inspector
+   server (dev-only, never in a release build) — read §3's table with them so nothing about what
+   the app talks to is a surprise later.
+4. **Shell — which tabs (feeds §5/§6).** The tab list from the interview is already live in the
+   layer map's presentation package names; confirm it reads right in their vocabulary.
+5. **Building blocks, layer by layer (§5) — *their* names.** Walk the layer box top to bottom —
+   `presentation → domain ← data`, then `core` (leaf utilities, importable by every layer above,
+   never the reverse), then `di` as the wiring rail — reading each arrow as the plain-language
+   promise it is and naming its gate: "your UI never calls a repository directly — ARCH-01 fails
+   the lane if it does"; "domain stays pure Kotlin — ARCH-02"; "data never reaches up into
+   presentation or di — ARCH-09"; "core never reaches into presentation, data, or di —
+   ARCH-10". Use the intent brief's first-screens vocabulary for the presentation package names,
+   not `home`/`profile` generically, once real feature names exist (post §7.4).
+6. **The policies (§7) — enforced vs. advisory, read straight.** One pass down the crosscutting
+   list (error handling, threading, DI, design tokens, automation reachability, insets) — each
+   already carries its `[enforced: ...]` / `[advisory]` tag in the doc; read a few aloud so
+   "which promises are mechanical and which are manners" is explicit, not implied.
+7. **Decisions & glossary (§8) — point, don't re-decide.** The ADR index is a generated table:
+   every configuration choice that deviated from the interview default (Room off, iOS off, a
+   non-`both` auth scope) already has its own numbered ADR, auto-seeded by the engine at stamp
+   time (`src/lib/adr-seed.mjs` — never hand-authored, so the wording and numbering are
+   deterministic for a given config). Point at them as the record of *why*, rather than asking the
+   human to justify the choice again; a decision NOT covered by an auto-seeded ADR (something they
+   changed by hand later) gets a fresh one from `docs/adr/template.md`, same as any other
+   significant decision.
+
+Approval here means "I understand and accept this shape for my app," not "I designed it" — say so
+plainly before asking for it. Approve `architecture`.
 
 ### 7.3 Components — propose, shape, approve
 The template doesn't ship a blank slate here: `presentation/components/*.kt` already carries a

@@ -23,12 +23,14 @@
 //                              "(12 files)" note.
 //   - adr-index             — docs/adr/*.md (excluding the template), parsed
 //                              for `# ADR-NNNN: Title` + `- **Status:** ...`.
-//   - glossary               — NOT a term-extraction (that needs a genesis
-//                              conversation — Wave D, not shipped). The only
-//                              mechanically derivable fact is whether
-//                              specs/intent.md has been filled in yet; the
-//                              generator reports that honestly instead of
-//                              guessing at vocabulary.
+//   - glossary               — NOT a term-extraction: specs/intent.md carries
+//                              a `## Glossary` section the genesis intent
+//                              conversation (conversation 0) fills with the
+//                              app's domain nouns; this generator mechanically
+//                              LIFTS that section's body verbatim (never
+//                              parses prose for nouns itself — that would be
+//                              guessing at vocabulary, the thing this file's
+//                              header promises never to do).
 //
 // The marker grammar (`<!-- cmp:generated ID -->` … `<!-- /cmp:generated -->`)
 // is generic: regenerateArchDoc() rewrites the body of every marker it finds
@@ -296,17 +298,27 @@ export function generateAdrIndex(root) {
 // ── glossary ─────────────────────────────────────────────────────────────────
 
 // The exact placeholder text specs/intent.md ships every unfilled section
-// with (qa/scaffold's seed) — presence anywhere in the file means the
-// genesis intent interview (conversation 0) has not run yet.
+// with (qa/scaffold's seed) — presence in a section's body means that
+// section hasn't been filled in by the genesis intent interview yet.
 const INTENT_PLACEHOLDER_MARKER = "_not yet captured";
 
+// specs/intent.md's `## Glossary` heading — a level-2 heading, matched at
+// column 0 so it can't fire on a nested heading inside another section's
+// body. The NEXT level-2 heading (or EOF) closes the section.
+const GLOSSARY_HEADING_RE = /^##\s+Glossary\s*$/m;
+const NEXT_HEADING_RE = /^##\s+\S/m;
+
 /**
- * The domain glossary (§8). Term EXTRACTION from the intent brief's prose is
- * a genesis-conversation job (Wave D — `docs/proposals/architecture-document-
- * standard.md` §6, not shipped), not something a tree walk can do reliably.
- * The only fact this generator can derive mechanically is whether
- * `specs/intent.md` has been filled in yet, so it reports that honestly
- * instead of guessing at vocabulary.
+ * The domain glossary (§8). specs/intent.md ships a `## Glossary` section
+ * that the genesis intent conversation (conversation 0) fills with the
+ * app's domain nouns (its own vocabulary — "their feature names", per
+ * GENESIS-FLOW-DESIGN.md). This generator does NOT extract terms from
+ * prose itself (that would be guessing); it mechanically LIFTS that
+ * section's body verbatim, the same "derived, not fabricated" contract
+ * every other section in this file keeps. Honest about every state: the
+ * file missing, the section missing (an older intent.md pre-dating this
+ * section), the section present but still carrying the unfilled
+ * placeholder, and the section genuinely filled in.
  * @param {string} root
  * @returns {string} markdown/prose (no trailing newline)
  */
@@ -316,16 +328,29 @@ export function generateGlossary(root) {
     return `_Domain glossary — \`${INTENT_REL_PATH}\` not found, so there is nothing to seed it from yet._`;
   }
   const content = fs.readFileSync(intentPath, "utf8");
-  if (content.includes(INTENT_PLACEHOLDER_MARKER)) {
+
+  const headingMatch = content.match(GLOSSARY_HEADING_RE);
+  if (!headingMatch) {
     return (
-      `_Domain glossary — seeded from the intent interview's vocabulary once [\`${INTENT_REL_PATH}\`](../${INTENT_REL_PATH}) ` +
-      "is filled in; empty on a fresh scaffold._"
+      `_Domain glossary — [\`${INTENT_REL_PATH}\`](../${INTENT_REL_PATH}) has no \`## Glossary\` ` +
+      "section to lift from yet — nothing derived._"
     );
   }
+
+  const afterHeading = content.slice(headingMatch.index + headingMatch[0].length);
+  const nextHeadingMatch = afterHeading.match(NEXT_HEADING_RE);
+  const body = (nextHeadingMatch ? afterHeading.slice(0, nextHeadingMatch.index) : afterHeading).trim();
+
+  if (body.length === 0 || body.includes(INTENT_PLACEHOLDER_MARKER)) {
+    return (
+      `_Domain glossary — seeded from the \`## Glossary\` section of [\`${INTENT_REL_PATH}\`](../${INTENT_REL_PATH}) ` +
+      "once the genesis intent interview fills it in; empty on a fresh scaffold._"
+    );
+  }
+
   return (
-    `_Domain glossary — [\`${INTENT_REL_PATH}\`](../${INTENT_REL_PATH}) has been filled in, but glossary-term extraction ` +
-    "from its prose is genesis-conversation work that has not shipped yet (architecture-document-standard.md Wave D) — " +
-    "no terms are seeded automatically today._"
+    `_Lifted verbatim from the \`## Glossary\` section of [\`${INTENT_REL_PATH}\`](../${INTENT_REL_PATH}) — edit it ` +
+    `there, not here; this block is regenerated from it.\n\n${body}`
   );
 }
 
@@ -340,6 +365,25 @@ export const SECTIONS = [
 export const SECTION_IDS = SECTIONS.map((s) => s.id);
 
 const MARKER_BLOCK_RE = /<!-- cmp:generated ([a-zA-Z0-9_-]+) -->\n([\s\S]*?)<!-- \/cmp:generated -->/g;
+
+/**
+ * Strip every `cmp:generated ID` marker block's BODY from `content`,
+ * replacing it with nothing but leaving the marker pair itself (id and all)
+ * in place — the doc's STRUCTURE (which sections exist, in what order) still
+ * counts toward whatever a caller does with the result, only the mechanically
+ * regenerated CONTENT is removed.
+ *
+ * This is the ONE definition of "generated" for this doc — reused (never
+ * forked) by qa/lib/approvals.mjs's `architecture` artifact hash basis
+ * (docs/proposals/architecture-document-standard.md §4.4): regenerating a
+ * section (`node qa/arch-doc.mjs`) must never invalidate that human approval,
+ * only an authored-prose edit may.
+ * @param {string} content
+ * @returns {string}
+ */
+export function stripGeneratedSections(content) {
+  return content.replace(MARKER_BLOCK_RE, (_whole, id) => `<!-- cmp:generated ${id} -->\n<!-- /cmp:generated -->`);
+}
 
 /**
  * Regenerate every `cmp:generated` marker section in `docRelPath` (default

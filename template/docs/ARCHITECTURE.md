@@ -309,7 +309,7 @@ re-solve edge-to-edge padding with a direct inset API call.
 <!-- /cmp:generated -->
 
 <!-- cmp:generated glossary -->
-_Domain glossary — seeded from the intent interview's vocabulary once [`specs/intent.md`](../specs/intent.md) is filled in; empty on a fresh scaffold._
+_Domain glossary — seeded from the `## Glossary` section of [`specs/intent.md`](../specs/intent.md) once the genesis intent interview fills it in; empty on a fresh scaffold._
 <!-- /cmp:generated -->
 
 ## The exemplar feature (`home` by default, configurable)

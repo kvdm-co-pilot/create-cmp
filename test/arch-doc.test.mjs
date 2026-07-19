@@ -104,3 +104,67 @@ test("arch-doc: staleness is still detected after stamping (deleting an ADR fail
     fs.rmSync(out, { recursive: true, force: true });
   }
 });
+
+// ── glossary (Wave D — lift verbatim from specs/intent.md's `## Glossary`) ──
+
+test("glossary: fresh scaffold's unfilled `## Glossary` placeholder reports honestly, --check stays green", async () => {
+  const out = await stamp();
+  try {
+    const intent = fs.readFileSync(path.join(out, "specs/intent.md"), "utf8");
+    assert.match(intent, /^## Glossary$/m, "the seeded intent brief carries a Glossary section");
+
+    const { generateGlossary, regenerateArchDoc } = await importWalker(out);
+    const glossary = generateGlossary(out);
+    assert.match(glossary, /once the genesis intent interview fills it in; empty on a fresh scaffold/);
+
+    const result = regenerateArchDoc(out);
+    assert.equal(result.changed, false, "the shipped doc's glossary marker already matches the seeded state");
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("glossary: a filled `## Glossary` section is lifted VERBATIM into the generated block, not re-authored", async () => {
+  const out = await stamp();
+  try {
+    const intentPath = path.join(out, "specs/intent.md");
+    const intent = fs.readFileSync(intentPath, "utf8");
+    const filled = intent.replace(
+      /## Glossary\n\n_not yet captured[\s\S]*?(?=\n## |$)/,
+      "## Glossary\n\n- **Trip** — a single planned outing with an itinerary and companions.\n- **Companion** — a person invited on a Trip.\n"
+    );
+    assert.notEqual(filled, intent, "the replace actually matched the seeded placeholder");
+    fs.writeFileSync(intentPath, filled);
+
+    const { generateGlossary, regenerateArchDoc, writeArchDoc } = await importWalker(out);
+    const glossary = generateGlossary(out);
+    assert.match(glossary, /Lifted verbatim from the `## Glossary` section/);
+    assert.match(glossary, /\*\*Trip\*\* — a single planned outing with an itinerary and companions\./);
+    assert.match(glossary, /\*\*Companion\*\* — a person invited on a Trip\./);
+
+    // regenerating updates ONLY the glossary marker — every other generated
+    // section (still derived from the unchanged tree) stays byte-identical.
+    const before = regenerateArchDoc(out);
+    assert.deepEqual(before.changedSections, ["glossary"]);
+    const written = writeArchDoc(out);
+    assert.equal(written.wrote, true);
+    const after = regenerateArchDoc(out);
+    assert.equal(after.changed, false, "re-running regeneration after the write is a no-op");
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("glossary: an intent.md with NO `## Glossary` section (legacy shape) is reported honestly, never fabricated", async () => {
+  const out = await stamp();
+  try {
+    const intentPath = path.join(out, "specs/intent.md");
+    const withoutGlossary = fs.readFileSync(intentPath, "utf8").replace(/\n## Glossary\n[\s\S]*$/, "\n");
+    fs.writeFileSync(intentPath, withoutGlossary);
+
+    const { generateGlossary } = await importWalker(out);
+    assert.match(generateGlossary(out), /has no `## Glossary` section to lift from yet — nothing derived/);
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
