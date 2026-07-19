@@ -54,8 +54,11 @@ function assertWrapped(root, screenRel, label) {
   );
   assert.match(screen, /BaseScreen \{/, `${label}: stamped screen wraps its content in BaseScreen { }`);
   // The wrap must enclose the real content, not sit empty: the root container
-  // and the screen's own testTag title must still be present inside the file.
-  assert.match(screen, /Column\(/, `${label}: root container survives the wrap`);
+  // (ScreenColumn — the component-vocabulary root, see
+  // docs/proposals/component-system-deep-dive.md §5) and the screen's own
+  // item-level testTag must still be present inside the file.
+  assert.match(screen, /ScreenColumn\(/, `${label}: root container survives the wrap`);
+  assert.match(screen, /testTag/, `${label}: stamped screen still declares a literal testTag (ARCH-04)`);
   // Balanced braces — the wrap added exactly one opener and one closer.
   const opens = (screen.match(/\{/g) || []).length;
   const closes = (screen.match(/\}/g) || []).length;

@@ -86,4 +86,24 @@ class HomeScreenTest {
         waitUntil(timeoutMillis = 5_000) { clickedId != null }
         kotlin.test.assertEquals("item-42", clickedId)
     }
+
+    // SPEC: HOME-04
+    @Test
+    fun `tapping retry after a failure reloads and shows recovered items`() = runComposeUiTest {
+        repository.failure = DomainError.Network
+        val vm = viewModel()
+
+        setContent {
+            MaterialTheme { HomeScreen(onItemClick = {}, viewModel = vm) }
+        }
+
+        awaitNode(hasTestTag("home_error"))
+        onNodeWithTag("home_retry", useUnmergedTree = true).assertExists()
+
+        repository.failure = null
+        repository.items = listOf(Item(id = "1", title = "Recovered", subtitle = "sub"))
+        onNodeWithTag("home_retry").performClick()
+
+        awaitNode(hasText("Recovered"))
+    }
 }

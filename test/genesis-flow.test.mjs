@@ -222,9 +222,12 @@ test("exemplar reconfigure: registry hashes the CONFIGURED feature's 11-file set
 // ── §1: stamper — clone-source refactor ──────────────────────────────────────
 
 // The reference rename map exactly as the stamper hardcoded it BEFORE the
-// clone source became configurable (whole-word, longest-key-first). Stamping
-// from `home` must still be byte-identical to this transform — the pin that
-// the generated-from-source-names map degenerates to the historical literals.
+// clone source became configurable (whole-word, longest-key-first), extended
+// with the `_loading`/`_retry` tag families the component-vocabulary wave
+// (docs/proposals/component-system-deep-dive.md §6.2) added to the production
+// RENAME_MAP alongside `_title`/`_error`/`_empty`. Stamping from `home` must
+// still be byte-identical to this transform — the pin that the
+// generated-from-source-names map degenerates to the historical literals.
 function referenceHomeRename(text, F, f, F_UPPER, E) {
   const map = [
     ["HomeScreenTest", `${F}ScreenTest`],
@@ -236,6 +239,8 @@ function referenceHomeRename(text, F, f, F_UPPER, E) {
     ["home_title", `${f}_title`],
     ["home_error", `${f}_error`],
     ["home_empty", `${f}_empty`],
+    ["home_loading", `${f}_loading`],
+    ["home_retry", `${f}_retry`],
     ["FakeItemRepository", `Fake${E}Repository`],
     ["ItemRepositoryImpl", `${E}RepositoryImpl`],
     ["ItemRepository", `${E}Repository`],
