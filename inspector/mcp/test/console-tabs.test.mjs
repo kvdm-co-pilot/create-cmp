@@ -1178,3 +1178,82 @@ test("commentsTabHtml: ledger renders target/text/author/status, escapes user te
   assert.match(html, /resolved by agent/);
   assert.match(html, /reworded the clause/);
 });
+
+// --- componentsBodyHtml: component stories (§3.3 — the story render at the
+// top of every entry's visual strip) -----------------------------------------
+
+test("componentsBodyHtml: the entry's visual strip is story-first — the component's own story render, labeled with its registry id, precedes live @state variants and the params table", () => {
+  const html = componentsBodyHtml(
+    {
+      available: true,
+      components: [
+        component({
+          name: "EmptyState",
+          facts: { derivedTags: ["empty"] },
+        }),
+      ],
+    },
+    {
+      componentStories: {
+        "empty-state": { id: "component.empty-state", title: "EmptyState — component story", png: "component.empty-state/screen.png" },
+      },
+      stateVariants: { loading: [], empty: [{ id: "home@empty", title: "Home — empty", png: "home@empty/screen.png" }], error: [] },
+      version: 4,
+      changedVersions: {},
+    },
+  );
+  assert.match(html, /class="component-story"/);
+  assert.match(html, /story render &mdash; <code>component\.empty-state<\/code>/, "labeled with the registry id");
+  assert.match(html, /src="\/previews\/component\.empty-state\/screen\.png\?v=4"/, "story PNG uses the screen cards' version cache-buster");
+  const story = html.indexOf("component-story");
+  const variants = html.indexOf("component-live-variants");
+  const params = html.indexOf("params-table");
+  assert.ok(story !== -1 && variants !== -1 && params !== -1);
+  assert.ok(story < variants && variants < params, "story render first, then live variants, then the signature");
+});
+
+test("componentsBodyHtml: a component with no story render on disk states the absence (standardized form) — never a broken image", () => {
+  const html = componentsBodyHtml(
+    { available: true, components: [component({ name: "AppHeader" })] },
+    { componentStories: {}, version: 2, changedVersions: {} },
+  );
+  assert.match(html, /no story render yet &mdash; run the preview render to produce <code>component\.app-header<\/code>/);
+  assert.doesNotMatch(html, /<img[^>]*component\.app-header/, "no fabricated story thumbnail");
+});
+
+test("componentsBodyHtml: story renders show even with NO componentStories meta at all (older service) — as the absence line, not an error", () => {
+  const html = componentsBodyHtml({ available: true, components: [component({ name: "AppHeader" })] });
+  assert.match(html, /no story render yet/);
+});
+
+test("componentsBodyHtml: a story changed in this render carries the persistent changed-#N chip (same vocabulary as the Screens grid)", () => {
+  const html = componentsBodyHtml(
+    { available: true, components: [component({ name: "ListItemCard" })] },
+    {
+      componentStories: {
+        "list-item-card": { id: "component.list-item-card", title: "ListItemCard — component story", png: "component.list-item-card/screen.png" },
+      },
+      version: 6,
+      changedVersions: { "component.list-item-card": 6 },
+    },
+  );
+  assert.match(html, /<span class="chg">changed #6<\/span>/);
+});
+
+test("componentsBodyHtml: a parse-error entry still shows its story render (render evidence is scan-independent)", () => {
+  const html = componentsBodyHtml(
+    {
+      available: true,
+      components: [component({ name: "Broken", parseError: true, params: [], paramsParsed: [] })],
+    },
+    {
+      componentStories: {
+        broken: { id: "component.broken", title: "Broken — component story", png: "component.broken/screen.png" },
+      },
+      version: 1,
+      changedVersions: {},
+    },
+  );
+  assert.match(html, /signature not parsed/);
+  assert.match(html, /src="\/previews\/component\.broken\/screen\.png\?v=1"/);
+});

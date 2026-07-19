@@ -202,8 +202,10 @@ and tells you what your edit changed.
 Screens come from `inspector/PreviewRegistry.kt` (desktopMain). The `add-feature` and
 `add-screen` stampers auto-register stamped screens at the `// cmp:anchor preview-registry`
 marker; when you add a screen by hand, register it there — a forced-state variant is just
-another entry (`"home@empty"`). Assert on `tree.json` structure; never read PNG bytes.
-Pixels are for humans.
+another entry (`"home@empty"`). Every common component also carries a story entry
+(`"component.<kebab-name>"` in `inspector/ComponentStories.kt`); when you add a component,
+add its story — the lane's `componentStories` step fails naming the missing id otherwise.
+Assert on `tree.json` structure; never read PNG bytes. Pixels are for humans.
 <!-- <<< cmp:feature inspector -->
 <!-- >>> cmp:feature dev-client -->
 For one interactive window instead of stills of every screen:

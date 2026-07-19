@@ -348,6 +348,11 @@ function previewEntry(tab) {
  */
 export function renderPreviewRegistryKt(infos) {
   const hasHome = infos.some((t) => t.slug === "home");
+  // Same condition that writes PlaceholderScreen.kt into presentation/components:
+  // when it ships, it is a registry component like any other, so it needs a
+  // component story too — hosted HERE (the generated file) because the static
+  // ComponentStories.kt can only reference components that always exist.
+  const hasPlaceholder = infos.some((t) => t.slug !== "home" && t.slug !== "profile");
   const imports = [
     "import androidx.compose.foundation.layout.Box",
     "import androidx.compose.foundation.layout.fillMaxSize",
@@ -401,6 +406,11 @@ ${imports.join("\n")}
  * preview-only fakes behind its usual parameters). Every entry renders the same way
  * (gallery card, \`-Pscreen=\` selector, golden baseline), so loading/empty/error states
  * sit side by side with the default seeded state.
+ *
+ * Component stories (\`component.<kebab-name>\` ids, ComponentStories.kt) are appended
+ * below — one isolated render per \`presentation/components\` composable. The console
+ * keeps them out of the Screens grid and shows each at the top of its Components-page
+ * entry; the verify lane's \`componentStories\` step enforces one story per component.
  */
 data class ScreenPreview(
     val id: String,
@@ -420,7 +430,7 @@ ${infos.map(previewTabArg).join("\n")}
 ${infos.map(previewEntry).join("\n")}
     ScreenPreview("detail", "Detail (nav destination)") { DetailScreen(itemId = "1", onBack = {}) },${homeStateVariantEntries(hasHome)}
     // cmp:anchor preview-registry
-)
+) + componentStories()${hasPlaceholder ? " + placeholderScreenStories()" : ""}
 
 /**
  * Hosts a single tab's content the way [AppShell] does — inside [BaseScreen] — minus the
@@ -432,7 +442,28 @@ private fun TabHost(content: @Composable () -> Unit) {
         Box(Modifier.fillMaxSize()) { content() }
     }
 }
-${homeStateVariantHelper(hasHome)}`;
+${homeStateVariantHelper(hasHome)}${placeholderStoryHelper(hasPlaceholder)}`;
+}
+
+/**
+ * The PlaceholderScreen component story — only when a configured tab has no feature
+ * yet (the same condition that writes PlaceholderScreen.kt into
+ * presentation/components). The component-story parity gate
+ * (qa/lib/component-stories.mjs) requires one story per registry composable, and
+ * PlaceholderScreen's can't live in the static ComponentStories.kt because the
+ * component itself is conditional.
+ * @param {boolean} hasPlaceholder
+ */
+function placeholderStoryHelper(hasPlaceholder) {
+  if (!hasPlaceholder) return "";
+  return `
+/** Component story for the generated [PlaceholderScreen] — see ComponentStories.kt for the convention. */
+private fun placeholderScreenStories(): List<ScreenPreview> = listOf(
+    ScreenPreview("component.placeholder-screen", "PlaceholderScreen — component story") {
+        StoryHost { PlaceholderScreen(title = "Placeholder", titleTag = "story_title") }
+    },
+)
+`;
 }
 
 /**

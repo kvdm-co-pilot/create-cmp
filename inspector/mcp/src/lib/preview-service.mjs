@@ -170,6 +170,36 @@ export function stateVariantCards(cards) {
   return out;
 }
 
+// Component-story registry entries (§3.3): `component.<kebab-name>` ids from
+// ComponentStories.kt. Rendered by the same pipeline as every other entry,
+// but they are component documentation, not screens — the gallery keeps them
+// out of the Screens grid/counts and the Components section shows each at the
+// top of its entry.
+const COMPONENT_STORY_ID_RE = /^component\.(.+)$/;
+
+/** True when a registry id is a component story, not a screen. */
+export function isComponentStoryId(id) {
+  return COMPONENT_STORY_ID_RE.test(String(id));
+}
+
+/**
+ * Every CURRENTLY RENDERED component-story entry, keyed by its kebab name
+ * (`component.app-header` → `"app-header"`), for componentsBodyHtml. A
+ * project whose registry predates component stories yields `{}` — the
+ * Components section then states the absence per entry, never an error.
+ * @param {Array<{screen: {id: string, title: string, png: string}}>} cards
+ * @returns {Record<string, {id: string, title: string, png: string}>}
+ */
+export function componentStoryCards(cards) {
+  const out = {};
+  for (const { screen } of cards) {
+    const m = COMPONENT_STORY_ID_RE.exec(screen.id);
+    if (!m) continue;
+    out[m[1]] = { id: screen.id, title: screen.title, png: screen.png };
+  }
+  return out;
+}
+
 /**
  * Compile-failure lines in Compose Hot Reload / Gradle recompile output. In daemon mode
  * a broken edit produces NO render (no classes are written, so no trigger fires) — these
@@ -232,6 +262,11 @@ export function galleryHtml(state) {
   } = state;
   const width = viewport?.width ?? 411;
   const changedSet = new Set(changed);
+  // §3.3: component stories render through the same pipeline but are not
+  // screens — the Screens grid, screen count, and changed-count all exclude
+  // them; the Components section picks them up via componentsMeta below.
+  const screenCards = cards.filter(({ screen }) => !isComponentStoryId(screen.id));
+  const changedScreens = changed.filter((id) => !isComponentStoryId(id));
   // Rail badge (§7.3): count of OPEN comments next to the Comments item.
   // Always rendered (hidden at 0) so the SSE "comment" handler can always
   // find #comments-badge to update in place.
@@ -285,7 +320,7 @@ export function galleryHtml(state) {
   // the frame; R3–R5 rebuild each body to the §3 professional forms) ---------
 
   const screensBody = `<div class="grid">
-${cards
+${screenCards
   .map(({ screen, svg, summary, a11y }) => {
     const isChanged = changedSet.has(screen.id);
     const changedIn = changedVersions[screen.id];
@@ -316,8 +351,8 @@ ${cards
   // signed, has it moved". Artifact-governed pages use the artifact grammar;
   // the rest state only what their own data shows (evidence-or-silence). ----
 
-  const screensStatus = `render #${version} &middot; ${cards.length} screen${cards.length === 1 ? "" : "s"}${
-    changed.length ? ` &middot; <span class="chg">${changed.length} changed this render</span>` : ""
+  const screensStatus = `render #${version} &middot; ${screenCards.length} screen${screenCards.length === 1 ? "" : "s"}${
+    changedScreens.length ? ` &middot; <span class="chg">${changedScreens.length} changed this render</span>` : ""
   }${openNote("screens")}`;
 
   const dsStatus = (artifactStatusHtml(dsRecord) || "the visual vocabulary — tokens, contrast, candidates") + openNote("design-system");
@@ -395,7 +430,17 @@ ${cards
       id: "components",
       title: "Components",
       statusHtml: componentsStatus,
-      bodyHtml: componentsBodyHtml(components, componentsMeta),
+      // §3.3 story pickup: the section gets the current render's story cards
+      // plus the changed-attribution vocabulary the Screens grid uses
+      // (version cache-buster, persistent changed-#N chips). componentStories
+      // is derived here when the caller didn't pass one, so a bare
+      // galleryHtml({cards}) still shows story renders.
+      bodyHtml: componentsBodyHtml(components, {
+        componentStories: componentStoryCards(cards),
+        ...componentsMeta,
+        version,
+        changedVersions,
+      }),
     },
     {
       id: "screens",
@@ -1538,6 +1583,9 @@ export function createPreviewService(opts) {
           drift: componentsDrift,
           violations: handRolledViolations,
           stateVariants: stateVariantCards(cards),
+          // §3.3: each component's own story render (component.<kebab> ids),
+          // shown at the top of its Components-page entry.
+          componentStories: componentStoryCards(cards),
         };
         // AD-1: the "architecture" governed artifact's own live status record
         // (same lookup pattern as componentsApprovalRecord above) — drives the

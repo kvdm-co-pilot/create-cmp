@@ -9,7 +9,23 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getComponentsData, parseKdocSections } from "../src/lib/components.mjs";
+import { getComponentsData, parseKdocSections, kebabCase, componentStoryId } from "../src/lib/components.mjs";
+
+// --- componentStoryId (§3.3: `component.<kebab>` story ids, mirrored by the
+// template's qa/lib/component-stories.mjs lane gate) -------------------------
+
+test("kebabCase: PascalCase composable names -> derivable kebab ids", () => {
+  assert.equal(kebabCase("AppHeader"), "app-header");
+  assert.equal(kebabCase("AppPrimaryButton"), "app-primary-button");
+  assert.equal(kebabCase("ListItemCard"), "list-item-card");
+  assert.equal(kebabCase("NavItem"), "nav-item");
+  assert.equal(kebabCase("Spinner"), "spinner");
+});
+
+test("componentStoryId: the full registry id, dot-separated (Windows-path-safe)", () => {
+  assert.equal(componentStoryId("AppHeader"), "component.app-header");
+  assert.equal(componentStoryId("ContentStateContainer"), "component.content-state-container");
+});
 
 function makeFixtureProject() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-components-"));
