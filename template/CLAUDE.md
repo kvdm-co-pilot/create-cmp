@@ -25,8 +25,10 @@ invariants the conformance gates enforce.
 - **Every screen:** a `*Screen` composable with a `testTag`ged root, a ViewModel with a test.
 - **Design values** (colors / spacing / typography / radii) come from the theme's token catalog
   (`presentation/theme/`). Never hardcode literals in screens.
-- The `home` feature is the **exemplar** — it shows the full pattern through every layer,
-  including the tests. When you add a feature, mirror it exactly: Screen → ViewModel (+ test) →
+- One feature is the **exemplar** — it shows the full pattern through every layer,
+  including the tests. It ships as `home`, and `qa/approvals.json`'s `exemplarFeature` key
+  can retarget it to your own first feature once shaped (see "Configurable exemplar" below).
+  When you add a feature, mirror the exemplar exactly: Screen → ViewModel (+ test) →
   UseCase (+ test) → Repository interface in `domain` + impl in `data` (+ test) → DI module
   entry → navigation route.
 
@@ -56,41 +58,71 @@ Commit it with your change — git history is the audit ledger. Binary artifacts
 
 Some artifacts are **governed**: a human must approve them, and approval is bound to
 the artifact's content by hash (`qa/approvals.json`) — the same idea as the evidence
-receipt, applied to a human decision instead of a lane run. The ordered walk (later
-artifacts are expressed in the vocabulary of the ones before them):
+receipt, applied to a human decision instead of a lane run. The ordered walk is a
+**definition order**, not just an approval order: each artifact is the vocabulary the
+next is written in, so on a fresh app each step is a conversation that *ends* in an
+approval (the genesis walk — six conversations):
 
+0. **Intent** — `specs/intent.md`, the root brief everything else traces to (purpose /
+   audience / platforms / brand feel / reference apps / first screens). Filled by the
+   `cmp-new` interview; the seed's placeholder prose is clearly marked unfilled.
 1. **Design system** — `presentation/theme/Theme.kt`, `presentation/theme/Tokens.kt`
 2. **Architecture + structure** — `specs/app-base.spec.md`
-3. **Exemplar feature** — the `home` 11-file set the `add-feature` stamper clones from
-4. **Exemplar spec** — `specs/home.spec.md`
-5. **Per-feature spec** — `specs/<feature>.spec.md`, one governed artifact per feature,
+3. **Components** — every `presentation/components/*.kt` (a dynamic, sorted glob).
+   Once approved, the registry is law: adding or changing a common component
+   invalidates the approval until a human re-approves.
+4. **Exemplar feature** — the **configured** exemplar's 11-file set the `add-feature`
+   stamper clones from (see "Configurable exemplar" below)
+5. **Exemplar spec** — `specs/<exemplar>.spec.md`
+6. **Per-feature spec** — `specs/<feature>.spec.md`, one governed artifact per feature,
    added as features land
 
 | Command | What |
 |---|---|
-| `node qa/approve.mjs --status` | List every governed artifact + live state (`unreviewed` / `approved` / `changed-since-approval`) + short hash |
-| `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time |
+| `node qa/approve.mjs --status` | List every governed artifact + live state (`unreviewed` / `approved` / `changed-since-approval` / `reopened`) + short hash + mode badge |
+| `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time (also clears a `defaults-accepted` mode: shaping upgrades the record) |
+| `node qa/approve.mjs --accept-defaults` | **Express lane**: approve every currently-resolvable artifact in one visible act, each stamped `"mode": "defaults-accepted"` — build now, walk the definition later. Unresolvable artifacts are skipped with the standard refusal printed, never silently. The ledger never pretends the defaults were designed. |
+| `node qa/approve.mjs --reopen <artifact>` | **Reopen for redesign**: move an *approved* artifact (shaped or defaults-accepted) back to `reopened` — deliberate, recorded (`reopenedAt`). Refuses unknown ids and anything not currently approved. |
 
-With the create-cmp plugin, the same decisions can be made by clicking Approve on the
-**Approvals** tab of the preview console (`preview {projectDir}`'s URL, alongside Design
-System and Specs) — it calls the same library, so the CLI and the console never disagree.
-An agent blocks on a pending decision with `approval_status {waitForDecision:true}`.
+With the create-cmp plugin, the same decisions can be made by clicking Approve/Reopen on
+the **Approvals** tab of the preview console (`preview {projectDir}`'s URL, alongside
+Design System and Specs) — it calls the same library, so the CLI and the console never
+disagree. An agent blocks on a pending decision with `approval_status {waitForDecision:true}`.
 
 The verify lane's `approvals` gate (a step like any other, in every profile) resolves
 each artifact's live status against `qa/approvals.json`:
 
 - **`unreviewed`** → **SKIP** with a warning line — non-blocking, nothing fails until a
   human opts in by approving.
+- **`reopened`** → **SKIP** with a warning line, exactly like `unreviewed` — sanctioned
+  redesign never trips the gate. Edits made while an artifact is reopened are never
+  drift; re-approve when the redesign lands.
 - **`approved`, hash still matches** → **PASS**.
 - **`approved`, hash no longer matches** → **FAIL**, naming the artifact and the
   re-approval command. The artifact changed after sign-off — re-approve it (or revert
   the change) before the lane can go green. Invalidation is mechanical, like golden-tree
   drift, not a judgment call.
 
+That last asymmetry is the point: **redesign is a decision; drift is an accident** — the
+ledger records which was which. A run with one reopened artifact and one drifted artifact
+FAILs naming only the drifted one.
+
 A gate FAIL fails the lane verdict, which fails `qa/receipt-check.mjs` (the Stop hook)
 by the same mechanism any other FAIL does — no separate enforcement to maintain.
 `add-feature` seeds each new feature's spec as `unreviewed` automatically and prints the
 approval reminder; it never refuses to stamp over this.
+
+### Configurable exemplar — the DNA features are cloned from
+
+`qa/approvals.json` carries a top-level `"exemplarFeature"` key (absent ⇒ `"home"`, so
+older ledgers keep meaning what they meant). It names the feature whose 11-file set is
+the governed **exemplar-feature** artifact AND the clone source `qa/scaffold-feature.mjs`
+stamps new features from. The genesis walk's endgame is setting it to *your* first real
+feature: stamp it (`add-feature`), shape it, then point `exemplarFeature` at it — from
+then on the stamper clones *your* pattern in *your* domain language, and `home` demotes
+to an ordinary feature spec. If the configured exemplar has grown files beyond the
+canonical 11-file shape, the stamper clones the canonical set and **warns, listing
+exactly what it skipped** — never silently.
 
 ## Comments — review feedback flows back through the agent
 

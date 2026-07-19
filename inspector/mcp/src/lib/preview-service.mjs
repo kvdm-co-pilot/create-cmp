@@ -34,7 +34,11 @@ import { promisify } from "node:util";
 import { renderTreeSvg } from "./render.mjs";
 import { auditA11y } from "./a11y.mjs";
 import { fetchLiveCatalog } from "./live.mjs";
-import { getApprovalsData, approveArtifact as approveArtifactViaLib } from "./approvals-bridge.mjs";
+import {
+  getApprovalsData,
+  approveArtifact as approveArtifactViaLib,
+  reopenArtifact as reopenArtifactViaLib,
+} from "./approvals-bridge.mjs";
 import {
   getCommentsData,
   addComment as addCommentViaLib,
@@ -43,6 +47,7 @@ import {
 import { getSpecsData } from "./specs.mjs";
 import { getArchitectureData } from "./architecture.mjs";
 import { getComponentsData } from "./components.mjs";
+import { getVariantsData } from "./variants.mjs";
 import {
   designSystemTabHtml,
   approvalsTabHtml,
@@ -161,7 +166,7 @@ const esc = (s) =>
  * (screen.prev.png is the pre-render copy); every card keeps a persistent
  * "changed #N" badge from `changedVersions` so attribution outlives the next render.
  * @param {object} state { appName, viewport, cards, version, changed, changedVersions, error,
- *   approvals, specs, designSystem, architecture, components, comments }
+ *   approvals, specs, designSystem, architecture, components, comments, variants }
  */
 export function galleryHtml(state) {
   const {
@@ -178,6 +183,7 @@ export function galleryHtml(state) {
     architecture = { layerMap: { available: false }, governedContract: { available: false }, featureShape: { available: false } },
     components = { available: false },
     comments = { available: false },
+    variants = { available: false },
   } = state;
   const width = viewport?.width ?? 411;
   const changedSet = new Set(changed);
@@ -185,6 +191,13 @@ export function galleryHtml(state) {
   // tab. Always renders the badge element (even at 0, just hidden) so the SSE
   // "comment" handler below can always find #comments-badge to update in place.
   const openCommentCount = comments.available ? comments.comments.filter((c) => c.status === "open").length : 0;
+  // §2 mode presentation: the Design System tab's candidates strip is genesis-
+  // mode only — derived from the design-system ARTIFACT's own live status
+  // (undefined when approvals data isn't available at all, which reads as
+  // steward — the safe default: no strip rather than a fabricated one).
+  const designSystemStatus = approvals.available
+    ? (approvals.statuses.find((s) => s.id === "design-system") || {}).status
+    : undefined;
   return `<!doctype html>
 <meta charset="utf-8">
 <title>${esc(appName)} — live previews</title>
@@ -242,12 +255,36 @@ export function galleryHtml(state) {
   .badge-approved { background: #E8F7EF; color: #16A34A; }
   .badge-unreviewed { background: #EEF2FF; color: #4338CA; }
   .badge-changed { background: #FDECEC; color: #DC2626; }
+  /* reopened (§2 "Reopen for redesign") — a deliberate state, so it gets its own color
+     rather than reusing badge-unreviewed even though the gate treats them the same. */
+  .badge-reopened { background: #FEF6E7; color: #B45309; }
+  /* defaults-accepted (§2 express lane) layers ON TOP of badge-approved — a distinct
+     outline, not a different fill, so "approved" stays legible at a glance. */
+  .badge-unshaped { box-shadow: inset 0 0 0 1px #B45309; }
   .artifact-id { font-size: 11px; color: #9CA3AF; }
   .approved-at { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
   .unresolvable-note, .missing-note { font-size: 11px; color: #B45309; margin: 4px 0 0; }
   .approve-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
                  border: 1px solid #0A2540; background: #0A2540; color: #fff; cursor: pointer; }
   .approve-btn:disabled { background: #E5E7EB; border-color: #E5E7EB; color: #9CA3AF; cursor: not-allowed; }
+  .reopen-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
+                border: 1px solid #B45309; background: #fff; color: #B45309; cursor: pointer; }
+  /* §2 mode presentation: the per-artifact genesis/steward banner, inline under the label. */
+  .artifact-banner { font-size: 11px; margin-top: 4px; padding: 4px 8px; border-radius: 8px; max-width: 320px; }
+  .banner-mode { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
+  .banner-genesis { background: #EEF2FF; color: #312E81; }
+  .banner-steward { background: #F3F4F6; color: #4B5563; }
+  .banner-unshaped { background: #FEF6E7; color: #92400E; }
+  /* §2 candidates strip (Design System tab, genesis mode only). */
+  .candidates-strip { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+  .candidate-card { flex: 1 1 260px; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; background: #fff; }
+  .candidate-card h4 { margin: 0 0 8px; font-size: 13px; }
+  .candidate-shots { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+  .candidate-shot { width: 90px; }
+  .candidate-shot img { width: 100%; border: 1px solid #E5E7EB; border-radius: 8px; display: block; }
+  .pick-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
+              border: 1px solid #0A2540; background: #0A2540; color: #fff; cursor: pointer; }
+  .pick-btn:disabled { background: #E5E7EB; border-color: #E5E7EB; color: #9CA3AF; cursor: not-allowed; }
   .spec-file h3 { margin: 18px 0 6px; font-size: 14px; }
   .spec-file:first-child h3 { margin-top: 0; }
   .clause-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -352,7 +389,7 @@ ${cards
 </div>
 </div>
 <div id="tab-design-system" class="tab-panel" data-tab="design-system">
-${designSystemTabHtml(designSystem, components)}
+${designSystemTabHtml(designSystem, components, variants, designSystemStatus)}
 </div>
 <div id="tab-architecture" class="tab-panel" data-tab="architecture">
 ${architectureTabHtml(architecture)}
@@ -387,6 +424,7 @@ ${commentsTabHtml(comments)}
           cur.innerHTML = fresh.innerHTML;
           if (wasActive) cur.classList.add("active");
           wireApproveButtons(cur);
+          wireReopenButtons(cur);
         } else {
           location.reload(); // fallback: unexpected markup — the old behavior
         }
@@ -489,6 +527,82 @@ ${commentsTabHtml(comments)}
   });
   }
   wireApproveButtons(document);
+  // Reopen (§2/§3) — POST /api/reopen; confirmed the same way approve is: the
+  // server's SSE "approval" broadcast (reopen reuses that event type — it's
+  // still just "an artifact's status changed", the same in-place refresh
+  // covers both) swaps the Approvals panel, not this handler. An older
+  // project lib without reopenArtifact surfaces its refusal in #approve-error
+  // — never a crash (GENESIS-FLOW-DESIGN.md §3 "honest degrade").
+  function wireReopenButtons(scope) {
+  scope.querySelectorAll(".reopen-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const artifact = btn.dataset.artifact;
+      const errBox = document.getElementById("approve-error");
+      if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Reopening…";
+      try {
+        const res = await fetch("/api/reopen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ artifact }),
+        });
+        const body = await res.json();
+        if (!body.ok) {
+          if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "reopen refused"; }
+          btn.disabled = false;
+          btn.textContent = original;
+        }
+      } catch (err) {
+        if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  });
+  }
+  wireReopenButtons(document);
+  // Pick (§2 candidates strip) — POSTs the EXISTING /api/comment endpoint with
+  // target {type:"design-system"}, text "pick:<name>" — no new decision
+  // machinery; the agent observes it via review_comments{waitForComment}. A
+  // successful pick is confirmed by the same "comment" SSE broadcast every
+  // other comment produces (refreshes the Comments tab + badge); this handler
+  // just gives immediate button feedback so the human isn't left guessing.
+  function wirePickButtons(scope) {
+  scope.querySelectorAll(".pick-btn").forEach((btn) => {
+    if (btn.dataset.wired) return;
+    btn.dataset.wired = "1";
+    btn.addEventListener("click", async () => {
+      const name = btn.dataset.variant;
+      const errBox = document.getElementById("pick-error");
+      if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Picking…";
+      try {
+        const res = await fetch("/api/comment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target: { type: "design-system" }, text: "pick:" + name }),
+        });
+        const body = await res.json();
+        if (!body.ok) {
+          if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "pick refused"; }
+          btn.disabled = false;
+          btn.textContent = original;
+        } else {
+          btn.textContent = "Picked";
+        }
+      } catch (err) {
+        if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  });
+  }
+  wirePickButtons(document);
   // Comments (§7.3) — every 💬 control (screens, spec clauses, tokens,
   // components, architecture nodes) opens the same inline popover and POSTs
   // to /api/comment; a successful post is confirmed by the server's SSE
@@ -864,6 +978,59 @@ export function createPreviewService(opts) {
     } catch {
       return { available: false };
     }
+  }
+
+  const VARIANT_NAME_RE = /^[a-z0-9-]+$/;
+
+  /**
+   * §2 "Design-language candidates": stash the CURRENT render outputs (each
+   * screen's screen.png from the last completed render, held in `cards`) plus
+   * design-system.json into composeApp/build/previews/variants/<name>/,
+   * REPLACING that variant if one already exists — an rmSync then copy, both
+   * synchronous, so no caller ever observes a half-written variant directory.
+   * The MCP tool's zod schema is the first gate on `name`, but this primitive
+   * is also a direct test seam — never trust a caller's regex alone, so the
+   * shape is re-checked here too.
+   * @param {string} name
+   * @returns {{ok:true, name:string, screens:string[], designSystemStashed:boolean, dir:string} | {ok:false, reason:string}}
+   */
+  function snapshotVariant(name) {
+    if (typeof name !== "string" || !VARIANT_NAME_RE.test(name)) {
+      return {
+        ok: false,
+        reason: `invalid variant name "${name}" — must match [a-z0-9-]+ (lowercase letters, digits, hyphens)`,
+      };
+    }
+    if (cards.length === 0) {
+      return {
+        ok: false,
+        reason: "no current render to stash — call preview {projectDir} and wait for a render to complete first",
+      };
+    }
+    const variantDir = path.join(previewsDir, "variants", name);
+    try {
+      fs.rmSync(variantDir, { recursive: true, force: true }); // replace, per §2
+      fs.mkdirSync(variantDir, { recursive: true });
+    } catch (err) {
+      return { ok: false, reason: `could not prepare ${variantDir}: ${err && err.message ? err.message : err}` };
+    }
+    const screens = [];
+    for (const { screen } of cards) {
+      const src = path.join(previewsDir, screen.png);
+      if (!fs.existsSync(src)) continue; // honest: only stash what actually rendered
+      const dst = path.join(variantDir, screen.png);
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.copyFileSync(src, dst);
+      screens.push(screen.id);
+    }
+    let designSystemStashed = false;
+    const dsSrc = path.join(previewsDir, "design-system.json");
+    if (fs.existsSync(dsSrc)) {
+      fs.copyFileSync(dsSrc, path.join(variantDir, "design-system.json"));
+      designSystemStashed = true;
+    }
+    touch("variant-snapshot");
+    return { ok: true, name, screens, designSystemStashed, dir: variantDir };
   }
 
   /**
@@ -1298,6 +1465,7 @@ export function createPreviewService(opts) {
         const specs = getSpecsData(projectDir);
         const architecture = getArchitectureData(projectDir);
         const components = getComponentsData(projectDir);
+        const variants = getVariantsData(projectDir);
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(
           galleryHtml({
@@ -1314,6 +1482,7 @@ export function createPreviewService(opts) {
             architecture,
             components,
             comments,
+            variants,
           }),
         );
         return;
@@ -1361,6 +1530,47 @@ export function createPreviewService(opts) {
           touch("approval");
           broadcast({ type: "approval", artifact });
           void checkApprovalWaiters(); // settle any waitForApprovalDecision() faster than the 1s poll
+        }
+        return;
+      }
+      if (url.pathname === "/api/reopen") {
+        // §2/§3 Reopen for redesign — same request/response shape as /api/approve
+        // (POST, {artifact}, {ok,...}|{ok:false,reason}), because it's the same
+        // KIND of thing: one governed artifact's status transitioning via the
+        // project's own approvals library. Deliberately NOT folded into
+        // /api/approve as a mode flag — "approve" and "reopen" are opposite
+        // directions of the same door, and conflating them in one endpoint would
+        // make a client-side bug (wrong flag) silently do the wrong transition.
+        if (req.method !== "POST") {
+          res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          res.end(JSON.stringify({ ok: false, reason: "method not allowed — use POST" }));
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse((await readBody(req)) || "{}");
+        } catch (err) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: `invalid JSON body: ${err.message}` }));
+          return;
+        }
+        const artifact = body && body.artifact;
+        if (!artifact || typeof artifact !== "string") {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: "missing `artifact` (string) in the request body" }));
+          return;
+        }
+        const result = await reopenArtifactViaLib(projectDir, artifact);
+        res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
+        res.end(JSON.stringify(result));
+        if (result.ok) {
+          touch("reopen");
+          // Reuses the "approval" SSE event type on purpose (design doc §3: "SSE
+          // `approval` event — existing in-place refresh covers the panel") — the
+          // client's approval-swap handler doesn't care WHICH transition fired,
+          // only that the Approvals panel needs a re-fetch.
+          broadcast({ type: "approval", artifact });
+          void checkApprovalWaiters();
         }
         return;
       }
@@ -1539,6 +1749,8 @@ export function createPreviewService(opts) {
     waitForNewComment,
     /** The agent's resolve primitive — records author "agent" + the note. */
     resolveComment: resolveCommentById,
+    /** §2 candidates strip primitive: stash the current render as a named variant (replaces if present). */
+    snapshotVariant,
     /** Test seam: force one render cycle without touching the filesystem watcher. */
     _renderCycle: renderCycle,
     /** Test seam: feed daemon-child output through the compile-failure scanner. */

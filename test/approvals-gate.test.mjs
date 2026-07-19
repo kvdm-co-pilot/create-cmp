@@ -81,18 +81,21 @@ function runStamper(root, args) {
   });
 }
 
-const STATIC_IDS = ["design-system", "architecture", "exemplar-feature", "exemplar-spec"];
+// GENESIS-FLOW-DESIGN.md §1 order: intent(0), design-system(1), architecture(2),
+// components(3), exemplar-feature(4), exemplar-spec(5) — six static artifacts on
+// a fresh scaffold (feature-spec:<name> only appears once a feature is stamped).
+const STATIC_IDS = ["intent", "design-system", "architecture", "components", "exemplar-feature", "exemplar-spec"];
 
-test("fresh scaffold: all four static artifacts are unreviewed and the gate SKIPs", async () => {
+test("fresh scaffold: all six static artifacts are unreviewed and the gate SKIPs", async () => {
   const out = await makeProject("cmp-appr-fresh-");
   try {
     const { evaluateApprovalsGate, listGovernedArtifacts } = await loadLib(out);
 
     const registry = listGovernedArtifacts(out);
     assert.deepEqual(
-      registry.map((a) => a.id).sort(),
-      [...STATIC_IDS].sort(),
-      "fresh scaffold registers exactly the 4 static governed artifacts (no feature specs exist yet)",
+      registry.map((a) => a.id),
+      STATIC_IDS,
+      "fresh scaffold registers exactly the 6 static governed artifacts, in §1 order (no feature specs exist yet)",
     );
 
     const gate = evaluateApprovalsGate(out);
@@ -116,7 +119,7 @@ test("approve via CLI moves one artifact to approved+match; others stay unreview
 
     const { evaluateApprovalsGate } = await loadLib(out);
     const gate = evaluateApprovalsGate(out);
-    assert.equal(gate.verdict, "SKIP", "the other 3 artifacts are still unreviewed");
+    assert.equal(gate.verdict, "SKIP", "the other 5 artifacts are still unreviewed");
     const ds = gate.statuses.find((s) => s.id === "design-system");
     assert.equal(ds.status, "approved");
     assert.equal(ds.storedHash, ds.hash);

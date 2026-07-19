@@ -53,18 +53,64 @@ function shortHash(hash) {
   return hash ? String(hash).slice(0, 8) : "none";
 }
 
-// The §1 ordered-walk numbering (VERIFICATION-LAYER-DESIGN.md §1) — shown so the
-// human sees the intended approval order, not just an alphabetical/registry list.
+// The §1 ordered-walk numbering (GENESIS-FLOW-DESIGN.md §1, superseding
+// VERIFICATION-LAYER-DESIGN.md §1's numbering) — shown so the human sees the
+// intended DEFINITION order (each artifact is the vocabulary the next is
+// written in), not just an alphabetical/registry list. `intent` and
+// `components` are new rows (§1's registry table); a project whose approvals
+// library predates them simply never reports those ids, so their numbers
+// just never appear — no fabrication, no renumbering surprise for the ids
+// that already existed.
 const ORDER_BY_ID = [
+  [/^intent$/, 0],
   [/^design-system$/, 1],
   [/^architecture$/, 2],
-  [/^exemplar-feature$/, 3],
-  [/^exemplar-spec$/, 4],
-  [/^feature-spec:/, 5],
+  [/^components$/, 3],
+  [/^exemplar-feature$/, 4],
+  [/^exemplar-spec$/, 5],
+  [/^feature-spec:/, 6],
 ];
 function orderNumber(id) {
   for (const [re, n] of ORDER_BY_ID) if (re.test(id)) return n;
   return "–";
+}
+
+// --- §2 mode presentation: per-artifact genesis/steward banners --------------
+//
+// "unreviewed"/"reopened" ⇒ genesis (workbench affordances + a one-line "what
+// shapes this artifact" guide); "approved" ⇒ steward; "approved" + mode
+// "defaults-accepted" ⇒ steward with the unshaped note. No global mode switch
+// — the per-artifact status IS the mode (§2 "Mode presentation").
+
+/** The one-line genesis guide, by artifact id pattern — never fabricated for an unknown id. */
+function genesisGuide(id) {
+  if (/^intent$/.test(id)) return "the interview that becomes this app's purpose, audience, platforms, and first screens.";
+  if (/^design-system$/.test(id)) return "the palette, type, and shape every screen renders in — react in your own words, never hex codes.";
+  if (/^architecture$/.test(id)) return "the layer map and structural decisions this harness enforces — approval means you understand and accept this shape.";
+  if (/^components$/.test(id)) return "the component vocabulary this app speaks in — shape each one; once approved it's law for every future feature.";
+  if (/^exemplar-feature$/.test(id)) return "this app's first real feature — the DNA every future feature is cloned from.";
+  if (/^exemplar-spec$/.test(id)) return "the Given/When/Then spec for that first feature's behavior.";
+  if (/^feature-spec:/.test(id)) return "a spec conversation in the frozen vocabulary — this feature's behavior, clause by clause.";
+  return "shapes this artifact.";
+}
+
+/**
+ * One artifact's genesis/steward banner. `undefined`/unknown `status` values
+ * (an older project lib, or "changed-since-approval") render NO banner —
+ * §2 defines the mapping only for unreviewed/reopened/approved; drift is a
+ * different concern (the hash mismatch already speaks for itself in the row).
+ */
+function artifactBannerHtml(s) {
+  if (s.status === "unreviewed" || s.status === "reopened") {
+    return `<div class="artifact-banner banner-genesis"><span class="banner-mode">genesis</span> ${esc(genesisGuide(s.id))}</div>`;
+  }
+  if (s.status === "approved") {
+    const unshaped = s.mode === "defaults-accepted";
+    return unshaped
+      ? `<div class="artifact-banner banner-steward banner-unshaped"><span class="banner-mode">steward</span> approved with defaults — unshaped; a real approval after shaping clears this note.</div>`
+      : `<div class="artifact-banner banner-steward"><span class="banner-mode">steward</span> frozen — drift is detected automatically; reopen for a deliberate redesign.</div>`;
+  }
+  return "";
 }
 
 /**
@@ -75,10 +121,20 @@ function orderNumber(id) {
  * unavailable catalog/scan gets an honest empty-state explaining how to
  * produce one. The two sections are independent: a project with tokens but
  * no components/ dir (or vice versa) still shows whichever half resolved.
+ * §2 "Design-language candidates (variants)": in genesis mode (design-system
+ * status unreviewed/reopened — `artifactStatus`), also renders the candidates
+ * strip below Components — one card per `snapshot_variant`-stashed variant,
+ * its screens side by side, with a Pick button. Steward mode (approved, incl.
+ * defaults-accepted) omits the strip entirely, per §2's "no global mode
+ * switch — the per-artifact status IS the mode". `artifactStatus` is the
+ * design-system artifact's live `status` string (or undefined, which reads
+ * as steward — the safe default when the caller has no approvals data at all).
  * @param {{available: boolean, source?: "previews"|"live", catalog?: {colors?: object, dimens?: object}}} ds
  * @param {{available: boolean, reason?: string, components?: object[]}} [components]
+ * @param {{available: boolean, variants?: Array<{name: string, screens: Array<{id: string, png: string}>, hasDesignSystem: boolean}>}} [variants]
+ * @param {string} [artifactStatus] the design-system artifact's live status (see approvalsTabHtml)
  */
-export function designSystemTabHtml(ds, components) {
+export function designSystemTabHtml(ds, components, variants, artifactStatus) {
   let dsHtml;
   if (!ds || !ds.available) {
     dsHtml = `<div class="empty">
@@ -118,9 +174,59 @@ ${colorCards || '    <p class="empty-inline">no colors declared</p>'}
 ${dimenRows || '    <tr><td colspan="2" class="empty-inline">no dimens declared</td></tr>'}
   </tbody></table>`;
   }
+  const genesisMode = artifactStatus === "unreviewed" || artifactStatus === "reopened";
+  const candidatesSection = genesisMode
+    ? `  <h3>Design-language candidates</h3>
+${candidatesStripHtml(variants)}`
+    : "";
   return `${dsHtml}
   <h3>Components</h3>
-${componentsSectionHtml(components)}`;
+${componentsSectionHtml(components)}
+${candidatesSection}`;
+}
+
+/**
+ * The genesis candidates strip (§2): each stashed variant's name + its
+ * stashed screen renders side by side (served via the existing /previews/
+ * static route — a variant's PNGs live under
+ * composeApp/build/previews/variants/<name>/<screenId>/screen.png, same
+ * layout as a normal render generation, just nested one level deeper), plus
+ * a Pick button. No candidates yet is an honest empty state, not an error —
+ * the strip is only ever shown in genesis mode (caller's concern), so this
+ * function itself doesn't need to know why it's being asked to render.
+ */
+function candidatesStripHtml(variants) {
+  if (!variants || !variants.available || !variants.variants || variants.variants.length === 0) {
+    return `<div class="empty">
+      <p>No design-language candidates stashed yet.</p>
+      <p>Edit <code>Tokens.kt</code>, let the preview re-render, then stash the result with the
+      <code>snapshot_variant</code> tool (e.g. <code>{name: "warmer"}</code>) — repeat per idea, then
+      compare them here and Pick one.</p>
+    </div>`;
+  }
+  const cards = variants.variants
+    .map((v) => {
+      const shots = v.screens
+        .map(
+          (s) => `        <div class="candidate-shot">
+          <img alt="${escAttr(v.name)} — ${escAttr(s.id)}" src="/previews/${escAttr(s.png)}">
+          <p class="lbl">${esc(s.id)}</p>
+        </div>`,
+        )
+        .join("\n");
+      return `    <div class="candidate-card">
+      <h4>${esc(v.name)}</h4>
+      <div class="candidate-shots">
+${shots || '        <p class="empty-inline">no screens stashed for this candidate</p>'}
+      </div>
+      <button type="button" class="pick-btn" data-variant="${escAttr(v.name)}">Pick &ldquo;${esc(v.name)}&rdquo;</button>
+    </div>`;
+    })
+    .join("\n");
+  return `  <div class="candidates-strip">
+${cards}
+  </div>
+  <div id="pick-error" class="banner" hidden></div>`;
 }
 
 /**
@@ -197,8 +303,30 @@ export function approvalsTabHtml(approvals) {
   }
   const rows = approvals.statuses
     .map((s) => {
-      const badgeClass =
-        s.status === "approved" ? "badge-approved" : s.status === "changed-since-approval" ? "badge-changed" : "badge-unreviewed";
+      // `reopened` (§2 "Reopen for redesign") is a DELIBERATE state, visually
+      // distinct from unreviewed — never collapsed into badge-unreviewed even
+      // though the gate treats them the same (SKIP, non-blocking). An older
+      // project lib that predates reopen simply never reports this status, so
+      // this branch is dead code there — no fabrication either way.
+      const unshaped = s.status === "approved" && s.mode === "defaults-accepted";
+      const badgeClass = [
+        s.status === "approved"
+          ? "badge-approved"
+          : s.status === "changed-since-approval"
+            ? "badge-changed"
+            : s.status === "reopened"
+              ? "badge-reopened"
+              : "badge-unreviewed",
+        unshaped ? "badge-unshaped" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      // §2 express lane: "approved · defaults accepted — unshaped" is the
+      // human-facing label for status approved + mode defaults-accepted —
+      // distinct wording from a shaped approval, per §2's "visually distinct
+      // from a shaped approval". A real approval later clears `mode`, which
+      // falls straight back to the plain "approved" label below.
+      const statusLabel = unshaped ? "approved · defaults accepted — unshaped" : s.status;
       // `resolvable` may be `undefined` against an older project-side approvals.mjs
       // that predates the field (a stale pre-approvals-refinement scaffold) — treat
       // that the same as "resolvable" (never FABRICATE an "unresolvable" claim the
@@ -222,13 +350,24 @@ export function approvalsTabHtml(approvals) {
       const missingNote =
         s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc(s.missing.join(", "))}</p>` : "";
       const btnLabel = s.status === "approved" ? "Re-approve" : "Approve";
+      // §2/§3 Reopen control: beside Re-approve on approved rows only — reopening
+      // the unreviewed/reopened/changed-since-approval is meaningless (the
+      // library refuses it too; the button just never offers it here). Always
+      // rendered when approved (never conditioned on lib support the tab data
+      // can't see) — the honest degrade lives in the bridge/endpoint: an older
+      // lib without reopenArtifact surfaces its refusal in #approve-error on
+      // click, never a crash (GENESIS-FLOW-DESIGN.md §3 "honest degrade").
+      const reopenBtn =
+        s.status === "approved"
+          ? `<button class="reopen-btn" data-artifact="${esc(s.id)}">Reopen</button>`
+          : "";
       return `    <tr class="approval-row" data-artifact="${esc(s.id)}">
       <td class="order-num">${orderNumber(s.id)}</td>
-      <td>${esc(s.label)}<div class="artifact-id">${esc(s.id)}</div></td>
-      <td><span class="badge ${badgeClass}">${esc(s.status)}</span></td>
+      <td>${esc(s.label)}<div class="artifact-id">${esc(s.id)}</div>${artifactBannerHtml(s)}</td>
+      <td><span class="badge ${badgeClass}">${esc(statusLabel)}</span></td>
       <td>${s.fileCount}</td>
       <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}</td>
-      <td><button class="approve-btn" data-artifact="${esc(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button></td>
+      <td><button class="approve-btn" data-artifact="${esc(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
     </tr>`;
     })
     .join("\n");

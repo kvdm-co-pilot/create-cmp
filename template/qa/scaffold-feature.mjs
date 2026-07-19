@@ -94,7 +94,8 @@ if (!IDENTIFIER_RE.test(entityName)) {
 // `repository` preset has no feature name (no nav/presentation/spec slice), so
 // F/f/F_UPPER are never read for it — the rename map still needs harmless
 // values to build (its feature-shaped entries never match repository-preset
-// file contents, which only reference Item/ItemRepository/GetItemsUseCase).
+// file contents, which only reference the exemplar's own entity, e.g.
+// Item/ItemRepository/GetItemsUseCase for the default `home` exemplar).
 const F = featureName ?? entityName; // PascalCase feature, e.g. Favorites
 const f = F[0].toLowerCase() + F.slice(1); // camelCase/package segment, e.g. favorites
 const F_UPPER = F.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase(); // FAVORITES
@@ -160,45 +161,122 @@ function guessPackageDirFromDisk() {
 const PACKAGE = resolvePackage();
 const PACKAGE_DIR = PACKAGE.split(".").join("/");
 
-// ── The rename map (§3) ──────────────────────────────────────────────────────
-// Whole-word (\b-delimited), applied LONGEST KEY FIRST so compound entries
-// (ItemRepositoryImpl) resolve before their substrings (ItemRepository, Item).
-// Anything not in this list is left untouched by design (see design doc §3
-// "LEAVE GENERIC" — awaitItem, items, item, goldenItems, itemId, onItemClick,
-// id, title, subtitle, and every androidx./kotlinx./org.koin./kotlin. token).
+// ── The file set (§4) ───────────────────────────────────────────────────────
+// Source paths are relative to composeApp/src/<sourceSet>/kotlin/<PACKAGE_DIR>.
 
-const RENAME_MAP = [
-  ["HomeScreenTest", `${F}ScreenTest`],
-  ["HomeViewModelTest", `${F}ViewModelTest`],
-  ["HomeGoldenTreeTest", `${F}GoldenTreeTest`],
-  ["HomeScreen", `${F}Screen`],
-  ["HomeViewModel", `${F}ViewModel`],
-  ["HomeUiState", `${F}UiState`],
-  ["home_title", `${f}_title`],
-  ["home_error", `${f}_error`],
-  ["FakeItemRepository", `Fake${E}Repository`],
-  ["ItemRepositoryImpl", `${E}RepositoryImpl`],
-  ["ItemRepository", `${E}Repository`],
-  ["GetItemsUseCase", `Get${E}sUseCase`],
-  ["getItemsCallCount", `get${E}sCallCount`],
-  ["getItems", `get${E}s`],
-  ["Item", E],
-  // Spec + test SPEC-tag retargeting (§6): HOME-0N -> <F_UPPER>-0N, then the
-  // bare HOME -> <F_UPPER> (must run AFTER the -0 form or "HOME-0" would be
-  // partially consumed oddly — longest-key-first already orders this).
-  ["HOME-0", `${F_UPPER}-0`],
-  ["HOME", F_UPPER],
-  // Package segment / path / golden filename / display text. Order matters:
-  // must run after HomeXxx / home_xxx above so those compounds are already
-  // resolved; the bare `home` word only matches the standalone package
-  // segment, golden filename stem, and prose by this point.
-  ["home", f],
-  ["Home", F],
-].sort((a, b) => b[0].length - a[0].length);
+const SRC = (sourceSet) => path.join(ROOT, "composeApp/src", sourceSet, "kotlin", PACKAGE_DIR);
 
+// ── Configurable exemplar (GENESIS-FLOW-DESIGN.md §1) ───────────────────────
+// This stamper clones from the CONFIGURED exemplar (qa/approvals.json's
+// `exemplarFeature`, defaulting to `home`) — the same resolution
+// qa/lib/approvals.mjs's governed-artifact registry uses, so a stamped feature
+// always matches what the registry hashes. Tolerant of a missing/pre-genesis-flow
+// qa/lib/approvals.mjs (mirrors the seedUnreviewed step further down): a broken
+// or absent import falls back to the hardcoded `home`/`Item` shape that predates
+// configurability — this script must never refuse to stamp because the approvals
+// ledger's tooling isn't present.
+let approvalsLib = null;
+try {
+  approvalsLib = await import("./lib/approvals.mjs");
+} catch {
+  approvalsLib = null;
+}
+
+function resolveSourceNames() {
+  if (approvalsLib && typeof approvalsLib.resolveExemplarNames === "function") {
+    return approvalsLib.resolveExemplarNames(ROOT);
+  }
+  return { f: "home", F: "Home", F_UPPER: "HOME", E: "Item" };
+}
+
+const { f: SOURCE_f, F: SOURCE_F, F_UPPER: SOURCE_F_UPPER, E: SOURCE_E } = resolveSourceNames();
+
+// Extras beyond the canonical 11-file shape (§1: "clone the canonical set and
+// WARN, listing what it skipped — never silently"). Scoped by NAME, not by
+// directory membership: the exemplar's presentation directory can legitimately
+// hold files that aren't "this feature's own" (e.g. the shipped `home`
+// exemplar's directory also holds `DetailScreen.kt` — a deliberately
+// NOT-cloned, permanent fixture per add-feature's SKILL.md, not drift) — so a
+// file only counts as an extra when its name is actually built FROM the
+// exemplar's own identifiers (starts with `${sourceF}` in presentation/, or
+// contains the entity as a whole word in the shared domain/data directories).
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+function scanDirForExtras(sourceSet, dirRel, canonicalBasenames, matches) {
+  const dirAbs = path.join(SRC(sourceSet), dirRel);
+  if (!fs.existsSync(dirAbs)) return [];
+  return fs
+    .readdirSync(dirAbs, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith(".kt") && matches(e.name) && !canonicalBasenames.has(e.name))
+    .map((e) => path.relative(ROOT, path.join(dirAbs, e.name)));
+}
+
+function findExemplarExtras(sourceF, sourceLowerF, sourceEntity) {
+  const namedForFeature = (n) => n.startsWith(sourceF);
+  const entityWholeWord = new RegExp(`\\b${escapeRegExp(sourceEntity)}\\b`);
+  return [
+    ...scanDirForExtras("commonMain", `presentation/${sourceLowerF}`, new Set([`${sourceF}Screen.kt`, `${sourceF}ViewModel.kt`]), namedForFeature),
+    ...scanDirForExtras("commonTest", `presentation/${sourceLowerF}`, new Set([`${sourceF}ViewModelTest.kt`]), namedForFeature),
+    ...scanDirForExtras("desktopTest", `presentation/${sourceLowerF}`, new Set([`${sourceF}ScreenTest.kt`, `${sourceF}GoldenTreeTest.kt`]), namedForFeature),
+    ...scanDirForExtras("commonMain", "domain/model", new Set([`${sourceEntity}.kt`]), (n) => entityWholeWord.test(n)),
+    ...scanDirForExtras("commonMain", "domain/repository", new Set([`${sourceEntity}Repository.kt`]), (n) => entityWholeWord.test(n)),
+    ...scanDirForExtras("commonMain", "domain/usecase", new Set([`Get${sourceEntity}sUseCase.kt`]), (n) => entityWholeWord.test(n)),
+    ...scanDirForExtras("commonMain", "data/remote", new Set([`${sourceEntity}RepositoryImpl.kt`]), (n) => entityWholeWord.test(n)),
+    ...scanDirForExtras("commonTest", "testing/fakes", new Set([`Fake${sourceEntity}Repository.kt`]), (n) => entityWholeWord.test(n)),
+  ];
+}
+
+const exemplarExtras = findExemplarExtras(SOURCE_F, SOURCE_f, SOURCE_E);
+if (exemplarExtras.length > 0) {
+  console.log(
+    `WARNING: the "${SOURCE_f}" exemplar has files beyond the canonical 11-file shape — only the canonical set is cloned, these are SKIPPED:\n` +
+      exemplarExtras.map((p) => `  - ${p}`).join("\n"),
+  );
+}
+
+// ── The rename map (§3) ──────────────────────────────────────────────────────
+// Whole-word (\b-delimited), applied LONGEST KEY FIRST so compound entries
+// (<Entity>RepositoryImpl) resolve before their substrings (<Entity>Repository,
+// <Entity>). Generated from the CLONE-SOURCE's own names (SOURCE_F/SOURCE_f/
+// SOURCE_E/SOURCE_F_UPPER) rather than hardcoded `Home`/`home`/`Item`/`HOME` — when
+// the source is the shipped `home` exemplar these resolve to exactly those
+// literals, so stamping from `home` is byte-identical to before configurability
+// existed (pinned by test/stamper-clone-source.test.mjs). Anything not in this
+// list is left untouched by design (see design doc §3 "LEAVE GENERIC" —
+// awaitItem, items, item, goldenItems, itemId, onItemClick, id, title, subtitle,
+// and every androidx./kotlinx./org.koin./kotlin. token).
+
+const RENAME_MAP = [
+  [`${SOURCE_F}ScreenTest`, `${F}ScreenTest`],
+  [`${SOURCE_F}ViewModelTest`, `${F}ViewModelTest`],
+  [`${SOURCE_F}GoldenTreeTest`, `${F}GoldenTreeTest`],
+  [`${SOURCE_F}Screen`, `${F}Screen`],
+  [`${SOURCE_F}ViewModel`, `${F}ViewModel`],
+  [`${SOURCE_F}UiState`, `${F}UiState`],
+  [`${SOURCE_f}_title`, `${f}_title`],
+  [`${SOURCE_f}_error`, `${f}_error`],
+  [`Fake${SOURCE_E}Repository`, `Fake${E}Repository`],
+  [`${SOURCE_E}RepositoryImpl`, `${E}RepositoryImpl`],
+  [`${SOURCE_E}Repository`, `${E}Repository`],
+  [`Get${SOURCE_E}sUseCase`, `Get${E}sUseCase`],
+  [`get${SOURCE_E}sCallCount`, `get${E}sCallCount`],
+  [`get${SOURCE_E}s`, `get${E}s`],
+  [SOURCE_E, E],
+  // Spec + test SPEC-tag retargeting (§6): <SOURCE_F_UPPER>-0N -> <F_UPPER>-0N,
+  // then the bare <SOURCE_F_UPPER> -> <F_UPPER> (must run AFTER the -0 form or
+  // "<SOURCE_F_UPPER>-0" would be partially consumed oddly — longest-key-first
+  // already orders this).
+  [`${SOURCE_F_UPPER}-0`, `${F_UPPER}-0`],
+  [SOURCE_F_UPPER, F_UPPER],
+  // Package segment / path / golden filename / display text. Order matters:
+  // must run after <SOURCE_F>Xxx / <SOURCE_f>_xxx above so those compounds are
+  // already resolved; the bare source-feature word only matches the standalone
+  // package segment, golden filename stem, and prose by this point.
+  [SOURCE_f, f],
+  [SOURCE_F, F],
+].sort((a, b) => b[0].length - a[0].length);
 
 const COMPILED_RENAMES = RENAME_MAP.map(([from, to]) => [new RegExp(`\\b${escapeRegExp(from)}\\b`, "g"), to]);
 
@@ -208,27 +286,30 @@ function applyRename(text) {
   return out;
 }
 
-// ── The file set (§4) ───────────────────────────────────────────────────────
-// Source paths are relative to composeApp/src/<sourceSet>/kotlin/<PACKAGE_DIR>.
-
-const SRC = (sourceSet) => path.join(ROOT, "composeApp/src", sourceSet, "kotlin", PACKAGE_DIR);
-
 // Every entry is tagged with the presets it belongs to. `feature` gets all 11
 // (the union); `repository` gets just the 5 data/domain files; `screen` gets
 // just the 6 presentation+tests+spec files. Filtered by the active preset
 // right after definition — nothing below this point sees the untagged list.
+//
+// `from:` sides are built from the CLONE-SOURCE names (SOURCE_F/SOURCE_f/
+// SOURCE_E) instead of hardcoded `home`/`Item` literals — this is exactly the
+// canonical-11-file SHAPE `exemplarKotlinFileSet` in qa/lib/approvals.mjs
+// encodes (that function is the registry's copy; this one is the stamper's,
+// kept independently so the stamper works even without qa/lib/approvals.mjs —
+// see the resolveSourceNames() fallback above). test/stamper-clone-source.test.mjs
+// pins that the two never disagree for a real project.
 const ALL_FILES = [
-  { from: path.join(SRC("commonMain"), "domain/model/Item.kt"), to: path.join(SRC("commonMain"), `domain/model/${E}.kt`), presets: ["feature", "repository"] },
-  { from: path.join(SRC("commonMain"), "domain/repository/ItemRepository.kt"), to: path.join(SRC("commonMain"), `domain/repository/${E}Repository.kt`), presets: ["feature", "repository"] },
-  { from: path.join(SRC("commonMain"), "domain/usecase/GetItemsUseCase.kt"), to: path.join(SRC("commonMain"), `domain/usecase/Get${E}sUseCase.kt`), presets: ["feature", "repository"] },
-  { from: path.join(SRC("commonMain"), "data/remote/ItemRepositoryImpl.kt"), to: path.join(SRC("commonMain"), `data/remote/${E}RepositoryImpl.kt`), presets: ["feature", "repository"] },
-  { from: path.join(SRC("commonTest"), "testing/fakes/FakeItemRepository.kt"), to: path.join(SRC("commonTest"), `testing/fakes/Fake${E}Repository.kt`), presets: ["feature", "repository"] },
-  { from: path.join(SRC("commonMain"), "presentation/home/HomeScreen.kt"), to: path.join(SRC("commonMain"), `presentation/${f}/${F}Screen.kt`), presets: ["feature", "screen"], wrapInBaseScreen: true },
-  { from: path.join(SRC("commonMain"), "presentation/home/HomeViewModel.kt"), to: path.join(SRC("commonMain"), `presentation/${f}/${F}ViewModel.kt`), presets: ["feature", "screen"] },
-  { from: path.join(SRC("commonTest"), "presentation/home/HomeViewModelTest.kt"), to: path.join(SRC("commonTest"), `presentation/${f}/${F}ViewModelTest.kt`), presets: ["feature", "screen"] },
-  { from: path.join(SRC("desktopTest"), "presentation/home/HomeScreenTest.kt"), to: path.join(SRC("desktopTest"), `presentation/${f}/${F}ScreenTest.kt`), presets: ["feature", "screen"] },
-  { from: path.join(SRC("desktopTest"), "presentation/home/HomeGoldenTreeTest.kt"), to: path.join(SRC("desktopTest"), `presentation/${f}/${F}GoldenTreeTest.kt`), presets: ["feature", "screen"] },
-  { from: path.join(ROOT, "specs/home.spec.md"), to: path.join(ROOT, `specs/${f}.spec.md`), isDefaultSpec: true, presets: ["feature", "screen"] },
+  { from: path.join(SRC("commonMain"), `domain/model/${SOURCE_E}.kt`), to: path.join(SRC("commonMain"), `domain/model/${E}.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonMain"), `domain/repository/${SOURCE_E}Repository.kt`), to: path.join(SRC("commonMain"), `domain/repository/${E}Repository.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonMain"), `domain/usecase/Get${SOURCE_E}sUseCase.kt`), to: path.join(SRC("commonMain"), `domain/usecase/Get${E}sUseCase.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonMain"), `data/remote/${SOURCE_E}RepositoryImpl.kt`), to: path.join(SRC("commonMain"), `data/remote/${E}RepositoryImpl.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonTest"), `testing/fakes/Fake${SOURCE_E}Repository.kt`), to: path.join(SRC("commonTest"), `testing/fakes/Fake${E}Repository.kt`), presets: ["feature", "repository"] },
+  { from: path.join(SRC("commonMain"), `presentation/${SOURCE_f}/${SOURCE_F}Screen.kt`), to: path.join(SRC("commonMain"), `presentation/${f}/${F}Screen.kt`), presets: ["feature", "screen"], wrapInBaseScreen: true },
+  { from: path.join(SRC("commonMain"), `presentation/${SOURCE_f}/${SOURCE_F}ViewModel.kt`), to: path.join(SRC("commonMain"), `presentation/${f}/${F}ViewModel.kt`), presets: ["feature", "screen"] },
+  { from: path.join(SRC("commonTest"), `presentation/${SOURCE_f}/${SOURCE_F}ViewModelTest.kt`), to: path.join(SRC("commonTest"), `presentation/${f}/${F}ViewModelTest.kt`), presets: ["feature", "screen"] },
+  { from: path.join(SRC("desktopTest"), `presentation/${SOURCE_f}/${SOURCE_F}ScreenTest.kt`), to: path.join(SRC("desktopTest"), `presentation/${f}/${F}ScreenTest.kt`), presets: ["feature", "screen"] },
+  { from: path.join(SRC("desktopTest"), `presentation/${SOURCE_f}/${SOURCE_F}GoldenTreeTest.kt`), to: path.join(SRC("desktopTest"), `presentation/${f}/${F}GoldenTreeTest.kt`), presets: ["feature", "screen"] },
+  { from: path.join(ROOT, `specs/${SOURCE_f}.spec.md`), to: path.join(ROOT, `specs/${f}.spec.md`), isDefaultSpec: true, presets: ["feature", "screen"] },
 ];
 
 const FILES = ALL_FILES.filter((file) => file.presets.includes(preset));
@@ -240,8 +321,8 @@ for (const file of FILES) {
   if (!fs.existsSync(file.from)) {
     die(
       `exemplar source file missing: ${path.relative(ROOT, file.from)}\n` +
-        "This script must run in an unmodified (or already-featured) create-cmp scaffold " +
-        "where the `home` exemplar still exists.",
+        `This script must run in an unmodified (or already-featured) create-cmp scaffold ` +
+        `where the "${SOURCE_f}" exemplar (qa/approvals.json's "exemplarFeature") still exists in its canonical 11-file shape.`,
     );
   }
 }
@@ -284,7 +365,7 @@ if (FILES.some((file) => file.isDefaultSpec) && fs.existsSync(path.join(ROOT, `s
 function defaultSpec() {
   return `# Spec: ${f}
 
-> Generated by \`scaffold-feature.mjs\` from the \`home\` exemplar shape. Refine the clause
+> Generated by \`scaffold-feature.mjs\` from the \`${SOURCE_f}\` exemplar shape. Refine the clause
 > prose below for ${F}'s real behavior (ids stay fixed) before running the verify lane.
 
 - **${F_UPPER}-01** — Given the ${F} screen opens, When ${f} are being loaded, Then a loading
@@ -320,7 +401,7 @@ function wrapScreenInBaseScreen(content, relPathForErrors) {
   const themeImportIdx = lines.findIndex((l) => /^import .+\.presentation\.theme\./.test(l));
   if (themeImportIdx === -1) {
     die(
-      `no presentation.theme import found in ${relPathForErrors} — the HomeScreen exemplar ` +
+      `no presentation.theme import found in ${relPathForErrors} — the ${SOURCE_F}Screen exemplar ` +
         "drifted from the shape this stamper wraps; cannot place the BaseScreen import.",
     );
   }
@@ -334,7 +415,7 @@ function wrapScreenInBaseScreen(content, relPathForErrors) {
   const rootIdx = lines.findIndex((l) => l === "    Column(");
   if (rootIdx === -1) {
     die(
-      `root "    Column(" not found in ${relPathForErrors} — the HomeScreen exemplar drifted ` +
+      `root "    Column(" not found in ${relPathForErrors} — the ${SOURCE_F}Screen exemplar drifted ` +
         "from the shape this stamper wraps in BaseScreen.",
     );
   }
@@ -350,7 +431,7 @@ function wrapScreenInBaseScreen(content, relPathForErrors) {
   if (funCloseIdx === -1 || lines[funCloseIdx - 1] !== "    }") {
     die(
       `could not locate the root container's closing brace in ${relPathForErrors} — the ` +
-        "HomeScreen exemplar drifted from the shape this stamper wraps in BaseScreen.",
+        `${SOURCE_F}Screen exemplar drifted from the shape this stamper wraps in BaseScreen.`,
     );
   }
   const rootCloseIdx = funCloseIdx - 1;
@@ -597,13 +678,13 @@ if (writesSpec) {
   // is a governed artifact (`feature-spec:<name>`) — seed it unreviewed so the
   // verify lane's `approvals` gate SKIP-warns until a human signs off. v1 does
   // NOT refuse to stamp over this (warn-then-enforce-at-verify is the honest
-  // default) — a dynamic import wrapped in try/catch means a missing or
-  // out-of-date qa/lib/approvals.mjs (an older, pre-approvals scaffold) never
-  // blocks the stamp itself.
+  // default) — reuses `approvalsLib` (already resolved above, tolerantly, for
+  // clone-source resolution) so a missing or out-of-date qa/lib/approvals.mjs
+  // (an older, pre-approvals scaffold) never blocks the stamp itself.
   try {
-    const { seedUnreviewed } = await import("./lib/approvals.mjs");
+    if (!approvalsLib || typeof approvalsLib.seedUnreviewed !== "function") throw new Error("no seedUnreviewed export");
     const artifactId = `feature-spec:${f}`;
-    seedUnreviewed(ROOT, artifactId);
+    approvalsLib.seedUnreviewed(ROOT, artifactId);
     console.log(`  Approval: specs/${f}.spec.md is unreviewed — run \`node qa/approve.mjs ${artifactId}\` once you've reviewed it.`);
   } catch {
     console.log("  (approvals seeding skipped — qa/lib/approvals.mjs not found in this scaffold)");

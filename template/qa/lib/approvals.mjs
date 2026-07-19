@@ -1,4 +1,6 @@
-// The hash-bound human-approval data model (VERIFICATION-LAYER-DESIGN.md §2).
+// The hash-bound human-approval data model (VERIFICATION-LAYER-DESIGN.md §2,
+// extended by GENESIS-FLOW-DESIGN.md §1/§2/§3 — the genesis flow's registry,
+// express lane, and reopen mechanics).
 //
 // Reuses ADR-0005's philosophy exactly (docs/adr/0005-evidence-binding-by-inputs-hash.md
 // in the create-cmp repo): an approval is valid iff a stored content hash matches a
@@ -7,22 +9,30 @@
 // verified tree.
 //
 // Three concerns, kept separable:
-//   1. The REGISTRY (`listGovernedArtifacts`) — artifact id -> resolved file list.
-//      Static artifacts (design-system, architecture, exemplar-feature, exemplar-spec)
-//      plus a DYNAMIC one (`feature-spec:<name>`) per non-base, non-home spec file
-//      present in specs/ right now. The registry is recomputed on every call — it
-//      reflects the tree as it stands, never a stale snapshot.
+//   1. The REGISTRY (`listGovernedArtifacts`) — artifact id -> resolved file list, in
+//      GENESIS-FLOW-DESIGN.md §1 order: intent(0), design-system(1), architecture(2),
+//      components(3), exemplar-feature(4), exemplar-spec(5), then one
+//      `feature-spec:<name>` (6+) per non-base, non-exemplar spec file present in
+//      specs/ right now. The exemplar (feature 4/5) is CONFIGURABLE — see
+//      `getExemplarFeature`/`resolveExemplarNames` below — defaulting to `home` so
+//      every ledger written before this config key existed keeps meaning what it
+//      meant. The registry is recomputed on every call — it reflects the tree as it
+//      stands, never a stale snapshot.
 //   2. STATE (`loadApprovals`/`saveApprovals`) — qa/approvals.json, the human's
-//      decisions: { artifact, status, hash, approvedAt }. Absent or corrupt is
-//      TOLERATED (treated as empty / all-unreviewed) — this ledger must never crash
-//      the verify lane or the stamper.
+//      decisions: { artifact, status, hash, approvedAt, mode?, reopenedAt? } plus the
+//      top-level `exemplarFeature` config key. Absent or corrupt is TOLERATED
+//      (treated as empty / all-unreviewed / default exemplar) — this ledger must
+//      never crash the verify lane or the stamper.
 //   3. The GATE (`evaluateApprovalsGate`) — combines registry + state into one
-//      per-artifact status (unreviewed / approved / changed-since-approval) and one
-//      aggregate verdict (PASS/FAIL/SKIP) for the verify-lane step to report.
+//      per-artifact status (unreviewed / approved / changed-since-approval /
+//      reopened) and one aggregate verdict (PASS/FAIL/SKIP) for the verify-lane step
+//      to report. `reopened` behaves like `unreviewed` for the gate (SKIP-warn,
+//      non-blocking) — sanctioned redesign is never drift.
 //
 // Consumers: qa/approve.mjs (the CLI — thin shell over this file), qa/verify.mjs
 // (the `approvals` gate), qa/scaffold-feature.mjs (seeds a new feature's spec as
-// unreviewed). The future console (design doc §4) calls this same library.
+// unreviewed, and resolves its clone-FROM exemplar through `resolveExemplarNames`).
+// The console (inspector/mcp/src/lib/approvals-bridge.mjs) calls this same library.
 
 import { createHash } from "node:crypto";
 import fs from "node:fs";
@@ -39,31 +49,87 @@ const KOTLIN_SOURCE_SETS = {
   desktopTest: "composeApp/src/desktopTest/kotlin",
 };
 
-// The exemplar `home` feature's OWN 11 files — the `from` side of every entry in
-// qa/scaffold-feature.mjs's ALL_FILES (:209-221), i.e. the exact file set the
-// stamper clones FROM. Kept as a flat sourceSet+rel list (not yet package-resolved)
-// so it works against ANY generated project's package.
-//
-// DRIFT GUARD: test/approvals-exemplar-list.test.mjs regex-extracts ALL_FILES'
-// `from:` entries out of the stamper's source and asserts they match this list
-// exactly. scaffold-feature.mjs is a script with top-level side effects (argument
-// parsing, `die()`/`process.exit`) and is not safely importable, so the guard
-// parses its source rather than forking a second copy of the list silently.
-// Edit BOTH sides together — the test fails loudly if they diverge.
-export const EXEMPLAR_FEATURE_KOTLIN_FILES = [
-  { sourceSet: "commonMain", rel: "domain/model/Item.kt" },
-  { sourceSet: "commonMain", rel: "domain/repository/ItemRepository.kt" },
-  { sourceSet: "commonMain", rel: "domain/usecase/GetItemsUseCase.kt" },
-  { sourceSet: "commonMain", rel: "data/remote/ItemRepositoryImpl.kt" },
-  { sourceSet: "commonTest", rel: "testing/fakes/FakeItemRepository.kt" },
-  { sourceSet: "commonMain", rel: "presentation/home/HomeScreen.kt" },
-  { sourceSet: "commonMain", rel: "presentation/home/HomeViewModel.kt" },
-  { sourceSet: "commonTest", rel: "presentation/home/HomeViewModelTest.kt" },
-  { sourceSet: "desktopTest", rel: "presentation/home/HomeScreenTest.kt" },
-  { sourceSet: "desktopTest", rel: "presentation/home/HomeGoldenTreeTest.kt" },
-];
+// The canonical 11-file EXEMPLAR SHAPE (10 kotlin files + 1 spec), parametrized by
+// the exemplar's own names — F (PascalCase feature, e.g. "Home"), f (lowercase
+// package segment, e.g. "home"), E (PascalCase entity, e.g. "Item"). This is the
+// SAME shape qa/scaffold-feature.mjs's ALL_FILES clones FROM (GENESIS-FLOW-DESIGN.md
+// §1's "configurable exemplar") — the stamper imports this exact function so the
+// clone-source list and the governed-artifact list can never drift from each other
+// (single source of truth, not a parallel copy to keep in sync by hand).
+// @param {string} F PascalCase feature name (e.g. "Home", "Favorites")
+// @param {string} f lowercase package-segment name (e.g. "home", "favorites")
+// @param {string} E PascalCase entity name (e.g. "Item", "Favorite")
+// @returns {Array<{sourceSet: string, rel: string}>}
+export function exemplarKotlinFileSet(F, f, E) {
+  return [
+    { sourceSet: "commonMain", rel: `domain/model/${E}.kt` },
+    { sourceSet: "commonMain", rel: `domain/repository/${E}Repository.kt` },
+    { sourceSet: "commonMain", rel: `domain/usecase/Get${E}sUseCase.kt` },
+    { sourceSet: "commonMain", rel: `data/remote/${E}RepositoryImpl.kt` },
+    { sourceSet: "commonTest", rel: `testing/fakes/Fake${E}Repository.kt` },
+    { sourceSet: "commonMain", rel: `presentation/${f}/${F}Screen.kt` },
+    { sourceSet: "commonMain", rel: `presentation/${f}/${F}ViewModel.kt` },
+    { sourceSet: "commonTest", rel: `presentation/${f}/${F}ViewModelTest.kt` },
+    { sourceSet: "desktopTest", rel: `presentation/${f}/${F}ScreenTest.kt` },
+    { sourceSet: "desktopTest", rel: `presentation/${f}/${F}GoldenTreeTest.kt` },
+  ];
+}
+
+// Naive de-pluralization, shared verbatim with qa/scaffold-feature.mjs's own
+// entity-name default (a feature stamped without `--entity` gets this exact
+// guess). Exported so both the stamper (deriving a NEW feature's entity) and this
+// registry (guessing a CONFIGURED exemplar's entity from its feature name alone —
+// see resolveExemplarNames) apply the identical heuristic. Unreliable for
+// irregular nouns by design (the skill surfaces the guess for human override at
+// stamp time); a wrong guess here simply fails to resolve files, which is refused
+// (never fabricated), not silently wrong.
+export function defaultEntityName(feature) {
+  if (feature.endsWith("ies") && feature.length > 3) return `${feature.slice(0, -3)}y`;
+  if (feature.endsWith("s") && !feature.endsWith("ss")) return feature.slice(0, -1);
+  return feature;
+}
+
+function toPascalCase(f) {
+  return f.charAt(0).toUpperCase() + f.slice(1);
+}
+
+function toUpperSnake(F) {
+  return F.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase();
+}
+
+/**
+ * Resolve the CONFIGURED exemplar's names — the ones the exemplar-feature/
+ * exemplar-spec governed artifacts (and qa/scaffold-feature.mjs's clone source)
+ * are built from.
+ *
+ * `home` (the default, and the only exemplar that predates configurability) is a
+ * hardcoded exception: its entity is `Item`, not derivable from `Home` by
+ * `defaultEntityName` (which would naively guess `Home`). Every OTHER exemplar is
+ * itself a feature that was stamped by qa/scaffold-feature.mjs, so its entity
+ * followed defaultEntityName(F) UNLESS it was stamped with an explicit `--entity`
+ * override — a choice this config key cannot see. In that mismatch case the guess
+ * is wrong and the file set simply fails to resolve (0 or partial files), which
+ * `resolveArtifactStatus`/`approveArtifact` already refuse rather than fabricate —
+ * the correct failure mode, not a special case to add here.
+ * @param {string} root
+ * @returns {{f: string, F: string, F_UPPER: string, E: string}}
+ */
+export function resolveExemplarNames(root) {
+  const f = getExemplarFeature(root);
+  const F = toPascalCase(f);
+  const F_UPPER = toUpperSnake(F);
+  const E = f === "home" ? "Item" : defaultEntityName(F);
+  return { f, F, F_UPPER, E };
+}
+
+// Backward-compatible constants for the DEFAULT (`home`) exemplar — kept exported
+// because they describe the shipped template's own exemplar shape independent of
+// any project's configuration, and because they're the fixture the "stamping from
+// home must be byte-identical" pin (test/stamper-clone-source.test.mjs) anchors to.
+export const EXEMPLAR_FEATURE_KOTLIN_FILES = exemplarKotlinFileSet("Home", "home", "Item");
 export const EXEMPLAR_SPEC_REL = "specs/home.spec.md";
 export const ARCHITECTURE_SPEC_REL = "specs/app-base.spec.md";
+export const INTENT_REL = "specs/intent.md";
 
 // ── Package resolution ───────────────────────────────────────────────────────
 // Mirrors qa/scaffold-feature.mjs's resolvePackage() primary path (the
@@ -120,12 +186,41 @@ export function isPackageResolvable(root) {
   return resolvePackageDir(root) !== null;
 }
 
+// ── Components glob ─────────────────────────────────────────────────────────
+
+/**
+ * Sorted list of `presentation/components/*.kt` files under the resolved
+ * package, non-recursive (GENESIS-FLOW-DESIGN.md §1's `components` artifact — the
+ * component vocabulary conversation 3 approves). Package-unresolvable or a
+ * missing/empty directory both yield `[]` — resolveArtifactStatus/approveArtifact
+ * already treat a 0-file artifact as unresolvable ("a components glob matching
+ * zero files is unresolvable, not approvable-empty" — §1), so no special-casing
+ * is needed here beyond returning the honest (possibly empty) list.
+ * @param {string} root
+ * @returns {string[]} root-relative paths, sorted
+ */
+function listComponentFiles(root) {
+  const dirRel = kotlinFile(root, "commonMain", "presentation/components");
+  if (!dirRel) return [];
+  let entries;
+  try {
+    entries = fs.readdirSync(path.join(root, dirRel), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((e) => e.isFile() && e.name.endsWith(".kt"))
+    .map((e) => path.posix.join(dirRel, e.name))
+    .sort((a, b) => a.localeCompare(b));
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 /**
  * The governed-artifact registry, resolved against the project at `root` right
- * now (§1 order: design-system, architecture, exemplar-feature, exemplar-spec,
- * then one feature-spec:<name> per non-base, non-home spec present).
+ * now (GENESIS-FLOW-DESIGN.md §1 order: intent(0), design-system(1),
+ * architecture(2), components(3), exemplar-feature(4), exemplar-spec(5), then one
+ * feature-spec:<name> (6+) per non-base, non-CONFIGURED-exemplar spec present).
  *
  * `complete: false` marks an artifact whose kotlin-rooted files could NOT be
  * resolved (unresolvable package — raw template / pre-stamp tree). Such an
@@ -138,6 +233,13 @@ export function isPackageResolvable(root) {
 export function listGovernedArtifacts(root) {
   const artifacts = [];
   const packageResolved = resolvePackageDir(root) !== null;
+
+  artifacts.push({
+    id: "intent",
+    label: `Intent brief (${INTENT_REL})`,
+    files: [INTENT_REL],
+    complete: true,
+  });
 
   artifacts.push({
     id: "design-system",
@@ -157,19 +259,30 @@ export function listGovernedArtifacts(root) {
   });
 
   artifacts.push({
+    id: "components",
+    label: "Components (presentation/components/*.kt)",
+    files: listComponentFiles(root),
+    complete: packageResolved,
+  });
+
+  const { f: exemplarF, F: exemplarF_Pascal, E: exemplarE } = resolveExemplarNames(root);
+  const exemplarSpecRel = `specs/${exemplarF}.spec.md`;
+  const exemplarKotlinFiles = exemplarKotlinFileSet(exemplarF_Pascal, exemplarF, exemplarE);
+
+  artifacts.push({
     id: "exemplar-feature",
-    label: "Exemplar feature (home — the 11-file set the stamper clones)",
+    label: `Exemplar feature (${exemplarF} — the 11-file set the stamper clones)`,
     files: [
-      ...EXEMPLAR_FEATURE_KOTLIN_FILES.map((f) => kotlinFile(root, f.sourceSet, f.rel)).filter(Boolean),
-      EXEMPLAR_SPEC_REL,
+      ...exemplarKotlinFiles.map((f) => kotlinFile(root, f.sourceSet, f.rel)).filter(Boolean),
+      exemplarSpecRel,
     ],
     complete: packageResolved,
   });
 
   artifacts.push({
     id: "exemplar-spec",
-    label: `Exemplar spec (${EXEMPLAR_SPEC_REL})`,
-    files: [EXEMPLAR_SPEC_REL],
+    label: `Exemplar spec (${exemplarSpecRel})`,
+    files: [exemplarSpecRel],
     complete: true,
   });
 
@@ -177,7 +290,7 @@ export function listGovernedArtifacts(root) {
   if (fs.existsSync(specsDir)) {
     const featureSpecs = fs
       .readdirSync(specsDir)
-      .filter((f) => f.endsWith(".spec.md") && f !== "app-base.spec.md" && f !== "home.spec.md")
+      .filter((f) => f.endsWith(".spec.md") && f !== "app-base.spec.md" && f !== `${exemplarF}.spec.md`)
       .sort((a, b) => a.localeCompare(b));
     for (const file of featureSpecs) {
       const name = file.slice(0, -".spec.md".length);
@@ -233,12 +346,17 @@ export function hashArtifactFiles(root, relFiles) {
 /**
  * Load qa/approvals.json. Absent or corrupt (unparsable JSON, wrong shape) is
  * TOLERATED — returns the empty state, which resolves every artifact as
- * "unreviewed". Never throws.
+ * "unreviewed" and every exemplar lookup to the default (`home`). Never throws.
+ *
+ * `exemplarFeature` is `undefined` when the key is absent or not a non-empty
+ * string — callers resolve the default (`getExemplarFeature`), never this
+ * function directly, so every ledger written before this key existed keeps
+ * meaning what it meant (GENESIS-FLOW-DESIGN.md §1).
  * @param {string} root
- * @returns {{ schema: string, artifacts: Array<{artifact: string, status: string, hash: (string|null), approvedAt: (string|null)}> }}
+ * @returns {{ schema: string, artifacts: Array<{artifact: string, status: string, hash: (string|null), approvedAt: (string|null), mode?: string, reopenedAt?: string}>, exemplarFeature: (string|undefined) }}
  */
 export function loadApprovals(root) {
-  const empty = { schema: APPROVALS_SCHEMA, artifacts: [] };
+  const empty = { schema: APPROVALS_SCHEMA, artifacts: [], exemplarFeature: undefined };
   const p = path.join(root, APPROVALS_REL_PATH);
   let raw;
   try {
@@ -249,7 +367,11 @@ export function loadApprovals(root) {
   try {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.artifacts)) return empty;
-    return { schema: parsed.schema ?? APPROVALS_SCHEMA, artifacts: parsed.artifacts };
+    const exemplarFeature =
+      typeof parsed.exemplarFeature === "string" && parsed.exemplarFeature.trim() !== ""
+        ? parsed.exemplarFeature.trim()
+        : undefined;
+    return { schema: parsed.schema ?? APPROVALS_SCHEMA, artifacts: parsed.artifacts, exemplarFeature };
   } catch {
     return empty;
   }
@@ -257,14 +379,34 @@ export function loadApprovals(root) {
 
 /**
  * Write qa/approvals.json (deterministic key order, trailing newline).
+ * `exemplarFeature` is included only when the caller explicitly passes one
+ * (undefined is omitted, never written as a literal `null`/`"undefined"`) — every
+ * internal transition (approveArtifact, seedUnreviewed, approveAllDefaults,
+ * reopenArtifact) reloads and threads the CURRENT value through so a write never
+ * silently drops a previously-configured exemplar.
  * @param {string} root
- * @param {{ artifacts: Array<object> }} state
+ * @param {{ artifacts: Array<object>, exemplarFeature?: string }} state
  */
 export function saveApprovals(root, state) {
   const p = path.join(root, APPROVALS_REL_PATH);
   fs.mkdirSync(path.dirname(p), { recursive: true });
   const out = { schema: APPROVALS_SCHEMA, artifacts: state.artifacts };
+  if (state.exemplarFeature !== undefined) out.exemplarFeature = state.exemplarFeature;
   fs.writeFileSync(p, `${JSON.stringify(out, null, 2)}\n`);
+}
+
+/**
+ * The configured exemplar feature's lowercase name (the package-segment form,
+ * e.g. `"home"`, `"favorites"`) — `qa/approvals.json`'s top-level
+ * `exemplarFeature` key, defaulting to `"home"` when absent (GENESIS-FLOW-DESIGN.md
+ * §1). This is the ONE function both `resolveExemplarNames` (registry) and
+ * qa/scaffold-feature.mjs (clone-source resolution) call — never read the raw key
+ * directly, so the default lives in exactly one place.
+ * @param {string} root
+ * @returns {string}
+ */
+export function getExemplarFeature(root) {
+  return loadApprovals(root).exemplarFeature ?? "home";
 }
 
 /**
@@ -293,7 +435,13 @@ function shortHash(hash) {
 /**
  * Resolve one artifact's live status: recompute its hash now and compare
  * against the stored record (if any).
- * - no stored record, or stored status !== "approved" -> "unreviewed"
+ * - no stored record, or stored status !== "approved"/"reopened" -> "unreviewed"
+ * - stored status === "reopened" -> "reopened", UNCONDITIONALLY — a reopened
+ *   artifact never re-derives "changed-since-approval" from further edits (there
+ *   is no live approval to compare against once reopened; it's fluid again by
+ *   definition until the next real approveArtifact call). This is the
+ *   sanctioned-redesign-vs-drift asymmetry the reopen mechanic exists for
+ *   (GENESIS-FLOW-DESIGN.md §2): only an `approved` artifact can go stale.
  * - approved + hash still matches (over >0 files) -> "approved"
  * - approved + hash no longer matches -> "changed-since-approval"
  * - approved + artifact NOW unresolvable (0 files, or an incomplete kotlin
@@ -304,11 +452,31 @@ function shortHash(hash) {
  *   read as PASS.
  * `resolvable` is false when the artifact resolves to 0 files right now OR its
  * file set is incomplete (kotlin roots unresolvable — see listGovernedArtifacts).
- * @returns {{id: string, label: string, status: string, hash: string, storedHash: (string|null), approvedAt: (string|null), fileCount: number, missing: string[], resolvable: boolean}}
+ * `mode` (e.g. `"defaults-accepted"`) and `reopenedAt` are surfaced only when the
+ * stored record actually carries them — never as an explicit `undefined` key, so
+ * structural equality checks against a plain unreviewed/approved status shape
+ * still hold.
+ * @returns {{id: string, label: string, status: string, hash: string, storedHash: (string|null), approvedAt: (string|null), fileCount: number, missing: string[], resolvable: boolean, mode?: string, reopenedAt?: string}}
  */
 export function resolveArtifactStatus(root, artifact, storedRecord) {
   const recomputed = hashArtifactFiles(root, artifact.files);
   const resolvable = recomputed.fileCount > 0 && artifact.complete !== false;
+
+  if (storedRecord && storedRecord.status === "reopened") {
+    return {
+      id: artifact.id,
+      label: artifact.label,
+      status: "reopened",
+      hash: recomputed.hash,
+      storedHash: storedRecord.hash ?? null,
+      approvedAt: storedRecord.approvedAt ?? null,
+      fileCount: recomputed.fileCount,
+      missing: recomputed.missing,
+      resolvable,
+      reopenedAt: storedRecord.reopenedAt,
+    };
+  }
+
   if (!storedRecord || storedRecord.status !== "approved") {
     return {
       id: artifact.id,
@@ -333,6 +501,7 @@ export function resolveArtifactStatus(root, artifact, storedRecord) {
     fileCount: recomputed.fileCount,
     missing: recomputed.missing,
     resolvable,
+    ...(storedRecord.mode ? { mode: storedRecord.mode } : {}),
   };
 }
 
@@ -352,7 +521,10 @@ export function getApprovalStatuses(root) {
 
 /**
  * Record an approval: recompute the artifact's hash now, stamp the time,
- * upsert into qa/approvals.json.
+ * upsert into qa/approvals.json. A fresh record always REPLACES the stored one
+ * wholesale (never merges) — so a real approval on a previously
+ * defaults-accepted or reopened artifact automatically clears `mode` and
+ * `reopenedAt`, with no separate "clear" step needed.
  *
  * REFUSES an unresolvable artifact — one that resolves to 0 files, or whose
  * kotlin-rooted file set could not be resolved at all (`complete: false`). An
@@ -360,13 +532,18 @@ export function getApprovalStatuses(root) {
  * a partial set would attest only a fraction of what the artifact governs.
  * Both are silently vacuous — the exact failure mode this harness exists to
  * kill (evidence must attest execution). Refusal cases: the project package is
- * unresolvable (raw template / pre-stamp tree), or the artifact's expected
- * files are all missing on disk.
+ * unresolvable (raw template / pre-stamp tree), the artifact's expected files
+ * are all missing on disk, or (a dynamic artifact, e.g. `components`) nothing
+ * currently matches its pattern.
  * @param {string} root
  * @param {string} artifactId
- * @returns {{ok: true, artifact: string, hash: string, approvedAt: string} | {ok: false, reason: string}}
+ * @param {{mode?: string}} [options] `mode` (e.g. `"defaults-accepted"`) is
+ *   stamped onto the record when the express lane approves a resolvable-but-
+ *   unshaped artifact (GENESIS-FLOW-DESIGN.md §2). Omitted for a normal/real
+ *   approval.
+ * @returns {{ok: true, artifact: string, hash: string, approvedAt: string, mode?: string} | {ok: false, reason: string}}
  */
-export function approveArtifact(root, artifactId) {
+export function approveArtifact(root, artifactId, options = {}) {
   const registry = listGovernedArtifacts(root);
   const artifact = registry.find((a) => a.id === artifactId);
   if (!artifact) {
@@ -385,19 +562,85 @@ export function approveArtifact(root, artifactId) {
     };
   }
   if (resolved.fileCount === 0) {
-    return {
-      ok: false,
-      reason:
-        `cannot approve "${artifactId}" — it resolves to 0 files; its expected files are all missing on disk: ` +
-        `${artifact.files.join(", ")}. An approval over zero files is vacuous (the empty-input hash attests nothing) and is refused.`,
-    };
+    const reason =
+      artifact.files.length === 0
+        ? `cannot approve "${artifactId}" — it resolves to 0 files; nothing currently matches this artifact's pattern (nothing to approve yet). An approval over zero files is vacuous (the empty-input hash attests nothing) and is refused.`
+        : `cannot approve "${artifactId}" — it resolves to 0 files; its expected files are all missing on disk: ` +
+          `${artifact.files.join(", ")}. An approval over zero files is vacuous (the empty-input hash attests nothing) and is refused.`;
+    return { ok: false, reason };
   }
   const state = loadApprovals(root);
   const others = state.artifacts.filter((a) => a.artifact !== artifactId);
   const approvedAt = new Date().toISOString();
-  others.push({ artifact: artifactId, status: "approved", hash: resolved.hash, approvedAt });
-  saveApprovals(root, { artifacts: others });
-  return { ok: true, artifact: artifactId, hash: resolved.hash, approvedAt };
+  const record = { artifact: artifactId, status: "approved", hash: resolved.hash, approvedAt };
+  if (options.mode) record.mode = options.mode;
+  others.push(record);
+  saveApprovals(root, { artifacts: others, exemplarFeature: state.exemplarFeature });
+  return { ok: true, artifact: artifactId, hash: resolved.hash, approvedAt, ...(options.mode ? { mode: options.mode } : {}) };
+}
+
+/**
+ * Express lane (GENESIS-FLOW-DESIGN.md §2): approve every currently-resolvable,
+ * not-yet-approved governed artifact in one pass, each stamped
+ * `mode: "defaults-accepted"`. An artifact already `"approved"` (real OR a prior
+ * defaults-accepted run) is left untouched — the express lane never overwrites a
+ * standing approval, shaped or not. Unresolvable artifacts are SKIPPED with the
+ * exact refusal `approveArtifact` would have printed (never a silent skip).
+ * @param {string} root
+ * @returns {{ok: true, approved: string[], skipped: Array<{id: string, reason: string}>}}
+ */
+export function approveAllDefaults(root) {
+  const registry = listGovernedArtifacts(root);
+  const state = loadApprovals(root);
+  const byId = new Map(state.artifacts.map((a) => [a.artifact, a]));
+  const approved = [];
+  const skipped = [];
+  for (const artifact of registry) {
+    const live = resolveArtifactStatus(root, artifact, byId.get(artifact.id));
+    if (live.status === "approved") continue; // already settled — never overwritten by the express lane
+    const result = approveArtifact(root, artifact.id, { mode: "defaults-accepted" });
+    if (result.ok) approved.push(artifact.id);
+    else skipped.push({ id: artifact.id, reason: result.reason });
+  }
+  return { ok: true, approved, skipped };
+}
+
+/**
+ * Reopen for redesign (GENESIS-FLOW-DESIGN.md §2): move an `approved` artifact
+ * (real or defaults-accepted — both are status `"approved"`) to `"reopened"`,
+ * recording `reopenedAt` and clearing any `mode` (a reopened artifact is fluid
+ * again, not "the defaults, still"). REFUSES an unknown id, and refuses any
+ * artifact whose LIVE status is not `"approved"` — reopening the unreviewed, the
+ * already-reopened, or a changed-since-approval artifact is meaningless (there is
+ * nothing sanctioned to walk back from).
+ * @param {string} root
+ * @param {string} artifactId
+ * @returns {{ok: true, artifact: string, reopenedAt: string} | {ok: false, reason: string}}
+ */
+export function reopenArtifact(root, artifactId) {
+  const registry = listGovernedArtifacts(root);
+  const artifact = registry.find((a) => a.id === artifactId);
+  if (!artifact) {
+    const known = registry.map((a) => a.id).join(", ") || "(none — no governed artifacts resolved in this project)";
+    return { ok: false, reason: `unknown artifact "${artifactId}" — valid ids: ${known}` };
+  }
+  const state = loadApprovals(root);
+  const stored = state.artifacts.find((a) => a.artifact === artifactId);
+  const live = resolveArtifactStatus(root, artifact, stored);
+  if (live.status !== "approved") {
+    return {
+      ok: false,
+      reason: `cannot reopen "${artifactId}" — it is "${live.status}", not "approved". Only an approved artifact (shaped or defaults-accepted) can be reopened for redesign.`,
+    };
+  }
+  const others = state.artifacts.filter((a) => a.artifact !== artifactId);
+  const reopenedAt = new Date().toISOString();
+  const record = { artifact: artifactId, status: "reopened", hash: stored.hash, approvedAt: stored.approvedAt, reopenedAt };
+  others.push(record);
+  saveApprovals(root, { artifacts: others, exemplarFeature: state.exemplarFeature });
+  // `artifact` is the ID STRING — the same convention approveArtifact returns
+  // (one library, one shape; the console bridge relies on the symmetry).
+  return { ok: true, artifact: artifactId, reopenedAt };
 }
 
 // ── The verify-lane gate ─────────────────────────────────────────────────────
@@ -408,16 +651,23 @@ export function approveArtifact(root, artifactId) {
  * compareTokenDrift/qa/lib/token-drift.mjs).
  *
  * Aggregate verdict:
- *   - any artifact "changed-since-approval" -> FAIL (names each + the re-approval command)
- *   - else any artifact "unreviewed"        -> SKIP (warns, non-blocking)
- *   - else (all approved + matching)        -> PASS
+ *   - any artifact "changed-since-approval"       -> FAIL (names each + the
+ *     re-approval command — NEVER names a merely-reopened artifact; see below)
+ *   - else any artifact "unreviewed"/"reopened"   -> SKIP (warns, non-blocking)
+ *   - else (all approved + matching)              -> PASS
+ *
+ * The sanctioned-redesign-vs-drift asymmetry (GENESIS-FLOW-DESIGN.md §2) lives
+ * right here: `reopened` is grouped with `unreviewed` as non-blocking pending
+ * work, `changed-since-approval` is checked FIRST and returns immediately — so a
+ * run with one reopened artifact and one genuinely drifted (changed-since-
+ * approval) artifact FAILs, and the FAIL reason names only the drifted one.
  * @param {string} root
  * @returns {{verdict: "PASS"|"FAIL"|"SKIP", reason: (string|undefined), statuses: Array<object>}}
  */
 export function evaluateApprovalsGate(root) {
   const statuses = getApprovalStatuses(root);
   const mismatched = statuses.filter((s) => s.status === "changed-since-approval");
-  const unreviewed = statuses.filter((s) => s.status === "unreviewed");
+  const pending = statuses.filter((s) => s.status === "unreviewed" || s.status === "reopened");
 
   if (mismatched.length > 0) {
     const lines = ["Approval invalidated — a governed artifact changed after sign-off:"];
@@ -435,10 +685,14 @@ export function evaluateApprovalsGate(root) {
     return { verdict: "FAIL", reason: lines.join("\n"), statuses };
   }
 
-  if (unreviewed.length > 0) {
+  if (pending.length > 0) {
     const lines = ["Governed artifacts awaiting human approval (non-blocking — approve when ready):"];
-    for (const s of unreviewed) {
-      if (!s.resolvable) {
+    for (const s of pending) {
+      if (s.status === "reopened") {
+        lines.push(
+          `  [${s.id}] ${s.label} — reopened for redesign at ${s.reopenedAt} (non-blocking until re-approved). Approve: node qa/approve.mjs ${s.id}`,
+        );
+      } else if (!s.resolvable) {
         lines.push(`  [${s.id}] ${s.label} — unreviewed, currently unresolvable (${s.fileCount} of expected files resolved) — not approvable in this tree.`);
       } else {
         lines.push(`  [${s.id}] ${s.label} — unreviewed. Approve: node qa/approve.mjs ${s.id}`);

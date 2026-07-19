@@ -94,3 +94,43 @@ export async function approveArtifact(root, artifactId) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
   }
 }
+
+/**
+ * Reopen an approved artifact for redesign (GENESIS-FLOW-DESIGN.md §2/§3),
+ * via the project's own library. Refusals ({ok:false, reason}) are the
+ * LIBRARY's decision verbatim (unknown id, non-approved state — reopening
+ * the unreviewed is meaningless) — same "never re-implement the model"
+ * stance as approveArtifact.
+ *
+ * Honest degrade (§3 "the console never crashes on an older lib"): a project
+ * whose qa/lib/approvals.mjs predates the reopen wave has no `reopenArtifact`
+ * export at all — that's checked explicitly here (not left to throw
+ * "lib.reopenArtifact is not a function" up through the generic catch) so
+ * the refusal reason names the real cause instead of a stack-trace-shaped one.
+ * @param {string} root
+ * @param {string} artifactId
+ */
+export async function reopenArtifact(root, artifactId) {
+  const lib = await loadLib(root);
+  if (!lib) {
+    return {
+      ok: false,
+      reason:
+        "the approvals library (qa/lib/approvals.mjs) is not present in this project — " +
+        "this looks like an older scaffold that predates the approvals wave.",
+    };
+  }
+  if (typeof lib.reopenArtifact !== "function") {
+    return {
+      ok: false,
+      reason:
+        "this project's qa/lib/approvals.mjs predates the reopen wave (no reopenArtifact export) — " +
+        "upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock Reopen.",
+    };
+  }
+  try {
+    return lib.reopenArtifact(root, artifactId);
+  } catch (err) {
+    return { ok: false, reason: err && err.message ? err.message : String(err) };
+  }
+}

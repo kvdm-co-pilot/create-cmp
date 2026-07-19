@@ -163,7 +163,10 @@ const server = new McpServer({
     "governed artifacts, sees the app's layer map + governed contract + feature shape, and leaves " +
     "review feedback; approval_status { waitForDecision: true } blocks on an approval decision the " +
     "same way preview_status blocks on a render, and review_comments { waitForComment: true } blocks " +
-    "on new review feedback the same way — act on it, then resolve_comment. Always assert on tree " +
+    "on new review feedback the same way — act on it, then resolve_comment. Genesis mode (a fresh " +
+    "app's unreviewed/reopened artifacts): snapshot_variant stashes the current render as a named " +
+    "design-language candidate for the Design System tab's candidates strip; the human's Pick lands " +
+    "as a `pick:<name>` comment, observed the normal review_comments way. Always assert on tree " +
     "JSON; never read PNG bytes into context.",
 });
 
@@ -1146,6 +1149,38 @@ server.registerTool(
   guarded(async ({ id, note }) => {
     if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
     return ok(await previewService.resolveComment(id, note));
+  })
+);
+
+server.registerTool(
+  "snapshot_variant",
+  {
+    title: "Stash the current renders as a named design-language candidate",
+    description:
+      "GENESIS-FLOW-DESIGN.md §2 'Design-language candidates (variants)': copies the CURRENT " +
+      "preview render (every screen's screen.png from the last completed render) plus " +
+      "design-system.json into composeApp/build/previews/variants/<name>/, REPLACING that " +
+      "variant if one with the same name already exists. Returns { name, screens, " +
+      "designSystemStashed, dir }. `name` must match [a-z0-9-]+ (lowercase letters, digits, " +
+      "hyphens) — anything else is refused, not sanitized. Typical loop: edit Tokens.kt, " +
+      "preview_status{waitForRender:true}, snapshot_variant{name:'warmer'}, repeat per " +
+      "candidate token set, then tell the human to compare them side by side in the Design " +
+      "System tab's candidates strip and click Pick — observed via " +
+      "review_comments{waitForComment:true} as a `pick:<name>` comment targeting design-system; " +
+      "apply the chosen tokens, resolve_comment with a note, then approve. Requires a running " +
+      "preview service (call preview{projectDir} first) with at least one completed render.",
+    inputSchema: {
+      name: z
+        .string()
+        .regex(/^[a-z0-9-]+$/, "must match [a-z0-9-]+ (lowercase letters, digits, hyphens)")
+        .describe("Candidate name, e.g. 'warmer' or 'rounded-v2' — used as the variant's directory name."),
+    },
+  },
+  guarded(async ({ name }) => {
+    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
+    const result = previewService.snapshotVariant(name);
+    if (!result.ok) return fail(result.reason);
+    return ok(result);
   })
 );
 
