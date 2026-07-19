@@ -7,8 +7,7 @@
 
 - **ARCH-01** — Given any file in `presentation`, When its imports **and fully-qualified
   inline references** are inspected, Then none resolve into the `data` layer (presentation
-  depends on domain only; qualifying the name inline instead of importing is the same
-  violation).
+  depends on domain only).
 - **ARCH-02** — Given any file in `domain`, When its imports **and fully-qualified inline
   references** are inspected, Then none resolve into `presentation`, `data`, or `di`, and
   none reference Compose, Koin, or platform types (domain is pure Kotlin).
@@ -59,9 +58,7 @@
 - **SHELL-04** — Given the app renders any screen, When interactive elements are present,
   Then each is perceivable by automation: it exposes a testTag, text, or content description.
 - **SHELL-05** — Given any screen registered directly on the NavHost (not a shell tab), When
-  it renders, Then its content is composed inside `BaseScreen` — a bare destination that
-  never touches inset APIs still renders under the status bar, which SHELL-03 alone cannot
-  catch.
+  it renders, Then its content is composed inside `BaseScreen`.
 
 ## Component vocabulary
 
