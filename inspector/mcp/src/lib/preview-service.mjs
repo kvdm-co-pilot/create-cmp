@@ -564,8 +564,12 @@ ${commentsTabHtml(comments)}
   }
   wireReopenButtons(document);
   // Pick (§2 candidates strip) — POSTs the EXISTING /api/comment endpoint with
-  // target {type:"design-system"}, text "pick:<name>" — no new decision
-  // machinery; the agent observes it via review_comments{waitForComment}. A
+  // target {type:"design-system", token:"variant:<name>"}, text "pick:<name>"
+  // — no new decision machinery; the agent observes it via
+  // review_comments{waitForComment}. The token field is REQUIRED by the §7.3
+  // comments contract for design-system targets (the gate proved the library
+  // refuses a token-less pick with 409); "variant:<name>" is the synthetic
+  // token id for a candidate, mirroring the "component:<Name>" convention. A
   // successful pick is confirmed by the same "comment" SSE broadcast every
   // other comment produces (refreshes the Comments tab + badge); this handler
   // just gives immediate button feedback so the human isn't left guessing.
@@ -584,7 +588,7 @@ ${commentsTabHtml(comments)}
         const res = await fetch("/api/comment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ target: { type: "design-system" }, text: "pick:" + name }),
+          body: JSON.stringify({ target: { type: "design-system", token: "variant:" + name }, text: "pick:" + name }),
         });
         const body = await res.json();
         if (!body.ok) {

@@ -154,8 +154,10 @@ channel decides:
 3. Repeat per candidate; restore or apply as needed.
 4. The Design System tab in genesis mode shows a **candidates strip** — each
    variant's screens side by side with a **Pick** button.
-5. Pick posts a structured comment (`target {type:"design-system"}`, text
-   `pick:<name>`, author `human-console`) — observed by the agent's existing
+5. Pick posts a structured comment (`target {type:"design-system",
+   token:"variant:<name>"}` — the token field is required by §7.3's contract
+   for design-system targets — text `pick:<name>`, author `human-console`)
+   — observed by the agent's existing
    `review_comments { waitForComment }`, who applies the chosen tokens,
    resolves the comment with a note, and walks to approval.
 No new decision machinery: pixels flow to the human, the pick flows back
