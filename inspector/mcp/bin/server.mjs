@@ -158,11 +158,13 @@ const server = new McpServer({
     "assert_token / audit_a11y / find_drift / navigate_and_inspect / prove_change. " +
     "Runtime eyes beyond the tree: runtime_crashes (persisted crashes + cause attribution), " +
     "runtime_logs (adb logcat, structured + bounded), db_schema / db_query (read-only SQLite " +
-    "state). Human approval gates: the preview gallery's Approvals/Design System/Specs tabs " +
-    "(same URL as `preview`) are where the human reviews and signs governed artifacts; " +
-    "approval_status { waitForDecision: true } blocks on their decision the same way " +
-    "preview_status blocks on a render. Always assert on tree JSON; never read PNG bytes into " +
-    "context.",
+    "state). Human approval gates: the preview gallery's Screens/Design System/Architecture/" +
+    "Approvals/Specs/Comments tabs (same URL as `preview`) are where the human reviews and signs " +
+    "governed artifacts, sees the app's layer map + governed contract + feature shape, and leaves " +
+    "review feedback; approval_status { waitForDecision: true } blocks on an approval decision the " +
+    "same way preview_status blocks on a render, and review_comments { waitForComment: true } blocks " +
+    "on new review feedback the same way — act on it, then resolve_comment. Always assert on tree " +
+    "JSON; never read PNG bytes into context.",
 });
 
 const treePathArg = z
@@ -1083,6 +1085,67 @@ server.registerTool(
     if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
     if (waitForDecision) return ok(await previewService.waitForApprovalDecision(timeoutMs));
     return ok(await previewService.approvalStatusSnapshot());
+  })
+);
+
+server.registerTool(
+  "review_comments",
+  {
+    title: "Console comment ledger — optionally WAIT for a new comment",
+    description:
+      "The human-comment half of the console (VERIFICATION-LAYER-DESIGN.md §7.3: 'pixels flow to the " +
+      "human, structure flows to the AI, judgment flows back through comments'): the full comment " +
+      "ledger, via the PROJECT'S OWN qa/lib/comments.mjs (never forked here) — target (screen/element/" +
+      "spec-line/design-system/architecture/general, rendered readably in the console's Comments tab), " +
+      "text, author, createdAt, status, resolution. Without waitForComment: the current snapshot " +
+      "{available, schema, comments}. With waitForComment:true: BLOCKS — same shape as " +
+      "approval_status's waitForDecision — until a NEW comment lands (a 💬 submitted in the console), " +
+      "then returns {timedOut, available, added:[newComments], comments}. A resolve does NOT wake this " +
+      "wait — only a fresh comment does. {available:false} in a project with no comments library (an " +
+      "older, pre-comments-wave scaffold) — resolves immediately, there is nothing to wait for. Loop of " +
+      "record: propose a change, tell the human to review it in the console, " +
+      "review_comments{waitForComment:true} instead of polling, act on `added`, then resolve_comment " +
+      "with what you did. Requires a running preview service (call preview{projectDir} first).",
+    inputSchema: {
+      status: z.enum(["open", "resolved"]).optional().describe("Filter the snapshot to one status."),
+      waitForComment: z
+        .boolean()
+        .optional()
+        .describe("Block until a new comment lands instead of returning immediately."),
+      timeoutMs: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("waitForComment timeout (default 120000; result carries timedOut:true on expiry)."),
+    },
+  },
+  guarded(async ({ status, waitForComment, timeoutMs }) => {
+    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
+    if (waitForComment) return ok(await previewService.waitForNewComment(timeoutMs));
+    return ok(await previewService.commentsSnapshot(status));
+  })
+);
+
+server.registerTool(
+  "resolve_comment",
+  {
+    title: "Resolve a console comment (the agent closes the loop)",
+    description:
+      "Marks a comment resolved via the project's own qa/lib/comments.mjs, recording author 'agent' " +
+      "and `note` (what you actually did about it — update the spec/plan/code FIRST, then resolve; " +
+      "the console never edits code itself, per §4's principle, so this is the only way a comment " +
+      "closes). Returns {ok:true, comment} or {ok:false, reason} — the library's refusal verbatim " +
+      "(unknown id, already resolved). The console's Comments tab then shows the resolution + note. " +
+      "Requires a running preview service (call preview{projectDir} first).",
+    inputSchema: {
+      id: z.string().describe("Comment id (see review_comments)."),
+      note: z.string().describe("What you did in response to the comment."),
+    },
+  },
+  guarded(async ({ id, note }) => {
+    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
+    return ok(await previewService.resolveComment(id, note));
   })
 );
 

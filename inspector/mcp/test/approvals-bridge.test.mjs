@@ -128,18 +128,27 @@ test("approveArtifact: honest refusal (not a throw) when the project has no appr
   }
 });
 
-test("resetApprovalsBridgeCache: a library added AFTER the first (miss) lookup is picked up once the cache is cleared", async () => {
+test("mid-session library install: a library added AFTER a (miss) lookup is picked up on the NEXT call — no cache reset needed", async () => {
+  // The real-world sequence this pins: the console is already running against a
+  // pre-approvals scaffold, then cmp-upgrade / a drift PR / a re-stamp installs
+  // qa/lib/approvals.mjs into the project. The bridge must see it on the very
+  // next probe — a cached "no library here" answer would degrade the Approvals
+  // tab and approval_status to {available:false} until a console restart (the
+  // exact defect the VL-7 gate caught in the wild, in the comments twin).
   const root = makeFixtureProject({ withApprovalsLib: false });
   try {
     assert.deepEqual(await getApprovalsData(root), { available: false });
-    // Library appears later (e.g. the project was re-stamped mid-session).
+    assert.deepEqual(await getApprovalsData(root), { available: false }, "repeat misses stay honest");
+    // Library appears mid-session (e.g. the project was re-stamped) — NO reset call.
     const libDir = path.join(root, "qa", "lib");
     fs.mkdirSync(libDir, { recursive: true });
     fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
-    // Without a reset the cached "no library here" lookup would still say so.
-    resetApprovalsBridgeCache(root);
     const data = await getApprovalsData(root);
-    assert.equal(data.available, true);
+    assert.equal(data.available, true, "the next call must re-probe — misses are never cached");
+
+    // And the write path works immediately too, on the same un-reset bridge.
+    const result = await approveArtifact(root, "design-system");
+    assert.equal(result.ok, true);
   } finally {
     cleanup(root);
   }

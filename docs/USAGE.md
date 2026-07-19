@@ -1,7 +1,7 @@
 # create-cmp — the complete usage guide
 
 > **Read this first.** It is the single entry point to the whole product: setup, the engine CLI,
-> the 9 skills, the `cmp-inspector` MCP (23 tools), and the workflows that tie them together. An
+> the 9 skills, the `cmp-inspector` MCP (25 tools), and the workflows that tie them together. An
 > agent that reads this knows how to drive create-cmp end to end. Concise by section, exhaustive in
 > total. Companion deep-dives are cross-linked; you rarely need them.
 
@@ -142,7 +142,7 @@ intent — the descriptions carry rich triggers.
 
 ---
 
-## 5. The `cmp-inspector` MCP (23 tools)
+## 5. The `cmp-inspector` MCP (25 tools)
 
 A stdio server that reads a Compose UI as a **single JSON tree contract** and never returns pixel
 bytes. Node: `node inspector/mcp/bin/server.mjs`.
@@ -185,7 +185,7 @@ Resolution: explicit `source` → `treePath` → the `connect_live` session defa
 - **uiautomator (tier 2):** any app, zero instrumentation — but `designToken` is always `null`
   (tokens don't cross the accessibility bridge), so token/drift tools reject it.
 
-### The 23 tools
+### The 25 tools
 
 **Read & assert:** `inspect_tree` (full tree + counts) · `get_node {testTag}` · `assert_token
 {testTag,key,expected}` · `layout_gaps {testTagA,testTagB}` (computed spacing).
@@ -249,6 +249,15 @@ resolvable}]}`. With `waitForDecision:true`: BLOCKS — same pattern as `preview
 changed:[artifactIds], statuses}`. Requires a running preview service (`preview {projectDir}`
 first) — that's where the project root comes from.
 
+**Comments (the console talks back — §7 below):** `review_comments {status?, waitForComment?,
+timeoutMs?}` — a snapshot of `qa/comments.json`, read via the project's own
+`qa/lib/comments.mjs`; `status` filters to `"open"`/`"resolved"`. With `waitForComment:true`:
+BLOCKS — same pattern as `approval_status`'s `waitForDecision` — until a new comment lands, then
+returns the refreshed snapshot · `resolve_comment {id, note}` — closes a comment *after* the agent
+has acted on it (author recorded as the agent), refusing an unknown id or a comment already
+resolved. Approvals gate the lane; comments never do — they're advisory input the agent is
+expected to read and act on, not a blocking check.
+
 **Verify:** `prove_change {before, after, catalogPath?}` — the verified-dev-loop keystone in one
 call: diffs before/after, regression-checks the after tree (drift + a11y), returns
 `{changes, regressions, verdict}` with verdict `proven-clean` | `changed-with-regressions` |
@@ -286,10 +295,16 @@ hash-bound the same way an evidence receipt is bound to the code it verified.
 | `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time |
 
 **The console:** the same preview-service URL from `preview {projectDir}` carries an **Approvals**
-tab (plus **Design System** and **Specs**, next to the **Screens** gallery) — click Approve there
-and it calls `POST /api/approve`, which writes the exact same `qa/approvals.json` the CLI writes.
-An agent blocks on the human's decision with `approval_status {waitForDecision:true}` (§5) instead
-of polling.
+tab (alongside **Screens**, **Design System**, **Architecture**, **Specs**, and **Comments** — tab
+order mirrors the §1 walk: screens → design-system → architecture → approvals → specs) — click
+Approve there and it calls `POST /api/approve`, which writes the exact same `qa/approvals.json`
+the CLI writes. An agent blocks on the human's decision with `approval_status
+{waitForDecision:true}` (§5) instead of polling. The **Design System** tab also lists the app's
+common components (name, file, params, used-in call sites) from a static source scan below the
+token grids, and the **Architecture** tab renders the layer map (`presentation` → `domain` ←
+`data`, with `di`/`navigation` as cross-cutting rails), the governed `app-base.spec.md` clauses,
+and the exemplar `home` feature's file tree — everything derived from the real project, never
+fabricated.
 
 **Gate semantics** (the `approvals` step, in every verify-lane profile):
 - **`unreviewed`** → **SKIP** with a warning line — non-blocking; nothing fails until a human
@@ -304,7 +319,42 @@ reminder; it never refuses to stamp over this. Approving zero or partially-resol
 refused outright (a vacuous approval would attest nothing) — see
 [VERIFICATION-LAYER-DESIGN.md](./VERIFICATION-LAYER-DESIGN.md) §2 for the full data model.
 
-## 7. Workflows — how it all fits together
+## 7. Comments — the console talks back
+
+Approvals are binding; comments are advisory. Where an artifact needs a person's sign-off, a
+comment is a person's *running feedback* — on a screen, a spec clause, a design-system token or
+component, an architecture tree node, or general — with a defined path back into the agent's
+plan, spec, and code.
+
+**The ledger:** `qa/comments.json` (`{schema:"cmp-comments/1", comments:[]}`), owned by
+`qa/lib/comments.mjs` (state, validation, transitions — the same split as `qa/lib/approvals.mjs`)
+and fronted by `qa/comment.mjs`, the CLI:
+
+| Command | What |
+|---|---|
+| `node qa/comment.mjs --list [--open]` | Every comment (or open-only), with resolution notes for resolved ones |
+| `node qa/comment.mjs --resolve <id> --note "..."` | Resolve a comment, recording what changed (author `agent-cli`) |
+
+**Targets:** `screen` (`{screen}`) · `element` (`{screen, testTag}`) · `spec-line`
+(`{file, clauseId}`) · `design-system` (`{token}`) · `architecture` (`{path}`) · `general` (no
+fields). `addComment` refuses empty/whitespace text and a target missing the fields its type
+requires; a ledger that exists but can't be parsed is never silently read as empty — reads throw,
+writes refuse, rather than fabricate an inbox with nothing in it.
+
+**The console:** a 💬 control on every screen card, spec clause row, design-system swatch/dimen/
+component card, and architecture tree node, plus a **Comments** tab (full ledger, an open-count
+badge). Adding one calls `POST /api/comment`, which writes the exact same `qa/comments.json` the
+CLI writes, through a bridge that degrades honestly for older scaffolds with no comments library.
+
+**The loop of record:** a human leaves a comment in the console → the agent observes it
+(`review_comments {waitForComment:true}` (§5), same blocking pattern as `approval_status`'s
+`waitForDecision`) → the agent updates the plan/spec/code the comment points at → the agent
+resolves it with a note (`resolve_comment {id, note}` (§5) or the CLI's `--resolve`) → the console
+shows `resolved` plus the note. The console never edits code — humans add/see, agents resolve,
+mirroring the Approvals tab's read-only-for-humans design. See
+[VERIFICATION-LAYER-DESIGN.md](./VERIFICATION-LAYER-DESIGN.md) §7.3 for the full contract.
+
+## 8. Workflows — how it all fits together
 
 ### A. New app → green
 
@@ -391,7 +441,7 @@ conforming slice, green tests at every layer, lane PASS.
 
 ---
 
-## 8. Invariants (never violate these)
+## 9. Invariants (never violate these)
 
 - **No pixels in model context.** `render_screen` and the screenshot route return **paths**, not
   bytes; `render_tree` returns SVG (text) — fine. The remote page is for the human.
@@ -408,7 +458,7 @@ conforming slice, green tests at every layer, lane PASS.
 
 ---
 
-## 9. Quick reference
+## 10. Quick reference
 
 ```bash
 # scaffold + prove green

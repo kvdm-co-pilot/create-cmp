@@ -92,6 +92,41 @@ by the same mechanism any other FAIL does — no separate enforcement to maintai
 `add-feature` seeds each new feature's spec as `unreviewed` automatically and prints the
 approval reminder; it never refuses to stamp over this.
 
+## Comments — review feedback flows back through the agent
+
+Approvals are binding (they gate the verify lane); **comments are advisory** — a human's
+running commentary on what they see, with a defined path back into your plan, spec, and
+code. `qa/comments.json` is the ledger (`qa/lib/comments.mjs` is the library, mirroring
+`qa/lib/approvals.mjs`'s shape: state + validation + transitions, nothing fabricated).
+
+**The loop of record:**
+
+1. A human adds a comment from the preview console (a 💬 on a screen card, spec clause,
+   design-system swatch/component, or architecture tree node — plus a **Comments** tab
+   with the full ledger and an open-count badge).
+2. You observe it — with the create-cmp plugin, `review_comments { waitForComment: true }`
+   blocks until a new one lands (same pattern as `approval_status { waitForDecision }`);
+   without the plugin, `node qa/comment.mjs --list --open`.
+3. You act on it — update the plan, the spec clause, or the code the comment points at.
+4. You resolve it **after** acting, with a note saying what you did —
+   `resolve_comment { id, note }` (plugin) or `node qa/comment.mjs --resolve <id> --note
+   "..."` (CLI, records author `agent-cli`). The console then shows `resolved` + your
+   note. The console never edits code itself — humans add/see comments, agents resolve
+   them, same as `qa/approve.mjs`'s CLI-first-console-later split.
+
+| Command | What |
+|---|---|
+| `node qa/comment.mjs --list` | Every comment, open and resolved, with resolution notes |
+| `node qa/comment.mjs --list --open` | Only open comments |
+| `node qa/comment.mjs --resolve <id> --note "..."` | Resolve a comment, recording what changed |
+
+A comment targets one of: a **screen**, an **element** (screen + testTag), a **spec-line**
+(file + clause id), a **design-system** token, an **architecture** path, or **general**
+(no target fields). `addComment` refuses empty/whitespace text and a target missing the
+fields its type requires — same refusal-over-fabrication stance as approvals. A comment
+ledger that exists but can't be parsed is never silently treated as empty (that would hide
+real feedback); reads and writes both surface the honest error instead.
+
 ## UI feedback loop — see what you build, without a device
 
 <!-- >>> cmp:feature inspector -->

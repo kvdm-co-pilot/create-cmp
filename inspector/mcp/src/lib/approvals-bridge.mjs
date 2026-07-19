@@ -19,30 +19,36 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 // One resolved-module lookup per project root. Dynamic `import()` is already
-// idempotent per resolved URL (Node's module cache), so this cache exists
-// mainly to avoid repeating the fs.existsSync + failed-import path once we've
-// established a project has no approvals library.
-const libCache = new Map(); // root -> Promise<module|null>
+// idempotent per resolved URL (Node's module cache), so this cache mainly
+// short-circuits the fs probe for known-good roots. Only SUCCESSFUL loads are
+// cached: a "no library here" answer must never be remembered, because a
+// project can GAIN qa/lib/approvals.mjs mid-session (cmp-upgrade, a drift PR,
+// an agent stamping the file) while the console keeps running — a cached null
+// would hide the new library until a restart, degrading the Approvals tab and
+// approval_status to {available:false} forever. The re-probe on each miss is
+// one fs.existsSync — cheap enough to pay per call.
+const libCache = new Map(); // root -> module (successful loads ONLY)
 
 async function loadLib(root) {
   if (libCache.has(root)) return libCache.get(root);
-  const promise = (async () => {
-    const libPath = path.join(root, "qa", "lib", "approvals.mjs");
-    if (!fs.existsSync(libPath)) return null;
-    try {
-      return await import(pathToFileURL(libPath).href);
-    } catch {
-      return null;
-    }
-  })();
-  libCache.set(root, promise);
-  return promise;
+  const libPath = path.join(root, "qa", "lib", "approvals.mjs");
+  if (!fs.existsSync(libPath)) return null;
+  let mod;
+  try {
+    mod = await import(pathToFileURL(libPath).href);
+  } catch {
+    return null; // import failed — not cached either; a fixed file is picked up next call
+  }
+  libCache.set(root, mod);
+  return mod;
 }
 
 /**
- * Test/ops seam: drop the cached module lookup for `root` (or everything when
- * omitted) — useful when a fixture project gains/loses its approvals library
- * mid-session, which a long-lived cache would otherwise hide.
+ * Test/ops seam: drop the cached module for `root` (or everything when
+ * omitted). Gaining a library mid-session needs NO reset (misses are never
+ * cached — see loadLib); this seam covers the remaining case: a root whose
+ * already-loaded library was removed or replaced, which the success cache
+ * would otherwise keep serving.
  */
 export function resetApprovalsBridgeCache(root) {
   if (root) libCache.delete(root);
