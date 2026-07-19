@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **Typed-result error flow at the foundation (template + exemplar).** Exceptions no longer
+  cross layer boundaries in generated apps: repositories return `AppResult<T>`
+  (`Success`/`Failure(DomainError)` — new shared `domain/result/AppResult.kt` +
+  `domain/model/DomainError.kt`), the data layer's new `suspendRunCatching` helper
+  (`data/AppResultCatching.kt`) is the single exception-translation point and **always
+  rethrows `CancellationException`** (the old `catch (e: Exception)` in the exemplar
+  ViewModel swallowed cancellation and leaked raw `e.message` to the UI), and
+  `HomeUiState` is now a sealed `Loading`/`Content`/`Empty`/`Error` hierarchy with
+  presentation-mapped error copy plus a new `home_empty` state (spec clause HOME-07).
+  Three new conformance gates enforce the policy as `specs/app-base.spec.md` clauses
+  ARCH-06 (repository interfaces return `AppResult`), ARCH-07 (ViewModels contain no
+  `try`/`catch`), and ARCH-08 (the data layer's only catch mechanism is
+  `suspendRunCatching`, cancellation-guard verified). The `add-feature` stamper clones the
+  new pattern (spec set is now `<FEATURE>-01..07`, incl. the empty state), and
+  `docs/ARCHITECTURE.md` gains explicit **Error handling** and **Threading (main-safety)**
+  policy sections.
+
 ## [0.8.0] - 2026-07-15
 
 ### Added

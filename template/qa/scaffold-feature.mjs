@@ -257,6 +257,7 @@ const RENAME_MAP = [
   [`${SOURCE_F}UiState`, `${F}UiState`],
   [`${SOURCE_f}_title`, `${f}_title`],
   [`${SOURCE_f}_error`, `${f}_error`],
+  [`${SOURCE_f}_empty`, `${f}_empty`],
   [`Fake${SOURCE_E}Repository`, `Fake${E}Repository`],
   [`${SOURCE_E}RepositoryImpl`, `${E}RepositoryImpl`],
   [`${SOURCE_E}Repository`, `${E}Repository`],
@@ -373,7 +374,8 @@ function defaultSpec() {
 - **${F_UPPER}-02** — Given the repository returns ${f}, When loading completes, Then the ${f}
   are listed with their title and subtitle, and no error is shown.
 - **${F_UPPER}-03** — Given the repository fails, When loading completes, Then a human-readable
-  error message is shown (\`${f}_error\`) and no ${f} are visible.
+  error message is shown (\`${f}_error\`) and no ${f} are visible — the copy is mapped in
+  presentation from the failure's \`DomainError\` kind, never a raw exception message.
 - **${F_UPPER}-04** — Given a load has failed, When the data source recovers and the user
   triggers a reload, Then the error clears and the ${f} render.
 - **${F_UPPER}-05** — Given ${f} are listed, When the user taps an item, Then the app navigates
@@ -381,6 +383,8 @@ function defaultSpec() {
 - **${F_UPPER}-06** — Given the ${F} screen renders, When its structure is inspected, Then the
   screen matches its committed golden tree (\`qa/golden/${f}.json\`) — structural regressions
   are intentional, declared changes only.
+- **${F_UPPER}-07** — Given the repository succeeds with zero ${f}, When loading completes, Then
+  the empty state is shown (\`${f}_empty\`) and neither ${f} nor an error are visible.
 `;
 }
 

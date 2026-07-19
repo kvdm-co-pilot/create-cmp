@@ -23,6 +23,10 @@ invariants the conformance gates enforce.
 - **Layers:** `presentation` → `domain` ← `data`. `domain` imports nothing app-internal;
   `presentation` never imports `data`. Koin wires implementations in `di/`.
 - **Every screen:** a `*Screen` composable with a `testTag`ged root, a ViewModel with a test.
+- **Errors are typed, never thrown across layers:** repositories return `AppResult`
+  (`Failure` carries a `DomainError` kind); the data layer's `suspendRunCatching` is the only
+  catch point and always rethrows `CancellationException`; ViewModels have no `try`/`catch` —
+  they fold results into a sealed UiState and map error kinds to user copy in presentation.
 - **Design values** (colors / spacing / typography / radii) come from the theme's token catalog
   (`presentation/theme/`). Never hardcode literals in screens.
 - One feature is the **exemplar** — it shows the full pattern through every layer,

@@ -152,6 +152,80 @@ class ArchitectureConformanceTest {
         )
     }
 
+    // SPEC: ARCH-06
+    @Test
+    fun `ARCH-06 repository interfaces return AppResult - exceptions never cross the boundary`() {
+        val offenders = sources(commonMain)
+            .filter { under(it, "domain") && under(it, "repository") }
+            .flatMap { file ->
+                nonCommentLines(file)
+                    .filter { it.contains("suspend fun") && !it.contains(": AppResult<") }
+                    .map { "${file.path} — ${it.trim()}" }
+            }
+        if (offenders.isNotEmpty()) fail(
+            violation(
+                "ARCH-06", "every one-shot repository operation (suspend fun) declares an AppResult<…> " +
+                    "return type — failures cross the data boundary as typed DomainError values, never as exceptions.",
+                offenders,
+                "return AppResult<T> and translate exceptions inside the data implementation via suspendRunCatching.",
+            )
+        )
+    }
+
+    // SPEC: ARCH-07
+    @Test
+    fun `ARCH-07 ViewModels contain no exception handling`() {
+        // Syntactic forms only (`try {`, `catch (`, `runCatching`) — a bare-word scan would
+        // false-positive on user-facing copy like "…try again." inside the ViewModel's strings.
+        val exceptionHandling = Regex("""\btry\s*\{|\bcatch\s*[({]|\brunCatching\b""")
+        val offenders = sources(commonMain)
+            .filter { under(it, "presentation") && it.name.endsWith("ViewModel.kt") }
+            .filter { file -> nonCommentLines(file).any { exceptionHandling.containsMatchIn(it) } }
+            .map { it.path }
+        if (offenders.isNotEmpty()) fail(
+            violation(
+                "ARCH-07", "ViewModels contain no try/catch/runCatching — they fold over AppResult " +
+                    "and map DomainError kinds to user copy; exception translation is the data layer's job.",
+                offenders,
+                "remove the exception handling; `when` over the use case's AppResult instead (see the exemplar ViewModel).",
+            )
+        )
+    }
+
+    // SPEC: ARCH-08
+    @Test
+    fun `ARCH-08 the data layer's only catch mechanism is suspendRunCatching with its cancellation guard`() {
+        val helperName = "AppResultCatching.kt"
+        val catching = Regex("""\bcatch\s*\(|\brunCatching\b""")
+        val dataFiles = sources(commonMain).filter { under(it, "data") }
+
+        val offenders = dataFiles
+            .filterNot { it.name == helperName }
+            .filter { file -> nonCommentLines(file).any { catching.containsMatchIn(it) } }
+            .map { it.path }
+            .toMutableList()
+
+        // The helper itself must keep the guard that makes the convention safe:
+        // CancellationException is rethrown, never mapped to a Failure.
+        val helper = dataFiles.firstOrNull { it.name == helperName }
+        if (helper != null) {
+            val text = helper.readText()
+            if (!text.contains("catch (e: CancellationException)") || !text.contains("throw e")) {
+                offenders.add("${helper.path} (the CancellationException rethrow guard is missing)")
+            }
+        }
+
+        if (offenders.isNotEmpty()) fail(
+            violation(
+                "ARCH-08", "the ONLY exception-catching mechanism in the data layer is the shared " +
+                    "suspendRunCatching helper ($helperName), which always rethrows CancellationException — " +
+                    "ad-hoc catch blocks can silently swallow cancellation.",
+                offenders,
+                "wrap the I/O in suspendRunCatching { … } (with a mapError classifier) instead of catching directly.",
+            )
+        )
+    }
+
     // SPEC: SHELL-05
     @Test
     fun `SHELL-05 every non-shell nav destination wraps its content in BaseScreen`() {

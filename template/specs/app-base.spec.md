@@ -21,6 +21,17 @@
 - **ARCH-05** — Given any file outside `presentation/theme`, When its source is inspected,
   Then it constructs no literal `Color(0x…)` values (design colors come from the token
   catalog).
+- **ARCH-06** — Given any repository interface in `domain/repository`, When its one-shot
+  operations (`suspend fun`s) are inspected, Then each declares an `AppResult<…>` return
+  type — raw exceptions never cross the data → domain boundary; failures travel as typed
+  `DomainError` values assigned inside the data implementation.
+- **ARCH-07** — Given any ViewModel in `presentation`, When its source is inspected, Then it
+  contains no `try`/`catch`/`runCatching` — ViewModels fold over `AppResult` and map
+  `DomainError` kinds to user-facing copy; a raw exception message is never shown to a user.
+- **ARCH-08** — Given any file in the `data` layer, When its source is inspected, Then the
+  only exception-catching mechanism is the shared `suspendRunCatching` helper
+  (`data/AppResultCatching.kt`), and the helper always rethrows `CancellationException` —
+  cancellation is never swallowed into a failure state.
 
 ## App shell
 

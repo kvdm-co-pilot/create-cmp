@@ -29,7 +29,7 @@ to stamp anything — see step 2.
 
 Every hand-written file is a drift chance in this project's architecture. `qa/scaffold-feature.mjs
 --preset screen` produces a **conforming skeleton by construction**: a Screen composable with a
-testTagged root, a ViewModel (+ test), a Compose UI test, a golden-tree test, and a six-clause
+testTagged root, a ViewModel (+ test), a Compose UI test, a golden-tree test, and a seven-clause
 spec — wired into Koin and the nav graph. Your job is to make it *behave* like the real screen,
 not to make it *structurally correct*.
 
@@ -72,7 +72,7 @@ node qa/scaffold-feature.mjs <FeatureName> --entity <EntityName> --preset screen
 This writes the Screen/ViewModel/tests/golden-tree-test, wires the ViewModel into
 `di/AppModule.kt` and a route into `presentation/navigation/Screen.kt` +
 `presentation/navigation/AppNavHost.kt` at their `// cmp:anchor` markers, and writes
-`specs/<feature>.spec.md` with a default six-clause set (`<FEATURE>-01..06`) cited by the three
+`specs/<feature>.spec.md` with a default seven-clause set (`<FEATURE>-01..07`) cited by the three
 generated test files.
 
 If it exits non-zero, read the message — it is actionable. Do not hand-edit around a stamper
@@ -109,7 +109,7 @@ node qa/verify.mjs
 ```
 
 This must PASS. It proves: the spec's six clauses are all bound to a citing test
-(specCoverage — `<FEATURE>-01..06` newly bound), the build compiles, unit tests pass, architecture
+(specCoverage — `<FEATURE>-01..07` newly bound), the build compiles, unit tests pass, architecture
 conformance holds, the golden tree matches, and accessibility holds. **Not done until this is
 PASS and the evidence receipt (`qa/evidence/latest.json`) is committed with your change** — this
 project's standing definition of done (see `CLAUDE.md`).

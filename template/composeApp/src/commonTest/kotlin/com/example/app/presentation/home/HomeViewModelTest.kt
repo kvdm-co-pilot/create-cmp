@@ -1,6 +1,7 @@
 package __PACKAGE__.presentation.home
 
 import app.cash.turbine.test
+import __PACKAGE__.domain.model.DomainError
 import __PACKAGE__.domain.model.Item
 import __PACKAGE__.domain.usecase.GetItemsUseCase
 import __PACKAGE__.testing.fakes.FakeItemRepository
@@ -8,9 +9,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.assertIs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -25,6 +24,8 @@ import kotlinx.coroutines.test.setMain
  *    so coroutines run under the test scheduler's virtual time.
  *  - Turbine (`state.test { … }`) for StateFlow assertions.
  *  - Hand-written fakes from `testing/fakes` — never mocks.
+ *  - Sealed-state assertions: each emission IS one state (`assertEquals` on the state,
+ *    `assertIs` on the branch) — no boolean-flag poking.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -47,57 +48,65 @@ class HomeViewModelTest {
     // SPEC: HOME-01
     @Test
     fun `starts in loading state`() = runTest(dispatcher) {
-        viewModel().state.test {
-            assertTrue(awaitItem().isLoading, "initial state should be loading")
-        }
-    }
-
-    @Test
-    fun `emits items when repository succeeds`() = runTest(dispatcher) {
         repository.items = listOf(Item(id = "1", title = "First", subtitle = "sub"))
 
         viewModel().state.test {
-            assertTrue(awaitItem().isLoading)
-
-            val loaded = awaitItem()
-            assertEquals(false, loaded.isLoading)
-            assertEquals(listOf("First"), loaded.items.map { it.title })
-            assertNull(loaded.errorMessage)
+            assertEquals(HomeUiState.Loading, awaitItem(), "initial state should be Loading")
         }
     }
 
+    // SPEC: HOME-02
     @Test
-    fun `emits error message when repository fails`() = runTest(dispatcher) {
-        repository.shouldFail = true
-        repository.failureMessage = "network down"
+    fun `emits Content when the repository returns items`() = runTest(dispatcher) {
+        val items = listOf(Item(id = "1", title = "First", subtitle = "sub"))
+        repository.items = items
 
         viewModel().state.test {
-            assertTrue(awaitItem().isLoading)
+            assertEquals(HomeUiState.Loading, awaitItem())
+            assertEquals(HomeUiState.Content(items), awaitItem())
+        }
+    }
 
-            val failed = awaitItem()
-            assertEquals(false, failed.isLoading)
-            assertTrue(failed.items.isEmpty())
-            assertEquals("network down", failed.errorMessage)
+    // SPEC: HOME-07
+    @Test
+    fun `emits Empty when the repository succeeds with no items`() = runTest(dispatcher) {
+        repository.items = emptyList()
+
+        viewModel().state.test {
+            assertEquals(HomeUiState.Loading, awaitItem())
+            assertEquals(HomeUiState.Empty, awaitItem())
+        }
+    }
+
+    // SPEC: HOME-03
+    @Test
+    fun `maps a typed failure to presentation copy - never a raw exception message`() = runTest(dispatcher) {
+        repository.failure = DomainError.Network
+
+        viewModel().state.test {
+            assertEquals(HomeUiState.Loading, awaitItem())
+
+            val failed = assertIs<HomeUiState.Error>(awaitItem())
+            assertEquals(DomainError.Network.toUserMessage(), failed.message)
         }
     }
 
     // SPEC: HOME-04
     @Test
     fun `reload after failure clears the error and loads items`() = runTest(dispatcher) {
-        repository.shouldFail = true
+        repository.failure = DomainError.Network
         val viewModel = viewModel()
 
         viewModel.state.test {
-            assertTrue(awaitItem().isLoading)
-            assertNotNull(awaitItem().errorMessage, "first load should fail")
+            assertEquals(HomeUiState.Loading, awaitItem())
+            assertIs<HomeUiState.Error>(awaitItem(), "first load should fail")
 
-            repository.shouldFail = false
+            repository.failure = null
             repository.items = listOf(Item(id = "1", title = "Recovered", subtitle = "sub"))
             viewModel.load()
 
-            assertTrue(awaitItem().isLoading, "reload should show loading again")
-            val recovered = awaitItem()
-            assertNull(recovered.errorMessage)
+            assertEquals(HomeUiState.Loading, awaitItem(), "reload should show loading again")
+            val recovered = assertIs<HomeUiState.Content>(awaitItem())
             assertEquals(listOf("Recovered"), recovered.items.map { it.title })
         }
     }
