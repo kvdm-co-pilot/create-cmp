@@ -1,7 +1,7 @@
 # create-cmp — the complete usage guide
 
 > **Read this first.** It is the single entry point to the whole product: setup, the engine CLI,
-> the 9 skills, the `cmp-inspector` MCP (25 tools), and the workflows that tie them together. An
+> the 9 skills, the `cmp-inspector` MCP (26 tools), and the workflows that tie them together. An
 > agent that reads this knows how to drive create-cmp end to end. Concise by section, exhaustive in
 > total. Companion deep-dives are cross-linked; you rarely need them.
 
@@ -130,7 +130,7 @@ intent — the descriptions carry rich triggers.
 
 | Skill | Use it to… | Under the hood |
 |---|---|---|
-| **cmp-new** | Start a new mobile app (Android + iOS) by interview — fires on framework-undecided "create a mobile app" requests (honest CMP-vs-RN/Flutter fit check first) as well as explicit CMP/KMP asks and comparisons like "React Native vs KMP". | Interviews → `create --verify` → generates tab screens from the example feature. |
+| **cmp-new** | Start a new mobile app (Android + iOS) by interview — fires on framework-undecided "create a mobile app" requests (honest CMP-vs-RN/Flutter fit check first) as well as explicit CMP/KMP asks and comparisons like "React Native vs KMP". | Interviews (incl. intent) → `create --verify` → the genesis walk: express-approve or shape design/architecture/components/exemplar together (§6). |
 | **cmp-doctor** | Set up or fix the toolchain / diagnose any KMP build. | `doctor` (+ `--fix`). |
 | **cmp-upgrade** | Bump Kotlin/CMP/KSP/Room/AGP safely. | `upgrade` (diff → apply → verify). |
 | **cmp-firebase-connect** | Wire a fresh app to its **own** Firebase (the #1 post-scaffold manual step). | Firebase CLI: login → project create/reuse → app register → real `google-services.json` replaces the placeholder → green build proves it. Consent-gated per cloud write. |
@@ -142,7 +142,7 @@ intent — the descriptions carry rich triggers.
 
 ---
 
-## 5. The `cmp-inspector` MCP (25 tools)
+## 5. The `cmp-inspector` MCP (26 tools)
 
 A stdio server that reads a Compose UI as a **single JSON tree contract** and never returns pixel
 bytes. Node: `node inspector/mcp/bin/server.mjs`.
@@ -185,7 +185,7 @@ Resolution: explicit `source` → `treePath` → the `connect_live` session defa
 - **uiautomator (tier 2):** any app, zero instrumentation — but `designToken` is always `null`
   (tokens don't cross the accessibility bridge), so token/drift tools reject it.
 
-### The 25 tools
+### The 26 tools
 
 **Read & assert:** `inspect_tree` (full tree + counts) · `get_node {testTag}` · `assert_token
 {testTag,key,expected}` · `layout_gaps {testTagA,testTagB}` (computed spacing).
@@ -239,15 +239,27 @@ against the previews dir's design-system.json) · `preview_stop` —
 shut the service down (the Gradle daemon stays warm).
 
 **Approvals (the human half of the verification layer):** `approval_status {waitForDecision?,
-timeoutMs?}` — every governed artifact's live status (design system, architecture+structure,
-exemplar feature, exemplar spec, per-feature specs — §6 below), read via the project's own
-`qa/lib/approvals.mjs`. Without `waitForDecision`: the current snapshot
-`{available, statuses:[{id,label,status,hash,storedHash,approvedAt,fileCount,missing,
-resolvable}]}`. With `waitForDecision:true`: BLOCKS — same pattern as `preview_status`'s
-`waitForRender` — until any artifact's status changes (a console Approve click, or
-`node qa/approve.mjs <artifact>` run in a terminal), then returns `{timedOut, available,
-changed:[artifactIds], statuses}`. Requires a running preview service (`preview {projectDir}`
-first) — that's where the project root comes from.
+timeoutMs?}` — every governed artifact's live status (intent brief, design system,
+architecture+structure, components, exemplar feature, exemplar spec, per-feature specs — §6
+below), read via the project's own `qa/lib/approvals.mjs`. Without `waitForDecision`: the current
+snapshot `{available, statuses:[{id,label,status,hash,storedHash,approvedAt,fileCount,missing,
+resolvable,mode?,reopenedAt?}]}` (`status` includes `reopened`; `mode` is `"defaults-accepted"`
+for an express-lane approval). With `waitForDecision:true`: BLOCKS — same pattern as
+`preview_status`'s `waitForRender` — until any artifact's status changes (a console
+Approve/Reopen click, or `node qa/approve.mjs <artifact>` / `--reopen <artifact>` run in a
+terminal), then returns `{timedOut, available, changed:[artifactIds], statuses}`. Requires a
+running preview service (`preview {projectDir}` first) — that's where the project root comes
+from.
+
+**Genesis (the design-language workbench — GENESIS-FLOW-DESIGN.md §2):** `snapshot_variant
+{name}` — stashes the CURRENT preview render (every screen's `screen.png` from the last
+completed render, plus `design-system.json`) into
+`composeApp/build/previews/variants/<name>/`, replacing a same-named variant if one exists;
+`name` must match `[a-z0-9-]+`. The typical loop: edit `Tokens.kt` → `preview_status
+{waitForRender:true}` → `snapshot_variant {name:"warmer"}` → repeat per candidate → the human
+compares them side by side in the console's Design System tab candidates strip and clicks Pick,
+which posts a `pick:<name>` comment observed the normal `review_comments` way. Requires a running
+preview service with at least one completed render.
 
 **Comments (the console talks back — §7 below):** `review_comments {status?, waitForComment?,
 timeoutMs?}` — a snapshot of `qa/comments.json`, read via the project's own
@@ -275,44 +287,77 @@ human's live device view page — watch + click-to-tap the real app). Reach it w
 
 ## 6. Approvals — human sign-off on governed artifacts
 
-Every generated project also carries a human half to the verification layer: five **governed
-artifacts**, approved in order (each is expressed in the vocabulary of the ones before it) and
-hash-bound the same way an evidence receipt is bound to the code it verified.
+Every generated project also carries a human half to the verification layer: six **governed
+artifacts**, in a **definition order**, not just an approval order — each is the vocabulary the
+next is written in — and hash-bound the same way an evidence receipt is bound to the code it
+verified.
 
 | # | Artifact | Files |
 |---|---|---|
+| 0 | Intent brief | `specs/intent.md` |
 | 1 | Design system | `presentation/theme/Theme.kt`, `presentation/theme/Tokens.kt` |
 | 2 | Architecture + structure | `specs/app-base.spec.md` |
-| 3 | Exemplar feature | the `home` 11-file set `add-feature` clones from |
-| 4 | Exemplar spec | `specs/home.spec.md` |
-| 5 | Per-feature spec | `specs/<feature>.spec.md`, one per feature as it lands |
+| 3 | Components | `presentation/components/*.kt` (dynamic, sorted glob) |
+| 4 | Exemplar feature | the **configured** exemplar's 11-file set `add-feature` clones from (`home` by default) |
+| 5 | Exemplar spec | `specs/<exemplar>.spec.md` |
+| 6+ | Per-feature spec | `specs/<feature>.spec.md`, one per non-base, non-exemplar feature as it lands |
+
+**Configurable exemplar:** `qa/approvals.json` carries a top-level `"exemplarFeature"` key
+(absent ⇒ `"home"`, so every ledger written before this key existed keeps meaning what it meant).
+It names the feature whose file set is the governed exemplar-feature/exemplar-spec artifacts AND
+the clone source `qa/scaffold-feature.mjs` stamps new features from — retargeting it to the app's
+own first feature is the genesis walk's endgame (see below); `home` then demotes to an ordinary
+per-feature spec.
 
 **Commands:**
 
 | Command | What |
 |---|---|
-| `node qa/approve.mjs --status` | List every governed artifact + live state (`unreviewed` / `approved` / `changed-since-approval`) + short hash |
-| `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time |
+| `node qa/approve.mjs --status` | List every governed artifact + live state (`unreviewed` / `approved` / `changed-since-approval` / `reopened`) + short hash + mode badge |
+| `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time (also clears a `defaults-accepted` mode: shaping upgrades the record) |
+| `node qa/approve.mjs --accept-defaults` | **Express lane**: approve every currently-resolvable artifact in one visible act, each stamped `"mode": "defaults-accepted"`. Unresolvable artifacts are skipped with the standard refusal, never silently. |
+| `node qa/approve.mjs --reopen <artifact>` | **Reopen for redesign**: move an *approved* artifact back to `reopened` (recorded `reopenedAt`); refuses unknown ids and anything not currently approved. |
 
 **The console:** the same preview-service URL from `preview {projectDir}` carries an **Approvals**
-tab (alongside **Screens**, **Design System**, **Architecture**, **Specs**, and **Comments** — tab
-order mirrors the §1 walk: screens → design-system → architecture → approvals → specs) — click
-Approve there and it calls `POST /api/approve`, which writes the exact same `qa/approvals.json`
-the CLI writes. An agent blocks on the human's decision with `approval_status
+tab (alongside **Screens**, **Design System**, **Architecture**, **Specs**, and **Comments**) —
+click Approve there and it calls `POST /api/approve`, which writes the exact same
+`qa/approvals.json` the CLI writes; a **Reopen** button beside Approve on approved rows calls
+`POST /api/reopen` the same way. An agent blocks on the human's decision with `approval_status
 {waitForDecision:true}` (§5) instead of polling. The **Design System** tab also lists the app's
 common components (name, file, params, used-in call sites) from a static source scan below the
-token grids, and the **Architecture** tab renders the layer map (`presentation` → `domain` ←
-`data`, with `di`/`navigation` as cross-cutting rails), the governed `app-base.spec.md` clauses,
-and the exemplar `home` feature's file tree — everything derived from the real project, never
-fabricated.
+token grids — plus, while `design-system` is unreviewed/reopened, the **candidates strip** from
+the design-language workbench (§5's `snapshot_variant`) — and the **Architecture** tab renders the
+layer map (`presentation` → `domain` ← `data`, with `di`/`navigation` as cross-cutting rails), the
+governed `app-base.spec.md` clauses, and the exemplar feature's file tree — everything derived
+from the real project, never fabricated.
 
 **Gate semantics** (the `approvals` step, in every verify-lane profile):
 - **`unreviewed`** → **SKIP** with a warning line — non-blocking; nothing fails until a human
   opts in.
+- **`reopened`** → **SKIP** with a warning line, exactly like `unreviewed` — sanctioned redesign
+  never trips the gate.
 - **`approved`, hash still matches** → **PASS**.
 - **`approved`, hash no longer matches** → **FAIL**, naming the artifact and the re-approval
-  command — the artifact changed after sign-off. A gate FAIL fails the lane verdict, which the
-  Stop hook and CI both already refuse "done" over — no separate enforcement to maintain.
+  command — the artifact changed after sign-off without a reopen. A gate FAIL fails the lane
+  verdict, which the Stop hook and CI both already refuse "done" over — no separate enforcement
+  to maintain. A run with one reopened artifact and one drifted artifact FAILs naming only the
+  drifted one — redesign is a decision, drift is an accident.
+
+### The genesis walk — defining artifacts before freezing them
+
+On a fresh scaffold nothing generic gets signed: the `cmp-new` skill runs an intent interview
+(purpose, audience, platforms, brand feel, reference apps, first screens → `specs/intent.md`),
+proves the build GREEN, then offers a fork:
+
+- **Express lane** — `qa/approve.mjs --accept-defaults`, build now, walk the definition later.
+- **Guided walk** — a conversation per artifact, each ending in its approval, in the registry
+  order above: intent → design language (the candidates workbench, §5) → architecture
+  (comprehension + configuration, not open-ended choice) → components (propose/shape/approve) →
+  the human's own first feature stamped as the exemplar (`qa/scaffold-feature.mjs`, then
+  `exemplarFeature` retargeted) → exemplar spec.
+
+Full design: [`GENESIS-FLOW-DESIGN.md`](./GENESIS-FLOW-DESIGN.md). Step-by-step skill behavior:
+[`skills/cmp-new/SKILL.md`](../skills/cmp-new/SKILL.md).
 
 `add-feature` seeds each new feature's spec as `unreviewed` automatically and prints the approval
 reminder; it never refuses to stamp over this. Approving zero or partially-resolved files is
@@ -358,9 +403,11 @@ mirroring the Approvals tab's read-only-for-humans design. See
 
 ### A. New app → green
 
-`cmp-new` (or `create --verify`) → interview/flags → stamp → **GREEN build verdict** → generate tab
-screens. Output ships `.gitignore`, a CI `verify.yml`, the Maestro E2E harness, the inspector, and the
-desktop dev-client. Next: `cmp-firebase-connect`, then run it.
+`cmp-new` (or `create --verify`) → interview (incl. intent) → stamp (tabs wired, extra tabs get a
+`PlaceholderScreen` stub) → **GREEN build verdict** → the genesis walk (§6): express-approve the
+defaults, or shape design language/architecture/components and stamp the human's own first
+feature as the exemplar. Output ships `.gitignore`, a CI `verify.yml`, the Maestro E2E harness,
+the inspector, and the desktop dev-client. Next: `cmp-firebase-connect`, then run it.
 
 ### B. Connect your own backend
 

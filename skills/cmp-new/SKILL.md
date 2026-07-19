@@ -107,6 +107,23 @@ interrogate. Defaults shown in brackets.
 `themePrefix` is the PascalCase form of the app name (the prefix in `<Prefix>Theme` etc.) —
 derive it, don't ask.
 
+### Intent — the root brief (feeds `specs/intent.md` and two of the flags above)
+
+Ask these in the SAME round as the table above — one compact conversation, not two interviews.
+The answers seed the intent brief written once the scaffold exists (§4) and sharpen `tabs` and
+`room` above: a "first screens" answer naming distinct areas becomes the tab list; an explicit
+"no persistence needed" answer is the one case worth turning `room`'s default off for.
+
+| Ask | Feeds |
+|---|---|
+| What is this app, in one or two sentences? What problem, for whom? | Purpose |
+| Who's the primary user? | Audience |
+| Two or three words for how it should feel (e.g. "calm, trustworthy" vs. "playful, bold")? | Brand feel — seeds the design-language conversation, §7.1 |
+| One to three apps whose look/feel this should be judged against? | Reference apps |
+| What are the first 2–4 screens you see in your head? | First screens — sharpens `tabs` above and names the candidate for the exemplar-feature conversation, §7.4 |
+
+(Platforms is already covered by `platforms.ios` in the table above — don't ask it twice.)
+
 ## 2. Assemble the engine config object
 
 Build exactly the shape from `docs/CONTRACT.md` (validated by `options.schema.json`):
@@ -159,56 +176,139 @@ Notes:
   config-object *shape* in §2 is the stable contract, individual CLI flag names are the engine
   agent's surface.
 
-## 4. Bespoke layer — generate the tab screens
+## 4. After GREEN — write the intent brief
 
-After the engine reports GREEN, generate one screen per tab the user requested, copying the
-**example feature** the template ships (`presentation/<feature>/` + its ViewModel/state, wired into
-navigation and the Koin DI module). For each tab:
+`specs/intent.md` now exists (the scaffold ships it seeded with `_not yet captured_` markers, one
+per section). Replace each marker with what you captured in the intent round above — Purpose,
+Audience, Platforms, Brand feel, Reference apps, First screens — as plain prose, not clause
+syntax (this file carries no `// SPEC:` tags; `specCoverage` never scans it). This is the root
+artifact every later conversation traces to — don't skip it even on the express lane below (§6);
+the express lane still needs a *filled* brief to approve, defaults-accepted or not.
 
-1. Copy the example-feature screen + ViewModel pattern, renaming to the tab label.
-2. Register the route in the type-safe `Screen`/`Routes` and add it to the `tabs` list the generic
-   `AppShell`/bottom-nav consumes (the shell is data-driven, not role-hardcoded — just extend the
-   list).
-3. Hook the ViewModel into the existing Koin module.
-4. Keep each screen inside the template's `BaseScreen` Scaffold so insets/edge-to-edge stay solved.
+The engine already used your `tabs` answer while scaffolding: `home` and `profile` slugs get
+their real shipped screens; any other configured tab gets a generated `PlaceholderScreen` stub
+(testTag `<slug>_title`) wired into the bottom nav and the Maestro smoke flow already — there is
+no hand-copying step here anymore. Turning a placeholder (or anything else) into a real feature
+is what the exemplar-feature conversation does (§7.4) or, after genesis, the ordinary
+`add-feature` skill.
 
-Match the template's existing style exactly — Clean Architecture boundaries
-(`data/domain/presentation/di`), theme tokens (`<Prefix>Tokens`/`<Prefix>Theme`), DM Sans.
+## 5. Start the daily UI loop — the walk below needs it
 
-## 5. Report
-
-Tell the user: the target directory, the GREEN/FAIL verdict from the engine, which tabs/screens you
-generated, and the next commands — drop in `google-services.json` / `GoogleService-Info.plist`
-(intentionally not templated), then `./gradlew :composeApp:installDebug` (Android) and, on macOS,
-the iOS build. If they want a device run + smoke, point them at the **cmp-qa-prep** skill; if their
-toolchain is incomplete, point them at **cmp-doctor** first.
-
-**Then establish the daily UI loop** (the single most valuable thing to hand over): offer to start
+Before offering the fork, start the loop (the single most valuable thing to hand over, and a
+prerequisite for the design-language conversation's candidates): offer to run
 `preview { projectDir }` (the **cmp-preview** skill) right away — a live gallery of every screen
-that re-renders on save, no device or emulator. From then on, every UI edit you or they make is
-verified with `preview_status { waitForRender: true }` (which screens changed, or the compile
-error) — this is your feedback loop for ALL subsequent UI work in the app, and it's documented for
-future sessions in the generated `CLAUDE.md` ("UI feedback loop").
+that re-renders on save, no device or emulator. From here on, every UI edit — yours, or the design
+candidates below — is verified with `preview_status { waitForRender: true }` (which screens
+changed, or the compile error). This loop is documented for future sessions in the generated
+`CLAUDE.md` ("UI feedback loop").
 
-## 6. Walk the human through approvals (recommended, not required)
+## 6. THE FORK — express lane or guided walk
 
-The preview service you just started also carries the **console** — the same URL, three more
-tabs. Close the loop the harness expects: give the human the console and walk the ordered
-approval list (`template/CLAUDE.md`'s "Approvals" section) so they bless the contract the harness
-then enforces. This is optional — `qa/verify.mjs`'s `approvals` gate only SKIP-warns on
-`unreviewed`, it never fails a fresh scaffold — but skipping it means every future change ships
-with an unsigned contract, so recommend it.
+Tell the human plainly, right after the loop is up: their app has six governed artifacts —
+intent, design system, architecture, components, exemplar feature, exemplar spec — and there are
+two honest ways to sign off on them. Ask which they want; don't default to either silently.
 
-1. Hand over the console `url` again and point out the extra tabs: **Design System**, **Approvals**,
-   **Specs** (alongside the **Screens** gallery).
-2. Walk the artifacts **in order** — each is expressed in the vocabulary of the ones before it:
-   1. design system (Design System tab), 2. architecture + structure (Specs tab, `app-base.spec.md`),
-   3. exemplar feature (Screens tab, the `home` card's pixels + structure — the Approvals tab
-   names its file count), 4. exemplar spec (Specs tab, `home.spec.md`), 5. any feature specs
-   already seeded (Specs tab, per-feature clauses).
-3. For each artifact: tell the human what to look at and why, then either they click **Approve** in
-   the console, or — on their confirmed word — you run `node qa/approve.mjs <artifact>`.
-4. Block on each decision with `approval_status { waitForDecision: true }` instead of polling; it
-   returns as soon as the console POSTs the approve or the CLI command runs.
-5. Close with `node qa/approve.mjs --status` so the human sees exactly what's signed and what's
-   still open.
+- **Express lane.** `node qa/approve.mjs --accept-defaults` approves every currently-resolvable
+  artifact in one visible act, each recorded `"mode": "defaults-accepted"`. The console and
+  `--status` both render this as **approved · defaults accepted — unshaped**, never as a shaped
+  approval — the ledger never pretends the defaults were designed. Good for "build now, walk the
+  definition later"; a later real approval (after shaping, via the guided steps below) clears the
+  mode. This only settles the *human* half — `qa/verify.mjs` still runs the same either way.
+- **Guided walk.** The six conversations in §7, each ending in its own approval — slower, but
+  everything the harness later enforces is something the human actually chose.
+
+If express: run the command, then `node qa/approve.mjs --status` so they see exactly what's
+signed and in what mode, and skip to §9 (Report). If guided, continue to §7.
+
+## 7. The guided walk — six conversations, each ending in its approval
+
+Walk the artifacts **in registry order** (`node qa/approve.mjs --status` always lists them in
+this order) — each is expressed in the vocabulary of the ones before it. For each: tell the human
+what you're about to show them and why, do the step, then either they click **Approve** in the
+console or — on their confirmed word — you run `node qa/approve.mjs <artifact>`. Block on each
+decision with `approval_status { waitForDecision: true }` instead of polling.
+
+### 7.0 Intent
+Already written (§4). Show it back to them — the console's **Specs** tab renders it like any
+other spec file (prose sections, no clause grammar) — confirm nothing's off, approve `intent`.
+
+### 7.1 Design language — the candidates loop
+A workbench, not a swatch grid — choices are shown **rendered**, never as hex codes:
+
+1. Edit `Tokens.kt` toward one candidate direction (start from the brand-feel words captured in
+   the intent round).
+2. `preview_status { waitForRender: true }` to confirm it rendered.
+3. `snapshot_variant { name }` (e.g. `{name: "warmer"}`) stashes the current renders under
+   `composeApp/build/previews/variants/<name>/`.
+4. Repeat for 2–3 candidates total, editing `Tokens.kt` to a fresh direction before each next
+   `snapshot_variant`.
+5. Tell the human to open the console's **Design System** tab — in genesis mode it shows a
+   **candidates strip**, each variant's screens side by side with a **Pick** button.
+6. Block on `review_comments { waitForComment: true }` for their pick — clicking Pick posts a
+   `pick:<name>` comment targeting `design-system`. Apply that candidate's tokens for real (if
+   `Tokens.kt` isn't already left on that candidate), `resolve_comment { id, note }` saying what
+   you applied, then approve `design-system`.
+
+If they react in words instead of clicking Pick ("warmer", "rounder"), treat that as another
+round — regenerate, snapshot, ask again — until they say "this is mine."
+
+### 7.2 Architecture — comprehension, not open-ended choice
+The harness *is* the opinion here. Walk the layer map in the console's **Architecture** tab using
+*their* feature names (from the intent brief) and the real decisions already baked into the
+scaffold (local DB on/off, auth, which tabs). Approval here means "I understand and accept this
+shape for my app," not "I designed it" — say so plainly. Approve `architecture`.
+
+### 7.3 Components — propose, shape, approve
+From the brief and the now-frozen design language, propose the component vocabulary this app
+will speak in (`presentation/components/*.kt` — ships with just `BaseScreen`; you'll typically
+add a few: cards, list rows, buttons, whatever the first screens need). Shape each with the human
+in place, using the preview loop to check. Once approved, the registry is law — any component
+added or changed afterward invalidates the approval (`changed-since-approval`) until a human
+re-approves. Approve `components`.
+
+### 7.4 The exemplar is THEIR first feature
+The exemplar is the DNA every future feature clones from — it must never stay generic `home`
+items. Using the "first screens" answer from the intent round, agree with the human which one is
+their real first feature, then:
+
+1. Stamp it: `node qa/scaffold-feature.mjs <Name>` (add `--entity <Entity>` if the naive
+   de-pluralized guess is wrong — confirm the guess with them first). If a tab was already wired
+   to a `PlaceholderScreen` stub under this name, this is where it becomes real.
+2. Shape it with them — rewrite the spec clauses in `specs/<name>.spec.md` to the feature's real
+   behavior (the six clause ids stay fixed), adapt the entity/screen/tests to match, checking with
+   the preview loop as you go.
+3. Point `qa/approvals.json`'s `"exemplarFeature"` key at it — edit the JSON directly, there is no
+   CLI flag for this yet: `"exemplarFeature": "<name>"`. From this moment the registry's
+   `exemplar-feature`/`exemplar-spec` artifacts resolve to THIS feature's 11 files, and
+   `qa/scaffold-feature.mjs` clones from it for every feature stamped after. `home` demotes to an
+   ordinary `feature-spec:home` artifact the instant you do this — tell the human they can keep it
+   as a reference feature or delete it later, either is fine.
+4. Capture the golden baseline fresh — never copied, it must reflect the shaped behavior:
+   `UPDATE_GOLDEN=1 ./gradlew :composeApp:desktopTest --tests "*<Name>GoldenTree*"`.
+5. Approve both `exemplar-feature` and `exemplar-spec`.
+
+## 8. The reopen contract
+
+Design work isn't always done at first approval. `node qa/approve.mjs --reopen <artifact>` moves
+an **approved** artifact (shaped or defaults-accepted) back to `reopened` — a deliberate, recorded
+redesign (`reopenedAt`), never a silent edit. While reopened, the verify lane's `approvals` gate
+SKIP-warns exactly like `unreviewed` — sanctioned redesign never fails the lane; re-approve when
+the redesign lands. The console has the same control (a **Reopen** button beside **Approve** on
+approved rows), calling the same library, so the CLI and console never disagree.
+
+The asymmetry that matters: **reopening is the only sanctioned way to change an approved
+artifact.** If you (the agent) find yourself editing `Tokens.kt`, `app-base.spec.md`, a component,
+or the exemplar's files without a fresh reopen, that's drift — the `approvals` gate will FAIL and
+name it, not silently pass. Never "fix" a FAIL by re-approving on your own judgment; that is
+exactly the vacuous signature this system exists to prevent. Get the human to reopen (or approve
+the new state) themselves.
+
+## 9. Report
+
+Tell the human: the target directory, the GREEN/FAIL verdict from the engine, which lane they
+took (express or guided) and — if guided — what's now approved (`node qa/approve.mjs --status`).
+Point out the next manual steps: drop in `google-services.json` / `GoogleService-Info.plist`
+(intentionally not templated), then `./gradlew :composeApp:installDebug` (Android) and, on macOS,
+the iOS build. If they want a device run + smoke, point them at **cmp-qa-prep**; if their
+toolchain is incomplete, point them at **cmp-doctor** first. If they took the express lane, remind
+them the walk is still available any time — `--reopen` on any artifact starts it for that one.
