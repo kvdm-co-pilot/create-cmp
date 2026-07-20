@@ -1497,22 +1497,23 @@ test("evidenceBodyHtml: freshness unknown (stale:null) is stated as unknown — 
   assert.doesNotMatch(html, /evidence-stale/);
 });
 
-test("evidenceBodyHtml: timeline — prior receipts newest-first with their commit; the standardized absence line until the first archived run", () => {
+test("evidenceBodyHtml: audit trail — committed receipts newest-first, each attributed (verdict · commit · author); the standardized absence line until the first commit", () => {
   const withHistory = evidenceBodyHtml(FRESH_RECEIPT, {
     available: true,
     receipts: [
-      { file: "qa/evidence/history/2026-07-19T05-00-00-000Z-PASS-abc1234.json", verdict: "PASS", profile: "local", commitSha: "abc1234deadbeef", generatedAt: "2026-07-19T05:00:00.000Z", ageMs: 3 * 60 * 60 * 1000 },
-      { file: "qa/evidence/history/2026-07-18T20-00-00-000Z-FAIL-def5678.json", verdict: "FAIL", profile: "ci", commitSha: "def5678cafef00d", generatedAt: "2026-07-18T20:00:00.000Z", ageMs: 12 * 60 * 60 * 1000 },
+      { file: "qa/evidence/latest.json@abc1234", verdict: "PASS", profile: "local", commitSha: "abc1234deadbeef", author: "Ada Auditor", committedAt: "2026-07-19T05:00:00+00:00", ageMs: 3 * 60 * 60 * 1000 },
+      { file: "qa/evidence/latest.json@def5678", verdict: "FAIL", profile: "ci", commitSha: "def5678cafef00d", author: "Grace Hopper", committedAt: "2026-07-18T20:00:00+00:00", ageMs: 12 * 60 * 60 * 1000 },
     ],
   });
   assert.match(withHistory, /evidence-timeline/);
-  assert.match(withHistory, /2026-07-19T05-00-00-000Z-PASS-abc1234\.json/);
+  assert.match(withHistory, /Audit trail/);
   assert.match(withHistory, /step-verdict-fail">FAIL</);
   assert.match(withHistory, /commit <code>abc1234<\/code>/, "timeline row shows the shortened commit sha");
+  assert.match(withHistory, /by Ada Auditor/, "timeline row shows the git author");
+  assert.match(withHistory, /committed 2026-07-19T05:00:00/, "timeline row shows the commit date");
 
-  const noHistory = evidenceBodyHtml(FRESH_RECEIPT, { available: false, reason: "no receipt history yet — run node qa/verify.mjs" });
-  assert.match(noHistory, /no receipt history yet/);
-  assert.match(noHistory, /qa\/evidence\/history\//);
+  const noHistory = evidenceBodyHtml(FRESH_RECEIPT, { available: false, reason: "no committed history for qa/evidence/latest.json — commit a verify receipt to build the audit trail" });
+  assert.match(noHistory, /no committed history/);
   assert.doesNotMatch(noHistory, /evidence-timeline/);
 });
 

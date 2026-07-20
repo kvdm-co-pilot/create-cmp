@@ -571,36 +571,9 @@ const receipt = {
 
 fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
 fs.writeFileSync(path.join(EVIDENCE_DIR, "latest.json"), `${JSON.stringify(receipt, null, 2)}\n`);
-
-// History: archive each receipt under qa/evidence/history/ so the studio
-// console's Evidence timeline can show past runs. This is a LOCAL rolling
-// window — gitignored and bounded — while latest.json stays the single
-// committed receipt-of-record (the receipt-check gate and git-as-ledger are
-// unchanged). The whole qa/evidence prefix is excluded from the inputs hash
-// (qa/lib/inputs-hash.mjs), so an archived receipt never feeds a later run's
-// hash. Archiving is best-effort: a convenience surface must never fail the
-// lane, so any error here is swallowed after the receipt-of-record is written.
-const HISTORY_DIR = path.join(EVIDENCE_DIR, "history");
-const HISTORY_KEEP = 30;
-try {
-  fs.mkdirSync(HISTORY_DIR, { recursive: true });
-  // Name sorts chronologically: sanitized ISO timestamp (Windows-safe — no
-  // ':' or '.') + verdict + short parent sha, for a readable, unique-enough id.
-  const stamp = receipt.generatedAt.replace(/[:.]/g, "-");
-  const shortSha = (receipt.commit.sha ?? "nogit").slice(0, 7);
-  fs.writeFileSync(
-    path.join(HISTORY_DIR, `${stamp}-${verdict}-${shortSha}.json`),
-    `${JSON.stringify(receipt, null, 2)}\n`,
-  );
-  // Prune to the newest HISTORY_KEEP. The timestamp prefix makes lexical order
-  // chronological, so slicing off the head drops the oldest files.
-  const archived = fs.readdirSync(HISTORY_DIR).filter((n) => n.endsWith(".json")).sort();
-  for (const stale of archived.slice(0, Math.max(0, archived.length - HISTORY_KEEP))) {
-    try { fs.unlinkSync(path.join(HISTORY_DIR, stale)); } catch {}
-  }
-} catch {
-  // best-effort — latest.json is already written; the timeline is a convenience
-}
+// latest.json is the single receipt-of-record. Commit it with your change: the
+// studio console's Evidence audit trail reconstructs the full history from the
+// git log of this file — every commit is one verified, attributed state.
 
 if (asJson) console.log(JSON.stringify(receipt, null, 2));
 else console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict} — receipt written to qa/evidence/latest.json (commit it with your change)`);

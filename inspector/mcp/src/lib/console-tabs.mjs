@@ -1416,17 +1416,23 @@ function inputsBindingHtml(r) {
   return `inputs binding unknown &mdash; ${esc(r.staleReason || "freshness could not be recomputed")}`;
 }
 
-/** One receipt as a timeline row — verdict colored, stated facts only. */
+/**
+ * One committed receipt as a timeline row — the compliance record: the verdict
+ * as attested at that commit, plus git's own attribution (commit · author ·
+ * when). Stated facts only; nothing re-derived.
+ */
 function timelineRowHtml(r) {
   const cls = r.verdict === "PASS" ? "step-verdict-pass" : r.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
   const age = typeof r.ageMs === "number" ? formatReceiptAge(r.ageMs) : "age unknown";
   const commit = r.commitSha ? `<span class="meta">commit <code>${esc(String(r.commitSha).slice(0, 7))}</code></span>` : "";
+  const author = r.author ? `<span class="meta">by ${esc(r.author)}</span>` : "";
+  const when = r.committedAt ? esc(r.committedAt) : "commit date unknown";
   return `    <li>
       <span class="${cls}">${esc(r.verdict || "?")}</span>
       ${r.profile ? `<span class="meta">profile <code>${esc(r.profile)}</code></span>` : ""}
       ${commit}
-      <span class="meta">${r.generatedAt ? esc(r.generatedAt) : "generatedAt unknown"} &middot; ${esc(age)}</span>
-      <code>${esc(r.file)}</code>
+      ${author}
+      <span class="meta">committed ${when} &middot; ${esc(age)}</span>
     </li>`;
 }
 
@@ -1438,9 +1444,10 @@ function timelineRowHtml(r) {
  * - per-step rows: verdict, honest SKIP/FAIL reasons verbatim, humanized
  *   duration, and a link to the section the step governs where that mapping
  *   is real (STEP_GOVERNS — unmapped steps get no link);
- * - timeline: prior receipts newest-first from the lane's local history
- *   (receipt-bridge.mjs listReceiptHistory reads qa/evidence/history/), else
- *   the standardized absence line until the first archived run exists.
+ * - timeline: the committed receipt audit trail, newest-first, reconstructed
+ *   from git (receipt-bridge.mjs listReceiptHistory) — one attributed entry per
+ *   verified commit; else the standardized absence line until the first receipt
+ *   is committed.
  * @param {object|null|undefined} lastReceipt receipt-bridge.mjs's getLastReceipt() result
  * @param {{available: boolean, reason?: string, receipts?: object[]}} [history] listReceiptHistory() result
  */
@@ -1513,7 +1520,7 @@ ${stepRows}
       ? `  <ul class="evidence-timeline">
 ${history.receipts.map(timelineRowHtml).join("\n")}
   </ul>`
-      : `  <p class="empty-inline">${esc((history && history.reason) || "no receipt history yet")} &mdash; the lane keeps the last 30 runs under <code>qa/evidence/history/</code></p>`;
+      : `  <p class="empty-inline">${esc((history && history.reason) || "no committed receipt history yet")} &mdash; each commit of <code>qa/evidence/latest.json</code> becomes one entry in the audit trail</p>`;
 
   return `  <p class="meta">Rendered from <code>${esc(r.relPath || "qa/evidence/latest.json")}</code> &mdash; the verify lane's own attestation.
   The lane is the law: nothing on this page is re-derived live.</p>
@@ -1526,7 +1533,8 @@ ${history.receipts.map(timelineRowHtml).join("\n")}
   </div>
   <h3>Steps</h3>
 ${stepsHtml}
-  <h3>Receipt timeline</h3>
+  <h3>Audit trail &mdash; committed receipts</h3>
+  <p class="meta">Every commit of <code>qa/evidence/latest.json</code> is one verified state of record, attributed from git. Newest first.</p>
 ${timelineHtml}`;
 }
 

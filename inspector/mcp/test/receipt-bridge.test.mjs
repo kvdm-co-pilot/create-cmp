@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { getLastReceipt, resetReceiptBridgeCache, RECEIPT_REL_PATH } from "../src/lib/receipt-bridge.mjs";
 
@@ -230,74 +231,89 @@ test("getLastReceipt: exposes the receipt's own steps[], profile, commit, and in
   }
 });
 
-// --- listReceiptHistory (§3.6 timeline source) -------------------------------
+// --- listReceiptHistory (§3.6: the committed receipt audit trail, from git) ---
 
-test("listReceiptHistory: only latest.json (+schema.json) on disk -> the standardized 'no receipt history' absence, never a fabricated timeline", async () => {
+/** Commit qa/evidence/latest.json with a given receipt at a given author date. */
+function commitReceipt(root, receipt, { message, authorDate }) {
+  writeReceipt(root, receipt);
+  execFileSync("git", ["add", "qa/evidence/latest.json"], { cwd: root, stdio: "ignore" });
+  execFileSync("git", ["commit", "-m", message], {
+    cwd: root,
+    stdio: "ignore",
+    env: { ...process.env, GIT_AUTHOR_DATE: authorDate, GIT_COMMITTER_DATE: authorDate },
+  });
+}
+
+/** A git repo fixture with a fixed identity so author attribution is deterministic. */
+function makeGitProject() {
+  const root = makeFixtureProject({ withInputsHashLib: false });
+  execFileSync("git", ["init", "-q"], { cwd: root, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "auditor@example.com"], { cwd: root, stdio: "ignore" });
+  execFileSync("git", ["config", "user.name", "Ada Auditor"], { cwd: root, stdio: "ignore" });
+  return root;
+}
+
+test("listReceiptHistory: not a git repo (or receipt never committed) -> the standardized absence, never a fabricated trail", async () => {
   const { listReceiptHistory } = await import("../src/lib/receipt-bridge.mjs");
   const root = makeFixtureProject({ withInputsHashLib: false });
   try {
-    writeReceipt(root, makeReceipt());
-    fs.writeFileSync(path.join(root, "qa", "evidence", "schema.json"), "{}");
+    writeReceipt(root, makeReceipt()); // on disk but no git history
     const history = listReceiptHistory(root);
     assert.equal(history.available, false);
-    assert.match(history.reason, /no receipt history yet/);
-    assert.equal(listReceiptHistory(fs.mkdtempSync(path.join(os.tmpdir(), "cmp-no-evidence-"))).available, false);
+    assert.match(history.reason, /no committed history|has no commits/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("listReceiptHistory: reads the lane's qa/evidence/history/ archive newest-first, carrying each receipt's commit sha", async () => {
+test("listReceiptHistory: reconstructs the committed audit trail from git — newest-first, each entry attributed (sha + author + date) with the verdict as attested at that commit", async () => {
   const { listReceiptHistory } = await import("../src/lib/receipt-bridge.mjs");
-  const root = makeFixtureProject({ withInputsHashLib: false });
+  const root = makeGitProject();
   try {
-    const historyDir = path.join(root, "qa", "evidence", "history");
-    fs.mkdirSync(historyDir, { recursive: true });
-    // The lane writes sanitized-timestamp filenames; content carries generatedAt + commit.sha.
-    const a = makeReceipt({ generatedAt: "2026-07-19T20:00:00.000Z" });
-    a.commit = { sha: "aaaaaaa1111", dirty: [] };
-    const b = makeReceipt({ generatedAt: "2026-07-20T06:00:00.000Z" });
-    b.verdict = "FAIL";
-    b.commit = { sha: "bbbbbbb2222", dirty: [] };
-    fs.writeFileSync(path.join(historyDir, "2026-07-19T20-00-00-000Z-PASS-aaaaaaa.json"), JSON.stringify(a));
-    fs.writeFileSync(path.join(historyDir, "2026-07-20T06-00-00-000Z-FAIL-bbbbbbb.json"), JSON.stringify(b));
-    fs.writeFileSync(path.join(historyDir, "broken.json"), "{ nope");
+    commitReceipt(root, makeReceipt({ generatedAt: "2026-07-19T20:00:00.000Z" }), {
+      message: "verify: pass",
+      authorDate: "2026-07-19T20:00:00",
+    });
+    const failing = makeReceipt({ generatedAt: "2026-07-20T06:00:00.000Z" });
+    failing.verdict = "FAIL";
+    commitReceipt(root, failing, { message: "verify: fail", authorDate: "2026-07-20T06:00:00" });
+
     const history = listReceiptHistory(root);
     assert.equal(history.available, true);
-    assert.deepEqual(
-      history.receipts.map((r) => r.file),
-      ["qa/evidence/history/2026-07-20T06-00-00-000Z-FAIL-bbbbbbb.json", "qa/evidence/history/2026-07-19T20-00-00-000Z-PASS-aaaaaaa.json"],
-      "newest first, from the history subdir",
-    );
-    assert.equal(history.receipts[0].verdict, "FAIL");
-    assert.equal(history.receipts[0].commitSha, "bbbbbbb2222", "commit sha carried through for the timeline");
+    assert.equal(history.receipts.length, 2, "one entry per commit of latest.json");
+    // Newest first: the FAIL commit leads.
+    assert.equal(history.receipts[0].verdict, "FAIL", "verdict is what was attested AT that commit");
+    assert.equal(history.receipts[1].verdict, "PASS");
+    assert.equal(history.receipts[0].author, "Ada Auditor", "git author attribution carried through");
+    assert.match(history.receipts[0].commitSha, /^[0-9a-f]{40}$/, "full commit sha");
+    assert.match(history.receipts[0].file, /qa\/evidence\/latest\.json@[0-9a-f]{7}$/, "file cites the receipt at its commit");
+    assert.equal(typeof history.receipts[0].ageMs, "number", "age from the commit date");
+    assert.match(history.receipts[0].committedAt, /^2026-07-20T06:00:00/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("listReceiptHistory: extra receipt files list newest-first with their own facts; non-receipt json is skipped, not guessed at", async () => {
+test("listReceiptHistory: a commit whose latest.json is malformed is skipped, never fabricated into a verdict", async () => {
   const { listReceiptHistory } = await import("../src/lib/receipt-bridge.mjs");
-  const root = makeFixtureProject({ withInputsHashLib: false });
+  const root = makeGitProject();
   try {
-    const evidenceDir = path.join(root, "qa", "evidence");
-    fs.mkdirSync(evidenceDir, { recursive: true });
-    fs.writeFileSync(path.join(evidenceDir, "older.json"), JSON.stringify(makeReceipt({ generatedAt: "2026-07-18T20:00:00.000Z" })));
-    const newer = makeReceipt({ generatedAt: "2026-07-19T05:00:00.000Z" });
-    newer.verdict = "FAIL";
-    fs.writeFileSync(path.join(evidenceDir, "newer.json"), JSON.stringify(newer));
-    fs.writeFileSync(path.join(evidenceDir, "notes.json"), JSON.stringify({ hello: "not a receipt" }));
-    fs.writeFileSync(path.join(evidenceDir, "broken.json"), "{ nope");
+    // First commit: a non-receipt blob at the path.
+    fs.mkdirSync(path.join(root, "qa", "evidence"), { recursive: true });
+    fs.writeFileSync(path.join(root, "qa", "evidence", "latest.json"), "{ not json");
+    execFileSync("git", ["add", "qa/evidence/latest.json"], { cwd: root, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "junk"], {
+      cwd: root, stdio: "ignore",
+      env: { ...process.env, GIT_AUTHOR_DATE: "2026-07-18T00:00:00", GIT_COMMITTER_DATE: "2026-07-18T00:00:00" },
+    });
+    // Second commit: a real receipt.
+    commitReceipt(root, makeReceipt({ generatedAt: "2026-07-19T00:00:00.000Z" }), {
+      message: "verify: pass", authorDate: "2026-07-19T00:00:00",
+    });
     const history = listReceiptHistory(root);
     assert.equal(history.available, true);
-    assert.deepEqual(
-      history.receipts.map((r) => r.file),
-      ["qa/evidence/newer.json", "qa/evidence/older.json"],
-      "newest first",
-    );
-    assert.equal(history.receipts[0].verdict, "FAIL");
-    assert.equal(history.receipts[0].profile, "local");
-    assert.equal(typeof history.receipts[0].ageMs, "number");
+    assert.equal(history.receipts.length, 1, "the malformed commit is skipped, the real one kept");
+    assert.equal(history.receipts[0].verdict, "PASS");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

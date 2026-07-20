@@ -18,12 +18,6 @@ build/
 # (qa/evidence/latest.json) IS committed — these artifacts are hashed into it instead.
 qa-artifacts/
 
-# Verify-lane receipt history — a LOCAL rolling window (last 30 runs) the studio
-# console's Evidence timeline reads. latest.json remains the committed
-# receipt-of-record; this local log is not committed (and is excluded from the
-# inputs hash like the rest of qa/evidence).
-qa/evidence/history/
-
 # iOS / CocoaPods / XcodeGen
 iosApp/Pods/
 iosApp/Podfile.lock

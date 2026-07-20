@@ -24,6 +24,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 /** Where a generated project writes its evidence receipt (qa/verify.mjs). */
@@ -178,75 +179,89 @@ export async function getLastReceipt(root) {
   };
 }
 
+/** How far back the committed-receipt audit trail is walked (git log --max-count). */
+const HISTORY_MAX_COMMITS = 50;
+// A field separator that cannot occur in a sha, author name, or ISO date.
+const GIT_FIELD_SEP = "\x1f";
+
+function git(root, args) {
+  return execFileSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+    timeout: 5000,
+    stdio: ["ignore", "pipe", "ignore"], // swallow stderr; errors surface as throws
+    maxBuffer: 8 * 1024 * 1024,
+  });
+}
+
 /**
- * Prior receipts on disk, newest first — the Evidence timeline's source.
- * The lane archives each run under qa/evidence/history/ (a local rolling
- * window; latest.json stays the committed receipt-of-record — see
- * template/qa/verify.mjs). This reads that directory, and ALSO any receipt
- * files dropped flat under qa/evidence/ (besides latest.json/schema.json), so
- * both the current layout and a hand-kept one work. A file that parses as a
- * cmp-evidence receipt (has steps[]) is listed with its verdict/profile/
- * commit/age; unparseable or non-receipt files are skipped, not guessed at. No
- * receipts anywhere → `available: false` with the reason stated, so the console
- * renders the standardized absence line rather than a fabricated timeline.
+ * The committed receipt audit trail, newest first — the Evidence timeline's
+ * source. This reconstructs history from GIT, not a folder of files: every
+ * commit that changed qa/evidence/latest.json is one verified state of record,
+ * and git's own log gives it a permanent, attributed, tamper-evident chain
+ * (author + date + sha). Each entry pairs that commit metadata with the receipt
+ * as it was AT that commit (git show <sha>:qa/evidence/latest.json), so the
+ * verdict/profile shown are exactly what was attested then — never re-derived.
+ *
+ * This is the compliance record; the Evidence headline card, separately, shows
+ * the CURRENT working-tree receipt (committed or not). A project that is not a
+ * git repo, or whose receipt has no commits yet, degrades to
+ * `available: false` with the reason stated — the console renders the
+ * standardized absence line, never a fabricated trail.
  * @param {string} root project root
- * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, verdict: string|null, profile: string|null, commitSha: string|null, generatedAt: string|null, ageMs: number|null}>}}
+ * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, commitSha: string, author: string|null, committedAt: string|null, ageMs: number|null, verdict: string|null, profile: string|null, generatedAt: string|null}>}}
  */
 export function listReceiptHistory(root) {
-  const evidenceDir = path.join(root, "qa", "evidence");
-  if (!fs.existsSync(evidenceDir)) {
-    return { available: false, reason: "no qa/evidence directory" };
+  let logOut;
+  try {
+    logOut = git(root, [
+      "log",
+      `--max-count=${HISTORY_MAX_COMMITS}`,
+      `--format=%H${GIT_FIELD_SEP}%an${GIT_FIELD_SEP}%aI`,
+      "--",
+      RECEIPT_REL_PATH,
+    ]);
+  } catch {
+    // Not a git repo, git unavailable, or the command failed.
+    return { available: false, reason: `no committed history for ${RECEIPT_REL_PATH} — commit a verify receipt to build the audit trail` };
   }
+  const lines = logOut.split("\n").filter(Boolean);
+  if (lines.length === 0) {
+    return { available: false, reason: `${RECEIPT_REL_PATH} has no commits yet — commit a verify receipt to build the audit trail` };
+  }
+
   const receipts = [];
-  const readReceipt = (absPath, relFile) => {
+  for (const line of lines) {
+    const [sha, author, committedAt] = line.split(GIT_FIELD_SEP);
+    if (!sha) continue;
+    let content;
+    try {
+      content = git(root, ["show", `${sha}:${RECEIPT_REL_PATH}`]);
+    } catch {
+      continue; // receipt absent at that commit (e.g. the commit that removed it) — skipped, not guessed
+    }
     let parsed;
     try {
-      parsed = JSON.parse(fs.readFileSync(absPath, "utf8"));
+      parsed = JSON.parse(content);
     } catch {
-      return; // not parseable — skipped, never guessed at
+      continue; // a malformed committed receipt is skipped, never fabricated
     }
-    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.steps)) return;
-    const at = Date.parse(parsed.generatedAt ?? "");
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.steps)) continue;
+    const at = Date.parse(committedAt ?? "");
     receipts.push({
-      file: relFile,
+      file: `${RECEIPT_REL_PATH}@${sha.slice(0, 7)}`,
+      commitSha: sha,
+      author: author || null,
+      committedAt: committedAt || null,
+      ageMs: Number.isNaN(at) ? null : Date.now() - at,
       verdict: parsed.verdict ?? null,
       profile: typeof parsed.profile === "string" ? parsed.profile : null,
-      commitSha: parsed.commit && typeof parsed.commit.sha === "string" ? parsed.commit.sha : null,
       generatedAt: parsed.generatedAt ?? null,
-      ageMs: Number.isNaN(at) ? null : Date.now() - at,
     });
-  };
-  const readDir = (absDir) => {
-    let entries;
-    try {
-      entries = fs.readdirSync(absDir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    return entries;
-  };
-
-  // The archive directory the lane writes (qa/evidence/history/*.json).
-  const historyDir = path.join(evidenceDir, "history");
-  for (const e of readDir(historyDir) || []) {
-    if (e.isFile() && e.name.endsWith(".json")) {
-      readReceipt(path.join(historyDir, e.name), `qa/evidence/history/${e.name}`);
-    }
   }
-  // Back-compat: receipt files kept flat in qa/evidence/ (not latest/schema).
-  for (const e of readDir(evidenceDir) || []) {
-    if (e.isFile() && e.name.endsWith(".json") && e.name !== "latest.json" && e.name !== "schema.json") {
-      readReceipt(path.join(evidenceDir, e.name), `qa/evidence/${e.name}`);
-    }
-  }
-
   if (receipts.length === 0) {
-    return { available: false, reason: "no receipt history yet — run node qa/verify.mjs (the lane keeps the last 30 runs)" };
+    return { available: false, reason: `no parseable committed receipts in the history of ${RECEIPT_REL_PATH}` };
   }
-  receipts.sort((a, b) => {
-    const ta = Date.parse(a.generatedAt ?? "");
-    const tb = Date.parse(b.generatedAt ?? "");
-    return (Number.isNaN(tb) ? -Infinity : tb) - (Number.isNaN(ta) ? -Infinity : ta);
-  });
+  // git log already returns newest-first; the receipts array preserves that.
   return { available: true, receipts };
 }

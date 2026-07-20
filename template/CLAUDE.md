@@ -70,9 +70,9 @@ the tree. The governed `architecture` artifact (below) hashes the document along
 
 `node qa/verify.mjs` writes `qa/evidence/latest.json` (schema: `qa/evidence/schema.json`).
 Commit it with your change; git history is the audit ledger. Binary artifacts under
-`qa-artifacts/` are hashed into the receipt, never committed. Each run is also archived to
-`qa/evidence/history/` — a local, gitignored rolling window (last 30 runs) that the studio
-console's Evidence timeline reads; `latest.json` stays the one committed receipt-of-record.
+`qa-artifacts/` are hashed into the receipt, never committed. The studio console's Evidence
+page reconstructs the full audit trail from the git log of `latest.json` — every commit is
+one verified, attributed state — so committing each receipt is what builds the record.
 
 ## Approvals — governed artifacts need a human's sign-off
 
