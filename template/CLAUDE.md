@@ -10,6 +10,25 @@ Done means `node qa/verify.mjs` reports PASS and the receipt it writes
 a failure. SKIPped steps are recorded in the receipt; never present green-with-gaps as fully
 verified.
 
+**Verify in two tiers — the full lane is a checkpoint, not an inner loop.** It builds,
+tests, and gates the whole tree to produce the receipt, so it is slow by design; running it
+after every edit wastes the minutes it takes. Iterate on the fast tier, and run the lane
+once — when you believe the change is done.
+
+- **Inner loop — run continuously (seconds):** the preview loop (below) for UI, and
+  `./gradlew :composeApp:desktopTest` for the unit tests your change touches. This is where
+  you catch your own mistakes.
+- **Checkpoint — run once, at done:** `node qa/verify.mjs`. It writes the receipt; commit
+  the receipt with your change. The Stop hook (`qa/receipt-check.mjs`) then confirms — with a
+  cheap hash check, not another lane run — that a valid receipt attests your commit, and CI
+  re-runs the full lane on push. After a green checkpoint, do not re-run the lane unless you
+  change the tree again.
+
+Humans get the same gate at push time: run `node qa/setup-hooks.mjs` once (after `git init`)
+to enable the shipped pre-push hook. It blocks a push whose committed receipt doesn't attest
+HEAD — the same cheap check, before code leaves the machine (`git push --no-verify` bypasses
+it; CI still enforces it).
+
 ## Specifications — behavior starts here
 
 New behavior begins as a spec clause in `specs/<feature>.spec.md`: Given/When/Then with a
@@ -226,7 +245,8 @@ conventions) · [`CONTRIBUTING.md`](./CONTRIBUTING.md) (workflow, Conventional C
 
 | Command | What |
 |---|---|
-| `node qa/verify.mjs` | The verify lane (profile `local`) — your definition of done |
+| `node qa/verify.mjs` | The verify lane (profile `local`) — the done checkpoint, run once |
 | `./gradlew :composeApp:desktopTest` | Unit tests only (fast inner loop) |
+| `node qa/setup-hooks.mjs` | Enable the pre-push receipt gate (one-time, after `git init`) |
 | `./gradlew :composeApp:assembleDebug` | Android debug build |
 | `./gradlew :composeApp:hotRunDesktop --auto` | Desktop dev-client with hot reload |
