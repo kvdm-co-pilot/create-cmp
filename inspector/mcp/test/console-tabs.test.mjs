@@ -1497,20 +1497,22 @@ test("evidenceBodyHtml: freshness unknown (stale:null) is stated as unknown — 
   assert.doesNotMatch(html, /evidence-stale/);
 });
 
-test("evidenceBodyHtml: timeline — prior receipts newest-first when a history source exists; the standardized absence line when only latest.json is retained", () => {
+test("evidenceBodyHtml: timeline — prior receipts newest-first with their commit; the standardized absence line until the first archived run", () => {
   const withHistory = evidenceBodyHtml(FRESH_RECEIPT, {
     available: true,
     receipts: [
-      { file: "qa/evidence/2026-07-19T05.json", verdict: "PASS", profile: "local", generatedAt: "2026-07-19T05:00:00.000Z", ageMs: 3 * 60 * 60 * 1000 },
-      { file: "qa/evidence/2026-07-18T20.json", verdict: "FAIL", profile: "ci", generatedAt: "2026-07-18T20:00:00.000Z", ageMs: 12 * 60 * 60 * 1000 },
+      { file: "qa/evidence/history/2026-07-19T05-00-00-000Z-PASS-abc1234.json", verdict: "PASS", profile: "local", commitSha: "abc1234deadbeef", generatedAt: "2026-07-19T05:00:00.000Z", ageMs: 3 * 60 * 60 * 1000 },
+      { file: "qa/evidence/history/2026-07-18T20-00-00-000Z-FAIL-def5678.json", verdict: "FAIL", profile: "ci", commitSha: "def5678cafef00d", generatedAt: "2026-07-18T20:00:00.000Z", ageMs: 12 * 60 * 60 * 1000 },
     ],
   });
   assert.match(withHistory, /evidence-timeline/);
-  assert.match(withHistory, /2026-07-19T05\.json/);
+  assert.match(withHistory, /2026-07-19T05-00-00-000Z-PASS-abc1234\.json/);
   assert.match(withHistory, /step-verdict-fail">FAIL</);
+  assert.match(withHistory, /commit <code>abc1234<\/code>/, "timeline row shows the shortened commit sha");
 
-  const noHistory = evidenceBodyHtml(FRESH_RECEIPT, { available: false, reason: "no receipt history — only the latest receipt is retained" });
-  assert.match(noHistory, /no receipt history &mdash; only the latest receipt is retained/);
+  const noHistory = evidenceBodyHtml(FRESH_RECEIPT, { available: false, reason: "no receipt history yet — run node qa/verify.mjs" });
+  assert.match(noHistory, /no receipt history yet/);
+  assert.match(noHistory, /qa\/evidence\/history\//);
   assert.doesNotMatch(noHistory, /evidence-timeline/);
 });
 

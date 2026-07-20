@@ -240,8 +240,37 @@ test("listReceiptHistory: only latest.json (+schema.json) on disk -> the standar
     fs.writeFileSync(path.join(root, "qa", "evidence", "schema.json"), "{}");
     const history = listReceiptHistory(root);
     assert.equal(history.available, false);
-    assert.match(history.reason, /no receipt history — only the latest receipt is retained/);
+    assert.match(history.reason, /no receipt history yet/);
     assert.equal(listReceiptHistory(fs.mkdtempSync(path.join(os.tmpdir(), "cmp-no-evidence-"))).available, false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("listReceiptHistory: reads the lane's qa/evidence/history/ archive newest-first, carrying each receipt's commit sha", async () => {
+  const { listReceiptHistory } = await import("../src/lib/receipt-bridge.mjs");
+  const root = makeFixtureProject({ withInputsHashLib: false });
+  try {
+    const historyDir = path.join(root, "qa", "evidence", "history");
+    fs.mkdirSync(historyDir, { recursive: true });
+    // The lane writes sanitized-timestamp filenames; content carries generatedAt + commit.sha.
+    const a = makeReceipt({ generatedAt: "2026-07-19T20:00:00.000Z" });
+    a.commit = { sha: "aaaaaaa1111", dirty: [] };
+    const b = makeReceipt({ generatedAt: "2026-07-20T06:00:00.000Z" });
+    b.verdict = "FAIL";
+    b.commit = { sha: "bbbbbbb2222", dirty: [] };
+    fs.writeFileSync(path.join(historyDir, "2026-07-19T20-00-00-000Z-PASS-aaaaaaa.json"), JSON.stringify(a));
+    fs.writeFileSync(path.join(historyDir, "2026-07-20T06-00-00-000Z-FAIL-bbbbbbb.json"), JSON.stringify(b));
+    fs.writeFileSync(path.join(historyDir, "broken.json"), "{ nope");
+    const history = listReceiptHistory(root);
+    assert.equal(history.available, true);
+    assert.deepEqual(
+      history.receipts.map((r) => r.file),
+      ["qa/evidence/history/2026-07-20T06-00-00-000Z-FAIL-bbbbbbb.json", "qa/evidence/history/2026-07-19T20-00-00-000Z-PASS-aaaaaaa.json"],
+      "newest first, from the history subdir",
+    );
+    assert.equal(history.receipts[0].verdict, "FAIL");
+    assert.equal(history.receipts[0].commitSha, "bbbbbbb2222", "commit sha carried through for the timeline");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
