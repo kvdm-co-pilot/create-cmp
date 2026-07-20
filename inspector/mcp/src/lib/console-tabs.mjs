@@ -1420,9 +1420,11 @@ function inputsBindingHtml(r) {
 function timelineRowHtml(r) {
   const cls = r.verdict === "PASS" ? "step-verdict-pass" : r.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
   const age = typeof r.ageMs === "number" ? formatReceiptAge(r.ageMs) : "age unknown";
+  const commit = r.commitSha ? `<span class="meta">commit <code>${esc(String(r.commitSha).slice(0, 7))}</code></span>` : "";
   return `    <li>
       <span class="${cls}">${esc(r.verdict || "?")}</span>
       ${r.profile ? `<span class="meta">profile <code>${esc(r.profile)}</code></span>` : ""}
+      ${commit}
       <span class="meta">${r.generatedAt ? esc(r.generatedAt) : "generatedAt unknown"} &middot; ${esc(age)}</span>
       <code>${esc(r.file)}</code>
     </li>`;
@@ -1436,9 +1438,9 @@ function timelineRowHtml(r) {
  * - per-step rows: verdict, honest SKIP/FAIL reasons verbatim, humanized
  *   duration, and a link to the section the step governs where that mapping
  *   is real (STEP_GOVERNS — unmapped steps get no link);
- * - timeline: prior receipts when a history source exists on disk
- *   (receipt-bridge.mjs listReceiptHistory), else the standardized absence
- *   line — the lane retains only latest.json today.
+ * - timeline: prior receipts newest-first from the lane's local history
+ *   (receipt-bridge.mjs listReceiptHistory reads qa/evidence/history/), else
+ *   the standardized absence line until the first archived run exists.
  * @param {object|null|undefined} lastReceipt receipt-bridge.mjs's getLastReceipt() result
  * @param {{available: boolean, reason?: string, receipts?: object[]}} [history] listReceiptHistory() result
  */
@@ -1511,7 +1513,7 @@ ${stepRows}
       ? `  <ul class="evidence-timeline">
 ${history.receipts.map(timelineRowHtml).join("\n")}
   </ul>`
-      : `  <p class="empty-inline">no receipt history &mdash; only the latest receipt is retained</p>`;
+      : `  <p class="empty-inline">${esc((history && history.reason) || "no receipt history yet")} &mdash; the lane keeps the last 30 runs under <code>qa/evidence/history/</code></p>`;
 
   return `  <p class="meta">Rendered from <code>${esc(r.relPath || "qa/evidence/latest.json")}</code> &mdash; the verify lane's own attestation.
   The lane is the law: nothing on this page is re-derived live.</p>

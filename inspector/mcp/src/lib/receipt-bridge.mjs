@@ -180,50 +180,68 @@ export async function getLastReceipt(root) {
 
 /**
  * Prior receipts on disk, newest first — the Evidence timeline's source.
- * The lane today retains ONLY qa/evidence/latest.json (template/qa/verify.mjs
- * writes exactly that one file; git history is the ledger of record), so on a
- * standard project this returns `available: false` with that stated plainly —
- * the console renders the standardized absence line, never a fabricated
- * timeline. A project that DOES keep extra receipt files under qa/evidence/
- * (any *.json besides latest.json and schema.json that parses as a
- * cmp-evidence receipt, i.e. has steps[]) gets them listed with their own
- * verdict/profile/age; unparseable or non-receipt files are skipped, not
- * guessed at.
+ * The lane archives each run under qa/evidence/history/ (a local rolling
+ * window; latest.json stays the committed receipt-of-record — see
+ * template/qa/verify.mjs). This reads that directory, and ALSO any receipt
+ * files dropped flat under qa/evidence/ (besides latest.json/schema.json), so
+ * both the current layout and a hand-kept one work. A file that parses as a
+ * cmp-evidence receipt (has steps[]) is listed with its verdict/profile/
+ * commit/age; unparseable or non-receipt files are skipped, not guessed at. No
+ * receipts anywhere → `available: false` with the reason stated, so the console
+ * renders the standardized absence line rather than a fabricated timeline.
  * @param {string} root project root
- * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, verdict: string|null, profile: string|null, generatedAt: string|null, ageMs: number|null}>}}
+ * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, verdict: string|null, profile: string|null, commitSha: string|null, generatedAt: string|null, ageMs: number|null}>}}
  */
 export function listReceiptHistory(root) {
   const evidenceDir = path.join(root, "qa", "evidence");
   if (!fs.existsSync(evidenceDir)) {
     return { available: false, reason: "no qa/evidence directory" };
   }
-  let entries;
-  try {
-    entries = fs.readdirSync(evidenceDir);
-  } catch (err) {
-    return { available: false, reason: err && err.message ? err.message : String(err) };
-  }
   const receipts = [];
-  for (const name of entries) {
-    if (!name.endsWith(".json") || name === "latest.json" || name === "schema.json") continue;
+  const readReceipt = (absPath, relFile) => {
     let parsed;
     try {
-      parsed = JSON.parse(fs.readFileSync(path.join(evidenceDir, name), "utf8"));
+      parsed = JSON.parse(fs.readFileSync(absPath, "utf8"));
     } catch {
-      continue; // not parseable — skipped, never guessed at
+      return; // not parseable — skipped, never guessed at
     }
-    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.steps)) continue;
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.steps)) return;
     const at = Date.parse(parsed.generatedAt ?? "");
     receipts.push({
-      file: `qa/evidence/${name}`,
+      file: relFile,
       verdict: parsed.verdict ?? null,
       profile: typeof parsed.profile === "string" ? parsed.profile : null,
+      commitSha: parsed.commit && typeof parsed.commit.sha === "string" ? parsed.commit.sha : null,
       generatedAt: parsed.generatedAt ?? null,
       ageMs: Number.isNaN(at) ? null : Date.now() - at,
     });
+  };
+  const readDir = (absDir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(absDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    return entries;
+  };
+
+  // The archive directory the lane writes (qa/evidence/history/*.json).
+  const historyDir = path.join(evidenceDir, "history");
+  for (const e of readDir(historyDir) || []) {
+    if (e.isFile() && e.name.endsWith(".json")) {
+      readReceipt(path.join(historyDir, e.name), `qa/evidence/history/${e.name}`);
+    }
   }
+  // Back-compat: receipt files kept flat in qa/evidence/ (not latest/schema).
+  for (const e of readDir(evidenceDir) || []) {
+    if (e.isFile() && e.name.endsWith(".json") && e.name !== "latest.json" && e.name !== "schema.json") {
+      readReceipt(path.join(evidenceDir, e.name), `qa/evidence/${e.name}`);
+    }
+  }
+
   if (receipts.length === 0) {
-    return { available: false, reason: "no receipt history — only the latest receipt is retained" };
+    return { available: false, reason: "no receipt history yet — run node qa/verify.mjs (the lane keeps the last 30 runs)" };
   }
   receipts.sort((a, b) => {
     const ta = Date.parse(a.generatedAt ?? "");
