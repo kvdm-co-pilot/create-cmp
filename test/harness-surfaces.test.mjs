@@ -68,6 +68,8 @@ const ASSERTED_FILES = [
   "qa/receipt-check.mjs",
   "qa/lib/inputs-hash.mjs",
   "qa/scaffold-feature.mjs",
+  "qa/setup-hooks.mjs",
+  ".githooks/pre-push",
   "qa/refusal-demo.mjs",
   "qa/e2e/smoke.yaml",
   "qa/evidence/schema.json",
@@ -149,6 +151,19 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       const buildGradle = fs.readFileSync(path.join(out, "composeApp/build.gradle.kts"), "utf8");
       assert.match(buildGradle, /goldenBaselines/, "golden baselines declared as a Test input");
       assert.match(buildGradle, /inputs\.property\("updateGolden"/, "UPDATE_GOLDEN declared as a Test input");
+    });
+
+    await t.test("verification is tiered: CLAUDE.md teaches inner-loop vs checkpoint, and the pre-push gate ships", () => {
+      const claudeMd = fs.readFileSync(path.join(out, "CLAUDE.md"), "utf8");
+      assert.match(claudeMd, /checkpoint, not an inner loop/i, "CLAUDE.md frames the full lane as a checkpoint");
+      assert.match(claudeMd, /desktopTest/, "the inner loop names the fast unit-test command");
+      assert.match(claudeMd, /setup-hooks\.mjs/, "CLAUDE.md points humans at the pre-push setup");
+      // The pre-push hook runs the CHEAP receipt check (not the full lane) and documents the bypass.
+      const hook = fs.readFileSync(path.join(out, ".githooks/pre-push"), "utf8");
+      assert.match(hook, /if node qa\/receipt-check\.mjs/, "pre-push gates on the cheap receipt check, not the full lane");
+      assert.match(hook, /no-verify/, "pre-push documents the bypass; CI still enforces");
+      const setup = fs.readFileSync(path.join(out, "qa/setup-hooks.mjs"), "utf8");
+      assert.match(setup, /core\.hooksPath/, "setup-hooks points git at .githooks");
     });
 
     await t.test("latest.json is the committed receipt-of-record — never gitignored", () => {
