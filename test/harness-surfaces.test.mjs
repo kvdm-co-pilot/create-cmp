@@ -151,16 +151,11 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.match(buildGradle, /inputs\.property\("updateGolden"/, "UPDATE_GOLDEN declared as a Test input");
     });
 
-    await t.test("lane archives each receipt to a local, gitignored history the Evidence timeline reads", () => {
-      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
-      assert.match(verify, /qa\/evidence\/history|"history"|HISTORY_DIR/, "verify.mjs archives into a history dir");
-      assert.match(verify, /HISTORY_KEEP|slice\(0, Math\.max/, "verify.mjs prunes the history to a bounded window");
-      // latest.json stays the committed receipt-of-record; the rolling history is local only.
+    await t.test("latest.json is the committed receipt-of-record — never gitignored", () => {
+      // The Evidence audit trail is the git history of this one file, so it must stay tracked.
       const gitignore = fs.readFileSync(path.join(out, ".gitignore"), "utf8");
-      assert.match(gitignore, /qa\/evidence\/history\//, "the rolling history is gitignored, not committed");
-      // No active rule ignores latest.json (comments mentioning it don't count).
       const ignoreRules = gitignore.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#"));
-      assert.ok(!ignoreRules.some((l) => l.includes("latest.json")), "latest.json remains committed (never ignored)");
+      assert.ok(!ignoreRules.some((l) => l.includes("qa/evidence")), "nothing under qa/evidence is gitignored");
     });
 
     await t.test("qa/e2e/smoke.yaml cites SHELL-01 and uses extendedWaitUntil", () => {
