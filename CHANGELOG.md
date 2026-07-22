@@ -6,6 +6,52 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-21
+
+This release is the **studio** — the generated project's console is rebuilt as a
+documentation site where every section is the professional artifact its discipline
+authors, derived from the live tree, with drift shown in place — plus the runtime
+eyes, the ordered human-approval layer, the genesis definition flow, and a tiered
+verify workflow that stops the agent re-running the heavy lane on every edit.
+
+### Added
+
+- **The studio console — the preview gallery rebuilt as a documentation site.** One
+  shell (`inspector/mcp/src/lib/console-shell.mjs`) frames a single design system
+  (ink/paper + one accent; semantic red/amber/green reserved for drift, reopened, and
+  signed) with a sidebar coverage rail whose glyphs read at a glance — ● signed,
+  ○ unsigned, ◐ reopened, ⚠ drifted. The sections follow the genesis definition order —
+  **Intent → Design language → Architecture → Components → Screens → Specs → Evidence** —
+  and each is a spec, a mirror of the live tree, and a drift surface at once: the
+  Screen×State matrix, the Intent brief, the Architecture document as derived truth, the
+  Design-language token/contrast proof pages, and a **visual render for every component**
+  via `ComponentStories.kt` (14 stories) with a parity gate so a component can never
+  appear on the bar without its render.
+- **The Evidence audit trail — the committed receipt history, reconstructed from git.**
+  `qa/evidence/latest.json` is the single receipt-of-record; the console's Evidence
+  section walks `git log` of that one file to show the full signed history (verdict,
+  profile, commit, author, age) — the git history *is* the ledger, nothing extra to
+  retain or trust.
+- **Runtime eyes + ordered, hash-bound human approvals (VL-1…VL-7).** The debug app's
+  `/inspect/*` endpoints expose live nav, a11y contrast, ANR/crashes, logs, and the DB as
+  MCP structure (`connect_live` + the cmp-inspector tools); approvals are hash-bound gates
+  the console renders as a two-way surface, with a comments ledger the agent and human
+  both write to.
+- **The genesis definition flow.** `cmp-new` becomes a six-conversation walk in which
+  nothing generic is ever signed: a definition layer sits under the approvals, the
+  exemplar is configurable, an express lane exists for the impatient, and reopen-vs-drift
+  is an explicit asymmetry.
+- **The component vocabulary (CV-1) and the architecture-document standard (AD-1).** Both
+  land as derived truth — on the console page and enforced in the lane (new conformance
+  clauses, incl. ARCH-11) — rather than as standing prose.
+- **Tiered verify workflow — the full lane is a checkpoint, not an inner loop.**
+  `template/CLAUDE.md` now teaches two tiers: iterate with the preview + targeted
+  `:composeApp:desktopTest`; run `node qa/verify.mjs` once, at the done checkpoint. A new
+  opt-in **pre-push gate** (`.githooks/pre-push`, enabled by `node qa/setup-hooks.mjs`)
+  runs only the cheap receipt-check — the same predicate CI enforces — so an unverified
+  push is caught locally without rebuilding anything. Bypassable with `git push
+  --no-verify`; CI still enforces.
+
 ### Changed
 
 - **Typed-result error flow at the foundation (template + exemplar).** Exceptions no longer
@@ -590,7 +636,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.6.1...v0.7.0
