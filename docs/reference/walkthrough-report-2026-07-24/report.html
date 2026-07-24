@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fuelled — full app run-through (emulator)</title>
+<style>
+  :root { --bg:#0a0c0b; --surface:#141715; --surface2:#1b1f1c; --text:#e8ece9; --muted:#9aa39c;
+          --lime:#b8ff3c; --protein:#4cc9f0; --carbs:#ffb703; --fat:#f72585; --ok:#3ddc84; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font:15px/1.55 -apple-system,'SF Pro Text',Segoe UI,Roboto,sans-serif; padding:40px 24px 80px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { font-size:34px; letter-spacing:-0.5px; }
+  h1 .dot { color:var(--lime); }
+  .sub { color:var(--muted); margin:6px 0 28px; }
+  .meta { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:36px; }
+  .chip { background:var(--surface); border:1px solid #262b27; border-radius:999px; padding:6px 14px; font-size:13px; color:var(--muted); }
+  .chip b { color:var(--text); font-weight:600; }
+  .chip.ok b { color:var(--ok); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:22px; }
+  .card { background:var(--surface); border:1px solid #262b27; border-radius:18px; overflow:hidden; }
+  .card img { width:100%; display:block; background:#000; }
+  .card .body { padding:16px 18px 18px; }
+  .card h2 { font-size:17px; margin-bottom:2px; }
+  .card .tag { font-size:11.5px; color:var(--bg); background:var(--lime); border-radius:6px; padding:2px 8px; font-weight:700; display:inline-block; margin-bottom:10px; }
+  .card ul { list-style:none; margin-top:8px; }
+  .card li { padding:3px 0 3px 22px; position:relative; font-size:13.5px; color:var(--muted); }
+  .card li::before { content:"✓"; position:absolute; left:0; color:var(--ok); font-weight:700; }
+  .card li.note::before { content:"→"; color:var(--carbs); }
+  section { margin-top:48px; }
+  section > h2 { font-size:22px; margin-bottom:14px; }
+  table { width:100%; border-collapse:collapse; background:var(--surface); border-radius:14px; overflow:hidden; font-size:13.5px; }
+  th,td { text-align:left; padding:10px 14px; border-bottom:1px solid #262b27; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; }
+  td b.pass { color:var(--ok); }
+  .flow { background:var(--surface); border:1px solid #262b27; border-radius:14px; padding:18px 20px; margin-top:10px; font-size:14px; }
+  .flow code { background:var(--surface2); border-radius:6px; padding:1px 7px; font-size:12.5px; color:var(--lime); }
+  .findings { background:var(--surface); border-left:4px solid var(--carbs); border-radius:10px; padding:16px 20px; margin-top:10px; font-size:14px; color:var(--muted); }
+  .findings b { color:var(--text); }
+  footer { margin-top:56px; color:var(--muted); font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Fuelled<span class="dot">.</span> — full app run-through</h1>
+<p class="sub">Live on the headless Android emulator (Medium_Phone_API_35) · debug build · real Room data · driven via the cmp-inspector live tier, pixels captured per screen · 2026-07-24</p>
+
+<div class="meta">
+  <span class="chip ok">verify lane <b>PASS (11/11)</b></span>
+  <span class="chip ok">a11y live audit <b>0 violations</b></span>
+  <span class="chip">governed artifacts <b>9/9 approved</b></span>
+  <span class="chip">specs <b>26 clauses, all test-cited</b></span>
+  <span class="chip">DB <b>Room v5, seeded</b></span>
+</div>
+
+<div class="grid">
+
+  <div class="card"><img src="01-today.png" alt="Today">
+    <div class="body"><span class="tag">TODAY — dashboard</span><h2>Daily macro dashboard</h2>
+    <ul>
+      <li>Calorie ring: 939 kcal left of 2,400 (live Room aggregate)</li>
+      <li>Macro bars P 121/180 · C 168/260 · F 31/70</li>
+      <li>Protein focus card: 59 g to go</li>
+      <li>Log grouped by meal — Breakfast 535 · Lunch 710 · Snack 216; day total = Σ entries</li>
+      <li class="note">Spec TODAY-01/02/03 seen live; empty/error arms proven in tests</li>
+    </ul></div></div>
+
+  <div class="card"><img src="02-foods.png" alt="Foods">
+    <div class="body"><span class="tag">FOODS — exemplar</span><h2>Searchable catalog (Room)</h2>
+    <ul>
+      <li>Catalog served from Room, seeded on first run (7 foods)</li>
+      <li>Rows: name · brand · serving · P/C/F tags · kcal</li>
+      <li>Nav Today→Foods proven structurally (navigate_and_inspect)</li>
+    </ul></div></div>
+
+  <div class="card"><img src="03-foods-search.png" alt="Foods search">
+    <div class="body"><span class="tag">FOODS — search live</span><h2>Search filters at the source</h2>
+    <ul>
+      <li>Typed “oats” → exactly <i>Rolled oats</i> (VM → use-case → Room LIKE)</li>
+      <li>Filter runs in the data layer, not the composable (FOODS-02)</li>
+      <li>Empty state verified live (a no-match query renders “Nothing here yet”)</li>
+    </ul></div></div>
+
+  <div class="card"><img src="04-food-detail.png" alt="Food detail">
+    <div class="body"><span class="tag">FOOD DETAIL</span><h2>Nutritional breakdown</h2>
+    <ul>
+      <li>Route change proven: <i>shell → food/{foodId}</i>, resolved by id via repository (FOODS-05/06)</li>
+      <li>Hero kcal + stacked macro proportion bar + per-macro % (14 P / 68 C / 18 F)</li>
+      <li>Back returns to the still-filtered list (state survives)</li>
+    </ul></div></div>
+
+  <div class="card"><img src="05-supplements.png" alt="Supplements">
+    <div class="body"><span class="tag">SUPPLEMENTS — persistence</span><h2>Today's stack, grouped by timing</h2>
+    <ul>
+      <li>Groups: Morning · Pre-workout · Evening, seeded stack of 6</li>
+      <li><b>“3 of 6 taken”</b> — the 3rd was toggled by the e2e run and <b>survived force-stop + restarts</b> (SUPP-03 persistence, observed live)</li>
+    </ul></div></div>
+
+  <div class="card"><img src="06-supplements-toggled.png" alt="Supplements toggled">
+    <div class="body"><span class="tag">SUPPLEMENTS — tap-to-take</span><h2>Toggle round-trips through Room</h2>
+    <ul>
+      <li>Tapped Caffeine's take control → summary re-rendered <b>3 of 6 → 4 of 6</b></li>
+      <li>Write path: VM → SetSupplementTaken → DAO UPDATE → re-read (persisted)</li>
+    </ul></div></div>
+
+  <div class="card"><img src="07-profile.png" alt="Profile">
+    <div class="body"><span class="tag">PROFILE</span><h2>Identity, goals, stats, settings</h2>
+    <ul>
+      <li>Identity from Room: Karel · Cutting · 2,400 kcal target (PROF-01)</li>
+      <li>Goals rows tappable: calories / protein / activity (PROF-02)</li>
+      <li>Weekly stats: 12-day streak · 172 g avg protein · 82.4 kg (PROF-03)</li>
+      <li>Settings list tappable: units · reminders · connected apps · account (PROF-04)</li>
+    </ul></div></div>
+
+</div>
+
+<section>
+  <h2>Live flow evidence (structural, not screenshots)</h2>
+  <div class="flow">
+    Every transition was proven from the running app's semantics tree via <code>navigate_and_inspect</code> — before/after tags + route:
+    <br><br>
+    Today → <code>nav_foods</code> → Foods (route <code>shell</code>, tags flip to <code>foods_*</code>) →
+    type “oats” → list = <code>foods_item_3</code> only → tap row → <code>food/{foodId}</code> (detail content) →
+    <code>food_detail_back</code> → filtered list intact → <code>nav_supplements</code> → “3 of 6 taken” →
+    <code>supplements_take_4</code> → <b>“4 of 6 taken”</b> → <code>nav_profile</code> → identity/goals/settings rows.
+    <br><br>
+    Per-screen live a11y audits: Today ✓ · Foods ✓ · Detail ✓ · Supplements (11 checks) ✓ · Profile ✓ — <b>0 violations anywhere</b>.
+  </div>
+</section>
+
+<section>
+  <h2>Feature scorecard</h2>
+  <table>
+    <tr><th>Feature</th><th>Spec</th><th>Unit/UI tests</th><th>Golden</th><th>Seen live on device</th></tr>
+    <tr><td>Foods catalog + search + detail (exemplar)</td><td>FOODS-01…08</td><td><b class="pass">PASS</b></td><td><b class="pass">PASS</b></td><td><b class="pass">search · detail · back</b></td></tr>
+    <tr><td>Today dashboard (aggregating repo)</td><td>TODAY-01…06</td><td><b class="pass">PASS</b></td><td><b class="pass">PASS</b></td><td><b class="pass">ring · bars · log</b></td></tr>
+    <tr><td>Supplements tap-to-take (persisted)</td><td>SUPP-01…06</td><td><b class="pass">PASS</b></td><td><b class="pass">PASS</b></td><td><b class="pass">toggle 3→4 · survives restart</b></td></tr>
+    <tr><td>Profile (identity/goals/stats/settings)</td><td>PROF-01…06</td><td><b class="pass">PASS</b></td><td><b class="pass">PASS</b></td><td><b class="pass">all rows present + tappable</b></td></tr>
+    <tr><td>Shell + bottom nav</td><td>SHELL-01…05</td><td><b class="pass">PASS</b></td><td>—</td><td><b class="pass">all 4 tabs + back</b></td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Surfaced during this run-through (logged to harness findings)</h2>
+  <div class="findings">
+    <b>render_screen(live) serves a stale frame [P1]</b> — the MCP's live screenshot returned byte-identical PNGs for two different screens; caught by hash-compare, cross-checked with adb screencap (which is what this report's images use). Structural tools were unaffected. Logged with a regression-proof recipe.<br><br>
+    <b>The live device view /inspect/remote needs headline documentation [P1]</b> — click-to-drive browser mirror of the real device; “critical, it's amazing” → promoted to README/console/launch-content material.<br><br>
+    <b>Not a bug:</b> a search for “oats” initially showed the empty state — leftover “Chicken” in the retained ViewModel query (process survived the e2e run) made the query “Chickenoats”. Correct behavior; a fresh launch filtered perfectly. Real DAO SQL (<code>LIKE '%…%'</code>) matches the fake's contains semantics — checked.
+  </div>
+</section>
+
+<footer>
+  Captures: adb exec-out screencap (hash-distinct, cross-verified against the live semantics tree at capture time) · Driving &amp; assertions: cmp-inspector MCP live tier (connect_live, navigate_and_inspect, inspect_tree, audit_a11y) · Evidence receipt: qa/evidence/latest.json @ commit 87d072a
+</footer>
+
+</div>
+</body>
+</html>
