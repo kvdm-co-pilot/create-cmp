@@ -2,7 +2,7 @@
   "name": "@create-cmp/inspector-mcp",
   "version": "0.6.1",
   "private": true,
-  "description": "MCP server that reads a running Compose Multiplatform UI as structured JSON (hierarchy + geometry + resolved design tokens) and exposes query/assert/token-drift tools — never screenshots. Phase 0 of the create-cmp inspector.",
+  "description": "MCP server that reads a running Compose Multiplatform UI as structured JSON (hierarchy + geometry + resolved design tokens) and exposes query/assert/token-drift tools \u2014 never screenshots. Phase 0 of the create-cmp inspector.",
   "type": "module",
   "bin": {
     "cmp-inspector-mcp": "bin/server.mjs"
@@ -32,6 +32,7 @@
   "license": "MIT",
   "author": "Karel van der Merwe",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.25 || ^4.0"
   }
 }
