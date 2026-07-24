@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-24
+
 The first full dogfood run (the Fuelled showcase, rebuilt end-to-end on 0.9.0 —
 `docs/DOGFOODING-FINDINGS.md`) is folded back into the harness.
 
@@ -742,7 +744,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.7.0...v0.7.1
