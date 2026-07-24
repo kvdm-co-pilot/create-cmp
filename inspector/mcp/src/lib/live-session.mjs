@@ -53,7 +53,18 @@ export async function getLiveDeviceStatus({ port = 9500, fetchImpl = fetch } = {
  * `start()` is idempotent while a chain is running (a second click reports the
  * running chain instead of racing a parallel one).
  */
-export function createLiveSession({ projectDir, port = 9500, exec, gradleEnv, log = () => {} }) {
+export function createLiveSession({
+  projectDir,
+  port = 9500,
+  exec,
+  gradleEnv,
+  log = () => {},
+  // Injectable so the health step is testable. Without it the step reached the
+  // REAL loopback inspector on the machine-global port — a test would silently
+  // assert against whatever app happened to be running, exactly the isolation
+  // trap that let a foreign preview daemon get adopted.
+  fetchImpl = fetch,
+} = {}) {
   const state = {
     running: false,
     startedAt: null,
@@ -62,14 +73,31 @@ export function createLiveSession({ projectDir, port = 9500, exec, gradleEnv, lo
     steps: [], // {name, status: running|ok|fail, detail?, ms}
   };
 
+  /**
+   * A step's detail is read by a human watching the chain, so it must never be
+   * "[object Object]" — which is exactly what `String(x)` gives for the exec
+   * result a step returns when it just hands back its `exec(...)` promise.
+   * Strings pass through; an exec result degrades to its stdout; anything else
+   * with no useful text reports nothing rather than noise.
+   */
+  const describeDetail = (value) => {
+    if (value == null) return "";
+    if (typeof value === "string") return value.trim();
+    if (typeof value === "object") {
+      const out = [value.stdout, value.stderr].filter((s) => typeof s === "string" && s.trim());
+      return out.length ? out.join(" ").trim() : "";
+    }
+    return String(value);
+  };
+
   const step = async (name, fn) => {
     const entry = { name, status: "running", startedAt: Date.now() };
     state.steps.push(entry);
     log(`live-session: ${name}…`);
     try {
-      const detail = await fn();
+      const detail = describeDetail(await fn());
       entry.status = "ok";
-      if (detail) entry.detail = String(detail).slice(0, 300);
+      if (detail) entry.detail = detail.slice(0, 300);
     } catch (err) {
       entry.status = "fail";
       entry.detail = String(err && err.message ? err.message : err).slice(0, 500);
@@ -118,12 +146,15 @@ export function createLiveSession({ projectDir, port = 9500, exec, gradleEnv, lo
       await exec("adb", ["shell", "monkey", "-p", appId, "-c", "android.intent.category.LAUNCHER", "1"]);
       return appId;
     });
-    await step("forward", () => exec("adb", ["forward", `tcp:${port}`, `tcp:${port}`]));
+    await step("forward", async () => {
+      await exec("adb", ["forward", `tcp:${port}`, `tcp:${port}`]);
+      return `tcp:${port} → tcp:${port}`;
+    });
     await step("health", async () => {
       const deadline = Date.now() + 30_000;
       let lastReason = "";
       while (Date.now() < deadline) {
-        const status = await getLiveDeviceStatus({ port });
+        const status = await getLiveDeviceStatus({ port, fetchImpl });
         if (status.reachable) return `${status.appId} (${status.buildType})`;
         lastReason = status.reason;
         await new Promise((r) => setTimeout(r, 1000));

@@ -11,6 +11,16 @@ The first full dogfood run (the Fuelled showcase, rebuilt end-to-end on 0.9.0 �
 
 ### Fixed
 
+- **The live-session chain reports readable step details (P2), and is testable at all (P1).**
+  Driving the console's own Start-live-session chain surfaced `forward` reporting
+  `detail: "[object Object]"` — the step handed back its `exec` result and `String()` did the
+  rest. Details now degrade sensibly (string → stdout → nothing, never a stringified object) and
+  `forward` names the port pair it bound. The deeper issue: `createLiveSession` took no
+  injectable fetch, so its `health` step always hit the real loopback inspector on the
+  machine-global port — the same isolation trap that let a foreign preview daemon be adopted, and
+  the reason this file had no tests. `fetchImpl` is now threaded through, and the chain has
+  coverage: step order, readable details, stop-at-failure with the device's own error preserved,
+  double-start refusal, and the unreachable/transient/HTTP-error paths of the health probe.
 - **CI installs `inspector/mcp`'s dependencies (P1).** `inspector/mcp` is a separate package, not
   a workspace, so the root `npm install` never reached it while `node --test` still discovered its
   tests — `server-tools.test.mjs` died on `ERR_MODULE_NOT_FOUND` and `main` had been red since
