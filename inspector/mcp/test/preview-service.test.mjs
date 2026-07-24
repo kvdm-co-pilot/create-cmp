@@ -583,6 +583,12 @@ test("service: start serves the gallery, re-render marks changed screens, stop c
   const service = createPreviewService({
     projectDir,
     port: 19700, // test range, probes upward if busy
+    // Gradle path only. The daemon port is machine-global: with `hot` left on,
+    // a daemon running for ANY project on this machine gets probed, and
+    // adoption schedules its own render — which shows up here as an extra
+    // version bump and a flaky assertion. This test drives renderCycle()
+    // by hand; the counts must be exactly the cycles it asked for.
+    hot: false,
     runRender: async () => writeFakePreviews(previewsDir, ["shell", "home"], stamps),
   });
 
@@ -881,6 +887,67 @@ test("service: daemon fast path renders via HTTP and falls back to gradle when i
     assert.equal(status.lastError, null, "fallback render succeeded");
   } finally {
     service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: a healthy daemon serving ANOTHER project is refused, not adopted", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+
+  // A daemon for a DIFFERENT checkout, answering on the same machine-global port.
+  // It is healthy and would render happily — with the other project's screens.
+  let daemonRenders = 0;
+  const daemon = http.createServer((req, res) => {
+    if (req.url === "/health") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          screens: ["someone-elses-screen"],
+          previewsDir: path.join(os.tmpdir(), "a-totally-different-checkout", "composeApp", "build", "previews"),
+        }),
+      );
+      return;
+    }
+    daemonRenders++;
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ rendered: ["someone-elses-screen"], ms: 1 }));
+  });
+  await new Promise((r) => daemon.listen(19760, "127.0.0.1", r));
+
+  let gradleRenders = 0;
+  const service = createPreviewService({
+    projectDir,
+    port: 19750,
+    hot: true,
+    daemonUrl: "http://127.0.0.1:19760",
+    spawnDaemon: () => {
+      throw new Error("no daemon of our own in this test");
+    },
+    runRender: async () => {
+      gradleRenders++;
+      writeFakePreviews(previewsDir, ["shell"], { shell: gradleRenders });
+    },
+  });
+
+  try {
+    await service.start();
+    await new Promise((r) => setTimeout(r, 300));
+
+    assert.equal(service.status().mode, "gradle", "a foreign daemon is never adopted");
+    await service._renderCycle();
+    assert.equal(daemonRenders, 0, "not one render went to the foreign daemon");
+    assert.ok(gradleRenders >= 1, "renders stayed on the gradle path");
+    assert.deepEqual(
+      service.status().screens.map((s) => s.id),
+      ["shell"],
+      "the served screens are this project's, not the other checkout's",
+    );
+  } finally {
+    service.stop();
+    await new Promise((r) => daemon.close(r));
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });

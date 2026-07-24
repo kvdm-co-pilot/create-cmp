@@ -676,7 +676,7 @@ the disabled arm correctly dimmed (that state had never been inspectable), `Scre
 `AppHeader` white with the accent action. **Principle:** a story must sit in the same composition
 context as the screens it documents, or it documents a lie.
 
-### The console cannot show the type ramp — the design-system catalog carries no typography [P1, OPEN]
+### The console cannot show the type ramp — the design-system catalog carries no typography [P1, FIXED]
 
 Same review pass. The Design language page renders colours, spacing, radii and elevation, then
 prints: *"Not derivable statically — the design-system catalog carries no typography tokens."*
@@ -697,13 +697,31 @@ style set in its own size and weight with metrics alongside, not a name/value ta
 the showcase. Side benefit: type tokens become assertable by `assert_token` / `find_drift`, which
 today cannot see them at all. No approval is invalidated — the `design-system` artifact hashes
 `Theme.kt` + `Tokens.kt` source, not the generated JSON.
+**Fixed** — and fixed at the root rather than by duplicating numbers: `Typography.kt` now holds
+the ramp as plain data (`<Prefix>TypeRamp`, a list of `<Prefix>TypeStyle`) and the `@Composable`
+factory BUILDS its `TextStyle`s from that list, so the published ramp and the rendered ramp are
+the same numbers by construction. `tracking` is nullable, never flattened to `0.sp` — Compose
+resolves unspecified tracking differently, and collapsing it would silently retrack the mid-ramp
+styles. Both catalog emitters publish it: `PreviewHarness.designSystemCatalog()` (headless tier)
+and `InspectorCatalog` (live `/inspect/design-system`), so the console renders one ramp whichever
+tier it read. `console-tabs.mjs` renders it as a real ramp — an "Ag" specimen SET in each rung's
+own size, weight and tracking, metrics alongside — not a name/value table. Font family is
+deliberately absent from the catalog: it resolves through `@Composable Font()` and is not
+derivable there, and a guessed name would be a fabrication.
 
-### Story canvas renders a 48dp component on a full device-height frame [P2, OPEN]
+### Story canvas renders a 48dp component on a full device-height frame [P2, FIXED]
 
 Cosmetic sibling of the black-on-black bug, and part of why "blank" was the natural reading: every
 story renders onto the full preview canvas, so a 48dp icon button occupies a sliver at the top and
-~95% of the card is empty background. **Fix:** crop the story capture to its content bounds, or
-render stories on a short frame sized to the component.
+~95% of the card is empty background. **Fixed:** `renderPng` crops component stories (`component.*` ids ONLY — a screen's
+frame is part of what is reviewed) to their content bounding box plus one `PaddingPage`
+gutter. The box is measured from the PIXELS, not the semantics tree, so decoration with no
+semantics (a ring, a shimmer, a divider) is kept; the background reference is the top-left
+pixel, which `StoryHost` paints in `Background` by construction. Two honest fallbacks, never a
+wrong crop: nothing differs from the background, or a degenerate box under 8 px a side → the
+full frame. Cropping is lossless — the kept pixels are the rendered pixels, and `tree.json` is
+untouched, so goldens and a11y math are unaffected. Proven on Fuelled: screens stay
+822x1782; Tag 136x198, Spinner 97x140, ProgressRing 272x272, AppBottomBar 822x178.
 
 ### `java_home` probe leaked its miss message into the MCP log [P3, FIXED]
 
@@ -752,8 +770,8 @@ and a planted ARCH-12 violation FAILing conformance):
   strike-through above (no metric separates the fixture pair from a legitimate pair;
   the call is the agent's rubric reasoning, ratified at the Components approval).
 - **SECOND WAVE (same day):** `StoryHost` content-colour FIXED (template + showcase, re-render
-  proven); `java_home` stderr leak FIXED; type-ramp catalog gap and story-canvas sizing OPEN
-  (see the second-wave section above); ARCH-12 strictness settled as a DECISION, not an issue.
+  proven); `java_home` stderr leak FIXED; type-ramp catalog gap and story-canvas sizing NOW ALSO
+  FIXED in the console-review wave below; ARCH-12 strictness settled as a DECISION, not an issue.
 - **CORRECTION:** [C6] is only half done. The stale-frame *bug* is fixed, but its actual ask — one
   atomic `capture_screen{live}` returning pixels + tree + hash FROM THE SAME FRAME — was never
   built; pixels and tree are still hand-juggled across two calls and trusted to be the same moment.
@@ -785,3 +803,53 @@ and a planted ARCH-12 violation FAILing conformance):
 
 This log is append-only during dogfooding runs; promote items into real tasks/issues when
 scheduled.
+
+### CONSOLE REVIEW WAVE — section-by-section, before the two pending approvals
+
+Walked all twelve console sections against the live Fuelled tree before signing anything. Three
+things were wrong, all of the same shape: **the console could not show part of what the human is
+asked to approve.** Fixing them was the precondition for approving, not a follow-up.
+
+1. **Architecture §2 Constraints had no mirror at all [P1, FIXED].** `getArchitectureDoc()`
+   parsed §1, §3–§8 and silently skipped §2 — so the frozen version set, the one constraint
+   §2 tags `[advisory — no version-drift gate ships yet]`, was invisible in the surface where
+   `architecture` gets signed. Now rendered in the three-in-one form: §2's authored bullets, the
+   same five libraries read live from `gradle/libs.versions.toml`, the version §2's own prose
+   claims for each, and a verdict per row — plus the KSP `<kotlin>-<ksp>` invariant checked
+   against the LIVE values, never against the prose. The console is now the eyes that advisory
+   rule does not have. Proven on Fuelled: 5/5 `pinned as documented`, KSP invariant holds
+   (`2.2.20-2.0.4` carries Kotlin `2.2.20`).
+2. **Type ramp** — see the second-wave entry above, now FIXED.
+3. **Story canvas** — see the second-wave entry above, now FIXED.
+
+**Found while gating, not while reviewing: the preview service would adopt another project's
+daemon [P1, FIXED].** The suite failed once at 703/704 on a version-count assertion, passed on
+re-run — a flaky gate, which in this product is the cardinal sin. Root cause was not the test:
+`ensureDaemon()` probed the machine-global daemon port, found the daemon belonging to a DIFFERENT
+checkout (the showcase console, running for this very review), and adopted it — meaning a preview
+service can render another app's screens under this project's name. `/health` now reports
+`previewsDir` and adoption refuses on mismatch (a daemon that predates the field is reused, with
+the log saying plainly that the project went unverified). The test that flaked now pins
+`hot: false`, since it drives `renderCycle()` by hand and must count only the cycles it asked for;
+a new regression test asserts a foreign daemon is refused, receives zero renders, and never
+substitutes its screens. Three consecutive green runs of that file.
+
+### The receipt's own `commit.dirty` corrupted its first path [P1, FIXED]
+
+Caught by reading the fresh PASS receipt before committing it, not by any gate. Every entry in
+`commit.dirty` was a real path except the first, which read
+`omposeApp/src/androidDebug/.../InspectorCatalog.kt` — a file that does not exist. Cause:
+`commit.dirty` was built from `tryGit("status --porcelain")`, and `tryGit` `.trim()`s the WHOLE
+blob. An unstaged modification is `" M path"`, so the trim ate the first line's leading space and
+the fixed `slice(3)` then swallowed that path's first character. Always the first entry, always
+silently, in every receipt this project has ever written whose first porcelain line was an
+unstaged modification. **Fixed:** a `tryGitLines()` helper that strips only trailing newlines,
+used for the porcelain parse; `tryGit` keeps its trim for the single-line callers (`rev-parse`)
+that need it. Regression test in `test/harness-surfaces.test.mjs` builds a real git repo whose
+first porcelain line leads with a space and asserts both halves — that the old trimmed parse
+loses a character, and that the shipped parse does not.
+
+Worth naming for what it is: the receipt is this product's core artifact, the thing every other
+claim rests on, and it had been quietly misnaming a file in its own audit record. It survived
+because nothing reads `commit.dirty` mechanically — `inputs.hash` is what the gates check. An
+unread field is exactly where this kind of rot lives.

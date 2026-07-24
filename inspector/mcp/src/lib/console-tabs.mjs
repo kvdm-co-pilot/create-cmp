@@ -261,6 +261,68 @@ ${rows}
  * @param {{available: boolean, source?: "previews"|"live", catalog?: {colors?: object, dimens?: object, typography?: object}}} ds
  * @param {{usage?: object, variants?: object, artifactStatus?: string}} [meta]
  */
+/**
+ * The type ramp, shown the way a designer reads one: a specimen line SET in
+ * each rung's real size, weight and tracking, with the numbers beside it —
+ * not a table of numbers alone. The catalog publishes the ramp as an ordered
+ * array (PreviewHarness's `typography` block, lifted from the same data the
+ * Typography factory builds its styles from), which is why order is preserved
+ * rather than sorted: display → headline → title → body → label IS the ramp.
+ *
+ * A flat `{name: value}` object is still accepted — an older catalog that
+ * exported typography some other way renders as plain rows rather than
+ * nothing. A catalog with no typography at all keeps the honest absence line;
+ * this never invents a specimen.
+ * @param {Array<object>|object|undefined} typography
+ */
+function typeRampHtml(typography) {
+  const absent = `  <p class="empty-inline">Not derivable statically &mdash; the design-system catalog carries no typography tokens</p>`;
+  if (!typography) return absent;
+  if (!Array.isArray(typography)) {
+    const entries = Object.entries(typography);
+    if (!entries.length) return absent;
+    return dimenSubTableHtml(entries.map(([name, value]) => ({ name, value: String(value) })));
+  }
+  if (!typography.length) return absent;
+  const px = (v) => {
+    const n = Number.parseFloat(String(v));
+    return Number.isFinite(n) ? n : null;
+  };
+  const rows = typography
+    .map((spec) => {
+      const size = px(spec.size);
+      const weight = Number.isFinite(Number(spec.weight)) ? Number(spec.weight) : 400;
+      const tracking = spec.tracking == null ? null : px(spec.tracking);
+      const style = [
+        size == null ? null : `font-size:${size}px`,
+        `font-weight:${weight}`,
+        px(spec.lineHeight) == null ? null : `line-height:${px(spec.lineHeight)}px`,
+        tracking == null ? null : `letter-spacing:${tracking}px`,
+      ]
+        .filter(Boolean)
+        .join(";");
+      const numbers = [
+        spec.size ? `${spec.size}` : null,
+        `w${weight}`,
+        spec.lineHeight ? `lh ${spec.lineHeight}` : null,
+        spec.tracking == null ? "tracking unset" : `tracking ${spec.tracking}`,
+      ]
+        .filter(Boolean)
+        .join(" &middot; ");
+      return `      <tr>
+        <td class="ramp-name"><code>${esc(spec.name ?? "—")}</code></td>
+        <td class="ramp-specimen"><span style="${style}">Ag</span></td>
+        <td class="ramp-numbers">${numbers}</td>
+      </tr>`;
+    })
+    .join("\n");
+  return `  <table class="doc-table type-ramp">
+    <tbody>
+${rows}
+    </tbody>
+  </table>`;
+}
+
 export function designLanguageBodyHtml(ds, meta = {}) {
   const genesisMode = meta.artifactStatus === "unreviewed" || meta.artifactStatus === "reopened";
   const candidatesSection = genesisMode
@@ -292,13 +354,7 @@ export function designLanguageBodyHtml(ds, meta = {}) {
     if (other.length) dimenSections.push(`  <h3>Other dimensions</h3>\n${dimenSubTableHtml(other)}`);
   }
 
-  // The catalog contract carries colors + dimens today; typography is stated
-  // absent in the standardized form rather than faked from theme code the
-  // catalog doesn't export. A future catalog that DOES carry typography
-  // renders its entries as derived values, nothing more.
-  const typeRamp = typography && Object.keys(typography).length
-    ? dimenSubTableHtml(Object.entries(typography).map(([name, value]) => ({ name, value: String(value) })))
-    : `  <p class="empty-inline">Not derivable statically &mdash; the design-system catalog carries no typography tokens</p>`;
+  const typeRamp = typeRampHtml(typography);
 
   return `  <p class="meta">source: ${esc(sourceLabel)}</p>
   <h3>Color tokens</h3>
@@ -1122,6 +1178,53 @@ function systemContextHtml(sc) {
   return `${intro}${diagram}${table}`;
 }
 
+/**
+ * §2 as spec + mirror at once. The authored bullets are the constraint; the
+ * version-set table under them is the SAME set read live from
+ * `gradle/libs.versions.toml`, with the version §2's prose claims beside it.
+ * A row where those two disagree is drift the doc cannot see about itself —
+ * §2 tags its own version rule `[advisory — no version-drift gate ships
+ * yet]`, so this table is the eyes that rule does not have. The KSP
+ * `<kotlin>-<ksp>` invariant §2 states in bold is checked against the live
+ * values, never against the prose.
+ * @param {object} versionSet architecture.mjs's doc.versionSet
+ */
+function versionSetHtml(versionSet) {
+  if (!versionSet || !versionSet.available) {
+    return `<p class="empty-inline">${esc((versionSet && versionSet.reason) || "gradle/libs.versions.toml not readable")}</p>`;
+  }
+  const badge = (status) => {
+    if (status === "match") return `<span class="glyph glyph-signed">&#10003;</span> pinned as documented`;
+    if (status === "drift") return `<span class="glyph glyph-drift">&#9888;</span> drift — the doc says otherwise`;
+    if (status === "undocumented") return `<span class="glyph glyph-unsigned">&#9675;</span> not named in §2`;
+    return `<span class="glyph glyph-drift">&#9888;</span> missing from the catalog`;
+  };
+  const rows = versionSet.rows
+    .map(
+      (r) => `      <tr>
+        <td>${esc(r.library)}</td>
+        <td><code>${esc(r.catalogVersion ?? "—")}</code></td>
+        <td><code>${esc(r.docVersion ?? "—")}</code></td>
+        <td>${badge(r.status)}</td>
+      </tr>`,
+    )
+    .join("\n");
+  const inv = versionSet.kspInvariant;
+  const invLine = inv.available
+    ? inv.ok
+      ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> KSP is <code>&lt;kotlin&gt;-&lt;ksp&gt;</code> — <code>${esc(inv.ksp)}</code> carries Kotlin <code>${esc(inv.kotlin)}</code>.</p>`
+      : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> KSP <code>${esc(inv.ksp)}</code> is not prefixed by Kotlin <code>${esc(inv.kotlin)}</code> — Room's KMP native compilation breaks on this.</p>`
+    : `<p class="empty-inline">${esc(inv.reason)}</p>`;
+  return `  <h4>The frozen set, as pinned</h4>
+  <table class="doc-table">
+    <thead><tr><th>Library</th><th>${esc("gradle/libs.versions.toml")}</th><th>§2 says</th><th>Verdict</th></tr></thead>
+    <tbody>
+${rows}
+    </tbody>
+  </table>
+${invLine}`;
+}
+
 function platformViewHtml(pv) {
   if (!pv || !pv.available) {
     return `<p class="empty-inline">${esc((pv && pv.reason) || "docs/ARCHITECTURE.md not found")}</p>`;
@@ -1380,6 +1483,11 @@ export function architectureTabHtml(data, meta = {}) {
   return `  <section class="arch-section" id="arch-purpose">
     <h3>1. Purpose &amp; quality goals</h3>
 ${mdTableHtml(doc && doc.qualityAttributes)}
+  </section>
+  <section class="arch-section" id="arch-constraints">
+    <h3>2. Constraints</h3>
+${docSectionProseHtml(doc && doc.constraints)}
+${versionSetHtml(doc && doc.versionSet)}
   </section>
   <section class="arch-section" id="arch-context">
     <h3>3. System context</h3>

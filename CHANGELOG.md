@@ -11,6 +11,36 @@ The first full dogfood run (the Fuelled showcase, rebuilt end-to-end on 0.9.0 �
 
 ### Fixed
 
+- **The receipt no longer corrupts the first path in `commit.dirty` (P1).** `commit.dirty` was
+  parsed from `tryGit("status --porcelain")`, whose `.trim()` eats the leading space of an
+  unstaged-modification line (`" M path"`); the fixed `slice(3)` then swallowed that path's first
+  character, so every receipt whose first dirty line was an unstaged modification named a file
+  that does not exist. A `tryGitLines()` helper strips only trailing newlines; `tryGit` keeps its
+  trim for the single-line callers that need it.
+- **The preview service no longer adopts another project's daemon (P1).** The daemon port is
+  machine-global: with two checkouts previewed at once, `ensureDaemon()` found the *other*
+  project's healthy daemon and rendered through it — serving another app's screens under this
+  project's name. `PreviewDaemon`'s `/health` now reports `previewsDir` and adoption refuses on
+  mismatch (a daemon predating the field is still reused, with the log saying plainly that the
+  project went unverified). Found because it made a preview-service test flaky, which in a
+  verification harness is the cardinal sin.
+- **Architecture §2 Constraints had no console mirror (P1).** The doc parser skipped §2
+  entirely, so the frozen version set — the constraint §2 itself tags "no version-drift gate
+  ships yet" — was invisible in the surface where `architecture` gets approved. Now rendered
+  as spec + mirror at once: §2's authored bullets, the five lockstep libraries read live from
+  `gradle/libs.versions.toml`, the version §2's prose claims for each, a verdict per row, and
+  the KSP `<kotlin>-<ksp>` invariant checked against the live values rather than the prose.
+- **The type ramp reaches the design-system catalog (P1).** `Typography.kt` now holds the ramp
+  as plain data and the `@Composable` factory builds its `TextStyle`s from that list, so the
+  published ramp and the rendered ramp are the same numbers by construction (nullable
+  `tracking` is preserved, never flattened to `0.sp`). Both emitters publish it —
+  `designSystemCatalog()` and `InspectorCatalog` — and the console renders a real ramp:
+  a specimen set in each rung's own size, weight and tracking, metrics alongside.
+- **Component stories are framed to the component (P2).** Story renders (`component.*` only —
+  a screen's frame is part of what is reviewed) crop to their content bounding box plus one
+  `PaddingPage` gutter, measured from the pixels so unsemantic decoration is kept. A 48 dp
+  button no longer renders as a sliver on a full device-height frame. Lossless, and
+  `tree.json` is untouched, so goldens and a11y math are unaffected.
 - **Live screenshots read the composited frame (P1).** `/inspect/screenshot` now captures via
   `PixelCopy` (API 26+, Activity-window-guarded; dialog roots and pre-26 fall back to the
   software draw) — a software `View.draw` replays stale Compose layer recordings, which served

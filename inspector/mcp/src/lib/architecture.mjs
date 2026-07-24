@@ -413,11 +413,92 @@ function proseBeforeFirstBlock(body) {
 }
 
 const DOC_REL = "docs/ARCHITECTURE.md";
+const VERSIONS_REL = "gradle/libs.versions.toml";
+
+// §2's frozen set, as a drift surface. The doc's own words are the authored
+// form; `gradle/libs.versions.toml` is the derived truth; the delta between
+// them IS the drift — which is exactly the gate §2 admits does not ship yet
+// ("[advisory — no version-drift gate ships yet]"). The five keys below are
+// the lockstep set §2 names by hand; nothing here invents a sixth.
+const LOCKSTEP = [
+  { label: "Kotlin", tomlKey: "kotlin", docLabel: "Kotlin" },
+  { label: "KSP", tomlKey: "ksp", docLabel: "KSP" },
+  { label: "Compose Multiplatform", tomlKey: "compose-multiplatform", docLabel: "Compose Multiplatform" },
+  { label: "Room", tomlKey: "room", docLabel: "Room" },
+  { label: "AGP", tomlKey: "agp", docLabel: "AGP" },
+];
+
+/** `[versions]` entries from gradle/libs.versions.toml — the live, declared set. */
+function parseVersionCatalog(root) {
+  let text;
+  try {
+    text = fs.readFileSync(path.join(root, VERSIONS_REL), "utf8");
+  } catch (err) {
+    return { available: false, reason: err && err.message ? err.message : String(err) };
+  }
+  const versions = {};
+  let inVersions = false;
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (/^\[.+\]$/.test(t)) {
+      inVersions = t === "[versions]";
+      continue;
+    }
+    if (!inVersions || t.startsWith("#") || !t) continue;
+    const m = t.match(/^([A-Za-z0-9_-]+)\s*=\s*"([^"]*)"/);
+    if (m) versions[m[1]] = m[2];
+  }
+  return { available: true, file: VERSIONS_REL, versions };
+}
+
+/**
+ * §2's version set as spec + mirror at once: the version each library is
+ * pinned to in the catalog, the version §2's prose CLAIMS it is pinned to,
+ * and the verdict. Plus the one invariant §2 states in bold — KSP must be
+ * `<kotlin>-<ksp>` — checked against the live values, not the prose.
+ *
+ * A library the prose never names is reported `docVersion: null` with status
+ * `undocumented`: honest absence, never a silent pass.
+ */
+function deriveVersionSet(root, constraintsBody) {
+  const catalog = parseVersionCatalog(root);
+  if (!catalog.available) return { available: false, reason: catalog.reason };
+  const prose = constraintsBody || "";
+  const rows = LOCKSTEP.map(({ label, tomlKey, docLabel }) => {
+    const live = catalog.versions[tomlKey] ?? null;
+    // "Kotlin `2.2.20`" / "KSP `2.2.20-2.0.4`" — the doc's own inline-code form.
+    const escaped = docLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = prose.match(new RegExp(`${escaped}\\s*\`([^\`]+)\``));
+    const docVersion = m ? m[1] : null;
+    let status;
+    if (!live) status = "missing-from-catalog";
+    else if (!docVersion) status = "undocumented";
+    else status = docVersion === live ? "match" : "drift";
+    return { library: label, tomlKey, catalogVersion: live, docVersion, status };
+  });
+  const kotlin = catalog.versions.kotlin ?? null;
+  const ksp = catalog.versions.ksp ?? null;
+  const kspInvariant =
+    kotlin && ksp
+      ? { available: true, ok: ksp.startsWith(`${kotlin}-`), kotlin, ksp }
+      : { available: false, reason: "kotlin or ksp missing from [versions]" };
+  return {
+    available: true,
+    file: VERSIONS_REL,
+    rows,
+    kspInvariant,
+    drifted: rows.filter((r) => r.status === "drift").length,
+  };
+}
 
 /**
  * docs/ARCHITECTURE.md's own structure, parsed section by section — the
  * "authored form" the Architecture tab mirrors:
  *   - qualityAttributes: §1's Quality/Scenario/Backing table.
+ *   - constraints / versionSet: §2's authored prose, plus the frozen version
+ *     set read live from gradle/libs.versions.toml and diffed against the
+ *     versions §2's own words claim — the drift surface for the gate §2
+ *     itself admits does not ship yet.
  *   - systemContext: §3's intro prose + its Integration table.
  *   - platformView: §4's source-set table (+ the expect/actual table, if a
  *     second table is present in that section).
@@ -443,6 +524,7 @@ export function getArchitectureDoc(root) {
   const byNumber = (n) => sections.find((s) => new RegExp(`^${n}\\.`).test(s.heading));
 
   const purpose = byNumber(1);
+  const constraints = byNumber(2);
   const context = byNumber(3);
   const platform = byNumber(4);
   const runtime = byNumber(6);
@@ -460,6 +542,10 @@ export function getArchitectureDoc(root) {
     qualityAttributes: purposeTables[0]
       ? { available: true, headers: purposeTables[0].headers, rows: purposeTables[0].rows }
       : { available: false, reason: `no table found under "${purpose ? purpose.heading : "1. Purpose & quality goals"}"` },
+    constraints: constraints
+      ? { available: true, heading: constraints.heading, body: constraints.body.trim() }
+      : { available: false, reason: `no "2. Constraints" section found` },
+    versionSet: deriveVersionSet(root, constraints ? constraints.body : ""),
     systemContext: context
       ? {
           available: true,

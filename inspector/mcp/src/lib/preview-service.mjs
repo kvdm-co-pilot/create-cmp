@@ -1454,13 +1454,31 @@ export function createPreviewService(opts) {
     if (typeof r.reloadHooked === "boolean") daemonReloadHooked = r.reloadHooked;
   }
 
+  /**
+   * Healthy AND ours. The daemon port is machine-global: a second checkout
+   * previewed at the same time answers /health here just as convincingly, and
+   * adopting it would render THAT project's screens under this project's name.
+   * `previewsDir` (PreviewDaemon.kt's /health) is the identity check.
+   *
+   * A daemon that doesn't report `previewsDir` predates that field; it is
+   * adopted, because refusing would break reuse for every already-running
+   * daemon, but the log says plainly that the project went unverified.
+   */
   async function daemonHealthy() {
+    let health;
     try {
-      noteDaemonReload(await daemonFetch("/health", 2000));
-      return true;
+      health = await daemonFetch("/health", 2000);
     } catch {
       return false;
     }
+    const theirs = health && typeof health.previewsDir === "string" ? path.resolve(health.previewsDir) : null;
+    if (theirs && theirs !== path.resolve(previewsDir)) {
+      log(`a daemon is running on ${daemonUrl} but serves ${theirs} — not this project; staying on the gradle path`);
+      return false;
+    }
+    if (!theirs) log(`daemon on ${daemonUrl} reports no previewsDir (older build) — reusing it unverified`);
+    noteDaemonReload(health);
+    return true;
   }
 
   /**

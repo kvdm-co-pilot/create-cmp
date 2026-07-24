@@ -81,6 +81,22 @@ function tryGit(cmd) {
   }
 }
 
+/**
+ * Line-oriented git output, WITHOUT [tryGit]'s trim. `git status --porcelain`
+ * has significant leading whitespace: an unstaged modification is `" M path"`,
+ * so trimming the whole blob eats the first line's leading space — and a fixed
+ * `slice(3)` then swallows that path's first character. The receipt would name
+ * a file that does not exist. Only trailing newlines are dropped here.
+ */
+function tryGitLines(cmd) {
+  try {
+    const out = execSync(`git ${cmd}`, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    return out.replace(/\n+$/, "").split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 function junitSummary(dir) {
   if (!fs.existsSync(dir)) return null;
   let tests = 0, failures = 0, errors = 0, skipped = 0;
@@ -594,7 +610,7 @@ const receipt = {
   verdict,
   commit: {
     sha: tryGit("rev-parse HEAD"),
-    dirty: (tryGit("status --porcelain") ?? "").split("\n").filter(Boolean).map((l) => l.slice(3)).sort(),
+    dirty: tryGitLines("status --porcelain").map((l) => l.slice(3)).sort(),
   },
   inputs: {
     hash: inputs.hash,

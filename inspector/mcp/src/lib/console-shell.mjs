@@ -454,6 +454,12 @@ export const SHELL_CSS = `
   .doc-table { width: 100%; border-collapse: collapse; font-size: var(--fs-meta); margin: 4px 0 12px; }
   .doc-table th, .doc-table td { padding: 7px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
   .doc-table th { color: var(--muted); font-weight: 600; }
+  /* Type ramp: the specimen column is set in the rung's OWN size/weight/tracking,
+     so the row heights are deliberately uneven — that unevenness is the ramp. */
+  .type-ramp td { vertical-align: middle; }
+  .type-ramp .ramp-name { width: 16ch; white-space: nowrap; }
+  .type-ramp .ramp-specimen { color: var(--ink); overflow: hidden; }
+  .type-ramp .ramp-numbers { width: 34ch; color: var(--muted); text-align: right; white-space: nowrap; }
   .doc-prose { font-size: var(--fs-body); max-width: 75ch; }
   .doc-prose p { margin: 0 0 10px; }
   .doc-prose h4, .doc-prose h5 { margin: 14px 0 6px; font-size: var(--fs-meta); color: var(--ink); }

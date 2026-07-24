@@ -137,6 +137,50 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.match(receiptCheck, /\.\/lib\/inputs-hash\.mjs/);
     });
 
+    await t.test("receipt's commit.dirty keeps whole paths — porcelain's leading space is not trimmed away", async () => {
+      // Regression guard for a corrupted audit record: commit.dirty was built from
+      // tryGit("status --porcelain"), and tryGit trims the WHOLE blob. An unstaged
+      // modification is " M path", so the trim ate the first line's leading space and
+      // the fixed slice(3) then swallowed that path's first character — the receipt
+      // named "omposeApp/.../InspectorCatalog.kt", a file that does not exist. Always
+      // the first entry, always silently. Exercised for real: a git repo whose first
+      // porcelain line is an unstaged modification.
+      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      const dirtyLine = verify.split("\n").find((l) => l.includes("dirty:"));
+      assert.ok(dirtyLine, "the receipt still records commit.dirty");
+      assert.doesNotMatch(
+        dirtyLine,
+        /tryGit\("status --porcelain"\)/,
+        `commit.dirty must not read the trimmed blob (got: ${dirtyLine.trim()})`,
+      );
+
+      const repo = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-dirty-"));
+      try {
+        const { execSync } = await import("node:child_process");
+        const git = (cmd) => execSync(`git ${cmd}`, { cwd: repo, stdio: ["ignore", "pipe", "ignore"] });
+        git("init -q");
+        git("config user.email t@t.t");
+        git("config user.name t");
+        fs.writeFileSync(path.join(repo, "aaa-first.txt"), "one\n");
+        git("add -A");
+        git("commit -qm seed");
+        fs.writeFileSync(path.join(repo, "aaa-first.txt"), "two\n"); // unstaged -> " M aaa-first.txt"
+
+        const raw = execSync("git status --porcelain", { cwd: repo, encoding: "utf8" });
+        assert.match(raw, /^ M aaa-first\.txt/, "the first porcelain line really does lead with a space");
+
+        // The OLD shape, reproduced here so the bug it hid stays visible.
+        const trimmed = raw.trim().split("\n").filter(Boolean).map((l) => l.slice(3));
+        assert.deepEqual(trimmed, ["aa-first.txt"], "the trimmed parse loses a character (the bug)");
+
+        // The shipped shape.
+        const kept = raw.replace(/\n+$/, "").split("\n").filter(Boolean).map((l) => l.slice(3));
+        assert.deepEqual(kept, ["aaa-first.txt"], "the untrimmed parse keeps the whole path");
+      } finally {
+        fs.rmSync(repo, { recursive: true, force: true });
+      }
+    });
+
     await t.test("evidence attests EXECUTION: lane forces --rerun, build script declares golden/UPDATE_GOLDEN as test inputs", () => {
       // Regression guard for the cache-poisoning bug: Gradle's build cache replayed a PASS
       // from a different tree state (byte-identical re-scaffold; golden baselines and the
