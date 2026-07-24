@@ -63,7 +63,13 @@ export function resolveJavaHome({
 
 function defaultMacJavaHome() {
   try {
-    return execFileSync("/usr/libexec/java_home", { encoding: "utf8", timeout: 5000 }).trim();
+    // stderr ignored: with no JDK registered, java_home prints "Unable to locate a
+    // Java Runtime" — a probe miss, not an error worth surfacing in the MCP log.
+    return execFileSync("/usr/libexec/java_home", {
+      encoding: "utf8",
+      timeout: 5000,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
   } catch {
     return null;
   }
