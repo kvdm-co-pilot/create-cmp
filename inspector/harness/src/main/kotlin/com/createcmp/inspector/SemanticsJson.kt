@@ -48,6 +48,7 @@ object SemanticsJson {
         put("clickable", JsonPrimitive(node.isClickable()))
         put("disabled", JsonPrimitive(node.isDisabled()))
         put("bounds", node.boundsJson())
+        put("size", node.sizeJson())
         put("designToken", node.designTokenJson())
         put("children", buildJsonArray {
             node.children.forEach { add(nodeToJson(it)) }
@@ -75,6 +76,12 @@ object SemanticsJson {
 
     private fun SemanticsNode.isDisabled(): Boolean =
         config.contains(SemanticsProperties.Disabled)
+
+    /** Full composed (unclipped) size — additive contract field; `bounds` is the clipped slice. */
+    private fun SemanticsNode.sizeJson(): JsonObject = buildJsonObject {
+        put("width", JsonPrimitive(size.width))
+        put("height", JsonPrimitive(size.height))
+    }
 
     private fun SemanticsNode.boundsJson(): JsonObject {
         val rect = boundsInRoot

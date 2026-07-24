@@ -194,3 +194,57 @@ test("a clickable node with low contrast fails its pass too (not just the contra
   assert.equal(violations.filter((v) => v.testTag === "clickable_low_contrast" && v.rule === "low-contrast").length, 1);
   assert.equal(passCount, 0, "the clickable node has a violation, so it must not count as a pass");
 });
+
+// ---------------------------------------------------------------------------
+// scroll-clipped touch targets — DOGFOODING-FINDINGS "a11y audit correctness".
+// `bounds` is the visible slice after ancestor clipping; the additive `size`
+// field is the full composed size, and touch targets are judged on it. The
+// numbers below are the real false positive: a Fuelled Foods row measured
+// 371x36 at the 891px viewport fold while composing 371x88.
+// ---------------------------------------------------------------------------
+
+const clipNode = (over = {}) => ({
+  testTag: null,
+  text: "Chicken breast",
+  contentDescription: null,
+  clickable: true,
+  bounds: { x: 20, y: 855, width: 371, height: 36 },
+  designToken: null,
+  children: [],
+  ...over,
+});
+const clipTree = (children) => ({ schemaVersion: 1, root: { ...clipNode({ text: null, clickable: false }), bounds: { x: 0, y: 0, width: 411, height: 891 }, children } });
+
+test("a fold-clipped row (bounds 371x36, size 371x88) is NOT a touch-target violation", () => {
+  const { violations, passCount } = auditA11y(
+    clipTree([clipNode({ testTag: "foods_item_7", size: { width: 371, height: 88 } })])
+  );
+  assert.deepEqual(violations, [], "clipping is a scroll-position artifact, not an a11y defect");
+  assert.equal(passCount, 1);
+});
+
+test("a genuinely small target stays flagged — size confirms what bounds report", () => {
+  const { violations } = auditA11y(
+    clipTree([clipNode({ testTag: "tiny_icon", bounds: { x: 0, y: 0, width: 40, height: 40 }, size: { width: 40, height: 40 } })])
+  );
+  const hits = violations.filter((v) => v.testTag === "tiny_icon" && v.rule === "touch-target-too-small");
+  assert.equal(hits.length, 1);
+  assert.match(hits[0].detail, /40x40px/);
+});
+
+test("old trees without `size` are judged on bounds, as before (back-compat)", () => {
+  const { violations } = auditA11y(
+    clipTree([clipNode({ testTag: "legacy_clipped_row" })]) // no size field: 371x36 flags
+  );
+  assert.equal(
+    violations.filter((v) => v.testTag === "legacy_clipped_row" && v.rule === "touch-target-too-small").length,
+    1
+  );
+});
+
+test("a fully scrolled-out row (bounds height 0, real composed size) is not flagged", () => {
+  const { violations } = auditA11y(
+    clipTree([clipNode({ testTag: "offscreen_row", bounds: { x: 20, y: 891, width: 371, height: 0 }, size: { width: 371, height: 88 } })])
+  );
+  assert.deepEqual(violations, []);
+});
