@@ -281,6 +281,39 @@ of design values — no hardcoded `Color(0x…)` literals outside it. The regist
 components own the token call sites (declared once per component, correct everywhere it's
 used), so a screen almost never touches a token directly.
 
+### Component vocabulary `[governed — registry membership is judgment]`
+
+`presentation/components/` is the design-system registry — the shared vocabulary screens compose
+from. It is **distilled from real screens, not authored before them**: build the screens, then
+promote the primitives that pass the bar. What earns a place is **judgment, not a reuse count** —
+govern a composable when it (1) encodes a *design-system decision* (how the product presents
+something — a progress ring, a metric tile, a chip) rather than *how one screen arranges its data*;
+(2) is a *stable, obvious* shape, not a speculative one; (3) would cause visible inconsistency if
+each screen reinvented it; or (4) centralizes a cross-cutting concern worth enforcing once (a11y,
+tokens — as `AppButton` does the 48 dp target). Keep it **feature-local** when it is a one-screen
+composition, carries feature/domain logic, or genuinely differs from its neighbors. Reuse count is
+a *signal* (≥2 real uses is strong evidence), never the rule — a single-use stable primitive is
+still a component; a five-times-duplicated set of *different* shapes is not.
+
+Two guardrails are first-class:
+
+- **Do not force reuse.** Cramming genuinely-different composables into one over-parameterized
+  component (leading slot + trailing slot + toggle + chevron + value…) is a *worse* antipattern
+  than duplication — god-components with leaky parameter lists and hidden coupling. "Both are rows"
+  is not a reason to unify; only near-identical shape **and** behavior is. **When in doubt, keep
+  them separate.**
+- **A domain-named component is a smell.** A composable named for a domain concept (`MacroTag`) is
+  a feature decision in design-system clothes — generalize it to a real primitive (`Tag` = label +
+  value + colour) or keep it local. Never admit domain vocabulary to the registry. Brand marks
+  (`presentation/brand/`) are their own category, governed separately.
+
+Any conformance gate here flags **only** true near-identical duplication or re-invention of an
+existing registry component — never "you have two rows, unify them" (that would push toward the
+antipattern above), and it never *forces* a promotion. Division of labor: the **agent makes the
+rubric calls** — classifies each screen composable, promotes or keeps local, with reasoning — and
+the **human governs at the Components approval**, which is exactly what that gate exists for.
+Nothing the agent promotes is law until the approval signs it.
+
 ### Automation reachability `[enforced: ARCH-04, ARCH-11, SHELL-04]`
 
 Every screen root and interactive element is testTag-addressable
