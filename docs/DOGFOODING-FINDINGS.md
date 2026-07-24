@@ -853,3 +853,19 @@ Worth naming for what it is: the receipt is this product's core artifact, the th
 claim rests on, and it had been quietly misnaming a file in its own audit record. It survived
 because nothing reads `commit.dirty` mechanically — `inputs.hash` is what the gates check. An
 unread field is exactly where this kind of rot lives.
+
+### CI on `main` had been red for days — the local suite was never the CI gate [P1, FIXED]
+
+Surfaced by pushing. `main`'s CI has failed on every run since at least 2026-07-20 — five
+consecutive reds, including the `0.9.0` release commit. Cause:
+`inspector/mcp` is a SEPARATE npm package, not a workspace, so the root `npm install` never
+reaches it; `node --test` from the root discovers `inspector/mcp/test/*.test.mjs` regardless, and
+`server-tools.test.mjs` dies on `ERR_MODULE_NOT_FOUND` for `@modelcontextprotocol/sdk`.
+
+The uncomfortable part is not the missing step, it is what it meant: **the local suite that
+reports 706/706 is not the gate CI runs.** It passes locally only because those deps happen to be
+installed on this machine. That is the false-green this whole product exists to prevent, sitting
+in its own repo, unnoticed through a release. Reproduced deliberately — a fresh `--depth 1` clone
+plus a root-only install gives CI's exact 703/1 with the same error; adding
+`npm install --prefix inspector/mcp` in the same clone gives 706/706. **Fixed:** that install step
+in `.github/workflows/ci.yml`, with the reasoning in a comment so nobody deletes it as redundant.

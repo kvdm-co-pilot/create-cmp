@@ -11,6 +11,10 @@ The first full dogfood run (the Fuelled showcase, rebuilt end-to-end on 0.9.0 â€
 
 ### Fixed
 
+- **CI installs `inspector/mcp`'s dependencies (P1).** `inspector/mcp` is a separate package, not
+  a workspace, so the root `npm install` never reached it while `node --test` still discovered its
+  tests â€” `server-tools.test.mjs` died on `ERR_MODULE_NOT_FOUND` and `main` had been red since
+  2026-07-20, through the 0.9.0 release. It also meant the local suite was not the gate CI ran.
 - **The receipt no longer corrupts the first path in `commit.dirty` (P1).** `commit.dirty` was
   parsed from `tryGit("status --porcelain")`, whose `.trim()` eats the leading space of an
   unstaged-modification line (`" M path"`); the fixed `slice(3)` then swallowed that path's first

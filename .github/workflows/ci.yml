@@ -27,6 +27,15 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      # inspector/mcp is a SEPARATE package, not a workspace — a root install
+      # does not reach it. `node --test` from the root discovers its test files
+      # regardless, so without this step server-tools.test.mjs dies on
+      # ERR_MODULE_NOT_FOUND for @modelcontextprotocol/sdk and the whole run is
+      # red. It also means a local suite that passes (because those deps are
+      # installed on the dev machine) is NOT the gate CI runs — the exact
+      # false-green this project exists to prevent.
+      - name: Install MCP server dependencies
+        run: npm install --no-audit --no-fund --prefix inspector/mcp
       - name: Run tests
         run: node --test
 
