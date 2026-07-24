@@ -4,7 +4,9 @@ A living log of create-cmp **harness / plugin** defects and improvements surface
 real apps on top of it. Each item: what's wrong, the evidence, the proposed fix, and status.
 This is the fix backlog for the engine/template/console — **not** showcase-app work.
 
-> Source run: **Fuelled** showcase rebuild (genesis walk on create-cmp-cli@0.9.0), 2026-07-23.
+> Source run: **Fuelled** showcase rebuilt end-to-end on create-cmp-cli@0.9.0, 2026-07-23/24 —
+> genesis walk → Room-backed exemplar → three more features (all spec-first) → on-device e2e →
+> live walkthrough. Final state committed at showcase `87d072a` (9/9 approved, lane green on-device).
 > The showcase is the flagship demo; every rough edge it hits, a real user hits first.
 
 Severity: **P1** = blocks/embarrasses a new user out of the box · **P2** = real friction, workaround exists · **P3** = polish.
@@ -483,22 +485,46 @@ rules on them.
 4. The console surfaces any composable used in a screen but absent from the registry.
 5. `node qa/verify.mjs` is green on a fresh scaffold after a distillation pass.
 
+**Worked example from tonight's Foods/Profile audit — the gate's own test fixtures:**
+- **Positive (gate SHOULD flag):** Profile's `GoalRow` and `SettingsRow` were near-identical —
+  `Row(fillMaxWidth, clickable, padding(h18,v16)) { label weight(1) → [optional value] → chevron }`;
+  `SettingsRow` is literally `GoalRow` with `value = null`. This is the near-identical-shape-AND-
+  behaviour duplication clause (a). **But the resolution is NOT registry promotion** — only Profile
+  uses it, so the right move is a *local* unify into one `DisclosureRow(label, value: String? = null,
+  onClick)`, promoted to the registry only if a second screen later needs it. The example proves the
+  gate flags duplication *without* implying "promote."
+- **Negative (gate must NOT flag):** the feature rows across screens — `FoodRow`, `SupplementRow`,
+  Today's meal/entry rows — are genuinely *different* shapes and behaviours; the do-not-force
+  guardrail keeps them separate and local. A gate that flagged these would be the bug the section
+  warns about.
+Wire both as fixtures: the `GoalRow`/`SettingsRow` pair must FAIL the duplication check; the varied
+feature rows must PASS it.
+
 ## Reference implementation & acceptance (for the flow-fix / template-uplift task)
 
-**Lift-from source: the Fuelled showcase** at `/Users/test/dev/create-cmp-showcase`. Relevant
-commits: `ada72ad` (bare 0.9.0 scaffold) → `6b5cdb3` (premium UI) → `fb5e1d9` (conformance +
-green verify lane). Diff `ada72ad..HEAD` is the whole uplift.
+**Lift-from source: the Fuelled showcase** at `/Users/test/dev/create-cmp-showcase`. The
+**definitive reference is commit `87d072a`** — the COMPLETE app: all four tabs
+(Foods/Today/Supplements/Profile) wired as full Room-backed vertical slices, each defined
+**spec-first**, **9/9 governed artifacts approved**, verify lane green **with on-device e2e**
+(Room v5, seeded). Waypoints: `ada72ad` (bare 0.9.0 scaffold) → `6b5cdb3` (premium UI) →
+`fb5e1d9` (conformance + green lane) → `2f4f22f` (Foods = Room-backed exemplar, genesis walk
+complete) → `87d072a` (Today/Supplements/Profile + on-device walkthrough). Diff `ada72ad..87d072a`
+is the whole uplift.
 
 Exact files that embody each fix (all under `composeApp/src/commonMain/kotlin/com/kvdm/fuelled/`
 unless noted):
 
-| Fix | Reference file(s) in Fuelled |
+| Fix | Reference file(s) in Fuelled @ `87d072a` |
 |---|---|
 | Premium dark theme (graphite + lime, M3 container ladder) | `presentation/theme/Theme.kt` |
 | Full numeric type ramp (12 styles, tracked display sizes) | `presentation/theme/Typography.kt` |
 | Brand/logo primitive (drawn bolt badge + wordmark) | `presentation/brand/FuelledLogo.kt` |
 | Material back button (IconButton + AutoMirrored ArrowBack, 48dp) | `presentation/components/AppHeader.kt` |
-| Designed exemplar / UI-first stateless-over-sample screens | `presentation/today/TodayScreen.kt`, `foods/FoodsScreen.kt`, `foods/FoodDetailScreen.kt`, `supplements/SupplementsScreen.kt`, `profile/ProfileScreen.kt` |
+| UI-first: stateless-over-sample screen **+** VM-backed `*Route` nav seam | `presentation/{today,foods,supplements,profile}/*Screen.kt` (stateless, `sampleX` default) + the `*Route` composable in each (Koin VM) |
+| Full Room-backed vertical slice — the exemplar layers to mirror | `domain/model/Food.kt`, `domain/repository/FoodRepository.kt`, `domain/usecase/{GetFoods,SearchFoods,GetFood}UseCase.kt`, `data/local/{FoodEntity,FoodDao}.kt`, `data/remote/FoodRepositoryImpl.kt` (typed `AppResult`, only translation point, idempotent seed), `presentation/foods/{FoodsViewModel,FoodDetailViewModel}.kt`, `di/AppModule.kt` |
+| Spec-first feature specs (every clause cited by a durable test) | `specs/{foods,today,supplements,profile}.spec.md` + their `commonTest`/`desktopTest` suites |
+| Distilled primitives (from screens, not authored first) | `presentation/components/{ProgressRing,StatBar,StatTile,Tag}.kt`, `desktopMain/.../inspector/ComponentStories.kt` |
+| On-device e2e (search filter + tap-to-take, settle-hardened) | `qa/e2e/smoke.yaml` |
 | Nav passes ids, not resolved entities | `presentation/navigation/AppNavHost.kt` + `Screen.kt` |
 
 **Template targets to change (in `/Users/test/dev/create-cmp`):**
@@ -519,6 +545,23 @@ unless noted):
 5. ARCH-12 (or equiv) exists, is green on the exemplar, and FAILS on a planted "sample data referenced
    from production wiring" violation.
 6. Every pre-existing gate stays green on a fresh scaffold (`node qa/verify.mjs` PASS).
+
+## E2E behaviour assertions must wait for async settle, not assert into the loading transition [P2]
+
+The full lane's `e2eSmoke` FAILED on `assertVisible: foods_item_1` **after** typing a search query —
+while the *identical* flow passed when run standalone on a warm emulator. Root cause (read from the
+Maestro logs, not guessed): a search keystroke routes VM → use-case → Room, and the ViewModel passes
+through a brief `Loading` arm that clears the list between keystrokes; on an emulator **loaded by the
+lane's own Android build + APK install moments earlier**, that transition stretches (a 33 s gap just
+to type + hide-keyboard, then a 17 s no-show), and a bare `assertVisible` races it. `verify.mjs`
+already *documents* this ("a loaded emulator gives up too early under load") but the template's
+`qa/e2e/smoke.yaml` still used bare asserts for behaviour. **Fix:** any assertion that follows an
+interaction triggering an async state change (search, load, toggle) must use `extendedWaitUntil`
+(wait for the settled result), reserving bare `assertVisible` for static post-nav elements. Port the
+settle-wait pattern into the template `smoke.yaml` and the cmp-test/e2e authoring guidance, with a
+one-line rule. *Proven fix in Fuelled `qa/e2e/smoke.yaml` @ `87d072a` — search + tap-to-take blocks
+use `extendedWaitUntil`, and the lane went green on-device.* Relates to [C10] (deterministic app
+lifecycle: the retained-ViewModel "Chickenoats" state that also came from a warm, un-relaunched app).
 
 ## Run-through flow — productization [collected 2026-07-24, from the live emulator walkthrough]
 
@@ -542,7 +585,8 @@ C7–C10 deepen evidence quality; D13 ([preview↔lane isolation]) underwrites a
   report into `qa/walkthrough.mjs` (+ an MCP verb): enumerate the nav graph, per screen capture
   **pixels + tree + a11y from the same frame**, prove each transition, emit
   `qa/evidence/walkthrough/<date>/report.html`, render it as a console "Walkthrough" section. Two
-  points that make it a *template*, not a copy of tonight's file: (a) **styling is pulled from
+  points that make it a *template*, not a copy of tonight's file (reference copy committed at
+  `docs/reference/walkthrough-report-2026-07-24/report.html` + its 7 emulator captures): (a) **styling is pulled from
   `design-system.json`** so every generated app's report is auto-branded in its own tokens — that is
   *why* tonight's report "felt like Fuelled"; codify it, don't hardcode it; (b) **it is evidence, not
   decoration** — same folder discipline as `latest.json`, each screen card deep-links its spec clauses
