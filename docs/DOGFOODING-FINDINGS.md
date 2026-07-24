@@ -794,12 +794,35 @@ and a planted ARCH-12 violation FAILing conformance):
   704/704 (exit code checked — an earlier 698 "green" was a tail-masked pipe; two real
   test-expectation updates + one flaky-IPC re-run isolated). NOT built (out of scope,
   D-level): D11 `--with-device`.
-- **STILL OPEN:** the designed exemplar home screen + UI-first seam split of the template
-  exemplar (held deliberately — it is the product's first impression and must be judged
-  RENDERED by the human via the candidates loop, next session); D11 lane-owned device
-  lifecycle; candidates strip hiding the live variant (P2);
-  `npm version` manifest lockstep (P2); plugin cache refresh (P3); the stamper clone-shape
-  decision (P2 — unchanged: canonical set + warning; revisit when the seam split lands).
+- **STILL OPEN:** D11 lane-owned device lifecycle; candidates strip hiding the live variant
+  (P2); `npm version` manifest lockstep (P2 — the plugin manifests are still hand-bumped
+  beside `package.json`); the stamper clone-shape decision (P2 — unchanged: canonical set +
+  warning). Plugin cache refresh: DONE (0.10.1).
+
+### DECISION — the template exemplar stays as it is
+
+Not a finding, and no longer an open item: **the template ships the conventional blank-app
+state on purpose** — the `home` list plus `profile`, unchanged. Karel's call, 2026-07-24:
+"leave it as is in the current version it is fine and the most used blank app template state,
+anything else would be weird — just the current old existing template exemplar."
+
+The reasoning is the product's, not a compromise: a *template's* first screen should look like
+a template's first screen. A designed dashboard would be the template presuming what the app
+is about, and the app's own first screen is exactly what the genesis walk exists to shape.
+Fuelled's Today is what that shaping produces downstream — which is the showcase's job, not
+the template's.
+
+Consequently CLOSED, and not to be re-raised: the "designed exemplar home screen", promoting
+Fuelled's `ProgressRing`/`StatBar`/`StatTile`/`Tag` into the template registry (they stay
+showcase-local), and the seam split of the template exemplar. `home` keeps its current shape
+as the `add-feature` clone source.
+
+**Correction to an earlier claim in this session:** the template does NOT ship orphaned
+premium components. `ProgressRing`, `StatBar`, `StatTile` and `Tag` do not exist in the
+template at all — they were distilled in Fuelled and never promoted. A consumer scan that
+reported "0 uses" was counting files that were absent, and it also excluded `components/`,
+where legitimate internal use lives (`AppIconButton` is used by both `AppHeader` and
+`AppButton`). The template registry is 13 components with no orphans.
 
 This log is append-only during dogfooding runs; promote items into real tasks/issues when
 scheduled.
