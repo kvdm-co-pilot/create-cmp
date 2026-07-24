@@ -33,6 +33,7 @@ import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { renderTreeSvg } from "./render.mjs";
 import { auditA11y } from "./a11y.mjs";
+import { gradleEnv } from "./jdk.mjs";
 import { fetchLiveCatalog } from "./live.mjs";
 import {
   getApprovalsData,
@@ -86,6 +87,61 @@ const COMPILE_WATCHDOG_MS = 20000;
 // reload-aware, such stale renders are retried on this cadence until the swap lands.
 const STALE_RETRY_MS = 2500;
 const MAX_STALE_RETRIES = 3;
+
+// ── Verify-lane coexistence (the "eyes + gate always on" keystone) ──────────────
+// The preview service and `qa/verify.mjs` both spawn Gradle against the same project
+// and share composeApp/build/kspCaches; KSP's incremental storage is single-owner, so
+// concurrent builds throw "Storage for [...] is already registered" and one side dies
+// (historically: render-failed + a manual preview_stop/--stop/rm dance). Two defenses:
+//   1. COORDINATE — the lane stamps .cmp-lane-in-progress for its duration; renders
+//      DEFER while it exists. mtime-bounded so a crashed lane never wedges the eyes.
+//   2. SELF-HEAL — a spawn that still collides clears kspCaches and retries once.
+const LANE_MARKER_REL = ["composeApp", "build", ".cmp-lane-in-progress"];
+const LANE_MARKER_STALE_MS = 30 * 60 * 1000;
+const LANE_POLL_MS = 5000;
+export const KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
+
+/**
+ * The app's display name for the console shell: settings.gradle(.kts)'s
+ * `rootProject.name` (the engine stamps the real app name there), falling back to
+ * the directory basename only when no settings file resolves — "Fuelled · studio",
+ * never "create-cmp-showcase · studio".
+ */
+export function resolveAppName(projectDir) {
+  for (const f of ["settings.gradle.kts", "settings.gradle"]) {
+    try {
+      const text = fs.readFileSync(path.join(projectDir, f), "utf8");
+      const m = text.match(/rootProject\.name\s*=\s*["']([^"']+)["']/);
+      if (m) return m[1];
+    } catch {
+      /* try the next form */
+    }
+  }
+  return path.basename(projectDir);
+}
+
+/** True while a verify lane holds the project (fresh marker file present). */
+export function laneInProgress(projectDir, { now = Date.now } = {}) {
+  try {
+    const st = fs.statSync(path.join(projectDir, ...LANE_MARKER_REL));
+    return now() - st.mtimeMs < LANE_MARKER_STALE_MS;
+  } catch {
+    return false;
+  }
+}
+
+/** Run a Gradle invocation; on the KSP storage collision, clear kspCaches and retry once. */
+export async function withKspSelfHeal(projectDir, log, run) {
+  try {
+    return await run();
+  } catch (err) {
+    const text = `${err && err.message ? err.message : err}${err && err.stdout ? err.stdout : ""}${err && err.stderr ? err.stderr : ""}`;
+    if (!KSP_COLLISION_RE.test(text)) throw err;
+    log("KSP cache collision (concurrent Gradle — verify lane?) — clearing kspCaches, retrying once");
+    fs.rmSync(path.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
+    return await run();
+  }
+}
 
 /**
  * The app's base package — needed to address the daemon main class
@@ -420,13 +476,16 @@ export function galleryHtml(state) {
   // Screens stays the DEFAULT page — the daily hot-reload surface.
   const railItems = [
     // §3.0: Intent is genesis order 0 — the root artifact everything else is
-    // expressed in — so it leads the rail.
+    // expressed in — so it leads the rail. The rest follows the REVISED
+    // definition order (spec-first behavior, UI-first visuals): architecture,
+    // then the exemplar's surfaces (Specs, Screens), then the design system
+    // and components — which lock on / are distilled from those screens.
     { id: "intent", label: "Intent", glyph: statusGlyph(intentRecord) },
-    { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
-    { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
-    { id: "screens", label: "Screens", glyph: null, active: true },
     { id: "specs", label: "Specs", glyph: null },
+    { id: "screens", label: "Screens", glyph: null, active: true },
+    { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
+    { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
     // §3.6: the Evidence item's glyph derives from the latest receipt itself
     // (✓ fresh PASS · ✗ FAIL · ⚠ stale · ○ none) — receiptGlyph, the same
     // derivation the rail foot uses.
@@ -448,6 +507,23 @@ export function galleryHtml(state) {
       bodyHtml: intentBodyHtml(intent),
     },
     {
+      id: "architecture",
+      title: "Architecture",
+      statusHtml: archStatus,
+      bodyHtml: architectureTabHtml(architecture, architectureMeta),
+    },
+    // §3.5: the RTM's last-receipt column reads the same receipt as Evidence.
+    { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt }) },
+    {
+      id: "screens",
+      title: "Screens",
+      statusHtml: screensStatus,
+      headExtraHtml: `<div class="screens-toolbar"><input id="filter" type="search" placeholder="filter screens&hellip;"></div>`,
+      bodyHtml: screensBody,
+      active: true,
+      fullBleed: true,
+    },
+    {
       id: "design-system",
       title: "Design language",
       statusHtml: dsStatus,
@@ -456,12 +532,6 @@ export function galleryHtml(state) {
         variants,
         artifactStatus: designSystemStatus,
       }),
-    },
-    {
-      id: "architecture",
-      title: "Architecture",
-      statusHtml: archStatus,
-      bodyHtml: architectureTabHtml(architecture, architectureMeta),
     },
     {
       id: "components",
@@ -479,17 +549,6 @@ export function galleryHtml(state) {
         changedVersions,
       }),
     },
-    {
-      id: "screens",
-      title: "Screens",
-      statusHtml: screensStatus,
-      headExtraHtml: `<div class="screens-toolbar"><input id="filter" type="search" placeholder="filter screens&hellip;"></div>`,
-      bodyHtml: screensBody,
-      active: true,
-      fullBleed: true,
-    },
-    // §3.5: the RTM's last-receipt column reads the same receipt as Evidence.
-    { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt }) },
     { id: "evidence", title: "Evidence", statusHtml: evidenceStatus, bodyHtml: evidenceBodyHtml(effectiveReceipt, receiptHistory) },
     { id: "approvals", title: "Approvals", statusHtml: approvalsStatus, bodyHtml: approvalsTabHtml(approvals) },
     { id: "comments", title: "Comments", statusHtml: commentsStatus, bodyHtml: commentsTabHtml(comments) },
@@ -808,30 +867,36 @@ export function galleryHtml(state) {
  */
 export function createPreviewService(opts) {
   const projectDir = path.resolve(opts.projectDir);
-  const appName = opts.appName || path.basename(projectDir);
+  const appName = opts.appName || resolveAppName(projectDir);
   const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
   const srcDir = path.join(projectDir, "composeApp", "src");
   const log = opts.log || (() => {});
   const hot = opts.hot !== false; // phase 2 on by default; falls back to gradle transparently
   const daemonUrl = opts.daemonUrl || `http://127.0.0.1:${opts.daemonPort || DEFAULT_DAEMON_PORT}`;
+  // Gradle spawns get gradleEnv(): a resolved JAVA_HOME propagated through the
+  // child env — the MCP server often runs outside a login shell, and the fix must
+  // NEVER be a hand-edit to the tracked `gradlew` (see jdk.mjs). withKspSelfHeal
+  // is coexistence defense 2 (see laneInProgress below for defense 1).
   const runRender =
     opts.runRender ||
-    (async (dir) => {
-      await execFileAsync(
-        "./gradlew",
-        [":composeApp:renderScreens", "-q", "--console=plain"],
-        { cwd: dir, timeout: 600000, maxBuffer: 16 * 1024 * 1024 },
-      );
-    });
+    ((dir) =>
+      withKspSelfHeal(dir, log, () =>
+        execFileAsync(
+          "./gradlew",
+          [":composeApp:renderScreens", "-q", "--console=plain"],
+          { cwd: dir, timeout: 600000, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() },
+        ),
+      ));
   const runCompileCheck =
     opts.runCompileCheck ||
-    (async (dir) => {
-      await execFileAsync(
-        "./gradlew",
-        [":composeApp:compileKotlinDesktop", "-q", "--console=plain"],
-        { cwd: dir, timeout: 300000, maxBuffer: 16 * 1024 * 1024 },
-      );
-    });
+    ((dir) =>
+      withKspSelfHeal(dir, log, () =>
+        execFileAsync(
+          "./gradlew",
+          [":composeApp:compileKotlinDesktop", "-q", "--console=plain"],
+          { cwd: dir, timeout: 300000, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() },
+        ),
+      ));
   const watchdogMs = opts.watchdogMs ?? COMPILE_WATCHDOG_MS;
   const staleRetryMs = opts.staleRetryMs ?? STALE_RETRY_MS;
 
@@ -1338,7 +1403,7 @@ export function createPreviewService(opts) {
           "--console=plain",
           "-q",
         ],
-        { cwd: projectDir, stdio: ["ignore", "pipe", "pipe"] },
+        { cwd: projectDir, stdio: ["ignore", "pipe", "pipe"], env: gradleEnv() },
       );
     });
 
@@ -1418,6 +1483,15 @@ export function createPreviewService(opts) {
   async function renderCycle() {
     if (rendering) {
       renderQueued = true;
+      return;
+    }
+    // Coexistence defense 1: a verify lane holds the project — defer instead of
+    // colliding on kspCaches. The render is not lost; it re-schedules until the
+    // marker clears (or goes stale), then runs.
+    if (laneInProgress(projectDir)) {
+      touch("lane-defer");
+      log("verify lane in progress — deferring render until it finishes");
+      scheduleRender(LANE_POLL_MS);
       return;
     }
     rendering = true;

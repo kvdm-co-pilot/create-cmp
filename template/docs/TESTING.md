@@ -54,6 +54,13 @@ Maestro flows (`qa/e2e/*.yaml`) cover boot + bottom-nav — install the free CLI
 (`curl -fsSL "https://get.maestro.mobile.dev" | bash`). Selectors go by **testTag** (`id:` —
 surfaced as resource-ids via `TestTagAutomation`), never by display text. One flow per
 journey, spec-clause cited; keep the E2E tip small — behavior belongs in unit tests.
+
+**Settle rule:** an assertion that follows an interaction triggering an async state change
+(typing a search query, a toggle that persists, a load) must be an `extendedWaitUntil`, not
+a bare `assertVisible` — the ViewModel round-trip passes through a brief Loading arm that a
+lane-loaded emulator stretches, and asserting into that transition is a false red (a real
+one: a search assert that passed standalone failed in-lane behind a 33s type gap). Bare
+asserts are for static post-navigation elements only.
 <!-- <<< cmp:feature e2e -->
 
 ## The verify lane

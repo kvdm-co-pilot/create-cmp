@@ -81,10 +81,11 @@ function runStamper(root, args) {
   });
 }
 
-// GENESIS-FLOW-DESIGN.md §1 order: intent(0), design-system(1), architecture(2),
-// components(3), exemplar-feature(4), exemplar-spec(5) — six static artifacts on
-// a fresh scaffold (feature-spec:<name> only appears once a feature is stamped).
-const STATIC_IDS = ["intent", "design-system", "architecture", "components", "exemplar-feature", "exemplar-spec"];
+// GENESIS-FLOW-DESIGN.md §1 REVISED order (spec-first behavior, UI-first
+// visuals): intent(0), architecture(1), exemplar-spec(2), exemplar-feature(3),
+// design-system(4), components(5) — six static artifacts on a fresh scaffold
+// (feature-spec:<name> only appears once a feature is stamped).
+const STATIC_IDS = ["intent", "architecture", "exemplar-spec", "exemplar-feature", "design-system", "components"];
 
 test("fresh scaffold: all six static artifacts are unreviewed and the gate SKIPs", async () => {
   const out = await makeProject("cmp-appr-fresh-");

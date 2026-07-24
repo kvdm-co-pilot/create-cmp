@@ -359,10 +359,16 @@ times. Building UI-first without a distillation step actively *fragments* the de
    - **Console:** the Components page lists *"composables used in your screens but not in the
      registry"* — a promotion queue that turns the invisible gap into an actionable surface
      (analogous to the existing componentStories parity gate).
-   - **Conformance clause(s):** flag **cross-feature duplication** (≥2 near-identical composables →
-     promote or dedupe) and **re-invention** of an existing registry component (a hand-rolled row
-     while `ListItemCard` exists). Duplication is the mechanical signal; *which* to promote is the
-     agent's rubric call, ratified at the Components approval.
+   - ~~**Conformance clause(s):** flag cross-feature duplication / re-invention mechanically.~~
+     **WITHDRAWN 2026-07-24, empirically.** Similarity metrics were measured against the real
+     Fuelled corpus while implementing: symmetric LCS-over-tokens scores the true near-identical
+     pair `GoalRow↔SettingsRow` at **0.776** and the legitimately-different `TakenSummary↔MealCard`
+     at **0.734** — no threshold separates them (bag-of-tokens inverts them outright). A mechanical
+     duplication gate is therefore *structurally* the bug the guardrail below warns about. The
+     duplication surface is the console **promotion queue** (inventory + signals, no verdicts) and
+     the classification is the **agent's rubric reasoning** in the distillation step, ratified at
+     the Components approval — per Karel, in-session: "the agent must reason on components here,
+     it's not a simple gate."
 
 **Promotion heuristic:** superseded by *What counts as a component — the inclusion rubric* below.
 Do NOT use a bare "≥2 uses" or "it's a primitive" shortcut in isolation — the five-part rubric is
@@ -653,6 +659,30 @@ C7–C10 deepen evidence quality; D13 ([preview↔lane isolation]) underwrites a
 
 ## Status
 
-All items **OPEN** unless noted. Fixes proven in the Fuelled showcase are marked "proven in
-Fuelled" and can be lifted into `template/` directly. This log is append-only during dogfooding
-runs; promote items into real tasks/issues when scheduled.
+**Fix wave landed 2026-07-24** (single batch commit; gated once at the end: engine + mcp suites
+407/407 each, a fresh scaffold's full lane 11/11 green **on-device**, and a planted ARCH-12
+violation FAILing conformance):
+
+- **FIXED:** stale live pixels (PixelCopy + sha256 tripwire, live-proven on the emulator at
+  0.8s settle); a11y scroll-clip false positives (`size` field + max(bounds,size), live-proven
+  on the Foods fold row); JAVA_HOME propagation (jdk.mjs, no tracked-file edits);
+  preview↔lane coexistence (lane marker + KSP self-heal, both sides); genesis reorder
+  (spec-first exemplar + UI-first design-system/components, registry + walk + docs);
+  ARCH-12 + UI-first policy; SHELL-05 `*Route` widening; exemplar-retarget prose-refresh step
+  (in the walk); promotion queue (console, signals-only); AppIconButton + Material back +
+  12-style ramp + BrandMark; settle rule (template smoke + generator + TESTING.md);
+  receipt strength label (D12); remote-view headlined (README + template README/CLAUDE.md);
+  console shell title from rootProject.name.
+- **WITHDRAWN:** the mechanical duplication/re-invention conformance clause — see the
+  strike-through above (no metric separates the fixture pair from a legitimate pair;
+  the call is the agent's rubric reasoning, ratified at the Components approval).
+- **STILL OPEN:** the designed exemplar home screen + UI-first seam split of the template
+  exemplar (held deliberately — it is the product's first impression and must be judged
+  RENDERED by the human via the candidates loop, next session); A1 console live-device
+  section + A2 generated walkthrough report (chip task — its C6/D13 blockers are now fixed);
+  A3/B4/B5/C7–C10/D11 productization items; candidates strip hiding the live variant (P2);
+  `npm version` manifest lockstep (P2); plugin cache refresh (P3); the stamper clone-shape
+  decision (P2 — unchanged: canonical set + warning; revisit when the seam split lands).
+
+This log is append-only during dogfooding runs; promote items into real tasks/issues when
+scheduled.

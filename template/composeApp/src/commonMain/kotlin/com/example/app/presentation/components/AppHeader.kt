@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +21,11 @@ import androidx.compose.ui.unit.dp
  * M3 `TopAppBar` — no scroll behaviors, no center-aligned variants, no window-inset
  * handling (`BaseScreen` owns insets, SHELL-03). A collapsing toolbar would be a
  * registry addition, not a default.
+ *
+ * The back affordance is a Material icon button with the auto-mirrored arrow
+ * (RTL-correct), via [AppIconButton] so the 48 dp touch-target floor holds by
+ * construction — never a text link. It renders only when [onBack] is non-null, so a tab
+ * root never shows a back control.
  *
  * @param title Headline text, rendered in `headlineMedium`.
  * @param screenTag Feature slug; derives the `<screenTag>_title` and `<screenTag>_back` tags.
@@ -38,9 +45,11 @@ fun AppHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
-            AppTextButton(
-                text = "← Back",
+            AppIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
                 onClick = onBack,
+                tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.semantics { testTag = "${screenTag}_back" },
             )
         }

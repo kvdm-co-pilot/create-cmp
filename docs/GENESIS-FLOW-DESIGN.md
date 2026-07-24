@@ -29,34 +29,56 @@ each step is a conversation that *ends* in an approval.
 
 ### The walk as six conversations
 
+Revised order after the first full dogfood run (Fuelled, 2026-07-24 — see
+`docs/DOGFOODING-FINDINGS.md`). Two ordering principles, one per artifact
+kind: **behavioral artifacts are spec-first** (clauses confirmed before the
+slice is built), **visual artifacts are UI-first** (design system and
+component vocabulary are *distilled from* the real screens, never authored
+before them — you cannot judge a palette on placeholder stubs).
+
 0. **Intent.** Before anything renders, the agent interviews: what is this
    app, who is it for, which platforms, what brand feel, which reference
    apps, what are the first screens you see in your head? Output: the
-   **intent brief** — the root artifact everything else traces to.
-1. **Design language.** A workbench, not a swatch grid: 2–3 candidate
-   languages (palette + type + shape), each shown **applied to the user's own
-   screens**, side by side. The human reacts in their language ("warmer",
-   "rounder"); the agent regenerates; the loop runs until "this is mine".
-   Approval freezes the tokens. Rule: **choices are shown rendered, never as
-   hex codes.**
-2. **Architecture.** The harness *is* the opinion here — that's its value.
+   **intent brief** — the root artifact everything else traces to. The
+   brand-feel words seed a **provisional palette** — real tokens, honestly
+   provisional — that carries the build until the design-system lock (3).
+1. **Architecture.** The harness *is* the opinion here — that's its value.
    This step is comprehension + configuration, not open-ended choice: the
    layer map drawn with *their* feature names, the real decisions surfaced
    (local DB? auth? which tabs?), each reflected in the tree. Approval means
    "I understand and accept this shape for my app."
-3. **Components.** From the brief + the frozen design language, the agent
-   proposes the component vocabulary *this* app will speak in; the human
-   shapes each in place. Once approved, the registry is law: future features
-   reuse these or explicitly propose additions.
-4. **The exemplar is THEIR first feature.** The exemplar is the DNA every
-   future feature is cloned from — it must never stay "home items". Genesis
-   writes the spec for the user's *actual* first feature, builds it, verifies
-   it with the runtime eyes, approves it — and from then on the stamper
-   clones *their* pattern in *their* domain language.
+2. **The exemplar is THEIR first feature — spec first, then build.** The
+   exemplar is the DNA every future feature is cloned from — it must never
+   stay "home items". The conversation is two-phase, and the phase gate is
+   the point: (a) **propose the behavior clauses** for the user's actual
+   first feature and get them confirmed — approve `exemplar-spec`; (b) build
+   the slice **to satisfy the confirmed clauses** (screens UI-first on the
+   provisional palette: stateless over a `sample*` seam, ARCH-12 guards the
+   seam), verify with the runtime eyes, approve `exemplar-feature`. From then
+   on the stamper clones *their* pattern in *their* domain language. This
+   matches `add-feature`'s existing discipline — genesis is no longer the one
+   flow allowed to build before the spec is confirmed.
+3. **Design language — locked on the real exemplar.** A workbench, not a
+   swatch grid: 2–3 candidate languages (palette + type + shape), each shown
+   **applied to the real exemplar screens** (they exist now — that is why
+   this step moved), side by side. The human reacts in their language
+   ("warmer", "rounder"); the agent regenerates; the loop runs until "this is
+   mine". Approval freezes the tokens; if the lock changed the exemplar's
+   look, the existing reopen contract re-approves it — a loop, not a line.
+   Rule: **choices are shown rendered, never as hex codes.**
+4. **Components — distilled, not pre-frozen.** After the screens exist, the
+   agent classifies every screen composable against the inclusion rubric
+   (template `docs/ARCHITECTURE.md` §7): promote the genuinely-reusable
+   primitives into the registry (story included), keep one-screen
+   compositions local, never force similar-but-different shapes into one
+   component. The agent makes each call with reasoning; the human governs at
+   the Components approval — ratify, reshape, or reject. Once approved, the
+   registry is law: future features reuse these or explicitly propose
+   additions.
 5. **Every next feature** — a spec conversation in the frozen vocabulary
    (the VL walk as already built).
 
-(The shell/navigation is shaped in conversation 2's tab decisions and the
+(The shell/navigation is shaped in conversation 1's tab decisions and the
 exemplar's rendered screens; it is governed by `app-base.spec.md` + the
 exemplar rather than as a separate artifact.)
 
@@ -96,11 +118,11 @@ the single source of truth):
 | # | id | files |
 |---|---|---|
 | 0 | `intent` | `specs/intent.md` |
-| 1 | `design-system` | `presentation/theme/Theme.kt`, `Tokens.kt` (unchanged) |
-| 2 | `architecture` | `specs/app-base.spec.md` **+** `docs/ARCHITECTURE.md` (`cmp:generated` sections stripped before hashing — AD-1 Wave B, `docs/proposals/architecture-document-standard.md` §4.4) |
-| 3 | `components` | `presentation/components/*.kt` (dynamic glob, sorted) |
-| 4 | `exemplar-feature` | the 11-file set of the **configured** exemplar |
-| 5 | `exemplar-spec` | `specs/<exemplar>.spec.md` |
+| 1 | `architecture` | `specs/app-base.spec.md` **+** `docs/ARCHITECTURE.md` (`cmp:generated` sections stripped before hashing — AD-1 Wave B, `docs/proposals/architecture-document-standard.md` §4.4) |
+| 2 | `exemplar-spec` | `specs/<exemplar>.spec.md` — **before** the feature: spec-first |
+| 3 | `exemplar-feature` | the file set of the **configured** exemplar |
+| 4 | `design-system` | `presentation/theme/Theme.kt`, `Tokens.kt` — **after** the exemplar: locked on real screens |
+| 5 | `components` | `presentation/components/*.kt` (dynamic glob, sorted) — distilled from the screens |
 | 6+ | `feature-spec:<name>` | per non-base, non-exemplar spec (unchanged) |
 
 - **Intent brief:** template ships `specs/intent.md` as a structured seed

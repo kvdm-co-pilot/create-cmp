@@ -281,6 +281,28 @@ of design values — no hardcoded `Color(0x…)` literals outside it. The regist
 components own the token call sites (declared once per component, correct everywhere it's
 used), so a screen almost never touches a token directly.
 
+### UI-first construction `[advisory, with one enforced hazard gate: ARCH-12]`
+
+Screens are built **UI-first**: a stateless composable over a plain state value, rendered in the
+preview gallery before any ViewModel or data layer exists. The pattern has four parts, and the
+fourth is a gate:
+
+1. **Stateless screen** — `XScreen(state, onEvent)`; it owns no data and calls no VM.
+2. **Preview seam** — the screen's state parameter defaults to a `sampleX` fixture declared in the
+   same file, so the preview registry renders it with zero DI. This is what lets a screen exist —
+   and be judged, styled, and approved — before its vertical slice is built.
+3. **Wiring obligation** — the sample default is scaffolding, not a destination. The screen ends up
+   driven by a VM-backed `XRoute` wrapper (the actual nav destination; `SHELL-05` inspects both
+   suffixes), and the slice follows the exemplar layer-for-layer.
+4. **The hazard → enforced.** Sample data must never leak into production wiring: a `sample*`
+   symbol is referenced only in its declaring file (the seam), the preview registry/stories, and
+   tests. `ARCH-12` fails the lane on any other `commonMain` reference — a nav host resolving
+   entities from sample data is the proven failure mode this exists to stop.
+
+This pattern is why the genesis walk can lock the design system and distill the component registry
+*after* real screens exist — the visual artifacts are extracted from the product, not guessed ahead
+of it.
+
 ### Component vocabulary `[governed — registry membership is judgment]`
 
 `presentation/components/` is the design-system registry — the shared vocabulary screens compose

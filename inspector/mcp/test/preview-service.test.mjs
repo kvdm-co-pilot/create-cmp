@@ -487,13 +487,16 @@ test("galleryHtml (§2 rail): sections in the genesis definition order, Intent f
   const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
   const nav = html.match(/<nav class="rail-nav">([\s\S]*?)<\/nav>/)[1];
   const order = [...nav.matchAll(/data-tab="([a-z-]+)"/g)].map((m) => m[1]);
+  // The REVISED definition order (spec-first behavior, UI-first visuals):
+  // intent → architecture → the exemplar's surfaces (Specs, Screens) →
+  // design language + components, which lock on / distill from those screens.
   assert.deepEqual(order, [
     "intent",
-    "design-system",
     "architecture",
-    "components",
-    "screens",
     "specs",
+    "screens",
+    "design-system",
+    "components",
     "evidence",
     "approvals",
     "comments",

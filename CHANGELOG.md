@@ -6,6 +6,68 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+The first full dogfood run (the Fuelled showcase, rebuilt end-to-end on 0.9.0 —
+`docs/DOGFOODING-FINDINGS.md`) is folded back into the harness.
+
+### Fixed
+
+- **Live screenshots read the composited frame (P1).** `/inspect/screenshot` now captures via
+  `PixelCopy` (API 26+, Activity-window-guarded; dialog roots and pre-26 fall back to the
+  software draw) — a software `View.draw` replays stale Compose layer recordings, which served
+  byte-identical "screenshots" of two different screens during the dogfood walkthrough.
+  `render_screen{live}` returns the capture's `sha256` and flags `identicalToPrevious` with a
+  stale warning — the tripwire that caught the original lie, built in.
+- **a11y touch-target audit judges the full composed size (P1).** All three semantics
+  serializers emit an additive `size` field (unclipped); both audits use `max(bounds, size)`,
+  so a list row bisected by a scroll fold (reported 371×36 of a 371×88 row) is never a false
+  violation. Genuinely small targets still fail; old trees behave as before.
+- **MCP-spawned Gradle resolves a JDK without touching tracked files (P1).** `jdk.mjs` resolves
+  `JAVA_HOME` (env → `/usr/libexec/java_home` → sdkman → Android Studio JBR) and propagates it
+  through the child env of every Gradle spawn — the previous de-facto workaround mutated the
+  committed `gradlew`, leaving the repo permanently dirty.
+- **Preview daemon and verify lane coexist (P1, D13).** The lane stamps
+  `composeApp/build/.cmp-lane-in-progress` for its duration and the preview service defers
+  renders while it exists (mtime-bounded); both sides self-heal the KSP
+  "Storage … is already registered" collision by clearing `kspCaches` and retrying once — the
+  manual stop/clear/restart dance, automated.
+- **SHELL-05 inspects `*Route` nav destinations** (was keyed on `*Screen(` only — the UI-first
+  seam's VM-backed destinations passed the gate vacuously).
+
+### Changed
+
+- **Genesis definition order re-founded on two principles (P1, the headline).** Behavior is
+  spec-first: `exemplar-spec` precedes `exemplar-feature` — the clauses are human-confirmed
+  before the slice is built, matching `add-feature`. Visuals are UI-first: `design-system` and
+  `components` lock AFTER the exemplar (candidates render on real screens; the registry is
+  distilled from them; a provisional palette seeded from the intent's brand-feel words carries
+  the build). New order: intent → architecture → exemplar-spec → exemplar-feature →
+  design-system → components. The `cmp-new` walk, `GENESIS-FLOW-DESIGN.md`, and the template
+  contract all encode it, including the exemplar-retarget architecture-prose refresh
+  (reopen → re-approve) and the design-lock → golden-regen → reopen loop.
+- **The UI-first pattern is codified with an enforced hazard gate.** Template
+  `ARCHITECTURE.md` §7 documents stateless-screen + `sample*` preview seam + `*Route` wiring;
+  new clause **ARCH-12** fails the lane when a `sample*` fixture is referenced outside its
+  declaring file (the proven failure: a nav host resolving entities from sample data).
+- **Component distillation is agent judgment, ratified at the approval — never a similarity
+  gate.** The console's Components page gains the **promotion queue**: composables used in
+  screens but absent from the registry, with signals only (cross-feature use count,
+  composes-registry hint). The planned mechanical duplication clause was withdrawn on
+  evidence: measured on the real showcase, no metric separates near-identical from
+  legitimately-different pairs (0.776 vs 0.734).
+- **Premium defaults.** `AppHeader`'s back affordance is a Material auto-mirrored icon button
+  via the new **`AppIconButton`** (48 dp floor by construction — raw M3 `IconButton` is 40×40,
+  below the harness's own audit); the type ramp grows from 6 to 12 styles with tracked display
+  sizes; a **`BrandMark`/`BrandWordmark`** starter lands in `presentation/brand/` (guided
+  placeholder — brand is governed separately from the components registry).
+- **Receipts declare their strength (D12).** `PASS (on-device: e2eSmoke+tokenDrift)` vs
+  `PASS (desktop-only)` on the lane verdict line and as `strength.onDeviceSteps` in the
+  receipt — a desktop green and an on-device green are different claims.
+- **The live device view is headlined, not buried.** README "Watch and drive your app live
+  from a browser" section, generated-project README block, and a standing offer step in the
+  generated `CLAUDE.md`; the console shell titles itself from `rootProject.name`, not the
+  directory basename. E2E docs + generated smoke carry the settle rule (async assertions use
+  `extendedWaitUntil` — a lane-loaded emulator stretches the Loading arm past a bare assert).
+
 ## [0.9.0] - 2026-07-21
 
 This release is the **studio** — the generated project's console is rebuilt as a

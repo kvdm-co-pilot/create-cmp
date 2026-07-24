@@ -208,9 +208,9 @@ The generated `CLAUDE.md` documents this loop for future sessions ("UI feedback 
 
 ## 6. THE FORK — express lane or guided walk
 
-Once the loop is up, tell the human plainly: their app has six governed artifacts — intent,
-design system, architecture, components, exemplar feature, exemplar spec — and there are
-two honest ways to sign off on them. Ask which they want; don't default to either silently.
+Once the loop is up, tell the human plainly: their app has six governed artifacts — in
+definition order: intent, architecture, exemplar spec, exemplar feature, design system,
+components — and there are two honest ways to sign off on them. Ask which they want; don't default to either silently.
 
 - **Express lane.** `node qa/approve.mjs --accept-defaults` approves every
   currently-resolvable artifact in one visible act, each recorded
@@ -233,33 +233,24 @@ say what you're about to show and why, do the step, then either they click **App
 the console or — on their confirmed word — you run `node qa/approve.mjs <artifact>`. Block
 on each decision with `approval_status { waitForDecision: true }` instead of polling.
 
-### 7.0 Intent
+The order encodes two principles, one per artifact kind (learned the hard way in the first
+full dogfood run): **behavior is spec-first** — the exemplar's clauses are confirmed before
+the slice is built; **visuals are UI-first** — the design system and component vocabulary
+are *distilled from* the real screens, never locked before them. You cannot judge a palette
+on placeholder stubs, and a component library authored before the screens governs the wrong
+thing.
+
+### 7.0 Intent — plus the provisional palette
 Already written (§4). Show it back to them — the console renders it like any other spec
 file (prose sections, no clause grammar). Confirm nothing reads wrong, then approve
 `intent`.
 
-### 7.1 Design language — the candidates loop
-This is a working session, not a swatch grid — every choice is shown **rendered**, never as
-hex codes:
+Then seed a **provisional palette**: one honest `Tokens.kt` edit toward the brand-feel
+words ("calm, trustworthy" → muted blues; "energetic, bold" → high contrast + saturated
+accent). Say plainly it is provisional — the design-system *lock* happens in §7.3, on the
+real exemplar. Do NOT approve `design-system` now; it stays `unreviewed` until then.
 
-1. Edit `Tokens.kt` toward one candidate direction, starting from the brand-feel words
-   captured in the intent round.
-2. `preview_status { waitForRender: true }` to confirm it rendered.
-3. `snapshot_variant { name }` (e.g. `{name: "warmer"}`) stashes the current renders under
-   `composeApp/build/previews/variants/<name>/`.
-4. Repeat for 2–3 candidates total, moving `Tokens.kt` to a fresh direction before each
-   next `snapshot_variant`.
-5. Point the human at the console's Design System page — in genesis mode it shows the
-   **candidates strip**: each variant's screens side by side, with a **Pick** button.
-6. Block on `review_comments { waitForComment: true }` for their pick — clicking Pick posts
-   a `pick:<name>` comment targeting `design-system`. Apply that candidate's tokens for
-   real (if `Tokens.kt` isn't already on it), `resolve_comment { id, note }` saying what
-   you applied, then approve `design-system`.
-
-If they answer in words instead of clicking Pick ("warmer", "rounder"), that is another
-round — regenerate, snapshot, ask again — until they say "this is mine."
-
-### 7.2 Architecture — comprehension, not open-ended choice
+### 7.1 Architecture — comprehension, not open-ended choice
 The harness *is* the opinion here, and `docs/ARCHITECTURE.md` is the document that opinion
 lives in — approving `architecture` hashes it alongside `specs/app-base.spec.md`
 (`cmp:generated` sections stripped first, so a later regeneration never invalidates the
@@ -290,7 +281,7 @@ narrating a diagram:
    as the plain-language promise it is, and naming its gate: "your UI never calls a
    repository directly — ARCH-01 fails the lane if it does"; "domain stays pure Kotlin —
    ARCH-02"; "data never reaches up into presentation or di — ARCH-09"; "core never reaches
-   into presentation, data, or di — ARCH-10". Once real feature names exist (post §7.4),
+   into presentation, data, or di — ARCH-10". Once real feature names exist (post §7.2),
    use the intent brief's first-screens vocabulary for the presentation packages, not
    `home`/`profile`.
 6. **The policies (§7) — enforced vs. advisory, read straight.** One pass down the
@@ -308,60 +299,116 @@ narrating a diagram:
 Before asking for the approval, say plainly what it means: "I understand and accept this
 shape for my app," not "I designed it." Approve `architecture`.
 
-### 7.3 Components — propose, shape, approve
-The template does not ship a blank slate: `presentation/components/*.kt` already carries a
-nine-component vocabulary (page container, header, bottom bar, the loading/empty/error
-state machine, list row, skeleton, two buttons — full inventory in
-`docs/proposals/component-system-deep-dive.md` §4), proven against the exemplar screen.
-Your job is to walk the human through what's there, **per component**, and let them keep,
-rename, or reshape each for their domain — using the preview loop (the exemplar, or a state
-variant like `home@empty`/`home@error`) so every choice is seen, not described:
-
-- **`ScreenColumn`** — the page container every screen roots in (`<screen>_screen`, page
-  padding). Rarely reshaped; ask whether the page padding token feels right.
-- **`AppHeader`** — the title row (optional back, trailing actions slot). Ask about title
-  typography and casing for their brand.
-- **`AppBottomBar`** — the tab bar, already live in the shell from the tabs interview. This
-  is where it is *named* as a component, not built fresh.
-- **`ContentUiState` + `ContentStateContainer`** — the four-arm loading/content/empty/error
-  lifecycle every data-backed screen inherits. Rarely reshaped visually; confirm they
-  understand it is shared — a change here drifts every consuming screen's golden.
-- **`ListItemCard`** — the one list-row shape (leading/trailing slots). Ask whether their
-  data needs a second row variant or one is enough. The registry default: one usually is.
-- **`Shimmer` / `ListItemSkeleton`** — the loading placeholder shown while a list loads.
-- **`EmptyState`** — the default copy is generic ("Nothing here yet"). This is exactly
-  where their domain language replaces it — ask what their app should say when a list is
-  empty.
-- **`ErrorState`** — the error + retry view. Ask about retry copy and tone.
-- **`AppButton`** (`AppPrimaryButton`/`AppTextButton`) — the two buttons, 48dp-enforced.
-  Ask about label casing and weight.
-
-Propose an addition beyond the nine only when a first screen genuinely needs one (a chip, a
-badge). A new file is a registry *addition*, shaped and approved the same way — never added
-speculatively. Once approved, the registry is law: any component added or changed afterward
-invalidates the approval (`changed-since-approval`) until a human re-approves. Approve
-`components`.
-
-### 7.4 The exemplar is THEIR first feature
+### 7.2 The exemplar is THEIR first feature — spec first, then build
 The exemplar is the DNA every future feature clones from — it must never stay generic
-`home` items. From the "first screens" answer, agree which one is their real first feature,
-then:
+`home` items. This conversation is **two-phase, and the phase gate is the point**: the
+human confirms the behavior before any of it is built (the same discipline `add-feature`
+enforces post-genesis — genesis is not exempt from spec-first).
 
-1. Stamp it: `node qa/scaffold-feature.mjs <Name>` (add `--entity <Entity>` if the naive
-   de-pluralized guess is wrong — confirm the guess with them first). If a tab was already
-   wired to a `PlaceholderScreen` stub under this name, this is where it becomes real.
-2. Shape it with them — rewrite the spec clauses in `specs/<name>.spec.md` to the feature's
-   real behavior (the six clause ids stay fixed), adapt the entity, screen, and tests to
-   match, checking with the preview loop as you go.
-3. Point `qa/approvals.json`'s `"exemplarFeature"` key at it — edit the JSON directly;
-   there is no CLI flag yet: `"exemplarFeature": "<name>"`. From this moment the registry's
-   `exemplar-feature`/`exemplar-spec` artifacts resolve to this feature's 11 files, and
-   `qa/scaffold-feature.mjs` clones from it for every later feature. `home` demotes to an
-   ordinary `feature-spec:home` artifact — tell the human they can keep it as a reference
-   or delete it later; either is fine.
-4. Capture the golden baseline fresh — never copied; it must reflect the shaped behavior:
+**Phase A — the spec, confirmed before the build:**
+
+1. From the "first screens" answer, agree which one is their real first feature.
+2. **Propose the behavior clauses in conversation** — Given/When/Then, in their domain
+   words, before any code exists. Iterate until they say yes.
+3. Stamp the feature (`node qa/scaffold-feature.mjs <Name>`; add `--entity <Entity>` if
+   the naive de-pluralized guess is wrong — confirm the guess first), then immediately
+   replace the seeded spec text in `specs/<name>.spec.md` with the confirmed clauses (the
+   clause ids stay fixed).
+4. Point `qa/approvals.json`'s `"exemplarFeature"` key at it — edit the JSON directly:
+   `"exemplarFeature": "<name>"`. The registry's `exemplar-spec`/`exemplar-feature`
+   artifacts now resolve to this feature; `home` demotes to an ordinary
+   `feature-spec:home` (keep as reference or delete later; either is fine).
+5. **Approve `exemplar-spec` now** — before the slice is shaped. That approval IS the
+   spec-first gate.
+
+**Phase B — build to the confirmed clauses:**
+
+6. Shape the slice **UI-first on the provisional palette**: the stateless
+   `XScreen(state)` over a same-file `sample*` default renders in the preview gallery
+   before the ViewModel/data layer exists; the VM-backed `XRoute` wrapper becomes the nav
+   destination once the layers land. ARCH-12 guards the seam — sample data never leaks
+   into production wiring (see `docs/ARCHITECTURE.md` §7, "UI-first construction").
+   Durable tests cite the confirmed clauses (`// SPEC: <ID>`).
+7. **Refresh the architecture prose.** Retargeting the exemplar deletes the old feature's
+   files, and `docs/ARCHITECTURE.md`'s AUTHORED prose (the §5 walkthrough, §3 tables) still
+   names them while the `architecture` approval stays green (generated sections are
+   stripped from its hash — correct, but the prose is now a lie). Update the prose to the
+   new exemplar, `node qa/approve.mjs --reopen architecture`, and have them re-approve —
+   the doc and the tree must agree under a fresh sign-off.
+8. Capture the golden baseline fresh — never copied; it must reflect the shaped behavior:
    `UPDATE_GOLDEN=1 ./gradlew :composeApp:desktopTest --tests "*<Name>GoldenTree*"`.
-5. Approve both `exemplar-feature` and `exemplar-spec`.
+9. Approve `exemplar-feature`.
+
+### 7.3 Design language — the candidates loop, locked on the real exemplar
+Now the palette lock has something real to be judged on — the exemplar screens. This is a
+working session, not a swatch grid — every choice is shown **rendered on their real
+screens**, never as hex codes and never on stubs:
+
+1. Edit `Tokens.kt` toward one candidate direction, starting from the provisional palette
+   and the brand-feel words.
+2. `preview_status { waitForRender: true }` to confirm it rendered.
+3. `snapshot_variant { name }` (e.g. `{name: "warmer"}`) stashes the current renders under
+   `composeApp/build/previews/variants/<name>/`.
+4. Repeat for 2–3 candidates total, moving `Tokens.kt` to a fresh direction before each
+   next `snapshot_variant`.
+5. Point the human at the console's Design System page — in genesis mode it shows the
+   **candidates strip**: each variant's screens side by side, with a **Pick** button.
+6. Block on `review_comments { waitForComment: true }` for their pick — clicking Pick posts
+   a `pick:<name>` comment targeting `design-system`. Apply that candidate's tokens for
+   real (if `Tokens.kt` isn't already on it), `resolve_comment { id, note }` saying what
+   you applied, then approve `design-system`.
+
+If they answer in words instead of clicking Pick ("warmer", "rounder"), that is another
+round — regenerate, snapshot, ask again — until they say "this is mine."
+
+**The lock loops back, by design.** If the locked tokens changed the exemplar's rendered
+look, regenerate its golden (`UPDATE_GOLDEN=1 …`) and — if the change is structural enough
+to invalidate the `exemplar-feature` hash — reopen and re-approve it. Provisional → build →
+lock → reopen is the intended co-evolution loop, not a failure.
+
+### 7.4 Components — distill from the screens, then approve
+The registry (`presentation/components/*.kt`) starts as the template's starter kit — page
+container, header, bottom bar, the loading/empty/error state machine, list row, skeleton,
+buttons — but the artifact the human approves must be **the app's real vocabulary,
+distilled from the screens that now exist**, not the starter kit rubber-stamped.
+
+Run the distillation (`docs/ARCHITECTURE.md` §7, "Component vocabulary" — the inclusion
+rubric and both guardrails live there):
+
+1. Inventory every composable the screens define outside `components/` (the console's
+   Components page lists them — the promotion queue — with cross-feature use counts).
+2. **You make the rubric call for each — this is reasoning, never a mechanical
+   threshold.** (No similarity metric can make this call: on the reference showcase, a
+   true near-identical pair and a legitimately-different pair scored within 0.05 of each
+   other.) Weigh the five questions for every entry:
+   1. *Design-system decision or feature decision?* How the product presents something
+      (ring/bar/tile/chip) → govern; how one screen arranges its data → local.
+   2. *Stable/obvious or speculative?* Govern well-understood shapes; never invent a
+      shape ("unify these rows") that doesn't exist.
+   3. *Would uncontrolled divergence hurt?* Visible inconsistency if every screen
+      reinvented it → govern; divergence fine → local.
+   4. *Cross-cutting concern worth enforcing once?* a11y floor, token binding — earns
+      membership independent of reuse count.
+   5. *Cost of being wrong, both directions, for THIS thing?* Cheap-to-change stable
+      primitive → bias govern; likely-to-diverge, feature-coupled → bias local.
+   Reuse count is a *signal* feeding 2 and 3, never the rule. Resolutions: promote, keep
+   local, generalize first (a domain-named composable like `MacroTag` is a smell — it
+   becomes a real primitive like `Tag`, or stays local), or **unify locally** (two
+   near-identical same-screen rows become one local composable — unification is not
+   promotion). Guardrails: **never force similar-but-different shapes into one
+   component** (over-parameterized god-components are worse than duplication — when in
+   doubt, keep them separate), and check the registry *before* rolling anything new.
+3. Implement the promotions — each moved into `presentation/components/`, each with a
+   story in `ComponentStories.kt` (the `componentStories` lane step fails on a missing
+   one).
+4. Present the decided registry with one-line reasoning per call, walking the starter
+   pieces too (rename `EmptyState` copy into their domain language, confirm `AppHeader`
+   typography, etc.).
+
+The human's move is the **approval** — ratify, reshape, or reject your calls; they are
+never interrogated composable-by-composable. Once approved, the registry is law: any
+component added or changed afterward invalidates the approval (`changed-since-approval`)
+until a human re-approves. Approve `components`.
 
 ## 8. The reopen contract
 

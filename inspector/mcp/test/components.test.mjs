@@ -468,3 +468,52 @@ test("getComponentsData: kdocDescription + paramDocs surface on scanned componen
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// --- promotion queue (the ungoverned scan — the drift half of the Components
+// section: signals only, never verdicts; the classification is the agent's
+// rubric call, ratified at the Components approval) --------------------------
+
+test("getComponentsData.ungoverned: lists screen composables outside the registry with signals; seam wrappers excluded", () => {
+  const { root, pkgDir, componentsDir } = makeFixtureProject();
+  try {
+    fs.writeFileSync(
+      path.join(componentsDir, "Tag.kt"),
+      `@Composable\nfun Tag(label: String) { Text(label) }\n`,
+    );
+    const foodsDir = path.join(pkgDir, "presentation", "foods");
+    const todayDir = path.join(pkgDir, "presentation", "today");
+    fs.mkdirSync(foodsDir, { recursive: true });
+    fs.mkdirSync(todayDir, { recursive: true });
+    // FoodRow: local, composes the registry Tag. FoodsScreen/FoodsRoute: seam — excluded.
+    fs.writeFileSync(
+      path.join(foodsDir, "FoodsScreen.kt"),
+      `@Composable\nfun FoodsScreen() { FoodRow() }\n\n@Composable\nfun FoodsRoute() { FoodsScreen() }\n\n@Composable\nprivate fun FoodRow() { Row { Tag("P") } }\n`,
+    );
+    // StatTileLocal: used cross-feature (also called from foods), composes nothing governed.
+    fs.writeFileSync(
+      path.join(todayDir, "TodayScreen.kt"),
+      `@Composable\nfun TodayScreen() { StatTileLocal() }\n\n@Composable\nfun StatTileLocal() { Column { Text("x") } }\n`,
+    );
+    fs.appendFileSync(path.join(foodsDir, "FoodsScreen.kt"), `\n@Composable\nprivate fun FoodsExtra() { StatTileLocal() }\n`);
+
+    const data = getComponentsData(root);
+    assert.equal(data.available, true);
+    const names = data.ungoverned.map((u) => u.name);
+    assert.ok(names.includes("FoodRow"), "local row is in the queue");
+    assert.ok(names.includes("StatTileLocal"), "cross-feature composable is in the queue");
+    assert.ok(!names.includes("FoodsScreen") && !names.includes("FoodsRoute") && !names.includes("TodayScreen"),
+      "the *Screen/*Route seam wrappers are the pattern, never promotion candidates");
+    assert.ok(!names.includes("Tag"), "registry components are not in the queue");
+
+    const foodRow = data.ungoverned.find((u) => u.name === "FoodRow");
+    assert.equal(foodRow.composesRegistry, true, "FoodRow's body calls the governed Tag");
+    assert.equal(foodRow.crossFeatureUseCount, 0, "FoodRow is used only in its own feature");
+    const statTile = data.ungoverned.find((u) => u.name === "StatTileLocal");
+    assert.equal(statTile.crossFeatureUseCount, 1, "StatTileLocal is used from one OTHER feature — a signal, not a verdict");
+    assert.equal(statTile.composesRegistry, false);
+    // sorted: cross-feature-used entries first (the strongest signal reads first)
+    assert.equal(data.ungoverned[0].name, "StatTileLocal");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

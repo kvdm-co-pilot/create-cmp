@@ -64,6 +64,22 @@ accessibility, on-device E2E — and writes a receipt bound to a content hash of
 verified. The Stop hook and CI both check that receipt. You cannot hand-forge it, and a stale one
 doesn't pass.
 
+## Watch and drive your app live — from a browser
+
+Every debug build carries a live device view. With the app running on a device or emulator
+(`adb forward tcp:9500 tcp:9500`, or just `connect_live` from the plugin), open:
+
+```
+http://127.0.0.1:9500/inspect/remote
+```
+
+A self-contained page mirrors the running app (~700ms refresh) and **click-to-tap drives the
+real thing** — clicks scale to device pixels and dispatch as taps. This is the "two audiences,
+one app" split at its purest: the human watches and drives real pixels in a browser while the
+agent asserts on the semantics tree (`navigate_and_inspect`, `prove_change`, `db_query`). Use
+it to watch an e2e run, demo a feature, or poke at the app without touching the device. No
+install, no CORS, debug builds only — release builds contain none of this code.
+
 ## Quick start
 
 ```bash

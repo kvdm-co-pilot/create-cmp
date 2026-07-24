@@ -101,22 +101,33 @@ human decision. The ordered walk is a **definition order**, not just an approval
 each artifact is the vocabulary the next is written in, so on a fresh app each step is a
 conversation that ends in an approval — the genesis walk, six conversations:
 
+The order encodes two disciplines: **behavior is spec-first** (the exemplar's clauses are
+confirmed before the slice is built) and **visuals are UI-first** (the design system and
+component vocabulary are distilled from the real screens, so they lock after the exemplar —
+a provisional palette carries the build until then).
+
 0. **Intent** — `specs/intent.md`, the root brief everything else traces to (purpose,
    audience, platforms, brand feel, reference apps, first screens, **glossary**). Filled by
    the `cmp-new` interview; the seed's placeholder prose is marked unfilled. Its
    `## Glossary` section is lifted verbatim into `docs/ARCHITECTURE.md` §8 — write it there
    in the exact form you want published.
-1. **Design system** — `presentation/theme/Theme.kt`, `presentation/theme/Tokens.kt`.
-2. **Architecture + structure** — `specs/app-base.spec.md` **and**
+1. **Architecture + structure** — `specs/app-base.spec.md` **and**
    [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) (`cmp:generated` sections stripped
    before hashing, so a mechanical regeneration never invalidates the approval — only an
    authored-prose edit does).
-3. **Components** — every `presentation/components/*.kt` (a dynamic, sorted glob). Once
+2. **Exemplar spec** — `specs/<exemplar>.spec.md`. Confirmed BEFORE the slice is built:
+   propose the clauses, get the human's yes, then implement to satisfy them (the same
+   discipline `add-feature` already enforces post-genesis).
+3. **Exemplar feature** — the **configured** exemplar's file set the `add-feature`
+   stamper clones from (see "Configurable exemplar"), built to the confirmed spec.
+4. **Design system** — `presentation/theme/Theme.kt`, `presentation/theme/Tokens.kt`.
+   Locked on the REAL exemplar: candidates render on real screens, never stubs. If the
+   lock changes the exemplar's look, reopen → re-approve it — that loop is the design,
+   not a failure.
+5. **Components** — every `presentation/components/*.kt` (a dynamic, sorted glob),
+   distilled from the screens per the inclusion rubric (`docs/ARCHITECTURE.md` §7). Once
    approved, the registry is law: adding or changing a common component invalidates the
    approval until a human re-approves.
-4. **Exemplar feature** — the **configured** exemplar's 11-file set the `add-feature`
-   stamper clones from (see "Configurable exemplar").
-5. **Exemplar spec** — `specs/<exemplar>.spec.md`.
 6. **Per-feature spec** — `specs/<feature>.spec.md`, one governed artifact per feature,
    added as features land.
 
@@ -219,6 +230,13 @@ and tells you what your edit changed.
 **Without the plugin:** `./gradlew :composeApp:renderScreens` renders every screen to
 `composeApp/build/previews/<id>/{screen.png, tree.json}` (`-Pscreen=<id>` for one);
 `node qa/preview-gallery.mjs` builds a self-contained gallery page from the output.
+
+**Live tier — the human's live device view (standing step).** Whenever `connect_live`
+succeeds, OFFER the `remoteUrl` it returns (`http://127.0.0.1:9500/inspect/remote`) to the
+human — every time, not as a maybe. It is a self-contained browser page that mirrors the
+running app (~700ms refresh) with click-to-tap driving the real device: they watch and drive
+the actual app while you assert on the tree (`navigate_and_inspect` / `prove_change` /
+`db_query`). It is also the right way for a human to *watch* an e2e run.
 
 Screens come from `inspector/PreviewRegistry.kt` (desktopMain). The `add-feature` and
 `add-screen` stampers auto-register stamped screens at the `// cmp:anchor preview-registry`

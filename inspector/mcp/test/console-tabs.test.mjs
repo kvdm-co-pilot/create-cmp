@@ -218,10 +218,12 @@ test("approvalsTabHtml: §1 order numbers, status badges, short hash, and an App
       },
     ],
   });
-  // §1 ordered-walk numbering (GENESIS-FLOW-DESIGN.md §1's registry table).
-  assert.match(html, /<td class="order-num">1<\/td>/, "design-system is #1");
-  assert.match(html, /<td class="order-num">2<\/td>/, "architecture is #2");
-  assert.match(html, /<td class="order-num">4<\/td>/, "exemplar-feature is #4");
+  // §1 ordered-walk numbering (GENESIS-FLOW-DESIGN.md §1's revised registry
+  // table — spec-first behavior, UI-first visuals): architecture #1,
+  // exemplar-feature #3, design-system #4 (locks AFTER the exemplar).
+  assert.match(html, /<td class="order-num">1<\/td>/, "architecture is #1");
+  assert.match(html, /<td class="order-num">3<\/td>/, "exemplar-feature is #3");
+  assert.match(html, /<td class="order-num">4<\/td>/, "design-system is #4");
   assert.match(html, /<td class="order-num">6<\/td>/, "feature-spec:* is #6");
   // Status badges.
   assert.match(html, /badge-approved/);

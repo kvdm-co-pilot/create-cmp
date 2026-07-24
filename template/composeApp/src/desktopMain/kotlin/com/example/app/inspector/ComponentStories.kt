@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
@@ -22,6 +23,7 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import __PACKAGE__.presentation.components.AppBottomBar
 import __PACKAGE__.presentation.components.AppHeader
+import __PACKAGE__.presentation.components.AppIconButton
 import __PACKAGE__.presentation.components.AppPrimaryButton
 import __PACKAGE__.presentation.components.AppTextButton
 import __PACKAGE__.presentation.components.BaseScreen
@@ -138,6 +140,21 @@ fun componentStories(): List<ScreenPreview> = listOf(
             onClick = {},
             enabled = false,
             modifier = Modifier.semantics { testTag = "story_text_disabled" },
+        )
+    },
+    variantsStory("component.app-icon-button", "AppIconButton") {
+        AppIconButton(
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "Back",
+            onClick = {},
+            modifier = Modifier.semantics { testTag = "story_icon_button" },
+        )
+        AppIconButton(
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "Back — disabled",
+            onClick = {},
+            enabled = false,
+            modifier = Modifier.semantics { testTag = "story_icon_button_disabled" },
         )
     },
     // The four-state contract: all four arms of the container, stacked.

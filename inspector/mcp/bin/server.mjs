@@ -37,6 +37,7 @@ import {
   validateSerial,
   DEFAULT_HOST,
 } from "../src/lib/live.mjs";
+import { gradleEnv } from "../src/lib/jdk.mjs";
 import { navigateAndInspect, writeLiveScreenshot, DEFAULT_SETTLE_MS } from "../src/lib/navigate.mjs";
 import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
 import { readPngMeta } from "../src/lib/png.mjs";
@@ -846,7 +847,7 @@ server.registerTool(
           await execFileAsync(
             "./gradlew",
             [":composeApp:renderScreens", `-Pscreen=${id}`, "-q"],
-            { cwd: dir, timeout: 600000 }
+            { cwd: dir, timeout: 600000, env: gradleEnv() }
           );
         } catch (err) {
           return fail(
@@ -880,7 +881,7 @@ server.registerTool(
       // outputs (out/tree.json, out/design-system.json, out/screen.png) — --args
       // word-splitting makes explicit flags unreliable across shells.
       try {
-        await execFileAsync("./gradlew", ["run", "-q"], { cwd: dir, timeout: 300000 });
+        await execFileAsync("./gradlew", ["run", "-q"], { cwd: dir, timeout: 300000, env: gradleEnv() });
       } catch (err) {
         return fail(
           `harness render failed in '${dir}': ${err && err.message ? err.message : err}. ` +

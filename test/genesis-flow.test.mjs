@@ -116,13 +116,13 @@ test("intent artifact: order 0, resolves specs/intent.md, approvable; deletion r
   }
 });
 
-test("components artifact: order 3, dynamic sorted glob; zero-glob is unresolvable (refused), approved-then-emptied FAILs", async () => {
+test("components artifact: order 5 (distilled AFTER the exemplar), dynamic sorted glob; zero-glob is unresolvable (refused), approved-then-emptied FAILs", async () => {
   const out = await makeProject("cmp-gen-components-");
   try {
     const { listGovernedArtifacts, approveArtifact, evaluateApprovalsGate } = await loadLib(out);
 
     const registry = listGovernedArtifacts(out);
-    assert.equal(registry[3].id, "components", "components is order 3");
+    assert.equal(registry[5].id, "components", "components is order 5 — distilled from the screens, after the exemplar");
 
     const componentsDir = path.join(out, "composeApp/src/commonMain/kotlin", PKG_DIR, "presentation/components");
     const onDisk = fs
@@ -131,7 +131,7 @@ test("components artifact: order 3, dynamic sorted glob; zero-glob is unresolvab
       .map((n) => `composeApp/src/commonMain/kotlin/${PKG_DIR}/presentation/components/${n}`)
       .sort((a, b) => a.localeCompare(b));
     assert.ok(onDisk.length > 0, "sanity: the template ships common components");
-    assert.deepEqual(registry[3].files, onDisk, "components resolves the sorted presentation/components/*.kt glob");
+    assert.deepEqual(registry[5].files, onDisk, "components resolves the sorted presentation/components/*.kt glob");
 
     const ok = approveArtifact(out, "components");
     assert.equal(ok.ok, true);
@@ -544,7 +544,7 @@ test("reopen: refusals are precise (unknown id, unreviewed, already-reopened, dr
     const unknown = reopenArtifact(out, "not-a-thing");
     assert.equal(unknown.ok, false);
     assert.match(unknown.reason, /unknown artifact "not-a-thing"/);
-    assert.match(unknown.reason, /valid ids: intent, design-system/);
+    assert.match(unknown.reason, /valid ids: intent, architecture, exemplar-spec/);
 
     const unreviewed = reopenArtifact(out, "design-system");
     assert.equal(unreviewed.ok, false);

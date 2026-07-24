@@ -70,11 +70,14 @@ function shortHash(hash) {
 // that already existed.
 const ORDER_BY_ID = [
   [/^intent$/, 0],
-  [/^design-system$/, 1],
-  [/^architecture$/, 2],
-  [/^components$/, 3],
-  [/^exemplar-feature$/, 4],
-  [/^exemplar-spec$/, 5],
+  [/^architecture$/, 1],
+  // Spec-first: the exemplar's clauses are confirmed BEFORE the slice is built.
+  [/^exemplar-spec$/, 2],
+  [/^exemplar-feature$/, 3],
+  // UI-first: the design system locks on — and the components are distilled
+  // from — the real exemplar screens, so both FOLLOW the exemplar.
+  [/^design-system$/, 4],
+  [/^components$/, 5],
   [/^feature-spec:/, 6],
 ];
 function orderNumber(id) {
@@ -652,7 +655,51 @@ export function componentsBodyHtml(components, meta = {}) {
     .join("\n");
   return `<div class="component-list">
 ${entries}
-</div>`;
+</div>
+${promotionQueueHtml(components.ungoverned)}`;
+}
+
+/**
+ * The PROMOTION QUEUE — the drift half of the Components section: composables your
+ * screens define OUTSIDE the registry, each with signals only (cross-feature use,
+ * composes-registry hint). Deliberately verdict-free: promote-vs-keep-local is the
+ * agent's rubric call (ARCHITECTURE.md §7, the five questions), ratified at the
+ * Components approval — this surface exists so nothing stays invisible to that call,
+ * and so the human reviewing the approval can challenge a call without re-deriving
+ * the inventory.
+ */
+export function promotionQueueHtml(ungoverned) {
+  if (!Array.isArray(ungoverned)) return "";
+  if (ungoverned.length === 0) {
+    return `<section class="promotion-queue">
+  <h3>In your screens, not in the registry</h3>
+  <p class="meta">none &mdash; every screen composable is either governed or a *Screen/*Route seam wrapper.</p>
+</section>`;
+  }
+  const rows = ungoverned
+    .map(
+      (u) => `    <tr>
+      <td><code>${esc(u.name)}</code></td>
+      <td><code>${esc(u.file)}</code></td>
+      <td>${esc(u.feature)}</td>
+      <td>${u.crossFeatureUseCount > 0 ? `<strong>${u.crossFeatureUseCount}</strong>` : "0"}</td>
+      <td>${u.composesRegistry ? "composes registry components" : "self-contained"}</td>
+    </tr>`,
+    )
+    .join("\n");
+  return `<section class="promotion-queue">
+  <h3>In your screens, not in the registry &mdash; the promotion queue</h3>
+  <p class="meta">Ungoverned composables (seam wrappers excluded). Signals only &mdash; whether each
+  is promoted, kept local, or generalized is a judgment call made against the inclusion rubric
+  (ARCHITECTURE.md &sect;7) and ratified at the Components approval. Cross-feature use is a signal,
+  never the rule.</p>
+  <table class="params-table">
+    <thead><tr><th>composable</th><th>file</th><th>feature</th><th>cross-feature uses</th><th>composition</th></tr></thead>
+    <tbody>
+${rows}
+    </tbody>
+  </table>
+</section>`;
 }
 
 /**

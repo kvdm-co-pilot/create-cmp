@@ -29,6 +29,15 @@ follow the contract in [`CLAUDE.md`](./CLAUDE.md).
 node qa/verify.mjs
 ```
 
+<!-- >>> cmp:feature inspector -->
+**Watch and drive the app live from a browser:** with a debug build running on a
+device/emulator, run `adb forward tcp:9500 tcp:9500` and open
+`http://127.0.0.1:9500/inspect/remote` — a self-contained page that mirrors the running app
+(~700ms refresh) with **click-to-tap driving the real device**. The human's window into the
+same app the agent inspects structurally; also the way to watch an e2e run. Debug builds
+only — release builds contain no inspector code.
+<!-- <<< cmp:feature inspector -->
+
 <!-- >>> cmp:feature ios -->
 **iOS:** `cd iosApp && xcodegen generate && pod install`, then open
 `iosApp.xcworkspace` in Xcode and run. (First time: `brew install xcodegen`.)

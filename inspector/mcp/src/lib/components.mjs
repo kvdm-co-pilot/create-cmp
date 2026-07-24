@@ -338,6 +338,7 @@ function scanComposables(text) {
       kdocDescription,
       paramDocs,
       facts: deriveFacts(body ?? ""),
+      body: body ?? "",
     });
   }
   return out;
@@ -407,5 +408,61 @@ export function getComponentsData(root) {
     }
   }
   components.sort((a, b) => a.name.localeCompare(b.name) || a.file.localeCompare(b.file));
-  return { available: true, components };
+  return { available: true, components, ungoverned: scanUngoverned(root, presentationDirs, components) };
+}
+
+// The seam wrappers are the PATTERN, not promotion candidates: XScreen/XRoute are how a
+// feature exists (UI-first stateless + VM-backed destination), and Preview helpers are
+// registry plumbing. Everything else declared outside components/ is a candidate.
+const SEAM_NAME_RE = /(Screen|Route|Preview)$/;
+
+/**
+ * The PROMOTION QUEUE — the drift half of the Components section (spec-mirror-drift:
+ * the registry is the signed doc, the screens are the live tree, and this delta IS the
+ * drift surface). Scans every @Composable declared under presentation/** OUTSIDE
+ * components/, excluding the *Screen/*Route/*Preview seam, and reports each with
+ * SIGNALS ONLY — file, feature, body size, cross-feature use count, and whether it
+ * composes registry components. Deliberately NO verdicts and NO similarity scoring:
+ * promote-vs-keep-local is the agent's five-question rubric call, ratified at the
+ * Components approval (measured 2026-07-24: no mechanical metric separates
+ * near-identical from legitimately-different — a scoring gate here would be the
+ * over-abstraction bug the rubric's guardrail names).
+ */
+function scanUngoverned(root, presentationDirs, registryComponents) {
+  const registryNames = new Set(registryComponents.map((c) => c.name));
+  const featureFiles = presentationDirs
+    .flatMap(walkKtFiles)
+    .filter((f) => !f.split(path.sep).includes("components"));
+  const fileTexts = new Map(featureFiles.map((f) => [f, fs.readFileSync(f, "utf8")]));
+
+  const out = [];
+  for (const [file, text] of fileTexts) {
+    const relFile = path.relative(root, file).split(path.sep).join("/");
+    const featureOf = (rel) => {
+      const after = rel.split("/presentation/")[1] ?? "";
+      return after.includes("/") ? after.split("/")[0] : "(root)";
+    };
+    for (const sig of scanComposables(text)) {
+      if (SEAM_NAME_RE.test(sig.name)) continue;
+      if (registryNames.has(sig.name)) continue; // an override/duplicate name — registry page owns it
+      const callRe = new RegExp(`\\b${sig.name}\\s*\\(`);
+      const usedIn = [];
+      for (const [otherFile, otherText] of fileTexts) {
+        if (otherFile === file) continue;
+        if (callRe.test(otherText)) usedIn.push(path.relative(root, otherFile).split(path.sep).join("/"));
+      }
+      const features = new Set([featureOf(relFile), ...usedIn.map(featureOf)]);
+      out.push({
+        name: sig.name,
+        file: relFile,
+        feature: featureOf(relFile),
+        params: sig.params.length,
+        usedIn: usedIn.sort((a, b) => a.localeCompare(b)),
+        crossFeatureUseCount: features.size - 1,
+        composesRegistry: registryComponents.some((c) => new RegExp(`\\b${c.name}\\s*\\(`).test(sig.body)),
+      });
+    }
+  }
+  out.sort((a, b) => b.crossFeatureUseCount - a.crossFeatureUseCount || a.name.localeCompare(b.name));
+  return out;
 }
