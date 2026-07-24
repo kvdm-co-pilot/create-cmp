@@ -21,15 +21,14 @@ import {
 import { resetApprovalsBridgeCache } from "../src/lib/approvals-bridge.mjs";
 import { resetCommentsBridgeCache } from "../src/lib/comments-bridge.mjs";
 import { resetReceiptBridgeCache } from "../src/lib/receipt-bridge.mjs";
+import { copyProjectLib } from "./fixtures/copy-project-lib.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REAL_APPROVALS_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "approvals.mjs");
-// approvals.mjs statically imports arch-doc.mjs (AD-1 Wave B — the
-// `architecture` artifact's doc-hashing basis) — every fixture below that
-// copies the REAL approvals.mjs must ship this alongside it, or the dynamic
-// import fails at load time (module not found), not at any
-// architecture-artifact-specific call site.
-const REAL_ARCH_DOC_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "arch-doc.mjs");
+// copyProjectLib ships approvals.mjs WITH its static relative imports
+// (arch-doc.mjs, intent-checks.mjs, …) — a missing sibling fails the bridge's
+// dynamic import at load time, which reads as "the whole library is absent"
+// rather than as anything specific. The set is derived from the source, so a
+// newly added sibling import copies itself (see fixtures/copy-project-lib.mjs).
 const REAL_APP_BASE_SPEC = path.join(HERE, "..", "..", "..", "template", "specs", "app-base.spec.md");
 const REAL_ARCHITECTURE_DOC = path.join(HERE, "..", "..", "..", "template", "docs", "ARCHITECTURE.md");
 const REAL_INPUTS_HASH_LIB = path.join(HERE, "..", "..", "..", "template", "qa", "lib", "inputs-hash.mjs");
@@ -78,8 +77,7 @@ function makeApprovalsFixtureProject() {
   fs.writeFileSync(path.join(themeDir, "Tokens.kt"), "object AcmeTokens\n");
   const libDir = path.join(root, "qa", "lib");
   fs.mkdirSync(libDir, { recursive: true });
-  fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
-  fs.copyFileSync(REAL_ARCH_DOC_LIB, path.join(libDir, "arch-doc.mjs"));
+  copyProjectLib(libDir, "approvals.mjs");
   return root;
 }
 
@@ -122,8 +120,7 @@ function makeComponentsFixtureProject() {
   );
   const libDir = path.join(root, "qa", "lib");
   fs.mkdirSync(libDir, { recursive: true });
-  fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
-  fs.copyFileSync(REAL_ARCH_DOC_LIB, path.join(libDir, "arch-doc.mjs"));
+  copyProjectLib(libDir, "approvals.mjs");
   return { root, componentsDir };
 }
 
@@ -192,8 +189,7 @@ async function makeArchitectureFixtureProject() {
 
   const libDir = path.join(root, "qa", "lib");
   fs.mkdirSync(libDir, { recursive: true });
-  fs.copyFileSync(REAL_APPROVALS_LIB, path.join(libDir, "approvals.mjs"));
-  fs.copyFileSync(REAL_ARCH_DOC_LIB, path.join(libDir, "arch-doc.mjs"));
+  copyProjectLib(libDir, "approvals.mjs");
   fs.copyFileSync(REAL_INPUTS_HASH_LIB, path.join(libDir, "inputs-hash.mjs"));
 
   // The evidence receipt: computed with the REAL algorithm over the tree as
@@ -494,10 +490,14 @@ test("galleryHtml (§2 rail): sections in the genesis definition order, Intent f
   // evidence, derived from committed manifests), Digest is the returning
   // human's since-you-last-looked read, and Live device is deliberately LAST —
   // the console arc ends DRIVE (A1).
+  // Features (the post-genesis delivery board) joins the definition cluster
+  // right after Specs: a feature's walk — brief, spec, build, deliver, accept —
+  // starts there, before the screens it produces.
   assert.deepEqual(order, [
     "intent",
     "architecture",
     "specs",
+    "features",
     "screens",
     "design-system",
     "components",

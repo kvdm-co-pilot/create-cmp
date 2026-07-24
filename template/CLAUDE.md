@@ -131,6 +131,61 @@ a provisional palette carries the build until then).
 6. **Per-feature spec** — `specs/<feature>.spec.md`, one governed artifact per feature,
    added as features land.
 
+### After genesis — the feature walk
+
+Genesis governs the app's birth. A feature added later gets the same treatment in
+miniature, and the same two disciplines (behavior spec-first, visuals UI-first):
+
+| Step | What | When |
+|---|---|---|
+| 1 | **Feature brief** — `docs/proposals/<name>.md` + its `cmp:intent-checks` block, approved BEFORE code | when the change carries decisions or blast radius |
+| 2 | **Feature spec** — `MEAL-01`… clauses confirmed before implementing | always |
+| 3 | Build the slice (`add-feature`) | always |
+| 4–6 | Re-approve `design-system` / `components` / `architecture` | only the ones the change actually touched — the hashes say which |
+| 7 | `--deliver`, then the human's `--accept` | at done |
+
+**Not every change needs a brief.** A copy fix, a small bug fix, a spike: spec clause →
+code → verify, exactly as before; the standing drift gates still cover it. Write a brief
+when the change carries **decisions a future contributor could plausibly "simplify" away**
+("the day boundary is configurable, default 04:00 — not midnight") or **declared blast
+radius** into other governed artifacts. Legacy features never get retro-briefs.
+
+A brief is an ordinary document until you add the block — the block is the opt-in, and it
+turns the doc into a governed `feature-intent:<name>` artifact:
+
+```json cmp:intent-checks
+{
+  "touches": ["components", "design-system"],
+  "checks": [
+    { "id": "clauses", "kind": "spec-clauses", "file": "specs/meal.spec.md", "clauses": ["MEAL-01"] },
+    { "id": "day-boundary", "kind": "pattern", "file": "…/ProfileEntity.kt", "pattern": "dayStartHour" },
+    { "id": "tray", "kind": "file-exists", "file": "…/AddToMealScreen.kt" }
+  ]
+}
+```
+
+- **Checks are mechanical only** (`file-exists`, `pattern`, `spec-clauses`) — presence of
+  what was promised. Quality lives in the tests; a check that needs judgment belongs in the
+  prose a human reads, not in a gate that fails a build. Keep 3–10 of them.
+- **`touches` declares, it does not enforce** — the artifact hashes already enforce.
+  Declaring is what lets the console show "components re-approval, as planned" instead of
+  an unexplained failure, and surface **undeclared blast** when something drifted that no
+  open brief accounted for.
+- **Delivery state lives in the ledger, never in the doc.** The brief's bytes are hash-bound
+  from approval on; if `delivered` lived in the prose, claiming done would read as drift.
+
+| Command | What |
+|---|---|
+| `node qa/approve.mjs feature-intent:<name>` | the human signs the brief (before code) |
+| `node qa/approve.mjs --deliver <name>` | **your** claim of done — ARMS the checks: from here any unsatisfied one FAILs the lane |
+| `node qa/approve.mjs --accept <name>` | the human's bookend; refused while any armed check fails |
+
+The lane's `intentChecks` step: SKIP while briefs are building (checks informational),
+FAIL when a *delivered* brief's checks don't hold, and FAIL for a malformed block whether
+delivered or not. So "the feature is done" is an assertion the harness can refuse, not a
+sentence in your summary. Editing a feature is the same brief **reopened** — that reopens
+the set it declared, and re-approval is one walk back.
+
 | Command | What |
 |---|---|
 | `node qa/approve.mjs --status` | Every governed artifact with live state (`unreviewed` / `approved` / `changed-since-approval` / `reopened`), short hash, mode badge |

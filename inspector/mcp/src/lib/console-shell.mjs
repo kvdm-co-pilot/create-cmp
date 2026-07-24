@@ -595,4 +595,29 @@ export const SHELL_CSS = `
     border: 1px solid var(--line); background: var(--surface); color: inherit; cursor: pointer; }
   .comment-submit { border-color: var(--accent) !important; background: var(--accent) !important; color: var(--accent-ink); }
   .comment-error { color: var(--drift); font-size: var(--fs-meta); margin: 0; }
+
+  /* --- features (the post-genesis delivery board) --- */
+  .feature-board { display: flex; flex-direction: column; gap: 14px; }
+  .feature-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--surface); }
+  .feature-card-closed { opacity: 0.65; }
+  .feature-card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .feature-card-head h3 { margin: 0; }
+  .feature-phase { font-size: var(--fs-meta); font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
+  .phase-proposed { color: var(--muted); }
+  .phase-approved { color: var(--accent); border-color: var(--accent); }
+  .phase-delivered { color: var(--reopen); border-color: var(--reopen); }
+  .phase-accepted { color: var(--ok, #3a8f5a); border-color: currentColor; }
+  .phase-drift, .phase-reopened { color: var(--drift); border-color: var(--drift); }
+  .feature-tally { color: var(--muted); font-size: var(--fs-meta); }
+  .feature-doc-link { margin-left: auto; color: var(--muted); font-size: var(--fs-meta); text-decoration: none; }
+  .feature-touches { font-size: var(--fs-meta); margin: 6px 0; }
+  .feature-as-declared { color: var(--muted); font-style: italic; }
+  .feature-checks { margin-top: 6px; }
+  .feature-check-detail { color: var(--muted); }
+  .pending-inline { color: var(--muted); }
+  .feature-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
+  .feature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  .feature-undeclared { border: 1px solid var(--drift); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
+    font-size: var(--fs-meta); }
 `;

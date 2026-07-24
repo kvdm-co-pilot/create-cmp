@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs b4a27728772525ce1a7787a362bf6e03b6f8cac93492be144a3acb9daad99889
+// cmp:bundle-inputs 1b2bd8b2f60cf1173ca7627a5fdd68ad7d2d3ae9efe4bcbfbb407a1a7fecc726
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32235,7 +32235,7 @@ async function approveArtifact(root, artifactId) {
     };
   }
   try {
-    return lib.approveArtifact(root, artifactId);
+    return lib.approveArtifact(root, artifactId, { via: "console" });
   } catch (err) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
   }
@@ -32256,6 +32256,35 @@ async function reopenArtifact(root, artifactId) {
   }
   try {
     return lib.reopenArtifact(root, artifactId);
+  } catch (err) {
+    return { ok: false, reason: err && err.message ? err.message : String(err) };
+  }
+}
+async function getFeatureBoard(root) {
+  const lib = await loadLib(root);
+  if (!lib || typeof lib.getFeatureBoard !== "function") return { available: false };
+  try {
+    return { available: true, board: lib.getFeatureBoard(root) };
+  } catch (err) {
+    return { available: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+async function acceptFeature(root, name) {
+  const lib = await loadLib(root);
+  if (!lib) {
+    return {
+      ok: false,
+      reason: "the approvals library (qa/lib/approvals.mjs) is not present in this project \u2014 this looks like an older scaffold that predates the approvals wave."
+    };
+  }
+  if (typeof lib.acceptFeature !== "function") {
+    return {
+      ok: false,
+      reason: "this project's qa/lib/approvals.mjs predates the feature-intent wave (no acceptFeature export) \u2014 upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock feature acceptance."
+    };
+  }
+  try {
+    return lib.acceptFeature(root, name);
   } catch (err) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
   }
@@ -34148,6 +34177,31 @@ var SHELL_CSS = `
     border: 1px solid var(--line); background: var(--surface); color: inherit; cursor: pointer; }
   .comment-submit { border-color: var(--accent) !important; background: var(--accent) !important; color: var(--accent-ink); }
   .comment-error { color: var(--drift); font-size: var(--fs-meta); margin: 0; }
+
+  /* --- features (the post-genesis delivery board) --- */
+  .feature-board { display: flex; flex-direction: column; gap: 14px; }
+  .feature-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--surface); }
+  .feature-card-closed { opacity: 0.65; }
+  .feature-card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .feature-card-head h3 { margin: 0; }
+  .feature-phase { font-size: var(--fs-meta); font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
+  .phase-proposed { color: var(--muted); }
+  .phase-approved { color: var(--accent); border-color: var(--accent); }
+  .phase-delivered { color: var(--reopen); border-color: var(--reopen); }
+  .phase-accepted { color: var(--ok, #3a8f5a); border-color: currentColor; }
+  .phase-drift, .phase-reopened { color: var(--drift); border-color: var(--drift); }
+  .feature-tally { color: var(--muted); font-size: var(--fs-meta); }
+  .feature-doc-link { margin-left: auto; color: var(--muted); font-size: var(--fs-meta); text-decoration: none; }
+  .feature-touches { font-size: var(--fs-meta); margin: 6px 0; }
+  .feature-as-declared { color: var(--muted); font-style: italic; }
+  .feature-checks { margin-top: 6px; }
+  .feature-check-detail { color: var(--muted); }
+  .pending-inline { color: var(--muted); }
+  .feature-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
+  .feature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  .feature-undeclared { border: 1px solid var(--drift); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
+    font-size: var(--fs-meta); }
 `;
 
 // src/lib/design-language.mjs
@@ -35632,6 +35686,66 @@ ${lane}
 ${approvals}
 ${commits}`;
 }
+function featuresTabHtml(features, meta3 = {}) {
+  if (!features || !features.available) {
+    return `  <p class="empty-inline">feature briefs are not available in this project \u2014 qa/lib/approvals.mjs predates the feature-intent wave (or is absent). A feature brief is a docs/proposals/&lt;name&gt;.md carrying a <code>cmp:intent-checks</code> block.</p>`;
+  }
+  const { board } = features;
+  if (!board || board.features.length === 0) {
+    return `  <p class="empty-inline">no feature briefs yet. A brief is born by adding a <code>cmp:intent-checks</code> block (checks + declared touches) to a doc under <code>docs/proposals/</code> \u2014 it then appears here as a governed <code>feature-intent</code> artifact, approved BEFORE the feature is built.</p>`;
+  }
+  const undeclared = board.undeclared.length > 0 ? `  <div class="feature-undeclared"><strong>Undeclared blast:</strong> ${board.undeclared.map((u) => `<code>${esc4(u.id)}</code>`).join(", ")} changed since approval, and no open brief declared touching ${board.undeclared.length === 1 ? "it" : "them"} \u2014 either a brief's <code>touches</code> is incomplete, or this drift belongs to no feature. The approvals gate is already failing on it; the plan should say why.</div>` : "";
+  const phaseChip = (phase) => {
+    const cls = phase === "accepted" ? "phase-accepted" : phase === "delivered" ? "phase-delivered" : phase === "approved" ? "phase-approved" : phase === "changed-since-approval" ? "phase-drift" : phase === "reopened" ? "phase-reopened" : "phase-proposed";
+    return `<span class="feature-phase ${cls}">${esc4(phase)}</span>`;
+  };
+  const cards = board.features.map((f) => {
+    const armed = f.record && f.record.delivered && !f.record.accepted;
+    const checksRows = f.checks.results.map((r) => {
+      const mark = r.ok ? `<span class="ok-inline">\u2713</span>` : `<span class="${armed ? "bad-inline" : "pending-inline"}">${armed ? "\u2717" : "\u25CB"}</span>`;
+      return `      <tr><td>${mark}</td><td><code>${esc4(r.id)}</code></td><td class="feature-check-detail">${esc4(r.detail)}</td></tr>`;
+    }).join("\n");
+    const checksTable = f.checks.total > 0 || f.checks.error ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>check</th><th>${armed ? "armed \u2014 a \u2717 here is the lane's FAIL" : "informational until delivered"}</th></tr></thead><tbody>
+${checksRows}
+    </tbody></table>` : `    <p class="empty-inline">the brief's cmp:intent-checks block has zero checks \u2014 delivery cannot be claimed mechanically until it promises something checkable.</p>`;
+    const touches = f.touches.length > 0 ? `    <p class="feature-touches">declares touching: ${f.touches.map((t) => {
+      const drifted = t.status === "changed-since-approval";
+      const note = drifted ? ` <span class="feature-as-declared">(as declared \u2014 re-approve when shaped)</span>` : "";
+      return `<code>${esc4(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc4(t.status)}</span>${note}`;
+    }).join(" \xB7 ")}</p>` : `    <p class="feature-touches meta">declares touching nothing beyond its own spec</p>`;
+    const stamps = [];
+    if (f.record && f.record.approvedAt) stamps.push(`approved ${esc4(f.record.approvedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}`);
+    if (f.record && f.record.delivered) stamps.push(`delivered ${esc4(f.record.deliveredAt ?? "?")}`);
+    if (f.record && f.record.accepted) stamps.push(`accepted ${esc4(f.record.acceptedAt ?? "?")}`);
+    const actions = [];
+    if (f.phase === "proposed" || f.phase === "changed-since-approval") {
+      actions.push(`<button type="button" class="approve-btn" data-artifact="feature-intent:${escAttr(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
+    }
+    if (f.phase === "delivered" && f.checks.satisfied === f.checks.total && f.checks.total > 0) {
+      actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr(f.name)}">Accept delivery</button>`);
+    }
+    if (f.phase === "approved") {
+      actions.push(`<span class="meta">building \u2014 agent claims done with <code>node qa/approve.mjs --deliver ${esc4(f.name)}</code></span>`);
+    }
+    return `  <article class="feature-card${f.phase === "accepted" ? " feature-card-closed" : ""}">
+    <header class="feature-card-head">
+      <h3>${esc4(f.name)}</h3>
+      ${phaseChip(f.phase)}
+      <span class="feature-tally">${f.checks.satisfied}/${f.checks.total} checks</span>
+      <a class="feature-doc-link" href="#" title="${escAttr(f.rel)}">${esc4(f.rel)}</a>
+    </header>
+    ${stamps.length > 0 ? `<p class="meta">${stamps.join(" \xB7 ")}</p>` : ""}
+${touches}
+${checksTable}
+    ${actions.length > 0 ? `<div class="feature-actions">${actions.join(" ")}</div>` : ""}
+  </article>`;
+  }).join("\n");
+  return `${undeclared}
+  <div class="feature-board">
+${cards}
+  </div>
+  <p class="empty-inline" id="feature-error" hidden></p>`;
+}
 
 // src/lib/intent.mjs
 import fs13 from "node:fs";
@@ -35827,6 +35941,7 @@ function galleryHtml(state) {
     treeHash = null,
     tokenUsage = null,
     intent = { available: false },
+    features = { available: false },
     // PW-5: the productization surfaces — each degrades to an honest empty
     // state when its data provider wasn't wired by the caller.
     walkthrough = { available: false, runs: [] },
@@ -35917,6 +36032,21 @@ function galleryHtml(state) {
     approvalsStatus = parts.join(" &middot; ");
   }
   const commentsStatus = comments.available ? `${openCommentCount} open &middot; ${comments.comments.length - openCommentCount} resolved` : "comments ledger not available in this project";
+  let featuresStatus = "no feature briefs yet";
+  let deliveredAwaiting = 0;
+  if (features.available && features.board && features.board.features.length > 0) {
+    const briefs = features.board.features;
+    const n = (ph) => briefs.filter((f) => f.phase === ph).length;
+    deliveredAwaiting = n("delivered");
+    const parts = [`${briefs.length} brief${briefs.length === 1 ? "" : "s"}`];
+    if (n("proposed")) parts.push(`${n("proposed")} awaiting sign-off`);
+    if (n("approved")) parts.push(`${n("approved")} building`);
+    if (deliveredAwaiting) parts.push(`${deliveredAwaiting} delivered \u2014 acceptance pending`);
+    if (n("accepted")) parts.push(`${n("accepted")} accepted`);
+    if (n("changed-since-approval")) parts.push(`<span class="status-drift">${n("changed-since-approval")} drifted</span>`);
+    if (features.board.undeclared.length > 0) parts.push(`<span class="status-drift">undeclared blast</span>`);
+    featuresStatus = parts.join(" &middot; ");
+  }
   const railItems = [
     // §3.0: Intent is genesis order 0 — the root artifact everything else is
     // expressed in — so it leads the rail. The rest follows the REVISED
@@ -35926,6 +36056,15 @@ function galleryHtml(state) {
     { id: "intent", label: "Intent", glyph: statusGlyph(intentRecord) },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
     { id: "specs", label: "Specs", glyph: null },
+    // The post-genesis delivery board sits with the definition cluster: a
+    // feature's walk (brief → spec → build → deliver → accept) starts here.
+    // The glyph marks the one state waiting on the HUMAN in this section: a
+    // delivered brief pending acceptance.
+    {
+      id: "features",
+      label: "Features",
+      glyph: deliveredAwaiting > 0 ? { ch: "\u25CF", cls: "glyph-unsigned", label: `${deliveredAwaiting} delivered \u2014 acceptance pending` } : null
+    },
     { id: "screens", label: "Screens", glyph: null, active: true },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
@@ -35970,6 +36109,7 @@ function galleryHtml(state) {
     },
     // §3.5: the RTM's last-receipt column reads the same receipt as Evidence.
     { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt }) },
+    { id: "features", title: "Features", statusHtml: featuresStatus, bodyHtml: featuresTabHtml(features) },
     {
       id: "screens",
       title: "Screens",
@@ -36074,6 +36214,18 @@ function galleryHtml(state) {
         } else {
           location.reload(); // fallback: unexpected markup \u2014 the old behavior
         }
+        // The Features board reads the same ledger, so every approval-family
+        // transition (approve / reopen / deliver / accept) refreshes it too \u2014
+        // same in-place swap, same re-wiring of its buttons.
+        const freshFeatures = doc.querySelector("#tab-features");
+        const curFeatures = document.querySelector("#tab-features");
+        if (freshFeatures && curFeatures) {
+          const wasActive = curFeatures.classList.contains("active");
+          curFeatures.innerHTML = freshFeatures.innerHTML;
+          if (wasActive) curFeatures.classList.add("active");
+          wireApproveButtons(curFeatures);
+          wireFeatureAcceptButtons(curFeatures);
+        }
       }).catch(() => location.reload());
     }
     // Comments refresh IN PLACE too (\xA77.3, same VL-6 pattern as approvals):
@@ -36175,6 +36327,40 @@ function galleryHtml(state) {
   });
   }
   wireApproveButtons(document);
+  // Feature acceptance \u2014 POST /api/feature/accept; confirmed by the server's
+  // SSE "approval" broadcast (the Features panel swaps in place), same
+  // no-self-mutation contract as approve/reopen. Refusals (checks failing,
+  // not delivered, older project lib) surface in #feature-error verbatim.
+  function wireFeatureAcceptButtons(scope) {
+  scope.querySelectorAll(".feature-accept-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const name = btn.dataset.name;
+      const errBox = document.getElementById("feature-error");
+      if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Accepting\u2026";
+      try {
+        const res = await fetch("/api/feature/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const body = await res.json();
+        if (!body.ok) {
+          if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "acceptance refused"; }
+          btn.disabled = false;
+          btn.textContent = original;
+        }
+      } catch (err) {
+        if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  });
+  }
+  wireFeatureAcceptButtons(document);
   // Reopen (\xA72/\xA73) \u2014 POST /api/reopen; confirmed the same way approve is: the
   // server's SSE "approval" broadcast (reopen reuses that event type \u2014 it's
   // still just "an artifact's status changed", the same in-place refresh
@@ -37068,9 +37254,10 @@ function createPreviewService(opts) {
         } catch {
         }
         const walkthrough = getWalkthroughData(projectDir);
-        const [liveDevice, digest] = await Promise.all([
+        const [liveDevice, digest, featureBoard] = await Promise.all([
           getLiveDeviceStatus({ port: inspectorPort }),
-          getDigestData(projectDir, { execFileAsync })
+          getDigestData(projectDir, { execFileAsync }),
+          getFeatureBoard(projectDir)
         ]);
         const anchoredDiffs = {};
         if (approvals.available) {
@@ -37105,6 +37292,7 @@ function createPreviewService(opts) {
             treeHash,
             tokenUsage,
             intent,
+            features: featureBoard,
             walkthrough,
             liveDevice,
             liveSession: liveSession.status(),
@@ -37188,6 +37376,36 @@ function createPreviewService(opts) {
         if (result.ok) {
           touch("reopen");
           broadcast({ type: "approval", artifact });
+          void checkApprovalWaiters();
+        }
+        return;
+      }
+      if (url2.pathname === "/api/feature/accept") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          res.end(JSON.stringify({ ok: false, reason: "method not allowed \u2014 use POST" }));
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse(await readBody(req) || "{}");
+        } catch (err) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: `invalid JSON body: ${err.message}` }));
+          return;
+        }
+        const name = body && body.name;
+        if (!name || typeof name !== "string") {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: "missing `name` (string \u2014 the brief's docs/proposals/<name>.md name) in the request body" }));
+          return;
+        }
+        const result = await acceptFeature(projectDir, name);
+        res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
+        res.end(JSON.stringify(result));
+        if (result.ok) {
+          touch("feature-accept");
+          broadcast({ type: "approval", artifact: `feature-intent:${name}` });
           void checkApprovalWaiters();
         }
         return;

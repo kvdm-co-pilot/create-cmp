@@ -89,7 +89,10 @@ export async function approveArtifact(root, artifactId) {
     };
   }
   try {
-    return lib.approveArtifact(root, artifactId);
+    // `via` is an audit field on the ledger row ("which surface did this
+    // signature come through") — older project libs simply ignore unknown
+    // options, so this stays compatible with pre-feature-intent scaffolds.
+    return lib.approveArtifact(root, artifactId, { via: "console" });
   } catch (err) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
   }
@@ -130,6 +133,57 @@ export async function reopenArtifact(root, artifactId) {
   }
   try {
     return lib.reopenArtifact(root, artifactId);
+  } catch (err) {
+    return { ok: false, reason: err && err.message ? err.message : String(err) };
+  }
+}
+
+/**
+ * The Features board (feature briefs + lifecycle + declared-vs-actual blast
+ * radius), via the project's own library. Degrades to { available: false } for
+ * projects whose approvals lib predates the feature-intent wave (no
+ * getFeatureBoard export) — the section renders its empty-state explanation,
+ * never a crash.
+ * @param {string} root
+ * @returns {Promise<{available: true, board: object} | {available: false, error?: string}>}
+ */
+export async function getFeatureBoard(root) {
+  const lib = await loadLib(root);
+  if (!lib || typeof lib.getFeatureBoard !== "function") return { available: false };
+  try {
+    return { available: true, board: lib.getFeatureBoard(root) };
+  } catch (err) {
+    return { available: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+/**
+ * The human's acceptance of a delivered feature brief, via the project's own
+ * library — which refuses while any armed check fails (accepting a red
+ * delivery is refused there, not here; this bridge adds nothing).
+ * @param {string} root
+ * @param {string} name the brief's name (docs/proposals/<name>.md)
+ */
+export async function acceptFeature(root, name) {
+  const lib = await loadLib(root);
+  if (!lib) {
+    return {
+      ok: false,
+      reason:
+        "the approvals library (qa/lib/approvals.mjs) is not present in this project — " +
+        "this looks like an older scaffold that predates the approvals wave.",
+    };
+  }
+  if (typeof lib.acceptFeature !== "function") {
+    return {
+      ok: false,
+      reason:
+        "this project's qa/lib/approvals.mjs predates the feature-intent wave (no acceptFeature export) — " +
+        "upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock feature acceptance.",
+    };
+  }
+  try {
+    return lib.acceptFeature(root, name);
   } catch (err) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
   }

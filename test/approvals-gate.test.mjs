@@ -452,8 +452,9 @@ test("verify.mjs registers the approvals step in the scaffold and local (and the
   const out = await makeProject("cmp-appr-wiring-");
   try {
     const text = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
-    assert.match(text, /import \{ evaluateApprovalsGate \} from "\.\/lib\/approvals\.mjs";/);
+    assert.match(text, /import \{ evaluateApprovalsGate, evaluateIntentChecksGate \} from "\.\/lib\/approvals\.mjs";/);
     assert.match(text, /function stepApprovals\(\)/);
+    assert.match(text, /function stepIntentChecks\(\)/);
 
     const scaffoldArrayMatch = text.match(/scaffold:\s*\[([^\]]*)\]/);
     const localArrayMatch = text.match(/local:\s*\[([^\]]*)\]/);

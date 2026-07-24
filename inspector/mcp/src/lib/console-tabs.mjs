@@ -2233,3 +2233,123 @@ ${lane}
 ${approvals}
 ${commits}`;
 }
+
+/**
+ * §Features — the post-genesis delivery board: one card per feature brief
+ * (docs/proposals/*.md carrying a cmp:intent-checks block), rendering the
+ * brief's full lifecycle from the project's own library (getFeatureBoard —
+ * this file composes NOTHING; the model lives in the project's qa/lib).
+ *
+ * The card is the feature walk made visible:
+ *   proposed  → the human approves the brief (before code — the Approve button)
+ *   approved  → the agent builds; checks are informational (n/m)
+ *   delivered → the agent claimed done; checks are ARMED (a failing one is the
+ *               lane's FAIL, shown red here)
+ *   accepted  → the human's bookend; the card is history
+ *
+ * Declared-vs-actual blast radius is the spec-mirror-drift principle applied
+ * to PLANS: `touches` is what the brief declared it would invalidate; each
+ * entry renders with the touched artifact's LIVE status — drift on a declared
+ * artifact reads "as declared" (expected re-approval), and drift nowhere
+ * declared surfaces in the `undeclared` banner as plan-drift.
+ */
+export function featuresTabHtml(features, meta = {}) {
+  if (!features || !features.available) {
+    return `  <p class="empty-inline">feature briefs are not available in this project — qa/lib/approvals.mjs predates the feature-intent wave (or is absent). A feature brief is a docs/proposals/&lt;name&gt;.md carrying a <code>cmp:intent-checks</code> block.</p>`;
+  }
+  const { board } = features;
+  if (!board || board.features.length === 0) {
+    return `  <p class="empty-inline">no feature briefs yet. A brief is born by adding a <code>cmp:intent-checks</code> block (checks + declared touches) to a doc under <code>docs/proposals/</code> — it then appears here as a governed <code>feature-intent</code> artifact, approved BEFORE the feature is built.</p>`;
+  }
+
+  const undeclared =
+    board.undeclared.length > 0
+      ? `  <div class="feature-undeclared"><strong>Undeclared blast:</strong> ${board.undeclared
+          .map((u) => `<code>${esc(u.id)}</code>`)
+          .join(", ")} changed since approval, and no open brief declared touching ${board.undeclared.length === 1 ? "it" : "them"} — either a brief's <code>touches</code> is incomplete, or this drift belongs to no feature. The approvals gate is already failing on it; the plan should say why.</div>`
+      : "";
+
+  const phaseChip = (phase) => {
+    const cls =
+      phase === "accepted"
+        ? "phase-accepted"
+        : phase === "delivered"
+          ? "phase-delivered"
+          : phase === "approved"
+            ? "phase-approved"
+            : phase === "changed-since-approval"
+              ? "phase-drift"
+              : phase === "reopened"
+                ? "phase-reopened"
+                : "phase-proposed";
+    return `<span class="feature-phase ${cls}">${esc(phase)}</span>`;
+  };
+
+  const cards = board.features
+    .map((f) => {
+      const armed = f.record && f.record.delivered && !f.record.accepted;
+      const checksRows = f.checks.results
+        .map((r) => {
+          const mark = r.ok ? `<span class="ok-inline">✓</span>` : `<span class="${armed ? "bad-inline" : "pending-inline"}">${armed ? "✗" : "○"}</span>`;
+          return `      <tr><td>${mark}</td><td><code>${esc(r.id)}</code></td><td class="feature-check-detail">${esc(r.detail)}</td></tr>`;
+        })
+        .join("\n");
+      const checksTable =
+        f.checks.total > 0 || f.checks.error
+          ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>check</th><th>${
+              armed ? "armed — a ✗ here is the lane's FAIL" : "informational until delivered"
+            }</th></tr></thead><tbody>\n${checksRows}\n    </tbody></table>`
+          : `    <p class="empty-inline">the brief's cmp:intent-checks block has zero checks — delivery cannot be claimed mechanically until it promises something checkable.</p>`;
+
+      const touches =
+        f.touches.length > 0
+          ? `    <p class="feature-touches">declares touching: ${f.touches
+              .map((t) => {
+                const drifted = t.status === "changed-since-approval";
+                const note = drifted ? ` <span class="feature-as-declared">(as declared — re-approve when shaped)</span>` : "";
+                return `<code>${esc(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc(t.status)}</span>${note}`;
+              })
+              .join(" · ")}</p>`
+          : `    <p class="feature-touches meta">declares touching nothing beyond its own spec</p>`;
+
+      const stamps = [];
+      if (f.record && f.record.approvedAt) stamps.push(`approved ${esc(f.record.approvedAt)}${f.record.via ? ` via ${esc(f.record.via)}` : ""}`);
+      if (f.record && f.record.delivered) stamps.push(`delivered ${esc(f.record.deliveredAt ?? "?")}`);
+      if (f.record && f.record.accepted) stamps.push(`accepted ${esc(f.record.acceptedAt ?? "?")}`);
+
+      // The three human/agent moments, each offered only when it is the real
+      // next step: Approve (unsigned or drifted brief), Accept (delivered,
+      // green, unaccepted), and the agent's --deliver rendered as a hint (it
+      // is the AGENT's claim — the console never claims done on its behalf).
+      const actions = [];
+      if (f.phase === "proposed" || f.phase === "changed-since-approval") {
+        actions.push(`<button type="button" class="approve-btn" data-artifact="feature-intent:${escAttr(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
+      }
+      if (f.phase === "delivered" && f.checks.satisfied === f.checks.total && f.checks.total > 0) {
+        actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr(f.name)}">Accept delivery</button>`);
+      }
+      if (f.phase === "approved") {
+        actions.push(`<span class="meta">building — agent claims done with <code>node qa/approve.mjs --deliver ${esc(f.name)}</code></span>`);
+      }
+
+      return `  <article class="feature-card${f.phase === "accepted" ? " feature-card-closed" : ""}">
+    <header class="feature-card-head">
+      <h3>${esc(f.name)}</h3>
+      ${phaseChip(f.phase)}
+      <span class="feature-tally">${f.checks.satisfied}/${f.checks.total} checks</span>
+      <a class="feature-doc-link" href="#" title="${escAttr(f.rel)}">${esc(f.rel)}</a>
+    </header>
+    ${stamps.length > 0 ? `<p class="meta">${stamps.join(" · ")}</p>` : ""}
+${touches}
+${checksTable}
+    ${actions.length > 0 ? `<div class="feature-actions">${actions.join(" ")}</div>` : ""}
+  </article>`;
+    })
+    .join("\n");
+
+  return `${undeclared}
+  <div class="feature-board">
+${cards}
+  </div>
+  <p class="empty-inline" id="feature-error" hidden></p>`;
+}

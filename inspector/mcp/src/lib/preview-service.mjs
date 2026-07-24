@@ -39,6 +39,8 @@ import {
   getApprovalsData,
   approveArtifact as approveArtifactViaLib,
   reopenArtifact as reopenArtifactViaLib,
+  getFeatureBoard as getFeatureBoardViaLib,
+  acceptFeature as acceptFeatureViaLib,
 } from "./approvals-bridge.mjs";
 import {
   getCommentsData,
@@ -70,6 +72,7 @@ import {
   walkthroughTabHtml,
   liveDeviceTabHtml,
   digestTabHtml,
+  featuresTabHtml,
 } from "./console-tabs.mjs";
 import { getTokenUsage } from "./design-language.mjs";
 import { getIntentData } from "./intent.mjs";
@@ -327,6 +330,7 @@ export function galleryHtml(state) {
     treeHash = null,
     tokenUsage = null,
     intent = { available: false },
+    features = { available: false },
     // PW-5: the productization surfaces — each degrades to an honest empty
     // state when its data provider wasn't wired by the caller.
     walkthrough = { available: false, runs: [] },
@@ -485,6 +489,24 @@ export function galleryHtml(state) {
     ? `${openCommentCount} open &middot; ${comments.comments.length - openCommentCount} resolved`
     : "comments ledger not available in this project";
 
+  // Features (the post-genesis delivery board): phase tallies from the
+  // project's own getFeatureBoard — facts only, no fabricated zeros.
+  let featuresStatus = "no feature briefs yet";
+  let deliveredAwaiting = 0;
+  if (features.available && features.board && features.board.features.length > 0) {
+    const briefs = features.board.features;
+    const n = (ph) => briefs.filter((f) => f.phase === ph).length;
+    deliveredAwaiting = n("delivered");
+    const parts = [`${briefs.length} brief${briefs.length === 1 ? "" : "s"}`];
+    if (n("proposed")) parts.push(`${n("proposed")} awaiting sign-off`);
+    if (n("approved")) parts.push(`${n("approved")} building`);
+    if (deliveredAwaiting) parts.push(`${deliveredAwaiting} delivered — acceptance pending`);
+    if (n("accepted")) parts.push(`${n("accepted")} accepted`);
+    if (n("changed-since-approval")) parts.push(`<span class="status-drift">${n("changed-since-approval")} drifted</span>`);
+    if (features.board.undeclared.length > 0) parts.push(`<span class="status-drift">undeclared blast</span>`);
+    featuresStatus = parts.join(" &middot; ");
+  }
+
   // Rail + sections share one order: the genesis definition order (§2), with
   // the cross-cutting ledgers (Approvals, Comments) after the artifact pages.
   // Screens stays the DEFAULT page — the daily hot-reload surface.
@@ -497,6 +519,15 @@ export function galleryHtml(state) {
     { id: "intent", label: "Intent", glyph: statusGlyph(intentRecord) },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
     { id: "specs", label: "Specs", glyph: null },
+    // The post-genesis delivery board sits with the definition cluster: a
+    // feature's walk (brief → spec → build → deliver → accept) starts here.
+    // The glyph marks the one state waiting on the HUMAN in this section: a
+    // delivered brief pending acceptance.
+    {
+      id: "features",
+      label: "Features",
+      glyph: deliveredAwaiting > 0 ? { ch: "●", cls: "glyph-unsigned", label: `${deliveredAwaiting} delivered — acceptance pending` } : null,
+    },
     { id: "screens", label: "Screens", glyph: null, active: true },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
@@ -542,6 +573,7 @@ export function galleryHtml(state) {
     },
     // §3.5: the RTM's last-receipt column reads the same receipt as Evidence.
     { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt }) },
+    { id: "features", title: "Features", statusHtml: featuresStatus, bodyHtml: featuresTabHtml(features) },
     {
       id: "screens",
       title: "Screens",
@@ -652,6 +684,18 @@ export function galleryHtml(state) {
         } else {
           location.reload(); // fallback: unexpected markup — the old behavior
         }
+        // The Features board reads the same ledger, so every approval-family
+        // transition (approve / reopen / deliver / accept) refreshes it too —
+        // same in-place swap, same re-wiring of its buttons.
+        const freshFeatures = doc.querySelector("#tab-features");
+        const curFeatures = document.querySelector("#tab-features");
+        if (freshFeatures && curFeatures) {
+          const wasActive = curFeatures.classList.contains("active");
+          curFeatures.innerHTML = freshFeatures.innerHTML;
+          if (wasActive) curFeatures.classList.add("active");
+          wireApproveButtons(curFeatures);
+          wireFeatureAcceptButtons(curFeatures);
+        }
       }).catch(() => location.reload());
     }
     // Comments refresh IN PLACE too (§7.3, same VL-6 pattern as approvals):
@@ -753,6 +797,40 @@ export function galleryHtml(state) {
   });
   }
   wireApproveButtons(document);
+  // Feature acceptance — POST /api/feature/accept; confirmed by the server's
+  // SSE "approval" broadcast (the Features panel swaps in place), same
+  // no-self-mutation contract as approve/reopen. Refusals (checks failing,
+  // not delivered, older project lib) surface in #feature-error verbatim.
+  function wireFeatureAcceptButtons(scope) {
+  scope.querySelectorAll(".feature-accept-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const name = btn.dataset.name;
+      const errBox = document.getElementById("feature-error");
+      if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Accepting…";
+      try {
+        const res = await fetch("/api/feature/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const body = await res.json();
+        if (!body.ok) {
+          if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "acceptance refused"; }
+          btn.disabled = false;
+          btn.textContent = original;
+        }
+      } catch (err) {
+        if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  });
+  }
+  wireFeatureAcceptButtons(document);
   // Reopen (§2/§3) — POST /api/reopen; confirmed the same way approve is: the
   // server's SSE "approval" broadcast (reopen reuses that event type — it's
   // still just "an artifact's status changed", the same in-place refresh
@@ -1874,9 +1952,10 @@ export function createPreviewService(opts) {
         // probe is sub-second; B5's anchored diffs run ONLY for artifacts
         // currently drifted (bounded per-request work — zero when nothing is).
         const walkthrough = getWalkthroughData(projectDir);
-        const [liveDevice, digest] = await Promise.all([
+        const [liveDevice, digest, featureBoard] = await Promise.all([
           getLiveDeviceStatus({ port: inspectorPort }),
           getDigestData(projectDir, { execFileAsync }),
+          getFeatureBoardViaLib(projectDir),
         ]);
         const anchoredDiffs = {};
         if (approvals.available) {
@@ -1911,6 +1990,7 @@ export function createPreviewService(opts) {
             treeHash,
             tokenUsage,
             intent,
+            features: featureBoard,
             walkthrough,
             liveDevice,
             liveSession: liveSession.status(),
@@ -2003,6 +2083,44 @@ export function createPreviewService(opts) {
           // client's approval-swap handler doesn't care WHICH transition fired,
           // only that the Approvals panel needs a re-fetch.
           broadcast({ type: "approval", artifact });
+          void checkApprovalWaiters();
+        }
+        return;
+      }
+      if (url.pathname === "/api/feature/accept") {
+        // The human's bookend on a delivered feature brief. Same shape as
+        // /api/approve — and its own endpoint for the same reason /api/reopen
+        // is: acceptance is a distinct transition with distinct refusals
+        // (checks failing, delivery not claimed), and conflating transitions
+        // behind one endpoint lets a client bug do the wrong one silently.
+        // The DELIVER transition deliberately has no endpoint: delivery is the
+        // AGENT's claim of done, made via the CLI/MCP it works through — the
+        // console never claims done on the agent's behalf.
+        if (req.method !== "POST") {
+          res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          res.end(JSON.stringify({ ok: false, reason: "method not allowed — use POST" }));
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse((await readBody(req)) || "{}");
+        } catch (err) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: `invalid JSON body: ${err.message}` }));
+          return;
+        }
+        const name = body && body.name;
+        if (!name || typeof name !== "string") {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: "missing `name` (string — the brief's docs/proposals/<name>.md name) in the request body" }));
+          return;
+        }
+        const result = await acceptFeatureViaLib(projectDir, name);
+        res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
+        res.end(JSON.stringify(result));
+        if (result.ok) {
+          touch("feature-accept");
+          broadcast({ type: "approval", artifact: `feature-intent:${name}` });
           void checkApprovalWaiters();
         }
         return;
