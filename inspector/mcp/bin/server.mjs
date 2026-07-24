@@ -39,6 +39,7 @@ import {
 } from "../src/lib/live.mjs";
 import { gradleEnv } from "../src/lib/jdk.mjs";
 import { navigateAndInspect, writeLiveScreenshot, DEFAULT_SETTLE_MS } from "../src/lib/navigate.mjs";
+import { captureScreen, relaunchApp } from "../src/lib/capture.mjs";
 import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
 import { readPngMeta } from "../src/lib/png.mjs";
 import { proveChange } from "../src/lib/prove.mjs";
@@ -522,6 +523,95 @@ server.registerTool(
         host: live.host || DEFAULT_HOST,
         port: validatePort(port ?? live.port),
         settleMs,
+      })
+    );
+  })
+);
+
+// sha256 of the previous capture_screen frame — the atomic verb's own staleness
+// baseline (independent of render_screen's, which tracks a different code path).
+let lastAtomicCaptureSha256 = null;
+
+server.registerTool(
+  "capture_screen",
+  {
+    title: "Atomic live capture: pixels + tree + hash from the SAME frame",
+    description:
+      "ONE observation of the running app that is provably coherent: pixels, semantics tree, sha256 and " +
+      "current route captured together, with a frame-stability proof (pixels are read before AND after " +
+      "the tree; the capture is accepted only when both reads hash identically — else it settles and " +
+      "retries, and after `maxAttempts` fails honestly with both hashes). Refuses a frame byte-identical " +
+      "to the previous capture_screen call unless `allowSame: true` (the stale-frame tripwire). Returns " +
+      "{ png (path — give it to the human, never read the bytes), width, height, sha256, tree, route?, " +
+      "attempts, sameAsPrevious }. This is the capture primitive walkthrough evidence is built from; " +
+      "prefer it over separate render_screen{live} + inspect_tree calls whenever pixels and structure " +
+      "must describe the same moment. Requires connect_live (or a reachable forward).",
+    inputSchema: {
+      out: z.string().optional().describe("Write the PNG here (default: a temp path)."),
+      allowSame: z
+        .boolean()
+        .optional()
+        .describe("Accept a frame identical to the previous capture (for legitimately static screens)."),
+      settleMs: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Wait between stability retries (default 300ms)."),
+      maxAttempts: z.number().int().min(1).max(10).optional().describe("Frame-stability retries (default 3)."),
+      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
+    },
+  },
+  guarded(async ({ out, allowSame, settleMs, maxAttempts, port }) => {
+    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
+    const result = await captureScreen({
+      host: live.host || DEFAULT_HOST,
+      port: validatePort(port ?? live.port),
+      out,
+      allowSame,
+      settleMs,
+      maxAttempts,
+      previousSha256: lastAtomicCaptureSha256,
+    });
+    lastAtomicCaptureSha256 = result.sha256;
+    return ok(result);
+  })
+);
+
+server.registerTool(
+  "relaunch_app",
+  {
+    title: "Deterministic app lifecycle: force-stop, (optionally) clear data, relaunch — verified",
+    description:
+      "Restart the running app from a KNOWN state instead of monkey-and-hope: adb force-stop, optional " +
+      "`pm clear` (clearState — pristine app data: databases, prefs, first-run state), launcher start, " +
+      "then polls GET /inspect/health until `processStartedAtMs` has moved STRICTLY FORWARD — the fresh " +
+      "process is proven by the receipt, not assumed (a retained ViewModel surviving an e2e run was the " +
+      "incident this exists for). Returns { relaunched, clearedState, beforeStartedAtMs, afterStartedAtMs }. " +
+      "appId is resolved from the live inspector's own health. Needs adb on PATH and the forward up; " +
+      "the adb forward survives an app restart (it is device-level), so no re-connect is needed after.",
+    inputSchema: {
+      clearState: z
+        .boolean()
+        .optional()
+        .describe("Also `pm clear` — wipes app data (Room DBs, prefs) for a first-run walk. Default false."),
+      serial: z.string().optional().describe("adb device serial (when several devices are attached)."),
+      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
+    },
+  },
+  guarded(async ({ clearState, serial, port }) => {
+    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
+    const p = validatePort(port ?? live.port);
+    const host = live.host || DEFAULT_HOST;
+    if (serial != null) validateSerial(serial);
+    const health = await fetchHealth({ host, port: p }); // actionable error if unreachable
+    return ok(
+      await relaunchApp({
+        appId: health.appId,
+        serial,
+        clearState,
+        exec: (cmd, args) => execFileAsync(cmd, args, { timeout: 15_000 }),
+        fetchHealthImpl: () => fetchHealth({ host, port: p }),
       })
     );
   })

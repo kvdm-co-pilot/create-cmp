@@ -52,6 +52,10 @@ import { getComponentsData } from "./components.mjs";
 import { getVariantsData } from "./variants.mjs";
 import { getComponentDriftInfo } from "./component-drift.mjs";
 import { getHandRolledStateViolations } from "./handrolled-state.mjs";
+import { getWalkthroughData, WALKTHROUGH_REL_DIR } from "./walkthrough-data.mjs";
+import { getLiveDeviceStatus, createLiveSession } from "./live-session.mjs";
+import { getDigestData } from "./digest.mjs";
+import { getApprovalAnchoredDiff } from "./approval-diff.mjs";
 import { renderShellPage, statusGlyph, artifactStatusHtml, railReceiptHtml, receiptGlyph, formatAgeCoarse } from "./console-shell.mjs";
 import {
   designLanguageBodyHtml,
@@ -63,6 +67,9 @@ import {
   commentsTabHtml,
   screensBodyHtml,
   intentBodyHtml,
+  walkthroughTabHtml,
+  liveDeviceTabHtml,
+  digestTabHtml,
 } from "./console-tabs.mjs";
 import { getTokenUsage } from "./design-language.mjs";
 import { getIntentData } from "./intent.mjs";
@@ -320,6 +327,13 @@ export function galleryHtml(state) {
     treeHash = null,
     tokenUsage = null,
     intent = { available: false },
+    // PW-5: the productization surfaces — each degrades to an honest empty
+    // state when its data provider wasn't wired by the caller.
+    walkthrough = { available: false, runs: [] },
+    liveDevice = null,
+    liveSession = null,
+    digest = null,
+    anchoredDiffs = null,
   } = state;
   const width = viewport?.width ?? 411;
   // §3.3: component stories render through the same pipeline but are not
@@ -490,12 +504,26 @@ export function galleryHtml(state) {
     // (✓ fresh PASS · ✗ FAIL · ⚠ stale · ○ none) — receiptGlyph, the same
     // derivation the rail foot uses.
     { id: "evidence", label: "Evidence", glyph: receiptGlyph(effectiveReceipt) },
+    // A2: the walkthrough report is evidence-adjacent — derived from committed
+    // manifests, so it sits right after Evidence in the arc.
+    { id: "walkthrough", label: "Walkthrough", glyph: null },
     { id: "approvals", label: "Approvals", glyph: null },
     {
       id: "comments",
       label: "Comments",
       glyph: null,
       badgeHtml: `<span class="tab-badge" id="comments-badge"${openCommentCount === 0 ? " hidden" : ""}>${openCommentCount}</span>`,
+    },
+    // B4: the returning human's first read — everything since they last looked.
+    { id: "digest", label: "Digest", glyph: null },
+    // A1: the console arc ends DRIVE — Live device is deliberately the final
+    // section: define → preview → approve → verify → report → drive. The glyph
+    // follows statusGlyph's {ch, cls, label} shape (a bare string renders as
+    // "undefined" — the rail template reads g.ch/g.cls).
+    {
+      id: "live-device",
+      label: "Live device",
+      glyph: liveDevice && liveDevice.reachable ? { ch: "●", cls: "glyph-signed", label: "device connected" } : null,
     },
   ];
 
@@ -550,8 +578,32 @@ export function galleryHtml(state) {
       }),
     },
     { id: "evidence", title: "Evidence", statusHtml: evidenceStatus, bodyHtml: evidenceBodyHtml(effectiveReceipt, receiptHistory) },
-    { id: "approvals", title: "Approvals", statusHtml: approvalsStatus, bodyHtml: approvalsTabHtml(approvals) },
+    {
+      id: "walkthrough",
+      title: "Walkthrough",
+      statusHtml: walkthrough.available
+        ? `<span class="status-line">latest run ${walkthrough.runs[0].generatedAt}</span>`
+        : `<span class="status-line">no runs yet</span>`,
+      bodyHtml: walkthroughTabHtml(walkthrough),
+    },
+    { id: "approvals", title: "Approvals", statusHtml: approvalsStatus, bodyHtml: approvalsTabHtml(approvals, { anchoredDiffs }) },
     { id: "comments", title: "Comments", statusHtml: commentsStatus, bodyHtml: commentsTabHtml(comments) },
+    {
+      id: "digest",
+      title: "Digest",
+      statusHtml: `<span class="status-line">since you last looked</span>`,
+      bodyHtml: digestTabHtml(digest),
+    },
+    {
+      id: "live-device",
+      title: "Live device",
+      statusHtml:
+        liveDevice && liveDevice.reachable
+          ? `<span class="status-line">connected — ${liveDevice.appId}</span>`
+          : `<span class="status-line">not connected</span>`,
+      bodyHtml: liveDeviceTabHtml(liveDevice, liveSession),
+      fullBleed: true,
+    },
   ];
 
   const bodyScript = `
@@ -830,6 +882,33 @@ export function galleryHtml(state) {
     });
   }
   wireCommentButtons(document);
+  // A1 — the Start-live-session chain: POST kicks it off server-side; the page
+  // then polls /live/status and reloads when the chain finishes (success or
+  // fail — either way the section re-renders the honest per-step outcomes).
+  const liveBtn = document.getElementById("live-start-btn");
+  if (liveBtn) {
+    liveBtn.addEventListener("click", async () => {
+      const errBox = document.getElementById("live-error");
+      if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
+      liveBtn.disabled = true;
+      liveBtn.textContent = "Starting…";
+      try {
+        const res = await fetch("/live/start", { method: "POST" });
+        const body = await res.json();
+        if (!body.started) throw new Error(body.reason || "did not start");
+        const poll = setInterval(async () => {
+          try {
+            const st = await (await fetch("/live/status")).json();
+            if (!st.running) { clearInterval(poll); location.reload(); }
+          } catch { /* transient poll failure — keep polling */ }
+        }, 2000);
+      } catch (err) {
+        liveBtn.disabled = false;
+        liveBtn.textContent = "Start live session";
+        if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
+      }
+    });
+  }
 `;
 
   return renderShellPage({
@@ -847,7 +926,23 @@ export function galleryHtml(state) {
     // gets the roomier single-pane width.
     extraCss: `  .matrix-cell img, .matrix-cell.matrix-none { width: ${Math.round(width * 0.38)}px; }
   .matrix-col { width: ${Math.round(width * 0.38)}px; }
-  .row-detail .wire svg { width: ${Math.round(width * 0.7)}px; }`,
+  .row-detail .wire svg { width: ${Math.round(width * 0.7)}px; }
+  /* PW-5 surfaces: walkthrough grid, live-device embed, digest lists, B5 diff */
+  .wt-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+  .wt-card { width: 210px; }
+  .wt-card img { width: 100%; border-radius: 8px; border: 1px solid var(--line); }
+  .wt-meta { font-size: var(--fs-meta); color: var(--muted); margin-top: 4px; }
+  .wt-notwalked li, .wt-history li, .digest-list li { font-size: var(--fs-meta); color: var(--muted); margin: 3px 0; }
+  .ok-inline { color: var(--ok, #7dc87d); }
+  .bad-inline { color: var(--err, #d07d7d); }
+  .live-remote { width: 100%; height: 72vh; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .live-steps li { font-size: var(--fs-meta); margin: 3px 0; }
+  .live-step-ok { color: var(--ok, #7dc87d); }
+  .live-step-fail { color: var(--err, #d07d7d); }
+  .live-step-running { color: var(--muted); }
+  #live-start-btn { font: inherit; font-size: var(--fs-meta); font-weight: 600; padding: 8px 16px; cursor: pointer; }
+  .approval-diff { max-height: 420px; overflow: auto; font-size: 12px; background: var(--surface); border-radius: 8px; padding: 10px; }
+  .approval-diff-row td { border-top: none; }`,
     bodyScript,
     provenance: { treeHash, version },
   });
@@ -899,6 +994,28 @@ export function createPreviewService(opts) {
       ));
   const watchdogMs = opts.watchdogMs ?? COMPILE_WATCHDOG_MS;
   const staleRetryMs = opts.staleRetryMs ?? STALE_RETRY_MS;
+
+  // A1 — one live-session chain per service; /live/start + /live/status drive it.
+  const inspectorPort = opts.inspectorPort ?? 9500;
+  const liveSession = createLiveSession({
+    projectDir,
+    port: inspectorPort,
+    gradleEnv,
+    log,
+    exec: (cmd, cmdArgs, o = {}) => {
+      if (o.detach) {
+        const child = spawn(cmd, cmdArgs, { detached: true, stdio: "ignore" });
+        child.unref();
+        return Promise.resolve({ stdout: "" });
+      }
+      return execFileAsync(cmd, cmdArgs, {
+        cwd: o.cwd,
+        env: o.env,
+        timeout: o.timeoutMs ?? 30_000,
+        maxBuffer: 16 * 1024 * 1024,
+      });
+    },
+  });
 
   let server = null;
   let port = null;
@@ -1735,6 +1852,23 @@ export function createPreviewService(opts) {
           });
           treeHash = stdout.trim() || null;
         } catch {}
+        // PW-5 surfaces. Walkthrough + digest read committed ledgers; the live
+        // probe is sub-second; B5's anchored diffs run ONLY for artifacts
+        // currently drifted (bounded per-request work — zero when nothing is).
+        const walkthrough = getWalkthroughData(projectDir);
+        const [liveDevice, digest] = await Promise.all([
+          getLiveDeviceStatus({ port: inspectorPort }),
+          getDigestData(projectDir, { execFileAsync }),
+        ]);
+        const anchoredDiffs = {};
+        if (approvals.available) {
+          for (const s of approvals.statuses) {
+            if (s.status !== "changed-since-approval") continue;
+            anchoredDiffs[s.id] = await getApprovalAnchoredDiff(projectDir, s.id, { execFileAsync }).catch(
+              (err) => ({ available: false, reason: err.message })
+            );
+          }
+        }
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(
           galleryHtml({
@@ -1759,6 +1893,11 @@ export function createPreviewService(opts) {
             treeHash,
             tokenUsage,
             intent,
+            walkthrough,
+            liveDevice,
+            liveSession: liveSession.status(),
+            digest,
+            anchoredDiffs,
           }),
         );
         return;
@@ -1886,6 +2025,38 @@ export function createPreviewService(opts) {
           broadcast({ type: "comment" });
           void checkCommentWaiters(); // settle any waitForNewComment() faster than the 1s poll
         }
+        return;
+      }
+      if (url.pathname === "/live/start" && req.method === "POST") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(liveSession.start()));
+        return;
+      }
+      if (url.pathname === "/live/status") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(liveSession.status()));
+        return;
+      }
+      if (url.pathname.startsWith("/walkthrough/")) {
+        // Static walkthrough evidence (A2): pngs, trees, report.html — same
+        // traversal constraint as /previews/, rooted at the evidence dir.
+        const wtRoot = path.join(projectDir, WALKTHROUGH_REL_DIR);
+        const rel = decodeURIComponent(url.pathname.slice("/walkthrough/".length));
+        const file = path.normalize(path.join(wtRoot, rel));
+        if (!file.startsWith(wtRoot) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+          res.writeHead(404);
+          res.end("not found");
+          return;
+        }
+        const type = file.endsWith(".png")
+          ? "image/png"
+          : file.endsWith(".json")
+            ? "application/json"
+            : file.endsWith(".html")
+              ? "text/html; charset=utf-8"
+              : "application/octet-stream";
+        res.writeHead(200, { "content-type": type });
+        fs.createReadStream(file).pipe(res);
         return;
       }
       if (url.pathname.startsWith("/previews/")) {

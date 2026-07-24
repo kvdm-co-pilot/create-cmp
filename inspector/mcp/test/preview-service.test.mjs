@@ -490,6 +490,10 @@ test("galleryHtml (§2 rail): sections in the genesis definition order, Intent f
   // The REVISED definition order (spec-first behavior, UI-first visuals):
   // intent → architecture → the exemplar's surfaces (Specs, Screens) →
   // design language + components, which lock on / distill from those screens.
+  // PW-5 extends the arc's tail: Walkthrough sits after Evidence (it IS
+  // evidence, derived from committed manifests), Digest is the returning
+  // human's since-you-last-looked read, and Live device is deliberately LAST —
+  // the console arc ends DRIVE (A1).
   assert.deepEqual(order, [
     "intent",
     "architecture",
@@ -498,8 +502,11 @@ test("galleryHtml (§2 rail): sections in the genesis definition order, Intent f
     "design-system",
     "components",
     "evidence",
+    "walkthrough",
     "approvals",
     "comments",
+    "digest",
+    "live-device",
   ]);
   assert.match(html, /id="tab-screens" class="tab-panel active/, "Screens stays the default page");
   assert.match(html, /id="tab-intent" class="tab-panel/, "Intent section present");

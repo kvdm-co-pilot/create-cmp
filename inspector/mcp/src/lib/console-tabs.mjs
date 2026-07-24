@@ -708,7 +708,7 @@ ${rows}
  * "unresolvable" when `resolvable === false`, mirroring qa/approve.mjs --status).
  * @param {{available: boolean, error?: string, statuses?: object[]}} approvals
  */
-export function approvalsTabHtml(approvals) {
+export function approvalsTabHtml(approvals, meta = {}) {
   if (!approvals || !approvals.available) {
     const detail = approvals && approvals.error
       ? esc(approvals.error)
@@ -781,6 +781,21 @@ export function approvalsTabHtml(approvals) {
         s.status === "approved"
           ? `<button class="reopen-btn" data-artifact="${esc(s.id)}">Reopen</button>`
           : "";
+      // B5 — approval-anchored diff: on a changed-since-approval row, the drift
+      // is shown AGAINST THE APPROVED BYTES (anchor located by hash match in
+      // git history, hashed with the project's own library). When the anchor
+      // can't be found, the honest reason renders instead — the chip alone
+      // said "something changed"; this says WHAT, or exactly why it can't.
+      const anchored = meta.anchoredDiffs ? meta.anchoredDiffs[s.id] : null;
+      const diffRow =
+        s.status === "changed-since-approval" && anchored
+          ? anchored.available
+            ? `    <tr class="approval-diff-row"><td colspan="6"><details>
+      <summary>diff against approved bytes (anchor ${esc(anchored.anchorSha)} · ${esc(anchored.anchorWhen || "")}${anchored.truncated ? " · truncated" : ""})</summary>
+      <pre class="approval-diff">${esc(anchored.diff)}</pre>
+    </details></td></tr>`
+            : `    <tr class="approval-diff-row"><td colspan="6"><p class="empty-inline">anchored diff unavailable &mdash; ${esc(anchored.reason)}</p></td></tr>`
+          : "";
       return `    <tr class="approval-row" data-artifact="${esc(s.id)}">
       <td class="order-num">${orderNumber(s.id)}</td>
       <td>${esc(s.label)}<div class="artifact-id">${esc(s.id)}</div>${artifactBannerHtml(s)}</td>
@@ -788,7 +803,8 @@ export function approvalsTabHtml(approvals) {
       <td>${s.fileCount}</td>
       <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}</td>
       <td><button class="approve-btn" data-artifact="${esc(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
-    </tr>`;
+    </tr>
+${diffRow}`;
     })
     .join("\n");
   return `  <table class="approvals-table">
@@ -1964,4 +1980,148 @@ export function intentBodyHtml(intent) {
   return `<div class="brief">
 ${sections}
 </div>`;
+}
+
+// --- Walkthrough (A2/A3) — the generated report as a console section ---------
+//
+// Derived truth only: everything rendered here is read from a run's committed
+// manifest (walkthrough-data.mjs) — the console never re-walks or re-computes.
+// The section is the report's summary + deep links; report.html stays the
+// full-fidelity artifact.
+
+export function walkthroughTabHtml(wt) {
+  if (!wt || !wt.available) {
+    return `<div class="empty">
+      <p>No walkthrough runs yet.</p>
+      <p>With the debug app live (adb forward tcp:9500), run <code>node qa/walkthrough.mjs</code> —
+      it walks every tab and parameterless route, captures pixels + tree + a11y from one proven
+      frame per screen, reads the DB at capture time, and writes a committable report under
+      <code>qa/evidence/walkthrough/</code>.</p>
+    </div>`;
+  }
+  const latest = wt.runs[0];
+  const m = latest.manifest;
+  const cards = (m.screens ?? [])
+    .map((s) => {
+      const a11yLine =
+        (s.a11y?.violations ?? []).length === 0
+          ? `<span class="ok-inline">a11y 0 violations</span>`
+          : `<span class="bad-inline">a11y ${s.a11y.violations.length} violations</span>`;
+      const settled = s.settled === false ? ` <span class="bad-inline">captured mid-load</span>` : "";
+      const spec = s.spec ? ` · spec ${esc(s.spec.file)} (${s.spec.clauses.length} clauses)` : "";
+      const variants = (s.variants ?? []).length ? ` · ${s.variants.length} tier-0 variants` : "";
+      return `    <div class="wt-card">
+      <img src="/walkthrough/${esc(latest.relDirBase || "")}/${esc(s.png)}" loading="lazy">
+      <div class="wt-meta"><strong>${esc(s.id)}</strong> <span class="chip">${esc(s.kind)}</span>${settled}<br>
+      route <code>${esc(s.route ?? "—")}</code> · ${s.nodes} nodes · ${a11yLine}${spec}${variants}</div>
+    </div>`;
+    })
+    .join("\n");
+  const notWalked = (m.notWalked ?? []).length
+    ? `  <h3>Not walked</h3>
+  <ul class="wt-notwalked">${m.notWalked.map((n) => `<li><code>${esc(n.target)}</code> — ${esc(n.reason)}</li>`).join("")}</ul>`
+    : "";
+  const db = m.db
+    ? `  <h3>DB at capture time</h3>
+  <table class="params-table"><thead><tr><th>table</th><th>rows</th></tr></thead><tbody>
+${m.db.tables.map((t) => `    <tr><td><code>${esc(t.name)}</code></td><td>${t.error ? esc(t.error) : t.rowCount ?? "?"}</td></tr>`).join("\n")}
+  </tbody></table>`
+    : `  <p class="empty-inline">no DB appendix — Room off or the app predates /inspect/db</p>`;
+  const history =
+    wt.runs.length > 1
+      ? `  <h3>Previous runs</h3>
+  <ul class="wt-history">${wt.runs
+    .slice(1)
+    .map((r) =>
+      r.error
+        ? `<li>${esc(r.relDir)} — <span class="bad-inline">${esc(r.error)}</span></li>`
+        : `<li>${esc(r.generatedAt)} — ${r.screenCount} screens, ${r.a11yViolations} a11y violations
+          <span class="empty-inline">(diff: <code>node qa/walkthrough.mjs --compare ${esc(r.relDir)} ${esc(wt.runs[0].relDir)}</code>)</span></li>`
+    )
+    .join("")}</ul>`
+      : "";
+  return `  <p class="meta">latest: ${esc(latest.generatedAt)} · ${latest.screenCount} screens · ${latest.a11yViolations} a11y violations · ${latest.notWalked} not walked${latest.unsettled ? ` · <strong>${latest.unsettled} captured mid-load</strong>` : ""} —
+  <a href="/walkthrough/${esc(latest.relDirBase || "")}/report.html" target="_blank">open full report</a></p>
+  <div class="wt-grid">
+${cards}
+  </div>
+${notWalked}
+${db}
+${history}`;
+}
+
+// --- Live device (A1) — the console arc ends DRIVE ---------------------------
+//
+// Reachable: embed /inspect/remote (already a self-contained page that mirrors
+// and drives the real device) with the status chip. Unreachable: the honest
+// state + the Start button, which runs the whole chain (boot AVD if needed →
+// installDebug → launch → forward → health) server-side; the page polls
+// /live/status and renders each step's real outcome.
+
+export function liveDeviceTabHtml(live, session) {
+  const chainHtml = session && session.steps && session.steps.length
+    ? `  <ol class="live-steps">
+${session.steps
+  .map(
+    (s) =>
+      `    <li class="live-step-${esc(s.status)}"><code>${esc(s.name)}</code> — ${esc(s.status)}${s.detail ? `: ${esc(s.detail)}` : ""}${s.ms != null ? ` <span class="empty-inline">(${Math.round(s.ms / 100) / 10}s)</span>` : ""}</li>`
+  )
+  .join("\n")}
+  </ol>`
+    : "";
+  if (live && live.reachable) {
+    return `  <p class="meta"><span class="ok-inline">●</span> ${esc(live.appId)} · ${esc(live.buildType)} · process started ${esc(
+      live.processStartedAtMs ? new Date(live.processStartedAtMs).toISOString() : "unknown"
+    )} — <a href="${esc(live.remoteUrl)}" target="_blank">open in its own tab</a></p>
+  <iframe class="live-remote" src="${esc(live.remoteUrl)}" title="live device"></iframe>
+${chainHtml}`;
+  }
+  return `  <p class="meta"><span class="bad-inline">○</span> ${esc(live ? live.reason : "status unknown")}</p>
+  <p>Start the whole chain from here — boot a headless AVD if no device is attached, install the
+  debug build, launch it, forward the inspector port, and wait for health:</p>
+  <p><button id="live-start-btn"${session && session.running ? " disabled" : ""}>${session && session.running ? "Starting…" : "Start live session"}</button></p>
+${chainHtml}
+  <div id="live-error" class="banner" hidden></div>`;
+}
+
+// --- Digest (B4) — what happened since you last looked -----------------------
+//
+// The narrative layer over ledgers that already exist (git log, committed
+// receipts, the approvals + comments ledgers). Every line is derived; the
+// digest can never disagree with the audit trail because it IS the audit
+// trail, grouped.
+
+export function digestTabHtml(digest) {
+  if (!digest || !digest.available) {
+    return `<div class="empty"><p>No digest — ${esc(digest ? digest.reason : "unavailable")}</p></div>`;
+  }
+  const lane = digest.laneRuns.length
+    ? `  <h3>Lane runs</h3>
+  <table class="params-table"><thead><tr><th>when</th><th>commit</th><th>verdict</th><th>strength</th></tr></thead><tbody>
+${digest.laneRuns
+  .map(
+    (r) =>
+      `    <tr><td>${esc(r.when)}</td><td><code>${esc(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc(r.verdict)}</span></td><td>${esc(r.strength ?? "—")}</td></tr>`
+  )
+  .join("\n")}
+  </tbody></table>`
+    : `  <h3>Lane runs</h3>
+  <p class="empty-inline">no committed receipts in the window — the lane has not run (or its receipt was not committed)</p>`;
+  const approvals = digest.approvalEvents.length
+    ? `  <h3>Approval events</h3>
+  <ul class="digest-list">${digest.approvalEvents.map((e) => `<li>${esc(e.when)} · <code>${esc(e.sha)}</code> — ${esc(e.subject)}</li>`).join("")}</ul>`
+    : "";
+  const commits = digest.commits.length
+    ? `  <h3>Commits</h3>
+  <ul class="digest-list">${digest.commits.map((c) => `<li>${esc(c.when)} · <code>${esc(c.sha)}</code> — ${esc(c.subject)}</li>`).join("")}</ul>`
+    : `  <p class="empty-inline">no commits in the window</p>`;
+  const comments =
+    digest.openComments == null
+      ? ""
+      : `  <p class="meta">${digest.openComments} open comment${digest.openComments === 1 ? "" : "s"} awaiting action</p>`;
+  return `  <p class="meta">window: since ${esc(digest.since)}</p>
+${comments}
+${lane}
+${approvals}
+${commits}`;
 }

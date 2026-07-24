@@ -1,6 +1,5 @@
 package __PACKAGE__.inspector
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -14,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -279,8 +279,22 @@ private fun variantsStory(
  * generated registry can host the PlaceholderScreen story on custom-tab
  * scaffolds (PlaceholderScreen ships only when a configured tab has no
  * feature yet, so its story rides PreviewRegistry.kt, not this file).
+ *
+ * A `Surface`, not a bare `Box`: real screens root in [BaseScreen]'s `Scaffold`, which
+ * provides `LocalContentColor` to everything below it. A Box only PAINTS a background —
+ * it supplies no content color — so any component that correctly inherits one (an
+ * [AppIconButton] tint, a bare `Text`) fell back to `LocalContentColor`'s black default
+ * and rendered black-on-near-black. The story read as an empty rectangle while the
+ * component was in fact drawing perfectly. Stories must sit in the same content-color
+ * context as the screens they document, or they document a lie.
  */
 @Composable
 internal fun StoryHost(content: @Composable BoxScope.() -> Unit) {
-    Box(Modifier.fillMaxSize().background(__THEME_PREFIX__Colors.Background)) { content() }
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = __THEME_PREFIX__Colors.Background,
+        contentColor = __THEME_PREFIX__Colors.OnSurface,
+    ) {
+        Box(Modifier.fillMaxSize()) { content() }
+    }
 }

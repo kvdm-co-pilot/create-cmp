@@ -650,6 +650,80 @@ C7–C10 deepen evidence quality; D13 ([preview↔lane isolation]) underwrites a
   daemon must be stopped for each build wave. The KSP-isolation fix ([Build/eyes reliability P1]) is
   what makes "the console never goes down" true. Already logged — flagged here as the dependency.
 
+## Second wave — surfaced while mirroring the harness into the showcase [2026-07-24, later same day]
+
+### Component stories rendered black-on-black — `StoryHost` provided no content colour [P1, FIXED]
+
+Karel, reviewing the Components page: *"why is this blank?"* — pointing at `AppIconButton` and
+`ScreenColumn`. Nothing was failing to draw. `StoryHost` wrapped every story in
+
+```kotlin
+Box(Modifier.fillMaxSize().background(<Prefix>Colors.Background)) { content() }
+```
+
+A `Box` **paints** a background; it does not **provide** one. `LocalContentColor` comes from
+`Surface`, never from `MaterialTheme` — and real screens get it because `BaseScreen` roots in a
+`Scaffold`, which is a Surface internally. So stories ran with `LocalContentColor`'s default of
+BLACK on a near-black app background. The tell is which stories broke: everything passing an
+explicit token (`AppTextButton`, `NavItem`'s tints) looked fine, while everything **correctly
+inheriting** content colour vanished — `AppIconButton`'s default tint, `ScreenColumn`'s bare
+`Text`, and `AppHeader`'s title once the template stopped hardcoding `color = onSurface`. The two
+components behaving most correctly were the two that disappeared, and the story surface — the
+thing whose whole job is to show a component honestly — was the liar. **Fix (landed, template +
+showcase):** `StoryHost` is a `Surface(color = Background, contentColor = OnSurface)`, the same
+content-colour context a screen has. Re-rendered proof: `AppIconButton` enabled arrow white with
+the disabled arm correctly dimmed (that state had never been inspectable), `ScreenColumn` legible,
+`AppHeader` white with the accent action. **Principle:** a story must sit in the same composition
+context as the screens it documents, or it documents a lie.
+
+### The console cannot show the type ramp — the design-system catalog carries no typography [P1, OPEN]
+
+Same review pass. The Design language page renders colours, spacing, radii and elevation, then
+prints: *"Not derivable statically — the design-system catalog carries no typography tokens."*
+The console is being honest, exactly as `console-tabs.mjs` documents; the data never arrives.
+`designSystemCatalog()` (PreviewHarness.kt) emits `colors` + `dimens` and nothing else —
+confirmed empirically against Fuelled's generated file: `Object.keys(design-system.json)` →
+`['colors','dimens']`. Meanwhile Fuelled's `Typography.kt` carries the full 12-style ramp
+(`displayLarge` 56sp/-1.5 tracking … `labelSmall` 11sp/+0.8, all DM Sans). **The design exists;
+it just never reaches the catalog.** This is worse than a missing table: §7.1 of the genesis walk
+has the human judge the design language RENDERED, never as hex codes — and type is the one axis
+that page structurally cannot show. We shipped the premium ramp as a headline template default and
+made it invisible in the exact surface where it is meant to be approved. By [spec-mirror-drift],
+Design language claims to mirror the design system while silently omitting a third of it.
+**Fix:** (a) `PreviewHarness.kt` emits a `typography` block — per style: family, size, lineHeight,
+weight, tracking; (b) `InspectorCatalog.kt` (androidDebug) emits the same so the live
+`/inspect/design-system` tier matches; (c) `console-tabs.mjs` renders it as an actual ramp — each
+style set in its own size and weight with metrics alongside, not a name/value table; (d) mirror to
+the showcase. Side benefit: type tokens become assertable by `assert_token` / `find_drift`, which
+today cannot see them at all. No approval is invalidated — the `design-system` artifact hashes
+`Theme.kt` + `Tokens.kt` source, not the generated JSON.
+
+### Story canvas renders a 48dp component on a full device-height frame [P2, OPEN]
+
+Cosmetic sibling of the black-on-black bug, and part of why "blank" was the natural reading: every
+story renders onto the full preview canvas, so a 48dp icon button occupies a sliver at the top and
+~95% of the card is empty background. **Fix:** crop the story capture to its content bounds, or
+render stories on a short frame sized to the component.
+
+### `java_home` probe leaked its miss message into the MCP log [P3, FIXED]
+
+Surfaced by exercising the new resolver through the showcase's dev pin. `jdk.mjs` called
+`execFileSync("/usr/libexec/java_home")` without a `stdio` spec, so it inherited stderr — on a
+machine where java_home has nothing registered, a probe *miss* printed `Unable to locate a Java
+Runtime. Please visit http://www.java.com...` into the server log. Resolution itself was correct
+(fell through to sdkman current). **Fixed** (`0a32118`): `stdio: ["ignore","pipe","ignore"]`; the
+7 jdk tests still pass.
+
+### DECISION — ARCH-12 stays maximally strict; each screen owns its fixture
+
+Not a finding: a decision, recorded so it is not re-opened. Mirroring ARCH-12 into the showcase
+failed on `FoodDetailScreen`'s `food: Food = sampleFoods.first()`, borrowing the fixture declared
+in `FoodsScreen.kt`. Two options were put up — refine the clause to permit cross-file references in
+default-parameter position, or give each screen its own fixture. **Karel chose the latter.**
+`sampleFood` now lives in `FoodDetailScreen.kt`; ARCH-12 is unchanged and passes green. The
+duplication of fixture data, and the same cost for every future screen, is the deliberate price of
+a rule that cannot be argued with case by case — the guarantee is worth more than the keystrokes.
+
 ## Carried over (pre-showcase, already flagged)
 
 - Exemplar-aware `featureShape` (spawned task `cc8eaa87`).
@@ -659,9 +733,10 @@ C7–C10 deepen evidence quality; D13 ([preview↔lane isolation]) underwrites a
 
 ## Status
 
-**Fix wave landed 2026-07-24** (single batch commit; gated once at the end: engine + mcp suites
-407/407 each, a fresh scaffold's full lane 11/11 green **on-device**, and a planted ARCH-12
-violation FAILing conformance):
+**Fix wave landed 2026-07-24** (single batch commit; gated once at the end: full suite 698/698
+across engine + mcp — an earlier "407/407 each" claim in this log was wrong, it double-counted
+one glob run twice from two directories; a fresh scaffold's full lane 11/11 green **on-device**;
+and a planted ARCH-12 violation FAILing conformance):
 
 - **FIXED:** stale live pixels (PixelCopy + sha256 tripwire, live-proven on the emulator at
   0.8s settle); a11y scroll-clip false positives (`size` field + max(bounds,size), live-proven
@@ -676,11 +751,35 @@ violation FAILing conformance):
 - **WITHDRAWN:** the mechanical duplication/re-invention conformance clause — see the
   strike-through above (no metric separates the fixture pair from a legitimate pair;
   the call is the agent's rubric reasoning, ratified at the Components approval).
+- **SECOND WAVE (same day):** `StoryHost` content-colour FIXED (template + showcase, re-render
+  proven); `java_home` stderr leak FIXED; type-ramp catalog gap and story-canvas sizing OPEN
+  (see the second-wave section above); ARCH-12 strictness settled as a DECISION, not an issue.
+- **CORRECTION:** [C6] is only half done. The stale-frame *bug* is fixed, but its actual ask — one
+  atomic `capture_screen{live}` returning pixels + tree + hash FROM THE SAME FRAME — was never
+  built; pixels and tree are still hand-juggled across two calls and trusted to be the same moment.
+  A1/A2 depend on it.
+- **PRODUCTIZATION WAVE landed (same day, second batch — all A/B/C items):** A1 Live-device
+  console section (embedded /inspect/remote + Start-live-session chain with per-step honest
+  outcomes); A2 `qa/walkthrough.mjs` + manifest + auto-branded report.html + console
+  Walkthrough section (live-proven on Fuelled: 4 tabs, same-frame captures, settle rule
+  applied to the walk itself); A3 `--compare` run diff (proven on two real runs —
+  byte-identical pixels across all 4 screens, a determinism proof in passing); B4 Digest
+  section (lane verdicts read from each committed receipt's own bytes, approval events,
+  commits, open comments); B5 approval-anchored diffs (anchor located by hashing historical
+  commits with the PROJECT'S OWN approvals lib — proven: components drift anchored at
+  5a7cddf, 81-line diff); C6 second half `capture_screen` (pixels→tree→pixels sandwich,
+  stability proof + stale tripwire, live-proven incl. refusal); C7 `/inspect/navigate`
+  route-jump (jump half only, read half untouched; parameterized routes honestly not
+  walked); C8 tier-0 variant stitching, labelled by source; C9 DB appendix read at capture
+  time (Fuelled: 5 tables with row counts); C10 `relaunch_app` verified by
+  `processStartedAtMs` advancing + `pm clear` first-run option (live-proven). Gate:
+  704/704 (exit code checked — an earlier 698 "green" was a tail-masked pipe; two real
+  test-expectation updates + one flaky-IPC re-run isolated). NOT built (out of scope,
+  D-level): D11 `--with-device`.
 - **STILL OPEN:** the designed exemplar home screen + UI-first seam split of the template
   exemplar (held deliberately — it is the product's first impression and must be judged
-  RENDERED by the human via the candidates loop, next session); A1 console live-device
-  section + A2 generated walkthrough report (chip task — its C6/D13 blockers are now fixed);
-  A3/B4/B5/C7–C10/D11 productization items; candidates strip hiding the live variant (P2);
+  RENDERED by the human via the candidates loop, next session); D11 lane-owned device
+  lifecycle; candidates strip hiding the live variant (P2);
   `npm version` manifest lockstep (P2); plugin cache refresh (P3); the stamper clone-shape
   decision (P2 — unchanged: canonical set + warning; revisit when the seam split lands).
 

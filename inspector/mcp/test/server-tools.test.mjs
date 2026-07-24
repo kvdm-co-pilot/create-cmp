@@ -27,12 +27,26 @@ async function withClient(fn) {
   }
 }
 
-test("bin/server.mjs registers 26 tools, including review_comments, resolve_comment, and snapshot_variant with valid schemas", async () => {
+test("bin/server.mjs registers 28 tools, including capture_screen and relaunch_app with valid schemas", async () => {
   await withClient(async (client) => {
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 26, "23 pre-VL-7 tools + review_comments + resolve_comment + snapshot_variant");
+    // 23 pre-VL-7 + review_comments + resolve_comment + snapshot_variant,
+    // + PW-2's capture_screen (C6: same-frame pixels+tree+hash) and
+    // relaunch_app (C10: verified deterministic lifecycle).
+    assert.equal(tools.length, 28, "26 post-VL-7 tools + capture_screen + relaunch_app");
 
     const byName = new Map(tools.map((t) => [t.name, t]));
+
+    const capture = byName.get("capture_screen");
+    assert.ok(capture, "capture_screen is registered");
+    assert.match(capture.description, /frame-stability proof/i);
+    assert.equal(capture.inputSchema.type, "object");
+    assert.ok(capture.inputSchema.properties.allowSame, "allowSame is in the schema");
+
+    const relaunch = byName.get("relaunch_app");
+    assert.ok(relaunch, "relaunch_app is registered");
+    assert.match(relaunch.description, /processStartedAtMs/);
+    assert.ok(relaunch.inputSchema.properties.clearState, "clearState is in the schema");
 
     const review = byName.get("review_comments");
     assert.ok(review, "review_comments is registered");
