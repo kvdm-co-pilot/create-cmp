@@ -62,6 +62,12 @@ const execFileAsync = promisify(execFile);
 // omit `source` entirely. Explicit `source`/`treePath` always wins over it.
 let sessionDefaultSource = null;
 
+// sha256 of the previous render_screen{live} capture — the stale-frame tripwire.
+// Two captures of two DIFFERENT screens hashing the same means the pixel path is
+// lying (the device-side hazard: a software draw replaying a stale layer
+// recording); the flag surfaces it so no one trusts a lying frame silently.
+let lastLiveCaptureSha256 = null;
+
 // Resolve which tree a tool call operates on. Pull-on-demand: a live source
 // re-fetches /inspect/tree on EVERY call, so each call sees the current screen.
 function resolveTree({ source, treePath } = {}) {
@@ -789,7 +795,19 @@ server.registerTool(
         port: validatePort(source.port ?? live.port),
         out,
       });
-      return ok({ ...meta, displayHint: RENDER_SCREEN_DISPLAY_HINT });
+      const identicalToPrevious = meta.sha256 === lastLiveCaptureSha256;
+      lastLiveCaptureSha256 = meta.sha256;
+      const staleness = identicalToPrevious
+        ? {
+            identicalToPrevious,
+            staleWarning:
+              "This capture is byte-identical to the previous live capture. If the screen " +
+              "changed between the two (navigation, interaction), the pixel path is serving a " +
+              "stale frame — cross-check with `adb exec-out screencap -p` and do not present " +
+              "this PNG as evidence of the current screen.",
+          }
+        : { identicalToPrevious };
+      return ok({ ...meta, ...staleness, displayHint: RENDER_SCREEN_DISPLAY_HINT });
     }
     let target = pngPath;
     if (!target && projectDir) {

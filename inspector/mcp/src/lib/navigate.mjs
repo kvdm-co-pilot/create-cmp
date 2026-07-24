@@ -8,6 +8,7 @@
 // Pure logic + injectable transports (fetchImpl/sleep) so everything unit-tests
 // against a stub HTTP server, like live.mjs does.
 
+import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -130,7 +131,12 @@ export async function navigateAndInspect({
 /**
  * render_screen's live path: GET /inspect/screenshot, write the PNG bytes to a
  * file, and return the SAME path-only metadata shape as every other render_screen
- * call — { path, width, height, sizeBytes } from the PNG header, NEVER the bytes.
+ * call — { path, width, height, sizeBytes } from the PNG header, NEVER the bytes —
+ * plus `sha256` of the capture, the stale-frame tripwire: two captures of two
+ * DIFFERENT screens must never hash the same. (The device's PixelCopy capture makes
+ * that true at the source; the hash is how a caller — or the server's
+ * identicalToPrevious flag — proves it per pair, since pixels themselves never
+ * enter model context.)
  */
 export async function writeLiveScreenshot({ host, port, out, fetchImpl, timeoutMs } = {}) {
   const bytes = await fetchLiveScreenshot({ host, port, fetchImpl, timeoutMs });
@@ -140,5 +146,5 @@ export async function writeLiveScreenshot({ host, port, out, fetchImpl, timeoutM
   const dir = dirname(target);
   if (dir && dir !== ".") mkdirSync(dir, { recursive: true });
   writeFileSync(target, bytes);
-  return readPngMeta(target);
+  return { ...readPngMeta(target), sha256: createHash("sha256").update(bytes).digest("hex") };
 }

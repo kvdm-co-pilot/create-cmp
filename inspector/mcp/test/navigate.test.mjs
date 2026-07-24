@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
@@ -58,7 +59,7 @@ const detailTree = {
 // GET /inspect/screenshot serves real PNG bytes. `navs` (optional) queues
 // GET /inspect/nav responses in call order; omit to simulate an app without the route (404).
 function startStub({ trees = [], screenshot = tinyPng, navs = null } = {}) {
-  const seen = { taps: [], treeFetches: 0, navFetches: 0 };
+  const seen = { taps: [], treeFetches: 0, navFetches: 0, screenshotFetches: 0 };
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
       if (req.method === "GET" && req.url.startsWith("/inspect/tree")) {
@@ -81,8 +82,12 @@ function startStub({ trees = [], screenshot = tinyPng, navs = null } = {}) {
         return;
       }
       if (req.method === "GET" && req.url.startsWith("/inspect/screenshot")) {
+        const body = Array.isArray(screenshot)
+          ? screenshot[Math.min(seen.screenshotFetches, screenshot.length - 1)]
+          : screenshot;
+        seen.screenshotFetches++;
         res.writeHead(200, { "Content-Type": "image/png" });
-        res.end(screenshot);
+        res.end(body);
         return;
       }
       if (req.method === "POST" && req.url === "/inspect/tap") {
@@ -242,8 +247,8 @@ test("writeLiveScreenshot: writes the PNG to `out` and returns path-only metadat
     assert.equal(meta.sizeBytes, tinyPng.length);
     assert.deepEqual(
       Object.keys(meta).sort(),
-      ["height", "path", "sizeBytes", "width"],
-      "metadata only — never bytes/base64"
+      ["height", "path", "sha256", "sizeBytes", "width"],
+      "metadata + capture hash only — never bytes/base64"
     );
     assert.ok(fs.readFileSync(out).equals(tinyPng), "file on disk is the exact PNG served");
   } finally {
@@ -261,6 +266,29 @@ test("writeLiveScreenshot: defaults to a temp file when out is omitted", async (
     fs.rmSync(meta.path, { force: true });
   } finally {
     server.close();
+  }
+});
+
+// The stale-frame tripwire (DOGFOODING-FINDINGS "render_screen{live} serves a STALE
+// cached frame"): two captures of two DIFFERENT screens must hash differently, and the
+// hash must be the honest sha256 of the served bytes — it is the only way a caller can
+// prove freshness, since the pixels themselves never enter model context.
+test("writeLiveScreenshot: sha256 is the real hash of the bytes — different frames differ, identical frames match", async () => {
+  const secondPng = Buffer.concat([tinyPng, Buffer.from([0x00])]); // valid header, different bytes
+  const { server, port } = await startStub({ screenshot: [tinyPng, secondPng, secondPng] });
+  const dir = path.join(os.tmpdir(), `cmp-nav-test-${Date.now()}`);
+  try {
+    const first = await writeLiveScreenshot({ port, out: path.join(dir, "1.png") });
+    const second = await writeLiveScreenshot({ port, out: path.join(dir, "2.png") });
+    const third = await writeLiveScreenshot({ port, out: path.join(dir, "3.png") });
+    const sha = (buf) => crypto.createHash("sha256").update(buf).digest("hex");
+    assert.equal(first.sha256, sha(tinyPng), "hash is of the exact served bytes");
+    assert.equal(second.sha256, sha(secondPng));
+    assert.notEqual(first.sha256, second.sha256, "different frames must never hash the same");
+    assert.equal(second.sha256, third.sha256, "an unchanged frame hashes the same (legitimate)");
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
