@@ -18,7 +18,9 @@
   ],
   "scripts": {
     "test": "node --test",
-    "start": "node bin/server.mjs"
+    "start": "node bin/server.mjs",
+    "build:bundle": "node scripts/build-bundle.mjs",
+    "check:bundle": "node scripts/build-bundle.mjs --check"
   },
   "keywords": [
     "mcp",
@@ -34,5 +36,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.25 || ^4.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
   }
 }

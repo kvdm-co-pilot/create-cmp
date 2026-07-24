@@ -1,6 +1,6 @@
 {
   "name": "create-cmp-cli",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Create production mobile apps (Android + iOS, one Kotlin codebase) with AI — the delivery harness for Compose Multiplatform, the current generation of cross-platform (Google-backed KMP, iOS stable since May 2025). A deterministic, non-interactive generator that scaffolds a green-building app in minutes, then holds AI-driven changes to a machine-enforced verify lane with a committed evidence receipt. Every app carries a device-free UI preview loop (real screens rendered headlessly on save; changed-screen attribution and compile-error surfacing for coding agents, a live gallery for humans) plus agent-first docs (CLAUDE.md + AGENTS.md). Installs the `create-cmp` command.",
   "type": "module",
   "bin": {

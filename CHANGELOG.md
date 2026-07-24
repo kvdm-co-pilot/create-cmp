@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-07-24
+
+### Fixed
+
+- **The plugin's MCP server now actually starts (P1).** `cmp-inspector` — the preview loop, the
+  inspector, the studio console — had **never** been able to run from a marketplace install.
+  The Claude Code plugin is distributed as a git clone into `~/.claude/plugins/cache/`, nothing
+  runs `npm install` there, and `inspector/mcp` is a separate package: the server died on
+  `ERR_MODULE_NOT_FOUND` for `@modelcontextprotocol/sdk` before serving a single tool. It only
+  ever worked from a repo checkout, where `node_modules` happens to exist — which is why no test
+  and no amount of local use ever caught it. The server is now bundled to one self-contained
+  ~1.4 MB file (`inspector/mcp/dist/server.mjs`, esbuild), committed because the clone IS the
+  distribution, and `.mcp.json` launches that. Verified by booting it in a directory with no
+  `node_modules` anywhere above it: 28 tools served.
+- **The bundle attests its own inputs, so it cannot silently go stale.** A committed build
+  artifact drifts the moment someone edits a source and forgets to rebuild — and every plugin
+  user would then run yesterday's server while the repo's tests pass against today's source. The
+  bundle carries a `cmp:bundle-inputs` hash of every source, the declared dependency versions,
+  and the inlined version (the receipt idea, applied to a build artifact); `npm run check:bundle`
+  and a test fail with the exact rebuild command when they diverge. Proven by editing a source
+  without rebuilding and watching the gate fail, then pass again on restore.
+- **The bundle no longer reads a sibling `package.json` for its version** — inlined at build time,
+  since a bundle that needs files arranged around it is not self-contained.
+
 ## [0.10.0] - 2026-07-24
 
 The first full dogfood run (the Fuelled showcase, rebuilt end-to-end on 0.9.0 —
@@ -744,7 +768,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.7.1...v0.8.0

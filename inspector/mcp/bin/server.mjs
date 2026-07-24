@@ -139,11 +139,20 @@ async function gitChangedFiles(cwd) {
 // server + tools
 // ---------------------------------------------------------------------------
 
-const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+// Version. The bundled build (dist/server.mjs, what the Claude Code plugin runs)
+// has this inlined by esbuild's `define`, so it depends on NO sibling file — a
+// bundle that has to read ../package.json is not self-contained, and the whole
+// reason the bundle exists is that nothing installs or arranges files around it.
+// Running from source, the identifier is undefined and the manifest is read as
+// before; `typeof` on an undeclared name is safe, a bare reference would throw.
+const SERVER_VERSION =
+  typeof __CMP_BUNDLE_VERSION__ !== "undefined"
+    ? __CMP_BUNDLE_VERSION__
+    : JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 const server = new McpServer({
   name: "cmp-inspector",
-  version: pkg.version,
+  version: SERVER_VERSION,
   // Injected into the connected agent's context — the discovery surface for the
   // default workflow. Front-loaded: the edit loop first, everything else after.
   instructions:

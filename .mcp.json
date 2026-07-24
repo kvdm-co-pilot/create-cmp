@@ -2,7 +2,7 @@
   "mcpServers": {
     "cmp-inspector": {
       "command": "node",
-      "args": ["inspector/mcp/bin/server.mjs"]
+      "args": ["inspector/mcp/dist/server.mjs"]
     }
   }
 }
