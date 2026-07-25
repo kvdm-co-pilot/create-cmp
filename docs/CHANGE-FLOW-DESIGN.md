@@ -218,19 +218,46 @@ after.
 **The rail-truth rule** (Karel, 2026-07-25): *a neutral glyph means truly
 nothing pending here.* The working baseline is all-green; the moment a change
 lands, every affected tab turns colour — the rail IS the human's work queue.
-Any state waiting on a human is colour from the moment it exists:
+Any state waiting on a human is colour from the moment it exists, and every
+waiting-state has a **distinct colour** — grey is reserved for truly-nothing:
 
-| State | Glyph |
-|---|---|
-| unsigned brief (`proposed`) / unreviewed spec or artifact | ○ unsigned |
-| drifted (changed-since-approval) | ⚠ drift |
-| reopened for redesign | ◐ reopen |
-| proven — acceptance pending | ● attention |
-| everything signed, nothing pending | ● green |
-| section has no data at all | · neutral |
+| State | Glyph | Colour |
+|---|---|---|
+| unsigned brief (`proposed`) / unreviewed spec or artifact | ○ | **accent blue** — your signature is the next step |
+| proven — acceptance pending | ● | **accent blue** — your acceptance is the next step |
+| drifted (changed-since-approval) | ⚠ | red — an accident to review |
+| reopened for redesign | ◐ | amber — sanctioned, never rendered as drift |
+| everything signed, nothing pending | ● | green |
+| section has no data at all | · | neutral grey |
 
-Features and Specs roll up their families (worst state wins); Approvals — the
-work queue itself — carries the count of decisions waiting.
+Roll-up rules: Features and Specs aggregate their families, worst state wins
+(drift > reopened > unsigned > acceptance-pending > all-signed); **reopen is
+never collapsed into drift** — the asymmetry is the product. Approvals — the
+work queue itself — counts every decision waiting on the human **including
+pending acceptances** (a ledger field, not an artifact status), so Features
+and Approvals can never tell different stories. **Ungoverned sections never
+go green**: Screens has no signature to show — its one honest colour is red,
+when the last render/compile failed and the gallery may be stale; Walkthrough,
+Comments, Digest, and Live device stay neutral by design.
+
+**The change surface — what changed vs. what is still approved** (Karel,
+2026-07-25). A red chip alone says *something* changed; the console must say
+*what*, and what the signature still covers. Every drifted artifact renders
+ONE panel — at the top of **its own section** (spec-mirror-drift: each section
+is its own drift surface) and inside the Approvals table:
+
+- the per-file split against the **signed bytes**: which files changed
+  (modified / added / deleted) and which are **still exactly as signed** —
+  "9 of 11 files still exactly as signed · 2 changed", never one
+  undifferentiated alarm;
+- the full diff, anchored to the commit whose tree hashes to the *stored
+  approval hash* (located, never guessed — if no commit matches, the panel
+  says exactly that instead of showing a diff against "roughly then");
+- the **Re-approve** button in place — re-approval happens where the drift is
+  read, not on another tab.
+
+Implementation: `inspector/mcp/src/lib/approval-diff.mjs` (anchor + per-file
+split) + `driftPanelHtml` in `console-tabs.mjs` (the one renderer).
 
 ---
 

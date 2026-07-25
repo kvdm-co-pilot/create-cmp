@@ -89,6 +89,70 @@ function orderNumber(id) {
   return "–";
 }
 
+// --- the change surface: what changed vs. what is still approved -------------
+//
+// ONE renderer for every drifted artifact, shown IN THE SECTION IT BELONGS TO
+// (spec-mirror-drift: each section is its own drift surface) and in the
+// Approvals table. It answers the two questions a red chip can't:
+//   1. WHAT changed — the diff against the SIGNED bytes (B5's anchored diff:
+//      the anchor is the commit whose tree hashes to the stored approval hash,
+//      never "roughly then"), per-file M/A/D.
+//   2. What is STILL approved — the artifact files byte-identical to what the
+//      human signed, listed, so a drifted components registry reads "9 of 11
+//      still exactly as signed · 2 changed", not one undifferentiated alarm.
+// The Re-approve button is the same approve-btn wiring every other surface
+// uses — re-approval happens where the drift is read, not on another tab.
+
+/**
+ * @param {object} status a getApprovalStatuses row (must be changed-since-approval to render)
+ * @param {object|null} anchored getApprovalAnchoredDiff result for this artifact
+ * @param {{withApprove?: boolean}} [opts] withApprove=false inside the Approvals
+ *   table, whose rows already carry the button
+ */
+export function driftPanelHtml(status, anchored, opts = {}) {
+  if (!status || status.status !== "changed-since-approval") return "";
+  const withApprove = opts.withApprove !== false;
+  const signedLine = status.approvedAt ? ` It was signed ${esc(status.approvedAt)}.` : "";
+
+  let filesHtml = "";
+  let diffHtml = "";
+  if (anchored && anchored.available) {
+    const { changed = [], unchanged = [] } = anchored.files ?? {};
+    const total = changed.length + unchanged.length;
+    const verb = { M: "changed", A: "added since signing", D: "deleted" };
+    const changedItems = changed
+      .map((c) => `<li><span class="status-drift">${esc(verb[c.status] ?? c.status)}</span> <code>${esc(c.path)}</code></li>`)
+      .join("\n");
+    const stillSigned =
+      unchanged.length > 0
+        ? `      <details class="drift-still-signed"><summary>${unchanged.length} file(s) still exactly as signed</summary>
+        <ul>${unchanged.map((f) => `<li><span class="ok-inline">✓</span> <code>${esc(f)}</code></li>`).join("\n")}</ul>
+      </details>`
+        : "";
+    filesHtml = `    <p class="drift-summary">${
+      total > 1 ? `<strong>${unchanged.length} of ${total}</strong> file(s) still exactly as signed &middot; <strong>${changed.length}</strong> changed:` : "what changed:"
+    }</p>
+    <ul class="drift-files">
+${changedItems}
+    </ul>
+${stillSigned}`;
+    diffHtml = `    <details class="drift-diff"><summary>diff against the signed bytes (anchor ${esc(anchored.anchorSha)} &middot; ${esc(
+      anchored.anchorWhen || "",
+    )}${anchored.truncated ? " &middot; truncated" : ""})</summary>
+      <pre class="approval-diff">${esc(anchored.diff)}</pre>
+    </details>`;
+  } else if (anchored) {
+    diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc(anchored.reason)}</p>`;
+  }
+
+  return `  <div class="drift-panel" data-artifact="${escAttr(status.id)}">
+    <p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve — or revert the change.</p>
+${filesHtml}
+${diffHtml}
+    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">Re-approve ${esc(status.id)}</button></div>` : ""}
+  </div>`;
+}
+
 // --- §2 mode presentation: per-artifact genesis/steward banners --------------
 //
 // "unreviewed"/"reopened" ⇒ genesis (workbench affordances + a one-line "what
@@ -848,14 +912,14 @@ export function approvalsTabHtml(approvals, meta = {}) {
       // can't be found, the honest reason renders instead — the chip alone
       // said "something changed"; this says WHAT, or exactly why it can't.
       const anchored = meta.anchoredDiffs ? meta.anchoredDiffs[s.id] : null;
+      // The SAME change-surface panel every section shows (driftPanelHtml) —
+      // what changed, what is still exactly as signed, the anchored diff. The
+      // row already carries the Approve button, so the panel omits its own.
       const diffRow =
-        s.status === "changed-since-approval" && anchored
-          ? anchored.available
-            ? `    <tr class="approval-diff-row"><td colspan="6"><details>
-      <summary>diff against approved bytes (anchor ${esc(anchored.anchorSha)} · ${esc(anchored.anchorWhen || "")}${anchored.truncated ? " · truncated" : ""})</summary>
-      <pre class="approval-diff">${esc(anchored.diff)}</pre>
-    </details></td></tr>`
-            : `    <tr class="approval-diff-row"><td colspan="6"><p class="empty-inline">anchored diff unavailable &mdash; ${esc(anchored.reason)}</p></td></tr>`
+        s.status === "changed-since-approval"
+          ? `    <tr class="approval-diff-row"><td colspan="6">
+${driftPanelHtml(s, anchored, { withApprove: false })}
+    </td></tr>`
           : "";
       return `    <tr class="approval-row" data-artifact="${esc(s.id)}">
       <td class="order-num">${orderNumber(s.id)}</td>

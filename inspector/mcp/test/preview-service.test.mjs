@@ -571,6 +571,80 @@ test("galleryHtml (rail-truth): colour = pending human work — a neutral glyph 
   assert.match(featureBtn(empty), /glyph-none/, "no briefs = truly nothing pending = neutral");
 });
 
+test("galleryHtml (rail-truth semantics): reopen never reads as drift; acceptances count as work; Screens reds on failure", () => {
+  const base = { appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] };
+  const btn = (html, tab) => html.match(new RegExp(`<button[^>]*data-tab="${tab}"[^>]*>.*?</button>`, "s"))[0];
+  const brief = (phase, over = {}) => ({
+    name: "meal", rel: "docs/features/meal.md", phase, record: { status: "approved" }, touches: [], blockError: null,
+    specRel: "specs/meal.spec.md", specExists: true, clauses: [{ id: "MEAL-01", withdrawn: false, cited: true }],
+    covered: 1, total: 1, receipt: { present: true, verdict: "PASS", attestsTree: true }, provenDone: false,
+    doneReason: "…", ...over,
+  });
+
+  // Reopen is a SANCTIONED redesign — amber ◐, never collapsed into drift red.
+  const reopened = galleryHtml({
+    ...base,
+    features: { available: true, board: { features: [brief("reopened")], undeclared: [] } },
+    approvals: { available: true, statuses: [{ id: "feature-brief:meal", status: "reopened" }] },
+  });
+  assert.match(btn(reopened, "features"), /glyph-reopen/);
+  assert.doesNotMatch(btn(reopened, "features"), /glyph-drift/);
+
+  // A proven feature awaiting acceptance is accent (attn), and the Approvals
+  // work queue COUNTS it — Features and Approvals never tell different stories.
+  const proven = galleryHtml({
+    ...base,
+    features: { available: true, board: { features: [brief("proven", { provenDone: true })], undeclared: [] } },
+    approvals: { available: true, statuses: [{ id: "feature-brief:meal", status: "approved" }, { id: "feature-spec:meal", status: "approved" }] },
+  });
+  assert.match(btn(proven, "features"), /glyph-attn/);
+  assert.match(btn(proven, "approvals"), /1 decision\(s\) waiting \(1 acceptance\)/);
+  assert.doesNotMatch(btn(proven, "approvals"), /nothing waiting on you/);
+
+  // Screens is ungoverned — never green; red exactly when the last render or
+  // compile failed (the gallery may be stale), neutral otherwise.
+  const failed = galleryHtml({ ...base, error: "e: boom", errorSource: "compile" });
+  assert.match(btn(failed, "screens"), /glyph-drift/);
+  assert.match(btn(failed, "screens"), /last compile failed/);
+  assert.match(btn(galleryHtml(base), "screens"), /glyph-none/);
+});
+
+test("galleryHtml (change surface): a drifted artifact shows WHAT changed and what is still approved, in its own section", () => {
+  const anchored = {
+    available: true,
+    anchorSha: "abc1234",
+    anchorWhen: "2026-07-21 10:00:00 +0200",
+    diff: "--- a/presentation/components/AppButton.kt\n+++ b/presentation/components/AppButton.kt\n-old\n+new",
+    truncated: false,
+    files: {
+      changed: [{ status: "M", path: "presentation/components/AppButton.kt" }],
+      unchanged: ["presentation/components/AppHeader.kt", "presentation/components/ListItemCard.kt"],
+    },
+  };
+  const html = galleryHtml({
+    appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [],
+    approvals: {
+      available: true,
+      statuses: [{
+        id: "components", label: "Components", status: "changed-since-approval", hash: "b", storedHash: "a",
+        approvedAt: "2026-07-21T08:00:00Z", fileCount: 3, missing: [], resolvable: true,
+      }],
+    },
+    anchoredDiffs: { components: anchored },
+  });
+  const section = html.match(/<section id="tab-components"[\s\S]*?(?=<section id="tab-)/)[0];
+  assert.match(section, /drift-panel/, "the drift panel renders in the artifact's OWN section");
+  assert.match(section, /Changed since signature/);
+  assert.match(section, /<strong>2 of 3<\/strong> file\(s\) still exactly as signed/);
+  assert.match(section, /AppButton\.kt/);
+  assert.match(section, /2 file\(s\) still exactly as signed/);
+  assert.match(section, /anchor abc1234/);
+  assert.match(section, /Re-approve components/, "re-approval offered where the drift is read");
+  // …and the Approvals table carries the same panel (without a second button).
+  const approvalsSection = html.match(/<section id="tab-approvals"[\s\S]*?(?=<section id="tab-)/)[0];
+  assert.match(approvalsSection, /drift-panel/);
+});
+
 test("galleryHtml (§3.0): intent sections render with a fill-count status; spec-line comments on specs/intent.md attribute to Intent, not Specs", () => {
   const html = galleryHtml({
     appName: "Acme",

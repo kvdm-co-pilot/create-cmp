@@ -49,7 +49,13 @@ async function materialize(git, sha, relFiles, alsoNeeded) {
 
 /**
  * @returns {Promise<{available: boolean, reason?: string, anchorSha?: string,
- *   anchorWhen?: string, diff?: string, truncated?: boolean}>}
+ *   anchorWhen?: string, diff?: string, truncated?: boolean,
+ *   files?: {changed: Array<{status: string, path: string}>, unchanged: string[]}}>}
+ *   `files` is the what-changed / what-is-still-approved split: `changed` are
+ *   the artifact files that differ from the SIGNED bytes (git name-status:
+ *   M/A/D), `unchanged` are the files still byte-identical to what the human
+ *   approved — so a drifted multi-file artifact can say "9 of 11 files still
+ *   exactly as signed" instead of one undifferentiated red chip.
  */
 export async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync } = {}) {
   const git = (args) =>
@@ -93,6 +99,19 @@ export async function getApprovalAnchoredDiff(projectDir, artifactId, { execFile
           : lib.hashArtifactFiles(tmp, artifact.files);
       if (h.hash === stored) {
         const { stdout: diff } = await git(["diff", sha, "--", ...artifact.files]);
+        // Per-file split: which files drifted from the signed bytes, and which
+        // are still exactly what the human approved. name-status is computed
+        // from the SAME anchor as the diff, so the two can never disagree.
+        const { stdout: nameStatus } = await git(["diff", "--name-status", sha, "--", ...artifact.files]);
+        const changed = nameStatus
+          .split("\n")
+          .filter(Boolean)
+          .map((l) => {
+            const [status, ...rest] = l.split("\t");
+            return { status: status[0], path: rest[rest.length - 1] };
+          });
+        const changedPaths = new Set(changed.map((c) => c.path));
+        const unchanged = artifact.files.filter((f) => !changedPaths.has(f));
         const lines = diff.split("\n");
         const truncated = lines.length > MAX_DIFF_LINES;
         return {
@@ -101,6 +120,7 @@ export async function getApprovalAnchoredDiff(projectDir, artifactId, { execFile
           anchorWhen: when,
           diff: (truncated ? lines.slice(0, MAX_DIFF_LINES) : lines).join("\n"),
           truncated,
+          files: { changed, unchanged },
         };
       }
     } catch {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 7e73906f90c699842b09cf4791984162190f13090cde1cfaa7f5070747c3296c
+// cmp:bundle-inputs 8947fc1854d8111b337d6b5b43ede1c331938702193867363b34e7f6b8daad29
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -33673,6 +33673,13 @@ async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: 
       const h = artifact.id === "architecture" ? lib.hashArchitectureArtifact(tmp) : lib.hashArtifactFiles(tmp, artifact.files);
       if (h.hash === stored) {
         const { stdout: diff } = await git2(["diff", sha, "--", ...artifact.files]);
+        const { stdout: nameStatus } = await git2(["diff", "--name-status", sha, "--", ...artifact.files]);
+        const changed = nameStatus.split("\n").filter(Boolean).map((l) => {
+          const [status, ...rest] = l.split("	");
+          return { status: status[0], path: rest[rest.length - 1] };
+        });
+        const changedPaths = new Set(changed.map((c) => c.path));
+        const unchanged = artifact.files.filter((f) => !changedPaths.has(f));
         const lines = diff.split("\n");
         const truncated = lines.length > MAX_DIFF_LINES;
         return {
@@ -33680,7 +33687,8 @@ async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: 
           anchorSha: sha.slice(0, 7),
           anchorWhen: when,
           diff: (truncated ? lines.slice(0, MAX_DIFF_LINES) : lines).join("\n"),
-          truncated
+          truncated,
+          files: { changed, unchanged }
         };
       }
     } catch {
@@ -33868,7 +33876,11 @@ var SHELL_CSS = `
   .rail-label { flex: 1; }
   .glyph { flex: none; width: 1.1em; text-align: center; font-size: 11px; line-height: 1; }
   .glyph-signed { color: var(--signed); }
-  .glyph-unsigned { color: var(--muted); }
+  /* Waiting-on-you states are ACCENT, not grey \u2014 the rail-truth rule: grey is
+     reserved for "truly nothing pending" (glyph-none); anything that needs the
+     human's signature (unsigned \u25CB) or acceptance (attn \u25CF) must read as colour. */
+  .glyph-unsigned { color: var(--accent); }
+  .glyph-attn { color: var(--accent); }
   .glyph-reopen { color: var(--reopen); }
   .glyph-drift { color: var(--drift); }
   .glyph-none { color: var(--line); }
@@ -34207,6 +34219,19 @@ var SHELL_CSS = `
   .feature-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
   .feature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
     border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  /* The change surface: what changed vs. what is still exactly as signed \u2014
+     rendered at the top of the drifted artifact's own section AND inside the
+     Approvals table (driftPanelHtml \u2014 one renderer, everywhere). */
+  .drift-panel { border: 1px solid var(--drift); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+                 background: var(--drift-bg); font-size: var(--fs-meta); }
+  .drift-panel .drift-head { margin: 0 0 6px; }
+  .drift-summary { margin: 6px 0 4px; }
+  .drift-files { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .drift-files code, .drift-still-signed code { overflow-wrap: anywhere; }
+  .drift-still-signed { margin: 4px 0; }
+  .drift-still-signed ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .drift-diff { margin: 6px 0 0; }
+  .approvals-table .drift-panel { margin-bottom: 0; }
   .feature-undeclared { border: 1px solid var(--drift); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
     font-size: var(--fs-meta); }
 `;
@@ -34371,6 +34396,40 @@ var ORDER_BY_ID = [
 function orderNumber(id) {
   for (const [re, n] of ORDER_BY_ID) if (re.test(id)) return n;
   return "\u2013";
+}
+function driftPanelHtml(status, anchored, opts = {}) {
+  if (!status || status.status !== "changed-since-approval") return "";
+  const withApprove = opts.withApprove !== false;
+  const signedLine = status.approvedAt ? ` It was signed ${esc4(status.approvedAt)}.` : "";
+  let filesHtml = "";
+  let diffHtml = "";
+  if (anchored && anchored.available) {
+    const { changed = [], unchanged = [] } = anchored.files ?? {};
+    const total = changed.length + unchanged.length;
+    const verb = { M: "changed", A: "added since signing", D: "deleted" };
+    const changedItems = changed.map((c) => `<li><span class="status-drift">${esc4(verb[c.status] ?? c.status)}</span> <code>${esc4(c.path)}</code></li>`).join("\n");
+    const stillSigned = unchanged.length > 0 ? `      <details class="drift-still-signed"><summary>${unchanged.length} file(s) still exactly as signed</summary>
+        <ul>${unchanged.map((f) => `<li><span class="ok-inline">\u2713</span> <code>${esc4(f)}</code></li>`).join("\n")}</ul>
+      </details>` : "";
+    filesHtml = `    <p class="drift-summary">${total > 1 ? `<strong>${unchanged.length} of ${total}</strong> file(s) still exactly as signed &middot; <strong>${changed.length}</strong> changed:` : "what changed:"}</p>
+    <ul class="drift-files">
+${changedItems}
+    </ul>
+${stillSigned}`;
+    diffHtml = `    <details class="drift-diff"><summary>diff against the signed bytes (anchor ${esc4(anchored.anchorSha)} &middot; ${esc4(
+      anchored.anchorWhen || ""
+    )}${anchored.truncated ? " &middot; truncated" : ""})</summary>
+      <pre class="approval-diff">${esc4(anchored.diff)}</pre>
+    </details>`;
+  } else if (anchored) {
+    diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc4(anchored.reason)}</p>`;
+  }
+  return `  <div class="drift-panel" data-artifact="${escAttr(status.id)}">
+    <p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc4(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve \u2014 or revert the change.</p>
+${filesHtml}
+${diffHtml}
+    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">Re-approve ${esc4(status.id)}</button></div>` : ""}
+  </div>`;
 }
 function genesisGuide(id) {
   if (/^intent$/.test(id)) return "the interview that becomes this app's purpose, audience, platforms, and first screens.";
@@ -34811,10 +34870,9 @@ function approvalsTabHtml(approvals, meta3 = {}) {
     const btnLabel = s.status === "approved" ? "Re-approve" : "Approve";
     const reopenBtn = s.status === "approved" ? `<button class="reopen-btn" data-artifact="${esc4(s.id)}">Reopen</button>` : "";
     const anchored = meta3.anchoredDiffs ? meta3.anchoredDiffs[s.id] : null;
-    const diffRow = s.status === "changed-since-approval" && anchored ? anchored.available ? `    <tr class="approval-diff-row"><td colspan="6"><details>
-      <summary>diff against approved bytes (anchor ${esc4(anchored.anchorSha)} \xB7 ${esc4(anchored.anchorWhen || "")}${anchored.truncated ? " \xB7 truncated" : ""})</summary>
-      <pre class="approval-diff">${esc4(anchored.diff)}</pre>
-    </details></td></tr>` : `    <tr class="approval-diff-row"><td colspan="6"><p class="empty-inline">anchored diff unavailable &mdash; ${esc4(anchored.reason)}</p></td></tr>` : "";
+    const diffRow = s.status === "changed-since-approval" ? `    <tr class="approval-diff-row"><td colspan="6">
+${driftPanelHtml(s, anchored, { withApprove: false })}
+    </td></tr>` : "";
     return `    <tr class="approval-row" data-artifact="${esc4(s.id)}">
       <td class="order-num">${orderNumber(s.id)}</td>
       <td>${esc4(s.label)}<div class="artifact-id">${esc4(s.id)}</div>${artifactBannerHtml(s)}</td>
@@ -35945,6 +36003,7 @@ function galleryHtml(state) {
     changed = [],
     changedVersions = {},
     error: error51 = null,
+    errorSource = null,
     approvals = { available: false },
     specs = { available: false },
     designSystem = { available: false },
@@ -36063,8 +36122,9 @@ function galleryHtml(state) {
     if (n("changed-since-approval")) parts.push(`<span class="status-drift">${n("changed-since-approval")} drifted</span>`);
     if (features.board.undeclared.length > 0) parts.push(`<span class="status-drift">undeclared blast</span>`);
     featuresStatus = parts.join(" &middot; ");
-    featuresGlyph = n("changed-since-approval") > 0 || n("reopened") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${n("changed-since-approval") + n("reopened")} brief(s) drifted/reopened` } : n("proposed") > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${n("proposed")} brief(s) awaiting signature` } : n("proven") > 0 ? { ch: "\u25CF", cls: "glyph-unsigned", label: `${n("proven")} proven \u2014 acceptance pending` } : { ch: "\u25CF", cls: "glyph-signed", label: "all briefs signed" };
+    featuresGlyph = n("changed-since-approval") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${n("changed-since-approval")} brief(s) changed since signature` } : n("reopened") > 0 ? { ch: "\u25D0", cls: "glyph-reopen", label: `${n("reopened")} brief(s) reopened for redesign` } : n("proposed") > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${n("proposed")} brief(s) awaiting signature` } : n("proven") > 0 ? { ch: "\u25CF", cls: "glyph-attn", label: `${n("proven")} proven \u2014 acceptance pending` } : { ch: "\u25CF", cls: "glyph-signed", label: "all briefs signed" };
   }
+  const provenAwaiting = features.available && features.board ? features.board.features.filter((f) => f.phase === "proven").length : 0;
   let specsGlyph = null;
   if (approvals.available && approvals.statuses) {
     const specRecords = approvals.statuses.filter((s) => s.id === "exemplar-spec" || s.id.startsWith("feature-spec:"));
@@ -36076,8 +36136,9 @@ function galleryHtml(state) {
   let approvalsGlyph = null;
   if (approvals.available && approvals.statuses) {
     const c = (st) => approvals.statuses.filter((s) => s.status === st).length;
-    const pending = c("unreviewed") + c("changed-since-approval") + c("reopened");
-    approvalsGlyph = c("changed-since-approval") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${pending} decision(s) waiting \u2014 ${c("changed-since-approval")} drifted` } : pending > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${pending} decision(s) waiting` } : { ch: "\u25CF", cls: "glyph-signed", label: "nothing waiting on you" };
+    const pending = c("unreviewed") + c("changed-since-approval") + c("reopened") + provenAwaiting;
+    const detail = provenAwaiting > 0 ? ` (${provenAwaiting} acceptance${provenAwaiting === 1 ? "" : "s"})` : "";
+    approvalsGlyph = c("changed-since-approval") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${pending} decision(s) waiting \u2014 ${c("changed-since-approval")} drifted${detail}` } : pending > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${pending} decision(s) waiting${detail}` } : { ch: "\u25CF", cls: "glyph-signed", label: "nothing waiting on you" };
   }
   const railItems = [
     // §3.0: Intent is genesis order 0 — the root artifact everything else is
@@ -36094,7 +36155,15 @@ function galleryHtml(state) {
     { id: "features", label: "Features", glyph: featuresGlyph },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
     { id: "specs", label: "Specs", glyph: specsGlyph },
-    { id: "screens", label: "Screens", glyph: null, active: true },
+    // Screens is UNGOVERNED — no signature exists, so it can never be green.
+    // Its one honest colour is red: the last render or compile FAILED, so the
+    // gallery may be showing stale pixels. Otherwise neutral.
+    {
+      id: "screens",
+      label: "Screens",
+      glyph: error51 ? { ch: "\u2717", cls: "glyph-drift", label: `last ${errorSource || "render"} failed \u2014 the gallery may be stale` } : null,
+      active: true
+    },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
     // §3.6: the Evidence item's glyph derives from the latest receipt itself
@@ -36200,6 +36269,22 @@ function galleryHtml(state) {
       fullBleed: true
     }
   ];
+  if (approvals.available && approvals.statuses) {
+    const sectionOfArtifact = (id) => id === "intent" || id === "architecture" || id === "design-system" || id === "components" ? id : id.startsWith("feature-brief:") ? "features" : id === "exemplar-spec" || id.startsWith("feature-spec:") ? "specs" : id === "exemplar-feature" ? "screens" : null;
+    const panelsBySection = {};
+    for (const s of approvals.statuses) {
+      if (s.status !== "changed-since-approval") continue;
+      const sec = sectionOfArtifact(s.id);
+      if (!sec) continue;
+      (panelsBySection[sec] ??= []).push(driftPanelHtml(s, anchoredDiffs ? anchoredDiffs[s.id] : null));
+    }
+    for (const section of sections) {
+      if (panelsBySection[section.id]) {
+        section.bodyHtml = `${panelsBySection[section.id].join("\n")}
+${section.bodyHtml}`;
+      }
+    }
+  }
   const bodyScript = `
   const pill = document.getElementById("pill");
   // \xA72: the rail glyphs and page-status lines are drift surfaces \u2014 they must
@@ -37310,6 +37395,7 @@ function createPreviewService(opts) {
             changed: lastChanged,
             changedVersions: Object.fromEntries(changedAt),
             error: lastError,
+            errorSource: lastErrorSource,
             approvals,
             specs,
             designSystem,

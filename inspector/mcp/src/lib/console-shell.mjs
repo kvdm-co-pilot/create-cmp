@@ -286,7 +286,11 @@ export const SHELL_CSS = `
   .rail-label { flex: 1; }
   .glyph { flex: none; width: 1.1em; text-align: center; font-size: 11px; line-height: 1; }
   .glyph-signed { color: var(--signed); }
-  .glyph-unsigned { color: var(--muted); }
+  /* Waiting-on-you states are ACCENT, not grey — the rail-truth rule: grey is
+     reserved for "truly nothing pending" (glyph-none); anything that needs the
+     human's signature (unsigned ○) or acceptance (attn ●) must read as colour. */
+  .glyph-unsigned { color: var(--accent); }
+  .glyph-attn { color: var(--accent); }
   .glyph-reopen { color: var(--reopen); }
   .glyph-drift { color: var(--drift); }
   .glyph-none { color: var(--line); }
@@ -625,6 +629,19 @@ export const SHELL_CSS = `
   .feature-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
   .feature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
     border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  /* The change surface: what changed vs. what is still exactly as signed —
+     rendered at the top of the drifted artifact's own section AND inside the
+     Approvals table (driftPanelHtml — one renderer, everywhere). */
+  .drift-panel { border: 1px solid var(--drift); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+                 background: var(--drift-bg); font-size: var(--fs-meta); }
+  .drift-panel .drift-head { margin: 0 0 6px; }
+  .drift-summary { margin: 6px 0 4px; }
+  .drift-files { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .drift-files code, .drift-still-signed code { overflow-wrap: anywhere; }
+  .drift-still-signed { margin: 4px 0; }
+  .drift-still-signed ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .drift-diff { margin: 6px 0 0; }
+  .approvals-table .drift-panel { margin-bottom: 0; }
   .feature-undeclared { border: 1px solid var(--drift); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
     font-size: var(--fs-meta); }
 `;

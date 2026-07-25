@@ -73,6 +73,7 @@ import {
   liveDeviceTabHtml,
   digestTabHtml,
   featuresTabHtml,
+  driftPanelHtml,
 } from "./console-tabs.mjs";
 import { getTokenUsage } from "./design-language.mjs";
 import { getIntentData } from "./intent.mjs";
@@ -316,6 +317,7 @@ export function galleryHtml(state) {
     changed = [],
     changedVersions = {},
     error = null,
+    errorSource = null,
     approvals = { available: false },
     specs = { available: false },
     designSystem = { available: false },
@@ -507,17 +509,27 @@ export function galleryHtml(state) {
     featuresStatus = parts.join(" &middot; ");
     // The rail-truth rule: a neutral glyph means TRULY nothing pending here.
     // Every phase waiting on a human is colour, the moment it exists — worst
-    // state wins (drift > unsigned brief > proven-awaiting-accept). All-green
-    // (every brief accepted or building against a signed brief) reads signed.
+    // state wins: drift (an accident, red) > reopened (a sanctioned redesign,
+    // amber — NEVER collapsed into drift; the asymmetry is the product) >
+    // unsigned brief (accent — waiting on your signature) > proven-awaiting-
+    // accept (accent, filled — waiting on your acceptance). All-green reads
+    // signed.
     featuresGlyph =
-      n("changed-since-approval") > 0 || n("reopened") > 0
-        ? { ch: "⚠", cls: "glyph-drift", label: `${n("changed-since-approval") + n("reopened")} brief(s) drifted/reopened` }
-        : n("proposed") > 0
-          ? { ch: "○", cls: "glyph-unsigned", label: `${n("proposed")} brief(s) awaiting signature` }
-          : n("proven") > 0
-            ? { ch: "●", cls: "glyph-unsigned", label: `${n("proven")} proven — acceptance pending` }
-            : { ch: "●", cls: "glyph-signed", label: "all briefs signed" };
+      n("changed-since-approval") > 0
+        ? { ch: "⚠", cls: "glyph-drift", label: `${n("changed-since-approval")} brief(s) changed since signature` }
+        : n("reopened") > 0
+          ? { ch: "◐", cls: "glyph-reopen", label: `${n("reopened")} brief(s) reopened for redesign` }
+          : n("proposed") > 0
+            ? { ch: "○", cls: "glyph-unsigned", label: `${n("proposed")} brief(s) awaiting signature` }
+            : n("proven") > 0
+              ? { ch: "●", cls: "glyph-attn", label: `${n("proven")} proven — acceptance pending` }
+              : { ch: "●", cls: "glyph-signed", label: "all briefs signed" };
   }
+  // Acceptances the human owes — counted into the Approvals work queue below,
+  // so Features and Approvals can never tell different stories about whether
+  // anything waits on you.
+  const provenAwaiting =
+    features.available && features.board ? features.board.features.filter((f) => f.phase === "proven").length : 0;
 
   // Specs roll-up (rail-truth): the Specs tab aggregates every spec-family
   // artifact (exemplar-spec + feature-spec:*) so an unreviewed or drifted
@@ -540,15 +552,19 @@ export function galleryHtml(state) {
 
   // Approvals roll-up (rail-truth): this tab IS the work queue — its glyph is
   // the count of decisions currently waiting on the human, colour when > 0.
+  // Pending ACCEPTANCES count too (a ledger field, not an artifact status —
+  // without this the queue said "nothing waiting on you" while a proven
+  // feature sat awaiting the human's accept).
   let approvalsGlyph = null;
   if (approvals.available && approvals.statuses) {
     const c = (st) => approvals.statuses.filter((s) => s.status === st).length;
-    const pending = c("unreviewed") + c("changed-since-approval") + c("reopened");
+    const pending = c("unreviewed") + c("changed-since-approval") + c("reopened") + provenAwaiting;
+    const detail = provenAwaiting > 0 ? ` (${provenAwaiting} acceptance${provenAwaiting === 1 ? "" : "s"})` : "";
     approvalsGlyph =
       c("changed-since-approval") > 0
-        ? { ch: "⚠", cls: "glyph-drift", label: `${pending} decision(s) waiting — ${c("changed-since-approval")} drifted` }
+        ? { ch: "⚠", cls: "glyph-drift", label: `${pending} decision(s) waiting — ${c("changed-since-approval")} drifted${detail}` }
         : pending > 0
-          ? { ch: "○", cls: "glyph-unsigned", label: `${pending} decision(s) waiting` }
+          ? { ch: "○", cls: "glyph-unsigned", label: `${pending} decision(s) waiting${detail}` }
           : { ch: "●", cls: "glyph-signed", label: "nothing waiting on you" };
   }
 
@@ -570,7 +586,17 @@ export function galleryHtml(state) {
     { id: "features", label: "Features", glyph: featuresGlyph },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
     { id: "specs", label: "Specs", glyph: specsGlyph },
-    { id: "screens", label: "Screens", glyph: null, active: true },
+    // Screens is UNGOVERNED — no signature exists, so it can never be green.
+    // Its one honest colour is red: the last render or compile FAILED, so the
+    // gallery may be showing stale pixels. Otherwise neutral.
+    {
+      id: "screens",
+      label: "Screens",
+      glyph: error
+        ? { ch: "✗", cls: "glyph-drift", label: `last ${errorSource || "render"} failed — the gallery may be stale` }
+        : null,
+      active: true,
+    },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
     // §3.6: the Evidence item's glyph derives from the latest receipt itself
@@ -682,6 +708,36 @@ export function galleryHtml(state) {
       fullBleed: true,
     },
   ];
+
+  // The change surface (spec-mirror-drift): every drifted artifact's panel —
+  // what changed vs. the signed bytes, what is still exactly as signed, and
+  // the Re-approve button — renders AT THE TOP OF THE SECTION IT BELONGS TO,
+  // not only in the Approvals table. The human reads the drift where they
+  // read the artifact.
+  if (approvals.available && approvals.statuses) {
+    const sectionOfArtifact = (id) =>
+      id === "intent" || id === "architecture" || id === "design-system" || id === "components"
+        ? id
+        : id.startsWith("feature-brief:")
+          ? "features"
+          : id === "exemplar-spec" || id.startsWith("feature-spec:")
+            ? "specs"
+            : id === "exemplar-feature"
+              ? "screens" // the exemplar's file set IS the built surface
+              : null;
+    const panelsBySection = {};
+    for (const s of approvals.statuses) {
+      if (s.status !== "changed-since-approval") continue;
+      const sec = sectionOfArtifact(s.id);
+      if (!sec) continue;
+      (panelsBySection[sec] ??= []).push(driftPanelHtml(s, anchoredDiffs ? anchoredDiffs[s.id] : null));
+    }
+    for (const section of sections) {
+      if (panelsBySection[section.id]) {
+        section.bodyHtml = `${panelsBySection[section.id].join("\n")}\n${section.bodyHtml}`;
+      }
+    }
+  }
 
   const bodyScript = `
   const pill = document.getElementById("pill");
@@ -2021,6 +2077,7 @@ export function createPreviewService(opts) {
             changed: lastChanged,
             changedVersions: Object.fromEntries(changedAt),
             error: lastError,
+            errorSource: lastErrorSource,
             approvals,
             specs,
             designSystem,
