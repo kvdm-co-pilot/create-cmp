@@ -208,7 +208,7 @@ The generated `CLAUDE.md` documents this loop for future sessions ("UI feedback 
 
 ## 6. THE FORK — express lane or guided walk
 
-Once the loop is up, tell the human plainly: their app has six governed artifacts — in
+Once the loop is up, tell the human plainly: their app has six governed artifacts (plus a feature brief per shaped feature) — in
 definition order: intent, architecture, exemplar spec, exemplar feature, design system,
 components — and there are two honest ways to sign off on them. Ask which they want; don't default to either silently.
 
@@ -219,13 +219,13 @@ components — and there are two honest ways to sign off on them. Ask which they
   never pretends the defaults were designed. Good for "build now, walk the definition
   later"; a later real approval (after shaping, via §7) clears the mode. This settles only
   the *human* half — `qa/verify.mjs` runs the same either way.
-- **Guided walk.** The six conversations in §7, each ending in its own approval. Slower,
+- **Guided walk.** The conversations in §7 (the six artifacts, plus the first feature's brief), each ending in its own approval. Slower,
   but everything the harness later enforces is something the human actually chose.
 
 If express: run the command, then `node qa/approve.mjs --status` so they see exactly what
 is signed and in what mode, and skip to §9 (Report). If guided, continue to §7.
 
-## 7. The guided walk — six conversations, each ending in its approval
+## 7. The guided walk — the conversations, each ending in its approval
 
 Walk the artifacts **in registry order** (`node qa/approve.mjs --status` always lists them
 in this order) — each is expressed in the vocabulary of the ones before it. For each step:
@@ -249,6 +249,23 @@ Then seed a **provisional palette**: one honest `Tokens.kt` edit toward the bran
 words ("calm, trustworthy" → muted blues; "energetic, bold" → high contrast + saturated
 accent). Say plainly it is provisional — the design-system *lock* happens in §7.3, on the
 real exemplar. Do NOT approve `design-system` now; it stays `unreviewed` until then.
+
+### 7.0.5 First feature brief — the decide step, before any contract
+
+The moment intent is signed, turn the interview's "first screens" answer into the first
+feature's **brief**: `docs/features/<exemplar-name>.md` — the feature's decisions and
+their why, in the human's domain language, with an **Open decisions** section for every
+call that is genuinely theirs. It appears in the console's Features section (directly
+after Intent on the rail) as `proposed` the moment the file exists — the rail glyph turns
+until they sign. Close the open decisions conversationally, then they approve
+`feature-brief:<name>` (console Approve, or `node qa/approve.mjs feature-brief:<name>`).
+Signed BEFORE §7.2 writes a single clause — genesis runs the same decide → contract →
+build → prove → sign loop the app will live in forever (CHANGE-FLOW-DESIGN.md), and the
+one feature every future feature is cloned from must not skip the decide step.
+
+Boundaries: brief only the feature(s) actually being shaped — placeholder tabs earn a
+brief when they become real. And on the express lane there is NO brief: never fabricate
+decision prose; the Features section shows its honest empty state instead.
 
 ### 7.1 Architecture — comprehension, not open-ended choice
 The harness *is* the opinion here, and `docs/ARCHITECTURE.md` is the document that opinion

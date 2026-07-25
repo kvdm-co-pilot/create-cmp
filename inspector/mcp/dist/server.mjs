@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 21a2f01a5a544dc6d98b60e4842e3078982ba3e265d450e3e1df4d8af3512b5d
+// cmp:bundle-inputs 7e73906f90c699842b09cf4791984162190f13090cde1cfaa7f5070747c3296c
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34354,18 +34354,19 @@ function shortHash2(hash2) {
 }
 var ORDER_BY_ID = [
   [/^intent$/, 0],
-  [/^architecture$/, 1],
+  // Decide-first: a feature's brief is signed before anything else about it
+  // exists — it speaks intent's vocabulary, so it sits directly after intent
+  // (CHANGE-FLOW-DESIGN.md §6; true at genesis and ever after).
+  [/^feature-brief:/, 1],
+  [/^architecture$/, 2],
   // Spec-first: the exemplar's clauses are confirmed BEFORE the slice is built.
-  [/^exemplar-spec$/, 2],
-  [/^exemplar-feature$/, 3],
+  [/^exemplar-spec$/, 3],
+  [/^exemplar-feature$/, 4],
   // UI-first: the design system locks on — and the components are distilled
   // from — the real exemplar screens, so both FOLLOW the exemplar.
-  [/^design-system$/, 4],
-  [/^components$/, 5],
-  [/^feature-spec:/, 6],
-  // Post-genesis: a feature's brief is signed before its spec is written
-  // (CHANGE-FLOW-DESIGN.md §4) — but both live after the genesis six.
-  [/^feature-brief:/, 6]
+  [/^design-system$/, 5],
+  [/^components$/, 6],
+  [/^feature-spec:/, 7]
 ];
 function orderNumber(id) {
   for (const [re, n] of ORDER_BY_ID) if (re.test(id)) return n;
@@ -36050,19 +36051,33 @@ function galleryHtml(state) {
   }
   const commentsStatus = comments.available ? `${openCommentCount} open &middot; ${comments.comments.length - openCommentCount} resolved` : "comments ledger not available in this project";
   let featuresStatus = "no feature briefs yet";
-  let provenAwaiting = 0;
+  let featuresGlyph = null;
   if (features.available && features.board && features.board.features.length > 0) {
     const briefs = features.board.features;
     const n = (ph) => briefs.filter((f) => f.phase === ph).length;
-    provenAwaiting = n("proven");
     const parts = [`${briefs.length} brief${briefs.length === 1 ? "" : "s"}`];
     if (n("proposed")) parts.push(`${n("proposed")} awaiting sign-off`);
     if (n("approved")) parts.push(`${n("approved")} building`);
-    if (provenAwaiting) parts.push(`${provenAwaiting} proven \u2014 acceptance pending`);
+    if (n("proven")) parts.push(`${n("proven")} proven \u2014 acceptance pending`);
     if (n("accepted")) parts.push(`${n("accepted")} accepted`);
     if (n("changed-since-approval")) parts.push(`<span class="status-drift">${n("changed-since-approval")} drifted</span>`);
     if (features.board.undeclared.length > 0) parts.push(`<span class="status-drift">undeclared blast</span>`);
     featuresStatus = parts.join(" &middot; ");
+    featuresGlyph = n("changed-since-approval") > 0 || n("reopened") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${n("changed-since-approval") + n("reopened")} brief(s) drifted/reopened` } : n("proposed") > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${n("proposed")} brief(s) awaiting signature` } : n("proven") > 0 ? { ch: "\u25CF", cls: "glyph-unsigned", label: `${n("proven")} proven \u2014 acceptance pending` } : { ch: "\u25CF", cls: "glyph-signed", label: "all briefs signed" };
+  }
+  let specsGlyph = null;
+  if (approvals.available && approvals.statuses) {
+    const specRecords = approvals.statuses.filter((s) => s.id === "exemplar-spec" || s.id.startsWith("feature-spec:"));
+    const c = (st) => specRecords.filter((s) => s.status === st).length;
+    if (specRecords.length > 0) {
+      specsGlyph = c("changed-since-approval") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${c("changed-since-approval")} spec(s) drifted` } : c("reopened") > 0 ? { ch: "\u25D0", cls: "glyph-reopen", label: `${c("reopened")} spec(s) reopened for redesign` } : c("unreviewed") > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${c("unreviewed")} spec(s) unsigned` } : { ch: "\u25CF", cls: "glyph-signed", label: "all specs signed" };
+    }
+  }
+  let approvalsGlyph = null;
+  if (approvals.available && approvals.statuses) {
+    const c = (st) => approvals.statuses.filter((s) => s.status === st).length;
+    const pending = c("unreviewed") + c("changed-since-approval") + c("reopened");
+    approvalsGlyph = c("changed-since-approval") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${pending} decision(s) waiting \u2014 ${c("changed-since-approval")} drifted` } : pending > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${pending} decision(s) waiting` } : { ch: "\u25CF", cls: "glyph-signed", label: "nothing waiting on you" };
   }
   const railItems = [
     // §3.0: Intent is genesis order 0 — the root artifact everything else is
@@ -36071,17 +36086,14 @@ function galleryHtml(state) {
     // then the exemplar's surfaces (Specs, Screens), then the design system
     // and components — which lock on / are distilled from those screens.
     { id: "intent", label: "Intent", glyph: statusGlyph(intentRecord) },
+    // Features sits DIRECTLY after Intent (CHANGE-FLOW-DESIGN.md §6): a
+    // feature's walk — brief → contract → build → prove → accept — is the
+    // decide layer, and a brief speaks intent's vocabulary; it needs nothing
+    // from architecture. The glyph is the rail-truth roll-up: colour for any
+    // state waiting on the human, from the moment a brief file exists.
+    { id: "features", label: "Features", glyph: featuresGlyph },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
-    { id: "specs", label: "Specs", glyph: null },
-    // The per-feature view sits with the definition cluster: a feature's walk
-    // (brief → contract → build → prove → accept) starts here. The glyph
-    // marks the one state waiting on the HUMAN in this section: a feature
-    // whose doneness has DERIVED (proven) pending acceptance.
-    {
-      id: "features",
-      label: "Features",
-      glyph: provenAwaiting > 0 ? { ch: "\u25CF", cls: "glyph-unsigned", label: `${provenAwaiting} proven \u2014 acceptance pending` } : null
-    },
+    { id: "specs", label: "Specs", glyph: specsGlyph },
     { id: "screens", label: "Screens", glyph: null, active: true },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
@@ -36092,7 +36104,8 @@ function galleryHtml(state) {
     // A2: the walkthrough report is evidence-adjacent — derived from committed
     // manifests, so it sits right after Evidence in the arc.
     { id: "walkthrough", label: "Walkthrough", glyph: null },
-    { id: "approvals", label: "Approvals", glyph: null },
+    // The work queue itself: colour whenever any decision waits on the human.
+    { id: "approvals", label: "Approvals", glyph: approvalsGlyph },
     {
       id: "comments",
       label: "Comments",
@@ -36118,6 +36131,9 @@ function galleryHtml(state) {
       statusHtml: intentStatus,
       bodyHtml: intentBodyHtml(intent)
     },
+    // Features directly after Intent — same order as the rail (decide layer
+    // before the contract layer; CHANGE-FLOW-DESIGN.md §6).
+    { id: "features", title: "Features", statusHtml: featuresStatus, bodyHtml: featuresTabHtml(features) },
     {
       id: "architecture",
       title: "Architecture",
@@ -36126,7 +36142,6 @@ function galleryHtml(state) {
     },
     // §3.5: the RTM's last-receipt column reads the same receipt as Evidence.
     { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt }) },
-    { id: "features", title: "Features", statusHtml: featuresStatus, bodyHtml: featuresTabHtml(features) },
     {
       id: "screens",
       title: "Screens",

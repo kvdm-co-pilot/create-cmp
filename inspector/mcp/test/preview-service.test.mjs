@@ -483,21 +483,20 @@ test("galleryHtml (§2 rail): sections in the genesis definition order, Intent f
   const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
   const nav = html.match(/<nav class="rail-nav">([\s\S]*?)<\/nav>/)[1];
   const order = [...nav.matchAll(/data-tab="([a-z-]+)"/g)].map((m) => m[1]);
-  // The REVISED definition order (spec-first behavior, UI-first visuals):
-  // intent → architecture → the exemplar's surfaces (Specs, Screens) →
-  // design language + components, which lock on / distill from those screens.
+  // The definition order (decide-first briefs, spec-first behavior, UI-first
+  // visuals): intent → Features (the decide layer — a brief speaks intent's
+  // vocabulary, so it sits DIRECTLY after Intent; CHANGE-FLOW-DESIGN.md §6) →
+  // architecture → the exemplar's surfaces (Specs, Screens) → design language
+  // + components, which lock on / distill from those screens.
   // PW-5 extends the arc's tail: Walkthrough sits after Evidence (it IS
   // evidence, derived from committed manifests), Digest is the returning
   // human's since-you-last-looked read, and Live device is deliberately LAST —
   // the console arc ends DRIVE (A1).
-  // Features (the per-feature view) joins the definition cluster
-  // right after Specs: a feature's walk — brief, contract, build, prove, accept —
-  // starts there, before the screens it produces.
   assert.deepEqual(order, [
     "intent",
+    "features",
     "architecture",
     "specs",
-    "features",
     "screens",
     "design-system",
     "components",
@@ -511,6 +510,65 @@ test("galleryHtml (§2 rail): sections in the genesis definition order, Intent f
   assert.match(html, /id="tab-screens" class="tab-panel active/, "Screens stays the default page");
   assert.match(html, /id="tab-intent" class="tab-panel/, "Intent section present");
   assert.match(html, /Not yet captured &mdash; conversation 0 pending/, "no intent data -> the §3.0 pending state");
+});
+
+test("galleryHtml (rail-truth): colour = pending human work — a neutral glyph means truly nothing pending", () => {
+  const base = { appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] };
+  const featureBtn = (html) => html.match(/<button[^>]*data-tab="features"[^>]*>.*?<\/button>/s)[0];
+  const approvalsBtn = (html) => html.match(/<button[^>]*data-tab="approvals"[^>]*>.*?<\/button>/s)[0];
+  const specsBtn = (html) => html.match(/<button[^>]*data-tab="specs"[^>]*>.*?<\/button>/s)[0];
+  const brief = (phase) => ({
+    name: "meal", rel: "docs/features/meal.md", phase, record: null, touches: [], blockError: null,
+    specRel: "specs/meal.spec.md", specExists: false, clauses: [], covered: 0, total: 0,
+    receipt: { present: false, verdict: null, attestsTree: false }, provenDone: false,
+    doneReason: "no spec yet (specs/meal.spec.md) — behavior starts as clauses there",
+  });
+
+  // A brief awaiting the human's signature lights Features the moment the file exists.
+  const proposed = galleryHtml({
+    ...base,
+    features: { available: true, board: { features: [brief("proposed")], undeclared: [] } },
+    approvals: { available: true, statuses: [
+      { id: "feature-brief:meal", status: "unreviewed" },
+      { id: "exemplar-spec", status: "approved" },
+    ] },
+  });
+  assert.match(featureBtn(proposed), /glyph-unsigned/, "proposed brief = colour on Features");
+  assert.match(featureBtn(proposed), /awaiting signature/);
+  assert.match(approvalsBtn(proposed), /glyph-unsigned/, "the work queue shows the pending decision");
+  assert.match(approvalsBtn(proposed), /1 decision\(s\) waiting/);
+  assert.match(specsBtn(proposed), /glyph-signed/, "all specs signed reads green, not neutral");
+
+  // Drift outranks everything.
+  const drifted = galleryHtml({
+    ...base,
+    features: { available: true, board: { features: [brief("changed-since-approval")], undeclared: [] } },
+    approvals: { available: true, statuses: [
+      { id: "feature-brief:meal", status: "changed-since-approval" },
+      { id: "feature-spec:meal", status: "changed-since-approval" },
+    ] },
+  });
+  assert.match(featureBtn(drifted), /glyph-drift/);
+  assert.match(specsBtn(drifted), /glyph-drift/, "a drifted spec is colour on the Specs roll-up");
+  assert.match(approvalsBtn(drifted), /glyph-drift/);
+
+  // All green: signed dots, not neutral — the baseline Karel asked for.
+  const green = galleryHtml({
+    ...base,
+    features: { available: true, board: { features: [{ ...brief("accepted"), record: { status: "approved", accepted: true } }], undeclared: [] } },
+    approvals: { available: true, statuses: [
+      { id: "feature-brief:meal", status: "approved" },
+      { id: "feature-spec:meal", status: "approved" },
+    ] },
+  });
+  assert.match(featureBtn(green), /glyph-signed/);
+  assert.match(specsBtn(green), /glyph-signed/);
+  assert.match(approvalsBtn(green), /glyph-signed/);
+  assert.match(approvalsBtn(green), /nothing waiting on you/);
+
+  // No data at all: the neutral dot is honest.
+  const empty = galleryHtml(base);
+  assert.match(featureBtn(empty), /glyph-none/, "no briefs = truly nothing pending = neutral");
 });
 
 test("galleryHtml (§3.0): intent sections render with a fill-count status; spec-line comments on specs/intent.md attribute to Intent, not Specs", () => {

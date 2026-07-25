@@ -493,19 +493,63 @@ export function galleryHtml(state) {
   // getFeatureBoard — facts only, no fabricated zeros. `proven` is DERIVED
   // doneness (clauses cited + receipt PASS + attests tree), never a claim.
   let featuresStatus = "no feature briefs yet";
-  let provenAwaiting = 0;
+  let featuresGlyph = null;
   if (features.available && features.board && features.board.features.length > 0) {
     const briefs = features.board.features;
     const n = (ph) => briefs.filter((f) => f.phase === ph).length;
-    provenAwaiting = n("proven");
     const parts = [`${briefs.length} brief${briefs.length === 1 ? "" : "s"}`];
     if (n("proposed")) parts.push(`${n("proposed")} awaiting sign-off`);
     if (n("approved")) parts.push(`${n("approved")} building`);
-    if (provenAwaiting) parts.push(`${provenAwaiting} proven — acceptance pending`);
+    if (n("proven")) parts.push(`${n("proven")} proven — acceptance pending`);
     if (n("accepted")) parts.push(`${n("accepted")} accepted`);
     if (n("changed-since-approval")) parts.push(`<span class="status-drift">${n("changed-since-approval")} drifted</span>`);
     if (features.board.undeclared.length > 0) parts.push(`<span class="status-drift">undeclared blast</span>`);
     featuresStatus = parts.join(" &middot; ");
+    // The rail-truth rule: a neutral glyph means TRULY nothing pending here.
+    // Every phase waiting on a human is colour, the moment it exists — worst
+    // state wins (drift > unsigned brief > proven-awaiting-accept). All-green
+    // (every brief accepted or building against a signed brief) reads signed.
+    featuresGlyph =
+      n("changed-since-approval") > 0 || n("reopened") > 0
+        ? { ch: "⚠", cls: "glyph-drift", label: `${n("changed-since-approval") + n("reopened")} brief(s) drifted/reopened` }
+        : n("proposed") > 0
+          ? { ch: "○", cls: "glyph-unsigned", label: `${n("proposed")} brief(s) awaiting signature` }
+          : n("proven") > 0
+            ? { ch: "●", cls: "glyph-unsigned", label: `${n("proven")} proven — acceptance pending` }
+            : { ch: "●", cls: "glyph-signed", label: "all briefs signed" };
+  }
+
+  // Specs roll-up (rail-truth): the Specs tab aggregates every spec-family
+  // artifact (exemplar-spec + feature-spec:*) so an unreviewed or drifted
+  // contract is COLOUR on the rail, not a neutral dot the human must dig for.
+  let specsGlyph = null;
+  if (approvals.available && approvals.statuses) {
+    const specRecords = approvals.statuses.filter((s) => s.id === "exemplar-spec" || s.id.startsWith("feature-spec:"));
+    const c = (st) => specRecords.filter((s) => s.status === st).length;
+    if (specRecords.length > 0) {
+      specsGlyph =
+        c("changed-since-approval") > 0
+          ? { ch: "⚠", cls: "glyph-drift", label: `${c("changed-since-approval")} spec(s) drifted` }
+          : c("reopened") > 0
+            ? { ch: "◐", cls: "glyph-reopen", label: `${c("reopened")} spec(s) reopened for redesign` }
+            : c("unreviewed") > 0
+              ? { ch: "○", cls: "glyph-unsigned", label: `${c("unreviewed")} spec(s) unsigned` }
+              : { ch: "●", cls: "glyph-signed", label: "all specs signed" };
+    }
+  }
+
+  // Approvals roll-up (rail-truth): this tab IS the work queue — its glyph is
+  // the count of decisions currently waiting on the human, colour when > 0.
+  let approvalsGlyph = null;
+  if (approvals.available && approvals.statuses) {
+    const c = (st) => approvals.statuses.filter((s) => s.status === st).length;
+    const pending = c("unreviewed") + c("changed-since-approval") + c("reopened");
+    approvalsGlyph =
+      c("changed-since-approval") > 0
+        ? { ch: "⚠", cls: "glyph-drift", label: `${pending} decision(s) waiting — ${c("changed-since-approval")} drifted` }
+        : pending > 0
+          ? { ch: "○", cls: "glyph-unsigned", label: `${pending} decision(s) waiting` }
+          : { ch: "●", cls: "glyph-signed", label: "nothing waiting on you" };
   }
 
   // Rail + sections share one order: the genesis definition order (§2), with
@@ -518,17 +562,14 @@ export function galleryHtml(state) {
     // then the exemplar's surfaces (Specs, Screens), then the design system
     // and components — which lock on / are distilled from those screens.
     { id: "intent", label: "Intent", glyph: statusGlyph(intentRecord) },
+    // Features sits DIRECTLY after Intent (CHANGE-FLOW-DESIGN.md §6): a
+    // feature's walk — brief → contract → build → prove → accept — is the
+    // decide layer, and a brief speaks intent's vocabulary; it needs nothing
+    // from architecture. The glyph is the rail-truth roll-up: colour for any
+    // state waiting on the human, from the moment a brief file exists.
+    { id: "features", label: "Features", glyph: featuresGlyph },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
-    { id: "specs", label: "Specs", glyph: null },
-    // The per-feature view sits with the definition cluster: a feature's walk
-    // (brief → contract → build → prove → accept) starts here. The glyph
-    // marks the one state waiting on the HUMAN in this section: a feature
-    // whose doneness has DERIVED (proven) pending acceptance.
-    {
-      id: "features",
-      label: "Features",
-      glyph: provenAwaiting > 0 ? { ch: "●", cls: "glyph-unsigned", label: `${provenAwaiting} proven — acceptance pending` } : null,
-    },
+    { id: "specs", label: "Specs", glyph: specsGlyph },
     { id: "screens", label: "Screens", glyph: null, active: true },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
@@ -539,7 +580,8 @@ export function galleryHtml(state) {
     // A2: the walkthrough report is evidence-adjacent — derived from committed
     // manifests, so it sits right after Evidence in the arc.
     { id: "walkthrough", label: "Walkthrough", glyph: null },
-    { id: "approvals", label: "Approvals", glyph: null },
+    // The work queue itself: colour whenever any decision waits on the human.
+    { id: "approvals", label: "Approvals", glyph: approvalsGlyph },
     {
       id: "comments",
       label: "Comments",
@@ -566,6 +608,9 @@ export function galleryHtml(state) {
       statusHtml: intentStatus,
       bodyHtml: intentBodyHtml(intent),
     },
+    // Features directly after Intent — same order as the rail (decide layer
+    // before the contract layer; CHANGE-FLOW-DESIGN.md §6).
+    { id: "features", title: "Features", statusHtml: featuresStatus, bodyHtml: featuresTabHtml(features) },
     {
       id: "architecture",
       title: "Architecture",
@@ -574,7 +619,6 @@ export function galleryHtml(state) {
     },
     // §3.5: the RTM's last-receipt column reads the same receipt as Evidence.
     { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt }) },
-    { id: "features", title: "Features", statusHtml: featuresStatus, bodyHtml: featuresTabHtml(features) },
     {
       id: "screens",
       title: "Screens",

@@ -29,10 +29,20 @@ Everything that ever happens to a create-cmp app is the same loop:
 | Sign | human judgment | approvals (`qa/approvals.json`), hash-bound; invalidated mechanically by drift |
 
 **Genesis is this loop run for the first time over everything**, in the
-definition order (intent → architecture → exemplar spec → exemplar → design
-system → components). Every later change is the same loop over a subset.
-There is no second flow. Anything that proposes a second flow is wrong by
-construction — that is the lesson of the first implementation.
+definition order — and briefs are part of it (Karel, 2026-07-25): **intent →
+feature brief(s) → architecture → exemplar spec → exemplar → design system →
+components**. Once intent is signed, the interview's "first screens" answer
+becomes the first feature's brief — `docs/features/<exemplar>.md`, `proposed`
+in the console — so the app's FIRST feature gets the decide step every later
+feature gets, and the Features section has content from day one. The brief
+sits directly after intent because it speaks intent's vocabulary (purpose,
+audience, domain nouns); only the *spec* needs architecture's vocabulary.
+Two boundaries: the express lane stays light (no fabricated brief prose —
+the Features section shows its honest empty state), and placeholder tabs
+earn a brief only when they become real. Every later change is the same
+loop over a subset. There is no second flow. Anything that proposes a second
+flow is wrong by construction — that is the lesson of the first
+implementation.
 
 ### The roles — who may do what
 
@@ -198,6 +208,29 @@ The Features section is the **per-feature view** — a feature's brief, its slic
 of the RTM, its screens, its blast radius, its lifecycle — not a governance
 board. Section = signed doc + derived truth + drift surface, like every other
 console section (the spec-mirror-drift standard).
+
+**Rail order mirrors the loop** (Karel, 2026-07-25): Intent → **Features** →
+Architecture → Specs → Screens → Design language → Components → Evidence.
+Features sits directly after Intent — the decide layer before the contract
+layer — so the rail reads as the walk actually runs, at genesis and ever
+after.
+
+**The rail-truth rule** (Karel, 2026-07-25): *a neutral glyph means truly
+nothing pending here.* The working baseline is all-green; the moment a change
+lands, every affected tab turns colour — the rail IS the human's work queue.
+Any state waiting on a human is colour from the moment it exists:
+
+| State | Glyph |
+|---|---|
+| unsigned brief (`proposed`) / unreviewed spec or artifact | ○ unsigned |
+| drifted (changed-since-approval) | ⚠ drift |
+| reopened for redesign | ◐ reopen |
+| proven — acceptance pending | ● attention |
+| everything signed, nothing pending | ● green |
+| section has no data at all | · neutral |
+
+Features and Specs roll up their families (worst state wins); Approvals — the
+work queue itself — carries the count of decisions waiting.
 
 ---
 

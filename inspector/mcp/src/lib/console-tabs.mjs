@@ -70,18 +70,19 @@ function shortHash(hash) {
 // that already existed.
 const ORDER_BY_ID = [
   [/^intent$/, 0],
-  [/^architecture$/, 1],
+  // Decide-first: a feature's brief is signed before anything else about it
+  // exists — it speaks intent's vocabulary, so it sits directly after intent
+  // (CHANGE-FLOW-DESIGN.md §6; true at genesis and ever after).
+  [/^feature-brief:/, 1],
+  [/^architecture$/, 2],
   // Spec-first: the exemplar's clauses are confirmed BEFORE the slice is built.
-  [/^exemplar-spec$/, 2],
-  [/^exemplar-feature$/, 3],
+  [/^exemplar-spec$/, 3],
+  [/^exemplar-feature$/, 4],
   // UI-first: the design system locks on — and the components are distilled
   // from — the real exemplar screens, so both FOLLOW the exemplar.
-  [/^design-system$/, 4],
-  [/^components$/, 5],
-  [/^feature-spec:/, 6],
-  // Post-genesis: a feature's brief is signed before its spec is written
-  // (CHANGE-FLOW-DESIGN.md §4) — but both live after the genesis six.
-  [/^feature-brief:/, 6],
+  [/^design-system$/, 5],
+  [/^components$/, 6],
+  [/^feature-spec:/, 7],
 ];
 function orderNumber(id) {
   for (const [re, n] of ORDER_BY_ID) if (re.test(id)) return n;

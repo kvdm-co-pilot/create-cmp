@@ -87,10 +87,15 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     fs.writeFileSync(receiptPath, JSON.stringify({ verdict, inputs: { hash } }, null, 2));
   };
 
-  await t.test("location is the opt-in: docs/features governed, docs/proposals not", () => {
+  await t.test("location is the opt-in: docs/features governed, docs/proposals not; briefs sit directly after intent", () => {
     const ids = lib.listGovernedArtifacts(root).map((a) => a.id);
     assert.ok(ids.includes("feature-brief:meal"), `expected feature-brief:meal in ${ids}`);
     assert.ok(!ids.some((id) => id.includes("harness-notes")), "docs/proposals must never be governed");
+    // Decide-first: the brief is the layer after intent (CHANGE-FLOW-DESIGN.md
+    // §6) — it speaks intent's vocabulary; only the spec needs architecture's.
+    assert.equal(ids[0], "intent");
+    assert.equal(ids[1], "feature-brief:meal");
+    assert.equal(ids[2], "architecture");
   });
 
   await t.test("acceptance refuses an unsigned brief; the walk is sign-first", () => {

@@ -30,11 +30,17 @@ each step is a conversation that *ends* in an approval.
 ### The walk as six conversations
 
 Revised order after the first full dogfood run (Fuelled, 2026-07-24 — see
-`docs/DOGFOODING-FINDINGS.md`). Two ordering principles, one per artifact
-kind: **behavioral artifacts are spec-first** (clauses confirmed before the
-slice is built), **visual artifacts are UI-first** (design system and
-component vocabulary are *distilled from* the real screens, never authored
-before them — you cannot judge a palette on placeholder stubs).
+`docs/DOGFOODING-FINDINGS.md`), amended 2026-07-25 (Karel): the first
+feature's **brief** enters the walk directly after intent — genesis runs the
+same decide → contract → build → prove → sign loop as every later change
+(CHANGE-FLOW-DESIGN.md), and the decide step must not be skipped for the one
+feature every future feature is cloned from. Three ordering principles, one
+per artifact kind: **decision artifacts are decide-first** (a brief speaks
+intent's vocabulary and needs nothing from architecture), **behavioral
+artifacts are spec-first** (clauses confirmed before the slice is built),
+**visual artifacts are UI-first** (design system and component vocabulary
+are *distilled from* the real screens, never authored before them — you
+cannot judge a palette on placeholder stubs).
 
 0. **Intent.** Before anything renders, the agent interviews: what is this
    app, who is it for, which platforms, what brand feel, which reference
@@ -42,6 +48,17 @@ before them — you cannot judge a palette on placeholder stubs).
    **intent brief** — the root artifact everything else traces to. The
    brand-feel words seed a **provisional palette** — real tokens, honestly
    provisional — that carries the build until the design-system lock (3).
+
+0.5. **First feature brief.** The interview's "first screens" answer becomes
+   the first feature's brief — `docs/features/<exemplar>.md`, `proposed` in
+   the console's Features section (which sits directly after Intent on the
+   rail): the decisions and their why, in the human's domain language, with
+   an Open decisions section closed conversationally before signing. Signed
+   BEFORE the exemplar spec is written — the app's first feature gets the
+   same decide step every later feature gets, and the Features section has
+   content from day one. Boundaries: the **express lane stays light** (no
+   fabricated brief prose — Features shows its honest empty state), and
+   **placeholder tabs earn a brief only when they become real**.
 1. **Architecture.** The harness *is* the opinion here — that's its value.
    This step is comprehension + configuration, not open-ended choice: the
    layer map drawn with *their* feature names, the real decisions surfaced
