@@ -222,11 +222,12 @@ test("approvalsTabHtml: §1 order numbers, status badges, short hash, and an App
   // Ordered-walk numbering (GENESIS-FLOW-DESIGN.md §1 amended 2026-07-25 —
   // decide-first briefs directly after intent, then spec-first behavior,
   // UI-first visuals): architecture #2, exemplar-feature #4, design-system #5
-  // (locks AFTER the exemplar), feature-spec:* #7. (#1 is feature-brief:*.)
+  // (locks AFTER the exemplar), feature-design:* #7 (brief → design → spec →
+  // build), feature-spec:* #8. (#1 is feature-brief:*.)
   assert.match(html, /<td class="order-num">2<\/td>/, "architecture is #2");
   assert.match(html, /<td class="order-num">4<\/td>/, "exemplar-feature is #4");
   assert.match(html, /<td class="order-num">5<\/td>/, "design-system is #5");
-  assert.match(html, /<td class="order-num">7<\/td>/, "feature-spec:* is #7");
+  assert.match(html, /<td class="order-num">8<\/td>/, "feature-spec:* is #8");
   // Status badges.
   assert.match(html, /badge-approved/);
   assert.match(html, /badge-unreviewed/);

@@ -264,6 +264,68 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     assert.equal(row.accepted, undefined);
   });
 
+  await t.test("the design gate: brief → design → spec → build, signed on rendered output", () => {
+    // A feature with NO ui surface carries no design rung at all — the honest skip.
+    assert.equal(lib.getFeatureBoard(root).features.find((f) => f.name === "meal").design, null);
+
+    // A brief DECLARING a screens surface holds the gate before any file exists.
+    fs.writeFileSync(
+      path.join(featuresDir, "wizard.md"),
+      '# wizard\n\n## Decisions\n\n- three steps, no skip.\n\n```json cmp:feature\n{ "touches": [], "screens": true }\n```\n',
+    );
+    const registry = lib.listGovernedArtifacts(root);
+    const design = registry.find((a) => a.id === "feature-design:wizard");
+    assert.ok(design, "screens:true must create the design artifact before any screen file exists");
+    assert.deepEqual(design.files, []);
+    assert.equal(design.complete, false);
+    // Definition order: design sits after components, before the feature specs.
+    const ids = registry.map((a) => a.id);
+    assert.ok(ids.indexOf("feature-design:wizard") > ids.indexOf("components"));
+    assert.ok(ids.indexOf("feature-design:wizard") < ids.indexOf("feature-spec:meal"));
+
+    // Nothing rendered → nothing signable: the refusal is the point.
+    assert.equal(lib.approveArtifact(root, "feature-design:wizard").ok, false);
+
+    // Signed brief + undrafted design → the design rung, agent-owned.
+    runApprove(root, ["feature-brief:wizard"]);
+    const next = () => lib.getFeatureBoard(root).features.find((f) => f.name === "wizard").nextStep;
+    assert.equal(next().key, "design");
+    assert.equal(next().owner, "agent drafts → human signs");
+    assert.match(next().label, /you sign what renders/);
+
+    // Screens land: the artifact binds ONLY *Screen.kt — a ViewModel edit
+    // during a legitimate build must never read as design drift.
+    const wizardDir = path.join(root, "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/wizard");
+    fs.mkdirSync(wizardDir, { recursive: true });
+    fs.writeFileSync(path.join(wizardDir, "WizardScreen.kt"), "// stub-data draft\nclass WizardScreen\n");
+    fs.writeFileSync(path.join(wizardDir, "WizardViewModel.kt"), "class WizardViewModel\n");
+    const resolved = lib.listGovernedArtifacts(root).find((a) => a.id === "feature-design:wizard");
+    assert.equal(resolved.files.length, 1);
+    assert.match(resolved.files[0], /WizardScreen\.kt$/);
+    assert.equal(next().key, "sign-design");
+    assert.equal(next().owner, "human");
+
+    // The human signs; the walk moves on to the behavior contract.
+    runApprove(root, ["feature-design:wizard"]);
+    assert.equal(next().key, "contract");
+
+    // A post-signature screen edit is drift, and the rung says re-approve.
+    fs.appendFileSync(path.join(wizardDir, "WizardScreen.kt"), "// drift\n");
+    assert.equal(lib.getApprovalStatuses(root).find((s) => s.id === "feature-design:wizard").status, "changed-since-approval");
+    assert.equal(next().key, "sign-design");
+    assert.match(next().label, /re-approve the design/);
+
+    // Acceptance refuses past an unsigned/drifted design — form is part of
+    // "the proven thing is what I wanted". Signature refusals outrank the
+    // doneness derivation, so this fires without building wizard to green.
+    const res = lib.acceptFeature(root, "wizard");
+    assert.equal(res.ok, false);
+    assert.match(res.reason, /feature-design:wizard is "changed-since-approval"/);
+
+    fs.rmSync(path.join(featuresDir, "wizard.md"));
+    fs.rmSync(wizardDir, { recursive: true, force: true });
+  });
+
   await t.test("the deliver/checks machinery is really gone — doneness has ONE definition", () => {
     assert.ok(!fs.existsSync(path.join(root, "qa/lib/intent-checks.mjs")), "intent-checks.mjs must not be stamped");
     const verify = fs.readFileSync(path.join(root, "qa/verify.mjs"), "utf8");

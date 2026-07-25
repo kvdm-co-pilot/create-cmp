@@ -18,11 +18,12 @@ lost and the mistake never rebuilt.
 
 Everything that ever happens to a create-cmp app is the same loop:
 
-> **Decide → Contract → Build → Prove → Sign**
+> **Decide → Design → Contract → Build → Prove → Sign**
 
 | Stage | What it is | Where it lives |
 |---|---|---|
 | Decide | why this change, which options were rejected, what it will disturb | feature brief (`docs/features/<name>.md`) — only when there is something to decide |
+| Design | what it looks like — drafted on stub data, judged on RENDERED screens, never prose (Karel, 2026-07-25: a brief describing "a tray with a running total" is a description; nobody signs a description) | `feature-design:<name>` over `presentation/<name>/*Screen.kt` — **derived: the stage exists iff the change has a UI surface**; a pure-logic change skips it honestly |
 | Contract | precisely what, testably | clauses in `specs/*.spec.md`; structural promises in governed artifacts |
 | Build | code, tests, stories, goldens | the tree |
 | Prove | mechanical verification | the lane (`qa/verify.mjs`) → receipt hash-bound to the tree |
@@ -51,11 +52,14 @@ implementation.
 - **The agent produces.** Research, brief drafts, clauses proposals, code,
   tests, lane runs. **The agent holds no signing verb.** There is no
   `--deliver`, no self-declared done, no state only an agent's word supports.
-- **The human judges.** Four signatures, each answering a question only a
-  human can: the brief (*is this the right thing to build?*), the spec
-  (*are these the right promises?*), the visual artifacts (*does it look
-  right?* — judged on rendered screens, never descriptions), and acceptance
-  (*is the proven thing what I wanted?*).
+- **The human judges.** The signatures, each answering a question only a
+  human can: the brief (*is this the right thing to build?*), the feature's
+  design (*is this the right form?* — `feature-design:<name>`, judged on
+  rendered screens, never descriptions, BEFORE the behavior contract), the
+  spec (*are these the right promises?*), the shared visual artifacts
+  (*does it still look right?* — design system / components on drift), and
+  acceptance (*is the proven thing what I wanted?* — which includes its form:
+  acceptance refuses past an unsigned or drifted design).
 
 ### The chain — why nothing can slip through
 
@@ -80,7 +84,8 @@ blast radius or not — is in unresolved drift.
 | Governed artifact | `qa/approvals.json` registry | yes | human signature over content bytes; drift invalidates |
 | Receipt | `qa/evidence/latest.json` | — | the lane's verdict, hash-bound to the tree (`inputs.hash`) |
 | Feature brief | `docs/features/<name>.md` | `feature-brief:<name>` | the *why*: decisions + rationale + declared blast radius. **Location is the opt-in** — every doc in `docs/features/` is governed; harness design standards stay in `docs/proposals/` |
-| `touches` | ```json cmp:feature``` block in the brief | declaration only | the artifacts this change expects to invalidate; hashes enforce, declaration lets the console tell *as-planned* from *undeclared blast* |
+| Feature design | `presentation/<name>/*Screen.kt` | `feature-design:<name>` | the *form*: the feature's own screens, signed on rendered output. Derives from **briefs only** (legacy features never sprout retro-governance): exists iff the brief declares `"screens": true` OR screen files exist on disk. Binds `*Screen.kt` only — a ViewModel edit during a legitimate build is never design drift. Undrafted (no files) → unresolvable: not signable, not in the human's queue — the *agent's* work |
+| `touches` / `screens` | ```json cmp:feature``` block in the brief | declaration only | `touches`: the artifacts this change expects to invalidate; hashes enforce, declaration lets the console tell *as-planned* from *undeclared blast*. `screens: true`: this feature has a UI surface — holds the design gate before any screen file exists |
 | Comment | `qa/comments.json` | advisory | human feedback with a defined path back into plan/spec/code |
 
 **Doneness is derived, never claimed.** A feature is provably done iff:
@@ -158,25 +163,40 @@ What happens when the human describes a decision-carrying change
    `node qa/approve.mjs feature-brief:<name>`). Hash-frozen from this click:
    the reasoning cannot shift under the feature while it is built. `via` is
    recorded (`console`/`cli`) for audit.
-5. **Contract.** Reopen every signed spec the brief declares it will amend
+5. **Design** (Karel, 2026-07-25: *"you never showed me the intended design
+   changes — I need to approve those first"*). If the feature has a UI surface
+   (declared `"screens": true`, or screen files exist), the agent drafts the
+   screens against **stub data** — no domain/data wiring — registers them in
+   the PreviewRegistry, renders them, and **stops**. The human judges the
+   rendered screens in the gallery (candidates via `snapshot_variant` when
+   there are directions to choose between) and signs `feature-design:<name>`.
+   *Brief → design → spec (Karel-decided): the brief's decisions are enough
+   to draw against, and the clauses are then written about a form that
+   exists — clauses drafted blind to form are how a tray nobody had seen got
+   promised in MEAL-09..12.* A pure-logic change has no design artifact and
+   skips this step honestly.
+6. **Contract.** Reopen every signed spec the brief declares it will amend
    (`--reopen feature-spec:<surface>` — sanctioned redesign, never drift).
    Write the new clauses where the behavior lives: new surface → new spec;
    changed surface → that surface's spec. The human signs the spec(s).
    *Spec-first is preserved: the contract changes before the code does.*
-6. **Build.** Slices land through the stamper/preview loop. Declared blast
+7. **Build.** Slices land through the stamper/preview loop. Declared blast
    arrives as planned: touched artifact hashes break, the lane FAILs naming
    them, the Features card shows *"as declared — re-approve when shaped"*.
    Undeclared drift surfaces in the **Undeclared blast** banner as plan-drift.
-   The human re-approves visual artifacts on rendered output.
-7. **Prove.** Nothing to do — the card's tally climbs as citing tests land,
+   The human re-approves visual artifacts on rendered output — wiring the
+   signed screens from stub to real state drifts `feature-design:<name>` too;
+   that re-approval is the "does it still look right" pass, in place.
+8. **Prove.** Nothing to do — the card's tally climbs as citing tests land,
    and `provenDone` flips when the receipt attests the finished tree.
-8. **Accept.** The button enables only at provenDone. Acceptance means the one
-   thing only the human can say: *the proven thing is what I wanted.* The card
-   closes into history as the feature's doc-of-record.
+9. **Accept.** The button enables only at provenDone AND a signed design.
+   Acceptance means the one thing only the human can say: *the proven thing is
+   what I wanted* — form included.
 
-Two signatures (brief, spec) rather than one mega-approval, because they catch
-different failures — building the wrong thing vs. building the thing wrong —
-and a signature nobody can actually judge in one click is a rubber stamp.
+Three signatures (brief, design, spec) rather than one mega-approval, because
+they catch different failures — building the wrong thing, building it in the
+wrong shape, and building the thing wrong — and a signature nobody can
+actually judge in one click is a rubber stamp.
 
 **A signature hands off — it never commands** (Karel, 2026-07-25). Every
 feature carries a **derived next step** — computed from live state exactly
@@ -186,12 +206,19 @@ like `provenDone`, never claimed — naming the step AND its owner:
 |---|---|---|
 | brief unsigned | sign the brief | human |
 | brief drifted / reopened | re-approve (or finish the redesign) | human |
+| UI surface declared, screens undrafted | **design**: draft on stub data, render — signed on what renders | agent drafts → human signs |
+| screens rendered, design unsigned / drifted | sign (or re-approve) the design | human |
+| design reopened | finish the redesign, then re-approve | agent |
 | signed, no spec / no clauses | **contract**: write the clauses — *including reopening & amending every declared `feature-spec:*` still signed* | agent drafts → human signs |
 | spec exists, unsigned | sign the contract | human |
 | clauses uncited | build & cite | agent |
 | cited, receipt missing/stale/red | prove: run the lane | agent |
 | provenDone | accept | human |
 | accepted | closed | — |
+
+The design rungs sit ABOVE `proven` in the ladder: a feature whose clauses all
+cite green but whose design was never signed reads *sign the design*, not
+*accept* — and `--accept` refuses with the same reason.
 
 It renders on the Features card, in `--status` (`next → …`), and **in the
 approval SSE event** (`{type:"approval", artifact, feature, next}`) — so a

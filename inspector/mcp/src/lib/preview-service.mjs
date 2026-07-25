@@ -542,6 +542,14 @@ export function galleryHtml(state) {
     if (n("accepted")) parts.push(`${n("accepted")} accepted`);
     if (n("changed-since-approval")) parts.push(`<span class="status-drift">${n("changed-since-approval")} drifted</span>`);
     if (features.board.undeclared.length > 0) parts.push(`<span class="status-drift">undeclared blast</span>`);
+    // The design gate's pending states (brief → design → spec → build): each
+    // feature's feature-design:<name> artifact, folded into the same rollup.
+    const dn = (pred) => briefs.filter((f) => f.design && pred(f.design)).length;
+    const designDrift = dn((d) => d.status === "changed-since-approval");
+    const designReopen = dn((d) => d.status === "reopened");
+    const designAwait = dn((d) => d.status === "unreviewed" && d.resolvable !== false);
+    if (designAwait) parts.push(`${designAwait} design${designAwait === 1 ? "" : "s"} awaiting signature`);
+    if (designDrift) parts.push(`<span class="status-drift">${designDrift} design${designDrift === 1 ? "" : "s"} drifted</span>`);
     featuresStatus = parts.join(" &middot; ");
     // The rail-truth rule: a neutral glyph means TRULY nothing pending here.
     // Every phase waiting on a human is colour, the moment it exists — worst
@@ -550,13 +558,32 @@ export function galleryHtml(state) {
     // unsigned brief (accent — waiting on your signature) > proven-awaiting-
     // accept (accent, filled — waiting on your acceptance). All-green reads
     // signed.
+    // Design states fold into the same worst-state ladder: a drifted design
+    // is red like any drift, a reopened one amber, one awaiting signature
+    // accent — an UNDRAFTED design (unresolvable) is the agent's work, not
+    // the human's, so it alone stays out of the colour ladder.
     featuresGlyph =
-      n("changed-since-approval") > 0
-        ? { ch: "⚠", cls: "glyph-drift", label: `${n("changed-since-approval")} brief(s) changed since signature` }
-        : n("reopened") > 0
-          ? { ch: "◐", cls: "glyph-reopen", label: `${n("reopened")} brief(s) reopened for redesign` }
-          : n("proposed") > 0
-            ? { ch: "○", cls: "glyph-unsigned", label: `${n("proposed")} brief(s) awaiting signature` }
+      n("changed-since-approval") > 0 || designDrift > 0
+        ? {
+            ch: "⚠",
+            cls: "glyph-drift",
+            label:
+              n("changed-since-approval") > 0
+                ? `${n("changed-since-approval")} brief(s) changed since signature`
+                : `${designDrift} design(s) changed since signature`,
+          }
+        : n("reopened") > 0 || designReopen > 0
+          ? {
+              ch: "◐",
+              cls: "glyph-reopen",
+              label: n("reopened") > 0 ? `${n("reopened")} brief(s) reopened for redesign` : `${designReopen} design(s) reopened for redesign`,
+            }
+          : n("proposed") > 0 || designAwait > 0
+            ? {
+                ch: "○",
+                cls: "glyph-unsigned",
+                label: n("proposed") > 0 ? `${n("proposed")} brief(s) awaiting signature` : `${designAwait} design(s) awaiting signature`,
+              }
             : n("proven") > 0
               ? { ch: "●", cls: "glyph-attn", label: `${n("proven")} proven — acceptance pending` }
               : { ch: "●", cls: "glyph-signed", label: "all briefs signed" };
@@ -593,7 +620,12 @@ export function galleryHtml(state) {
   // feature sat awaiting the human's accept).
   let approvalsGlyph = null;
   if (approvals.available && approvals.statuses) {
-    const c = (st) => approvals.statuses.filter((s) => s.status === st).length;
+    // An unreviewed artifact that is UNRESOLVABLE (e.g. a declared-but-
+    // undrafted feature design) is the agent's work, not a decision the
+    // human can make — same exclusion pendingOnHuman applies, so the glyph
+    // and the queue never tell different stories. Drift stays counted
+    // regardless of resolvability: deleted signed files must surface.
+    const c = (st) => approvals.statuses.filter((s) => s.status === st && (st !== "unreviewed" || s.resolvable !== false)).length;
     const pending = c("unreviewed") + c("changed-since-approval") + c("reopened") + provenAwaiting;
     const detail = provenAwaiting > 0 ? ` (${provenAwaiting} acceptance${provenAwaiting === 1 ? "" : "s"})` : "";
     approvalsGlyph =
@@ -778,8 +810,8 @@ export function galleryHtml(state) {
     const sectionOfArtifact = (id) =>
       id === "intent" || id === "architecture" || id === "design-system" || id === "components"
         ? id
-        : id.startsWith("feature-brief:")
-          ? "features"
+        : id.startsWith("feature-brief:") || id.startsWith("feature-design:")
+          ? "features" // a design's card row lives here; its pixels in Screens
           : id === "exemplar-spec" || id.startsWith("feature-spec:")
             ? "specs"
             : id === "exemplar-feature"
@@ -1711,7 +1743,7 @@ export function createPreviewService(opts) {
     const tabOf = (id) =>
       id === "intent" || id === "architecture" || id === "design-system" || id === "components"
         ? id
-        : id.startsWith("feature-brief:")
+        : id.startsWith("feature-brief:") || id.startsWith("feature-design:")
           ? "features"
           : id === "exemplar-spec" || id.startsWith("feature-spec:")
             ? "specs"
@@ -1760,9 +1792,11 @@ export function createPreviewService(opts) {
   async function nextStepFor(artifactId) {
     const featureName = artifactId.startsWith("feature-brief:")
       ? artifactId.slice("feature-brief:".length)
-      : artifactId.startsWith("feature-spec:")
-        ? artifactId.slice("feature-spec:".length)
-        : null;
+      : artifactId.startsWith("feature-design:")
+        ? artifactId.slice("feature-design:".length)
+        : artifactId.startsWith("feature-spec:")
+          ? artifactId.slice("feature-spec:".length)
+          : null;
     if (!featureName) return {};
     try {
       const board = await getFeatureBoardViaLib(projectDir);

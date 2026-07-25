@@ -155,10 +155,11 @@ right.
 | Step | What |
 |---|---|
 | 1 | **Feature brief** — `docs/features/<name>.md`: the decisions with their why, research, rejected options, an **Open decisions** section until the human closes each. Signed BEFORE code. |
-| 2 | **Contract** — reopen any signed spec the brief amends (`--reopen feature-spec:<surface>`); write the clauses where the behavior lives; the human signs |
-| 3 | Build the slice (`add-feature` / preview loop). Declared blast lands "as declared"; re-approve touched visual artifacts on rendered output |
-| 4 | Prove — nothing to do: the lane's gates + receipt ARE the proof |
-| 5 | The human's `--accept` — enabled only at provenDone |
+| 2 | **Design** — iff the feature has a UI surface (`"screens": true`, or screen files exist): draft the screens on STUB data, register them in the PreviewRegistry, render, and STOP. The human judges the rendered screens and signs `feature-design:<name>`. Never ask a human to approve a described UI. |
+| 3 | **Contract** — reopen any signed spec the brief amends (`--reopen feature-spec:<surface>`); write the clauses where the behavior lives — about the form that now exists; the human signs |
+| 4 | Build the slice (`add-feature` / preview loop). Declared blast lands "as declared"; re-approve touched visual artifacts on rendered output (wiring the signed screens from stub to real state drifts `feature-design:<name>` — its re-approval is that pass) |
+| 5 | Prove — nothing to do: the lane's gates + receipt ARE the proof |
+| 6 | The human's `--accept` — enabled only at provenDone AND a signed design |
 
 **Direct lane** — everything else (bug fix, copy edit, tweak): confirm in chat, reopen →
 amend clause → re-approve if a signed contract is touched, build, lane once at done.
@@ -170,13 +171,16 @@ Legacy features never get retro-briefs; spikes are ungoverned until they become 
 machine-read block, and it **declares — it never gates**:
 
 ```json cmp:feature
-{ "touches": ["components", "design-system"] }
+{ "touches": ["components", "design-system"], "screens": true }
 ```
 
 `touches` is the declared blast radius — the artifact hashes already enforce; declaring
 lets the console show "components re-approval, as planned" instead of an unexplained
 failure, and surface **undeclared blast** when something drifted that no open brief
-accounted for.
+accounted for. `screens: true` declares a UI surface: it holds the design gate
+(`feature-design:<name>` — the feature's own `presentation/<name>/*Screen.kt`, signed on
+rendered output) before any screen file exists; once files exist, disk is ground truth
+regardless. Both declare — neither gates.
 
 **Doneness is DERIVED, never claimed.** There is no `--deliver` and no checks block —
 deliberately (they existed and were removed as a weaker parallel truth). A feature is

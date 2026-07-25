@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs ef2f466d8848dd1aa794830201ebae108a37ebe157506aeb887102e3048d40d6
+// cmp:bundle-inputs 0eb650795d67990de45f5eed36f3c6a49241fa41642fb2fca2457beeb395533b
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34430,7 +34430,10 @@ var ORDER_BY_ID = [
   // from — the real exemplar screens, so both FOLLOW the exemplar.
   [/^design-system$/, 5],
   [/^components$/, 6],
-  [/^feature-spec:/, 7]
+  // Brief → design → spec → build (decided 2026-07-25): a feature's screens
+  // are signed on RENDERED output before its behavior contract pins them down.
+  [/^feature-design:/, 7],
+  [/^feature-spec:/, 8]
 ];
 function orderNumber(id) {
   for (const [re, n] of ORDER_BY_ID) if (re.test(id)) return n;
@@ -35858,6 +35861,8 @@ ${clauseRows}
 ${sections.map((s) => `      <h4>${esc4(s.heading)}</h4>
       <div class="doc-prose">${mdProseHtml(s.body)}</div>`).join("\n")}
     </details>` : "";
+    const designHtml = f.design ? f.design.status === "approved" ? `    <p class="feature-design meta">design signed \u2014 ${f.design.fileCount} screen file(s) under governance</p>` : f.design.status === "reopened" ? `    <p class="feature-design"><span class="status-reopened">design reopened</span> \u2014 redesign in progress; re-approve when it lands</p>` : !f.design.resolvable ? `    <p class="feature-design meta">design not drafted yet \u2014 the agent drafts the screens on stub data; you sign what renders, in the Screens gallery</p>` : `    <p class="feature-design"><span class="${f.design.status === "changed-since-approval" ? "status-drift" : "pending-inline"}">${f.design.status === "changed-since-approval" ? "design changed since signature" : "design awaits your signature"}</span> \u2014 judge it on the rendered screens, then
+      <button type="button" class="approve-btn" data-artifact="${escAttr(f.design.id)}">${f.design.status === "changed-since-approval" ? "Re-approve design" : "Approve design"}</button></p>` : "";
     const nextHtml = f.nextStep ? `    <p class="feature-next">next &rarr; ${esc4(f.nextStep.label)}${f.nextStep.owner ? ` <span class="meta">&middot; ${esc4(f.nextStep.owner)}</span>` : ""}</p>` : "";
     const stamps = [];
     if (f.record && f.record.approvedAt) stamps.push(`signed ${esc4(f.record.approvedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}`);
@@ -35884,6 +35889,7 @@ ${sections.map((s) => `      <h4>${esc4(s.heading)}</h4>
     </header>
     ${stamps.length > 0 ? `<p class="meta">${stamps.join(" \xB7 ")}</p>` : ""}
 ${nextHtml}
+${designHtml}
 ${doneLine}
 ${decisionsHtml}
 ${touches}
@@ -36215,8 +36221,26 @@ function galleryHtml(state) {
     if (n("accepted")) parts.push(`${n("accepted")} accepted`);
     if (n("changed-since-approval")) parts.push(`<span class="status-drift">${n("changed-since-approval")} drifted</span>`);
     if (features.board.undeclared.length > 0) parts.push(`<span class="status-drift">undeclared blast</span>`);
+    const dn = (pred) => briefs.filter((f) => f.design && pred(f.design)).length;
+    const designDrift = dn((d) => d.status === "changed-since-approval");
+    const designReopen = dn((d) => d.status === "reopened");
+    const designAwait = dn((d) => d.status === "unreviewed" && d.resolvable !== false);
+    if (designAwait) parts.push(`${designAwait} design${designAwait === 1 ? "" : "s"} awaiting signature`);
+    if (designDrift) parts.push(`<span class="status-drift">${designDrift} design${designDrift === 1 ? "" : "s"} drifted</span>`);
     featuresStatus = parts.join(" &middot; ");
-    featuresGlyph = n("changed-since-approval") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${n("changed-since-approval")} brief(s) changed since signature` } : n("reopened") > 0 ? { ch: "\u25D0", cls: "glyph-reopen", label: `${n("reopened")} brief(s) reopened for redesign` } : n("proposed") > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${n("proposed")} brief(s) awaiting signature` } : n("proven") > 0 ? { ch: "\u25CF", cls: "glyph-attn", label: `${n("proven")} proven \u2014 acceptance pending` } : { ch: "\u25CF", cls: "glyph-signed", label: "all briefs signed" };
+    featuresGlyph = n("changed-since-approval") > 0 || designDrift > 0 ? {
+      ch: "\u26A0",
+      cls: "glyph-drift",
+      label: n("changed-since-approval") > 0 ? `${n("changed-since-approval")} brief(s) changed since signature` : `${designDrift} design(s) changed since signature`
+    } : n("reopened") > 0 || designReopen > 0 ? {
+      ch: "\u25D0",
+      cls: "glyph-reopen",
+      label: n("reopened") > 0 ? `${n("reopened")} brief(s) reopened for redesign` : `${designReopen} design(s) reopened for redesign`
+    } : n("proposed") > 0 || designAwait > 0 ? {
+      ch: "\u25CB",
+      cls: "glyph-unsigned",
+      label: n("proposed") > 0 ? `${n("proposed")} brief(s) awaiting signature` : `${designAwait} design(s) awaiting signature`
+    } : n("proven") > 0 ? { ch: "\u25CF", cls: "glyph-attn", label: `${n("proven")} proven \u2014 acceptance pending` } : { ch: "\u25CF", cls: "glyph-signed", label: "all briefs signed" };
   }
   const provenAwaiting = features.available && features.board ? features.board.features.filter((f) => f.phase === "proven").length : 0;
   let specsGlyph = null;
@@ -36229,7 +36253,7 @@ function galleryHtml(state) {
   }
   let approvalsGlyph = null;
   if (approvals.available && approvals.statuses) {
-    const c = (st) => approvals.statuses.filter((s) => s.status === st).length;
+    const c = (st) => approvals.statuses.filter((s) => s.status === st && (st !== "unreviewed" || s.resolvable !== false)).length;
     const pending = c("unreviewed") + c("changed-since-approval") + c("reopened") + provenAwaiting;
     const detail = provenAwaiting > 0 ? ` (${provenAwaiting} acceptance${provenAwaiting === 1 ? "" : "s"})` : "";
     approvalsGlyph = c("changed-since-approval") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${pending} decision(s) waiting \u2014 ${c("changed-since-approval")} drifted${detail}` } : pending > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${pending} decision(s) waiting${detail}` } : { ch: "\u25CF", cls: "glyph-signed", label: "nothing waiting on you" };
@@ -36384,7 +36408,7 @@ ${section.bodyHtml}`;
     }
   }
   if (approvals.available && approvals.statuses) {
-    const sectionOfArtifact = (id) => id === "intent" || id === "architecture" || id === "design-system" || id === "components" ? id : id.startsWith("feature-brief:") ? "features" : id === "exemplar-spec" || id.startsWith("feature-spec:") ? "specs" : id === "exemplar-feature" ? "screens" : null;
+    const sectionOfArtifact = (id) => id === "intent" || id === "architecture" || id === "design-system" || id === "components" ? id : id.startsWith("feature-brief:") || id.startsWith("feature-design:") ? "features" : id === "exemplar-spec" || id.startsWith("feature-spec:") ? "specs" : id === "exemplar-feature" ? "screens" : null;
     const panelsBySection = {};
     for (const s of approvals.statuses) {
       if (s.status !== "changed-since-approval") continue;
@@ -37170,7 +37194,7 @@ function createPreviewService(opts) {
   }
   async function pendingOnHuman(excludeArtifact) {
     const items = [];
-    const tabOf = (id) => id === "intent" || id === "architecture" || id === "design-system" || id === "components" ? id : id.startsWith("feature-brief:") ? "features" : id === "exemplar-spec" || id.startsWith("feature-spec:") ? "specs" : "approvals";
+    const tabOf = (id) => id === "intent" || id === "architecture" || id === "design-system" || id === "components" ? id : id.startsWith("feature-brief:") || id.startsWith("feature-design:") ? "features" : id === "exemplar-spec" || id.startsWith("feature-spec:") ? "specs" : "approvals";
     try {
       const snap = await approvalStatusSnapshot();
       if (snap.available) {
@@ -37201,7 +37225,7 @@ function createPreviewService(opts) {
     };
   }
   async function nextStepFor(artifactId) {
-    const featureName = artifactId.startsWith("feature-brief:") ? artifactId.slice("feature-brief:".length) : artifactId.startsWith("feature-spec:") ? artifactId.slice("feature-spec:".length) : null;
+    const featureName = artifactId.startsWith("feature-brief:") ? artifactId.slice("feature-brief:".length) : artifactId.startsWith("feature-design:") ? artifactId.slice("feature-design:".length) : artifactId.startsWith("feature-spec:") ? artifactId.slice("feature-spec:".length) : null;
     if (!featureName) return {};
     try {
       const board = await getFeatureBoard(projectDir);

@@ -94,6 +94,42 @@ test("proven (derived, never claimed) offers Accept; anything less does not", ()
   assert.doesNotMatch(stale, /feature-accept-btn/);
 });
 
+test("the design gate row: each state honest, signable in place, absent for pure-logic", () => {
+  // No UI surface -> no design row at all (the honest skip).
+  const none = featuresTabHtml({ available: true, board: { features: [baseFeature({ design: null })], undeclared: [] } });
+  assert.doesNotMatch(none, /feature-design/);
+
+  // Declared but undrafted -> the agent's work; no button that could only fail.
+  const undrafted = featuresTabHtml({
+    available: true,
+    board: { features: [baseFeature({ design: { id: "feature-design:meal", status: "unreviewed", resolvable: false, fileCount: 0 } })], undeclared: [] },
+  });
+  assert.match(undrafted, /design not drafted yet/);
+  assert.doesNotMatch(undrafted, /data-artifact="feature-design:meal"/);
+
+  // Rendered, awaiting signature -> Approve design, same approve-btn contract.
+  const awaiting = featuresTabHtml({
+    available: true,
+    board: { features: [baseFeature({ design: { id: "feature-design:meal", status: "unreviewed", resolvable: true, fileCount: 2 } })], undeclared: [] },
+  });
+  assert.match(awaiting, /design awaits your signature/);
+  assert.match(awaiting, /class="approve-btn" data-artifact="feature-design:meal">Approve design</);
+
+  // Drifted -> re-approve wording; signed -> quiet meta line, no button.
+  const drifted = featuresTabHtml({
+    available: true,
+    board: { features: [baseFeature({ design: { id: "feature-design:meal", status: "changed-since-approval", resolvable: true, fileCount: 2 } })], undeclared: [] },
+  });
+  assert.match(drifted, /design changed since signature/);
+  assert.match(drifted, /Re-approve design/);
+  const signed = featuresTabHtml({
+    available: true,
+    board: { features: [baseFeature({ design: { id: "feature-design:meal", status: "approved", resolvable: true, fileCount: 2 } })], undeclared: [] },
+  });
+  assert.match(signed, /design signed — 2 screen file\(s\) under governance/);
+  assert.doesNotMatch(signed, /data-artifact="feature-design:meal"/);
+});
+
 test("a missing spec renders the contract-step explanation, not a crash", () => {
   const html = featuresTabHtml({
     available: true,

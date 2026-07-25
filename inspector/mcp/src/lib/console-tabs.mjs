@@ -82,7 +82,10 @@ const ORDER_BY_ID = [
   // from — the real exemplar screens, so both FOLLOW the exemplar.
   [/^design-system$/, 5],
   [/^components$/, 6],
-  [/^feature-spec:/, 7],
+  // Brief → design → spec → build (decided 2026-07-25): a feature's screens
+  // are signed on RENDERED output before its behavior contract pins them down.
+  [/^feature-design:/, 7],
+  [/^feature-spec:/, 8],
 ];
 function orderNumber(id) {
   for (const [re, n] of ORDER_BY_ID) if (re.test(id)) return n;
@@ -2491,6 +2494,24 @@ ${sections.map((s) => `      <h4>${esc(s.heading)}</h4>\n      <div class="doc-p
     </details>`
           : "";
 
+      // The design gate (brief → design → spec → build): a feature with a UI
+      // surface carries a feature-design:<name> artifact, signed on RENDERED
+      // output in the Screens gallery — never on this card's prose. null =
+      // pure-logic feature, no rung to show (the honest skip). The button
+      // speaks the same approve-btn contract as every signature control.
+      const designHtml = f.design
+        ? f.design.status === "approved"
+          ? `    <p class="feature-design meta">design signed — ${f.design.fileCount} screen file(s) under governance</p>`
+          : f.design.status === "reopened"
+            ? `    <p class="feature-design"><span class="status-reopened">design reopened</span> — redesign in progress; re-approve when it lands</p>`
+            : !f.design.resolvable
+              ? `    <p class="feature-design meta">design not drafted yet — the agent drafts the screens on stub data; you sign what renders, in the Screens gallery</p>`
+              : `    <p class="feature-design"><span class="${f.design.status === "changed-since-approval" ? "status-drift" : "pending-inline"}">${
+                  f.design.status === "changed-since-approval" ? "design changed since signature" : "design awaits your signature"
+                }</span> — judge it on the rendered screens, then
+      <button type="button" class="approve-btn" data-artifact="${escAttr(f.design.id)}">${f.design.status === "changed-since-approval" ? "Re-approve design" : "Approve design"}</button></p>`
+        : "";
+
       // The derived next step — computed like provenDone, never claimed. A
       // signature HANDS OFF: the line names the step and its owner, so the
       // card always says what happens next and who does it.
@@ -2529,6 +2550,7 @@ ${sections.map((s) => `      <h4>${esc(s.heading)}</h4>\n      <div class="doc-p
     </header>
     ${stamps.length > 0 ? `<p class="meta">${stamps.join(" · ")}</p>` : ""}
 ${nextHtml}
+${designHtml}
 ${doneLine}
 ${decisionsHtml}
 ${touches}
