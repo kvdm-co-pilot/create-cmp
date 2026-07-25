@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 1b2bd8b2f60cf1173ca7627a5fdd68ad7d2d3ae9efe4bcbfbb407a1a7fecc726
+// cmp:bundle-inputs be38b08399e299bb329e8445dc04d3dfcf18f4c5c1516439b36af28ef962e7b2
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34194,8 +34194,13 @@ var SHELL_CSS = `
   .feature-doc-link { margin-left: auto; color: var(--muted); font-size: var(--fs-meta); text-decoration: none; }
   .feature-touches { font-size: var(--fs-meta); margin: 6px 0; }
   .feature-as-declared { color: var(--muted); font-style: italic; }
-  .feature-checks { margin-top: 6px; }
-  .feature-check-detail { color: var(--muted); }
+  /* Check details are file paths and regexes \u2014 long, unbreakable-looking
+     strings. Without an explicit wrap they blow the table past the card and
+     the right-hand end (the part that says WHY a check is unmet) is clipped
+     off-screen, which is the one thing the row exists to tell you. */
+  .feature-checks { margin-top: 6px; table-layout: auto; width: 100%; }
+  .feature-checks td, .feature-checks th { vertical-align: top; }
+  .feature-check-detail { color: var(--muted); overflow-wrap: anywhere; word-break: break-word; }
   .pending-inline { color: var(--muted); }
   .feature-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
   .feature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
