@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 8947fc1854d8111b337d6b5b43ede1c331938702193867363b34e7f6b8daad29
+// cmp:bundle-inputs ce28f4804c145f818080b3903d4c934c3248ef9824f3a7ee09114c671e5844b6
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34202,6 +34202,12 @@ var SHELL_CSS = `
   .phase-proven { color: var(--reopen); border-color: var(--reopen); }
   .feature-done-yes { color: var(--ok, #3a8f5a); font-size: var(--fs-meta); font-weight: 600; }
   .feature-done { margin: 4px 0; font-size: var(--fs-meta); }
+  .feature-next { margin: 6px 0 2px; font-size: var(--fs-meta); font-weight: 600; color: var(--accent); }
+  .feature-decisions { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 8px 0; }
+  .feature-decisions h4 { margin: 0 0 4px; font-size: var(--fs-meta); }
+  .feature-brief-full { margin: 8px 0 2px; font-size: var(--fs-meta); }
+  .feature-brief-full h4 { margin: 10px 0 4px; }
+  .feature-brief-full .doc-prose, .feature-decisions .doc-prose { font-size: var(--fs-meta); }
   .phase-accepted { color: var(--ok, #3a8f5a); border-color: currentColor; }
   .phase-drift, .phase-reopened { color: var(--drift); border-color: var(--drift); }
   .feature-tally { color: var(--muted); font-size: var(--fs-meta); }
@@ -35783,9 +35789,23 @@ ${clauseRows}
     const doneLine = `    <p class="feature-done ${f.provenDone ? "feature-done-yes" : "meta"}">${f.provenDone ? "\u2713 proven done" : "not yet proven done"} \u2014 ${esc4(f.doneReason)}</p>`;
     const touches = f.touches.length > 0 ? `    <p class="feature-touches">declares touching: ${f.touches.map((t) => {
       const drifted = t.status === "changed-since-approval";
-      const note = drifted ? ` <span class="feature-as-declared">(as declared \u2014 re-approve when shaped)</span>` : "";
+      const isSpec = t.id.startsWith("feature-spec:");
+      const note = drifted ? ` <span class="feature-as-declared">(as declared \u2014 re-approve when shaped)</span>` : isSpec && t.status === "approved" && f.phase !== "accepted" ? ` <span class="feature-as-declared">(this contract will be reopened &amp; amended)</span>` : !isSpec && t.status === "approved" && f.phase !== "accepted" ? ` <span class="feature-as-declared">(re-approval expected when the work lands)</span>` : "";
       return `<code>${esc4(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc4(t.status)}</span>${note}`;
     }).join(" \xB7 ")}</p>` : `    <p class="feature-touches meta">declares touching nothing beyond its own spec</p>`;
+    const sections = Array.isArray(f.sections) ? f.sections : [];
+    const decisionSections = sections.filter((s) => /decision/i.test(s.heading));
+    const decisionsHtml = decisionSections.map(
+      (s) => `    <div class="feature-decisions">
+      <h4>${esc4(s.heading)}</h4>
+      <div class="doc-prose">${mdProseHtml(s.body)}</div>
+    </div>`
+    ).join("\n");
+    const fullBriefHtml = sections.length > 0 ? `    <details class="feature-brief-full"><summary>the full brief (${sections.length} sections \u2014 the signed document)</summary>
+${sections.map((s) => `      <h4>${esc4(s.heading)}</h4>
+      <div class="doc-prose">${mdProseHtml(s.body)}</div>`).join("\n")}
+    </details>` : "";
+    const nextHtml = f.nextStep ? `    <p class="feature-next">next &rarr; ${esc4(f.nextStep.label)}${f.nextStep.owner ? ` <span class="meta">&middot; ${esc4(f.nextStep.owner)}</span>` : ""}</p>` : "";
     const stamps = [];
     if (f.record && f.record.approvedAt) stamps.push(`signed ${esc4(f.record.approvedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}`);
     if (f.record && f.record.accepted) stamps.push(`accepted ${esc4(f.record.acceptedAt ?? "?")}`);
@@ -35810,9 +35830,12 @@ ${clauseRows}
       <a class="feature-doc-link" href="#" title="${escAttr(f.rel)}">${esc4(f.rel)}</a>
     </header>
     ${stamps.length > 0 ? `<p class="meta">${stamps.join(" \xB7 ")}</p>` : ""}
+${nextHtml}
 ${doneLine}
+${decisionsHtml}
 ${touches}
 ${clauseTable}
+${fullBriefHtml}
     ${actions.length > 0 ? `<div class="feature-actions">${actions.join(" ")}</div>` : ""}
   </article>`;
   }).join("\n");
@@ -36985,6 +37008,17 @@ function createPreviewService(opts) {
 `;
     for (const res of sseClients) res.write(data);
   }
+  async function nextStepFor(artifactId) {
+    const featureName = artifactId.startsWith("feature-brief:") ? artifactId.slice("feature-brief:".length) : artifactId.startsWith("feature-spec:") ? artifactId.slice("feature-spec:".length) : null;
+    if (!featureName) return {};
+    try {
+      const board = await getFeatureBoard(projectDir);
+      const feature = board.available ? board.board.features.find((f) => f.name === featureName) : null;
+      return feature && feature.nextStep ? { feature: featureName, next: feature.nextStep } : {};
+    } catch {
+      return {};
+    }
+  }
   function loadPreviews() {
     const manifest = JSON.parse(
       fs14.readFileSync(path15.join(previewsDir, "manifest.json"), "utf8")
@@ -37463,7 +37497,7 @@ function createPreviewService(opts) {
         res.end(JSON.stringify(result));
         if (result.ok) {
           touch("approval");
-          broadcast({ type: "approval", artifact });
+          broadcast({ type: "approval", artifact, ...await nextStepFor(artifact) });
           void checkApprovalWaiters();
         }
         return;
@@ -37523,7 +37557,7 @@ function createPreviewService(opts) {
         res.end(JSON.stringify(result));
         if (result.ok) {
           touch("feature-accept");
-          broadcast({ type: "approval", artifact: `feature-brief:${name}` });
+          broadcast({ type: "approval", artifact: `feature-brief:${name}`, ...await nextStepFor(`feature-brief:${name}`) });
           void checkApprovalWaiters();
         }
         return;

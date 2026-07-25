@@ -2388,16 +2388,54 @@ export function featuresTabHtml(features, meta = {}) {
         f.provenDone ? "✓ proven done" : "not yet proven done"
       } — ${esc(f.doneReason)}</p>`;
 
+      // Declared blast, stated as what it MEANS for the existing features —
+      // "feature-spec:today · approved" says nothing; "today's contract will
+      // be reopened and amended" is what the human actually signed up for.
       const touches =
         f.touches.length > 0
           ? `    <p class="feature-touches">declares touching: ${f.touches
               .map((t) => {
                 const drifted = t.status === "changed-since-approval";
-                const note = drifted ? ` <span class="feature-as-declared">(as declared — re-approve when shaped)</span>` : "";
+                const isSpec = t.id.startsWith("feature-spec:");
+                const note = drifted
+                  ? ` <span class="feature-as-declared">(as declared — re-approve when shaped)</span>`
+                  : isSpec && t.status === "approved" && f.phase !== "accepted"
+                    ? ` <span class="feature-as-declared">(this contract will be reopened &amp; amended)</span>`
+                    : !isSpec && t.status === "approved" && f.phase !== "accepted"
+                      ? ` <span class="feature-as-declared">(re-approval expected when the work lands)</span>`
+                      : "";
                 return `<code>${esc(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc(t.status)}</span>${note}`;
               })
               .join(" · ")}</p>`
           : `    <p class="feature-touches meta">declares touching nothing beyond its own spec</p>`;
+
+      // The signed substance: the decisions section(s) inline — an approval
+      // moment must show WHAT is being approved — and the full brief a click
+      // away. Evidence-or-silence: no /decision/i heading → no invented
+      // summary, just the full document.
+      const sections = Array.isArray(f.sections) ? f.sections : [];
+      const decisionSections = sections.filter((s) => /decision/i.test(s.heading));
+      const decisionsHtml = decisionSections
+        .map(
+          (s) => `    <div class="feature-decisions">
+      <h4>${esc(s.heading)}</h4>
+      <div class="doc-prose">${mdProseHtml(s.body)}</div>
+    </div>`,
+        )
+        .join("\n");
+      const fullBriefHtml =
+        sections.length > 0
+          ? `    <details class="feature-brief-full"><summary>the full brief (${sections.length} sections — the signed document)</summary>
+${sections.map((s) => `      <h4>${esc(s.heading)}</h4>\n      <div class="doc-prose">${mdProseHtml(s.body)}</div>`).join("\n")}
+    </details>`
+          : "";
+
+      // The derived next step — computed like provenDone, never claimed. A
+      // signature HANDS OFF: the line names the step and its owner, so the
+      // card always says what happens next and who does it.
+      const nextHtml = f.nextStep
+        ? `    <p class="feature-next">next &rarr; ${esc(f.nextStep.label)}${f.nextStep.owner ? ` <span class="meta">&middot; ${esc(f.nextStep.owner)}</span>` : ""}</p>`
+        : "";
 
       const stamps = [];
       if (f.record && f.record.approvedAt) stamps.push(`signed ${esc(f.record.approvedAt)}${f.record.via ? ` via ${esc(f.record.via)}` : ""}`);
@@ -2429,9 +2467,12 @@ export function featuresTabHtml(features, meta = {}) {
       <a class="feature-doc-link" href="#" title="${escAttr(f.rel)}">${esc(f.rel)}</a>
     </header>
     ${stamps.length > 0 ? `<p class="meta">${stamps.join(" · ")}</p>` : ""}
+${nextHtml}
 ${doneLine}
+${decisionsHtml}
 ${touches}
 ${clauseTable}
+${fullBriefHtml}
     ${actions.length > 0 ? `<div class="feature-actions">${actions.join(" ")}</div>` : ""}
   </article>`;
     })

@@ -178,6 +178,37 @@ Two signatures (brief, spec) rather than one mega-approval, because they catch
 different failures — building the wrong thing vs. building the thing wrong —
 and a signature nobody can actually judge in one click is a rubber stamp.
 
+**A signature hands off — it never commands** (Karel, 2026-07-25). Every
+feature carries a **derived next step** — computed from live state exactly
+like `provenDone`, never claimed — naming the step AND its owner:
+
+| Live state | Next step | Owner |
+|---|---|---|
+| brief unsigned | sign the brief | human |
+| brief drifted / reopened | re-approve (or finish the redesign) | human |
+| signed, no spec / no clauses | **contract**: write the clauses — *including reopening & amending every declared `feature-spec:*` still signed* | agent drafts → human signs |
+| spec exists, unsigned | sign the contract | human |
+| clauses uncited | build & cite | agent |
+| cited, receipt missing/stale/red | prove: run the lane | agent |
+| provenDone | accept | human |
+| accepted | closed | — |
+
+It renders on the Features card, in `--status` (`next → …`), and **in the
+approval SSE event** (`{type:"approval", artifact, feature, next}`) — so a
+listening agent receives "brief signed → next: contract" and its obligation
+is restate-then-draft-then-stop at the next signature, never autonomous
+execution. Forward signatures (brief, spec) advance the walk; closing acts
+(re-approval after drift, express-lane defaults, acceptance, reopen) enrich
+nothing — they close, they do not start work.
+
+**The card shows what is being signed** (Karel, 2026-07-25: a status shell
+gives "nothing useful to approve"). The Features card renders the brief's
+SUBSTANCE: its decisions section(s) inline (evidence-or-silence — no
+/decision/i heading, no invented summary), the full signed document one click
+away, and the declared blast stated as what it MEANS for existing features —
+`feature-spec:today` reads *"this contract will be reopened & amended"*, not
+a bare status.
+
 ---
 
 ## 5. The direct lane, step by step

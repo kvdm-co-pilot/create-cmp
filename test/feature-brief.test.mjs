@@ -106,19 +106,39 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     assert.match(cli.stderr, /not "approved"/);
   });
 
+  await t.test("the derived next step walks the loop — owner-labelled, never claimed", () => {
+    const next = () => lib.getFeatureBoard(root).features.find((f) => f.name === "meal").nextStep;
+    // Unsigned brief: the human's signature is the next step.
+    assert.equal(next().key, "sign-brief");
+    assert.equal(next().owner, "human");
+  });
+
   await t.test("doneness derives honestly at every stage — and acceptance quotes the gap", () => {
     runApprove(root, ["feature-brief:meal"]);
+    const next = () => lib.getFeatureBoard(root).features.find((f) => f.name === "meal").nextStep;
 
     // No spec yet.
     let res = lib.acceptFeature(root, "meal");
     assert.equal(res.ok, false);
     assert.match(res.reason, /not provenDone: no spec yet \(specs\/meal\.spec\.md\)/);
+    // Signed brief + no spec → the contract step, drafted by the agent for
+    // the human's signature.
+    assert.equal(next().key, "contract");
+    assert.match(next().label, /write the clauses in specs\/meal\.spec\.md/);
+    assert.equal(next().owner, "agent drafts → human signs");
 
     // Spec with live clauses, none cited.
     fs.writeFileSync(path.join(root, "specs/meal.spec.md"), "# meal\n\n- **MEAL-01** — Given…\n- **MEAL-02** — Given…\n");
     res = lib.acceptFeature(root, "meal");
     assert.equal(res.ok, false);
     assert.match(res.reason, /0\/2 clauses cited — 2 promise\(s\) have no citing test/);
+    // The spec now exists but is unsigned — the contract needs the signature.
+    assert.equal(next().key, "sign-spec");
+    assert.equal(next().owner, "human");
+    // Sign it; the walk moves to build & cite.
+    runApprove(root, ["feature-spec:meal"]);
+    assert.equal(next().key, "build");
+    assert.match(next().label, /2 clause\(s\) have no citing test yet/);
 
     // Clauses cited, but no receipt.
     const testDir = path.join(root, "composeApp/src/commonTest/kotlin/com/acme/demo");
@@ -127,6 +147,7 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     res = lib.acceptFeature(root, "meal");
     assert.equal(res.ok, false);
     assert.match(res.reason, /no receipt — run node qa\/verify\.mjs/);
+    assert.equal(next().key, "prove");
 
     // A FAIL receipt proves nothing.
     writeReceipt("FAIL", computeInputsHash(root).hash);
@@ -148,13 +169,35 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     assert.match(derived.doneReason, /2\/2 clauses cited · receipt PASS · attests this tree/);
 
     const board = lib.getFeatureBoard(root);
-    assert.equal(board.features.find((f) => f.name === "meal").phase, "proven");
+    const card = board.features.find((f) => f.name === "meal");
+    assert.equal(card.phase, "proven");
+    assert.equal(card.nextStep.key, "accept");
+    assert.equal(card.nextStep.owner, "human");
 
     const out = runApprove(root, ["--accept", "meal"]);
     assert.match(out, /accepted feature-brief:meal/);
     const row = lib.getApprovalStatuses(root).find((s) => s.id === "feature-brief:meal");
     assert.equal(row.accepted, true);
-    assert.equal(lib.getFeatureBoard(root).features.find((f) => f.name === "meal").phase, "accepted");
+    const after = lib.getFeatureBoard(root).features.find((f) => f.name === "meal");
+    assert.equal(after.phase, "accepted");
+    assert.equal(after.nextStep.key, "closed");
+  });
+
+  await t.test("a change to EXISTING features: the contract step names the declared amendments", () => {
+    // A new brief declaring blast into meal's SIGNED contract — the derived
+    // contract step must say that contract will be reopened & amended, by
+    // name; that is what the human's signature on this brief sets in motion.
+    fs.writeFileSync(
+      path.join(featuresDir, "planner.md"),
+      '# planner\n\n## Decisions\n\n- weeks start Monday.\n\n```json cmp:feature\n{ "touches": ["feature-spec:meal"] }\n```\n',
+    );
+    runApprove(root, ["feature-brief:planner"]);
+    const card = lib.getFeatureBoard(root).features.find((f) => f.name === "planner");
+    assert.equal(card.nextStep.key, "contract");
+    assert.match(card.nextStep.label, /reopen & amend specs\/meal\.spec\.md \(declared\)/);
+    // The signed substance travels with the board — sections, decisions included.
+    assert.ok(card.sections.some((s) => /decisions/i.test(s.heading)), "sections carry the decisions heading");
+    fs.rmSync(path.join(featuresDir, "planner.md"));
   });
 
   await t.test("--status prints the same derived doneReason the board carries — honestly stale after the acceptance write", () => {

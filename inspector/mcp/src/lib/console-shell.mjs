@@ -612,6 +612,12 @@ export const SHELL_CSS = `
   .phase-proven { color: var(--reopen); border-color: var(--reopen); }
   .feature-done-yes { color: var(--ok, #3a8f5a); font-size: var(--fs-meta); font-weight: 600; }
   .feature-done { margin: 4px 0; font-size: var(--fs-meta); }
+  .feature-next { margin: 6px 0 2px; font-size: var(--fs-meta); font-weight: 600; color: var(--accent); }
+  .feature-decisions { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 8px 0; }
+  .feature-decisions h4 { margin: 0 0 4px; font-size: var(--fs-meta); }
+  .feature-brief-full { margin: 8px 0 2px; font-size: var(--fs-meta); }
+  .feature-brief-full h4 { margin: 10px 0 4px; }
+  .feature-brief-full .doc-prose, .feature-decisions .doc-prose { font-size: var(--fs-meta); }
   .phase-accepted { color: var(--ok, #3a8f5a); border-color: currentColor; }
   .phase-drift, .phase-reopened { color: var(--drift); border-color: var(--drift); }
   .feature-tally { color: var(--muted); font-size: var(--fs-meta); }

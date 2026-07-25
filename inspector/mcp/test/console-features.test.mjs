@@ -117,6 +117,50 @@ test("a missing spec renders the contract-step explanation, not a crash", () => 
   assert.match(html, /behavior starts as clauses there/);
 });
 
+test("the card shows the signed substance and the derived next step — never a status shell", () => {
+  const html = featuresTabHtml({
+    available: true,
+    board: {
+      features: [
+        baseFeature({
+          phase: "proposed",
+          record: null,
+          nextStep: { key: "sign-brief", owner: "human", label: "sign the brief — decisions close before code" },
+          sections: [
+            { heading: "1. How do we determine breakfast?", body: "Slot inferred from time of day." },
+            { heading: "7. Decisions", body: "1. **Day boundary — 04:00, configurable.** Not midnight.\n2. **Vertical slice first.**" },
+          ],
+          touches: [{ id: "feature-spec:today", status: "approved", label: "Feature spec (specs/today.spec.md)" }],
+        }),
+      ],
+      undeclared: [],
+    },
+  });
+  // The decisions the human is signing render INLINE on the card.
+  assert.match(html, /feature-decisions/);
+  assert.match(html, /Day boundary — 04:00, configurable/);
+  // The full signed document is one click away.
+  assert.match(html, /the full brief \(2 sections — the signed document\)/);
+  assert.match(html, /Slot inferred from time of day/);
+  // The derived next step, owner named.
+  assert.match(html, /next &rarr; sign the brief — decisions close before code/);
+  assert.match(html, /human/);
+  // Declared blast into an existing feature says what it MEANS, not a bare status.
+  assert.match(html, /this contract will be reopened &amp; amended/);
+});
+
+test("no /decision/i heading -> no invented summary; the full document still renders", () => {
+  const html = featuresTabHtml({
+    available: true,
+    board: {
+      features: [baseFeature({ sections: [{ heading: "Research", body: "Sources and options." }] })],
+      undeclared: [],
+    },
+  });
+  assert.doesNotMatch(html, /feature-decisions/);
+  assert.match(html, /the full brief \(1 sections — the signed document\)/);
+});
+
 test("declared drift reads as planned; undeclared blast gets the banner", () => {
   const html = featuresTabHtml({
     available: true,

@@ -1561,6 +1561,30 @@ export function createPreviewService(opts) {
     for (const res of sseClients) res.write(data);
   }
 
+  /**
+   * The derived next step for an approval event, when the signed artifact
+   * belongs to a feature's walk (its brief or its spec). {} for everything
+   * else — genesis artifacts and closing re-approvals enrich nothing; a
+   * signature advances the walk only where the walk has a next step to name
+   * (CHANGE-FLOW-DESIGN.md §4: forward signatures hand off, closing
+   * signatures just close).
+   */
+  async function nextStepFor(artifactId) {
+    const featureName = artifactId.startsWith("feature-brief:")
+      ? artifactId.slice("feature-brief:".length)
+      : artifactId.startsWith("feature-spec:")
+        ? artifactId.slice("feature-spec:".length)
+        : null;
+    if (!featureName) return {};
+    try {
+      const board = await getFeatureBoardViaLib(projectDir);
+      const feature = board.available ? board.board.features.find((f) => f.name === featureName) : null;
+      return feature && feature.nextStep ? { feature: featureName, next: feature.nextStep } : {};
+    } catch {
+      return {};
+    }
+  }
+
   /** Reload previews dir into cards + tree map. Throws if the dir/manifest is missing. */
   function loadPreviews() {
     const manifest = JSON.parse(
@@ -2143,7 +2167,11 @@ export function createPreviewService(opts) {
         res.end(JSON.stringify(result));
         if (result.ok) {
           touch("approval");
-          broadcast({ type: "approval", artifact });
+          // A signature HANDS OFF (CHANGE-FLOW-DESIGN.md §4): when the signed
+          // artifact belongs to a feature's walk, the event carries the
+          // DERIVED next step + owner, so a listening agent receives "brief
+          // signed → next: contract" instead of a bare id it must re-derive.
+          broadcast({ type: "approval", artifact, ...(await nextStepFor(artifact)) });
           void checkApprovalWaiters(); // settle any waitForApprovalDecision() faster than the 1s poll
         }
         return;
@@ -2222,7 +2250,7 @@ export function createPreviewService(opts) {
         res.end(JSON.stringify(result));
         if (result.ok) {
           touch("feature-accept");
-          broadcast({ type: "approval", artifact: `feature-brief:${name}` });
+          broadcast({ type: "approval", artifact: `feature-brief:${name}`, ...(await nextStepFor(`feature-brief:${name}`)) });
           void checkApprovalWaiters();
         }
         return;
