@@ -290,6 +290,29 @@ is its own drift surface) and inside the Approvals table:
 Implementation: `inspector/mcp/src/lib/approval-diff.mjs` (anchor + per-file
 split) + `driftPanelHtml` in `console-tabs.mjs` (the one renderer).
 
+**The prompt after every decision** (Karel, 2026-07-25 — "the user is prompted
+what to do next but still guided through the flow"). Every decision endpoint
+(approve / reopen / accept) returns a `whatNext` payload — what just happened,
+the walk's derived next step, and everything else still waiting on the human —
+and the console renders it as a guided prompt at the moment of the click:
+
+- next step owned by the **agent** → *"Next — build & cite … Do you want to
+  ask the agent to proceed?"* The affirmative button records the request **as
+  a comment in the ledger** (the human→agent channel of record — auditable,
+  the agent resolves it with a note when done), never a hidden side-channel.
+- next act is the **human's own** → *"Still waiting on you: Approve
+  feature-spec:today (+2 more)"* with **Take me there** — a jump to that
+  artifact's signature bar (sign-where-you-read makes every queue item one
+  click away).
+- nothing pending → *"Nothing else waits on you — everything is green."*
+
+The queue deliberately excludes `reopened` artifacts (a redesign in progress
+waits on the WORK, not the human — prompting a re-approval would invite
+signing an unfinished redesign) and unresolvable ones (a button that could
+only fail is not guidance). The prompt guides; it never acts on its own — the
+human's click is the instruction, and it lands in a ledger like every other
+judgment.
+
 **Sign where you read** (Karel, 2026-07-25 — "I see the spec but I have no way
 to approve it on the screen itself"). Every governed section carries its OWN
 signature control — a bar with the artifact's live status and its

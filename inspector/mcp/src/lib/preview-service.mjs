@@ -916,6 +916,80 @@ export function galleryHtml(state) {
   // in place), not by this handler mutating state itself — the two never race.
   // Wiring lives in a function because the SSE swap replaces the panel's DOM
   // and must re-attach these listeners to the fresh buttons.
+  // The guided-flow prompt: every decision ends with "do you want to …?" —
+  // the walk's next step offered as an action, never left to inference.
+  // A hand-off to the agent is recorded as a COMMENT (the human→agent channel
+  // of record — auditable, resolvable), never a hidden side-channel; a next
+  // act that is the human's own jumps them to that artifact's signature bar.
+  function showNextPrompt(whatNext) {
+    if (!whatNext) return;
+    document.querySelectorAll(".next-prompt").forEach((el) => el.remove());
+    const bar = document.createElement("div");
+    bar.className = "next-prompt";
+    const head = document.createElement("span");
+    head.className = "next-prompt-did";
+    head.textContent = whatNext.did + ".";
+    bar.appendChild(head);
+    const dismiss = () => bar.remove();
+
+    const mkBtn = (label, onClick, primary) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = primary ? "next-prompt-primary" : "next-prompt-dismiss";
+      b.textContent = label;
+      b.addEventListener("click", onClick);
+      return b;
+    };
+
+    const next = whatNext.next;
+    const pending = Array.isArray(whatNext.pending) ? whatNext.pending : [];
+    if (next && next.owner && next.owner.indexOf("agent") === 0) {
+      const q = document.createElement("span");
+      q.textContent = " Next — " + next.label + ". Do you want to ask the agent to proceed?";
+      bar.appendChild(q);
+      bar.appendChild(
+        mkBtn("Ask the agent to proceed", async () => {
+          try {
+            const res = await fetch("/api/comment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                target: { type: "general" },
+                text: "Proceed" + (whatNext.feature ? " with " + whatNext.feature : "") + ": " + next.label,
+              }),
+            });
+            const body = await res.json();
+            head.textContent = body.ok
+              ? "Requested — recorded in the comments ledger; a listening agent picks it up."
+              : "Could not record the request: " + (body.reason || "refused");
+            bar.querySelectorAll(".next-prompt-primary").forEach((el) => el.remove());
+          } catch (err) {
+            head.textContent = "Could not record the request: " + String(err);
+          }
+        }, true),
+      );
+    } else if (pending.length > 0) {
+      const q = document.createElement("span");
+      q.textContent = " Still waiting on you: " + pending[0].label + (pending.length > 1 ? " (+" + (pending.length - 1) + " more)" : "") + ".";
+      bar.appendChild(q);
+      bar.appendChild(
+        mkBtn("Take me there", () => {
+          const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + pending[0].tab + '"]');
+          if (railBtn) railBtn.click();
+          const target = document.querySelector('#tab-' + pending[0].tab + ' [data-artifact="' + pending[0].artifact + '"]');
+          if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+          dismiss();
+        }, true),
+      );
+    } else {
+      const q = document.createElement("span");
+      q.textContent = " Nothing else waits on you — everything is green.";
+      bar.appendChild(q);
+    }
+    bar.appendChild(mkBtn("Not now", dismiss, false));
+    document.body.appendChild(bar);
+  }
+
   function wireApproveButtons(scope) {
   scope.querySelectorAll(".approve-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -936,6 +1010,8 @@ export function galleryHtml(state) {
           if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "approval refused"; }
           btn.disabled = false;
           btn.textContent = original;
+        } else {
+          showNextPrompt(body.whatNext);
         }
       } catch (err) {
         if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
@@ -970,6 +1046,8 @@ export function galleryHtml(state) {
           if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "acceptance refused"; }
           btn.disabled = false;
           btn.textContent = original;
+        } else {
+          showNextPrompt(body.whatNext);
         }
       } catch (err) {
         if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
@@ -1006,6 +1084,8 @@ export function galleryHtml(state) {
           if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "reopen refused"; }
           btn.disabled = false;
           btn.textContent = original;
+        } else {
+          showNextPrompt(body.whatNext);
         }
       } catch (err) {
         if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
@@ -1620,6 +1700,63 @@ export function createPreviewService(opts) {
    * (CHANGE-FLOW-DESIGN.md §4: forward signatures hand off, closing
    * signatures just close).
    */
+  /**
+   * Everything currently waiting on the HUMAN, as actionable items — the
+   * guided-flow queue the post-decision prompt walks them through. Each item
+   * names the action in plain words and the tab where its signature control
+   * lives (sign-where-you-read), so "Take me there" is one click.
+   */
+  async function pendingOnHuman(excludeArtifact) {
+    const items = [];
+    const tabOf = (id) =>
+      id === "intent" || id === "architecture" || id === "design-system" || id === "components"
+        ? id
+        : id.startsWith("feature-brief:")
+          ? "features"
+          : id === "exemplar-spec" || id.startsWith("feature-spec:")
+            ? "specs"
+            : "approvals";
+    try {
+      const snap = await approvalStatusSnapshot();
+      if (snap.available) {
+        for (const s of snap.statuses) {
+          if (s.id === excludeArtifact) continue;
+          if (s.status === "unreviewed" && s.resolvable !== false) {
+            items.push({ artifact: s.id, tab: tabOf(s.id), label: `Approve ${s.id}` });
+          } else if (s.status === "changed-since-approval") {
+            items.push({ artifact: s.id, tab: tabOf(s.id), label: `Re-approve ${s.id} — it changed since signing` });
+          }
+          // `reopened` is deliberately absent: a redesign in progress waits on
+          // the WORK, not on the human — prompting them to re-approve it now
+          // would invite signing an unfinished redesign.
+        }
+      }
+      const board = await getFeatureBoardViaLib(projectDir);
+      if (board.available) {
+        for (const f of board.board.features) {
+          if (f.phase === "proven") items.push({ artifact: `feature-brief:${f.name}`, tab: "features", label: `Accept ${f.name} — proven done` });
+        }
+      }
+    } catch {
+      /* an unreadable ledger yields an empty queue, never a crash */
+    }
+    return items;
+  }
+
+  /**
+   * The post-decision hand-off payload (whatNext): what just happened, the
+   * walk's derived next step, and the human's remaining queue. Every decision
+   * endpoint returns it so the console can PROMPT — "do you want to …" —
+   * instead of leaving the human to infer the flow's next move.
+   */
+  async function whatNextAfter(did, artifactId) {
+    return {
+      did,
+      ...(await nextStepFor(artifactId)),
+      pending: await pendingOnHuman(artifactId),
+    };
+  }
+
   async function nextStepFor(artifactId) {
     const featureName = artifactId.startsWith("feature-brief:")
       ? artifactId.slice("feature-brief:".length)
@@ -2281,6 +2418,7 @@ export function createPreviewService(opts) {
           return;
         }
         const result = await approveArtifactViaLib(projectDir, artifact);
+        if (result.ok) result.whatNext = await whatNextAfter(`Signed ${artifact}`, artifact);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));
         if (result.ok) {
@@ -2323,6 +2461,7 @@ export function createPreviewService(opts) {
           return;
         }
         const result = await reopenArtifactViaLib(projectDir, artifact);
+        if (result.ok) result.whatNext = await whatNextAfter(`Reopened ${artifact} for redesign`, artifact);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));
         if (result.ok) {
@@ -2366,6 +2505,7 @@ export function createPreviewService(opts) {
           return;
         }
         const result = await acceptFeatureViaLib(projectDir, name);
+        if (result.ok) result.whatNext = await whatNextAfter(`Accepted ${name} — its card closes into history`, `feature-brief:${name}`);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));
         if (result.ok) {

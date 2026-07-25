@@ -635,6 +635,18 @@ export const SHELL_CSS = `
   .feature-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
   .feature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
     border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  /* The guided-flow prompt: every decision ends with "do you want to …?" */
+  .next-prompt { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+                 max-width: min(720px, calc(100vw - 48px)); z-index: 60;
+                 display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+                 border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px;
+                 background: var(--accent-bg); color: var(--ink); font-size: var(--fs-meta);
+                 box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+  .next-prompt-did { font-weight: 650; }
+  .next-prompt button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+  .next-prompt-primary { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
+  .next-prompt-dismiss { border: 1px solid var(--line); background: var(--paper); color: var(--muted); }
+
   /* Sign where you read: every governed section's own signature control. */
   .signature-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
                    border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px;

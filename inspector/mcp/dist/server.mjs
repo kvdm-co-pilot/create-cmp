@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 61e1916125355bd9ee87e8e78e4c69339a43829a20b1f7cb5a14a24a8e951f75
+// cmp:bundle-inputs ef2f466d8848dd1aa794830201ebae108a37ebe157506aeb887102e3048d40d6
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34234,6 +34234,18 @@ var SHELL_CSS = `
   .feature-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
   .feature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
     border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  /* The guided-flow prompt: every decision ends with "do you want to \u2026?" */
+  .next-prompt { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+                 max-width: min(720px, calc(100vw - 48px)); z-index: 60;
+                 display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+                 border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px;
+                 background: var(--accent-bg); color: var(--ink); font-size: var(--fs-meta);
+                 box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+  .next-prompt-did { font-weight: 650; }
+  .next-prompt button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+  .next-prompt-primary { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
+  .next-prompt-dismiss { border: 1px solid var(--line); background: var(--paper); color: var(--muted); }
+
   /* Sign where you read: every governed section's own signature control. */
   .signature-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
                    border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px;
@@ -36504,6 +36516,80 @@ ${section.bodyHtml}`;
   // in place), not by this handler mutating state itself \u2014 the two never race.
   // Wiring lives in a function because the SSE swap replaces the panel's DOM
   // and must re-attach these listeners to the fresh buttons.
+  // The guided-flow prompt: every decision ends with "do you want to \u2026?" \u2014
+  // the walk's next step offered as an action, never left to inference.
+  // A hand-off to the agent is recorded as a COMMENT (the human\u2192agent channel
+  // of record \u2014 auditable, resolvable), never a hidden side-channel; a next
+  // act that is the human's own jumps them to that artifact's signature bar.
+  function showNextPrompt(whatNext) {
+    if (!whatNext) return;
+    document.querySelectorAll(".next-prompt").forEach((el) => el.remove());
+    const bar = document.createElement("div");
+    bar.className = "next-prompt";
+    const head = document.createElement("span");
+    head.className = "next-prompt-did";
+    head.textContent = whatNext.did + ".";
+    bar.appendChild(head);
+    const dismiss = () => bar.remove();
+
+    const mkBtn = (label, onClick, primary) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = primary ? "next-prompt-primary" : "next-prompt-dismiss";
+      b.textContent = label;
+      b.addEventListener("click", onClick);
+      return b;
+    };
+
+    const next = whatNext.next;
+    const pending = Array.isArray(whatNext.pending) ? whatNext.pending : [];
+    if (next && next.owner && next.owner.indexOf("agent") === 0) {
+      const q = document.createElement("span");
+      q.textContent = " Next \u2014 " + next.label + ". Do you want to ask the agent to proceed?";
+      bar.appendChild(q);
+      bar.appendChild(
+        mkBtn("Ask the agent to proceed", async () => {
+          try {
+            const res = await fetch("/api/comment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                target: { type: "general" },
+                text: "Proceed" + (whatNext.feature ? " with " + whatNext.feature : "") + ": " + next.label,
+              }),
+            });
+            const body = await res.json();
+            head.textContent = body.ok
+              ? "Requested \u2014 recorded in the comments ledger; a listening agent picks it up."
+              : "Could not record the request: " + (body.reason || "refused");
+            bar.querySelectorAll(".next-prompt-primary").forEach((el) => el.remove());
+          } catch (err) {
+            head.textContent = "Could not record the request: " + String(err);
+          }
+        }, true),
+      );
+    } else if (pending.length > 0) {
+      const q = document.createElement("span");
+      q.textContent = " Still waiting on you: " + pending[0].label + (pending.length > 1 ? " (+" + (pending.length - 1) + " more)" : "") + ".";
+      bar.appendChild(q);
+      bar.appendChild(
+        mkBtn("Take me there", () => {
+          const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + pending[0].tab + '"]');
+          if (railBtn) railBtn.click();
+          const target = document.querySelector('#tab-' + pending[0].tab + ' [data-artifact="' + pending[0].artifact + '"]');
+          if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+          dismiss();
+        }, true),
+      );
+    } else {
+      const q = document.createElement("span");
+      q.textContent = " Nothing else waits on you \u2014 everything is green.";
+      bar.appendChild(q);
+    }
+    bar.appendChild(mkBtn("Not now", dismiss, false));
+    document.body.appendChild(bar);
+  }
+
   function wireApproveButtons(scope) {
   scope.querySelectorAll(".approve-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -36524,6 +36610,8 @@ ${section.bodyHtml}`;
           if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "approval refused"; }
           btn.disabled = false;
           btn.textContent = original;
+        } else {
+          showNextPrompt(body.whatNext);
         }
       } catch (err) {
         if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
@@ -36558,6 +36646,8 @@ ${section.bodyHtml}`;
           if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "acceptance refused"; }
           btn.disabled = false;
           btn.textContent = original;
+        } else {
+          showNextPrompt(body.whatNext);
         }
       } catch (err) {
         if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
@@ -36594,6 +36684,8 @@ ${section.bodyHtml}`;
           if (errBox) { errBox.hidden = false; errBox.textContent = body.reason || "reopen refused"; }
           btn.disabled = false;
           btn.textContent = original;
+        } else {
+          showNextPrompt(body.whatNext);
         }
       } catch (err) {
         if (errBox) { errBox.hidden = false; errBox.textContent = String(err); }
@@ -37075,6 +37167,38 @@ function createPreviewService(opts) {
 
 `;
     for (const res of sseClients) res.write(data);
+  }
+  async function pendingOnHuman(excludeArtifact) {
+    const items = [];
+    const tabOf = (id) => id === "intent" || id === "architecture" || id === "design-system" || id === "components" ? id : id.startsWith("feature-brief:") ? "features" : id === "exemplar-spec" || id.startsWith("feature-spec:") ? "specs" : "approvals";
+    try {
+      const snap = await approvalStatusSnapshot();
+      if (snap.available) {
+        for (const s of snap.statuses) {
+          if (s.id === excludeArtifact) continue;
+          if (s.status === "unreviewed" && s.resolvable !== false) {
+            items.push({ artifact: s.id, tab: tabOf(s.id), label: `Approve ${s.id}` });
+          } else if (s.status === "changed-since-approval") {
+            items.push({ artifact: s.id, tab: tabOf(s.id), label: `Re-approve ${s.id} \u2014 it changed since signing` });
+          }
+        }
+      }
+      const board = await getFeatureBoard(projectDir);
+      if (board.available) {
+        for (const f of board.board.features) {
+          if (f.phase === "proven") items.push({ artifact: `feature-brief:${f.name}`, tab: "features", label: `Accept ${f.name} \u2014 proven done` });
+        }
+      }
+    } catch {
+    }
+    return items;
+  }
+  async function whatNextAfter(did, artifactId) {
+    return {
+      did,
+      ...await nextStepFor(artifactId),
+      pending: await pendingOnHuman(artifactId)
+    };
   }
   async function nextStepFor(artifactId) {
     const featureName = artifactId.startsWith("feature-brief:") ? artifactId.slice("feature-brief:".length) : artifactId.startsWith("feature-spec:") ? artifactId.slice("feature-spec:".length) : null;
@@ -37612,6 +37736,7 @@ function createPreviewService(opts) {
           return;
         }
         const result = await approveArtifact(projectDir, artifact);
+        if (result.ok) result.whatNext = await whatNextAfter(`Signed ${artifact}`, artifact);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));
         if (result.ok) {
@@ -37643,6 +37768,7 @@ function createPreviewService(opts) {
           return;
         }
         const result = await reopenArtifact(projectDir, artifact);
+        if (result.ok) result.whatNext = await whatNextAfter(`Reopened ${artifact} for redesign`, artifact);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));
         if (result.ok) {
@@ -37674,6 +37800,7 @@ function createPreviewService(opts) {
           return;
         }
         const result = await acceptFeature(projectDir, name);
+        if (result.ok) result.whatNext = await whatNextAfter(`Accepted ${name} \u2014 its card closes into history`, `feature-brief:${name}`);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));
         if (result.ok) {

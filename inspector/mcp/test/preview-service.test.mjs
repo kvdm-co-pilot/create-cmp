@@ -2410,3 +2410,47 @@ test("service: a spec file's signature control binds to the MOST SPECIFIC artifa
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });
+
+test("service: every decision response carries whatNext — the guided-flow prompt's payload", async () => {
+  const projectDir = makeApprovalsFixtureProject();
+  // A second RESOLVABLE artifact (intent), so the human's queue is non-empty
+  // after the first signature. Unresolvable artifacts are correctly excluded —
+  // a queue item whose button could only fail is not guidance.
+  fs.mkdirSync(path.join(projectDir, "specs"), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, "specs", "intent.md"), "# intent\n\n## Purpose\n\nDemo.\n");
+  const service = createPreviewService({ projectDir, port: 19950, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const post = async (url, body) =>
+      (await fetch(new URL(url, st.url), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+
+    // Approve one artifact: the response must say what happened, and list the
+    // rest of the human's queue (the other unreviewed artifacts).
+    const first = await post("/api/approve", { artifact: "design-system" });
+    assert.equal(first.ok, true);
+    assert.ok(first.whatNext, "decision responses carry whatNext");
+    assert.equal(first.whatNext.did, "Signed design-system");
+    assert.ok(Array.isArray(first.whatNext.pending));
+    assert.ok(first.whatNext.pending.length > 0, "other unreviewed artifacts appear in the human's queue");
+    assert.ok(first.whatNext.pending.every((p) => p.artifact !== "design-system"), "the just-signed artifact is not in its own queue");
+    assert.ok(first.whatNext.pending.every((p) => p.tab && p.label), "each queue item is actionable: a tab and a plain-words label");
+
+    // Reopen carries it too — with the reopened artifact excluded from the
+    // queue (a redesign in progress waits on the WORK, not the human).
+    const re = await post("/api/reopen", { artifact: "design-system" });
+    assert.equal(re.ok, true);
+    assert.equal(re.whatNext.did, "Reopened design-system for redesign");
+    assert.ok(re.whatNext.pending.every((p) => p.artifact !== "design-system"));
+
+    // The page script ships the prompt.
+    const page = await (await fetch(st.url)).text();
+    assert.match(page, /showNextPrompt/);
+    assert.match(page, /Ask the agent to proceed/);
+    assert.match(page, /Take me there/);
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
