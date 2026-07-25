@@ -41,6 +41,7 @@ import {
   reopenArtifact as reopenArtifactViaLib,
   getFeatureBoard as getFeatureBoardViaLib,
   acceptFeature as acceptFeatureViaLib,
+  getGovernedArtifacts as getGovernedArtifactsViaLib,
 } from "./approvals-bridge.mjs";
 import {
   getCommentsData,
@@ -74,6 +75,7 @@ import {
   digestTabHtml,
   featuresTabHtml,
   driftPanelHtml,
+  signatureBarHtml,
 } from "./console-tabs.mjs";
 import { getTokenUsage } from "./design-language.mjs";
 import { getIntentData } from "./intent.mjs";
@@ -347,6 +349,7 @@ export function galleryHtml(state) {
     liveSession = null,
     digest = null,
     anchoredDiffs = null,
+    governedArtifacts = { available: false },
   } = state;
   const width = viewport?.width ?? 411;
   // §3.3: component stories render through the same pipeline but are not
@@ -470,6 +473,32 @@ export function galleryHtml(state) {
   }
   const componentsStatus =
     (componentsStatusParts.join(" &middot; ") || "no components scan available") + openNote("components");
+
+  // specs/<file> -> its governing artifact's live status, built from the
+  // project's OWN registry (id + files) — so app-base maps to `architecture`
+  // and the CONFIGURED exemplar's spec to `exemplar-spec`, never guessed from
+  // a filename. Absent registry (older lib) simply yields no signature bars.
+  // A spec file can appear in MORE than one artifact's file set: the exemplar's
+  // spec is governed by `exemplar-spec` (1 file) AND listed inside
+  // `exemplar-feature` (the 11-file clone source). The signature control must
+  // bind to the MOST SPECIFIC artifact — fewest files — or a click under
+  // "foods.spec.md" would sign the entire exemplar feature instead of its
+  // contract, the exact silent wrong-transition this console refuses elsewhere.
+  const specArtifactByFile = {};
+  if (governedArtifacts.available && approvals.available && approvals.statuses) {
+    const byId = new Map(approvals.statuses.map((s) => [s.id, s]));
+    const winnerSize = {};
+    for (const a of governedArtifacts.artifacts) {
+      if (!byId.has(a.id)) continue;
+      for (const f of a.files) {
+        if (!f.endsWith(".spec.md")) continue;
+        if (winnerSize[f] === undefined || a.files.length < winnerSize[f]) {
+          winnerSize[f] = a.files.length;
+          specArtifactByFile[f] = byId.get(a.id);
+        }
+      }
+    }
+  }
 
   const specsStatus = specs.available
     ? `${specs.files.length} spec file${specs.files.length === 1 ? "" : "s"} &middot; ${specs.files.reduce((n, f) => n + f.clauses.length, 0)} clauses${openNote("specs")}`
@@ -651,7 +680,12 @@ export function galleryHtml(state) {
       bodyHtml: architectureTabHtml(architecture, architectureMeta),
     },
     // §3.5: the RTM's last-receipt column reads the same receipt as Evidence.
-    { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt }) },
+    {
+      id: "specs",
+      title: "Specs",
+      statusHtml: specsStatus,
+      bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt, artifactByFile: specArtifactByFile }),
+    },
     {
       id: "screens",
       title: "Screens",
@@ -715,6 +749,25 @@ export function galleryHtml(state) {
       fullBleed: true,
     },
   ];
+
+  // Sign where you read: every governed section carries its OWN signature
+  // control, so the human reading an artifact is the human who can sign it.
+  // The Approvals tab stays the ledger and the queue — it is no longer the
+  // only place a decision can be made.
+  if (approvals.available && approvals.statuses) {
+    const byId = new Map(approvals.statuses.map((s) => [s.id, s]));
+    const bar = (id, what) => (byId.has(id) ? signatureBarHtml(byId.get(id), { what }) : "");
+    const barBySection = {
+      intent: bar("intent", "the intent brief"),
+      architecture: bar("architecture", "this architecture"),
+      "design-system": bar("design-system", "the design system"),
+      components: bar("components", "the component registry"),
+    };
+    for (const section of sections) {
+      const b = barBySection[section.id];
+      if (b) section.bodyHtml = `${b}\n${section.bodyHtml}`;
+    }
+  }
 
   // The change surface (spec-mirror-drift): every drifted artifact's panel —
   // what changed vs. the signed bytes, what is still exactly as signed, and
@@ -2140,10 +2193,11 @@ export function createPreviewService(opts) {
         // probe is sub-second; B5's anchored diffs run ONLY for artifacts
         // currently drifted (bounded per-request work — zero when nothing is).
         const walkthrough = getWalkthroughData(projectDir);
-        const [liveDevice, digest, featureBoard] = await Promise.all([
+        const [liveDevice, digest, featureBoard, governedArtifacts] = await Promise.all([
           getLiveDeviceStatus({ port: inspectorPort }),
           getDigestData(projectDir, { execFileAsync }),
           getFeatureBoardViaLib(projectDir),
+          getGovernedArtifactsViaLib(projectDir),
         ]);
         const anchoredDiffs = {};
         if (approvals.available) {
@@ -2185,6 +2239,7 @@ export function createPreviewService(opts) {
             liveSession: liveSession.status(),
             digest,
             anchoredDiffs,
+            governedArtifacts,
           }),
         );
         return;

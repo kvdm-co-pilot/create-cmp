@@ -15,6 +15,7 @@ import {
   screensBodyHtml,
   intentBodyHtml,
   clausesForScreen,
+  signatureBarHtml,
 } from "../src/lib/console-tabs.mjs";
 
 // --- Design language (§3.1: the designer's handoff spec) --------------------
@@ -1756,4 +1757,59 @@ test("intentBodyHtml: a `**Term** — definition` glossary renders as a definiti
   });
   assert.doesNotMatch(prose, /glossary-table/);
   assert.match(prose, /domain nouns are still being talked through/);
+});
+
+test("sign where you read: every governed section carries its own signature control", () => {
+  const unreviewed = { id: "feature-spec:meal", status: "unreviewed", fileCount: 1, resolvable: true, approvedAt: null };
+  const approved = { id: "components", status: "approved", fileCount: 9, resolvable: true, approvedAt: "2026-07-25T08:00:00Z" };
+  const drifted = { id: "design-system", status: "changed-since-approval", fileCount: 2, resolvable: true, approvedAt: "x" };
+  const unresolvable = { id: "exemplar-feature", status: "unreviewed", fileCount: 0, resolvable: false, approvedAt: null };
+
+  // Unsigned: an Approve button naming what the signature means.
+  const a = signatureBarHtml(unreviewed, { what: "this contract" });
+  assert.match(a, /class="approve-btn" data-artifact="feature-spec:meal"/);
+  assert.match(a, /Approve this contract/);
+  assert.match(a, /nothing here is binding until you sign it/);
+  assert.doesNotMatch(a, /reopen-btn/, "an unsigned artifact cannot be reopened");
+
+  // Signed: re-approve AND reopen (the sanctioned-redesign door).
+  const b = signatureBarHtml(approved, { what: "the component registry" });
+  assert.match(b, /Re-approve the component registry/);
+  assert.match(b, /class="reopen-btn" data-artifact="components"/);
+  assert.match(b, /badge-approved/);
+
+  // Drifted: the bar says what the state means and points at the diff below.
+  const c = signatureBarHtml(drifted, { what: "the design system" });
+  assert.match(c, /badge-drift/);
+  assert.match(c, /review the diff below, then re-approve/);
+
+  // Unresolvable: no button that would only fail on click.
+  const d = signatureBarHtml(unresolvable, {});
+  assert.doesNotMatch(d, /approve-btn/);
+  assert.match(d, /not approvable yet/);
+
+  // No status at all (older lib) -> silence, never a fabricated control.
+  assert.equal(signatureBarHtml(null), "");
+});
+
+test("specsTabHtml: each spec file's signature bar comes from the REGISTRY, never guessed from the filename", () => {
+  const specs = {
+    available: true,
+    files: [
+      { file: "app-base.spec.md", clauses: [{ id: "ARCH-01", prose: "…", withdrawn: false, cited: true, tests: [] }] },
+      { file: "meal.spec.md", clauses: [{ id: "MEAL-01", prose: "…", withdrawn: false, cited: false, tests: [] }] },
+    ],
+  };
+  const html = specsTabHtml(specs, {
+    artifactByFile: {
+      // app-base is governed by `architecture` — a filename-derived guess would
+      // have invented `feature-spec:app-base`.
+      "specs/app-base.spec.md": { id: "architecture", status: "approved", fileCount: 2, resolvable: true, approvedAt: "x" },
+      "specs/meal.spec.md": { id: "feature-spec:meal", status: "unreviewed", fileCount: 1, resolvable: true, approvedAt: null },
+    },
+  });
+  assert.match(html, /data-artifact="architecture"/);
+  assert.match(html, /data-artifact="feature-spec:meal"/);
+  assert.doesNotMatch(html, /feature-spec:app-base/);
+  assert.match(html, /Approve this contract/);
 });

@@ -635,6 +635,18 @@ export const SHELL_CSS = `
   .feature-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
   .feature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
     border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  /* Sign where you read: every governed section's own signature control. */
+  .signature-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+                   border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px;
+                   margin: 0 0 14px; background: var(--surface); font-size: var(--fs-meta); }
+  .signature-line { color: var(--muted); }
+  .signature-id { color: var(--muted); }
+  .signature-actions { margin-left: auto; display: flex; gap: 8px; }
+  .signature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
+                              border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
+  .signature-actions button:hover { border-color: var(--accent); color: var(--accent); }
+  .spec-file .signature-bar { margin-top: 6px; }
+
   /* The change surface: what changed vs. what is still exactly as signed —
      rendered at the top of the drifted artifact's own section AND inside the
      Approvals table (driftPanelHtml — one renderer, everywhere). */

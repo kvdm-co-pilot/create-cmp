@@ -290,6 +290,20 @@ is its own drift surface) and inside the Approvals table:
 Implementation: `inspector/mcp/src/lib/approval-diff.mjs` (anchor + per-file
 split) + `driftPanelHtml` in `console-tabs.mjs` (the one renderer).
 
+**Sign where you read** (Karel, 2026-07-25 — "I see the spec but I have no way
+to approve it on the screen itself"). Every governed section carries its OWN
+signature control — a bar with the artifact's live status and its
+Approve / Re-approve / Reopen buttons: Intent, Architecture, Design language,
+Components, each feature card, and **each spec file in the Specs RTM**. The
+Approvals tab remains the ledger and the queue; it is no longer the only place
+a decision can be made. The human reading the contract is the human who signs
+it. Each spec file binds to the **most specific** artifact governing it —
+resolved from the project's own registry (id + files), never guessed from a
+filename, and never the artifact with the widest file set: the exemplar's spec
+binds to `exemplar-spec` (1 file), NOT to `exemplar-feature` (which lists that
+same spec among its 11 clone-source files), or a click under the contract
+would sign the whole feature.
+
 **The console is live for the whole governed surface** (Karel, 2026-07-25 —
 "I had to refresh the page"). The live-truth promise originally held only for
 changes the console ITSELF made: SSE events fired from its own POST handlers,

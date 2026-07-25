@@ -89,6 +89,60 @@ function orderNumber(id) {
   return "–";
 }
 
+// --- sign where you read -----------------------------------------------------
+//
+// Every governed section carries its OWN signature control. The Approvals tab
+// is the ledger — the queue, the audit trail — but it must never be the only
+// place a decision can be made: a human reading a spec, a brief, or a token
+// catalogue is exactly the human who should be able to sign it, without
+// hunting for the artifact's row on another tab. One renderer, reused by
+// every section, emitting the SAME `approve-btn`/`reopen-btn` contract the
+// console's wiring and the refresh routine already speak.
+
+/**
+ * @param {object|null} status a getApprovalStatuses row for this artifact
+ * @param {{what?: string}} [opts] `what` names the thing in the section's own
+ *   words ("this contract", "the design system") — the button says what the
+ *   signature means, never a bare verb.
+ */
+export function signatureBarHtml(status, opts = {}) {
+  if (!status) return "";
+  const what = opts.what || status.id;
+  const cls =
+    status.status === "approved"
+      ? "badge-approved"
+      : status.status === "changed-since-approval"
+        ? "badge-drift"
+        : status.status === "reopened"
+          ? "badge-reopened"
+          : "badge-unreviewed";
+  const line =
+    status.status === "approved"
+      ? `signed${status.approvedAt ? ` ${esc(status.approvedAt)}` : ""}${status.mode ? ` · ${esc(status.mode)}` : ""}`
+      : status.status === "changed-since-approval"
+        ? "changed since signature — review the diff below, then re-approve"
+        : status.status === "reopened"
+          ? `reopened for redesign${status.reopenedAt ? ` ${esc(status.reopenedAt)}` : ""} — re-approve when the redesign lands`
+          : "not signed yet — nothing here is binding until you sign it";
+  // Refused states never offer a button that would only fail on click.
+  const canApprove = status.resolvable !== false;
+  const approveLabel = status.status === "approved" ? `Re-approve ${what}` : status.status === "unreviewed" ? `Approve ${what}` : `Re-approve ${what}`;
+  const buttons = [
+    canApprove
+      ? `<button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">${esc(approveLabel)}</button>`
+      : `<span class="meta">not approvable yet — ${status.fileCount} of its expected files resolved</span>`,
+    status.status === "approved" ? `<button type="button" class="reopen-btn" data-artifact="${escAttr(status.id)}">Reopen for redesign</button>` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `  <div class="signature-bar">
+    <span class="badge ${cls}">${esc(status.status)}</span>
+    <span class="signature-line">${line}</span>
+    <code class="signature-id">${esc(status.id)}</code>
+    <span class="signature-actions">${buttons}</span>
+  </div>`;
+}
+
 // --- the change surface: what changed vs. what is still approved -------------
 //
 // ONE renderer for every drifted artifact, shown IN THE SECTION IT BELONGS TO
@@ -992,7 +1046,7 @@ function citingTestsCellHtml(c) {
  * when the field is absent (older data), the block is silent rather than
  * claiming a clean scan that never ran.
  * @param {{available: boolean, files?: Array<{file: string, clauses: object[]}>, orphanCitations?: object[]}} specs
- * @param {{lastReceipt?: object|null}} [meta]
+ * @param {{lastReceipt?: object|null, artifactByFile?: Record<string, object>}} [meta]
  */
 export function specsTabHtml(specs, meta = {}) {
   if (!specs || !specs.available) {
@@ -1025,8 +1079,15 @@ export function specsTabHtml(specs, meta = {}) {
     </tr>`;
         })
         .join("\n");
+      // Sign where you read: this file's governing artifact's signature bar
+      // sits directly under its heading. `artifactByFile` is built from the
+      // project's OWN registry (id + files), never guessed from the filename —
+      // so app-base maps to `architecture`, the CONFIGURED exemplar's spec to
+      // `exemplar-spec`, and every other file to its `feature-spec:<name>`.
+      const specStatus = meta.artifactByFile ? meta.artifactByFile[`specs/${f.file}`] : null;
       return `  <div class="spec-file">
     <h3>specs/${esc(f.file)}</h3>
+${signatureBarHtml(specStatus, { what: "this contract" })}
     <p class="rtm-counts">${counts}</p>
     ${
       rows

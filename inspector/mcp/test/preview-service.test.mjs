@@ -2390,3 +2390,23 @@ test("service: the GOVERNED SURFACE is watched — a spec written by an agent, o
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });
+
+test("service: a spec file's signature control binds to the MOST SPECIFIC artifact (exemplar-spec, never exemplar-feature)", async () => {
+  const projectDir = makeApprovalsFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19940, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+    const page = await (await fetch(st.url)).text();
+    const specs = page.match(/<section id="tab-specs"[\s\S]*?(?=<section id="tab-)/);
+    if (!specs) return; // fixture without a specs section — nothing to bind
+    const bindings = [...specs[0].matchAll(/<h3>specs\/([^<]+)<\/h3>\s*<div class="signature-bar">[\s\S]*?data-artifact="([^"]+)"/g)]
+      .map((m) => [m[1], m[2]]);
+    for (const [file, artifact] of bindings) {
+      assert.notEqual(artifact, "exemplar-feature", `${file} must bind to its CONTRACT, not the 11-file exemplar feature`);
+    }
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});

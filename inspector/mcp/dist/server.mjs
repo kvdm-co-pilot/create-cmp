@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 9846c07df8b505a884c57dbaae08919702d048bea7e27787e032970cd1e98d49
+// cmp:bundle-inputs 61e1916125355bd9ee87e8e78e4c69339a43829a20b1f7cb5a14a24a8e951f75
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32226,6 +32226,15 @@ async function getApprovalsData(root) {
     return { available: false, error: err && err.message ? err.message : String(err) };
   }
 }
+async function getGovernedArtifacts(root) {
+  const lib = await loadLib(root);
+  if (!lib || typeof lib.listGovernedArtifacts !== "function") return { available: false };
+  try {
+    return { available: true, artifacts: lib.listGovernedArtifacts(root).map((a) => ({ id: a.id, files: a.files })) };
+  } catch (err) {
+    return { available: false, error: err && err.message ? err.message : String(err) };
+  }
+}
 async function approveArtifact(root, artifactId) {
   const lib = await loadLib(root);
   if (!lib) {
@@ -34225,6 +34234,18 @@ var SHELL_CSS = `
   .feature-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
   .feature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
     border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  /* Sign where you read: every governed section's own signature control. */
+  .signature-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+                   border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px;
+                   margin: 0 0 14px; background: var(--surface); font-size: var(--fs-meta); }
+  .signature-line { color: var(--muted); }
+  .signature-id { color: var(--muted); }
+  .signature-actions { margin-left: auto; display: flex; gap: 8px; }
+  .signature-actions button { font: inherit; font-size: var(--fs-meta); padding: 4px 12px; border-radius: 6px;
+                              border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
+  .signature-actions button:hover { border-color: var(--accent); color: var(--accent); }
+  .spec-file .signature-bar { margin-top: 6px; }
+
   /* The change surface: what changed vs. what is still exactly as signed \u2014
      rendered at the top of the drifted artifact's own section AND inside the
      Approvals table (driftPanelHtml \u2014 one renderer, everywhere). */
@@ -34402,6 +34423,24 @@ var ORDER_BY_ID = [
 function orderNumber(id) {
   for (const [re, n] of ORDER_BY_ID) if (re.test(id)) return n;
   return "\u2013";
+}
+function signatureBarHtml(status, opts = {}) {
+  if (!status) return "";
+  const what = opts.what || status.id;
+  const cls = status.status === "approved" ? "badge-approved" : status.status === "changed-since-approval" ? "badge-drift" : status.status === "reopened" ? "badge-reopened" : "badge-unreviewed";
+  const line = status.status === "approved" ? `signed${status.approvedAt ? ` ${esc4(status.approvedAt)}` : ""}${status.mode ? ` \xB7 ${esc4(status.mode)}` : ""}` : status.status === "changed-since-approval" ? "changed since signature \u2014 review the diff below, then re-approve" : status.status === "reopened" ? `reopened for redesign${status.reopenedAt ? ` ${esc4(status.reopenedAt)}` : ""} \u2014 re-approve when the redesign lands` : "not signed yet \u2014 nothing here is binding until you sign it";
+  const canApprove = status.resolvable !== false;
+  const approveLabel = status.status === "approved" ? `Re-approve ${what}` : status.status === "unreviewed" ? `Approve ${what}` : `Re-approve ${what}`;
+  const buttons = [
+    canApprove ? `<button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">${esc4(approveLabel)}</button>` : `<span class="meta">not approvable yet \u2014 ${status.fileCount} of its expected files resolved</span>`,
+    status.status === "approved" ? `<button type="button" class="reopen-btn" data-artifact="${escAttr(status.id)}">Reopen for redesign</button>` : ""
+  ].filter(Boolean).join(" ");
+  return `  <div class="signature-bar">
+    <span class="badge ${cls}">${esc4(status.status)}</span>
+    <span class="signature-line">${line}</span>
+    <code class="signature-id">${esc4(status.id)}</code>
+    <span class="signature-actions">${buttons}</span>
+  </div>`;
 }
 function driftPanelHtml(status, anchored, opts = {}) {
   if (!status || status.status !== "changed-since-approval") return "";
@@ -34940,8 +34979,10 @@ function specsTabHtml(specs, meta3 = {}) {
       <td>${gate ? stepReceiptCellHtml(meta3.lastReceipt, gate) : `<span class="empty-inline">&mdash;</span>`}</td>
     </tr>`;
     }).join("\n");
+    const specStatus = meta3.artifactByFile ? meta3.artifactByFile[`specs/${f.file}`] : null;
     return `  <div class="spec-file">
     <h3>specs/${esc4(f.file)}</h3>
+${signatureBarHtml(specStatus, { what: "this contract" })}
     <p class="rtm-counts">${counts}</p>
     ${rows ? `<table class="doc-table rtm-table">
     <thead><tr><th>Clause</th><th>Requirement</th><th>Citing tests</th><th>Gate</th><th>Last receipt</th></tr></thead>
@@ -36050,7 +36091,8 @@ function galleryHtml(state) {
     liveDevice = null,
     liveSession = null,
     digest = null,
-    anchoredDiffs = null
+    anchoredDiffs = null,
+    governedArtifacts = { available: false }
   } = state;
   const width = viewport?.width ?? 411;
   const screenCards = cards.filter(({ screen }) => !isComponentStoryId(screen.id));
@@ -36117,6 +36159,21 @@ function galleryHtml(state) {
     }
   }
   const componentsStatus = (componentsStatusParts.join(" &middot; ") || "no components scan available") + openNote("components");
+  const specArtifactByFile = {};
+  if (governedArtifacts.available && approvals.available && approvals.statuses) {
+    const byId = new Map(approvals.statuses.map((s) => [s.id, s]));
+    const winnerSize = {};
+    for (const a of governedArtifacts.artifacts) {
+      if (!byId.has(a.id)) continue;
+      for (const f of a.files) {
+        if (!f.endsWith(".spec.md")) continue;
+        if (winnerSize[f] === void 0 || a.files.length < winnerSize[f]) {
+          winnerSize[f] = a.files.length;
+          specArtifactByFile[f] = byId.get(a.id);
+        }
+      }
+    }
+  }
   const specsStatus = specs.available ? `${specs.files.length} spec file${specs.files.length === 1 ? "" : "s"} &middot; ${specs.files.reduce((n, f) => n + f.clauses.length, 0)} clauses${openNote("specs")}` : "no specs/ directory found";
   let evidenceStatus = "no verify receipt yet";
   if (effectiveReceipt && effectiveReceipt.available) {
@@ -36235,7 +36292,12 @@ function galleryHtml(state) {
       bodyHtml: architectureTabHtml(architecture, architectureMeta)
     },
     // §3.5: the RTM's last-receipt column reads the same receipt as Evidence.
-    { id: "specs", title: "Specs", statusHtml: specsStatus, bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt }) },
+    {
+      id: "specs",
+      title: "Specs",
+      statusHtml: specsStatus,
+      bodyHtml: specsTabHtml(specs, { lastReceipt: effectiveReceipt, artifactByFile: specArtifactByFile })
+    },
     {
       id: "screens",
       title: "Screens",
@@ -36294,6 +36356,21 @@ function galleryHtml(state) {
       fullBleed: true
     }
   ];
+  if (approvals.available && approvals.statuses) {
+    const byId = new Map(approvals.statuses.map((s) => [s.id, s]));
+    const bar = (id, what) => byId.has(id) ? signatureBarHtml(byId.get(id), { what }) : "";
+    const barBySection = {
+      intent: bar("intent", "the intent brief"),
+      architecture: bar("architecture", "this architecture"),
+      "design-system": bar("design-system", "the design system"),
+      components: bar("components", "the component registry")
+    };
+    for (const section of sections) {
+      const b = barBySection[section.id];
+      if (b) section.bodyHtml = `${b}
+${section.bodyHtml}`;
+    }
+  }
   if (approvals.available && approvals.statuses) {
     const sectionOfArtifact = (id) => id === "intent" || id === "architecture" || id === "design-system" || id === "components" ? id : id.startsWith("feature-brief:") ? "features" : id === "exemplar-spec" || id.startsWith("feature-spec:") ? "specs" : id === "exemplar-feature" ? "screens" : null;
     const panelsBySection = {};
@@ -37445,10 +37522,11 @@ function createPreviewService(opts) {
         } catch {
         }
         const walkthrough = getWalkthroughData(projectDir);
-        const [liveDevice, digest, featureBoard] = await Promise.all([
+        const [liveDevice, digest, featureBoard, governedArtifacts] = await Promise.all([
           getLiveDeviceStatus({ port: inspectorPort }),
           getDigestData(projectDir, { execFileAsync }),
-          getFeatureBoard(projectDir)
+          getFeatureBoard(projectDir),
+          getGovernedArtifacts(projectDir)
         ]);
         const anchoredDiffs = {};
         if (approvals.available) {
@@ -37489,7 +37567,8 @@ function createPreviewService(opts) {
             liveDevice,
             liveSession: liveSession.status(),
             digest,
-            anchoredDiffs
+            anchoredDiffs,
+            governedArtifacts
           })
         );
         return;

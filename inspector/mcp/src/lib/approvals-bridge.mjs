@@ -71,6 +71,25 @@ export async function getApprovalsData(root) {
 }
 
 /**
+ * The governed registry itself — artifact id -> the files it governs, from the
+ * project's own library. The console uses it to put each section's signature
+ * control on the RIGHT artifact: which spec file belongs to `architecture`,
+ * which to `exemplar-spec` (the exemplar is CONFIGURABLE — never guess it from
+ * a filename), which to `feature-spec:<name>`.
+ * @param {string} root
+ * @returns {Promise<{available: true, artifacts: Array<{id: string, files: string[]}>} | {available: false, error?: string}>}
+ */
+export async function getGovernedArtifacts(root) {
+  const lib = await loadLib(root);
+  if (!lib || typeof lib.listGovernedArtifacts !== "function") return { available: false };
+  try {
+    return { available: true, artifacts: lib.listGovernedArtifacts(root).map((a) => ({ id: a.id, files: a.files })) };
+  } catch (err) {
+    return { available: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+/**
  * Approve one artifact via the project's own library. Refusals ({ok:false,
  * reason}) are the LIBRARY's decision verbatim — this bridge adds nothing
  * (vacuous-approval protection, unresolvable-artifact refusal, unknown ids —
