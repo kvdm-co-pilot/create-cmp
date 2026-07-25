@@ -2327,3 +2327,66 @@ test("galleryHtml: a stale receipt demotes the Evidence rail glyph to ⚠ and ma
   assert.match(html, /data-tab="evidence"><span class="glyph glyph-drift"/);
   assert.match(html, /stale &mdash; tree changed since/);
 });
+
+test("service: the GOVERNED SURFACE is watched — a spec written by an agent, or a CLI ledger write, reaches the open page without a refresh", async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-governance-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, "specs"), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, "docs", "features"), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, "qa"), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, "qa", "approvals.json"), JSON.stringify({ schema: "cmp-approvals/1", artifacts: [] }));
+
+  const service = createPreviewService({ projectDir, port: 19930, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Read the SSE stream the open page listens on.
+    const events = [];
+    const ac = new AbortController();
+    const res = await fetch(`${st.url}events`, { signal: ac.signal });
+    const reader = res.body.getReader();
+    const pump = (async () => {
+      const dec = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        for (const line of dec.decode(value).split("\n")) {
+          if (line.startsWith("data: ")) events.push(JSON.parse(line.slice(6)));
+        }
+      }
+    })().catch(() => {});
+    const waitFor = async (pred, ms = 4000) => {
+      const until = Date.now() + ms;
+      while (Date.now() < until) {
+        if (events.some(pred)) return true;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return false;
+    };
+
+    // 1. An AGENT writes a spec — the most common event in the change flow.
+    fs.writeFileSync(path.join(projectDir, "specs", "meal.spec.md"), "# meal\n\n- **MEAL-01** — Given…\n");
+    assert.ok(await waitFor((e) => e.type === "governance"), "a written spec broadcasts governance");
+
+    // 2. An agent writes a feature BRIEF.
+    events.length = 0;
+    fs.writeFileSync(path.join(projectDir, "docs", "features", "meal.md"), "# meal brief\n");
+    assert.ok(await waitFor((e) => e.type === "governance"), "a written brief broadcasts governance");
+
+    // 3. A ledger write made OUTSIDE this server (node qa/approve.mjs in a
+    //    terminal) reads as a real decision, not a generic change.
+    events.length = 0;
+    fs.writeFileSync(
+      path.join(projectDir, "qa", "approvals.json"),
+      JSON.stringify({ schema: "cmp-approvals/1", artifacts: [{ artifact: "feature-spec:meal", status: "approved", hash: "x", approvedAt: "now" }] }),
+    );
+    assert.ok(await waitFor((e) => e.type === "approval" && e.origin === "file"), "a CLI ledger write broadcasts approval");
+
+    ac.abort();
+    await pump;
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});

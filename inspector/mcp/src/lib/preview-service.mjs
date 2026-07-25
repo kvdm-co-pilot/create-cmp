@@ -88,6 +88,13 @@ const DEBOUNCE_MS = 400;
 // write. A longer trailing debounce here avoids rendering once with pre-swap code.
 const CLASSES_DEBOUNCE_MS = 1500;
 const POLL_FALLBACK_MS = 2000;
+// Governed-surface watch: a short trailing debounce coalesces the several
+// write events one editor save (or one CLI run) produces into ONE broadcast.
+const GOVERNANCE_DEBOUNCE_MS = 200;
+// A ledger write made by this server has already broadcast; the file watcher's
+// echo of that same write is suppressed inside this window so agents listening
+// on the stream are never double-notified for one decision.
+const SELF_WRITE_ECHO_MS = 1500;
 const DAEMON_BOOT_TIMEOUT_MS = 240000; // first boot may compile + download a JBR
 const DAEMON_RENDER_TIMEOUT_MS = 120000;
 // The hot recompiler is a SEPARATE Gradle daemon whose output we cannot observe. If a
@@ -761,69 +768,57 @@ export function galleryHtml(state) {
       if (curStatus && freshStatus) curStatus.innerHTML = freshStatus.innerHTML;
     });
   }
+  // Every governed panel refreshes IN PLACE (no location.reload()): a full
+  // reload flashes the page, drops scroll, and blanks assistive/agent views of
+  // the document mid-navigation. ONE routine for every governed-state event —
+  // an approval, a comment, or a change to the governed FILES themselves —
+  // because they all mean the same thing: the truth this page renders moved.
+  // Panels are re-wired individually (never document-wide), so an unswapped
+  // panel can never pick up a second listener and double-POST.
+  const GOVERNED_PANELS = [
+    "tab-intent", "tab-features", "tab-architecture", "tab-specs",
+    "tab-design-system", "tab-components", "tab-approvals", "tab-evidence", "tab-comments",
+  ];
+  function refreshGovernedPanels() {
+    fetch("/").then((r) => r.text()).then((html) => {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const swapped = [];
+      for (const id of GOVERNED_PANELS) {
+        const fresh = doc.querySelector("#" + id);
+        const cur = document.querySelector("#" + id);
+        if (!fresh || !cur) continue;
+        const wasActive = cur.classList.contains("active");
+        cur.innerHTML = fresh.innerHTML;
+        if (wasActive) cur.classList.add("active");
+        swapped.push(cur);
+      }
+      if (swapped.length === 0) { location.reload(); return; } // unexpected markup — old behavior
+      for (const el of swapped) {
+        wireApproveButtons(el);
+        wireReopenButtons(el);
+        wireFeatureAcceptButtons(el);
+        wireCommentButtons(el);
+        wirePickButtons(el);
+      }
+      const freshBadge = doc.querySelector("#comments-badge");
+      const curBadge = document.querySelector("#comments-badge");
+      if (freshBadge && curBadge) {
+        curBadge.textContent = freshBadge.textContent;
+        curBadge.hidden = freshBadge.hidden;
+      }
+      syncShellFromDoc(doc);
+    }).catch(() => location.reload());
+  }
   const es = new EventSource("/events");
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "rendering") { pill.textContent = "rendering…"; pill.className = "rendering"; }
     if (msg.type === "render") location.reload();
-    // Approvals refresh IN PLACE (no location.reload()): a full reload on every
-    // approval flashes the page, drops scroll, and blanks assistive/agent views
-    // of the document mid-navigation — an approval only changes the Approvals
-    // tab's markup, so swap exactly that panel from a re-fetched page.
-    if (msg.type === "approval") {
-      fetch("/").then((r) => r.text()).then((html) => {
-        const doc = new DOMParser().parseFromString(html, "text/html");
-        const fresh = doc.querySelector("#tab-approvals");
-        const cur = document.querySelector("#tab-approvals");
-        if (fresh && cur) {
-          const wasActive = cur.classList.contains("active");
-          cur.innerHTML = fresh.innerHTML;
-          if (wasActive) cur.classList.add("active");
-          wireApproveButtons(cur);
-          wireReopenButtons(cur);
-          syncShellFromDoc(doc);
-        } else {
-          location.reload(); // fallback: unexpected markup — the old behavior
-        }
-        // The Features board reads the same ledger, so every approval-family
-        // transition (approve / reopen / deliver / accept) refreshes it too —
-        // same in-place swap, same re-wiring of its buttons.
-        const freshFeatures = doc.querySelector("#tab-features");
-        const curFeatures = document.querySelector("#tab-features");
-        if (freshFeatures && curFeatures) {
-          const wasActive = curFeatures.classList.contains("active");
-          curFeatures.innerHTML = freshFeatures.innerHTML;
-          if (wasActive) curFeatures.classList.add("active");
-          wireApproveButtons(curFeatures);
-          wireFeatureAcceptButtons(curFeatures);
-        }
-      }).catch(() => location.reload());
-    }
-    // Comments refresh IN PLACE too (§7.3, same VL-6 pattern as approvals):
-    // one SSE event covers BOTH a new comment (POST /api/comment, console)
-    // and a resolution (resolve_comment, agent) — either way, only the
-    // Comments tab's markup and the tab-bar open-count badge changed.
-    if (msg.type === "comment") {
-      fetch("/").then((r) => r.text()).then((html) => {
-        const doc = new DOMParser().parseFromString(html, "text/html");
-        const freshPanel = doc.querySelector("#tab-comments");
-        const curPanel = document.querySelector("#tab-comments");
-        if (freshPanel && curPanel) {
-          const wasActive = curPanel.classList.contains("active");
-          curPanel.innerHTML = freshPanel.innerHTML;
-          if (wasActive) curPanel.classList.add("active");
-        } else {
-          location.reload();
-          return;
-        }
-        const freshBadge = doc.querySelector("#comments-badge");
-        const curBadge = document.querySelector("#comments-badge");
-        if (freshBadge && curBadge) {
-          curBadge.textContent = freshBadge.textContent;
-          curBadge.hidden = freshBadge.hidden;
-        }
-        syncShellFromDoc(doc);
-      }).catch(() => location.reload());
+    // approval (a decision, from the console OR the CLI), comment (added or
+    // resolved), governance (a governed FILE changed — an agent wrote a spec
+    // or a brief, or the lane wrote a receipt): all one refresh.
+    if (msg.type === "approval" || msg.type === "comment" || msg.type === "governance") {
+      refreshGovernedPanels();
     }
     if (msg.type === "error") {
       pill.textContent = msg.source === "compile" ? "compile failed" : "render failed";
@@ -1200,6 +1195,9 @@ export function createPreviewService(opts) {
   let port = null;
   let watcher = null;
   let classesWatcher = null;
+  // When this server last wrote a ledger itself (approve/reopen/accept/comment)
+  // — the governed-surface watcher suppresses its echo of that write.
+  let lastSelfLedgerWriteAt = 0;
   let mode = "gradle"; // "gradle" (task per render) | "daemon" (resident hot JVM)
   let daemonChild = null;
   let daemonBootDeadline = null;
@@ -1961,6 +1959,71 @@ export function createPreviewService(opts) {
     }
   }
 
+  // --- the governed surface, watched -----------------------------------------
+  // The console's live-truth promise used to hold only for changes the CONSOLE
+  // ITSELF made: SSE events fired from its own POST handlers, and the file
+  // watcher covered composeApp/src (the render surface) alone. So the two most
+  // common events in the change flow — an agent writing a spec or a brief, and
+  // `node qa/approve.mjs` run in a terminal — left the page stale until a
+  // manual refresh, which is exactly the lie this console exists to prevent.
+  // These watchers close it: the governed files are watched, and a change
+  // broadcasts the same events the in-place swaps already listen for.
+  const GOVERNANCE_WATCHES = [
+    { rel: "specs", kind: "governance" },
+    // Mirrors FEATURES_DIR_REL in the project's own qa/lib/feature-brief.mjs;
+    // this package cannot import that file statically (it lives in the generated app).
+    { rel: "docs/features", kind: "governance" },
+    { rel: "qa", kind: "ledger", only: new Set(["approvals.json", "comments.json"]) },
+    { rel: "qa/evidence", kind: "governance", only: new Set(["latest.json"]) },
+  ];
+  const pendingGovernance = new Set();
+  let governanceWatchers = [];
+  let governanceTimer = null;
+
+  function flushGovernance() {
+    const kinds = [...pendingGovernance];
+    pendingGovernance.clear();
+    for (const kind of kinds) {
+      if (kind === "approval") {
+        // Suppress the echo of the console's OWN ledger write: that path
+        // already broadcast (with its derived next step), and a duplicate
+        // would double-notify every agent listening on the stream.
+        if (Date.now() - lastSelfLedgerWriteAt < SELF_WRITE_ECHO_MS) continue;
+        touch("approval");
+        broadcast({ type: "approval", origin: "file" });
+        void checkApprovalWaiters();
+      } else if (kind === "comment") {
+        if (Date.now() - lastSelfLedgerWriteAt < SELF_WRITE_ECHO_MS) continue;
+        touch("comment");
+        broadcast({ type: "comment", origin: "file" });
+        void checkCommentWaiters();
+      } else {
+        touch("governance-change");
+        broadcast({ type: "governance" });
+      }
+    }
+  }
+
+  function watchGovernance() {
+    for (const w of GOVERNANCE_WATCHES) {
+      const abs = path.join(projectDir, w.rel);
+      if (!fs.existsSync(abs)) continue; // a project without it simply has nothing to watch
+      try {
+        const watcher = fs.watch(abs, (_event, filename) => {
+          const base = filename ? path.basename(filename) : "";
+          if (w.only && !w.only.has(base)) return;
+          pendingGovernance.add(w.kind === "ledger" ? (base === "comments.json" ? "comment" : "approval") : "governance");
+          clearTimeout(governanceTimer);
+          governanceTimer = setTimeout(flushGovernance, GOVERNANCE_DEBOUNCE_MS);
+        });
+        governanceWatchers.push(watcher);
+      } catch {
+        /* unwatchable path — the page still updates on the next interaction */
+      }
+    }
+    if (governanceWatchers.length > 0) log("watching the governed surface (specs, docs/features, qa ledgers, receipt)");
+  }
+
   function scanStamp() {
     let stamp = 0;
     (function walk(dir) {
@@ -2167,6 +2230,7 @@ export function createPreviewService(opts) {
         res.end(JSON.stringify(result));
         if (result.ok) {
           touch("approval");
+          lastSelfLedgerWriteAt = Date.now();
           // A signature HANDS OFF (CHANGE-FLOW-DESIGN.md §4): when the signed
           // artifact belongs to a feature's walk, the event carries the
           // DERIVED next step + owner, so a listening agent receives "brief
@@ -2212,6 +2276,7 @@ export function createPreviewService(opts) {
           // `approval` event — existing in-place refresh covers the panel") — the
           // client's approval-swap handler doesn't care WHICH transition fired,
           // only that the Approvals panel needs a re-fetch.
+          lastSelfLedgerWriteAt = Date.now();
           broadcast({ type: "approval", artifact });
           void checkApprovalWaiters();
         }
@@ -2250,6 +2315,7 @@ export function createPreviewService(opts) {
         res.end(JSON.stringify(result));
         if (result.ok) {
           touch("feature-accept");
+          lastSelfLedgerWriteAt = Date.now();
           broadcast({ type: "approval", artifact: `feature-brief:${name}`, ...(await nextStepFor(`feature-brief:${name}`)) });
           void checkApprovalWaiters();
         }
@@ -2288,6 +2354,7 @@ export function createPreviewService(opts) {
         res.end(JSON.stringify(result));
         if (result.ok) {
           touch("comment");
+          lastSelfLedgerWriteAt = Date.now();
           broadcast({ type: "comment" });
           void checkCommentWaiters(); // settle any waitForNewComment() faster than the 1s poll
         }
@@ -2424,6 +2491,7 @@ export function createPreviewService(opts) {
       }
       await listen(opts.port || DEFAULT_PORT);
       startWatching();
+      watchGovernance();
       void renderCycle();
       if (hot) void ensureDaemon();
       return status();
@@ -2437,6 +2505,9 @@ export function createPreviewService(opts) {
       settleCommentWaiters(); // ditto for pending waitForNewComment() calls
       daemonBootDeadline = 0; // abort any in-flight boot poll
       if (classesWatcher) classesWatcher.close();
+      clearTimeout(governanceTimer);
+      for (const w of governanceWatchers) w.close();
+      governanceWatchers = [];
       // Best-effort daemon teardown: ask the JVM to exit, then kill the gradle client.
       fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {});
       if (daemonChild) daemonChild.kill("SIGTERM");

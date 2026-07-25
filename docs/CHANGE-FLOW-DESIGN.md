@@ -290,6 +290,21 @@ is its own drift surface) and inside the Approvals table:
 Implementation: `inspector/mcp/src/lib/approval-diff.mjs` (anchor + per-file
 split) + `driftPanelHtml` in `console-tabs.mjs` (the one renderer).
 
+**The console is live for the whole governed surface** (Karel, 2026-07-25 —
+"I had to refresh the page"). The live-truth promise originally held only for
+changes the console ITSELF made: SSE events fired from its own POST handlers,
+and the file watcher covered `composeApp/src` (the render surface) alone. The
+two most common events in this flow — **an agent writing a spec or a brief**,
+and **`node qa/approve.mjs` run in a terminal** — left the page stale, which
+is exactly the lie this console exists to prevent. Now `specs/`,
+`docs/features/`, `qa/approvals.json`, `qa/comments.json`, and the receipt are
+watched, and a change broadcasts the same events the in-place swaps listen
+for: a ledger write reads as a **decision** (`approval`/`comment` — it also
+wakes any blocked `approval_status{waitForDecision}`), everything else as
+`governance`. All three refresh every governed panel in place — no reload, no
+lost scroll — and the console's own writes suppress their file echo so an
+agent listening on the stream is never double-notified for one decision.
+
 ---
 
 ## 7. Command reference
