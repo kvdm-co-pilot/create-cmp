@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs be38b08399e299bb329e8445dc04d3dfcf18f4c5c1516439b36af28ef962e7b2
+// cmp:bundle-inputs 21a2f01a5a544dc6d98b60e4842e3078982ba3e265d450e3e1df4d8af3512b5d
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32280,7 +32280,7 @@ async function acceptFeature(root, name) {
   if (typeof lib.acceptFeature !== "function") {
     return {
       ok: false,
-      reason: "this project's qa/lib/approvals.mjs predates the feature-intent wave (no acceptFeature export) \u2014 upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock feature acceptance."
+      reason: "this project's qa/lib/approvals.mjs predates the feature-brief wave (no acceptFeature export) \u2014 upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock feature acceptance."
     };
   }
   try {
@@ -34187,7 +34187,9 @@ var SHELL_CSS = `
   .feature-phase { font-size: var(--fs-meta); font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
   .phase-proposed { color: var(--muted); }
   .phase-approved { color: var(--accent); border-color: var(--accent); }
-  .phase-delivered { color: var(--reopen); border-color: var(--reopen); }
+  .phase-proven { color: var(--reopen); border-color: var(--reopen); }
+  .feature-done-yes { color: var(--ok, #3a8f5a); font-size: var(--fs-meta); font-weight: 600; }
+  .feature-done { margin: 4px 0; font-size: var(--fs-meta); }
   .phase-accepted { color: var(--ok, #3a8f5a); border-color: currentColor; }
   .phase-drift, .phase-reopened { color: var(--drift); border-color: var(--drift); }
   .feature-tally { color: var(--muted); font-size: var(--fs-meta); }
@@ -34360,7 +34362,10 @@ var ORDER_BY_ID = [
   // from — the real exemplar screens, so both FOLLOW the exemplar.
   [/^design-system$/, 4],
   [/^components$/, 5],
-  [/^feature-spec:/, 6]
+  [/^feature-spec:/, 6],
+  // Post-genesis: a feature's brief is signed before its spec is written
+  // (CHANGE-FLOW-DESIGN.md §4) — but both live after the genesis six.
+  [/^feature-brief:/, 6]
 ];
 function orderNumber(id) {
   for (const [re, n] of ORDER_BY_ID) if (re.test(id)) return n;
@@ -34374,6 +34379,7 @@ function genesisGuide(id) {
   if (/^exemplar-feature$/.test(id)) return "this app's first real feature \u2014 the DNA every future feature is cloned from.";
   if (/^exemplar-spec$/.test(id)) return "the Given/When/Then spec for that first feature's behavior.";
   if (/^feature-spec:/.test(id)) return "a spec conversation in the frozen vocabulary \u2014 this feature's behavior, clause by clause.";
+  if (/^feature-brief:/.test(id)) return "this feature's decisions and their why \u2014 signed before the build, the card's doc-of-record after.";
   return "shapes this artifact.";
 }
 function artifactBannerHtml(s) {
@@ -35693,55 +35699,61 @@ ${commits}`;
 }
 function featuresTabHtml(features, meta3 = {}) {
   if (!features || !features.available) {
-    return `  <p class="empty-inline">feature briefs are not available in this project \u2014 qa/lib/approvals.mjs predates the feature-intent wave (or is absent). A feature brief is a docs/proposals/&lt;name&gt;.md carrying a <code>cmp:intent-checks</code> block.</p>`;
+    return `  <p class="empty-inline">feature briefs are not available in this project \u2014 qa/lib/approvals.mjs predates the feature-brief wave (or is absent). A feature brief is a <code>docs/features/&lt;name&gt;.md</code>; its location is the governance opt-in.</p>`;
   }
   const { board } = features;
   if (!board || board.features.length === 0) {
-    return `  <p class="empty-inline">no feature briefs yet. A brief is born by adding a <code>cmp:intent-checks</code> block (checks + declared touches) to a doc under <code>docs/proposals/</code> \u2014 it then appears here as a governed <code>feature-intent</code> artifact, approved BEFORE the feature is built.</p>`;
+    return `  <p class="empty-inline">no feature briefs yet. A brief is born by writing <code>docs/features/&lt;name&gt;.md</code> \u2014 the decisions and their why, signed BEFORE the feature is built. Its location is the governance opt-in; it appears here as a governed <code>feature-brief:&lt;name&gt;</code> artifact the moment the file exists.</p>`;
   }
   const undeclared = board.undeclared.length > 0 ? `  <div class="feature-undeclared"><strong>Undeclared blast:</strong> ${board.undeclared.map((u) => `<code>${esc4(u.id)}</code>`).join(", ")} changed since approval, and no open brief declared touching ${board.undeclared.length === 1 ? "it" : "them"} \u2014 either a brief's <code>touches</code> is incomplete, or this drift belongs to no feature. The approvals gate is already failing on it; the plan should say why.</div>` : "";
   const phaseChip = (phase) => {
-    const cls = phase === "accepted" ? "phase-accepted" : phase === "delivered" ? "phase-delivered" : phase === "approved" ? "phase-approved" : phase === "changed-since-approval" ? "phase-drift" : phase === "reopened" ? "phase-reopened" : "phase-proposed";
+    const cls = phase === "accepted" ? "phase-accepted" : phase === "proven" ? "phase-proven" : phase === "approved" ? "phase-approved" : phase === "changed-since-approval" ? "phase-drift" : phase === "reopened" ? "phase-reopened" : "phase-proposed";
     return `<span class="feature-phase ${cls}">${esc4(phase)}</span>`;
   };
   const cards = board.features.map((f) => {
-    const armed = f.record && f.record.delivered && !f.record.accepted;
-    const checksRows = f.checks.results.map((r) => {
-      const mark = r.ok ? `<span class="ok-inline">\u2713</span>` : `<span class="${armed ? "bad-inline" : "pending-inline"}">${armed ? "\u2717" : "\u25CB"}</span>`;
-      return `      <tr><td>${mark}</td><td><code>${esc4(r.id)}</code></td><td class="feature-check-detail">${esc4(r.detail)}</td></tr>`;
+    const clauseRows = f.clauses.map((c) => {
+      const mark = c.withdrawn ? `<span class="pending-inline">\u2014</span>` : c.cited ? `<span class="ok-inline">\u2713</span>` : `<span class="pending-inline">\u25CB</span>`;
+      const id = c.withdrawn ? `<s><code>${esc4(c.id)}</code></s>` : `<code>${esc4(c.id)}</code>`;
+      const state = c.withdrawn ? "withdrawn" : c.cited ? "cited by a test" : "no citing test yet";
+      return `      <tr><td>${mark}</td><td>${id}</td><td class="feature-check-detail">${state}</td></tr>`;
     }).join("\n");
-    const checksTable = f.checks.total > 0 || f.checks.error ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>check</th><th>${armed ? "armed \u2014 a \u2717 here is the lane's FAIL" : "informational until delivered"}</th></tr></thead><tbody>
-${checksRows}
-    </tbody></table>` : `    <p class="empty-inline">the brief's cmp:intent-checks block has zero checks \u2014 delivery cannot be claimed mechanically until it promises something checkable.</p>`;
+    const clauseTable = f.specExists ? f.clauses.length > 0 ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>clause</th><th><code>${esc4(f.specRel)}</code></th></tr></thead><tbody>
+${clauseRows}
+    </tbody></table>` : `    <p class="empty-inline"><code>${esc4(f.specRel)}</code> exists but has no clauses yet \u2014 behavior starts as clauses there.</p>` : `    <p class="empty-inline">no spec yet (<code>${esc4(f.specRel)}</code>) \u2014 the contract step: behavior starts as clauses there, signed before the build.</p>`;
+    const receiptNote = f.receipt.present ? `receipt ${esc4(f.receipt.verdict ?? "?")}${f.receipt.verdict === "PASS" ? f.receipt.attestsTree ? " \xB7 attests this tree" : " \xB7 attests an OLDER tree" : ""}` : "no receipt yet";
+    const doneLine = `    <p class="feature-done ${f.provenDone ? "feature-done-yes" : "meta"}">${f.provenDone ? "\u2713 proven done" : "not yet proven done"} \u2014 ${esc4(f.doneReason)}</p>`;
     const touches = f.touches.length > 0 ? `    <p class="feature-touches">declares touching: ${f.touches.map((t) => {
       const drifted = t.status === "changed-since-approval";
       const note = drifted ? ` <span class="feature-as-declared">(as declared \u2014 re-approve when shaped)</span>` : "";
       return `<code>${esc4(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc4(t.status)}</span>${note}`;
     }).join(" \xB7 ")}</p>` : `    <p class="feature-touches meta">declares touching nothing beyond its own spec</p>`;
     const stamps = [];
-    if (f.record && f.record.approvedAt) stamps.push(`approved ${esc4(f.record.approvedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}`);
-    if (f.record && f.record.delivered) stamps.push(`delivered ${esc4(f.record.deliveredAt ?? "?")}`);
+    if (f.record && f.record.approvedAt) stamps.push(`signed ${esc4(f.record.approvedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}`);
     if (f.record && f.record.accepted) stamps.push(`accepted ${esc4(f.record.acceptedAt ?? "?")}`);
     const actions = [];
     if (f.phase === "proposed" || f.phase === "changed-since-approval") {
-      actions.push(`<button type="button" class="approve-btn" data-artifact="feature-intent:${escAttr(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
+      actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
     }
-    if (f.phase === "delivered" && f.checks.satisfied === f.checks.total && f.checks.total > 0) {
-      actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr(f.name)}">Accept delivery</button>`);
+    if (f.phase === "proven") {
+      actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr(f.name)}">Accept</button>`);
     }
     if (f.phase === "approved") {
-      actions.push(`<span class="meta">building \u2014 agent claims done with <code>node qa/approve.mjs --deliver ${esc4(f.name)}</code></span>`);
+      actions.push(`<span class="meta">building \u2014 Accept enables when doneness derives (${f.covered}/${f.total} clauses cited, ${receiptNote})</span>`);
+    }
+    if (f.blockError) {
+      actions.push(`<span class="status-drift">cmp:feature block: ${esc4(f.blockError)}</span>`);
     }
     return `  <article class="feature-card${f.phase === "accepted" ? " feature-card-closed" : ""}">
     <header class="feature-card-head">
       <h3>${esc4(f.name)}</h3>
       ${phaseChip(f.phase)}
-      <span class="feature-tally">${f.checks.satisfied}/${f.checks.total} checks</span>
+      <span class="feature-tally">${f.covered}/${f.total} clauses cited</span>
       <a class="feature-doc-link" href="#" title="${escAttr(f.rel)}">${esc4(f.rel)}</a>
     </header>
     ${stamps.length > 0 ? `<p class="meta">${stamps.join(" \xB7 ")}</p>` : ""}
+${doneLine}
 ${touches}
-${checksTable}
+${clauseTable}
     ${actions.length > 0 ? `<div class="feature-actions">${actions.join(" ")}</div>` : ""}
   </article>`;
   }).join("\n");
@@ -36038,15 +36050,15 @@ function galleryHtml(state) {
   }
   const commentsStatus = comments.available ? `${openCommentCount} open &middot; ${comments.comments.length - openCommentCount} resolved` : "comments ledger not available in this project";
   let featuresStatus = "no feature briefs yet";
-  let deliveredAwaiting = 0;
+  let provenAwaiting = 0;
   if (features.available && features.board && features.board.features.length > 0) {
     const briefs = features.board.features;
     const n = (ph) => briefs.filter((f) => f.phase === ph).length;
-    deliveredAwaiting = n("delivered");
+    provenAwaiting = n("proven");
     const parts = [`${briefs.length} brief${briefs.length === 1 ? "" : "s"}`];
     if (n("proposed")) parts.push(`${n("proposed")} awaiting sign-off`);
     if (n("approved")) parts.push(`${n("approved")} building`);
-    if (deliveredAwaiting) parts.push(`${deliveredAwaiting} delivered \u2014 acceptance pending`);
+    if (provenAwaiting) parts.push(`${provenAwaiting} proven \u2014 acceptance pending`);
     if (n("accepted")) parts.push(`${n("accepted")} accepted`);
     if (n("changed-since-approval")) parts.push(`<span class="status-drift">${n("changed-since-approval")} drifted</span>`);
     if (features.board.undeclared.length > 0) parts.push(`<span class="status-drift">undeclared blast</span>`);
@@ -36061,14 +36073,14 @@ function galleryHtml(state) {
     { id: "intent", label: "Intent", glyph: statusGlyph(intentRecord) },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
     { id: "specs", label: "Specs", glyph: null },
-    // The post-genesis delivery board sits with the definition cluster: a
-    // feature's walk (brief → spec → build → deliver → accept) starts here.
-    // The glyph marks the one state waiting on the HUMAN in this section: a
-    // delivered brief pending acceptance.
+    // The per-feature view sits with the definition cluster: a feature's walk
+    // (brief → contract → build → prove → accept) starts here. The glyph
+    // marks the one state waiting on the HUMAN in this section: a feature
+    // whose doneness has DERIVED (proven) pending acceptance.
     {
       id: "features",
       label: "Features",
-      glyph: deliveredAwaiting > 0 ? { ch: "\u25CF", cls: "glyph-unsigned", label: `${deliveredAwaiting} delivered \u2014 acceptance pending` } : null
+      glyph: provenAwaiting > 0 ? { ch: "\u25CF", cls: "glyph-unsigned", label: `${provenAwaiting} proven \u2014 acceptance pending` } : null
     },
     { id: "screens", label: "Screens", glyph: null, active: true },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
@@ -37402,7 +37414,7 @@ function createPreviewService(opts) {
         const name = body && body.name;
         if (!name || typeof name !== "string") {
           res.writeHead(400, { "content-type": "application/json" });
-          res.end(JSON.stringify({ ok: false, reason: "missing `name` (string \u2014 the brief's docs/proposals/<name>.md name) in the request body" }));
+          res.end(JSON.stringify({ ok: false, reason: "missing `name` (string \u2014 the brief's docs/features/<name>.md name) in the request body" }));
           return;
         }
         const result = await acceptFeature(projectDir, name);
@@ -37410,7 +37422,7 @@ function createPreviewService(opts) {
         res.end(JSON.stringify(result));
         if (result.ok) {
           touch("feature-accept");
-          broadcast({ type: "approval", artifact: `feature-intent:${name}` });
+          broadcast({ type: "approval", artifact: `feature-brief:${name}` });
           void checkApprovalWaiters();
         }
         return;

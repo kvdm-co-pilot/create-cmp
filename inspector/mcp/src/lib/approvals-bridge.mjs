@@ -139,9 +139,9 @@ export async function reopenArtifact(root, artifactId) {
 }
 
 /**
- * The Features board (feature briefs + lifecycle + declared-vs-actual blast
- * radius), via the project's own library. Degrades to { available: false } for
- * projects whose approvals lib predates the feature-intent wave (no
+ * The per-feature view (feature briefs + DERIVED doneness + declared-vs-actual
+ * blast radius), via the project's own library. Degrades to { available: false }
+ * for projects whose approvals lib predates the feature-brief wave (no
  * getFeatureBoard export) — the section renders its empty-state explanation,
  * never a crash.
  * @param {string} root
@@ -158,11 +158,12 @@ export async function getFeatureBoard(root) {
 }
 
 /**
- * The human's acceptance of a delivered feature brief, via the project's own
- * library — which refuses while any armed check fails (accepting a red
- * delivery is refused there, not here; this bridge adds nothing).
+ * The human's acceptance of a feature brief, via the project's own library —
+ * which refuses until the feature is provenDone (derived: clauses cited +
+ * receipt PASS + receipt attests the tree; refused there, not here — this
+ * bridge adds nothing).
  * @param {string} root
- * @param {string} name the brief's name (docs/proposals/<name>.md)
+ * @param {string} name the brief's name (docs/features/<name>.md)
  */
 export async function acceptFeature(root, name) {
   const lib = await loadLib(root);
@@ -178,7 +179,7 @@ export async function acceptFeature(root, name) {
     return {
       ok: false,
       reason:
-        "this project's qa/lib/approvals.mjs predates the feature-intent wave (no acceptFeature export) — " +
+        "this project's qa/lib/approvals.mjs predates the feature-brief wave (no acceptFeature export) — " +
         "upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock feature acceptance.",
     };
   }

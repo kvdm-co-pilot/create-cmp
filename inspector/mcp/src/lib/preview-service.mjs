@@ -489,18 +489,19 @@ export function galleryHtml(state) {
     ? `${openCommentCount} open &middot; ${comments.comments.length - openCommentCount} resolved`
     : "comments ledger not available in this project";
 
-  // Features (the post-genesis delivery board): phase tallies from the
-  // project's own getFeatureBoard — facts only, no fabricated zeros.
+  // Features (the per-feature view): phase tallies from the project's own
+  // getFeatureBoard — facts only, no fabricated zeros. `proven` is DERIVED
+  // doneness (clauses cited + receipt PASS + attests tree), never a claim.
   let featuresStatus = "no feature briefs yet";
-  let deliveredAwaiting = 0;
+  let provenAwaiting = 0;
   if (features.available && features.board && features.board.features.length > 0) {
     const briefs = features.board.features;
     const n = (ph) => briefs.filter((f) => f.phase === ph).length;
-    deliveredAwaiting = n("delivered");
+    provenAwaiting = n("proven");
     const parts = [`${briefs.length} brief${briefs.length === 1 ? "" : "s"}`];
     if (n("proposed")) parts.push(`${n("proposed")} awaiting sign-off`);
     if (n("approved")) parts.push(`${n("approved")} building`);
-    if (deliveredAwaiting) parts.push(`${deliveredAwaiting} delivered — acceptance pending`);
+    if (provenAwaiting) parts.push(`${provenAwaiting} proven — acceptance pending`);
     if (n("accepted")) parts.push(`${n("accepted")} accepted`);
     if (n("changed-since-approval")) parts.push(`<span class="status-drift">${n("changed-since-approval")} drifted</span>`);
     if (features.board.undeclared.length > 0) parts.push(`<span class="status-drift">undeclared blast</span>`);
@@ -519,14 +520,14 @@ export function galleryHtml(state) {
     { id: "intent", label: "Intent", glyph: statusGlyph(intentRecord) },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
     { id: "specs", label: "Specs", glyph: null },
-    // The post-genesis delivery board sits with the definition cluster: a
-    // feature's walk (brief → spec → build → deliver → accept) starts here.
-    // The glyph marks the one state waiting on the HUMAN in this section: a
-    // delivered brief pending acceptance.
+    // The per-feature view sits with the definition cluster: a feature's walk
+    // (brief → contract → build → prove → accept) starts here. The glyph
+    // marks the one state waiting on the HUMAN in this section: a feature
+    // whose doneness has DERIVED (proven) pending acceptance.
     {
       id: "features",
       label: "Features",
-      glyph: deliveredAwaiting > 0 ? { ch: "●", cls: "glyph-unsigned", label: `${deliveredAwaiting} delivered — acceptance pending` } : null,
+      glyph: provenAwaiting > 0 ? { ch: "●", cls: "glyph-unsigned", label: `${provenAwaiting} proven — acceptance pending` } : null,
     },
     { id: "screens", label: "Screens", glyph: null, active: true },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
@@ -2088,14 +2089,14 @@ export function createPreviewService(opts) {
         return;
       }
       if (url.pathname === "/api/feature/accept") {
-        // The human's bookend on a delivered feature brief. Same shape as
-        // /api/approve — and its own endpoint for the same reason /api/reopen
-        // is: acceptance is a distinct transition with distinct refusals
-        // (checks failing, delivery not claimed), and conflating transitions
-        // behind one endpoint lets a client bug do the wrong one silently.
-        // The DELIVER transition deliberately has no endpoint: delivery is the
-        // AGENT's claim of done, made via the CLI/MCP it works through — the
-        // console never claims done on the agent's behalf.
+        // The human's bookend on a feature brief. Same shape as /api/approve —
+        // and its own endpoint for the same reason /api/reopen is: acceptance
+        // is a distinct transition with distinct refusals (not provenDone,
+        // brief drifted), and conflating transitions behind one endpoint lets
+        // a client bug do the wrong one silently. There is deliberately NO
+        // deliver endpoint and no deliver anywhere: doneness is DERIVED, never
+        // claimed (CHANGE-FLOW-DESIGN.md §2) — the library refuses acceptance
+        // until the derivation holds.
         if (req.method !== "POST") {
           res.writeHead(405, { "content-type": "application/json", allow: "POST" });
           res.end(JSON.stringify({ ok: false, reason: "method not allowed — use POST" }));
@@ -2112,7 +2113,7 @@ export function createPreviewService(opts) {
         const name = body && body.name;
         if (!name || typeof name !== "string") {
           res.writeHead(400, { "content-type": "application/json" });
-          res.end(JSON.stringify({ ok: false, reason: "missing `name` (string — the brief's docs/proposals/<name>.md name) in the request body" }));
+          res.end(JSON.stringify({ ok: false, reason: "missing `name` (string — the brief's docs/features/<name>.md name) in the request body" }));
           return;
         }
         const result = await acceptFeatureViaLib(projectDir, name);
@@ -2120,7 +2121,7 @@ export function createPreviewService(opts) {
         res.end(JSON.stringify(result));
         if (result.ok) {
           touch("feature-accept");
-          broadcast({ type: "approval", artifact: `feature-intent:${name}` });
+          broadcast({ type: "approval", artifact: `feature-brief:${name}` });
           void checkApprovalWaiters();
         }
         return;

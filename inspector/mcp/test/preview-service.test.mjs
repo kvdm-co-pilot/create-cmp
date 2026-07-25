@@ -25,7 +25,7 @@ import { copyProjectLib } from "./fixtures/copy-project-lib.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // copyProjectLib ships approvals.mjs WITH its static relative imports
-// (arch-doc.mjs, intent-checks.mjs, …) — a missing sibling fails the bridge's
+// (arch-doc.mjs, feature-brief.mjs, …) — a missing sibling fails the bridge's
 // dynamic import at load time, which reads as "the whole library is absent"
 // rather than as anything specific. The set is derived from the source, so a
 // newly added sibling import copies itself (see fixtures/copy-project-lib.mjs).
@@ -490,8 +490,8 @@ test("galleryHtml (§2 rail): sections in the genesis definition order, Intent f
   // evidence, derived from committed manifests), Digest is the returning
   // human's since-you-last-looked read, and Live device is deliberately LAST —
   // the console arc ends DRIVE (A1).
-  // Features (the post-genesis delivery board) joins the definition cluster
-  // right after Specs: a feature's walk — brief, spec, build, deliver, accept —
+  // Features (the per-feature view) joins the definition cluster
+  // right after Specs: a feature's walk — brief, contract, build, prove, accept —
   // starts there, before the screens it produces.
   assert.deepEqual(order, [
     "intent",

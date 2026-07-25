@@ -79,6 +79,9 @@ const ORDER_BY_ID = [
   [/^design-system$/, 4],
   [/^components$/, 5],
   [/^feature-spec:/, 6],
+  // Post-genesis: a feature's brief is signed before its spec is written
+  // (CHANGE-FLOW-DESIGN.md §4) — but both live after the genesis six.
+  [/^feature-brief:/, 6],
 ];
 function orderNumber(id) {
   for (const [re, n] of ORDER_BY_ID) if (re.test(id)) return n;
@@ -101,6 +104,7 @@ function genesisGuide(id) {
   if (/^exemplar-feature$/.test(id)) return "this app's first real feature — the DNA every future feature is cloned from.";
   if (/^exemplar-spec$/.test(id)) return "the Given/When/Then spec for that first feature's behavior.";
   if (/^feature-spec:/.test(id)) return "a spec conversation in the frozen vocabulary — this feature's behavior, clause by clause.";
+  if (/^feature-brief:/.test(id)) return "this feature's decisions and their why — signed before the build, the card's doc-of-record after.";
   return "shapes this artifact.";
 }
 
@@ -2235,18 +2239,21 @@ ${commits}`;
 }
 
 /**
- * §Features — the post-genesis delivery board: one card per feature brief
- * (docs/proposals/*.md carrying a cmp:intent-checks block), rendering the
- * brief's full lifecycle from the project's own library (getFeatureBoard —
- * this file composes NOTHING; the model lives in the project's qa/lib).
+ * §Features — the per-feature view (CHANGE-FLOW-DESIGN.md §6): one card per
+ * feature brief (any docs/features/*.md — location is the governance opt-in),
+ * composing the brief's signature with the feature's DERIVED state from the
+ * project's own library (getFeatureBoard — this file composes NOTHING; the
+ * model lives in the project's qa/lib).
  *
- * The card is the feature walk made visible:
- *   proposed  → the human approves the brief (before code — the Approve button)
- *   approved  → the agent builds; checks are informational (n/m)
- *   delivered → the agent claimed done; checks are ARMED (a failing one is the
- *               lane's FAIL, shown red here)
- *   accepted  → the human's bookend; the card is history
+ * The card is the one loop made visible:
+ *   proposed  → the human signs the brief (before code — the Approve button)
+ *   approved  → the agent builds; the clause slice below is the live tally
+ *   proven    → derived, never claimed: every live clause cited + receipt
+ *               PASS + receipt attests THIS tree (the doneReason line)
+ *   accepted  → the human's bookend — "the proven thing is what I wanted"
  *
+ * The clause table is this feature's slice of the RTM — the same scan the
+ * lane's specCoverage gate runs, so this view and the lane can never disagree.
  * Declared-vs-actual blast radius is the spec-mirror-drift principle applied
  * to PLANS: `touches` is what the brief declared it would invalidate; each
  * entry renders with the touched artifact's LIVE status — drift on a declared
@@ -2255,11 +2262,11 @@ ${commits}`;
  */
 export function featuresTabHtml(features, meta = {}) {
   if (!features || !features.available) {
-    return `  <p class="empty-inline">feature briefs are not available in this project — qa/lib/approvals.mjs predates the feature-intent wave (or is absent). A feature brief is a docs/proposals/&lt;name&gt;.md carrying a <code>cmp:intent-checks</code> block.</p>`;
+    return `  <p class="empty-inline">feature briefs are not available in this project — qa/lib/approvals.mjs predates the feature-brief wave (or is absent). A feature brief is a <code>docs/features/&lt;name&gt;.md</code>; its location is the governance opt-in.</p>`;
   }
   const { board } = features;
   if (!board || board.features.length === 0) {
-    return `  <p class="empty-inline">no feature briefs yet. A brief is born by adding a <code>cmp:intent-checks</code> block (checks + declared touches) to a doc under <code>docs/proposals/</code> — it then appears here as a governed <code>feature-intent</code> artifact, approved BEFORE the feature is built.</p>`;
+    return `  <p class="empty-inline">no feature briefs yet. A brief is born by writing <code>docs/features/&lt;name&gt;.md</code> — the decisions and their why, signed BEFORE the feature is built. Its location is the governance opt-in; it appears here as a governed <code>feature-brief:&lt;name&gt;</code> artifact the moment the file exists.</p>`;
   }
 
   const undeclared =
@@ -2273,8 +2280,8 @@ export function featuresTabHtml(features, meta = {}) {
     const cls =
       phase === "accepted"
         ? "phase-accepted"
-        : phase === "delivered"
-          ? "phase-delivered"
+        : phase === "proven"
+          ? "phase-proven"
           : phase === "approved"
             ? "phase-approved"
             : phase === "changed-since-approval"
@@ -2287,19 +2294,34 @@ export function featuresTabHtml(features, meta = {}) {
 
   const cards = board.features
     .map((f) => {
-      const armed = f.record && f.record.delivered && !f.record.accepted;
-      const checksRows = f.checks.results
-        .map((r) => {
-          const mark = r.ok ? `<span class="ok-inline">✓</span>` : `<span class="${armed ? "bad-inline" : "pending-inline"}">${armed ? "✗" : "○"}</span>`;
-          return `      <tr><td>${mark}</td><td><code>${esc(r.id)}</code></td><td class="feature-check-detail">${esc(r.detail)}</td></tr>`;
+      // This feature's slice of the RTM: its spec's clauses with their live
+      // citation state. A withdrawn clause renders struck and never counts.
+      const clauseRows = f.clauses
+        .map((c) => {
+          const mark = c.withdrawn
+            ? `<span class="pending-inline">—</span>`
+            : c.cited
+              ? `<span class="ok-inline">✓</span>`
+              : `<span class="pending-inline">○</span>`;
+          const id = c.withdrawn ? `<s><code>${esc(c.id)}</code></s>` : `<code>${esc(c.id)}</code>`;
+          const state = c.withdrawn ? "withdrawn" : c.cited ? "cited by a test" : "no citing test yet";
+          return `      <tr><td>${mark}</td><td>${id}</td><td class="feature-check-detail">${state}</td></tr>`;
         })
         .join("\n");
-      const checksTable =
-        f.checks.total > 0 || f.checks.error
-          ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>check</th><th>${
-              armed ? "armed — a ✗ here is the lane's FAIL" : "informational until delivered"
-            }</th></tr></thead><tbody>\n${checksRows}\n    </tbody></table>`
-          : `    <p class="empty-inline">the brief's cmp:intent-checks block has zero checks — delivery cannot be claimed mechanically until it promises something checkable.</p>`;
+      const clauseTable = f.specExists
+        ? f.clauses.length > 0
+          ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>clause</th><th><code>${esc(f.specRel)}</code></th></tr></thead><tbody>\n${clauseRows}\n    </tbody></table>`
+          : `    <p class="empty-inline"><code>${esc(f.specRel)}</code> exists but has no clauses yet — behavior starts as clauses there.</p>`
+        : `    <p class="empty-inline">no spec yet (<code>${esc(f.specRel)}</code>) — the contract step: behavior starts as clauses there, signed before the build.</p>`;
+
+      // Derived doneness, stated in one honest line — the same doneReason the
+      // CLI's --status prints; green only when every conjunct holds.
+      const receiptNote = f.receipt.present
+        ? `receipt ${esc(f.receipt.verdict ?? "?")}${f.receipt.verdict === "PASS" ? (f.receipt.attestsTree ? " · attests this tree" : " · attests an OLDER tree") : ""}`
+        : "no receipt yet";
+      const doneLine = `    <p class="feature-done ${f.provenDone ? "feature-done-yes" : "meta"}">${
+        f.provenDone ? "✓ proven done" : "not yet proven done"
+      } — ${esc(f.doneReason)}</p>`;
 
       const touches =
         f.touches.length > 0
@@ -2313,35 +2335,38 @@ export function featuresTabHtml(features, meta = {}) {
           : `    <p class="feature-touches meta">declares touching nothing beyond its own spec</p>`;
 
       const stamps = [];
-      if (f.record && f.record.approvedAt) stamps.push(`approved ${esc(f.record.approvedAt)}${f.record.via ? ` via ${esc(f.record.via)}` : ""}`);
-      if (f.record && f.record.delivered) stamps.push(`delivered ${esc(f.record.deliveredAt ?? "?")}`);
+      if (f.record && f.record.approvedAt) stamps.push(`signed ${esc(f.record.approvedAt)}${f.record.via ? ` via ${esc(f.record.via)}` : ""}`);
       if (f.record && f.record.accepted) stamps.push(`accepted ${esc(f.record.acceptedAt ?? "?")}`);
 
-      // The three human/agent moments, each offered only when it is the real
-      // next step: Approve (unsigned or drifted brief), Accept (delivered,
-      // green, unaccepted), and the agent's --deliver rendered as a hint (it
-      // is the AGENT's claim — the console never claims done on its behalf).
+      // The two human moments, each offered only when it is the real next
+      // step: Approve (unsigned or drifted brief) and Accept (enabled only at
+      // provenDone — the library refuses anything else, the button just
+      // doesn't pretend otherwise). There is no agent verb here at all.
       const actions = [];
       if (f.phase === "proposed" || f.phase === "changed-since-approval") {
-        actions.push(`<button type="button" class="approve-btn" data-artifact="feature-intent:${escAttr(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
+        actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
       }
-      if (f.phase === "delivered" && f.checks.satisfied === f.checks.total && f.checks.total > 0) {
-        actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr(f.name)}">Accept delivery</button>`);
+      if (f.phase === "proven") {
+        actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr(f.name)}">Accept</button>`);
       }
       if (f.phase === "approved") {
-        actions.push(`<span class="meta">building — agent claims done with <code>node qa/approve.mjs --deliver ${esc(f.name)}</code></span>`);
+        actions.push(`<span class="meta">building — Accept enables when doneness derives (${f.covered}/${f.total} clauses cited, ${receiptNote})</span>`);
+      }
+      if (f.blockError) {
+        actions.push(`<span class="status-drift">cmp:feature block: ${esc(f.blockError)}</span>`);
       }
 
       return `  <article class="feature-card${f.phase === "accepted" ? " feature-card-closed" : ""}">
     <header class="feature-card-head">
       <h3>${esc(f.name)}</h3>
       ${phaseChip(f.phase)}
-      <span class="feature-tally">${f.checks.satisfied}/${f.checks.total} checks</span>
+      <span class="feature-tally">${f.covered}/${f.total} clauses cited</span>
       <a class="feature-doc-link" href="#" title="${escAttr(f.rel)}">${esc(f.rel)}</a>
     </header>
     ${stamps.length > 0 ? `<p class="meta">${stamps.join(" · ")}</p>` : ""}
+${doneLine}
 ${touches}
-${checksTable}
+${clauseTable}
     ${actions.length > 0 ? `<div class="feature-actions">${actions.join(" ")}</div>` : ""}
   </article>`;
     })

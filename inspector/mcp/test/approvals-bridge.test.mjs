@@ -19,7 +19,7 @@ import { copyProjectLib } from "./fixtures/copy-project-lib.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // copyProjectLib ships approvals.mjs WITH its static relative imports
-// (arch-doc.mjs, intent-checks.mjs, …) — a missing sibling fails the bridge's
+// (arch-doc.mjs, feature-brief.mjs, …) — a missing sibling fails the bridge's
 // dynamic import at load time, which reads as "the whole library is absent"
 // rather than as anything specific. The set is derived from the source, so a
 // newly added sibling import copies itself (see fixtures/copy-project-lib.mjs).

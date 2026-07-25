@@ -605,7 +605,9 @@ export const SHELL_CSS = `
   .feature-phase { font-size: var(--fs-meta); font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
   .phase-proposed { color: var(--muted); }
   .phase-approved { color: var(--accent); border-color: var(--accent); }
-  .phase-delivered { color: var(--reopen); border-color: var(--reopen); }
+  .phase-proven { color: var(--reopen); border-color: var(--reopen); }
+  .feature-done-yes { color: var(--ok, #3a8f5a); font-size: var(--fs-meta); font-weight: 600; }
+  .feature-done { margin: 4px 0; font-size: var(--fs-meta); }
   .phase-accepted { color: var(--ok, #3a8f5a); border-color: currentColor; }
   .phase-drift, .phase-reopened { color: var(--drift); border-color: var(--drift); }
   .feature-tally { color: var(--muted); font-size: var(--fs-meta); }
