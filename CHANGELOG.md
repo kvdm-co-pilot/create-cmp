@@ -6,6 +6,66 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Reachability lane step (FI-7, AUTONOMY-GAPS §3).** A real feature passed clause coverage,
+  conformance, goldens, a11y, and on-device smoke — and was accepted — while nothing in the
+  navigation graph referenced its screen. `qa/lib/reachability.mjs` closes that shape of false
+  green: a `presentation/<feature>/*Screen.kt` whose `*Screen`/`*Route` entry composables are
+  referenced nowhere in commonMain outside the feature's own directory fails the lane, in the
+  `scaffold` and `local` profiles both. Preview-registry (desktopMain) references deliberately
+  do not count. The escape hatch is a declaration, not a gate bypass: `{ "unrouted": true }` in
+  the brief's `cmp:feature` block.
+- **`qa/verify.mjs --help`, and unknown arguments are refused by name (AUTONOMY-GAPS §6).**
+  Previously any unrecognized flag silently started the full multi-minute lane. Same
+  refusal-over-fabrication stance as `qa/approve.mjs`: usage on `--help`/`-h` (exit 0), exit 2
+  naming the argument otherwise.
+- **Renderer health is a first-class signal (FI-9, AUTONOMY-GAPS §5).** The preview service
+  tracks every render attempt (`lastOutcome`, `lastSuccessAt`, `lastAttemptAt`,
+  `consecutiveFailures`) and surfaces it in `/api/status`, the `preview_status` MCP tool, and
+  an amber console banner ("Renderer down since … — screens below are stale") distinct from
+  the red compile-error banner. A dead renderer behind an HTTP 200 can no longer pass for
+  healthy.
+
+### Fixed
+
+- **Ledger writes no longer destroy the evidence they depend on (FI-8, AUTONOMY-GAPS §2).**
+  `qa/comments.json` left the verified surface (comments are advisory; no lane step reads
+  them), and `qa/approvals.json` is now hashed by gating-field projection — `artifact`,
+  `status`, `hash`, `exemplarFeature` — so acceptance bookkeeping (`accepted`, `acceptedAt`,
+  `via`, `mode`, timestamps) never invalidates a receipt. Clicking Accept on a provenDone
+  feature used to instantly re-red the lane for a tree whose code had not changed.
+- **The scaffolder no longer ships a feature it does not wire.** With a config that omits a
+  shipped default tab (`--tabs "Home:home"`, say), `rewriteNavHost` correctly dropped
+  `profile`'s import and its `appTabs()` entry and the preview registry dropped its preview —
+  but `presentation/profile/` stayed on disk, wired to nothing. The new reachability step
+  then FAILed such a scaffold at `create-cmp --verify` time, honestly: it was dead code.
+  `rewriteTabSurfaces` now removes the unconfigured feature. `profile` is the only strippable
+  one (a self-contained stub: one file, no ViewModel, no clauses, no DI entry, no tests).
+  **`home` is deliberately never stripped** — it is the governed exemplar the genesis walk
+  approves and `qa/scaffold-feature.mjs` clones, and it owns `DetailScreen`, which the nav
+  graph registers unconditionally, so it stays genuinely reachable with no tab of its own
+  rather than being exempted by declaration.
+- **Screens outside the shell are now visible to on-device automation.**
+  `Modifier.exposeTestTagsForAutomation()` was applied inside `AppShell`. That property is
+  inherited by descendants, so it covered the tabs and nothing else: every destination
+  registered directly on the NavHost (the template's `detail/{itemId}`, and any tray or
+  full-screen flow a project adds) had testTags no id-selector could see, making those
+  screens untestable end-to-end. Moved to the `NavHost` itself in `AppNavHost.kt` — the
+  actual graph root — so every destination inherits it, including ones added later.
+- **A signed brief's machine-read block is no longer part of the signed bytes (AUTONOMY-GAPS
+  §1).** Feature-brief hashes strip the `cmp:feature` declaration block before hashing (the
+  `architecture` artifact's `cmp:generated` precedent), so adding `"screens": true` or
+  `"unrouted": true` to a signed brief never manufactures a human re-approval. Legacy
+  raw-bytes approvals keep verifying unchanged content via a strictly-stronger byte-identical
+  fallback.
+- **The preview daemon and the verify lane coordinate in both directions (FI-9, AUTONOMY-GAPS
+  §4).** The daemon now stamps `composeApp/build/.cmp-render-in-progress` (mtime-refreshed on
+  activity) for the duration of its Gradle work, and the lane's `shGradle` waits for it to
+  clear or go stale before launching its own Gradle command — the symmetric half of the
+  DF-4 lane marker the daemon already respects. Ad-hoc Gradle runs outside the lane remain
+  uncoordinated; pause the daemon or expect the self-heal retry.
+
 ## [0.10.1] - 2026-07-24
 
 ### Fixed

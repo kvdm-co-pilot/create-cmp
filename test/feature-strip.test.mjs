@@ -248,3 +248,68 @@ test("default (inspector ON): debug module + release no-op twin stamped under th
 
   fs.rmSync(out, { recursive: true, force: true });
 });
+
+// ── Unconfigured default features (FI-7 follow-up) ───────────────────────────
+// rewriteNavHost drops the import + appTabs() entry for a shipped default
+// feature the config did not ask for, and renderPreviewRegistryKt drops its
+// preview — but the SOURCES used to stay on disk, wired to nothing. The
+// reachability lane step (qa/lib/reachability.mjs) then FAILed the scaffold at
+// `create-cmp --verify` time, correctly: it was dead code. Don't ship what you
+// don't wire.
+
+test("single-tab config: the unconfigured profile feature is stripped, and the tree passes reachability", async () => {
+  // baseConfig's tabs are [Home] only — profile is a shipped default nobody asked for.
+  const out = await stamp({});
+
+  assert.ok(
+    !fs.existsSync(path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/profile")),
+    "presentation/profile must be gone when no profile tab is configured",
+  );
+  assert.deepEqual(grepSources(out, /ProfileScreen/), [], "no ProfileScreen reference may survive");
+
+  const { evaluateReachability } = await import(path.join(out, "qa/lib/reachability.mjs"));
+  const result = evaluateReachability(out);
+  assert.equal(result.verdict, "PASS", `reachability must pass: ${result.reason ?? ""}`);
+
+  fs.rmSync(out, { recursive: true, force: true });
+});
+
+test("profile tab configured: the profile feature SURVIVES and stays reachable", async () => {
+  const out = await stamp({ tabs: [{ label: "Home", icon: "home" }, { label: "Profile", icon: "person" }] });
+
+  const profileDir = path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/profile");
+  assert.ok(fs.existsSync(profileDir), "a configured profile tab keeps its feature");
+
+  const { evaluateReachability } = await import(path.join(out, "qa/lib/reachability.mjs"));
+  const result = evaluateReachability(out);
+  assert.equal(result.verdict, "PASS", `reachability must pass: ${result.reason ?? ""}`);
+  const profile = result.details.features.find((f) => f.name === "profile");
+  assert.ok(profile?.reachable, "the configured profile feature must be reachable from the nav graph");
+
+  fs.rmSync(out, { recursive: true, force: true });
+});
+
+test("no home tab: home SURVIVES (it is the exemplar and owns the Detail destination) while profile is stripped", async () => {
+  // Neither shipped default is a tab — both get PlaceholderScreen stubs in the shell.
+  const out = await stamp({ tabs: [{ label: "Feed", icon: "list" }, { label: "Settings", icon: "person" }] });
+
+  const presentation = path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/presentation");
+  assert.ok(fs.existsSync(path.join(presentation, "home")), "home is never stripped — it is the governed exemplar");
+  assert.ok(!fs.existsSync(path.join(presentation, "profile")), "profile is stripped");
+
+  // Home stays REACHABLE with no tab of its own: AppNavHost registers DetailScreen
+  // (which home owns) as a destination unconditionally. That is what keeps the
+  // exemplar honest rather than exempt.
+  const { evaluateReachability } = await import(path.join(out, "qa/lib/reachability.mjs"));
+  const result = evaluateReachability(out);
+  assert.equal(result.verdict, "PASS", `reachability must pass: ${result.reason ?? ""}`);
+  const home = result.details.features.find((f) => f.name === "home");
+  assert.ok(home?.reachable, "home must be reachable via the Detail destination");
+  assert.ok(!home?.unrouted, "home must be genuinely reachable, never exempted by declaration");
+
+  // The exemplar the genesis walk and the feature stamper depend on still resolves.
+  const approvals = JSON.parse(fs.readFileSync(path.join(out, "qa/approvals.json"), "utf8"));
+  assert.equal(approvals.exemplarFeature ?? "home", "home", "exemplarFeature must still name a feature that exists");
+
+  fs.rmSync(out, { recursive: true, force: true });
+});

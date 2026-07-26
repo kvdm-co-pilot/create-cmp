@@ -17,6 +17,11 @@ import {
   stateVariantCards,
   componentStoryCards,
   isComponentStoryId,
+  laneInProgress,
+  stampRenderMarker,
+  touchRenderMarker,
+  clearRenderMarker,
+  RENDER_MARKER_REL,
 } from "../src/lib/preview-service.mjs";
 import { resetApprovalsBridgeCache } from "../src/lib/approvals-bridge.mjs";
 import { resetCommentsBridgeCache } from "../src/lib/comments-bridge.mjs";
@@ -681,6 +686,108 @@ test("galleryHtml (§3.0): intent sections render with a fill-count status; spec
   assert.doesNotMatch(statusOf("specs"), /open comment/, "…and not under Specs");
 });
 
+// --- FI-9 Change A: the render-in-progress marker (symmetric with LANE_MARKER) -----
+
+test("stampRenderMarker: writes '<pid> <ISO>\\n' under composeApp/build, creating the dir if needed", () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-render-marker-"));
+  try {
+    stampRenderMarker(projectDir);
+    const p = path.join(projectDir, ...RENDER_MARKER_REL);
+    assert.ok(fs.existsSync(p), "composeApp/build/.cmp-render-in-progress was created");
+    const text = fs.readFileSync(p, "utf8");
+    assert.match(text, /^\d+ \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n$/, "mirrors the lane marker's own '<pid> <ISO>\\n' format");
+    assert.equal(Number(text.split(" ")[0]), process.pid);
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("clearRenderMarker: removes the marker; a repeat call (nothing to remove) does not throw", () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-render-marker-"));
+  try {
+    stampRenderMarker(projectDir);
+    const p = path.join(projectDir, ...RENDER_MARKER_REL);
+    assert.ok(fs.existsSync(p));
+    clearRenderMarker(projectDir);
+    assert.ok(!fs.existsSync(p));
+    assert.doesNotThrow(() => clearRenderMarker(projectDir));
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("touchRenderMarker: refreshes mtime when a marker is stamped; a no-op (never throws) when it isn't", () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-render-marker-"));
+  try {
+    // No marker stamped yet — touch must be a silent no-op (this is what makes
+    // wiring it into every touch() call in the service safe, even outside a render).
+    assert.doesNotThrow(() => touchRenderMarker(projectDir));
+    assert.ok(!fs.existsSync(path.join(projectDir, ...RENDER_MARKER_REL)));
+
+    stampRenderMarker(projectDir);
+    const p = path.join(projectDir, ...RENDER_MARKER_REL);
+    const before = fs.statSync(p).mtimeMs;
+    // Back-date the marker so a refresh is observable even on filesystems with
+    // coarse mtime resolution.
+    const past = new Date(before - 60_000);
+    fs.utimesSync(p, past, past);
+    assert.ok(fs.statSync(p).mtimeMs < before);
+    touchRenderMarker(projectDir);
+    assert.ok(fs.statSync(p).mtimeMs > past.getTime(), "touch bumped mtime forward");
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("render marker vs. lane marker: independent files, same '<pid> <ISO>' contract, distinguishable by name", () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-render-marker-"));
+  try {
+    const laneMarkerPath = path.join(projectDir, "composeApp", "build", ".cmp-lane-in-progress");
+    fs.mkdirSync(path.dirname(laneMarkerPath), { recursive: true });
+    fs.writeFileSync(laneMarkerPath, `${process.pid} ${new Date().toISOString()}\n`);
+    assert.equal(laneInProgress(projectDir), true, "the lane marker still reads as in-progress");
+
+    stampRenderMarker(projectDir);
+    // Both markers coexist without clobbering each other.
+    assert.ok(fs.existsSync(laneMarkerPath));
+    assert.ok(fs.existsSync(path.join(projectDir, ...RENDER_MARKER_REL)));
+    assert.notEqual(RENDER_MARKER_REL.at(-1), ".cmp-lane-in-progress");
+
+    clearRenderMarker(projectDir);
+    assert.ok(!fs.existsSync(path.join(projectDir, ...RENDER_MARKER_REL)));
+    assert.equal(laneInProgress(projectDir), true, "clearing the render marker never touches the lane marker");
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: a render marker left stamped from a prior process does not stop the service — renderCycle's own runRender wrapping owns it, not renderCycle itself", async () => {
+  // This documents the intended split of ownership: renderCycle() only ever
+  // DEFERS on the LANE marker (laneInProgress); it never reads the render
+  // marker itself — the render marker exists for the *other* side's consumer
+  // (qa/verify.mjs's shGradle) to read. A stale one left on disk (e.g. from a
+  // killed daemon before this fix, or a crash) must never wedge a fresh service.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+  stampRenderMarker(projectDir); // simulate a leftover marker from a previous run
+
+  const service = createPreviewService({
+    projectDir,
+    port: 19980,
+    hot: false,
+    runRender: async () => writeFakePreviews(previewsDir, ["shell"]),
+  });
+  try {
+    await service.start();
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(service.status().version, 1, "render proceeds normally; the render marker never gates renderCycle");
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
 // --- service loop with a fake renderer ---------------------------------------------
 
 function writeFakePreviews(previewsDir, screens, stamps = {}) {
@@ -782,19 +889,67 @@ test("service: render failure keeps previous state and reports lastError", async
   try {
     await service.start();
     await new Promise((r) => setTimeout(r, 100));
-    assert.equal(service.status().version, 1);
+    let status = service.status();
+    assert.equal(status.version, 1);
+    // FI-9 Change B: the first successful render marks the renderer healthy.
+    assert.equal(status.renderer.lastOutcome, "ok");
+    assert.ok(status.renderer.lastSuccessAt, "lastSuccessAt is stamped");
+    assert.ok(status.renderer.lastAttemptAt, "lastAttemptAt is stamped");
+    assert.equal(status.renderer.consecutiveFailures, 0);
+    const firstSuccessAt = status.renderer.lastSuccessAt;
 
     fail = true;
     await service._renderCycle();
-    const status = service.status();
+    status = service.status();
     assert.equal(status.version, 1, "previous render is kept");
     assert.match(status.lastError, /compile broke/);
+    // The renderer health object tracks the render PIPELINE's own failure,
+    // independent of (but consistent with) lastError/lastErrorSource here.
+    assert.equal(status.renderer.lastOutcome, "failed");
+    assert.equal(status.renderer.consecutiveFailures, 1);
+    assert.equal(status.renderer.lastSuccessAt, firstSuccessAt, "lastSuccessAt is untouched by a failed attempt");
+    assert.ok(status.renderer.lastAttemptAt >= firstSuccessAt, "lastAttemptAt advanced");
+
+    // A second consecutive failure increments the streak.
+    await service._renderCycle();
+    assert.equal(service.status().renderer.consecutiveFailures, 2);
 
     const page = await (await fetch(status.url)).text();
     assert.match(page, /last render FAILED/, "gallery shows the failure banner");
     assert.match(page, /shell screen/, "previous cards still shown");
+    // FI-9 Change B: the distinct renderer-down banner, separate from the
+    // generic failure banner above — states since-when + the render error.
+    assert.match(page, /<div class="banner banner-renderer">/, "the renderer-down banner is rendered");
+    assert.match(page, /Renderer down since/, "banner states the down-since framing");
+    assert.match(page, /compile broke/, "banner surfaces the underlying render error");
+
+    // Recovery: a good render clears the renderer failure state.
+    fail = false;
+    await service._renderCycle();
+    status = service.status();
+    assert.equal(status.renderer.lastOutcome, "ok");
+    assert.equal(status.renderer.consecutiveFailures, 0);
+    const recoveredPage = await (await fetch(status.url)).text();
+    assert.doesNotMatch(recoveredPage, /<div class="banner banner-renderer">/, "the renderer-down banner clears on recovery");
   } finally {
     service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: renderer.lastOutcome starts 'never' before any render has run", () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const service = createPreviewService({ projectDir, port: 19985, hot: false, runRender: async () => {} });
+  try {
+    const status = service.status();
+    assert.deepEqual(status.renderer, {
+      lastOutcome: "never",
+      lastSuccessAt: null,
+      lastAttemptAt: null,
+      consecutiveFailures: 0,
+    });
+  } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });

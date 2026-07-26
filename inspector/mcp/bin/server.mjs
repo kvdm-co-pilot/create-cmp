@@ -1144,7 +1144,13 @@ server.registerTool(
     description:
       "The agent's post-edit feedback call. Without arguments: returns the preview service's " +
       "current status (mode, version, rendering, lastError/lastErrorSource, lastActivity, " +
-      "changedLastRender, per-screen summaries incl. lastChangedVersion). With " +
+      "changedLastRender, per-screen summaries incl. lastChangedVersion, and `renderer` — the " +
+      "render PIPELINE's own health: {lastOutcome:'ok'|'failed'|'never', lastSuccessAt, " +
+      "lastAttemptAt, consecutiveFailures}, tracked independently of lastError so a later, " +
+      "unrelated compile message can never mask a dead renderer. renderer.lastOutcome:'failed' " +
+      "means every render since lastSuccessAt has failed outright (Gradle/daemon call itself " +
+      "threw) — the screens below are stale pixels, not a fresh 'no changes' result; this is " +
+      "different from lastErrorSource:'compile' (the user's edit didn't build). With " +
       "waitForRender:true it BLOCKS until the next render cycle completes (success or failure) " +
       "or a hot-recompile failure is detected, then returns the same status plus `timedOut` — " +
       "so the edit loop is: edit → preview_status{waitForRender:true} → read changedLastRender " +

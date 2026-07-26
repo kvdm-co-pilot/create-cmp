@@ -527,6 +527,8 @@ const PLACEHOLDER_REL =
 const PREVIEW_REGISTRY_REL =
   "composeApp/src/desktopMain/kotlin/com/example/app/inspector/PreviewRegistry.kt";
 const SMOKE_REL = "qa/e2e/smoke.yaml";
+const PROFILE_FEATURE_REL =
+  "composeApp/src/commonMain/kotlin/com/example/app/presentation/profile";
 
 /**
  * Rewrite every tab-driven surface present in the copied project dir. Runs
@@ -575,5 +577,29 @@ export function rewriteTabSurfaces(projectDir, tabs, log = () => {}) {
   if (fs.existsSync(smokePath)) {
     fs.writeFileSync(smokePath, renderSmokeYaml(infos));
     log(`  tabs → ${SMOKE_REL}`);
+  }
+
+  // A shipped default feature the config did NOT ask for must not be left on
+  // disk: rewriteNavHost drops its import and its appTabs() entry, and
+  // renderPreviewRegistryKt drops its preview, so the files would sit there
+  // wired to nothing — dead code the reachability gate (qa/lib/reachability.mjs)
+  // correctly FAILs at `--verify` time. Don't ship what you don't wire.
+  //
+  // `profile` is the only one: it is a self-contained stub screen (one file, no
+  // ViewModel, no spec clauses, no DI entry, no tests), so removing it leaves
+  // nothing dangling.
+  //
+  // `home` is deliberately NEVER stripped, even when it is not a configured tab.
+  // It is the governed EXEMPLAR (`qa/approvals.json`'s exemplarFeature — the file
+  // set `qa/scaffold-feature.mjs` clones and the genesis walk approves), and it
+  // owns `DetailScreen`, which AppNavHost registers as a destination
+  // unconditionally. So it stays both governed and reachable with no tab of its
+  // own — removing it would break the genesis walk and dangle the Detail route.
+  if (!infos.some((t) => t.slug === "profile")) {
+    const profilePath = path.join(projectDir, PROFILE_FEATURE_REL);
+    if (fs.existsSync(profilePath)) {
+      fs.rmSync(profilePath, { recursive: true, force: true });
+      log(`  tabs → removed ${PROFILE_FEATURE_REL} (no profile tab configured)`);
+    }
   }
 }

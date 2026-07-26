@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 0eb650795d67990de45f5eed36f3c6a49241fa41642fb2fca2457beeb395533b
+// cmp:bundle-inputs 0c4b078160ef6c2b8961d080087f02c6a13e6483a8f64ac2899836f26f3f19fe
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -33807,6 +33807,22 @@ function provenanceHtml(p = {}) {
   const render = typeof p.version === "number" && p.version > 0 ? ` &middot; render #${p.version}` : "";
   return `${tree}${render} &middot; absence = not derivable`;
 }
+function clockTime(iso) {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toTimeString().slice(0, 5);
+  } catch {
+    return null;
+  }
+}
+function rendererDownBannerHtml(r) {
+  if (!r || r.lastOutcome !== "failed") return "";
+  const since = clockTime(r.lastSuccessAt);
+  const headline = since ? `Renderer down since ${since} &mdash; screens below are stale.` : `Renderer down &mdash; no render has completed yet, so there are no screens to show.`;
+  const streak = r.consecutiveFailures > 1 ? ` (${r.consecutiveFailures} renders in a row have failed.)` : "";
+  const errTail = r.lastError ? ` Last error: ${esc3(r.lastError)}` : "";
+  return `<div class="banner banner-renderer">${headline}${streak}${errTail}</div>`;
+}
 function renderShellPage(p) {
   const prov = provenanceHtml(p.provenance || {});
   return `<!doctype html>
@@ -33829,6 +33845,7 @@ ${p.railItems.map(railItemHtml).join("\n")}
   <div class="rail-foot">${p.railFootHtml}</div>
 </aside>
 <main>
+${rendererDownBannerHtml(p.rendererDown)}
 ${p.error ? `<div class="banner">last render FAILED &mdash; showing previous state
 ${esc3(p.error)}</div>` : ""}
 ${p.sections.map((s) => sectionHtml(s, prov)).join("\n")}
@@ -33909,6 +33926,10 @@ var SHELL_CSS = `
   main { flex: 1; min-width: 0; }
   .banner { margin: 24px 40px 0; padding: 10px 14px; border-radius: 10px; background: var(--drift-bg);
             color: var(--drift); font-size: var(--fs-body); white-space: pre-wrap; }
+  /* Renderer-down (FI-9 Change B): amber/--reopen, not red/--drift \u2014 "the eyes
+     are stale", the same "stale, not broken" vocabulary the rail-foot receipt
+     line uses, kept visually distinct from a compile/reload .banner. */
+  .banner-renderer { background: var(--reopen-bg); color: var(--reopen); }
   .tab-panel { display: none; padding: 32px 40px 48px; }
   .tab-panel.active { display: block; }
   .page-head { margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
@@ -35978,6 +35999,29 @@ var LANE_MARKER_REL = ["composeApp", "build", ".cmp-lane-in-progress"];
 var LANE_MARKER_STALE_MS = 30 * 60 * 1e3;
 var LANE_POLL_MS = 5e3;
 var KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
+var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
+function stampRenderMarker(projectDir) {
+  try {
+    const p = path15.join(projectDir, ...RENDER_MARKER_REL);
+    fs14.mkdirSync(path15.dirname(p), { recursive: true });
+    fs14.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+`);
+  } catch {
+  }
+}
+function touchRenderMarker(projectDir) {
+  try {
+    const now = /* @__PURE__ */ new Date();
+    fs14.utimesSync(path15.join(projectDir, ...RENDER_MARKER_REL), now, now);
+  } catch {
+  }
+}
+function clearRenderMarker(projectDir) {
+  try {
+    fs14.rmSync(path15.join(projectDir, ...RENDER_MARKER_REL), { force: true });
+  } catch {
+  }
+}
 function resolveAppName(projectDir) {
   for (const f of ["settings.gradle.kts", "settings.gradle"]) {
     try {
@@ -36088,6 +36132,8 @@ function galleryHtml(state) {
     changedVersions = {},
     error: error51 = null,
     errorSource = null,
+    renderer = { lastOutcome: "never", lastSuccessAt: null, lastAttemptAt: null, consecutiveFailures: 0 },
+    rendererLastErrorText = null,
     approvals = { available: false },
     specs = { available: false },
     designSystem = { available: false },
@@ -36851,6 +36897,12 @@ ${section.bodyHtml}`;
     railFootHtml: `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`,
     sections,
     error: error51,
+    // FI-9 Change B: the renderer's OWN health banner, additive to `error`
+    // above (which already covers "last render/compile/reload FAILED" as a
+    // point-in-time message) — this one survives a LATER unrelated
+    // compile-check message overwriting `error`/`errorSource`, and states
+    // since-when the (possibly stale) screens below stopped refreshing.
+    rendererDown: renderer && renderer.lastOutcome === "failed" ? { ...renderer, lastError: rendererLastErrorText } : null,
     // §3.4 geometry from the render viewport: uniform cell width keeps the
     // matrix's columns aligned without a shared grid; the expanded wireframe
     // gets the roomier single-pane width.
@@ -36886,24 +36938,38 @@ function createPreviewService(opts) {
   });
   const hot = opts.hot !== false;
   const daemonUrl = opts.daemonUrl || `http://127.0.0.1:${opts.daemonPort || DEFAULT_DAEMON_PORT}`;
-  const runRender = opts.runRender || ((dir) => withKspSelfHeal(
-    dir,
-    log,
-    () => execFileAsync(
-      "./gradlew",
-      [":composeApp:renderScreens", "-q", "--console=plain"],
-      { cwd: dir, timeout: 6e5, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() }
-    )
-  ));
-  const runCompileCheck = opts.runCompileCheck || ((dir) => withKspSelfHeal(
-    dir,
-    log,
-    () => execFileAsync(
-      "./gradlew",
-      [":composeApp:compileKotlinDesktop", "-q", "--console=plain"],
-      { cwd: dir, timeout: 3e5, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() }
-    )
-  ));
+  const runRender = opts.runRender || (async (dir) => {
+    stampRenderMarker(dir);
+    try {
+      return await withKspSelfHeal(
+        dir,
+        log,
+        () => execFileAsync(
+          "./gradlew",
+          [":composeApp:renderScreens", "-q", "--console=plain"],
+          { cwd: dir, timeout: 6e5, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() }
+        )
+      );
+    } finally {
+      clearRenderMarker(dir);
+    }
+  });
+  const runCompileCheck = opts.runCompileCheck || (async (dir) => {
+    stampRenderMarker(dir);
+    try {
+      return await withKspSelfHeal(
+        dir,
+        log,
+        () => execFileAsync(
+          "./gradlew",
+          [":composeApp:compileKotlinDesktop", "-q", "--console=plain"],
+          { cwd: dir, timeout: 3e5, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() }
+        )
+      );
+    } finally {
+      clearRenderMarker(dir);
+    }
+  });
   const watchdogMs = opts.watchdogMs ?? COMPILE_WATCHDOG_MS;
   const staleRetryMs = opts.staleRetryMs ?? STALE_RETRY_MS;
   const inspectorPort = opts.inspectorPort ?? 9500;
@@ -36941,6 +37007,11 @@ function createPreviewService(opts) {
   let version2 = 0;
   let lastError = null;
   let lastErrorSource = null;
+  let rendererLastOutcome = "never";
+  let rendererLastSuccessAt = null;
+  let rendererLastAttemptAt = null;
+  let rendererConsecutiveFailures = 0;
+  let rendererLastErrorText = null;
   let lastActivity = null;
   let compileErrorLines = [];
   let lastChanged = [];
@@ -36963,6 +37034,7 @@ function createPreviewService(opts) {
   const sseClients = /* @__PURE__ */ new Set();
   function touch(what) {
     lastActivity = { what, at: (/* @__PURE__ */ new Date()).toISOString() };
+    touchRenderMarker(projectDir);
   }
   function settleWaiters() {
     for (const w of renderWaiters) {
@@ -37359,10 +37431,12 @@ function createPreviewService(opts) {
     );
   });
   function adoptDaemonChild(child) {
+    stampRenderMarker(projectDir);
     child.stdout?.on("data", noteDaemonOutput);
     child.stderr?.on("data", noteDaemonOutput);
     child.on?.("exit", (code) => {
       log(`daemon gradle client exited (${code})`);
+      clearRenderMarker(projectDir);
       if (mode === "daemon") {
         mode = "gradle";
         if (classesWatcher) {
@@ -37429,6 +37503,7 @@ function createPreviewService(opts) {
     }
     rendering = true;
     touch("render-start");
+    rendererLastAttemptAt = (/* @__PURE__ */ new Date()).toISOString();
     snapshotPngs();
     broadcast({ type: "rendering" });
     let suppressSettle = false;
@@ -37457,6 +37532,10 @@ function createPreviewService(opts) {
         await runRender(projectDir);
       }
       loadPreviews();
+      rendererLastOutcome = "ok";
+      rendererLastSuccessAt = (/* @__PURE__ */ new Date()).toISOString();
+      rendererConsecutiveFailures = 0;
+      rendererLastErrorText = null;
       lastError = null;
       lastErrorSource = null;
       compileErrorLines = [];
@@ -37492,6 +37571,9 @@ function createPreviewService(opts) {
     } catch (err) {
       lastError = err && err.message ? err.message : String(err);
       lastErrorSource = "render";
+      rendererLastOutcome = "failed";
+      rendererConsecutiveFailures += 1;
+      rendererLastErrorText = lastError;
       touch("render-failed");
       log(`render FAILED: ${lastError}`);
       broadcast({ type: "error", error: lastError, source: "render" });
@@ -37696,6 +37778,8 @@ function createPreviewService(opts) {
             changedVersions: Object.fromEntries(changedAt),
             error: lastError,
             errorSource: lastErrorSource,
+            renderer: rendererHealth(),
+            rendererLastErrorText,
             approvals,
             specs,
             designSystem,
@@ -37943,6 +38027,14 @@ function createPreviewService(opts) {
       tryPort(startPort);
     });
   }
+  function rendererHealth() {
+    return {
+      lastOutcome: rendererLastOutcome,
+      lastSuccessAt: rendererLastSuccessAt,
+      lastAttemptAt: rendererLastAttemptAt,
+      consecutiveFailures: rendererConsecutiveFailures
+    };
+  }
   function status() {
     return {
       projectDir,
@@ -37954,6 +38046,7 @@ function createPreviewService(opts) {
       rendering,
       lastError,
       lastErrorSource,
+      renderer: rendererHealth(),
       lastActivity,
       changedLastRender: lastChanged,
       screens: cards.map(({ screen, summary, a11y }) => ({
@@ -38001,6 +38094,7 @@ function createPreviewService(opts) {
       fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {
       });
       if (daemonChild) daemonChild.kill("SIGTERM");
+      clearRenderMarker(projectDir);
       if (watcher) watcher.close();
       for (const res of sseClients) res.end();
       sseClients.clear();
@@ -38741,7 +38835,7 @@ server.registerTool(
   "preview_status",
   {
     title: "Preview status \u2014 optionally WAIT for the next render",
-    description: "The agent's post-edit feedback call. Without arguments: returns the preview service's current status (mode, version, rendering, lastError/lastErrorSource, lastActivity, changedLastRender, per-screen summaries incl. lastChangedVersion). With waitForRender:true it BLOCKS until the next render cycle completes (success or failure) or a hot-recompile failure is detected, then returns the same status plus `timedOut` \u2014 so the edit loop is: edit \u2192 preview_status{waitForRender:true} \u2192 read changedLastRender (empty = the edit reached no screen) and lastError (source 'compile' = the edit didn't even build). No polling, no sleeps.",
+    description: "The agent's post-edit feedback call. Without arguments: returns the preview service's current status (mode, version, rendering, lastError/lastErrorSource, lastActivity, changedLastRender, per-screen summaries incl. lastChangedVersion, and `renderer` \u2014 the render PIPELINE's own health: {lastOutcome:'ok'|'failed'|'never', lastSuccessAt, lastAttemptAt, consecutiveFailures}, tracked independently of lastError so a later, unrelated compile message can never mask a dead renderer. renderer.lastOutcome:'failed' means every render since lastSuccessAt has failed outright (Gradle/daemon call itself threw) \u2014 the screens below are stale pixels, not a fresh 'no changes' result; this is different from lastErrorSource:'compile' (the user's edit didn't build). With waitForRender:true it BLOCKS until the next render cycle completes (success or failure) or a hot-recompile failure is detected, then returns the same status plus `timedOut` \u2014 so the edit loop is: edit \u2192 preview_status{waitForRender:true} \u2192 read changedLastRender (empty = the edit reached no screen) and lastError (source 'compile' = the edit didn't even build). No polling, no sleeps.",
     inputSchema: {
       waitForRender: external_exports.boolean().optional().describe("Block until the next render/compile outcome instead of returning immediately."),
       timeoutMs: external_exports.number().int().positive().optional().describe("waitForRender timeout (default 120000; result carries timedOut:true on expiry).")

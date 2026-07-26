@@ -37,6 +37,13 @@ block is declaration, and the artifact hashes it governs already enforce.
 (hashes enforce blast; disk presence enforces the design gate). Neither can
 authorise anything. If a future field could, it does not belong in the block.
 
+**Status: FIXED (2026-07-26).** `hashFeatureBriefArtifact` in
+`template/qa/lib/approvals.mjs` hashes the brief EOL-normalized with the block
+stripped (`stripFeatureBlock`, feature-brief.mjs — one grammar, shared with the
+parser). Legacy raw-bytes approvals keep verifying via a byte-identical
+fallback, which can only ever vouch for content unchanged since signing.
+Pinned by `test/autonomy-hash-surface.test.mjs`.
+
 ---
 
 ## 2. Accepting a proven feature invalidates the proof that permitted acceptance
@@ -73,6 +80,13 @@ changed**.
 refuses unless doneness derives from clauses + receipt + tree hash, and that
 check runs before the write. The field records a decision; it never gates one.
 
+**Status: FIXED (2026-07-26).** In the receipts SSOT
+(`packages/receipts/src/inputs-hash.mjs`, vendored to `template/qa/lib/`):
+`qa/comments.json` is excluded from the surface, and `qa/approvals.json` is
+hashed by gating-field projection — `artifact`, `status`, `hash`,
+`exemplarFeature` — with an unparsable ledger falling back to raw bytes.
+Pinned by `test/autonomy-hash-surface.test.mjs`.
+
 ---
 
 ## 3. Nothing catches "built, verified, and unreachable"
@@ -97,6 +111,20 @@ carved M3 down to "the tray" and omitted how a user reaches it. The brief had
 opened with *"I need to be able to actually add meals."* **Brief and spec
 drafting must cover the entry point by default** — a screen nobody can navigate
 to is not a delivered feature.
+
+**Status: FIXED (2026-07-26).** `template/qa/lib/reachability.mjs` +
+`stepReachability` in both lane profiles: a `presentation/<feature>/*Screen.kt`
+whose `*Screen`/`*Route` entry composables are referenced nowhere in commonMain
+outside the feature's own directory FAILs the lane; preview-registry references
+(desktopMain) deliberately do not count. Escape hatch is a declaration:
+`{ "unrouted": true }` in the brief's block. Pinned by
+`test/reachability.test.mjs`; the exact pre-wiring meal state is a fixture.
+Side-finding, ALSO FIXED: a scaffold whose `--tabs` omitted a shipped default
+feature left that feature's files on disk unwired, which the new gate honestly
+flagged. `rewriteTabSurfaces` now removes it — `profile` only, a self-contained
+stub; `home` is never stripped (the governed exemplar, and it owns the
+unconditionally-registered `DetailScreen`, so it stays genuinely reachable with
+no tab of its own rather than being exempted by declaration).
 
 ---
 
@@ -128,6 +156,16 @@ incremental state cannot alias the lane's, or expose a pause/resume on the
 preview service that tooling can serialise against. Until then, every automated
 run must stop the console first — which is exactly the coupling to remove.
 
+**Status: FIXED for the harness's own surfaces (2026-07-26).** The daemon
+stamps `composeApp/build/.cmp-render-in-progress` (mtime-refreshed on
+activity) for the duration of its Gradle work; the lane's `shGradle` waits for
+it to clear or go stale (5-minute freshness window, 3-minute wait cap) — the
+symmetric half of the DF-4 lane marker the daemon already respects. The
+self-heal retry remains as the last line. HONEST RESIDUAL: an ad-hoc
+`./gradlew` run outside `shGradle` (an agent invoking `desktopTest` directly)
+is still uncoordinated — it should check the marker, or expect the KSP
+self-heal to catch the collision.
+
 ---
 
 ## 5. The console reports healthy while it is blind
@@ -147,6 +185,14 @@ vocabulary for this — Screens goes red on render/compile failure — but a *de
 renderer* is a different condition from *a compile error*, and only the second
 is currently visible.
 
+**Status: FIXED (2026-07-26).** The preview service tracks every render
+attempt (`lastOutcome` / `lastSuccessAt` / `lastAttemptAt` /
+`consecutiveFailures`, independent of the compile watchdog's `lastError`) and
+surfaces the `renderer` object in `/api/status` and the `preview_status` MCP
+tool; the console page shows an amber "Renderer down since … — screens below
+are stale" banner, distinct from the red compile-error banner. Agent
+discipline stays: check `renderer.lastOutcome`, never a status code.
+
 ---
 
 ## 6. `qa/verify.mjs` treats any unknown flag as "run the lane"
@@ -161,6 +207,10 @@ name.
 
 **Fix.** Real `--help`; refuse unknown flags with a non-zero exit naming the
 flag. Already queued as a background task.
+
+**Status: FIXED (2026-07-26).** `--help`/`-h` prints usage and exits 0 before
+anything runs; an unknown argument exits 2 naming it. Live-verified on the
+showcase (`--bogus` → exit 2 in under a second, no Gradle started).
 
 ---
 
@@ -196,3 +246,14 @@ hashing things that cannot change a verdict, and letting two Gradle clients shar
 one cache. Fixing them removes roughly three lane re-runs, one human
 re-approval, and every false red from a run like tonight's, without weakening a
 single gate.
+
+---
+
+## Resolution — all six closed (2026-07-26)
+
+Every gap above now carries a **Status** line. All six were fixed the day after
+they were logged, live-tested by finishing the `today` feature on the showcase
+with the console running throughout. One honest residual (§4: ad-hoc Gradle
+runs outside `shGradle`) and one side-finding (§3: scaffold leaves unconfigured
+default-tab features on disk) are recorded in place and tracked as their own
+tasks. The prediction in "The pattern" held: no gate was weakened.

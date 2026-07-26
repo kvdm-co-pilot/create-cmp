@@ -121,6 +121,51 @@ const LANE_MARKER_STALE_MS = 30 * 60 * 1000;
 const LANE_POLL_MS = 5000;
 export const KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
 
+// The SYMMETRIC half: while the preview service itself has a Gradle invocation in
+// flight (a `renderScreens`/`compileKotlinDesktop` task, or the resident
+// `hotRunDesktop` daemon client), it stamps .cmp-render-in-progress the same way —
+// so `qa/verify.mjs`'s shGradle can defer/self-heal around an active render exactly
+// as the daemon defers around an active lane. mtime-bounded (consumers treat it as
+// stale after 5 minutes) so a crashed daemon never wedges the lane.
+export const RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
+
+/** Stamp the render-in-progress marker for the duration of a Gradle invocation. */
+export function stampRenderMarker(projectDir) {
+  try {
+    const p = path.join(projectDir, ...RENDER_MARKER_REL);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, `${process.pid} ${new Date().toISOString()}\n`);
+  } catch {
+    /* best-effort — a missed marker only costs the lane a possible collision,
+       already guarded by SELF-HEAL (withKspSelfHeal / shGradle) */
+  }
+}
+
+/**
+ * Refresh the render marker's mtime without rewriting it — a no-op when no marker
+ * is currently stamped. Wired into `touch()` so any observed activity (daemon
+ * output, a render settling, a source change) keeps a long-running invocation
+ * (the resident daemon client, or a slow cold first render) from going stale under
+ * the consumer's 5-minute window.
+ */
+export function touchRenderMarker(projectDir) {
+  try {
+    const now = new Date();
+    fs.utimesSync(path.join(projectDir, ...RENDER_MARKER_REL), now, now);
+  } catch {
+    /* no marker currently stamped — nothing to refresh */
+  }
+}
+
+/** Clear the render-in-progress marker (called in a finally on every exit path). */
+export function clearRenderMarker(projectDir) {
+  try {
+    fs.rmSync(path.join(projectDir, ...RENDER_MARKER_REL), { force: true });
+  } catch {
+    /* already gone */
+  }
+}
+
 /**
  * The app's display name for the console shell: settings.gradle(.kts)'s
  * `rootProject.name` (the engine stamps the real app name there), falling back to
@@ -327,6 +372,8 @@ export function galleryHtml(state) {
     changedVersions = {},
     error = null,
     errorSource = null,
+    renderer = { lastOutcome: "never", lastSuccessAt: null, lastAttemptAt: null, consecutiveFailures: 0 },
+    rendererLastErrorText = null,
     approvals = { available: false },
     specs = { available: false },
     designSystem = { available: false },
@@ -1260,6 +1307,12 @@ export function galleryHtml(state) {
     railFootHtml: `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`,
     sections,
     error,
+    // FI-9 Change B: the renderer's OWN health banner, additive to `error`
+    // above (which already covers "last render/compile/reload FAILED" as a
+    // point-in-time message) — this one survives a LATER unrelated
+    // compile-check message overwriting `error`/`errorSource`, and states
+    // since-when the (possibly stale) screens below stopped refreshing.
+    rendererDown: renderer && renderer.lastOutcome === "failed" ? { ...renderer, lastError: rendererLastErrorText } : null,
     // §3.4 geometry from the render viewport: uniform cell width keeps the
     // matrix's columns aligned without a shared grid; the expanded wireframe
     // gets the roomier single-pane width.
@@ -1313,24 +1366,36 @@ export function createPreviewService(opts) {
   // is coexistence defense 2 (see laneInProgress below for defense 1).
   const runRender =
     opts.runRender ||
-    ((dir) =>
-      withKspSelfHeal(dir, log, () =>
-        execFileAsync(
-          "./gradlew",
-          [":composeApp:renderScreens", "-q", "--console=plain"],
-          { cwd: dir, timeout: 600000, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() },
-        ),
-      ));
+    (async (dir) => {
+      stampRenderMarker(dir);
+      try {
+        return await withKspSelfHeal(dir, log, () =>
+          execFileAsync(
+            "./gradlew",
+            [":composeApp:renderScreens", "-q", "--console=plain"],
+            { cwd: dir, timeout: 600000, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() },
+          ),
+        );
+      } finally {
+        clearRenderMarker(dir);
+      }
+    });
   const runCompileCheck =
     opts.runCompileCheck ||
-    ((dir) =>
-      withKspSelfHeal(dir, log, () =>
-        execFileAsync(
-          "./gradlew",
-          [":composeApp:compileKotlinDesktop", "-q", "--console=plain"],
-          { cwd: dir, timeout: 300000, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() },
-        ),
-      ));
+    (async (dir) => {
+      stampRenderMarker(dir);
+      try {
+        return await withKspSelfHeal(dir, log, () =>
+          execFileAsync(
+            "./gradlew",
+            [":composeApp:compileKotlinDesktop", "-q", "--console=plain"],
+            { cwd: dir, timeout: 300000, maxBuffer: 16 * 1024 * 1024, env: gradleEnv() },
+          ),
+        );
+      } finally {
+        clearRenderMarker(dir);
+      }
+    });
   const watchdogMs = opts.watchdogMs ?? COMPILE_WATCHDOG_MS;
   const staleRetryMs = opts.staleRetryMs ?? STALE_RETRY_MS;
 
@@ -1373,6 +1438,19 @@ export function createPreviewService(opts) {
   let version = 0;
   let lastError = null;
   let lastErrorSource = null; // "render" | "compile" — what produced lastError
+  // Renderer health (FI-9 Change B) — the render PIPELINE's own up/down signal,
+  // tracked independently of lastError/lastErrorSource so a later, unrelated
+  // compile-watchdog message can never overwrite the fact that renders
+  // themselves are failing ("the eyes are stale" vs. "your edit didn't build").
+  // Updated ONLY by actual render attempts in renderCycle(), never by
+  // compileWatchdog. rendererLastErrorText mirrors the render-specific error
+  // message for the console banner; it is intentionally NOT part of the public
+  // `renderer` status shape (kept to the four documented fields).
+  let rendererLastOutcome = "never"; // "ok" | "failed" | "never"
+  let rendererLastSuccessAt = null; // ISO
+  let rendererLastAttemptAt = null; // ISO
+  let rendererConsecutiveFailures = 0;
+  let rendererLastErrorText = null;
   let lastActivity = null; // { what, at } — last observed signal, so the agent can tell "quiet" from "dead"
   let compileErrorLines = []; // accumulated hot-recompile failures (cleared on next good render)
   let lastChanged = [];
@@ -1396,6 +1474,7 @@ export function createPreviewService(opts) {
 
   function touch(what) {
     lastActivity = { what, at: new Date().toISOString() };
+    touchRenderMarker(projectDir); // no-op unless a render marker is currently stamped
   }
 
   /** Resolve every pending waitForRender with the (just-updated) status. */
@@ -1969,10 +2048,17 @@ export function createPreviewService(opts) {
 
   /** Wire a spawned daemon child's streams/exit into the service (also for injected spawns). */
   function adoptDaemonChild(child) {
+    // The daemon's `hotRunDesktop` client is itself a Gradle invocation that stays
+    // "in flight" for as long as the process runs — not a single discrete task like
+    // runRender/runCompileCheck — so it gets the marker for its whole lifetime,
+    // refreshed by touch() (wired to noteDaemonOutput below) rather than cleared
+    // between renders.
+    stampRenderMarker(projectDir);
     child.stdout?.on("data", noteDaemonOutput);
     child.stderr?.on("data", noteDaemonOutput);
     child.on?.("exit", (code) => {
       log(`daemon gradle client exited (${code})`);
+      clearRenderMarker(projectDir);
       if (mode === "daemon") {
         mode = "gradle";
         if (classesWatcher) {
@@ -2056,6 +2142,7 @@ export function createPreviewService(opts) {
     }
     rendering = true;
     touch("render-start");
+    rendererLastAttemptAt = new Date().toISOString(); // renderer health: every attempt counts, success or not
     snapshotPngs(); // keep the pre-render pixels for the gallery's before/after compare
     broadcast({ type: "rendering" });
     let suppressSettle = false;
@@ -2087,6 +2174,13 @@ export function createPreviewService(opts) {
         await runRender(projectDir);
       }
       loadPreviews();
+      // Renderer health: the Gradle/daemon call it took to get here succeeded —
+      // the pipeline itself is alive, independent of whether the swap/stale
+      // checks below still have something to say about THIS render's content.
+      rendererLastOutcome = "ok";
+      rendererLastSuccessAt = new Date().toISOString();
+      rendererConsecutiveFailures = 0;
+      rendererLastErrorText = null;
       lastError = null;
       lastErrorSource = null;
       compileErrorLines = [];
@@ -2134,6 +2228,12 @@ export function createPreviewService(opts) {
     } catch (err) {
       lastError = err && err.message ? err.message : String(err);
       lastErrorSource = "render";
+      // Renderer health: the render PIPELINE failed outright (Gradle/daemon call
+      // threw) — distinct from a compile error in the user's code. Tracked here
+      // only, so a later unrelated compileWatchdog message never masks it.
+      rendererLastOutcome = "failed";
+      rendererConsecutiveFailures += 1;
+      rendererLastErrorText = lastError;
       touch("render-failed");
       log(`render FAILED: ${lastError}`);
       broadcast({ type: "error", error: lastError, source: "render" });
@@ -2390,6 +2490,8 @@ export function createPreviewService(opts) {
             changedVersions: Object.fromEntries(changedAt),
             error: lastError,
             errorSource: lastErrorSource,
+            renderer: rendererHealth(),
+            rendererLastErrorText,
             approvals,
             specs,
             designSystem,
@@ -2679,6 +2781,21 @@ export function createPreviewService(opts) {
     });
   }
 
+  /**
+   * The render PIPELINE's own health (FI-9 Change B) — "is Gradle/the daemon
+   * actually producing pixels", independent of lastError/lastErrorSource (which
+   * a compile-check message can overwrite). "never" = no render has been
+   * attempted yet since this service started.
+   */
+  function rendererHealth() {
+    return {
+      lastOutcome: rendererLastOutcome,
+      lastSuccessAt: rendererLastSuccessAt,
+      lastAttemptAt: rendererLastAttemptAt,
+      consecutiveFailures: rendererConsecutiveFailures,
+    };
+  }
+
   function status() {
     return {
       projectDir,
@@ -2690,6 +2807,7 @@ export function createPreviewService(opts) {
       rendering,
       lastError,
       lastErrorSource,
+      renderer: rendererHealth(),
       lastActivity,
       changedLastRender: lastChanged,
       screens: cards.map(({ screen, summary, a11y }) => ({
@@ -2740,6 +2858,10 @@ export function createPreviewService(opts) {
       // Best-effort daemon teardown: ask the JVM to exit, then kill the gradle client.
       fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {});
       if (daemonChild) daemonChild.kill("SIGTERM");
+      // Belt-and-braces: the exit event above clears this too, but that fires
+      // asynchronously once the killed process actually exits — clear synchronously
+      // here as well so a stopped service never leaves a marker for the lane to see.
+      clearRenderMarker(projectDir);
       if (watcher) watcher.close();
       for (const res of sseClients) res.end();
       sseClients.clear();

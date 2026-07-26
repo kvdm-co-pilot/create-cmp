@@ -185,6 +185,38 @@ export function provenanceHtml(p = {}) {
   return `${tree}${render} &middot; absence = not derivable`;
 }
 
+/** "HH:MM" in server-local time, from an ISO timestamp — null-safe. */
+function clockTime(iso) {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toTimeString().slice(0, 5);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The renderer's OWN failure banner (FI-9 Change B) — distinct from `p.error`
+ * (which also covers compile/reload messages that already have their own
+ * presentation, right above each screen). This fires only when the render
+ * PIPELINE itself is dead (the last Gradle/daemon render call threw outright):
+ * "the eyes are stale", not "your edit didn't build". Amber (--reopen), the
+ * same "stale, not necessarily broken" vocabulary the rail-foot receipt line
+ * already uses for a stale-but-not-failed verify receipt — kept visually
+ * distinct from the red `.banner` a compile/reload failure shows.
+ * @param {{lastOutcome: string, lastSuccessAt: string|null, lastAttemptAt: string|null, consecutiveFailures: number, lastError?: string|null}|null} r
+ */
+export function rendererDownBannerHtml(r) {
+  if (!r || r.lastOutcome !== "failed") return "";
+  const since = clockTime(r.lastSuccessAt);
+  const headline = since
+    ? `Renderer down since ${since} &mdash; screens below are stale.`
+    : `Renderer down &mdash; no render has completed yet, so there are no screens to show.`;
+  const streak = r.consecutiveFailures > 1 ? ` (${r.consecutiveFailures} renders in a row have failed.)` : "";
+  const errTail = r.lastError ? ` Last error: ${esc(r.lastError)}` : "";
+  return `<div class="banner banner-renderer">${headline}${streak}${errTail}</div>`;
+}
+
 /**
  * The full page. Everything visible is composed here; the caller supplies
  * only data (rail items, section bodies) and behavior (`bodyScript`).
@@ -194,6 +226,7 @@ export function provenanceHtml(p = {}) {
  * @param {string} p.railFootHtml  the verify-receipt line
  * @param {Array} p.sections  sectionHtml inputs
  * @param {string|null} [p.error]  last render failure (banner above the pages)
+ * @param {object|null} [p.rendererDown]  renderer health when dead (see rendererDownBannerHtml)
  * @param {string} [p.extraCss]  caller-computed rules (viewport-derived sizes)
  * @param {string} p.bodyScript  the behavior <script> body (unowned by the shell)
  * @param {{treeHash?: string|null, version?: number}} [p.provenance]
@@ -220,6 +253,7 @@ ${p.railItems.map(railItemHtml).join("\n")}
   <div class="rail-foot">${p.railFootHtml}</div>
 </aside>
 <main>
+${rendererDownBannerHtml(p.rendererDown)}
 ${p.error ? `<div class="banner">last render FAILED &mdash; showing previous state\n${esc(p.error)}</div>` : ""}
 ${p.sections.map((s) => sectionHtml(s, prov)).join("\n")}
 </main>
@@ -310,6 +344,10 @@ export const SHELL_CSS = `
   main { flex: 1; min-width: 0; }
   .banner { margin: 24px 40px 0; padding: 10px 14px; border-radius: 10px; background: var(--drift-bg);
             color: var(--drift); font-size: var(--fs-body); white-space: pre-wrap; }
+  /* Renderer-down (FI-9 Change B): amber/--reopen, not red/--drift — "the eyes
+     are stale", the same "stale, not broken" vocabulary the rail-foot receipt
+     line uses, kept visually distinct from a compile/reload .banner. */
+  .banner-renderer { background: var(--reopen-bg); color: var(--reopen); }
   .tab-panel { display: none; padding: 32px 40px 48px; }
   .tab-panel.active { display: block; }
   .page-head { margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
