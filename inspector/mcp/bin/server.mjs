@@ -1112,7 +1112,27 @@ server.registerTool(
       hot,
       log: (m) => process.stderr.write(`[preview] ${m}\n`),
     });
-    const st = await service.start();
+    let st;
+    try {
+      st = await service.start();
+    } catch (err) {
+      // Another PROCESS already serves this project (the one-console-per-project guard).
+      // This tool's contract is "starts or reuses", so reuse is the honest answer: point
+      // the caller at the console that is actually serving rather than starting a second
+      // render loop against the same build directory.
+      if (err && err.code === "CMP_CONSOLE_ALREADY_RUNNING") {
+        return ok({
+          ...err.existing,
+          projectDir: dir,
+          reusedExternal: true,
+          note:
+            `A studio console for this project is already running in another process ` +
+            `(pid ${err.existing.pid}). Use it at ${err.existing.url} — a second one would ` +
+            `render into the same build directory and the two would disagree.`,
+        });
+      }
+      throw err;
+    }
     previewService = service;
     previewProjectDir = dir;
     return ok(st);

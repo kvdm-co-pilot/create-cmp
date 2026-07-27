@@ -26,8 +26,10 @@
 //   trees, reusing the pure render/a11y libs (wireframe SVG inline; PNGs served
 //   statically with a version cache-buster, not base64 — the page stays light).
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
@@ -121,6 +123,27 @@ const LANE_MARKER_STALE_MS = 30 * 60 * 1000;
 const LANE_POLL_MS = 5000;
 export const KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
 
+// Defense 1 covers the lane, which announces itself. It does NOT cover an ad-hoc
+// `./gradlew` an operator types by hand — that stamps no marker, so a render can be
+// launched into the middle of it. What breaks is not KSP but the CLASSPATH: while a
+// foreign build rewrites composeApp/build/classes, `renderScreens` (a JavaExec off
+// that output) can start against a half-written classes dir and die with
+// "Could not find or load main class …PreviewHarnessKt". Nothing is wrong with the
+// tree — the class is on disk moments later.
+//
+// So this is a RACE, not a failure, and the console must not report it as one. A
+// matching error defers and re-schedules (like the lane) instead of setting
+// lastError/rendererLastOutcome. Only if it survives MAX_TRANSIENT_RETRIES does it
+// surface — at which point it is no longer transient and the operator needs to see it.
+export const TRANSIENT_RENDER_RE =
+  /Could not find or load main class|java\.lang\.(?:ClassNotFoundException|NoClassDefFoundError)|Timeout waiting to lock|Could not create service of type/;
+const TRANSIENT_RETRY_MS = 4000;
+const MAX_TRANSIENT_RETRIES = 12; // ~48s of quiet cover — a foreign `desktopTest --rerun` fits
+// Past the quiet window the console STATES that it is stuck (it must never show pixels
+// without saying how old they are) — but it keeps trying on this slower cadence, because
+// the condition that broke the render is usually someone else's build finishing.
+const STUCK_RETRY_MS = 30000;
+
 // The SYMMETRIC half: while the preview service itself has a Gradle invocation in
 // flight (a `renderScreens`/`compileKotlinDesktop` task, or the resident
 // `hotRunDesktop` daemon client), it stamps .cmp-render-in-progress the same way —
@@ -128,6 +151,80 @@ export const KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
 // as the daemon defers around an active lane. mtime-bounded (consumers treat it as
 // stale after 5 minutes) so a crashed daemon never wedges the lane.
 export const RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
+
+// ── One console per project (the pile-up guard) ─────────────────────────────────
+// Nothing used to stop a second preview service binding the same projectDir. Each one
+// runs its OWN render loop against the SAME composeApp/build, so they collide on the
+// classes dir (the "Could not find or load main class" race), and the human ends up
+// reading whichever stale console they happened to bookmark. Three abandoned services
+// were found running against one project — two of them eight days old.
+//
+// The registry lives in the OS temp dir keyed by the resolved projectDir, NOT under
+// composeApp/build: this is process coordination, not a build artifact, and a
+// `gradle clean` must not silently drop the guard while a console is still serving.
+//
+// Liveness is PROVEN, never assumed: the recorded pid must exist AND its port must
+// answer as a console for this same project. A crashed service therefore never wedges
+// the next start — the stale record is simply taken over.
+export function consoleRegistryPath(projectDir) {
+  const key = crypto.createHash("sha1").update(path.resolve(projectDir)).digest("hex").slice(0, 12);
+  return path.join(os.tmpdir(), `cmp-console-${key}.json`);
+}
+
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0); // signal 0 tests existence without touching the process
+    return true;
+  } catch (err) {
+    return err && err.code === "EPERM"; // exists but owned by someone else
+  }
+}
+
+/**
+ * The console already serving `projectDir`, or null. Both checks matter: a pid alone
+ * can be a recycled number, and a port alone can be someone else's server.
+ * @returns {Promise<{pid: number, port: number, url: string, startedAt: string}|null>}
+ */
+export async function findLiveConsole(projectDir, { probe } = {}) {
+  let rec;
+  try {
+    rec = JSON.parse(fs.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+  } catch {
+    return null;
+  }
+  if (!rec || typeof rec.pid !== "number" || typeof rec.port !== "number") return null;
+  // Deliberately NOT skipping our own pid: two services inside one process collide just
+  // as badly as two processes, and the probe below settles it either way — a record left
+  // by our own crashed predecessor simply fails to answer.
+  if (!processAlive(rec.pid)) return null;
+  const answers = probe
+    ? await probe(rec)
+    : await fetch(`http://127.0.0.1:${rec.port}/`, { signal: AbortSignal.timeout(2000) })
+        .then((r) => r.ok)
+        .catch(() => false);
+  return answers ? rec : null;
+}
+
+function writeConsoleRegistry(projectDir, port) {
+  try {
+    fs.writeFileSync(
+      consoleRegistryPath(projectDir),
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path.resolve(projectDir), startedAt: new Date().toISOString() })}\n`,
+    );
+  } catch {
+    /* the guard is best-effort — never block a console from starting over bookkeeping */
+  }
+}
+
+function clearConsoleRegistry(projectDir) {
+  try {
+    const p = consoleRegistryPath(projectDir);
+    const rec = JSON.parse(fs.readFileSync(p, "utf8"));
+    if (rec && rec.pid === process.pid) fs.rmSync(p, { force: true });
+  } catch {
+    /* never throw on teardown */
+  }
+}
 
 /** Stamp the render-in-progress marker for the duration of a Gradle invocation. */
 export function stampRenderMarker(projectDir) {
@@ -374,6 +471,10 @@ export function galleryHtml(state) {
     errorSource = null,
     renderer = { lastOutcome: "never", lastSuccessAt: null, lastAttemptAt: null, consecutiveFailures: 0 },
     rendererLastErrorText = null,
+    // Derived provenance of the pixels below (see the service's freshness()). Defaulting
+    // to null keeps older callers rendering exactly as before rather than asserting a
+    // freshness this page has no basis for.
+    freshness = null,
     approvals = { available: false },
     specs = { available: false },
     designSystem = { available: false },
@@ -945,6 +1046,9 @@ export function galleryHtml(state) {
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "rendering") { pill.textContent = "rendering…"; pill.className = "rendering"; }
+    // A concurrent Gradle build (an ad-hoc ./gradlew) holds the classes dir. Not a
+    // failure — the render is queued and will run. Say exactly that; never the error pill.
+    if (msg.type === "deferred") { pill.textContent = "waiting for another build…"; pill.className = "rendering"; }
     if (msg.type === "render") location.reload();
     // approval (a decision, from the console OR the CLI), comment (added or
     // resolved), governance (a governed FILE changed — an agent wrote a spec
@@ -1313,6 +1417,9 @@ export function galleryHtml(state) {
     // compile-check message overwriting `error`/`errorSource`, and states
     // since-when the (possibly stale) screens below stopped refreshing.
     rendererDown: renderer && renderer.lastOutcome === "failed" ? { ...renderer, lastError: rendererLastErrorText } : null,
+    // The freshness banner sits ABOVE the renderer/error banners: "are these pixels
+    // current" is the first thing a reader needs, before why they might not be.
+    freshness,
     // §3.4 geometry from the render viewport: uniform cell width keeps the
     // matrix's columns aligned without a shared grid; the expanded wireframe
     // gets the roomier single-pane width.
@@ -1450,6 +1557,29 @@ export function createPreviewService(opts) {
   let rendererLastSuccessAt = null; // ISO
   let rendererLastAttemptAt = null; // ISO
   let rendererConsecutiveFailures = 0;
+  // Consecutive transient (foreign-build) deferrals for the CURRENT render attempt;
+  // reset on any settled outcome so each new race gets the full retry budget.
+  let transientRetries = 0;
+  // FRESHNESS (the console's core promise: pixels are never shown without a truthful
+  // provenance). Both are wall-clock ms, derived from real events — never claimed:
+  //   lastRenderAt   — when the previews ON DISK were produced (manifest mtime at load,
+  //                    NOT "now", so a service that boots onto week-old previews says so).
+  //   srcChangedAt   — when a watched source file last changed.
+  // stale ⇔ srcChangedAt > lastRenderAt. renderPhase says what is being done about it.
+  let lastRenderAt = null;
+  let srcChangedAt = null;
+  let renderPhase = "idle"; // "idle" | "rendering" | "waiting-build" | "waiting-lane" | "stuck"
+  // Which source generation the CURRENT pixels actually cover. Captured when a render
+  // starts and committed only when it succeeds, so a save that lands mid-render leaves
+  // the result honestly stale instead of being swallowed by "the render finished after
+  // the save, therefore it included it" — which is not true and is unfalsifiable by
+  // timestamps alone (manifest mtime and a save can land in the same millisecond).
+  let renderCoversSrcAt = null;
+  // Whether a render is genuinely pending. The console may only say "queued" when this
+  // is true — a promise of a refresh that is not coming is the same lie as a stale
+  // screen presented as current.
+  let renderScheduled = false;
+  let renderPhaseDetail = null;
   let rendererLastErrorText = null;
   let lastActivity = null; // { what, at } — last observed signal, so the agent can tell "quiet" from "dead"
   let compileErrorLines = []; // accumulated hot-recompile failures (cleared on next good render)
@@ -1888,9 +2018,16 @@ export function createPreviewService(opts) {
 
   /** Reload previews dir into cards + tree map. Throws if the dir/manifest is missing. */
   function loadPreviews() {
-    const manifest = JSON.parse(
-      fs.readFileSync(path.join(previewsDir, "manifest.json"), "utf8"),
-    );
+    const manifestPath = path.join(previewsDir, "manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    // The manifest's mtime is when these pixels were actually produced. Using it (rather
+    // than Date.now()) is what makes a freshly-started service honest about previews it
+    // found on disk from a previous run instead of presenting them as a new render.
+    try {
+      lastRenderAt = fs.statSync(manifestPath).mtimeMs;
+    } catch {
+      lastRenderAt = Date.now();
+    }
     viewport = manifest.viewport;
     const trees = new Map();
     cards = manifest.screens.map((screen) => {
@@ -2136,11 +2273,19 @@ export function createPreviewService(opts) {
     // marker clears (or goes stale), then runs.
     if (laneInProgress(projectDir)) {
       touch("lane-defer");
+      renderPhase = "waiting-lane";
+      renderPhaseDetail = "a verify lane is running";
       log("verify lane in progress — deferring render until it finishes");
+      broadcast({ type: "freshness" });
       scheduleRender(LANE_POLL_MS);
       return;
     }
     rendering = true;
+    renderScheduled = false;
+    const coveringSrcAt = srcChangedAt; // the generation THIS attempt is about to cover
+    renderPhase = "rendering";
+    renderPhaseDetail = null;
+    broadcast({ type: "freshness" });
     touch("render-start");
     rendererLastAttemptAt = new Date().toISOString(); // renderer health: every attempt counts, success or not
     snapshotPngs(); // keep the pre-render pixels for the gallery's before/after compare
@@ -2181,6 +2326,10 @@ export function createPreviewService(opts) {
       rendererLastSuccessAt = new Date().toISOString();
       rendererConsecutiveFailures = 0;
       rendererLastErrorText = null;
+      transientRetries = 0;
+      renderPhase = "idle";
+      renderPhaseDetail = null;
+      renderCoversSrcAt = coveringSrcAt;
       lastError = null;
       lastErrorSource = null;
       compileErrorLines = [];
@@ -2226,7 +2375,47 @@ export function createPreviewService(opts) {
         broadcast({ type: "render", version, changed: lastChanged });
       }
     } catch (err) {
-      lastError = err && err.message ? err.message : String(err);
+      const errText = err && err.message ? err.message : String(err);
+      // A foreign Gradle build is rewriting the classes dir under us (see
+      // TRANSIENT_RENDER_RE): defer and retry rather than reporting a failure the
+      // tree does not actually have. The previous render stays on screen, unlabelled
+      // — which is the truth: nothing new has been proven, nothing is broken.
+      if (TRANSIENT_RENDER_RE.test(errText)) {
+        transientRetries++;
+        suppressSettle = true; // waiters get the retry's outcome, not this race
+        const quiet = transientRetries <= MAX_TRANSIENT_RETRIES;
+        // Within the quiet window this is an ordinary collision and the console just says
+        // it is waiting. Past it, the console STOPS being quiet — it still shows the last
+        // good render, but labelled stuck, with how old it is. It never stops retrying:
+        // the usual cause is another build that will finish.
+        renderPhase = quiet ? "waiting-build" : "stuck";
+        renderPhaseDetail = quiet
+          ? "another build is using the project"
+          : `another build has held the project for a while — still retrying (${errText.split("\n")[0]})`;
+        if (!quiet) {
+          // Past the quiet window the pipeline is genuinely not producing pixels, and
+          // renderer health is what `preview_status` consumers (agents) read. Staying
+          // "ok" here would be the same lie the banner used to tell, moved to the API.
+          rendererLastOutcome = "failed";
+          rendererConsecutiveFailures += 1;
+          rendererLastErrorText = errText;
+        }
+        touch(quiet ? "render-deferred" : "render-stuck");
+        log(
+          `render deferred (attempt ${transientRetries}) — a foreign Gradle invocation is rewriting ` +
+            `the classes dir; retrying in ${quiet ? TRANSIENT_RETRY_MS : STUCK_RETRY_MS}ms`,
+        );
+        broadcast({ type: "freshness" });
+        scheduleRender(quiet ? TRANSIENT_RETRY_MS : STUCK_RETRY_MS);
+        return;
+      }
+      transientRetries = 0;
+      // A real failure. Report it — AND keep trying, so a transient cause we did not
+      // classify still heals itself rather than leaving a dead console until someone saves.
+      renderPhase = "stuck";
+      renderPhaseDetail = errText.split("\n")[0];
+      scheduleRender(STUCK_RETRY_MS);
+      lastError = errText;
       lastErrorSource = "render";
       // Renderer health: the render PIPELINE failed outright (Gradle/daemon call
       // threw) — distinct from a compile error in the user's code. Tracked here
@@ -2248,8 +2437,14 @@ export function createPreviewService(opts) {
     }
   }
 
+  /** Every watched source change funnels here — the one place freshness can be stamped. */
+  function noteSourceChanged() {
+    srcChangedAt = Date.now();
+  }
+
   function scheduleRender(delayMs = DEBOUNCE_MS) {
     clearTimeout(debounceTimer);
+    renderScheduled = true;
     debounceTimer = setTimeout(() => void renderCycle(), delayMs);
   }
 
@@ -2260,10 +2455,20 @@ export function createPreviewService(opts) {
       watcher = fs.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
+        noteSourceChanged(); // freshness: the pixels on screen are now behind the source
         noteSrcChange(); // daemon mode: mark swap-pending + arm the compile watchdog
         // Daemon mode: the hot agent recompiles on save and the classes watcher fires
         // once fresh classes land — rendering now would race it with stale code.
-        if (mode === "daemon" && classesWatcher) return;
+        //
+        // But that hand-off is not guaranteed: a save that produces NO new classes (a
+        // no-op save, a comment-only edit, a recompile that yields nothing) never fires
+        // the classes watcher, and the render would never happen — leaving the console
+        // permanently stale while promising a refresh that was not coming. Arm a fallback
+        // so the state always settles; a redundant render simply confirms freshness.
+        if (mode === "daemon" && classesWatcher) {
+          scheduleRender(watchdogMs);
+          return;
+        }
         scheduleRender();
       });
       log(`watching ${srcDir} (fs events)`);
@@ -2275,6 +2480,7 @@ export function createPreviewService(opts) {
         if (stamp !== lastStamp) {
           lastStamp = stamp;
           touch("src-change");
+          noteSourceChanged();
           noteSrcChange();
           scheduleRender();
         }
@@ -2492,6 +2698,7 @@ export function createPreviewService(opts) {
             errorSource: lastErrorSource,
             renderer: rendererHealth(),
             rendererLastErrorText,
+            freshness: freshness(),
             approvals,
             specs,
             designSystem,
@@ -2796,6 +3003,40 @@ export function createPreviewService(opts) {
     };
   }
 
+  /**
+   * The console's core promise, DERIVED: are the pixels on screen current, and if not,
+   * what is being done about it. Never claimed — `state` falls out of comparing when the
+   * previews were produced against when a source file last changed.
+   *
+   *   never    — nothing has rendered; there is nothing to show.
+   *   fresh    — the previews were produced after the last source change.
+   *   stale    — a source change is not yet reflected. `phase` says why:
+   *              rendering / waiting-build / waiting-lane / stuck.
+   *
+   * `ageMs` lets every surface state how old what it is showing actually is, which is
+   * what a service that boots onto previews from a previous run owes the reader.
+   */
+  function freshness() {
+    const uncovered = srcChangedAt !== null && srcChangedAt !== renderCoversSrcAt;
+    const working =
+      renderPhase === "stuck" || renderPhase === "waiting-build" || renderPhase === "waiting-lane";
+    const state =
+      lastRenderAt === null ? "never" : uncovered || working ? "stale" : "fresh";
+    // "queued" is only true when a render is genuinely pending. If we are stale with
+    // nothing scheduled and nothing running, say SO — that is a state the reader needs
+    // (it means a save did not reach the renderer), not one to paper over.
+    const pending = renderScheduled || rendering;
+    return {
+      state,
+      phase: state === "stale" && renderPhase === "idle" && !pending ? "unrefreshed" : renderPhase,
+      pending,
+      detail: renderPhaseDetail,
+      lastRenderAt: lastRenderAt === null ? null : new Date(lastRenderAt).toISOString(),
+      sourceChangedAt: srcChangedAt === null ? null : new Date(srcChangedAt).toISOString(),
+      ageMs: lastRenderAt === null ? null : Math.max(0, Date.now() - lastRenderAt),
+    };
+  }
+
   function status() {
     return {
       projectDir,
@@ -2808,6 +3049,7 @@ export function createPreviewService(opts) {
       lastError,
       lastErrorSource,
       renderer: rendererHealth(),
+      freshness: freshness(),
       lastActivity,
       changedLastRender: lastChanged,
       screens: cards.map(({ screen, summary, a11y }) => ({
@@ -2831,12 +3073,33 @@ export function createPreviewService(opts) {
           `'${projectDir}' does not look like a create-cmp app (no composeApp/).`,
         );
       }
+      // One console per project. A second service against the same tree would run its
+      // own render loop against the same build dir — the collision that produced the
+      // "Could not find or load main class" failures, plus a second URL showing a
+      // different truth. `takeover: true` is the deliberate override.
+      if (opts.takeover !== true) {
+        const live = await findLiveConsole(projectDir, opts.probeConsole);
+        if (live) {
+          const err = new Error(
+            `A studio console is already serving this project at ${live.url} ` +
+              `(pid ${live.pid}, since ${live.startedAt}). Open that one — a second console would ` +
+              `run its own renders against the same build directory and the two would disagree. ` +
+              `To replace it: stop pid ${live.pid}, or start with takeover: true.`,
+          );
+          err.code = "CMP_CONSOLE_ALREADY_RUNNING";
+          err.existing = live;
+          throw err;
+        }
+      }
       if (fs.existsSync(path.join(previewsDir, "manifest.json"))) {
         // Serve what's on disk immediately; a fresh render still runs right after,
         // so the human sees SOMETHING at once and current state seconds later.
         loadPreviews();
       }
       await listen(opts.port || DEFAULT_PORT);
+      // Claim the project only once we are actually listening — a service that failed
+      // to bind must never leave a record that blocks the next honest attempt.
+      writeConsoleRegistry(projectDir, port);
       startWatching();
       watchGovernance();
       void renderCycle();
@@ -2862,6 +3125,7 @@ export function createPreviewService(opts) {
       // asynchronously once the killed process actually exits — clear synchronously
       // here as well so a stopped service never leaves a marker for the lane to see.
       clearRenderMarker(projectDir);
+      clearConsoleRegistry(projectDir); // release the project for the next console
       if (watcher) watcher.close();
       for (const res of sseClients) res.end();
       sseClients.clear();
@@ -2888,6 +3152,9 @@ export function createPreviewService(opts) {
     snapshotVariant,
     /** Test seam: force one render cycle without touching the filesystem watcher. */
     _renderCycle: renderCycle,
+    // Test seam: simulate a save without depending on fs.watch timing (which is
+    // platform-dependent and would make the freshness assertions flaky).
+    _noteSourceChangedForTest: noteSourceChanged,
     /** Test seam: feed daemon-child output through the compile-failure scanner. */
     _noteDaemonOutput: noteDaemonOutput,
     /** Test seam: simulate a source-change event (swap-pending + watchdog arming). */

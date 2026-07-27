@@ -217,6 +217,54 @@ export function rendererDownBannerHtml(r) {
   return `<div class="banner banner-renderer">${headline}${streak}${errTail}</div>`;
 }
 
+/** "4 minutes" / "2 hours" / "3 days" — how old, in words a reader can act on. */
+function ageWords(ms) {
+  if (ms === null || ms === undefined) return null;
+  const mins = Math.round(ms / 60000);
+  if (mins < 1) return "moments";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"}`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"}`;
+  const days = Math.round(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+/**
+ * The freshness banner — the console's central honesty guarantee: pixels are NEVER shown
+ * without saying whether they are current, and when they are not, what is being done.
+ *
+ * Deliberately not an error dump. A concurrent build is normal and reads as a calm
+ * "refreshing"; only a render that stays stuck earns alarm styling, and even then the
+ * message says the screens are still being retried, because they are.
+ *
+ * @param {{state: string, phase: string, detail: string|null, ageMs: number|null}|null} f
+ */
+export function freshnessBannerHtml(f) {
+  if (!f) return "";
+  if (f.state === "never") {
+    return `<div class="banner banner-renderer">No render yet &mdash; there are no screens to show until the first one completes.</div>`;
+  }
+  if (f.state === "fresh") return ""; // current: the pixels speak for themselves
+  const age = ageWords(f.ageMs);
+  const shown = age ? `Showing the last good render from ${age} ago.` : "Showing the last good render.";
+  const because = f.detail ? ` ${esc(f.detail)}.` : "";
+  if (f.phase === "rendering") {
+    return `<div class="banner banner-stale">Refreshing now &mdash; ${shown.toLowerCase()}</div>`;
+  }
+  if (f.phase === "waiting-build" || f.phase === "waiting-lane") {
+    return `<div class="banner banner-stale">Waiting to refresh:${because} ${shown} This updates itself.</div>`;
+  }
+  if (f.phase === "stuck") {
+    return `<div class="banner banner-renderer">Cannot refresh right now &mdash; still retrying.${because} ${shown}</div>`;
+  }
+  if (f.phase === "unrefreshed") {
+    // Stale with nothing pending: a save did not reach the renderer. Say that plainly
+    // rather than promising a refresh that is not coming.
+    return `<div class="banner banner-renderer">Out of date and NOT refreshing &mdash; a change has not reached the renderer.${because} ${shown}</div>`;
+  }
+  return `<div class="banner banner-stale">Out of date &mdash; ${shown} A refresh is queued.</div>`;
+}
+
 /**
  * The full page. Everything visible is composed here; the caller supplies
  * only data (rail items, section bodies) and behavior (`bodyScript`).
@@ -227,6 +275,8 @@ export function rendererDownBannerHtml(r) {
  * @param {Array} p.sections  sectionHtml inputs
  * @param {string|null} [p.error]  last render failure (banner above the pages)
  * @param {object|null} [p.rendererDown]  renderer health when dead (see rendererDownBannerHtml)
+ * @param {object|null} [p.freshness]  derived freshness (see freshnessBannerHtml) — the
+ *   provenance of the pixels below; absent only in callers that render no screens
  * @param {string} [p.extraCss]  caller-computed rules (viewport-derived sizes)
  * @param {string} p.bodyScript  the behavior <script> body (unowned by the shell)
  * @param {{treeHash?: string|null, version?: number}} [p.provenance]
@@ -253,6 +303,7 @@ ${p.railItems.map(railItemHtml).join("\n")}
   <div class="rail-foot">${p.railFootHtml}</div>
 </aside>
 <main>
+${freshnessBannerHtml(p.freshness)}
 ${rendererDownBannerHtml(p.rendererDown)}
 ${p.error ? `<div class="banner">last render FAILED &mdash; showing previous state\n${esc(p.error)}</div>` : ""}
 ${p.sections.map((s) => sectionHtml(s, prov)).join("\n")}
@@ -348,6 +399,9 @@ export const SHELL_CSS = `
      are stale", the same "stale, not broken" vocabulary the rail-foot receipt
      line uses, kept visually distinct from a compile/reload .banner. */
   .banner-renderer { background: var(--reopen-bg); color: var(--reopen); }
+  /* Stale-but-working-on-it: informational, NOT alarm. A concurrent build is normal;
+     only a render that stays stuck earns the renderer banner's colour. */
+  .banner-stale { background: var(--surface-2, rgba(255,255,255,.05)); color: var(--muted); }
   .tab-panel { display: none; padding: 32px 40px 48px; }
   .tab-panel.active { display: block; }
   .page-head { margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }

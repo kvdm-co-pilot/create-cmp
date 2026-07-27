@@ -18,6 +18,8 @@ import {
   componentStoryCards,
   isComponentStoryId,
   laneInProgress,
+  consoleRegistryPath,
+  findLiveConsole,
   stampRenderMarker,
   touchRenderMarker,
   clearRenderMarker,
@@ -2606,6 +2608,336 @@ test("service: every decision response carries whatNext — the guided-flow prom
     assert.match(page, /Take me there/);
   } finally {
     service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: a concurrent foreign Gradle build DEFERS the render — never an error banner, never a renderer-down state", async () => {
+  // The race this closes: an ad-hoc `./gradlew` (which stamps no lane marker) rewrites
+  // composeApp/build/classes while renderScreens launches off that output, so the
+  // JavaExec dies with "Could not find or load main class …PreviewHarnessKt". Nothing
+  // is wrong with the tree — the class is back moments later. Reporting that as a
+  // render failure sends the operator to debug a build that is fine.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+
+  let raceRemaining = 0;
+  const service = createPreviewService({
+    projectDir,
+    port: 19733,
+    hot: false,
+    runRender: async () => {
+      if (raceRemaining > 0) {
+        raceRemaining--;
+        throw new Error(
+          "Could not find or load main class com.example.app.inspector.PreviewHarnessKt",
+        );
+      }
+      writeFakePreviews(previewsDir, ["shell"]);
+    },
+  });
+
+  try {
+    await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(service.status().renderer.lastOutcome, "ok");
+    const healthyAt = service.status().renderer.lastSuccessAt;
+
+    // A foreign build holds the classes dir for the next two attempts.
+    raceRemaining = 2;
+    await service._renderCycle();
+
+    const during = service.status();
+    assert.equal(during.lastError, null, "a concurrent build sets NO lastError");
+    assert.equal(during.lastErrorSource, null, "and no error source");
+    assert.equal(
+      during.renderer.lastOutcome,
+      "ok",
+      "the renderer is not 'down' — it was never given a chance to run",
+    );
+    assert.equal(during.renderer.consecutiveFailures, 0, "a race is not a failure streak");
+    assert.equal(during.renderer.lastSuccessAt, healthyAt, "no new success is claimed either");
+
+    const duringPage = await (await fetch(during.url)).text();
+    assert.doesNotMatch(duringPage, /last render FAILED/, "no failure banner during the race");
+    assert.doesNotMatch(
+      duringPage,
+      /<div class="banner banner-renderer">/,
+      "no renderer-down banner during the race",
+    );
+
+    // When the foreign build finishes, the deferred render runs and settles normally.
+    raceRemaining = 0;
+    await service._renderCycle();
+    const after = service.status();
+    assert.equal(after.renderer.lastOutcome, "ok");
+    assert.equal(after.lastError, null);
+    assert.ok(after.renderer.lastSuccessAt >= healthyAt, "the retry produced a real render");
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: a transient error that NEVER clears stops being quiet — it says stuck, keeps retrying, and never claims health it does not have", async () => {
+  // The other half of the promise: deferring silently forever is a hang wearing a smile.
+  // Past the quiet window the console must SAY it cannot refresh (and how old what it is
+  // showing is) while still retrying — and renderer health, which agents read, must agree.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+
+  let broken = false;
+  const service = createPreviewService({
+    projectDir,
+    port: 19734,
+    hot: false,
+    runRender: async () => {
+      if (broken) throw new Error("Could not find or load main class Whatever");
+      writeFakePreviews(previewsDir, ["shell"]);
+    },
+  });
+
+  try {
+    await service.start();
+    await new Promise((r) => setTimeout(r, 100));
+    broken = true;
+    // Exhaust the budget: every cycle defers until the allowance is spent.
+    for (let i = 0; i < 13; i++) await service._renderCycle();
+    const status = service.status();
+    // The page states it plainly, with the age of what it IS showing — no Gradle dump.
+    assert.equal(status.freshness.phase, "stuck", "the phase says stuck, not 'fine'");
+    assert.equal(status.freshness.state, "stale");
+    assert.ok(status.freshness.ageMs >= 0, "and how old the shown render is");
+    // Renderer health agrees — the MCP surface never reports a health it does not have.
+    assert.equal(status.renderer.lastOutcome, "failed");
+    assert.ok(status.renderer.consecutiveFailures >= 1);
+    const page = await (await fetch(status.url)).text();
+    assert.match(page, /Cannot refresh right now/, "the banner states the situation");
+    assert.match(page, /still retrying/, "and that it has not given up");
+    assert.doesNotMatch(page, /BUILD FAILED/, "never a raw build dump");
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: freshness is DERIVED — a source change past the last render reads stale, and a render clears it", async () => {
+  // The console's core promise: pixels are never shown without a truthful provenance.
+  // `state` falls out of comparing when the previews were produced against when a source
+  // file last changed — it is never set by whoever happens to feel confident.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  const srcDir = path.join(projectDir, "composeApp", "src");
+  fs.mkdirSync(srcDir, { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+
+  const service = createPreviewService({
+    projectDir,
+    port: 19735,
+    hot: false,
+    runRender: async () => writeFakePreviews(previewsDir, ["shell"]),
+  });
+
+  try {
+    await service.start();
+    // Wait for the initial render to SETTLE rather than guessing at a delay: while a
+    // render is in flight the pixels are not confirmed, so "stale" is the honest answer
+    // and a fixed sleep would race it.
+    const settled = async () => {
+      for (let i = 0; i < 100; i++) {
+        if (service.status().freshness.phase === "idle") return true;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      return false;
+    };
+    assert.ok(await settled(), "the initial render settles");
+    // Render once more explicitly: this covers any watcher event (including a spurious
+    // FSEvents delivery for the tmpdir) that arrived during startup, so the assertion
+    // tests the DERIVATION rather than the platform's watcher timing.
+    await service._renderCycle();
+    assert.equal(service.status().freshness.state, "fresh", "a just-rendered tree is fresh");
+    const freshPage = await (await fetch(service.status().url)).text();
+    assert.doesNotMatch(freshPage, /Showing the last good render/, "no provenance banner when current");
+
+    // A save the render has not caught up with yet.
+    service._noteSourceChangedForTest();
+    const stale = service.status();
+    assert.equal(stale.state, undefined);
+    assert.equal(stale.freshness.state, "stale", "source moved past the pixels");
+    const stalePage = await (await fetch(stale.url)).text();
+    assert.match(stalePage, /out of date|Showing the last good render|Refreshing/i, "the page says so");
+
+    // Rendering it clears the staleness, derived — nothing had to declare it fixed.
+    await service._renderCycle();
+    assert.equal(service.status().freshness.state, "fresh");
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: a service that boots onto previews from a PREVIOUS run dates them by the manifest, not by 'now'", async () => {
+  // This is the failure that started all of this: a console came up on week-old previews
+  // and presented them as current. Age comes from the manifest's own mtime, so the very
+  // first page load can already say how old what it is showing really is.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+  writeFakePreviews(previewsDir, ["shell"]);
+  // Backdate the manifest by two days, as a stale on-disk render would be.
+  const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+  const manifestPath = path.join(previewsDir, "manifest.json");
+  fs.utimesSync(manifestPath, twoDaysAgo / 1000, twoDaysAgo / 1000);
+
+  const service = createPreviewService({
+    projectDir,
+    port: 19736,
+    hot: false,
+    // Never renders: the service can only report what it found on disk.
+    runRender: async () => {
+      throw new Error("Could not find or load main class Whatever");
+    },
+  });
+
+  try {
+    await service.start().catch(() => {});
+    await new Promise((r) => setTimeout(r, 150));
+    const f = service.status().freshness;
+    assert.ok(f.lastRenderAt, "the on-disk render is dated");
+    assert.ok(
+      f.ageMs > 24 * 60 * 60 * 1000,
+      `age comes from the manifest mtime, not boot time (got ${f.ageMs}ms)`,
+    );
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("service: a stale state with NOTHING pending says so — it never promises a refresh that is not coming", async () => {
+  // The live bug this closes: in daemon mode the src watcher hands the render off to the
+  // classes watcher, which never fires for a save that produces no new classes. The
+  // console sat stale forever while its banner claimed "a refresh is queued".
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+
+  const service = createPreviewService({
+    projectDir,
+    port: 19737,
+    hot: false,
+    runRender: async () => writeFakePreviews(previewsDir, ["shell"]),
+  });
+
+  try {
+    await service.start();
+    for (let i = 0; i < 100 && service.status().freshness.phase !== "idle"; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    await service._renderCycle();
+    assert.equal(service.status().freshness.state, "fresh");
+
+    // A change lands but no render is ever scheduled for it (the hand-off that got lost).
+    service._noteSourceChangedForTest();
+    const f = service.status().freshness;
+    assert.equal(f.state, "stale");
+    assert.equal(f.pending, false, "nothing is actually scheduled");
+    assert.equal(f.phase, "unrefreshed", "and the phase says exactly that");
+
+    const page = await (await fetch(service.status().url)).text();
+    assert.match(page, /NOT refreshing/, "the banner does not promise a refresh");
+    assert.doesNotMatch(page, /A refresh is queued/, "it must not claim a queue it does not have");
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("guard: a second console for the same project is refused, and told where the first one is", async () => {
+  // Three abandoned consoles were once found serving one project, each rendering into
+  // the same build directory — the collision behind the "could not load main class"
+  // failures, and two different URLs claiming to be the truth.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+  const mk = (port) =>
+    createPreviewService({
+      projectDir,
+      port,
+      hot: false,
+      runRender: async () => writeFakePreviews(previewsDir, ["shell"]),
+    });
+
+  const first = mk(19740);
+  let second;
+  try {
+    await first.start();
+    second = mk(19741);
+    const err = await second.start().then(
+      () => null,
+      (e) => e,
+    );
+    assert.ok(err, "the second console must not start");
+    assert.equal(err.code, "CMP_CONSOLE_ALREADY_RUNNING");
+    assert.match(err.message, /already serving this project/);
+    assert.match(err.message, /19740/, "it names the URL of the console that IS serving");
+    assert.equal(err.existing.pid, process.pid);
+
+    // Releasing the project lets the next console have it — the guard is not a wedge.
+    first.stop();
+    await second.start();
+    assert.ok(second.status().url.includes("19741"));
+  } finally {
+    try { first.stop(); } catch { /* already stopped */ }
+    try { if (second) second.stop(); } catch { /* never started */ }
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("guard: a record left by a CRASHED console never blocks the next start", async () => {
+  // The failure mode a naive lock file introduces: a service that dies without cleanup
+  // locks the project forever. Liveness is proven (pid + port), never assumed.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
+
+  // A record whose pid cannot exist: nothing may be inferred from it but "stale".
+  fs.writeFileSync(
+    consoleRegistryPath(projectDir),
+    JSON.stringify({ pid: 2147483646, port: 19742, url: "http://127.0.0.1:19742/", startedAt: "2020-01-01T00:00:00.000Z" }),
+  );
+  assert.equal(await findLiveConsole(projectDir), null, "a dead pid is not a live console");
+
+  const service = createPreviewService({
+    projectDir,
+    port: 19743,
+    hot: false,
+    runRender: async () => writeFakePreviews(previewsDir, ["shell"]),
+  });
+  try {
+    await service.start(); // must not throw
+    assert.ok(service.status().url.includes("19743"));
+  } finally {
+    service.stop();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("guard: a live pid whose port does NOT answer is stale too — a recycled pid never wedges a project", async () => {
+  // pids get reused. Requiring the port to answer as well is what keeps the guard from
+  // blocking a project because some unrelated process inherited the number.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp"), { recursive: true });
+  fs.writeFileSync(
+    consoleRegistryPath(projectDir),
+    JSON.stringify({ pid: process.pid, port: 19744, url: "http://127.0.0.1:19744/", startedAt: "2020-01-01T00:00:00.000Z" }),
+  );
+  try {
+    // This process is alive, but nothing is listening on that port.
+    assert.equal(await findLiveConsole(projectDir), null);
+  } finally {
+    fs.rmSync(consoleRegistryPath(projectDir), { force: true });
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });

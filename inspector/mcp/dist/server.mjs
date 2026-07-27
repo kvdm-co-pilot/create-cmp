@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 0c4b078160ef6c2b8961d080087f02c6a13e6483a8f64ac2899836f26f3f19fe
+// cmp:bundle-inputs 179b00b5468eaa253d5346278a348db32fe6a18a1668b844fd52d53aac5ebd46
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32193,8 +32193,10 @@ function parseLogcat(raw, opts = {}) {
 }
 
 // src/lib/preview-service.mjs
+import crypto from "node:crypto";
 import fs14 from "node:fs";
 import http from "node:http";
+import os2 from "node:os";
 import path15 from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
@@ -33823,6 +33825,39 @@ function rendererDownBannerHtml(r) {
   const errTail = r.lastError ? ` Last error: ${esc3(r.lastError)}` : "";
   return `<div class="banner banner-renderer">${headline}${streak}${errTail}</div>`;
 }
+function ageWords(ms) {
+  if (ms === null || ms === void 0) return null;
+  const mins = Math.round(ms / 6e4);
+  if (mins < 1) return "moments";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"}`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"}`;
+  const days = Math.round(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+function freshnessBannerHtml(f) {
+  if (!f) return "";
+  if (f.state === "never") {
+    return `<div class="banner banner-renderer">No render yet &mdash; there are no screens to show until the first one completes.</div>`;
+  }
+  if (f.state === "fresh") return "";
+  const age = ageWords(f.ageMs);
+  const shown = age ? `Showing the last good render from ${age} ago.` : "Showing the last good render.";
+  const because = f.detail ? ` ${esc3(f.detail)}.` : "";
+  if (f.phase === "rendering") {
+    return `<div class="banner banner-stale">Refreshing now &mdash; ${shown.toLowerCase()}</div>`;
+  }
+  if (f.phase === "waiting-build" || f.phase === "waiting-lane") {
+    return `<div class="banner banner-stale">Waiting to refresh:${because} ${shown} This updates itself.</div>`;
+  }
+  if (f.phase === "stuck") {
+    return `<div class="banner banner-renderer">Cannot refresh right now &mdash; still retrying.${because} ${shown}</div>`;
+  }
+  if (f.phase === "unrefreshed") {
+    return `<div class="banner banner-renderer">Out of date and NOT refreshing &mdash; a change has not reached the renderer.${because} ${shown}</div>`;
+  }
+  return `<div class="banner banner-stale">Out of date &mdash; ${shown} A refresh is queued.</div>`;
+}
 function renderShellPage(p) {
   const prov = provenanceHtml(p.provenance || {});
   return `<!doctype html>
@@ -33845,6 +33880,7 @@ ${p.railItems.map(railItemHtml).join("\n")}
   <div class="rail-foot">${p.railFootHtml}</div>
 </aside>
 <main>
+${freshnessBannerHtml(p.freshness)}
 ${rendererDownBannerHtml(p.rendererDown)}
 ${p.error ? `<div class="banner">last render FAILED &mdash; showing previous state
 ${esc3(p.error)}</div>` : ""}
@@ -33930,6 +33966,9 @@ var SHELL_CSS = `
      are stale", the same "stale, not broken" vocabulary the rail-foot receipt
      line uses, kept visually distinct from a compile/reload .banner. */
   .banner-renderer { background: var(--reopen-bg); color: var(--reopen); }
+  /* Stale-but-working-on-it: informational, NOT alarm. A concurrent build is normal;
+     only a render that stays stuck earns the renderer banner's colour. */
+  .banner-stale { background: var(--surface-2, rgba(255,255,255,.05)); color: var(--muted); }
   .tab-panel { display: none; padding: 32px 40px 48px; }
   .tab-panel.active { display: block; }
   .page-head { margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
@@ -35999,7 +36038,53 @@ var LANE_MARKER_REL = ["composeApp", "build", ".cmp-lane-in-progress"];
 var LANE_MARKER_STALE_MS = 30 * 60 * 1e3;
 var LANE_POLL_MS = 5e3;
 var KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
+var TRANSIENT_RENDER_RE = /Could not find or load main class|java\.lang\.(?:ClassNotFoundException|NoClassDefFoundError)|Timeout waiting to lock|Could not create service of type/;
+var TRANSIENT_RETRY_MS = 4e3;
+var MAX_TRANSIENT_RETRIES = 12;
+var STUCK_RETRY_MS = 3e4;
 var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
+function consoleRegistryPath(projectDir) {
+  const key = crypto.createHash("sha1").update(path15.resolve(projectDir)).digest("hex").slice(0, 12);
+  return path15.join(os2.tmpdir(), `cmp-console-${key}.json`);
+}
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err && err.code === "EPERM";
+  }
+}
+async function findLiveConsole(projectDir, { probe } = {}) {
+  let rec;
+  try {
+    rec = JSON.parse(fs14.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+  } catch {
+    return null;
+  }
+  if (!rec || typeof rec.pid !== "number" || typeof rec.port !== "number") return null;
+  if (!processAlive(rec.pid)) return null;
+  const answers = probe ? await probe(rec) : await fetch(`http://127.0.0.1:${rec.port}/`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
+  return answers ? rec : null;
+}
+function writeConsoleRegistry(projectDir, port) {
+  try {
+    fs14.writeFileSync(
+      consoleRegistryPath(projectDir),
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path15.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString() })}
+`
+    );
+  } catch {
+  }
+}
+function clearConsoleRegistry(projectDir) {
+  try {
+    const p = consoleRegistryPath(projectDir);
+    const rec = JSON.parse(fs14.readFileSync(p, "utf8"));
+    if (rec && rec.pid === process.pid) fs14.rmSync(p, { force: true });
+  } catch {
+  }
+}
 function stampRenderMarker(projectDir) {
   try {
     const p = path15.join(projectDir, ...RENDER_MARKER_REL);
@@ -36134,6 +36219,10 @@ function galleryHtml(state) {
     errorSource = null,
     renderer = { lastOutcome: "never", lastSuccessAt: null, lastAttemptAt: null, consecutiveFailures: 0 },
     rendererLastErrorText = null,
+    // Derived provenance of the pixels below (see the service's freshness()). Defaulting
+    // to null keeps older callers rendering exactly as before rather than asserting a
+    // freshness this page has no basis for.
+    freshness = null,
     approvals = { available: false },
     specs = { available: false },
     designSystem = { available: false },
@@ -36536,6 +36625,9 @@ ${section.bodyHtml}`;
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "rendering") { pill.textContent = "rendering\u2026"; pill.className = "rendering"; }
+    // A concurrent Gradle build (an ad-hoc ./gradlew) holds the classes dir. Not a
+    // failure \u2014 the render is queued and will run. Say exactly that; never the error pill.
+    if (msg.type === "deferred") { pill.textContent = "waiting for another build\u2026"; pill.className = "rendering"; }
     if (msg.type === "render") location.reload();
     // approval (a decision, from the console OR the CLI), comment (added or
     // resolved), governance (a governed FILE changed \u2014 an agent wrote a spec
@@ -36903,6 +36995,9 @@ ${section.bodyHtml}`;
     // compile-check message overwriting `error`/`errorSource`, and states
     // since-when the (possibly stale) screens below stopped refreshing.
     rendererDown: renderer && renderer.lastOutcome === "failed" ? { ...renderer, lastError: rendererLastErrorText } : null,
+    // The freshness banner sits ABOVE the renderer/error banners: "are these pixels
+    // current" is the first thing a reader needs, before why they might not be.
+    freshness,
     // §3.4 geometry from the render viewport: uniform cell width keeps the
     // matrix's columns aligned without a shared grid; the expanded wireframe
     // gets the roomier single-pane width.
@@ -37011,6 +37106,13 @@ function createPreviewService(opts) {
   let rendererLastSuccessAt = null;
   let rendererLastAttemptAt = null;
   let rendererConsecutiveFailures = 0;
+  let transientRetries = 0;
+  let lastRenderAt = null;
+  let srcChangedAt = null;
+  let renderPhase = "idle";
+  let renderCoversSrcAt = null;
+  let renderScheduled = false;
+  let renderPhaseDetail = null;
   let rendererLastErrorText = null;
   let lastActivity = null;
   let compileErrorLines = [];
@@ -37308,9 +37410,13 @@ function createPreviewService(opts) {
     }
   }
   function loadPreviews() {
-    const manifest = JSON.parse(
-      fs14.readFileSync(path15.join(previewsDir, "manifest.json"), "utf8")
-    );
+    const manifestPath = path15.join(previewsDir, "manifest.json");
+    const manifest = JSON.parse(fs14.readFileSync(manifestPath, "utf8"));
+    try {
+      lastRenderAt = fs14.statSync(manifestPath).mtimeMs;
+    } catch {
+      lastRenderAt = Date.now();
+    }
     viewport = manifest.viewport;
     const trees = /* @__PURE__ */ new Map();
     cards = manifest.screens.map((screen) => {
@@ -37497,11 +37603,19 @@ function createPreviewService(opts) {
     }
     if (laneInProgress(projectDir)) {
       touch("lane-defer");
+      renderPhase = "waiting-lane";
+      renderPhaseDetail = "a verify lane is running";
       log("verify lane in progress \u2014 deferring render until it finishes");
+      broadcast({ type: "freshness" });
       scheduleRender(LANE_POLL_MS);
       return;
     }
     rendering = true;
+    renderScheduled = false;
+    const coveringSrcAt = srcChangedAt;
+    renderPhase = "rendering";
+    renderPhaseDetail = null;
+    broadcast({ type: "freshness" });
     touch("render-start");
     rendererLastAttemptAt = (/* @__PURE__ */ new Date()).toISOString();
     snapshotPngs();
@@ -37536,6 +37650,10 @@ function createPreviewService(opts) {
       rendererLastSuccessAt = (/* @__PURE__ */ new Date()).toISOString();
       rendererConsecutiveFailures = 0;
       rendererLastErrorText = null;
+      transientRetries = 0;
+      renderPhase = "idle";
+      renderPhaseDetail = null;
+      renderCoversSrcAt = coveringSrcAt;
       lastError = null;
       lastErrorSource = null;
       compileErrorLines = [];
@@ -37569,7 +37687,31 @@ function createPreviewService(opts) {
         broadcast({ type: "render", version: version2, changed: lastChanged });
       }
     } catch (err) {
-      lastError = err && err.message ? err.message : String(err);
+      const errText = err && err.message ? err.message : String(err);
+      if (TRANSIENT_RENDER_RE.test(errText)) {
+        transientRetries++;
+        suppressSettle = true;
+        const quiet = transientRetries <= MAX_TRANSIENT_RETRIES;
+        renderPhase = quiet ? "waiting-build" : "stuck";
+        renderPhaseDetail = quiet ? "another build is using the project" : `another build has held the project for a while \u2014 still retrying (${errText.split("\n")[0]})`;
+        if (!quiet) {
+          rendererLastOutcome = "failed";
+          rendererConsecutiveFailures += 1;
+          rendererLastErrorText = errText;
+        }
+        touch(quiet ? "render-deferred" : "render-stuck");
+        log(
+          `render deferred (attempt ${transientRetries}) \u2014 a foreign Gradle invocation is rewriting the classes dir; retrying in ${quiet ? TRANSIENT_RETRY_MS : STUCK_RETRY_MS}ms`
+        );
+        broadcast({ type: "freshness" });
+        scheduleRender(quiet ? TRANSIENT_RETRY_MS : STUCK_RETRY_MS);
+        return;
+      }
+      transientRetries = 0;
+      renderPhase = "stuck";
+      renderPhaseDetail = errText.split("\n")[0];
+      scheduleRender(STUCK_RETRY_MS);
+      lastError = errText;
       lastErrorSource = "render";
       rendererLastOutcome = "failed";
       rendererConsecutiveFailures += 1;
@@ -37587,8 +37729,12 @@ function createPreviewService(opts) {
       }
     }
   }
+  function noteSourceChanged() {
+    srcChangedAt = Date.now();
+  }
   function scheduleRender(delayMs = DEBOUNCE_MS) {
     clearTimeout(debounceTimer);
+    renderScheduled = true;
     debounceTimer = setTimeout(() => void renderCycle(), delayMs);
   }
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
@@ -37597,8 +37743,12 @@ function createPreviewService(opts) {
       watcher = fs14.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
+        noteSourceChanged();
         noteSrcChange();
-        if (mode === "daemon" && classesWatcher) return;
+        if (mode === "daemon" && classesWatcher) {
+          scheduleRender(watchdogMs);
+          return;
+        }
         scheduleRender();
       });
       log(`watching ${srcDir} (fs events)`);
@@ -37609,6 +37759,7 @@ function createPreviewService(opts) {
         if (stamp !== lastStamp) {
           lastStamp = stamp;
           touch("src-change");
+          noteSourceChanged();
           noteSrcChange();
           scheduleRender();
         }
@@ -37780,6 +37931,7 @@ function createPreviewService(opts) {
             errorSource: lastErrorSource,
             renderer: rendererHealth(),
             rendererLastErrorText,
+            freshness: freshness(),
             approvals,
             specs,
             designSystem,
@@ -38035,6 +38187,21 @@ function createPreviewService(opts) {
       consecutiveFailures: rendererConsecutiveFailures
     };
   }
+  function freshness() {
+    const uncovered = srcChangedAt !== null && srcChangedAt !== renderCoversSrcAt;
+    const working = renderPhase === "stuck" || renderPhase === "waiting-build" || renderPhase === "waiting-lane";
+    const state = lastRenderAt === null ? "never" : uncovered || working ? "stale" : "fresh";
+    const pending = renderScheduled || rendering;
+    return {
+      state,
+      phase: state === "stale" && renderPhase === "idle" && !pending ? "unrefreshed" : renderPhase,
+      pending,
+      detail: renderPhaseDetail,
+      lastRenderAt: lastRenderAt === null ? null : new Date(lastRenderAt).toISOString(),
+      sourceChangedAt: srcChangedAt === null ? null : new Date(srcChangedAt).toISOString(),
+      ageMs: lastRenderAt === null ? null : Math.max(0, Date.now() - lastRenderAt)
+    };
+  }
   function status() {
     return {
       projectDir,
@@ -38047,6 +38214,7 @@ function createPreviewService(opts) {
       lastError,
       lastErrorSource,
       renderer: rendererHealth(),
+      freshness: freshness(),
       lastActivity,
       changedLastRender: lastChanged,
       screens: cards.map(({ screen, summary, a11y }) => ({
@@ -38069,10 +38237,22 @@ function createPreviewService(opts) {
           `'${projectDir}' does not look like a create-cmp app (no composeApp/).`
         );
       }
+      if (opts.takeover !== true) {
+        const live = await findLiveConsole(projectDir, opts.probeConsole);
+        if (live) {
+          const err = new Error(
+            `A studio console is already serving this project at ${live.url} (pid ${live.pid}, since ${live.startedAt}). Open that one \u2014 a second console would run its own renders against the same build directory and the two would disagree. To replace it: stop pid ${live.pid}, or start with takeover: true.`
+          );
+          err.code = "CMP_CONSOLE_ALREADY_RUNNING";
+          err.existing = live;
+          throw err;
+        }
+      }
       if (fs14.existsSync(path15.join(previewsDir, "manifest.json"))) {
         loadPreviews();
       }
       await listen(opts.port || DEFAULT_PORT2);
+      writeConsoleRegistry(projectDir, port);
       startWatching();
       watchGovernance();
       void renderCycle();
@@ -38095,6 +38275,7 @@ function createPreviewService(opts) {
       });
       if (daemonChild) daemonChild.kill("SIGTERM");
       clearRenderMarker(projectDir);
+      clearConsoleRegistry(projectDir);
       if (watcher) watcher.close();
       for (const res of sseClients) res.end();
       sseClients.clear();
@@ -38121,6 +38302,9 @@ function createPreviewService(opts) {
     snapshotVariant,
     /** Test seam: force one render cycle without touching the filesystem watcher. */
     _renderCycle: renderCycle,
+    // Test seam: simulate a save without depending on fs.watch timing (which is
+    // platform-dependent and would make the freshness assertions flaky).
+    _noteSourceChangedForTest: noteSourceChanged,
     /** Test seam: feed daemon-child output through the compile-failure scanner. */
     _noteDaemonOutput: noteDaemonOutput,
     /** Test seam: simulate a source-change event (swap-pending + watchdog arming). */
@@ -38810,7 +38994,20 @@ server.registerTool(
       log: (m) => process.stderr.write(`[preview] ${m}
 `)
     });
-    const st = await service.start();
+    let st;
+    try {
+      st = await service.start();
+    } catch (err) {
+      if (err && err.code === "CMP_CONSOLE_ALREADY_RUNNING") {
+        return ok({
+          ...err.existing,
+          projectDir: dir,
+          reusedExternal: true,
+          note: `A studio console for this project is already running in another process (pid ${err.existing.pid}). Use it at ${err.existing.url} \u2014 a second one would render into the same build directory and the two would disagree.`
+        });
+      }
+      throw err;
+    }
     previewService = service;
     previewProjectDir = dir;
     return ok(st);
