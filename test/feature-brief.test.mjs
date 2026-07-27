@@ -264,6 +264,44 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     assert.equal(row.accepted, undefined);
   });
 
+  await t.test("the audit rung: no signature is requested until the design has been attacked", () => {
+    // Regression for the churn measured on meal-plan (2026-07-27): brief signed,
+    // design signed, spec signed — and only THEN an edge-case audit that found
+    // nine gaps, three of them defects in already-signed clauses. Three signing
+    // rounds for one feature. The audit was always going to happen; the ladder
+    // just never placed it, so it happened last. Now it is a rung.
+    fs.writeFileSync(
+      path.join(featuresDir, "checkout.md"),
+      '# checkout\n\n## Decisions\n\n- one page.\n\n```json cmp:feature\n{ "touches": [], "screens": true }\n```\n',
+    );
+    const dir = path.join(root, "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/checkout");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "CheckoutScreen.kt"), "// stub-data draft\nclass CheckoutScreen\n");
+    const next = () => lib.getFeatureBoard(root).features.find((f) => f.name === "checkout").nextStep;
+
+    // Rendered, unaudited, NOTHING signed: the rung is the audit, owned by the
+    // agent — the human is not asked for anything yet.
+    assert.equal(next().key, "audit");
+    assert.equal(next().owner, "agent");
+
+    // A token gesture does not satisfy it: two cases still read as unaudited.
+    fs.appendFileSync(path.join(featuresDir, "checkout.md"), "\n## Edge cases\n\n- empty cart → CHK-02\n- card declined → CHK-05\n");
+    assert.equal(next().key, "audit");
+
+    // A real pass does. The count cannot judge QUALITY — what it enforces is
+    // that the pass happened and left written output BEFORE the gate.
+    fs.appendFileSync(path.join(featuresDir, "checkout.md"), "- back button mid-payment → out of scope for v1\n");
+    assert.equal(lib.getFeatureBoard(root).features.find((f) => f.name === "checkout").edgeCases, 3);
+    assert.equal(next().key, "sign-brief");
+    assert.equal(next().owner, "human");
+
+    // And the audit's findings were recorded while the brief was UNSIGNED, so
+    // signing it now does not immediately reopen it — the churn is gone.
+    runApprove(root, ["feature-brief:checkout"]);
+    assert.equal(lib.getApprovalStatuses(root).find((a) => a.id === "feature-brief:checkout").status, "approved");
+    assert.equal(next().key, "sign-design");
+  });
+
   await t.test("the design gate: brief → design → spec → build, signed on rendered output", () => {
     // A feature with NO ui surface carries no design rung at all — the honest skip.
     assert.equal(lib.getFeatureBoard(root).features.find((f) => f.name === "meal").design, null);
@@ -286,8 +324,10 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     // Nothing rendered → nothing signable: the refusal is the point.
     assert.equal(lib.approveArtifact(root, "feature-design:wizard").ok, false);
 
-    // Signed brief + undrafted design → the design rung, agent-owned.
-    runApprove(root, ["feature-brief:wizard"]);
+    // Unsigned brief + undrafted design → the DESIGN rung, agent-owned. The
+    // ladder asks for no signature yet: drafting and auditing come first, so the
+    // human signs once, at the end, rather than signing and then being asked
+    // again for every finding.
     const next = () => lib.getFeatureBoard(root).features.find((f) => f.name === "wizard").nextStep;
     assert.equal(next().key, "design");
     assert.equal(next().owner, "agent drafts → human signs");
@@ -302,8 +342,28 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     const resolved = lib.listGovernedArtifacts(root).find((a) => a.id === "feature-design:wizard");
     assert.equal(resolved.files.length, 1);
     assert.match(resolved.files[0], /WizardScreen\.kt$/);
+
+    // Rendered but UNAUDITED: the ladder still refuses to ask for a signature.
+    assert.equal(next().key, "audit");
+    assert.equal(next().owner, "agent");
+    assert.match(next().label, /Findings land BEFORE the signature/);
+
+    // The audit runs and records what it found — into the brief, while the brief
+    // is still unsigned, which is the whole point of the ordering.
+    fs.appendFileSync(
+      path.join(featuresDir, "wizard.md"),
+      "\n## Edge cases\n\n- back mid-wizard → step state survives (decision 4)\n" +
+        "- no network on step 3 → queued, retried (WIZ-07)\n" +
+        "- resumed after kill → out of scope for v1\n",
+    );
+    assert.equal(next().key, "sign-brief");
+    assert.equal(next().owner, "human");
+
+    // Only now, brief signed, is the design signable.
+    runApprove(root, ["feature-brief:wizard"]);
     assert.equal(next().key, "sign-design");
     assert.equal(next().owner, "human");
+    assert.match(next().label, /audited/);
 
     // The human signs; the walk moves on to the behavior contract.
     runApprove(root, ["feature-design:wizard"]);

@@ -18,12 +18,13 @@ lost and the mistake never rebuilt.
 
 Everything that ever happens to a create-cmp app is the same loop:
 
-> **Decide → Design → Contract → Build → Prove → Sign**
+> **Decide → Design → Audit → Contract → Build → Prove → Sign**
 
 | Stage | What it is | Where it lives |
 |---|---|---|
 | Decide | why this change, which options were rejected, what it will disturb | feature brief (`docs/features/<name>.md`) — only when there is something to decide |
 | Design | what it looks like — drafted on stub data, judged on RENDERED screens, never prose (Karel, 2026-07-25: a brief describing "a tray with a running total" is a description; nobody signs a description) | `feature-design:<name>` over `presentation/<name>/*Screen.kt` — **derived: the stage exists iff the change has a UI surface**; a pure-logic change skips it honestly |
+| Audit | attack the design before anyone signs it — what does this do on a skipped day, a reordered clock, a denied permission, an empty week? | `## Edge cases` in the brief: one line per case and how it resolves (a decision, a clause, or an explicit "out of scope"). **Derived rung**: while a UI feature records fewer than three, the ladder asks for no signature at all |
 | Contract | precisely what, testably | clauses in `specs/*.spec.md`; structural promises in governed artifacts |
 | Build | code, tests, stories, goldens | the tree |
 | Prove | mechanical verification | the lane (`qa/verify.mjs`) → receipt hash-bound to the tree |
@@ -44,6 +45,19 @@ earn a brief only when they become real. Every later change is the same
 loop over a subset. There is no second flow. Anything that proposes a second
 flow is wrong by construction — that is the lesson of the first
 implementation.
+
+**Why Audit is a stage and not a habit** (Karel, 2026-07-27). It was always
+happening — just last, after the signatures, where every finding reopened a
+signed artifact. Measured on `meal-plan`: the brief was signed, designed, signed
+again, contracted, signed again, and only then audited; the audit found nine
+gaps, three of them defects in clauses already approved. Three signing rounds for
+one feature, and none of the work was wasted — it was simply done in an order
+that made the human sign the same thing repeatedly. So the ladder now drafts and
+audits BEFORE it asks for anything: for a feature with a UI surface the agent
+owns `design` then `audit`, and only then does `sign-brief` appear. Findings land
+in the signing round instead of causing another one. The gate counts entries; it
+cannot judge them, and does not pretend to — what it enforces is that the
+adversarial pass happens while everything is still unsigned and cheap to change.
 
 ### The roles — who may do what
 
