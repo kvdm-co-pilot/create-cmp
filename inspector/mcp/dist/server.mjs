@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 179b00b5468eaa253d5346278a348db32fe6a18a1668b844fd52d53aac5ebd46
+// cmp:bundle-inputs 782aae82e091e326beb1e95fbe40c5eaf9a63eb0dd5b79d09e48d9bc2a461c72
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35927,8 +35927,9 @@ ${sections.map((s) => `      <h4>${esc4(s.heading)}</h4>
     const stamps = [];
     if (f.record && f.record.approvedAt) stamps.push(`signed ${esc4(f.record.approvedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}`);
     if (f.record && f.record.accepted) stamps.push(`accepted ${esc4(f.record.acceptedAt ?? "?")}`);
+    const briefAwaitsSignature = f.phase === "proposed" || f.phase === "changed-since-approval" || f.phase === "reopened";
     const actions = [];
-    if (f.phase === "proposed" || f.phase === "changed-since-approval") {
+    if (briefAwaitsSignature) {
       actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
     }
     if (f.phase === "proven") {

@@ -2524,11 +2524,21 @@ ${sections.map((s) => `      <h4>${esc(s.heading)}</h4>\n      <div class="doc-p
       if (f.record && f.record.accepted) stamps.push(`accepted ${esc(f.record.acceptedAt ?? "?")}`);
 
       // The two human moments, each offered only when it is the real next
-      // step: Approve (unsigned or drifted brief) and Accept (enabled only at
-      // provenDone — the library refuses anything else, the button just
-      // doesn't pretend otherwise). There is no agent verb here at all.
+      // step: Approve (unsigned, drifted, or REOPENED brief) and Accept
+      // (enabled only at provenDone — the library refuses anything else, the
+      // button just doesn't pretend otherwise). There is no agent verb here.
+      //
+      // `reopened` belongs here for the same reason the other two do: it is a
+      // phase whose next step is a human signature. The card already SAYS so —
+      // its derived next line reads "finish the redesign, then re-approve the
+      // brief · human" — and omitting the control left the one card that
+      // renders the whole brief as the one place you could read it and not act
+      // on it, sending you to the Approvals table to do what this card just
+      // asked for. "Sign where you read" is the rule; this was the gap in it.
+      const briefAwaitsSignature =
+        f.phase === "proposed" || f.phase === "changed-since-approval" || f.phase === "reopened";
       const actions = [];
-      if (f.phase === "proposed" || f.phase === "changed-since-approval") {
+      if (briefAwaitsSignature) {
         actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
       }
       if (f.phase === "proven") {
