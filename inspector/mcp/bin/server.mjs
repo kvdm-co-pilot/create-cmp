@@ -1062,6 +1062,53 @@ server.registerTool(
 let previewService = null;
 let previewProjectDir = null;
 
+// The session's resolved console (console-protocol.md decision 4): set by a
+// successful `preview` call — whether it STARTED a service in this process or
+// ADOPTED one another process is serving. Every console-backed tool below
+// speaks HTTP to `url` and never touches the service object (decision 1: one
+// wire, whoever started the process — the in-process object was a second data
+// path, and dual paths drift). `external` exists for exactly one decision:
+// preview_stop refuses to reach through the wire and close the human's window.
+let activeConsole = null; // {url, projectDir, external}
+
+/**
+ * One call on the console's wire. `holdMs` is how long the SERVER may
+ * legitimately hold the request (long-polls pass their wait budget); the
+ * client aborts 15s later, so the server's own `timedOut:true` answer always
+ * wins the race and the abort only fires when the console truly stopped
+ * answering. Failures come back as {failed: reason} in plain words — a dead
+ * console is reported as exactly that, never a stack trace (decision 6).
+ */
+async function consoleCall(pathname, { method = "GET", body, holdMs = 15000 } = {}) {
+  if (!activeConsole) return { failed: "No preview service is running — call preview { projectDir } first." };
+  let res;
+  try {
+    res = await fetch(new URL(pathname, activeConsole.url), {
+      method,
+      ...(body !== undefined ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(holdMs + 15000),
+    });
+  } catch {
+    return {
+      failed:
+        `The console at ${activeConsole.url} stopped answering — it may have been stopped or crashed. ` +
+        `Call preview { projectDir: "${activeConsole.projectDir}" } again.`,
+    };
+  }
+  if (res.status === 404) {
+    // A console that answers but lacks the route predates the protocol — the
+    // build handshake's vocabulary, reused (console-protocol.md edge case 3).
+    return {
+      failed:
+        `The console at ${activeConsole.url} predates this protocol route (${pathname}) — it is running an ` +
+        `older build. Restart it: node inspector/mcp/bin/console.mjs ${activeConsole.projectDir}`,
+    };
+  }
+  const json = await res.json().catch(() => null);
+  if (json === null) return { failed: `The console at ${activeConsole.url} answered ${res.status} with a non-JSON body for ${pathname}.` };
+  return { json, httpStatus: res.status };
+}
+
 server.registerTool(
   "preview",
   {
@@ -1101,7 +1148,9 @@ server.registerTool(
   guarded(async ({ projectDir, port, hot }) => {
     const dir = resolvePath(projectDir);
     if (previewService && previewProjectDir === dir) {
-      return ok({ ...previewService.status(), note: "already running (same project) — URL unchanged." });
+      const st = previewService.status();
+      activeConsole = { url: st.url, projectDir: dir, external: false };
+      return ok({ ...st, note: "already running (same project) — URL unchanged." });
     }
     if (previewService) {
       previewService.stop();
@@ -1136,6 +1185,9 @@ server.registerTool(
         }
         const mine = buildStatus(loadedBuildId().id);
         const mismatch = adoptedBuild && adoptedBuild.id && mine.id && adoptedBuild.id !== mine.id;
+        // Adoption resolves the session's console: every console-backed tool
+        // now speaks to it over the wire, identically to an owned one.
+        activeConsole = { url: err.existing.url, projectDir: dir, external: true };
         return ok({
           ...err.existing,
           projectDir: dir,
@@ -1159,6 +1211,7 @@ server.registerTool(
     }
     previewService = service;
     previewProjectDir = dir;
+    activeConsole = { url: st.url, projectDir: dir, external: false };
     return ok(st);
   })
 );
@@ -1173,10 +1226,22 @@ server.registerTool(
     inputSchema: {},
   },
   guarded(async () => {
+    // The one tool that does NOT go over the wire (console-protocol.md
+    // decision 5): stopping is an act of ownership. A console another process
+    // serves is the HUMAN's standalone window — an agent tool named "stop
+    // preview" must not reach through the wire and close it; the human's own
+    // verb exists and the refusal names it.
+    if (activeConsole && activeConsole.external) {
+      return fail(
+        `That console (${activeConsole.url}) is a standalone process this session did not start — refusing to stop ` +
+          `the human's window. To stop it deliberately: node inspector/mcp/bin/console.mjs ${activeConsole.projectDir} --stop`,
+      );
+    }
     if (!previewService) return fail("No preview service is running.");
     const final = previewService.stop();
     previewService = null;
     previewProjectDir = null;
+    activeConsole = null;
     return ok({ ...final, stopped: true });
   })
 );
@@ -1214,9 +1279,15 @@ server.registerTool(
     },
   },
   guarded(async ({ waitForRender, timeoutMs }) => {
-    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
-    if (waitForRender) return ok(await previewService.waitForRender(timeoutMs));
-    return ok(previewService.status());
+    // Over the wire (console-protocol.md decision 1) — identically against a
+    // console this process started and one it adopted. The wait is a
+    // long-poll: the console holds the request and answers with the same
+    // snapshot-plus-timedOut shape the in-process method returned.
+    const call = waitForRender
+      ? await consoleCall(`/api/render-wait${timeoutMs ? `?timeoutMs=${timeoutMs}` : ""}`, { holdMs: timeoutMs ?? 120000 })
+      : await consoleCall("/status");
+    if (call.failed) return fail(call.failed);
+    return ok(call.json);
   })
 );
 
@@ -1253,9 +1324,11 @@ server.registerTool(
     },
   },
   guarded(async ({ waitForDecision, timeoutMs }) => {
-    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
-    if (waitForDecision) return ok(await previewService.waitForApprovalDecision(timeoutMs));
-    return ok(await previewService.approvalStatusSnapshot());
+    const call = waitForDecision
+      ? await consoleCall(`/api/approval-wait${timeoutMs ? `?timeoutMs=${timeoutMs}` : ""}`, { holdMs: timeoutMs ?? 120000 })
+      : await consoleCall("/api/approvals");
+    if (call.failed) return fail(call.failed);
+    return ok(call.json);
   })
 );
 
@@ -1292,9 +1365,11 @@ server.registerTool(
     },
   },
   guarded(async ({ status, waitForComment, timeoutMs }) => {
-    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
-    if (waitForComment) return ok(await previewService.waitForNewComment(timeoutMs));
-    return ok(await previewService.commentsSnapshot(status));
+    const call = waitForComment
+      ? await consoleCall(`/api/comment-wait${timeoutMs ? `?timeoutMs=${timeoutMs}` : ""}`, { holdMs: timeoutMs ?? 120000 })
+      : await consoleCall(`/api/comments${status ? `?status=${status}` : ""}`);
+    if (call.failed) return fail(call.failed);
+    return ok(call.json);
   })
 );
 
@@ -1315,8 +1390,9 @@ server.registerTool(
     },
   },
   guarded(async ({ id, note }) => {
-    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
-    return ok(await previewService.resolveComment(id, note));
+    const call = await consoleCall("/api/resolve-comment", { method: "POST", body: { id, note } });
+    if (call.failed) return fail(call.failed);
+    return ok(call.json);
   })
 );
 
@@ -1345,10 +1421,10 @@ server.registerTool(
     },
   },
   guarded(async ({ name }) => {
-    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
-    const result = previewService.snapshotVariant(name);
-    if (!result.ok) return fail(result.reason);
-    return ok(result);
+    const call = await consoleCall("/api/variant", { method: "POST", body: { name } });
+    if (call.failed) return fail(call.failed);
+    if (!call.json.ok) return fail(call.json.reason);
+    return ok(call.json);
   })
 );
 
@@ -1371,33 +1447,16 @@ server.registerTool(
     },
   },
   guarded(async ({ screen, tolerancePx, minTouchTargetPx }) => {
-    if (!previewService) return fail("No preview service is running — call preview { projectDir } first.");
-    const { before, after, version } = previewService.treesFor(screen);
-    if (!after) {
-      const known = previewService.status().screens.map((s) => s.id).join(", ");
-      return fail(`Screen '${screen}' is not in the current render. Known screens: ${known || "(none yet)"}.`);
-    }
-    if (!before) {
-      return fail(
-        `No previous generation for '${screen}' yet — preview_diff compares the last two renders. ` +
-          "Edit code, then preview_status { waitForRender: true }, then call this again."
-      );
-    }
-    let catalog;
-    const catalogPath = join(previewService.status().previewsDir, "design-system.json");
-    if (existsSync(catalogPath)) catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
-    return ok({
-      screen,
-      fromVersion: version - 1,
-      toVersion: version,
-      ...proveChange({
-        beforeTree: JSON.parse(before),
-        afterTree: JSON.parse(after),
-        catalog,
-        tolerancePx,
-        minTouchTargetPx,
-      }),
-    });
+    // The diff computes SERVER-SIDE (console-protocol.md decision 3): the
+    // previous tree generation exists only in the console process's memory, so
+    // the verdict crosses the wire, never the inputs.
+    const params = new URLSearchParams({ screen });
+    if (tolerancePx !== undefined) params.set("tolerancePx", String(tolerancePx));
+    if (minTouchTargetPx !== undefined) params.set("minTouchTargetPx", String(minTouchTargetPx));
+    const call = await consoleCall(`/api/diff?${params}`);
+    if (call.failed) return fail(call.failed);
+    if (!call.json.ok) return fail(call.json.reason);
+    return ok(call.json);
   })
 );
 

@@ -8,6 +8,30 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The console protocol — one wire, whoever started the process**
+  (`docs/proposals/console-protocol.md`). The seven console-backed MCP tools
+  (`preview_status`/`waitForRender`, `preview_diff`, `snapshot_variant`, `approval_status`,
+  `review_comments`, `resolve_comment`, `preview_stop`) gated on an in-process service
+  object — so against the standalone console (the recommended setup since the same day's
+  detachment) they answered "No preview service is running". Now the console exposes eight
+  thin routes over its existing HTTP server (long-poll waits in the tools' own
+  block-then-snapshot shape; `preview_diff` computes SERVER-side, where the previous tree
+  generation lives) and the tools speak HTTP **always** — including to a console this
+  process started (Docker's model: one path, no in-process fast path to drift).
+  `preview_stop` is the deliberate exception: it refuses to stop a console another process
+  serves — an agent tool must not close the human's window; `bin/console.mjs --stop` is the
+  human's verb. Proven end-to-end: a fresh MCP server adopted the standalone console
+  (build-id match confirmed) and ran the previously-gated tools against it.
+
+### Fixed
+
+- **A busy console read as a dead one.** `findLiveConsole`'s liveness probe fetched `/` —
+  the full gallery page, which derives the whole governed surface — with a 2s budget; under
+  boot-time load it timed out, the one-console-per-project guard let a second service
+  start, and that service overwrote and then deleted the real console's registry record
+  (observed live during the protocol proof). The probe now hits `/status` — constant-cost
+  JSON. A liveness probe must cost the server nothing, or load defeats it.
+
 - **The console's build handshake — a process that knows whether it is stale**
   (`docs/proposals/console-build-handshake.md`). Twice in two days a long-lived console
   served a page built from an older module graph while the rebuilt code sat on disk, and

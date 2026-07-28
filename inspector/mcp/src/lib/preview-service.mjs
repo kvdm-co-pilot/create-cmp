@@ -36,6 +36,7 @@ import { promisify } from "node:util";
 import { renderTreeSvg } from "./render.mjs";
 import { auditA11y } from "./a11y.mjs";
 import { buildStatus, loadedBuildId } from "./build-id.mjs";
+import { proveChange } from "./prove.mjs";
 import { gradleEnv } from "./jdk.mjs";
 import { fetchLiveCatalog } from "./live.mjs";
 import {
@@ -206,9 +207,15 @@ export async function findLiveConsole(projectDir, { probe } = {}) {
   // as badly as two processes, and the probe below settles it either way — a record left
   // by our own crashed predecessor simply fails to answer.
   if (!processAlive(rec.pid)) return null;
+  // Probe /status — cheap, constant-cost JSON — NEVER "/": the gallery page
+  // derives the whole governed surface (git subprocess, approval board,
+  // ~700KB of HTML) and under boot-time load blew the 2s budget, so a BUSY
+  // console read as a dead one. The guard then let a second service start,
+  // overwrite this record, and delete it on stop — observed 2026-07-28. A
+  // liveness probe must cost the server nothing, or load defeats it.
   const answers = probe
     ? await probe(rec)
-    : await fetch(`http://127.0.0.1:${rec.port}/`, { signal: AbortSignal.timeout(2000) })
+    : await fetch(`http://127.0.0.1:${rec.port}/status`, { signal: AbortSignal.timeout(2000) })
         .then((r) => r.ok)
         .catch(() => false);
   return answers ? rec : null;
@@ -2117,6 +2124,45 @@ export function createPreviewService(opts) {
   }
 
   /**
+   * preview_diff's whole computation, moved to where the state lives
+   * (console-protocol.md decision 3): the previous tree generation exists only
+   * in THIS process's memory, so the diff must happen here — a client in
+   * another process can only receive the verdict, never the inputs. Refusals
+   * are {ok:false, reason} in the tools' own wording, so the wire adds nothing.
+   */
+  function diffScreen({ screen, tolerancePx, minTouchTargetPx } = {}) {
+    const { before, after, version: v } = treesFor(screen);
+    if (!after) {
+      const known = cards.map((c) => c.screen.id).join(", ");
+      return { ok: false, reason: `Screen '${screen}' is not in the current render. Known screens: ${known || "(none yet)"}.` };
+    }
+    if (!before) {
+      return {
+        ok: false,
+        reason:
+          `No previous generation for '${screen}' yet — the diff compares the last two renders. ` +
+          "Edit code, then preview_status { waitForRender: true }, then call this again.",
+      };
+    }
+    let catalog;
+    const catalogPath = path.join(previewsDir, "design-system.json");
+    if (fs.existsSync(catalogPath)) catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
+    return {
+      ok: true,
+      screen,
+      fromVersion: v - 1,
+      toVersion: v,
+      ...proveChange({
+        beforeTree: JSON.parse(before),
+        afterTree: JSON.parse(after),
+        catalog,
+        tolerancePx,
+        minTouchTargetPx,
+      }),
+    };
+  }
+
+  /**
    * Copy each screen's current PNG to screen.prev.png before a render overwrites it,
    * so the gallery can show hover before/after on changed cards.
    */
@@ -2798,6 +2844,99 @@ export function createPreviewService(opts) {
         res.end(JSON.stringify(status(), null, 2));
         return;
       }
+      // ── The console protocol (docs/proposals/console-protocol.md) ─────────
+      // The MCP tools' wire: thin routes over service methods that already
+      // exist, so the tools work identically against a console this process
+      // started and one another process started (one wire, whoever started
+      // the process). The waits are LONG-POLLS — hold, then answer with the
+      // same snapshot-plus-timedOut shape the in-process methods return —
+      // because that IS the tools' contract; Node bounds request receipt, not
+      // response time, so the hold is safe.
+      const jsonOut = (code, body) => {
+        res.writeHead(code, { "content-type": "application/json" });
+        res.end(JSON.stringify(body));
+      };
+      // timeoutMs: a bad value falls back to the service default rather than
+      // erroring — a wait with a mistyped timeout should still wait.
+      const timeoutParam = () => {
+        const raw = Number.parseInt(url.searchParams.get("timeoutMs") ?? "", 10);
+        return Number.isInteger(raw) && raw > 0 ? raw : undefined;
+      };
+      if (url.pathname === "/api/render-wait") {
+        jsonOut(200, await waitForRender(timeoutParam()));
+        return;
+      }
+      if (url.pathname === "/api/diff") {
+        const screen = url.searchParams.get("screen");
+        if (!screen) {
+          jsonOut(400, { ok: false, reason: "missing `screen` query parameter" });
+          return;
+        }
+        const num = (name) => {
+          const raw = url.searchParams.get(name);
+          return raw === null ? undefined : Number(raw);
+        };
+        const result = diffScreen({ screen, tolerancePx: num("tolerancePx"), minTouchTargetPx: num("minTouchTargetPx") });
+        jsonOut(result.ok ? 200 : 409, result);
+        return;
+      }
+      if (url.pathname === "/api/variant") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          res.end(JSON.stringify({ ok: false, reason: "method not allowed — use POST" }));
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse((await readBody(req)) || "{}");
+        } catch (err) {
+          jsonOut(400, { ok: false, reason: `invalid JSON body: ${err.message}` });
+          return;
+        }
+        if (!body.name || typeof body.name !== "string") {
+          jsonOut(400, { ok: false, reason: "missing `name` (string) in the request body" });
+          return;
+        }
+        const result = snapshotVariant(body.name);
+        jsonOut(result.ok ? 200 : 409, result);
+        return;
+      }
+      if (url.pathname === "/api/approvals") {
+        jsonOut(200, await approvalStatusSnapshot());
+        return;
+      }
+      if (url.pathname === "/api/approval-wait") {
+        jsonOut(200, await waitForApprovalDecision(timeoutParam()));
+        return;
+      }
+      if (url.pathname === "/api/comments") {
+        jsonOut(200, await commentsSnapshot(url.searchParams.get("status") ?? undefined));
+        return;
+      }
+      if (url.pathname === "/api/comment-wait") {
+        jsonOut(200, await waitForNewComment(timeoutParam()));
+        return;
+      }
+      if (url.pathname === "/api/resolve-comment") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          res.end(JSON.stringify({ ok: false, reason: "method not allowed — use POST" }));
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse((await readBody(req)) || "{}");
+        } catch (err) {
+          jsonOut(400, { ok: false, reason: `invalid JSON body: ${err.message}` });
+          return;
+        }
+        if (!body.id || typeof body.id !== "string" || !body.note || typeof body.note !== "string") {
+          jsonOut(400, { ok: false, reason: "missing `id` (string) and/or `note` (string) in the request body" });
+          return;
+        }
+        jsonOut(200, await resolveCommentById(body.id, body.note));
+        return;
+      }
       if (url.pathname === "/api/approve") {
         if (req.method !== "POST") {
           res.writeHead(405, { "content-type": "application/json", allow: "POST" });
@@ -3206,6 +3345,8 @@ export function createPreviewService(opts) {
     status,
     waitForRender,
     treesFor,
+    /** preview_diff's computation, where the previous generation lives (console-protocol.md §3). */
+    diffScreen,
     /** Current approval statuses (§4 tab data) — {available:false} with no approvals library. */
     approvalStatusSnapshot,
     /** Blocks until any governed artifact's status changes (or timeoutMs elapses). */

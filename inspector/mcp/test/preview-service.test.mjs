@@ -2931,6 +2931,42 @@ test("guard: a record left by a CRASHED console never blocks the next start", as
   }
 });
 
+test("guard: a BUSY console is still a live console — the probe hits cheap /status, never the heavy gallery page", async () => {
+  // Observed 2026-07-28: the probe fetched "/" — the full gallery, which
+  // derives the whole governed surface and blew the 2s budget under boot-time
+  // load — so a busy console read as DEAD, the guard let a second service
+  // start, and that service overwrote and then deleted the real console's
+  // registry record. A liveness probe must cost the server nothing.
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preview-"));
+  fs.mkdirSync(path.join(projectDir, "composeApp"), { recursive: true });
+  const port = 19746;
+
+  // A server that is ALIVE but busy: /status answers instantly, "/" hangs far
+  // past the probe budget — the shape of a console mid-first-render.
+  const busy = http.createServer((req, res) => {
+    if (req.url === "/status") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("{}");
+      return;
+    }
+    /* "/" never answers within any probe budget — hold the socket */
+  });
+  await new Promise((r) => busy.listen(port, "127.0.0.1", r));
+  fs.writeFileSync(
+    consoleRegistryPath(projectDir),
+    JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, startedAt: "2020-01-01T00:00:00.000Z" }),
+  );
+  try {
+    const live = await findLiveConsole(projectDir);
+    assert.ok(live, "a console whose gallery is slow is BUSY, not dead — it must still be found");
+    assert.equal(live.port, port);
+  } finally {
+    busy.close();
+    fs.rmSync(consoleRegistryPath(projectDir), { force: true });
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
 test("guard: a live pid whose port does NOT answer is stale too — a recycled pid never wedges a project", async () => {
   // pids get reused. Requiring the port to answer as well is what keeps the guard from
   // blocking a project because some unrelated process inherited the number.

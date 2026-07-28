@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 844fa579282d78128de7895722a804749eebd14514e656268659f62bae9ef090
+// cmp:bundle-inputs 46a5305e4351e20abc9a0edc6463c2552e20723bb1df3f82e3ce90ee259cb3e8
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36249,7 +36249,7 @@ async function findLiveConsole(projectDir, { probe } = {}) {
   }
   if (!rec || typeof rec.pid !== "number" || typeof rec.port !== "number") return null;
   if (!processAlive(rec.pid)) return null;
-  const answers = probe ? await probe(rec) : await fetch(`http://127.0.0.1:${rec.port}/`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
+  const answers = probe ? await probe(rec) : await fetch(`http://127.0.0.1:${rec.port}/status`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
   return answers ? rec : null;
 }
 function writeConsoleRegistry(projectDir, port) {
@@ -37677,6 +37677,35 @@ function createPreviewService(opts) {
       version: version2
     };
   }
+  function diffScreen({ screen, tolerancePx, minTouchTargetPx } = {}) {
+    const { before, after, version: v } = treesFor(screen);
+    if (!after) {
+      const known = cards.map((c) => c.screen.id).join(", ");
+      return { ok: false, reason: `Screen '${screen}' is not in the current render. Known screens: ${known || "(none yet)"}.` };
+    }
+    if (!before) {
+      return {
+        ok: false,
+        reason: `No previous generation for '${screen}' yet \u2014 the diff compares the last two renders. Edit code, then preview_status { waitForRender: true }, then call this again.`
+      };
+    }
+    let catalog;
+    const catalogPath = path16.join(previewsDir, "design-system.json");
+    if (fs15.existsSync(catalogPath)) catalog = JSON.parse(fs15.readFileSync(catalogPath, "utf8"));
+    return {
+      ok: true,
+      screen,
+      fromVersion: v - 1,
+      toVersion: v,
+      ...proveChange({
+        beforeTree: JSON.parse(before),
+        afterTree: JSON.parse(after),
+        catalog,
+        tolerancePx,
+        minTouchTargetPx
+      })
+    };
+  }
   function snapshotPngs() {
     for (const { screen } of cards) {
       const src = path16.join(previewsDir, screen.png);
@@ -38211,6 +38240,89 @@ function createPreviewService(opts) {
         res.end(JSON.stringify(status(), null, 2));
         return;
       }
+      const jsonOut = (code, body) => {
+        res.writeHead(code, { "content-type": "application/json" });
+        res.end(JSON.stringify(body));
+      };
+      const timeoutParam = () => {
+        const raw = Number.parseInt(url2.searchParams.get("timeoutMs") ?? "", 10);
+        return Number.isInteger(raw) && raw > 0 ? raw : void 0;
+      };
+      if (url2.pathname === "/api/render-wait") {
+        jsonOut(200, await waitForRender(timeoutParam()));
+        return;
+      }
+      if (url2.pathname === "/api/diff") {
+        const screen = url2.searchParams.get("screen");
+        if (!screen) {
+          jsonOut(400, { ok: false, reason: "missing `screen` query parameter" });
+          return;
+        }
+        const num = (name) => {
+          const raw = url2.searchParams.get(name);
+          return raw === null ? void 0 : Number(raw);
+        };
+        const result = diffScreen({ screen, tolerancePx: num("tolerancePx"), minTouchTargetPx: num("minTouchTargetPx") });
+        jsonOut(result.ok ? 200 : 409, result);
+        return;
+      }
+      if (url2.pathname === "/api/variant") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          res.end(JSON.stringify({ ok: false, reason: "method not allowed \u2014 use POST" }));
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse(await readBody(req) || "{}");
+        } catch (err) {
+          jsonOut(400, { ok: false, reason: `invalid JSON body: ${err.message}` });
+          return;
+        }
+        if (!body.name || typeof body.name !== "string") {
+          jsonOut(400, { ok: false, reason: "missing `name` (string) in the request body" });
+          return;
+        }
+        const result = snapshotVariant(body.name);
+        jsonOut(result.ok ? 200 : 409, result);
+        return;
+      }
+      if (url2.pathname === "/api/approvals") {
+        jsonOut(200, await approvalStatusSnapshot());
+        return;
+      }
+      if (url2.pathname === "/api/approval-wait") {
+        jsonOut(200, await waitForApprovalDecision(timeoutParam()));
+        return;
+      }
+      if (url2.pathname === "/api/comments") {
+        jsonOut(200, await commentsSnapshot(url2.searchParams.get("status") ?? void 0));
+        return;
+      }
+      if (url2.pathname === "/api/comment-wait") {
+        jsonOut(200, await waitForNewComment(timeoutParam()));
+        return;
+      }
+      if (url2.pathname === "/api/resolve-comment") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          res.end(JSON.stringify({ ok: false, reason: "method not allowed \u2014 use POST" }));
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse(await readBody(req) || "{}");
+        } catch (err) {
+          jsonOut(400, { ok: false, reason: `invalid JSON body: ${err.message}` });
+          return;
+        }
+        if (!body.id || typeof body.id !== "string" || !body.note || typeof body.note !== "string") {
+          jsonOut(400, { ok: false, reason: "missing `id` (string) and/or `note` (string) in the request body" });
+          return;
+        }
+        jsonOut(200, await resolveCommentById(body.id, body.note));
+        return;
+      }
       if (url2.pathname === "/api/approve") {
         if (req.method !== "POST") {
           res.writeHead(405, { "content-type": "application/json", allow: "POST" });
@@ -38531,6 +38643,8 @@ function createPreviewService(opts) {
     status,
     waitForRender,
     treesFor,
+    /** preview_diff's computation, where the previous generation lives (console-protocol.md §3). */
+    diffScreen,
     /** Current approval statuses (§4 tab data) — {available:false} with no approvals library. */
     approvalStatusSnapshot,
     /** Blocks until any governed artifact's status changes (or timeoutMs elapses). */
@@ -39208,6 +39322,30 @@ server.registerTool(
 );
 var previewService = null;
 var previewProjectDir = null;
+var activeConsole = null;
+async function consoleCall(pathname, { method = "GET", body, holdMs = 15e3 } = {}) {
+  if (!activeConsole) return { failed: "No preview service is running \u2014 call preview { projectDir } first." };
+  let res;
+  try {
+    res = await fetch(new URL(pathname, activeConsole.url), {
+      method,
+      ...body !== void 0 ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {},
+      signal: AbortSignal.timeout(holdMs + 15e3)
+    });
+  } catch {
+    return {
+      failed: `The console at ${activeConsole.url} stopped answering \u2014 it may have been stopped or crashed. Call preview { projectDir: "${activeConsole.projectDir}" } again.`
+    };
+  }
+  if (res.status === 404) {
+    return {
+      failed: `The console at ${activeConsole.url} predates this protocol route (${pathname}) \u2014 it is running an older build. Restart it: node inspector/mcp/bin/console.mjs ${activeConsole.projectDir}`
+    };
+  }
+  const json2 = await res.json().catch(() => null);
+  if (json2 === null) return { failed: `The console at ${activeConsole.url} answered ${res.status} with a non-JSON body for ${pathname}.` };
+  return { json: json2, httpStatus: res.status };
+}
 server.registerTool(
   "preview",
   {
@@ -39224,7 +39362,9 @@ server.registerTool(
   guarded(async ({ projectDir, port, hot }) => {
     const dir = resolvePath(projectDir);
     if (previewService && previewProjectDir === dir) {
-      return ok({ ...previewService.status(), note: "already running (same project) \u2014 URL unchanged." });
+      const st2 = previewService.status();
+      activeConsole = { url: st2.url, projectDir: dir, external: false };
+      return ok({ ...st2, note: "already running (same project) \u2014 URL unchanged." });
     }
     if (previewService) {
       previewService.stop();
@@ -39250,6 +39390,7 @@ server.registerTool(
         }
         const mine = buildStatus(loadedBuildId().id);
         const mismatch = adoptedBuild && adoptedBuild.id && mine.id && adoptedBuild.id !== mine.id;
+        activeConsole = { url: err.existing.url, projectDir: dir, external: true };
         return ok({
           ...err.existing,
           projectDir: dir,
@@ -39263,6 +39404,7 @@ server.registerTool(
     }
     previewService = service;
     previewProjectDir = dir;
+    activeConsole = { url: st.url, projectDir: dir, external: false };
     return ok(st);
   })
 );
@@ -39274,10 +39416,16 @@ server.registerTool(
     inputSchema: {}
   },
   guarded(async () => {
+    if (activeConsole && activeConsole.external) {
+      return fail(
+        `That console (${activeConsole.url}) is a standalone process this session did not start \u2014 refusing to stop the human's window. To stop it deliberately: node inspector/mcp/bin/console.mjs ${activeConsole.projectDir} --stop`
+      );
+    }
     if (!previewService) return fail("No preview service is running.");
     const final = previewService.stop();
     previewService = null;
     previewProjectDir = null;
+    activeConsole = null;
     return ok({ ...final, stopped: true });
   })
 );
@@ -39292,9 +39440,9 @@ server.registerTool(
     }
   },
   guarded(async ({ waitForRender, timeoutMs }) => {
-    if (!previewService) return fail("No preview service is running \u2014 call preview { projectDir } first.");
-    if (waitForRender) return ok(await previewService.waitForRender(timeoutMs));
-    return ok(previewService.status());
+    const call = waitForRender ? await consoleCall(`/api/render-wait${timeoutMs ? `?timeoutMs=${timeoutMs}` : ""}`, { holdMs: timeoutMs ?? 12e4 }) : await consoleCall("/status");
+    if (call.failed) return fail(call.failed);
+    return ok(call.json);
   })
 );
 server.registerTool(
@@ -39308,9 +39456,9 @@ server.registerTool(
     }
   },
   guarded(async ({ waitForDecision, timeoutMs }) => {
-    if (!previewService) return fail("No preview service is running \u2014 call preview { projectDir } first.");
-    if (waitForDecision) return ok(await previewService.waitForApprovalDecision(timeoutMs));
-    return ok(await previewService.approvalStatusSnapshot());
+    const call = waitForDecision ? await consoleCall(`/api/approval-wait${timeoutMs ? `?timeoutMs=${timeoutMs}` : ""}`, { holdMs: timeoutMs ?? 12e4 }) : await consoleCall("/api/approvals");
+    if (call.failed) return fail(call.failed);
+    return ok(call.json);
   })
 );
 server.registerTool(
@@ -39325,9 +39473,9 @@ server.registerTool(
     }
   },
   guarded(async ({ status, waitForComment, timeoutMs }) => {
-    if (!previewService) return fail("No preview service is running \u2014 call preview { projectDir } first.");
-    if (waitForComment) return ok(await previewService.waitForNewComment(timeoutMs));
-    return ok(await previewService.commentsSnapshot(status));
+    const call = waitForComment ? await consoleCall(`/api/comment-wait${timeoutMs ? `?timeoutMs=${timeoutMs}` : ""}`, { holdMs: timeoutMs ?? 12e4 }) : await consoleCall(`/api/comments${status ? `?status=${status}` : ""}`);
+    if (call.failed) return fail(call.failed);
+    return ok(call.json);
   })
 );
 server.registerTool(
@@ -39341,8 +39489,9 @@ server.registerTool(
     }
   },
   guarded(async ({ id, note }) => {
-    if (!previewService) return fail("No preview service is running \u2014 call preview { projectDir } first.");
-    return ok(await previewService.resolveComment(id, note));
+    const call = await consoleCall("/api/resolve-comment", { method: "POST", body: { id, note } });
+    if (call.failed) return fail(call.failed);
+    return ok(call.json);
   })
 );
 server.registerTool(
@@ -39355,10 +39504,10 @@ server.registerTool(
     }
   },
   guarded(async ({ name }) => {
-    if (!previewService) return fail("No preview service is running \u2014 call preview { projectDir } first.");
-    const result = previewService.snapshotVariant(name);
-    if (!result.ok) return fail(result.reason);
-    return ok(result);
+    const call = await consoleCall("/api/variant", { method: "POST", body: { name } });
+    if (call.failed) return fail(call.failed);
+    if (!call.json.ok) return fail(call.json.reason);
+    return ok(call.json);
   })
 );
 server.registerTool(
@@ -39373,32 +39522,13 @@ server.registerTool(
     }
   },
   guarded(async ({ screen, tolerancePx, minTouchTargetPx }) => {
-    if (!previewService) return fail("No preview service is running \u2014 call preview { projectDir } first.");
-    const { before, after, version: version2 } = previewService.treesFor(screen);
-    if (!after) {
-      const known = previewService.status().screens.map((s) => s.id).join(", ");
-      return fail(`Screen '${screen}' is not in the current render. Known screens: ${known || "(none yet)"}.`);
-    }
-    if (!before) {
-      return fail(
-        `No previous generation for '${screen}' yet \u2014 preview_diff compares the last two renders. Edit code, then preview_status { waitForRender: true }, then call this again.`
-      );
-    }
-    let catalog;
-    const catalogPath = join4(previewService.status().previewsDir, "design-system.json");
-    if (existsSync2(catalogPath)) catalog = JSON.parse(readFileSync4(catalogPath, "utf8"));
-    return ok({
-      screen,
-      fromVersion: version2 - 1,
-      toVersion: version2,
-      ...proveChange({
-        beforeTree: JSON.parse(before),
-        afterTree: JSON.parse(after),
-        catalog,
-        tolerancePx,
-        minTouchTargetPx
-      })
-    });
+    const params = new URLSearchParams({ screen });
+    if (tolerancePx !== void 0) params.set("tolerancePx", String(tolerancePx));
+    if (minTouchTargetPx !== void 0) params.set("minTouchTargetPx", String(minTouchTargetPx));
+    const call = await consoleCall(`/api/diff?${params}`);
+    if (call.failed) return fail(call.failed);
+    if (!call.json.ok) return fail(call.json.reason);
+    return ok(call.json);
   })
 );
 for (const signal of ["SIGINT", "SIGTERM"]) {
