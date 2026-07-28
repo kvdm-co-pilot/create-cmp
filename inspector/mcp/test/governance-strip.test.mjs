@@ -93,12 +93,45 @@ test("governanceStripHtml: counts, the one next act as a jump button, and (+n mo
   assert.match(html, /id="gov-strip"/);
   assert.match(html, /2 signed/);
   assert.match(html, /2 await you/); // components (drift) + feature-brief:meal (unreviewed)
-  assert.match(html, /1 in redesign/); // design-system: reopened, unproven — not in the queue
-  assert.match(html, /1 drifted/);
+  // A lone artifact in a category is NAMED, not counted — "1 in redesign" told
+  // the reader nothing about which artifact or where to look (2026-07-28).
+  assert.match(html, /in redesign: design-system/); // reopened, unproven — not in the queue
+  assert.match(html, /drifted: components/);
   // The next act is the FIRST queue item, as a jump button speaking the same
   // data-tab/data-artifact contract the guided prompt's "Take me there" uses.
   assert.match(html, /class="gov-next" data-go-tab="components" data-go-artifact="components"/);
   assert.match(html, /\(\+1 more\)/);
+});
+
+// "1 in redesign" is a number with no referent — it names no artifact and offers
+// no way to reach it, which is how a reader ends up asking what it means and
+// where to look (2026-07-28). A lone one names itself and jumps.
+test("governanceStripHtml: a single reopened/drifted artifact is NAMED and jumps to its row", () => {
+  const redesign = governanceStripHtml({
+    statuses: [
+      status("intent", "approved"),
+      { ...status("feature-design:meal", "reopened"), label: "Feature design (meal)" },
+    ],
+    features: [],
+    journal: [],
+  });
+  assert.match(redesign, /in redesign: Feature design \(meal\)/, "the count names the artifact");
+  assert.match(redesign, /class="gov-n gov-redesign gov-jump"/);
+  assert.match(redesign, /data-go-tab="approvals"/);
+  assert.match(redesign, /data-go-artifact="feature-design:meal"/, "clicking lands on the row that explains itself");
+  assert.doesNotMatch(redesign, /1 in redesign/, "the bare digit is what nobody could read");
+
+  // More than one: the digit is right (naming four artifacts in a rail strip is
+  // noise), but it still jumps to the tab.
+  const many = governanceStripHtml({
+    statuses: [status("a", "changed-since-approval"), status("b", "changed-since-approval")],
+    features: [],
+    journal: [],
+  });
+  assert.match(many, /2 drifted/);
+  const countBtn = many.match(/<button[^>]*gov-drift[^>]*>/)[0];
+  assert.match(countBtn, /data-go-tab="approvals"/);
+  assert.doesNotMatch(countBtn, /data-go-artifact/, "no single artifact to name, so the count claims none");
 });
 
 test("governanceStripHtml: nothing pending says so; no statuses at all renders NOTHING (silence, not a fabricated dashboard)", () => {

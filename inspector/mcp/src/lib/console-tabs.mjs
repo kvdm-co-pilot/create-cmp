@@ -165,13 +165,24 @@ export function signatureBarHtml(status, opts = {}) {
 // uses — re-approval happens where the drift is read, not on another tab.
 
 /**
- * @param {object} status a getApprovalStatuses row (must be changed-since-approval to render)
+ * Renders for the two states that have a signature to compare against:
+ * `changed-since-approval` (unsanctioned — drift) and `reopened` (sanctioned —
+ * redesign). Both answer "what moved since the bytes I signed"; only the tone
+ * and the call to action differ. Before 2026-07-28 a reopened row rendered
+ * NOTHING here — it showed a hash, a timestamp, and a bare "reopened" badge,
+ * which is unreadable unless you already know which files the artifact governs
+ * and why its signature was walked back. The gate's drift/redesign asymmetry is
+ * about pass/fail; it was never a reason to withhold the explanation.
+ *
+ * @param {object} status a getApprovalStatuses row (changed-since-approval or reopened)
  * @param {object|null} anchored getApprovalAnchoredDiff result for this artifact
  * @param {{withApprove?: boolean}} [opts] withApprove=false inside the Approvals
  *   table, whose rows already carry the button
  */
 export function driftPanelHtml(status, anchored, opts = {}) {
-  if (!status || status.status !== "changed-since-approval") return "";
+  if (!status) return "";
+  const reopened = status.status === "reopened";
+  if (status.status !== "changed-since-approval" && !reopened) return "";
   const withApprove = opts.withApprove !== false;
   const signedLine = status.approvedAt ? ` It was signed ${esc(status.approvedAt)}.` : "";
 
@@ -206,11 +217,24 @@ ${stillSigned}`;
     diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc(anchored.reason)}</p>`;
   }
 
-  return `  <div class="drift-panel" data-artifact="${escAttr(status.id)}">
-    <p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve — or revert the change.</p>
+  // A reopened row states the three things its bare badge never did: that this
+  // was deliberate (and by whom, and why, when the ledger recorded it), that the
+  // lane is not failing because of it, and what the human is being asked to do.
+  const who = status.via ? ` via ${esc(status.via)}` : "";
+  const why = status.reason
+    ? ` Reason given: <em>${esc(status.reason)}</em>.`
+    : " No reason was recorded — this reopen predates the reason-required rule.";
+  const head = reopened
+    ? `<p class="drift-head"><strong>Reopened for redesign</strong> &mdash; the signature on <code>${esc(status.id)}</code> was deliberately walked back${
+        status.reopenedAt ? ` ${esc(status.reopenedAt)}` : ""
+      }${who}.${why} This is sanctioned, not drift: the verify lane skips it rather than failing. Below is what has moved since the bytes you signed. Approve when the rendered result is what you want.</p>`
+    : `<p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve — or revert the change.</p>`;
+
+  return `  <div class="drift-panel${reopened ? " drift-panel-reopened" : ""}" data-artifact="${escAttr(status.id)}">
+    ${head}
 ${filesHtml}
 ${diffHtml}
-    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">Re-approve ${esc(status.id)}</button></div>` : ""}
+    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">${reopened ? "Approve" : "Re-approve"} ${esc(status.id)}</button></div>` : ""}
   </div>`;
 }
 
@@ -991,7 +1015,7 @@ export function approvalsTabHtml(approvals, meta = {}) {
       // what changed, what is still exactly as signed, the anchored diff. The
       // row already carries the Approve button, so the panel omits its own.
       const diffRow =
-        s.status === "changed-since-approval"
+        s.status === "changed-since-approval" || s.status === "reopened"
           ? `    <tr class="approval-diff-row"><td colspan="6">
 ${driftPanelHtml(s, anchored, { withApprove: false })}
     </td></tr>`

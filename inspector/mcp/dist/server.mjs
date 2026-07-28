@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs ff834678ba0d057d482c740519b25ca321d1340d706df1c20f203439e7be91b6
+// cmp:bundle-inputs 5d046c5c164928557fda257f20f4a5ab24a0b9a6b7aab2d955855f4c5f592a0f
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -33838,13 +33838,15 @@ function governanceStripHtml({ statuses = [], features = [], journal = [] }, for
   const queue = deriveHumanQueue({ statuses, features });
   const signed = statuses.filter((s) => s.status === "approved").length;
   const queued = new Set(queue.map((q) => q.artifact));
-  const redesign = statuses.filter((s) => s.status === "reopened" && !queued.has(s.id)).length;
-  const drift = statuses.filter((s) => s.status === "changed-since-approval").length;
+  const redesigning = statuses.filter((s) => s.status === "reopened" && !queued.has(s.id));
+  const drifted = statuses.filter((s) => s.status === "changed-since-approval");
+  const countBtn = (cls, text, artifact) => `<button type="button" class="gov-n ${cls} gov-jump" data-go-tab="approvals"${artifact ? ` data-go-artifact="${esc3(artifact)}"` : ""} title="take me there">${esc3(text)}</button>`;
+  const namesOf = (rows, noun) => rows.length === 1 ? `${noun}: ${rows[0].label || rows[0].id}` : `${rows.length} ${noun}`;
   const counts = [
     `<span class="gov-n gov-signed">${signed} signed</span>`,
     queue.length > 0 ? `<span class="gov-n gov-awaiting">${queue.length} await${queue.length === 1 ? "s" : ""} you</span>` : null,
-    redesign > 0 ? `<span class="gov-n gov-redesign">${redesign} in redesign</span>` : null,
-    drift > 0 ? `<span class="gov-n gov-drift">${drift} drifted</span>` : null
+    redesigning.length > 0 ? countBtn("gov-redesign", namesOf(redesigning, "in redesign"), redesigning.length === 1 ? redesigning[0].id : null) : null,
+    drifted.length > 0 ? countBtn("gov-drift", namesOf(drifted, "drifted"), drifted.length === 1 ? drifted[0].id : null) : null
   ].filter(Boolean).join(" \xB7 ");
   const next = queue.length > 0 ? (
     // data-go-* (NOT data-tab/data-artifact): a strip jump is not a rail tab
@@ -34083,6 +34085,11 @@ var SHELL_CSS = `
                background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
   .gov-counts { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); line-height: 1.6; }
   .gov-n { white-space: nowrap; }
+  /* A count that names an artifact wraps \u2014 the name is the point, not the digit. */
+  .gov-jump { white-space: normal; text-align: left; appearance: none; border: none; background: none;
+              padding: 0; margin: 0; font: inherit; cursor: pointer; text-decoration: underline;
+              text-decoration-style: dotted; text-underline-offset: 2px; }
+  .gov-jump:hover { text-decoration-style: solid; }
   .gov-signed { color: var(--signed); font-weight: 600; }
   .gov-awaiting { color: var(--accent); font-weight: 650; }
   .gov-redesign { color: var(--reopen); font-weight: 600; }
@@ -34698,7 +34705,9 @@ function signatureBarHtml(status, opts = {}) {
   </div>`;
 }
 function driftPanelHtml(status, anchored, opts = {}) {
-  if (!status || status.status !== "changed-since-approval") return "";
+  if (!status) return "";
+  const reopened = status.status === "reopened";
+  if (status.status !== "changed-since-approval" && !reopened) return "";
   const withApprove = opts.withApprove !== false;
   const signedLine = status.approvedAt ? ` It was signed ${esc4(status.approvedAt)}.` : "";
   let filesHtml = "";
@@ -34724,11 +34733,14 @@ ${stillSigned}`;
   } else if (anchored) {
     diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc4(anchored.reason)}</p>`;
   }
-  return `  <div class="drift-panel" data-artifact="${escAttr(status.id)}">
-    <p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc4(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve \u2014 or revert the change.</p>
+  const who = status.via ? ` via ${esc4(status.via)}` : "";
+  const why = status.reason ? ` Reason given: <em>${esc4(status.reason)}</em>.` : " No reason was recorded \u2014 this reopen predates the reason-required rule.";
+  const head = reopened ? `<p class="drift-head"><strong>Reopened for redesign</strong> &mdash; the signature on <code>${esc4(status.id)}</code> was deliberately walked back${status.reopenedAt ? ` ${esc4(status.reopenedAt)}` : ""}${who}.${why} This is sanctioned, not drift: the verify lane skips it rather than failing. Below is what has moved since the bytes you signed. Approve when the rendered result is what you want.</p>` : `<p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc4(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve \u2014 or revert the change.</p>`;
+  return `  <div class="drift-panel${reopened ? " drift-panel-reopened" : ""}" data-artifact="${escAttr(status.id)}">
+    ${head}
 ${filesHtml}
 ${diffHtml}
-    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">Re-approve ${esc4(status.id)}</button></div>` : ""}
+    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">${reopened ? "Approve" : "Re-approve"} ${esc4(status.id)}</button></div>` : ""}
   </div>`;
 }
 function genesisGuide(id) {
@@ -35176,7 +35188,7 @@ function approvalsTabHtml(approvals, meta3 = {}) {
     const btnLabel = s.status === "approved" ? "Re-approve" : "Approve";
     const reopenBtn = s.status === "approved" ? `<button class="reopen-btn" data-artifact="${esc4(s.id)}">Reopen</button>` : "";
     const anchored = meta3.anchoredDiffs ? meta3.anchoredDiffs[s.id] : null;
-    const diffRow = s.status === "changed-since-approval" ? `    <tr class="approval-diff-row"><td colspan="6">
+    const diffRow = s.status === "changed-since-approval" || s.status === "reopened" ? `    <tr class="approval-diff-row"><td colspan="6">
 ${driftPanelHtml(s, anchored, { withApprove: false })}
     </td></tr>` : "";
     return `    <tr class="approval-row" data-artifact="${esc4(s.id)}">
@@ -36832,7 +36844,10 @@ ${section.bodyHtml}`;
   const govStrip = document.getElementById("gov-strip");
   if (govStrip) {
     govStrip.addEventListener("click", (e) => {
-      const btn = e.target.closest(".gov-next");
+      // .gov-next is the single next act; .gov-jump is a count that names its
+      // artifact (in redesign / drifted). Both carry data-go-* and both must
+      // land the reader on the row that explains itself.
+      const btn = e.target.closest(".gov-next, .gov-jump");
       if (!btn) return;
       const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
       if (railBtn) railBtn.click();
@@ -38182,7 +38197,7 @@ function createPreviewService(opts) {
         const anchoredDiffs = {};
         if (approvals.available) {
           for (const s of approvals.statuses) {
-            if (s.status !== "changed-since-approval") continue;
+            if (s.status !== "changed-since-approval" && s.status !== "reopened") continue;
             anchoredDiffs[s.id] = await getApprovalAnchoredDiff(projectDir, s.id, { execFileAsync }).catch(
               (err) => ({ available: false, reason: err.message })
             );

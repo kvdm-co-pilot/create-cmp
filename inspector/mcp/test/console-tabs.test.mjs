@@ -16,6 +16,7 @@ import {
   intentBodyHtml,
   clausesForScreen,
   signatureBarHtml,
+  driftPanelHtml,
 } from "../src/lib/console-tabs.mjs";
 
 // --- Design language (§3.1: the designer's handoff spec) --------------------
@@ -195,6 +196,73 @@ test("approvalsTabHtml: an approved row shows the signed hash and names a legacy
   assert.match(ordinary, /abcdef01/);
   assert.doesNotMatch(ordinary, /pre-strip/, "silence about the basis is the normal case");
   assert.doesNotMatch(ordinary, /&middot; none|>none</, "the fallback must never print the shortHash miss token");
+});
+
+// A reopened row used to render a hash, a timestamp and a bare badge — unreadable
+// unless you already knew which files the artifact governed and why its signature
+// was walked back. It now gets the same change surface a drifted row gets.
+test("driftPanelHtml: a reopened artifact explains itself — deliberate, not failing, and what moved", () => {
+  const html = driftPanelHtml(
+    {
+      id: "feature-design:meal",
+      status: "reopened",
+      storedHash: "6716fc54",
+      hash: "65b472e2",
+      reopenedAt: "2026-07-26T18:56:09.847Z",
+      via: "cli",
+      reason: "the meal-plan brief removed the tray's targeting controls",
+    },
+    {
+      available: true,
+      anchorSha: "abc1234",
+      anchorWhen: "2026-07-26",
+      diff: "- slot pills\n+ target line",
+      files: { changed: [{ path: "presentation/meal/MealTrayScreen.kt", status: "M" }], unchanged: [] },
+    },
+  );
+  assert.match(html, /Reopened for redesign/);
+  assert.match(html, /deliberately walked back 2026-07-26T18:56:09.847Z via cli/, "who and when, off the ledger row");
+  assert.match(html, /the meal-plan brief removed the tray/, "and why");
+  assert.match(html, /sanctioned, not drift/, "the reader must know the lane is not failing over this");
+  assert.match(html, /MealTrayScreen\.kt/, "the file that moved is named, not just counted");
+  assert.match(html, /- slot pills/, "the anchored diff against the signed bytes renders");
+  assert.doesNotMatch(html, /Changed since signature/, "a redesign is not drift wording");
+});
+
+test("driftPanelHtml: a reopen with no recorded reason says so rather than implying none was needed", () => {
+  const html = driftPanelHtml({ id: "feature-design:meal", status: "reopened", reopenedAt: "2026-07-26T18:56:09.847Z" }, null);
+  assert.match(html, /No reason was recorded — this reopen predates the reason-required rule/);
+});
+
+test("driftPanelHtml: still silent for states with no signature to compare against", () => {
+  assert.equal(driftPanelHtml({ id: "intent", status: "approved" }, null), "");
+  assert.equal(driftPanelHtml({ id: "intent", status: "unreviewed" }, null), "");
+  assert.equal(driftPanelHtml(null, null), "");
+});
+
+test("approvalsTabHtml: the reopened row carries the change panel, not just a badge", () => {
+  const html = approvalsTabHtml(
+    {
+      available: true,
+      statuses: [
+        {
+          id: "feature-design:meal",
+          label: "Feature design (meal)",
+          status: "reopened",
+          hash: "65b472e2",
+          storedHash: "6716fc54",
+          reopenedAt: "2026-07-26T18:56:09.847Z",
+          fileCount: 1,
+          missing: [],
+          resolvable: true,
+        },
+      ],
+    },
+    { anchoredDiffs: { "feature-design:meal": { available: false, reason: "anchor commit not found" } } },
+  );
+  assert.match(html, /approval-diff-row/, "the reopened row opens a panel row");
+  assert.match(html, /Reopened for redesign/);
+  assert.match(html, /anchor commit not found/, "an unresolvable anchor states why, never silence");
 });
 
 test("approvalsTabHtml: no governed artifacts resolved yet", () => {

@@ -1077,7 +1077,10 @@ export function galleryHtml(state) {
   const govStrip = document.getElementById("gov-strip");
   if (govStrip) {
     govStrip.addEventListener("click", (e) => {
-      const btn = e.target.closest(".gov-next");
+      // .gov-next is the single next act; .gov-jump is a count that names its
+      // artifact (in redesign / drifted). Both carry data-go-* and both must
+      // land the reader on the row that explains itself.
+      const btn = e.target.closest(".gov-next, .gov-jump");
       if (!btn) return;
       const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
       if (railBtn) railBtn.click();
@@ -2781,7 +2784,13 @@ export function createPreviewService(opts) {
         const anchoredDiffs = {};
         if (approvals.available) {
           for (const s of approvals.statuses) {
-            if (s.status !== "changed-since-approval") continue;
+            // `reopened` gets the anchored diff too. It is NOT drift — that
+            // distinction is the GATE's (drift FAILs, redesign SKIPs) and was
+            // over-applied here: "what has moved since the bytes I signed" is
+            // the same question with the same answer either way, and a
+            // sanctioned redesign is precisely the one a human is being asked
+            // to re-sign, so it needs MORE explanation, not none.
+            if (s.status !== "changed-since-approval" && s.status !== "reopened") continue;
             anchoredDiffs[s.id] = await getApprovalAnchoredDiff(projectDir, s.id, { execFileAsync }).catch(
               (err) => ({ available: false, reason: err.message })
             );

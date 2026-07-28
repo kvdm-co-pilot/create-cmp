@@ -25,6 +25,25 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **A reopened artifact explained nothing.** The console showed a `reopened` row as a badge,
+  a hash and a timestamp — unreadable unless you already knew which files the artifact
+  governed and why its signature had been walked back ("I see 1 in redesign, I have no idea
+  what that means or where I can see the changes"). The change surface every drifted row
+  gets (`driftPanelHtml` — files changed, files still exactly as signed, the anchored diff
+  against the signed bytes) was never rendered for it, and `anchoredDiffs` was not even
+  computed. The drift/redesign asymmetry belongs to the **gate** (drift FAILs, redesign
+  SKIPs); applying it to the **display** was the error — "what moved since I signed this" is
+  the same question with the same answer either way, and a sanctioned redesign is precisely
+  the one a human is being asked to re-sign. A reopened row now renders that panel, headed
+  with who walked the signature back, when, why (or that no reason was recorded, for rows
+  predating the reason-required rule), that the lane is not failing over it, and what the
+  human is being asked to do.
+
+- **A count with no referent.** The governance strip said `1 in redesign` — a digit naming
+  no artifact and offering no way to reach it. A category holding exactly one artifact now
+  names it (`in redesign: Feature design (meal — …)`), and every non-zero count is a jump
+  button landing on the Approvals row that explains itself.
+
 - **A signed row displayed a hash nobody signed.** Every approved-row display — the console
   section header, the artifact card, `qa/approve.mjs --status` — printed the LIVE recompute
   (`hash`) labelled "signed", not the hash the signature was actually bound to

@@ -118,14 +118,28 @@ export function governanceStripHtml({ statuses = [], features = [], journal = []
   const queue = deriveHumanQueue({ statuses, features });
   const signed = statuses.filter((s) => s.status === "approved").length;
   const queued = new Set(queue.map((q) => q.artifact));
-  const redesign = statuses.filter((s) => s.status === "reopened" && !queued.has(s.id)).length;
-  const drift = statuses.filter((s) => s.status === "changed-since-approval").length;
+  const redesigning = statuses.filter((s) => s.status === "reopened" && !queued.has(s.id));
+  const drifted = statuses.filter((s) => s.status === "changed-since-approval");
+
+  // A bare "1 in redesign" is a number with no referent — it names no artifact,
+  // no owner, and no way to reach it, which is exactly how a reader ends up
+  // asking "what does that mean and where do I see it?" (2026-07-28). So each
+  // non-zero count names its artifact when there is only one, and every count is
+  // a jump button to the Approvals row that explains itself.
+  const countBtn = (cls, text, artifact) =>
+    `<button type="button" class="gov-n ${cls} gov-jump" data-go-tab="approvals"${
+      artifact ? ` data-go-artifact="${esc(artifact)}"` : ""
+    } title="take me there">${esc(text)}</button>`;
+  const namesOf = (rows, noun) =>
+    rows.length === 1 ? `${noun}: ${rows[0].label || rows[0].id}` : `${rows.length} ${noun}`;
 
   const counts = [
     `<span class="gov-n gov-signed">${signed} signed</span>`,
     queue.length > 0 ? `<span class="gov-n gov-awaiting">${queue.length} await${queue.length === 1 ? "s" : ""} you</span>` : null,
-    redesign > 0 ? `<span class="gov-n gov-redesign">${redesign} in redesign</span>` : null,
-    drift > 0 ? `<span class="gov-n gov-drift">${drift} drifted</span>` : null,
+    redesigning.length > 0
+      ? countBtn("gov-redesign", namesOf(redesigning, "in redesign"), redesigning.length === 1 ? redesigning[0].id : null)
+      : null,
+    drifted.length > 0 ? countBtn("gov-drift", namesOf(drifted, "drifted"), drifted.length === 1 ? drifted[0].id : null) : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -520,6 +534,11 @@ export const SHELL_CSS = `
                background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
   .gov-counts { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); line-height: 1.6; }
   .gov-n { white-space: nowrap; }
+  /* A count that names an artifact wraps — the name is the point, not the digit. */
+  .gov-jump { white-space: normal; text-align: left; appearance: none; border: none; background: none;
+              padding: 0; margin: 0; font: inherit; cursor: pointer; text-decoration: underline;
+              text-decoration-style: dotted; text-underline-offset: 2px; }
+  .gov-jump:hover { text-decoration-style: solid; }
   .gov-signed { color: var(--signed); font-weight: 600; }
   .gov-awaiting { color: var(--accent); font-weight: 650; }
   .gov-redesign { color: var(--reopen); font-weight: 600; }
