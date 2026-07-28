@@ -13,6 +13,7 @@ import {
   getApprovalsData,
   approveArtifact,
   reopenArtifact,
+  getJournal,
   resetApprovalsBridgeCache,
 } from "../src/lib/approvals-bridge.mjs";
 import { copyProjectLib } from "./fixtures/copy-project-lib.mjs";
@@ -208,6 +209,53 @@ test("reopenArtifact: refuses an unreviewed artifact (nothing to reopen) and an 
     const unknown = await reopenArtifact(root, "not-a-real-artifact");
     assert.equal(unknown.ok, false);
     assert.match(unknown.reason, /unknown artifact/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("reopenArtifact: the console's reason + via ride through to the library (07-28 audit: attribution is mechanical)", async () => {
+  const root = makeReopenFixtureProject();
+  try {
+    await approveArtifact(root, "design-system");
+    const result = await reopenArtifact(root, "design-system", { reason: "the hero reads too dense" });
+    assert.equal(result.ok, true);
+    // The fixture records what it was handed — proving the bridge passed
+    // reason through and stamped via: "console" (the bridge is the console's
+    // surface; the CLI stamps "cli" on its own side).
+    const row = JSON.parse(fs.readFileSync(path.join(root, "qa", "approvals.json"), "utf8")).artifacts.find(
+      (a) => a.artifact === "design-system",
+    );
+    assert.equal(row.reason, "the hero reads too dense");
+    assert.equal(row.via, "console");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("getJournal: honest degrade against a lib without readJournal; events verbatim from a lib that has it", async () => {
+  // Predates-the-journal lib → {available: false}, never a crash.
+  const older = makeReopenFixtureProject();
+  try {
+    const res = await getJournal(older);
+    assert.equal(res.available, false);
+  } finally {
+    cleanup(older);
+  }
+  // A lib WITH readJournal → its events, verbatim.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-approvals-journal-"));
+  try {
+    const libDir = path.join(root, "qa", "lib");
+    fs.mkdirSync(libDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(libDir, "approvals.mjs"),
+      "export function getApprovalStatuses() { return []; }\n" +
+        'export function readJournal() { return [{ at: "2026-07-28T00:00:00.000Z", verb: "reopen", artifact: "x", reason: "why" }]; }\n',
+    );
+    const res = await getJournal(root);
+    assert.equal(res.available, true);
+    assert.equal(res.events.length, 1);
+    assert.equal(res.events[0].reason, "why");
   } finally {
     cleanup(root);
   }

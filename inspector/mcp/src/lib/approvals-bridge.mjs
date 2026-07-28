@@ -131,8 +131,12 @@ export async function approveArtifact(root, artifactId) {
  * the refusal reason names the real cause instead of a stack-trace-shaped one.
  * @param {string} root
  * @param {string} artifactId
+ * @param {{reason?: string}} [options] `reason` — why the signature is being
+ *   walked back (2026-07-28 flow audit). A post-audit project lib REFUSES
+ *   without it; an older lib ignores unknown options, so passing it stays
+ *   compatible in both directions.
  */
-export async function reopenArtifact(root, artifactId) {
+export async function reopenArtifact(root, artifactId, options = {}) {
   const lib = await loadLib(root);
   if (!lib) {
     return {
@@ -151,9 +155,28 @@ export async function reopenArtifact(root, artifactId) {
     };
   }
   try {
-    return lib.reopenArtifact(root, artifactId);
+    return lib.reopenArtifact(root, artifactId, { reason: options.reason, via: "console" });
   } catch (err) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
+  }
+}
+
+/**
+ * The governance journal (qa/approvals.log.jsonl) via the project's own
+ * library — every approve/reopen/accept with when, which surface, and why.
+ * Degrades to { available: false } for a project lib that predates the
+ * journal wave (no readJournal export) — the console then renders no
+ * history rather than a fabricated one.
+ * @param {string} root
+ * @returns {Promise<{available: true, events: object[]} | {available: false, error?: string}>}
+ */
+export async function getJournal(root) {
+  const lib = await loadLib(root);
+  if (!lib || typeof lib.readJournal !== "function") return { available: false };
+  try {
+    return { available: true, events: lib.readJournal(root) };
+  } catch (err) {
+    return { available: false, error: err && err.message ? err.message : String(err) };
   }
 }
 

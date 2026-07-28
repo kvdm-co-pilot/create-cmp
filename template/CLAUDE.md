@@ -156,7 +156,7 @@ right.
 |---|---|
 | 1 | **Feature brief** — `docs/features/<name>.md`: the decisions with their why, research, rejected options, an **Open decisions** section until the human closes each. Signed BEFORE code. |
 | 2 | **Design** — iff the feature has a UI surface (`"screens": true`, or screen files exist): draft the screens on STUB data, register them in the PreviewRegistry, render, and STOP. The human judges the rendered screens and signs `feature-design:<name>`. Never ask a human to approve a described UI. |
-| 3 | **Contract** — reopen any signed spec the brief amends (`--reopen feature-spec:<surface>`); write the clauses where the behavior lives — about the form that now exists; the human signs |
+| 3 | **Contract** — reopen any signed spec the brief amends (`--reopen feature-spec:<surface> --reason "…"`); write the clauses where the behavior lives — about the form that now exists; the human signs |
 | 4 | Build the slice (`add-feature` / preview loop). Declared blast lands "as declared"; re-approve touched visual artifacts on rendered output (wiring the signed screens from stub to real state drifts `feature-design:<name>` — its re-approval is that pass) |
 | 5 | Prove — nothing to do: the lane's gates + receipt ARE the proof |
 | 6 | The human's `--accept` — enabled only at provenDone AND a signed design |
@@ -197,15 +197,21 @@ signed bytes must not move when the human accepts).
 | `node qa/approve.mjs feature-brief:<name>` | the human signs the brief (before code) |
 | `node qa/approve.mjs --accept <name>` | the human's bookend; refused until provenDone |
 
-Editing a feature is the same brief **reopened** — that reopens the set it declared, and
-re-approval is one walk back.
+Editing a feature is the same brief **reopened** — `--reopen-feature <name> --reason "…"`
+reopens the brief + its spec + its design + the set it declared, as ONE recorded change;
+re-approval is one walk back. Every reopen **requires a `--reason`** (it walks back a
+signature; the signer reads why from the ledger itself) and is journaled with `via` — the
+append-only journal (`qa/approvals.log.jsonl`, printed by `--log`, shown in the console
+strip's History) is how "what happened while I was away" stays answerable.
 
 | Command | What |
 |---|---|
 | `node qa/approve.mjs --status` | Every governed artifact with live state (`unreviewed` / `approved` / `changed-since-approval` / `reopened`), short hash, mode badge |
 | `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time; also clears a `defaults-accepted` mode |
 | `node qa/approve.mjs --accept-defaults` | **Express lane**: approve every currently-resolvable artifact in one visible act, each stamped `"mode": "defaults-accepted"` — build now, walk the definition later. Unresolvable artifacts are skipped with the standard refusal printed. The ledger never pretends the defaults were designed. |
-| `node qa/approve.mjs --reopen <artifact>` | Move an *approved* artifact (shaped or defaults-accepted) back to `reopened` for deliberate redesign — recorded (`reopenedAt`). Refuses unknown ids and anything not currently approved. |
+| `node qa/approve.mjs --reopen <artifact> --reason "…"` | Move an *approved* artifact (shaped or defaults-accepted) back to `reopened` for deliberate redesign. `--reason` is REQUIRED and recorded (`reopenedAt`, `via`, `reason` — on the row and in the journal). Refuses unknown ids and anything not currently approved. |
+| `node qa/approve.mjs --reopen-feature <name> --reason "…"` | ONE recorded change: reopens the brief + `feature-spec:<name>` + `feature-design:<name>` + every declared `touches` artifact (each only if currently approved), all under one reason. |
+| `node qa/approve.mjs --log` | The governance journal — every approve/reopen/accept with when, which surface (`via`), and why. |
 
 With the create-cmp plugin, the same decisions can be made from the preview console
 (`preview {projectDir}`'s URL) — it calls the same library, so the CLI and the console

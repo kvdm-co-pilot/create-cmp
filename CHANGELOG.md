@@ -8,6 +8,29 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The governance journal (2026-07-28 flow audit, fixes 1–4).** The holistic audit of the
+  post-genesis flow — triggered by a signer returning to a "reopened" artifact with no way to
+  learn what happened — found five root causes; this wave closes four mechanically:
+  - *Memory:* `qa/approvals.log.jsonl`, an append-only journal beside the mutable snapshot —
+    one line per approve / reopen / accept with `{at, verb, artifact, via, reason?}`.
+    `qa/approve.mjs --log` prints it. Excluded from the verified surface like
+    `qa/comments.json`, so recording history never invalidates a receipt.
+  - *Attribution:* `--reopen` now REFUSES without `--reason` — a reopen walks back a
+    signature, and `via` + `reason` land on the ledger row (outside the inputs-hash
+    projection) and in the journal. The console's Reopen buttons prompt for the reason; the
+    signature bar, Approvals row, and feature-card stamp read it back.
+  - *The derived split:* `reopened` covered two opposite situations. Now `reopened` +
+    `provenDone` derives "redesign proven — re-approve" (owner: human, ENTERS the guided
+    queue); an unproven redesign stays the agent's (out of the queue). One derivation
+    (`deriveHumanQueue`) feeds the queue, the guided prompt, and the strip — resolving the
+    doc-of-record's own contradiction (next-step table vs queue-exclusion note).
+  - *One change, one record:* `--reopen-feature <name> --reason "…"` reopens the brief + its
+    spec + its design + every declared `touches` artifact as one grouped change.
+- **The governance strip.** Rail-resident, visible on every console tab: derived counts
+  (*N signed · M await you · K in redesign · J drifted*), the single next human act as a
+  jump button, and History — the journal's recent events with each reopen's reason.
+  Refreshes on the same SSE events as the panels.
+
 - **Reachability lane step (FI-7, AUTONOMY-GAPS §3).** A real feature passed clause coverage,
   conformance, goldens, a11y, and on-device smoke — and was accepted — while nothing in the
   navigation graph referenced its screen. `qa/lib/reachability.mjs` closes that shape of false

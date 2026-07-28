@@ -541,24 +541,24 @@ test("reopen: refusals are precise (unknown id, unreviewed, already-reopened, dr
   try {
     const { reopenArtifact, approveArtifact } = await loadLib(out);
 
-    const unknown = reopenArtifact(out, "not-a-thing");
+    const unknown = reopenArtifact(out, "not-a-thing", { reason: "test redesign" });
     assert.equal(unknown.ok, false);
     assert.match(unknown.reason, /unknown artifact "not-a-thing"/);
     assert.match(unknown.reason, /valid ids: intent, architecture, exemplar-spec/);
 
-    const unreviewed = reopenArtifact(out, "design-system");
+    const unreviewed = reopenArtifact(out, "design-system", { reason: "test redesign" });
     assert.equal(unreviewed.ok, false);
     assert.match(unreviewed.reason, /it is "unreviewed", not "approved"/);
 
     // Approved -> reopened works; the result's `artifact` is the ID STRING
     // (same convention as approveArtifact — the console bridge relies on it).
     assert.equal(approveArtifact(out, "design-system").ok, true);
-    const reopened = reopenArtifact(out, "design-system");
+    const reopened = reopenArtifact(out, "design-system", { reason: "test redesign" });
     assert.equal(reopened.ok, true);
     assert.equal(reopened.artifact, "design-system", "reopenArtifact returns the artifact id string, like approveArtifact");
     assert.match(reopened.reopenedAt, /^\d{4}-\d{2}-\d{2}T/);
 
-    const again = reopenArtifact(out, "design-system");
+    const again = reopenArtifact(out, "design-system", { reason: "test redesign" });
     assert.equal(again.ok, false);
     assert.match(again.reason, /it is "reopened", not "approved"/);
 
@@ -566,7 +566,7 @@ test("reopen: refusals are precise (unknown id, unreviewed, already-reopened, dr
     // there is nothing sanctioned to walk back from.
     assert.equal(approveArtifact(out, "architecture").ok, true);
     fs.appendFileSync(path.join(out, "specs/app-base.spec.md"), "\n<!-- drift -->\n");
-    const drifted = reopenArtifact(out, "architecture");
+    const drifted = reopenArtifact(out, "architecture", { reason: "test redesign" });
     assert.equal(drifted.ok, false);
     assert.match(drifted.reason, /it is "changed-since-approval", not "approved"/);
   } finally {
@@ -582,8 +582,8 @@ test("reopen: status surfaces reopened+reopenedAt; edits while reopened stay reo
     // Both flavors reopen: a real approval and a defaults-accepted one.
     assert.equal(approveArtifact(out, "design-system").ok, true);
     assert.equal(approveArtifact(out, "components", { mode: "defaults-accepted" }).ok, true);
-    assert.equal(reopenArtifact(out, "design-system").ok, true);
-    assert.equal(reopenArtifact(out, "components").ok, true, "a defaults-accepted approval is reopenable too");
+    assert.equal(reopenArtifact(out, "design-system", { reason: "test redesign" }).ok, true);
+    assert.equal(reopenArtifact(out, "components", { reason: "test redesign" }).ok, true, "a defaults-accepted approval is reopenable too");
 
     let statuses = getApprovalStatuses(out);
     const ds = statuses.find((s) => s.id === "design-system");
@@ -616,7 +616,7 @@ test("THE asymmetry, one run: a reopened artifact + a drifted artifact ⇒ gate 
 
     // design-system: approved then REOPENED (sanctioned redesign)…
     assert.equal(approveArtifact(out, "design-system").ok, true);
-    assert.equal(reopenArtifact(out, "design-system").ok, true);
+    assert.equal(reopenArtifact(out, "design-system", { reason: "test redesign" }).ok, true);
     const themeFile = path.join(out, "composeApp/src/commonMain/kotlin", PKG_DIR, "presentation/theme/Theme.kt");
     fs.appendFileSync(themeFile, "\n// sanctioned redesign edit\n");
 
@@ -646,7 +646,9 @@ test("reopen CLI: --reopen writes the same ledger the library writes; refusals e
   const out = await makeProject("cmp-gen-reopen-cli-");
   try {
     runApprove(out, ["exemplar-spec"]);
-    const stdout = runApprove(out, ["--reopen", "exemplar-spec"]);
+    // --reason is REQUIRED since the 07-28 governance-journal wave (its own
+    // refusal is pinned in test/governance-journal.test.mjs).
+    const stdout = runApprove(out, ["--reopen", "exemplar-spec", "--reason", "clauses need a rework"]);
     assert.match(stdout, /↺ reopened exemplar-spec for redesign — at \d{4}-/);
 
     const entry = readLedger(out).artifacts.find((a) => a.artifact === "exemplar-spec");
@@ -656,7 +658,7 @@ test("reopen CLI: --reopen writes the same ledger the library writes; refusals e
     const status = runApprove(out, ["--status"]);
     assert.match(status, /↺ exemplar-spec: reopened \(reopened at /);
 
-    const fail = runApproveExpectFail(out, ["--reopen", "design-system"]);
+    const fail = runApproveExpectFail(out, ["--reopen", "design-system", "--reason", "x"]);
     assert.equal(fail.status, 1);
     assert.match(fail.stderr, /cannot reopen "design-system" — it is "unreviewed", not "approved"/);
 

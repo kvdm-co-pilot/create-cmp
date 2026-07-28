@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 782aae82e091e326beb1e95fbe40c5eaf9a63eb0dd5b79d09e48d9bc2a461c72
+// cmp:bundle-inputs dedcd2cf2e49e7a8a15386d37070c8e59b10822542aa63cceb1658b9ac835a97
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32251,7 +32251,7 @@ async function approveArtifact(root, artifactId) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
   }
 }
-async function reopenArtifact(root, artifactId) {
+async function reopenArtifact(root, artifactId, options = {}) {
   const lib = await loadLib(root);
   if (!lib) {
     return {
@@ -32266,9 +32266,18 @@ async function reopenArtifact(root, artifactId) {
     };
   }
   try {
-    return lib.reopenArtifact(root, artifactId);
+    return lib.reopenArtifact(root, artifactId, { reason: options.reason, via: "console" });
   } catch (err) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
+  }
+}
+async function getJournal(root) {
+  const lib = await loadLib(root);
+  if (!lib || typeof lib.readJournal !== "function") return { available: false };
+  try {
+    return { available: true, events: lib.readJournal(root) };
+  } catch (err) {
+    return { available: false, error: err && err.message ? err.message : String(err) };
   }
 }
 async function getFeatureBoard(root) {
@@ -33731,6 +33740,63 @@ function statusGlyph(record2) {
   }
 }
 var shortHash = (h) => h ? String(h).slice(0, 8) : null;
+function deriveHumanQueue({ statuses = [], features = [] }, excludeArtifact) {
+  const tabOf = (id) => id === "intent" || id === "architecture" || id === "design-system" || id === "components" ? id : id.startsWith("feature-brief:") || id.startsWith("feature-design:") ? "features" : id === "exemplar-spec" || id.startsWith("feature-spec:") ? "specs" : "approvals";
+  const readyBriefs = new Set(
+    features.filter((f) => f.phase === "reopened" && f.provenDone).map((f) => `feature-brief:${f.name}`)
+  );
+  const items = [];
+  for (const s of statuses) {
+    if (s.id === excludeArtifact) continue;
+    if (s.status === "unreviewed" && s.resolvable !== false) {
+      items.push({ artifact: s.id, tab: tabOf(s.id), label: `Approve ${s.id}` });
+    } else if (s.status === "changed-since-approval") {
+      items.push({ artifact: s.id, tab: tabOf(s.id), label: `Re-approve ${s.id} \u2014 it changed since signing` });
+    } else if (s.status === "reopened" && readyBriefs.has(s.id)) {
+      items.push({ artifact: s.id, tab: tabOf(s.id), label: `Re-approve ${s.id} \u2014 the redesign is proven` });
+    }
+  }
+  for (const f of features) {
+    if (f.phase === "proven" && `feature-brief:${f.name}` !== excludeArtifact) {
+      items.push({ artifact: `feature-brief:${f.name}`, tab: "features", label: `Accept ${f.name} \u2014 proven done` });
+    }
+  }
+  return items;
+}
+function governanceStripHtml({ statuses = [], features = [], journal = [] }, formatAge = formatAgeCoarse) {
+  if (statuses.length === 0) return "";
+  const queue = deriveHumanQueue({ statuses, features });
+  const signed = statuses.filter((s) => s.status === "approved").length;
+  const queued = new Set(queue.map((q) => q.artifact));
+  const redesign = statuses.filter((s) => s.status === "reopened" && !queued.has(s.id)).length;
+  const drift = statuses.filter((s) => s.status === "changed-since-approval").length;
+  const counts = [
+    `<span class="gov-n gov-signed">${signed} signed</span>`,
+    queue.length > 0 ? `<span class="gov-n gov-awaiting">${queue.length} await${queue.length === 1 ? "s" : ""} you</span>` : null,
+    redesign > 0 ? `<span class="gov-n gov-redesign">${redesign} in redesign</span>` : null,
+    drift > 0 ? `<span class="gov-n gov-drift">${drift} drifted</span>` : null
+  ].filter(Boolean).join(" \xB7 ");
+  const next = queue.length > 0 ? (
+    // data-go-* (NOT data-tab/data-artifact): a strip jump is not a rail tab
+    // button, and overloading the rail's attributes would collide with every
+    // selector that treats data-tab as "a tab exists here".
+    `<button type="button" class="gov-next" data-go-tab="${esc3(queue[0].tab)}" data-go-artifact="${esc3(queue[0].artifact)}" title="take me there">${esc3(queue[0].label)}${queue.length > 1 ? ` <span class="gov-more">(+${queue.length - 1} more)</span>` : ""}</button>`
+  ) : `<p class="gov-clear">Nothing waits on you.</p>`;
+  const recent = [...journal].slice(-8).reverse();
+  const history = recent.length === 0 ? "" : `<details class="gov-history"><summary>History</summary>
+${recent.map((e) => {
+    const glyph = e.verb === "approve" ? "\u25CF" : e.verb === "reopen" ? "\u25D0" : e.verb === "accept" ? "\u25C6" : "\xB7";
+    const age = e.at && formatAge ? formatAge(Date.now() - Date.parse(e.at)) : "";
+    const who = e.via ? ` via ${e.via}` : "";
+    return `  <p class="gov-event" title="${esc3(e.at || "")}${e.reason ? ` \u2014 ${esc3(e.reason)}` : ""}"><span class="gov-event-glyph">${glyph}</span> ${esc3(e.verb)} ${esc3(e.artifact || "")}${esc3(who)}${age ? ` \xB7 ${esc3(age)}` : ""}${e.reason ? `<span class="gov-event-reason">${esc3(e.reason)}</span>` : ""}</p>`;
+  }).join("\n")}
+</details>`;
+  return `<div id="gov-strip">
+  <p class="gov-counts">${counts}</p>
+  ${next}
+${history}
+</div>`;
+}
 function artifactStatusHtml(record2) {
   const g = statusGlyph(record2);
   if (!g) return "";
@@ -33874,6 +33940,7 @@ ${p.extraCss || ""}
     <p class="rail-sub">studio console</p>
     <span id="pill">live</span>
   </div>
+${p.govStripHtml || ""}
   <nav class="rail-nav">
 ${p.railItems.map(railItemHtml).join("\n")}
   </nav>
@@ -33929,6 +33996,27 @@ var SHELL_CSS = `
           background: var(--signed-bg); color: var(--signed); }
   #pill.rendering { background: var(--reopen-bg); color: var(--reopen); }
   #pill.error { background: var(--drift-bg); color: var(--drift); }
+  /* --- the governance strip (07-28 audit fix 5: status visible at ALL times,
+         on every tab \u2014 counts, the one next human act, recent history) --- */
+  #gov-strip { margin: 0 4px; padding: 10px; border: 1px solid var(--line); border-radius: 10px;
+               background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+  .gov-counts { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); line-height: 1.6; }
+  .gov-n { white-space: nowrap; }
+  .gov-signed { color: var(--signed); font-weight: 600; }
+  .gov-awaiting { color: var(--accent); font-weight: 650; }
+  .gov-redesign { color: var(--reopen); font-weight: 600; }
+  .gov-drift { color: var(--drift); font-weight: 650; }
+  .gov-next { appearance: none; border: none; border-radius: 8px; padding: 6px 9px; cursor: pointer;
+              font: inherit; font-size: var(--fs-meta); font-weight: 600; text-align: left;
+              background: var(--accent-bg); color: var(--accent); line-height: 1.45; }
+  .gov-next:hover { filter: brightness(0.97); }
+  .gov-more { font-weight: 400; color: var(--muted); }
+  .gov-clear { margin: 0; font-size: var(--fs-meta); color: var(--muted); }
+  .gov-history summary { font-size: var(--fs-meta); color: var(--muted); cursor: pointer; }
+  .gov-event { margin: 6px 0 0; font-size: var(--fs-meta); color: var(--ink-2); line-height: 1.4;
+               overflow-wrap: anywhere; }
+  .gov-event-glyph { color: var(--muted); }
+  .gov-event-reason { display: block; color: var(--muted); font-style: italic; }
   .rail-nav { display: flex; flex-direction: column; gap: 1px; }
   .tab-btn { appearance: none; display: flex; align-items: center; gap: 9px; width: 100%;
              padding: 7px 10px; border: none; border-radius: 8px; background: none; cursor: pointer;
@@ -34087,6 +34175,7 @@ var SHELL_CSS = `
   .artifact-id, .approved-at { font-size: var(--fs-meta); color: var(--muted); }
   .approved-at { margin-top: 2px; }
   .unresolvable-note, .missing-note { font-size: var(--fs-meta); color: var(--reopen); margin: 4px 0 0; }
+  .reopen-note { font-size: var(--fs-meta); color: var(--reopen); margin: 4px 0 0; overflow-wrap: anywhere; }
   .order-num { color: var(--muted); }
   .artifact-banner { font-size: var(--fs-meta); margin-top: 4px; padding: 4px 8px; border-radius: 8px; max-width: 340px; }
   .banner-mode { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; font-size: 9.5px; }
@@ -34503,7 +34592,13 @@ function signatureBarHtml(status, opts = {}) {
   if (!status) return "";
   const what = opts.what || status.id;
   const cls = status.status === "approved" ? "badge-approved" : status.status === "changed-since-approval" ? "badge-drift" : status.status === "reopened" ? "badge-reopened" : "badge-unreviewed";
-  const line = status.status === "approved" ? `signed${status.approvedAt ? ` ${esc4(status.approvedAt)}` : ""}${status.mode ? ` \xB7 ${esc4(status.mode)}` : ""}` : status.status === "changed-since-approval" ? "changed since signature \u2014 review the diff below, then re-approve" : status.status === "reopened" ? `reopened for redesign${status.reopenedAt ? ` ${esc4(status.reopenedAt)}` : ""} \u2014 re-approve when the redesign lands` : "not signed yet \u2014 nothing here is binding until you sign it";
+  const line = status.status === "approved" ? `signed${status.approvedAt ? ` ${esc4(status.approvedAt)}` : ""}${status.mode ? ` \xB7 ${esc4(status.mode)}` : ""}` : status.status === "changed-since-approval" ? "changed since signature \u2014 review the diff below, then re-approve" : status.status === "reopened" ? (
+    // The WHY, read straight off the ledger row (07-28 audit: "reopened"
+    // with no reason was the state Karel came back to and could not
+    // decode). Pre-audit rows carry no reason — the line then says only
+    // what it knows.
+    `reopened for redesign${status.reopenedAt ? ` ${esc4(status.reopenedAt)}` : ""}${status.via ? ` via ${esc4(status.via)}` : ""}${status.reason ? ` \u2014 <em>${esc4(status.reason)}</em>` : ""} \u2014 re-approve when the redesign lands`
+  ) : "not signed yet \u2014 nothing here is binding until you sign it";
   const canApprove = status.resolvable !== false;
   const approveLabel = status.status === "approved" ? `Re-approve ${what}` : status.status === "unreviewed" ? `Approve ${what}` : `Re-approve ${what}`;
   const buttons = [
@@ -34987,6 +35082,7 @@ function approvalsTabHtml(approvals, meta3 = {}) {
     const hashInfo = s.status === "changed-since-approval" ? unresolvable ? `approved ${shortHash2(s.storedHash)} &rarr; unresolvable` : `approved ${shortHash2(s.storedHash)} &rarr; now ${shortHash2(s.hash)}` : s.status === "approved" ? shortHash2(s.hash) : unresolvable ? "unresolvable" : `would approve at ${shortHash2(s.hash)}`;
     const unresolvableNote = s.resolvable === false ? `<p class="unresolvable-note">unresolvable (${s.fileCount} of expected files resolved) \u2014 not approvable</p>` : "";
     const missingNote = s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc4(s.missing.join(", "))}</p>` : "";
+    const reopenNote = s.status === "reopened" ? `<p class="reopen-note">reopened${s.reopenedAt ? ` ${esc4(s.reopenedAt)}` : ""}${s.via ? ` via ${esc4(s.via)}` : ""}${s.reason ? ` \u2014 ${esc4(s.reason)}` : ""}</p>` : "";
     const btnLabel = s.status === "approved" ? "Re-approve" : "Approve";
     const reopenBtn = s.status === "approved" ? `<button class="reopen-btn" data-artifact="${esc4(s.id)}">Reopen</button>` : "";
     const anchored = meta3.anchoredDiffs ? meta3.anchoredDiffs[s.id] : null;
@@ -34998,7 +35094,7 @@ ${driftPanelHtml(s, anchored, { withApprove: false })}
       <td>${esc4(s.label)}<div class="artifact-id">${esc4(s.id)}</div>${artifactBannerHtml(s)}</td>
       <td><span class="badge ${badgeClass}">${esc4(statusLabel)}</span></td>
       <td>${s.fileCount}</td>
-      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc4(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}</td>
+      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc4(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}${reopenNote}</td>
       <td><button class="approve-btn" data-artifact="${esc4(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
     </tr>
 ${diffRow}`;
@@ -35927,6 +36023,10 @@ ${sections.map((s) => `      <h4>${esc4(s.heading)}</h4>
     const stamps = [];
     if (f.record && f.record.approvedAt) stamps.push(`signed ${esc4(f.record.approvedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}`);
     if (f.record && f.record.accepted) stamps.push(`accepted ${esc4(f.record.acceptedAt ?? "?")}`);
+    if (f.record && f.record.status === "reopened" && f.record.reopenedAt)
+      stamps.push(
+        `reopened ${esc4(f.record.reopenedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}${f.record.reason ? ` \u2014 ${esc4(f.record.reason)}` : ""}`
+      );
     const briefAwaitsSignature = f.phase === "proposed" || f.phase === "changed-since-approval" || f.phase === "reopened";
     const actions = [];
     if (briefAwaitsSignature) {
@@ -36246,7 +36346,10 @@ function galleryHtml(state) {
     liveSession = null,
     digest = null,
     anchoredDiffs = null,
-    governedArtifacts = { available: false }
+    governedArtifacts = { available: false },
+    // The governance journal (qa/approvals.log.jsonl via the project's own
+    // library) — feeds the strip's History; degrades to no history.
+    journal = { available: false }
   } = state;
   const width = viewport?.width ?? 411;
   const screenCards = cards.filter(({ screen }) => !isComponentStoryId(screen.id));
@@ -36580,6 +36683,11 @@ ${section.bodyHtml}`;
       const freshStatus = freshPanel.querySelector(".page-status");
       if (curStatus && freshStatus) curStatus.innerHTML = freshStatus.innerHTML;
     });
+    // The governance strip lives in the rail \u2014 visible on every tab, so it
+    // must track every ledger transition the panels do.
+    const curStrip = document.getElementById("gov-strip");
+    const freshStrip = doc.getElementById("gov-strip");
+    if (curStrip && freshStrip) curStrip.innerHTML = freshStrip.innerHTML;
   }
   // Every governed panel refreshes IN PLACE (no location.reload()): a full
   // reload flashes the page, drops scroll, and blanks assistive/agent views of
@@ -36621,6 +36729,21 @@ ${section.bodyHtml}`;
       }
       syncShellFromDoc(doc);
     }).catch(() => location.reload());
+  }
+  // The governance strip's next-act button: jump to the artifact's own
+  // signature bar (sign-where-you-read \u2014 same jump the guided prompt's "Take
+  // me there" performs). Delegated from the strip container because the SSE
+  // shell-sync replaces the strip's innerHTML wholesale.
+  const govStrip = document.getElementById("gov-strip");
+  if (govStrip) {
+    govStrip.addEventListener("click", (e) => {
+      const btn = e.target.closest(".gov-next");
+      if (!btn) return;
+      const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
+      if (railBtn) railBtn.click();
+      const target = document.querySelector('#tab-' + btn.dataset.goTab + ' [data-artifact="' + btn.dataset.goArtifact + '"]');
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
   }
   const es = new EventSource("/events");
   es.onmessage = (e) => {
@@ -36831,6 +36954,10 @@ ${section.bodyHtml}`;
   scope.querySelectorAll(".reopen-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const artifact = btn.dataset.artifact;
+      // A reopen walks back a signature, so it carries a reason the signer can
+      // read from the ledger later (07-28 audit). Cancel = no transition.
+      const reason = window.prompt("Reopen " + artifact + " \u2014 why, in one sentence?\\n(Recorded on the ledger and in the journal.)");
+      if (reason === null || reason.trim() === "") return;
       const errBox = document.getElementById("approve-error");
       if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
       const original = btn.textContent;
@@ -36840,7 +36967,7 @@ ${section.bodyHtml}`;
         const res = await fetch("/api/reopen", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ artifact }),
+          body: JSON.stringify({ artifact, reason: reason.trim() }),
         });
         const body = await res.json();
         if (!body.ok) {
@@ -36983,6 +37110,15 @@ ${section.bodyHtml}`;
   return renderShellPage({
     appName,
     railItems,
+    // The governance strip (07-28 audit, fix 5): counts + the one next human
+    // act + recent history, rail-resident so it is visible on EVERY tab. Its
+    // queue is the SAME deriveHumanQueue the guided prompt uses — one
+    // derivation, so the strip and the prompt can never disagree.
+    govStripHtml: governanceStripHtml({
+      statuses: approvals.available ? approvals.statuses : [],
+      features: features.available ? features.board.features : [],
+      journal: journal.available ? journal.events : []
+    }),
     // §3.6: the rail-foot verify line doubles as the deep link to Evidence —
     // the same .tab-btn/data-tab wiring the nav items use (showTab picks it
     // up with no new JS mechanism), styled back to a quiet meta line by the
@@ -37368,29 +37504,18 @@ function createPreviewService(opts) {
     for (const res of sseClients) res.write(data);
   }
   async function pendingOnHuman(excludeArtifact) {
-    const items = [];
-    const tabOf = (id) => id === "intent" || id === "architecture" || id === "design-system" || id === "components" ? id : id.startsWith("feature-brief:") || id.startsWith("feature-design:") ? "features" : id === "exemplar-spec" || id.startsWith("feature-spec:") ? "specs" : "approvals";
     try {
-      const snap = await approvalStatusSnapshot();
-      if (snap.available) {
-        for (const s of snap.statuses) {
-          if (s.id === excludeArtifact) continue;
-          if (s.status === "unreviewed" && s.resolvable !== false) {
-            items.push({ artifact: s.id, tab: tabOf(s.id), label: `Approve ${s.id}` });
-          } else if (s.status === "changed-since-approval") {
-            items.push({ artifact: s.id, tab: tabOf(s.id), label: `Re-approve ${s.id} \u2014 it changed since signing` });
-          }
-        }
-      }
-      const board = await getFeatureBoard(projectDir);
-      if (board.available) {
-        for (const f of board.board.features) {
-          if (f.phase === "proven") items.push({ artifact: `feature-brief:${f.name}`, tab: "features", label: `Accept ${f.name} \u2014 proven done` });
-        }
-      }
+      const [snap, board] = await Promise.all([approvalStatusSnapshot(), getFeatureBoard(projectDir)]);
+      return deriveHumanQueue(
+        {
+          statuses: snap.available ? snap.statuses : [],
+          features: board.available ? board.board.features : []
+        },
+        excludeArtifact
+      );
     } catch {
+      return [];
     }
-    return items;
   }
   async function whatNextAfter(did, artifactId) {
     return {
@@ -37904,11 +38029,12 @@ function createPreviewService(opts) {
         } catch {
         }
         const walkthrough = getWalkthroughData(projectDir);
-        const [liveDevice, digest, featureBoard, governedArtifacts] = await Promise.all([
+        const [liveDevice, digest, featureBoard, governedArtifacts, journal] = await Promise.all([
           getLiveDeviceStatus({ port: inspectorPort }),
           getDigestData(projectDir, { execFileAsync }),
           getFeatureBoard(projectDir),
-          getGovernedArtifacts(projectDir)
+          getGovernedArtifacts(projectDir),
+          getJournal(projectDir)
         ]);
         const anchoredDiffs = {};
         if (approvals.available) {
@@ -37953,7 +38079,8 @@ function createPreviewService(opts) {
             liveSession: liveSession.status(),
             digest,
             anchoredDiffs,
-            governedArtifacts
+            governedArtifacts,
+            journal
           })
         );
         return;
@@ -38028,7 +38155,9 @@ function createPreviewService(opts) {
           res.end(JSON.stringify({ ok: false, reason: "missing `artifact` (string) in the request body" }));
           return;
         }
-        const result = await reopenArtifact(projectDir, artifact);
+        const result = await reopenArtifact(projectDir, artifact, {
+          reason: typeof body.reason === "string" ? body.reason : void 0
+        });
         if (result.ok) result.whatNext = await whatNextAfter(`Reopened ${artifact} for redesign`, artifact);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));

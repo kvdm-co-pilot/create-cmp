@@ -118,8 +118,14 @@ export function approveArtifact(root, artifactId) {
  * Reopen an approved artifact for redesign (§2 "Reopen for redesign"):
  * refuses unknown ids and any artifact not currently `approved` (reopening
  * the unreviewed, already-reopened, or drifted is meaningless).
+ *
+ * Mirrors the real library's post-audit (2026-07-28) options contract: the
+ * bridge passes { reason, via } through, and this fixture RECORDS them so
+ * the bridge tests can assert the pass-through happened (the real lib
+ * additionally refuses a missing reason — that refusal is pinned against
+ * the real lib in the create-cmp test suite, not here).
  */
-export function reopenArtifact(root, artifactId) {
+export function reopenArtifact(root, artifactId, options = {}) {
   const artifact = REGISTRY.find((a) => a.id === artifactId);
   if (!artifact) {
     const known = REGISTRY.map((a) => a.id).join(", ");
@@ -135,6 +141,8 @@ export function reopenArtifact(root, artifactId) {
   }
   rec.status = "reopened";
   rec.reopenedAt = new Date().toISOString();
+  if (options.reason) rec.reason = options.reason;
+  if (options.via) rec.via = options.via;
   delete rec.mode;
   save(root, state);
   return { ok: true, artifact: artifactId };

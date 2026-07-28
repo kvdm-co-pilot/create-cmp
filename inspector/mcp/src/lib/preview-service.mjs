@@ -44,6 +44,7 @@ import {
   getFeatureBoard as getFeatureBoardViaLib,
   acceptFeature as acceptFeatureViaLib,
   getGovernedArtifacts as getGovernedArtifactsViaLib,
+  getJournal as getJournalViaLib,
 } from "./approvals-bridge.mjs";
 import {
   getCommentsData,
@@ -61,7 +62,7 @@ import { getWalkthroughData, WALKTHROUGH_REL_DIR } from "./walkthrough-data.mjs"
 import { getLiveDeviceStatus, createLiveSession } from "./live-session.mjs";
 import { getDigestData } from "./digest.mjs";
 import { getApprovalAnchoredDiff } from "./approval-diff.mjs";
-import { renderShellPage, statusGlyph, artifactStatusHtml, railReceiptHtml, receiptGlyph, formatAgeCoarse } from "./console-shell.mjs";
+import { renderShellPage, statusGlyph, artifactStatusHtml, railReceiptHtml, receiptGlyph, formatAgeCoarse, deriveHumanQueue, governanceStripHtml } from "./console-shell.mjs";
 import {
   designLanguageBodyHtml,
   componentsBodyHtml,
@@ -498,6 +499,9 @@ export function galleryHtml(state) {
     digest = null,
     anchoredDiffs = null,
     governedArtifacts = { available: false },
+    // The governance journal (qa/approvals.log.jsonl via the project's own
+    // library) — feeds the strip's History; degrades to no history.
+    journal = { available: false },
   } = state;
   const width = viewport?.width ?? 411;
   // §3.3: component stories render through the same pipeline but are not
@@ -1000,6 +1004,11 @@ export function galleryHtml(state) {
       const freshStatus = freshPanel.querySelector(".page-status");
       if (curStatus && freshStatus) curStatus.innerHTML = freshStatus.innerHTML;
     });
+    // The governance strip lives in the rail — visible on every tab, so it
+    // must track every ledger transition the panels do.
+    const curStrip = document.getElementById("gov-strip");
+    const freshStrip = doc.getElementById("gov-strip");
+    if (curStrip && freshStrip) curStrip.innerHTML = freshStrip.innerHTML;
   }
   // Every governed panel refreshes IN PLACE (no location.reload()): a full
   // reload flashes the page, drops scroll, and blanks assistive/agent views of
@@ -1041,6 +1050,21 @@ export function galleryHtml(state) {
       }
       syncShellFromDoc(doc);
     }).catch(() => location.reload());
+  }
+  // The governance strip's next-act button: jump to the artifact's own
+  // signature bar (sign-where-you-read — same jump the guided prompt's "Take
+  // me there" performs). Delegated from the strip container because the SSE
+  // shell-sync replaces the strip's innerHTML wholesale.
+  const govStrip = document.getElementById("gov-strip");
+  if (govStrip) {
+    govStrip.addEventListener("click", (e) => {
+      const btn = e.target.closest(".gov-next");
+      if (!btn) return;
+      const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
+      if (railBtn) railBtn.click();
+      const target = document.querySelector('#tab-' + btn.dataset.goTab + ' [data-artifact="' + btn.dataset.goArtifact + '"]');
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
   }
   const es = new EventSource("/events");
   es.onmessage = (e) => {
@@ -1251,6 +1275,10 @@ export function galleryHtml(state) {
   scope.querySelectorAll(".reopen-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const artifact = btn.dataset.artifact;
+      // A reopen walks back a signature, so it carries a reason the signer can
+      // read from the ledger later (07-28 audit). Cancel = no transition.
+      const reason = window.prompt("Reopen " + artifact + " — why, in one sentence?\\n(Recorded on the ledger and in the journal.)");
+      if (reason === null || reason.trim() === "") return;
       const errBox = document.getElementById("approve-error");
       if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
       const original = btn.textContent;
@@ -1260,7 +1288,7 @@ export function galleryHtml(state) {
         const res = await fetch("/api/reopen", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ artifact }),
+          body: JSON.stringify({ artifact, reason: reason.trim() }),
         });
         const body = await res.json();
         if (!body.ok) {
@@ -1404,6 +1432,15 @@ export function galleryHtml(state) {
   return renderShellPage({
     appName,
     railItems,
+    // The governance strip (07-28 audit, fix 5): counts + the one next human
+    // act + recent history, rail-resident so it is visible on EVERY tab. Its
+    // queue is the SAME deriveHumanQueue the guided prompt uses — one
+    // derivation, so the strip and the prompt can never disagree.
+    govStripHtml: governanceStripHtml({
+      statuses: approvals.available ? approvals.statuses : [],
+      features: features.available ? features.board.features : [],
+      journal: journal.available ? journal.events : [],
+    }),
     // §3.6: the rail-foot verify line doubles as the deep link to Evidence —
     // the same .tab-btn/data-tab wiring the nav items use (showTab picks it
     // up with no new JS mechanism), styled back to a quiet meta line by the
@@ -1948,40 +1985,27 @@ export function createPreviewService(opts) {
    * lives (sign-where-you-read), so "Take me there" is one click.
    */
   async function pendingOnHuman(excludeArtifact) {
-    const items = [];
-    const tabOf = (id) =>
-      id === "intent" || id === "architecture" || id === "design-system" || id === "components"
-        ? id
-        : id.startsWith("feature-brief:") || id.startsWith("feature-design:")
-          ? "features"
-          : id === "exemplar-spec" || id.startsWith("feature-spec:")
-            ? "specs"
-            : "approvals";
+    // ONE derivation for the whole console (console-shell.mjs deriveHumanQueue —
+    // the strip reads the same function, so the prompt and the strip can never
+    // tell different stories). Notably it INCLUDES a reopened brief once its
+    // redesign derives provenDone: at that point the work is finished and
+    // proven, and what remains is exactly the human's signature (07-28 audit,
+    // fix 3 — before this, the Features card said "waiting on you" while this
+    // queue said nothing was). A reopened artifact still mid-redesign stays
+    // out: it waits on the WORK, not the human.
     try {
-      const snap = await approvalStatusSnapshot();
-      if (snap.available) {
-        for (const s of snap.statuses) {
-          if (s.id === excludeArtifact) continue;
-          if (s.status === "unreviewed" && s.resolvable !== false) {
-            items.push({ artifact: s.id, tab: tabOf(s.id), label: `Approve ${s.id}` });
-          } else if (s.status === "changed-since-approval") {
-            items.push({ artifact: s.id, tab: tabOf(s.id), label: `Re-approve ${s.id} — it changed since signing` });
-          }
-          // `reopened` is deliberately absent: a redesign in progress waits on
-          // the WORK, not on the human — prompting them to re-approve it now
-          // would invite signing an unfinished redesign.
-        }
-      }
-      const board = await getFeatureBoardViaLib(projectDir);
-      if (board.available) {
-        for (const f of board.board.features) {
-          if (f.phase === "proven") items.push({ artifact: `feature-brief:${f.name}`, tab: "features", label: `Accept ${f.name} — proven done` });
-        }
-      }
+      const [snap, board] = await Promise.all([approvalStatusSnapshot(), getFeatureBoardViaLib(projectDir)]);
+      return deriveHumanQueue(
+        {
+          statuses: snap.available ? snap.statuses : [],
+          features: board.available ? board.board.features : [],
+        },
+        excludeArtifact,
+      );
     } catch {
       /* an unreadable ledger yields an empty queue, never a crash */
+      return [];
     }
-    return items;
   }
 
   /**
@@ -2670,11 +2694,12 @@ export function createPreviewService(opts) {
         // probe is sub-second; B5's anchored diffs run ONLY for artifacts
         // currently drifted (bounded per-request work — zero when nothing is).
         const walkthrough = getWalkthroughData(projectDir);
-        const [liveDevice, digest, featureBoard, governedArtifacts] = await Promise.all([
+        const [liveDevice, digest, featureBoard, governedArtifacts, journal] = await Promise.all([
           getLiveDeviceStatus({ port: inspectorPort }),
           getDigestData(projectDir, { execFileAsync }),
           getFeatureBoardViaLib(projectDir),
           getGovernedArtifactsViaLib(projectDir),
+          getJournalViaLib(projectDir),
         ]);
         const anchoredDiffs = {};
         if (approvals.available) {
@@ -2720,6 +2745,7 @@ export function createPreviewService(opts) {
             digest,
             anchoredDiffs,
             governedArtifacts,
+            journal,
           }),
         );
         return;
@@ -2803,7 +2829,12 @@ export function createPreviewService(opts) {
           res.end(JSON.stringify({ ok: false, reason: "missing `artifact` (string) in the request body" }));
           return;
         }
-        const result = await reopenArtifactViaLib(projectDir, artifact);
+        // `reason` (07-28 audit, fix 2) rides through to the project's own
+        // library, which refuses without it — the refusal wording is the
+        // library's, verbatim, same as every other transition.
+        const result = await reopenArtifactViaLib(projectDir, artifact, {
+          reason: typeof body.reason === "string" ? body.reason : undefined,
+        });
         if (result.ok) result.whatNext = await whatNextAfter(`Reopened ${artifact} for redesign`, artifact);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));

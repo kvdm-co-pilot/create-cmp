@@ -66,6 +66,11 @@ adversarial pass happens while everything is still unsigned and cheap to change.
 - **The agent produces.** Research, brief drafts, clauses proposals, code,
   tests, lane runs. **The agent holds no signing verb.** There is no
   `--deliver`, no self-declared done, no state only an agent's word supports.
+  The one state change an agent may execute against a SIGNED artifact — a
+  reopen, on the human's word — is **mechanically attributed**: it refuses to
+  run without a `--reason`, and records `via` + `reason` on the ledger row and
+  in the journal (2026-07-28 flow audit: two reopens landed with neither, and
+  the signer came back to "reopened" with no way to learn what happened).
 - **The human judges.** The signatures, each answering a question only a
   human can: the brief (*is this the right thing to build?*), the feature's
   design (*is this the right form?* — `feature-design:<name>`, judged on
@@ -101,6 +106,7 @@ blast radius or not — is in unresolved drift.
 | Feature design | `presentation/<name>/*Screen.kt` | `feature-design:<name>` | the *form*: the feature's own screens, signed on rendered output. Derives from **briefs only** (legacy features never sprout retro-governance): exists iff the brief declares `"screens": true` OR screen files exist on disk. Binds `*Screen.kt` only — a ViewModel edit during a legitimate build is never design drift. Undrafted (no files) → unresolvable: not signable, not in the human's queue — the *agent's* work |
 | `touches` / `screens` | ```json cmp:feature``` block in the brief | declaration only | `touches`: the artifacts this change expects to invalidate; hashes enforce, declaration lets the console tell *as-planned* from *undeclared blast*. `screens: true`: this feature has a UI surface — holds the design gate before any screen file exists |
 | Comment | `qa/comments.json` | advisory | human feedback with a defined path back into plan/spec/code |
+| Journal | `qa/approvals.log.jsonl` | history only | **append-only memory** of every approve / reopen / accept: `{at, verb, artifact, via, reason?, feature?}`. The snapshot (`qa/approvals.json`) stays the derived STATE that gates; the journal answers *"what happened while I was away, who did it, and why"* — the question a mutable snapshot structurally cannot (2026-07-28 flow audit, finding 1: every transition overwrote the row; reopen dropped `via`, re-approval dropped `reopenedAt`). Excluded from the verified surface like `qa/comments.json` — no lane step reads it, so recording history never invalidates a receipt. Read it: `node qa/approve.mjs --log`, or the console strip's History |
 
 **Doneness is derived, never claimed.** A feature is provably done iff:
 
@@ -219,7 +225,9 @@ like `provenDone`, never claimed — naming the step AND its owner:
 | Live state | Next step | Owner |
 |---|---|---|
 | brief unsigned | sign the brief | human |
-| brief drifted / reopened | re-approve (or finish the redesign) | human |
+| brief drifted | re-approve (or revert the edit) | human |
+| brief reopened, redesign not yet proven | finish and prove the redesign | agent |
+| brief reopened, redesign **provenDone** | re-approve the brief | human |
 | UI surface declared, screens undrafted | **design**: draft on stub data, render — signed on what renders | agent drafts → human signs |
 | screens rendered, design unsigned / drifted | sign (or re-approve) the design | human |
 | design reopened | finish the redesign, then re-approve | agent |
@@ -347,12 +355,39 @@ and the console renders it as a guided prompt at the moment of the click:
   click away).
 - nothing pending → *"Nothing else waits on you — everything is green."*
 
-The queue deliberately excludes `reopened` artifacts (a redesign in progress
-waits on the WORK, not the human — prompting a re-approval would invite
-signing an unfinished redesign) and unresolvable ones (a button that could
-only fail is not guidance). The prompt guides; it never acts on its own — the
+The queue excludes a `reopened` artifact **while its redesign is unproven** (a
+redesign in progress waits on the WORK, not the human — prompting a
+re-approval would invite signing an unfinished redesign) and unresolvable ones
+(a button that could only fail is not guidance). But `reopened` is one stored
+state covering two opposite situations (2026-07-28 flow audit, finding 3), and
+the queue keys off the DERIVED half: a reopened **brief whose feature derives
+provenDone** — the redesign finished, cited, receipt-PASS against this tree —
+has become exactly the human's turn, and it enters the queue as "re-approve —
+the redesign is proven". One derivation (`deriveHumanQueue`, console-shell)
+feeds the queue, the guided prompt, AND the governance strip (below), so no two surfaces
+can disagree about whose turn it is — the disagreement between this paragraph
+and the next-step table above was the audit's smoking gun. The prompt guides; it never acts on its own — the
 human's click is the instruction, and it lands in a ledger like every other
 judgment.
+
+**The governance strip — status visible at ALL times** (Karel, 2026-07-28 —
+"I should be able to see the status at all times on the current console").
+The andon-board answer: a rail-resident block, above the nav so no tab choice
+can hide it, carrying (1) one derived counts line — *N signed · M await you ·
+K in redesign · J drifted* — (2) the single next human act as a jump button
+("take me there" — the same sign-where-you-read jump the guided prompt uses,
+fed by the same `deriveHumanQueue`), and (3) **History**: the journal's recent
+events, each with verb, artifact, surface (`via`), age, and the reopen's
+*reason* — so "what changed while I was away" is read off the strip, not asked
+of the agent. It refreshes on the same SSE `approval`/`governance` events as
+the panels. Nothing on it is claimed: counts, queue, and history are all
+derivations over the ledger + journal (`governanceStripHtml`, console-shell).
+
+**Reopen carries its why, where you click it.** The console's Reopen buttons
+prompt for the one-sentence reason and refuse an empty one (the library
+refuses too — the prompt just keeps the refusal from being the first thing you
+see); a reopened artifact's signature bar, Approvals row, and feature-card
+stamp all read the reason back from the ledger row.
 
 **Sign where you read** (Karel, 2026-07-25 — "I see the spec but I have no way
 to approve it on the screen itself"). Every governed section carries its OWN
@@ -392,8 +427,10 @@ agent listening on the stream is never double-notified for one decision.
 | `node qa/approve.mjs --status` | either | every artifact + every feature's derived doneness |
 | `node qa/approve.mjs feature-brief:<name>` | human | sign a brief |
 | `node qa/approve.mjs feature-spec:<surface>` | human | sign a contract |
-| `node qa/approve.mjs --reopen <artifact>` | human (or agent on the human's word) | sanctioned redesign — never drift |
+| `node qa/approve.mjs --reopen <artifact> --reason "…"` | human (or agent on the human's word) | sanctioned redesign — never drift. `--reason` REQUIRED; `via` + `reason` land on the row and in the journal |
+| `node qa/approve.mjs --reopen-feature <name> --reason "…"` | human (or agent on the human's word) | ONE recorded change: reopens the brief + its spec + its design + declared `touches` (each only if approved), one reason, journal events grouped by feature |
 | `node qa/approve.mjs --accept <name>` | human | accept a provenDone feature; refused otherwise |
+| `node qa/approve.mjs --log` | either | the journal — every approve/reopen/accept with when, which surface, why |
 | `node qa/verify.mjs` | agent | the prove step; writes the receipt |
 
 Deliberately absent: `--deliver` (removed — an agent signing verb),
@@ -418,8 +455,10 @@ Deliberately absent: `--deliver` (removed — an agent signing verb),
   the same receipt but attributed to Today. Safe (the §1 chain blocks
   acceptance while anything drifts) but attribution is convention. Revisit
   only if it bites.
-- **Starting a change is N reopen commands, not one.** A `--reopen-feature`
-  keyed off the brief's touches would collapse it. Nicety; not built.
+- ~~**Starting a change is N reopen commands, not one.**~~ Closed 2026-07-28:
+  `--reopen-feature <name> --reason "…"` reopens the brief's whole declared set
+  as one recorded change (the audit promoted this from nicety to primary cause
+  of "things change all over and I have no idea what the state is").
 
 ## 10. Implementation index
 

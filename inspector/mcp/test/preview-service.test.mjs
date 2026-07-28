@@ -2594,9 +2594,16 @@ test("service: every decision response carries whatNext — the guided-flow prom
     assert.ok(first.whatNext.pending.every((p) => p.artifact !== "design-system"), "the just-signed artifact is not in its own queue");
     assert.ok(first.whatNext.pending.every((p) => p.tab && p.label), "each queue item is actionable: a tab and a plain-words label");
 
-    // Reopen carries it too — with the reopened artifact excluded from the
-    // queue (a redesign in progress waits on the WORK, not the human).
-    const re = await post("/api/reopen", { artifact: "design-system" });
+    // A reopen WITHOUT a reason is refused by the real library (07-28 audit:
+    // a reopen walks back a signature; attribution is mechanical, not polite).
+    const bare = await post("/api/reopen", { artifact: "design-system" });
+    assert.equal(bare.ok, false);
+    assert.match(bare.reason, /without a reason/);
+
+    // Reopen (with its reason) carries whatNext too — with the reopened
+    // artifact excluded from the queue (an unproven redesign waits on the
+    // WORK, not the human).
+    const re = await post("/api/reopen", { artifact: "design-system", reason: "tokens read too cold" });
     assert.equal(re.ok, true);
     assert.equal(re.whatNext.did, "Reopened design-system for redesign");
     assert.ok(re.whatNext.pending.every((p) => p.artifact !== "design-system"));

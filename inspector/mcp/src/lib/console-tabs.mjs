@@ -125,7 +125,11 @@ export function signatureBarHtml(status, opts = {}) {
       : status.status === "changed-since-approval"
         ? "changed since signature — review the diff below, then re-approve"
         : status.status === "reopened"
-          ? `reopened for redesign${status.reopenedAt ? ` ${esc(status.reopenedAt)}` : ""} — re-approve when the redesign lands`
+          ? // The WHY, read straight off the ledger row (07-28 audit: "reopened"
+            // with no reason was the state Karel came back to and could not
+            // decode). Pre-audit rows carry no reason — the line then says only
+            // what it knows.
+            `reopened for redesign${status.reopenedAt ? ` ${esc(status.reopenedAt)}` : ""}${status.via ? ` via ${esc(status.via)}` : ""}${status.reason ? ` — <em>${esc(status.reason)}</em>` : ""} — re-approve when the redesign lands`
           : "not signed yet — nothing here is binding until you sign it";
   // Refused states never offer a button that would only fail on click.
   const canApprove = status.resolvable !== false;
@@ -951,6 +955,12 @@ export function approvalsTabHtml(approvals, meta = {}) {
           : "";
       const missingNote =
         s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc(s.missing.join(", "))}</p>` : "";
+      // A reopened row answers the reader's first question — why? — from the
+      // ledger row itself (07-28 audit: attribution + reason recorded on reopen).
+      const reopenNote =
+        s.status === "reopened"
+          ? `<p class="reopen-note">reopened${s.reopenedAt ? ` ${esc(s.reopenedAt)}` : ""}${s.via ? ` via ${esc(s.via)}` : ""}${s.reason ? ` — ${esc(s.reason)}` : ""}</p>`
+          : "";
       const btnLabel = s.status === "approved" ? "Re-approve" : "Approve";
       // §2/§3 Reopen control: beside Re-approve on approved rows only — reopening
       // the unreviewed/reopened/changed-since-approval is meaningless (the
@@ -983,7 +993,7 @@ ${driftPanelHtml(s, anchored, { withApprove: false })}
       <td>${esc(s.label)}<div class="artifact-id">${esc(s.id)}</div>${artifactBannerHtml(s)}</td>
       <td><span class="badge ${badgeClass}">${esc(statusLabel)}</span></td>
       <td>${s.fileCount}</td>
-      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}</td>
+      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}${reopenNote}</td>
       <td><button class="approve-btn" data-artifact="${esc(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
     </tr>
 ${diffRow}`;
@@ -2522,6 +2532,13 @@ ${sections.map((s) => `      <h4>${esc(s.heading)}</h4>\n      <div class="doc-p
       const stamps = [];
       if (f.record && f.record.approvedAt) stamps.push(`signed ${esc(f.record.approvedAt)}${f.record.via ? ` via ${esc(f.record.via)}` : ""}`);
       if (f.record && f.record.accepted) stamps.push(`accepted ${esc(f.record.acceptedAt ?? "?")}`);
+      // A reopened brief answers "why?" right on the card (07-28 audit:
+      // attribution + reason are recorded at reopen time; older rows without
+      // them just say when).
+      if (f.record && f.record.status === "reopened" && f.record.reopenedAt)
+        stamps.push(
+          `reopened ${esc(f.record.reopenedAt)}${f.record.via ? ` via ${esc(f.record.via)}` : ""}${f.record.reason ? ` — ${esc(f.record.reason)}` : ""}`,
+        );
 
       // The two human moments, each offered only when it is the real next
       // step: Approve (unsigned, drifted, or REOPENED brief) and Accept

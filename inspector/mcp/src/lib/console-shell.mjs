@@ -51,6 +51,116 @@ export function statusGlyph(record) {
 
 const shortHash = (h) => (h ? String(h).slice(0, 8) : null);
 
+// --- the human's queue (ONE derivation — the strip, the guided prompt, and ---
+// --- approval_status all read this; two derivations was the 07-28 audit's ----
+// --- finding 3: the card said "waiting on you" while the queue said nothing --
+
+/**
+ * Everything currently waiting on the HUMAN, as actionable items, derived
+ * from the live statuses + feature board. Each item names the action in plain
+ * words and the tab where its signature control lives (sign-where-you-read).
+ *
+ * `reopened` is included ONLY when it has become the human's turn: a reopened
+ * feature brief whose feature derives provenDone (the redesign is finished
+ * and proven — same derivation acceptance trusts). A reopened artifact still
+ * mid-redesign stays out: prompting a re-approval there would invite signing
+ * an unfinished redesign.
+ * @param {{statuses?: object[], features?: object[]}} data
+ * @param {string} [excludeArtifact] the artifact just acted on (its own prompt
+ *   should not re-list it)
+ * @returns {Array<{artifact: string, tab: string, label: string}>}
+ */
+export function deriveHumanQueue({ statuses = [], features = [] }, excludeArtifact) {
+  const tabOf = (id) =>
+    id === "intent" || id === "architecture" || id === "design-system" || id === "components"
+      ? id
+      : id.startsWith("feature-brief:") || id.startsWith("feature-design:")
+        ? "features"
+        : id === "exemplar-spec" || id.startsWith("feature-spec:")
+          ? "specs"
+          : "approvals";
+  const readyBriefs = new Set(
+    features.filter((f) => f.phase === "reopened" && f.provenDone).map((f) => `feature-brief:${f.name}`),
+  );
+  const items = [];
+  for (const s of statuses) {
+    if (s.id === excludeArtifact) continue;
+    if (s.status === "unreviewed" && s.resolvable !== false) {
+      items.push({ artifact: s.id, tab: tabOf(s.id), label: `Approve ${s.id}` });
+    } else if (s.status === "changed-since-approval") {
+      items.push({ artifact: s.id, tab: tabOf(s.id), label: `Re-approve ${s.id} — it changed since signing` });
+    } else if (s.status === "reopened" && readyBriefs.has(s.id)) {
+      items.push({ artifact: s.id, tab: tabOf(s.id), label: `Re-approve ${s.id} — the redesign is proven` });
+    }
+  }
+  for (const f of features) {
+    if (f.phase === "proven" && `feature-brief:${f.name}` !== excludeArtifact) {
+      items.push({ artifact: `feature-brief:${f.name}`, tab: "features", label: `Accept ${f.name} — proven done` });
+    }
+  }
+  return items;
+}
+
+// --- the governance strip (rail-resident — visible on EVERY tab) --------------
+
+/**
+ * The always-visible aggregate (07-28 audit, fix 5 — the andon-board answer to
+ * "I should be able to see the status at all times"): one counts line, the
+ * single next human act as a jump button, and the journal's recent history.
+ * Renders in the rail, so no tab choice can hide it. Returns "" when there is
+ * nothing derivable (no statuses at all — an ungoverned or older project):
+ * silence, not a fabricated dashboard.
+ * @param {{statuses?: object[], features?: object[], journal?: object[]}} data
+ * @param {(ageMs: number) => string} [formatAge]
+ */
+export function governanceStripHtml({ statuses = [], features = [], journal = [] }, formatAge = formatAgeCoarse) {
+  if (statuses.length === 0) return "";
+  const queue = deriveHumanQueue({ statuses, features });
+  const signed = statuses.filter((s) => s.status === "approved").length;
+  const queued = new Set(queue.map((q) => q.artifact));
+  const redesign = statuses.filter((s) => s.status === "reopened" && !queued.has(s.id)).length;
+  const drift = statuses.filter((s) => s.status === "changed-since-approval").length;
+
+  const counts = [
+    `<span class="gov-n gov-signed">${signed} signed</span>`,
+    queue.length > 0 ? `<span class="gov-n gov-awaiting">${queue.length} await${queue.length === 1 ? "s" : ""} you</span>` : null,
+    redesign > 0 ? `<span class="gov-n gov-redesign">${redesign} in redesign</span>` : null,
+    drift > 0 ? `<span class="gov-n gov-drift">${drift} drifted</span>` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const next =
+    queue.length > 0
+      ? // data-go-* (NOT data-tab/data-artifact): a strip jump is not a rail tab
+        // button, and overloading the rail's attributes would collide with every
+        // selector that treats data-tab as "a tab exists here".
+        `<button type="button" class="gov-next" data-go-tab="${esc(queue[0].tab)}" data-go-artifact="${esc(queue[0].artifact)}" title="take me there">${esc(queue[0].label)}${queue.length > 1 ? ` <span class="gov-more">(+${queue.length - 1} more)</span>` : ""}</button>`
+      : `<p class="gov-clear">Nothing waits on you.</p>`;
+
+  // Newest first, capped — the strip is a glance, the full history is --log.
+  const recent = [...journal].slice(-8).reverse();
+  const history =
+    recent.length === 0
+      ? ""
+      : `<details class="gov-history"><summary>History</summary>
+${recent
+  .map((e) => {
+    const glyph = e.verb === "approve" ? "●" : e.verb === "reopen" ? "◐" : e.verb === "accept" ? "◆" : "·";
+    const age = e.at && formatAge ? formatAge(Date.now() - Date.parse(e.at)) : "";
+    const who = e.via ? ` via ${e.via}` : "";
+    return `  <p class="gov-event" title="${esc(e.at || "")}${e.reason ? ` — ${esc(e.reason)}` : ""}"><span class="gov-event-glyph">${glyph}</span> ${esc(e.verb)} ${esc(e.artifact || "")}${esc(who)}${age ? ` · ${esc(age)}` : ""}${e.reason ? `<span class="gov-event-reason">${esc(e.reason)}</span>` : ""}</p>`;
+  })
+  .join("\n")}
+</details>`;
+
+  return `<div id="gov-strip">
+  <p class="gov-counts">${counts}</p>
+  ${next}
+${history}
+</div>`;
+}
+
 /**
  * The header status line for a section governed by ONE artifact — the §2
  * grammar: "● signed a1b2c3 · approved <when>" / "○ unsigned" / "⚠ drifted
@@ -280,6 +390,8 @@ export function freshnessBannerHtml(f) {
  * @param {string} [p.extraCss]  caller-computed rules (viewport-derived sizes)
  * @param {string} p.bodyScript  the behavior <script> body (unowned by the shell)
  * @param {{treeHash?: string|null, version?: number}} [p.provenance]
+ * @param {string} [p.govStripHtml]  the governance strip (governanceStripHtml) —
+ *   rail-resident so it is visible on EVERY tab; "" renders nothing
  */
 export function renderShellPage(p) {
   const prov = provenanceHtml(p.provenance || {});
@@ -297,6 +409,7 @@ ${p.extraCss || ""}
     <p class="rail-sub">studio console</p>
     <span id="pill">live</span>
   </div>
+${p.govStripHtml || ""}
   <nav class="rail-nav">
 ${p.railItems.map(railItemHtml).join("\n")}
   </nav>
@@ -362,6 +475,27 @@ export const SHELL_CSS = `
           background: var(--signed-bg); color: var(--signed); }
   #pill.rendering { background: var(--reopen-bg); color: var(--reopen); }
   #pill.error { background: var(--drift-bg); color: var(--drift); }
+  /* --- the governance strip (07-28 audit fix 5: status visible at ALL times,
+         on every tab — counts, the one next human act, recent history) --- */
+  #gov-strip { margin: 0 4px; padding: 10px; border: 1px solid var(--line); border-radius: 10px;
+               background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+  .gov-counts { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); line-height: 1.6; }
+  .gov-n { white-space: nowrap; }
+  .gov-signed { color: var(--signed); font-weight: 600; }
+  .gov-awaiting { color: var(--accent); font-weight: 650; }
+  .gov-redesign { color: var(--reopen); font-weight: 600; }
+  .gov-drift { color: var(--drift); font-weight: 650; }
+  .gov-next { appearance: none; border: none; border-radius: 8px; padding: 6px 9px; cursor: pointer;
+              font: inherit; font-size: var(--fs-meta); font-weight: 600; text-align: left;
+              background: var(--accent-bg); color: var(--accent); line-height: 1.45; }
+  .gov-next:hover { filter: brightness(0.97); }
+  .gov-more { font-weight: 400; color: var(--muted); }
+  .gov-clear { margin: 0; font-size: var(--fs-meta); color: var(--muted); }
+  .gov-history summary { font-size: var(--fs-meta); color: var(--muted); cursor: pointer; }
+  .gov-event { margin: 6px 0 0; font-size: var(--fs-meta); color: var(--ink-2); line-height: 1.4;
+               overflow-wrap: anywhere; }
+  .gov-event-glyph { color: var(--muted); }
+  .gov-event-reason { display: block; color: var(--muted); font-style: italic; }
   .rail-nav { display: flex; flex-direction: column; gap: 1px; }
   .tab-btn { appearance: none; display: flex; align-items: center; gap: 9px; width: 100%;
              padding: 7px 10px; border: none; border-radius: 8px; background: none; cursor: pointer;
@@ -520,6 +654,7 @@ export const SHELL_CSS = `
   .artifact-id, .approved-at { font-size: var(--fs-meta); color: var(--muted); }
   .approved-at { margin-top: 2px; }
   .unresolvable-note, .missing-note { font-size: var(--fs-meta); color: var(--reopen); margin: 4px 0 0; }
+  .reopen-note { font-size: var(--fs-meta); color: var(--reopen); margin: 4px 0 0; overflow-wrap: anywhere; }
   .order-num { color: var(--muted); }
   .artifact-banner { font-size: var(--fs-meta); margin-top: 4px; padding: 4px 8px; border-radius: 8px; max-width: 340px; }
   .banner-mode { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; font-size: 9.5px; }
