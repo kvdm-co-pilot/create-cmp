@@ -8,6 +8,34 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The console's build handshake — a process that knows whether it is stale**
+  (`docs/proposals/console-build-handshake.md`). Twice in two days a long-lived console
+  served a page built from an older module graph while the rebuilt code sat on disk, and
+  the only way to detect it was grepping the fetched HTML for a marker string. Now the
+  console reports the build it LOADED (`src/lib/build-id.mjs` — the same sources+deps hash
+  the bundler already stamps as `cmp:bundle-inputs`, moved down so the service and the
+  bundler share one definition), recomputes what is on disk, and the difference is
+  staleness — derived, never claimed. Surfaced three ways: `build` on `/status`, the
+  console build id in every page's provenance footer, and a **drift-red banner above the
+  page** when stale, carrying the command that fixes it. `stale` is tri-state: unknown
+  freshness renders as neither a warning nor a clean bill of health.
+- **The studio console as a standalone process** (`inspector/mcp/bin/console.mjs`), with
+  `--status` and `--stop`. The console used to be hosted inside the MCP server process — a
+  child of the agent process, which the desktop app respawns routinely (three MCP server
+  pids in one working day). Every respawn killed the console under the human's cursor.
+  A detached process survives them; the lifecycle verbs exist because a detached process
+  without them is litter by construction (an orphaned console ran for a day). `preview`
+  already adopts a console another process is serving — it now also compares build ids and
+  **warns instead of silently adopting one running different code**.
+
+### Fixed
+
+- **The console's connection pill could never recover.** `es.onerror` wrote "disconnected"
+  and nothing ever wrote "live" back, so a one-second blip looked permanent even after
+  `EventSource` silently reconnected — a direct cause of "the studio keeps getting
+  disconnected". It now distinguishes *reconnecting…* (the server blinked; retry pending)
+  from *server gone* (CLOSED), and restores *live* on every reconnect.
+
 - **The governance journal (2026-07-28 flow audit, fixes 1–4).** The holistic audit of the
   post-genesis flow — triggered by a signer returning to a "reopened" artifact with no way to
   learn what happened — found five root causes; this wave closes four mechanically:

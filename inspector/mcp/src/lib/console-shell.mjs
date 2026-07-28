@@ -292,7 +292,34 @@ ${s.bodyHtml}
 export function provenanceHtml(p = {}) {
   const tree = p.treeHash ? `derived from tree <code>@${esc(p.treeHash)}</code>` : "derived from the live tree";
   const render = typeof p.version === "number" && p.version > 0 ? ` &middot; render #${p.version}` : "";
-  return `${tree}${render} &middot; absence = not derivable`;
+  // Which build of the CONSOLE drew this page. Provenance already answers
+  // "which tree is this derived from"; without this it could not answer "and
+  // which code did the deriving" — the question that cost two hours to answer
+  // by hand (2026-07-27/28).
+  const build = p.build && p.build.id ? ` &middot; console <code>${esc(String(p.build.id).slice(0, 8))}</code>` : "";
+  return `${tree}${render}${build} &middot; absence = not derivable`;
+}
+
+/**
+ * The stale-console banner: this page was drawn by code that is no longer the
+ * code on disk. Sits with the other page-top banners because it invalidates
+ * everything below it — a reader who trusts a stale page is the exact failure
+ * (twice in two days) that this whole handshake exists to prevent.
+ *
+ * Silent when fresh, and silent when freshness is UNKNOWN (`stale: null`) —
+ * an unknown must not be dressed up as either a warning or a clean bill of
+ * health; the provenance footer still shows whatever id there is.
+ * @param {{id: string|null, mode: string, stale: boolean|null, diskId: string|null}|null|undefined} build
+ */
+export function staleConsoleBannerHtml(build) {
+  if (!build || build.stale !== true) return "";
+  const from = build.id ? `<code>${esc(String(build.id).slice(0, 8))}</code>` : "an unknown build";
+  const to = build.diskId ? `<code>${esc(String(build.diskId).slice(0, 8))}</code>` : "a newer build";
+  const how =
+    build.mode === "bundle"
+      ? "the bundle was rebuilt after this console started"
+      : "the console's sources changed after it started";
+  return `<div class="banner banner-stale-build">This console is running ${from}; the code on disk is now ${to} &mdash; ${how}. Everything below was drawn by the older code. Restart the console to pick it up: <code>node inspector/mcp/bin/console.mjs &lt;projectDir&gt;</code></div>`;
 }
 
 /** "HH:MM" in server-local time, from an ISO timestamp — null-safe. */
@@ -389,9 +416,11 @@ export function freshnessBannerHtml(f) {
  *   provenance of the pixels below; absent only in callers that render no screens
  * @param {string} [p.extraCss]  caller-computed rules (viewport-derived sizes)
  * @param {string} p.bodyScript  the behavior <script> body (unowned by the shell)
- * @param {{treeHash?: string|null, version?: number}} [p.provenance]
+ * @param {{treeHash?: string|null, version?: number, build?: object}} [p.provenance]
  * @param {string} [p.govStripHtml]  the governance strip (governanceStripHtml) —
  *   rail-resident so it is visible on EVERY tab; "" renders nothing
+ * @param {object|null} [p.build]  the console's own build handshake
+ *   (buildStatus) — drives the stale banner; absent renders nothing
  */
 export function renderShellPage(p) {
   const prov = provenanceHtml(p.provenance || {});
@@ -416,6 +445,7 @@ ${p.railItems.map(railItemHtml).join("\n")}
   <div class="rail-foot">${p.railFootHtml}</div>
 </aside>
 <main>
+${staleConsoleBannerHtml(p.build)}
 ${freshnessBannerHtml(p.freshness)}
 ${rendererDownBannerHtml(p.rendererDown)}
 ${p.error ? `<div class="banner">last render FAILED &mdash; showing previous state\n${esc(p.error)}</div>` : ""}
@@ -536,6 +566,10 @@ export const SHELL_CSS = `
   /* Stale-but-working-on-it: informational, NOT alarm. A concurrent build is normal;
      only a render that stays stuck earns the renderer banner's colour. */
   .banner-stale { background: var(--surface-2, rgba(255,255,255,.05)); color: var(--muted); }
+  /* A stale console invalidates the whole page below it, so it reads as DRIFT
+     (the reserved red), never as the quiet grey a queued refresh gets. */
+  .banner-stale-build { background: var(--drift-bg); color: var(--drift); font-weight: 600; }
+  .banner-stale-build code { font-weight: 500; }
   .tab-panel { display: none; padding: 32px 40px 48px; }
   .tab-panel.active { display: block; }
   .page-head { margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }

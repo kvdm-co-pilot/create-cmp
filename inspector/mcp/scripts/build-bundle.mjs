@@ -24,67 +24,28 @@
 //   (no flag) build and write dist/server.mjs
 //   --check   report whether the committed bundle matches the current sources
 
-import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
 
+// The build id's definition lives in src/lib/build-id.mjs, not here: the
+// SERVICE needs it at runtime (to report which build it is running), and it
+// cannot import this file without dragging esbuild into the shipped bundle.
+// Re-exported below so this module's existing consumers keep their import site.
+import { BUNDLE_MARKER, recordedHash, sourceFiles, sourcesHash } from "../src/lib/build-id.mjs";
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, "..");
 const ENTRY = path.join(ROOT, "bin", "server.mjs");
 const OUT = path.join(ROOT, "dist", "server.mjs");
-const MARKER = "cmp:bundle-inputs";
+const MARKER = BUNDLE_MARKER;
 
-/** Every first-party source the bundle is built from, sorted — the hash inputs. */
-export function sourceFiles(root = ROOT) {
-  const out = [];
-  const walk = (dir) => {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (e.isFile() && p.endsWith(".mjs")) out.push(p);
-    }
-  };
-  walk(path.join(root, "src"));
-  out.push(path.join(root, "bin", "server.mjs"));
-  return out.sort();
-}
-
-/**
- * Hash of the sources AND the declared dependency versions. Dependencies are in
- * the hash on purpose: a bundle built against a different SDK version is a
- * different artifact even when not one first-party byte changed.
- */
-export function inputsHash(root = ROOT) {
-  const h = createHash("sha256");
-  for (const f of sourceFiles(root)) {
-    h.update(path.relative(root, f).split(path.sep).join("/"));
-    h.update("\0");
-    h.update(fs.readFileSync(f));
-    h.update("\0");
-  }
-  const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  h.update(JSON.stringify(pkg.dependencies ?? {}));
-  // The version is INLINED into the bundle (see build()'s `define`), so it is a
-  // real input: leave it out and a version bump changes the artifact while the
-  // hash still claims the artifact is current. The hash must cover everything
-  // that ends up in the file, or it attests less than it appears to.
-  h.update(String(pkg.version ?? ""));
-  return h.digest("hex");
-}
-
-/** The `cmp:bundle-inputs` hash recorded in a built bundle, or null. */
-export function recordedHash(bundlePath = OUT) {
-  let text;
-  try {
-    text = fs.readFileSync(bundlePath, "utf8").slice(0, 4096);
-  } catch {
-    return null;
-  }
-  const m = text.match(new RegExp(`${MARKER}\\s+([0-9a-f]{64})`));
-  return m ? m[1] : null;
-}
+// Re-exported so scripts/tests that import them from here keep working — one
+// definition (src/lib/build-id.mjs), two import sites.
+export { sourceFiles, recordedHash };
+/** @deprecated name kept for existing callers; `sourcesHash` is the definition. */
+export const inputsHash = sourcesHash;
 
 export async function build() {
   const hash = inputsHash();

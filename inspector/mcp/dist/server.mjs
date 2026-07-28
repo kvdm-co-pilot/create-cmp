@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs dedcd2cf2e49e7a8a15386d37070c8e59b10822542aa63cceb1658b9ac835a97
+// cmp:bundle-inputs 844fa579282d78128de7895722a804749eebd14514e656268659f62bae9ef090
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -3235,8 +3235,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path16) {
-      let input = path16;
+    function removeDotSegments(path17) {
+      let input = path17;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3488,8 +3488,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path16, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path16 && path16 !== "/" ? path16 : void 0;
+        const [path17, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path17 && path17 !== "/" ? path17 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6882,12 +6882,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs15, exportName) {
+    function addFormats(ajv, list, fs16, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs15[f]);
+        ajv.addFormat(f, fs16[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7254,8 +7254,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path16, errorMaps, issueData } = params;
-  const fullPath = [...path16, ...issueData.path || []];
+  const { data, path: path17, errorMaps, issueData } = params;
+  const fullPath = [...path17, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7370,11 +7370,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path16, key) {
+  constructor(parent, value, path17, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path16;
+    this._path = path17;
     this._key = key;
   }
   get path() {
@@ -11294,10 +11294,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path16) {
-  if (!path16)
+function getElementAtPath(obj, path17) {
+  if (!path17)
     return obj;
-  return path16.reduce((acc, key) => acc?.[key], obj);
+  return path17.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11706,11 +11706,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path16, issues) {
+function prefixIssues(path17, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path16);
+    iss.path.unshift(path17);
     return iss;
   });
 }
@@ -11857,16 +11857,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path16 = []) => {
+  const processError = (error52, path17 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path16, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path17, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path16, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path16, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
       } else {
-        const fullpath = [...path16, ...issue2.path];
+        const fullpath = [...path17, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -11893,17 +11893,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path16 = []) => {
+  const processError = (error52, path17 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path16, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path17, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path16, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path16, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
       } else {
-        const fullpath = [...path16, ...issue2.path];
+        const fullpath = [...path17, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -11935,8 +11935,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path16 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path16) {
+  const path17 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path17) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -25061,13 +25061,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path16 = ref.slice(1).split("/").filter(Boolean);
-  if (path16.length === 0) {
+  const path17 = ref.slice(1).split("/").filter(Boolean);
+  if (path17.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path16[0] === defsKey) {
-    const key = path16[1];
+  if (path17[0] === defsKey) {
+    const key = path17[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -31014,11 +31014,11 @@ function* walk(tree) {
   if (!root || typeof root !== "object") return;
   yield* walkNode(root, "root");
 }
-function* walkNode(node, path16) {
-  yield { node, path: path16 };
+function* walkNode(node, path17) {
+  yield { node, path: path17 };
   const children = Array.isArray(node.children) ? node.children : [];
   for (let i = 0; i < children.length; i++) {
-    yield* walkNode(children[i], `${path16}.children[${i}]`);
+    yield* walkNode(children[i], `${path17}.children[${i}]`);
   }
 }
 function findByTestTag(tree, tag) {
@@ -31081,8 +31081,8 @@ function requireBounds(node, label) {
 // src/lib/drift.mjs
 function findDrift(tree) {
   const out = [];
-  for (const { node, path: path16 } of walk(tree)) {
-    if (path16 === "root" && node.testTag == null && node.text == null && node.designToken == null) {
+  for (const { node, path: path17 } of walk(tree)) {
+    if (path17 === "root" && node.testTag == null && node.text == null && node.designToken == null) {
       continue;
     }
     const b = node.bounds;
@@ -31093,7 +31093,7 @@ function findDrift(tree) {
     const textPresent = node.text != null && node.text !== "";
     const reason = textPresent ? "renders text with no design token (possible raw value / un-tokenized)" : "has a visual footprint but no design token (possible raw value / un-tokenized)";
     out.push({
-      path: path16,
+      path: path17,
       testTag: node.testTag ?? null,
       text: node.text ?? null,
       bounds: b,
@@ -31106,7 +31106,7 @@ function diffAgainstDesignSystem(tree, catalog) {
   const colors = catalog && catalog.colors || {};
   const dimens = catalog && catalog.dimens || {};
   const out = [];
-  for (const { node, path: path16 } of walk(tree)) {
+  for (const { node, path: path17 } of walk(tree)) {
     const dt = node.designToken;
     if (!dt || !Array.isArray(dt.tokens) || dt.tokens.length === 0) continue;
     const resolved = dt.resolved && typeof dt.resolved === "object" ? dt.resolved : {};
@@ -31120,7 +31120,7 @@ function diffAgainstDesignSystem(tree, catalog) {
       const matches = resolvedValues.includes(declaredNorm);
       if (!matches) {
         out.push({
-          path: path16,
+          path: path17,
           token,
           declared,
           // report the node's resolved value most likely intended for this token:
@@ -31192,16 +31192,16 @@ function diffTrees(currentTree, goldenTree, tolerancePx = 1) {
   diffNode(cur, gold, "root", tol, diffs);
   return diffs;
 }
-function diffNode(cur, gold, path16, tol, out) {
+function diffNode(cur, gold, path17, tol, out) {
   if (cur.testTag !== gold.testTag) {
-    out.push({ path: path16, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
+    out.push({ path: path17, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
   }
   if (cur.text !== gold.text) {
-    out.push({ path: path16, kind: "text-changed", before: gold.text, after: cur.text });
+    out.push({ path: path17, kind: "text-changed", before: gold.text, after: cur.text });
   }
   if (cur.contentDescription !== gold.contentDescription) {
     out.push({
-      path: path16,
+      path: path17,
       kind: "contentDescription-changed",
       before: gold.contentDescription,
       after: cur.contentDescription
@@ -31209,29 +31209,29 @@ function diffNode(cur, gold, path16, tol, out) {
   }
   const roleB = gold.role ?? null;
   const roleA = cur.role ?? null;
-  if (roleA !== roleB) out.push({ path: path16, kind: "role-changed", before: roleB, after: roleA });
+  if (roleA !== roleB) out.push({ path: path17, kind: "role-changed", before: roleB, after: roleA });
   const clickB = gold.clickable ?? false;
   const clickA = cur.clickable ?? false;
-  if (clickA !== clickB) out.push({ path: path16, kind: "clickable-changed", before: clickB, after: clickA });
+  if (clickA !== clickB) out.push({ path: path17, kind: "clickable-changed", before: clickB, after: clickA });
   const disB = gold.disabled ?? false;
   const disA = cur.disabled ?? false;
-  if (disA !== disB) out.push({ path: path16, kind: "disabled-changed", before: disB, after: disA });
+  if (disA !== disB) out.push({ path: path17, kind: "disabled-changed", before: disB, after: disA });
   if (JSON.stringify(cur.designToken) !== JSON.stringify(gold.designToken)) {
-    out.push({ path: path16, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
+    out.push({ path: path17, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
   }
   const moved = boundsMovedBeyond(cur.bounds, gold.bounds, tol);
   if (moved) {
-    out.push({ path: path16, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
+    out.push({ path: path17, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
   }
   const curKids = cur.children || [];
   const goldKids = gold.children || [];
   const shared = Math.min(curKids.length, goldKids.length);
   for (let i = 0; i < shared; i++) {
-    diffNode(curKids[i], goldKids[i], `${path16}.children[${i}]`, tol, out);
+    diffNode(curKids[i], goldKids[i], `${path17}.children[${i}]`, tol, out);
   }
   for (let i = shared; i < curKids.length; i++) {
     out.push({
-      path: `${path16}.children[${i}]`,
+      path: `${path17}.children[${i}]`,
       kind: "node-added",
       before: null,
       after: summarize(curKids[i])
@@ -31239,7 +31239,7 @@ function diffNode(cur, gold, path16, tol, out) {
   }
   for (let i = shared; i < goldKids.length; i++) {
     out.push({
-      path: `${path16}.children[${i}]`,
+      path: `${path17}.children[${i}]`,
       kind: "node-removed",
       before: summarize(goldKids[i]),
       after: null
@@ -31325,9 +31325,9 @@ function auditA11y(tree, opts = {}) {
   const violations = [];
   const warnings = [];
   let passCount = 0;
-  for (const { node, path: path16 } of walk(tree)) {
+  for (const { node, path: path17 } of walk(tree)) {
     const entryBase = {
-      path: path16,
+      path: path17,
       testTag: node.testTag ?? null,
       bounds: node.bounds ?? null
     };
@@ -31738,8 +31738,8 @@ function parsePngHeader(buf) {
   }
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
-function readPngMeta(path16) {
-  const abs = resolve(path16);
+function readPngMeta(path17) {
+  const abs = resolve(path17);
   let buf;
   try {
     buf = readFileSync3(abs);
@@ -31966,9 +31966,9 @@ function renderTreeSvg(tree, opts = {}) {
   const originY = LEGEND_H + MARGIN / 2;
   let nodeCount = 0;
   const body = [];
-  for (const { node, path: path16 } of walk(root)) {
+  for (const { node, path: path17 } of walk(root)) {
     nodeCount++;
-    if (depthOf(path16) > maxDepth) continue;
+    if (depthOf(path17) > maxDepth) continue;
     const b = node.bounds;
     const w = boundsDim(b, "width");
     const h = boundsDim(b, "height");
@@ -31979,10 +31979,10 @@ function renderTreeSvg(tree, opts = {}) {
     const sh = h * scale;
     const tokenized = node.designToken != null;
     const clickable = node.clickable === true;
-    const rules = violationsByPath.get(path16);
+    const rules = violationsByPath.get(path17);
     const base = tokenized ? STYLE.tokenized : STYLE.plain;
     body.push(
-      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path16)}"/>`
+      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path17)}"/>`
     );
     if (clickable) {
       body.push(
@@ -32073,8 +32073,8 @@ var ABBREV = {
 function abbrev(key) {
   return ABBREV[key] ?? key;
 }
-function depthOf(path16) {
-  return (path16.match(/\.children\[/g) || []).length;
+function depthOf(path17) {
+  return (path17.match(/\.children\[/g) || []).length;
 }
 function boundsDim(b, key) {
   return b && typeof b[key] === "number" ? b[key] : 0;
@@ -32094,9 +32094,9 @@ function countRenderable(tree, opts = {}) {
   const maxDepth = typeof opts.maxDepth === "number" && opts.maxDepth >= 0 ? opts.maxDepth : Infinity;
   let total = 0;
   let drawn = 0;
-  for (const { node, path: path16 } of walk(root)) {
+  for (const { node, path: path17 } of walk(root)) {
     total++;
-    if (depthOf(path16) > maxDepth) continue;
+    if (depthOf(path17) > maxDepth) continue;
     if (boundsDim(node.bounds, "width") > 0 && boundsDim(node.bounds, "height") > 0) drawn++;
   }
   return { total, drawn };
@@ -32194,22 +32194,92 @@ function parseLogcat(raw, opts = {}) {
 
 // src/lib/preview-service.mjs
 import crypto from "node:crypto";
-import fs14 from "node:fs";
+import fs15 from "node:fs";
 import http from "node:http";
 import os2 from "node:os";
-import path15 from "node:path";
+import path16 from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 
-// src/lib/approvals-bridge.mjs
+// src/lib/build-id.mjs
+import { createHash as createHash3 } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+var PKG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+var BUNDLE_MARKER = "cmp:bundle-inputs";
+function sourceFiles(root = PKG_ROOT) {
+  const out = [];
+  const walk2 = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk2(p);
+      else if (e.isFile() && p.endsWith(".mjs")) out.push(p);
+    }
+  };
+  walk2(path.join(root, "src"));
+  out.push(path.join(root, "bin", "server.mjs"));
+  return out.sort();
+}
+function sourcesHash(root = PKG_ROOT) {
+  const h = createHash3("sha256");
+  for (const f of sourceFiles(root)) {
+    h.update(path.relative(root, f).split(path.sep).join("/"));
+    h.update("\0");
+    h.update(fs.readFileSync(f));
+    h.update("\0");
+  }
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  h.update(JSON.stringify(pkg.dependencies ?? {}));
+  h.update(String(pkg.version ?? ""));
+  return h.digest("hex");
+}
+function recordedHash(bundlePath = path.join(PKG_ROOT, "dist", "server.mjs")) {
+  let text;
+  try {
+    text = fs.readFileSync(bundlePath, "utf8").slice(0, 4096);
+  } catch {
+    return null;
+  }
+  const m = text.match(new RegExp(`${BUNDLE_MARKER}\\s+([0-9a-f]{64})`));
+  return m ? m[1] : null;
+}
+function runningFrom(metaUrl = import.meta.url) {
+  const file2 = fileURLToPath(metaUrl);
+  return { mode: path.basename(path.dirname(file2)) === "dist" ? "bundle" : "source", file: file2 };
+}
+function loadedBuildId(metaUrl = import.meta.url) {
+  const { mode, file: file2 } = runningFrom(metaUrl);
+  try {
+    return { id: mode === "bundle" ? recordedHash(file2) : sourcesHash(), mode, file: file2 };
+  } catch {
+    return { id: null, mode, file: file2 };
+  }
+}
+function diskBuildId(metaUrl = import.meta.url) {
+  const { mode, file: file2 } = runningFrom(metaUrl);
+  try {
+    return mode === "bundle" ? recordedHash(file2) : sourcesHash();
+  } catch {
+    return null;
+  }
+}
+function buildStatus(loadedId, metaUrl = import.meta.url) {
+  const { mode } = runningFrom(metaUrl);
+  const disk = diskBuildId(metaUrl);
+  const stale = loadedId === null || disk === null ? null : loadedId !== disk;
+  return { id: loadedId, mode, stale, diskId: disk };
+}
+
+// src/lib/approvals-bridge.mjs
+import fs2 from "node:fs";
+import path2 from "node:path";
 import { pathToFileURL } from "node:url";
 var libCache = /* @__PURE__ */ new Map();
 async function loadLib(root) {
   if (libCache.has(root)) return libCache.get(root);
-  const libPath = path.join(root, "qa", "lib", "approvals.mjs");
-  if (!fs.existsSync(libPath)) return null;
+  const libPath = path2.join(root, "qa", "lib", "approvals.mjs");
+  if (!fs2.existsSync(libPath)) return null;
   let mod;
   try {
     mod = await import(pathToFileURL(libPath).href);
@@ -32311,14 +32381,14 @@ async function acceptFeature(root, name) {
 }
 
 // src/lib/comments-bridge.mjs
-import fs2 from "node:fs";
-import path2 from "node:path";
+import fs3 from "node:fs";
+import path3 from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 var libCache2 = /* @__PURE__ */ new Map();
 async function loadLib2(root) {
   if (libCache2.has(root)) return libCache2.get(root);
-  const libPath = path2.join(root, "qa", "lib", "comments.mjs");
-  if (!fs2.existsSync(libPath)) return null;
+  const libPath = path3.join(root, "qa", "lib", "comments.mjs");
+  if (!fs3.existsSync(libPath)) return null;
   let mod;
   try {
     mod = await import(pathToFileURL2(libPath).href);
@@ -32368,8 +32438,8 @@ async function resolveComment(root, id, input) {
 }
 
 // src/lib/specs.mjs
-import fs3 from "node:fs";
-import path3 from "node:path";
+import fs4 from "node:fs";
+import path4 from "node:path";
 var CLAUSE_LINE_RE = /^-\s+(~~)?\*\*([A-Z][A-Z0-9]*-\d{2,})\*\*(.*)$/;
 var TAG_LINE_RE = /^(?:\/\/|#)\s*SPEC:/;
 var TAG_IDS_RE = /SPEC:\s*([A-Z0-9,\s-]+)/;
@@ -32381,24 +32451,24 @@ function walkCodeFiles(dir) {
   const out = [];
   let entries;
   try {
-    entries = fs3.readdirSync(dir, { withFileTypes: true });
+    entries = fs4.readdirSync(dir, { withFileTypes: true });
   } catch {
     return out;
   }
   for (const e of entries) {
-    const p = path3.join(dir, e.name);
+    const p = path4.join(dir, e.name);
     if (e.isDirectory()) out.push(...walkCodeFiles(p));
     else if (CODE_EXTS.some((ext) => e.name.endsWith(ext))) out.push(p);
   }
   return out;
 }
 function citationIndex(root) {
-  const dirs = [path3.join(root, "composeApp", "src"), path3.join(root, "qa", "e2e")];
+  const dirs = [path4.join(root, "composeApp", "src"), path4.join(root, "qa", "e2e")];
   const index = /* @__PURE__ */ new Map();
   for (const dir of dirs) {
     for (const file2 of walkCodeFiles(dir)) {
-      const rel = path3.relative(root, file2).split(path3.sep).join("/");
-      fs3.readFileSync(file2, "utf8").split("\n").forEach((line, idx) => {
+      const rel = path4.relative(root, file2).split(path4.sep).join("/");
+      fs4.readFileSync(file2, "utf8").split("\n").forEach((line, idx) => {
         const trimmed = line.trim();
         if (!TAG_LINE_RE.test(trimmed)) return;
         const m = trimmed.match(TAG_IDS_RE);
@@ -32413,12 +32483,12 @@ function citationIndex(root) {
   return index;
 }
 function listSpecFiles(root) {
-  const specsDir = path3.join(root, "specs");
-  if (!fs3.existsSync(specsDir)) return [];
-  return fs3.readdirSync(specsDir).filter((f) => f.endsWith(".spec.md")).sort((a, b) => a.localeCompare(b));
+  const specsDir = path4.join(root, "specs");
+  if (!fs4.existsSync(specsDir)) return [];
+  return fs4.readdirSync(specsDir).filter((f) => f.endsWith(".spec.md")).sort((a, b) => a.localeCompare(b));
 }
 function parseSpecClauses(root, file2) {
-  const lines = fs3.readFileSync(path3.join(root, "specs", file2), "utf8").split("\n");
+  const lines = fs4.readFileSync(path4.join(root, "specs", file2), "utf8").split("\n");
   const clauses = [];
   let current = null;
   const flush = () => {
@@ -32477,8 +32547,8 @@ function getSpecsData(root) {
 }
 
 // src/lib/architecture.mjs
-import fs4 from "node:fs";
-import path4 from "node:path";
+import fs5 from "node:fs";
+import path5 from "node:path";
 var KNOWN_LAYERS = [
   { id: "presentation", label: "presentation (screens, navigation, theme \u2014 the human-facing layer)" },
   { id: "domain", label: "domain (models, repository interfaces, use cases \u2014 no platform/UI deps)" },
@@ -32486,13 +32556,13 @@ var KNOWN_LAYERS = [
   { id: "di", label: "di (dependency wiring \u2014 composes the above)" }
 ];
 function findPackageDir(kotlinRoot) {
-  if (!fs4.existsSync(kotlinRoot)) return null;
+  if (!fs5.existsSync(kotlinRoot)) return null;
   let found = null;
   (function walk2(dir) {
     if (found) return;
     let entries;
     try {
-      entries = fs4.readdirSync(dir, { withFileTypes: true });
+      entries = fs5.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
@@ -32502,7 +32572,7 @@ function findPackageDir(kotlinRoot) {
     }
     for (const e of entries) {
       if (found) return;
-      if (e.isDirectory()) walk2(path4.join(dir, e.name));
+      if (e.isDirectory()) walk2(path5.join(dir, e.name));
     }
   })(kotlinRoot);
   return found;
@@ -32511,12 +32581,12 @@ function walkKotlinFiles(dir, relPrefix = "") {
   const out = [];
   let entries;
   try {
-    entries = fs4.readdirSync(dir, { withFileTypes: true });
+    entries = fs5.readdirSync(dir, { withFileTypes: true });
   } catch {
     return out;
   }
   for (const e of entries) {
-    const abs = path4.join(dir, e.name);
+    const abs = path5.join(dir, e.name);
     const rel = relPrefix ? `${relPrefix}/${e.name}` : e.name;
     if (e.isDirectory()) out.push(...walkKotlinFiles(abs, rel));
     else if (e.name.endsWith(".kt") || e.name.endsWith(".kts")) out.push(rel);
@@ -32524,34 +32594,34 @@ function walkKotlinFiles(dir, relPrefix = "") {
   return out.sort((a, b) => a.localeCompare(b));
 }
 function toPosix(p) {
-  return p.split(path4.sep).join("/");
+  return p.split(path5.sep).join("/");
 }
 function getLayerMap(root) {
-  const kotlinRoot = path4.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path5.join(root, "composeApp", "src", "commonMain", "kotlin");
   const packageDir = findPackageDir(kotlinRoot);
   if (!packageDir) {
-    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path4.relative(root, kotlinRoot))}` };
+    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path5.relative(root, kotlinRoot))}` };
   }
-  const appPackage = toPosix(path4.relative(kotlinRoot, packageDir)).split("/").join(".");
+  const appPackage = toPosix(path5.relative(kotlinRoot, packageDir)).split("/").join(".");
   let topLevel;
   try {
-    topLevel = fs4.readdirSync(packageDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+    topLevel = fs5.readdirSync(packageDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
   } catch {
     topLevel = [];
   }
   const knownIds = new Set(KNOWN_LAYERS.map((l) => l.id));
   const layers = KNOWN_LAYERS.map(({ id, label }) => {
-    const dir = path4.join(packageDir, id);
-    const present = fs4.existsSync(dir);
+    const dir = path5.join(packageDir, id);
+    const present = fs5.existsSync(dir);
     return { id, label, present, files: present ? walkKotlinFiles(dir) : [] };
   });
-  const otherPackages = topLevel.filter((name) => !knownIds.has(name)).sort((a, b) => a.localeCompare(b)).map((name) => ({ name, files: walkKotlinFiles(path4.join(packageDir, name)) }));
-  return { available: true, appPackage, kotlinRoot: toPosix(path4.relative(root, kotlinRoot)), layers, otherPackages };
+  const otherPackages = topLevel.filter((name) => !knownIds.has(name)).sort((a, b) => a.localeCompare(b)).map((name) => ({ name, files: walkKotlinFiles(path5.join(packageDir, name)) }));
+  return { available: true, appPackage, kotlinRoot: toPosix(path5.relative(root, kotlinRoot)), layers, otherPackages };
 }
 function getGovernedContract(root) {
   const file2 = "app-base.spec.md";
-  const specPath = path4.join(root, "specs", file2);
-  if (!fs4.existsSync(specPath)) {
+  const specPath = path5.join(root, "specs", file2);
+  if (!fs5.existsSync(specPath)) {
     return { available: false, reason: `specs/${file2} not found` };
   }
   try {
@@ -32579,19 +32649,19 @@ var SOURCE_SETS = {
 };
 var EXEMPLAR_SPEC_REL = "specs/home.spec.md";
 function getFeatureShape(root) {
-  const kotlinRoot = path4.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path5.join(root, "composeApp", "src", "commonMain", "kotlin");
   const packageDir = findPackageDir(kotlinRoot);
   if (!packageDir) {
-    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path4.relative(root, kotlinRoot))}` };
+    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path5.relative(root, kotlinRoot))}` };
   }
-  const packageRel = toPosix(path4.relative(kotlinRoot, packageDir));
-  const homeDir = path4.join(packageDir, "presentation", "home");
+  const packageRel = toPosix(path5.relative(kotlinRoot, packageDir));
+  const homeDir = path5.join(packageDir, "presentation", "home");
   const presentationBase = `composeApp/src/commonMain/kotlin/${packageRel}/presentation/home`;
-  const presentationFiles = fs4.existsSync(homeDir) ? walkKotlinFiles(homeDir).map((f) => `${presentationBase}/${f}`) : [];
+  const presentationFiles = fs5.existsSync(homeDir) ? walkKotlinFiles(homeDir).map((f) => `${presentationBase}/${f}`) : [];
   const knownFiles = EXEMPLAR_FEATURE_FILES.map(
     ({ sourceSet, rel }) => `${SOURCE_SETS[sourceSet]}/${packageRel}/${rel}`
-  ).filter((relPath) => fs4.existsSync(path4.join(root, ...relPath.split("/"))));
-  if (fs4.existsSync(path4.join(root, ...EXEMPLAR_SPEC_REL.split("/")))) knownFiles.push(EXEMPLAR_SPEC_REL);
+  ).filter((relPath) => fs5.existsSync(path5.join(root, ...relPath.split("/"))));
+  if (fs5.existsSync(path5.join(root, ...EXEMPLAR_SPEC_REL.split("/")))) knownFiles.push(EXEMPLAR_SPEC_REL);
   const files = [.../* @__PURE__ */ new Set([...presentationFiles, ...knownFiles])].sort((a, b) => a.localeCompare(b));
   if (files.length === 0) {
     return {
@@ -32622,32 +32692,32 @@ var IMPORT_RE = /^\s*import\s+([\w.]+)/;
 function collectPackageBuckets(packageDir) {
   let entries;
   try {
-    entries = fs4.readdirSync(packageDir, { withFileTypes: true });
+    entries = fs5.readdirSync(packageDir, { withFileTypes: true });
   } catch {
     return [];
   }
   return entries.filter((e) => e.isDirectory()).map((e) => e.name);
 }
 function getDependencyGraph(root, clauses) {
-  const kotlinRoot = path4.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path5.join(root, "composeApp", "src", "commonMain", "kotlin");
   const packageDir = findPackageDir(kotlinRoot);
   if (!packageDir) {
-    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path4.relative(root, kotlinRoot))}` };
+    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path5.relative(root, kotlinRoot))}` };
   }
-  const appPackage = toPosix(path4.relative(kotlinRoot, packageDir)).split("/").join(".");
+  const appPackage = toPosix(path5.relative(kotlinRoot, packageDir)).split("/").join(".");
   const buckets = collectPackageBuckets(packageDir);
   const bucketSet = new Set(buckets);
   const rules = deriveLayerRules(clauses);
   const forbidden = new Map(rules.map((r) => [`${r.from}->${r.to}`, r.clauseId]));
   const edgeMap = /* @__PURE__ */ new Map();
   for (const bucket of buckets) {
-    const dir = path4.join(packageDir, bucket);
+    const dir = path5.join(packageDir, bucket);
     for (const relFile of walkKotlinFiles(dir)) {
-      const absFile = path4.join(dir, relFile);
-      const relFromRoot = toPosix(path4.relative(root, absFile));
+      const absFile = path5.join(dir, relFile);
+      const relFromRoot = toPosix(path5.relative(root, absFile));
       let text;
       try {
-        text = fs4.readFileSync(absFile, "utf8");
+        text = fs5.readFileSync(absFile, "utf8");
       } catch {
         continue;
       }
@@ -32736,7 +32806,7 @@ var LOCKSTEP = [
 function parseVersionCatalog(root) {
   let text;
   try {
-    text = fs4.readFileSync(path4.join(root, VERSIONS_REL), "utf8");
+    text = fs5.readFileSync(path5.join(root, VERSIONS_REL), "utf8");
   } catch (err) {
     return { available: false, reason: err && err.message ? err.message : String(err) };
   }
@@ -32781,11 +32851,11 @@ function deriveVersionSet(root, constraintsBody) {
   };
 }
 function getArchitectureDoc(root) {
-  const docPath = path4.join(root, ...DOC_REL.split("/"));
-  if (!fs4.existsSync(docPath)) return { available: false, reason: `${DOC_REL} not found` };
+  const docPath = path5.join(root, ...DOC_REL.split("/"));
+  if (!fs5.existsSync(docPath)) return { available: false, reason: `${DOC_REL} not found` };
   let text;
   try {
-    text = fs4.readFileSync(docPath, "utf8");
+    text = fs5.readFileSync(docPath, "utf8");
   } catch (err) {
     return { available: false, reason: err && err.message ? err.message : String(err) };
   }
@@ -32837,8 +32907,8 @@ function getArchitectureData(root) {
 }
 
 // src/lib/receipt-bridge.mjs
-import fs5 from "node:fs";
-import path5 from "node:path";
+import fs6 from "node:fs";
+import path6 from "node:path";
 import { execFileSync as execFileSync2 } from "node:child_process";
 import { pathToFileURL as pathToFileURL3 } from "node:url";
 var RECEIPT_REL_PATH = "qa/evidence/latest.json";
@@ -32846,8 +32916,8 @@ var INPUTS_HASH_REL_PATH = "qa/lib/inputs-hash.mjs";
 var inputsHashLibCache = /* @__PURE__ */ new Map();
 async function loadInputsHashLib(root) {
   if (inputsHashLibCache.has(root)) return inputsHashLibCache.get(root);
-  const libPath = path5.join(root, INPUTS_HASH_REL_PATH);
-  if (!fs5.existsSync(libPath)) return null;
+  const libPath = path6.join(root, INPUTS_HASH_REL_PATH);
+  if (!fs6.existsSync(libPath)) return null;
   let mod;
   try {
     mod = await import(pathToFileURL3(libPath).href);
@@ -32882,13 +32952,13 @@ async function recomputeStaleness(root, receipt) {
   return { stale: currentInputsHash !== receiptHash, currentInputsHash };
 }
 async function getLastReceipt(root) {
-  const receiptPath = path5.join(root, RECEIPT_REL_PATH);
-  if (!fs5.existsSync(receiptPath)) {
+  const receiptPath = path6.join(root, RECEIPT_REL_PATH);
+  if (!fs6.existsSync(receiptPath)) {
     return { available: false, reason: `no receipt at ${RECEIPT_REL_PATH} \u2014 run node qa/verify.mjs` };
   }
   let receipt;
   try {
-    receipt = JSON.parse(fs5.readFileSync(receiptPath, "utf8"));
+    receipt = JSON.parse(fs6.readFileSync(receiptPath, "utf8"));
   } catch (err) {
     return {
       available: false,
@@ -32987,8 +33057,8 @@ function listReceiptHistory(root) {
 }
 
 // src/lib/components.mjs
-import fs6 from "node:fs";
-import path6 from "node:path";
+import fs7 from "node:fs";
+import path7 from "node:path";
 function kebabCase(name) {
   return String(name).replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2").toLowerCase();
 }
@@ -32999,12 +33069,12 @@ function walkKtFiles(dir) {
   const out = [];
   let entries;
   try {
-    entries = fs6.readdirSync(dir, { withFileTypes: true });
+    entries = fs7.readdirSync(dir, { withFileTypes: true });
   } catch {
     return out;
   }
   for (const e of entries) {
-    const p = path6.join(dir, e.name);
+    const p = path7.join(dir, e.name);
     if (e.isDirectory()) out.push(...walkKtFiles(p));
     else if (e.name.endsWith(".kt")) out.push(p);
   }
@@ -33015,13 +33085,13 @@ function findPresentationDirs(kotlinRoot) {
   (function walk2(dir) {
     let entries;
     try {
-      entries = fs6.readdirSync(dir, { withFileTypes: true });
+      entries = fs7.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of entries) {
       if (!e.isDirectory()) continue;
-      const p = path6.join(dir, e.name);
+      const p = path7.join(dir, e.name);
       if (e.name === "presentation") out.push(p);
       else walk2(p);
     }
@@ -33196,36 +33266,36 @@ function scanComposables(text) {
 }
 var SCREEN_FILE_RE = /Screen\.kt$/;
 function getComponentsData(root) {
-  const kotlinRoot = path6.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path7.join(root, "composeApp", "src", "commonMain", "kotlin");
   const presentationDirs = findPresentationDirs(kotlinRoot);
   if (presentationDirs.length === 0) {
     return {
       available: false,
-      reason: `no 'presentation' directory found under ${path6.relative(root, kotlinRoot).split(path6.sep).join("/")}`
+      reason: `no 'presentation' directory found under ${path7.relative(root, kotlinRoot).split(path7.sep).join("/")}`
     };
   }
-  const componentsDirs = presentationDirs.map((p) => path6.join(p, "components")).filter((p) => fs6.existsSync(p));
+  const componentsDirs = presentationDirs.map((p) => path7.join(p, "components")).filter((p) => fs7.existsSync(p));
   if (componentsDirs.length === 0) {
     return { available: false, reason: "no presentation/components directory found" };
   }
   const componentFiles = componentsDirs.flatMap(
-    (dir) => fs6.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(".kt")).map((e) => path6.join(dir, e.name))
+    (dir) => fs7.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(".kt")).map((e) => path7.join(dir, e.name))
   );
   if (componentFiles.length === 0) {
     return { available: true, components: [] };
   }
   const allPresentationFiles = presentationDirs.flatMap(walkKtFiles);
-  const fileTexts = new Map(allPresentationFiles.map((f) => [f, fs6.readFileSync(f, "utf8")]));
+  const fileTexts = new Map(allPresentationFiles.map((f) => [f, fs7.readFileSync(f, "utf8")]));
   const components = [];
   for (const file2 of componentFiles) {
-    const text = fileTexts.get(file2) ?? fs6.readFileSync(file2, "utf8");
-    const relFile = path6.relative(root, file2).split(path6.sep).join("/");
+    const text = fileTexts.get(file2) ?? fs7.readFileSync(file2, "utf8");
+    const relFile = path7.relative(root, file2).split(path7.sep).join("/");
     for (const sig of scanComposables(text)) {
       const callRe = new RegExp(`\\b${sig.name}\\s*\\(`);
       const usedIn = [];
       for (const [otherFile, otherText] of fileTexts) {
         if (otherFile === file2) continue;
-        if (callRe.test(otherText)) usedIn.push(path6.relative(root, otherFile).split(path6.sep).join("/"));
+        if (callRe.test(otherText)) usedIn.push(path7.relative(root, otherFile).split(path7.sep).join("/"));
       }
       usedIn.sort((a, b) => a.localeCompare(b));
       components.push({
@@ -33249,11 +33319,11 @@ function getComponentsData(root) {
 var SEAM_NAME_RE = /(Screen|Route|Preview)$/;
 function scanUngoverned(root, presentationDirs, registryComponents) {
   const registryNames = new Set(registryComponents.map((c) => c.name));
-  const featureFiles = presentationDirs.flatMap(walkKtFiles).filter((f) => !f.split(path6.sep).includes("components"));
-  const fileTexts = new Map(featureFiles.map((f) => [f, fs6.readFileSync(f, "utf8")]));
+  const featureFiles = presentationDirs.flatMap(walkKtFiles).filter((f) => !f.split(path7.sep).includes("components"));
+  const fileTexts = new Map(featureFiles.map((f) => [f, fs7.readFileSync(f, "utf8")]));
   const out = [];
   for (const [file2, text] of fileTexts) {
-    const relFile = path6.relative(root, file2).split(path6.sep).join("/");
+    const relFile = path7.relative(root, file2).split(path7.sep).join("/");
     const featureOf = (rel) => {
       const after = rel.split("/presentation/")[1] ?? "";
       return after.includes("/") ? after.split("/")[0] : "(root)";
@@ -33265,7 +33335,7 @@ function scanUngoverned(root, presentationDirs, registryComponents) {
       const usedIn = [];
       for (const [otherFile, otherText] of fileTexts) {
         if (otherFile === file2) continue;
-        if (callRe.test(otherText)) usedIn.push(path6.relative(root, otherFile).split(path6.sep).join("/"));
+        if (callRe.test(otherText)) usedIn.push(path7.relative(root, otherFile).split(path7.sep).join("/"));
       }
       const features = /* @__PURE__ */ new Set([featureOf(relFile), ...usedIn.map(featureOf)]);
       out.push({
@@ -33284,35 +33354,35 @@ function scanUngoverned(root, presentationDirs, registryComponents) {
 }
 
 // src/lib/variants.mjs
-import fs7 from "node:fs";
-import path7 from "node:path";
+import fs8 from "node:fs";
+import path8 from "node:path";
 function getVariantsData(root) {
-  const variantsDir = path7.join(root, "composeApp", "build", "previews", "variants");
+  const variantsDir = path8.join(root, "composeApp", "build", "previews", "variants");
   let entries;
   try {
-    entries = fs7.readdirSync(variantsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+    entries = fs8.readdirSync(variantsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
   } catch {
     return { available: false };
   }
   if (entries.length === 0) return { available: false };
   const variants = entries.map((e) => e.name).sort().map((name) => {
-    const dir = path7.join(variantsDir, name);
+    const dir = path8.join(variantsDir, name);
     let screenDirs = [];
     try {
-      screenDirs = fs7.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
+      screenDirs = fs8.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
     } catch {
       screenDirs = [];
     }
-    const screens = screenDirs.map((e) => e.name).filter((id) => fs7.existsSync(path7.join(dir, id, "screen.png"))).sort().map((id) => ({ id, png: `variants/${name}/${id}/screen.png` }));
-    const hasDesignSystem = fs7.existsSync(path7.join(dir, "design-system.json"));
+    const screens = screenDirs.map((e) => e.name).filter((id) => fs8.existsSync(path8.join(dir, id, "screen.png"))).sort().map((id) => ({ id, png: `variants/${name}/${id}/screen.png` }));
+    const hasDesignSystem = fs8.existsSync(path8.join(dir, "design-system.json"));
     return { name, screens, hasDesignSystem };
   });
   return { available: true, variants };
 }
 
 // src/lib/component-drift.mjs
-import fs8 from "node:fs";
-import path8 from "node:path";
+import fs9 from "node:fs";
+import path9 from "node:path";
 function getComponentDriftInfo(root, files, approvalRecord) {
   if (!approvalRecord) {
     return { available: false, reason: "no approvals record for the components artifact" };
@@ -33333,7 +33403,7 @@ function getComponentDriftInfo(root, files, approvalRecord) {
   const byFile = {};
   for (const relFile of files) {
     try {
-      const stat = fs8.statSync(path8.join(root, relFile));
+      const stat = fs9.statSync(path9.join(root, relFile));
       byFile[relFile] = { modifiedSinceApproval: stat.mtimeMs > approvedAtMs, mtime: stat.mtime.toISOString() };
     } catch {
       byFile[relFile] = { modifiedSinceApproval: null, mtime: null };
@@ -33343,19 +33413,19 @@ function getComponentDriftInfo(root, files, approvalRecord) {
 }
 
 // src/lib/handrolled-state.mjs
-import fs9 from "node:fs";
-import path9 from "node:path";
+import fs10 from "node:fs";
+import path10 from "node:path";
 var INDICATORS = ["CircularProgressIndicator", "LinearProgressIndicator"];
 function isUnderComponentsDir(absFile) {
-  return absFile.split(path9.sep).includes("components");
+  return absFile.split(path10.sep).includes("components");
 }
 function getHandRolledStateViolations(root) {
-  const kotlinRoot = path9.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path10.join(root, "composeApp", "src", "commonMain", "kotlin");
   const presentationDirs = findPresentationDirs(kotlinRoot);
   if (presentationDirs.length === 0) {
     return {
       available: false,
-      reason: `no 'presentation' directory found under ${path9.relative(root, kotlinRoot).split(path9.sep).join("/")}`
+      reason: `no 'presentation' directory found under ${path10.relative(root, kotlinRoot).split(path10.sep).join("/")}`
     };
   }
   const files = presentationDirs.flatMap(walkKtFiles).filter((f) => !isUnderComponentsDir(f));
@@ -33363,7 +33433,7 @@ function getHandRolledStateViolations(root) {
   for (const file2 of files) {
     let text;
     try {
-      text = fs9.readFileSync(file2, "utf8");
+      text = fs10.readFileSync(file2, "utf8");
     } catch {
       continue;
     }
@@ -33378,7 +33448,7 @@ function getHandRolledStateViolations(root) {
       if (lines.length) indicators.push({ name, lines });
     }
     if (indicators.length) {
-      violations.push({ file: path9.relative(root, file2).split(path9.sep).join("/"), indicators });
+      violations.push({ file: path10.relative(root, file2).split(path10.sep).join("/"), indicators });
     }
   }
   violations.sort((a, b) => a.file.localeCompare(b.file));
@@ -33386,29 +33456,29 @@ function getHandRolledStateViolations(root) {
 }
 
 // src/lib/walkthrough-data.mjs
-import fs10 from "node:fs";
-import path10 from "node:path";
-var WALKTHROUGH_REL_DIR = path10.join("qa", "evidence", "walkthrough");
+import fs11 from "node:fs";
+import path11 from "node:path";
+var WALKTHROUGH_REL_DIR = path11.join("qa", "evidence", "walkthrough");
 function getWalkthroughData(projectDir, { limit = 8 } = {}) {
-  const root = path10.join(projectDir, WALKTHROUGH_REL_DIR);
-  if (!fs10.existsSync(root)) {
+  const root = path11.join(projectDir, WALKTHROUGH_REL_DIR);
+  if (!fs11.existsSync(root)) {
     return { available: false, reason: "no walkthrough runs yet \u2014 node qa/walkthrough.mjs against the live app", runs: [] };
   }
   const runs = [];
-  for (const entry of fs10.readdirSync(root)) {
-    const dir = path10.join(root, entry);
-    const manifestPath = path10.join(dir, "manifest.json");
-    if (!fs10.existsSync(manifestPath)) continue;
+  for (const entry of fs11.readdirSync(root)) {
+    const dir = path11.join(root, entry);
+    const manifestPath = path11.join(dir, "manifest.json");
+    if (!fs11.existsSync(manifestPath)) continue;
     let manifest;
     try {
-      manifest = JSON.parse(fs10.readFileSync(manifestPath, "utf8"));
+      manifest = JSON.parse(fs11.readFileSync(manifestPath, "utf8"));
     } catch (err) {
-      runs.push({ dir, relDir: path10.join(WALKTHROUGH_REL_DIR, entry), error: `manifest unreadable: ${err.message}` });
+      runs.push({ dir, relDir: path11.join(WALKTHROUGH_REL_DIR, entry), error: `manifest unreadable: ${err.message}` });
       continue;
     }
     runs.push({
       dir,
-      relDir: path10.join(WALKTHROUGH_REL_DIR, entry),
+      relDir: path11.join(WALKTHROUGH_REL_DIR, entry),
       relDirBase: entry,
       // the console's /walkthrough/<base>/… static route key
       generatedAt: manifest.generatedAt ?? entry,
@@ -33417,7 +33487,7 @@ function getWalkthroughData(projectDir, { limit = 8 } = {}) {
       a11yViolations: (manifest.screens ?? []).reduce((a, s) => a + (s.a11y?.violations ?? []).length, 0),
       unsettled: (manifest.screens ?? []).filter((s) => s.settled === false).length,
       notWalked: (manifest.notWalked ?? []).length,
-      hasReport: fs10.existsSync(path10.join(dir, "report.html")),
+      hasReport: fs11.existsSync(path11.join(dir, "report.html")),
       manifest
     });
   }
@@ -33427,7 +33497,7 @@ function getWalkthroughData(projectDir, { limit = 8 } = {}) {
 }
 
 // src/lib/live-session.mjs
-import path11 from "node:path";
+import path12 from "node:path";
 var HEALTH_TIMEOUT_MS = 900;
 async function getLiveDeviceStatus({ port = 9500, fetchImpl = fetch } = {}) {
   const url2 = `http://127.0.0.1:${port}/inspect/health`;
@@ -33547,11 +33617,11 @@ function createLiveSession({
     });
   }
   async function resolveAppId() {
-    const fs15 = await import("node:fs");
+    const fs16 = await import("node:fs");
     for (const f of ["composeApp/build.gradle.kts", "composeApp/build.gradle"]) {
-      const p = path11.join(projectDir, f);
-      if (!fs15.existsSync(p)) continue;
-      const m = fs15.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
+      const p = path12.join(projectDir, f);
+      if (!fs16.existsSync(p)) continue;
+      const m = fs16.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
       if (m) return m[1];
     }
     throw new Error("could not resolve applicationId from composeApp/build.gradle(.kts)");
@@ -33625,11 +33695,11 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
   }
   let openComments = null;
   try {
-    const fs15 = await import("node:fs");
-    const path16 = await import("node:path");
-    const ledger = path16.join(projectDir, "qa", "comments.json");
-    if (fs15.existsSync(ledger)) {
-      const data = JSON.parse(fs15.readFileSync(ledger, "utf8"));
+    const fs16 = await import("node:fs");
+    const path17 = await import("node:path");
+    const ledger = path17.join(projectDir, "qa", "comments.json");
+    if (fs16.existsSync(ledger)) {
+      const data = JSON.parse(fs16.readFileSync(ledger, "utf8"));
       openComments = (data.comments ?? []).filter((c) => c.status === "open").length;
     }
   } catch {
@@ -33639,15 +33709,15 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
 }
 
 // src/lib/approval-diff.mjs
-import fs11 from "node:fs";
+import fs12 from "node:fs";
 import os from "node:os";
-import path12 from "node:path";
+import path13 from "node:path";
 import { pathToFileURL as pathToFileURL4 } from "node:url";
 var SEARCH_DEPTH = 120;
 var MAX_DIFF_LINES = 400;
 async function importProjectApprovals(projectDir) {
-  const lib = path12.join(projectDir, "qa", "lib", "approvals.mjs");
-  if (!fs11.existsSync(lib)) return null;
+  const lib = path13.join(projectDir, "qa", "lib", "approvals.mjs");
+  if (!fs12.existsSync(lib)) return null;
   try {
     return await import(pathToFileURL4(lib).href);
   } catch {
@@ -33655,13 +33725,13 @@ async function importProjectApprovals(projectDir) {
   }
 }
 async function materialize(git2, sha, relFiles, alsoNeeded) {
-  const tmp = fs11.mkdtempSync(path12.join(os.tmpdir(), "cmp-approval-anchor-"));
+  const tmp = fs12.mkdtempSync(path13.join(os.tmpdir(), "cmp-approval-anchor-"));
   for (const rel of [...relFiles, ...alsoNeeded]) {
     try {
       const { stdout } = await git2(["show", `${sha}:${rel}`]);
-      const dest = path12.join(tmp, rel);
-      fs11.mkdirSync(path12.dirname(dest), { recursive: true });
-      fs11.writeFileSync(dest, stdout);
+      const dest = path13.join(tmp, rel);
+      fs12.mkdirSync(path13.dirname(dest), { recursive: true });
+      fs12.writeFileSync(dest, stdout);
     } catch {
     }
   }
@@ -33713,7 +33783,7 @@ async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: 
       }
     } catch {
     } finally {
-      if (tmp) fs11.rmSync(tmp, { recursive: true, force: true });
+      if (tmp) fs12.rmSync(tmp, { recursive: true, force: true });
     }
   }
   return {
@@ -33873,7 +33943,15 @@ ${s.bodyHtml}
 function provenanceHtml(p = {}) {
   const tree = p.treeHash ? `derived from tree <code>@${esc3(p.treeHash)}</code>` : "derived from the live tree";
   const render = typeof p.version === "number" && p.version > 0 ? ` &middot; render #${p.version}` : "";
-  return `${tree}${render} &middot; absence = not derivable`;
+  const build = p.build && p.build.id ? ` &middot; console <code>${esc3(String(p.build.id).slice(0, 8))}</code>` : "";
+  return `${tree}${render}${build} &middot; absence = not derivable`;
+}
+function staleConsoleBannerHtml(build) {
+  if (!build || build.stale !== true) return "";
+  const from = build.id ? `<code>${esc3(String(build.id).slice(0, 8))}</code>` : "an unknown build";
+  const to = build.diskId ? `<code>${esc3(String(build.diskId).slice(0, 8))}</code>` : "a newer build";
+  const how = build.mode === "bundle" ? "the bundle was rebuilt after this console started" : "the console's sources changed after it started";
+  return `<div class="banner banner-stale-build">This console is running ${from}; the code on disk is now ${to} &mdash; ${how}. Everything below was drawn by the older code. Restart the console to pick it up: <code>node inspector/mcp/bin/console.mjs &lt;projectDir&gt;</code></div>`;
 }
 function clockTime(iso) {
   if (!iso) return null;
@@ -33947,6 +34025,7 @@ ${p.railItems.map(railItemHtml).join("\n")}
   <div class="rail-foot">${p.railFootHtml}</div>
 </aside>
 <main>
+${staleConsoleBannerHtml(p.build)}
 ${freshnessBannerHtml(p.freshness)}
 ${rendererDownBannerHtml(p.rendererDown)}
 ${p.error ? `<div class="banner">last render FAILED &mdash; showing previous state
@@ -34057,6 +34136,10 @@ var SHELL_CSS = `
   /* Stale-but-working-on-it: informational, NOT alarm. A concurrent build is normal;
      only a render that stays stuck earns the renderer banner's colour. */
   .banner-stale { background: var(--surface-2, rgba(255,255,255,.05)); color: var(--muted); }
+  /* A stale console invalidates the whole page below it, so it reads as DRIFT
+     (the reserved red), never as the quiet grey a queued refresh gets. */
+  .banner-stale-build { background: var(--drift-bg); color: var(--drift); font-weight: 600; }
+  .banner-stale-build code { font-weight: 500; }
   .tab-panel { display: none; padding: 32px 40px 48px; }
   .tab-panel.active { display: block; }
   .page-head { margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
@@ -34425,8 +34508,8 @@ var SHELL_CSS = `
 `;
 
 // src/lib/design-language.mjs
-import fs12 from "node:fs";
-import path13 from "node:path";
+import fs13 from "node:fs";
+import path14 from "node:path";
 var DP_RE = /^(\d+(?:\.\d+)?)\s*dp$/;
 function classifyDimens(dimens = {}) {
   const spacing = [];
@@ -34516,7 +34599,7 @@ function countReferences(fileTexts, objectName, tokenNames) {
   return counts;
 }
 function getTokenUsage(root, catalog = {}) {
-  const kotlinRoot = path13.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path14.join(root, "composeApp", "src", "commonMain", "kotlin");
   const files = walkKtFiles(kotlinRoot);
   if (files.length === 0) {
     return { available: false, reason: "no .kt files found under composeApp/src/commonMain/kotlin" };
@@ -34524,11 +34607,11 @@ function getTokenUsage(root, catalog = {}) {
   const fileTexts = /* @__PURE__ */ new Map();
   for (const f of files) {
     try {
-      fileTexts.set(f, fs12.readFileSync(f, "utf8"));
+      fileTexts.set(f, fs13.readFileSync(f, "utf8"));
     } catch {
     }
   }
-  const rel = (abs) => path13.relative(root, abs).split(path13.sep).join("/");
+  const rel = (abs) => path14.relative(root, abs).split(path14.sep).join("/");
   const group = (tokens) => {
     const names = Object.keys(tokens || {});
     const decl = findDeclaringObject(fileTexts, names);
@@ -36067,8 +36150,8 @@ ${cards}
 }
 
 // src/lib/intent.mjs
-import fs13 from "node:fs";
-import path14 from "node:path";
+import fs14 from "node:fs";
+import path15 from "node:path";
 var INTENT_REL_PATH = "specs/intent.md";
 var PLACEHOLDER_LEAD_RE = /^_not yet captured[^_]*_\s*/i;
 function parseIntentMarkdown(md) {
@@ -36110,10 +36193,10 @@ function parseIntentMarkdown(md) {
   };
 }
 function getIntentData(root) {
-  const file2 = path14.join(root, "specs", "intent.md");
+  const file2 = path15.join(root, "specs", "intent.md");
   let raw;
   try {
-    raw = fs13.readFileSync(file2, "utf8");
+    raw = fs14.readFileSync(file2, "utf8");
   } catch {
     return { available: false, reason: `${INTENT_REL_PATH} not found` };
   }
@@ -36122,6 +36205,7 @@ function getIntentData(root) {
 
 // src/lib/preview-service.mjs
 var execFileAsync = promisify(execFile);
+var LOADED_BUILD = loadedBuildId();
 var DEFAULT_PORT2 = 9600;
 var DEFAULT_DAEMON_PORT = 9601;
 var PORT_ATTEMPTS = 10;
@@ -36145,8 +36229,8 @@ var MAX_TRANSIENT_RETRIES = 12;
 var STUCK_RETRY_MS = 3e4;
 var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
 function consoleRegistryPath(projectDir) {
-  const key = crypto.createHash("sha1").update(path15.resolve(projectDir)).digest("hex").slice(0, 12);
-  return path15.join(os2.tmpdir(), `cmp-console-${key}.json`);
+  const key = crypto.createHash("sha1").update(path16.resolve(projectDir)).digest("hex").slice(0, 12);
+  return path16.join(os2.tmpdir(), `cmp-console-${key}.json`);
 }
 function processAlive(pid) {
   try {
@@ -36159,7 +36243,7 @@ function processAlive(pid) {
 async function findLiveConsole(projectDir, { probe } = {}) {
   let rec;
   try {
-    rec = JSON.parse(fs14.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+    rec = JSON.parse(fs15.readFileSync(consoleRegistryPath(projectDir), "utf8"));
   } catch {
     return null;
   }
@@ -36170,9 +36254,9 @@ async function findLiveConsole(projectDir, { probe } = {}) {
 }
 function writeConsoleRegistry(projectDir, port) {
   try {
-    fs14.writeFileSync(
+    fs15.writeFileSync(
       consoleRegistryPath(projectDir),
-      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path15.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString() })}
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path16.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString() })}
 `
     );
   } catch {
@@ -36181,16 +36265,16 @@ function writeConsoleRegistry(projectDir, port) {
 function clearConsoleRegistry(projectDir) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs14.readFileSync(p, "utf8"));
-    if (rec && rec.pid === process.pid) fs14.rmSync(p, { force: true });
+    const rec = JSON.parse(fs15.readFileSync(p, "utf8"));
+    if (rec && rec.pid === process.pid) fs15.rmSync(p, { force: true });
   } catch {
   }
 }
 function stampRenderMarker(projectDir) {
   try {
-    const p = path15.join(projectDir, ...RENDER_MARKER_REL);
-    fs14.mkdirSync(path15.dirname(p), { recursive: true });
-    fs14.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+    const p = path16.join(projectDir, ...RENDER_MARKER_REL);
+    fs15.mkdirSync(path16.dirname(p), { recursive: true });
+    fs15.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
 `);
   } catch {
   }
@@ -36198,30 +36282,30 @@ function stampRenderMarker(projectDir) {
 function touchRenderMarker(projectDir) {
   try {
     const now = /* @__PURE__ */ new Date();
-    fs14.utimesSync(path15.join(projectDir, ...RENDER_MARKER_REL), now, now);
+    fs15.utimesSync(path16.join(projectDir, ...RENDER_MARKER_REL), now, now);
   } catch {
   }
 }
 function clearRenderMarker(projectDir) {
   try {
-    fs14.rmSync(path15.join(projectDir, ...RENDER_MARKER_REL), { force: true });
+    fs15.rmSync(path16.join(projectDir, ...RENDER_MARKER_REL), { force: true });
   } catch {
   }
 }
 function resolveAppName(projectDir) {
   for (const f of ["settings.gradle.kts", "settings.gradle"]) {
     try {
-      const text = fs14.readFileSync(path15.join(projectDir, f), "utf8");
+      const text = fs15.readFileSync(path16.join(projectDir, f), "utf8");
       const m = text.match(/rootProject\.name\s*=\s*["']([^"']+)["']/);
       if (m) return m[1];
     } catch {
     }
   }
-  return path15.basename(projectDir);
+  return path16.basename(projectDir);
 }
 function laneInProgress(projectDir, { now = Date.now } = {}) {
   try {
-    const st = fs14.statSync(path15.join(projectDir, ...LANE_MARKER_REL));
+    const st = fs15.statSync(path16.join(projectDir, ...LANE_MARKER_REL));
     return now() - st.mtimeMs < LANE_MARKER_STALE_MS;
   } catch {
     return false;
@@ -36234,22 +36318,22 @@ async function withKspSelfHeal(projectDir, log, run) {
     const text = `${err && err.message ? err.message : err}${err && err.stdout ? err.stdout : ""}${err && err.stderr ? err.stderr : ""}`;
     if (!KSP_COLLISION_RE.test(text)) throw err;
     log("KSP cache collision (concurrent Gradle \u2014 verify lane?) \u2014 clearing kspCaches, retrying once");
-    fs14.rmSync(path15.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
+    fs15.rmSync(path16.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
     return await run();
   }
 }
 function detectAppPackage(projectDir) {
-  const spec = path15.join(projectDir, "create-cmp.json");
-  if (fs14.existsSync(spec)) {
+  const spec = path16.join(projectDir, "create-cmp.json");
+  if (fs15.existsSync(spec)) {
     try {
-      const pkg = JSON.parse(fs14.readFileSync(spec, "utf8")).package;
+      const pkg = JSON.parse(fs15.readFileSync(spec, "utf8")).package;
       if (pkg) return pkg;
     } catch {
     }
   }
-  const gradle = path15.join(projectDir, "composeApp", "build.gradle.kts");
-  if (fs14.existsSync(gradle)) {
-    const m = fs14.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
+  const gradle = path16.join(projectDir, "composeApp", "build.gradle.kts");
+  if (fs15.existsSync(gradle)) {
+    const m = fs15.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
     if (m) return m[1];
   }
   throw new Error(
@@ -36349,7 +36433,11 @@ function galleryHtml(state) {
     governedArtifacts = { available: false },
     // The governance journal (qa/approvals.log.jsonl via the project's own
     // library) — feeds the strip's History; degrades to no history.
-    journal = { available: false }
+    journal = { available: false },
+    // The console's own build handshake (buildStatus). Absent = render no
+    // stale banner and no build id: unknown freshness is never dressed up as
+    // fresh, nor as a warning.
+    build = null
   } = state;
   const width = viewport?.width ?? 411;
   const screenCards = cards.filter(({ screen }) => !isComponentStoryId(screen.id));
@@ -36746,6 +36834,13 @@ ${section.bodyHtml}`;
     });
   }
   const es = new EventSource("/events");
+  // EventSource reconnects on its own, but nothing ever wrote the pill back to
+  // "live" \u2014 so a one-second blip read as permanently disconnected, which is a
+  // direct cause of "the studio keeps getting disconnected". The open event
+  // fires on the initial connect AND on every automatic reconnect \u2014 the honest
+  // signal. (No backticks in this comment: it lives inside the page's template
+  // literal, and a stray one closes the string.)
+  es.onopen = () => { pill.textContent = "live"; pill.className = ""; };
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "rendering") { pill.textContent = "rendering\u2026"; pill.className = "rendering"; }
@@ -36764,7 +36859,15 @@ ${section.bodyHtml}`;
       pill.className = "error";
     }
   };
-  es.onerror = () => { pill.textContent = "disconnected"; pill.className = "error"; };
+  // readyState distinguishes "retrying" (the server blinked; EventSource is
+  // already backing off toward a reconnect) from "gone" (CLOSED \u2014 it will not
+  // retry). Reporting both as "disconnected" told the human a recoverable blip
+  // was fatal.
+  es.onerror = () => {
+    const gone = es.readyState === 2; // CLOSED
+    pill.textContent = gone ? "server gone" : "reconnecting\u2026";
+    pill.className = gone ? "error" : "rendering";
+  };
   // Screen filter \u2014 survives the SSE-triggered reloads via sessionStorage.
   // \xA73.4: it filters matrix ROWS (one row per screen, states stay together).
   const filter = document.getElementById("filter");
@@ -37158,14 +37261,18 @@ ${section.bodyHtml}`;
   .approval-diff { max-height: 420px; overflow: auto; font-size: 12px; background: var(--surface); border-radius: 8px; padding: 10px; }
   .approval-diff-row td { border-top: none; }`,
     bodyScript,
-    provenance: { treeHash, version: version2 }
+    provenance: { treeHash, version: version2, build },
+    // The console's own build handshake — drives the stale banner above every
+    // page. galleryHtml's caller passes the live value; absent (older callers,
+    // tests that render a bare page) renders no banner rather than a fake one.
+    build
   });
 }
 function createPreviewService(opts) {
-  const projectDir = path15.resolve(opts.projectDir);
+  const projectDir = path16.resolve(opts.projectDir);
   const appName = opts.appName || resolveAppName(projectDir);
-  const previewsDir = path15.join(projectDir, "composeApp", "build", "previews");
-  const srcDir = path15.join(projectDir, "composeApp", "src");
+  const previewsDir = path16.join(projectDir, "composeApp", "build", "previews");
+  const srcDir = path16.join(projectDir, "composeApp", "src");
   const log = opts.log || (() => {
   });
   const hot = opts.hot !== false;
@@ -37426,10 +37533,10 @@ function createPreviewService(opts) {
     return result;
   }
   async function getDesignSystemData() {
-    const catalogPath = path15.join(previewsDir, "design-system.json");
-    if (fs14.existsSync(catalogPath)) {
+    const catalogPath = path16.join(previewsDir, "design-system.json");
+    if (fs15.existsSync(catalogPath)) {
       try {
-        return { available: true, source: "previews", catalog: JSON.parse(fs14.readFileSync(catalogPath, "utf8")) };
+        return { available: true, source: "previews", catalog: JSON.parse(fs15.readFileSync(catalogPath, "utf8")) };
       } catch (err) {
         log(`design-system.json at ${catalogPath} is not valid JSON (${err.message}) \u2014 trying a live session`);
       }
@@ -37455,26 +37562,26 @@ function createPreviewService(opts) {
         reason: "no current render to stash \u2014 call preview {projectDir} and wait for a render to complete first"
       };
     }
-    const variantDir = path15.join(previewsDir, "variants", name);
+    const variantDir = path16.join(previewsDir, "variants", name);
     try {
-      fs14.rmSync(variantDir, { recursive: true, force: true });
-      fs14.mkdirSync(variantDir, { recursive: true });
+      fs15.rmSync(variantDir, { recursive: true, force: true });
+      fs15.mkdirSync(variantDir, { recursive: true });
     } catch (err) {
       return { ok: false, reason: `could not prepare ${variantDir}: ${err && err.message ? err.message : err}` };
     }
     const screens = [];
     for (const { screen } of cards) {
-      const src = path15.join(previewsDir, screen.png);
-      if (!fs14.existsSync(src)) continue;
-      const dst = path15.join(variantDir, screen.png);
-      fs14.mkdirSync(path15.dirname(dst), { recursive: true });
-      fs14.copyFileSync(src, dst);
+      const src = path16.join(previewsDir, screen.png);
+      if (!fs15.existsSync(src)) continue;
+      const dst = path16.join(variantDir, screen.png);
+      fs15.mkdirSync(path16.dirname(dst), { recursive: true });
+      fs15.copyFileSync(src, dst);
       screens.push(screen.id);
     }
     let designSystemStashed = false;
-    const dsSrc = path15.join(previewsDir, "design-system.json");
-    if (fs14.existsSync(dsSrc)) {
-      fs14.copyFileSync(dsSrc, path15.join(variantDir, "design-system.json"));
+    const dsSrc = path16.join(previewsDir, "design-system.json");
+    if (fs15.existsSync(dsSrc)) {
+      fs15.copyFileSync(dsSrc, path16.join(variantDir, "design-system.json"));
       designSystemStashed = true;
     }
     touch("variant-snapshot");
@@ -37536,17 +37643,17 @@ function createPreviewService(opts) {
     }
   }
   function loadPreviews() {
-    const manifestPath = path15.join(previewsDir, "manifest.json");
-    const manifest = JSON.parse(fs14.readFileSync(manifestPath, "utf8"));
+    const manifestPath = path16.join(previewsDir, "manifest.json");
+    const manifest = JSON.parse(fs15.readFileSync(manifestPath, "utf8"));
     try {
-      lastRenderAt = fs14.statSync(manifestPath).mtimeMs;
+      lastRenderAt = fs15.statSync(manifestPath).mtimeMs;
     } catch {
       lastRenderAt = Date.now();
     }
     viewport = manifest.viewport;
     const trees = /* @__PURE__ */ new Map();
     cards = manifest.screens.map((screen) => {
-      const treeJson = fs14.readFileSync(path15.join(previewsDir, screen.tree), "utf8");
+      const treeJson = fs15.readFileSync(path16.join(previewsDir, screen.tree), "utf8");
       trees.set(screen.id, treeJson);
       const tree = JSON.parse(treeJson);
       const a11y = auditA11y(tree);
@@ -37572,10 +37679,10 @@ function createPreviewService(opts) {
   }
   function snapshotPngs() {
     for (const { screen } of cards) {
-      const src = path15.join(previewsDir, screen.png);
-      const dst = path15.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
+      const src = path16.join(previewsDir, screen.png);
+      const dst = path16.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
       try {
-        if (fs14.existsSync(src)) fs14.copyFileSync(src, dst);
+        if (fs15.existsSync(src)) fs15.copyFileSync(src, dst);
       } catch {
       }
     }
@@ -37606,8 +37713,8 @@ function createPreviewService(opts) {
     } catch {
       return false;
     }
-    const theirs = health && typeof health.previewsDir === "string" ? path15.resolve(health.previewsDir) : null;
-    if (theirs && theirs !== path15.resolve(previewsDir)) {
+    const theirs = health && typeof health.previewsDir === "string" ? path16.resolve(health.previewsDir) : null;
+    if (theirs && theirs !== path16.resolve(previewsDir)) {
       log(`a daemon is running on ${daemonUrl} but serves ${theirs} \u2014 not this project; staying on the gradle path`);
       return false;
     }
@@ -37710,9 +37817,9 @@ function createPreviewService(opts) {
   }
   function watchClasses() {
     if (classesWatcher) return;
-    const classesDir = path15.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
+    const classesDir = path16.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
     try {
-      classesWatcher = fs14.watch(classesDir, { recursive: true }, () => {
+      classesWatcher = fs15.watch(classesDir, { recursive: true }, () => {
         touch("classes-change");
         scheduleRender(CLASSES_DEBOUNCE_MS);
       });
@@ -37866,7 +37973,7 @@ function createPreviewService(opts) {
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
   function startWatching() {
     try {
-      watcher = fs14.watch(srcDir, { recursive: true }, (_event, filename) => {
+      watcher = fs15.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
         noteSourceChanged();
@@ -37926,11 +38033,11 @@ function createPreviewService(opts) {
   }
   function watchGovernance() {
     for (const w of GOVERNANCE_WATCHES) {
-      const abs = path15.join(projectDir, w.rel);
-      if (!fs14.existsSync(abs)) continue;
+      const abs = path16.join(projectDir, w.rel);
+      if (!fs15.existsSync(abs)) continue;
       try {
-        const watcher2 = fs14.watch(abs, (_event, filename) => {
-          const base = filename ? path15.basename(filename) : "";
+        const watcher2 = fs15.watch(abs, (_event, filename) => {
+          const base = filename ? path16.basename(filename) : "";
           if (w.only && !w.only.has(base)) return;
           pendingGovernance.add(w.kind === "ledger" ? base === "comments.json" ? "comment" : "approval" : "governance");
           clearTimeout(governanceTimer);
@@ -37947,17 +38054,17 @@ function createPreviewService(opts) {
     (function walk2(dir) {
       let entries;
       try {
-        entries = fs14.readdirSync(dir, { withFileTypes: true });
+        entries = fs15.readdirSync(dir, { withFileTypes: true });
       } catch {
         return;
       }
       for (const e of entries) {
-        const p = path15.join(dir, e.name);
+        const p = path16.join(dir, e.name);
         if (IGNORE.test(p)) continue;
         if (e.isDirectory()) walk2(p);
         else {
           try {
-            stamp = Math.max(stamp, fs14.statSync(p).mtimeMs);
+            stamp = Math.max(stamp, fs15.statSync(p).mtimeMs);
           } catch {
           }
         }
@@ -38080,7 +38187,8 @@ function createPreviewService(opts) {
             digest,
             anchoredDiffs,
             governedArtifacts,
-            journal
+            journal,
+            build: buildStatus(LOADED_BUILD.id)
           })
         );
         return;
@@ -38249,30 +38357,30 @@ function createPreviewService(opts) {
         return;
       }
       if (url2.pathname.startsWith("/walkthrough/")) {
-        const wtRoot = path15.join(projectDir, WALKTHROUGH_REL_DIR);
+        const wtRoot = path16.join(projectDir, WALKTHROUGH_REL_DIR);
         const rel = decodeURIComponent(url2.pathname.slice("/walkthrough/".length));
-        const file2 = path15.normalize(path15.join(wtRoot, rel));
-        if (!file2.startsWith(wtRoot) || !fs14.existsSync(file2) || !fs14.statSync(file2).isFile()) {
+        const file2 = path16.normalize(path16.join(wtRoot, rel));
+        if (!file2.startsWith(wtRoot) || !fs15.existsSync(file2) || !fs15.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".html") ? "text/html; charset=utf-8" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs14.createReadStream(file2).pipe(res);
+        fs15.createReadStream(file2).pipe(res);
         return;
       }
       if (url2.pathname.startsWith("/previews/")) {
         const rel = decodeURIComponent(url2.pathname.slice("/previews/".length));
-        const file2 = path15.normalize(path15.join(previewsDir, rel));
-        if (!file2.startsWith(previewsDir) || !fs14.existsSync(file2) || !fs14.statSync(file2).isFile()) {
+        const file2 = path16.normalize(path16.join(previewsDir, rel));
+        if (!file2.startsWith(previewsDir) || !fs15.existsSync(file2) || !fs15.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".svg") ? "image/svg+xml" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs14.createReadStream(file2).pipe(res);
+        fs15.createReadStream(file2).pipe(res);
         return;
       }
       res.writeHead(404);
@@ -38335,6 +38443,11 @@ function createPreviewService(opts) {
   function status() {
     return {
       projectDir,
+      // Which build is serving this, and is it the build on disk? Captured ONCE
+      // at module load (LOADED_BUILD, below) and compared against disk on every
+      // read — a process cannot notice its own staleness any other way, and
+      // twice in two days a stale console lied to a human about its own code.
+      build: buildStatus(LOADED_BUILD.id),
       url: port ? `http://127.0.0.1:${port}/` : null,
       previewsDir,
       mode,
@@ -38354,15 +38467,15 @@ function createPreviewService(opts) {
         a11yPass: a11y.pass,
         a11yViolations: a11y.violations.length,
         lastChangedVersion: changedAt.get(screen.id) ?? null,
-        tree: path15.join(previewsDir, screen.tree),
-        png: path15.join(previewsDir, screen.png)
+        tree: path16.join(previewsDir, screen.tree),
+        png: path16.join(previewsDir, screen.png)
       }))
     };
   }
   return {
     /** Initial render (unless fresh previews already exist), then serve + watch. */
     async start() {
-      if (!fs14.existsSync(path15.join(projectDir, "composeApp"))) {
+      if (!fs15.existsSync(path16.join(projectDir, "composeApp"))) {
         throw new Error(
           `'${projectDir}' does not look like a create-cmp app (no composeApp/).`
         );
@@ -38378,7 +38491,7 @@ function createPreviewService(opts) {
           throw err;
         }
       }
-      if (fs14.existsSync(path15.join(previewsDir, "manifest.json"))) {
+      if (fs15.existsSync(path16.join(previewsDir, "manifest.json"))) {
         loadPreviews();
       }
       await listen(opts.port || DEFAULT_PORT2);
@@ -38445,8 +38558,8 @@ function createPreviewService(opts) {
 // bin/server.mjs
 import { existsSync as existsSync2, mkdirSync as mkdirSync3, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
 import { dirname as dirname3, join as join4, resolve as resolvePath } from "node:path";
-import { fileURLToPath } from "node:url";
-var HERE = dirname3(fileURLToPath(import.meta.url));
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+var HERE = dirname3(fileURLToPath2(import.meta.url));
 var DEFAULT_HARNESS_DIR = join4(HERE, "..", "..", "harness");
 var execFileAsync2 = promisify2(execFile2);
 var sessionDefaultSource = null;
@@ -39129,11 +39242,21 @@ server.registerTool(
       st = await service.start();
     } catch (err) {
       if (err && err.code === "CMP_CONSOLE_ALREADY_RUNNING") {
+        let adoptedBuild = null;
+        try {
+          const remote = await (await fetch(`${err.existing.url}status`, { signal: AbortSignal.timeout(3e3) })).json();
+          adoptedBuild = remote && remote.build ? remote.build : null;
+        } catch {
+        }
+        const mine = buildStatus(loadedBuildId().id);
+        const mismatch = adoptedBuild && adoptedBuild.id && mine.id && adoptedBuild.id !== mine.id;
         return ok({
           ...err.existing,
           projectDir: dir,
           reusedExternal: true,
-          note: `A studio console for this project is already running in another process (pid ${err.existing.pid}). Use it at ${err.existing.url} \u2014 a second one would render into the same build directory and the two would disagree.`
+          build: adoptedBuild,
+          buildMatchesThisProcess: adoptedBuild && adoptedBuild.id ? !mismatch : null,
+          note: `A studio console for this project is already running in another process (pid ${err.existing.pid}). Use it at ${err.existing.url} \u2014 a second one would render into the same build directory and the two would disagree.` + (mismatch ? ` WARNING: it is running build ${String(adoptedBuild.id).slice(0, 8)}, but this process is ${String(mine.id).slice(0, 8)} \u2014 the page it serves was drawn by different code than you are editing. Restart it (node inspector/mcp/bin/console.mjs ${dir}) before trusting what it shows.` : adoptedBuild && adoptedBuild.stale === true ? ` WARNING: that console reports itself STALE \u2014 the code on disk changed after it started. Restart it.` : "")
         });
       }
       throw err;

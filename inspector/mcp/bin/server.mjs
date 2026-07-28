@@ -46,6 +46,7 @@ import { proveChange } from "../src/lib/prove.mjs";
 import { attributeCrash } from "../src/lib/attribution.mjs";
 import { parseLogcat } from "../src/lib/logcat.mjs";
 import { createPreviewService } from "../src/lib/preview-service.mjs";
+import { buildStatus, loadedBuildId } from "../src/lib/build-id.mjs";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1121,14 +1122,37 @@ server.registerTool(
       // the caller at the console that is actually serving rather than starting a second
       // render loop against the same build directory.
       if (err && err.code === "CMP_CONSOLE_ALREADY_RUNNING") {
+        // Adoption is right, but SILENT adoption of a console running older code
+        // is exactly how 2026-07-27/28 were lost: the page looked fine and was
+        // built from a previous module graph. Ask it which build it is running
+        // and say so when it disagrees with ours — refusing to pretend costs one
+        // HTTP call.
+        let adoptedBuild = null;
+        try {
+          const remote = await (await fetch(`${err.existing.url}status`, { signal: AbortSignal.timeout(3000) })).json();
+          adoptedBuild = remote && remote.build ? remote.build : null;
+        } catch {
+          /* a console that answers "/" but not "/status" predates the handshake — unknown, not stale */
+        }
+        const mine = buildStatus(loadedBuildId().id);
+        const mismatch = adoptedBuild && adoptedBuild.id && mine.id && adoptedBuild.id !== mine.id;
         return ok({
           ...err.existing,
           projectDir: dir,
           reusedExternal: true,
+          build: adoptedBuild,
+          buildMatchesThisProcess: adoptedBuild && adoptedBuild.id ? !mismatch : null,
           note:
             `A studio console for this project is already running in another process ` +
             `(pid ${err.existing.pid}). Use it at ${err.existing.url} — a second one would ` +
-            `render into the same build directory and the two would disagree.`,
+            `render into the same build directory and the two would disagree.` +
+            (mismatch
+              ? ` WARNING: it is running build ${String(adoptedBuild.id).slice(0, 8)}, but this process is ` +
+                `${String(mine.id).slice(0, 8)} — the page it serves was drawn by different code than you are editing. ` +
+                `Restart it (node inspector/mcp/bin/console.mjs ${dir}) before trusting what it shows.`
+              : adoptedBuild && adoptedBuild.stale === true
+                ? ` WARNING: that console reports itself STALE — the code on disk changed after it started. Restart it.`
+                : ""),
         });
       }
       throw err;

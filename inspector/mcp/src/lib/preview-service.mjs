@@ -35,6 +35,7 @@ import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { renderTreeSvg } from "./render.mjs";
 import { auditA11y } from "./a11y.mjs";
+import { buildStatus, loadedBuildId } from "./build-id.mjs";
 import { gradleEnv } from "./jdk.mjs";
 import { fetchLiveCatalog } from "./live.mjs";
 import {
@@ -84,6 +85,13 @@ import { getTokenUsage } from "./design-language.mjs";
 import { getIntentData } from "./intent.mjs";
 
 const execFileAsync = promisify(execFile);
+
+// The build this PROCESS loaded, captured exactly once, at module load. It must
+// never be recomputed: recomputing would silently track the disk and make the
+// staleness comparison always report "fresh" — the precise lie it exists to
+// catch. Evaluated here (module scope) so it is pinned before any file on disk
+// can change under a long-running console.
+const LOADED_BUILD = loadedBuildId();
 
 const DEFAULT_PORT = 9600;
 const DEFAULT_DAEMON_PORT = 9601;
@@ -502,6 +510,10 @@ export function galleryHtml(state) {
     // The governance journal (qa/approvals.log.jsonl via the project's own
     // library) — feeds the strip's History; degrades to no history.
     journal = { available: false },
+    // The console's own build handshake (buildStatus). Absent = render no
+    // stale banner and no build id: unknown freshness is never dressed up as
+    // fresh, nor as a warning.
+    build = null,
   } = state;
   const width = viewport?.width ?? 411;
   // §3.3: component stories render through the same pipeline but are not
@@ -1067,6 +1079,13 @@ export function galleryHtml(state) {
     });
   }
   const es = new EventSource("/events");
+  // EventSource reconnects on its own, but nothing ever wrote the pill back to
+  // "live" — so a one-second blip read as permanently disconnected, which is a
+  // direct cause of "the studio keeps getting disconnected". The open event
+  // fires on the initial connect AND on every automatic reconnect — the honest
+  // signal. (No backticks in this comment: it lives inside the page's template
+  // literal, and a stray one closes the string.)
+  es.onopen = () => { pill.textContent = "live"; pill.className = ""; };
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "rendering") { pill.textContent = "rendering…"; pill.className = "rendering"; }
@@ -1085,7 +1104,15 @@ export function galleryHtml(state) {
       pill.className = "error";
     }
   };
-  es.onerror = () => { pill.textContent = "disconnected"; pill.className = "error"; };
+  // readyState distinguishes "retrying" (the server blinked; EventSource is
+  // already backing off toward a reconnect) from "gone" (CLOSED — it will not
+  // retry). Reporting both as "disconnected" told the human a recoverable blip
+  // was fatal.
+  es.onerror = () => {
+    const gone = es.readyState === 2; // CLOSED
+    pill.textContent = gone ? "server gone" : "reconnecting…";
+    pill.className = gone ? "error" : "rendering";
+  };
   // Screen filter — survives the SSE-triggered reloads via sessionStorage.
   // §3.4: it filters matrix ROWS (one row per screen, states stay together).
   const filter = document.getElementById("filter");
@@ -1480,7 +1507,11 @@ export function galleryHtml(state) {
   .approval-diff { max-height: 420px; overflow: auto; font-size: 12px; background: var(--surface); border-radius: 8px; padding: 10px; }
   .approval-diff-row td { border-top: none; }`,
     bodyScript,
-    provenance: { treeHash, version },
+    provenance: { treeHash, version, build },
+    // The console's own build handshake — drives the stale banner above every
+    // page. galleryHtml's caller passes the live value; absent (older callers,
+    // tests that render a bare page) renders no banner rather than a fake one.
+    build,
   });
 }
 
@@ -2746,6 +2777,7 @@ export function createPreviewService(opts) {
             anchoredDiffs,
             governedArtifacts,
             journal,
+            build: buildStatus(LOADED_BUILD.id),
           }),
         );
         return;
@@ -3071,6 +3103,11 @@ export function createPreviewService(opts) {
   function status() {
     return {
       projectDir,
+      // Which build is serving this, and is it the build on disk? Captured ONCE
+      // at module load (LOADED_BUILD, below) and compared against disk on every
+      // read — a process cannot notice its own staleness any other way, and
+      // twice in two days a stale console lied to a human about its own code.
+      build: buildStatus(LOADED_BUILD.id),
       url: port ? `http://127.0.0.1:${port}/` : null,
       previewsDir,
       mode,
