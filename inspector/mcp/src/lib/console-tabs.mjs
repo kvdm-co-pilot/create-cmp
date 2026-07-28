@@ -561,7 +561,10 @@ function componentApprovalBadgeHtml(approval, drift, file) {
   const s = approval.status;
   if (s === "approved") {
     const unshaped = approval.mode === "defaults-accepted";
-    return `<span class="badge badge-approved${unshaped ? " badge-unshaped" : ""}" title="components artifact approved at ${shortDate(approval.approvedAt)}">approved &middot; ${shortHash(approval.hash)}</span>`;
+    // storedHash — the signature's own hash. Identical to the live recompute for
+    // `components` (only feature briefs can carry a legacy basis), but the rule
+    // is the same everywhere: what a badge calls "approved" is what was signed.
+    return `<span class="badge badge-approved${unshaped ? " badge-unshaped" : ""}" title="components artifact approved at ${shortDate(approval.approvedAt)}">approved &middot; ${shortHash(approval.storedHash ?? approval.hash)}</span>`;
   }
   if (s === "changed-since-approval") {
     const perFile = drift && drift.available ? drift.byFile && drift.byFile[file] : null;
@@ -945,7 +948,12 @@ export function approvalsTabHtml(approvals, meta = {}) {
             ? `approved ${shortHash(s.storedHash)} &rarr; unresolvable`
             : `approved ${shortHash(s.storedHash)} &rarr; now ${shortHash(s.hash)}`
           : s.status === "approved"
-            ? shortHash(s.hash)
+            ? // The signature's own hash (storedHash), never the live recompute:
+              // on a legacy raw-bytes row they differ, and only one of them was
+              // ever signed. See resolveArtifactStatus's `hashBasis`.
+              `${shortHash(s.storedHash ?? s.hash)}${
+                s.hashBasis === "raw-bytes" ? " · signed pre-strip, bytes unchanged" : ""
+              }`
             : unresolvable
               ? "unresolvable"
               : `would approve at ${shortHash(s.hash)}`;

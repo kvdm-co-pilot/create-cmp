@@ -3,7 +3,31 @@
 // honesty rules: a stale green is never presented as a live PASS.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { receiptGlyph, railReceiptHtml, rendererDownBannerHtml, renderShellPage } from "../src/lib/console-shell.mjs";
+import { artifactStatusHtml, receiptGlyph, railReceiptHtml, rendererDownBannerHtml, renderShellPage } from "../src/lib/console-shell.mjs";
+
+// The hash a signed row displays must be the hash the SIGNATURE was bound to —
+// `storedHash` — never the live recompute. They agree for everything signed on
+// the current basis, which is why the conflation hid; on a legacy raw-bytes
+// brief they differ and the live value is a number nobody ever signed.
+test("artifactStatusHtml: an approved row shows the SIGNED hash, not the live recompute", () => {
+  const html = artifactStatusHtml({
+    status: "approved",
+    storedHash: "0f77f5ff11112222333344445555666677778888999900001111222233334444",
+    hash: "e6dfb40b11112222333344445555666677778888999900001111222233334444",
+    approvedAt: "2026-07-01T10:00:00.000Z",
+    hashBasis: "raw-bytes",
+  });
+  assert.match(html, /signed <code>0f77f5ff<\/code>/, "the signature's own hash is what 'signed' names");
+  assert.doesNotMatch(html, /e6dfb40b/, "the live recompute must never be presented as the signed hash");
+  assert.match(html, /pre-strip — bytes unchanged since/, "a legitimate stored≠live row must explain itself");
+});
+
+test("artifactStatusHtml: the ordinary approved row is unchanged (stored === live) and claims no basis", () => {
+  const h = "16d3d6c511112222333344445555666677778888999900001111222233334444";
+  const html = artifactStatusHtml({ status: "approved", storedHash: h, hash: h, approvedAt: "2026-07-20T09:00:00.000Z" });
+  assert.match(html, /signed <code>16d3d6c5<\/code> · approved 2026-07-20T09:00:00.000Z/);
+  assert.doesNotMatch(html, /pre-strip/, "silence about the basis is the normal case");
+});
 
 test("receiptGlyph: ✓ fresh PASS · ✗ FAIL · ⚠ stale · ○ none — one derivation for rail item and rail foot", () => {
   assert.deepEqual(receiptGlyph(null), { ch: "○", cls: "glyph-unsigned", label: "no verify receipt yet" });

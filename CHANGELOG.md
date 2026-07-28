@@ -25,6 +25,20 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **A signed row displayed a hash nobody signed.** Every approved-row display — the console
+  section header, the artifact card, `qa/approve.mjs --status` — printed the LIVE recompute
+  (`hash`) labelled "signed", not the hash the signature was actually bound to
+  (`storedHash`). The two are equal for everything signed on the current basis, which is why
+  it went unseen; they legitimately differ on a legacy feature brief signed before
+  `cmp:feature` block-stripping, where the permanent raw-bytes fallback still vouches for
+  byte-identical content. On the showcase, `feature-brief:meal` therefore read `signed
+  e6dfb40b` — a value that appears in no signature, in the one surface whose entire job is
+  provenance. All three now read `storedHash`, and `resolveArtifactStatus` marks the
+  tolerance path it took (`hashBasis: "raw-bytes"`, emitted only when it fires) so the row
+  explains its own stored≠live rather than reading as tolerated drift: *signed pre-strip —
+  bytes unchanged since*. No gate behaviour changed; an older project-side library that
+  never sets `hashBasis` simply renders the signed hash with no note.
+
 - **A busy console read as a dead one.** `findLiveConsole`'s liveness probe fetched `/` —
   the full gallery page, which derives the whole governed surface — with a 2s budget; under
   boot-time load it timed out, the one-console-per-project guard let a second service

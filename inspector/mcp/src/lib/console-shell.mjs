@@ -176,7 +176,16 @@ export function artifactStatusHtml(record) {
   if (record.status === "approved") {
     const unshaped = record.mode === "defaults-accepted" ? " · defaults accepted — unshaped" : "";
     const at = record.approvedAt ? ` · approved ${esc(record.approvedAt)}` : "";
-    return `${glyph} signed <code>${esc(shortHash(record.hash) || "?")}</code>${at}${unshaped}`;
+    // The SIGNED hash is `storedHash` — what the human's signature was bound to.
+    // `hash` is the live recompute; the two agree for everything signed on the
+    // current basis, but on a `hashBasis: "raw-bytes"` row the live value is a
+    // number nobody ever signed, and printing it here would be a fabricated
+    // provenance claim in the one surface whose whole job is provenance.
+    // (`storedHash` is always set on an approved row; the fallback is belt.)
+    const signedHash = shortHash(record.storedHash) || shortHash(record.hash) || "?";
+    const basis =
+      record.hashBasis === "raw-bytes" ? " · signed pre-strip — bytes unchanged since" : "";
+    return `${glyph} signed <code>${esc(signedHash)}</code>${at}${unshaped}${basis}`;
   }
   if (record.status === "changed-since-approval") {
     const from = shortHash(record.storedHash);

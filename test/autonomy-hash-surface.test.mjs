@@ -150,13 +150,23 @@ test("feature-brief hash: a legacy raw-bytes approval still verifies while the b
     const legacyHash = hashArtifactFiles(root, artifact.files).hash;
     const stored = { artifact: artifact.id, status: "approved", hash: legacyHash, approvedAt: "2026-07-01T10:00:00.000Z" };
 
-    assert.equal(resolveArtifactStatus(root, artifact, stored).status, "approved", "a legacy raw-bytes approval must keep verifying on untouched bytes");
+    const legacy = resolveArtifactStatus(root, artifact, stored);
+    assert.equal(legacy.status, "approved", "a legacy raw-bytes approval must keep verifying on untouched bytes");
+
+    // The tolerance path must SAY it fired. This is the one approved state where
+    // storedHash !== hash legitimately; a row that shows the disagreement
+    // without naming its cause reads as tolerated drift.
+    assert.equal(legacy.hashBasis, "raw-bytes", "the legacy fallback must name the basis it accepted on");
+    assert.equal(legacy.storedHash, legacyHash, "storedHash stays what was actually signed");
+    assert.notEqual(legacy.hash, legacyHash, "the live recompute is on the stripped basis — a hash nobody signed");
 
     // Any edit — even a block-only edit — moves the raw bytes off the legacy
     // hash, so the fallback correctly stops vouching. (The stripped-basis hash
     // never matched a legacy record; that is exactly why the fallback exists.)
     write(root, "docs/features/meal.md", BRIEF_PROSE + BLOCK_V2);
-    assert.equal(resolveArtifactStatus(root, artifact, stored).status, "changed-since-approval", "the legacy fallback must only accept byte-identical content");
+    const drifted = resolveArtifactStatus(root, artifact, stored);
+    assert.equal(drifted.status, "changed-since-approval", "the legacy fallback must only accept byte-identical content");
+    assert.equal(drifted.hashBasis, undefined, "a row the fallback did not vouch for claims no basis");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

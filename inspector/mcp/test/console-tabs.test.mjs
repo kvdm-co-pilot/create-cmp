@@ -164,6 +164,39 @@ test("approvalsTabHtml: unavailable -> honest not-available state, with and with
   assert.match(withReason, /kaboom/);
 });
 
+// An approved row names the hash the SIGNATURE was bound to (storedHash). The
+// two agree for everything signed on the current basis — they differ only on a
+// legacy feature brief the raw-bytes fallback still vouches for, and there the
+// live recompute is a value no signature was ever taken against.
+test("approvalsTabHtml: an approved row shows the signed hash and names a legacy basis", () => {
+  const row = (over) => ({
+    id: "feature-brief:meal",
+    label: "Feature brief (docs/features/meal.md)",
+    status: "approved",
+    approvedAt: "2026-07-01T10:00:00.000Z",
+    fileCount: 1,
+    missing: [],
+    resolvable: true,
+    ...over,
+  });
+
+  const legacy = approvalsTabHtml({
+    available: true,
+    statuses: [row({ storedHash: "0f77f5ffaaaa", hash: "e6dfb40bbbbb", hashBasis: "raw-bytes" })],
+  });
+  assert.match(legacy, /0f77f5ff/, "the signed hash is what an approved row names");
+  assert.doesNotMatch(legacy, /e6dfb40b/, "the live recompute is not a signature and must not be shown as one");
+  assert.match(legacy, /signed pre-strip, bytes unchanged/, "a legitimate stored≠live row explains itself");
+
+  const ordinary = approvalsTabHtml({
+    available: true,
+    statuses: [row({ storedHash: "abcdef012345", hash: "abcdef012345" })],
+  });
+  assert.match(ordinary, /abcdef01/);
+  assert.doesNotMatch(ordinary, /pre-strip/, "silence about the basis is the normal case");
+  assert.doesNotMatch(ordinary, /&middot; none|>none</, "the fallback must never print the shortHash miss token");
+});
+
 test("approvalsTabHtml: no governed artifacts resolved yet", () => {
   const html = approvalsTabHtml({ available: true, statuses: [] });
   assert.match(html, /No governed artifacts resolved in this project yet/);

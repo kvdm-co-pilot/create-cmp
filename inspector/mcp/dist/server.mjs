@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 46a5305e4351e20abc9a0edc6463c2552e20723bb1df3f82e3ce90ee259cb3e8
+// cmp:bundle-inputs ff834678ba0d057d482c740519b25ca321d1340d706df1c20f203439e7be91b6
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -33874,7 +33874,9 @@ function artifactStatusHtml(record2) {
   if (record2.status === "approved") {
     const unshaped = record2.mode === "defaults-accepted" ? " \xB7 defaults accepted \u2014 unshaped" : "";
     const at = record2.approvedAt ? ` \xB7 approved ${esc3(record2.approvedAt)}` : "";
-    return `${glyph} signed <code>${esc3(shortHash(record2.hash) || "?")}</code>${at}${unshaped}`;
+    const signedHash = shortHash(record2.storedHash) || shortHash(record2.hash) || "?";
+    const basis = record2.hashBasis === "raw-bytes" ? " \xB7 signed pre-strip \u2014 bytes unchanged since" : "";
+    return `${glyph} signed <code>${esc3(signedHash)}</code>${at}${unshaped}${basis}`;
   }
   if (record2.status === "changed-since-approval") {
     const from = shortHash(record2.storedHash);
@@ -34949,7 +34951,7 @@ function componentApprovalBadgeHtml(approval, drift, file2) {
   const s = approval.status;
   if (s === "approved") {
     const unshaped = approval.mode === "defaults-accepted";
-    return `<span class="badge badge-approved${unshaped ? " badge-unshaped" : ""}" title="components artifact approved at ${shortDate(approval.approvedAt)}">approved &middot; ${shortHash2(approval.hash)}</span>`;
+    return `<span class="badge badge-approved${unshaped ? " badge-unshaped" : ""}" title="components artifact approved at ${shortDate(approval.approvedAt)}">approved &middot; ${shortHash2(approval.storedHash ?? approval.hash)}</span>`;
   }
   if (s === "changed-since-approval") {
     const perFile = drift && drift.available ? drift.byFile && drift.byFile[file2] : null;
@@ -35162,7 +35164,12 @@ function approvalsTabHtml(approvals, meta3 = {}) {
     ].filter(Boolean).join(" ");
     const statusLabel = unshaped ? "approved \xB7 defaults accepted \u2014 unshaped" : s.status;
     const unresolvable = s.resolvable === false;
-    const hashInfo = s.status === "changed-since-approval" ? unresolvable ? `approved ${shortHash2(s.storedHash)} &rarr; unresolvable` : `approved ${shortHash2(s.storedHash)} &rarr; now ${shortHash2(s.hash)}` : s.status === "approved" ? shortHash2(s.hash) : unresolvable ? "unresolvable" : `would approve at ${shortHash2(s.hash)}`;
+    const hashInfo = s.status === "changed-since-approval" ? unresolvable ? `approved ${shortHash2(s.storedHash)} &rarr; unresolvable` : `approved ${shortHash2(s.storedHash)} &rarr; now ${shortHash2(s.hash)}` : s.status === "approved" ? (
+      // The signature's own hash (storedHash), never the live recompute:
+      // on a legacy raw-bytes row they differ, and only one of them was
+      // ever signed. See resolveArtifactStatus's `hashBasis`.
+      `${shortHash2(s.storedHash ?? s.hash)}${s.hashBasis === "raw-bytes" ? " \xB7 signed pre-strip, bytes unchanged" : ""}`
+    ) : unresolvable ? "unresolvable" : `would approve at ${shortHash2(s.hash)}`;
     const unresolvableNote = s.resolvable === false ? `<p class="unresolvable-note">unresolvable (${s.fileCount} of expected files resolved) \u2014 not approvable</p>` : "";
     const missingNote = s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc4(s.missing.join(", "))}</p>` : "";
     const reopenNote = s.status === "reopened" ? `<p class="reopen-note">reopened${s.reopenedAt ? ` ${esc4(s.reopenedAt)}` : ""}${s.via ? ` via ${esc4(s.via)}` : ""}${s.reason ? ` \u2014 ${esc4(s.reason)}` : ""}</p>` : "";
