@@ -345,4 +345,5 @@ conventions) · [`CONTRIBUTING.md`](./CONTRIBUTING.md) (workflow, Conventional C
 | `./gradlew :composeApp:desktopTest` | Unit tests only (fast inner loop) |
 | `node qa/setup-hooks.mjs` | Enable the pre-push receipt gate (one-time, after `git init`) |
 | `./gradlew :composeApp:assembleDebug` | Android debug build |
+| `./gradlew :composeApp:assembleRelease` | Android release build — R8 + `lintVital`, the variant the lane's `releaseBuild` step proves. Produces an **unsigned** APK; signing needs a keystore, which is yours to create and keep out of the repo. |
 | `./gradlew :composeApp:hotRunDesktop --auto` | Desktop dev-client with hot reload |

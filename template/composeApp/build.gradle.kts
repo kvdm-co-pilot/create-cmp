@@ -202,7 +202,19 @@ android {
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Every field debug declares, release must declare too. BuildConfig is generated
+            // PER BUILD TYPE, so a field only debug carries simply does not exist in release —
+            // and `if (!USE_FIREBASE_EMULATORS) return` is a RUNTIME guard that does nothing
+            // for a compile-time symbol. Declaring the flag alone made release the one build
+            // nobody could produce: the code reading the host and ports failed to resolve them.
+            // The values below are never used (the flag is false); they exist so the shape of
+            // BuildConfig is the same in both build types.
             buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "false")
+            buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"\"")
+            buildConfigField("int", "FIREBASE_AUTH_PORT", "0")
+            buildConfigField("int", "FIREBASE_FIRESTORE_PORT", "0")
+            buildConfigField("int", "FIREBASE_FUNCTIONS_PORT", "0")
+            buildConfigField("int", "FIREBASE_STORAGE_PORT", "0")
             manifestPlaceholders["usesCleartextTraffic"] = "false"
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -224,6 +236,19 @@ android {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         // <<< cmp:feature !firebase
+    }
+
+    lint {
+        // ONE disabled check, not the gate. `lintVitalRelease` runs on every release build and
+        // it is worth keeping; what is not worth keeping is a detector that CRASHES on it.
+        // NullSafeMutableLiveData's detector throws IncompatibleClassChangeError against this
+        // Kotlin version (AGP's bug, not ours) and takes the whole release build with it.
+        //
+        // Disabling it costs nothing beyond the crash: an app on this template has no LiveData —
+        // state is Compose + Flow throughout — so the check has nothing to inspect. The blunt
+        // alternatives, `checkReleaseBuilds = false` or `abortOnError = false`, would switch off
+        // every real lint finding to dodge one broken one.
+        disable += "NullSafeMutableLiveData"
     }
 
     compileOptions {

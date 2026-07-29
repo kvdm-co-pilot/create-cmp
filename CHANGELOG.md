@@ -6,8 +6,35 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **The release build, which had never once succeeded.** `assembleRelease` failed three
+  ways on a generated app, none of them visible from a green debug lane, and every one of
+  them waiting for the first person who tried to ship:
+  - `BuildConfig` is generated **per build type**, and the Firebase-emulator constants were
+    declared only in `debug`. `release` could not compile — `Unresolved reference
+    'FIREBASE_EMULATOR_HOST'`. The `if (!USE_FIREBASE_EMULATORS) return` guard is a runtime
+    check and does nothing for a missing compile-time symbol. Both build types now declare
+    the same fields.
+  - R8 aborted on GitLive Firebase's RemoteConfig, which references `kotlinx.datetime.Instant`
+    — a class this version set no longer has (Kotlin 2.2 moved it to `kotlin.time.Instant`).
+    Suppressed with two `-dontwarn` lines: RemoteConfig is not wired up, so nothing reaches
+    the reference, and adding kotlinx-datetime back would put two `Instant` types in the graph.
+  - `lintVitalRelease` crashed — AGP's `NullSafeMutableLiveData` detector throws
+    `IncompatibleClassChangeError` against this Kotlin version. That one check is disabled
+    (the template has no LiveData at all); the lint gate itself stays on.
+
+  Proven end to end: a 15 MB minified APK (down from 33 MB debug) installs and runs — Room
+  seeds, Koin resolves, navigation and reactive state all behave under R8.
+
 ### Added
 
+- **`releaseBuild` — a verify-lane step, so this cannot rot again.** `assembleDebug` passing
+  says nothing about `assembleRelease`: R8 and `lintVital` only run on the release variant,
+  and `BuildConfig` differs between them. Runs in `local` and `ci`, deliberately not in
+  `scaffold` (stamp-time `--verify` promises a green first build; an R8 pass would add
+  minutes to every scaffold). Unsigned — signing needs a keystore, which belongs to whoever
+  ships the app.
 - **The console protocol — one wire, whoever started the process**
   (`docs/proposals/console-protocol.md`). The seven console-backed MCP tools
   (`preview_status`/`waitForRender`, `preview_diff`, `snapshot_variant`, `approval_status`,
