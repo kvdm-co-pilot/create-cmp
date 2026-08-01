@@ -49,3 +49,7 @@ inspector/harness/out/
 # canary lane, hashed into receipts but NEVER committed (template/CLAUDE.md,
 # qa/lib/inputs-hash.mjs EXCLUDED_PREFIXES). Matches the template's own .gitignore.
 qa-artifacts/
+
+# Scratch scaffolds from engine test runs — generated apps, build output and all.
+# The engine is tested by STAMPING these, not by keeping them.
+myapp/
