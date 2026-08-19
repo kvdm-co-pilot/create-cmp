@@ -1,7 +1,6 @@
 package __PACKAGE__.testing
 
 import android.os.SystemClock
-import org.junit.Assume.assumeTrue
 
 /**
  * Device-clock manipulation for the on-device tier — the primitive that turns "the alarm
@@ -26,8 +25,8 @@ import org.junit.Assume.assumeTrue
  * Constraints the code can't show:
  *  - No root involved. `adb root` is refused on production (user-build) images, including
  *    the stock Play-image AVDs — but `cmd alarm set-time` / `set-timezone` work from the
- *    SHELL uid, which is exactly what [AlarmAsserts.execShell]'s UiAutomation channel
- *    provides. Time-warp proofs therefore run on any stock emulator, no special image.
+ *    SHELL uid, which is exactly what [Shell.exec]'s UiAutomation channel provides.
+ *    Time-warp proofs therefore run on any stock emulator, no special image.
  *  - Network time sync fights the warp: with `auto_time` on, the device re-corrects the
  *    clock underneath the test. Every warp is bracketed — sync off, warp, run, restore,
  *    sync back on — and the restore runs in `finally`, so a crashed block still leaves
@@ -51,11 +50,10 @@ object TimeWarp {
      * and messaging — QA emulators only.
      */
     fun assumeOnEmulator() {
-        assumeTrue(
+        Shell.assumeOnEmulator(
             "TimeWarp runs only on emulators (ro.kernel.qemu != 1 here). Warping a real " +
                 "device's clock corrupts its owner's alarms, TLS validity, and auth " +
                 "tokens — run this suite on a stock QA AVD instead.",
-            AlarmAsserts.execShell("getprop ro.kernel.qemu").trim() == "1",
         )
     }
 
@@ -76,14 +74,14 @@ object TimeWarp {
         val autoTimeBefore = readGlobal("auto_time")
         val originalEpochMillis = System.currentTimeMillis()
         val startElapsed = SystemClock.elapsedRealtime()
-        AlarmAsserts.execShell("settings put global auto_time 0")
+        Shell.exec("settings put global auto_time 0")
         try {
-            AlarmAsserts.execShell("cmd alarm set-time $targetEpochMillis")
+            Shell.exec("cmd alarm set-time $targetEpochMillis")
             return block()
         } finally {
             val elapsed = SystemClock.elapsedRealtime() - startElapsed
-            AlarmAsserts.execShell("cmd alarm set-time ${originalEpochMillis + elapsed}")
-            AlarmAsserts.execShell("settings put global auto_time ${autoTimeBefore ?: "1"}")
+            Shell.exec("cmd alarm set-time ${originalEpochMillis + elapsed}")
+            Shell.exec("settings put global auto_time ${autoTimeBefore ?: "1"}")
         }
     }
 
@@ -98,21 +96,19 @@ object TimeWarp {
     fun <T> withTimeZone(olsonId: String, block: () -> T): T {
         assumeOnEmulator()
         val autoZoneBefore = readGlobal("auto_time_zone")
-        val originalZone = AlarmAsserts.execShell("getprop persist.sys.timezone").trim()
-        AlarmAsserts.execShell("settings put global auto_time_zone 0")
+        val originalZone = Shell.exec("getprop persist.sys.timezone").trim()
+        Shell.exec("settings put global auto_time_zone 0")
         try {
-            AlarmAsserts.execShell("cmd alarm set-timezone $olsonId")
+            Shell.exec("cmd alarm set-timezone $olsonId")
             return block()
         } finally {
             if (originalZone.isNotEmpty()) {
-                AlarmAsserts.execShell("cmd alarm set-timezone $originalZone")
+                Shell.exec("cmd alarm set-timezone $originalZone")
             }
-            AlarmAsserts.execShell("settings put global auto_time_zone ${autoZoneBefore ?: "1"}")
+            Shell.exec("settings put global auto_time_zone ${autoZoneBefore ?: "1"}")
         }
     }
 
-    /** A global setting's current value, or null when unset ("null" is settings-speak for absent). */
-    private fun readGlobal(key: String): String? =
-        AlarmAsserts.execShell("settings get global $key").trim()
-            .takeUnless { it.isEmpty() || it == "null" }
+    /** A global setting's current value, or null when unset — see [Shell.readSetting]. */
+    private fun readGlobal(key: String): String? = Shell.readSetting("global", key)
 }

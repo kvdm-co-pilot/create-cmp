@@ -67,6 +67,7 @@ const ASSERTED_FILES = [
   ".claude/skills/add-repository/SKILL.md",
   ".claude/settings.json",
   "qa/verify.mjs",
+  "qa/watch.mjs",
   "qa/receipt-check.mjs",
   "qa/lib/inputs-hash.mjs",
   "qa/scaffold-feature.mjs",
@@ -227,12 +228,22 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       // from a different tree state (byte-identical re-scaffold; golden baselines and the
       // UPDATE_GOLDEN env var were undeclared inputs), so a lane receipt attested tests that
       // never ran and a missing golden baseline sailed through locally while failing in CI.
+      //
+      // The flag is MODE-SCOPED, not dropped: `RERUN` resolves to " --rerun" for every
+      // full-lane (receipt-bearing) run and to "" only under --fast, whose receipt is
+      // already declared non-evidence (mode "fast", no rung, refused by receipt-check) —
+      // the integrity mechanism stays with the runs that produce integrity-bearing
+      // artifacts. Every desktopTest invocation must carry the scoped flag.
       const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      assert.match(verify, /const RERUN = fast \? "" : " --rerun";/, "the rerun flag is mode-scoped: full forces execution, fast omits it");
       const testInvocations = verify.split("\n").filter((l) => l.includes(":composeApp:desktopTest"));
       assert.ok(testInvocations.length >= 2, "lane has desktopTest invocations");
       for (const line of testInvocations) {
-        assert.match(line, /--rerun/, `desktopTest invocation forces --rerun: ${line.trim()}`);
+        assert.match(line, /\$\{RERUN\}/, `desktopTest invocation carries the mode-scoped rerun flag: ${line.trim()}`);
       }
+      // The device tier never runs under --fast, so its instrumented invocation keeps the
+      // unconditional flag.
+      assert.match(verify, /connectedDebugAndroidTest --rerun/, "instrumented invocation forces --rerun unconditionally");
       const buildGradle = fs.readFileSync(path.join(out, "composeApp/build.gradle.kts"), "utf8");
       assert.match(buildGradle, /goldenBaselines/, "golden baselines declared as a Test input");
       assert.match(buildGradle, /inputs\.property\("updateGolden"/, "UPDATE_GOLDEN declared as a Test input");

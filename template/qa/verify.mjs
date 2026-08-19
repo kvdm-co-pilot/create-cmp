@@ -6,7 +6,9 @@
 // Runs every verification step this project carries, aggregates a typed
 // PASS/FAIL verdict, and writes the evidence receipt to qa/evidence/latest.json.
 // `--fast` is the INNER LOOP: the resolved profile minus the device/release
-// tier — its receipt records mode "fast" and can never satisfy the done-gate.
+// tier, with unchanged pure-Node steps reused from the step cache (CACHED)
+// and unit tests scoped to the working-tree change — its receipt records
+// mode "fast" and can never satisfy the done-gate.
 // The receipt is COMMITTED with your change (see CLAUDE.md — a change is not
 // done without it). Binary artifacts under qa-artifacts/ are never committed;
 // the receipt references them by path + sha256.
@@ -35,6 +37,8 @@ import { clauseTierCoverage, scanCitations, scanSpecClauses, walkFiles } from ".
 import { evaluateComponentStoryParity } from "./lib/component-stories.mjs";
 import { evaluateReachability } from "./lib/reachability.mjs";
 import { evidenceLevel } from "./lib/evidence-level.mjs";
+import { memoizeStep } from "./lib/step-cache.mjs";
+import { changedWorkingTreePaths, deriveAffectedFilter } from "./lib/affected-tests.mjs";
 import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./lib/device-lease.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-doc.mjs";
 
@@ -62,10 +66,16 @@ Flags:
                                   minus the device/release tier (releaseBuild,
                                   tokenDrift, e2eSmoke, androidChecks,
                                   releaseSmoke), unconditionally, device
-                                  attached or not. The receipt records
-                                  mode "fast", derives no evidence rung, and
-                                  can NEVER satisfy the done-gate — run the
-                                  full lane once before you call it done
+                                  attached or not. Also reuses the pure-Node
+                                  steps' last PASS when their inputs are
+                                  unchanged (verdict CACHED), lets Gradle's
+                                  up-to-date checks stand (no --rerun), and
+                                  scopes unit tests to the working-tree change
+                                  (broad-impact changes run everything). The
+                                  receipt records mode "fast", derives no
+                                  evidence rung, and can NEVER satisfy the
+                                  done-gate — run the full lane once before
+                                  you call it done
   --json                         print the receipt as JSON instead of the
                                   human-readable step-by-step log
   --help, -h                     print this usage and exit 0 without
@@ -108,6 +118,18 @@ const fast = args.includes("--fast");
 const mode = fast ? "fast" : "full";
 
 const GRADLEW = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
+
+// ── `--rerun` is scoped to FULL mode ────────────────────────────────────────
+// `--rerun` exists for evidence integrity (see stepUnitTests's comment): it
+// stops Gradle's build cache replaying a PASS recorded against a different
+// tree into a receipt that claims tests executed. That mechanism belongs to
+// the runs that produce integrity-bearing artifacts — and a --fast run does
+// not: its receipt already declares itself non-evidence (mode "fast", no
+// evidence rung, refused by qa/receipt-check.mjs), so forcing execution there
+// paid an integrity tax to protect an artifact with nothing to protect. Fast
+// mode therefore omits the flag and lets Gradle's up-to-date/cache machinery
+// do its job; full mode keeps it, byte-identical to before.
+const RERUN = fast ? "" : " --rerun";
 
 function sh(cmd, opts = {}) {
   const started = Date.now();
@@ -610,9 +632,12 @@ function stepReleaseBuild() {
 // Runs a filtered slice of the JVM test tier and names the verdict after the gate it proves.
 // The full suite already ran in unitTests; the filtered slices stay cheap (compilation is
 // cached) while `--rerun` forces the tests themselves to EXECUTE — see stepUnitTests.
+// In fast mode the flag is omitted (RERUN, defined with the mode flags above): the
+// integrity mechanism belongs to the runs that produce integrity-bearing artifacts, and a
+// fast receipt has already declared itself non-evidence.
 function gradleTestStep(name, testsFilter, failHint) {
   return () => {
-    const res = shGradle(`${GRADLEW} :composeApp:desktopTest --rerun --tests "${testsFilter}" --console=plain`);
+    const res = shGradle(`${GRADLEW} :composeApp:desktopTest${RERUN} --tests "${testsFilter}" --console=plain`);
     return {
       name,
       verdict: res.ok ? "PASS" : "FAIL",
@@ -629,17 +654,61 @@ function stepUnitTests() {
   // restore a PASS recorded against a *different* tree state (deterministic re-scaffolds
   // produce byte-identical sources, and golden baselines aren't compile inputs), so the
   // receipt would attest tests that never executed. Compilation stays cached — only the
-  // test execution is forced.
-  const res = shGradle(`${GRADLEW} :composeApp:desktopTest --rerun --console=plain`);
+  // test execution is forced. Scoped to FULL mode (see RERUN above): the integrity
+  // mechanism belongs to the runs that produce integrity-bearing artifacts, and a fast
+  // receipt is already declared non-evidence.
+  //
+  // Fast mode additionally scopes the suite to tests plausibly affected by the
+  // working-tree change (qa/lib/affected-tests.mjs): changed .kt files map to
+  // `--tests "*<segment>*"` patterns, with a mandatory blast-radius escape hatch (build
+  // files, DI, theme, shared components, qa/, anything outside composeApp/src → full
+  // suite) and fail-open on every uncertain case (no git, unmappable change). FALSE
+  // NEGATIVES ARE ACCEPTABLE HERE AND ONLY HERE: the full, unfiltered suite runs at the
+  // checkpoint (the full lane), where done is actually decided. The filter that ran is
+  // reported in the step's note and recorded in the (fast-only) receipt, so a filtered
+  // run can never be mistaken for the full suite.
+  let note;
+  let testsArgs = "";
+  let affected = null;
+  if (fast) {
+    const changed = changedWorkingTreePaths(ROOT);
+    if (changed === null) {
+      note = "full suite — git unavailable, cannot derive the change (fail open)";
+    } else {
+      const filter = deriveAffectedFilter(changed);
+      if (filter.mode === "filtered") {
+        testsArgs = filter.patterns.map((p) => ` --tests "${p}"`).join("");
+        note = `affected: ${filter.patterns.join(", ")} — ${filter.sourcePaths.length} changed source file(s)`;
+        affected = { patterns: filter.patterns, changedFiles: filter.sourcePaths.length };
+      } else {
+        note = `full suite — ${filter.reason}`;
+      }
+    }
+  }
+  let res = shGradle(`${GRADLEW} :composeApp:desktopTest${RERUN}${testsArgs} --console=plain`);
+  if (fast && testsArgs && !res.ok && /No tests found for given includes/.test(res.out)) {
+    // The heuristic filter matched no test class at all (e.g. a feature with no tests
+    // yet). That is the harness's guess being wrong, not the app — fall back to the
+    // full suite in-lane rather than false-redding on our own filter. (RERUN is empty
+    // here by construction — this branch only exists in fast mode.)
+    const retry = shGradle(`${GRADLEW} :composeApp:desktopTest${RERUN} --console=plain`);
+    retry.durationMs += res.durationMs;
+    res = retry;
+    note = "full suite — the affected-test filter matched no tests (fell back)";
+    affected = null;
+  }
   const summary = junitSummary(path.join(ROOT, "composeApp/build/test-results/desktopTest"));
+  let details = summary ?? undefined;
+  if (affected) details = { ...(summary ?? {}), affected };
   return {
     name: "unitTests",
     verdict: res.ok ? "PASS" : "FAIL",
     reason: res.ok
       ? undefined
       : `desktopTest failed (${summary ? `${summary.failures + summary.errors} of ${summary.tests} tests` : "see output"}). Fix the failing behavior — do not delete or weaken tests to pass:\n${res.out.split("\n").filter((l) => /FAILED|error:/i.test(l)).slice(0, 12).join("\n")}`,
+    note,
     durationMs: res.durationMs,
-    details: summary ?? undefined,
+    details,
   };
 }
 
@@ -991,16 +1060,60 @@ function stepReleaseSmoke() {
 // can never mean two different lists.
 const DEVICE_STEPS = ["e2eSmoke", "tokenDrift", "androidChecks", "releaseSmoke"];
 
+// ── Fast-mode memoization of the pure-Node steps (qa/lib/step-cache.mjs) ────
+// These five steps run no Gradle, shell out to nothing, and are pure functions
+// of files on disk — so in FAST mode an unchanged input set reuses the last
+// PASS as verdict "CACHED" (rendered distinctly; only a PASS is ever reused,
+// a cached FAIL/SKIP always re-runs). THE FULL LANE NEVER CONSULTS THE CACHE —
+// deliberately: it keeps the integrity property absolute rather than "absolute
+// unless a cache says otherwise". A full run still WRITES entries so the next
+// fast run benefits. schemaHistory is NOT here even though it runs no Gradle:
+// it shells out to git and its verdict depends on HEAD state, not only file
+// bytes — memoizing it on a content hash could go silently stale.
+//
+// Each input set is the step's ACTUAL read surface, over-declared where cheap
+// (a too-broad set only costs cache misses; a too-narrow one is a
+// silently-stale gate — the worst possible bug here):
+//   specCoverage     reads specs/*.spec.md + citations under composeApp/src
+//                    and qa/e2e (qa/lib/spec-coverage.mjs)
+//   approvals        reads qa/approvals.json + every governed artifact file:
+//                    specs/, docs/features/, docs/ARCHITECTURE.md, and the
+//                    exemplar/theme/components Kotlin under composeApp/src
+//                    (qa/lib/approvals.mjs listGovernedArtifacts)
+//   componentStories reads commonMain presentation/components and desktopMain
+//                    inspector sources — both under composeApp/src
+//   reachability     reads commonMain Kotlin (composeApp/src) + the unrouted
+//                    declarations in docs/features/
+//   archDoc          reads docs/ARCHITECTURE.md, docs/adr/, specs/intent.md
+//                    (over-declared to all of specs/), and every source-set's
+//                    Kotlin under composeApp/src (qa/lib/arch-doc.mjs)
+const MEMOIZED_STEP_INPUTS = {
+  specCoverage: ["specs", "composeApp/src", "qa/e2e"],
+  approvals: ["qa/approvals.json", "specs", "docs/features", "docs/ARCHITECTURE.md", "composeApp/src"],
+  componentStories: ["composeApp/src"],
+  reachability: ["composeApp/src", "docs/features"],
+  archDoc: ["docs/ARCHITECTURE.md", "docs/adr", "specs", "composeApp/src"],
+};
+
+const memoized = (stepName, stepFn) => () =>
+  memoizeStep({ fast, root: ROOT, stepName, inputs: MEMOIZED_STEP_INPUTS[stepName], run: stepFn });
+
+const stepSpecCoverageMemo = memoized("specCoverage", stepSpecCoverage);
+const stepApprovalsMemo = memoized("approvals", stepApprovals);
+const stepComponentStoriesMemo = memoized("componentStories", stepComponentStories);
+const stepReachabilityMemo = memoized("reachability", stepReachability);
+const stepArchDocMemo = memoized("archDoc", stepArchDoc);
+
 const stepsForProfile = {
   // scaffold: what `create-cmp --verify` proves at stamp time — specCoverage,
   // the full JVM tier (unit + conformance + golden + UI tests) plus the Android build.
-  scaffold: [stepSpecCoverage, stepApprovals, stepComponentStories, stepReachability, stepArchDoc, stepSchemaHistory, stepBuild, stepUnitTests],
+  scaffold: [stepSpecCoverageMemo, stepApprovalsMemo, stepComponentStoriesMemo, stepReachabilityMemo, stepArchDocMemo, stepSchemaHistory, stepBuild, stepUnitTests],
   local: [
-    stepSpecCoverage,
-    stepApprovals,
-    stepComponentStories,
-    stepReachability,
-    stepArchDoc,
+    stepSpecCoverageMemo,
+    stepApprovalsMemo,
+    stepComponentStoriesMemo,
+    stepReachabilityMemo,
+    stepArchDocMemo,
     stepSchemaHistory,
     stepBuild,
     // Release stays OUT of `scaffold`: stamp-time --verify promises a green first build, and
@@ -1043,8 +1156,12 @@ if (!stepsForProfile[profile]) {
 // releaseBuild (R8 + lintVital, the slow release COMPILE). --fast filters
 // that tier out of whatever profile resolved, UNCONDITIONALLY — device
 // attached or not — so a small change gets its did-I-break-anything-obvious
-// signal in JVM time. Everything else in the profile still runs in full.
-// The loophole is closed at the receipt, not by convention: mode "fast" is
+// signal in JVM time. The rest of the profile still runs — but cheaply: the
+// pure-Node steps reuse an unchanged PASS from the step cache (CACHED — see
+// the memoization block above), the Gradle test steps drop --rerun (see
+// RERUN above), and unitTests scopes itself to the working-tree change
+// (see stepUnitTests). The loophole is closed at the receipt, not by
+// convention: mode "fast" is
 // recorded, no evidence rung is derived (qa/lib/evidence-level.mjs), and
 // qa/receipt-check.mjs refuses a fast receipt as done evidence.
 const FAST_EXCLUDED_NAMES = [...DEVICE_STEPS, "releaseBuild"];
@@ -1091,8 +1208,11 @@ for (const step of laneSteps) {
   const result = step();
   steps.push(result);
   if (!asJson) {
-    const mark = result.verdict === "PASS" ? "✓" : result.verdict === "SKIP" ? "→" : "✗";
-    console.log(`${mark} ${result.name}: ${result.verdict}${result.reason ? ` — ${result.reason.split("\n")[0]}` : ""}`);
+    // CACHED (fast mode only — see the memoization block above) renders with
+    // its own mark and "unchanged since" note so a reused verdict is never
+    // mistakable for a fresh execution.
+    const mark = result.verdict === "PASS" ? "✓" : result.verdict === "CACHED" ? "⚡" : result.verdict === "SKIP" ? "→" : "✗";
+    console.log(`${mark} ${result.name}: ${result.verdict}${result.note ? ` (${result.note})` : ""}${result.reason ? ` — ${result.reason.split("\n")[0]}` : ""}`);
   }
   if (result.name === "build" && result.verdict === "FAIL") break; // nothing downstream is meaningful
 }
@@ -1104,6 +1224,10 @@ for (const step of laneSteps) {
   if (laneDeviceLease) releaseDeviceLease(laneDeviceLease);
 }
 
+// CACHED counts as PASS for the lane verdict (it IS a prior PASS, reused only
+// in fast mode on an unchanged input set) — but it stays CACHED on the
+// receipt, visibly distinct, so a fast receipt can never be read as if every
+// step freshly executed.
 const verdict = steps.some((s) => s.verdict === "FAIL") ? "FAIL" : "PASS";
 
 // Receipt STRENGTH — a desktop-only green and an on-device green are different

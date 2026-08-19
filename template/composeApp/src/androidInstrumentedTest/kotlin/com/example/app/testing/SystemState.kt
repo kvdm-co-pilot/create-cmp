@@ -16,7 +16,7 @@ import androidx.test.platform.app.InstrumentationRegistry
  *   - Read and set the ringer mode. Setting SILENT/VIBRATE via AudioManager flips the
  *     device through DND on modern Android, so both knobs are driven through the shell
  *     (`cmd notification set_dnd`, `settings global zen_mode`) with the instrumentation's
- *     shell uid — no notification-policy grant dance, works on a stock emulator.
+ *     shell uid ([Shell.exec]) — no notification-policy grant dance, works on a stock emulator.
  *   - Read/set DND (zen mode) as a global: off / priority-only / total-silence / alarms-only.
  *   - Observe playback routing: which stream/usage an active player is on
  *     (AudioManager.activePlaybackConfigurations — see PlatformBehaviorSeamTest for the
@@ -28,9 +28,9 @@ import androidx.test.platform.app.InstrumentationRegistry
  *     handset makes air move.
  *   - Physical volume keys / hardware mute switches, Bluetooth routing, and whether the
  *     speaker is audible — there is no API for "a human heard it".
- *   - Lock-screen rendering and Doze wakeups: instrumentation keeps the device awake by
- *     design, so "fires from deep Doze" can only be rehearsed manually
- *     (`adb shell cmd deviceidle force-idle`) or trusted to the OS contract.
+ *   - Lock-screen rendering: whether a takeover actually draws over a locked, OEM-skinned
+ *     screen stays manual. Doze delivery, by contrast, stopped being a manual rehearsal
+ *     when [DozeControl] landed — force the idle state and watch the alarm arrive.
  *
  * Plain helpers, not a TestRule: state here is two scalars, and an explicit
  * snapshot-in-@Before / restore-in-@After (or [withRingerMode]) keeps the mechanism
@@ -86,12 +86,12 @@ object SystemState {
             ZEN_ALARMS_ONLY -> "alarms"
             else -> "off"
         }
-        AlarmAsserts.execShell("cmd notification set_dnd $arg")
+        Shell.exec("cmd notification set_dnd $arg")
     }
 
     /** The device's current DND global (ZEN_* value; unreadable/absent reads as off). */
     fun readZen(): Int =
-        AlarmAsserts.execShell("settings get global zen_mode").trim().toIntOrNull() ?: ZEN_OFF
+        Shell.exec("settings get global zen_mode").trim().toIntOrNull() ?: ZEN_OFF
 
     /**
      * Run [block] with the ringer in [mode], restoring the full snapshot afterwards even

@@ -203,6 +203,20 @@ android {
         }
     }
 
+    // AGP resolves BUILD-TYPE source sets at src/<buildType>/, while the Kotlin
+    // Multiplatform plugin only remaps the `main` one to src/androidMain/. Without this
+    // wiring, src/androidDebug/'s manifest and resources are silently never merged —
+    // dead files that look live: the debug network-security config never applied, and a
+    // permission declared there never reached the APK. Point the debug build type at them
+    // explicitly. Caught when an instrumented test asserted canScheduleExactAlarms() and
+    // found the grant it had declared was absent on the device.
+    sourceSets {
+        getByName("debug") {
+            manifest.srcFile("src/androidDebug/AndroidManifest.xml")
+            res.srcDirs("src/androidDebug/res")
+        }
+    }
+
     buildFeatures {
         buildConfig = true
     }

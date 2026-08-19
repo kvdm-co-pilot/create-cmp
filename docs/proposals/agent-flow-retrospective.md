@@ -292,13 +292,24 @@ honesty; trigger-gated building). Nothing here is built; each names its trigger.
    design: root is refused on stock user-build images, but `cmd alarm set-time`/
    `set-timezone` work root-free from the shell uid on any stock AVD — no special QA
    image needed. `TimeWarp.kt` (emulator-only guard, elapsed-time-correct restore) plus
-   an exemplar test in `PlatformBehaviorSeamTest.kt` that schedules a real exact alarm,
-   warps the clock past it, and asserts delivery — proven live. Compile-verified on a
-   scratch scaffold after two follow-up fixes: two undefined constants
-   (`REQUEST_WARP`/`ACTION_WARP`) and the missing `SCHEDULE_EXACT_ALARM`/
-   `USE_EXACT_ALARM` debug-manifest grant, both caught because the template had never
-   actually been compiled with this test in it — the exact failure mode this whole
-   batch exists to prevent, caught before it shipped.
+   an exemplar in `PlatformBehaviorSeamTest.kt` that schedules a real exact alarm, warps
+   the clock past it, and asserts delivery.
+
+   **Correction, and the lesson of the whole batch.** An earlier revision of this line
+   said the exemplar was "proven live." It was not: the agent that wrote it was cut off
+   before running it, and the orchestrator then verified only that it *compiled* — then
+   wrote "proven" anyway. When the batched device pass finally ran it, **it failed**, and
+   so did the alarm-identity exemplar beside it. Two follow-up fixes were needed: two
+   undefined constants (`REQUEST_WARP`/`ACTION_WARP`), and — the real find — the
+   `SCHEDULE_EXACT_ALARM`/`USE_EXACT_ALARM` grant was present in `src/androidDebug/`'s
+   manifest but **never reached the APK**, because AGP resolves build-type source sets at
+   `src/<buildType>/` while KMP only remaps `main` → `androidMain`. That manifest had been
+   dead in every app this template ever stamped (the debug network-security config never
+   applied either); it is now wired explicitly in the android block. Both exemplars pass
+   on device as of this entry. The overclaim is recorded rather than quietly edited out,
+   because it is the exact disease this document is about, committed by the process that
+   exists to prevent it — compile-clean read as proven, in a batch whose thesis is that
+   nothing is proven until it executes.
 
 2. **The evidence ladder, named** — receipts already grade themselves
    (`desktop-only` → `on-device: …+androidChecks` → release profile). Formalize the
@@ -353,18 +364,28 @@ honesty; trigger-gated building). Nothing here is built; each names its trigger.
    never a per-subagent gate, never concurrent across subagents; interim proof is
    always `--fast`; the full lane runs exactly once, after everything else lands.
 
-7. **Determinism probe** — ARCH-13 statically bans ambient time in app code, but a
+7. **Reject invalid package names at the door** — observed while running the batched
+   device pass: `--package com.final.proof` was accepted and stamped a project that
+   cannot configure at all (`Namespace 'com.final.proof' is not a valid Java package
+   name as 'final' is a Java keyword`). `--verify` does catch it, but late and as a raw
+   Gradle stack rather than an input error. Any reserved-word segment (`final`, `static`,
+   `new`, `public`, `class`, `int`…) or a segment starting with a digit has the same
+   shape. Cheap fix: validate segments in the engine's option parsing and refuse with a
+   message naming the offending segment. **Trigger: next engine change touching option
+   validation — or the first user who reports it.**
+
+8. **Determinism probe** — ARCH-13 statically bans ambient time in app code, but a
    library can still read the wall clock. A ci-profile option runs unit+golden tests
    twice under maximally-shifted TZ (UTC vs UTC+14); differing outcomes = a
    nondeterminism leak the static net missed. **Trigger: first golden flake that
    ARCH-13 didn't prevent.**
 
-8. **Audit cadence** — cmp-audit exists but fires on human request, like the audit
+9. **Audit cadence** — cmp-audit exists but fires on human request, like the audit
    that found the six defects. Cheapest mechanical nudge: the release profile's
    receipt lists subsystems whose androidMain changed since the last recorded audit.
    **Trigger: after cmp-audit's first real-app outing proves the question bank.**
 
-9. **iOS is the known asymmetry** — every behavior-tier capability is Android-only;
+10. **iOS is the known asymmetry** — every behavior-tier capability is Android-only;
    the platform-semantics bug class exists identically on iOS (UNUserNotificationCenter,
    background modes). Named here deliberately and NOT built: no iOS app evidence yet
    (evidence-or-silence), and building ahead of signal violates trigger-gating.

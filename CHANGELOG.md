@@ -36,6 +36,86 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **Runtime state control — the seam can now put the device INTO the state the claim is
+  about.** A claim is provable when the test can reach the state it is about, and most
+  escaped platform bugs escaped because the state was unreachable: nobody waits hours for
+  Doze, ships to a user who denies the permission, or hopes the OS reclaims the process
+  mid-test. TimeWarp (the clock) was the family's first organ and immediately made a
+  thrice-shipped-unverified delivery claim provable; the template now ships the rest —
+  `DozeControl` (forced light/deep idle), `PermissionControl` (the fresh-install denied
+  state as a test input), `ProcessControl` (real OS-driven activity destruction and
+  saved-state rebuild), `NetworkControl` (airplane mode, per-transport wifi/data), and
+  `ConfigControl` (dark mode, font scale, per-app locale) — every shell command verified
+  root-free from the shell uid on a stock user-build image, every bracket
+  snapshot/act/restore-in-`finally`, every entry point emulator-gated through one shared
+  guard (`Shell`, which also absorbs `AlarmAsserts.execShell`). The flagship exemplar
+  composes two organs: schedule `setExactAndAllowWhileIdle`, force deep idle, warp past
+  the trigger, watch the alarm arrive — the first proof the API's name keeps its promise
+  (`RuntimeStateSeamTest`, with permission-denied and activity-reclaim exemplars beside
+  it). The honesty ledger is part of the feature: each organ's header states what its
+  state does NOT reproduce (forced idle skips the descent ladder and maintenance windows;
+  revoking a held permission kills the holding process — verified live, and why no revoke
+  bracket exists; `am kill` cannot reclaim the pinned instrumented process — asserted
+  live in the exemplar so the claim can never rot; `settings put global
+  always_finish_activities` alone is a runtime no-op — ActivityTaskManagerService reads
+  it once at boot, verified live on API 35 — so the don't-keep bracket flips the LIVE
+  flag through the same `IActivityManager.setAlwaysFinish` binder call the
+  Developer-options toggle uses, under the shell's adopted permission identity, proven by
+  re-reading the setting the call itself writes), and docs/TESTING.md and the cmp-audit
+  question bank wire each organ to the questions it settles. The activity-reclaim
+  exemplar earns its name literally: a nonce planted in the first instance's
+  SavedStateRegistry must come back through the rebuilt instance's registry — the
+  saved-state path observed, not inferred from a new instance existing.
+
+- **Watch mode — the inner loop made resident, the way an IDE is.** A human's inner loop
+  costs nothing because the IDE is always running: errors appear on save. An agent has no
+  IDE, so it reaches for the heaviest thing labelled "done" after a five-line edit — the
+  exact session-burning pattern the preview daemon already solved for rendering, and the
+  most-adopted surface in the plugin because of it. `node qa/watch.mjs` (in every stamped
+  app) extends that idea to verification: it watches `composeApp/src`, `specs/`, and `qa/`
+  (never `qa/evidence/` or build output — watching your own output is an infinite loop)
+  and re-runs the fast lane on every save, debounced at the preview daemon's proven 400ms
+  so a multi-file save storm is ONE run and changes landing mid-run coalesce into exactly
+  one follow-up, never a stack. Deliberately decoupled: it shells out to
+  `node qa/verify.mjs --fast` rather than importing lane internals, so every fast-mode
+  economy (step cache, scoped tests) is inherited for free and the step list can never
+  fork. It is a fourth citizen of the marker protocol — it defers while
+  `.cmp-lane-in-progress` or `.cmp-render-in-progress` is fresh (the collision class that
+  once produced a 20+ bogus-failure `NoClassDefFoundError` cascade), and its own child
+  stamps the lane marker, so two watch instances serialize through the same mechanism.
+  And it is not a gate, by construction and by voice: fast receipts already earn no rung,
+  the output is plain greppable lines for agent and human alike (failing step reasons
+  verbatim, no cursor-control escapes), every run ends with the standing footer naming
+  the real gate, and Ctrl-C exits 0 after killing any in-flight child and cleaning up the
+  marker that child could no longer remove itself. `--once` runs a single coordinated
+  pass for scripting; `--json` emits one NDJSON object per run.
+
+- **Fast mode is now genuinely cheap — the inner loop stops paying the checkpoint's
+  integrity tax.** `--fast` (below) skipped the device/release tier but still
+  force-executed the entire JVM test tier four times over (`--rerun` on `unitTests`,
+  `conformance`, `goldenTrees`, `a11y`) — ~70 seconds on a bare scaffold for a five-line
+  edit, worse on a real app. `--rerun` exists for evidence integrity (Gradle's build cache
+  can replay a PASS recorded against a different tree into a receipt), but a fast receipt
+  has already declared itself non-evidence — mode `"fast"`, no rung, refused by the Stop
+  hook — so the tax protected nothing. Three economies, all fast-mode-only, all reported
+  honestly: **(1)** `--rerun` is mode-scoped — full runs keep it byte-identical, fast runs
+  let Gradle's up-to-date checks stand; **(2)** the five pure-Node gates (`specCoverage`,
+  `approvals`, `componentStories`, `reachability`, `archDoc`) memoize on a content hash of
+  their declared input sets (`qa/lib/step-cache.mjs`, cache in the gitignored
+  `composeApp/build/.cmp-step-cache.json`) and reuse an unchanged PASS as a visibly
+  distinct `⚡ CACHED` verdict — only a PASS is ever reused, a FAIL always re-runs fresh,
+  and the FULL lane never reads the cache (it only writes, so the next fast run benefits —
+  the integrity property stays absolute, not "absolute unless a cache says otherwise");
+  **(3)** fast unit tests scope to the working-tree change (`qa/lib/affected-tests.mjs`):
+  changed `.kt` files map to `--tests "*<feature>*"` filters, with a mandatory
+  blast-radius hatch (build files, DI, theme, shared components, `qa/` itself, anything
+  outside `composeApp/src` → full suite) and fail-open on every uncertain case — no git,
+  unmappable change, a filter that matches no tests. The receipt records exactly which
+  filter ran (`affected: *home* — 1 changed source file(s)`), so a subset can never
+  impersonate the suite; false negatives are tolerable only because the full, unfiltered
+  lane still decides done. Measured on a fresh scaffold: 121s cold → 32s unchanged →
+  34s after a one-line ViewModel edit (11 of 45 tests, scoped), full lane unchanged.
+
 - **`--fast` — the inner loop the lane never had, and green that cannot lie about being
   done.** The lane had exactly one mode: every configured step, every run. A one-line edit
   paid for the whole device/release tier — the R8 release compile, the emulator, Maestro,

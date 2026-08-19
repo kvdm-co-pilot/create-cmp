@@ -1,6 +1,5 @@
 package __PACKAGE__.testing
 
-import android.os.ParcelFileDescriptor
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -23,11 +22,12 @@ import org.junit.Assert.assertTrue
  *    raw block so a predicate can always fall back to substring matching. If a future
  *    Android release reshuffles the dump, fix the parser here, once — tests state intent
  *    through predicates, not format.
- *  - Reading the table proves REGISTRATION, not delivery. Doze, app standby buckets, and
- *    exact-alarm policy (API 31+ SCHEDULE_EXACT_ALARM) decide whether/when a registered
- *    alarm fires — those belong to the manual tier (see docs/TESTING.md).
- *  - The shell runs with the instrumentation's uiAutomation (shell uid), so no permission
- *    or root is needed.
+ *  - Reading the table proves REGISTRATION, not delivery. Delivery is its own proof:
+ *    [TimeWarp] warps the clock past the trigger, and [DozeControl] holds the device in
+ *    forced idle while it happens. App-standby buckets and OEM battery managers remain
+ *    outside the seam's reach (see docs/TESTING.md).
+ *  - The shell runs with the instrumentation's uiAutomation (shell uid, via [Shell.exec]),
+ *    so no permission or root is needed.
  */
 object AlarmAsserts {
 
@@ -47,7 +47,7 @@ object AlarmAsserts {
     fun registeredAlarms(
         packageName: String =
             InstrumentationRegistry.getInstrumentation().targetContext.packageName,
-    ): List<RegisteredAlarm> = parseDumpsysAlarm(execShell("dumpsys alarm"), packageName)
+    ): List<RegisteredAlarm> = parseDumpsysAlarm(Shell.exec("dumpsys alarm"), packageName)
 
     /**
      * Asserts at least one alarm matching [predicate] is registered. [what] names the
@@ -92,15 +92,6 @@ object AlarmAsserts {
     }
 
     // ── dump plumbing ───────────────────────────────────────────────────────
-
-    /** Runs [command] via UiAutomation (shell uid) and returns its full stdout. */
-    fun execShell(command: String): String {
-        val pfd = InstrumentationRegistry.getInstrumentation().uiAutomation
-            .executeShellCommand(command)
-        ParcelFileDescriptor.AutoCloseInputStream(pfd).use { stream ->
-            return stream.readBytes().decodeToString()
-        }
-    }
 
     /**
      * Tolerant `dumpsys alarm` parse: an entry starts at a line containing

@@ -36,8 +36,12 @@
         "required": ["name", "verdict", "durationMs"],
         "properties": {
           "name": { "type": "string" },
-          "verdict": { "enum": ["PASS", "FAIL", "SKIP"] },
+          "verdict": {
+            "enum": ["PASS", "FAIL", "SKIP", "CACHED"],
+            "description": "CACHED appears ONLY on mode:\"fast\" receipts: a pure-Node step's last PASS reused because its content-hashed input set is unchanged (qa/lib/step-cache.mjs). Counts as PASS for the lane verdict but stays visibly distinct — the full lane never consults the cache, so a full receipt never carries it."
+          },
           "reason": { "type": "string" },
+          "note": { "type": "string", "description": "Honest fine print on a non-FAIL step (fast mode): which unit-test filter ran, or when a CACHED verdict was originally earned." },
           "durationMs": { "type": "number" },
           "details": { "type": "object" }
         }

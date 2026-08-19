@@ -101,6 +101,24 @@ answered with a file:line or with "not applicable because …" — never with a 
 - Same arithmetic for tests: how many of the subsystem's clauses are exercised only from
   desktop-tier tests (the lane's specCoverage tier line gives the number)?
 
+**Settling PLAUSIBLE on the device** — when the project ships the instrumented seam,
+several of the questions above have a named state-control organ
+(`androidInstrumentedTest/…/testing/`) that turns PLAUSIBLE into CONFIRMED; cite it in
+the proposed test:
+
+- "does it survive Doze / which windows apply?" → `DozeControl` composed with `TimeWarp`
+  (force idle, warp past the trigger, watch delivery — the flagship exemplar in
+  `RuntimeStateSeamTest`).
+- "does a registered alarm actually deliver at T / across a DST transition?" →
+  `TimeWarp` + `AlarmAsserts`.
+- "what happens when the user denies it?" → `PermissionControl` (the fresh-install
+  denied default as a test input; its header documents why granted→denied cannot happen
+  mid-test) + `NotificationAsserts.assertNoNotification` for the silent-drop shape.
+- "does state survive process death / OS reclaim?" → `ProcessControl` (real OS-driven
+  activity destroy + saved-state rebuild; honest about the in-process kill limit).
+- "offline / one transport down?" → `NetworkControl`. Dark mode, font scale, locale →
+  `ConfigControl`.
+
 ## 3. Discipline — non-negotiable
 
 - **Evidence-or-silence.** Every finding cites file:line and states the concrete failure
@@ -122,5 +140,6 @@ audit's deliverable is the interrogation record: per finding, the category, the 
 the scenario, CONFIRMED/PLAUSIBLE, and its convert-or-cut landing.
 
 If the project has the instrumented seam (`androidInstrumentedTest`), every PLAUSIBLE
-platform finding should propose the instrumented test that would settle it — the seam
-exists precisely so platform claims stop being unfalsifiable.
+platform finding should propose the instrumented test that would settle it — naming the
+state-control organ that reaches the state in question (the map at the end of §2). The
+seam exists precisely so platform claims stop being unfalsifiable.

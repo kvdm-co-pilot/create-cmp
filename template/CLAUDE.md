@@ -15,7 +15,10 @@ tests, and gates the whole tree to produce the receipt, so it is slow by design;
 after every edit wastes the minutes it takes. Iterate on the fast tier, and run the lane
 once — when you believe the change is done.
 
-- **Inner loop — run continuously (seconds):** the preview loop (below) for UI, and
+- **Inner loop — run continuously (seconds):** the preview loop (below) for UI;
+  `node qa/watch.mjs` for verification — a resident watcher that re-runs the fast tier
+  (`node qa/verify.mjs --fast`) on every save and re-prints the step table, so the
+  did-I-break-anything signal is free the way an IDE's errors-on-save are free; and
   `./gradlew :composeApp:desktopTest` for the unit tests your change touches. This is where
   you catch your own mistakes.
 - **Checkpoint — run once, at done:** `node qa/verify.mjs`. It writes the receipt; commit
@@ -87,9 +90,16 @@ the tree. The governed `architecture` artifact (below) hashes the document along
 
 **Platform behavior tests live in `composeApp/src/androidInstrumentedTest`** — when a
 feature touches alarms, notifications, lock-screen intents, or audio routing, its behavior
-test goes there (helpers: `NotificationAsserts`, `AlarmAsserts`, `SystemState`; exemplar:
-`PlatformBehaviorSeamTest`), because no desktop tier can see those OS facts. The lane's
-`androidChecks` step runs them when a device is attached; see `docs/TESTING.md`.
+test goes there, because no desktop tier can see those OS facts. Assertion helpers:
+`NotificationAsserts`, `AlarmAsserts`, `SystemState`. **Runtime state control** — put the
+device into the state your claim is about, instead of waiting for it: `TimeWarp` (clock,
+timezone), `DozeControl` (forced idle), `PermissionControl`, `ProcessControl`,
+`NetworkControl`, `ConfigControl` (dark mode, font scale, per-app locale). They compose —
+the exemplar proves an `allowWhileIdle` alarm delivers from inside forced deep idle by
+nesting a clock warp in a Doze bracket. Exemplars: `PlatformBehaviorSeamTest`,
+`RuntimeStateSeamTest`. Each organ's header states what it does NOT reproduce; read it
+before claiming more than it proves. The lane's `androidChecks` step runs them when a
+device is attached; see `docs/TESTING.md`.
 
 ## Evidence
 
@@ -370,7 +380,8 @@ conventions) · [`CONTRIBUTING.md`](./CONTRIBUTING.md) (workflow, Conventional C
 | Command | What |
 |---|---|
 | `node qa/verify.mjs` | The verify lane (profile `local`) — the done checkpoint, run once |
-| `node qa/verify.mjs --fast` | **Inner loop — NOT the done-gate**: the lane minus the device/release tier (`releaseBuild`, `tokenDrift`, `e2eSmoke`, `androidChecks`, `releaseSmoke`). Its receipt records `"mode": "fast"`, earns no evidence rung, and the Stop hook refuses it — run the full lane once at done |
+| `node qa/verify.mjs --fast` | **Inner loop — NOT the done-gate**: skips the device/release tier (`releaseBuild`, `tokenDrift`, `e2eSmoke`, `androidChecks`, `releaseSmoke`), reuses unchanged pure-Node step results (`CACHED`, content-hashed inputs), and scopes unit tests to the working-tree change (broad-impact changes — build files, DI, theme, shared components, `qa/` — run the full suite). Its receipt records `"mode": "fast"`, earns no evidence rung, and the Stop hook refuses it — run the full lane once at done |
+| `node qa/watch.mjs` | **Resident inner loop — never a gate**: watches `composeApp/src`, `specs/`, `qa/` and re-runs `node qa/verify.mjs --fast` on save (debounced — a save storm is one run; defers while a verify lane or a preview render holds the project). `--once` for a single pass, `--json` for line-per-run output. The done-gate stays one deliberate full `node qa/verify.mjs` run |
 | `./gradlew :composeApp:desktopTest` | Unit tests only (fast inner loop) |
 | `node qa/setup-hooks.mjs` | Enable the pre-push receipt gate (one-time, after `git init`) |
 | `./gradlew :composeApp:assembleDebug` | Android debug build |
