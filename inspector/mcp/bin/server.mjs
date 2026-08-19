@@ -32,6 +32,7 @@ import {
 import { gradleEnv } from "../src/lib/jdk.mjs";
 import { navigateAndInspect, writeLiveScreenshot, DEFAULT_SETTLE_MS } from "../src/lib/navigate.mjs";
 import { connectLive, ConnectError } from "../src/lib/connect.mjs";
+import { readDeviceLease, listLiveDeviceLeases, formatHolder } from "../src/lib/device-lease.mjs";
 import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
 import { readPngMeta } from "../src/lib/png.mjs";
 import { attributeCrash } from "../src/lib/attribution.mjs";
@@ -55,6 +56,29 @@ const execFileAsync = promisify(execFile);
 // Session default source, set by connect_live so subsequent tool calls can
 // omit `source` entirely. Explicit `source`/`treePath` always wins over it.
 let sessionDefaultSource = null;
+
+// The adb serial connect_live actually resolved — the device-lease key for
+// later live-driving calls (navigate_and_inspect). connect_live itself checks
+// the lease inside connectLive(); this session record lets each subsequent tap
+// re-check the SAME device, because a verify lane can start at any moment
+// during an open console session. Check, never hold — see
+// src/lib/device-lease.mjs for the decision and the shared on-disk contract.
+let sessionDeviceSerial = null;
+
+/**
+ * The live lease standing between us and a device-driving call, or null.
+ * With no recorded serial (source came from env/legacy, not connect_live) any
+ * live lease on the machine refuses conservatively: a one-device machine is
+ * the very case this mechanism exists for, and a blind tap into a lane's
+ * device phase is exactly the collision it prevents.
+ */
+function deviceLeaseInTheWay() {
+  if (sessionDeviceSerial) {
+    const held = readDeviceLease(sessionDeviceSerial);
+    return held ? { serial: sessionDeviceSerial, ...held } : null;
+  }
+  return listLiveDeviceLeases()[0] ?? null;
+}
 
 // sha256 of the previous render_screen{live} capture — the stale-frame tripwire.
 // Two captures of two DIFFERENT screens hashing the same means the pixel path is
@@ -351,10 +375,12 @@ server.registerTool(
       throw err;
     }
     sessionDefaultSource = { kind: "live", host: "127.0.0.1", port: p };
+    sessionDeviceSerial = result.serial ?? sessionDeviceSerial; // the lease key later taps re-check
     return ok({
       status: "connected",
       forwarded: `tcp:${p} -> tcp:${p}`,
       sessionDefaultSource,
+      serial: result.serial,
       appId: result.appId,
       healed: result.healed,
       ...(result.relaunch ? { relaunch: result.relaunch } : {}),
@@ -399,6 +425,18 @@ server.registerTool(
     },
   },
   guarded(async ({ testTag, x, y, port, settleMs }) => {
+    // Same stance as connect_live's stage-"lease" refusal, re-checked per tap:
+    // a verify lane can begin its device phase at any moment during an open
+    // console session, and tapping into it is the collision class this exists
+    // to prevent. Check, never hold (src/lib/device-lease.mjs).
+    const held = deviceLeaseInTheWay();
+    if (held) {
+      return fail(
+        `navigate_and_inspect refused at stage 'lease': device ${held.serial} is held by ` +
+          `${formatHolder(held)} — a lane is driving this device right now; device evidence is ` +
+          `batched, not concurrent. Next: wait for the holder to finish (its lease clears on exit), then retry.`
+      );
+    }
     const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
     return ok(
       await navigateAndInspect({

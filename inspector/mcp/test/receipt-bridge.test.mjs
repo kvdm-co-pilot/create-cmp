@@ -318,3 +318,61 @@ test("listReceiptHistory: a commit whose latest.json is malformed is skipped, ne
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// --- evidenceLevel (the evidence ladder) — read verbatim, never re-derived ---
+
+test("getLastReceipt: the receipt's evidenceLevel rung is exposed verbatim; absent/null/malformed all degrade to null (never fabricated)", async () => {
+  const root = makeFixtureProject({ withInputsHashLib: false });
+  try {
+    // A rung as the lane wrote it — passed through untouched.
+    const withRung = makeReceipt();
+    withRung.evidenceLevel = { rung: "L2", name: "device", satisfiedBy: ["build", "unitTests", "e2eSmoke"] };
+    writeReceipt(root, withRung);
+    let result = await getLastReceipt(root);
+    assert.deepEqual(result.evidenceLevel, { rung: "L2", name: "device", satisfiedBy: ["build", "unitTests", "e2eSmoke"] });
+
+    // A FAILed lane records evidenceLevel null — the bridge reports null, no rung invented.
+    const failed = makeReceipt();
+    failed.verdict = "FAIL";
+    failed.evidenceLevel = null;
+    writeReceipt(root, failed);
+    result = await getLastReceipt(root);
+    assert.equal(result.evidenceLevel, null);
+
+    // A pre-ladder receipt has no field at all — same honest null.
+    writeReceipt(root, makeReceipt());
+    result = await getLastReceipt(root);
+    assert.equal(result.evidenceLevel, null);
+
+    // A malformed field (not the lane's shape) is never rendered as a rung.
+    const malformed = makeReceipt();
+    malformed.evidenceLevel = { rung: 2 };
+    writeReceipt(root, malformed);
+    result = await getLastReceipt(root);
+    assert.equal(result.evidenceLevel, null);
+  } finally {
+    resetReceiptBridgeCache(root);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("listReceiptHistory: each committed entry carries the rung as attested AT that commit (null where the receipt had none)", async () => {
+  const { listReceiptHistory } = await import("../src/lib/receipt-bridge.mjs");
+  const root = makeGitProject();
+  try {
+    commitReceipt(root, makeReceipt({ generatedAt: "2026-08-01T10:00:00.000Z" }), {
+      message: "verify: pre-ladder pass", authorDate: "2026-08-01T10:00:00",
+    });
+    const graded = makeReceipt({ generatedAt: "2026-08-02T10:00:00.000Z" });
+    graded.evidenceLevel = { rung: "L1", name: "desktop", satisfiedBy: ["build", "unitTests"] };
+    commitReceipt(root, graded, { message: "verify: graded pass", authorDate: "2026-08-02T10:00:00" });
+
+    const history = listReceiptHistory(root);
+    assert.equal(history.available, true);
+    assert.equal(history.receipts[0].evidenceLevel.rung, "L1", "newest entry shows the rung it attested");
+    assert.equal(history.receipts[0].evidenceLevel.name, "desktop");
+    assert.equal(history.receipts[1].evidenceLevel, null, "a pre-ladder receipt stays rung-less, never upgraded");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

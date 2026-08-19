@@ -6,7 +6,11 @@
   "required": ["schema", "profile", "verdict", "commit", "steps", "artifacts", "toolVersions", "generatedAt"],
   "properties": {
     "schema": { "const": "cmp-evidence/1" },
-    "profile": { "enum": ["scaffold", "local", "ci"] },
+    "profile": { "enum": ["scaffold", "local", "ci", "release"] },
+    "mode": {
+      "enum": ["full", "fast"],
+      "description": "How the lane was run. \"full\" is the done-gate. \"fast\" (verify --fast) excluded the device/release tier (releaseBuild, tokenDrift, e2eSmoke, androidChecks, releaseSmoke): an inner-loop signal whose receipt derives no evidence rung and is REFUSED by qa/receipt-check.mjs — it can never satisfy done. Absent on receipts predating the flag — treated as full."
+    },
     "verdict": { "enum": ["PASS", "FAIL"] },
     "commit": {
       "type": "object",
@@ -37,6 +41,16 @@
           "durationMs": { "type": "number" },
           "details": { "type": "object" }
         }
+      }
+    },
+    "evidenceLevel": {
+      "type": ["object", "null"],
+      "description": "The evidence ladder rung (qa/lib/evidence-level.mjs), DERIVED from which steps actually ran and PASSed — never declared. L0 scaffold / L1 desktop / L2 device / L3 release; a SKIPped step never upgrades a rung. null when the lane FAILed (a failed lane has no rung). Absent on receipts predating the ladder.",
+      "required": ["rung", "name", "satisfiedBy"],
+      "properties": {
+        "rung": { "enum": ["L0", "L1", "L2", "L3"] },
+        "name": { "enum": ["scaffold", "desktop", "device", "release"] },
+        "satisfiedBy": { "type": "array", "items": { "type": "string" }, "description": "The PASSed step names the rung counts as its evidence, in lane order" }
       }
     },
     "artifacts": {

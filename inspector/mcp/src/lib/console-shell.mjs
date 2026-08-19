@@ -266,7 +266,10 @@ export function railReceiptHtml(receipt, formatAge = formatAgeCoarse) {
     return `${glyph} verify ${esc(verdict)} ${esc(age)} &mdash; stale (tree changed since)`;
   }
   const unknown = receipt.stale === null ? " &middot; freshness unverified" : "";
-  return `${glyph} verify ${esc(verdict)} ${esc(age)}${unknown}`;
+  // The evidence-ladder rung, verbatim from the receipt's own derived
+  // evidenceLevel — absent (FAIL / pre-ladder receipt) means no rung shown.
+  const rung = receipt.evidenceLevel ? ` &middot; ${esc(receipt.evidenceLevel.rung)} ${esc(receipt.evidenceLevel.name)}` : "";
+  return `${glyph} verify ${esc(verdict)}${rung} ${esc(age)}${unknown}`;
 }
 
 /**
@@ -629,6 +632,7 @@ export const SHELL_CSS = `
   .badge-unshaped { box-shadow: inset 0 0 0 1px var(--reopen); }
   .badge-open { background: var(--accent-bg); color: var(--accent); }
   .badge-resolved { background: var(--signed-bg); color: var(--signed); }
+  .evidence-rung { background: var(--accent-bg); color: var(--accent); }
 
   /* --- screens (§3.4: the screen × state matrix) --- */
   .screens-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }

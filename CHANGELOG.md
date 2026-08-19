@@ -36,6 +36,70 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **`--fast` — the inner loop the lane never had, and green that cannot lie about being
+  done.** The lane had exactly one mode: every configured step, every run. A one-line edit
+  paid for the whole device/release tier — the R8 release compile, the emulator, Maestro,
+  the instrumented suite — every single time, which made the harness unusable for
+  iteration and is exactly how a done-gate teaches people to route around it.
+  `node qa/verify.mjs --fast` now filters that tier out of whatever profile resolved
+  (`releaseBuild` plus every `DEVICE_STEPS` entry — `tokenDrift`, `e2eSmoke`,
+  `androidChecks`, `releaseSmoke` — derived from the same constant, so the two lists can
+  never drift apart), unconditionally, device attached or not; the desktop tier still runs
+  in full. And the loophole is closed at the receipt, not by convention: a fast receipt
+  records `"mode": "fast"`, derives **no** evidence rung (the ladder returns null for
+  fast, always), and `qa/receipt-check.mjs` — the Stop hook, CI, and pre-push alike —
+  refuses it by name: "the last verify run was --fast (inner-loop only); run the full lane
+  (`node qa/verify.mjs`) before finishing". Loud banners at start and verdict say the same
+  thing in-band, and the template's Bash reminder hook now nudges a bare
+  `node qa/verify.mjs` toward `--fast` for iteration — allow-only, silent whenever
+  `--fast` is already present. Fast green is a signal; done still costs the full lane,
+  exactly once.
+
+- **One device, one driver — the lease that makes the scarce resource safe by
+  construction.** Agents parallelize; that is what they are for. An orchestrator ran three
+  subagents concurrently, two of them gated on device evidence, and the machine's ONE
+  emulator did what a shared mutable resource always does under concurrent writers: wedged
+  adbd, `device offline` while `adb devices` swore everything was fine, app state crossed
+  between sessions, false-red runs — every symptom already written up in this repo's own
+  retrospective, now reproduced by parallelism nobody can be asked to remember not to use.
+  The existing mutual exclusion (`.cmp-lane-in-progress`) was per-PROJECT while the device
+  is machine-GLOBAL: a scratch app in /tmp and the real app each stamped their own marker
+  and neither saw the other. The primitive now matches the resource:
+  - **A machine-global, per-serial device lease** (`<tmpdir>/create-cmp/device-leases/
+    <serial>.json` — pid, holder label, project root, acquiredAt; atomic write with
+    last-writer-wins detection; a dead pid or a 30-minute age reclaims silently, so a
+    crashed run never wedges the machine). Implemented twice against one documented
+    contract — `template/qa/lib/device-lease.mjs` (acquirer, ships in every stamped app)
+    and `inspector/mcp/src/lib/device-lease.mjs` (check-only reader) — because the two
+    codebases ship separately; each header points at the other, and an engine parity test
+    is the drift guard.
+  - **Every device-touching lane step leases first** (`tokenDrift` live tier, `e2eSmoke`,
+    `androidChecks`, `releaseSmoke`) — acquired once by the first device step, held to
+    lane exit. **Contention is a SKIP, never a FAIL**, naming the holder, its pid, root,
+    and age: nothing is broken, another run holds the device, and the evidence ladder
+    already prices that honestly — a SKIPped device step buys no rung, so contention
+    visibly degrades L2 to L1 instead of corrupting a receipt.
+  - **The live tier checks, and never holds**: `connect_live` refuses a leased device at a
+    named stage (`lease`) with the holder spelled out — "a lane is driving this device
+    right now", not a mysterious transport error — and `navigate_and_inspect` re-checks
+    per tap, because a lane can start mid-session. Holding for a whole console session
+    would starve the lane; the decision and its reasoning are written into the reader.
+  - **The deterrent**: the template's Bash reminder hook now also fires on hand-driven
+    device evidence (`connected*AndroidTest`, `maestro test`, `adb install`/`uninstall`) —
+    allow, never deny, ad-hoc debugging stays possible — saying what the lane already
+    encodes: device evidence is lane-owned and batched, a checkpoint, never an inner loop.
+- **The harness now notarizes itself before it ships.** 0.11.0's headline bug — the release
+  build had never once been run — and this batch's hand-run equivalent (stamp a scratch app,
+  run its full lane, read the receipt by eye) are now one script: `scripts/fleet-check.mjs`
+  stamps a real app from the current tree into a temp dir, runs the app's own
+  `qa/verify.mjs` inside it, and asserts the evidence receipt — verdict PASS at rung
+  `--min-level` or better (L1 desktop by default; rises to L2 on its own when `adb devices`
+  shows a device, because desktop-only green with an emulator sitting attached is
+  under-claiming). On failure the scratch app is kept and its path printed; the release
+  skill runs the check between the safety gate and the version bump and stops dead on red.
+  A notary caught overclaiming is dead — this is the anti-overclaim gate pointed at the
+  notary itself.
+
 - **The tier that could not see androidMain.** Across two real apps built on this template,
   the single biggest escaped-bug class was Android platform semantics — alarms that never
   rang, notifications that never posted, a silent phone that stayed silent, two logical

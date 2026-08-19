@@ -12,7 +12,7 @@ const short = (s) => String(s ?? "").slice(0, 7);
  * @param {{ execFileAsync: Function, sinceDays?: number, limit?: number }} deps
  * @returns {Promise<{available: boolean, reason?: string, since: string,
  *   commits: Array<{sha, subject, when}>,
- *   laneRuns: Array<{sha, when, verdict, strength?: string}>,
+ *   laneRuns: Array<{sha, when, verdict, strength?: string, rung?: string}>,
  *   approvalEvents: Array<{sha, when, subject}>,
  *   openComments: number|null}>}
  */
@@ -47,11 +47,15 @@ export async function getDigestData(projectDir, { execFileAsync, sinceDays = 7, 
         const body = await git(["show", `${sha}:qa/evidence/latest.json`]);
         const receipt = JSON.parse(body);
         const onDevice = receipt.strength?.onDeviceSteps ?? [];
+        // The evidence-ladder rung as attested at that commit (verbatim from
+        // the receipt's own evidenceLevel; absent on FAIL/pre-ladder receipts).
+        const level = receipt.evidenceLevel;
         laneRuns.push({
           sha: short(sha),
           when,
           verdict: receipt.verdict ?? "unknown",
           strength: onDevice.length ? `on-device: ${onDevice.join("+")}` : "desktop-only",
+          rung: level && typeof level.rung === "string" && typeof level.name === "string" ? `${level.rung} ${level.name}` : undefined,
         });
       } catch {
         laneRuns.push({ sha: short(sha), when, verdict: "unreadable" });

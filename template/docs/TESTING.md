@@ -110,3 +110,54 @@ asserts are for static post-navigation elements only.
 attached. It writes the evidence receipt to `qa/evidence/latest.json`; **commit the receipt
 with your change.** SKIPped steps are recorded honestly — green-with-gaps is visible, never
 silent.
+
+**`--fast` is the lane's inner loop.** `node qa/verify.mjs --fast` runs the resolved
+profile minus the device/release tier (`releaseBuild`, `tokenDrift`, `e2eSmoke`,
+`androidChecks`, `releaseSmoke`) — unconditionally, device attached or not. It exists
+because device/release evidence is the scarce, slow tier (R8 compile, emulator, Maestro,
+instrumented runner): batch it at the checkpoint, don't pay for it on every small edit.
+A fast run is mechanically unable to claim done — its receipt records `"mode": "fast"`,
+derives **no** evidence rung, and `qa/receipt-check.mjs` (the Stop hook, CI, pre-push)
+refuses it by name. Iterate on `--fast`; run the full lane once, deliberately, when the
+change is done.
+
+## One device, one driver
+
+The machine typically has ONE Android device/emulator, and it is the scarcest, slowest,
+most fragile resource the harness touches — two concurrent drivers produce wedged adbd,
+`device offline` while `adb devices` looks fine, crossed app state, and false reds that
+have nothing to do with the app. So device evidence is **batched, never an inner loop**:
+the lane sequences its device steps (`tokenDrift` live tier, `e2eSmoke`, `androidChecks`,
+`releaseSmoke`) once, last — don't hand-run `connectedDebugAndroidTest`, `maestro test`,
+or `adb install` mid-task to "check something".
+
+Mechanically, the first device step takes a **machine-global lease** on the device's adb
+serial (`<os tmpdir>/create-cmp/device-leases/<serial>.json` — `qa/lib/device-lease.mjs`
+documents the contract), held until the lane exits. It is machine-global on purpose: two
+different projects (a scratch app in /tmp, the real one) share the same emulator, and
+per-project markers cannot see each other.
+
+**Contention is a SKIP, never a FAIL** — nothing is broken; another run legitimately holds
+the device, and the reason names it: `held by "verify lane e2eSmoke" (pid 4711,
+/tmp/scratch-x, 2m ago)`. A SKIPped device step does not buy its rung, so contention
+visibly *lowers* the evidence level (L2 falls back to L1) instead of corrupting the run —
+re-run when the holder finishes to earn the full rung. To see who holds a device:
+`cat "${TMPDIR:-/tmp}/create-cmp/device-leases/<serial>.json"`. A crashed holder never
+wedges the machine: a lease whose pid is dead, or older than 30 minutes, is silently
+reclaimed by the next run. The live inspector tier (`connect_live`,
+`navigate_and_inspect`) checks the same lease and refuses to drive a leased device by
+naming the holder instead of failing with a mysterious transport error.
+
+## The evidence ladder
+
+Every PASS receipt names its rung (`evidenceLevel` in the receipt; derived by
+`qa/lib/evidence-level.mjs` from which steps actually ran and PASSed — never declared, and
+a SKIPped step never buys a rung: an unsigned-keystore `releaseSmoke` SKIP is not L3). The
+rung is the coarse grade; the per-step list stays the fine print. A FAILed lane has no rung.
+
+| Rung | What it proves | What it does NOT prove |
+|---|---|---|
+| **L0 scaffold** | Stamp-time green: the build compiles and the unit tests pass. | Nothing about conformance, rendered structure, a11y, or the release variant — and nothing on a device. |
+| **L1 desktop** | Full static + JVM evidence: build, unit tests, conformance, golden trees, a11y, release COMPILE, and the pure-Node gates. | That the app runs on a device at all — no APK was installed or driven; platform behavior (alarms, notifications) is invisible from this rung. |
+| **L2 device** | L1 plus executed on-device evidence: the debug APK installed and driven (`e2eSmoke`), instrumented platform assertions (`androidChecks`), and/or live token drift. | That the release variant behaves (R8 differs from debug — that is L3's job), nor that alarms/notifications actually land unless an instrumented behavior test asserts them. |
+| **L3 release** | L2 plus `releaseSmoke` PASSed: the signed release APK installed and driven on a device. | Real-backend behavior (the emulator/dev backend is a documented tier boundary — see the instrumented-tier section) and store-review compliance. |

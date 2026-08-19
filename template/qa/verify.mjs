@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // The verify lane — this project's single verification gate.
 //
-//   node qa/verify.mjs [--profile scaffold|local|ci|release] [--json]
+//   node qa/verify.mjs [--profile scaffold|local|ci|release] [--fast] [--json]
 //
 // Runs every verification step this project carries, aggregates a typed
 // PASS/FAIL verdict, and writes the evidence receipt to qa/evidence/latest.json.
+// `--fast` is the INNER LOOP: the resolved profile minus the device/release
+// tier — its receipt records mode "fast" and can never satisfy the done-gate.
 // The receipt is COMMITTED with your change (see CLAUDE.md — a change is not
 // done without it). Binary artifacts under qa-artifacts/ are never committed;
 // the receipt references them by path + sha256.
@@ -32,6 +34,8 @@ import { evaluateApprovalsGate } from "./lib/approvals.mjs";
 import { clauseTierCoverage, scanCitations, scanSpecClauses, walkFiles } from "./lib/spec-coverage.mjs";
 import { evaluateComponentStoryParity } from "./lib/component-stories.mjs";
 import { evaluateReachability } from "./lib/reachability.mjs";
+import { evidenceLevel } from "./lib/evidence-level.mjs";
+import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./lib/device-lease.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-doc.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -44,7 +48,7 @@ const ARTIFACTS_DIR = path.join(ROOT, "qa-artifacts");
 // killed). Same refusal-over-fabrication stance as qa/approve.mjs, which
 // refuses an unknown artifact by name rather than guessing: an unknown
 // argument here is refused by name, not swallowed into "run everything".
-const USAGE = `node qa/verify.mjs [--profile scaffold|local|ci|release] [--json] [--help]
+const USAGE = `node qa/verify.mjs [--profile scaffold|local|ci|release] [--fast] [--json] [--help]
 
 The verify lane — this project's single verification gate. Runs every
 verification step this project carries, aggregates a typed PASS/FAIL
@@ -54,6 +58,14 @@ it with your change — see CLAUDE.md). Exit code: 0 = PASS, 1 = FAIL.
 Flags:
   --profile <scaffold|local|ci|release>
                                  which step set to run (default: local)
+  --fast                         INNER LOOP ONLY — run the resolved profile
+                                  minus the device/release tier (releaseBuild,
+                                  tokenDrift, e2eSmoke, androidChecks,
+                                  releaseSmoke), unconditionally, device
+                                  attached or not. The receipt records
+                                  mode "fast", derives no evidence rung, and
+                                  can NEVER satisfy the done-gate — run the
+                                  full lane once before you call it done
   --json                         print the receipt as JSON instead of the
                                   human-readable step-by-step log
   --help, -h                     print this usage and exit 0 without
@@ -77,7 +89,7 @@ if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
   process.exit(0);
 }
 
-const RECOGNIZED_FLAGS = new Set(["--profile", "--json"]);
+const RECOGNIZED_FLAGS = new Set(["--profile", "--json", "--fast"]);
 for (let i = 0; i < rawArgs.length; i += 1) {
   const arg = rawArgs[i];
   if (arg === "--profile") {
@@ -92,6 +104,8 @@ for (let i = 0; i < rawArgs.length; i += 1) {
 const args = rawArgs;
 const profile = args.includes("--profile") ? args[args.indexOf("--profile") + 1] : "local";
 const asJson = args.includes("--json");
+const fast = args.includes("--fast");
+const mode = fast ? "fast" : "full";
 
 const GRADLEW = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
 
@@ -220,6 +234,86 @@ function deviceAttached() {
   const res = sh("adb devices", { timeout: 10_000 });
   if (!res.ok) return false;
   return res.out.split("\n").slice(1).some((l) => /\tdevice$/.test(l.trim().replace(/\s+/g, "\t")));
+}
+
+// ── The machine-global device lease (qa/lib/device-lease.mjs) ───────────────
+// LANE_MARKER above is per-PROJECT; the device is machine-GLOBAL. A scratch app
+// in /tmp and the real app each stamp their own marker and still share the one
+// emulator — nothing stopped two lanes (or a lane and a live console session)
+// driving it at once, which is the observed wedged-adbd / `device offline` /
+// crossed-app-state failure class. Every device-touching step below takes the
+// lease before touching the device.
+//
+// SCOPE DECISION — once per run, not per step: the lease is acquired lazily by
+// the FIRST device step that actually reaches the device and held until the
+// lane exits (released in the same `finally` as LANE_MARKER). A single run must
+// not thrash acquire/release between adjacent device steps, and holding through
+// the desktop steps interleaved among them (a11y sits between tokenDrift and
+// e2eSmoke) costs nothing — nothing else should drive the device mid-lane
+// anyway, which is the whole point.
+//
+// ON CONTENTION THE STEP RETURNS SKIP — NEVER FAIL: nothing is broken; another
+// run legitimately holds the device. This composes with the evidence ladder
+// (qa/lib/evidence-level.mjs): a SKIPped device step simply does not buy its
+// rung, so contention visibly DEGRADES the evidence level (L2 falls back to L1)
+// instead of corrupting the run with a false red — that degradation being
+// honest and visible is exactly why SKIP is the right verdict.
+let laneDeviceLease = null;
+
+/** Serials of devices currently in `device` state (same parse as deviceAttached). */
+function attachedDeviceSerials() {
+  const res = sh("adb devices", { timeout: 10_000 });
+  if (!res.ok) return [];
+  return res.out
+    .split("\n")
+    .slice(1)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => l.split(/\s+/))
+    .filter(([, state]) => state === "device")
+    .map(([serial]) => serial);
+}
+
+/**
+ * Acquire (or confirm) the lane's device lease for a device step.
+ * Returns null when the lane holds the device; otherwise the SKIP result the
+ * step should return verbatim. The serial leased is the one the lane will
+ * actually drive: the single attached device, or ANDROID_SERIAL when several
+ * are attached (adb/Gradle/Maestro honor the same variable). Ambiguity is
+ * SKIPped by name — leasing a guess would protect the wrong device.
+ */
+function leaseDeviceForStep(stepName) {
+  if (laneDeviceLease) return null; // already held for this run
+  const serials = attachedDeviceSerials();
+  if (serials.length === 0) return null; // each step's own guard SKIPs "no device" with its precise reason
+  let serial = serials[0];
+  if (serials.length > 1) {
+    const chosen = process.env.ANDROID_SERIAL;
+    if (chosen && serials.includes(chosen)) {
+      serial = chosen;
+    } else {
+      return {
+        name: stepName,
+        verdict: "SKIP",
+        reason: `${serials.length} devices attached (${serials.join(", ")}) — the lane cannot tell which one it would drive, so it leases none rather than guessing. Set ANDROID_SERIAL to the device this lane should own, or detach the extras.`,
+        durationMs: 0,
+      };
+    }
+  }
+  const res = acquireDeviceLease({ serial, holder: `verify lane ${stepName}`, root: ROOT });
+  if (!res.ok) {
+    return {
+      name: stepName,
+      verdict: "SKIP",
+      reason: `device ${serial} is held by ${formatHolder(res.heldBy)} — device evidence is batched, not concurrent; wait for it or run once when it finishes`,
+      durationMs: 0,
+    };
+  }
+  if (res.reclaimed) {
+    console.error(`· reclaimed a dead device lease on ${serial} (was ${formatHolder(res.reclaimed)})`);
+  }
+  laneDeviceLease = res.handle;
+  return null;
 }
 
 // Settle adb before handing the device to whatever drives it next (Maestro, the
@@ -621,6 +715,10 @@ function stepTokenDrift() {
     durationMs: elapsed(),
   });
 
+  // Machine-global lease before the first device touch (contention = SKIP).
+  const leaseSkip = leaseDeviceForStep("tokenDrift");
+  if (leaseSkip) return { ...leaseSkip, durationMs: elapsed() };
+
   sh(`adb forward tcp:${INSPECTOR_PORT} tcp:${INSPECTOR_PORT}`);
   try {
     let health = curlJson(`http://127.0.0.1:${INSPECTOR_PORT}/inspect/health`);
@@ -747,6 +845,9 @@ function runMaestroSmoke(name, priorDurationMs) {
 function stepE2eSmoke() {
   const guard = maestroGuards("e2eSmoke");
   if (guard) return guard;
+  // Machine-global lease before the first device touch (contention = SKIP).
+  const leaseSkip = leaseDeviceForStep("e2eSmoke");
+  if (leaseSkip) return leaseSkip;
   const install = shGradle(`${GRADLEW} :composeApp:installDebug --console=plain`);
   if (!install.ok) {
     return { name: "e2eSmoke", verdict: "FAIL", reason: "installDebug failed — the APK could not be installed on the attached device", durationMs: install.durationMs };
@@ -789,6 +890,9 @@ function stepAndroidChecks() {
       durationMs: Date.now() - started,
     };
   }
+  // Machine-global lease before the first device touch (contention = SKIP).
+  const leaseSkip = leaseDeviceForStep("androidChecks");
+  if (leaseSkip) return { ...leaseSkip, durationMs: Date.now() - started };
   // Settle before Gradle's own install+drive: earlier lane steps (tokenDrift's
   // port-forwards, e2eSmoke's reinstall) can leave the transport stale — see settleAdb.
   settleAdb();
@@ -844,6 +948,12 @@ function stepReleaseSmoke() {
     };
   }
 
+  // Machine-global lease before the first device touch (contention = SKIP).
+  // After the signing check on purpose: an unsigned template SKIPs on the
+  // keystore without ever needing the device.
+  const leaseSkip = leaseDeviceForStep("releaseSmoke");
+  if (leaseSkip) return leaseSkip;
+
   const install = shGradle(`${GRADLEW} :composeApp:installRelease --console=plain`);
   if (!install.ok) {
     if (/INSTALL_FAILED_UPDATE_INCOMPATIBLE/.test(install.out)) {
@@ -874,6 +984,12 @@ function stepReleaseSmoke() {
 }
 
 // ── Lane ───────────────────────────────────────────────────────────────────
+
+// Device-dependent steps, in lane order. Used twice: receipt STRENGTH (which
+// on-device steps actually PASSed — see below, where the receipt is built) and
+// the --fast exclusion (with releaseBuild added), so the "device/slow tier"
+// can never mean two different lists.
+const DEVICE_STEPS = ["e2eSmoke", "tokenDrift", "androidChecks", "releaseSmoke"];
 
 const stepsForProfile = {
   // scaffold: what `create-cmp --verify` proves at stamp time — specCoverage,
@@ -921,13 +1037,57 @@ if (!stepsForProfile[profile]) {
   process.exit(2);
 }
 
+// ── --fast: the inner loop, mechanically unable to claim done ───────────────
+// The genuinely slow tier is device/release work — every DEVICE_STEPS entry
+// (Gradle install + emulator + Maestro + instrumented runner) plus
+// releaseBuild (R8 + lintVital, the slow release COMPILE). --fast filters
+// that tier out of whatever profile resolved, UNCONDITIONALLY — device
+// attached or not — so a small change gets its did-I-break-anything-obvious
+// signal in JVM time. Everything else in the profile still runs in full.
+// The loophole is closed at the receipt, not by convention: mode "fast" is
+// recorded, no evidence rung is derived (qa/lib/evidence-level.mjs), and
+// qa/receipt-check.mjs refuses a fast receipt as done evidence.
+const FAST_EXCLUDED_NAMES = [...DEVICE_STEPS, "releaseBuild"];
+const STEP_FN_BY_NAME = {
+  e2eSmoke: stepE2eSmoke,
+  tokenDrift: stepTokenDrift,
+  androidChecks: stepAndroidChecks,
+  releaseSmoke: stepReleaseSmoke,
+  releaseBuild: stepReleaseBuild,
+};
+for (const name of FAST_EXCLUDED_NAMES) {
+  if (!STEP_FN_BY_NAME[name]) {
+    // Drift guard: a new device-tier step must be mapped here or --fast would silently run it.
+    console.error(`internal: fast-excluded step "${name}" has no entry in STEP_FN_BY_NAME — fix qa/verify.mjs`);
+    process.exit(2);
+  }
+}
+const FAST_EXCLUDED_FNS = new Set(FAST_EXCLUDED_NAMES.map((name) => STEP_FN_BY_NAME[name]));
+const laneSteps = fast
+  ? stepsForProfile[profile].filter((fn) => !FAST_EXCLUDED_FNS.has(fn))
+  : stepsForProfile[profile];
+const fastExcluded = fast
+  ? FAST_EXCLUDED_NAMES.filter((name) => stepsForProfile[profile].includes(STEP_FN_BY_NAME[name]))
+  : [];
+
+if (fast) {
+  console.error(
+    [
+      "⚡⚡ FAST MODE — INNER LOOP ONLY, NOT THE DONE-GATE ⚡⚡",
+      `   skipping the device/release tier: ${fastExcluded.join(", ") || "(none in this profile)"}`,
+      '   this run\'s receipt records mode "fast", earns no evidence rung, and can NEVER satisfy "done"',
+      "   run the full lane once (node qa/verify.mjs) before you finish",
+    ].join("\n"),
+  );
+}
+
 // Stamp the lane marker for the run's duration (coexistence defense 1 above);
 // always removed, even on a failing step, so the eyes only ever defer briefly.
 fs.mkdirSync(path.dirname(LANE_MARKER), { recursive: true });
 fs.writeFileSync(LANE_MARKER, `${process.pid} ${new Date().toISOString()}\n`);
 const steps = [];
 try {
-for (const step of stepsForProfile[profile]) {
+for (const step of laneSteps) {
   const result = step();
   steps.push(result);
   if (!asJson) {
@@ -938,6 +1098,10 @@ for (const step of stepsForProfile[profile]) {
 }
 } finally {
   fs.rmSync(LANE_MARKER, { force: true });
+  // The device lease (if a device step took it) is held to the very end of the
+  // run — see the scope decision at leaseDeviceForStep. Release is idempotent
+  // and never deletes a foreign holder's lease.
+  if (laneDeviceLease) releaseDeviceLease(laneDeviceLease);
 }
 
 const verdict = steps.some((s) => s.verdict === "FAIL") ? "FAIL" : "PASS";
@@ -946,9 +1110,17 @@ const verdict = steps.some((s) => s.verdict === "FAIL") ? "FAIL" : "PASS";
 // claims, and the difference should never live only in the SKIP lines. Device-
 // dependent steps that actually RAN (PASSed) are named on the receipt and in the
 // verdict line: "PASS (on-device: e2eSmoke)" vs "PASS (desktop-only)".
-const DEVICE_STEPS = ["e2eSmoke", "tokenDrift", "androidChecks", "releaseSmoke"];
+// (DEVICE_STEPS itself is defined above the lane — it also drives --fast.)
 const onDeviceSteps = steps.filter((s) => DEVICE_STEPS.includes(s.name) && s.verdict === "PASS").map((s) => s.name);
 const strengthLabel = onDeviceSteps.length ? `on-device: ${onDeviceSteps.join("+")}` : "desktop-only";
+
+// Receipt RUNG — the evidence ladder (qa/lib/evidence-level.mjs): the coarse,
+// named grade (L0 scaffold / L1 desktop / L2 device / L3 release) DERIVED from
+// which steps actually ran and PASSed. The strength string above stays as the
+// fine print; the rung is added alongside, never in place of it. null on FAIL —
+// a failed lane has no rung. null on a --fast run too: the inner loop is a
+// signal, never evidence, so a fast receipt derives NO rung at all.
+const level = evidenceLevel(steps, profile, { mode });
 
 // Artifacts: hash whatever the run left under qa-artifacts/ (never committed).
 const artifacts = [];
@@ -975,6 +1147,10 @@ const inputs = computeInputsHash(ROOT);
 const receipt = {
   schema: "cmp-evidence/1",
   profile,
+  // "full" is the done-gate; "fast" (--fast) excluded the device/release tier
+  // and is REFUSED by qa/receipt-check.mjs — a fast run can never end a session
+  // as "done". Receipts predating this field are treated as full.
+  mode,
   verdict,
   commit: {
     sha: tryGit("rev-parse HEAD"),
@@ -986,6 +1162,7 @@ const receipt = {
   },
   steps,
   strength: { onDeviceSteps },
+  evidenceLevel: level,
   artifacts,
   toolVersions: {
     node: process.version,
@@ -1000,7 +1177,19 @@ fs.writeFileSync(path.join(EVIDENCE_DIR, "latest.json"), `${JSON.stringify(recei
 // studio console's Evidence audit trail reconstructs the full history from the
 // git log of this file — every commit is one verified, attributed state.
 
-if (asJson) console.log(JSON.stringify(receipt, null, 2));
-else console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict} (${strengthLabel}) — receipt written to qa/evidence/latest.json (commit it with your change)`);
+if (asJson) {
+  console.log(JSON.stringify(receipt, null, 2));
+  if (fast) {
+    console.error(`⚡⚡ FAST MODE verdict: ${verdict} — INNER LOOP ONLY, not done. Skipped: ${fastExcluded.join(", ") || "(none)"}. Run the full lane (node qa/verify.mjs) before you finish.`);
+  }
+} else if (fast) {
+  // Deliberately NOT the full lane's verdict-line shape: fast-green must never
+  // be mistakable for done-green.
+  console.log(
+    `\n${verdict === "PASS" ? "⚡⚡" : "❌"} verify lane [FAST — INNER LOOP ONLY, NOT DONE]: ${verdict} (skipped device/release tier: ${fastExcluded.join(", ") || "none"}) — this fast receipt satisfies no done-gate; run the full lane (node qa/verify.mjs) once before you finish`,
+  );
+} else {
+  console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name}` : ""} (${strengthLabel}) — receipt written to qa/evidence/latest.json (commit it with your change)`);
+}
 
 process.exit(verdict === "PASS" ? 0 : 1);

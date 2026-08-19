@@ -10,11 +10,13 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { scaffold } from "../src/scaffold.mjs";
+import { evidenceLevel } from "../template/qa/lib/evidence-level.mjs";
 
 // A parallel lane is mid-flight renaming the device-E2E feature key
 // `appium` -> `e2e` (CLI flags + manifest key). Detect which key the CURRENT
@@ -136,10 +138,28 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       const preEntries = settings.hooks?.PreToolUse || [];
       const bashEntry = preEntries.find((e) => e.matcher === "Bash");
       assert.ok(bashEntry, "PreToolUse has a Bash matcher entry");
+      assert.equal(
+        preEntries.filter((e) => e.matcher === "Bash").length,
+        1,
+        "exactly ONE Bash matcher entry — the deterrents extend it, never compete with it"
+      );
       const preCmd = (bashEntry.hooks || []).map((h) => h.command).join("\n");
       assert.ok(/screencap\|uiautomator dump/.test(preCmd), "reminder triggers on screencap/uiautomator dump");
       assert.ok(preCmd.includes('"permissionDecision\":\"allow'), "reminder allows — it never blocks");
       assert.ok(preCmd.includes("|| true"), "non-matching commands stay silent and successful");
+      // The device-evidence deterrent: hand-driven device commands get the
+      // lane-owned-and-batched reminder (machine-global lease; device proof is a
+      // checkpoint, never an inner loop) — same properties as the pixel reminder.
+      assert.ok(/connected\[A-Za-z\]\*AndroidTest/.test(preCmd), "reminder triggers on gradlew connected*AndroidTest");
+      assert.ok(preCmd.includes("maestro test"), "reminder triggers on hand-run maestro test");
+      assert.ok(/adb \(-s \[\^ \]\+ \)\?\(install\|uninstall\)/.test(preCmd), "reminder triggers on adb install/uninstall (with or without -s)");
+      assert.ok(preCmd.includes("device-lease.mjs"), "the reason names the machine-global lease");
+      // EVERY hook under the Bash matcher carries the allow + silent-no-match
+      // properties individually — joining must not hide a blocking or noisy one.
+      for (const h of bashEntry.hooks || []) {
+        assert.ok(h.command.includes('"permissionDecision\":\"allow'), "every Bash reminder allows — never blocks/denies");
+        assert.ok(h.command.trimEnd().endsWith("|| true"), "every Bash reminder is silent and successful on no match");
+      }
     });
 
     await t.test("qa/ harness scripts exist and reference their collaborators", () => {
@@ -261,6 +281,112 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.match(String(id), /cmp-evidence/);
     });
 
+    await t.test("qa/evidence/schema.json declares the evidence ladder (nullable evidenceLevel) and accepts the release profile", () => {
+      const schema = JSON.parse(fs.readFileSync(path.join(out, "qa/evidence/schema.json"), "utf8"));
+      const level = schema.properties?.evidenceLevel;
+      assert.ok(level, "schema declares evidenceLevel");
+      assert.deepEqual(level.type, ["object", "null"], "evidenceLevel is nullable (a FAILed lane has no rung)");
+      assert.deepEqual(level.properties.rung.enum, ["L0", "L1", "L2", "L3"]);
+      assert.deepEqual(level.properties.name.enum, ["scaffold", "desktop", "device", "release"]);
+      // A release-profile receipt (the only way to reach L3) must not violate its own schema.
+      assert.ok(schema.properties.profile.enum.includes("release"), "profile enum accepts 'release'");
+    });
+
+    await t.test("verify.mjs derives the rung via qa/lib/evidence-level.mjs and writes it onto the receipt + verdict line", () => {
+      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      assert.match(verify, /from "\.\/lib\/evidence-level\.mjs"/, "the rung derivation lives in the lib, imported by the lane");
+      assert.match(verify, /evidenceLevel: level/, "the receipt carries evidenceLevel");
+      assert.match(verify, /\$\{level\.rung\} \$\{level\.name\}/, "the verdict line names the rung alongside the strength label");
+      assert.match(verify, /strength: \{ onDeviceSteps \}/, "the existing fine-print strength field is untouched — the rung is added alongside, never in place of it");
+      assert.ok(fs.existsSync(path.join(out, "qa/lib/evidence-level.mjs")), "qa/lib/evidence-level.mjs ships in the scaffold");
+    });
+
+    await t.test("--fast is the inner loop: exclusion derived from DEVICE_STEPS, mode stamped, banner loud, docs honest", () => {
+      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      // The slow-tier list is DERIVED from DEVICE_STEPS (+ releaseBuild) — one
+      // source of truth with the receipt-strength/lease feature, never a
+      // second hand-maintained list that can drift.
+      assert.match(verify, /\[\.\.\.DEVICE_STEPS, "releaseBuild"\]/, "fast exclusion reuses DEVICE_STEPS as source of truth");
+      assert.match(verify, /--fast/, "verify.mjs recognizes --fast");
+      assert.match(verify, /mode: fast \? "fast" : "full"|const mode = fast \? "fast" : "full"/, "the receipt records mode fast/full distinctly");
+      assert.match(verify, /INNER LOOP ONLY, NOT THE DONE-GATE/, "the start banner is loud and unambiguous");
+      assert.match(verify, /FAST — INNER LOOP ONLY, NOT DONE/, "the fast verdict line is visually distinct from done-green");
+      assert.match(verify, /evidenceLevel\(steps, profile, \{ mode \}\)/, "the rung derivation is told the mode — fast derives no rung");
+      // Docs: CLAUDE.md commands table + TESTING.md both teach the flag honestly.
+      const claudeMd = fs.readFileSync(path.join(out, "CLAUDE.md"), "utf8");
+      assert.match(claudeMd, /node qa\/verify\.mjs --fast/, "CLAUDE.md commands table lists --fast");
+      assert.match(claudeMd, /Inner loop — NOT the done-gate/, "CLAUDE.md labels --fast as not the done-gate");
+      const testingMd = fs.readFileSync(path.join(out, "docs/TESTING.md"), "utf8");
+      assert.match(testingMd, /--fast/, "TESTING.md documents --fast");
+      // Schema: mode is declared, optional (older receipts predate it).
+      const schema = JSON.parse(fs.readFileSync(path.join(out, "qa/evidence/schema.json"), "utf8"));
+      assert.deepEqual(schema.properties.mode.enum, ["full", "fast"], "schema declares the mode field");
+      assert.ok(!schema.required.includes("mode"), "mode stays optional — receipts predating the flag remain valid");
+    });
+
+    await t.test("receipt-check REFUSES a fast-mode receipt — a session cannot end 'done' on --fast evidence", () => {
+      const receiptPath = path.join(out, "qa/evidence/latest.json");
+      const baseReceipt = {
+        schema: "cmp-evidence/1",
+        profile: "local",
+        verdict: "PASS",
+        commit: { sha: null, dirty: [] },
+        inputs: { hash: "a".repeat(64), fileCount: 1 },
+        steps: [{ name: "build", verdict: "PASS", durationMs: 60_000 }, { name: "unitTests", verdict: "PASS", durationMs: 30_000 }],
+        strength: { onDeviceSteps: [] },
+        evidenceLevel: null,
+        artifacts: [],
+        toolVersions: {},
+        generatedAt: new Date().toISOString(),
+      };
+      try {
+        // 1. mode "fast" → refused BY NAME, exit 2 (the Stop-hook block signal),
+        //    before any hash recompute (the bogus inputs.hash never matters).
+        fs.writeFileSync(receiptPath, JSON.stringify({ ...baseReceipt, mode: "fast" }, null, 2));
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("expected --hook to exit 2 over a fast-mode receipt");
+        } catch (err) {
+          assert.equal(err.status, 2, "hook mode blocks with exit 2");
+          assert.match(String(err.stderr), /--fast \(inner-loop only\)/, "the refusal names --fast");
+          assert.match(String(err.stderr), /run the full lane/, "the refusal names the fix");
+        }
+        // 2. A legacy receipt WITHOUT mode is never refused as fast — it falls
+        //    through to the normal predicate (here: hash mismatch), proving the
+        //    fast refusal cannot misfire on pre-flag receipts.
+        fs.writeFileSync(receiptPath, JSON.stringify(baseReceipt, null, 2));
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("expected --hook to exit 2 over a stale-hash receipt");
+        } catch (err) {
+          assert.equal(err.status, 2);
+          assert.doesNotMatch(String(err.stderr), /--fast/, "a mode-less receipt is never refused for fast-mode reasons");
+        }
+      } finally {
+        fs.rmSync(receiptPath, { force: true });
+      }
+    });
+
+    await t.test("the Bash reminder hook nudges bare full-lane runs toward --fast — allow-only, silent when --fast is present", () => {
+      const settings = JSON.parse(fs.readFileSync(path.join(out, ".claude/settings.json"), "utf8"));
+      const bashEntry = (settings.hooks?.PreToolUse || []).find((e) => e.matcher === "Bash");
+      const cmd = (bashEntry?.hooks || []).map((h) => h.command).find((c) => c.includes("qa/verify\\.mjs"));
+      assert.ok(cmd, "the fast-nudge hook ships under the SAME Bash matcher entry");
+      assert.ok(cmd.includes("--fast"), "the nudge names the flag");
+      // Functional proof against the REAL hook-input shape: JSON on stdin.
+      const run = (json) => spawnSync("sh", ["-c", cmd], { input: json, encoding: "utf8" });
+      const fired = run('{"tool_input":{"command":"node qa/verify.mjs"}}');
+      assert.equal(fired.status, 0);
+      assert.match(fired.stdout, /permissionDecision.*allow/, "fires (allow-only) on a bare full-lane run");
+      assert.match(fired.stdout, /--fast/, "the reminder points at --fast");
+      const silentFast = run('{"tool_input":{"command":"node qa/verify.mjs --fast"}}');
+      assert.equal(silentFast.status, 0);
+      assert.equal(silentFast.stdout, "", "must NOT fire when --fast is already present");
+      const silentOther = run('{"tool_input":{"command":"ls -la"}}');
+      assert.equal(silentOther.status, 0);
+      assert.equal(silentOther.stdout, "", "silent and successful on every non-matching command");
+    });
+
     await t.test("specs/ has README + app-base + home specs with their clause ids", () => {
       for (const rel of ["specs/README.md", "specs/app-base.spec.md", "specs/home.spec.md"]) {
         assert.ok(fs.existsSync(path.join(out, rel)), `${rel} exists`);
@@ -287,5 +413,106 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
     });
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+// --- The evidence ladder: rung derivation honesty (qa/lib/evidence-level.mjs) --
+//
+// The rung is the vocabulary the Evidence business sells in, so it must be
+// honest to a fault: DERIVED from which steps actually ran and PASSed, never
+// declared by a profile flag, and a SKIP can never buy a rung — the key pin
+// here is releaseSmoke SKIP (e.g. unsigned keystore) staying L2, never L3.
+
+/** A synthetic green desktop lane (local profile, no device attached). */
+function desktopPassSteps() {
+  const pass = (name) => ({ name, verdict: "PASS", durationMs: 100 });
+  const skip = (name, reason) => ({ name, verdict: "SKIP", reason, durationMs: 1 });
+  return [
+    pass("specCoverage"),
+    skip("approvals", "unreviewed artifacts"),
+    pass("componentStories"),
+    pass("reachability"),
+    pass("archDoc"),
+    pass("schemaHistory"),
+    pass("build"),
+    pass("releaseBuild"),
+    pass("unitTests"),
+    pass("conformance"),
+    pass("goldenTrees"),
+    skip("tokenDrift", "no device"),
+    pass("a11y"),
+    skip("e2eSmoke", "no device"),
+    skip("androidChecks", "no device"),
+  ];
+}
+
+test("evidence ladder: a green desktop lane (device steps all SKIP) is L1 — SKIPs are visible fine print, not rungs", () => {
+  const level = evidenceLevel(desktopPassSteps(), "local");
+  assert.equal(level.rung, "L1");
+  assert.equal(level.name, "desktop");
+  assert.ok(level.satisfiedBy.includes("conformance") && level.satisfiedBy.includes("releaseBuild"));
+  assert.ok(!level.satisfiedBy.includes("e2eSmoke"), "a SKIPped device step is never counted as evidence");
+});
+
+test("evidence ladder: one on-device execution step PASSed lifts to L2 device", () => {
+  const steps = desktopPassSteps().map((s) => (s.name === "e2eSmoke" ? { name: "e2eSmoke", verdict: "PASS", durationMs: 60_000 } : s));
+  const level = evidenceLevel(steps, "local");
+  assert.equal(level.rung, "L2");
+  assert.equal(level.name, "device");
+  assert.ok(level.satisfiedBy.includes("e2eSmoke"));
+});
+
+test("evidence ladder: THE key pin — releaseSmoke SKIP (unsigned keystore) never upgrades L2 to L3", () => {
+  const steps = desktopPassSteps().map((s) => (s.name === "e2eSmoke" ? { name: "e2eSmoke", verdict: "PASS", durationMs: 60_000 } : s));
+  steps.push({ name: "releaseSmoke", verdict: "SKIP", reason: "release APK is unsigned — no signingConfig", durationMs: 0 });
+  const level = evidenceLevel(steps, "release");
+  assert.equal(level.rung, "L2", "a SKIP can never buy a rung — the label must not overclaim");
+  assert.ok(!level.satisfiedBy.includes("releaseSmoke"));
+});
+
+test("evidence ladder: releaseSmoke PASSed on top of L2 is L3 release", () => {
+  const steps = desktopPassSteps().map((s) => (s.name === "e2eSmoke" ? { name: "e2eSmoke", verdict: "PASS", durationMs: 60_000 } : s));
+  steps.push({ name: "releaseSmoke", verdict: "PASS", durationMs: 90_000 });
+  const level = evidenceLevel(steps, "release");
+  assert.equal(level.rung, "L3");
+  assert.equal(level.name, "release");
+  assert.ok(level.satisfiedBy.includes("releaseSmoke"));
+});
+
+test("evidence ladder: a FAILed lane has no rung — evidenceLevel is null", () => {
+  const steps = desktopPassSteps().map((s) => (s.name === "goldenTrees" ? { name: "goldenTrees", verdict: "FAIL", reason: "drift", durationMs: 100 } : s));
+  assert.equal(evidenceLevel(steps, "local"), null);
+  // Even a FAIL in a device step nulls the rung — the lane verdict is FAIL.
+  const deviceFail = desktopPassSteps().map((s) => (s.name === "e2eSmoke" ? { name: "e2eSmoke", verdict: "FAIL", reason: "smoke red", durationMs: 100 } : s));
+  assert.equal(evidenceLevel(deviceFail, "local"), null);
+});
+
+test("evidence ladder: a fast-mode run derives NO rung — the inner loop is a signal, never evidence", () => {
+  // Even a fully green step list buys nothing under mode "fast": a fast receipt
+  // must never be silently reused as if it were a full-lane result.
+  assert.equal(evidenceLevel(desktopPassSteps(), "local", { mode: "fast" }), null);
+  // The same steps under full mode (or with mode unstated — legacy callers)
+  // still derive their honest rung.
+  assert.equal(evidenceLevel(desktopPassSteps(), "local", { mode: "full" }).rung, "L1");
+  assert.equal(evidenceLevel(desktopPassSteps(), "local").rung, "L1");
+});
+
+test("evidence ladder: a green scaffold-profile lane is L0 — and the profile flag never buys a higher rung", () => {
+  const pass = (name) => ({ name, verdict: "PASS", durationMs: 100 });
+  const scaffoldSteps = [
+    pass("specCoverage"),
+    { name: "approvals", verdict: "SKIP", reason: "unreviewed", durationMs: 1 },
+    pass("componentStories"),
+    pass("reachability"),
+    pass("archDoc"),
+    pass("schemaHistory"),
+    pass("build"),
+    pass("unitTests"),
+  ];
+  // The same steps claim the same rung under any requested profile: derived, never declared.
+  for (const profile of ["scaffold", "local", "ci", "release"]) {
+    const level = evidenceLevel(scaffoldSteps, profile);
+    assert.equal(level.rung, "L0", `profile "${profile}" cannot declare a rung the steps did not earn`);
+    assert.equal(level.name, "scaffold");
   }
 });

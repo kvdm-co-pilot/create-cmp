@@ -94,6 +94,9 @@ test goes there (helpers: `NotificationAsserts`, `AlarmAsserts`, `SystemState`; 
 ## Evidence
 
 `node qa/verify.mjs` writes `qa/evidence/latest.json` (schema: `qa/evidence/schema.json`).
+Each PASS receipt names its **evidence rung** (L0 scaffold / L1 desktop / L2 device /
+L3 release), derived from which steps actually ran and passed — never declared, and a
+SKIPped step never upgrades it (see `docs/TESTING.md` §"The evidence ladder").
 Commit it with your change; git history is the audit ledger. Binary artifacts under
 `qa-artifacts/` are hashed into the receipt, never committed. The studio console's Evidence
 page reconstructs the full audit trail from the git log of `latest.json` — every commit is
@@ -367,6 +370,7 @@ conventions) · [`CONTRIBUTING.md`](./CONTRIBUTING.md) (workflow, Conventional C
 | Command | What |
 |---|---|
 | `node qa/verify.mjs` | The verify lane (profile `local`) — the done checkpoint, run once |
+| `node qa/verify.mjs --fast` | **Inner loop — NOT the done-gate**: the lane minus the device/release tier (`releaseBuild`, `tokenDrift`, `e2eSmoke`, `androidChecks`, `releaseSmoke`). Its receipt records `"mode": "fast"`, earns no evidence rung, and the Stop hook refuses it — run the full lane once at done |
 | `./gradlew :composeApp:desktopTest` | Unit tests only (fast inner loop) |
 | `node qa/setup-hooks.mjs` | Enable the pre-push receipt gate (one-time, after `git init`) |
 | `./gradlew :composeApp:assembleDebug` | Android debug build |

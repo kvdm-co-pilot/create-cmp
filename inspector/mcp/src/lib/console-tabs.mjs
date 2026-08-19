@@ -1773,8 +1773,13 @@ function timelineRowHtml(r) {
   const commit = r.commitSha ? `<span class="meta">commit <code>${esc(String(r.commitSha).slice(0, 7))}</code></span>` : "";
   const author = r.author ? `<span class="meta">by ${esc(r.author)}</span>` : "";
   const when = r.committedAt ? esc(r.committedAt) : "commit date unknown";
+  // The rung as attested AT that commit (receipt.evidenceLevel, derived by the
+  // lane) — absent on FAIL receipts and pre-ladder receipts, and then omitted
+  // rather than guessed.
+  const rung = r.evidenceLevel ? `<span class="badge evidence-rung">${esc(r.evidenceLevel.rung)} &middot; ${esc(r.evidenceLevel.name)}</span>` : "";
   return `    <li>
       <span class="${cls}">${esc(r.verdict || "?")}</span>
+      ${rung}
       ${r.profile ? `<span class="meta">profile <code>${esc(r.profile)}</code></span>` : ""}
       ${commit}
       ${author}
@@ -1823,6 +1828,13 @@ export function evidenceBodyHtml(lastReceipt, history) {
     : r.stale === null
       ? ` <span class="badge badge-unreviewed">freshness unknown</span>`
       : "";
+  // The evidence-ladder rung — the receipt's own derived coarse grade (L0
+  // scaffold / L1 desktop / L2 device / L3 release), rendered verbatim. A FAIL
+  // or pre-ladder receipt has none, and none is shown — never fabricated. The
+  // per-step table below stays the fine print.
+  const rungChip = r.evidenceLevel
+    ? ` <span class="badge evidence-rung" title="${escAttr(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"}`)}">Evidence: ${esc(r.evidenceLevel.rung)} &middot; ${esc(r.evidenceLevel.name)}</span>`
+    : "";
   const age = formatReceiptAge(r.ageMs);
   const dirty =
     r.commitDirty && r.commitDirty.length
@@ -1872,7 +1884,7 @@ ${history.receipts.map(timelineRowHtml).join("\n")}
   The lane is the law: nothing on this page is re-derived live.</p>
   <div class="evidence-headline${stale ? " evidence-stale" : ""}">
     <p class="lbl">latest receipt</p>
-    <span class="evidence-verdict ${verdictCls}">${esc(r.verdict || "?")}</span>${staleChip}
+    <span class="evidence-verdict ${verdictCls}">${esc(r.verdict || "?")}</span>${rungChip}${staleChip}
     <ul class="evidence-facts">
       ${facts}
     </ul>
@@ -2380,11 +2392,11 @@ export function digestTabHtml(digest) {
   }
   const lane = digest.laneRuns.length
     ? `  <h3>Lane runs</h3>
-  <table class="params-table"><thead><tr><th>when</th><th>commit</th><th>verdict</th><th>strength</th></tr></thead><tbody>
+  <table class="params-table"><thead><tr><th>when</th><th>commit</th><th>verdict</th><th>evidence</th></tr></thead><tbody>
 ${digest.laneRuns
   .map(
     (r) =>
-      `    <tr><td>${esc(r.when)}</td><td><code>${esc(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc(r.verdict)}</span></td><td>${esc(r.strength ?? "—")}</td></tr>`
+      `    <tr><td>${esc(r.when)}</td><td><code>${esc(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc(r.verdict)}</span></td><td>${r.rung ? `${esc(r.rung)} &mdash; ` : ""}${esc(r.strength ?? "—")}</td></tr>`
   )
   .join("\n")}
   </tbody></table>`

@@ -288,13 +288,17 @@ Each idea resolves against VISION.md's principles (pixels-to-humans/structure-to
 the gate is the business; billing boundary = assurance boundary; strongest-true-case
 honesty; trigger-gated building). Nothing here is built; each names its trigger.
 
-1. **Time-warp alarm proof** — the one honesty gap left in the alerting story: "the
-   ladder is unit-tested to the minute, but nobody watched a notification arrive"
-   shipped in a release note three times. The seam can close it: qa-prep prefers a
-   rootable AOSP emulator image for the QA AVD, a `TimeWarp` helper sets the device
-   clock to T−1min, and the instrumented test asserts the notification posts. This is
-   an *execution-bound evidence* differentiator no scaffold ships. Spike first: verify
-   clock-set mechanics per API level. **Trigger: next app with scheduled alerting.**
+1. **Time-warp alarm proof — LANDED (2026-08-19).** The spike overturned the original
+   design: root is refused on stock user-build images, but `cmd alarm set-time`/
+   `set-timezone` work root-free from the shell uid on any stock AVD — no special QA
+   image needed. `TimeWarp.kt` (emulator-only guard, elapsed-time-correct restore) plus
+   an exemplar test in `PlatformBehaviorSeamTest.kt` that schedules a real exact alarm,
+   warps the clock past it, and asserts delivery — proven live. Compile-verified on a
+   scratch scaffold after two follow-up fixes: two undefined constants
+   (`REQUEST_WARP`/`ACTION_WARP`) and the missing `SCHEDULE_EXACT_ALARM`/
+   `USE_EXACT_ALARM` debug-manifest grant, both caught because the template had never
+   actually been compiled with this test in it — the exact failure mode this whole
+   batch exists to prevent, caught before it shipped.
 
 2. **The evidence ladder, named** — receipts already grade themselves
    (`desktop-only` → `on-device: …+androidChecks` → release profile). Formalize the
@@ -304,12 +308,12 @@ honesty; trigger-gated building). Nothing here is built; each names its trigger.
    boundary). Cheap: naming + rendering. **Trigger: first Gatekeeper Evidence
    conversation, or the next engine release — whichever lands first.**
 
-3. **Fleet check before release** — 0.11.0's headline bug was "the release build had
-   never once been run"; this batch's equivalent proof (stamp scratch app → full lane
-   incl. androidChecks on an emulator) was done by hand. Encode as
-   `scripts/fleet-check.mjs` + an npm-publish skill step. A notary caught overclaiming
-   is dead; this is the anti-overclaim gate for the harness itself. **Trigger: next
-   engine release (run it manually then; script it if it hurts).**
+3. **Fleet check before release — LANDED (2026-08-19).** `scripts/fleet-check.mjs`
+   stamps a scratch app, runs the lane, and asserts the receipt's verdict AND rung
+   (`--min-level`); wired into the npm-publish skill as step 2, before the version
+   bump, STOP-on-failure. Same idea generalized further this session: the verify lane
+   itself gained an inner-loop/checkpoint split (`--fast`, item 9 below) after a live
+   demonstration of the cost this item was written to prevent.
 
 4. **Harness upgrade for stamped apps** — the reverse of §3.4: when the engine moves,
    stamped apps' `cmp:generated` blocks and qa/ scripts age. Extend the upgrade path
@@ -324,18 +328,43 @@ honesty; trigger-gated building). Nothing here is built; each names its trigger.
    project drift from its tooling?" mechanically. In-repo only, app-owned, no
    phone-home. **Trigger: the next retrospective request — do not build speculatively.**
 
-6. **Determinism probe** — ARCH-13 statically bans ambient time in app code, but a
+6. **The inner-loop/checkpoint split — LANDED (2026-08-19), the sharpest lesson of
+   this whole session.** `node qa/verify.mjs` had exactly one mode: the full lane,
+   every step, every time — including the device/R8-release tier, the genuinely slow
+   part. There was no sanctioned fast path, so an agent iterating on a small change
+   either skipped verification or paid the full cost every time; multiple orchestrated
+   subagents each independently choosing to pay it compounded into real wasted time —
+   caught live, mid-session, exactly the way the retrospective's other findings were
+   caught. Fixed the same way as every other finding in this document: mechanically,
+   not by instruction. `--fast` filters the device/release tier
+   (`releaseBuild`/`tokenDrift`/`e2eSmoke`/`androidChecks`/`releaseSmoke`) out of
+   whatever profile resolves, using `DEVICE_STEPS` as the single shared source of
+   truth so the two features cannot drift apart. The loophole a fast path always
+   risks — a cheap run mistaken for "done" — is closed by construction: the receipt
+   records `mode: "fast"`, earns no evidence rung (`evidenceLevel` returns null,
+   never even L0), and `qa/receipt-check.mjs`'s Stop hook refuses to end a session on
+   one. `template/.claude/settings.json` reminds on a bare full-lane invocation
+   without `--fast`. Proven: 1m10s cold vs. 4m13s for the same scratch app, receipt-
+   check refuses after fast/passes after full. Industry pattern this mirrors:
+   Nx/Turborepo `affected`, Jest `--onlyChanged`, Bazel presubmit/postsubmit — fast
+   inner loop scoped to what's cheap to prove, one full run at the gate, never
+   repeated speculatively. Also landed: the same discipline written into
+   `agents/cmp-orchestrator.md` as a standing rule — device/Gradle-heavy proof is
+   never a per-subagent gate, never concurrent across subagents; interim proof is
+   always `--fast`; the full lane runs exactly once, after everything else lands.
+
+7. **Determinism probe** — ARCH-13 statically bans ambient time in app code, but a
    library can still read the wall clock. A ci-profile option runs unit+golden tests
    twice under maximally-shifted TZ (UTC vs UTC+14); differing outcomes = a
    nondeterminism leak the static net missed. **Trigger: first golden flake that
    ARCH-13 didn't prevent.**
 
-7. **Audit cadence** — cmp-audit exists but fires on human request, like the audit
+8. **Audit cadence** — cmp-audit exists but fires on human request, like the audit
    that found the six defects. Cheapest mechanical nudge: the release profile's
    receipt lists subsystems whose androidMain changed since the last recorded audit.
    **Trigger: after cmp-audit's first real-app outing proves the question bank.**
 
-8. **iOS is the known asymmetry** — every behavior-tier capability is Android-only;
+9. **iOS is the known asymmetry** — every behavior-tier capability is Android-only;
    the platform-semantics bug class exists identically on iOS (UNUserNotificationCenter,
    background modes). Named here deliberately and NOT built: no iOS app evidence yet
    (evidence-or-silence), and building ahead of signal violates trigger-gating.

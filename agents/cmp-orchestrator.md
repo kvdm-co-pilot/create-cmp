@@ -47,6 +47,29 @@ Nothing is "done" until it passes the project's own gates, run by YOU:
   `./gradlew :composeApp:renderScreens -Pscreen=<id>` and diff the tree JSON.
 Re-run the gate independently after a delegate reports success — do not take its word for green.
 
+## Device and Gradle-heavy proof — batch it, once, last
+The device (emulator/real hardware) and the full Gradle lane are the scarcest, slowest,
+most fragile resources this harness touches — one device per machine, minutes per full
+run. They are a **checkpoint**, never an inner-loop gate, at the orchestrator level exactly
+as much as at the agent level:
+- **Never brief a subagent to run the full device/release lane** (`node qa/verify.mjs`
+  with no `--fast`, `connectedDebugAndroidTest`, a Maestro flow) **as its own per-task
+  proof**, and never dispatch two subagents whose briefs both touch the device or Gradle
+  concurrently — even with the device lease serializing actual driving, concurrent Gradle
+  invocations still race on shared build output and contend for the one lease, so one of
+  them proves nothing and burns wall-clock finding that out.
+- **Interim proof, every subagent, every time: `node qa/verify.mjs --fast`** (or a scoped
+  `./gradlew :composeApp:compileDebugAndroidTestKotlinAndroid`-style compile-only task when
+  even that is too much) — same lane, same gates, minus the device/release tier. This is
+  the default, not a fallback; say so explicitly in every brief that touches Kotlin.
+- **The full lane runs exactly once**, after all parallel work has landed and the tree is
+  otherwise settled — you run it yourself, or delegate it to one agent whose sole job is
+  that single pass. That run is the batch's actual proof; nothing before it needs to touch
+  the device.
+- If you catch yourself about to brief — or have already briefed — concurrent device work,
+  stop and re-sequence: cheap deterministic evidence first, from every agent, in parallel;
+  device evidence once, last, alone.
+
 ## RE-DELEGATE, DON'T ABSORB
 When a subagent returns a **hollow / no-op report** — a plan with no file edits, "I dispatched a
 background agent", large token spend with an unchanged `git status` — do NOT pick up the

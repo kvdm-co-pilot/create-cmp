@@ -678,7 +678,12 @@ export function galleryHtml(state) {
   let evidenceStatus = "no verify receipt yet";
   if (effectiveReceipt && effectiveReceipt.available) {
     const age = typeof effectiveReceipt.ageMs === "number" ? formatAgeCoarse(effectiveReceipt.ageMs) : "age unknown";
-    evidenceStatus = `verify ${esc(effectiveReceipt.verdict || "?")} &middot; ${esc(age)}${
+    // The rung (receipt's own derived evidenceLevel) rides the status line —
+    // "verify PASS · L2 device · 3m ago" — absent on FAIL/pre-ladder receipts.
+    const rung = effectiveReceipt.evidenceLevel
+      ? ` &middot; ${esc(effectiveReceipt.evidenceLevel.rung)} ${esc(effectiveReceipt.evidenceLevel.name)}`
+      : "";
+    evidenceStatus = `verify ${esc(effectiveReceipt.verdict || "?")}${rung} &middot; ${esc(age)}${
       effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""
     }`;
   }

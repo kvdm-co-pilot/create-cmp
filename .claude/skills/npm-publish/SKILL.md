@@ -71,7 +71,26 @@ git branch --show-current       # must be `main`
 node --test                     # must be all-green; this also runs as prepublishOnly
 ```
 
-### 2. Auth check
+### 2. Fleet check — prove the engine's output actually runs
+
+0.11.0 shipped with a release build that had never once been run. This step makes that
+structurally impossible: stamp a real scratch app from the current tree and run its full verify
+lane, asserting the receipt (verdict PASS at the required evidence rung).
+
+```bash
+node scripts/fleet-check.mjs                    # no device attached: desktop rung (L1)
+node scripts/fleet-check.mjs --min-level L2     # emulator/device attached: require on-device proof
+```
+
+Booting an emulator first is the release manager's choice — the script never boots one, it only
+uses what `adb devices` already shows (and when a device IS attached, its default min-level rises
+to L2 on its own). For a release, attach an emulator and require L2. Honest cost: this stamps a
+fresh app and runs its Gradle lane — expect several minutes, more on a cold Gradle cache.
+
+**STOP on failure.** The scratch dir is kept and its path printed — that is the crime scene. Do
+not proceed to the version bump until the fleet check passes.
+
+### 3. Auth check
 
 ```bash
 npm whoami
@@ -80,7 +99,7 @@ npm whoami
 Must print a username (see Auth above). Do not proceed past this step without a confirmed
 identity — if it errors, hand off to Karel for a token refresh / `npm login`.
 
-### 3. Confirm the registry name is still ours to use
+### 4. Confirm the registry name is still ours to use
 
 ```bash
 npm view create-cmp-cli version
@@ -91,7 +110,7 @@ npm view create-cmp-cli version
   it. If it doesn't match, STOP — someone else owns it now; surface this to the user rather than
   guessing a new name yourself.
 
-### 4. Bump the version
+### 5. Bump the version
 
 Use semver correctly — patch for fixes, minor for new options/features, major for breaking template
 or CLI-flag changes:
@@ -112,17 +131,17 @@ registry by three minor versions (0.1.0 vs 0.4.0, caught by a field report):
 # .claude-plugin/marketplace.json   -> metadata.version AND plugins[*].version -> "X.Y.Z"
 ```
 
-Commit these with the changelog fold (step 5). A release is not done while the plugin manifests
+Commit these with the changelog fold (step 6). A release is not done while the plugin manifests
 disagree with the npm version.
 
-### 5. Update the changelog
+### 6. Update the changelog
 
 Move the `## [Unreleased]` entries in `CHANGELOG.md` into a new `## [X.Y.Z] - <date>` section (use
 the actual current date, not a placeholder), and add the new compare/tag links at the bottom
 matching the existing pattern. Commit this as part of the same release commit if `npm version`
 hasn't already committed, or as a follow-up commit — either way it must land before push.
 
-### 6. Publish
+### 7. Publish
 
 ```bash
 npm publish
@@ -135,7 +154,7 @@ publish aborts; fix and retry rather than forcing past it.
 Publish from the **repo root only** — subpackages like `inspector/mcp` are `private: true` and
 will fail with `EPRIVATE` (that error means wrong directory, not a config problem).
 
-### 7. Verify on the registry
+### 8. Verify on the registry
 
 ```bash
 npm view create-cmp-cli version
@@ -145,11 +164,11 @@ npx create-cmp-cli@latest --help
 Confirm the version matches what you just published and the CLI actually runs from the registry
 (not from a local cache) before declaring success.
 
-### 8. Push the tag and cut a GitHub release
+### 9. Push the tag and cut a GitHub release
 
 Direct pushes to `main` are blocked by branch protection, so release-prep commits (version bump +
 changelog) land via branch → PR → `gh pr merge --rebase --delete-branch`, then `git pull` on main
-before publishing. By step 8 the commit is already on main; only the tag and release remain:
+before publishing. By step 9 the commit is already on main; only the tag and release remain:
 
 ```bash
 git push origin --tags

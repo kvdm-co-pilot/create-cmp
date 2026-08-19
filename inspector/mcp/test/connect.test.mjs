@@ -36,6 +36,7 @@ test("happy path: device attached, forward created, health answers — nothing t
   const { exec, calls } = makeExec([oneDevice]);
   const r = await connectLive({
     port: 9500,
+    readLeaseImpl: () => null, // hermetic: never read the real machine lease dir
     exec,
     fetchHealthImpl: async () => HEALTH,
   });
@@ -47,7 +48,7 @@ test("happy path: device attached, forward created, health answers — nothing t
 test("no device attached: stage 'device' error naming the next command, no bare timeout", async () => {
   const { exec } = makeExec([["adb devices", () => ({ stdout: "List of devices attached\n" })]]);
   await assert.rejects(
-    connectLive({ port: 9500, exec, fetchHealthImpl: async () => HEALTH }),
+    connectLive({ port: 9500, readLeaseImpl: () => null, exec, fetchHealthImpl: async () => HEALTH }),
     (err) => {
       assert.ok(err instanceof ConnectError);
       assert.equal(err.stage, "device");
@@ -63,7 +64,7 @@ test("adb missing from PATH: stage 'adb' with an install fix", async () => {
     e.code = "ENOENT";
     throw e;
   };
-  await assert.rejects(connectLive({ port: 9500, exec, fetchHealthImpl: async () => HEALTH }), (err) => {
+  await assert.rejects(connectLive({ port: 9500, readLeaseImpl: () => null, exec, fetchHealthImpl: async () => HEALTH }), (err) => {
     assert.equal(err.stage, "adb");
     assert.match(err.fix, /platform-tools/);
     return true;
@@ -74,7 +75,7 @@ test("multiple devices, no serial: stage 'device' error listing the candidates",
   const { exec } = makeExec([
     ["adb devices", () => ({ stdout: "List of devices attached\nemulator-5554\tdevice\nemulator-5556\tdevice\n" })],
   ]);
-  await assert.rejects(connectLive({ port: 9500, exec, fetchHealthImpl: async () => HEALTH }), (err) => {
+  await assert.rejects(connectLive({ port: 9500, readLeaseImpl: () => null, exec, fetchHealthImpl: async () => HEALTH }), (err) => {
     assert.equal(err.stage, "device");
     assert.match(err.fix, /emulator-5554, emulator-5556/);
     return true;
@@ -92,6 +93,7 @@ test("dead health: launches the app (resolved applicationId, never hardcoded) an
   ]);
   const r = await connectLive({
     port: 9500,
+    readLeaseImpl: () => null, // hermetic: never read the real machine lease dir
     projectDir: dir,
     exec,
     sleep: async () => {},
@@ -110,6 +112,7 @@ test("launched app that never answers health: stage 'health' error naming logcat
   await assert.rejects(
     connectLive({
       port: 9500,
+      readLeaseImpl: () => null, // hermetic: never read the real machine lease dir
       appId: "com.example.app",
       exec,
       sleep: async () => {},
@@ -140,7 +143,7 @@ test("stale transport (`device offline` while adb devices says device): ONE adb 
       },
     ],
   ]);
-  const r = await connectLive({ port: 9500, exec, sleep: async () => {}, fetchHealthImpl: async () => HEALTH });
+  const r = await connectLive({ port: 9500, readLeaseImpl: () => null, exec, sleep: async () => {}, fetchHealthImpl: async () => HEALTH });
   assert.deepEqual(r.healed, ["adb-transport-reset"]);
   const idx = (p) => calls.findIndex((c) => c.includes(p));
   assert.ok(idx("kill-server") >= 0 && idx("start-server") > idx("kill-server") && idx("wait-for-device") > idx("start-server"),
@@ -154,7 +157,7 @@ test("offline persisting after the reset: the error says the reset already happe
     ["forward", () => { throw new Error("adb: error: device offline"); }],
   ]);
   await assert.rejects(
-    connectLive({ port: 9500, exec, sleep: async () => {}, fetchHealthImpl: async () => HEALTH }),
+    connectLive({ port: 9500, readLeaseImpl: () => null, exec, sleep: async () => {}, fetchHealthImpl: async () => HEALTH }),
     (err) => {
       assert.equal(err.stage, "forward");
       assert.match(err.message, /already reset once/);
@@ -171,6 +174,7 @@ test("relaunch: true — absorbed relaunch_app: force-stop → launch, proven by
   ]);
   const r = await connectLive({
     port: 9500,
+    readLeaseImpl: () => null, // hermetic: never read the real machine lease dir
     relaunch: true,
     exec,
     sleep: async () => {},
@@ -240,4 +244,40 @@ test("relaunchApp: a process that never restarts is an error, not a success", as
     }),
     /no fresh process within/
   );
+});
+
+// ── The machine-global device lease (src/lib/device-lease.mjs) ────────────────
+// A verify lane holds the ONE device for its whole device phase; connect_live
+// must refuse with the holder's name — "a lane is driving this device right
+// now" — never a mysterious `device offline`.
+
+test("lease held by a lane: stage 'lease' error naming the holder, its pid, root, and age — before any forward/launch", async () => {
+  const { exec, calls } = makeExec([oneDevice]);
+  await assert.rejects(
+    connectLive({
+      port: 9500,
+      exec,
+      fetchHealthImpl: async () => HEALTH,
+      readLeaseImpl: (serial) => {
+        assert.equal(serial, "emulator-5554", "the lease is checked for the ACTUAL resolved serial, even unnamed single-device");
+        return { holder: "verify lane e2eSmoke", pid: 4711, root: "/tmp/scratch-x", acquiredAt: "2026-08-19T10:00:00.000Z", ageMs: 120_000 };
+      },
+    }),
+    (err) => {
+      assert.ok(err instanceof ConnectError);
+      assert.equal(err.stage, "lease");
+      assert.match(err.message, /held by "verify lane e2eSmoke" \(pid 4711, \/tmp\/scratch-x, 2m ago\)/);
+      assert.match(err.message, /batched, not concurrent/);
+      assert.match(err.fix, /wait for the holder/);
+      return true;
+    }
+  );
+  assert.ok(!calls.some((c) => c.includes("forward")), "a leased device is never even forwarded to");
+  assert.ok(!calls.some((c) => c.includes("monkey")), "a leased device is never launched into");
+});
+
+test("lease free: connect proceeds and the result reports the resolved serial (the session's lease key)", async () => {
+  const { exec } = makeExec([oneDevice]);
+  const r = await connectLive({ port: 9500, readLeaseImpl: () => null, exec, fetchHealthImpl: async () => HEALTH });
+  assert.equal(r.serial, "emulator-5554");
 });

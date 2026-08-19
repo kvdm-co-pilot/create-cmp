@@ -6,7 +6,8 @@
 // receipt itself (qa/evidence/latest.json) is written by the project's own
 // qa/verify.mjs — see that file's `receipt` object (schema "cmp-evidence/1"):
 // { schema, profile, verdict, commit, inputs: {hash, fileCount}, steps: [{name,
-// verdict, reason?, durationMs, details?}], artifacts, toolVersions, generatedAt }.
+// verdict, reason?, durationMs, details?}], strength, evidenceLevel: {rung,
+// name, satisfiedBy}|null, artifacts, toolVersions, generatedAt }.
 // This bridge reads that JSON directly (never re-derives its shape) and, to
 // answer "is it still bound to the CURRENT tree", dynamically imports the
 // project's OWN qa/lib/inputs-hash.mjs and calls its computeInputsHash — the
@@ -55,6 +56,25 @@ async function loadInputsHashLib(root) {
 export function resetReceiptBridgeCache(root) {
   if (root) inputsHashLibCache.delete(root);
   else inputsHashLibCache.clear();
+}
+
+/**
+ * The receipt's own evidence-ladder rung (`evidenceLevel`: {rung, name,
+ * satisfiedBy} — written by the lane's qa/lib/evidence-level.mjs, DERIVED from
+ * which steps ran and PASSed). Read verbatim, never re-derived here: the lane
+ * is the law. `null` covers all three honest absences alike — a FAILed lane
+ * (the lane itself records null), a receipt predating the ladder, and a
+ * malformed field — because none of them may be rendered as a rung.
+ * @returns {{rung: string, name: string, satisfiedBy: string[]}|null}
+ */
+function readEvidenceLevel(receipt) {
+  const level = receipt.evidenceLevel;
+  if (!level || typeof level !== "object" || typeof level.rung !== "string" || typeof level.name !== "string") return null;
+  return {
+    rung: level.rung,
+    name: level.name,
+    satisfiedBy: Array.isArray(level.satisfiedBy) ? level.satisfiedBy.filter((s) => typeof s === "string") : [],
+  };
 }
 
 /**
@@ -120,6 +140,7 @@ async function recomputeStaleness(root, receipt) {
  *   generatedAt?: string|null,
  *   ageMs?: number|null,
  *   steps?: Array<{name: string, verdict: string, reason?: string, durationMs?: number}>,
+ *   evidenceLevel?: {rung: string, name: string, satisfiedBy: string[]}|null,
  *   conformance?: {verdict: string, reason?: string, durationMs?: number}|null,
  *   inputsHash?: string|null,
  *   inputsFileCount?: number|null,
@@ -160,6 +181,8 @@ export async function getLastReceipt(root) {
 
   const { stale, currentInputsHash, staleReason } = await recomputeStaleness(root, receipt);
 
+  const evidenceLevel = readEvidenceLevel(receipt);
+
   return {
     available: true,
     relPath: RECEIPT_REL_PATH,
@@ -170,6 +193,7 @@ export async function getLastReceipt(root) {
     generatedAt: receipt.generatedAt ?? null,
     ageMs,
     steps,
+    evidenceLevel,
     conformance,
     inputsHash: receipt.inputs && typeof receipt.inputs.hash === "string" ? receipt.inputs.hash : null,
     inputsFileCount: receipt.inputs && typeof receipt.inputs.fileCount === "number" ? receipt.inputs.fileCount : null,
@@ -209,7 +233,7 @@ function git(root, args) {
  * `available: false` with the reason stated — the console renders the
  * standardized absence line, never a fabricated trail.
  * @param {string} root project root
- * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, commitSha: string, author: string|null, committedAt: string|null, ageMs: number|null, verdict: string|null, profile: string|null, generatedAt: string|null}>}}
+ * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, commitSha: string, author: string|null, committedAt: string|null, ageMs: number|null, verdict: string|null, profile: string|null, evidenceLevel: {rung: string, name: string, satisfiedBy: string[]}|null, generatedAt: string|null}>}}
  */
 export function listReceiptHistory(root) {
   let logOut;
@@ -256,6 +280,7 @@ export function listReceiptHistory(root) {
       ageMs: Number.isNaN(at) ? null : Date.now() - at,
       verdict: parsed.verdict ?? null,
       profile: typeof parsed.profile === "string" ? parsed.profile : null,
+      evidenceLevel: readEvidenceLevel(parsed),
       generatedAt: parsed.generatedAt ?? null,
     });
   }

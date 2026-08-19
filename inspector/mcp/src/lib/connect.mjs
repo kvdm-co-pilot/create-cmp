@@ -10,7 +10,11 @@
 //      `device offline` while `adb devices` says `device`,
 //   4. the app process had been replaced after a reinstall.
 // Each is now an internal healing move, in order: ensure a device is attached
-// (else an actionable error naming the exact next command) → ensure the forward
+// (else an actionable error naming the exact next command) → refuse (stage
+// "lease") while a verify lane holds the machine-global device lease, naming
+// the holder — a lane mid-device-phase must never be collided with, and "a lane
+// is driving this device" beats a mysterious `device offline` (see
+// device-lease.mjs, including the check-don't-hold decision) → ensure the forward
 // (creating it IS ensuring it — `adb forward` is idempotent) → poll health → if
 // dead, launch the app (applicationId parsed from the project, never hardcoded)
 // and re-poll with bounded backoff → on any `device offline`-class error, reset
@@ -26,12 +30,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { readDeviceLease, formatHolder, MAX_LEASE_AGE_MS } from "./device-lease.mjs";
+
 const defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** A stage-labeled, next-command-carrying failure. */
 export class ConnectError extends Error {
   /**
-   * @param {string} stage    which healing stage failed (adb|device|forward|app-id|launch|health|relaunch)
+   * @param {string} stage    which healing stage failed (adb|device|lease|forward|app-id|launch|health|relaunch)
    * @param {string} message  what went wrong, in plain words
    * @param {string} fix      the ONE command/action to run next
    * @param {{offlineClass?: boolean}} [opts]
@@ -96,10 +102,12 @@ export function resolveAppId(projectDir, { fsImpl = fs } = {}) {
 }
 
 /**
- * `adb devices` → the serial to use. Throws a stage-"device" ConnectError with
+ * `adb devices` → the device to use. Throws a stage-"device" ConnectError with
  * the exact next command when no usable device exists.
  *
- * @returns {Promise<string|null>} the chosen serial (null = single device, no -s needed)
+ * @returns {Promise<{flag: string|null, actual: string}>} `flag` is what adb -s
+ *   needs (null = single unnamed device, no -s); `actual` is the real serial of
+ *   the chosen device either way — the device-lease key.
  */
 async function resolveDevice({ exec, serial }) {
   let stdout;
@@ -159,7 +167,7 @@ async function resolveDevice({ exec, serial }) {
       "accept the USB-debugging authorization prompt on the device screen, then re-run connect_live."
     );
   }
-  return serial ? chosenSerial : null; // single unnamed device: no -s needed
+  return { flag: serial ? chosenSerial : null, actual: chosenSerial }; // single unnamed device: no -s needed
 }
 
 /**
@@ -176,7 +184,8 @@ async function resolveDevice({ exec, serial }) {
  * @param {(o:{port:number, timeoutMs?:number})=>Promise<object>} opts.fetchHealthImpl
  * @param {(ms:number)=>Promise<void>} [opts.sleep]
  * @param {number} [opts.launchWaitMs]      bounded backoff budget after a launch (default 20s)
- * @returns {Promise<{health:object, appId:(string|null), healed:string[], relaunch:(object|null), port:number}>}
+ * @param {(serial:string)=>object|null} [opts.readLeaseImpl] device-lease reader (injectable for tests)
+ * @returns {Promise<{health:object, appId:(string|null), healed:string[], relaunch:(object|null), port:number, serial:string}>}
  */
 export async function connectLive({
   port,
@@ -189,13 +198,33 @@ export async function connectLive({
   fetchHealthImpl,
   sleep = defaultSleep,
   launchWaitMs = 20_000,
+  readLeaseImpl = (s) => readDeviceLease(s),
 } = {}) {
   const healed = [];
 
   const attempt = async () => {
     // 1. A device must be attached (and usable).
-    const s = await resolveDevice({ exec, serial });
+    const { flag: s, actual: actualSerial } = await resolveDevice({ exec, serial });
     const withSerial = (args) => (s ? ["-s", s, ...args] : args);
+
+    // 1.5. The machine-global device lease (src/lib/device-lease.mjs — the
+    // check-only reader; the acquiring side lives in every generated app's
+    // qa/lib/device-lease.mjs). A verify lane holds the device for its whole
+    // device phase; driving the live app mid-lane is the wedged-adbd /
+    // `device offline` collision class, so a held device is a refusal that
+    // NAMES the holder — never a mysterious transport error. connect_live
+    // checks but never holds (see device-lease.mjs's hold-vs-check decision):
+    // a console session is open-ended and must not starve the lane.
+    const heldBy = readLeaseImpl(actualSerial);
+    if (heldBy) {
+      throw new ConnectError(
+        "lease",
+        `device ${actualSerial} is held by ${formatHolder(heldBy)} — a lane is driving this device right now; ` +
+          `device evidence is batched, not concurrent.`,
+        `wait for the holder to finish (its lease clears on exit, or goes stale after ` +
+          `${Math.round(MAX_LEASE_AGE_MS / 60_000)} min if it crashed), then re-run connect_live.`
+      );
+    }
 
     // 2. Ensure the forward exists — creating it IS ensuring it (idempotent).
     const forwardArgs = withSerial(["forward", `tcp:${port}`, `tcp:${port}`]);
@@ -270,7 +299,7 @@ export async function connectLive({
       healed.push(clearState ? "relaunched-cleared" : "relaunched");
     }
 
-    return { health, appId: health.appId || resolvedAppId || null, healed, relaunch: relaunchReceipt, port };
+    return { health, appId: health.appId || resolvedAppId || null, healed, relaunch: relaunchReceipt, port, serial: actualSerial };
   };
 
   try {

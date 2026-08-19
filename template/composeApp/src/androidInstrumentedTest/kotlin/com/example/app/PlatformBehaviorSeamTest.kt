@@ -4,17 +4,26 @@ import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.app.PendingIntent
 import android.os.Build
+import android.os.SystemClock
+import android.util.Log
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import __PACKAGE__.testing.AlarmAsserts
 import __PACKAGE__.testing.NotificationAsserts
+import __PACKAGE__.testing.TimeWarp
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import org.junit.After
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
@@ -82,6 +91,7 @@ class PlatformBehaviorSeamTest {
         listOf(REQUEST_A, REQUEST_B, REQUEST_SHARED).forEach { code ->
             alarmManager.cancel(probePendingIntent(code, ACTION_PROBE))
         }
+        alarmManager.cancel(probePendingIntent(REQUEST_WARP, ACTION_WARP))
     }
 
     @Test
@@ -149,6 +159,102 @@ class PlatformBehaviorSeamTest {
         ) { it.whenMs == t3 || it.whenMs == t3 + 60_000 }
     }
 
+    @Test
+    fun anExactAlarmScheduledForTheFutureActuallyDeliversWhenItsTimeArrives() {
+        // The proof shape for "my scheduled thing actually fires": registration says the
+        // OS *holds* the alarm ([twoLogicalAlarmsNeedTwoPendingIntentIdentities] stops
+        // there); this test warps the clock past the trigger time and watches DELIVERY —
+        // the onReceive that no other tier can observe, in seconds instead of hours. In
+        // your feature's test, the arrange step becomes YOUR scheduling path (the ladder
+        // that computes "tomorrow at 08:00") and the receiver becomes YOUR receiver —
+        // keep the shape: schedule → assert registered → warp past T → await delivery →
+        // assert the OS slot is consumed. Emulator-only via TimeWarp's guard.
+        TimeWarp.assumeOnEmulator()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Exact alarms are permission-gated from API 31. The debug manifest declares
+            // SCHEDULE_EXACT_ALARM (≤32, granted by default there) and USE_EXACT_ALARM
+            // (33+, granted at install) — see androidDebug/AndroidManifest.xml for why
+            // they live in the debug manifest and not the shipped one.
+            assertTrue(
+                "canScheduleExactAlarms() is false — the debug-manifest exact-alarm " +
+                    "grant (androidDebug/AndroidManifest.xml) is missing or was removed; " +
+                    "setExactAndAllowWhileIdle would throw SecurityException",
+                alarmManager.canScheduleExactAlarms(),
+            )
+        }
+
+        val delivered = CountDownLatch(1)
+        val deliveredAtElapsed = AtomicLong(0)
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context?, intent: Intent?) {
+                deliveredAtElapsed.set(SystemClock.elapsedRealtime())
+                delivered.countDown()
+            }
+        }
+        // Dynamic registration: the receiver lives exactly as long as the test, no
+        // manifest entry to leak. NOT_EXPORTED is correct because AlarmManager sends the
+        // PendingIntent's broadcast with this app's own identity (API 33+ requires the
+        // exported flag to be stated for context-registered receivers).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(
+                receiver,
+                IntentFilter(ACTION_WARP),
+                Context.RECEIVER_NOT_EXPORTED,
+            )
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(receiver, IntentFilter(ACTION_WARP))
+        }
+
+        try {
+            // Far enough ahead that nothing fires before the warp; close enough that a
+            // registration-time sanity read stays cheap.
+            val target = System.currentTimeMillis() + 2 * 60_000L
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                target,
+                probePendingIntent(REQUEST_WARP, ACTION_WARP),
+            )
+            AlarmAsserts.assertAlarmRegistered("the warp-probe exact alarm") {
+                it.whenMs == target
+            }
+
+            TimeWarp.withWarpedClock(target + 5_000L) {
+                val warpedAtElapsed = SystemClock.elapsedRealtime()
+                // Bounded on monotonic time (latch.await is nanoTime-based), so the
+                // warped wall clock cannot distort the timeout.
+                assertTrue(
+                    "the exact alarm did not deliver within 60s of the clock warping " +
+                        "past its trigger time — scheduled for $target, clock warped to " +
+                        "${target + 5_000L}",
+                    delivered.await(60, TimeUnit.SECONDS),
+                )
+                Log.i(
+                    "PlatformBehaviorSeam",
+                    "warp-probe alarm delivered ${deliveredAtElapsed.get() - warpedAtElapsed}ms " +
+                        "after the clock warp",
+                )
+            }
+
+            // Delivery consumes the OS slot: the registry entry must be gone. Bounded
+            // poll on monotonic time — the table update can trail the broadcast slightly.
+            val goneDeadline = SystemClock.elapsedRealtime() + 10_000L
+            while (SystemClock.elapsedRealtime() < goneDeadline &&
+                AlarmAsserts.registeredAlarms().any { it.whenMs == target }
+            ) {
+                Thread.sleep(200)
+            }
+            assertTrue(
+                "the warp-probe alarm fired but its entry is still in the OS alarm table " +
+                    "— a fired one-shot alarm must be consumed, not re-armed",
+                AlarmAsserts.registeredAlarms().none { it.whenMs == target },
+            )
+        } finally {
+            context.unregisterReceiver(receiver)
+        }
+    }
+
     private fun probePendingIntent(requestCode: Int, action: String): PendingIntent =
         PendingIntent.getBroadcast(
             context,
@@ -164,6 +270,8 @@ class PlatformBehaviorSeamTest {
         const val REQUEST_A = 424_301
         const val REQUEST_B = 424_302
         const val REQUEST_SHARED = 424_303
+        const val ACTION_WARP = "cmp.seam.WARP_ALARM"
+        const val REQUEST_WARP = 424_304
         const val HOUR_MS = 60L * 60 * 1000
     }
 }
