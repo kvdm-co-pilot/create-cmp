@@ -280,3 +280,68 @@ remains tracked as task #115 / FI-10 — pre-existing, explicitly out of this ba
 Batch gate: 830/830 engine+inspector tests, instrumented seam proven on a live emulator
 (3/3, including the alarm-collision demonstration), full `--profile release` lane PASS on
 a scratch scaffold.
+
+
+## 10. Roadmap beyond this batch — ideas held against the vision (2026-08-19)
+
+Each idea resolves against VISION.md's principles (pixels-to-humans/structure-to-agents;
+the gate is the business; billing boundary = assurance boundary; strongest-true-case
+honesty; trigger-gated building). Nothing here is built; each names its trigger.
+
+1. **Time-warp alarm proof** — the one honesty gap left in the alerting story: "the
+   ladder is unit-tested to the minute, but nobody watched a notification arrive"
+   shipped in a release note three times. The seam can close it: qa-prep prefers a
+   rootable AOSP emulator image for the QA AVD, a `TimeWarp` helper sets the device
+   clock to T−1min, and the instrumented test asserts the notification posts. This is
+   an *execution-bound evidence* differentiator no scaffold ships. Spike first: verify
+   clock-set mechanics per API level. **Trigger: next app with scheduled alerting.**
+
+2. **The evidence ladder, named** — receipts already grade themselves
+   (`desktop-only` → `on-device: …+androidChecks` → release profile). Formalize the
+   rungs (L0 scaffold / L1 desktop / L2 device / L3 release), render the rung in the
+   console and README badge, and make the release commit's receipt name it. This is
+   the vocabulary the Evidence business sells in (billing boundary = assurance
+   boundary). Cheap: naming + rendering. **Trigger: first Gatekeeper Evidence
+   conversation, or the next engine release — whichever lands first.**
+
+3. **Fleet check before release** — 0.11.0's headline bug was "the release build had
+   never once been run"; this batch's equivalent proof (stamp scratch app → full lane
+   incl. androidChecks on an emulator) was done by hand. Encode as
+   `scripts/fleet-check.mjs` + an npm-publish skill step. A notary caught overclaiming
+   is dead; this is the anti-overclaim gate for the harness itself. **Trigger: next
+   engine release (run it manually then; script it if it hurts).**
+
+4. **Harness upgrade for stamped apps** — the reverse of §3.4: when the engine moves,
+   stamped apps' `cmp:generated` blocks and qa/ scripts age. Extend the upgrade path
+   to diff-and-regenerate them (version sets already covered). The pilot is
+   regenerating the two real apps after this batch's release. **Trigger: this batch's
+   release.**
+
+5. **Flight recorder** — this retrospective was only possible because session
+   transcripts happened to exist. The harness can observe its own adoption: an
+   append-only in-repo journal (lane runs, SKIP reasons, capability probes,
+   degraded-path activations) and a `qa/retrospective.mjs` that answers "did this
+   project drift from its tooling?" mechanically. In-repo only, app-owned, no
+   phone-home. **Trigger: the next retrospective request — do not build speculatively.**
+
+6. **Determinism probe** — ARCH-13 statically bans ambient time in app code, but a
+   library can still read the wall clock. A ci-profile option runs unit+golden tests
+   twice under maximally-shifted TZ (UTC vs UTC+14); differing outcomes = a
+   nondeterminism leak the static net missed. **Trigger: first golden flake that
+   ARCH-13 didn't prevent.**
+
+7. **Audit cadence** — cmp-audit exists but fires on human request, like the audit
+   that found the six defects. Cheapest mechanical nudge: the release profile's
+   receipt lists subsystems whose androidMain changed since the last recorded audit.
+   **Trigger: after cmp-audit's first real-app outing proves the question bank.**
+
+8. **iOS is the known asymmetry** — every behavior-tier capability is Android-only;
+   the platform-semantics bug class exists identically on iOS (UNUserNotificationCenter,
+   background modes). Named here deliberately and NOT built: no iOS app evidence yet
+   (evidence-or-silence), and building ahead of signal violates trigger-gating.
+   **Trigger: first real iOS-enabled app reaching its alerting feature.**
+
+Landed this session as part of "all suggestions in": the SessionStart capability-contract
+banner (every session learns the contract, not just skill-invoked ones) and the
+PreToolUse structured-eyes reminder on `screencap`/`uiautomator dump` — both test-pinned
+in `test/harness-surfaces.test.mjs`.

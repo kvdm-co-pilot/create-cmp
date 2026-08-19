@@ -121,6 +121,27 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       );
     });
 
+    await t.test(".claude/settings.json carries the session-contract and drift-deterrent hooks", () => {
+      const settings = JSON.parse(fs.readFileSync(path.join(out, ".claude/settings.json"), "utf8"));
+      // SessionStart: the governed-app banner reaches every session's context — the
+      // capability contract must not depend on a skill being invoked first (a whole
+      // production app was built in a session that never learned its tools were missing).
+      const sessionCmds = (settings.hooks?.SessionStart || []).flatMap((e) => (e.hooks || []).map((h) => h.command));
+      assert.ok(
+        sessionCmds.some((c) => typeof c === "string" && c.includes("cmp-inspector") && c.includes("additionalContext")),
+        "SessionStart hook injects the capability-contract banner"
+      );
+      // PreToolUse on Bash: pixel/blind-tap fallbacks get a structured-eyes reminder —
+      // allow (never block), silent on every non-matching command.
+      const preEntries = settings.hooks?.PreToolUse || [];
+      const bashEntry = preEntries.find((e) => e.matcher === "Bash");
+      assert.ok(bashEntry, "PreToolUse has a Bash matcher entry");
+      const preCmd = (bashEntry.hooks || []).map((h) => h.command).join("\n");
+      assert.ok(/screencap\|uiautomator dump/.test(preCmd), "reminder triggers on screencap/uiautomator dump");
+      assert.ok(preCmd.includes('"permissionDecision\":\"allow'), "reminder allows — it never blocks");
+      assert.ok(preCmd.includes("|| true"), "non-matching commands stay silent and successful");
+    });
+
     await t.test("qa/ harness scripts exist and reference their collaborators", () => {
       for (const rel of [
         "qa/verify.mjs",

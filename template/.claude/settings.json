@@ -1,5 +1,27 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This app is governed by its delivery contract (CLAUDE.md): behavior starts in specs/, done is `node qa/verify.mjs` with a committed receipt, approvals gate signed artifacts. The cmp-inspector MCP tools (preview loop, live tier) are the expected eyes — if they are absent from this session, that is a fault to diagnose (plugin disabled, session predates plugin enablement, or stale plugin copy; see cmp-doctor), not a cue to fall back to screenshots or blind adb.\"}}'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "grep -qE 'screencap|uiautomator dump' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"Reminder: raw pixels/blind taps lose structure. If cmp-inspector is connected, inspect_tree reads the semantic tree and navigate_and_inspect gives verified taps; if its tools are missing, diagnose first (cmp-doctor, Inspector MCP section).\"}}' || true"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",
