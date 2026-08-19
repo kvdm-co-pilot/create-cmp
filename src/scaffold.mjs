@@ -18,6 +18,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { validate, formatErrors } from "./lib/schema.mjs";
+import { validatePackageName } from "./lib/package-name.mjs";
 import { buildTokenMap, replaceTokens, replacePathTokens, isBinaryPath, slugifyAppName } from "./lib/tokens.mjs";
 import { renamePackageDirs } from "./lib/rename.mjs";
 import {
@@ -51,8 +52,12 @@ export function loadSchema(opts = {}) {
  */
 export function validateConfig(config, opts = {}) {
   const schema = loadSchema(opts);
-  const { valid, errors } = validate(config, schema);
-  if (!valid) {
+  const { errors } = validate(config, schema);
+  // The schema pattern proves the SHAPE of the package id; this proves its
+  // segments are legal Java identifiers. Merged into one list so a config with
+  // both problems reports both at once.
+  errors.push(...validatePackageName(config?.package).errors);
+  if (errors.length > 0) {
     const err = new Error(`Invalid config:\n${formatErrors(errors)}`);
     err.validationErrors = errors;
     throw err;

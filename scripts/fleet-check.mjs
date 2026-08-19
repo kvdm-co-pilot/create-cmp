@@ -59,9 +59,19 @@ export function compareLevels(a, b) {
   return ia - ib;
 }
 
-/** "l2", "L2 (device)" → "L2"; unknown → null. */
+/**
+ * "l2", "L2 (device)", or the receipt's own `{ rung: "L2", name, satisfiedBy }`
+ * object → "L2"; unknown → null.
+ *
+ * The object form is what qa/lib/evidence-level.mjs actually returns and what
+ * verify.mjs writes onto the receipt. Reading only the string form silently
+ * degraded every real receipt to the strength fallback below — caught by the
+ * 0.12.0 fleet check, which reported "receipt names no evidenceLevel" against a
+ * receipt that named one perfectly well.
+ */
 export function normalizeLevel(v) {
-  const m = String(v ?? "").match(/L[0-3]/i);
+  const raw = v && typeof v === "object" && !Array.isArray(v) ? v.rung : v;
+  const m = String(raw ?? "").match(/L[0-3]/i);
   return m ? m[0].toUpperCase() : null;
 }
 
@@ -85,11 +95,24 @@ export function levelFromStrength(strength) {
   return "L1";
 }
 
-/** The receipt's own rung when it names one; the strength fallback otherwise. */
+/**
+ * The receipt's own rung when it CARRIES the field; the strength fallback only
+ * for receipts that predate it.
+ *
+ * The distinction matters: a receipt with `evidenceLevel: null` is not silent,
+ * it is asserting "this run earned no rung" — a FAILed lane, or a `--fast` run,
+ * which by design never becomes evidence. Falling back to strength there would
+ * grade a fast receipt L1 (its onDeviceSteps list is empty, exactly like a
+ * clean desktop lane) and hand the inner loop a rung the ladder refuses it.
+ * Absent key → legacy receipt → derive from strength.
+ *
+ * @returns {"L0"|"L1"|"L2"|"L3"|null} null when the receipt asserts no rung.
+ */
 export function levelFromReceipt(receipt) {
-  const named = normalizeLevel(receipt.evidenceLevel);
-  if (named) return named;
-  return levelFromStrength(receipt.strength ?? receipt.strengthLabel ?? null);
+  if (receipt && Object.hasOwn(receipt, "evidenceLevel")) {
+    return normalizeLevel(receipt.evidenceLevel);
+  }
+  return levelFromStrength(receipt?.strength ?? receipt?.strengthLabel ?? null);
 }
 
 // ── Environment probes ──────────────────────────────────────────────────────
@@ -250,7 +273,12 @@ async function main() {
   const rung = levelFromReceipt(receipt);
   const failures = [];
   if (receipt.verdict !== "PASS") failures.push(`lane verdict is ${receipt.verdict}, not PASS`);
-  if (compareLevels(rung, minLevel) < 0) {
+  if (rung === null) {
+    // The receipt asserts no rung at all (FAILed lane, or a --fast run). There
+    // is nothing to compare; a release gate cannot pass on a run that earned
+    // no evidence.
+    failures.push(`receipt earned no evidence rung (mode ${receipt.mode ?? "full"}) — required >=${minLevel}`);
+  } else if (compareLevels(rung, minLevel) < 0) {
     failures.push(`evidence rung ${rung} is below the required minimum ${minLevel}`);
   }
 
@@ -260,9 +288,12 @@ async function main() {
     const reason = s.verdict !== "PASS" && s.reason ? `  (${String(s.reason).split("\n")[0]})` : "";
     process.stdout.write(`  ${s.name.padEnd(26)} ${String(s.verdict).padEnd(8)} ${fmtDuration(s.durationMs)}${reason}\n`);
   }
-  const named = normalizeLevel(receipt.evidenceLevel);
+  const carried = receipt && Object.hasOwn(receipt, "evidenceLevel");
+  const rungLabel = rung ?? "none";
+  const provenance = carried ? "" : " (derived from strength — legacy receipt names no evidenceLevel)";
+  const rungName = carried && receipt.evidenceLevel?.name ? ` ${receipt.evidenceLevel.name}` : "";
   process.stdout.write(
-    `\n  rung: ${rung}${named ? "" : " (derived from strength — receipt names no evidenceLevel)"}` +
+    `\n  rung: ${rungLabel}${rungName}${provenance}` +
     ` | required: >=${minLevel} | verdict: ${receipt.verdict}\n`
   );
 

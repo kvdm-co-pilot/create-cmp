@@ -364,15 +364,16 @@ honesty; trigger-gated building). Nothing here is built; each names its trigger.
    never a per-subagent gate, never concurrent across subagents; interim proof is
    always `--fast`; the full lane runs exactly once, after everything else lands.
 
-7. **Reject invalid package names at the door** — observed while running the batched
-   device pass: `--package com.final.proof` was accepted and stamped a project that
-   cannot configure at all (`Namespace 'com.final.proof' is not a valid Java package
-   name as 'final' is a Java keyword`). `--verify` does catch it, but late and as a raw
-   Gradle stack rather than an input error. Any reserved-word segment (`final`, `static`,
-   `new`, `public`, `class`, `int`…) or a segment starting with a digit has the same
-   shape. Cheap fix: validate segments in the engine's option parsing and refuse with a
-   message naming the offending segment. **Trigger: next engine change touching option
-   validation — or the first user who reports it.**
+7. **Reject invalid package names at the door — LANDED (2026-08-19).** Observed while
+   running the batched device pass: `--package com.final.proof` was accepted and stamped
+   a complete project that cannot configure at all (`Namespace 'com.final.proof' is not
+   a valid Java package name as 'final' is a Java keyword`). `--verify` did catch it,
+   but late and as a raw Gradle stack rather than an input error. Now
+   `src/lib/package-name.mjs` refuses any reserved-word segment at validation stage (a),
+   naming the offending segment and suggesting a rename; the errors merge into the
+   schema's own list, so a config with both problems reports both at once. Contextual
+   keywords (`var`, `record`, `sealed`, `yield`) stay legal — refusing them would reject
+   valid ids. Digit-leading segments were already excluded by the schema pattern.
 
 8. **Determinism probe** — ARCH-13 statically bans ambient time in app code, but a
    library can still read the wall clock. A ci-profile option runs unit+golden tests

@@ -76,6 +76,30 @@ test("fallback also accepts the receipt's strength OBJECT ({ onDeviceSteps })", 
   assert.equal(levelFromStrength({ onDeviceSteps: ["e2eSmoke", "releaseSmoke"] }), "L3");
 });
 
+// The receipt shape verify.mjs ACTUALLY writes: evidenceLevel is the object
+// qa/lib/evidence-level.mjs returns, never a bare string. The original test
+// asserted only the string form, so the reader could be wrong about every real
+// receipt and stay green — which it was, until the 0.12.0 fleet check printed
+// "receipt names no evidenceLevel" against a receipt that named one.
+test("normalizeLevel reads the receipt's real object form", () => {
+  assert.equal(normalizeLevel({ rung: "L2", name: "device", satisfiedBy: ["e2eSmoke"] }), "L2");
+  assert.equal(normalizeLevel({ rung: "L1", name: "desktop", satisfiedBy: [] }), "L1");
+  assert.equal(normalizeLevel({ rung: 2 }), null, "a malformed rung is not a rung");
+  assert.equal(normalizeLevel({}), null);
+  assert.equal(normalizeLevel(null), null);
+});
+
+test("a receipt that asserts no rung is not silently promoted by the strength fallback", () => {
+  // A --fast run: evidenceLevel null, and an empty onDeviceSteps list that is
+  // indistinguishable from a clean desktop lane. Trusting strength here would
+  // hand the inner loop L1.
+  assert.equal(levelFromReceipt({ mode: "fast", evidenceLevel: null, strength: { onDeviceSteps: [] } }), null);
+  // A FAILed lane records the same null.
+  assert.equal(levelFromReceipt({ verdict: "FAIL", evidenceLevel: null, strength: { onDeviceSteps: ["e2eSmoke"] } }), null);
+  // Only a receipt with NO such key is legacy, and only it falls back.
+  assert.equal(levelFromReceipt({ strength: { onDeviceSteps: ["e2eSmoke"] } }), "L2");
+});
+
 test("levelFromReceipt prefers the named evidenceLevel, falls back to strength", () => {
   // A receipt that names its rung wins outright.
   assert.equal(levelFromReceipt({ evidenceLevel: "L3", strength: { onDeviceSteps: [] } }), "L3");

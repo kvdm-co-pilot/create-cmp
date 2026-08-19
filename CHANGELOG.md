@@ -6,7 +6,34 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-19
+
 ### Fixed
+
+- **The pre-release fleet check never actually read the evidence ladder it gates on.**
+  `qa/lib/evidence-level.mjs` returns — and the receipt stores — an object
+  (`{ rung, name, satisfiedBy }`); `scripts/fleet-check.mjs` read it as a bare string, so
+  `String({...})` matched no rung, and every real receipt silently fell through to the
+  legacy strength-parsing fallback. Its own test asserted the string form, so the reader
+  could be wrong about every receipt ever written and stay green — found only when the
+  0.12.0 release run printed "receipt names no evidenceLevel" against a receipt that
+  named one perfectly well. Two consequences, both closed: the rung is now read from the
+  field the ladder writes, and a receipt asserting **no** rung (`evidenceLevel: null` — a
+  FAILed lane, or a `--fast` run) is no longer promoted by the fallback, which would have
+  graded a fast receipt L1 off its empty `onDeviceSteps` list and handed the inner loop a
+  rung the ladder explicitly refuses it. Only a receipt with no such key is legacy, and
+  only it derives from strength.
+
+- **A Java keyword in the package id stamped an app that could never configure.**
+  `--package com.final.proof` passed validation (the schema pattern only proves the
+  reverse-DNS *shape*), stamped a complete project, and then died at the first Gradle
+  configure — `Namespace 'com.final.proof' is not a valid Java package name as 'final'
+  is a Java keyword` — a raw Gradle stack for what is an input error, after the work of
+  a full stamp. Found while running this batch's device pass. The engine now refuses any
+  reserved-word segment at validation stage (a), before a single file is copied, naming
+  the offending segment and suggesting the rename. Contextual keywords (`var`, `record`,
+  `sealed`, `yield`) stay legal — refusing them would reject valid ids — and the errors
+  merge into the schema's own list, so a config with two problems reports both at once.
 
 - **The lane could fail Maestro before the app got a chance to be wrong.** `installDebug`
   returning 0 means the package manager accepted the APK — not that the device is ready to
@@ -1289,7 +1316,9 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.8.0...v0.9.0
