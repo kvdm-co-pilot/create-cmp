@@ -17,21 +17,13 @@ import { z } from "zod";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { walk, loadTree } from "../src/lib/tree.mjs";
-import { getNode, assertToken, layoutGaps } from "../src/lib/query.mjs";
-import { findDrift, diffAgainstDesignSystem } from "../src/lib/drift.mjs";
-import { normalizeTree, diffTrees } from "../src/lib/snapshot.mjs";
+import { walk } from "../src/lib/tree.mjs";
+import { getNode, siblingLayoutGaps } from "../src/lib/query.mjs";
 import { auditA11y } from "../src/lib/a11y.mjs";
-import {
-  resolveTree as resolveTreeFromSource,
-  resolveSourceDescriptor,
-  resolveCatalog,
-  requireInstrumentedTree,
-} from "../src/lib/source.mjs";
+import { resolveTree as resolveTreeFromSource } from "../src/lib/source.mjs";
 import {
   fetchHealth,
   fetchLiveCrashes,
-  fetchLiveDbSchema,
   fetchLiveDbQuery,
   validatePort,
   validateSerial,
@@ -39,10 +31,9 @@ import {
 } from "../src/lib/live.mjs";
 import { gradleEnv } from "../src/lib/jdk.mjs";
 import { navigateAndInspect, writeLiveScreenshot, DEFAULT_SETTLE_MS } from "../src/lib/navigate.mjs";
-import { captureScreen, relaunchApp } from "../src/lib/capture.mjs";
+import { connectLive, ConnectError } from "../src/lib/connect.mjs";
 import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
 import { readPngMeta } from "../src/lib/png.mjs";
-import { proveChange } from "../src/lib/prove.mjs";
 import { attributeCrash } from "../src/lib/attribution.mjs";
 import { parseLogcat } from "../src/lib/logcat.mjs";
 import { createPreviewService } from "../src/lib/preview-service.mjs";
@@ -172,10 +163,13 @@ const server = new McpServer({
     "no-change. Zero snapshot bookkeeping.\n" +
     "4. preview_stop {} when the session ends.\n\n" +
     "One-off render: render_screen { projectDir, screen } (~1s warm via the resident " +
-    "daemon). Inspect the RUNNING app (tier 1): connect_live, then get_node / " +
-    "assert_token / audit_a11y / find_drift / navigate_and_inspect / prove_change. " +
+    "daemon). Inspect the RUNNING app (tier 1): connect_live (SELF-HEALING — creates the " +
+    "adb forward, launches the debug app when its health endpoint is dead, resets a stale " +
+    "adb transport, and can force a verified relaunch with {relaunch:true}), then " +
+    "inspect_tree (one node via testTag, an SVG wireframe via format:'wireframe', spacing " +
+    "via includeLayoutGaps) and navigate_and_inspect. " +
     "Runtime eyes beyond the tree: runtime_crashes (persisted crashes + cause attribution), " +
-    "runtime_logs (adb logcat, structured + bounded), db_schema / db_query (read-only SQLite " +
+    "runtime_logs (adb logcat, structured + bounded), db_query (read-only SQLite " +
     "state). Human approval gates: the preview gallery's Screens/Design System/Architecture/" +
     "Approvals/Specs/Comments tabs (same URL as `preview`) are where the human reviews and signs " +
     "governed artifacts, sees the app's layer map + governed contract + feature shape, and leaves " +
@@ -233,262 +227,143 @@ server.registerTool(
   {
     title: "Inspect Compose tree",
     description:
-      "Load the full enriched Compose semantics tree (hierarchy + geometry + resolved design tokens) as JSON, " +
+      "Load the enriched Compose semantics tree (hierarchy + geometry + resolved design tokens) as JSON, " +
       "plus a compact summary { nodeCount, taggedCount, tokenizedCount }. With source {kind:'live'} this reads " +
-      "the RUNNING app's current screen (real data + nav state) on every call.",
-    inputSchema: { source: sourceArg, treePath: treePathArg },
-  },
-  guarded(async ({ source, treePath }) => {
-    const tree = await resolveTree({ source, treePath });
-    return ok({ summary: summarize(tree), tree });
-  })
-);
-
-server.registerTool(
-  "get_node",
-  {
-    title: "Get node by testTag",
-    description:
-      "Return a single node (geometry + resolved design tokens) matched by its testTag, or a clear not-found.",
+      "the RUNNING app's current screen (real data + nav state) on every call. Options: `testTag` returns only " +
+      "that node's subtree; format:'wireframe' returns the (sub)tree as a deterministic SVG wireframe instead " +
+      "of raw JSON (footprint nodes as rects, tokenized nodes highlighted with a resolved-values chip, " +
+      "clickable nodes with a distinct outline, testTags as mono labels — SVG is structured text, safe for " +
+      "model context; a11yOverlay:true marks accessibility violations, `out` also writes the file); " +
+      "includeLayoutGaps:true adds `layoutGaps` — the spacing between each pair of consecutive TAGGED siblings " +
+      "({parentPath, a, b, gaps:{gapX,gapY,dxLeft,dyTop}}).",
     inputSchema: {
       source: sourceArg,
       treePath: treePathArg,
-      testTag: z.string().describe("The testTag of the node to fetch."),
-    },
-  },
-  guarded(async ({ source, treePath, testTag }) => {
-    const tree = await resolveTree({ source, treePath });
-    const node = getNode(tree, testTag);
-    if (!node) return fail(`No node found with testTag '${testTag}'.`);
-    return ok({ node });
-  })
-);
-
-server.registerTool(
-  "assert_token",
-  {
-    title: "Assert a resolved design token",
-    description:
-      "Assert that a node's resolved design-token value for `key` equals `expected`. Returns { pass, key, actual, expected }.",
-    inputSchema: {
-      source: sourceArg,
-      treePath: treePathArg,
-      testTag: z.string().describe("The testTag of the node to assert on."),
-      key: z.string().describe("A key inside designToken.resolved (e.g. 'padding', 'radius', 'color')."),
-      expected: z.string().describe("The expected resolved value (e.g. '16dp')."),
-    },
-  },
-  guarded(async ({ source, treePath, testTag, key, expected }) => {
-    const tree = requireInstrumentedTree(await resolveTree({ source, treePath }), "assert_token");
-    const node = getNode(tree, testTag);
-    if (!node) return fail(`No node found with testTag '${testTag}'.`);
-    return ok(assertToken(node, key, expected));
-  })
-);
-
-server.registerTool(
-  "layout_gaps",
-  {
-    title: "Compute spacing between two nodes",
-    description:
-      "Compute the spacing/padding between two nodes from their bounds: { gapX, gapY, dxLeft, dyTop }.",
-    inputSchema: {
-      source: sourceArg,
-      treePath: treePathArg,
-      testTagA: z.string().describe("testTag of the first node."),
-      testTagB: z.string().describe("testTag of the second node."),
-    },
-  },
-  guarded(async ({ source, treePath, testTagA, testTagB }) => {
-    const tree = await resolveTree({ source, treePath });
-    const a = getNode(tree, testTagA);
-    if (!a) return fail(`No node found with testTag '${testTagA}'.`);
-    const b = getNode(tree, testTagB);
-    if (!b) return fail(`No node found with testTag '${testTagB}'.`);
-    return ok({ testTagA, testTagB, gaps: layoutGaps(a, b) });
-  })
-);
-
-server.registerTool(
-  "diff_against_design_system",
-  {
-    title: "Diff resolved tokens against the declared catalog",
-    description:
-      "For every tokenized node, compare its resolved values against the declared design-system catalog; " +
-      "report drift entries { path, token, declared, resolved }. Empty list = clean. With a live source and " +
-      "no catalogPath, the catalog is fetched from the app's /inspect/design-system endpoint.",
-    inputSchema: {
-      source: sourceArg,
-      treePath: treePathArg,
-      catalogPath: z
-        .string()
+      testTag: z.string().optional().describe("Return only the subtree rooted at the node with this testTag."),
+      format: z
+        .enum(["json", "wireframe"])
         .optional()
-        .describe(
-          "Path to the declared design-system catalog JSON ({ colors, dimens }). Optional for live sources " +
-            "(fetched from /inspect/design-system)."
-        ),
-    },
-  },
-  guarded(async ({ source, treePath, catalogPath }) => {
-    const tree = requireInstrumentedTree(
-      await resolveTree({ source, treePath }),
-      "diff_against_design_system"
-    );
-    const catalog = await resolveCatalog({
-      source,
-      treePath,
-      catalogPath,
-      sessionDefault: sessionDefaultSource,
-    });
-    const drift = diffAgainstDesignSystem(tree, catalog);
-    return ok({ clean: drift.length === 0, driftCount: drift.length, drift });
-  })
-);
-
-server.registerTool(
-  "find_drift",
-  {
-    title: "Find un-tokenized nodes",
-    description:
-      "Sweep the tree for nodes with a visual footprint but no design token (possible raw value / un-tokenized). " +
-      "Returns the list; empty = clean.",
-    inputSchema: { source: sourceArg, treePath: treePathArg },
-  },
-  guarded(async ({ source, treePath }) => {
-    const tree = requireInstrumentedTree(await resolveTree({ source, treePath }), "find_drift");
-    const drift = findDrift(tree);
-    return ok({ clean: drift.length === 0, driftCount: drift.length, drift });
-  })
-);
-
-server.registerTool(
-  "snapshot_save",
-  {
-    title: "Save a golden-tree snapshot",
-    description:
-      "Normalize the current tree (round bounds to integers, drop `source`, sort designToken.resolved keys) " +
-      "and write it to `snapshotPath` as the golden regression file. Commit the golden: diffs against it are " +
-      "human-readable JSON, not pixels.",
-    inputSchema: {
-      source: sourceArg,
-      treePath: treePathArg,
-      snapshotPath: z.string().describe("Where to write the normalized golden snapshot JSON."),
-    },
-  },
-  guarded(async ({ source, treePath, snapshotPath }) => {
-    const tree = await resolveTree({ source, treePath });
-    const normalized = normalizeTree(tree);
-    const dir = dirname(snapshotPath);
-    if (dir && dir !== ".") mkdirSync(dir, { recursive: true });
-    writeFileSync(snapshotPath, JSON.stringify(normalized, null, 2) + "\n");
-    return ok({ saved: true, snapshotPath, summary: summarize(normalized) });
-  })
-);
-
-server.registerTool(
-  "snapshot_diff",
-  {
-    title: "Diff the current tree against a golden snapshot",
-    description:
-      "Structurally compare the current tree with a saved golden: node added/removed (by path), text/testTag/" +
-      "contentDescription changed, designToken changed, role/clickable/disabled changed, bounds moved beyond " +
-      "`tolerancePx` (default 1). Returns { pass, diffCount, diffs:[{path, kind, before, after}] }; empty diffs = pass. " +
-      "This is the CI regression primitive — JSON diffs instead of pixel flakiness.",
-    inputSchema: {
-      source: sourceArg,
-      treePath: treePathArg,
-      snapshotPath: z.string().describe("Path to the golden snapshot written by snapshot_save."),
-      tolerancePx: z
-        .number()
-        .min(0)
+        .describe("Default 'json'. 'wireframe' renders the (sub)tree as a deterministic SVG wireframe."),
+      out: z.string().optional().describe("wireframe only: also write the SVG to this path."),
+      a11yOverlay: z
+        .boolean()
         .optional()
-        .describe("Max allowed bounds movement per axis in px before a 'bounds-moved' diff (default 1)."),
+        .describe("wireframe only: overlay accessibility-audit violations in a danger style."),
+      maxDepth: z.number().int().min(0).optional().describe("wireframe only: only draw nodes up to this depth (root = 0)."),
+      scale: z.number().positive().optional().describe("wireframe only: explicit px scale (default fits width to ~740)."),
+      includeLayoutGaps: z
+        .boolean()
+        .optional()
+        .describe("Add `layoutGaps`: spacing between consecutive tagged siblings, tree-wide."),
     },
   },
-  guarded(async ({ source, treePath, snapshotPath, tolerancePx }) => {
-    const tree = await resolveTree({ source, treePath });
-    const golden = loadTree(snapshotPath);
-    const diffs = diffTrees(tree, golden, tolerancePx ?? 1);
-    return ok({ pass: diffs.length === 0, diffCount: diffs.length, diffs });
-  })
-);
-
-server.registerTool(
-  "audit_a11y",
-  {
-    title: "Audit the tree for accessibility faults",
-    description:
-      "Check every node: clickable nodes smaller than `minTouchTargetPx` (default 48) in width or height, " +
-      "clickable nodes with no text/contentDescription/descendant text (missing label), a node whose " +
-      "designToken.resolved exposes BOTH a foreground and a background color with a WCAG contrast ratio " +
-      "below `minContrastRatio` (default 4.5, AA for normal text — fires ONLY when both colors are " +
-      "genuinely known/parseable, never a guess), and empty-string contentDescription (warning). Returns " +
-      "{ violations:[{path,testTag,rule,detail,bounds}], warnings, warningCount, passCount }. Rules: " +
-      "touch-target-too-small, missing-label, low-contrast, (warn) empty-content-description. Note: the " +
-      "headless harness dumps at density 1, so px == dp there; pass a device-density-scaled " +
-      "minTouchTargetPx for on-device trees. Old trees without the optional clickable/role fields are " +
-      "skipped gracefully.",
-    inputSchema: {
-      source: sourceArg,
-      treePath: treePathArg,
-      minTouchTargetPx: z
-        .number()
-        .positive()
-        .optional()
-        .describe("Minimum touch-target size in px (default 48; px == dp on density-1 harness output)."),
-      minContrastRatio: z
-        .number()
-        .positive()
-        .optional()
-        .describe("Minimum WCAG contrast ratio for fg/bg color pairs (default 4.5, WCAG AA normal text)."),
-    },
-  },
-  guarded(async ({ source, treePath, minTouchTargetPx, minContrastRatio }) => {
-    const tree = await resolveTree({ source, treePath });
-    const result = auditA11y(tree, { minTouchTargetPx, minContrastRatio });
-    return ok({ pass: result.violations.length === 0, violationCount: result.violations.length, ...result });
+  guarded(async ({ source, treePath, testTag, format, out, a11yOverlay, maxDepth, scale, includeLayoutGaps }) => {
+    const full = await resolveTree({ source, treePath });
+    let tree = full;
+    if (testTag != null) {
+      const node = getNode(full, testTag);
+      if (!node) return fail(`No node found with testTag '${testTag}'.`);
+      tree = { ...full, root: node };
+    }
+    const extras = includeLayoutGaps ? { layoutGaps: siblingLayoutGaps(tree) } : {};
+    if (format === "wireframe") {
+      const svg = renderTreeSvg(tree, { a11y: a11yOverlay ? auditA11y(tree) : undefined, maxDepth, scale });
+      let svgPath = null;
+      if (out) {
+        svgPath = resolvePath(out);
+        const dir = dirname(svgPath);
+        if (dir && dir !== ".") mkdirSync(dir, { recursive: true });
+        writeFileSync(svgPath, svg);
+      }
+      const { total } = countRenderable(tree, { maxDepth });
+      const [, w, h] = svg.match(/<svg[^>]* width="(\d+)" height="(\d+)"/) || [];
+      return ok({
+        summary: summarize(tree),
+        svg,
+        svgPath,
+        nodeCount: total,
+        width: Number(w),
+        height: Number(h),
+        ...extras,
+      });
+    }
+    return ok({ summary: summarize(tree), tree, ...extras });
   })
 );
 
 server.registerTool(
   "connect_live",
   {
-    title: "Connect to a running app's live inspector",
+    title: "Connect to a running app's live inspector (self-healing)",
     description:
-      "Tier 1 handshake: run ONE bounded `adb forward tcp:<port> tcp:<port>` (the debug-only inspector " +
-      "server binds loopback on the device), then GET /inspect/health. On success, sets the session " +
-      "default source to {kind:'live', port} so subsequent tool calls can omit `source`. Requires a " +
-      "create-cmp DEBUG build running on the device/emulator (the inspector is structurally absent from " +
-      "release builds). This tool never launches apps or emulators.",
+      "Tier 1 handshake, SELF-HEALING: ensures a device/emulator is attached, ensures the " +
+      "`adb forward tcp:<port> tcp:<port>` exists (creating it — the debug-only inspector server binds " +
+      "loopback on the device), then GETs /inspect/health. If health is dead it LAUNCHES the debug app " +
+      "(applicationId parsed from the project — composeApp/build.gradle.kts / create-cmp.json — never " +
+      "hardcoded; pass `projectDir` when the server's cwd is not the app repo, or `appId` to skip " +
+      "resolution) and re-polls with bounded backoff. On a `device offline`-class adb error (a stale adb " +
+      "server transport — the client says offline while `adb devices` says device) it resets the adb " +
+      "server (kill-server / start-server / wait-for-device) once and retries the whole sequence once. " +
+      "{relaunch:true} forces a VERIFIED restart from a known state (adb force-stop → optional `pm clear` " +
+      "via clearState → launch → health's processStartedAtMs proven to move forward). Every failure names " +
+      "the stage that failed and the one command to run next — never a bare timeout. On success, sets the " +
+      "session default source to {kind:'live', port} so subsequent tool calls can omit `source`; the " +
+      "result's `healed` lists what it had to fix (app-launched, adb-transport-reset, relaunched). " +
+      "Requires a create-cmp DEBUG build installed on the device (the inspector is structurally absent " +
+      "from release builds). This tool never starts emulators.",
     inputSchema: {
       port: z.number().int().optional().describe("Inspector port (default 9500)."),
       serial: z.string().optional().describe("adb device serial (when several devices are attached)."),
+      projectDir: z
+        .string()
+        .optional()
+        .describe("App repo root, for applicationId resolution when the app must be launched (default: cwd)."),
+      appId: z.string().optional().describe("Explicit applicationId (skips resolution from the project)."),
+      relaunch: z
+        .boolean()
+        .optional()
+        .describe("Force a verified relaunch (force-stop + launch, proven by processStartedAtMs advancing)."),
+      clearState: z
+        .boolean()
+        .optional()
+        .describe("With relaunch: also `pm clear` — pristine app data (Room DBs, prefs, first-run state)."),
     },
   },
-  guarded(async ({ port, serial }) => {
+  guarded(async ({ port, serial, projectDir, appId, relaunch, clearState }) => {
     const p = validatePort(port);
     const s = validateSerial(serial);
-    const args = [...(s ? ["-s", s] : []), "forward", `tcp:${p}`, `tcp:${p}`];
+    let result;
     try {
-      await execFileAsync("adb", args, { timeout: 5000 });
+      result = await connectLive({
+        port: p,
+        serial: s,
+        projectDir: projectDir ? resolvePath(projectDir) : undefined,
+        appId,
+        relaunch,
+        clearState,
+        exec: (cmd, args) => execFileAsync(cmd, args, { timeout: 20_000 }),
+        fetchHealthImpl: (o) => fetchHealth({ port: p, ...o }),
+      });
     } catch (err) {
-      return fail(
-        `adb forward failed (adb ${args.join(" ")}): ${err && err.message ? err.message : err}. ` +
-          "Is adb on PATH and a device/emulator attached (`adb devices`)?"
-      );
+      if (err instanceof ConnectError) {
+        return fail(`connect_live failed at stage '${err.stage}': ${err.message} Next: ${err.fix}`);
+      }
+      throw err;
     }
-    const health = await fetchHealth({ port: p }); // throws an actionable error if unreachable
     sessionDefaultSource = { kind: "live", host: "127.0.0.1", port: p };
     return ok({
       status: "connected",
       forwarded: `tcp:${p} -> tcp:${p}`,
       sessionDefaultSource,
-      health,
+      appId: result.appId,
+      healed: result.healed,
+      ...(result.relaunch ? { relaunch: result.relaunch } : {}),
+      health: result.health,
       remoteUrl: `http://127.0.0.1:${p}/inspect/remote`,
       remoteUrlHint:
         "Offer to open remoteUrl in the HUMAN's browser — it is the live device view: they " +
-        "watch and click-to-drive the real app while you inspect the tree (navigate_and_inspect / " +
-        "prove_change). Do not fetch it yourself.",
+        "watch and click-to-drive the real app while you inspect the tree (inspect_tree / " +
+        "navigate_and_inspect). Do not fetch it yourself.",
     });
   })
 );
@@ -533,95 +408,6 @@ server.registerTool(
         host: live.host || DEFAULT_HOST,
         port: validatePort(port ?? live.port),
         settleMs,
-      })
-    );
-  })
-);
-
-// sha256 of the previous capture_screen frame — the atomic verb's own staleness
-// baseline (independent of render_screen's, which tracks a different code path).
-let lastAtomicCaptureSha256 = null;
-
-server.registerTool(
-  "capture_screen",
-  {
-    title: "Atomic live capture: pixels + tree + hash from the SAME frame",
-    description:
-      "ONE observation of the running app that is provably coherent: pixels, semantics tree, sha256 and " +
-      "current route captured together, with a frame-stability proof (pixels are read before AND after " +
-      "the tree; the capture is accepted only when both reads hash identically — else it settles and " +
-      "retries, and after `maxAttempts` fails honestly with both hashes). Refuses a frame byte-identical " +
-      "to the previous capture_screen call unless `allowSame: true` (the stale-frame tripwire). Returns " +
-      "{ png (path — give it to the human, never read the bytes), width, height, sha256, tree, route?, " +
-      "attempts, sameAsPrevious }. This is the capture primitive walkthrough evidence is built from; " +
-      "prefer it over separate render_screen{live} + inspect_tree calls whenever pixels and structure " +
-      "must describe the same moment. Requires connect_live (or a reachable forward).",
-    inputSchema: {
-      out: z.string().optional().describe("Write the PNG here (default: a temp path)."),
-      allowSame: z
-        .boolean()
-        .optional()
-        .describe("Accept a frame identical to the previous capture (for legitimately static screens)."),
-      settleMs: z
-        .number()
-        .int()
-        .min(0)
-        .optional()
-        .describe("Wait between stability retries (default 300ms)."),
-      maxAttempts: z.number().int().min(1).max(10).optional().describe("Frame-stability retries (default 3)."),
-      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
-    },
-  },
-  guarded(async ({ out, allowSame, settleMs, maxAttempts, port }) => {
-    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
-    const result = await captureScreen({
-      host: live.host || DEFAULT_HOST,
-      port: validatePort(port ?? live.port),
-      out,
-      allowSame,
-      settleMs,
-      maxAttempts,
-      previousSha256: lastAtomicCaptureSha256,
-    });
-    lastAtomicCaptureSha256 = result.sha256;
-    return ok(result);
-  })
-);
-
-server.registerTool(
-  "relaunch_app",
-  {
-    title: "Deterministic app lifecycle: force-stop, (optionally) clear data, relaunch — verified",
-    description:
-      "Restart the running app from a KNOWN state instead of monkey-and-hope: adb force-stop, optional " +
-      "`pm clear` (clearState — pristine app data: databases, prefs, first-run state), launcher start, " +
-      "then polls GET /inspect/health until `processStartedAtMs` has moved STRICTLY FORWARD — the fresh " +
-      "process is proven by the receipt, not assumed (a retained ViewModel surviving an e2e run was the " +
-      "incident this exists for). Returns { relaunched, clearedState, beforeStartedAtMs, afterStartedAtMs }. " +
-      "appId is resolved from the live inspector's own health. Needs adb on PATH and the forward up; " +
-      "the adb forward survives an app restart (it is device-level), so no re-connect is needed after.",
-    inputSchema: {
-      clearState: z
-        .boolean()
-        .optional()
-        .describe("Also `pm clear` — wipes app data (Room DBs, prefs) for a first-run walk. Default false."),
-      serial: z.string().optional().describe("adb device serial (when several devices are attached)."),
-      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
-    },
-  },
-  guarded(async ({ clearState, serial, port }) => {
-    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
-    const p = validatePort(port ?? live.port);
-    const host = live.host || DEFAULT_HOST;
-    if (serial != null) validateSerial(serial);
-    const health = await fetchHealth({ host, port: p }); // actionable error if unreachable
-    return ok(
-      await relaunchApp({
-        appId: health.appId,
-        serial,
-        clearState,
-        exec: (cmd, args) => execFileAsync(cmd, args, { timeout: 15_000 }),
-        fetchHealthImpl: () => fetchHealth({ host, port: p }),
       })
     );
   })
@@ -731,35 +517,18 @@ server.registerTool(
 );
 
 server.registerTool(
-  "db_schema",
-  {
-    title: "List the running app's SQLite tables",
-    description:
-      "GET /inspect/db on the running app: tables via `sqlite_master` as { name, sql } (CREATE TABLE " +
-      "text). Read-only, off the main thread. Returns { tables:[...] }. 404 when the app's `room` " +
-      "feature is off. Requires connect_live.",
-    inputSchema: {
-      port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
-    },
-  },
-  guarded(async ({ port }) => {
-    const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
-    return ok(await fetchLiveDbSchema({ host: live.host || DEFAULT_HOST, port: validatePort(port ?? live.port) }));
-  })
-);
-
-server.registerTool(
   "db_query",
   {
     title: "Read rows from one SQLite table (read-only, bounded)",
     description:
-      "GET /inspect/db?table=<name>&limit=<n> on the running app. `table` must be a real name from " +
-      "db_schema — the device validates it strictly against `sqlite_master` before ever touching a " +
+      "GET /inspect/db?table=<name>&limit=<n> on the running app — assert PERSISTED state in the live " +
+      "tier. `table` must be a real table name (the app's Room schema JSONs and @Entity classes are " +
+      "in-repo) — the device validates it strictly against `sqlite_master` before ever touching a " +
       "query, so an unknown name 404s rather than running arbitrary SQL. Rows are capped by `limit` " +
       "(device-side default/max apply regardless of what's requested). Returns { table, columns, rows, " +
       "rowCount }. Requires connect_live.",
     inputSchema: {
-      table: z.string().describe("Exact table name (see db_schema)."),
+      table: z.string().describe("Exact table name (see the app's Room schema JSONs / @Entity classes)."),
       limit: z.number().int().positive().optional().describe("Row cap (device-side default/max still apply)."),
       port: z.number().int().optional().describe("Inspector port (default: the connect_live session port, else 9500)."),
     },
@@ -772,69 +541,11 @@ server.registerTool(
   })
 );
 
-server.registerTool(
-  "render_tree",
-  {
-    title: "Render the tree as an SVG wireframe",
-    description:
-      "Render the semantics tree (ANY source, including live) as a deterministic SVG wireframe: every " +
-      "node with a footprint as a rect, token-annotated nodes highlighted with a resolved-values chip " +
-      "('radius 16 · pad 16'), clickable nodes with a distinct outline, testTags as mono labels, text " +
-      "shown, plus a legend and a footer (nodeCount · source · schemaVersion). Writes the SVG to `out` " +
-      "and returns { svgPath, nodeCount, width, height } AND the SVG text — SVG is structured text, " +
-      "not pixels, so it is safe for model context. Set a11y:true to overlay audit violations in a " +
-      "danger style.",
-    inputSchema: {
-      source: sourceArg,
-      treePath: treePathArg,
-      out: z
-        .string()
-        .optional()
-        .describe(
-          "Where to write the SVG. Default: next to a file-source tree (tree.json -> tree.svg), " +
-            "else ./render-tree.svg in the caller's cwd."
-        ),
-      a11y: z.boolean().optional().describe("Overlay audit_a11y violations in the danger style."),
-      maxDepth: z.number().int().min(0).optional().describe("Only draw nodes up to this depth (root = 0)."),
-      scale: z.number().positive().optional().describe("Explicit px scale (default fits width to ~740)."),
-    },
-  },
-  guarded(async ({ source, treePath, out, a11y, maxDepth, scale }) => {
-    const tree = await resolveTree({ source, treePath });
-    const audit = a11y ? auditA11y(tree) : undefined;
-    const svg = renderTreeSvg(tree, { a11y: audit, maxDepth, scale });
-
-    let svgPath;
-    if (out) {
-      svgPath = resolvePath(out);
-    } else {
-      const desc = resolveSourceDescriptor({ source, treePath, sessionDefault: sessionDefaultSource });
-      svgPath =
-        desc.kind === "file" && desc.path
-          ? resolvePath(desc.path.replace(/\.json$/i, "") + ".svg")
-          : resolvePath(join(process.cwd(), "render-tree.svg"));
-    }
-    const dir = dirname(svgPath);
-    if (dir && dir !== ".") mkdirSync(dir, { recursive: true });
-    writeFileSync(svgPath, svg);
-
-    const { total } = countRenderable(tree, { maxDepth });
-    const [, w, h] = svg.match(/<svg[^>]* width="(\d+)" height="(\d+)"/) || [];
-    return ok({
-      svgPath,
-      nodeCount: total,
-      width: Number(w),
-      height: Number(h),
-      svg,
-    });
-  })
-);
-
 const RENDER_SCREEN_DISPLAY_HINT =
   "Pixels are for the HUMAN, structure is for the AI: do NOT read this PNG's bytes into model " +
   "context. To show it, write a small HTML file embedding <img src=\"file://<path>\"> and open it " +
   "(e.g. `open preview.html` on macOS), or attach the file through the host UI. For your own " +
-  "reasoning, use render_tree / inspect_tree on the same screen instead.";
+  "reasoning, use inspect_tree (optionally format:'wireframe') on the same screen instead.";
 
 server.registerTool(
   "render_screen",
@@ -852,7 +563,7 @@ server.registerTool(
       "current screen from GET /inspect/screenshot and writes it to `out` (or a temp file); " +
       "`pngPath` points at a PNG a harness already produced; `harness:true` runs the create-cmp " +
       "checkout's demo harness (bundled SampleScreen — use `projectDir` for real apps). Pair it " +
-      "with render_tree for the structural twin.",
+      "with inspect_tree (format:'wireframe') for the structural twin.",
     inputSchema: {
       source: z
         .object({
@@ -992,64 +703,6 @@ server.registerTool(
     }
     const meta = readPngMeta(target); // throws a clear error if missing / not a PNG
     return ok({ ...meta, displayHint: RENDER_SCREEN_DISPLAY_HINT });
-  })
-);
-
-// before/after accept the full source union, or a bare string as a file-path
-// shorthand (the typical `before` is a snapshot file saved pre-edit).
-const treeRefArg = (name) =>
-  z
-    .union([z.string().describe("File-path shorthand (= {kind:'file'})."), sourceArg.unwrap()])
-    .describe(
-      `The ${name} tree: a source union ({kind:"file"|"live"|"uiautomator"}) or a file path. ` +
-        `Typical use: before = a snapshot saved pre-edit, after = {kind:"live"} post-reload.`
-    );
-
-server.registerTool(
-  "prove_change",
-  {
-    title: "Prove what a change did (the verified dev loop)",
-    description:
-      "After editing code and reloading the app, ONE call proves what changed and that nothing " +
-      "regressed: structurally diffs the BEFORE tree (typically a pre-edit snapshot file) against the " +
-      "AFTER tree (typically {kind:'live'}), then regression-checks the AFTER tree with " +
-      "diff_against_design_system (catalog auto-fetched from /inspect/design-system when after is " +
-      "live) and audit_a11y. Returns { changes, regressions:{drift, driftChecked, a11y}, verdict: " +
-      "'proven-clean' | 'changed-with-regressions' | 'no-change' }.",
-    inputSchema: {
-      before: treeRefArg("BEFORE"),
-      after: treeRefArg("AFTER"),
-      catalogPath: z
-        .string()
-        .optional()
-        .describe("Declared design-system catalog JSON; optional when `after` is live (auto-fetched)."),
-      tolerancePx: z.number().min(0).optional().describe("Bounds-move tolerance in px (default 1)."),
-      minTouchTargetPx: z.number().positive().optional().describe("a11y touch-target minimum (default 48)."),
-    },
-  },
-  guarded(async ({ before, after, catalogPath, tolerancePx, minTouchTargetPx }) => {
-    const toSource = (ref) => (typeof ref === "string" ? { kind: "file", path: ref } : ref);
-    const beforeSource = toSource(before);
-    const afterSource = toSource(after);
-    const beforeTree = await resolveTree({ source: beforeSource });
-    const afterTree = await resolveTree({ source: afterSource });
-
-    // Catalog: explicit path wins; a live AFTER source auto-fetches the declared
-    // catalog; otherwise the drift check is skipped (driftChecked:false).
-    let catalog;
-    const afterDesc = resolveSourceDescriptor({
-      source: afterSource,
-      sessionDefault: sessionDefaultSource,
-    });
-    if (catalogPath || afterDesc.kind === "live") {
-      catalog = await resolveCatalog({
-        source: afterSource,
-        catalogPath,
-        sessionDefault: sessionDefaultSource,
-      });
-    }
-
-    return ok(proveChange({ beforeTree, afterTree, catalog, tolerancePx, minTouchTargetPx }));
   })
 );
 
@@ -1433,13 +1086,14 @@ server.registerTool(
   {
     title: "Diff a screen across the last two renders (one-call verified edit)",
     description:
-      "prove_change with ZERO bookkeeping: the preview service already retains the previous " +
+      "The verified dev loop with ZERO bookkeeping: the preview service already retains the previous " +
       "generation of every screen's tree, so this diffs a screen's LAST render against its " +
-      "CURRENT one — no pre-edit snapshot_save needed. Returns { changes, regressions:{drift, " +
-      "driftChecked, a11y}, verdict } like prove_change (drift is checked against the " +
-      "previews dir's design-system.json when present). Typical loop: edit → " +
-      "preview_status{waitForRender:true} → preview_diff{screen:<a changed id>}. Use " +
-      "snapshot_save + prove_change instead when the baseline must survive sessions/renders.",
+      "CURRENT one — no pre-edit snapshot needed. Returns { changes, regressions:{drift, " +
+      "driftChecked, a11y}, verdict: 'proven-clean' | 'changed-with-regressions' | 'no-change' } " +
+      "(drift is checked against the previews dir's design-system.json when present). Typical loop: " +
+      "edit → preview_status{waitForRender:true} → preview_diff{screen:<a changed id>}. For a " +
+      "baseline that must survive sessions, the lane's golden trees (qa/golden/, UPDATE_GOLDEN=1) " +
+      "are the durable regression layer.",
     inputSchema: {
       screen: z.string().describe("Registry screen id (see preview_status screens[].id)."),
       tolerancePx: z.number().min(0).optional().describe("Bounds-move tolerance in px (default 1)."),

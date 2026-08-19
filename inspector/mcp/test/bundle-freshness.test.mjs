@@ -93,8 +93,8 @@ test("dist/server.mjs boots and serves every tool with NO node_modules in scope"
     const list = messages.find((m) => m.id === 2);
     assert.ok(list && list.result, `tools/list produced no result. stderr: ${stderr.slice(0, 400)}`);
     const names = list.result.tools.map((t) => t.name);
-    assert.equal(names.length, 28, `the bundled registry is complete (got ${names.length})`);
-    for (const required of ["preview", "capture_screen", "relaunch_app", "approval_status", "review_comments"]) {
+    assert.equal(names.length, 15, `the bundled registry is complete (got ${names.length})`);
+    for (const required of ["preview", "connect_live", "inspect_tree", "approval_status", "review_comments"]) {
       assert.ok(names.includes(required), `${required} is in the bundled registry`);
     }
 

@@ -1,4 +1,4 @@
-// source.mjs — resolve WHICH tree (and catalog) a tool call operates on.
+// source.mjs — resolve WHICH tree a tool call operates on.
 //
 // Every tool accepts an optional discriminated-union `source`:
 //   { kind:"file",        path }                      — a tree JSON on disk (tier 0)
@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import { loadTree } from "./tree.mjs";
 import { convertUiautomatorXml } from "./uiautomator.mjs";
-import { fetchLiveTree, fetchLiveCatalog, DEFAULT_HOST, DEFAULT_PORT } from "./live.mjs";
+import { fetchLiveTree, DEFAULT_HOST, DEFAULT_PORT } from "./live.mjs";
 
 /**
  * Normalize the caller's inputs into a concrete source descriptor.
@@ -80,50 +80,4 @@ export async function resolveTree(params = {}) {
     default:
       throw new Error(`unknown source kind '${desc.kind}'.`);
   }
-}
-
-/**
- * Resolve the design-system CATALOG for diff_against_design_system:
- * explicit catalogPath wins; a live source falls back to GET /inspect/design-system.
- * @returns {Promise<object>} { colors, dimens }
- */
-export async function resolveCatalog(params = {}) {
-  const { catalogPath, fetchImpl } = params;
-  if (catalogPath) {
-    let raw;
-    try {
-      raw = readFileSync(catalogPath, "utf8");
-    } catch (err) {
-      if (err.code === "ENOENT") throw new Error(`catalog file not found: ${catalogPath}`);
-      throw new Error(`could not read catalog file '${catalogPath}': ${err.message}`);
-    }
-    try {
-      return JSON.parse(raw);
-    } catch (err) {
-      throw new Error(`catalog file '${catalogPath}' is not valid JSON: ${err.message}`);
-    }
-  }
-  const desc = resolveSourceDescriptor(params);
-  if (desc.kind === "live") {
-    return fetchLiveCatalog({ host: desc.host, port: desc.port, fetchImpl });
-  }
-  throw new Error(
-    "diff_against_design_system: `catalogPath` is required for non-live sources " +
-      "(with a live source the catalog is fetched from /inspect/design-system automatically)."
-  );
-}
-
-/**
- * Guard for token/drift tools: uiautomator trees carry no design tokens, so
- * asserting/diffing tokens on them is meaningless — fail loudly and clearly.
- */
-export function requireInstrumentedTree(tree, toolName) {
-  if (tree && tree.source === "uiautomator") {
-    throw new Error(
-      `${toolName} requires an instrumented source (tier 0 headless render or tier 1 live app): ` +
-        "the uiautomator tree carries no design tokens (custom semantics keys do not cross the " +
-        "accessibility bridge). Use source {kind:\"live\"} against a create-cmp debug build instead."
-    );
-  }
-  return tree;
 }

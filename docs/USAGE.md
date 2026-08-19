@@ -185,39 +185,43 @@ Resolution: explicit `source` → `treePath` → the `connect_live` session defa
 - **uiautomator (tier 2):** any app, zero instrumentation — but `designToken` is always `null`
   (tokens don't cross the accessibility bridge), so token/drift tools reject it.
 
-### The 26 tools
+### The 15 tools
 
-**Read & assert:** `inspect_tree` (full tree + counts) · `get_node {testTag}` · `assert_token
-{testTag,key,expected}` · `layout_gaps {testTagA,testTagB}` (computed spacing).
+A deliberately lean surface: two production apps proved that a wide tool catalog gets ignored
+while the verify lane and a few daily verbs carry all the flow. Token drift, a11y audits, and
+golden regression live in the **lane** (`tokenDrift`, `a11y`, `goldenTrees` steps), not in
+interactive twins.
 
-**Design-system:** `diff_against_design_system {catalogPath?}` (resolved vs declared token catalog;
-live auto-fetches it) · `find_drift` (footprint nodes with no token — un-tokenized/raw values).
+**Read & assert:** `inspect_tree` — the one tree contract: full tree + counts; `testTag` narrows
+to one subtree; `format:"wireframe"` returns the deterministic SVG wireframe (tokenized nodes
+with resolved-value chips, clickable outlines, optional `a11yOverlay`); `includeLayoutGaps`
+adds a computed-spacing report for consecutive tagged siblings.
 
-**Regression:** `snapshot_save {snapshotPath}` (normalized golden) · `snapshot_diff
-{snapshotPath,tolerancePx?}` (structural diff; kinds: node-added/-removed, text/testTag/
-contentDescription/designToken/role/clickable/disabled-changed, bounds-moved) · `audit_a11y
-{minTouchTargetPx?}` (touch-target-too-small, missing-label, empty-content-description).
+**Live (tier 1):** `connect_live {port?,serial?,relaunch?}` — self-healing handshake: device
+attached → `adb forward` ensured → health poll → app launched if dead (applicationId derived
+from the project, never hardcoded) → one adb-server transport reset on `device offline` — every
+failure names its stage and the one next command; returns `remoteUrl` and sets the session
+default source · `navigate_and_inspect {testTag?|x,y,settleMs?}` — resolves a tap from the live
+tree, taps via `POST /inspect/tap`, re-fetches, returns `{before, after, changed}` (structural
+navigation, zero pixels).
 
-**Live (tier 1):** `connect_live {port?,serial?}` — runs ONE `adb forward`, GETs `/inspect/health`,
-returns `remoteUrl` and sets the session default source · `navigate_and_inspect {testTag?|x,y,
-settleMs?}` — resolves a tap from the live tree, taps via `POST /inspect/tap`, re-fetches, returns
-`{before, after, changed}` (structural navigation, zero pixels).
+**Runtime (behavior, not just structure):** `runtime_crashes {since?}` — crash JSON written to
+`filesDir/inspector/crashes/` by the uncaught-exception handler (survives the process that
+crashed), intersected with recently-edited files for a `"your edit to X likely caused this"`
+attribution · `runtime_logs {since?,level?,limit?}` — structured `adb logcat --pid=<app pid>`
+entries, capped + tailed, never a firehose · `db_query {table,limit?}` — the app's Room DB,
+read-only, table identifier validated (never raw SQL from the wire): assert persisted state
+after a flow instead of trusting the UI. (Schema questions: the exported Room schema JSONs are
+already in the repo.)
 
-**Runtime (the AI half of the verification layer — behavior, not just structure):**
-`runtime_crashes {since?}` — crash JSON written to `filesDir/inspector/crashes/` by the
-uncaught-exception handler (survives the process that crashed), intersected with recently-edited
-files for a `"your edit to X likely caused this"` attribution · `runtime_logs {since?,level?,
-limit?}` — structured `adb logcat --pid=<app pid>` entries, capped + tailed, never a firehose ·
-`db_schema {}` / `db_query {table,limit?}` — the app's Room DB, read-only, table identifier
-validated (never raw SQL from the wire): what tables exist, what's actually in them after a flow.
-
-**Render:** `render_tree {source?,a11y?}` — deterministic **SVG wireframe** (any source; tokenized
-nodes highlighted with resolved-value chips, clickable outlines, optional a11y overlay); SVG is
-text, so it's returned inline · `render_screen` — **pixel preview, path-only**: returns
+**Render:** `render_screen` — **pixel preview, path-only**: returns
 `{path,width,height,sizeBytes,displayHint}` from the PNG header, never bytes. From
 `projectDir` (+ `screen?` registry id — through the resident preview daemon when one is running
 (`via:"daemon"`, ~1s warm) else the app's own `:composeApp:renderScreens`, also returns
 `treePath`), live (`/inspect/screenshot`), a `pngPath`, or the demo harness.
+
+**Console bridge:** `approval_status {waitForDecision?}` · `review_comments {waitForComment?}` ·
+`resolve_comment {id,note}` · `snapshot_variant {name}` (genesis design-language candidates).
 
 **The agent edit loop** (the reason these tools exist — use it while BUILDING, not only when
 asked): 1) `preview {projectDir}` once; 2) edit code; 3) `preview_status {waitForRender:true}` —
@@ -233,7 +237,7 @@ transparent); returns per-screen structural summaries + tree paths · `preview_s
 until the next render or hot-recompile outcome, then returns `changedLastRender`,
 `lastError`/`lastErrorSource` (`"compile"` = the edit didn't build — a watchdog compile check
 surfaces daemon-mode failures the hot recompiler hides), `lastActivity`, and per-screen summaries (`lastChangedVersion` keeps
-attribution across renders) · `preview_diff {screen}` — prove_change between a screen's last two
+attribution across renders) · `preview_diff {screen}` — a verified structural diff between a screen's last two
 renders with ZERO snapshot bookkeeping (the service retains the previous generation; drift checked
 against the previews dir's design-system.json) · `preview_stop` —
 shut the service down (the Gradle daemon stays warm).
@@ -269,11 +273,6 @@ returns the refreshed snapshot · `resolve_comment {id, note}` — closes a comm
 has acted on it (author recorded as the agent), refusing an unknown id or a comment already
 resolved. Approvals gate the lane; comments never do — they're advisory input the agent is
 expected to read and act on, not a blocking check.
-
-**Verify:** `prove_change {before, after, catalogPath?}` — the verified-dev-loop keystone in one
-call: diffs before/after, regression-checks the after tree (drift + a11y), returns
-`{changes, regressions, verdict}` with verdict `proven-clean` | `changed-with-regressions` |
-`no-change`.
 
 ### The in-app server (tier 1 plumbing)
 
@@ -423,14 +422,14 @@ The same JVM target hosts the inspector's headless tier-0 renders.
 
 ### D. The verified dev loop (THE core workflow) — *prompt → watch → prove*
 
-For any UI change in a create-cmp app, a change **isn't done until `prove_change` says so**:
+For any UI change in a create-cmp app, a change **isn't done until the proof call says so**:
 
-1. `snapshot_save {source:{kind:"live"}}` → `before.json` (before editing).
-2. Make the code change (agent edits source).
-3. Reload — hot reload (desktop) or reinstall (device).
-4. `prove_change {before:"before.json", after:{kind:"live"}}` → structural diff + drift + a11y +
-   **verdict**.
-5. `render_tree {source:{kind:"live"}}` → show the human the after-state wireframe.
+1. `preview {projectDir}` once per session (or `connect_live` for the on-device tier).
+2. Make the edit.
+3. `preview_status {waitForRender:true}` → which screens changed, or the compile error.
+4. `preview_diff {screen}` → structural diff + drift + a11y regressions + verdict
+   (`proven-clean` / `changed-with-regressions` / `no-change`).
+5. `inspect_tree {format:"wireframe"}` → show the human the after-state wireframe.
 
 The agent reports *"title bounds grew, `GapCard` unchanged, no drift, no a11y regressions:
 **proven-clean**"* — it demonstrates the change from the rendered tree instead of claiming it.
@@ -438,9 +437,9 @@ The agent reports *"title bounds grew, `GapCard` unchanged, no drift, no a11y re
 ### E. Live inspection + the human live view
 
 `connect_live` → `remoteUrl` (offer to open it: the human watches the real device and clicks to
-tap). Agent side: `inspect_tree`, `get_node`, `navigate_and_inspect {testTag}` to drive + re-observe,
-`diff_against_design_system` / `find_drift` for token fidelity, `audit_a11y` for touch targets,
-`render_tree`/`render_screen` to show.
+tap). Agent side: `inspect_tree` (subtree via `testTag`), `navigate_and_inspect {testTag}` to
+drive + re-observe; token fidelity and touch targets are the lane's `tokenDrift` and `a11y`
+steps; `inspect_tree {format:"wireframe"}` / `render_screen` to show.
 
 ### F. Tests that write themselves
 
@@ -491,7 +490,7 @@ conforming slice, green tests at every layer, lane PASS.
 ## 9. Invariants (never violate these)
 
 - **No pixels in model context.** `render_screen` and the screenshot route return **paths**, not
-  bytes; `render_tree` returns SVG (text) — fine. The remote page is for the human.
+  bytes; `inspect_tree {format:"wireframe"}` returns SVG (text) — fine. The remote page is for the human.
 - **Determinism.** Don't hand-generate what the engine stamps. To change the skeleton, change the
   template + version set, not one output.
 - **Feature toggles are delete-before-rename.** Declare feature paths with the literal
@@ -517,7 +516,7 @@ node bin/create-cmp.mjs upgrade --dry-run     # then --verify to apply+prove
 (cd my-app && ./gradlew :composeApp:hotRunDesktop --auto)
 # live inspection
 (cd my-app && ./gradlew :composeApp:installDebug) ; adb forward tcp:9500 tcp:9500
-#   then in Claude: connect_live → inspect_tree → navigate_and_inspect → prove_change
+#   then in Claude: connect_live → inspect_tree → navigate_and_inspect → preview_diff
 ```
 
 **Deeper dives:** [`ARCHITECTURE.md`](./ARCHITECTURE.md) (engine) · [`INSPECTOR-PLAN.md`](./INSPECTOR-PLAN.md)

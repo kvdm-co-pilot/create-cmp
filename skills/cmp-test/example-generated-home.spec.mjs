@@ -20,7 +20,7 @@
 //   2. accessibility id == contentDescription — works out of the box.
 //   3. text xpath — works out of the box; last resort, brittle against copy changes.
 // NO coordinates, NO pixels: taps go through semantic selectors; geometry claims (48dp
-// touch targets, card gaps) live in the inspector layer (audit_a11y / golden trees).
+// touch targets, card gaps) live in the inspector layer (the lane's a11y step / golden trees).
 // ═════════════════════════════════════════════════════════════════════════════════════════
 
 import { AppiumClient } from './lib/appium-client.mjs';
@@ -63,7 +63,7 @@ async function main() {
     // ── 2. THE ACTION BUTTON — observed as a labeled clickable ─────────────────────────
     // Tree: testTag="home_action" contentDescription="Add item" role="Button"
     // clickable=true bounds=48x48. Presence + clickability are asserted semantically here;
-    // the 48x48 touch-target GEOMETRY is the inspector's job (audit_a11y + the golden
+    // the 48x48 touch-target GEOMETRY is the inspector's job (the lane's a11y step + the golden
     // tree), not Appium's.
     await client.waitForElement('accessibility id', 'Add item', 10000);
     const actionIsClickable = await client.elementExists(

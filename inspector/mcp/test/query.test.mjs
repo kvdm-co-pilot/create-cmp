@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import { loadTree } from "../src/lib/tree.mjs";
-import { getNode, assertToken, layoutGaps } from "../src/lib/query.mjs";
+import { getNode, layoutGaps, siblingLayoutGaps } from "../src/lib/query.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const tree = loadTree(join(here, "..", "fixtures", "tree.json"));
@@ -18,32 +18,6 @@ test("getNode hits by testTag", () => {
 
 test("getNode misses cleanly", () => {
   assert.equal(getNode(tree, "does_not_exist"), null);
-});
-
-test("assertToken passes when resolved value matches", () => {
-  const node = getNode(tree, "card_one");
-  const r = assertToken(node, "radius", "16dp");
-  assert.equal(r.pass, true);
-  assert.equal(r.actual, "16dp");
-  assert.equal(r.expected, "16dp");
-});
-
-test("assertToken fails when resolved value differs", () => {
-  const node = getNode(tree, "card_two");
-  const r = assertToken(node, "radius", "16dp");
-  assert.equal(r.pass, false);
-  assert.equal(r.actual, "24dp");
-});
-
-test("assertToken fails gracefully on missing key / null node", () => {
-  const node = getNode(tree, "card_one");
-  const r = assertToken(node, "nonexistentKey", "x");
-  assert.equal(r.pass, false);
-  assert.equal(r.actual, null);
-
-  const r2 = assertToken(null, "radius", "16dp");
-  assert.equal(r2.pass, false);
-  assert.equal(r2.actual, null);
 });
 
 test("layoutGaps computes vertical gap and deltas between stacked nodes", () => {
@@ -68,4 +42,14 @@ test("layoutGaps computes horizontal gap for side-by-side boxes", () => {
 
 test("layoutGaps throws a clear error when bounds are missing", () => {
   assert.throws(() => layoutGaps({}, getNode(tree, "home_title")), /no bounds/);
+});
+
+test("siblingLayoutGaps reports gaps between consecutive tagged siblings, tree-wide", () => {
+  const report = siblingLayoutGaps(tree);
+  const hit = report.find((r) => r.a === "home_title" && r.b === "home_subtitle_raw");
+  assert.ok(hit, "adjacent tagged siblings under root are reported");
+  assert.equal(hit.parentPath, "root");
+  assert.equal(hit.gaps.gapY, 8);
+  // pairs are consecutive only — first and third tagged siblings are not paired
+  assert.ok(!report.some((r) => r.a === "home_title" && r.b === "card_one"));
 });

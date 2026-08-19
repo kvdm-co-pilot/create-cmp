@@ -8,7 +8,6 @@ import {
   fetchLiveCatalog,
   fetchLiveNav,
   fetchLiveCrashes,
-  fetchLiveDbSchema,
   fetchLiveDbQuery,
   validatePort,
   validateSerial,
@@ -159,18 +158,6 @@ test("fetchLiveCrashes: parses { crashes:[...] }", async () => {
     const data = await fetchLiveCrashes({ port });
     assert.equal(data.crashes.length, 1);
     assert.equal(data.crashes[0].exception, "java.lang.NullPointerException");
-  } finally {
-    server.close();
-  }
-});
-
-test("fetchLiveDbSchema: parses { tables:[...] }", async () => {
-  const { server, port } = await startStub({
-    "/inspect/db": [200, { tables: [{ name: "items", sql: "CREATE TABLE items (id TEXT)" }] }],
-  });
-  try {
-    const schema = await fetchLiveDbSchema({ port });
-    assert.deepEqual(schema.tables, [{ name: "items", sql: "CREATE TABLE items (id TEXT)" }]);
   } finally {
     server.close();
   }

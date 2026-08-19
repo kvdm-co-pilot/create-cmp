@@ -110,11 +110,6 @@ export function fetchLiveCrashes(opts = {}) {
   return fetchJson("/inspect/crashes", opts);
 }
 
-/** GET /inspect/db → schema { tables:[{name,sql}] }. */
-export function fetchLiveDbSchema(opts = {}) {
-  return fetchJson("/inspect/db", opts);
-}
-
 /**
  * GET /inspect/db?table=<name>&limit=<n> → { table, columns, rows, rowCount }.
  * `table` is required (this is the caller's identifier to read, not free-form SQL — the
@@ -122,7 +117,7 @@ export function fetchLiveDbSchema(opts = {}) {
  */
 export function fetchLiveDbQuery({ table, limit, ...opts } = {}) {
   if (!table || typeof table !== "string") {
-    throw new Error("fetchLiveDbQuery requires a string `table` (see fetchLiveDbSchema for valid names).");
+    throw new Error("fetchLiveDbQuery requires a string `table` (a real table name — see the app's Room schema JSONs).");
   }
   const qs = new URLSearchParams({ table });
   if (limit != null) qs.set("limit", String(limit));

@@ -5,7 +5,7 @@ import __PACKAGE__.domain.repository.ItemRepository
 import __PACKAGE__.domain.usecase.GetItemsUseCase
 import __PACKAGE__.presentation.home.HomeViewModel
 // cmp:anchor di-imports
-import org.koin.core.module.dsl.viewModelOf
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val repositoryModule = module {
@@ -19,7 +19,10 @@ val useCaseModule = module {
 }
 
 val viewModelModule = module {
-    viewModelOf(::HomeViewModel)
+    // Explicit factories only — never reflection-based viewModelOf (ARCH-14): it silently
+    // ignores constructor default parameter values, turning a compile-time wiring error
+    // into a runtime resolution crash. One get() per constructor dependency.
+    viewModel { HomeViewModel(get()) }
     // cmp:anchor di-viewmodels
 }
 

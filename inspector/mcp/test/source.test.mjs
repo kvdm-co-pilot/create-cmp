@@ -4,12 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import {
-  resolveSourceDescriptor,
-  resolveTree,
-  resolveCatalog,
-  requireInstrumentedTree,
-} from "../src/lib/source.mjs";
+import { resolveSourceDescriptor, resolveTree } from "../src/lib/source.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const TREE_PATH = join(here, "..", "fixtures", "tree.json");
@@ -97,35 +92,4 @@ test("resolveTree live kind fetches /inspect/tree via the injected fetch", async
   });
   assert.equal(tree.source, "live-android");
   assert.equal(tree.root.testTag, "home_title");
-});
-
-test("resolveCatalog: explicit path wins; live source falls back to /inspect/design-system; file source demands a path", async () => {
-  const catalog = await resolveCatalog({
-    catalogPath: join(here, "..", "fixtures", "design-system.json"),
-    env: NO_ENV,
-  });
-  assert.equal(catalog.dimens.PaddingPage, "16dp");
-
-  const liveCatalog = await resolveCatalog({
-    source: { kind: "live", port: 9500 },
-    env: NO_ENV,
-    fetchImpl: stubFetch({ "/inspect/design-system": { colors: {}, dimens: { GapCard: "12dp" } } }),
-  });
-  assert.equal(liveCatalog.dimens.GapCard, "12dp");
-
-  await assert.rejects(
-    () => resolveCatalog({ treePath: TREE_PATH, env: NO_ENV }),
-    /catalogPath.*required/s
-  );
-});
-
-test("requireInstrumentedTree rejects uiautomator trees for token tools, passes others", () => {
-  assert.throws(
-    () => requireInstrumentedTree({ source: "uiautomator", root: {} }, "assert_token"),
-    /assert_token requires an instrumented source/
-  );
-  const live = { source: "live-android", root: {} };
-  assert.equal(requireInstrumentedTree(live, "find_drift"), live);
-  const headless = { source: "headless-jvm", root: {} };
-  assert.equal(requireInstrumentedTree(headless, "find_drift"), headless);
 });

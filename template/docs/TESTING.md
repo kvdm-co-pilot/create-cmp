@@ -9,6 +9,7 @@ copy their shape.
 | Conformance gates (ARCH clauses) | `composeApp/src/desktopTest/…/conformance` | same task |
 | Screen behavior — Compose UI Test (spec-cited) | `composeApp/src/desktopTest/…/presentation` | same task |
 | Golden trees (structure) | `qa/golden/` + `HomeGoldenTreeTest` | same task |
+| Instrumented behavior (platform facts) | `composeApp/src/androidInstrumentedTest` | `./gradlew :composeApp:connectedDebugAndroidTest` (device attached) |
 <!-- >>> cmp:feature e2e -->
 | E2E smoke (few) | `qa/e2e/*.yaml` (Maestro) | `maestro test qa/e2e/smoke.yaml` |
 <!-- <<< cmp:feature e2e -->
@@ -46,6 +47,45 @@ Every durable test cites the spec clause it verifies (`// SPEC: HOME-02` — see
 
 Never delete, weaken, or `@Ignore` a failing test to get green. Fix the behavior — or if the
 test is genuinely wrong, change it and say so explicitly in your PR/summary.
+
+## The instrumented tier — platform behavior
+
+This seam exists because platform behavior escapes every desktop tier. Alarms,
+notifications, lock-screen/full-screen intents, notification channels, PendingIntent
+identity, audio routing, process death, and runtime permissions are OS facts:
+`desktopTest` runs on a JVM, golden trees pin structure, the conformance suite is static,
+and the E2E smoke taps UI without asserting anything about the shade or the alarm table.
+A feature whose whole point is "the phone alerts" can ship fully green from every other
+tier and never alert — that class of defect escaped to production repeatedly before this
+tier existed. When your feature touches alarms, notifications, or locks, its behavior
+test lives here.
+
+**What belongs here:** claims only the OS can witness — a notification actually reached
+the shade, a channel holds the importance the feature needs, N logical alarms occupy N
+PendingIntent slots, the alert path plays with `USAGE_ALARM` on a silenced ringer, the
+app survives process death, a permission-gated path degrades correctly.
+
+**What does not:** logic (→ `commonTest`), rendered structure (→ golden trees),
+architecture rules (→ conformance), UI journeys (→ E2E flows). If a JVM test can prove
+it, a JVM test is where it goes — this tier is the most expensive seat in the house.
+
+**Cost model:** needs a device/emulator, so it runs at checkpoint cadence — the lane's
+`androidChecks` step (`connectedDebugAndroidTest`) SKIPs honestly when no device is
+attached and runs in `local`/`ci` when one is, with the `release` profile adding the
+release-APK smoke on top. It is not an inner-loop tier; don't reach for it per-edit.
+
+**The helpers** (`androidInstrumentedTest/…/testing/`), small and composable — see
+`PlatformBehaviorSeamTest` for the exemplar shape:
+
+- `NotificationAsserts` — bounded-poll wait for a posted notification (id/tag or
+  predicate), channel-exists with an importance floor, full-screen-intent capability
+  (API-aware).
+- `AlarmAsserts` — the OS alarm table (`dumpsys alarm`) parsed per-package;
+  alarm-registered and N-distinct-alarms assertions (the PendingIntent-identity
+  collision, caught mechanically).
+- `SystemState` — snapshot/restore of ringer mode and DND so audio-routing claims are
+  testable; its header is honest about what instrumentation cannot control (OEM sound
+  policy, Doze wakeups, "a human heard it") — those stay a documented manual tier.
 
 <!-- >>> cmp:feature e2e -->
 ## E2E

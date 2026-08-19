@@ -85,6 +85,12 @@ the tree. The governed `architecture` artifact (below) hashes the document along
 - Never delete, weaken, or `@Ignore` a failing test to reach green. Fix the behavior — or,
   if the test itself is wrong, say so in your summary and justify the change.
 
+**Platform behavior tests live in `composeApp/src/androidInstrumentedTest`** — when a
+feature touches alarms, notifications, lock-screen intents, or audio routing, its behavior
+test goes there (helpers: `NotificationAsserts`, `AlarmAsserts`, `SystemState`; exemplar:
+`PlatformBehaviorSeamTest`), because no desktop tier can see those OS facts. The lane's
+`androidChecks` step runs them when a device is attached; see `docs/TESTING.md`.
+
 ## Evidence
 
 `node qa/verify.mjs` writes `qa/evidence/latest.json` (schema: `qa/evidence/schema.json`).
@@ -305,16 +311,35 @@ and tells you what your edit changed.
 3. `preview_diff { screen }` proves the change in one call: `proven-clean` /
    `changed-with-regressions` / `no-change`. No snapshot bookkeeping.
 
-**Without the plugin:** `./gradlew :composeApp:renderScreens` renders every screen to
-`composeApp/build/previews/<id>/{screen.png, tree.json}` (`-Pscreen=<id>` for one);
-`node qa/preview-gallery.mjs` builds a self-contained gallery page from the output.
+**If the tools are missing:** capability absence is a fault to diagnose and report — never
+a silent fallback. If ToolSearch finds no `cmp-inspector` tools, STOP and tell the human
+which it is: the plugin is disabled (`enabledPlugins` in `~/.claude/settings.json` or the
+project settings); the session predates the plugin's enablement (MCP servers attach at
+session start — restart the session; no in-session retry will surface them); or the plugin
+copy is stale/broken (run cmp-doctor's inspector-MCP check group). Report before degrading.
+
+**Degraded path** — for environments where the plugin is genuinely unavailable (CI, other
+agents), and only after the fault is reported: `./gradlew :composeApp:renderScreens` renders
+every screen to `composeApp/build/previews/<id>/{screen.png, tree.json}` (`-Pscreen=<id>`
+for one); `node qa/preview-gallery.mjs` builds a self-contained gallery page from the
+output. What this loses: on-save re-render, changed-screen attribution, compile errors
+in-band, and the `preview_diff` change proof — structured feedback replaced by pixels.
 
 **Live tier — the human's live device view (standing step).** Whenever `connect_live`
 succeeds, OFFER the `remoteUrl` it returns (`http://127.0.0.1:9500/inspect/remote`) to the
 human — every time, not as a maybe. It is a self-contained browser page that mirrors the
 running app (~700ms refresh) with click-to-tap driving the real device: they watch and drive
-the actual app while you assert on the tree (`navigate_and_inspect` / `prove_change` /
-`db_query`). It is also the right way for a human to *watch* an e2e run.
+the actual app while you assert on the tree (`navigate_and_inspect` — its before/after delta
+is the change proof live — and `inspect_tree`). It is also the right way for a human to
+*watch* an e2e run.
+
+Asserting persisted state: `db_query` reads bounded rows from the running app's database;
+use it when a flow's proof is a row existing (or not) after an action, instead of shelling
+into sqlite or trusting the UI.
+
+When the app crashes or misbehaves on device: `runtime_crashes` returns persisted crashes
+with cause attribution and `runtime_logs` bounded structured logcat for the app's pid; use
+these before hand-grepping `adb logcat`.
 
 Screens come from `inspector/PreviewRegistry.kt` (desktopMain). The `add-feature` and
 `add-screen` stampers auto-register stamped screens at the `// cmp:anchor preview-registry`
@@ -347,3 +372,5 @@ conventions) · [`CONTRIBUTING.md`](./CONTRIBUTING.md) (workflow, Conventional C
 | `./gradlew :composeApp:assembleDebug` | Android debug build |
 | `./gradlew :composeApp:assembleRelease` | Android release build — R8 + `lintVital`, the variant the lane's `releaseBuild` step proves. Produces an **unsigned** APK; signing needs a keystore, which is yours to create and keep out of the repo. |
 | `./gradlew :composeApp:hotRunDesktop --auto` | Desktop dev-client with hot reload |
+| `./gradlew :composeApp:connectedDebugAndroidTest` | Instrumented behavior tests on the attached device (the lane's `androidChecks` step) |
+| `node qa/verify.mjs --profile release` | Ship-time lane: everything `ci` proves plus the release-APK Maestro smoke (`releaseSmoke`) |

@@ -17,8 +17,15 @@ the agent's fast feedback tier answers "No preview service is running":
 `approval_status` (incl. `waitForDecision`) · `review_comments` (incl. `waitForComment`) ·
 `resolve_comment` · `preview_stop`
 
-(`snapshot_save`/`snapshot_diff`/`prove_change` were never gated — they take explicit
+(`snapshot_save`/`snapshot_diff`/`prove_change` were never gated — they took explicit
 sources. The gap is these seven.)
+
+> **2026-08-19 note:** the tool surface was consolidated after this proposal shipped
+> (`agent-flow-retrospective.md` §5, 28 → 15 public tools). All seven console-backed tools
+> above survive unchanged and this protocol remains the wire of record for them.
+> `snapshot_save`/`snapshot_diff`/`prove_change` no longer exist as public tools — their
+> jobs live in `preview_diff` (which already computes server-side per decision 3) and the
+> lane's `goldenTrees` step.
 
 ## Decisions
 

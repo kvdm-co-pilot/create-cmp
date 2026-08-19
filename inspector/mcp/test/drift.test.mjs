@@ -5,34 +5,13 @@ import { dirname, join } from "node:path";
 import { readFileSync } from "node:fs";
 
 import { loadTree } from "../src/lib/tree.mjs";
-import { findDrift, diffAgainstDesignSystem } from "../src/lib/drift.mjs";
+import { diffAgainstDesignSystem } from "../src/lib/drift.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const tree = loadTree(join(here, "..", "fixtures", "tree.json"));
 const catalog = JSON.parse(
   readFileSync(join(here, "..", "fixtures", "design-system.json"), "utf8")
 );
-
-test("findDrift catches the un-tokenized text node", () => {
-  const drift = findDrift(tree);
-  const tags = drift.map((d) => d.testTag);
-  assert.ok(tags.includes("home_subtitle_raw"), "should flag the untokenized subtitle");
-});
-
-test("findDrift does NOT flag tokenized nodes", () => {
-  const drift = findDrift(tree);
-  const tags = drift.map((d) => d.testTag);
-  assert.ok(!tags.includes("home_title"));
-  assert.ok(!tags.includes("card_one"));
-  assert.ok(!tags.includes("card_two"));
-});
-
-test("findDrift includes path, bounds and a reason", () => {
-  const entry = findDrift(tree).find((d) => d.testTag === "home_subtitle_raw");
-  assert.equal(entry.path, "root.children[1]");
-  assert.equal(entry.bounds.width, 328);
-  assert.match(entry.reason, /un-tokenized/);
-});
 
 test("diffAgainstDesignSystem catches the contradicting radius on card_two", () => {
   const drift = diffAgainstDesignSystem(tree, catalog);

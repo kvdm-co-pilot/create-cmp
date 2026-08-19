@@ -6,20 +6,18 @@ description: >-
   "inspect the Compose UI", "read the design tokens", asks "why is this padding wrong", "check for
   token drift", "is this screen matching the design system", "debug this Compose layout without
   screenshots", "what colour/radius/spacing did this actually render", "assert the resolved tokens",
-  "diff this screen against the design system", "snapshot this screen as a regression golden",
   "did this UI change / regress", or "audit this screen for accessibility (touch targets, missing
   labels)", "inspect the RUNNING app", "what's on the screen right now", "check the real
   navigation state", "show me the screen / a preview / a wireframe of the UI", or "prove this UI
   change did what it should". Drives the create-cmp inspector: either render a screen headlessly
   with the harness (tier 0) or connect to the RUNNING debug app's live endpoint (tier 1:
   connect_live + source {kind:"live"} — real data, real nav state), then query with the
-  cmp-inspector MCP tools (get_node, assert_token, layout_gaps, diff_against_design_system,
-  find_drift, snapshot_save, snapshot_diff, audit_a11y, render_tree, render_screen, prove_change,
-  navigate_and_inspect). Also covers "drive the running app", "tap the app and check the screen",
+  cmp-inspector MCP tools (inspect_tree — whole tree, one testTag subtree, wireframe SVG, or
+  layout-gap report; navigate_and_inspect; render_screen; db_query; runtime_crashes;
+  runtime_logs). Also covers "drive the running app", "tap the app and check the screen",
   "let me watch/click the app from my browser" (connect_live's remoteUrl live device view).
-  Asserts on the rendered STRUCTURE, not pixels — catches token drift (raw values where a token
-  belongs), layout faults, UI regressions, and a11y faults mechanically — and proves every UI
-  change with prove_change (the verified dev loop).
+  Asserts on the rendered STRUCTURE, not pixels — layout faults, UI regressions, and navigation
+  state are read mechanically from the tree; token drift and a11y are gated by the verify lane.
 ---
 
 # cmp-inspect — read a live Compose UI as structured design data
@@ -28,6 +26,22 @@ Your job: answer "what did this Compose screen actually render, and does it matc
 by inspecting **structured JSON** — hierarchy + geometry + resolved design tokens — **never a
 screenshot**. Screenshots burn tokens, degrade to pixel-guessing for colours/spacing, and can't read
 theme tokens at all. This skill drives the `cmp-inspector` MCP over a fixed JSON tree contract.
+
+## Before any inspector call: confirm the capability (fail loud)
+
+The cmp-inspector MCP tools are a capability, not a given. Before your first call, confirm
+they resolve (ToolSearch for "cmp-inspector"). If no tools match, **STOP — do not fall back
+to screenshots, raw adb, or manual Gradle silently.** Diagnose in order and REPORT to the human:
+
+1. **Plugin enabled?** Check `enabledPlugins` in `~/.claude/settings.json` (or the project's
+   `.claude/settings.json`).
+2. **Session older than the plugin's enablement?** MCP servers attach at session START — a
+   session born without the plugin never gains its tools, and no amount of in-session
+   retrying will surface them. The fix is restarting the session.
+3. **Plugin copy stale or server broken?** Run cmp-doctor's inspector-MCP check group.
+
+Only after reporting may the documented degraded path be used — and the report must name what
+is lost: structured trees and change proofs replaced by pixels.
 
 > **No-pixels rule.** Do not screenshot the app to reason about layout, colour, or spacing. Render
 > the semantics tree and assert on it. The tree carries the *resolved* design token — strictly
@@ -50,12 +64,12 @@ Use for previews and layout/token assertions on the app's real screens:
    same viewport), plus `design-system.json` and a `manifest.json`. Parameters are `-P`
    properties, NEVER `--args` (Gradle word-splits it into task names). Or in one MCP call:
    `render_screen { projectDir, screen? }` runs the task and returns the PNG metadata +
-   `treePath`. (The create-cmp checkout also has a standalone demo harness in
-   `inspector/harness/` rendering a bundled SampleScreen — for real apps use the project task.)
+   `treePath`. (Prefer the **cmp-preview** loop when you're editing — its resident service
+   renders on save and owns the change-proof verdict.)
 2. **Show the human** — `node qa/preview-gallery.mjs` builds one self-contained
    `composeApp/build/previews/index.html`: pixels + wireframe + a11y per screen. Open it in a
    browser; regenerate after any edit. No device, no emulator, no app launch.
-3. **Inspect** — call the `cmp-inspector` MCP tools against a screen's tree, passing
+3. **Inspect** — call `inspect_tree` against a screen's tree, passing
    `treePath` (or `source:{kind:"file",path}`, or export `CMP_INSPECTOR_TREE` once and omit it).
 
 **Tier 1 (LIVE) — build → connect → inspect the running app.** Use when the question involves
@@ -65,24 +79,23 @@ Use for previews and layout/token assertions on the app's real screens:
    :composeApp:installDebug`, then launch it). Every create-cmp app scaffolded with the default
    `--inspector` feature ships a debug-only loopback HTTP server on `127.0.0.1:9500`
    (androidDebug source set only — release builds contain no inspector code).
-2. **`connect_live { port?: 9500, serial? }`** — runs one bounded `adb forward tcp:9500 tcp:9500`
-   and health-checks `/inspect/health`. On success it sets the session default source, so every
-   subsequent tool call can just omit `source`.
+2. **`connect_live { port?: 9500, serial?, relaunch? }`** — the self-healing handshake: it
+   ensures a device is attached, ensures the `adb forward`, polls `/inspect/health`, launches
+   the app itself if health is dead, and resets a stale adb transport once before giving up.
+   Pass `relaunch: true` to force a fresh app process (proven by `processStartedAtMs` moving
+   forward). On success it sets the session default source, so every subsequent tool call can
+   just omit `source`; its result's `healed` list says what it had to fix, and every failure
+   names the stage that failed plus the one command to run next.
 3. **Inspect** — call any tool with `source:{kind:"live"}` (or nothing, after connect_live). Each
-   call re-fetches the tree, so it always reflects the CURRENT screen: navigate the app (Appium
-   MCP / adb), call `inspect_tree` again, and assert the nav-state change structurally (e.g.
-   `home_title` gone, detail content present). Trees carry `source:"live-android"`.
-   `diff_against_design_system` needs no `catalogPath` live — the declared catalog is fetched
-   from `/inspect/design-system`.
-
-   Cold start: if you get "compose root not ready / not reachable", the app is still launching —
-   retry after a second or two. If `connect_live` fails, check `adb devices` and that the app is a
-   DEBUG build of a create-cmp app (the server is structurally absent from release).
+   call re-fetches the tree, so it always reflects the CURRENT screen: navigate the app
+   (`navigate_and_inspect`), call `inspect_tree` again, and assert the nav-state change
+   structurally (e.g. `home_title` gone, detail content present). Trees carry
+   `source:"live-android"`.
 
 **Tier 2 (uiautomator fallback)** — when the app is NOT a create-cmp debug build (third-party,
 release build) or tier 1 is unreachable: get Appium `getPageSource` XML and pass
 `source:{kind:"uiautomator", xml}` (or `xmlPath`). You get geometry + text + clickability for any
-app, but `designToken` is always null — token/drift tools reject these trees by design.
+app, but `designToken` is always null — token-aware consumers reject these trees by design.
 
 ## The tree contract you assert on
 
@@ -108,71 +121,72 @@ which is only possible because create-cmp owns the theme and the component kit.
 
 Nodes may also carry **optional interaction fields** (additive, still schemaVersion 1; absent on
 old trees): `role` (`"Button"`, `"Checkbox"`, … or null), `clickable` (has an OnClick action),
-`disabled` (Disabled semantics present). These feed the a11y audit and interaction-regression diffs.
+`disabled` (Disabled semantics present). These feed the lane's a11y gate and interaction diffs.
 
-## The MCP tools
+## The MCP tools you'll use here
 
 | Tool | Use it to… |
 |---|---|
-| `inspect_tree` | pull the whole tree + a summary `{ nodeCount, taggedCount, tokenizedCount }` |
-| `get_node` | fetch one node by `testTag` — its geometry + resolved tokens |
-| `assert_token` | assert a node's resolved value for a key (`padding`, `radius`, `color`, `fontSize`) equals what you expect |
-| `layout_gaps` | compute real spacing between two nodes: `{ gapX, gapY, dxLeft, dyTop }` — this is how you verify padding/margins |
-| `diff_against_design_system` | flag every node whose resolved value contradicts the declared catalog |
-| `find_drift` | sweep for nodes that render but carry **no** token (raw value / un-tokenized) |
-| `snapshot_save` | write the normalized tree as a **golden-tree snapshot** (commit it — it's the regression fixture) |
-| `snapshot_diff` | structurally diff the current tree vs a golden: `{path, kind, before, after}` entries; empty = pass |
-| `audit_a11y` | audit touch targets (< 48px clickables), missing labels on clickables, empty contentDescription |
-| `connect_live` | tier-1 handshake: one bounded `adb forward` + `/inspect/health`; sets the session default source and returns the human's `remoteUrl` live view |
+| `inspect_tree` | the one query verb. Whole tree + summary `{ nodeCount, taggedCount, tokenizedCount }`; `testTag` narrows to one subtree (geometry + resolved tokens of a single node and its children); `format: "wireframe"` returns the deterministic SVG wireframe instead of JSON (structure you AND the human can read — SVG is text, not pixels); `includeLayoutGaps: true` adds the computed spacing report between sibling footprints (`{ gapX, gapY, dxLeft, dyTop }`) — how you verify padding/margins |
+| `connect_live` | tier-1 handshake, self-healing (forward, health, launch, transport reset; `relaunch: true` forces a fresh process); sets the session default source and returns the human's `remoteUrl` live view |
 | `navigate_and_inspect` | tap the RUNNING app (coords resolved from the live tree by `testTag`, or explicit x/y) via POST /inspect/tap, wait, re-fetch → `{ tapped, before, after, changed }` |
-| `render_tree` | draw the tree as a deterministic **SVG wireframe** (any source, incl. live) — structure you AND the human can see |
-| `render_screen` | pixel preview with a **path-only contract** — returns the PNG's path + metadata, never bytes; for the HUMAN |
-| `prove_change` | the verified dev loop: diff a BEFORE tree vs an AFTER tree + regression-check drift/a11y → one verdict |
+| `render_screen` | pixel preview with a **path-only contract** — returns the PNG's path + metadata, never bytes; for the HUMAN. `{ source: {kind:"live"} }` captures the CURRENT device screen |
+| `db_query` | read bounded rows from the running app's database — assert persisted state instead of shelling into sqlite or trusting the UI |
+| `runtime_crashes` | persisted crashes with cause attribution — reach for it before hand-grepping logcat |
+| `runtime_logs` | bounded structured logcat for the app's pid |
 
 All take an optional `source` (`{kind:"file"|"live"|"uiautomator"}`) and the legacy `treePath`;
 omit both after `connect_live` (or if `CMP_INSPECTOR_TREE`/`CMP_INSPECTOR_LIVE` is set). Errors
 (missing file, bad JSON, node not found, live server unreachable) come back as a clean, actionable
 `{ error }` — read it and fix the input.
 
+**Jobs that moved to the lane and the preview loop** (don't look for interactive twins — they
+were removed because the deterministic version won): token drift and design-system conformance →
+the verify lane's `tokenDrift` step; a11y audit → the lane's `a11y` step (and per-screen
+`a11yPass`/`a11yViolations` in `preview_status`); golden-tree snapshots and regression diffs →
+the lane's `goldenTrees` step (`qa/golden/`, re-blessed with `UPDATE_GOLDEN=1`); change proof →
+`preview_diff { screen }` (cmp-preview's verified edit loop) and, live, `navigate_and_inspect`'s
+before/after delta.
+
 ## Typical workflows
 
-**"Why is this padding wrong?"** — `get_node` both elements, then `layout_gaps` between them; compare
-the computed `gapY`/`gapX` to the intended dp. Or `assert_token(testTag, "padding", "16dp")` directly
-if the node self-reports padding.
+**"Why is this padding wrong?"** — `inspect_tree { testTag: "<node>" }` for the node's resolved
+tokens, then `inspect_tree { includeLayoutGaps: true }` and compare the computed `gapY`/`gapX`
+between the two elements to the intended dp.
 
-**"Check for token drift / does this match the design system?"** — run `find_drift` first (catches
-raw values with no token), then `diff_against_design_system` with the declared catalog
-(`{ colors, dimens }`) to catch resolved values that contradict the declared token. A drift entry is
-`{ path, token, declared, resolved }`. Both empty = clean. This is the mechanical UI-fidelity gate:
-raw hex where `Surface` belongs, or a `24dp` radius where `RadiusCard` is `16dp`, is caught for free.
+**"Check for token drift / does this match the design system?"** — that's the lane's job:
+`node qa/verify.mjs` (`tokenDrift` step) flags raw values where a token belongs and resolved
+values that contradict the declared catalog, deterministically. Use `inspect_tree` only to
+examine a specific node the lane named.
 
-**"Assert this screen renders correctly"** — `inspect_tree` for the shape, then a handful of
-`assert_token` / `layout_gaps` assertions on the key nodes.
+**"Assert this screen renders correctly"** — `inspect_tree` for the shape, then targeted
+`inspect_tree { testTag }` reads on the key nodes; a `includeLayoutGaps` pass for spacing claims.
 
-**"Snapshot this screen / did it regress?"** — the golden-tree loop, the CI regression primitive:
-
-1. Render the screen with the harness → `snapshot_save { treePath, snapshotPath }`. Commit the
-   golden (it's normalized: integer bounds, no `source`, sorted resolved keys — stable and reviewable).
-2. After any change: re-render → `snapshot_diff { treePath, snapshotPath }`. Empty `diffs` = pass.
-   A non-empty diff is a compact list of `{path, kind, before, after}` — node added/removed, text/
-   testTag/designToken changed, `clickable-changed` (a button silently losing its handler!),
-   `bounds-moved` beyond `tolerancePx` (default 1px, so sub-pixel jitter never flakes).
-3. Intentional change? Re-run `snapshot_save` to re-bless the golden. The review diff of the golden
-   file itself is human-readable JSON, unlike a pixel snapshot.
+**"Did this UI change / regress?"** — while editing, use cmp-preview's loop:
+`preview_status { waitForRender: true }` → `preview_diff { screen }` for the
+`proven-clean | changed-with-regressions | no-change` verdict. Durable cross-session baselines
+are the lane's golden trees (`qa/golden/`), regenerated deliberately with `UPDATE_GOLDEN=1`.
 
 **"What is the running app actually showing? / did navigation work?"** — the tier-1 loop:
 `connect_live`, then `inspect_tree` (no `source` needed — session default). Drive the app with
-`navigate_and_inspect` (below — one tool call taps AND re-inspects), or Appium MCP / `adb shell
-input tap` when you need gestures beyond a tap, then assert the structural change: the old
-screen's testTag/text is gone, the new screen's content is present. Real navigation state,
-observed live, zero screenshots.
+`navigate_and_inspect` (one tool call taps AND re-inspects), then assert the structural change:
+the old screen's testTag/text is gone, the new screen's content is present. Real navigation
+state, observed live, zero screenshots.
+
+**"Is the data actually saved?"** — `db_query`: bounded rows from the running app's own
+database. A flow whose proof is "a row exists (or is gone) after the action" is asserted here,
+not by squinting at the UI and not by `adb shell` sqlite gymnastics.
+
+**"The app crashed / misbehaves on device"** — `runtime_crashes` first (persisted crashes with
+cause attribution), then `runtime_logs` for the app-pid slice of logcat. Both are bounded and
+structured; hand-grepping `adb logcat` is the fallback, not the default.
 
 ## Drive it — the live device view (human) + navigate_and_inspect (agent)
 
-Track B of Live View: the human watches and drives the REAL app from a browser while you assert
-on the tree — same app, two audiences, zero pixels in model context.
+The human watches and drives the REAL app from a browser while you assert on the tree —
+same app, two audiences, zero pixels in model context.
 
-1. **`connect_live`** — its result now includes `remoteUrl`
+1. **`connect_live`** — its result includes `remoteUrl`
    (`http://127.0.0.1:9500/inspect/remote`). **Offer to open it for the human** (e.g. `open
    <remoteUrl>` on macOS): it is a self-contained live device view — the current screen re-fetched
    ~every 700ms, and clicking the image taps the real device (click coords are scaled to device px
@@ -184,25 +198,15 @@ on the tree — same app, two audiences, zero pixels in model context.
    (default 1500), re-fetches the tree, and returns
    `{ tapped, before:{tags,textSample,nodeCount}, after:{…}, changed }`. Assert on it: `changed:
    true` plus the new screen's tags/text in `after` IS the navigation proof.
-3. **Prove edits as usual** — `snapshot_save` → edit → reload → `prove_change` — while the human
-   literally watches the change land in the remote view.
-4. **Live pixels for the human**: `render_screen { source: {kind:"live"} }` captures the CURRENT
+3. **Live pixels for the human**: `render_screen { source: {kind:"live"} }` captures the CURRENT
    device screen via `GET /inspect/screenshot` and writes it to a file (`out` optional), returning
-   the same path-only metadata as ever — never bytes.
+   path-only metadata — never bytes.
 
 The `/inspect/screenshot`, `/inspect/tap` and `/inspect/remote` routes carry the same guarantees
 as the rest of the inspector server: **debug builds only** (androidDebug source set — structurally
 absent from release), **loopback only**, reached through one bounded `adb forward`. And the
 no-pixels rule holds: the screenshot route exists so pixels can flow to the HUMAN's browser/disk;
-your reasoning stays on `inspect_tree` / `render_tree` / `navigate_and_inspect`.
-
-**"Audit accessibility"** — `audit_a11y { treePath }`. Violations: `touch-target-too-small`
-(clickable under `minTouchTargetPx`, default 48 — harness dumps are density-1 so px == dp there;
-scale it for device-density trees) and `missing-label` (clickable with no text, no
-contentDescription, no descendant text — invisible to screen readers). Warning:
-`empty-content-description`. Old trees without the `clickable`/`role` fields are skipped, not
-crashed on. Fix violations in the kit (e.g. `defaultMinSize(48.dp)` on tap targets), re-render,
-re-audit until `pass: true`.
+your reasoning stays on `inspect_tree` / `navigate_and_inspect`.
 
 ## See it — wireframes for anyone, pixels for the human
 
@@ -210,47 +214,24 @@ re-audit until `pass: true`.
 No tool ever returns image bytes/base64 into model context. When you (the agent) need to *see*
 the screen, see it structurally; when the human needs to see it, hand them a file.
 
-- **`render_tree { source?, out?, a11y? }`** — the structural wireframe. Works for **any** source,
+- **`inspect_tree { format: "wireframe" }`** — the structural wireframe. Works for **any** source,
   including `{kind:"live"}` while you develop: every footprint node drawn as a rect, tokenized
   nodes highlighted with a resolved-values chip (`radius 16 · pad 16`), clickable nodes with a
   distinct dashed outline, testTags as mono labels, text shown, legend + a footer
-  (`<n> nodes · <source> · schemaVersion <v>`). Pass `a11y:true` to overlay audit violations in a
-  danger style. The result includes the SVG **text** — SVG is structured text, not pixels, so you
-  may read and reason over it, and the human can open the written `.svg` file too. Deterministic:
-  the same tree always renders byte-identical SVG (diffable, cacheable).
-- **`render_screen { projectDir, screen? }`, `{ pngPath }` or `{ harness: true }`** — real pixels,
-  **path-only contract** (tier 0). Returns `{ path, width, height, sizeBytes, displayHint }` parsed
-  from the PNG header — NEVER the image data. `projectDir` runs the app's own
+  (`<n> nodes · <source> · schemaVersion <v>`). The result includes the SVG **text** — SVG is
+  structured text, not pixels, so you may read and reason over it, and the human can open the
+  written `.svg` file too. Deterministic: the same tree always renders byte-identical SVG.
+- **`render_screen { projectDir, screen? }`, `{ pngPath }` or `{ source: {kind:"live"} }`** —
+  real pixels, **path-only contract**. Returns `{ path, width, height, sizeBytes, displayHint }`
+  parsed from the PNG header — NEVER the image data. `projectDir` runs the app's own
   `:composeApp:renderScreens` task for one registry `screen` (default `shell`) and additionally
   returns `treePath` + `previewsDir`, so every preview has its structural twin from the same
-  viewport; `harness:true` runs the checkout's demo harness (bundled SampleScreen only). To show
-  the human: prefer the gallery (`node qa/preview-gallery.mjs`), or follow the `displayHint` —
-  write a tiny HTML wrapper embedding `<img src="file://…">` and open it (or attach the file in
-  the host UI). Do **not** Read the PNG.
+  viewport. To show the human: prefer the gallery (`node qa/preview-gallery.mjs`), or follow the
+  `displayHint` — write a tiny HTML wrapper embedding `<img src="file://…">` and open it (or
+  attach the file in the host UI). Do **not** Read the PNG.
 
-Pair them: `render_screen` for the human's eyes, `render_tree` + the query tools for your
+Pair them: `render_screen` for the human's eyes, `inspect_tree` (JSON or wireframe) for your
 assertions — same screen, two audiences.
-
-## The verified dev loop — how UI changes get proven (the core workflow)
-
-For **any** UI change in a create-cmp app, "it compiles and looks right" is not done — **a change
-without a `prove_change` verdict is not done.** The loop:
-
-1. **Before editing:** `snapshot_save { source: {kind:"live"}, snapshotPath }` (or a tier-0 harness
-   tree) — capture the pre-change state as the BEFORE golden.
-2. **Make the code change.**
-3. **Reload:** dev-client hot reload on desktop, or rebuild/reinstall on the device, until the app
-   shows the new state.
-4. **`prove_change { before: <snapshotPath>, after: {kind:"live"} }`** — ONE call that structurally
-   diffs before→after AND regression-checks the AFTER tree (design-system drift with the live
-   catalog auto-fetched, plus the a11y audit). Read the verdict:
-   - `proven-clean` — the change landed and nothing regressed. Done.
-   - `no-change` — the edit didn't reach the screen (wrong screen? stale build? not reloaded?).
-   - `changed-with-regressions` — the change landed but introduced drift and/or a11y faults: fix,
-     reload, re-prove.
-5. **Present the proof:** the `changes` list is the evidence of what the edit did (human-readable
-   `{path, kind, before, after}` entries); pair it with `render_tree` of the after-state so the
-   human sees the result structurally (and `render_screen` when they want real pixels).
 
 ## Three tiers, one interface
 

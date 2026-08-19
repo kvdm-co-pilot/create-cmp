@@ -30,6 +30,7 @@
     "composeApp/src/androidMain/kotlin",
     "composeApp/src/androidDebug/kotlin",
     "composeApp/src/androidRelease/kotlin",
+    "composeApp/src/androidInstrumentedTest/kotlin",
     "composeApp/src/iosMain/kotlin",
     "composeApp/src/desktopMain/kotlin"
   ],

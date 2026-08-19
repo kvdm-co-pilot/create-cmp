@@ -21,6 +21,7 @@ app").
 | Maintainability | An AI session adds a feature; the lane names any layer violation as a clause, not a style nit | `[enforced: ARCH-01..05]` |
 | Reliability | A source fails; the failure crosses layers as a typed `DomainError`, never a raw exception, and the screen shows a mapped error state | `[enforced: ARCH-06/07/08]` |
 | Reliability (offline) | Network drops mid-session; cached Room data still renders, UI shows degraded state | `[advisory]` today — `NetworkMonitor` and Room ship as infrastructure (§4, §7) but no repository wires the cache-first fallback yet; clause candidate |
+| Reliability (platform behavior) | A feature that alarms or notifies actually alerts on a real device — the claim crosses the process boundary instead of stopping at a green JVM | instrumented tier (`androidInstrumentedTest`, lane step `androidChecks`); platform-behavior spec clauses cite instrumented tests, never desktop ones |
 | Interaction capability (a11y) | Every interactive element is perceivable by assistive tech and automation | `[enforced: SHELL-04 + A11y gates]` |
 | Security | The debug inspector HTTP server (§3) never ships in a release build | `[advisory]` today — true by source-set placement (`androidDebug`), not yet gated; clause candidate (`DEBUG-01`) |
 
@@ -79,6 +80,7 @@ app").
 | `androidMain` | Android entry point (`AppApplication`), platform `actual`s. |
 | `androidDebug` | Debug-only additions layered on `androidMain` — the inspector HTTP server, crash recorder, DB inspector. Never in `androidRelease`. |
 | `androidRelease` | Release-only twins (currently a no-op inspector stub) that make the `androidDebug` additions compile out cleanly. |
+| `androidInstrumentedTest` | The on-device behavior tier: platform facts no JVM test can see (alarms, notifications, PendingIntent identity, audio routing) asserted in the app's real process — generic helpers in `testing/`, exemplar in `PlatformBehaviorSeamTest`. Runs via the lane's `androidChecks` step (`connectedDebugAndroidTest`; SKIPs without a device). See `docs/TESTING.md` §"The instrumented tier". |
 | `iosMain` | iOS entry point (`MainViewController.kt`, `KoinHelper.kt`), platform `actual`s. |
 | `desktopMain` | The JVM tier: dev-client window/hot-reload, the preview-render harness, and desktop DI — **harness infrastructure**, not a shipped app target (project ADR `0003`). |
 | `desktopTest` | Conformance gates (this document's enforced clauses), Compose UI Tests, golden-tree structural baselines — the fast, device-free verification tier. |
@@ -180,7 +182,7 @@ Three named scenarios ground that loop in what actually happens on this codebase
    Room when `NetworkMonitor.isOnline` is false. Both pieces of infrastructure exist (§3, §7);
    no repository reads them today — hence the offline goal's `[advisory]` status in §1.
 3. **Navigate + process death.** `AppNavHost` (single-Activity/single-`ComposeUIViewController`)
-   owns the back stack; each screen's `ViewModel` (scoped via `viewModelOf`/Koin) survives
+   owns the back stack; each screen's `ViewModel` (a Koin `viewModel { }` factory) survives
    configuration change but not process death — a killed-and-restored process re-runs cold
    start and reloads from the repository, the same path as scenario 1.
 
@@ -232,7 +234,22 @@ injected, not hardcoded, so tests can pass a test dispatcher. Do **not** add `wi
 around calls that are already main-safe by contract; it's dead weight that hides where the
 real guarantee lives.
 
-### DI `[advisory]`
+### Time (inject the clock) `[enforced: ARCH-13]`
+
+**Ambient time reads are banned outside the designated time provider.** `Clock.System`,
+`System.currentTimeMillis`, `LocalDate.now()` / `LocalDateTime.now()` / `LocalTime.now()` /
+`Instant.now()`, and `TimeZone.currentSystemDefault()` may be referenced only inside a
+`core/time` package (the one place allowed to touch the wall clock; a fresh scaffold ships
+no time usage at all, so the package appears with your first time-dependent feature).
+Everywhere else, the current moment arrives as an **injected value** — a clock/time-provider
+interface declared in `core/time` and wired through Koin like any other dependency.
+
+The rationale is determinism of evidence: an ambient time read makes rendered structure and
+test results a function of *when* you run them — a golden tree that passes at 23:00 and
+fails at 09:00 with no code change, a "today" grouping that flips across a midnight
+boundary, a defaulted `Clock.System` constructor parameter that no test can pin. Injected
+time gives tests one seam to freeze, and gives every screen's rendered output a single
+source of "now" the harness can control.
 
 One Koin module per concern: `repositoryModule` / `useCaseModule` / `viewModelModule`
 (`di/AppModule.kt`, common to every platform), plus one platform module for platform-only
@@ -242,6 +259,21 @@ ItemRepository)` and `HomeViewModel(getItems: GetItemsUseCase)`; no field/proper
 no service-locator lookups inside domain or presentation code. Platform modules provide
 `actual`-backed singletons (`NetworkMonitor`, `AppDatabase`) that common modules then depend on
 via the domain-facing interface, not the concrete platform type.
+
+**ViewModels are registered with explicit `viewModel { … }` factories; reflection-based
+`viewModelOf` is disallowed** `[enforced: ARCH-14]`. Koin's `viewModelOf` silently ignores
+Kotlin constructor default parameter values — a ViewModel that compiles and previews fine
+crashes at runtime resolution the first time a defaulted parameter matters (the default was
+masking a dependency the graph never registered). An explicit factory states every
+dependency (`viewModel { XViewModel(get(), …) }`) and fails at compile time instead.
+
+Shared-vs-per-destination ViewModel scope is an **intent** decision no static rule can make
+for you `[advisory]`: a screen that default-instantiates its own ViewModel gets a fresh
+instance per destination, so state silently resets on re-entry. State meant to be shared
+across screens must be scoped explicitly — register it once and resolve the same instance
+at each destination (e.g. a `single { … }`-scoped holder, or a factory resolved against a
+shared owner) rather than letting each screen construct its own. Decide the scope when you
+introduce the ViewModel, not after the reset surprises you.
 
 ### Logging `[advisory — no shared logger ships today]`
 
@@ -273,6 +305,13 @@ stays the only place that talks to `AppDatabase`/`ItemDao` — domain never sees
 map `ItemEntity` → the domain `Item` inside `data/` — and schema changes get a `version`
 bump. `fallbackToDestructiveMigration` is a scaffold-stage convenience; replace it before
 shipping user data you can't afford to lose.
+
+Room's exported schema history (`composeApp/schemas/`) is **append-only**
+`[enforced: schemaHistory lane step]`: every version below the current highest is a frozen
+record of a database that shipped, and migrations are validated against those exact bytes.
+The lane fails if a historical `<version>.json` is rewritten or deleted (`git checkout --
+<file>` restores it); only the current highest version — the live, in-progress schema — may
+change between commits.
 
 ### Design tokens `[enforced: ARCH-05]`
 

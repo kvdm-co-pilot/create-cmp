@@ -76,7 +76,7 @@ http://127.0.0.1:9500/inspect/remote
 A self-contained page mirrors the running app (~700ms refresh) and **click-to-tap drives the
 real thing** — clicks scale to device pixels and dispatch as taps. This is the "two audiences,
 one app" split at its purest: the human watches and drives real pixels in a browser while the
-agent asserts on the semantics tree (`navigate_and_inspect`, `prove_change`, `db_query`). Use
+agent asserts on the semantics tree (`navigate_and_inspect`, `inspect_tree`, `db_query`). Use
 it to watch an e2e run, demo a feature, or poke at the app without touching the device. No
 install, no CORS, debug builds only — release builds contain none of this code.
 
@@ -161,11 +161,11 @@ Same engine as the CLI, conversational front door. Each skill is a guided flow, 
 | `cmp-test` | "Write tests for my app." *Observes* the running app's semantics tree — what's actually on screen, what's tappable, where navigation goes — and derives the regression suite from that. Tests come from rendered reality, not guesses. |
 | `cmp-qa-prep` | "Get my test environment up." Emulator + app install + E2E smoke run, with the gotchas handled. |
 
-Plus the **`cmp-inspector` MCP server** (26 tools) — the machine-readable window into a running
+Plus the **`cmp-inspector` MCP server** (15 tools — deliberately few; two production apps proved a lean surface gets used and a wide one gets ignored) — the machine-readable window into a running
 Compose UI that `cmp-inspect`, `cmp-test`, and the verified dev loop are built on. One tree
 contract, three sources: render a screen headlessly, connect to the live app, or read a device
 via UIAutomator. It also carries the runtime half of the agent's eyes (crashes, logs, DB state —
-`runtime_crashes`, `runtime_logs`, `db_schema`, `db_query`), the human-approval console
+`runtime_crashes`, `runtime_logs`, `db_query`), the human-approval console
 (`approval_status`, §8 below), the console's talk-back channel (`review_comments`,
 `resolve_comment`, §9 below), and the genesis walk's design-language workbench
 (`snapshot_variant`, §8 below).
@@ -313,7 +313,7 @@ scaffolded app carries the whole loop):
 `./gradlew :composeApp:renderScreens && node qa/preview-gallery.mjs`.
 
 **The verified dev loop (the flagship).** For any UI change: snapshot the live tree → make the
-edit → reload → `prove_change` compares before/after structure, token drift, and a11y, and returns
+edit → reload → `preview_diff` compares before/after structure, token drift, and a11y, and returns
 a verdict. The agent doesn't say "I centered the title" — it shows *"title bounds moved, tokens
 unchanged, no a11y regressions: proven clean."*
 
@@ -338,11 +338,13 @@ standalone gate. All of it works on any KMP project.
   generation and mechanical work to sub-agents with self-contained briefs, then **gates every
   hand-off through the verify lane** before accepting it. Nothing is reported done on prose —
   only on a receipt.
-- **The MCP tools** are how any agent *sees*: `inspect_tree`, `get_node`, `assert_token`,
-  `layout_gaps`, `diff_against_design_system`, `find_drift`, `snapshot_save`, `snapshot_diff`,
-  `audit_a11y`, `connect_live`, `navigate_and_inspect`, `render_tree`, `render_screen`,
-  `prove_change`. Structure in, structure out — never pixels in model context. The same eyes
-  extend to runtime behavior (`runtime_crashes`, `runtime_logs`, `db_schema`, `db_query`), to
+- **The MCP tools** are how any agent *sees*: `inspect_tree` (one tree contract — subtree by
+  `testTag`, wireframe rendering, layout-gap reporting as options), `connect_live`
+  (self-healing: device → forward → health → launch → transport reset), `navigate_and_inspect`,
+  `render_screen`, and the preview loop (`preview`, `preview_status`, `preview_diff`).
+  Structure in, structure out — never pixels in model context. Token drift, a11y, and golden
+  regressions are the verify lane's job, not interactive tools. The same eyes
+  extend to runtime behavior (`runtime_crashes`, `runtime_logs`, `db_query`), to
   the human side of the loop (`approval_status`, blocking on a console decision the same way
   `preview_status` blocks on a render), and to the console's talk-back channel
   (`review_comments`, `resolve_comment` — the agent observes feedback and closes the loop with a

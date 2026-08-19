@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The verify lane — this project's single verification gate.
 //
-//   node qa/verify.mjs [--profile scaffold|local|ci] [--json]
+//   node qa/verify.mjs [--profile scaffold|local|ci|release] [--json]
 //
 // Runs every verification step this project carries, aggregates a typed
 // PASS/FAIL verdict, and writes the evidence receipt to qa/evidence/latest.json.
@@ -17,6 +17,8 @@
 //   scaffold — spec coverage + build + unit tests (what `create-cmp --verify` proves at stamp time)
 //   local    — everything; device-dependent steps SKIP when no device is attached
 //   ci       — everything; SKIPs are recorded so the pipeline stays honest
+//   release  — everything ci proves PLUS the release-APK smoke (releaseSmoke): the
+//              ship-time profile, run before cutting a release, never per-change
 
 import { execSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -27,7 +29,7 @@ import { fileURLToPath } from "node:url";
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
 import { compareTokenDrift } from "./lib/token-drift.mjs";
 import { evaluateApprovalsGate } from "./lib/approvals.mjs";
-import { scanCitations, scanSpecClauses, walkFiles } from "./lib/spec-coverage.mjs";
+import { clauseTierCoverage, scanCitations, scanSpecClauses, walkFiles } from "./lib/spec-coverage.mjs";
 import { evaluateComponentStoryParity } from "./lib/component-stories.mjs";
 import { evaluateReachability } from "./lib/reachability.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-doc.mjs";
@@ -42,7 +44,7 @@ const ARTIFACTS_DIR = path.join(ROOT, "qa-artifacts");
 // killed). Same refusal-over-fabrication stance as qa/approve.mjs, which
 // refuses an unknown artifact by name rather than guessing: an unknown
 // argument here is refused by name, not swallowed into "run everything".
-const USAGE = `node qa/verify.mjs [--profile scaffold|local|ci] [--json] [--help]
+const USAGE = `node qa/verify.mjs [--profile scaffold|local|ci|release] [--json] [--help]
 
 The verify lane — this project's single verification gate. Runs every
 verification step this project carries, aggregates a typed PASS/FAIL
@@ -50,7 +52,8 @@ verdict, and writes the evidence receipt to qa/evidence/latest.json (commit
 it with your change — see CLAUDE.md). Exit code: 0 = PASS, 1 = FAIL.
 
 Flags:
-  --profile <scaffold|local|ci>  which step set to run (default: local)
+  --profile <scaffold|local|ci|release>
+                                 which step set to run (default: local)
   --json                         print the receipt as JSON instead of the
                                   human-readable step-by-step log
   --help, -h                     print this usage and exit 0 without
@@ -62,6 +65,9 @@ Profiles:
   local     everything; device-dependent steps SKIP when no device is
             attached
   ci        everything; SKIPs are recorded so the pipeline stays honest
+  release   everything ci proves PLUS the release-APK smoke (releaseSmoke) —
+            the ship-time profile; run it before cutting a release, never
+            per-change
 `;
 
 const rawArgs = process.argv.slice(2);
@@ -182,19 +188,31 @@ function tryGitLines(cmd) {
   }
 }
 
+// Recursive: desktopTest writes TEST-*.xml flat, but connected (instrumented) results
+// land one directory level down per device (build/outputs/androidTest-results/connected/
+// debug/<device>/TEST-*.xml) — both shapes are summarized by the same walk.
 function junitSummary(dir) {
   if (!fs.existsSync(dir)) return null;
   let tests = 0, failures = 0, errors = 0, skipped = 0;
-  for (const f of fs.readdirSync(dir).filter((f) => f.startsWith("TEST-") && f.endsWith(".xml"))) {
-    const xml = fs.readFileSync(path.join(dir, f), "utf8");
-    const m = xml.match(/<testsuite[^>]*tests="(\d+)"[^>]*skipped="(\d+)"[^>]*failures="(\d+)"[^>]*errors="(\d+)"/);
-    if (m) {
-      tests += Number(m[1]);
-      skipped += Number(m[2]);
-      failures += Number(m[3]);
-      errors += Number(m[4]);
+  const walk = (d) => {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, entry.name);
+      if (entry.isDirectory()) {
+        walk(p);
+        continue;
+      }
+      if (!entry.name.startsWith("TEST-") || !entry.name.endsWith(".xml")) continue;
+      const xml = fs.readFileSync(p, "utf8");
+      const m = xml.match(/<testsuite[^>]*tests="(\d+)"[^>]*skipped="(\d+)"[^>]*failures="(\d+)"[^>]*errors="(\d+)"/);
+      if (m) {
+        tests += Number(m[1]);
+        skipped += Number(m[2]);
+        failures += Number(m[3]);
+        errors += Number(m[4]);
+      }
     }
-  }
+  };
+  walk(dir);
   return { tests, failures, errors, skipped };
 }
 
@@ -202,6 +220,23 @@ function deviceAttached() {
   const res = sh("adb devices", { timeout: 10_000 });
   if (!res.ok) return false;
   return res.out.split("\n").slice(1).some((l) => /\tdevice$/.test(l.trim().replace(/\s+/g, "\t")));
+}
+
+// Settle adb before handing the device to whatever drives it next (Maestro, the
+// instrumented runner). An install task returning 0 means the package manager accepted
+// the APK — NOT that the device is ready to be driven: a reinstall over a running app
+// briefly drops the emulator's adb transport. `adb devices` still says `device`, but a
+// fresh adb client (Maestro's dadb, Gradle's ddmlib) gets `device offline` and dies
+// before the first assertion (observed 4/4 when the live-inspector tier ran earlier in
+// the lane — its port-forward traffic widens the window — and 0/4 when it was skipped).
+// wait-for-device blocks only while the transport is actually down; the kill/start pair
+// ahead of it clears a stale server-side transport entry that survives the device coming
+// back. Neither weakens any assertion — every downstream check still passes on its own
+// merits.
+function settleAdb() {
+  sh("adb kill-server");
+  sh("adb start-server");
+  sh("adb wait-for-device");
 }
 
 // ── Steps ──────────────────────────────────────────────────────────────────
@@ -229,6 +264,12 @@ function stepSpecCoverage() {
   const orphanTags = tags.filter((t) => !clauses.has(t.id) || clauses.get(t.id).withdrawn);
 
   if (orphanClauses.length === 0 && orphanTags.length === 0) {
+    // Tier visibility, not a gate (industry rule: instrument before you police). A clause
+    // cited only from desktop-tier tests can still hide a platform-behavior bug — both
+    // production apps shipped alarm/notification defects behind clauses that were
+    // "covered" by JVM tests androidMain never ran under. The line names them; the
+    // instrumented seam (androidChecks) is where such clauses earn a citation.
+    const tiers = clauseTierCoverage(clauses, tags);
     return {
       name: "specCoverage",
       verdict: "PASS",
@@ -238,6 +279,7 @@ function stepSpecCoverage() {
         withdrawn: [...clauses.values()].filter((c) => c.withdrawn).length,
         tags: tags.length,
         files: files.length,
+        tierNote: tiers.summaryLine,
       },
     };
   }
@@ -355,6 +397,82 @@ function stepArchDoc() {
     reason: lines.join("\n"),
     durationMs: elapsed(),
     details: { changedSections: result.changedSections, missingSections: result.missingSections },
+  };
+}
+
+// Schema-history gate — pure Node + git, no Gradle, same grouping as the other
+// evidence checks. Room's exportSchema writes one <version>.json per database per
+// target under composeApp/schemas/. Every version EXCEPT the current highest is a
+// frozen historical record of a database that shipped: migrations are written and
+// validated against those exact bytes, so a regeneration that rewrites them
+// silently corrupts the baseline every future migration is proven against. Only
+// the highest version is the live, in-progress schema — free to change or appear
+// (that IS the current change). This gate exists because schema regeneration
+// looks like harmless build output right up until a shipped user's upgrade fails.
+function stepSchemaHistory() {
+  const started = Date.now();
+  const elapsed = () => Date.now() - started;
+  const schemasRel = path.join("composeApp", "schemas");
+  const schemasRoot = path.join(ROOT, schemasRel);
+
+  if (!fs.existsSync(schemasRoot)) {
+    return { name: "schemaHistory", verdict: "SKIP", reason: "no exported Room schemas (composeApp/schemas/ absent) — nothing frozen to guard", durationMs: elapsed() };
+  }
+  const gitTop = tryGit("rev-parse --show-toplevel");
+  if (!gitTop || !tryGit("rev-parse HEAD")) {
+    return { name: "schemaHistory", verdict: "SKIP", reason: "no git history yet — schema versions have no committed baseline to be frozen against", durationMs: elapsed() };
+  }
+
+  // Every directory holding versioned schema JSONs, with its highest version on disk.
+  const versionFile = /^(\d+)\.json$/;
+  const maxVersionByDir = new Map(); // absolute dir path -> highest N among its N.json files
+  const walkSchemas = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, entry.name);
+      if (entry.isDirectory()) walkSchemas(p);
+      else {
+        const m = entry.name.match(versionFile);
+        if (m) maxVersionByDir.set(dir, Math.max(maxVersionByDir.get(dir) ?? 0, Number(m[1])));
+      }
+    }
+  };
+  walkSchemas(schemasRoot);
+
+  // Tracked schema files whose committed bytes no longer match the tree (staged or
+  // unstaged; deletions included). Paths come back relative to the git toplevel.
+  // Untracked files never appear here — a brand-new version file is by definition
+  // not yet frozen history.
+  const dirtyFiles = tryGitLines(`diff --name-only HEAD -- "${schemasRel.replace(/\\/g, "/")}"`);
+
+  const violations = [];
+  for (const rel of dirtyFiles) {
+    const abs = path.resolve(gitTop, rel);
+    const m = path.basename(abs).match(versionFile);
+    if (!m) continue; // not a versioned schema JSON
+    const version = Number(m[1]);
+    const dirMax = maxVersionByDir.get(path.dirname(abs));
+    // The highest version currently on disk is the live schema — dirty is fine.
+    // Anything else (a lower version, or a file whose whole directory is gone)
+    // is rewritten/deleted history.
+    if (dirMax !== undefined && version === dirMax) continue;
+    violations.push(rel);
+  }
+
+  if (violations.length === 0) {
+    return { name: "schemaHistory", verdict: "PASS", durationMs: elapsed(), details: { schemaDirs: maxVersionByDir.size } };
+  }
+
+  const lines = [
+    "Historical Room schema files were modified or deleted — these are frozen records of shipped databases, and regeneration must never rewrite them (migrations are validated against these exact bytes). Only the current highest version may change. Restore each file:",
+  ];
+  for (const rel of violations) lines.push(`  git checkout -- ${rel}`);
+  lines.push("If you intended a schema change, bump the database version so a NEW <version>.json is exported instead of overwriting history.");
+  return {
+    name: "schemaHistory",
+    verdict: "FAIL",
+    reason: lines.join("\n"),
+    durationMs: elapsed(),
+    details: { schemaDirs: maxVersionByDir.size, violations },
   };
 }
 
@@ -561,32 +679,37 @@ function maestroAvailable() {
   return sh("maestro --version", { timeout: 15_000 }).ok;
 }
 
-function stepE2eSmoke() {
+// The e2e guard trio, shared by every step that drives the smoke flow on a device.
+// Returns null when the harness is fully available, else the SKIP result for [name].
+function maestroGuards(name) {
   if (!fs.existsSync(path.join(ROOT, "qa/e2e"))) {
-    return { name: "e2eSmoke", verdict: "SKIP", reason: "e2e harness not included in this project (--no-e2e)", durationMs: 0 };
+    return { name, verdict: "SKIP", reason: "e2e harness not included in this project (--no-e2e)", durationMs: 0 };
   }
   if (!deviceAttached()) {
-    return { name: "e2eSmoke", verdict: "SKIP", reason: "no Android device/emulator attached (adb)", durationMs: 0 };
+    return { name, verdict: "SKIP", reason: "no Android device/emulator attached (adb)", durationMs: 0 };
   }
   if (!maestroAvailable()) {
-    return { name: "e2eSmoke", verdict: "SKIP", reason: "maestro CLI not installed — curl -fsSL https://get.maestro.mobile.dev | bash", durationMs: 0 };
+    return { name, verdict: "SKIP", reason: "maestro CLI not installed — curl -fsSL https://get.maestro.mobile.dev | bash", durationMs: 0 };
   }
-  const install = shGradle(`${GRADLEW} :composeApp:installDebug --console=plain`);
-  if (!install.ok) {
-    return { name: "e2eSmoke", verdict: "FAIL", reason: "installDebug failed — the APK could not be installed on the attached device", durationMs: install.durationMs };
-  }
-  // Harden the device for headless/CI automation before driving it. Without this, a slow or
-  // loaded emulator produces false reds that have nothing to do with the app:
-  //  - hide_error_dialogs=1 stops Android popping ANR/crash dialogs (e.g. SystemUI under load)
-  //    that steal focus over the app — a Maestro assert would then see only the dialog;
-  //  - MAESTRO_DRIVER_STARTUP_TIMEOUT gives the UiAutomator2 driver a generous budget to come
-  //    up on a slow emulator (the built-in default gives up too early under load).
-  // Both are benign, reversible, and only touch the device while the lane is driving it —
-  // hide_error_dialogs is restored to its pre-run value (or deleted, returning the device
-  // to its default) in the finally below, on every exit path.
-  // hide_error_dialogs suppresses the OS dialog, NEVER the underlying event — so after the
-  // run we grep the device log for ANR/crash lines the dialog would have shown, and FAIL on
-  // them. The eyes must report what automation stability had to hide.
+  return null;
+}
+
+// Drives qa/e2e/smoke.yaml against whatever build is installed, with the device hardened
+// for headless/CI automation. Shared by e2eSmoke (debug APK) and releaseSmoke (release
+// APK) so the hardening and the honesty sweep can never drift apart between variants.
+// Without the hardening, a slow or loaded emulator produces false reds that have nothing
+// to do with the app:
+//  - hide_error_dialogs=1 stops Android popping ANR/crash dialogs (e.g. SystemUI under load)
+//    that steal focus over the app — a Maestro assert would then see only the dialog;
+//  - MAESTRO_DRIVER_STARTUP_TIMEOUT gives the UiAutomator2 driver a generous budget to come
+//    up on a slow emulator (the built-in default gives up too early under load).
+// Both are benign, reversible, and only touch the device while the lane is driving it —
+// hide_error_dialogs is restored to its pre-run value (or deleted, returning the device
+// to its default) in the finally below, on every exit path.
+// hide_error_dialogs suppresses the OS dialog, NEVER the underlying event — so after the
+// run we grep the device log for ANR/crash lines the dialog would have shown, and FAIL on
+// them. The eyes must report what automation stability had to hide.
+function runMaestroSmoke(name, priorDurationMs) {
   const prevHideErrorDialogs = sh("adb shell settings get global hide_error_dialogs").out.trim();
   sh("adb shell settings put global hide_error_dialogs 1");
   sh("adb logcat -c"); // clear so the post-run dump only reflects this run
@@ -594,10 +717,10 @@ function stepE2eSmoke() {
     const res = sh("maestro test qa/e2e/smoke.yaml", { env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "120000" } });
     if (!res.ok) {
       return {
-        name: "e2eSmoke",
+        name,
         verdict: "FAIL",
         reason: `Maestro smoke failed (flow cites the SHELL spec clauses it proves):\n${res.out.split("\n").slice(-15).join("\n")}`,
-        durationMs: install.durationMs + res.durationMs,
+        durationMs: priorDurationMs + res.durationMs,
       };
     }
     const anrDump = sh("adb logcat -d -b system,crash,main");
@@ -605,13 +728,13 @@ function stepE2eSmoke() {
     if (anrDump.ok && anrRe.test(anrDump.out)) {
       const anrLines = anrDump.out.split("\n").filter((l) => anrRe.test(l)).slice(0, 10).join("\n");
       return {
-        name: "e2eSmoke",
+        name,
         verdict: "FAIL",
         reason: `Maestro smoke passed, but the device log shows an ANR/crash during the run (hide_error_dialogs only suppresses the OS dialog, never the underlying event):\n${anrLines}`,
-        durationMs: install.durationMs + res.durationMs,
+        durationMs: priorDurationMs + res.durationMs,
       };
     }
-    return { name: "e2eSmoke", verdict: "PASS", durationMs: install.durationMs + res.durationMs };
+    return { name, verdict: "PASS", durationMs: priorDurationMs + res.durationMs };
   } finally {
     if (prevHideErrorDialogs && prevHideErrorDialogs !== "null") {
       sh(`adb shell settings put global hide_error_dialogs ${prevHideErrorDialogs}`);
@@ -621,18 +744,148 @@ function stepE2eSmoke() {
   }
 }
 
+function stepE2eSmoke() {
+  const guard = maestroGuards("e2eSmoke");
+  if (guard) return guard;
+  const install = shGradle(`${GRADLEW} :composeApp:installDebug --console=plain`);
+  if (!install.ok) {
+    return { name: "e2eSmoke", verdict: "FAIL", reason: "installDebug failed — the APK could not be installed on the attached device", durationMs: install.durationMs };
+  }
+  settleAdb();
+  return runMaestroSmoke("e2eSmoke", install.durationMs);
+}
+
+// Instrumented behavior tier (composeApp/src/androidInstrumentedTest) — the one step
+// whose evidence crosses the process boundary. Alarms, notification channels,
+// full-screen intents, PendingIntent identity, and audio routing are OS facts:
+// desktopTest is a JVM, golden trees are structure, the conformance suite is static,
+// and the Maestro smoke taps UI without asserting anything about the shade or the
+// alarm table. Nine escaped platform-semantics defects across two real apps trace to
+// exactly this blind spot; the hand-built precursor of this step caught two bugs the
+// week it landed. `connectedDebugAndroidTest` builds, installs, and runs the
+// instrumented suite in the app's real process on the attached device.
+//
+// SKIP (never FAIL) on missing infrastructure — no device, or no instrumented sources
+// yet — mirroring e2eSmoke's stance: absence of the tier is recorded honestly, only
+// broken behavior fails.
+function stepAndroidChecks() {
+  const started = Date.now();
+  const instrumentedDir = path.join(ROOT, "composeApp/src/androidInstrumentedTest");
+  const hasSources = fs.existsSync(instrumentedDir) &&
+    walkFiles(instrumentedDir, [".kt"]).length > 0;
+  if (!hasSources) {
+    return {
+      name: "androidChecks",
+      verdict: "SKIP",
+      reason: "no instrumented tests (composeApp/src/androidInstrumentedTest has no Kotlin sources)",
+      durationMs: Date.now() - started,
+    };
+  }
+  if (!deviceAttached()) {
+    return {
+      name: "androidChecks",
+      verdict: "SKIP",
+      reason: "no Android device/emulator attached (adb) — instrumented behavior needs the real process boundary",
+      durationMs: Date.now() - started,
+    };
+  }
+  // Settle before Gradle's own install+drive: earlier lane steps (tokenDrift's
+  // port-forwards, e2eSmoke's reinstall) can leave the transport stale — see settleAdb.
+  settleAdb();
+  // `--rerun` for the same evidence-integrity reason as stepUnitTests: the receipt must
+  // attest tests that EXECUTED on this tree, never a replayed up-to-date verdict.
+  const res = shGradle(`${GRADLEW} :composeApp:connectedDebugAndroidTest --rerun --console=plain`);
+  const summary = junitSummary(path.join(ROOT, "composeApp/build/outputs/androidTest-results/connected"));
+  return {
+    name: "androidChecks",
+    verdict: res.ok ? "PASS" : "FAIL",
+    reason: res.ok
+      ? undefined
+      : `connectedDebugAndroidTest failed (${summary ? `${summary.failures + summary.errors} of ${summary.tests} tests` : "see output"}) — an on-device behavior claim is broken. Fix the behavior, not the test:\n${res.out.split("\n").filter((l) => /FAILED|error:|failed/i.test(l)).slice(0, 12).join("\n")}`,
+    durationMs: Date.now() - started,
+    details: summary ?? undefined,
+  };
+}
+
+// Release-APK smoke — the behavior half of stepReleaseBuild. assembleRelease proves R8
+// and the build graph COMPILE; two real bugs were only findable by *running* the release
+// variant (R8 behavior differs from debug). Installs the release APK and drives the same
+// Maestro smoke flow against it. Ship-time cost by design: this step exists only in the
+// `release` profile, never per-change.
+//
+// Honesty notes, both deliberate:
+//  - A template-fresh app has NO release signingConfig (the keystore belongs to whoever
+//    ships), and an unsigned APK cannot be installed. That is a SKIP naming what to
+//    configure, never a FAIL — a fresh scaffold must not red-bar on a keystore it was
+//    never given.
+//  - This step reinstalls NOTHING afterwards: the release build stays on the device,
+//    which is the honest state ("what is installed is what was last proven"). The next
+//    debug install over it will hit INSTALL_FAILED_UPDATE_INCOMPATIBLE (release and debug
+//    signatures differ) — run `adb uninstall <applicationId>` first; the same applies in
+//    reverse here, so that raw Gradle error is translated into the actionable message.
+function stepReleaseSmoke() {
+  const guard = maestroGuards("releaseSmoke");
+  if (guard) return guard;
+
+  let gradleText = "";
+  try {
+    gradleText = fs.readFileSync(path.join(ROOT, "composeApp/build.gradle.kts"), "utf8");
+  } catch {
+    gradleText = "";
+  }
+  const applicationId = gradleText.match(/applicationId\s*=\s*"([^"]+)"/)?.[1] ?? "<applicationId>";
+  if (!/signingConfig/.test(gradleText)) {
+    return {
+      name: "releaseSmoke",
+      verdict: "SKIP",
+      reason:
+        "release APK is unsigned — no signingConfig in composeApp/build.gradle.kts. To enable the release smoke: create a keystore (keytool -genkeypair), declare android.signingConfigs { create(\"release\") { … } } from a gitignored keystore.properties, and set buildTypes.release.signingConfig. The keystore is yours to keep out of the repo.",
+      durationMs: 0,
+    };
+  }
+
+  const install = shGradle(`${GRADLEW} :composeApp:installRelease --console=plain`);
+  if (!install.ok) {
+    if (/INSTALL_FAILED_UPDATE_INCOMPATIBLE/.test(install.out)) {
+      return {
+        name: "releaseSmoke",
+        verdict: "FAIL",
+        reason: `installRelease refused: the device holds a build with a different signature (usually the debug build from an earlier lane step). Android never installs across signatures — run \`adb uninstall ${applicationId}\` and re-run the release profile. This is a device-state conflict, not a build defect.`,
+        durationMs: install.durationMs,
+      };
+    }
+    if (/SigningConfig|not signed|INSTALL_PARSE_FAILED_NO_CERTIFICATES/i.test(install.out)) {
+      return {
+        name: "releaseSmoke",
+        verdict: "SKIP",
+        reason: "release APK is not installable — signing is not fully configured (see composeApp/build.gradle.kts signingConfigs). Configure a release keystore to enable the release smoke.",
+        durationMs: install.durationMs,
+      };
+    }
+    return {
+      name: "releaseSmoke",
+      verdict: "FAIL",
+      reason: `installRelease failed — the shippable APK could not be installed:\n${install.out.split("\n").filter((l) => /error|FAILURE|INSTALL_/i.test(l)).slice(0, 12).join("\n")}`,
+      durationMs: install.durationMs,
+    };
+  }
+  settleAdb();
+  return runMaestroSmoke("releaseSmoke", install.durationMs);
+}
+
 // ── Lane ───────────────────────────────────────────────────────────────────
 
 const stepsForProfile = {
   // scaffold: what `create-cmp --verify` proves at stamp time — specCoverage,
   // the full JVM tier (unit + conformance + golden + UI tests) plus the Android build.
-  scaffold: [stepSpecCoverage, stepApprovals, stepComponentStories, stepReachability, stepArchDoc, stepBuild, stepUnitTests],
+  scaffold: [stepSpecCoverage, stepApprovals, stepComponentStories, stepReachability, stepArchDoc, stepSchemaHistory, stepBuild, stepUnitTests],
   local: [
     stepSpecCoverage,
     stepApprovals,
     stepComponentStories,
     stepReachability,
     stepArchDoc,
+    stepSchemaHistory,
     stepBuild,
     // Release stays OUT of `scaffold`: stamp-time --verify promises a green first build, and
     // an R8 pass would add minutes to every scaffold to re-prove what this step proves here.
@@ -644,12 +897,27 @@ const stepsForProfile = {
     stepTokenDrift,
     stepA11y,
     stepE2eSmoke,
+    // androidChecks joins local BY the file's own convention, not despite it: local's
+    // contract (see USAGE) is "everything; device-dependent steps SKIP when no device is
+    // attached" — device presence is the opt-in, exactly as e2eSmoke and tokenDrift
+    // already work. A developer with no device attached pays nothing here; one who
+    // attached an emulator has already opted into the device tier's cost. Hiding this
+    // step in ci-only would make local's documented contract a lie and re-open the gap
+    // this tier closes (androidMain test-invisible in the profile people actually run).
+    // Last on purpose: the cheap desktop verdicts and the smoke land first.
+    stepAndroidChecks,
   ],
 };
 stepsForProfile.ci = stepsForProfile.local;
+// release = everything ci proves PLUS the release-APK behavior smoke. The expensive
+// proofs are profile-tiered by decision: per-change stays fast (local/ci pay for the
+// release COMPILE via releaseBuild, already in the set), and the release-variant
+// *behavior* cost lands once, at ship time. releaseSmoke runs last so the device ends
+// the run holding the exact build that was proven.
+stepsForProfile.release = [...stepsForProfile.ci, stepReleaseSmoke];
 
 if (!stepsForProfile[profile]) {
-  console.error(`Unknown profile "${profile}" — use scaffold | local | ci.`);
+  console.error(`Unknown profile "${profile}" — use scaffold | local | ci | release.`);
   process.exit(2);
 }
 
@@ -678,7 +946,7 @@ const verdict = steps.some((s) => s.verdict === "FAIL") ? "FAIL" : "PASS";
 // claims, and the difference should never live only in the SKIP lines. Device-
 // dependent steps that actually RAN (PASSed) are named on the receipt and in the
 // verdict line: "PASS (on-device: e2eSmoke)" vs "PASS (desktop-only)".
-const DEVICE_STEPS = ["e2eSmoke", "tokenDrift"];
+const DEVICE_STEPS = ["e2eSmoke", "tokenDrift", "androidChecks", "releaseSmoke"];
 const onDeviceSteps = steps.filter((s) => DEVICE_STEPS.includes(s.name) && s.verdict === "PASS").map((s) => s.name);
 const strengthLabel = onDeviceSteps.length ? `on-device: ${onDeviceSteps.join("+")}` : "desktop-only";
 

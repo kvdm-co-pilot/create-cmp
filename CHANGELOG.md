@@ -4,6 +4,188 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The lane could fail Maestro before the app got a chance to be wrong.** `installDebug`
+  returning 0 means the package manager accepted the APK — not that the device is ready to
+  be driven. A reinstall over a running app briefly drops the emulator's adb transport;
+  `adb devices` still says `device`, but Maestro's own adb client (dadb) gets `device
+  offline` and dies before the first assertion. Reproduced deterministically on a real
+  generated app: 4/4 failures whenever the live-inspector tier ran earlier in the lane
+  (its port-forward traffic widens the window), 0/4 when it was skipped — a false red
+  about the harness, never the app. `e2eSmoke` now settles adb between install and drive
+  (`kill-server`/`start-server`/`wait-for-device`): wait-for-device blocks only while the
+  transport is actually down, the kill/start pair clears the stale server-side transport
+  entry, and no assertion is weakened.
+
+- **`connect_live` lost real sessions to four conditions it can now heal itself.** The
+  missing `adb forward` (the lane tears its own down), the debug app simply not running,
+  the stale adb server transport (the client says `device offline` while `adb devices`
+  says `device` — 4/4 false-red smoke runs in one session), and an app process replaced
+  by a reinstall: each was a dead end that pushed agents back to raw adb. The handshake
+  now heals in order — ensure a device is attached, ensure the forward (creating it IS
+  ensuring it), poll health, launch the app if health is dead (applicationId parsed from
+  the project's own `build.gradle.kts`/`create-cmp.json`, never hardcoded) and re-poll
+  with bounded backoff, and on an offline-class error reset the adb server once and retry
+  the whole sequence once. Every failure path names the stage that failed and the one
+  command to run next — never a bare timeout — and the result's `healed` list says what
+  it had to fix. `relaunch: true` absorbs the old `relaunch_app` verb, still proven by
+  `processStartedAtMs` moving strictly forward, never assumed.
+
+### Added
+
+- **The tier that could not see androidMain.** Across two real apps built on this template,
+  the single biggest escaped-bug class was Android platform semantics — alarms that never
+  rang, notifications that never posted, a silent phone that stayed silent, two logical
+  alarms quietly sharing one PendingIntent slot. Nine defects, several latent across
+  multiple releases, and every desktop tier was green the whole time: `desktopTest` is a
+  JVM, golden trees are structure, the conformance suite is static, and the Maestro smoke
+  taps UI without asserting anything about the shade or the alarm table. The template now
+  ships the seam that one of those apps had to hand-build (and which caught two bugs the
+  week it landed), generalized:
+  - **`androidInstrumentedTest` source set** wired into the KMP build (runner, androidx.test
+    core, UiAutomator, JUnit ext in the catalog; `AndroidJUnitRunner` as the entry point),
+    with generic behavior-assertion helpers — `NotificationAsserts` (bounded-poll
+    wait-for-posted, channel-exists with an importance floor, full-screen-intent capability
+    across the API-34 permission split), `AlarmAsserts` (a tolerant `dumpsys alarm` parse
+    plus assert-registered and assert-N-distinct — the mechanical form of the
+    PendingIntent-identity collision), and `SystemState` (snapshot/restore of ringer/DND,
+    honest in its header about what only a manual tier can verify). The exemplar
+    `PlatformBehaviorSeamTest` boots the real app (real Android Koin graph — the thing
+    desktop DI fakes can never prove) and demonstrates the alarm-slot collision live.
+  - **`androidChecks` — a verify-lane step** running `connectedDebugAndroidTest` (with the
+    same adb settle and `--rerun` evidence stance as its siblings). It follows local's
+    documented contract — device presence is the opt-in, no device is an honest SKIP — and
+    the receipt's strength line now names it, so an on-device green is a different claim
+    than a desktop-only one, visibly.
+  - **The `release` profile** — everything `ci` proves plus `releaseSmoke`: install the
+    release APK and drive the same Maestro smoke against it, because two real bugs were
+    findable only by *running* what R8 produced, not compiling it. Profile-tiered by
+    decision: per-change lanes stay as fast as today, and the release-variant behavior cost
+    lands once, at ship time. A template-fresh app with no keystore SKIPs naming exactly
+    what to configure, and the debug-over-release signature conflict surfaces as an
+    actionable `adb uninstall` message instead of a raw Gradle error.
+  - The stamped feature-spec skeleton now says where platform-behavior clauses get their
+    citation (an instrumented test, never a desktop one); `docs/TESTING.md` carries the
+    tier's what-belongs/what-doesn't/cost-model contract.
+- **`schemaHistory` — a verify-lane step that keeps shipped Room schemas shipped.** Room's
+  `exportSchema` output looks like harmless build noise, so nothing stopped a regeneration
+  from quietly rewriting `composeApp/schemas/**/<version>.json` files that a released
+  database had already been built against — corrupting the exact bytes future migrations
+  are validated with, invisible until a real user's upgrade fails. The step freezes
+  history: every version below the current highest must be byte-identical to `HEAD`
+  (restore with `git checkout -- <file>`); the current highest — the live schema — stays
+  free to change, because that IS the current change. No schemas directory (feature off,
+  or never built) and no git history both SKIP honestly.
+- **ARCH-13 — inject the clock.** Ambient time reads (`Clock.System`,
+  `System.currentTimeMillis`, `LocalDate.now()` and friends,
+  `TimeZone.currentSystemDefault()`) make rendered structure and test evidence a function
+  of *when* you run them — a golden tree that passes at 23:00 and fails at 09:00 with no
+  code change, and no seam for a test to pin. The conformance gate now bans those APIs in
+  `commonMain` outside a designated `core/time` provider package; time arrives everywhere
+  else as an injected value. The template itself carries zero time usage, so the rule
+  lands green and exists purely to protect the thousands of apps stamped from it.
+- **ARCH-14 — explicit ViewModel factories; `viewModelOf` is banned.** Koin's
+  reflection-based `viewModelOf` silently ignores Kotlin constructor default parameter
+  values: a ViewModel that compiles and previews fine crashes at runtime resolution the
+  first time a defaulted parameter matters, because the default was masking a dependency
+  the graph never registered. Explicit `viewModel { XViewModel(get(), …) }` factories
+  state every dependency and fail at compile time instead. The exemplar's registration
+  and the `add-feature` stamper both switched to the explicit form — the stamper clones
+  the registration from the configured exemplar's own factory line, so the `get()` arity
+  always matches the cloned constructor. Shared-vs-per-destination ViewModel *scope*
+  stays an intent decision no static rule can make; `docs/ARCHITECTURE.md` now carries
+  the advisory note instead of a gate.
+- **The capability contract — a missing inspector is a fault to report, never a silent
+  downgrade.** An entire production app was built in one long resumed session that began
+  before the plugin was enabled; MCP servers attach at session start, so the inspector
+  tools were absent for the app's whole life — the agent probed for them 24 times, found
+  nothing, and quietly spent the build on 113 raw screenshots and 190 blind adb taps,
+  because the docs legitimized the fallback without ever demanding a diagnosis. Every
+  MCP-dependent skill (cmp-preview, cmp-inspect, cmp-test) now opens with the same
+  contract: confirm the tools resolve before the first call; if they don't, STOP and
+  report which fault it is — plugin disabled, session older than the plugin's enablement
+  (only a session restart can fix that; no in-session retry ever will), or a stale/broken
+  plugin copy — and only then use the degraded path, naming what it costs (structured
+  trees and change proofs replaced by pixels). The generated CLAUDE.md's "Without the
+  plugin" paragraph got the same demotion: fault-and-report first, the gradle fallback
+  explicitly labeled as the degraded path for environments where the plugin genuinely
+  cannot exist.
+- **cmp-doctor grew an inspector-MCP check group.** Four checks the engine cannot run for
+  you, so the skill has the agent run them directly: are the tools resolvable in THIS
+  session; is the plugin registered and enabled in the settings files; is the marketplace
+  copy stale (`~/.claude/plugins/marketplaces/<name>` is a git clone that never
+  auto-updates — one sat three weeks behind its source with nothing surfacing the drift;
+  the doctor now reports "N commits behind" with `git -C <copy> pull` as the
+  always-works fallback); and does the bundled server answer a JSON-RPC initialize
+  handshake. Plus two field lessons as notes where they belong: the stale-adb-server
+  symptom (`adb devices` fine, automation clients get `device offline` →
+  kill-server/start-server) and per-app AVD isolation (one shared emulator across apps
+  crosses their data and wedges adbd — one AVD per app, named after the app).
+- **`cmp-audit` — the adversarial audit that found six latent defects, as a repeatable
+  verb.** One human-triggered "double check for bugs" request surfaced six notification
+  defects, several latent across releases — because someone finally asked the platform's
+  questions instead of the spec's. The new skill encodes that method generically: scope
+  one subsystem, read its spec + implementation across ALL source sets (androidMain is
+  where JVM tests are blind) + its tests, then interrogate against a platform-semantics
+  question bank — identity (PendingIntent equality ignores extras; tag+id collisions),
+  lifecycle (reboot, process death, DST), cancellation symmetry, delivery (channel
+  off-switches, stream routing, exactness windows), delivery-time state re-ask, permission
+  gates, and coverage arithmetic ("the re-check covers N of M" — force the count). The
+  discipline is the part that made the original audit work and is non-negotiable:
+  evidence-or-silence (file:line + concrete failure scenario or no finding), a refuter
+  pass before reporting (only survivors, marked CONFIRMED or PLAUSIBLE), convert-or-cut
+  (spec amendment + failing-test-first proposal, or a named human decision). Findings
+  feed the change flow — never direct unreviewed fixes to signed artifacts.
+- **specCoverage now sees tiers, not just citations.** A clause about platform behavior
+  cited only by a desktop test is a claim nothing that runs on a device has ever checked —
+  and until now the coverage scan couldn't tell you which clauses those were. Every
+  citation now records the tier of the file that carries it (commonTest / desktopTest /
+  androidInstrumentedTest / e2e, derived from the citing path), and the lib derives the
+  one-line summary — "N clauses cited only from desktop-tier tests" — as report data.
+  Deliberately visibility-only, no new failure mode: instrument before you police.
+
+### Removed
+
+- **13 MCP tools nobody ever called — the surface now matches the flow** (28 → 15 public
+  tools, `docs/proposals/agent-flow-retrospective.md` §5). Across two full production
+  builds, 15+ of the 28 cmp-inspector tools logged **zero calls**: the verify lane had
+  already won every one of those jobs, and the unused twins were pure prompt weight and
+  choice noise. Every removed verb's job has a named owner, no capability lost:
+  `get_node`, `render_tree` and `layout_gaps` folded into `inspect_tree` as options
+  (`testTag` for one subtree, `format:"wireframe"` for the SVG, `includeLayoutGaps` for
+  the spacing report); `assert_token`/`find_drift`/`diff_against_design_system` belong to
+  the lane's `tokenDrift` step and `audit_a11y` to its `a11y` step;
+  `snapshot_save`/`snapshot_diff` to `preview_diff` (session-scoped) plus the lane's
+  `goldenTrees` (durable); `prove_change` to `preview_diff` + `navigate_and_inspect`;
+  `capture_screen` to `render_screen {kind:"live"}` and the `/inspect/remote` live view;
+  `relaunch_app` became an internal move of `connect_live` (`relaunch:true`); `db_schema`
+  to the Room schema JSONs already sitting in the repo. The registry test now pins the
+  surviving set EXACTLY, so a tool can neither vanish nor leak back unnoticed; the
+  orphaned internals (`findDrift`, `assertToken`, the atomic capture verb, the
+  catalog/instrumented-tree resolvers, `fetchLiveDbSchema`) went with their tools.
+
+### Changed
+
+- **The preview-vs-test build-dir collision: investigated, guards confirmed, the residual
+  constraint written down.** The incident — a standalone preview daemon compiling into
+  the same Gradle output dirs as a concurrent `desktopTest`, 20+ bogus
+  `NoClassDefFoundError` failures — was re-examined against the shipped coexistence
+  machinery. The clean isolations aren't reachable from the inspector alone: Gradle has
+  no CLI-level way to give one invoker a separate output dir without build-script support
+  (template work), and a shared invocation queue can't capture a hand-typed `./gradlew`.
+  What ships already serializes every *managed* invocation both ways — the lane's
+  `.cmp-lane-in-progress` marker defers renders, the preview's `.cmp-render-in-progress`
+  marker (stamped for the resident daemon's whole lifetime) defers the lane's `shGradle`,
+  KSP collisions self-heal, and transient classpath races defer-and-retry instead of
+  failing. The one uncovered path — an ad-hoc `./gradlew desktopTest` typed around the
+  lane while a daemon is up — is now documented in the inspector README with the
+  operator's way out (stop the daemon, or run tests through the lane); making hand-typed
+  Gradle coordinate too needs template-side build logic and is reported as template work,
+  not bolted on here.
+
 ## [0.11.0] - 2026-08-03
 
 ### Fixed
@@ -963,7 +1145,7 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.11.0...HEAD
 [0.10.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.8.0...v0.9.0

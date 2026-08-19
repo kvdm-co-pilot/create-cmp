@@ -10,8 +10,9 @@ description: >-
   from the running app". Tests are derived from the rendered structure — never guessed from
   source, never from screenshots — and land in the shipped harness: current scaffolds carry
   Maestro flows (qa/e2e/*.yaml, testTag selectors); legacy pre-Maestro scaffolds carry the
-  qa/appium AppiumClient runner or tests/appium pytest suite. Both are complemented by golden-tree
-  snapshots (snapshot_save / snapshot_diff / prove_change) as the device-free CI regression layer.
+  qa/appium AppiumClient runner or tests/appium pytest suite. Both are complemented by the verify
+  lane's golden-tree baseline (qa/golden/, the goldenTrees step) as the device-free CI regression
+  layer.
 ---
 
 # cmp-test — generate the regression suite from the rendered tree
@@ -22,6 +23,24 @@ description: >-
 > projects** that actually contain `qa/appium/` or `tests/appium/` — check which exists in the
 > target repo first and emit tests for THAT harness. Durable screen behavior belongs in Compose
 > UI Tests (spec-cited) either way; E2E stays a thin smoke layer.
+
+## Before anything: confirm the capability (fail loud)
+
+The cmp-inspector MCP tools are a capability, not a given. Before your first inspector call,
+confirm they resolve (ToolSearch for "cmp-inspector"). If no tools match, **STOP — do not fall
+back to screenshots, raw adb, or uiautomator dumps silently.** Diagnose in order and REPORT to
+the human:
+
+1. **Plugin enabled?** Check `enabledPlugins` in `~/.claude/settings.json` (or the project's
+   `.claude/settings.json`).
+2. **Session older than the plugin's enablement?** MCP servers attach at session START — a
+   session born without the plugin never gains its tools, and no amount of in-session
+   retrying will surface them. The fix is restarting the session.
+3. **Plugin copy stale or server broken?** Run cmp-doctor's inspector-MCP check group.
+
+Only after reporting may the documented degraded path (tier-2 uiautomator page-source) be
+used — and the report must name what is lost: structured semantics trees replaced by pixels
+and raw XML.
 
 Your job: turn "write tests for my app" into a committed, passing E2E suite — by **observing
 the app, not guessing from source**. Every create-cmp app is AI-inspectable: the `cmp-inspector`
@@ -68,14 +87,14 @@ Per observed screen, four layers:
 | **Existence** | every tagged node is present; key text renders (title, first list items) | the tree's `testTag` / `text` fields |
 | **Interaction** | each clickable → its expected tree change (card tap → detail content appears, old title gone) | the before/after trees you observed in step 1 |
 | **Navigation** | bottom-nav round-trips: tab A → tab B → back to A, asserting each screen's marker node | nav-state deltas observed live |
-| **Structural (CI)** | a golden-tree snapshot per screen (`snapshot_save`), diffed on every change (`snapshot_diff`) | the normalized tree itself — see §6 |
+| **Structural (CI)** | a golden-tree baseline per screen (`qa/golden/`), diffed by the lane's `goldenTrees` step on every run | the normalized tree itself — see §6 |
 
 Rules that make the plan durable:
 
 - Assert on **testTags and semantics**, never on pixels and never on coordinates.
-- Geometry claims (a 48dp touch target, a 12dp card gap) belong to the **inspector layer**
-  (`audit_a11y`, `layout_gaps`, golden trees), not to Appium — don't bend the Appium client into
-  measuring rects.
+- Geometry claims (a 48dp touch target, a 12dp card gap) belong to the **inspector/lane layer**
+  (the lane's `a11y` step, `inspect_tree { includeLayoutGaps: true }`, golden trees), not to
+  Appium — don't bend the Appium client into measuring rects.
 - Prefer a screen's **tagged marker node** (e.g. `home_title`) as its "I am here" assertion;
   fall back to a distinctive text only when no tag exists (then see §4).
 
@@ -165,16 +184,17 @@ The Maestro suite (or, on legacy projects, the Appium suite) proves flows on a d
 **golden-tree layer** catches structural
 regressions in CI with no emulator at all — generate it alongside:
 
-1. Per screen: render headlessly (or fetch live once) → `snapshot_save { treePath, snapshotPath:
-   "qa/goldens/<screen>.tree.json" }` → **commit the golden** (it's normalized and reviewable).
-2. In CI / after any change: re-render → `snapshot_diff { treePath, snapshotPath }`. Empty diffs
-   = pass. A diff entry like `clickable-changed` is a button silently losing its handler — a
-   class of regression the Appium suite only catches if it happens to tap that button.
-3. For a verified dev loop in one call: `prove_change { before: <golden>, after:
-   {kind:"live"} }` — structural diff + design-system drift check + a11y audit, returning a
-   `proven-clean | changed-with-regressions | no-change` verdict.
-4. Intentional UI change → re-bless with `snapshot_save`; the golden's git diff is
-   human-readable JSON, unlike a pixel snapshot.
+1. The lane's `goldenTrees` step owns this layer: per-screen normalized golden trees live in
+   `qa/golden/` and are **committed** (human-readable JSON, reviewable in any diff).
+2. In CI / after any change: `node qa/verify.mjs` diffs the current render against each
+   golden. Empty diffs = pass. A diff entry like `clickable-changed` is a button silently
+   losing its handler — a class of regression the Appium suite only catches if it happens
+   to tap that button.
+3. For an in-session verified dev loop: `preview_diff { screen }` after an edit returns a
+   `proven-clean | changed-with-regressions | no-change` verdict against the previous render;
+   live, `navigate_and_inspect`'s before/after delta is the proof.
+4. Intentional UI change → re-bless with `UPDATE_GOLDEN=1` (declared, never silent); the
+   golden's git diff is human-readable JSON, unlike a pixel snapshot.
 
 The two layers complement: golden trees are fast, device-free, and structural; the E2E suite
 proves the app really launches, navigates, and responds on device. Ship both.

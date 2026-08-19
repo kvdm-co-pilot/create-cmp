@@ -15,30 +15,6 @@ export function getNode(tree, testTag) {
 }
 
 /**
- * Assert a node's resolved design-token value for `key` equals `expected`.
- * @param {object} node   a tree node (may be null)
- * @param {string} key    a key inside designToken.resolved (e.g. "padding")
- * @param {string} expected
- * @returns {{ pass: boolean, key: string, actual: string|null, expected: string }}
- */
-export function assertToken(node, key, expected) {
-  const resolved =
-    node && node.designToken && node.designToken.resolved
-      ? node.designToken.resolved
-      : null;
-  const actual =
-    resolved && Object.prototype.hasOwnProperty.call(resolved, key)
-      ? resolved[key]
-      : null;
-  return {
-    pass: actual === expected,
-    key,
-    actual,
-    expected,
-  };
-}
-
-/**
  * Compute the layout relationship between two nodes' bounding boxes.
  *
  *  - gapX: horizontal empty space between the boxes (0 if they overlap on X).
@@ -77,6 +53,36 @@ export function layoutGaps(a, b) {
     dxLeft: bb.x - ba.x,
     dyTop: bb.y - ba.y,
   };
+}
+
+/**
+ * The tree-wide spacing report backing inspect_tree's `includeLayoutGaps`
+ * option (the old two-tag `layout_gaps` tool, generalized): for every parent,
+ * compute the gap between each pair of CONSECUTIVE tagged children (document
+ * order). Untagged siblings are skipped — a gap between two anonymous boxes
+ * names nothing anyone can act on.
+ *
+ * @param {object} tree
+ * @returns {Array<{ parentPath:string, a:string, b:string,
+ *                    gaps:{gapX:number,gapY:number,dxLeft:number,dyTop:number} }>}
+ */
+export function siblingLayoutGaps(tree) {
+  const out = [];
+  const visit = (node, path) => {
+    const children = Array.isArray(node.children) ? node.children : [];
+    const tagged = children.filter((c) => c && c.testTag != null && c.bounds);
+    for (let i = 0; i + 1 < tagged.length; i++) {
+      out.push({
+        parentPath: path,
+        a: tagged[i].testTag,
+        b: tagged[i + 1].testTag,
+        gaps: layoutGaps(tagged[i], tagged[i + 1]),
+      });
+    }
+    children.forEach((c, i) => c && visit(c, `${path}.children[${i}]`));
+  };
+  if (tree && tree.root) visit(tree.root, "root");
+  return out;
 }
 
 function requireBounds(node, label) {

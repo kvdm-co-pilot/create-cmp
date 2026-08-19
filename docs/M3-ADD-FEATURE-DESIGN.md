@@ -130,12 +130,14 @@ val useCaseModule = module {
     // cmp:anchor di-usecases
 }
 val viewModelModule = module {
-    viewModelOf(::HomeViewModel)
+    viewModel { HomeViewModel(get()) }
     // cmp:anchor di-viewmodels
 }
 ```
 Injects: `single<<E>Repository> { <E>RepositoryImpl() }`, `factory { Get<E>sUseCase(get()) }`,
-`viewModelOf(::<F>ViewModel)`, plus the three imports.
+an explicit `viewModel { <F>ViewModel(get()) }` factory (cloned from the exemplar's own
+registration line — `viewModelOf` is banned by ARCH-14: reflection ignores constructor
+default parameter values), plus the three imports.
 
 **`presentation/navigation/Screen.kt`** — route registry:
 ```kotlin

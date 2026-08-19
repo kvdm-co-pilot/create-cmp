@@ -59,6 +59,48 @@ with a `gradle/libs.versions.toml` — whoever scaffolded it:
 `--fix` applies only the SAFE heals (write `local.properties` from `ANDROID_HOME`, add
 `ksp.useKSP2=true`); everything else prints the exact manual command instead.
 
+## Inspector MCP — is the capability actually here? (agent-run check group)
+
+The cmp-inspector MCP is the plugin's whole UI feedback surface; when it is silently absent,
+agents degrade to screenshots and raw adb without anyone noticing (this happened for an
+entire production build). These four checks are yours to run directly — the engine cannot see
+your session. Report each as GREEN/FAIL with the next command.
+
+1. **Tools resolvable in THIS session** — ToolSearch for "cmp-inspector". Any
+   `mcp__cmp-inspector__*` match = GREEN. FAIL means the server is not attached to this
+   session: continue with checks 2–4 to say WHY. MCP servers attach at session START — if
+   the plugin was enabled (or fixed) after this session began, **no in-session retry will
+   ever surface the tools; the next command is: restart the session.**
+2. **Plugin registered + enabled** — read `~/.claude/settings.json` (and the project's
+   `.claude/settings.json` / `.claude/settings.local.json`) for `enabledPlugins` containing
+   the create-cmp plugin. FAIL → enable the plugin, then restart the session (check 1's
+   rule applies).
+3. **Marketplace copy staleness** — the installed copy under
+   `~/.claude/plugins/marketplaces/<name>` is a git clone that **never auto-updates** (a
+   real copy sat three weeks stale). If it is a git repo:
+   `git -C <copy> fetch --quiet && git -C <copy> log --oneline HEAD..origin/HEAD | wc -l`
+   (offline? report "staleness unknown — offline", not GREEN). If the marketplace source is
+   a local path (find it in `~/.claude/plugins/known_marketplaces.json` or settings
+   `extraKnownMarketplaces`), also compare against that directory's HEAD. Behind → FAIL:
+   "plugin copy is N commits behind its source". Remediation: update/reinstall the
+   marketplace copy — the exact command depends on the Claude Code version (the general
+   mechanism is the plugin marketplace update flow); the manual fallback that always works
+   is `git -C <marketplace-copy> pull`. Then restart the session.
+4. **Bundled server starts** — prove the server binary answers a JSON-RPC initialize:
+   `echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}' | node <plugin-root>/inspector/mcp/dist/server.mjs`
+   — any `"result"` line back = GREEN. A crash or silence = FAIL: the copy is broken or
+   half-updated; re-run check 3's remediation, then this again.
+
+Two device-side notes that fit here (field lessons, both reproduced on real apps):
+
+- **Stale adb server** — `adb devices` says `device` but automation clients (Maestro/dadb,
+  the inspector's forward) get `device offline`: the server-side transport entry is stale.
+  The next command is `adb kill-server && adb start-server && adb wait-for-device` — not an
+  emulator reboot, not an app fault.
+- **Per-app AVD isolation** — sharing one emulator across different apps' sessions crosses
+  their data and can wedge adbd into false "app crash" symptoms. One AVD per app, named
+  after the app.
+
 ## How to run it
 
 ```bash

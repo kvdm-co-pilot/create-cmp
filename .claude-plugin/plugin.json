@@ -50,7 +50,8 @@
     "./skills/cmp-upgrade",
     "./skills/cmp-dev-client",
     "./skills/cmp-firebase-connect",
-    "./skills/cmp-test"
+    "./skills/cmp-test",
+    "./skills/cmp-audit"
   ],
   "agents": [
     "./agents/cmp-orchestrator.md"

@@ -24,6 +24,23 @@ Your job: give the human a **live gallery URL** of their app's real screens and 
 current while they (or you) edit code — and use the structural side of the same render
 to verify changes. Nobody runs Gradle by hand; the MCP service owns the loop.
 
+## Before anything: confirm the capability (fail loud)
+
+The cmp-inspector MCP tools are a capability, not a given. Before your first call, confirm
+they resolve (ToolSearch for "cmp-inspector"). If no tools match, **STOP — do not fall back
+to manual Gradle, screenshots, or raw adb silently.** Diagnose in order and REPORT to the human:
+
+1. **Plugin enabled?** Check `enabledPlugins` in `~/.claude/settings.json` (or the project's
+   `.claude/settings.json`).
+2. **Session older than the plugin's enablement?** MCP servers attach at session START — a
+   session born without the plugin never gains its tools, and no amount of in-session
+   retrying will surface them. The fix is restarting the session.
+3. **Plugin copy stale or server broken?** Run cmp-doctor's inspector-MCP check group.
+
+Only after reporting may the documented degraded path (`./gradlew :composeApp:renderScreens`
++ `node qa/preview-gallery.mjs`) be used — and the report must name what is lost: on-save
+re-render, changed-screen attribution, and the `preview_diff` change proof.
+
 ## The one-call flow
 
 1. **`preview { projectDir }`** (cmp-inspector MCP) — starts (or reuses) the resident
@@ -52,7 +69,7 @@ to verify changes. Nobody runs Gradle by hand; the MCP service owns the loop.
    the daemon surfaces hot-recompile failures, you are NOT flying blind), and
    `screens: [{ id, nodes, tokenized, tagged, a11yPass, a11yViolations,
    lastChangedVersion, tree, png }]`. No HTTP polling, no sleeps. Assert deeper on the
-   `tree` paths with the inspector tools (`get_node`, `assert_token`) — never read PNGs.
+   `tree` paths with `inspect_tree` (pass `testTag` for one subtree) — never read PNGs.
 4. **`preview_stop {}`** when the session is done (the Gradle daemon stays warm — good).
 
 ## The verified edit loop (with the gallery open)
@@ -60,13 +77,13 @@ to verify changes. Nobody runs Gradle by hand; the MCP service owns the loop.
 1. `preview { projectDir }` → human watches the gallery.
 2. Edit code → `preview_status { waitForRender: true }` → the result names the changed
    screens or carries the compile/render error.
-3. `preview_diff { screen: <a changed id> }` → prove_change verdict (`proven-clean` /
+3. `preview_diff { screen: <a changed id> }` → a proven verdict (`proven-clean` /
    `changed-with-regressions` / `no-change`) between the last two renders — the service
    keeps the previous generation, so there is NO snapshot bookkeeping. The human sees
    the same change land visually: CHANGED flag, hover-to-compare before/after, and a
    persistent "changed #N" badge per card.
-4. For baselines that must survive sessions (goldens), keep using
-   `snapshot_save` + `prove_change { before, after }`.
+4. Baselines that must survive sessions are the lane's golden trees (`qa/golden/`,
+   the `goldenTrees` step) — re-bless intended changes with `UPDATE_GOLDEN=1`.
 
 Single-screen warm renders: `render_screen { projectDir, screen }` goes through the
 running daemon automatically (`via: "daemon"`, ~1s) and falls back to the Gradle task.

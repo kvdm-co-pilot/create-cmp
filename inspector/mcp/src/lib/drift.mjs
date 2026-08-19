@@ -1,71 +1,13 @@
 // drift.mjs — token-drift detection over the tree contract.
-// Two flavors:
-//   findDrift(tree)  — nodes with a visual footprint but NO designToken
-//                      (a "possible raw value / un-tokenized" element).
 //   diffAgainstDesignSystem(tree, catalog) — nodes whose *resolved* token value
 //                      contradicts the declared design-system catalog.
+// (The un-tokenized-node sweep that used to live here as `findDrift` was the
+// interactive twin of the verify lane's `tokenDrift` step; the lane owns that
+// job — template/qa/lib/token-drift.mjs — and the twin was removed with its
+// `find_drift` tool.)
 // No MCP imports; unit-testable.
 
 import { walk } from "./tree.mjs";
-
-/**
- * A node has a "visual footprint" if it occupies space (non-zero bounds) AND is
- * something a designer would style — i.e. it renders text OR it is a styling
- * surface. We approximate the latter as: has text present, OR its designToken is
- * absent (so if it also renders and has no token, it's suspicious).
- *
- * Concretely, per the contract: flag nodes that
- *   (1) have non-zero bounds (width>0 AND height>0), AND
- *   (2) (text is present) OR (designToken is present === false), AND
- *   (3) have NO designToken.
- *
- * @param {object} tree
- * @returns {Array<{ path:string, testTag:(string|null), text:(string|null),
- *                    bounds:object, reason:string }>}
- */
-export function findDrift(tree) {
-  const out = [];
-  for (const { node, path } of walk(tree)) {
-    // Skip the synthetic render-host root — the full-viewport container the headless
-    // renderer wraps content in. It has no semantics of its own (no tag/text/token),
-    // so flagging it is pure noise, not a real un-tokenized element.
-    if (
-      path === "root" &&
-      node.testTag == null &&
-      node.text == null &&
-      node.designToken == null
-    ) {
-      continue;
-    }
-
-    const b = node.bounds;
-    const hasFootprint =
-      b && typeof b.width === "number" && typeof b.height === "number" &&
-      b.width > 0 && b.height > 0;
-    if (!hasFootprint) continue;
-
-    const hasToken = node.designToken != null;
-    if (hasToken) continue;
-
-    const textPresent = node.text != null && node.text !== "";
-    // Condition: (text present) OR (designToken present is FALSE). Since we've
-    // already established the token is absent, the second clause is always true
-    // for a footprint node — so any footprint node without a token qualifies,
-    // and text presence sharpens the reason.
-    const reason = textPresent
-      ? "renders text with no design token (possible raw value / un-tokenized)"
-      : "has a visual footprint but no design token (possible raw value / un-tokenized)";
-
-    out.push({
-      path,
-      testTag: node.testTag ?? null,
-      text: node.text ?? null,
-      bounds: b,
-      reason,
-    });
-  }
-  return out;
-}
 
 /**
  * Diff every tokenized node's resolved values against the declared catalog.
