@@ -42,6 +42,8 @@ import { colors, ok, warn, fail, step } from "../lib/log.mjs";
 import { consent } from "../bootstrap/exec.mjs";
 import { loadRegistry, latestSet, getSet } from "../lib/registry.mjs";
 import { planUpgrade, BACKUP_SUFFIX } from "../lib/upgrade.mjs";
+import { writeHarnessLock, checkHarnessIntegrity, describeIntegrity } from "../../packages/harness/src/lib/harness-lock.mjs";
+import { LOCAL_PATCH_PATH } from "../lib/harness-upgrade.mjs";
 import {
   planHarnessUpgrade,
   applyHarnessPlan,
@@ -50,6 +52,52 @@ import {
 } from "../lib/harness-upgrade.mjs";
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/**
+ * The harness version this engine ships. Read from the package that owns the
+ * lane, NOT the engine's own package.json — they version independently, which
+ * is the point: the lane changes far more often than the template's app shape,
+ * and fusing them forced an app-shape merge every time a lane fix shipped.
+ * @returns {string|null} semver, or null when unreadable
+ */
+function shippedHarnessVersion() {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, "packages/harness/package.json"), "utf8")
+    ).version;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Advance create-cmp.json's engineVersion to what this engine just applied.
+ *
+ * Nothing used to do this, and the omission compounded: the next
+ * `upgrade --harness` re-fetched the STALE version as its merge base and
+ * re-presented every conflict already resolved by hand. Fuelled still read
+ * 0.9.0 after being upgraded to 0.13.0.
+ *
+ * Only called when the sweep landed COMPLETELY. With conflicts outstanding the
+ * app is genuinely part-way between two engine versions, and claiming the new
+ * one would be the same lie in the other direction.
+ * @param {string} projectDir
+ * @param {string} version
+ * @returns {boolean} whether the record was updated
+ */
+function writeBackEngineVersion(projectDir, version) {
+  const specPath = path.join(projectDir, "create-cmp.json");
+  try {
+    const record = JSON.parse(fs.readFileSync(specPath, "utf8"));
+    if (record.engineVersion === version) return false;
+    record.engineVersion = version;
+    record.upgradedAt = new Date().toISOString();
+    fs.writeFileSync(specPath, `${JSON.stringify(record, null, 2)}\n`);
+    return true;
+  } catch {
+    return false; // best-effort — never fail an applied upgrade over metadata
+  }
+}
 
 function readIfExists(p) {
   try {
@@ -158,6 +206,17 @@ function printHarnessReport(plan) {
       `${colors.dim(`unchanged ${c.unchanged} · already current ${c.current} · excluded state/secrets ${c.excluded}`)}\n`
   );
   const groups = [
+    // The machine-owned lane first: it is the bulk of the sweep and the part
+    // that needs no human judgement at all.
+    ["region-clean", "lane refreshed (machine-owned, untouched since install)", ok],
+    ["region-absorbed", "lane refreshed (local edit already carried by the new engine)", ok],
+    ["region-restored", "lane restored (files the app had deleted)", ok],
+    ["region-removed", "lane files retired by the engine", ok],
+    [
+      "region-patched",
+      `lane refreshed, LOCAL FORK preserved (not re-applied — see ${LOCAL_PATCH_PATH})`,
+      warn,
+    ],
     ["applied", "applied (engine changed, app never touched — will take the new content)", ok],
     ["merged", "merged (both changed different regions — both edits survive)", ok],
     ["added", "added (new engine files absent from the app)", ok],
@@ -169,6 +228,9 @@ function printHarnessReport(plan) {
   for (const [bucket, label, log] of groups) {
     const files = list(bucket);
     if (files.length === 0) continue;
+    // `orphaned` needs no action (the app's file is kept as-is), and neither do
+    // the clean lane buckets — they apply themselves. Only a preserved local
+    // fork earns a human's attention among the region buckets.
     if (bucket !== "orphaned") actionable += files.length;
     log(`${colors.bold(String(files.length))} ${label}`);
     for (const f of files) process.stdout.write(`    ${f}\n`);
@@ -309,6 +371,31 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
   for (const f of result.deleted) ok(`deleted ${f} ${colors.dim(`(backup: ${f}${BACKUP_SUFFIX})`)}`);
   for (const f of result.sidecars) warn(`conflict sidecar ${f} — resolve by hand, then delete it`);
 
+  // ── Re-lock the lane ──────────────────────────────────────────────────────
+  // The machine-owned region always lands on the new engine's content, whether
+  // or not app-shaped files conflicted — that is what the two independent
+  // version numbers buy. So the lock is rewritten on its own schedule.
+  const harnessVersion = shippedHarnessVersion();
+  if (harnessVersion) {
+    writeHarnessLock(projectDir, { version: harnessVersion });
+    ok(`lane locked at ${colors.bold(harnessVersion)} — ${describeIntegrity(checkHarnessIntegrity(projectDir))}`);
+  }
+
+  if (result.patched.length > 0) {
+    warn(
+      `${result.patched.length} lane file(s) carried a LOCAL change that the new engine does not. ` +
+        `The lane was refreshed and your edits were preserved — NOT re-applied — in ${LOCAL_PATCH_PATH}.`
+    );
+    for (const f of result.patched) process.stdout.write(`    ${f}\n`);
+    process.stdout.write(
+      colors.dim(
+        `  The diff is against the lane you WERE on, so it may not apply cleanly to the new one —\n` +
+          `  that is the merge this tool declined to do behind your back, not a broken patch.\n` +
+          `  Attempt it with: git apply --reject ${LOCAL_PATCH_PATH}   (or upstream the change)\n`
+      )
+    );
+  }
+
   if (result.backups.length > 0 || result.created.length > 0) {
     process.stdout.write(`\n${colors.bold("To revert")}\n`);
     for (const f of result.backups) {
@@ -326,6 +413,15 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
     );
     return 1;
   }
+  // ── Advance the recorded engine version ───────────────────────────────────
+  // Only now, with nothing conflicted: the sweep landed completely, so the
+  // next upgrade's merge base is genuinely this version. Skipping this is what
+  // made repeat upgrades compound — the base stayed stale and every
+  // already-resolved conflict came back.
+  if (writeBackEngineVersion(projectDir, currentVersion)) {
+    ok(`create-cmp.json engineVersion → ${colors.bold(currentVersion)}`);
+  }
+
   process.stdout.write(
     `\n${colors.green("Applied.")} Prove the build: ${colors.cyan(`create-cmp verify --target-dir ${targetDir}`)}\n`
   );

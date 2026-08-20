@@ -14,14 +14,15 @@ import { spawnSync } from "node:child_process";
 
 import {
   EXCLUDED_PATTERNS,
+  SIDECAR_SUFFIX,
+  applyHarnessPlan,
+  configFromSpecRecord,
+  decideFile,
+  decideRegionFile,
   isExcludedPath,
   matchesPattern,
   mergeThreeWay,
-  decideFile,
   planHarnessUpgrade,
-  applyHarnessPlan,
-  configFromSpecRecord,
-  SIDECAR_SUFFIX,
 } from "../src/lib/harness-upgrade.mjs";
 import { BACKUP_SUFFIX } from "../src/lib/upgrade.mjs";
 
@@ -321,6 +322,11 @@ test("planHarnessUpgrade: one synthetic tree hits every bucket, sorted and count
 
     assert.deepEqual(plan.counts, {
       excluded: 0,
+      "region-clean": 0,
+      "region-absorbed": 0,
+      "region-patched": 0,
+      "region-restored": 0,
+      "region-removed": 0,
       unchanged: 1,
       current: 1,
       applied: 1,
@@ -383,12 +389,15 @@ test("planHarnessUpgrade: every exclusion-list path is excluded and lands in NO 
 // --- applyHarnessPlan ------------------------------------------------------------
 
 test("apply: conflict leaves the app's file byte-for-byte and writes a .cmp-new sidecar", () => {
+  // An APP-SHAPED file: both sides edited the same region, so the app's work
+  // is never clobbered. (Lane files answer a different question — they are
+  // machine-owned and replaced wholesale; see the region tests below.)
   const t = tmpTrees();
   try {
-    writeTree(t.base, { "qa/verify.mjs": "x\ny\nz\n" });
-    writeTree(t.next, { "qa/verify.mjs": "x\ny ENGINE\nz\n" });
+    writeTree(t.base, { "composeApp/build.gradle.kts": "x\ny\nz\n" });
+    writeTree(t.next, { "composeApp/build.gradle.kts": "x\ny ENGINE\nz\n" });
     const appContent = "x\ny APP\nz\n";
-    writeTree(t.app, { "qa/verify.mjs": appContent });
+    writeTree(t.app, { "composeApp/build.gradle.kts": appContent });
 
     const plan = planHarnessUpgrade({ baseDir: t.base, newDir: t.next, projectDir: t.app });
     const result = applyHarnessPlan(
@@ -396,13 +405,13 @@ test("apply: conflict leaves the app's file byte-for-byte and writes a .cmp-new 
       plan.entries.filter((e) => e.write !== null || e.sidecar !== null || e.remove)
     );
 
-    const appFile = path.join(t.app, "qa", "verify.mjs");
+    const appFile = path.join(t.app, "composeApp", "build.gradle.kts");
     assert.equal(fs.readFileSync(appFile, "utf8"), appContent, "app file must be untouched");
     assert.equal(fs.existsSync(appFile + BACKUP_SUFFIX), false, "no backup — nothing was changed");
     const sidecar = appFile + SIDECAR_SUFFIX;
     assert.ok(fs.existsSync(sidecar), "sidecar must exist");
     assert.equal(fs.readFileSync(sidecar, "utf8"), "x\ny ENGINE\nz\n", "sidecar carries the NEW engine content");
-    assert.deepEqual(result.sidecars, ["qa/verify.mjs" + SIDECAR_SUFFIX]);
+    assert.deepEqual(result.sidecars, ["composeApp/build.gradle.kts" + SIDECAR_SUFFIX]);
   } finally {
     t.cleanup();
   }
@@ -514,4 +523,90 @@ test("CLI: --harness on a project without create-cmp.json refuses clearly, no cr
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ── The machine-owned region ────────────────────────────────────────────────
+// Lane files carry no app content and are byte-identical in every create-cmp
+// app, so they are a derived artifact: replaced wholesale, never merged.
+// Three-way merging them is what produced ~1,000 conflicted lines per app in
+// the 0.13.0 pilots, on diffs with zero app-specific tokens.
+
+test("region: an untouched lane file is replaced, not merged", () => {
+  const d = decideRegionFile({
+    relPath: "qa/verify.mjs",
+    base: Buffer.from("v1\n"),
+    next: Buffer.from("v2\n"),
+    theirs: Buffer.from("v1\n"),
+  });
+  assert.equal(d.bucket, "region-clean");
+  assert.equal(d.write.toString(), "v2\n");
+  assert.equal(d.sidecar, null);
+});
+
+test("region: a hand-mirrored engine change is ABSORBED, silently", () => {
+  // The pilots' overwhelmingly common case: the app had already applied by
+  // hand the change the engine now ships. Nothing to preserve, nothing to say.
+  const base = Buffer.from("one\ntwo\nthree\n");
+  const next = Buffer.from("one\ntwo ENGINE\nthree\n");
+  const d = decideRegionFile({ relPath: "qa/verify.mjs", base, next, theirs: next });
+  assert.equal(d.bucket, "current", "byte-identical to the new engine — nothing to do");
+
+  // And the same when the app reached that content by its own edit path.
+  const d2 = decideRegionFile({
+    relPath: "qa/lib/render.mjs",
+    base,
+    next,
+    theirs: Buffer.from("one\ntwo ENGINE\nthree\n"),
+  });
+  assert.equal(d2.bucket, "current");
+});
+
+test("region: a GENUINE local fork is replaced, but preserved as a patch", () => {
+  const d = decideRegionFile({
+    relPath: "qa/lib/render.mjs",
+    base: Buffer.from("one\ntwo\nthree\nfour\nfive\n"),
+    next: Buffer.from("one\ntwo\nthree\nfour\nfive ENGINE\n"),
+    theirs: Buffer.from("one APP\ntwo\nthree\nfour\nfive\n"),
+  });
+  assert.equal(d.bucket, "region-patched");
+  assert.equal(d.write.toString(), "one\ntwo\nthree\nfour\nfive ENGINE\n", "the region always lands on the new engine");
+  // Nothing is lost: the app's divergence survives as a reviewable patch that
+  // names the real project-relative path, so `git apply` can re-apply it.
+  assert.match(d.patch, /^diff --git a\/qa\/lib\/render\.mjs b\/qa\/lib\/render\.mjs$/m);
+  assert.match(d.patch, /^\+one APP$/m);
+  assert.match(d.patch, /^-one$/m);
+});
+
+test("region: a lane file the app deleted is restored", () => {
+  const d = decideRegionFile({
+    relPath: "qa/lib/a11y.mjs",
+    base: Buffer.from("v1\n"),
+    next: Buffer.from("v2\n"),
+    theirs: null,
+  });
+  assert.equal(d.bucket, "region-restored");
+  assert.equal(d.write.toString(), "v2\n");
+});
+
+test("region: a lane file the engine dropped is removed, with no orphan case", () => {
+  // Nothing app-owned can live in the region, so there is no app work to
+  // protect here — unlike an app-shaped file, which becomes `orphaned`.
+  const d = decideRegionFile({
+    relPath: "qa/lib/gone.mjs",
+    base: Buffer.from("v1\n"),
+    next: null,
+    theirs: Buffer.from("v1 + app edit\n"),
+  });
+  assert.equal(d.bucket, "region-removed");
+  assert.equal(d.remove, true);
+});
+
+test("region: decideFile routes lane files to the region table, app files to merge", () => {
+  const three = { base: Buffer.from("x\ny\nz\n"), next: Buffer.from("x\ny E\nz\n"), theirs: Buffer.from("x\ny A\nz\n") };
+  assert.equal(decideFile({ relPath: "qa/verify.mjs", ...three }).bucket, "region-patched");
+  assert.equal(decideFile({ relPath: "qa/lib/tree.mjs", ...three }).bucket, "region-patched");
+  // Not the region: app state, app flows, app source.
+  assert.equal(decideFile({ relPath: "qa/approvals.json", ...three }).bucket, "conflicted");
+  assert.equal(decideFile({ relPath: "qa/e2e/smoke.yaml", ...three }).bucket, "conflicted");
+  assert.equal(decideFile({ relPath: "composeApp/build.gradle.kts", ...three }).bucket, "conflicted");
 });

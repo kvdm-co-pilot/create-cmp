@@ -42,6 +42,7 @@ import { spawnSync } from "node:child_process";
 import { listFiles } from "./fsutil.mjs";
 import { isBinaryPath } from "./tokens.mjs";
 import { BACKUP_SUFFIX } from "./upgrade.mjs";
+import { isHarnessFile } from "../../packages/harness/src/lib/harness-region.mjs";
 
 /** Sidecar suffix for the new engine content beside a conflicted file. */
 export const SIDECAR_SUFFIX = ".cmp-new";
@@ -62,6 +63,10 @@ export const EXCLUDED_PATTERNS = [
   "create-cmp.json",
   "qa/evidence/**",
   "qa/approvals.json",
+  // Derived state, rewritten explicitly once the region has landed. Sweeping
+  // it would copy a stale manifest in, back up a value that was about to be
+  // replaced anyway, and count a guaranteed no-op as actionable work.
+  "qa/harness.lock.json",
   "qa/comments.json",
   "qa/golden/**",
   ".git/**",
@@ -172,7 +177,117 @@ export function mergeThreeWay(theirs, base, next) {
  * @returns {{bucket:string, write:Buffer|null, sidecar:Buffer|null, remove:boolean}|null}
  *        null when the path is in neither base nor new (app-authored — invisible)
  */
+
+/** Where a preserved local patch to machine-owned lane code is written. */
+export const LOCAL_PATCH_PATH = "qa/harness-local.patch";
+
+/**
+ * Unified diff from `base` to `theirs`, rewritten so it applies against the
+ * project tree (`git apply qa/harness-local.patch`). git diff --no-index exits
+ * 1 when there ARE differences, which is the only case we call it in.
+ * @param {Buffer} base
+ * @param {Buffer} theirs
+ * @param {string} relPath project-relative path the patch should name
+ * @returns {string} patch text, or "" if git could not produce one
+ */
+export function diffPatch(base, theirs, relPath) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-harness-diff-"));
+  try {
+    const b = path.join(dir, "base");
+    const t = path.join(dir, "theirs");
+    fs.writeFileSync(b, base);
+    fs.writeFileSync(t, theirs);
+    const r = spawnSync("git", ["diff", "--no-index", "--no-color", "--", b, t], {
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    // 0 = identical (we never call it then), 1 = differences, >1 = trouble.
+    if (r.error || (r.status !== 0 && r.status !== 1) || !r.stdout) return "";
+    return r.stdout
+      .split("\n")
+      .map((line) => {
+        if (line.startsWith("diff --git ")) return `diff --git a/${relPath} b/${relPath}`;
+        if (line.startsWith("--- ")) return `--- a/${relPath}`;
+        if (line.startsWith("+++ ")) return `+++ b/${relPath}`;
+        return line;
+      })
+      .join("\n");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * The decision table for MACHINE-OWNED lane files — a different question from
+ * the one decideFile asks about app-shaped files.
+ *
+ * Lane code is byte-identical in every create-cmp app and carries no app
+ * content, so it is a derived artifact, and the right operation on a derived
+ * artifact is REPLACE, not merge. Three-way merging it is what made upgrades
+ * expensive: the 0.13.0 pilots produced ~1,000 conflicted lines per app whose
+ * diffs contained zero app-specific tokens.
+ *
+ * The region is therefore always taken to the new engine's content. What
+ * varies is how honestly we account for what the app had:
+ *
+ *   region-current    already the new content                    → silent
+ *   region-clean      untouched since stamp                      → replace
+ *   region-absorbed   locally edited, but the edit is ALREADY in the new
+ *                     content (the app hand-mirrored engine work — the
+ *                     pilots' overwhelmingly common case) → replace, silent
+ *   region-patched    a genuine local fork of lane code → replace, AND
+ *                     preserve base→theirs as a patch so nothing is lost
+ *   added / removed   as for any other file
+ *
+ * "region-patched" deliberately does NOT block or merge. A local edit to lane
+ * code is a fork the app is maintaining; making it explicit (a reviewable
+ * patch file plus a loud report) is better than the status quo, where the
+ * divergence was invisible until it cost a thousand hand-resolved lines at
+ * the next upgrade.
+ *
+ * @param {object} params
+ * @param {string} params.relPath
+ * @param {Buffer|null} params.base
+ * @param {Buffer|null} params.next
+ * @param {Buffer|null} params.theirs
+ * @param {Function} [params.merge] injectable three-way merge (classifier only)
+ * @returns {{bucket:string, write:Buffer|null, sidecar:null, remove:boolean, patch?:string}|null}
+ */
+export function decideRegionFile({ relPath, base, next, theirs, merge = mergeThreeWay }) {
+  const eq = (a, b) => a !== null && b !== null && a.equals(b);
+  const replace = (bucket, extra = {}) => ({
+    bucket,
+    write: next,
+    sidecar: null,
+    remove: false,
+    ...extra,
+  });
+
+  if (next === null) {
+    // The engine dropped this lane file. Nothing app-owned can live here, so
+    // there is no "orphaned" case to protect — remove it.
+    if (theirs === null) return { bucket: "current", write: null, sidecar: null, remove: false };
+    return { bucket: "region-removed", write: null, sidecar: null, remove: true };
+  }
+  if (theirs === null) return replace(base === null ? "added" : "region-restored");
+  if (eq(theirs, next)) return { bucket: "current", write: null, sidecar: null, remove: false };
+  if (base === null) return replace("region-patched", { patch: "" }); // no base to diff against
+  if (eq(theirs, base)) return replace("region-clean");
+
+  // The app edited lane code. Is that edit already carried by the new engine?
+  // A clean three-way merge landing exactly on `next` means the local change
+  // contributed nothing beyond it — the hand-mirror case.
+  const m = merge(theirs, base, next);
+  if (m.clean && m.content !== null && m.content.equals(next)) return replace("region-absorbed");
+
+  return replace("region-patched", { patch: diffPatch(base, theirs, relPath) });
+}
+
 export function decideFile({ relPath, base, next, theirs, merge = mergeThreeWay }) {
+  // Machine-owned lane files answer a different question — see decideRegionFile.
+  if (isHarnessFile(relPath) && !(base === null && next === null)) {
+    return decideRegionFile({ relPath, base, next, theirs, merge });
+  }
   const none = (bucket) => ({ bucket, write: null, sidecar: null, remove: false });
   const write = (bucket, content) => ({ bucket, write: content, sidecar: null, remove: false });
   const conflict = () => ({ bucket: "conflicted", write: null, sidecar: next, remove: false });
@@ -255,6 +370,12 @@ export function planHarnessUpgrade({ baseDir, newDir, projectDir, merge = mergeT
     added: 0,
     removed: 0,
     orphaned: 0,
+    // Machine-owned lane buckets (decideRegionFile).
+    "region-clean": 0,
+    "region-absorbed": 0,
+    "region-patched": 0,
+    "region-restored": 0,
+    "region-removed": 0,
   };
   const entries = [];
   for (const relPath of [...rels].sort()) {
@@ -271,7 +392,7 @@ export function planHarnessUpgrade({ baseDir, newDir, projectDir, merge = mergeT
       merge,
     });
     if (decision === null) continue;
-    counts[decision.bucket] += 1;
+    counts[decision.bucket] = (counts[decision.bucket] ?? 0) + 1;
     entries.push({ relPath, ...decision });
   }
   return { entries, counts };
@@ -299,7 +420,13 @@ export function applyHarnessPlan(projectDir, entries) {
   const deleted = [];
   const sidecars = [];
   const backups = [];
+  const patched = [];
+  const patchChunks = [];
   for (const e of entries) {
+    if (e.bucket === "region-patched" && e.patch) {
+      patched.push(e.relPath);
+      patchChunks.push(e.patch.endsWith("\n") ? e.patch : `${e.patch}\n`);
+    }
     const abs = path.join(projectDir, e.relPath);
     if (e.sidecar !== null && e.sidecar !== undefined) {
       const sidecarPath = abs + SIDECAR_SUFFIX;
@@ -328,7 +455,37 @@ export function applyHarnessPlan(projectDir, entries) {
       }
     }
   }
-  return { written, created, deleted, sidecars, backups };
+  // One patch file for the whole run — the app's genuine divergence from the
+  // lane, preserved rather than discarded. Written only when there is
+  // something to preserve, and only after the writes above succeeded.
+  let patchPath = null;
+  if (patchChunks.length > 0) {
+    const abs = path.join(projectDir, LOCAL_PATCH_PATH);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(
+      abs,
+      `# Local changes to machine-owned lane code, preserved by \`create-cmp upgrade --harness\`.\n` +
+        `#\n` +
+        `# The lane was replaced with the new engine's version. These edits were NOT\n` +
+        `# re-applied — a local change to lane code is a fork this app is maintaining,\n` +
+        `# and re-applying it silently would hide that.\n` +
+        `#\n` +
+        `# This diff is against the lane you WERE on, so it may not apply cleanly to\n` +
+        `# the new one. That is not a defect in the patch: it is the merge this tool\n` +
+        `# deliberately declined to do behind your back. To attempt it:\n` +
+        `#\n` +
+        `#     git apply --reject ${LOCAL_PATCH_PATH}\n` +
+        `#\n` +
+        `# What applies, applies; the rest lands in *.rej for you to judge. If it does\n` +
+        `# conflict, that IS the finding — the engine has moved under this fork.\n` +
+        `#\n` +
+        `# Better still: upstream the change so the next upgrade carries it for you.\n` +
+        `# Delete this file once you have decided.\n\n` +
+        patchChunks.join("\n"),
+    );
+    patchPath = LOCAL_PATCH_PATH;
+  }
+  return { written, created, deleted, sidecars, backups, patched, patchPath };
 }
 
 /**
