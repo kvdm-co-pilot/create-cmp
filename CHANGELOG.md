@@ -23,7 +23,15 @@ All notable changes to this project are documented here. The format is based on
   MCP tools from the `registerTool` calls in the server, CLI commands from
   `src/commands/`, and the lane's size per profile from `stepsForProfile` in
   `verify.mjs` — the same table the lane itself dispatches on. `--json` for machines,
-  a table for humans. Offline and dependency-free, because the test suite consumes it.
+  a table for humans, `--markdown` to emit the launch-collateral facts file. Offline and
+  dependency-free, because the test suite consumes it.
+
+  That last mode earned itself within the hour. The facts file was first written by hand;
+  a concurrent release bumped the tree to 0.14.1 and the hand-written copy was stale
+  before the ink dried — the very failure it existed to prevent. It is generated now, and
+  it records the distinction that broke it: the **repo version is not the published
+  version** (the tree read 0.14.1 while npm's `latest` was still 0.14.0). Launch copy is
+  told to pin no version at all and write `npm create kmp@latest` instead.
 
   `test/doc-counts.test.mjs` then fails the suite when a public surface contradicts it.
   It matches counts in the two forms real copy uses — "10 skills" and the adjective form
@@ -52,6 +60,23 @@ All notable changes to this project are documented here. The format is based on
   `scripts/ground-truth.mjs` and pinned by the gate above, and instructs agents to derive
   rather than transcribe.
 
+
+## [0.14.1] - 2026-08-20
+
+### Fixed
+
+- **`qa/watch.mjs` — the save-triggered inner loop — had been dead since 0.13.0.** That
+  release added `--no-journal` so watch runs would not append hundreds of lines a day to a
+  committed flight recorder. It wired the consumer and never added the flag to
+  `RECOGNIZED_FLAGS`, so the strict unknown-argument check — which exists to catch typos —
+  rejected a flag the harness itself passes. Every watch run exited 2 before running a
+  single step. Confirmed on a real app. Nothing caught it because no test read the two
+  lists against each other, and the failure is invisible unless you actually watch a save.
+  `test/verify-flags.test.mjs` now pins the class, not the instance: every consumed flag is
+  recognized, every flag `watch.mjs` spawns is accepted, and every recognized flag is
+  documented in `--help`. The third assertion caught the other half of the same omission —
+  `--no-journal` was undocumented, so anyone hitting the rejection had no way to learn what
+  it was for.
 
 ## [0.14.0] - 2026-08-20
 
