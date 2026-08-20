@@ -20,7 +20,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { validate, formatErrors } from "./lib/schema.mjs";
 import { validatePackageName } from "./lib/package-name.mjs";
 import { buildTokenMap, replaceTokens, replacePathTokens, isBinaryPath, slugifyAppName } from "./lib/tokens.mjs";
-import { isHarnessFile } from "../packages/harness/src/lib/harness-region.mjs";
+import { isHarnessFile, listHarnessFiles } from "../packages/harness/src/lib/harness-region.mjs";
+import { writeHarnessLock } from "../packages/harness/src/lib/harness-lock.mjs";
 import { renamePackageDirs } from "./lib/rename.mjs";
 import {
   stripFeatureBlocks,
@@ -272,6 +273,41 @@ function applyAppNameSlug(projectDir, appName) {
  * @param {string} projectDir
  * @param {object} config validated engine config
  */
+/**
+ * The harness version this engine ships — read from the package that owns the
+ * lane, NOT from the engine's own package.json. The two version independently:
+ * the lane changes far more often than the template's app shape, and fusing
+ * them is what forced an app-shape merge every time a lane fix shipped.
+ * @returns {string} semver, or "unknown" if the manifest is unreadable
+ */
+function harnessVersion() {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, "packages/harness/package.json"), "utf8")
+    ).version;
+  } catch {
+    return "unknown"; // best-effort — never fail the stamp over version metadata
+  }
+}
+
+/**
+ * Record which lane this app carries, and a sha256 per machine-owned file, so
+ * the lane can prove offline on every run that it is unmodified since stamp.
+ * Runs LAST, after stamping and feature-stripping, so it hashes exactly the
+ * bytes the app will ship with.
+ * @param {string} projectDir
+ */
+function writeLaneLock(projectDir) {
+  const version = harnessVersion();
+  if (version === "unknown") return; // nothing honest to record
+  // No lane, no lock. A config that strips the harness (or a template that
+  // never carried one) must not get a manifest describing an empty region —
+  // it would attest nothing while creating the very qa/ directory the strip
+  // just removed.
+  if (listHarnessFiles(projectDir).length === 0) return;
+  writeHarnessLock(projectDir, { version });
+}
+
 function writeSpecOfRecord(projectDir, config) {
   let engineVersion = "unknown";
   try {
@@ -452,6 +488,12 @@ export async function scaffold(config, opts = {}) {
   // intent, re-stamp/resume all need it). Committed with the app; hand-edits
   // are visible spec changes, not drift.
   writeSpecOfRecord(projectDir, config);
+
+  // Lock the lane LAST — after stamping, feature-stripping and every other
+  // mutation — so the manifest hashes exactly the bytes this app will ship
+  // with. From here the app can prove offline, on every lane run, that its
+  // harness is the one it was given.
+  writeLaneLock(projectDir);
 
   ok("Scaffold complete.");
 

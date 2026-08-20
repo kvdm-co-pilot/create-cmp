@@ -75,6 +75,24 @@ test("a fresh scaffold lands byte-identical copies of every lane file", async ()
       );
     }
 
+    // The scaffold ships a lock, and the lane can vouch for itself with it.
+    const lock = JSON.parse(fs.readFileSync(path.join(out, "qa/harness.lock.json"), "utf8"));
+    assert.equal(lock.name, "create-cmp-harness");
+    assert.equal(
+      lock.version,
+      JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "packages/harness/package.json"), "utf8")).version,
+      "the lock records the harness version this engine actually shipped",
+    );
+    assert.equal(lock.fileCount, listHarnessFiles(out).length);
+    assert.equal(hashHarnessRegion(out).sha256, lock.sha256, "a fresh scaffold is intact by construction");
+
+    // And the tamper it exists to catch is caught, on a REAL stamped tree.
+    const verifyPath = path.join(out, "qa/verify.mjs");
+    const pristine = fs.readFileSync(verifyPath);
+    fs.writeFileSync(verifyPath, `${pristine}\n// steps.forEach((s) => (s.verdict = "PASS"))\n`);
+    assert.notEqual(hashHarnessRegion(out).sha256, lock.sha256, "an edited lane must not hash as installed");
+    fs.writeFileSync(verifyPath, pristine);
+
     // The scaffolded receipt-check must consume the vendored predicate, not a fork.
     const receiptCheck = fs.readFileSync(path.join(out, "qa/receipt-check.mjs"), "utf8");
     assert.match(receiptCheck, /from "\.\/lib\/receipt-validate\.mjs"/, "qa/receipt-check.mjs imports the shared predicate");
