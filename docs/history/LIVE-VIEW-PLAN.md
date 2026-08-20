@@ -1,5 +1,7 @@
 # Live View — plan of record (founder priority: ALL THREE are must-haves)
 
+> _Historical — superseded. Tracks A/B/C (preview, live device view, dev-client) were completed 2026-07-04; the current reference for these tools is [USAGE.md](../USAGE.md) §5 and §8 (workflows C/D/E). Kept for provenance._
+
 > **Status: ALL THREE TRACKS BUILT + VERIFIED (2026-07-04).** Track A — `render_tree` /
 > `render_screen` / `prove_change` (MCP v0.3.0). Track B — live device view: `/inspect/screenshot`
 > + `POST /inspect/tap` (HTTP, superseding the adb sketch) + the same-origin `/inspect/remote`

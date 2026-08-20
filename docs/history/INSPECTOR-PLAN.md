@@ -1,5 +1,7 @@
 # create-cmp Inspector — plan of record
 
+> _Historical — superseded. Describes the inspector's phase 0-2 build (2026-07-03); the current inspector reference (tools, tiers, tree contract) is [USAGE.md](../USAGE.md) §5. Kept for provenance._
+
 > **Status:** **Phase 0 built + verified (2026-07-03). Phase 1 (template token-annotation) +
 > contract extension + golden-tree snapshots + a11y audit built + verified (2026-07-03).
 > Phase 2 (LIVE on-device inspector) BUILT + VERIFIED (2026-07-03).** The
@@ -19,7 +21,7 @@
 > (tap a card at live-tree coordinates → re-fetch → `home_title` gone, Detail content present).
 > Phase 3 remains proposed. Scope for now is **Android + host-JVM only** — iOS is explicitly
 > deferred. Companion docs: [`INSPECTOR-PHASE2-DESIGN.md`](./INSPECTOR-PHASE2-DESIGN.md) (the
-> Phase 2 spec), [`ARCHITECTURE.md`](./ARCHITECTURE.md) (the scaffolder engine), and the internal
+> Phase 2 spec), [`ARCHITECTURE.md`](../ARCHITECTURE.md) (the scaffolder engine), and the internal
 > strategy notes (not in the public repo).
 
 ## The problem

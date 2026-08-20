@@ -14,7 +14,8 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "prepublishOnly": "npm test"
   },
   "engines": {
     "node": ">=18"
@@ -32,5 +33,12 @@
     "type": "git",
     "url": "git+https://github.com/kvdm-co-pilot/create-cmp.git",
     "directory": "packages/receipts"
+  },
+  "homepage": "https://github.com/kvdm-co-pilot/create-cmp/tree/main/packages/receipts#readme",
+  "bugs": {
+    "url": "https://github.com/kvdm-co-pilot/create-cmp/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

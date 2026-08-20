@@ -2,7 +2,7 @@
 
 Read a **running Compose Multiplatform UI as structured JSON** — hierarchy + geometry +
 resolved design tokens — and query/assert on it. **Never screenshots.** This is the
-Claude-side of the create-cmp inspector (see [`../../docs/INSPECTOR-PLAN.md`](../../docs/INSPECTOR-PLAN.md)):
+Claude-side of the create-cmp inspector (see [`../../docs/history/INSPECTOR-PLAN.md`](../../docs/history/INSPECTOR-PLAN.md)):
 Phase 0 (headless harness trees) + Phase 2 (LIVE on-device source over `adb forward`, plus the
 uiautomator fallback).
 

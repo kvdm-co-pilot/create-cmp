@@ -49,8 +49,9 @@ build dies**. Planned commands:
 
 The AI-native Compose inspector — read a running app's hierarchy, geometry, and *resolved design
 tokens* as structured JSON, never screenshots. Phase 0 (headless host-JVM render → MCP tools) is
-built and verified; see [`INSPECTOR-PLAN.md`](./INSPECTOR-PLAN.md) for phases 1–3 (token
-enrichment, live on-device inspection, plugin default).
+built and verified; see [`history/INSPECTOR-PLAN.md`](./history/INSPECTOR-PLAN.md) for phases 1–3
+(token enrichment, live on-device inspection, plugin default) — superseded build history; the
+current inspector reference is `USAGE.md` §5.
 
 Cheap, high-value additions on the same tree contract:
 

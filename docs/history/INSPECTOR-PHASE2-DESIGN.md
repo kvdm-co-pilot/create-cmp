@@ -1,5 +1,7 @@
 # Inspector Phase 2 — Live on-device Compose inspector (design)
 
+> _Historical — superseded. The live on-device inspector's build spec (2026-07-03), since shipped; the current inspector reference is [USAGE.md](../USAGE.md) §5. Kept for provenance._
+
 > **Status:** DESIGN — 2026-07-03. Companion to [`INSPECTOR-PLAN.md`](./INSPECTOR-PLAN.md)
 > (Phase 0 built + verified). This document is the build-track spec for **Tier 1: the live
 > on-device inspector** — an AI (via the `cmp-inspector` MCP) reading a **running Android app's**

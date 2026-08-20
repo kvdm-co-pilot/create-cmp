@@ -1,7 +1,7 @@
 # create-cmp — the complete usage guide
 
 > **Read this first.** It is the single entry point to the whole product: setup, the engine CLI,
-> the 9 skills, the `cmp-inspector` MCP (26 tools), and the workflows that tie them together. An
+> the 10 skills, the `cmp-inspector` MCP (15 tools), and the workflows that tie them together. An
 > agent that reads this knows how to drive create-cmp end to end. Concise by section, exhaustive in
 > total. Companion deep-dives are cross-linked; you rarely need them.
 
@@ -29,7 +29,7 @@ everything:
    *(The harness layers are being built out — see [`HARNESS-PLAN.md`](./HARNESS-PLAN.md) for what
    ships today vs next.)*
 
-**Two front doors, one engine:** the `create-cmp` CLI (`npx`) and the Claude Code plugin (9 skills +
+**Two front doors, one engine:** the `create-cmp` CLI (`npx`) and the Claude Code plugin (10 skills +
 the MCP). Same deterministic Node engine behind both.
 
 **The frozen version set** (moved as one unit by `upgrade`; never bump a piece in isolation):
@@ -40,6 +40,23 @@ Kotlin `2.2.20` · KSP `2.2.20-2.0.4` · Compose MP `1.10.3` · Room `2.8.4` · 
 > **Scope now:** Android + host-JVM are the active targets. iOS template support is intact and
 > compiles, but iOS CI is parked (manual dispatch). The inspector/live-view/dev-client features are
 > Android + desktop.
+
+### What a generated project carries
+
+Every stamped app is self-contained — the harness's real point (§8-H): a plain Claude Code
+session with **no create-cmp plugin installed** can extend it correctly, because the contract
+ships inside the repo, not in the tooling that made it.
+
+| Path | What's there |
+|---|---|
+| `CLAUDE.md` | The AI delivery contract — definition of done, spec-first workflow, architecture/testing rules. |
+| `composeApp/` | The shared Kotlin/Compose Multiplatform module — `commonMain` (presentation/domain/data), `androidMain`, `iosMain`, `desktopMain`, plus `androidDebug`'s inspector server. |
+| `specs/` | `app-base.spec.md` (architecture/shell clauses), `home.spec.md` (the exemplar feature's clauses), `intent.md` (the genesis-walk intent brief), `README.md` (the clause grammar). |
+| `docs/` | `ARCHITECTURE.md` (the app's own architecture, `cmp:generated` sections tree-derived), `TESTING.md` (the test pyramid applied here), `dev-client.md`, `adr/`. |
+| `qa/` | The harness: `verify.mjs` (the profile-tiered lane above) · `approve.mjs` + `approvals.json` (governed-artifact sign-off, §6) · `comment.mjs` + `comments.json` (§7) · `scaffold-feature.mjs` (the `add-feature`/`add-screen`/`add-repository` stamper) · `watch.mjs` (inner-loop fast-tier re-runs) · `receipt-check.mjs` (the Stop-hook gate) · `arch-doc.mjs` · `record-audit.mjs` (cmp-audit cadence) · `refusal-demo.mjs` · `preview-gallery.mjs` · `e2e/` (Maestro flows) · `golden/` (golden-tree baselines) · `evidence/latest.json` (the committed receipt). |
+| `.claude/skills/` | `add-feature`, `add-screen`, `add-repository` — the in-project stampers, usable with zero plugin. |
+| `.github/workflows/verify.yml` | CI re-runs the lane on every push and confirms the committed receipt still attests `HEAD`. |
+| `manifest.json` | The scaffold's own record of what was stamped (flags, verify commands) — read by the CLI's standalone `verify` command. |
 
 ---
 
@@ -59,7 +76,7 @@ node bin/create-cmp.mjs --help
 npx github:kvdm-co-pilot/create-cmp --help        # zero-install
 ```
 
-**Claude Code plugin** (adds the 9 skills + the `cmp-inspector` MCP):
+**Claude Code plugin** (adds the 10 skills + the `cmp-inspector` MCP):
 
 ```text
 /plugin marketplace add kvdm-co-pilot/create-cmp
@@ -112,7 +129,7 @@ Every command except `create` works on **any** KMP project, not only ones create
 
 | Command | Purpose | Key flags |
 |---|---|---|
-| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --region --theme-prefix` · `--ios/--no-ios` · `--firebase/--no-firebase --auth <email\|phone\|both\|none>` · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
+| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --region --theme-prefix --target-dir <dir>` · `--ios/--no-ios` · `--firebase/--no-firebase --auth <email\|phone\|both\|none>` (sub-toggles, default = `--firebase`'s value: `--firestore/--no-firestore --storage/--no-storage --functions/--no-functions --fcm/--no-fcm`) · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
 | `doctor` | Toolchain preflight **+** project diagnosis (kotlin↔ksp lockstep, drift vs the proven set, the KSP2/iOS catch-22, `sdk.dir`, `~/.konan` bloat, disk, and an inspector-stays-debug-only check). See also [docs/errors/](errors/README.md) — one page per build failure `doctor` diagnoses, with the exact error text and the manual fix. | `--fix` (safe heals) · `--yes --no-install --no-ios --target-dir <dir>` |
 | `upgrade` | Migrate `gradle/libs.versions.toml` to the next **proven-green** version set: diff table → surgical in-place edits (comments/format preserved) with `.bak-upgrade` backups → optional verify. Lockstep guardrail refuses a broken kotlin↔ksp pairing. | `--target-dir <dir> --set <id> --dry-run --yes --verify` |
 | `clean` | Cache & build-output hygiene: stale `~/.konan` toolchains + project `build/`/`.gradle/` (sizes shown, consent-gated); global Gradle caches are size-reported only. | `--target-dir <dir> --dry-run --yes` |
@@ -121,9 +138,33 @@ Every command except `create` works on **any** KMP project, not only ones create
 **Determinism rule for agents:** never hand-author Gradle files / the iOS shell / navigation / DI —
 that's exactly what makes CMP flaky. Stamp with the engine, then author only per-app screens.
 
+**Full options reference:** [`options.schema.json`](../options.schema.json) is the schema both
+front doors (CLI flags, the plugin's interview) build into and the engine validates against —
+the authoritative shape when a flag's exact type/default matters.
+
+### The verify lane — profile-tiered, no single gate count
+
+Don't confuse the CLI's standalone `verify` command above (a green-build check you can point
+at any project) with the richer lane every generated project carries at `qa/verify.mjs` —
+that one is **profile-tiered**: how many steps run depends on `--profile`, so "N gates" is
+never a fixed number. Bare `node qa/verify.mjs` (no `--profile`) defaults to `local`.
+
+| Profile | Steps | What it adds over the previous tier |
+|---|---|---|
+| `scaffold` | 9 | What `create-cmp --verify` proves at stamp time: harness integrity, specCoverage, approvals, componentStories, reachability, archDoc, schemaHistory, build, unitTests. |
+| `local` | 16 | The full JVM tier (conformance, goldenTrees, tokenDrift, a11y), the release-build compile check, `androidChecks`, and (device attached) `e2eSmoke` — device-dependent steps SKIP honestly with no device. |
+| `ci` | 17 | `local` plus the determinism probe's row (the probe itself stays opt-in behind `--determinism`; the row records whether it ran, so a SKIP is visible rather than absent). |
+| `release` | 19 | `ci` plus the audit-cadence report and the release-APK behavior smoke (`releaseSmoke`) — the ship-time profile, run before cutting a release, never per-change. |
+
+`--fast` runs the resolved profile minus the device/release-gated steps — the inner loop
+`qa/watch.mjs` re-runs on every save. Every run produces one typed `PASS`/`FAIL`/`SKIP`
+verdict plus a schema-validated evidence pack (`qa/evidence/latest.json`); SKIPs are always
+named, never silently absent. See §6 for the `approvals` step's own semantics and §8-H for
+the lane in the agent's edit loop.
+
 ---
 
-## 4. The 9 skills
+## 4. The 10 skills
 
 Skills are the plugin's conversational front door; each shells the same engine or the MCP. Invoke by
 intent — the descriptions carry rich triggers.
@@ -139,10 +180,11 @@ intent — the descriptions carry rich triggers.
 | **cmp-preview** | Live previews of REAL screens, zero commands. | `preview {projectDir}` → live gallery URL; watches sources, re-renders on save; structural summaries for the agent. |
 | **cmp-test** | Generate a regression suite by **observing** the app. | Reads the live tree via the MCP → derives a plan → writes Maestro E2E flows + golden-tree snapshots in the shipped harness style. |
 | **cmp-qa-prep** | Bring up emulator + Maestro flow run + the bottom-nav smoke (legacy Appium bring-up path also supported). | Emulator + Maestro harness. |
+| **cmp-audit** | Adversarial audit of one subsystem against its spec **and** platform semantics — the defect class desktop-tier tests can't see (alarm/notification/PendingIntent identity, reboot, process death, Doze, DST). | Reads spec clauses + every source set (`commonMain` **and** `androidMain`/`iosMain`) + tests → a platform-semantics question bank (identity, lifecycle, cancellation, delivery, state re-ask, permissions, coverage arithmetic) → a refuter pass kills weak findings → survivors land in the change flow as a spec amendment + failing-test-first fix proposal, or a named human decision — never a direct unreviewed fix. `node qa/record-audit.mjs <subsystem>` logs the cadence. |
 
 ---
 
-## 5. The `cmp-inspector` MCP (26 tools)
+## 5. The `cmp-inspector` MCP (15 tools)
 
 A stdio server that reads a Compose UI as a **single JSON tree contract** and never returns pixel
 bytes. Node: `node inspector/mcp/bin/server.mjs`.
@@ -519,8 +561,7 @@ node bin/create-cmp.mjs upgrade --dry-run     # then --verify to apply+prove
 #   then in Claude: connect_live → inspect_tree → navigate_and_inspect → preview_diff
 ```
 
-**Deeper dives:** [`ARCHITECTURE.md`](./ARCHITECTURE.md) (engine) · [`INSPECTOR-PLAN.md`](./INSPECTOR-PLAN.md)
-+ [`INSPECTOR-PHASE2-DESIGN.md`](./INSPECTOR-PHASE2-DESIGN.md) (inspector) ·
-[`LIVE-VIEW-PLAN.md`](./LIVE-VIEW-PLAN.md) (preview/live-view/dev-client) ·
-[`ROADMAP.md`](./ROADMAP.md) · [`TEST-DRIVE.md`](./TEST-DRIVE.md) (hands-on) ·
-[`inspector/mcp/README.md`](../inspector/mcp/README.md) (per-tool detail).
+**Deeper dives:** [`ARCHITECTURE.md`](./ARCHITECTURE.md) (engine) · [`ROADMAP.md`](./ROADMAP.md) ·
+[`inspector/mcp/README.md`](../inspector/mcp/README.md) (per-tool detail). Historical build
+designs for the inspector, live-view, and the founder test-drive checklist have moved to
+[`docs/history/`](./history/) — this document (§5 above) is the current inspector/tool reference.

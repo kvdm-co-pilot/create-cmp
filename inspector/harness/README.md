@@ -1,6 +1,6 @@
 # cmp-inspector-harness
 
-Phase 0 of the create-cmp inspector (`docs/INSPECTOR-PLAN.md`): a standalone Compose
+Phase 0 of the create-cmp inspector (`docs/history/INSPECTOR-PLAN.md`): a standalone Compose
 **Desktop (JVM)** project that composes a sample screen **headlessly** — no window, no
 emulator, no device — walks the Compose **semantics tree**, and emits it as JSON enriched
 with resolved **design tokens**. This proves the "inspect a running Compose UI as

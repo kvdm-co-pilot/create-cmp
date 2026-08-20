@@ -1,5 +1,7 @@
 # create-cmp — founder test drive
 
+> _Historical — superseded. A one-time founder pre-publish checklist from 2026-07-06 (references an 8-skill plugin; current is 10 — see [USAGE.md](../USAGE.md)). Kept for provenance; see [DOGFOODING-FINDINGS.md](../DOGFOODING-FINDINGS.md) for current hands-on findings._
+
 > The hands-on pass before publishing. Everything below is already machine-verified (204 engine +
 > 94 MCP tests, stamp-gate matrix, live emulator E2E, a real verified-dev-loop run) — this
 > checklist is about how it *feels*. Note friction, wording, and wow-moments; those are the

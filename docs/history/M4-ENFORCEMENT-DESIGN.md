@@ -1,8 +1,10 @@
 # M4 — Mechanical Enforcement + Negative Proof (design / delegation contract)
 
+> _Historical — superseded. The `inputs.hash` receipt/Stop-hook mechanism this designed has since shipped; the current design of record is [CHANGE-FLOW-DESIGN.md](../CHANGE-FLOW-DESIGN.md) (the Prove/Sign stages) and [ADR-0005](../adr/0005-evidence-binding-by-inputs-hash.md). Kept for provenance._
+
 > Layer-4 completion. Everything below ships **in the generated project** (ADR-0001) and works
 > with zero plugin. This doc is the buildable contract the implementation subagents work against;
-> the *why* of the core decision is [ADR-0005](adr/0005-evidence-binding-by-inputs-hash.md).
+> the *why* of the core decision is [ADR-0005](../adr/0005-evidence-binding-by-inputs-hash.md).
 
 The goal: make "no done without a verdict" **mechanical**, not honor-system, and **prove** the
 gates refuse real violations. Four pieces (A–C buildable now; D device-gated, stays a SKIP).

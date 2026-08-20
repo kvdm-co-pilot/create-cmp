@@ -13,121 +13,66 @@ renders, and blocked from "done" without proof.
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
-[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#the-claude-code-plugin-9-skills)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#the-claude-code-plugin-10-skills)
 
 </div>
 
 ---
 
 ```bash
-npx create-cmp-cli@latest my-app --name Acme --package com.acme.app --yes --verify
+npm create kmp@latest my-app
 ```
 
-Deterministic (stamps a frozen, CI-verified template), fully non-interactive with flags, and
-exits non-zero on failure. Every generated project ships its own verify lane — `node qa/verify.mjs`,
-8 gates, evidence receipts — with nothing installed. Agent-readable: [llms.txt](./llms.txt) ·
-[options.schema.json](./options.schema.json). Also answers to `npm create mobile` (the honest
-front door — opens with a CMP-vs-React Native/Flutter fit check, then delegates),
-`npm create compose-multiplatform`, and `npm create kmp` — official aliases
-([packages/aliases](packages/aliases)) that delegate here.
+Deterministic (stamps a frozen, CI-verified template), non-interactive with flags, exits non-zero
+on failure. Every generated project ships its own verify lane (`node qa/verify.mjs`, a
+multi-gate check, evidence receipts) with nothing installed. Agent-readable:
+[llms.txt](./llms.txt) · [options.schema.json](./options.schema.json).
 
 ## What is this, in plain words
 
 **Day one, it's a scaffolder.** One command gives you a working Compose Multiplatform app —
 Android and iOS, navigation and insets solved, Clean Architecture wired, tests passing, build
-green. It *stamps* a frozen, CI-verified template; it never asks an AI to freehand your project,
-so every scaffold is identical and every scaffold builds.
+green. It *stamps* a frozen, CI-verified template — no AI freehanding your project, so every
+scaffold is identical and every scaffold builds.
 
-**Every day after, it's a harness.** AI writes code fast, and confidently — including confidently
-wrong. The scarce thing is no longer code; it's a **machine-checkable definition of "correct"**.
-Every project this tool generates carries that definition inside it: behavior specs, an
-executable verify lane, generators that extend the app the right way by construction, and
-enforcement that refuses "done" without evidence. An AI session working in your repo doesn't
-*promise* the feature works — it has to *prove* it, and it gets blocked when it can't.
-
-**See it live:** [create-cmp-showcase](https://github.com/kvdm-co-pilot/create-cmp-showcase) is a
-public repo built entirely by this tool — every commit carries its evidence receipt, and
+**Every day after, it's a harness.** AI writes code fast, and confidently — including
+confidently wrong. Every project this tool generates carries a machine-checkable definition of
+"correct" inside it: specs, an executable verify lane, generators that extend the app the right
+way by construction, and enforcement that refuses "done" without evidence. **See it live:**
+[create-cmp-showcase](https://github.com/kvdm-co-pilot/create-cmp-showcase) is a public repo
+built entirely by this tool — every commit carries its evidence receipt, and
 [PR #1](https://github.com/kvdm-co-pilot/create-cmp-showcase/pull/1) shows the harness *refusing*
 a bad change and naming the exact rule it broke.
 
 ## The core loop
 
 ```
-  spec clause  →  generate from exemplar  →  verify lane (8 gates)  →  evidence receipt
-      ↑                                                                      │
+  spec clause  →  generate from exemplar  →  verify lane  →  evidence receipt
+      ↑                                                              │
       └────────────── enforcement: Stop hook + CI refuse "done" without it ──┘
 ```
 
 Behavior starts as a written spec clause. Code is cloned from a proven exemplar. The verify lane
 checks everything — spec coverage, build, tests, architecture, UI structure, design tokens,
-accessibility, on-device E2E — and writes a receipt bound to a content hash of the code it
-verified. The Stop hook and CI both check that receipt. You cannot hand-forge it, and a stale one
-doesn't pass.
-
-## Watch and drive your app live — from a browser
-
-Every debug build carries a live device view. With the app running on a device or emulator
-(`adb forward tcp:9500 tcp:9500`, or just `connect_live` from the plugin), open:
-
-```
-http://127.0.0.1:9500/inspect/remote
-```
-
-A self-contained page mirrors the running app (~700ms refresh) and **click-to-tap drives the
-real thing** — clicks scale to device pixels and dispatch as taps. This is the "two audiences,
-one app" split at its purest: the human watches and drives real pixels in a browser while the
-agent asserts on the semantics tree (`navigate_and_inspect`, `inspect_tree`, `db_query`). Use
-it to watch an e2e run, demo a feature, or poke at the app without touching the device. No
-install, no CORS, debug builds only — release builds contain none of this code.
+accessibility, on-device E2E, and more — and writes a receipt bound to a content hash of the code
+it verified. You cannot hand-forge it, and a stale one doesn't pass.
 
 ## Quick start
 
-```bash
-npx create-cmp-cli@latest
-```
-
-…or non-interactively:
+`npm create kmp@latest my-app` interviews you and takes you through it interactively. For
+scripts and CI, drive it with flags instead:
 
 ```bash
 npx create-cmp-cli@latest my-app --name Acme --package com.acme.app --yes --verify
 ```
 
-It interviews you (or takes flags), checks your toolchain, stamps the template, and **builds the
-app to prove it's green** before reporting success.
+Either way it checks your toolchain, stamps the template, and **builds the app to prove it's
+green** before reporting success. (The npm package is `create-cmp-cli` — `create-cmp` was
+already squatted — but the installed command is still `create-cmp`.)
 
-> **Name note:** the npm package is `create-cmp-cli` (the bare `create-cmp` name was already
-> squatted); the installed command is still `create-cmp`.
+## The Claude Code plugin (10 skills)
 
----
-
-# The features, one by one
-
-Three surfaces: the **CLI**, the **Claude Code plugin**, and — most importantly — **what every
-generated project carries inside it**.
-
-## The CLI (5 commands)
-
-Everything except `create` works on **any** KMP project, not just ones this tool made.
-
-| Command | Plain-speech: what it does |
-|---|---|
-| `create-cmp [dir]` | Makes a new app. Asks questions (or takes flags), stamps the template, renames everything to your package, removes features you turned off, builds it, tells you GREEN or FAIL. |
-| `create-cmp doctor [--fix]` | Checks your machine (JDK, Android SDK, emulator, Xcode, CocoaPods, XcodeGen, Node) **and** your project (do Kotlin and KSP versions agree? is the version catalog drifting? is `~/.konan` eating your disk?). `--fix` applies safe repairs — always asking first. |
-| `create-cmp upgrade [--dry-run]` | Moves your `libs.versions.toml` to the next **proven-green** version set. Shows a diff first, edits surgically with backups, guards the Kotlin↔KSP lockstep, and can re-verify the build after. |
-| `create-cmp clean` | Reclaims disk: stale Kotlin/Native toolchains, `build/` dirs. Shows sizes, asks before deleting. |
-| `create-cmp verify` | Runs the green-build gate against an existing project. Exit 0 = green. Useful in scripts and CI. |
-
-Hit a KMP build error? [Common CMP/KMP build errors and fixes](docs/errors/README.md) — kotlin↔KSP
-mismatch, the KSP2/iOS catch-22, `SDK location not found`, `No space left on device`, version drift.
-
-## The Claude Code plugin (9 skills)
-
-```text
-/plugin marketplace add kvdm-co-pilot/create-cmp
-/plugin install create-cmp
-```
-
-Same engine as the CLI, conversational front door. Each skill is a guided flow, not a wrapper:
+Install with `/plugin marketplace add kvdm-co-pilot/create-cmp` then `/plugin install create-cmp`.
 
 > **Make your agent reach for this from cold.** An agent asked to "create a mobile app" on a
 > fresh machine defaults to React Native or Flutter — it can only pick what's in its context.
@@ -149,281 +94,16 @@ Same engine as the CLI, conversational front door. Each skill is a guided flow, 
 > momentum, and why it's the strongest stack for agentic development — is
 > [docs/WHY-CMP.md](docs/WHY-CMP.md).
 
-| Skill | Plain-speech: what it does |
-|---|---|
-| `cmp-new` | "Make me an app." Interviews you (including the app's intent — purpose, audience, brand feel, first screens), scaffolds via the engine, proves the build green, then offers the genesis walk — approve the defaults now, or shape the design language, architecture, components, and your own first feature as the exemplar, each ending in an approval. |
-| `cmp-doctor` | "Why won't my KMP project build?" Runs the doctor, explains the findings, applies consented fixes. |
-| `cmp-upgrade` | "Bump my dependencies safely." Diff → apply → verify, with the lockstep guardrails. |
-| `cmp-preview` | "Show me my screens." Live gallery of every screen at a local URL — real DI/theme/data, no device, no emulator, no manual Gradle. Edit → save → the page re-renders itself; changed screens get flagged; a11y violations show per screen. The same console carries Design System (tokens + a Components section, plus a **candidates strip** for comparing design-language picks during genesis), Architecture, Approvals, Specs, and Comments tabs. |
-| `cmp-inspect` | "What did the UI actually render?" Reads a **running** app as structured JSON — hierarchy, geometry, resolved design tokens, navigation state. Never screenshots. Can assert tokens, find drift against your design system, audit accessibility, diff before/after. |
-| `cmp-dev-client` | "Let me iterate fast." Runs your shared UI in a phone-sized desktop window with hot reload — save a file, see it change. No emulator needed. Firebase stays off on desktop (offline fakes). |
-| `cmp-firebase-connect` | "Wire up my real Firebase." Drives the Firebase CLI: create/reuse a project, register the app, drop the real `google-services.json` over the placeholder, prove it with a green build. Every cloud action asks first. |
-| `cmp-test` | "Write tests for my app." *Observes* the running app's semantics tree — what's actually on screen, what's tappable, where navigation goes — and derives the regression suite from that. Tests come from rendered reality, not guesses. |
-| `cmp-qa-prep` | "Get my test environment up." Emulator + app install + E2E smoke run, with the gotchas handled. |
-
-Plus the **`cmp-inspector` MCP server** (15 tools — deliberately few; two production apps proved a lean surface gets used and a wide one gets ignored) — the machine-readable window into a running
-Compose UI that `cmp-inspect`, `cmp-test`, and the verified dev loop are built on. One tree
-contract, three sources: render a screen headlessly, connect to the live app, or read a device
-via UIAutomator. It also carries the runtime half of the agent's eyes (crashes, logs, DB state —
-`runtime_crashes`, `runtime_logs`, `db_query`), the human-approval console
-(`approval_status`, §8 below), the console's talk-back channel (`review_comments`,
-`resolve_comment`, §9 below), and the genesis walk's design-language workbench
-(`snapshot_variant`, §8 below).
-
-## What every generated project carries (the harness itself)
-
-This is the product. Delete the plugin, uninstall the CLI — your generated repo keeps all of it.
-
-### 1. Specs — behavior is written down first
-`specs/*.spec.md` — plain Given/When/Then clauses with stable ids (`HOME-01`, `ARCH-05`). New
-behavior starts as a clause; durable tests cite their clause (`// SPEC: HOME-02`). The `home`
-feature ships as the fully-cited example.
-
-### 2. The verify lane — one command, eight gates
-`node qa/verify.mjs` runs everything and writes a typed PASS/FAIL/SKIP receipt:
-
-| Gate | Plain-speech: what it catches |
-|---|---|
-| `specCoverage` | Behavior nobody tests, and test citations pointing at nothing. Every clause needs a test; every citation needs a clause. |
-| `build` | The app doesn't compile. |
-| `unitTests` | A behavior broke. ViewModels/UseCases/Repositories, tested with hand-written fakes. |
-| `conformance` | Architecture violations, **named by rule**: UI importing the data layer, hardcoded colors outside the theme, a screen without a ViewModel test. |
-| `goldenTrees` | A screen's *structure* changed when you didn't mean it to. Compares the rendered semantics tree against a committed baseline — no pixels, no flake. |
-| `tokenDrift` | The running app's design tokens drifting from the declared catalog — queried live from the debug inspector. Hardcode a color and it shows up here too. |
-| `a11y` | Missing content descriptions, undersized touch targets. |
-| `e2eSmoke` | The app doesn't actually boot and navigate on a device. Real Maestro run, hardened for slow emulators. |
-
-No device attached? Device-dependent gates record an honest **SKIP** — never a fake green.
-
-### 3. Evidence — receipts you can't forge
-The lane writes `qa/evidence/latest.json`: verdict, per-gate results, durations, and an
-`inputs.hash` — a content hash of every file that could affect the verdict. You commit the
-receipt with your change; git history becomes the audit ledger. Because validity is a *content*
-hash (not a commit SHA), rebases and merges don't invalidate honest receipts — but editing the
-verdict by hand, or reusing a stale receipt, fails immediately. The lane also forces test
-*execution* (`--rerun`), so a receipt can never launder a cached result from a different tree.
-
-### 4. Enforcement — "done" is mechanical, not honor-system
-- **Stop hook** (`.claude/settings.json`): when an AI session tries to end, it re-hashes the
-  verified surface and compares against the committed receipt. Changed code without a fresh PASS
-  receipt → the session is blocked, with the reason. Costs milliseconds (hashing only). Doc-only
-  edits never trigger it — enforcement is transparent, not hostile.
-- **CI receipt gate** (`.github/workflows/verify.yml`): every push re-checks that the committed
-  receipt attests `HEAD`, then independently re-runs the whole lane.
-- **The refusal demo** (`node qa/refusal-demo.mjs`): four staged violations — hardcoded color,
-  illegal layer import, deleted spec test, structural regression — each caught and **named by
-  clause**, 4/4. Run it to watch the harness say no.
-
-### 5. In-project generators — extend without the plugin
-Three skills ship *inside* the generated repo (`.claude/skills/`), backed by a deterministic
-stamper (`qa/scaffold-feature.mjs`):
-
-- **`add-feature`** — a full vertical slice cloned from the configured exemplar (`home` by
-  default, retargetable to the app's own first feature — §8): Screen → ViewModel → UseCase →
-  Repository → DI → nav route, **with tests at every layer** and a golden baseline slot.
-- **`add-screen`** — presentation only, for an entity whose data layer already exists.
-- **`add-repository`** — data/domain only: model, repository interface + impl, use case, fake.
-
-Any plain Claude Code session — no create-cmp plugin installed — finds these and extends the app
-correctly by construction.
-
-### 6. The inspector — AI-readable UI, previews without a device
-Two loops, one contract. **Live (tier 1):** every debug build serves `127.0.0.1:9500`
-(loopback-only, structurally absent from release): the UI tree as JSON, the design-token catalog,
-a screenshot route, a tap route, and a live device view for humans (`/inspect/remote` — watch the
-real device in a browser, click to tap). **Headless previews (tier 0):** every app ships
-`inspector/PreviewRegistry.kt` (the `@Preview` analog — shell, every tab, detail) and a
-`:composeApp:renderScreens` task that renders each screen with real DI/theme/data to
-`screen.png` + its contract `tree.json` — no device, no emulator; `node qa/preview-gallery.mjs`
-turns the output into one self-contained `index.html` (pixels + wireframe + a11y per screen).
-Agents read structure; humans see pixels.
-
-### 7. The daily-driver extras
-- **Live preview loop** — every real screen rendered headlessly on save (resident hot-reload
-  daemon, ~1s warm renders); a self-updating gallery for the human, changed-screen attribution
-  and compile-error surfacing for the agent. The agent sees what it builds.
-- **Desktop dev-client** — shared UI in a phone-sized JVM window, Compose Hot Reload attached.
-- **CI workflow** — Android job on every push; iOS job ready to un-comment.
-- **`CLAUDE.md`** — the AI delivery contract itself, stating everything above as rules any AI
-  session in the repo must follow.
-
-### 8. Human approval — governed artifacts, signed off by a person
-The verify lane and the exemplar-cloning generators cover *machine* correctness; approvals cover
-the one thing that isn't machine-checkable — whether a human actually looked. Six governed
-artifacts, in order (each is expressed in the vocabulary of the ones before it): the **intent
-brief**, the **design system**, the **architecture + structure** spec, the **components**
-vocabulary, the **exemplar feature** (the set every `add-feature` clone starts from — configurable,
-see below), the **exemplar spec**, and each **per-feature spec** as it lands. Approval is
-hash-bound to the artifact's content (the same idea as the evidence receipt, applied to a human
-decision): `node qa/approve.mjs <artifact>` records it, `node qa/approve.mjs --status` lists every
-artifact's live state, and the **Approvals tab** on the preview console (alongside **Design
-System** and **Specs**) does the same thing with a click (`POST /api/approve`, same library
-underneath). The verify lane's `approvals` gate SKIP-warns on `unreviewed` (non-blocking — a
-fresh scaffold stays green) and FAILs when an approved artifact's hash no longer matches, naming
-the artifact and the re-approval command.
-
-**Define, then freeze — the genesis walk.** Nothing generic gets signed: on a fresh scaffold each
-artifact is defined *with* the human before it's approved, not handed to them pre-decided. The
-`cmp-new` skill runs an intent interview, then offers a fork — the **express lane**
-(`qa/approve.mjs --accept-defaults`, one visible act recorded `"mode": "defaults-accepted"` and
-shown in the console as **approved · defaults accepted — unshaped**, never disguised as a real
-approval) or the **guided walk**, a conversation per artifact ending in its approval — including a
-design-language workbench (candidates rendered side by side, picked in the console, never chosen
-from hex codes) and stamping the human's *own* first feature as the exemplar
-(`qa/approvals.json`'s `exemplarFeature` key retargets the clone source from `home` to it).
-`qa/approve.mjs --reopen <artifact>` returns an **approved** artifact to genesis for a deliberate
-redesign — the gate SKIP-warns exactly like `unreviewed` while reopened, so sanctioned redesign
-is never mistaken for drift. Full walk: [docs/GENESIS-FLOW-DESIGN.md](docs/GENESIS-FLOW-DESIGN.md).
-The `approval_status { waitForDecision }` MCP tool lets an agent block on any decision instead of
-polling, the same pattern as `preview_status { waitForRender }`.
-
-### 9. Comments — review feedback flows back through the agent
-Approvals are binding; **comments are advisory** — a human's running feedback, with a defined path
-back into the plan, the spec, and the code. A 💬 control sits on every screen card, spec clause
-row, design-system swatch/dimen/component card, and architecture tree node in the console, plus a
-**Comments** tab with the full ledger and an open-count badge. Adding one calls `POST /api/comment`,
-which writes `qa/comments.json` in the generated project through the same degrade-honestly bridge
-pattern as approvals — `qa/lib/comments.mjs` owns the ledger (state, validation, transitions),
-`qa/comment.mjs` is the CLI. The loop of record: a human comments in the console → the agent
-observes it (`review_comments { waitForComment: true }`, blocking the same way
-`approval_status { waitForDecision }` does) → the agent updates the plan/spec/code → the agent
-resolves it with a note (`resolve_comment { id, note }`) → the console shows `resolved` plus the
-note. The console never edits code itself — humans add/see, agents resolve, same split as
-approvals. `addComment` refuses empty text and a target missing the fields its type requires
-(screen, element, spec-line, design-system, architecture, or general); a ledger that exists but
-can't be parsed is never silently read as empty — that would hide real feedback.
-
----
-
-# Workflows — how it fits together
-
-**New app → green.** `cmp-new` (or `npx create-cmp-cli`) → interview (incl. intent) → stamp →
-green build proven → the genesis walk (§8): express-approve the defaults, or shape the design
-language, architecture, components, and your own first feature as the exemplar. Then
-`cmp-firebase-connect` to wire your real backend.
-
-**The daily UI loop.** Say "preview my app" (the cmp-preview skill / `preview` MCP tool) → a
-live local gallery of EVERY real screen that re-renders on save — no device, no emulator, no
-manual Gradle. The agent runs the same loop to check its own work while it builds: edit →
-`preview_status { waitForRender: true }` → which screens changed (or the compile error, or the
-failed hot swap) → `preview_diff { screen }` for a proven verdict — feedback in seconds instead
-of a 25–40s build or an emulator round-trip. One interactive window instead of stills:
-`./gradlew :composeApp:hotRunDesktop --auto`. Command-line fallback (no plugin needed — the
-scaffolded app carries the whole loop):
-`./gradlew :composeApp:renderScreens && node qa/preview-gallery.mjs`.
-
-**The verified dev loop (the flagship).** For any UI change: snapshot the live tree → make the
-edit → reload → `preview_diff` compares before/after structure, token drift, and a11y, and returns
-a verdict. The agent doesn't say "I centered the title" — it shows *"title bounds moved, tokens
-unchanged, no a11y regressions: proven clean."*
-
-**Add a feature with AI (no plugin).** Ask any Claude Code session for a feature → it reads
-`CLAUDE.md` → proposes the spec clause first → runs `add-feature` → runs the lane → commits code
-+ receipt together. If it violates the architecture, the gates name the broken rule; if it tries
-to stop early, the Stop hook blocks it.
-
-**Tests that write themselves.** `cmp-test` reads the running app's semantics tree and emits the
-regression suite — existence, interaction, navigation, golden trees — in the shipped harness style.
-
-**Maintenance, for the life of the repo.** `doctor` when anything misbehaves, `upgrade` when you
-want newer versions without the version-matrix gamble, `clean` when disk fills, `verify` as the
-standalone gate. All of it works on any KMP project.
-
-## Agent flows — who does what
-
-- **A plain AI session** in a generated repo is the common case: the contract (`CLAUDE.md`), the
-  generators, the lane, and the hook are all local files — the session follows the loop above
-  with nothing installed.
-- **The `cmp-orchestrator` agent** (ships with the plugin) splits bigger jobs: it delegates
-  generation and mechanical work to sub-agents with self-contained briefs, then **gates every
-  hand-off through the verify lane** before accepting it. Nothing is reported done on prose —
-  only on a receipt.
-- **The MCP tools** are how any agent *sees*: `inspect_tree` (one tree contract — subtree by
-  `testTag`, wireframe rendering, layout-gap reporting as options), `connect_live`
-  (self-healing: device → forward → health → launch → transport reset), `navigate_and_inspect`,
-  `render_screen`, and the preview loop (`preview`, `preview_status`, `preview_diff`).
-  Structure in, structure out — never pixels in model context. Token drift, a11y, and golden
-  regressions are the verify lane's job, not interactive tools. The same eyes
-  extend to runtime behavior (`runtime_crashes`, `runtime_logs`, `db_query`), to
-  the human side of the loop (`approval_status`, blocking on a console decision the same way
-  `preview_status` blocks on a render), and to the console's talk-back channel
-  (`review_comments`, `resolve_comment` — the agent observes feedback and closes the loop with a
-  note instead of the console ever touching code).
-
-## The philosophy (why it's built this way)
-
-1. **Stamp, don't generate.** The skeleton comes from a frozen, CI-verified template. LLMs are
-   never in the hot path for code that must be identical every time. Determinism is the moat.
-2. **Evidence over claims.** "It works" is a claim. A committed receipt from an executed lane is
-   evidence. The whole harness exists to convert one into the other.
-3. **Specs before code.** If behavior isn't written as a clause, the coverage gate calls it
-   untested. New behavior starts in `specs/`, not in a diff.
-4. **Exemplars over documentation.** The `home` feature *is* the architecture guide — a running,
-   tested pattern that generators clone and humans copy. Patterns you can execute don't rot.
-5. **Refusal is a feature.** A green checkmark is cheap. A red one that names the violated clause
-   is what makes the green one mean something. The refusal demo is part of the product.
-6. **Honest SKIPs.** No device → the gate says SKIP, visibly, in the receipt. Green-with-gaps
-   presented as fully verified is treated as a bug — in the harness itself.
-7. **Structure, not pixels.** Golden trees, token assertions, and semantic diffs instead of
-   screenshot comparisons: platform-stable, flake-free, and machine-readable.
-8. **The contract lives in the project.** Everything enforcing correctness ships in the generated
-   repo, not the tool. Your repo stays verifiable after the tool is gone.
-9. **Enforcement must be cheap and fair.** The hook hashes files in milliseconds; doc edits never
-   invalidate evidence; rebases don't force re-runs. Gates that punish honest work get disabled —
-   so they're designed not to.
-10. **Dogfood in public.** The [showcase](https://github.com/kvdm-co-pilot/create-cmp-showcase) is
-    rebuilt from the published package, receipts and refusals included. Two of the last three
-    releases fixed bugs the dogfooding itself caught — the harness catching its own tool is the
-    system working.
-
----
-
-## Options
-
-| Option | Choices | Default |
-|---|---|---|
-| Platforms | Android (always) + iOS | iOS on |
-| App name / package / iOS bundle id | — | required / derived |
-| Firebase (GitLive KMP) | on / off | on |
-| Auth | `email` / `phone` / `both` / `none` | `both` |
-| Firebase region + services | any region · Firestore/Storage/Functions/FCM | `us-central1` · all on |
-| Room local cache | on / off | on |
-| E2E flows (Maestro) | on / off (`--e2e` / `--no-e2e`; `--appium` is a deprecated alias) | on |
-| Live inspector | on / off | on |
-| Desktop dev-client | on / off | on |
-| Bottom-nav tabs | label + icon, any count | Home, Profile |
-
-_Web/PWA is intentionally out of scope — Android + iOS only._
-
-## Requirements
-
-- **Node.js ≥ 18** for the tool itself.
-- **macOS** for iOS output; Android works on macOS or Linux.
-- Everything else (JDK 17, Android SDK + emulator, CocoaPods, XcodeGen) the `doctor` detects and —
-  with consent — installs. Maestro installs with `curl -fsSL https://get.maestro.mobile.dev | bash`.
-  Xcode itself is the one manual App Store step.
-
-## Why CMP, not React Native
-
-The only place CMP loses to RN on a new app is time-to-first-green-build — a tooling problem, not
-a merits problem. With one language, real native UI, no bridge, and a reproducible frozen
-template, CMP's `npx`-and-go is now competitive. If `create-next-app` made React the web default
-by deleting setup friction, the goal here is the same for multiplatform mobile.
-
 ## Docs
 
-[`docs/USAGE.md`](./docs/USAGE.md) — the complete usage guide (every command, skill, MCP tool,
-workflow) · [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — engine design ·
-[`docs/HARNESS-PLAN.md`](./docs/HARNESS-PLAN.md) — the harness, layer by layer ·
-[`docs/VERSIONS.md`](./docs/VERSIONS.md) — the proven-green version sets (what `upgrade` targets) ·
-[`docs/adr/`](./docs/adr/) — decision records · [`docs/ROADMAP.md`](./docs/ROADMAP.md) — what's next.
+[`docs/USAGE.md`](./docs/USAGE.md) is the deep reference — every CLI command, the full plugin
+skill table, the `cmp-inspector` MCP tools, the harness deep dive (specs, evidence, enforcement,
+generators, inspector, approvals, comments), workflows, philosophy, and the scaffold options
+table. Also: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) (engine design) and
+[`docs/ROADMAP.md`](./docs/ROADMAP.md) (what's next).
 
-## Contributing
+## Contributing & License
 
 Issues and PRs welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) and the
-[Code of Conduct](./CODE_OF_CONDUCT.md). The golden template is CI-gated: an upstream version bump
-must fail our CI, not your generated project.
-
-## License
-
-[MIT](./LICENSE) © Karel van der Merwe and create-cmp contributors.
+[Code of Conduct](./CODE_OF_CONDUCT.md). [MIT](./LICENSE) © Karel van der Merwe and create-cmp
+contributors.

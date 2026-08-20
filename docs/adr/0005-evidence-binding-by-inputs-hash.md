@@ -68,7 +68,8 @@ tree for the receipt-matches-HEAD gate.
 
 ## Related
 
-- `docs/M4-ENFORCEMENT-DESIGN.md` — the buildable M4 contract this ADR underpins.
+- `docs/history/M4-ENFORCEMENT-DESIGN.md` — the buildable M4 contract this ADR underpinned
+  (historical; superseded by CHANGE-FLOW-DESIGN.md's Prove/Sign stages, now shipped).
 - `template/qa/verify.mjs` — records `inputs.hash`; `template/qa/receipt-check.mjs` — the predicate.
 - `docs/adr/0001-the-contract-lives-in-the-generated-project.md` — why the hook + check ship in the
   generated project, not the plugin.

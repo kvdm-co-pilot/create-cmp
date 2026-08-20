@@ -180,6 +180,6 @@ remain parked behind the harness. They revive only when demand is proven externa
 
 - [`ROADMAP.md`](./ROADMAP.md) — public roadmap, reorganized around the harness.
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the engine's deterministic-stamp design (unchanged).
-- [`INSPECTOR-PLAN.md`](./INSPECTOR-PLAN.md) / [`LIVE-VIEW-PLAN.md`](./LIVE-VIEW-PLAN.md) —
-  Layer 5 detail.
+- [`history/INSPECTOR-PLAN.md`](./history/INSPECTOR-PLAN.md) / [`history/LIVE-VIEW-PLAN.md`](./history/LIVE-VIEW-PLAN.md) —
+  Layer 5 build history (superseded; current reference is `USAGE.md` §5).
 - [`USAGE.md`](./USAGE.md) — the single usage entry point.

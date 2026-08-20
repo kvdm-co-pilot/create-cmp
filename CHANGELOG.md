@@ -49,6 +49,19 @@ All notable changes to this project are documented here. The format is based on
   engine that stamped it, so a project can upgrade its lane without upgrading its
   generator, and pinning them to the CLI would break the first deliberate divergence.
 
+### Fixed
+
+- **`create-cmp-harness` exported a subpath that could not be imported.** Its `exports`
+  map declared `"./lib/*": "./src/lib/*.mjs"`, so a consumer writing the natural ESM form
+  — `create-cmp-harness/lib/harness-lock.mjs`, extension included, the way every import
+  inside the package itself is written — resolved to `harness-lock.mjs.mjs` and threw
+  `ERR_MODULE_NOT_FOUND`. Only the extensionless form worked, and nothing documented that.
+  Found by running the README's own example against an installed tarball rather than
+  reading it. The map now accepts both forms (`./lib/*.mjs` and `./lib/*`, Node preferring
+  the more specific pattern), verified by importing both from a packed tarball in a
+  scratch project with nothing else installed. The package is unpublished, so no consumer
+  ever hit this.
+
 ### Changed
 
 - **`docs/research/LAUNCH-SPRINT.md` §2 no longer holds numbers.** The section froze its

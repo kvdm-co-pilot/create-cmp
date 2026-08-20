@@ -1,5 +1,7 @@
 # M3 — `add-feature` design (the in-project generation skill)
 
+> _Historical — superseded. The `add-feature` stamper this designed has since shipped; day-to-day change flow (including how features are added) is now [CHANGE-FLOW-DESIGN.md](../CHANGE-FLOW-DESIGN.md). Kept for provenance._
+
 Status: plan/spec · Established: 2026-07-06 · Milestone: M3 (HARNESS-ROADMAP)
 
 > The deterministic feature generator that ships **inside** every scaffolded project. A plain
