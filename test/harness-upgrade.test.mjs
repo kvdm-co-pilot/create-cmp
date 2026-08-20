@@ -23,7 +23,9 @@ import {
   matchesPattern,
   mergeThreeWay,
   planHarnessUpgrade,
+  stampBaseWith,
 } from "../src/lib/harness-upgrade.mjs";
+import { buildTokenMap } from "../src/lib/tokens.mjs";
 import { BACKUP_SUFFIX } from "../src/lib/upgrade.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -609,4 +611,61 @@ test("region: decideFile routes lane files to the region table, app files to mer
   assert.equal(decideFile({ relPath: "qa/approvals.json", ...three }).bucket, "conflicted");
   assert.equal(decideFile({ relPath: "qa/e2e/smoke.yaml", ...three }).bucket, "conflicted");
   assert.equal(decideFile({ relPath: "composeApp/build.gradle.kts", ...three }).bucket, "conflicted");
+});
+
+test("region: a pre-0.14.0 STAMPED lane file is not mistaken for a local fork", () => {
+  // Engines before 0.14.0 ran lane code through the token stamper, so an app
+  // stamped by one carries `Fuelled` where the base template says
+  // `__APP_NAME__`. That difference was made by the engine, not the app —
+  // reporting it as a local fork would be the migration lying to every
+  // existing app on the one upgrade that crosses this boundary.
+  const tokenMap = buildTokenMap({
+    appName: "Fuelled",
+    package: "com.kvdm.fuelled",
+    iosBundleId: "com.kvdm.fuelled",
+    region: "us-central1",
+    themePrefix: "Fuelled",
+  });
+  const d = decideRegionFile({
+    relPath: "qa/preview-gallery.mjs",
+    base: Buffer.from("<title>__APP_NAME__ — previews</title>\n"),
+    next: Buffer.from("<title>${esc(APP_NAME)} — previews</title>\n"),
+    theirs: Buffer.from("<title>Fuelled — previews</title>\n"),
+    stampBase: stampBaseWith(tokenMap),
+  });
+  assert.equal(d.bucket, "region-clean", "the engine's own substitution is not the app's edit");
+  assert.equal(d.patch, undefined, "nothing to preserve — there was no local change");
+});
+
+test("region: stampBase never launders a REAL local edit into `clean`", () => {
+  const tokenMap = buildTokenMap({
+    appName: "Fuelled",
+    package: "com.kvdm.fuelled",
+    iosBundleId: "com.kvdm.fuelled",
+    region: "us-central1",
+    themePrefix: "Fuelled",
+  });
+  const d = decideRegionFile({
+    relPath: "qa/preview-gallery.mjs",
+    base: Buffer.from("<title>__APP_NAME__ — previews</title>\n"),
+    next: Buffer.from("<title>${esc(APP_NAME)} — previews</title>\n"),
+    theirs: Buffer.from("<title>Fuelled — previews</title>\n// ACME local tweak\n"),
+    stampBase: stampBaseWith(tokenMap),
+  });
+  assert.equal(d.bucket, "region-patched");
+  assert.match(d.patch, /ACME local tweak/);
+});
+
+test("region: stampBase is a no-op for a 0.14.0+ base, so it cannot misfire later", () => {
+  // Nothing left to stamp once the region stopped going through the stamper —
+  // the check simply never fires, which is why it needs no version comparison.
+  const tokenMap = buildTokenMap({
+    appName: "Fuelled",
+    package: "com.kvdm.fuelled",
+    iosBundleId: "com.kvdm.fuelled",
+    region: "us-central1",
+    themePrefix: "Fuelled",
+  });
+  const untokenized = Buffer.from("const APP = readRecord().name;\n");
+  assert.ok(stampBaseWith(tokenMap)(untokenized).equals(untokenized));
 });

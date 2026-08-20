@@ -40,7 +40,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { listFiles } from "./fsutil.mjs";
-import { isBinaryPath } from "./tokens.mjs";
+import { isBinaryPath, replaceTokens } from "./tokens.mjs";
 import { BACKUP_SUFFIX } from "./upgrade.mjs";
 import { isHarnessFile } from "../../packages/harness/src/lib/harness-region.mjs";
 
@@ -178,6 +178,23 @@ export function mergeThreeWay(theirs, base, next) {
  *        null when the path is in neither base nor new (app-authored — invisible)
  */
 
+
+/**
+ * A `stampBase` function for an app's recorded config — reproduces what a
+ * pre-0.14.0 engine would have written into that app's lane, so a file the
+ * stamper touched is not mistaken for a local edit. Binary-safe: content that
+ * does not round-trip through UTF-8 is returned unchanged.
+ * @param {Array<[string,string]>} tokenMap from buildTokenMap(config)
+ * @returns {(base: Buffer) => Buffer}
+ */
+export function stampBaseWith(tokenMap) {
+  return (base) => {
+    const text = base.toString("utf8");
+    if (!Buffer.from(text, "utf8").equals(base)) return base;
+    return Buffer.from(replaceTokens(text, tokenMap), "utf8");
+  };
+}
+
 /** Where a preserved local patch to machine-owned lane code is written. */
 export const LOCAL_PATCH_PATH = "qa/harness-local.patch";
 
@@ -253,7 +270,7 @@ export function diffPatch(base, theirs, relPath) {
  * @param {Function} [params.merge] injectable three-way merge (classifier only)
  * @returns {{bucket:string, write:Buffer|null, sidecar:null, remove:boolean, patch?:string}|null}
  */
-export function decideRegionFile({ relPath, base, next, theirs, merge = mergeThreeWay }) {
+export function decideRegionFile({ relPath, base, next, theirs, merge = mergeThreeWay, stampBase = null }) {
   const eq = (a, b) => a !== null && b !== null && a.equals(b);
   const replace = (bucket, extra = {}) => ({
     bucket,
@@ -274,6 +291,19 @@ export function decideRegionFile({ relPath, base, next, theirs, merge = mergeThr
   if (base === null) return replace("region-patched", { patch: "" }); // no base to diff against
   if (eq(theirs, base)) return replace("region-clean");
 
+  // The app's copy may be what its OWN engine produced rather than what the
+  // base tree holds, because engines before 0.14.0 ran lane code through the
+  // token stamper. Such an app carries `Fuelled` where the base template says
+  // `__APP_NAME__` — a difference the engine created, not the app. Asking
+  // "does this match the base as THIS app would have had it stamped?" is the
+  // accurate form of "did the app never touch it", and it needs no version
+  // comparison: for a 0.14.0+ base there is nothing left to stamp, so the
+  // check simply never fires.
+  if (stampBase !== null) {
+    const asStamped = stampBase(base);
+    if (eq(theirs, asStamped)) return replace("region-clean");
+  }
+
   // The app edited lane code. Is that edit already carried by the new engine?
   // A clean three-way merge landing exactly on `next` means the local change
   // contributed nothing beyond it — the hand-mirror case.
@@ -283,10 +313,10 @@ export function decideRegionFile({ relPath, base, next, theirs, merge = mergeThr
   return replace("region-patched", { patch: diffPatch(base, theirs, relPath) });
 }
 
-export function decideFile({ relPath, base, next, theirs, merge = mergeThreeWay }) {
+export function decideFile({ relPath, base, next, theirs, merge = mergeThreeWay, stampBase = null }) {
   // Machine-owned lane files answer a different question — see decideRegionFile.
   if (isHarnessFile(relPath) && !(base === null && next === null)) {
-    return decideRegionFile({ relPath, base, next, theirs, merge });
+    return decideRegionFile({ relPath, base, next, theirs, merge, stampBase });
   }
   const none = (bucket) => ({ bucket, write: null, sidecar: null, remove: false });
   const write = (bucket, content) => ({ bucket, write: content, sidecar: null, remove: false });
@@ -355,7 +385,7 @@ function toRel(root, abs) {
  *            sidecar?:Buffer|null, remove?:boolean}>,
  *            counts: Record<string, number>}}
  */
-export function planHarnessUpgrade({ baseDir, newDir, projectDir, merge = mergeThreeWay }) {
+export function planHarnessUpgrade({ baseDir, newDir, projectDir, merge = mergeThreeWay, stampBase = null }) {
   const rels = new Set();
   for (const f of listFiles(baseDir)) rels.add(toRel(baseDir, f));
   for (const f of listFiles(newDir)) rels.add(toRel(newDir, f));
@@ -390,6 +420,7 @@ export function planHarnessUpgrade({ baseDir, newDir, projectDir, merge = mergeT
       next: readIfPresent(newDir, relPath),
       theirs: readIfPresent(projectDir, relPath),
       merge,
+      stampBase,
     });
     if (decision === null) continue;
     counts[decision.bucket] = (counts[decision.bucket] ?? 0) + 1;

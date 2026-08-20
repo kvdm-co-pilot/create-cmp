@@ -43,7 +43,8 @@ import { consent } from "../bootstrap/exec.mjs";
 import { loadRegistry, latestSet, getSet } from "../lib/registry.mjs";
 import { planUpgrade, BACKUP_SUFFIX } from "../lib/upgrade.mjs";
 import { writeHarnessLock, checkHarnessIntegrity, describeIntegrity } from "../../packages/harness/src/lib/harness-lock.mjs";
-import { LOCAL_PATCH_PATH } from "../lib/harness-upgrade.mjs";
+import { LOCAL_PATCH_PATH, stampBaseWith } from "../lib/harness-upgrade.mjs";
+import { buildTokenMap } from "../lib/tokens.mjs";
 import {
   planHarnessUpgrade,
   applyHarnessPlan,
@@ -341,11 +342,28 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
     templateDir: baseTemplateDir,
     verify: false,
   });
-  const plan = planHarnessUpgrade({ baseDir, newDir, projectDir });
+  // Engines before 0.14.0 ran lane code through the token stamper, so an app
+  // stamped by one carries `Fuelled` where the base template says
+  // `__APP_NAME__`. Without this the migration would report the engine's own
+  // substitution as if the app had forked the lane.
+  const plan = planHarnessUpgrade({
+    baseDir,
+    newDir,
+    projectDir,
+    stampBase: stampBaseWith(buildTokenMap(configFromSpecRecord(record, projectDir))),
+  });
 
   const anythingToDo = printHarnessReport(plan);
   if (!anythingToDo) {
     ok("Engine-owned files are fully up to date — nothing to apply.");
+    // Still advance the record. An app that is ALREADY at the new engine is as
+    // upgraded as it can be, and leaving engineVersion stale here would keep
+    // the very defect this write-back exists to fix: the next run would fetch
+    // an obsolete merge base and re-litigate changes that already landed. Not
+    // on a dry run — that promises to write nothing.
+    if (flags["dry-run"] !== true && writeBackEngineVersion(projectDir, currentVersion)) {
+      ok(`create-cmp.json engineVersion → ${colors.bold(currentVersion)}`);
+    }
     return 0;
   }
 
