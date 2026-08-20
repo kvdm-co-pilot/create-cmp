@@ -1,4 +1,4 @@
-# cmp-receipts
+# @create-cmp/receipts
 
 Validate [create-cmp](https://github.com/kvdm-co-pilot/create-cmp) evidence
 receipts (`qa/evidence/latest.json`, schema `cmp-evidence/1`): the inputs-hash
@@ -22,14 +22,14 @@ scaffolded by create-cmp carries byte-identical copies of `src/inputs-hash.mjs`
 and `src/receipt-validate.mjs` in its own `qa/lib/` — so a generated project
 stays dependency-free and can validate its own receipt completely offline —
 while any hosted validator (a bot reviewing a PR, a dashboard, `npx
-cmp-receipts` run against a cloned repo) consumes the exact same logic from
+@create-cmp/receipts` run against a cloned repo) consumes the exact same logic from
 this package. Parity between the vendored copy and this package is pinned in
 the create-cmp repo by `test/harness-parity.test.mjs`.
 
 ## Install
 
 ```sh
-npm install cmp-receipts
+npm install @create-cmp/receipts
 ```
 
 ## Use
@@ -40,7 +40,7 @@ import {
   readReceipt, // (root) → receipt | null, from qa/evidence/latest.json
   evaluateReceipt, // (receipt, recompute) → { valid, reason, profile } — the local predicate
   validateReceiptForTree, // ({ root, now?, policy? }) → { status, reason, checks, skips } — hosted composite
-} from "cmp-receipts";
+} from "@create-cmp/receipts";
 
 // The local predicate — exactly what a generated project's Stop hook and CI run:
 const receipt = readReceipt(projectRoot);
@@ -76,8 +76,8 @@ console.log(hosted.status, hosted.reason);
 - `DEFAULT_POLICY` (`{ maxAgeMs, minExecutedMs }`) is overridable per call via
   `validateReceiptForTree({ root, policy: { maxAgeMs: ... } })`.
 
-The full export list (from `cmp-receipts`, or the two submodules directly —
-`cmp-receipts/inputs-hash` and `cmp-receipts/receipt-validate`):
+The full export list (from `@create-cmp/receipts`, or the two submodules directly —
+`@create-cmp/receipts/inputs-hash` and `@create-cmp/receipts/receipt-validate`):
 `computeInputsHash`, `VERIFIED_SURFACE`, `RECEIPT_REL_PATH`, `readReceipt`,
 `evaluateReceipt`, `DEFAULT_POLICY`, `checkFreshness`,
 `checkExecutionPlausibility`, `listSkippedSteps`, `validateReceiptForTree`.

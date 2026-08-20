@@ -1,7 +1,6 @@
 {
-  "name": "@create-cmp/inspector-mcp",
+  "name": "@create-cmp/inspector",
   "version": "0.6.1",
-  "private": true,
   "description": "MCP server that reads a running Compose Multiplatform UI as structured JSON (hierarchy + geometry + resolved design tokens) and exposes query/assert/token-drift tools \u2014 never screenshots. Phase 0 of the create-cmp inspector.",
   "type": "module",
   "bin": {
@@ -39,5 +38,17 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.1"
+  },
+  "homepage": "https://github.com/kvdm-co-pilot/create-cmp/tree/main/inspector/mcp#readme",
+  "bugs": {
+    "url": "https://github.com/kvdm-co-pilot/create-cmp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kvdm-co-pilot/create-cmp.git",
+    "directory": "inspector/mcp"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -6,6 +6,38 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **The library packages are scoped now: `@create-cmp/{harness,receipts,inspector}`.**
+  They were heading for the registry as `create-cmp-harness`, `cmp-receipts`, and
+  `@create-cmp/inspector-mcp` — three naming conventions for one product family, and
+  package names do not come back once published.
+
+  The decisive argument was not tidiness. `VISION.md` §3.2 commits the evidence
+  pipeline to being stack-agnostic — it is supposed to "break the mobile TAM cap with
+  no port". Publishing the receipt library as `cmp-receipts` would have hard-coded
+  Compose Multiplatform into the one artifact the strategy says must outgrow it, and
+  the name would need abandoning exactly when it started mattering. Scoping resolves
+  it cleanly: "cmp" moves from the **artifact** position to the **vendor** position,
+  and `@create-cmp/receipts` can describe any stack's receipts without lying. Owning
+  the org also reserves every future `@create-cmp/*` name in one move, where unscoped
+  every `cmp-<thing>` stayed individually squattable.
+
+  The front doors stay unscoped and must: `npm create kmp` resolves to the package
+  `create-kmp`, so npm's own convention fixes their shape. The namespace is
+  deliberately two-tier — `create-*` for front doors, `@create-cmp/*` for libraries —
+  and that is not an inconsistency to iron out later.
+
+  `@create-cmp/inspector` also drops `private: true` and gains real publish metadata,
+  which unblocks the MCP registry listing. Its **bin** stays `cmp-inspector-mcp` — a
+  command name, not a package name. Its version line stays independent at 0.6.1.
+
+  One interaction worth recording: the harness name is written into every generated
+  project's `qa/harness.lock.json`. It is **recorded and displayed, never compared** —
+  `checkHarnessIntegrity` verifies file digests — so existing projects keep verifying
+  and simply display the name they were stamped with. The rename does not invalidate a
+  single receipt.
+
 ### Added
 
 - **The repo's claims about itself are now derived, and a gate refuses the ones that

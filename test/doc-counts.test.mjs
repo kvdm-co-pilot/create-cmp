@@ -124,11 +124,11 @@ test("the version spine moves in lockstep", () => {
   // this repo IS the plugin source, so a split here ships a plugin that
   // misreports the engine it wraps.
   //
-  // `create-cmp-harness` is deliberately NOT in this spine. It is "versioned
+  // `@create-cmp/harness` is deliberately NOT in this spine. It is "versioned
   // independently of the engine that stamped this" (template/CLAUDE.md) so a
   // project can upgrade its lane without upgrading its generator. It happens
   // to read 0.14.0 today; that is a coincidence, not an invariant, and
-  // asserting it would break the first deliberate divergence. `cmp-receipts`
+  // asserting it would break the first deliberate divergence. `@create-cmp/receipts`
   // and the inspector MCP are independent for the same reason.
   const { cli, plugin, marketplace } = GT.versions;
   assert.deepEqual(

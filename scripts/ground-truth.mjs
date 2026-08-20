@@ -172,9 +172,9 @@ function renderMarkdown(gt) {
 | \`create-cmp-cli\` (repo) | **${v.cli}** |
 | Claude Code plugin | **${v.plugin}** |
 | marketplace entry | **${v.marketplace}** |
-| \`create-cmp-harness\` | ${v.harness} — independent, unpublished |
-| \`cmp-receipts\` | ${v.receipts} — independent, unpublished |
-| \`@create-cmp/inspector-mcp\` | ${v.inspectorMcp} — independent, bundled (\`private: true\`) |
+| \`${gt.npm.unpublished[0].name}\` | ${v.harness} — independent, unpublished |
+| \`${gt.npm.unpublished[1].name}\` | ${v.receipts} — independent, unpublished |
+| \`@create-cmp/inspector\` | ${v.inspectorMcp} — independent, published separately |
 
 CLI, plugin, and marketplace are **one release** and are pinned in lockstep.
 The other three are **deliberately independent** — the lane is versioned apart

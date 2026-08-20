@@ -33,9 +33,9 @@ test("a freshly locked tree reads back intact", () => {
   const r = checkHarnessIntegrity(root);
   assert.equal(r.status, "intact");
   assert.equal(r.version, "0.14.0");
-  assert.equal(r.name, "create-cmp-harness");
+  assert.equal(r.name, "@create-cmp/harness");
   assert.equal(r.sha256, r.recordedSha256);
-  assert.match(describeIntegrity(r), /create-cmp-harness 0\.14\.0 — 2 files verified/);
+  assert.match(describeIntegrity(r), /@create-cmp\/harness 0\.14\.0 — 2 files verified/);
 });
 
 test("the tamper this exists to catch: a green-forcing edit to verify.mjs", () => {

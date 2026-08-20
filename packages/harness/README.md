@@ -1,4 +1,4 @@
-# create-cmp-harness
+# @create-cmp/harness
 
 The **verify lane** every [create-cmp](https://github.com/kvdm-co-pilot/create-cmp)
 app carries — the machine-owned half of a stamped project.
@@ -52,7 +52,7 @@ node scripts/sync-harness.mjs
 `test/harness-parity.test.mjs` pins package ↔ template ↔ fresh-scaffold
 byte-equality, and `test/harness-region.test.mjs` pins the boundary itself.
 
-If you `npm install create-cmp-harness` directly, you're using it as a
+If you `npm install @create-cmp/harness` directly, you're using it as a
 **library** — see below — not as the thing that verifies your own project
 (`src/verify.mjs` resolves its project root relative to its own file
 location, so it only works copied into a project's `qa/`, exactly as
@@ -61,7 +61,7 @@ create-cmp vendors it).
 ## Install
 
 ```sh
-npm install create-cmp-harness
+npm install @create-cmp/harness
 ```
 
 ## Use
@@ -71,8 +71,8 @@ on the machine-owned region** — the same check `qa/verify.mjs` runs as its
 first step in every app, exposed as plain functions over any directory tree:
 
 ```js
-import { hashHarnessRegion, isHarnessFile } from "create-cmp-harness/harness-region";
-import { writeHarnessLock, checkHarnessIntegrity, describeIntegrity } from "create-cmp-harness/lib/harness-lock.mjs";
+import { hashHarnessRegion, isHarnessFile } from "@create-cmp/harness/harness-region";
+import { writeHarnessLock, checkHarnessIntegrity, describeIntegrity } from "@create-cmp/harness/lib/harness-lock.mjs";
 
 isHarnessFile("qa/verify.mjs");     // true  — machine-owned
 isHarnessFile("qa/approvals.json"); // false — app state, never hashed
@@ -80,10 +80,10 @@ isHarnessFile("qa/approvals.json"); // false — app state, never hashed
 // Lock a tree's region — what create-cmp writes at stamp/upgrade time:
 writeHarnessLock(projectRoot, { version: "0.14.1" });
 console.log(describeIntegrity(checkHarnessIntegrity(projectRoot)));
-// create-cmp-harness 0.14.1 — 2 files verified
+// @create-cmp/harness 0.14.1 — 2 files verified
 
 // Edit a lane file directly (instead of upgrading upstream) and check again:
-// create-cmp-harness 0.14.1 — 1 modified
+// @create-cmp/harness 0.14.1 — 1 modified
 ```
 
 `checkHarnessIntegrity` returns `{ status: "intact" | "modified" | "unlocked",
@@ -98,7 +98,7 @@ CLI entry a vendored copy runs as `qa/verify.mjs`) and every `src/lib/*.mjs`
 module it composes (spec-coverage scanning, approvals gate evaluation, golden
 tree / a11y / conformance test wiring, the device lease, the evidence
 receipt writer, and more). Each is exported individually
-(`create-cmp-harness/lib/<name>.mjs`) for reuse, but they are written to run
+(`@create-cmp/harness/lib/<name>.mjs`) for reuse, but they are written to run
 *inside* a scaffolded Compose Multiplatform project (they expect
 `composeApp/`, `specs/`, `gradlew`, and friends on disk) — they are not a
 general-purpose toolkit for arbitrary trees. `src/lib/inputs-hash.mjs` and
@@ -114,13 +114,13 @@ package for it.
 - **It does not verify an arbitrary project.** `qa/verify.mjs` is CMP/Gradle-
   specific (`assembleDebug`, `desktopTest`, Maestro flows, Android device
   leasing) and resolves its project root from its own file path — running it
-  from `node_modules/create-cmp-harness` will not verify the project that
+  from `node_modules/@create-cmp/harness` will not verify the project that
   depends on it. The lane only works vendored into a project's `qa/`, which
   `create-cmp` does for you at scaffold and upgrade time.
 - **It is not signed, only hashed.** `checkHarnessIntegrity` is a local,
   offline *integrity* check — "has this tree's lane changed since it was
   locked?" It cannot prove *authenticity* ("is this really the lane
-  `create-cmp-harness@X` published?") — that comparison needs the published
+  `@create-cmp/harness@X` published?") — that comparison needs the published
   package's own digest, which `create-cmp upgrade --harness` fetches and
   compares against.
 - **It does not publish evidence anywhere.** Receipts are written to
@@ -138,7 +138,7 @@ receipt-validation half published standalone.
 
 ## Versioning
 
-`create-cmp-harness` versions **independently of `create-cmp-cli`**. The lane
+`@create-cmp/harness` versions **independently of `create-cmp-cli`**. The lane
 changes far more often than the template's app shape, and fusing the two is
 what forced an app-shape merge every time a lane fix shipped. An app records
 both: the engine version that stamped its shape, and the harness version that
