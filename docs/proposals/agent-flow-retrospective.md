@@ -311,13 +311,32 @@ honesty; trigger-gated building). Nothing here is built; each names its trigger.
    exists to prevent it — compile-clean read as proven, in a batch whose thesis is that
    nothing is proven until it executes.
 
-2. **The evidence ladder, named** — receipts already grade themselves
-   (`desktop-only` → `on-device: …+androidChecks` → release profile). Formalize the
-   rungs (L0 scaffold / L1 desktop / L2 device / L3 release), render the rung in the
-   console and README badge, and make the release commit's receipt name it. This is
-   the vocabulary the Evidence business sells in (billing boundary = assurance
-   boundary). Cheap: naming + rendering. **Trigger: first Gatekeeper Evidence
-   conversation, or the next engine release — whichever lands first.**
+2. **The evidence ladder, named and rendered — LANDED (2026-08-20).** Receipts already
+   graded themselves in prose (`desktop-only` → `on-device: …+androidChecks` → release
+   profile); the ladder formalized the rungs (L0 scaffold / L1 desktop / L2 device / L3
+   release) as a field the lane DERIVES from the steps that actually ran
+   (`qa/lib/evidence-level.mjs`, `evidenceLevel` on the receipt) and the console renders
+   in three places — the rail foot, the Evidence section headline, and every row of the
+   committed-receipt timeline. What was missing is the surface a human meets first and
+   the one that travels: the README. `qa/lib/evidence-badge.mjs` now regenerates a
+   `cmp:generated evidence` block from the receipt the lane just wrote, under one rule —
+   **the badge is a statement about a specific commit, never about "now"** — so it renders
+   the rung together with the sha and date it was attested against, and that sentence
+   stays true as the tree moves on. Every degraded state has its own rendering and none
+   of them fall back to a rung: no receipt, a FAILed lane, and a `--fast` run each say so
+   (a fast run never borrows the last full run's rung), and a PASS whose receipt records
+   no rung says exactly that. The badge is an OUTPUT, written after the verdict, and
+   `README.md` is outside `VERIFIED_SURFACE` — pinned by a test, because a badge inside
+   the hashed surface would invalidate the very receipt it reports.
+
+   Also found while landing this: the pre-release fleet check had never actually read the
+   ladder. `evidence-level.mjs` returns an object; `scripts/fleet-check.mjs` read it as a
+   string, so every real receipt fell silently through to the legacy strength-parsing
+   fallback — and a `--fast` receipt (empty `onDeviceSteps`, indistinguishable from a
+   clean desktop lane) would have been graded L1 by that fallback, handing the inner loop
+   a rung the ladder explicitly refuses it. Its own test had asserted the string form, so
+   the reader could be wrong about every receipt ever written and stay green. Fixed in
+   0.12.0, with tests against the shape the lane actually writes.
 
 3. **Fleet check before release — LANDED (2026-08-19).** `scripts/fleet-check.mjs`
    stamps a scratch app, runs the lane, and asserts the receipt's verdict AND rung
@@ -326,18 +345,43 @@ honesty; trigger-gated building). Nothing here is built; each names its trigger.
    itself gained an inner-loop/checkpoint split (`--fast`, item 9 below) after a live
    demonstration of the cost this item was written to prevent.
 
-4. **Harness upgrade for stamped apps** — the reverse of §3.4: when the engine moves,
-   stamped apps' `cmp:generated` blocks and qa/ scripts age. Extend the upgrade path
-   to diff-and-regenerate them (version sets already covered). The pilot is
-   regenerating the two real apps after this batch's release. **Trigger: this batch's
-   release.**
+4. **Harness upgrade for stamped apps — LANDED (2026-08-20).** The reverse of §3.4: when
+   the engine moves, stamped apps' engine-owned files age and the fix never reaches them.
+   `create-cmp upgrade --harness` resolves it as a three-way merge — base = what the
+   engine would have stamped at the version in the app's own `create-cmp.json`, new = what
+   the current engine stamps, theirs = the app today; both stamps use the app's recorded
+   config, so every base→new diff is pure engine change. Engine-changed + app-untouched
+   fast-forwards; both-edited merges via `git merge-file` and applies only when clean; a
+   real conflict is never clobbered (a `<file>.cmp-new` sidecar, non-zero exit). App-
+   authored files are in neither tree and stay invisible; app state and secrets are
+   excluded by name at any depth and never read. The base is "old template + current
+   pipeline" — an approximation when the stamp pipeline itself changed, deliberate because
+   executing old engine code is worse, and it surfaces as a conflict rather than a silent
+   clobber. Pilot: the two real apps (showcase, stamped 0.9.0; brat, stamped 0.11.0).
 
-5. **Flight recorder** — this retrospective was only possible because session
-   transcripts happened to exist. The harness can observe its own adoption: an
-   append-only in-repo journal (lane runs, SKIP reasons, capability probes,
-   degraded-path activations) and a `qa/retrospective.mjs` that answers "did this
-   project drift from its tooling?" mechanically. In-repo only, app-owned, no
-   phone-home. **Trigger: the next retrospective request — do not build speculatively.**
+5. **Flight recorder — LANDED (2026-08-20).** This retrospective was only possible
+   because session transcripts happened to exist. The harness now removes the "happened
+   to": every verify-lane run appends one JSON line to `qa/flight-recorder.jsonl` —
+   profile, mode, verdict, evidence rung, per-step verdicts, every SKIP reason VERBATIM,
+   and every degraded-path activation — and `qa/retrospective.mjs` answers "did this
+   project drift from its tooling?" from that journal alone. In-repo, app-owned, no
+   phone-home, nothing machine- or user-identifying beyond what git already records. The
+   journal is COMMITTED rather than ignored, on `latest.json`'s precedent: the console's
+   Evidence timeline reconstructs history from git, and a gitignored journal answers
+   nothing on a fresh clone. It is excluded from the hashed input surface — a lane output
+   inside that surface would make every run invalidate its own receipt. A failed append
+   degrades to a note in the lane's output and never fails the lane: a recorder that
+   breaks the thing it observes is worse than no recorder.
+
+   **One deliberate gap, disclosed in the report itself.** `qa/watch.mjs` runs the fast
+   lane on every save; journaling those would add hundreds of lines a day to a committed
+   file and leave a permanently-dirty tree inside the very loop the recorder exists to
+   observe. Watch therefore passes `--no-journal`, and the fast count is DELIBERATE fast
+   runs only — `renderFlightReport` says so on its own face, because an undisclosed gap in
+   a census is a lie. This is the same rule the README evidence badge follows: **the inner
+   loop does not write to committed files.** The questions the reader actually answers
+   (SKIP reasons, degraded paths, whether the device tier is ever reached, the longest
+   stretch with no full lane) are unaffected by the gap.
 
 6. **The inner-loop/checkpoint split — LANDED (2026-08-19), the sharpest lesson of
    this whole session.** `node qa/verify.mjs` had exactly one mode: the full lane,
@@ -375,16 +419,44 @@ honesty; trigger-gated building). Nothing here is built; each names its trigger.
    keywords (`var`, `record`, `sealed`, `yield`) stay legal — refusing them would reject
    valid ids. Digit-leading segments were already excluded by the schema pattern.
 
-8. **Determinism probe** — ARCH-13 statically bans ambient time in app code, but a
-   library can still read the wall clock. A ci-profile option runs unit+golden tests
-   twice under maximally-shifted TZ (UTC vs UTC+14); differing outcomes = a
-   nondeterminism leak the static net missed. **Trigger: first golden flake that
-   ARCH-13 didn't prevent.**
+8. **Determinism probe — LANDED (2026-08-20).** ARCH-13 statically bans ambient time in
+   app code, but a library can still read the wall clock and a golden can still depend on
+   the machine's zone — this project has already lost a night to exactly that. The probe
+   runs the unit/golden tier twice under maximally-shifted zones and FAILS when the two
+   legs disagree, naming the test, the owning lane step, both zone labels, and the failure
+   line — never a bare "nondeterministic". It lives in the `ci` profile behind
+   `--determinism`, is refused by name in `--fast` and in the local/scaffold profiles, and
+   run alone it writes no receipt (a one-step receipt would satisfy the done-gate's hash
+   check while attesting almost nothing). Both legs force `--rerun`: TZ is not a Gradle
+   input, so without it the second leg replays the first and the probe certifies a
+   determinism it never tested. Two honesty rules: a suite producing zero results under
+   both zones FAILS as "the probe measured nothing" rather than passing by absence of
+   difference, and identical red under both zones PASSES with an explicit "deterministic,
+   but red" note so the failure is not double-reported under the wrong name.
 
-9. **Audit cadence** — cmp-audit exists but fires on human request, like the audit
-   that found the six defects. Cheapest mechanical nudge: the release profile's
-   receipt lists subsystems whose androidMain changed since the last recorded audit.
-   **Trigger: after cmp-audit's first real-app outing proves the question bank.**
+   **Correction to this document's own spec.** The brief for this item asserted that UTC
+   vs UTC+14 is the maximal shift, "a 26-hour range". It is not: that pair is 14 hours
+   apart and shares a calendar date for ten hours of every day, so the probe's power would
+   have depended on the time of day it ran — the exact flakiness it hunts. The implemented
+   pair is **UTC-12 vs UTC+14**, which genuinely spans 26 hours and whose local dates
+   differ at every instant. Recorded here rather than quietly fixed, for the same reason
+   as item 1's correction: the spec was confidently wrong, and it was caught by the person
+   implementing it, not by the person who wrote it.
+
+9. **Audit cadence — LANDED (2026-08-20).** cmp-audit found six latent defects on its
+   first real outing, which is precisely why it must not depend on someone remembering to
+   ask. The release profile's receipt now reports which subsystems' `androidMain` sources
+   changed since their last recorded audit. Subsystems are DERIVED — android `namespace`
+   from the app's own Gradle file → androidMain package root → immediate directories (plus
+   a `(root)` bucket for files at the package root) — never a hardcoded package list, because
+   this template is stamped into thousands of different apps. The record is
+   `qa/audits.jsonl`, appended by `node qa/record-audit.mjs <subsystem>`, which claims the
+   commit the audit ran against and REFUSES when the audited files are dirty or HEAD is
+   unknown: a record whose sha misattests is worse than no record. It is a report, never a
+   gate — structurally unable to FAIL, pinned by a test — and with nothing recorded it says
+   exactly "no audit recorded for <subsystem>", never implying a staleness it cannot
+   measure. The loop is closed at the other end too: `skills/cmp-audit/SKILL.md` §5 now
+   ends the audit by recording it.
 
 10. **iOS is the known asymmetry** — every behavior-tier capability is Android-only;
    the platform-semantics bug class exists identically on iOS (UNUserNotificationCenter,

@@ -358,8 +358,8 @@ function main() {
       const n = runCounter;
       const startedAtIso = new Date().toISOString();
       const started = Date.now();
-      say(`── watch run #${n} starting (node qa/verify.mjs --fast) …`);
-      const child = spawn(process.execPath, [path.join(ROOT, "qa", "verify.mjs"), "--fast", "--json"], {
+      say(`── watch run #${n} starting (node qa/verify.mjs --fast --no-journal) …`);
+      const child = spawn(process.execPath, [path.join(ROOT, "qa", "verify.mjs"), "--fast", "--json", "--no-journal"], {
         cwd: ROOT,
         stdio: ["ignore", "pipe", "pipe"],
         // Its own process GROUP: verify spawns Gradle through a shell, and a

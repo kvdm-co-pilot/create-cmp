@@ -143,3 +143,20 @@ If the project has the instrumented seam (`androidInstrumentedTest`), every PLAU
 platform finding should propose the instrumented test that would settle it — naming the
 state-control organ that reaches the state in question (the map at the end of §2). The
 seam exists precisely so platform claims stop being unfalsifiable.
+
+## 5. Record the audit — so cadence stops depending on memory
+
+The last act of an audit is to record that it happened:
+
+```bash
+node qa/record-audit.mjs <subsystem>
+```
+
+This appends one line to `qa/audits.jsonl` naming the subsystem and the commit the audit
+was run against. That record is what lets the release lane report which subsystems have
+changed since their last audit — the nudge that stops this skill depending on someone
+remembering to ask for it. The recorder refuses when the subsystem's files are dirty or
+HEAD is unknown, because a record whose sha misattests is worse than no record.
+
+Record only what you actually audited. One line per subsystem you interrogated — never a
+blanket sweep, and never before the findings have landed in §4's change flow.

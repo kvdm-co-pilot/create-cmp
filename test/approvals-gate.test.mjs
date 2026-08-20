@@ -464,7 +464,9 @@ test("verify.mjs registers the approvals step in the scaffold and local (and the
     assert.ok(localArrayMatch, "local profile array found");
     assert.match(scaffoldArrayMatch[1], /stepApprovals/, "approvals step registered in scaffold profile");
     assert.match(localArrayMatch[1], /stepApprovals/, "approvals step registered in local profile");
-    assert.match(text, /stepsForProfile\.ci\s*=\s*stepsForProfile\.local/, "ci profile inherits local (and therefore approvals)");
+    // ci = local + the opt-in determinism row (roadmap §10 item 8) — still a
+    // strict superset of local, so approvals rides along exactly as before.
+    assert.match(text, /stepsForProfile\.ci\s*=\s*\[\.\.\.stepsForProfile\.local, stepDeterminism\]/, "ci profile is a superset of local (and therefore carries approvals)");
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }

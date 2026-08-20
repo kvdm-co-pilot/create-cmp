@@ -6,6 +6,88 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-20
+
+### Added
+
+- **The flight recorder — the harness can now observe its own adoption, mechanically.**
+  The retrospective that reshaped this harness was only possible because session
+  transcripts happened to exist. Every lane run now appends one JSON line to
+  `qa/flight-recorder.jsonl` (profile, mode, verdict, rung, per-step verdicts, every SKIP
+  reason verbatim, every degraded-path activation), and `node qa/retrospective.mjs`
+  answers "did this project drift from its tooling?" from that journal alone — in-repo,
+  app-owned, **no phone-home**, nothing machine- or user-identifying. The journal is
+  committed (a gitignored one answers nothing on a fresh clone) and excluded from the
+  hashed input surface, or every run would invalidate its own receipt. A failed append
+  never fails the lane. **One deliberate gap, disclosed in the report's own output**:
+  `qa/watch.mjs` passes `--no-journal`, so save-triggered runs are not recorded — the fast
+  count is deliberate runs only. Journaling every save would add hundreds of lines a day
+  to a committed file and leave a permanently-dirty tree inside the loop the recorder
+  exists to observe; an undisclosed gap in a census would be a lie, so the reader names it.
+
+- **A determinism probe for the nondeterminism the static net cannot see.** ARCH-13 bans
+  ambient time in app code, but a library can still read the wall clock and a golden can
+  still depend on the machine's timezone — this project has lost a night to exactly that.
+  `node qa/verify.mjs --profile ci --determinism` runs the unit/golden tier twice under
+  **UTC-12 and UTC+14** — 26 hours apart, so their local dates differ at every instant —
+  and fails when the legs disagree, naming the test, the owning lane step, both zones, and
+  the failure line. Both legs force `--rerun`, because TZ is not a Gradle input and without
+  it the second leg replays the first, certifying a determinism it never tested. Refused by
+  name in `--fast` and the local/scaffold profiles; run alone it writes no receipt. A suite
+  producing zero results under both zones FAILS as "the probe measured nothing" rather than
+  passing by absence of difference.
+
+- **Audit cadence — the release receipt names what has drifted since its last audit.**
+  `cmp-audit` found six latent defects on its first real outing, so it must not depend on
+  someone remembering to ask. The release profile now reports which subsystems'
+  `androidMain` sources changed since their last recorded audit, with subsystems DERIVED
+  from the app's own namespace and package tree rather than any hardcoded list. Records live
+  in `qa/audits.jsonl` via `node qa/record-audit.mjs <subsystem>`, which claims the commit it
+  ran against and refuses when those files are dirty or HEAD is unknown — a record whose sha
+  misattests is worse than none. It is a report, never a gate: structurally unable to fail,
+  and with nothing recorded it says "no audit recorded for <subsystem>" rather than implying
+  a staleness it cannot measure. `skills/cmp-audit/SKILL.md` now ends an audit by recording it.
+
+- **`create-cmp upgrade --harness` — engine fixes finally flow to apps already stamped.**
+  The engine stamps an app from `template/` and walks away; when it later fixes a stamped
+  file, every app stamped from the old engine keeps the broken one. This is not
+  hypothetical — the dead `androidDebug/AndroidManifest.xml` (AGP resolves build-type
+  source sets at `src/<buildType>/`, KMP only remaps `main`→`androidMain`) was carried by
+  every app this template ever stamped, and the two real apps built on it still carry it.
+  The new mode closes that gap with a three-way merge, the same shape as dpkg conffile
+  handling: **base** is what the engine would have stamped at the version recorded in the
+  app's own `create-cmp.json`, **new** is what the current engine stamps, **theirs** is the
+  app today — and because both stamps use the app's own recorded config, every base→new
+  diff is pure engine change with tokens already resolved identically. A file the engine
+  changed and the app never touched fast-forwards; a file both edited is merged by
+  `git merge-file` and applied only when it merges cleanly; a genuine conflict is **never
+  clobbered** — the new engine's version lands beside it as `<file>.cmp-new` and the run
+  exits non-zero so a human resolves it. Files the app authored appear in neither base nor
+  new and are invisible to the sweep, which is the point. App state and secrets
+  (`qa/evidence/`, approvals, goldens, `keystore.properties`, `google-services.json`) are
+  excluded by name at any depth and are never even read. Dry run is the default; applying
+  requires `--yes`, backs every touched file up, and prints the revert commands.
+
+- **The evidence ladder now renders where a human actually looks — the README.** The
+  rung (L0 scaffold / L1 desktop / L2 device / L3 release) was already derived by the lane
+  and rendered in the console's rail foot, Evidence headline, and receipt timeline; the
+  README — the surface a human meets first, and the only one that travels into a repo
+  page, a PR, or a screenshot — still said nothing. A `cmp:generated evidence` block is now
+  regenerated from the receipt the lane just wrote, under one rule: **the badge is a
+  statement about a specific commit, never about "now"**, so it renders the rung together
+  with the sha and date it was attested against — a sentence that stays true after the tree
+  moves on. No degraded state falls back to a rung: no receipt, a FAILed lane, and a
+  `--fast` run each say so in their own words (a fast run never borrows the last full run's
+  rung), and a PASS whose receipt records no rung says exactly that. The badge is an
+  output, written after the verdict, and `README.md` sits outside `VERIFIED_SURFACE` —
+  pinned by a test, because a badge inside the hashed surface would invalidate the very
+  receipt it reports. A project that deletes the marker block has opted out and is never
+  re-seeded. The renderer is total — every receipt has an honest rendering — but the WRITER
+  is deliberately selective: a `--fast` receipt is never written to the README, because
+  `qa/watch.mjs` runs the fast lane on every save and a writer that fired there would leave
+  README.md permanently dirty in the inner loop, overwriting a true statement about a real
+  full-lane run with "no rung". A recorder must not disturb what it records.
+
 ## [0.12.0] - 2026-08-19
 
 ### Fixed
@@ -1316,7 +1398,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.0...v0.10.1

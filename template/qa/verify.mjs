@@ -37,10 +37,14 @@ import { clauseTierCoverage, scanCitations, scanSpecClauses, walkFiles } from ".
 import { evaluateComponentStoryParity } from "./lib/component-stories.mjs";
 import { evaluateReachability } from "./lib/reachability.mjs";
 import { evidenceLevel } from "./lib/evidence-level.mjs";
+import { updateReadmeBadge, README_REL_PATH } from "./lib/evidence-badge.mjs";
 import { memoizeStep } from "./lib/step-cache.mjs";
 import { changedWorkingTreePaths, deriveAffectedFilter } from "./lib/affected-tests.mjs";
 import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./lib/device-lease.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-doc.mjs";
+import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "./lib/determinism.mjs";
+import { evaluateAuditCadence } from "./lib/audit-cadence.mjs";
+import { appendFlightRecord, buildFlightEntry } from "./lib/flight-recorder.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EVIDENCE_DIR = path.join(ROOT, "qa", "evidence");
@@ -76,6 +80,18 @@ Flags:
                                   evidence rung, and can NEVER satisfy the
                                   done-gate — run the full lane once before
                                   you call it done
+  --determinism                  run the timezone determinism probe: the JVM
+                                  test tier (unit + golden + the other
+                                  desktop suites) executes TWICE, under
+                                  TZ=Etc/GMT+12 (UTC-12) and TZ=Etc/GMT-14
+                                  (UTC+14), and the probe FAILs naming every
+                                  test whose verdict or failure output
+                                  differs — a nondeterminism leak ARCH-13's
+                                  static net missed. Bare (no --profile) it
+                                  runs JUST the probe and writes no receipt;
+                                  with --profile ci (or release) it runs
+                                  inside the lane and lands on the receipt.
+                                  Never combinable with --fast
   --json                         print the receipt as JSON instead of the
                                   human-readable step-by-step log
   --help, -h                     print this usage and exit 0 without
@@ -99,7 +115,7 @@ if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
   process.exit(0);
 }
 
-const RECOGNIZED_FLAGS = new Set(["--profile", "--json", "--fast"]);
+const RECOGNIZED_FLAGS = new Set(["--profile", "--json", "--fast", "--determinism"]);
 for (let i = 0; i < rawArgs.length; i += 1) {
   const arg = rawArgs[i];
   if (arg === "--profile") {
@@ -115,7 +131,35 @@ const args = rawArgs;
 const profile = args.includes("--profile") ? args[args.indexOf("--profile") + 1] : "local";
 const asJson = args.includes("--json");
 const fast = args.includes("--fast");
+// --no-journal suppresses the flight-recorder append (qa/watch.mjs passes it).
+// See the append site below for why the inner loop must not write here.
+const noJournal = args.includes("--no-journal");
 const mode = fast ? "fast" : "full";
+
+// ── --determinism: the timezone double-run probe (roadmap §10 item 8) ───────
+// Refusals up front, by name (same stance as unknown arguments above):
+//  - never with --fast: the probe deliberately runs the JVM test tier twice,
+//    and --fast is the inner loop that exists to not pay such costs — the
+//    combination is a contradiction, so it is refused rather than silently
+//    resolved either way.
+//  - only the ci profile (and release, which inherits ci) carries the probe's
+//    lane row; asking for it in local/scaffold is refused with the two ways
+//    that DO work, instead of silently running a step the requested profile
+//    does not own.
+const determinism = args.includes("--determinism");
+const profileExplicit = args.includes("--profile");
+if (determinism && fast) {
+  console.error(
+    "--determinism cannot be combined with --fast: the probe runs the JVM test tier twice by design, and --fast is the inner loop. Run it alone (node qa/verify.mjs --determinism) or inside a full ci/release lane (--profile ci --determinism).",
+  );
+  process.exit(2);
+}
+if (determinism && profileExplicit && profile !== "ci" && profile !== "release") {
+  console.error(
+    `--determinism belongs to the ci profile (release inherits it), not "${profile}" — run --profile ci --determinism, or bare --determinism to run the probe alone.`,
+  );
+  process.exit(2);
+}
 
 const GRADLEW = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
 
@@ -158,6 +202,14 @@ function sh(cmd, opts = {}) {
 const LANE_MARKER = path.join(ROOT, "composeApp", "build", ".cmp-lane-in-progress");
 const KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
 
+// Degraded-path activations observed during this run — self-heals and
+// fallbacks that kept the lane moving without failing it. Collected for the
+// flight recorder (qa/lib/flight-recorder.mjs): a degradation that fires
+// once is a shrug, one that fires every run for a month is the tooling
+// quietly rotting under a green lane — and only a journal can tell those
+// two apart.
+const DEGRADED_PATHS = [];
+
 // The daemon's half of defense 2 above — pid + ISO timestamp, mirroring
 // LANE_MARKER's own content shape (see where LANE_MARKER is stamped, below).
 const RENDER_MARKER = path.join(ROOT, "composeApp", "build", ".cmp-render-in-progress");
@@ -197,6 +249,7 @@ function shGradle(cmd, opts = {}) {
   const retry = sh(cmd, opts);
   retry.durationMs += first.durationMs;
   retry.selfHealed = "ksp-cache-collision";
+  DEGRADED_PATHS.push("ksp-cache-collision: cleared kspCaches and retried the Gradle step");
   return retry;
 }
 
@@ -696,6 +749,7 @@ function stepUnitTests() {
     res = retry;
     note = "full suite — the affected-test filter matched no tests (fell back)";
     affected = null;
+    DEGRADED_PATHS.push("affected-test filter matched no tests — fell back to the full desktopTest suite");
   }
   const summary = junitSummary(path.join(ROOT, "composeApp/build/test-results/desktopTest"));
   let details = summary ?? undefined;
@@ -727,6 +781,115 @@ const stepA11y = gradleTestStep(
   "*A11yConformanceTest",
   "A11y gate failed (SHELL-04): interactive nodes must expose a testTag, text, or contentDescription:",
 );
+
+// ── Determinism probe (roadmap §10 item 8) — opt-in, ci-profile ────────────
+// ARCH-13 statically bans ambient time reads — in APP code. A library the
+// app calls can still read the wall clock, and a golden can still depend on
+// the machine's timezone through a seam the static net cannot see (a
+// ViewModel constructed without its injected clock already caused one
+// overnight golden-tree drift). This probe closes that gap DYNAMICALLY: it
+// runs the JVM test tier twice, under two timezones whose local calendar
+// dates never agree — the offsets are 26 hours apart, so any date-derived
+// value differs between the legs at every instant (see DETERMINISM_TIMEZONES
+// in qa/lib/determinism.mjs for why UTC-12/UTC+14 and not UTC/UTC+14) — and
+// FAILs naming every test whose outcome differs between the legs.
+//
+// Mechanics that carry the honesty:
+//  - TZ reaches the test JVM through the environment: Gradle forwards the
+//    client's environment to the daemon on every build, and test workers
+//    fork from the daemon — so the child env below is inherited all the way
+//    down to the JVM whose default timezone the tests see.
+//  - BOTH legs force --rerun. Without it Gradle would mark the second leg
+//    up-to-date (TZ is not a declared build input) and replay the first
+//    leg's results — the probe would then compare a run against its own
+//    echo and certify a determinism it never tested (the build-cache-replay
+//    lesson, again). The legs use the mode-scoped RERUN like every other
+//    desktopTest invocation — and because --determinism is refused alongside
+//    --fast up front, RERUN is always " --rerun" by the time a leg runs.
+//  - Only verdicts and failure output are compared; durations are never even
+//    parsed (qa/lib/determinism.mjs), so a timing wobble is structurally
+//    unable to trip the probe.
+function stepDeterminism() {
+  const started = Date.now();
+  const elapsed = () => Date.now() - started;
+  if (!determinism) {
+    return {
+      name: "determinism",
+      verdict: "SKIP",
+      reason: "determinism probe is opt-in (it runs the JVM test tier twice) — add --determinism to this lane, or run the probe alone: node qa/verify.mjs --determinism",
+      durationMs: elapsed(),
+    };
+  }
+
+  const resultsDir = path.join(ROOT, "composeApp/build/test-results/desktopTest");
+  const legs = [];
+  for (const { tz, label } of DETERMINISM_TIMEZONES) {
+    const res = shGradle(`${GRADLEW} :composeApp:desktopTest${RERUN} --console=plain`, { env: { ...process.env, TZ: tz } });
+    // Parsed NOW, before the next leg overwrites the same results directory.
+    const outcomes = parseJUnitOutcomes(resultsDir);
+    legs.push({ tz, label, ok: res.ok, outcomes, tail: res.out.split("\n").slice(-8).join("\n") });
+  }
+  const [a, b] = legs;
+  const labelA = `TZ=${a.tz} (${a.label})`;
+  const labelB = `TZ=${b.tz} (${b.label})`;
+  const countA = Object.keys(a.outcomes).length;
+  const countB = Object.keys(b.outcomes).length;
+
+  if (countA === 0 && countB === 0) {
+    // Neither leg produced a single test result: the suite failed before
+    // running anything (build error). The probe measured nothing — that is
+    // a FAIL that says so, never a PASS by absence of differences.
+    return {
+      name: "determinism",
+      verdict: "FAIL",
+      reason: `determinism probe could not execute: desktopTest produced no test results under either timezone — the suite fails before running (fix the build first; this is not a timezone difference):\n${a.tail}`,
+      durationMs: elapsed(),
+    };
+  }
+  if (countA === 0 || countB === 0) {
+    const ran = countA > 0 ? { label: labelA, n: countA } : { label: labelB, n: countB };
+    const empty = countA > 0 ? b : a;
+    return {
+      name: "determinism",
+      verdict: "FAIL",
+      reason: `Nondeterminism under timezone shift: desktopTest ran ${ran.n} test(s) under ${ran.label} but produced no results at all under TZ=${empty.tz} (${empty.label}) — the suite itself dies under that zone:\n${empty.tail}`,
+      durationMs: elapsed(),
+      details: { timezones: DETERMINISM_TIMEZONES.map((t) => t.tz) },
+    };
+  }
+
+  const diffs = compareOutcomes(a.outcomes, b.outcomes, labelA, labelB);
+  if (diffs.length > 0) {
+    const lines = [
+      `Nondeterminism under timezone shift — the same tree produced different outcomes under ${labelA} vs ${labelB}. Something reads ambient time or zone past the ARCH-13 net (a library default, an uninjected clock, a golden that captures "today"):`,
+    ];
+    for (const d of diffs.slice(0, 20)) lines.push(`  [${d.step}] ${d.test} — ${d.detail}`);
+    if (diffs.length > 20) lines.push(`  … and ${diffs.length - 20} more differing test(s)`);
+    return {
+      name: "determinism",
+      verdict: "FAIL",
+      reason: lines.join("\n"),
+      durationMs: elapsed(),
+      details: { timezones: DETERMINISM_TIMEZONES.map((t) => t.tz), diffs: diffs.slice(0, 50) },
+    };
+  }
+
+  const failedIdentically = Object.values(a.outcomes).filter((o) => o.status !== "pass" && o.status !== "skip").length;
+  return {
+    name: "determinism",
+    verdict: "PASS",
+    // Identical red is DETERMINISTIC red: the probe's claim ("no timezone
+    // dependence") holds, and the failing tests already belong to
+    // unitTests/goldenTrees, which fail the lane on their own merits — a
+    // second FAIL here would report the same defect twice under a wrong name.
+    note:
+      failedIdentically > 0
+        ? `${failedIdentically} test(s) failed identically under both timezones — deterministic, but red (the owning test steps report it)`
+        : undefined,
+    durationMs: elapsed(),
+    details: { timezones: DETERMINISM_TIMEZONES.map((t) => t.tz), testsCompared: countA },
+  };
+}
 
 // Live tokenDrift tier (harness M4-D): when a debug app + device are available,
 // fetches the declared catalog and the live semantics tree off the debug-only
@@ -1052,6 +1215,43 @@ function stepReleaseSmoke() {
   return runMaestroSmoke("releaseSmoke", install.durationMs);
 }
 
+// ── Audit cadence (roadmap §10 item 9) — a REPORT, never a gate ────────────
+// cmp-audit (the adversarial platform-semantics audit) found six latent
+// defects the first time a human happened to ask for it — which is exactly
+// why it must not depend on someone remembering to ask. This step is the
+// cheapest honest replacement for that memory: at ship time (release
+// profile) the receipt lists which androidMain subsystems changed since
+// their last RECORDED audit (qa/audits.jsonl, appended by
+// node qa/record-audit.mjs). The derivation lives in
+// qa/lib/audit-cadence.mjs; this step adds only the bookkeeping every step
+// carries — and by construction it maps every outcome to PASS or SKIP,
+// never FAIL: audit debt is a judgment call (a rename is not six latent
+// defects), and a gate here would teach people to game the ledger, which
+// would destroy the only value it has.
+function stepAuditCadence() {
+  const started = Date.now();
+  const report = evaluateAuditCadence(ROOT);
+  if (!report.ok) {
+    return { name: "auditCadence", verdict: "SKIP", reason: report.reason, durationMs: Date.now() - started };
+  }
+  return {
+    name: "auditCadence",
+    verdict: "PASS",
+    note: report.summary,
+    durationMs: Date.now() - started,
+    details: {
+      packageRoot: report.packageRoot,
+      subsystems: report.subsystems.map((s) => ({
+        name: s.name,
+        status: s.status,
+        changedFiles: s.changedFiles,
+        lastAudit: s.audit ? { sha: s.audit.sha, at: s.audit.at, by: s.audit.by } : null,
+      })),
+      lines: report.lines,
+    },
+  };
+}
+
 // ── Lane ───────────────────────────────────────────────────────────────────
 
 // Device-dependent steps, in lane order. Used twice: receipt STRENGTH (which
@@ -1137,17 +1337,55 @@ const stepsForProfile = {
     stepAndroidChecks,
   ],
 };
-stepsForProfile.ci = stepsForProfile.local;
-// release = everything ci proves PLUS the release-APK behavior smoke. The expensive
-// proofs are profile-tiered by decision: per-change stays fast (local/ci pay for the
-// release COMPILE via releaseBuild, already in the set), and the release-variant
-// *behavior* cost lands once, at ship time. releaseSmoke runs last so the device ends
-// the run holding the exact build that was proven.
-stepsForProfile.release = [...stepsForProfile.ci, stepReleaseSmoke];
+// ci = local + the determinism probe's row — the first place ci diverges
+// from local. The probe is OPT-IN (the step SKIPs unless --determinism was
+// passed: it doubles the JVM test tier's cost), but its row lives in the ci
+// profile so a ci receipt always records whether the probe ran — an honest,
+// visible gap beats an invisible one ("SKIPs are recorded so the pipeline
+// stays honest", per the profile's own contract). local deliberately does
+// NOT carry the row: the per-change developer profile is not where a
+// deliberate double-run belongs.
+stepsForProfile.ci = [...stepsForProfile.local, stepDeterminism];
+// release = everything ci proves PLUS the audit-cadence report and the
+// release-APK behavior smoke. The expensive proofs are profile-tiered by
+// decision: per-change stays fast (local/ci pay for the release COMPILE via
+// releaseBuild, already in the set), and the release-variant *behavior* cost
+// lands once, at ship time. auditCadence (a report, never a gate) also
+// belongs to ship time — "what moved in androidMain since its last
+// adversarial audit?" is the question asked before shipping, not per edit.
+// releaseSmoke runs last so the device ends the run holding the exact build
+// that was proven.
+stepsForProfile.release = [...stepsForProfile.ci, stepAuditCadence, stepReleaseSmoke];
 
 if (!stepsForProfile[profile]) {
   console.error(`Unknown profile "${profile}" — use scaffold | local | ci | release.`);
   process.exit(2);
+}
+
+// ── Bare --determinism: the probe, nothing else, and NO receipt ─────────────
+// "Run it alone" means alone: no other steps, and deliberately no
+// qa/evidence/latest.json. The done-gate (qa/receipt-check.mjs) validates a
+// receipt by verdict + content hash — a receipt whose steps are one probe
+// would satisfy it while attesting almost nothing, so a probe-only run must
+// never mint one. The lane marker IS still stamped: the probe runs Gradle
+// and owes the preview daemon the same coexistence courtesy as the lane.
+if (determinism && !profileExplicit) {
+  fs.mkdirSync(path.dirname(LANE_MARKER), { recursive: true });
+  fs.writeFileSync(LANE_MARKER, `${process.pid} ${new Date().toISOString()}\n`);
+  let probe;
+  try {
+    probe = stepDeterminism();
+  } finally {
+    fs.rmSync(LANE_MARKER, { force: true });
+  }
+  if (asJson) {
+    console.log(JSON.stringify(probe, null, 2));
+  } else {
+    const mark = probe.verdict === "PASS" ? "✓" : "✗";
+    console.log(`${mark} determinism: ${probe.verdict}${probe.note ? ` (${probe.note})` : ""}${probe.reason ? ` — ${probe.reason}` : ""}`);
+    console.log("\n(probe-only run — no receipt written; the full lane is where evidence is earned)");
+  }
+  process.exit(probe.verdict === "FAIL" ? 1 : 0);
 }
 
 // ── --fast: the inner loop, mechanically unable to claim done ───────────────
@@ -1202,6 +1440,7 @@ if (fast) {
 // always removed, even on a failing step, so the eyes only ever defer briefly.
 fs.mkdirSync(path.dirname(LANE_MARKER), { recursive: true });
 fs.writeFileSync(LANE_MARKER, `${process.pid} ${new Date().toISOString()}\n`);
+const laneStartedAt = Date.now(); // for the flight-recorder entry's durationMs
 const steps = [];
 try {
 for (const step of laneSteps) {
@@ -1301,6 +1540,51 @@ fs.writeFileSync(path.join(EVIDENCE_DIR, "latest.json"), `${JSON.stringify(recei
 // studio console's Evidence audit trail reconstructs the full history from the
 // git log of this file — every commit is one verified, attributed state.
 
+// The README's evidence badge is DERIVED from the receipt just written — an
+// output, never a gate, so it runs after the verdict and cannot change it. It
+// renders the rung together with the commit it was attested against, so the
+// sentence stays true as the tree moves on (qa/lib/evidence-badge.mjs).
+const badge = updateReadmeBadge(ROOT);
+
+// ── Flight recorder (roadmap §10 item 5) — the lane journals its own run ────
+// One JSON line per run into qa/flight-recorder.jsonl (committed, and
+// excluded from the receipt's hashed surface — qa/lib/flight-recorder.mjs
+// carries the whole rationale). Appended AFTER the receipt so the entry
+// records the final verdict and rung. A failed append must never fail the
+// lane — a recorder that breaks the thing it observes is worse than no
+// recorder — so the failure degrades to a note in the lane's own output,
+// which is itself the honest record of the degradation.
+//
+// --no-journal is the ONE exemption, and qa/watch.mjs passes it on every
+// save-triggered run. Same rule the README badge obeys, for the same reason:
+// THE INNER LOOP DOES NOT WRITE TO COMMITTED FILES. A watcher journaling every
+// save would add hundreds of lines a day to a committed file — turning the
+// app's history into keystroke noise and leaving a permanently-dirty tree in
+// the loop the recorder exists to observe. What survives is every full lane
+// and every DELIBERATE fast run, which is what the retrospective's questions
+// actually rest on (SKIP reasons, degraded paths, the longest stretch with no
+// full lane). qa/retrospective.mjs discloses the exemption in its own output
+// so the fast-vs-full ratio is never read as a complete census.
+const flight = noJournal
+  ? { ok: true, skipped: true }
+  : appendFlightRecord(
+      ROOT,
+      buildFlightEntry({
+        profile,
+        mode,
+        verdict,
+        evidenceLevel: level,
+        steps,
+        sha: receipt.commit.sha,
+        durationMs: Date.now() - laneStartedAt,
+        onDeviceSteps,
+        degraded: DEGRADED_PATHS,
+      }),
+    );
+if (!flight.ok) {
+  console.error(`· flight recorder: journal append failed (${flight.reason}) — the lane verdict is unaffected, but this run is missing from qa/flight-recorder.jsonl`);
+}
+
 if (asJson) {
   console.log(JSON.stringify(receipt, null, 2));
   if (fast) {
@@ -1313,7 +1597,19 @@ if (asJson) {
     `\n${verdict === "PASS" ? "⚡⚡" : "❌"} verify lane [FAST — INNER LOOP ONLY, NOT DONE]: ${verdict} (skipped device/release tier: ${fastExcluded.join(", ") || "none"}) — this fast receipt satisfies no done-gate; run the full lane (node qa/verify.mjs) once before you finish`,
   );
 } else {
-  console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name}` : ""} (${strengthLabel}) — receipt written to qa/evidence/latest.json (commit it with your change)`);
+  console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name}` : ""} (${strengthLabel}) — receipt written to qa/evidence/latest.json${badge.changed ? ` and ${README_REL_PATH}'s evidence badge refreshed` : ""} (commit ${badge.changed ? "them" : "it"} with your change)`);
+}
+
+// The audit-cadence nudges print in the human path, not only inside the
+// receipt JSON — a ship-time report that lives only in a JSON field is a
+// report nobody reads at ship time. Nudges only; a gate this is not.
+if (!asJson) {
+  const auditStep = steps.find((s) => s.name === "auditCadence");
+  const auditLines = auditStep?.details?.lines ?? [];
+  if (auditLines.length > 0) {
+    console.log("\naudit cadence (report, never a gate):");
+    for (const l of auditLines) console.log(`  ${l}`);
+  }
 }
 
 process.exit(verdict === "PASS" ? 0 : 1);

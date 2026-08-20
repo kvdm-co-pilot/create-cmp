@@ -71,6 +71,7 @@ function printHelp() {
       `  npx create-cmp create [target-dir]     same, explicit\n` +
       `  npx create-cmp doctor                  toolchain doctor + project diagnosis (any KMP project)\n` +
       `  npx create-cmp upgrade                 migrate to the next proven-green version set\n` +
+      `  npx create-cmp upgrade --harness       refresh engine-owned files of a stamped app (3-way merge)\n` +
       `  npx create-cmp clean                   ~/.konan + Gradle build-output hygiene (consent-gated)\n` +
       `  npx create-cmp verify                  run the green-build gate on an existing project\n\n` +
       `create (scaffold) flags:\n` +
@@ -83,6 +84,8 @@ function printHelp() {
       `  --target-dir  --verify/--no-verify  --yes  --force  --dry-run-verify\n\n` +
       `doctor flags:  --yes  --dry-run  --no-ios  --no-install  --target-dir <dir>  --fix\n` +
       `upgrade flags: --target-dir <dir>  --set <id>  --dry-run  --yes  --verify\n` +
+      `  --harness mode flags: --target-dir <dir>  --base-dir <extracted-template>  --dry-run  --yes\n` +
+      `  (--harness dry-runs by default; conflicts never clobber — they land as *.cmp-new sidecars)\n` +
       `clean flags:   --target-dir <dir>  --dry-run  --yes\n` +
       `verify flags:  --target-dir <dir>  --no-ios  --dry-run\n`
   );

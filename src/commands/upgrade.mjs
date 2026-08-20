@@ -17,15 +17,39 @@
 //     `<kotlin>-…`.
 //   - Works on ANY project with a libs.versions.toml — template markers only
 //     soften/strengthen messaging, never refuse.
+//
+// Second mode — `create-cmp upgrade --harness`:
+//
+//   create-cmp upgrade --harness [--target-dir .] [--base-dir <path>] [--dry-run] [--yes]
+//
+//   Refreshes the ENGINE-OWNED files of a stamped app via a three-way merge
+//   (base = old engine's stamp, new = current engine's stamp, theirs = the
+//   app's tree — both stamps use the app's own recorded config from
+//   create-cmp.json so every diff is pure engine change). Conflicts never
+//   clobber: the app's file stays put and a `.cmp-new` sidecar carries the
+//   new engine content. Decision logic lives in src/lib/harness-upgrade.mjs;
+//   this file does the filesystem/CLI orchestration (npm pack of the base
+//   version, temp-dir stamps, consent, backups, report, exit code).
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 import { flagBool } from "../lib/args.mjs";
 import { colors, ok, warn, fail, step } from "../lib/log.mjs";
 import { consent } from "../bootstrap/exec.mjs";
 import { loadRegistry, latestSet, getSet } from "../lib/registry.mjs";
 import { planUpgrade, BACKUP_SUFFIX } from "../lib/upgrade.mjs";
+import {
+  planHarnessUpgrade,
+  applyHarnessPlan,
+  configFromSpecRecord,
+  SIDECAR_SUFFIX,
+} from "../lib/harness-upgrade.mjs";
+
+const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 function readIfExists(p) {
   try {
@@ -48,11 +72,274 @@ function printDiffTable(changes) {
   }
 }
 
+// --- harness mode helpers ----------------------------------------------------
+
+/** Current engine version, from this checkout's package.json. */
+function currentEngineVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")).version;
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Resolve a --base-dir argument to a template root (the dir holding
+ * manifest.json). Accepts the template root itself, a repo/package checkout
+ * containing `template/`, or an extracted npm tarball (`package/template/`).
+ * Throws (never exits) so the caller's temp-dir cleanup always runs.
+ * @param {string} p
+ * @returns {string} absolute template root
+ */
+function resolveBaseTemplateDir(p) {
+  const abs = path.resolve(p);
+  for (const candidate of [abs, path.join(abs, "template"), path.join(abs, "package", "template")]) {
+    if (fs.existsSync(path.join(candidate, "manifest.json"))) return candidate;
+  }
+  throw new Error(
+    `--base-dir ${abs} does not look like a create-cmp template (no manifest.json at ` +
+      `<dir>, <dir>/template, or <dir>/package/template).`
+  );
+}
+
+/**
+ * Fetch the OLD engine's template by version: `npm pack create-cmp-cli@<v>`
+ * into a temp dir, then extract `package/template/` from the tarball.
+ * Fails loudly (throws — never exits, so the caller's temp-dir cleanup always
+ * runs), naming the exact command that failed and the --base-dir escape hatch
+ * (offline / local checkout / testing).
+ * @param {string} engineVersion version recorded in create-cmp.json
+ * @param {string} tmpRoot session temp dir (cleaned up by the caller)
+ * @returns {string} absolute path of the extracted template root
+ */
+function fetchBaseTemplate(engineVersion, tmpRoot) {
+  if (!engineVersion || engineVersion === "unknown" || !/^[0-9A-Za-z.+-]+$/.test(engineVersion)) {
+    throw new Error(
+      `create-cmp.json does not record a usable engineVersion (got ${JSON.stringify(engineVersion)}). ` +
+        `Pass --base-dir <path> pointing at the template this app was stamped from.`
+    );
+  }
+  const packDir = path.join(tmpRoot, "pack");
+  fs.mkdirSync(packDir, { recursive: true });
+  const packCmd = `npm pack create-cmp-cli@${engineVersion}`;
+  const r = spawnSync("npm", ["pack", `create-cmp-cli@${engineVersion}`], {
+    cwd: packDir,
+    encoding: "utf8",
+    timeout: 120000,
+  });
+  if (r.error || r.status !== 0) {
+    throw new Error(
+      `Could not fetch the base engine template: \`${packCmd}\` failed` +
+        (r.stderr ? ` — ${r.stderr.trim().split("\n").pop()}` : "") +
+        `.\n  Offline or unpublished version? Pass --base-dir <path> to an already-extracted template.`
+    );
+  }
+  // npm pack prints the tarball filename as the last stdout line.
+  const tgz = (r.stdout || "").trim().split("\n").pop().trim();
+  const tgzPath = path.join(packDir, tgz);
+  const tarCmd = `tar -xzf ${tgzPath} -C ${packDir}`;
+  const rt = spawnSync("tar", ["-xzf", tgzPath, "-C", packDir], { timeout: 120000 });
+  if (rt.error || rt.status !== 0 || !fs.existsSync(path.join(packDir, "package", "template", "manifest.json"))) {
+    throw new Error(
+      `Could not extract the base engine template: \`${tarCmd}\` failed or the tarball ` +
+        `carries no package/template/. Pass --base-dir <path> to an already-extracted template.`
+    );
+  }
+  return path.join(packDir, "package", "template");
+}
+
+/** Print the grouped harness report; returns whether anything is actionable. */
+function printHarnessReport(plan) {
+  const c = plan.counts;
+  const list = (bucket) => plan.entries.filter((e) => e.bucket === bucket).map((e) => e.relPath);
+
+  process.stdout.write(
+    `\n${colors.bold("Engine-owned files")} — ` +
+      `${colors.dim(`unchanged ${c.unchanged} · already current ${c.current} · excluded state/secrets ${c.excluded}`)}\n`
+  );
+  const groups = [
+    ["applied", "applied (engine changed, app never touched — will take the new content)", ok],
+    ["merged", "merged (both changed different regions — both edits survive)", ok],
+    ["added", "added (new engine files absent from the app)", ok],
+    ["removed", "removed (engine deleted, app never touched — will be deleted)", warn],
+    ["orphaned", "orphaned (engine deleted these but the app modified them — left in place)", warn],
+    ["conflicted", `conflicted (NEVER clobbered — new engine content lands beside as *${SIDECAR_SUFFIX})`, fail],
+  ];
+  let actionable = 0;
+  for (const [bucket, label, log] of groups) {
+    const files = list(bucket);
+    if (files.length === 0) continue;
+    if (bucket !== "orphaned") actionable += files.length;
+    log(`${colors.bold(String(files.length))} ${label}`);
+    for (const f of files) process.stdout.write(`    ${f}\n`);
+  }
+  process.stdout.write(
+    colors.dim(
+      `\n  Not considered: ${c.excluded} excluded app-state/secret files ` +
+        `(evidence, approvals, goldens, keystores, Firebase configs), and any app-authored ` +
+        `files the engine never stamped.\n`
+    )
+  );
+  return actionable > 0;
+}
+
+/**
+ * `create-cmp upgrade --harness` — refresh engine-owned files of a stamped app.
+ * @param {Record<string,string|boolean>} flags
+ * @param {string|undefined} positional optional target dir positional
+ */
+async function runHarnessUpgrade(flags, positional) {
+  const targetDir =
+    (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
+  const projectDir = path.resolve(targetDir);
+
+  const specPath = path.join(projectDir, "create-cmp.json");
+  const specRaw = readIfExists(specPath);
+  if (specRaw === null) {
+    process.stderr.write(
+      `Error: no create-cmp.json under ${projectDir}.\n` +
+        `\`create-cmp upgrade --harness\` refreshes the engine-owned files of a create-cmp-stamped ` +
+        `project, and needs the spec-of-record the stamp wrote. Run it from the project root or ` +
+        `pass --target-dir. (For a plain version-catalog upgrade, drop --harness.)\n`
+    );
+    process.exit(1);
+  }
+  let record;
+  try {
+    record = JSON.parse(specRaw);
+  } catch (e) {
+    process.stderr.write(`Error: ${specPath} is not valid JSON (${e.message}).\n`);
+    process.exit(1);
+  }
+
+  const baseVersion = record.engineVersion;
+  const currentVersion = currentEngineVersion();
+  process.stdout.write(
+    `\n${colors.bold("create-cmp upgrade --harness")} — refresh engine-owned files\n` +
+      `  project: ${colors.cyan(projectDir)}\n` +
+      `  stamped by engine ${colors.yellow(String(baseVersion))} ${colors.dim("→")} current engine ${colors.green(currentVersion)}\n\n`
+  );
+
+  // NOTE: `process.exit` skips `finally`, so the body below RETURNS an exit
+  // code and the temp trees are cleaned up before the process actually exits.
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "create-cmp-harness-"));
+  let code = 1;
+  try {
+    code = await harnessPlanAndApply({
+      flags,
+      record,
+      projectDir,
+      targetDir,
+      tmpRoot,
+      baseVersion,
+      currentVersion,
+    });
+  } catch (e) {
+    fail(e.message);
+    code = 1;
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+  process.exit(code);
+}
+
+/**
+ * The harness mode's plan/report/apply body. Returns the process exit code
+ * (0 = clean apply or dry run, 1 = conflicts produced) and throws on
+ * environment failures — it never calls process.exit itself, so the caller's
+ * temp-dir cleanup always runs.
+ * @returns {Promise<number>}
+ */
+async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRoot, baseVersion, currentVersion }) {
+  // Base template: --base-dir wins (offline / local checkout / testing);
+  // same-version needs no fetch (the local template IS the base); otherwise
+  // npm pack the recorded version.
+  let baseTemplateDir;
+  if (typeof flags["base-dir"] === "string") {
+    baseTemplateDir = resolveBaseTemplateDir(flags["base-dir"]);
+    step(`Base template: ${colors.cyan(baseTemplateDir)} (--base-dir)`);
+  } else if (baseVersion === currentVersion) {
+    baseTemplateDir = path.join(REPO_ROOT, "template");
+    step(`App was stamped by THIS engine version — base is the local template.`);
+  } else {
+    step(`Fetching base engine ${baseVersion} via npm pack…`);
+    baseTemplateDir = fetchBaseTemplate(baseVersion, tmpRoot);
+  }
+
+  // Stamp both sides with the app's OWN recorded config, so tokens resolve
+  // identically and base→new diffs are pure engine change. `verify:false`
+  // keeps this filesystem-only — no Gradle, no device.
+  const { scaffold } = await import("../scaffold.mjs");
+  const newDir = path.join(tmpRoot, "new");
+  const baseDir = path.join(tmpRoot, "base");
+  step("Stamping the CURRENT engine with the app's recorded config…");
+  await scaffold(configFromSpecRecord(record, newDir), { verify: false });
+  step(`Stamping the BASE engine (${baseVersion}) with the same config…`);
+  await scaffold(configFromSpecRecord(record, baseDir), {
+    templateDir: baseTemplateDir,
+    verify: false,
+  });
+  const plan = planHarnessUpgrade({ baseDir, newDir, projectDir });
+
+  const anythingToDo = printHarnessReport(plan);
+  if (!anythingToDo) {
+    ok("Engine-owned files are fully up to date — nothing to apply.");
+    return 0;
+  }
+
+  if (flags["dry-run"] === true) {
+    process.stdout.write(`\n${colors.yellow("Dry run")} — nothing written. Re-run with --yes to apply.\n`);
+    return 0;
+  }
+  const approved = await consent(
+    `\nApply these changes (backups written as *${BACKUP_SUFFIX}; conflicts only get *${SIDECAR_SUFFIX} sidecars)?`,
+    { assumeYes: flags.yes === true }
+  );
+  if (!approved) {
+    process.stdout.write(`${colors.yellow("Not applied")} — dry run only. Re-run with --yes to apply.\n`);
+    return 0;
+  }
+
+  const actionable = plan.entries.filter(
+    (e) => e.write !== null || e.sidecar !== null || e.remove
+  );
+  const result = applyHarnessPlan(projectDir, actionable);
+  for (const f of result.written) ok(`wrote ${f} ${colors.dim(`(backup: ${f}${BACKUP_SUFFIX})`)}`);
+  for (const f of result.created) ok(`created ${f}`);
+  for (const f of result.deleted) ok(`deleted ${f} ${colors.dim(`(backup: ${f}${BACKUP_SUFFIX})`)}`);
+  for (const f of result.sidecars) warn(`conflict sidecar ${f} — resolve by hand, then delete it`);
+
+  if (result.backups.length > 0 || result.created.length > 0) {
+    process.stdout.write(`\n${colors.bold("To revert")}\n`);
+    for (const f of result.backups) {
+      process.stdout.write(`  mv "${path.join(projectDir, f)}${BACKUP_SUFFIX}" "${path.join(projectDir, f)}"\n`);
+    }
+    for (const f of result.created) {
+      process.stdout.write(`  rm "${path.join(projectDir, f)}"\n`);
+    }
+  }
+
+  if (result.sidecars.length > 0) {
+    fail(
+      `${result.sidecars.length} conflict(s) need a human: the app's files were left untouched; ` +
+        `each *${SIDECAR_SUFFIX} sidecar carries the new engine content.`
+    );
+    return 1;
+  }
+  process.stdout.write(
+    `\n${colors.green("Applied.")} Prove the build: ${colors.cyan(`create-cmp verify --target-dir ${targetDir}`)}\n`
+  );
+  return 0;
+}
+
 /**
  * @param {Record<string,string|boolean>} flags
  * @param {string|undefined} positional optional target dir positional
  */
 export async function runUpgrade(flags, positional) {
+  if (flags.harness === true) {
+    return runHarnessUpgrade(flags, positional);
+  }
   const targetDir =
     (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
   const projectDir = path.resolve(targetDir);
