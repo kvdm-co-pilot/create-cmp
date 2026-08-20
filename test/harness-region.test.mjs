@@ -107,3 +107,26 @@ test("comparing against a missing/garbage manifest reports NOT intact, never thr
     assert.deepEqual(r.extra, ["qa/verify.mjs"]);
   }
 });
+
+test("the app contract DECLARES the boundary — this is what prevents recurrence", () => {
+  // The 0.13.0 pilots drifted because nothing ever told anyone those files
+  // were machine-owned. The mechanism (lock + integrity step) catches drift
+  // after the fact; saying so in the contract is what stops it happening.
+  const claude = fs.readFileSync(path.join(REPO_ROOT, "template/CLAUDE.md"), "utf8");
+  assert.match(claude, /machine-owned/i, "CLAUDE.md names the ownership boundary");
+  assert.match(claude, /qa\/harness\.lock\.json/, "CLAUDE.md points at the lock");
+  assert.match(claude, /do not edit `qa\/\*\.mjs`/i, "CLAUDE.md states the rule outright");
+  assert.match(claude, /upgrade --harness/, "CLAUDE.md gives the way out for a genuine fork");
+
+  // AGENTS.md is a pointer file, but this rule has to survive an agent that
+  // only skims it before editing.
+  const agents = fs.readFileSync(path.join(REPO_ROOT, "template/AGENTS.md"), "utf8");
+  assert.match(agents, /machine-owned/i, "AGENTS.md carries the rule too");
+});
+
+test("app-owned surfaces are named as app-owned, not left ambiguous", () => {
+  const claude = fs.readFileSync(path.join(REPO_ROOT, "template/CLAUDE.md"), "utf8");
+  for (const owned of ["approvals.json", "golden/", "evidence/", "e2e/*.yaml", "specs/"]) {
+    assert.ok(claude.includes(owned), `CLAUDE.md says ${owned} is the app's`);
+  }
+});

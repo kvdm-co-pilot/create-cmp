@@ -6,6 +6,81 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-20
+
+### Added
+
+- **The verify lane is now a machine-owned region, and it can prove it is the real lane.**
+  A create-cmp app holds two kinds of file. App-owned files are the app: screens, specs,
+  goldens, approvals, e2e flows. Machine-owned files are the lane — 10,364 lines of engine
+  code, byte-identical in every app ever stamped, carrying no app content at all. The rule
+  is mechanical, with no list to maintain: **machine-owned == the `.mjs` files directly
+  under `qa/` and `qa/lib/`**. `packages/harness` (`create-cmp-harness`, versioned
+  independently of the CLI) is the single source of truth; `scripts/sync-harness.mjs`
+  vendors it into the template so generated projects stay **dependency-free** —
+  `node qa/verify.mjs` still runs offline, in CI, air-gapped, with no install step.
+
+- **`qa/harness.lock.json` + a `harnessIntegrity` step that runs first in every profile.**
+  A receipt used to be unfalsifiable in one specific way: edit `qa/verify.mjs` to force
+  every step PASS and it still validated, because the edited file was simply part of the
+  hashed input surface. The lane vouched for the tree; nothing vouched for the lane. The
+  lock records the harness version and a sha256 per machine-owned file, and the receipt
+  carries a `harness` summary naming version and region digest. Two questions are kept
+  deliberately apart: **integrity** ("unmodified since installed?" — local, offline, every
+  run; a checksum, not a signature, so it catches the accident and the drift) and
+  **authenticity** ("the real published harness@X?" — remote, by comparing the digest
+  against what the registry published, which an attacker cannot forge). Neither claim is
+  stretched to cover the other's job. `unlocked` is its own state, not folded into
+  `modified`: an app stamped before locks existed has nothing known wrong and nothing
+  proven either, and a gate that cannot tell those apart teaches people to ignore it.
+
+### Changed
+
+- **`upgrade --harness` replaces the lane instead of merging it.** Lane code is a derived
+  artifact, and the right operation on a derived artifact is replace. Three-way merging it
+  is what made the 0.13.0 pilots expensive: ~1,000 conflicted lines per app, on diffs
+  containing zero app-specific tokens. The region now always lands on the new engine's
+  content; what varies is how honestly the app's prior state is accounted for —
+  `region-clean` (untouched), `region-absorbed` (the local edit is already in the new
+  content — the pilots' common case, silent), `region-restored`, `region-removed`, and
+  `region-patched`: a genuine local fork, replaced, with `base→theirs` preserved at
+  `qa/harness-local.patch`. That patch neither blocks nor silently re-applies. Its header
+  says outright that it may not apply cleanly to the new lane — that IS the merge the tool
+  declined to do behind your back — and points at `git apply --reject` so partial
+  re-application always makes progress.
+
+- **The lane is copied, never stamped.** Running harness code through token replacement
+  was a category error that had already caused live damage: `qa/lib/approvals.mjs` had to
+  detect unresolved tokens by *shape* because writing the literal `__PACKAGE__` in its own
+  source got rewritten out from under it, and `qa/scaffold-feature.mjs` shipped an error
+  message meaning to name the unresolved token that instead named the app's real package
+  ("found com.acme.app unresolved" — incoherent, since resolving is exactly what had
+  failed). Anything app-specific the lane needs is now read at runtime from
+  `create-cmp.json`. Byte-identity through the stamper is also what makes the region
+  hashable at all.
+
+- **The app contract declares the boundary.** CLAUDE.md gains "The lane is not yours to
+  edit" and AGENTS.md carries the one-line form. The pilots drifted because nothing ever
+  told anyone those files were machine-owned; the lock catches drift after the fact, but
+  saying so is what stops it happening. Both are pinned by tests.
+
+### Fixed
+
+- **`upgrade --harness` never advanced `engineVersion`, so repeat upgrades compounded.**
+  The next run re-fetched the *stale* version as its merge base and re-presented every
+  conflict already resolved by hand — Fuelled still read `0.9.0` after being upgraded to
+  0.13.0. It is now written back, but only when the sweep lands completely: with conflicts
+  outstanding the app really is part-way between two engine versions, and claiming the new
+  one would be the same lie in the other direction. Verified idempotent — a second run on
+  an upgraded fixture is completely silent.
+
+- `qa/harness.lock.json` is excluded from the upgrade sweep — derived state, rewritten
+  explicitly once the region has landed. Sweeping it copied a stale manifest in, backed up
+  a value about to be replaced, and counted a guaranteed no-op as actionable work.
+
+- Writing a lock for a config with no lane recreated the very `qa/` directory a feature
+  strip had just removed. No lane, no lock.
+
 ## [0.13.0] - 2026-08-20
 
 ### Added
@@ -1398,7 +1473,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.10.1...v0.11.0
