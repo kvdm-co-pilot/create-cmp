@@ -82,3 +82,15 @@ test("the real golden template ships `gitignore` (dot-less) so npm pack includes
     "template/.gitignore must NOT exist — it would be silently dropped from the npm tarball"
   );
 });
+
+// Dogfood finding from the first real `upgrade --harness` run: the tool's
+// pre-write backups and conflict sidecars were committed alongside the upgrade,
+// putting a stale copy of every touched file into the app's history. In a git
+// repo the previous commit IS the backup, so both are redundant to git the
+// moment they exist — kept on disk (an upgrade in a dirty or non-git tree still
+// needs them), ignored by git.
+test("upgrade backups and conflict sidecars are gitignored", () => {
+  const gi = fs.readFileSync(new URL("../template/gitignore", import.meta.url), "utf8");
+  assert.match(gi, /^\*\.bak-upgrade$/m);
+  assert.match(gi, /^\*\.cmp-new$/m);
+});
