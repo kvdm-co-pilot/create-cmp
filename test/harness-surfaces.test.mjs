@@ -17,6 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { scaffold } from "../src/scaffold.mjs";
 import { evidenceLevel } from "../template/qa/lib/evidence-level.mjs";
+import { isHarnessFile } from "../packages/harness/src/lib/harness-region.mjs";
 
 // A parallel lane is mid-flight renaming the device-E2E feature key
 // `appium` -> `e2e` (CLI flags + manifest key). Detect which key the CURRENT
@@ -410,6 +411,13 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
 
     await t.test("no unreplaced __PACKAGE__/__APP_NAME__ tokens remain in the asserted surfaces", () => {
       for (const rel of ASSERTED_FILES) {
+        // The machine-owned lane is COPIED, never stamped, so a token inside it
+        // is a deliberate literal — qa/lib/approvals.mjs and
+        // qa/scaffold-feature.mjs both need to name `__PACKAGE__` to detect or
+        // describe an UNRESOLVED one. Stamping used to rewrite those literals
+        // out from under them; the region rule is what fixed it, so excluding
+        // the region here is the assertion agreeing with that fix, not a hole.
+        if (isHarnessFile(rel)) continue;
         const p = path.join(out, rel);
         const content = fs.readFileSync(p, "utf8");
         assert.ok(!content.includes("__PACKAGE__"), `${rel} has no leftover __PACKAGE__ token`);

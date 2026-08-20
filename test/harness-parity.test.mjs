@@ -1,9 +1,17 @@
-// G0 item 1 — the shared receipts lib has ONE source of truth.
-// packages/receipts/src/ is canonical; the template ships byte-identical
-// vendored copies in qa/lib/ (generated projects stay dependency-free), and
-// the engine's verbatim template copy carries them into every scaffold.
-// This test pins all three layers: package ↔ template ↔ fresh scaffold.
-// Drift fix: node scripts/sync-receipts.mjs
+// The lane has ONE source of truth, and it survives the stamp pipeline intact.
+//
+// packages/harness/src/ is canonical for the whole verify lane (and
+// packages/receipts/src/ for the two files it owns inside it); the template
+// ships byte-identical vendored copies under qa/ so generated projects stay
+// dependency-free, and the engine carries them into every scaffold.
+//
+// This pins all three layers — package ↔ template ↔ fresh scaffold — for
+// every file in the machine-owned region, not just the two receipts files.
+// The scaffold layer is the one that matters most: it proves the stamper
+// never rewrites lane code, which is what makes the region content-hashable
+// and therefore what makes a receipt able to name the lane that issued it.
+//
+// Drift fix: node scripts/sync-harness.mjs
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -12,24 +20,25 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { scaffold } from "../src/scaffold.mjs";
-import { SYNCED_FILES } from "../scripts/sync-receipts.mjs";
+import { SYNCED_FILES, harnessFiles, orphanFiles } from "../scripts/sync-harness.mjs";
+import { listHarnessFiles, hashHarnessRegion } from "../packages/harness/src/lib/harness-region.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("receipts lib: template qa/lib copies are byte-identical to the package source", () => {
+test("every vendored copy is byte-identical to its package source", () => {
   assert.ok(SYNCED_FILES.length >= 2, "sync manifest lists the shared files");
   for (const { from, to } of SYNCED_FILES) {
     const src = fs.readFileSync(path.join(REPO_ROOT, from));
     const dest = fs.readFileSync(path.join(REPO_ROOT, to));
     assert.ok(
       src.equals(dest),
-      `${to} drifted from ${from} — run: node scripts/sync-receipts.mjs`,
+      `${to} drifted from ${from} — run: node scripts/sync-harness.mjs`,
     );
   }
 });
 
-test("receipts lib: a fresh scaffold lands byte-identical copies of the package source", async () => {
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-receipts-parity-"));
+test("a fresh scaffold lands byte-identical copies of every lane file", async () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-harness-parity-"));
   try {
     await scaffold(
       {
@@ -53,7 +62,8 @@ test("receipts lib: a fresh scaffold lands byte-identical copies of the package 
       { verify: false },
     );
 
-    for (const { from, to } of SYNCED_FILES) {
+    // Stage 2 only — stage 1's targets live inside packages/, not the template.
+    for (const { from, to } of harnessFiles()) {
       const rel = to.replace(/^template\//, "");
       const packageBytes = fs.readFileSync(path.join(REPO_ROOT, from));
       const scaffoldPath = path.join(out, rel);
@@ -73,7 +83,7 @@ test("receipts lib: a fresh scaffold lands byte-identical copies of the package 
   }
 });
 
-test("receipts lib: package predicate and template predicate agree on a real receipt", async () => {
+test("package predicate and template predicate agree on a real receipt", async () => {
   // Belt-and-braces beyond byte-equality: import BOTH copies and assert the
   // same verdict object for the same inputs.
   const pkg = await import(path.join(REPO_ROOT, "packages/receipts/src/receipt-validate.mjs"));

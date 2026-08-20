@@ -12,7 +12,7 @@ create-cmp carries byte-identical copies of `src/inputs-hash.mjs` and
 dependency-free (no npm install ever needed to run their own gates), while any
 hosted validator consumes the exact same logic from this package. Parity is
 test-pinned in the create-cmp repo (`test/receipts-parity.test.mjs`); after editing
-`src/`, run `node scripts/sync-receipts.mjs` from the repo root to re-vendor.
+`src/`, run `node scripts/sync-harness.mjs` from the repo root to re-vendor.
 
 ## API
 

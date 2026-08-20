@@ -20,6 +20,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { validate, formatErrors } from "./lib/schema.mjs";
 import { validatePackageName } from "./lib/package-name.mjs";
 import { buildTokenMap, replaceTokens, replacePathTokens, isBinaryPath, slugifyAppName } from "./lib/tokens.mjs";
+import { isHarnessFile } from "../packages/harness/src/lib/harness-region.mjs";
 import { renamePackageDirs } from "./lib/rename.mjs";
 import {
   stripFeatureBlocks,
@@ -78,7 +79,22 @@ export function loadManifest(templateDir) {
 }
 
 /**
- * Apply token replacement to every text file's CONTENT under projectDir.
+ * Apply token replacement to every text file's CONTENT under projectDir —
+ * except the machine-owned harness region, which is COPIED, never stamped.
+ *
+ * The lane carries no app content, so there is nothing in it to stamp; running
+ * it through token replacement only ever corrupted it. Two live examples the
+ * region rule retires: qa/lib/approvals.mjs had to detect unresolved tokens by
+ * SHAPE because writing the literal `__PACKAGE__` in its own source got
+ * rewritten out from under it, and qa/scaffold-feature.mjs shipped an error
+ * message that meant to name the unresolved token and instead named the app's
+ * real package ("found com.acme.demo unresolved"). Anything app-specific the
+ * lane needs is read at RUNTIME from create-cmp.json.
+ *
+ * Skipping the region is also what makes it content-hashable: every stamped
+ * app carries byte-identical lane files, so a receipt can name the exact lane
+ * version that issued it and an app can prove its copy is unmodified offline.
+ * test/harness-parity.test.mjs pins that byte-equality through the scaffold.
  */
 function replaceContents(projectDir, tokenMap, manifestRel) {
   for (const file of listFiles(projectDir)) {
@@ -86,6 +102,7 @@ function replaceContents(projectDir, tokenMap, manifestRel) {
     if (manifestRel && path.resolve(file) === path.resolve(path.join(projectDir, manifestRel))) {
       continue;
     }
+    if (isHarnessFile(path.relative(projectDir, file).split(path.sep).join("/"))) continue;
     if (isBinaryPath(file)) continue;
     let content;
     try {
