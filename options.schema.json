@@ -77,6 +77,10 @@
         "fcm": { "type": "boolean" }
       }
     },
+    "harness": {
+      "type": "boolean",
+      "description": "The verification harness (the mode split, LADDER R3). true/absent = full mode: verify lane + receipts + specs + approvals + generators + Stop hook. false = minimal mode (`--minimal`): the same app, tests, previews, inspector, and advisory hooks, without the lane or governance — `create-cmp harden` installs the subtraction back. Absent means full so every pre-mode config keeps meaning what it meant."
+    },
     "room": { "type": "boolean" },
     "e2e": {
       "type": "boolean",

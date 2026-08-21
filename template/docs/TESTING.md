@@ -13,12 +13,20 @@ copy their shape.
 <!-- >>> cmp:feature e2e -->
 | E2E smoke (few) | `qa/e2e/*.yaml` (Maestro) | `maestro test qa/e2e/smoke.yaml` |
 <!-- <<< cmp:feature e2e -->
+<!-- >>> cmp:feature harness -->
 | The lane (all of it) | `qa/verify.mjs` | `node qa/verify.mjs` |
 
 Every durable test cites the spec clause it verifies (`// SPEC: HOME-02` — see
 [`specs/`](../specs/README.md)); **new behavior begins as a spec clause.** The lane's
 `specCoverage` step enforces this: it fails on orphan clauses (no citing test) and orphan tags
 (no matching clause, or one citing a withdrawn clause).
+<!-- <<< cmp:feature harness -->
+<!-- >>> cmp:feature !harness -->
+
+Durable tests may cite a spec clause id in a comment (`// SPEC: HOME-02`) — the shipped
+tests do. This minimal scaffold carries no `specs/` directory or coverage gate; both
+arrive with `npx create-cmp-cli harden`.
+<!-- <<< cmp:feature !harness -->
 
 ## Unit conventions
 
@@ -140,6 +148,7 @@ one: a search assert that passed standalone failed in-lane behind a 33s type gap
 asserts are for static post-navigation elements only.
 <!-- <<< cmp:feature e2e -->
 
+<!-- >>> cmp:feature harness -->
 ## The verify lane
 
 `node qa/verify.mjs` is the definition of done: spec coverage → build → unit tests →
@@ -235,3 +244,4 @@ rung is the coarse grade; the per-step list stays the fine print. A FAILed lane 
 | **L1 desktop** | Full static + JVM evidence: build, unit tests, conformance, golden trees, a11y, release COMPILE, and the pure-Node gates. | That the app runs on a device at all — no APK was installed or driven; platform behavior (alarms, notifications) is invisible from this rung. |
 | **L2 device** | L1 plus executed on-device evidence: the debug APK installed and driven (`e2eSmoke`), instrumented platform assertions (`androidChecks`), and/or live token drift. | That the release variant behaves (R8 differs from debug — that is L3's job), nor that alarms/notifications actually land unless an instrumented behavior test asserts them. |
 | **L3 release** | L2 plus `releaseSmoke` PASSed: the signed release APK installed and driven on a device. | Real-backend behavior (the emulator/dev backend is a documented tier boundary — see the instrumented-tier section) and store-review compliance. |
+<!-- <<< cmp:feature harness -->

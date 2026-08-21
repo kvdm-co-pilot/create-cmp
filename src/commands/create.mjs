@@ -74,6 +74,10 @@ function buildConfigFromFlags(flags, positional) {
     region: typeof flags.region === "string" ? flags.region : "us-central1",
     themePrefix:
       typeof flags["theme-prefix"] === "string" ? flags["theme-prefix"] : pascalFromName(name),
+    // `--minimal` is the Act 1 door (LADDER §2): same app, tests, previews and
+    // advisory hooks, without the verify lane / receipts / governance.
+    // `create-cmp harden` installs the subtraction back.
+    harness: !flagBool(flags, "minimal", false),
     platforms: { android: true, ios },
     firebase: {
       enabled: firebase,
@@ -95,7 +99,7 @@ function buildConfigFromFlags(flags, positional) {
   };
 }
 
-async function interactiveConfig(positional) {
+async function interactiveConfig(positional, flags = {}) {
   let prompts;
   try {
     prompts = (await import("prompts")).default;
@@ -157,6 +161,12 @@ async function interactiveConfig(positional) {
 
   const extras = await prompts(
     [
+      {
+        type: "confirm",
+        name: "harness",
+        message: "Verification harness (verify lane, evidence receipts, machine-checked done)?",
+        initial: flags.minimal !== true, // --minimal pre-answers the interview question
+      },
       { type: "confirm", name: "room", message: "Room local cache?", initial: true },
       { type: "confirm", name: "e2e", message: "E2E test harness (Maestro)?", initial: true },
       {
@@ -193,6 +203,7 @@ async function interactiveConfig(positional) {
     iosBundleId: base.package,
     region: base.region,
     themePrefix: pascalFromName(base.appName),
+    harness: extras.harness,
     platforms: { android: true, ios: base.ios },
     firebase: { enabled: base.firebase, auth, firestore, storage, functions, fcm },
     room: extras.room,
@@ -222,7 +233,7 @@ export async function runCreate(flags, positional) {
 
   const config = nonInteractive
     ? buildConfigFromFlags(flags, positional)
-    : await interactiveConfig(positional);
+    : await interactiveConfig(positional, flags);
 
   const verify = flagBool(flags, "verify", true);
 

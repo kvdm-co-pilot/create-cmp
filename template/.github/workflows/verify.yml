@@ -1,9 +1,17 @@
 # CI for your Compose Multiplatform app — stamped in by create-cmp.
 #
+# >>> cmp:feature harness
 # What runs on every push/PR: a toolchain report (advisory) and the VERIFY LANE
 # (qa/verify.mjs) — build + unit tests + every other gate this project carries,
 # producing the evidence receipt. Green here = your frozen version set still
 # builds AND the harness's checks pass.
+# <<< cmp:feature harness
+# >>> cmp:feature !harness
+# What runs on every push/PR: a toolchain report (advisory), the JVM test tier
+# (unit + conformance + golden trees), and the Android debug build. This is a
+# minimal scaffold — `npx create-cmp-cli harden` upgrades this workflow to the
+# full verify lane with evidence receipts.
+# <<< cmp:feature !harness
 #
 # iOS: a ready-to-enable macOS job is included (commented out) at the bottom.
 # macOS runners cost ~10x Linux minutes, so it's opt-in.
@@ -36,6 +44,12 @@ jobs:
         continue-on-error: true
         run: npx --yes create-cmp-cli@latest doctor --yes --no-install --no-ios
 
+      # >>> cmp:feature !harness
+      - name: Tests (JVM tier) + debug build
+        run: ./gradlew :composeApp:desktopTest :composeApp:assembleDebug
+      # <<< cmp:feature !harness
+
+      # >>> cmp:feature harness
       # Receipt attests HEAD: the committed evidence receipt (qa/evidence/latest.json)
       # must validly attest the checked-out tree — verdict PASS and the inputs-hash
       # still matching the verified surface — BEFORE we spend a runner re-running the
@@ -62,6 +76,7 @@ jobs:
         with:
           name: verify-evidence
           path: qa/evidence/latest.json
+      # <<< cmp:feature harness
 
   # ── iOS (opt-in) ──────────────────────────────────────────────────────────
   # Uncomment to build the iOS app on every push to main. Uses the exact

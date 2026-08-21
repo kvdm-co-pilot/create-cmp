@@ -58,6 +58,33 @@ function renderAdr(number, title, body, dateIso) {
 // nothing beyond the shipped four; only a genuine choice gets a record.
 const DECISION_RULES = [
   {
+    id: "mode",
+    applies: (config) => config.harness === false,
+    title: () => "Minimal scaffold — verification harness deferred",
+    render: () => ({
+      context:
+        "create-cmp stamps the full verification harness by default: the verify lane " +
+        "(`qa/verify.mjs`) with evidence receipts, behavior specs (`specs/`), approval " +
+        "gates, feature generators, and a Stop hook making the definition of done " +
+        "machine-checked. This app was scaffolded `--minimal` — a deliberate choice to " +
+        "start with the smallest thing that builds green, deferring the harness rather " +
+        "than rejecting it.",
+      decision:
+        "We will start without the verification harness. The app keeps its full " +
+        "architecture, unit/conformance/golden tests (`./gradlew :composeApp:desktopTest`), " +
+        "headless previews, the live inspector, and advisory session hooks; it carries no " +
+        "verify lane, receipts, specs, approvals, generators, or enforcement hooks.",
+      consequences:
+        "- The definition of done is honor-system: green `desktopTest` plus review, with " +
+          "no receipt attesting what actually ran.\n" +
+        "- No spec-first behavior flow and no generators — new features are written by " +
+          "hand against `docs/ARCHITECTURE.md`.\n" +
+        "- Reversing this is one idempotent command, not a re-scope: " +
+          "`npx create-cmp-cli harden` installs the full harness and this ADR is " +
+          "superseded by that act.",
+    }),
+  },
+  {
     id: "persistence",
     applies: (config) => config.room === false,
     title: () => "No local Room persistence",

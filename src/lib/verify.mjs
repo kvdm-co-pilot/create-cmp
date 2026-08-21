@@ -41,8 +41,13 @@ export async function runVerify({ projectDir, manifest, config, dryRun = false }
   const verify = (manifest && manifest.verify) || {};
   const results = [];
 
+  // Minimal mode has no in-app lane to run — its gate is the Gradle tier the
+  // scaffold DOES ship (unit + conformance + golden tests, debug build).
+  const minimal = config?.harness === false;
+  const androidCommand = minimal && verify.androidMinimal ? verify.androidMinimal : verify.android;
+
   const plan = [];
-  if (verify.android) plan.push({ platform: "android", command: verify.android, eligible: true });
+  if (androidCommand) plan.push({ platform: "android", command: androidCommand, eligible: true });
   if (verify.ios) {
     const eligible = isMacOS() && !!config?.platforms?.ios;
     plan.push({ platform: "ios", command: verify.ios, eligible });

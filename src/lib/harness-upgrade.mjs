@@ -537,6 +537,10 @@ export function configFromSpecRecord(record, targetDir) {
     iosBundleId: record.bundleId,
     region: record.region ?? "us-central1",
     themePrefix: record.themePrefix,
+    // Deliberately the OPPOSITE default from the feature toggles below: every
+    // app stamped before the mode split carries the full harness, so an
+    // absent `harness` key means full, not absent.
+    harness: record.harness ?? true,
     platforms: record.platforms ?? { android: true, ios: true },
     firebase: record.firebase ?? { enabled: false },
     room: record.room ?? false,

@@ -324,6 +324,7 @@ function writeSpecOfRecord(projectDir, config) {
     bundleId: config.iosBundleId,
     themePrefix: config.themePrefix,
     region: config.region,
+    harness: config.harness !== false,
     platforms: config.platforms,
     firebase: config.firebase,
     room: config.room,
@@ -464,8 +465,24 @@ export async function scaffold(config, opts = {}) {
   if (seeded.length === 0) process.stdout.write("  no configuration deviated from the interview default — nothing to seed\n");
 
   // (e.2) regenerate the architecture doc's derived sections for the tree as
-  // stamped — see regenerateArchDoc above.
+  // stamped — see regenerateArchDoc above. MUST precede the minimal-mode lane
+  // subtraction below: the walker it imports (qa/lib/arch-doc.mjs) is lane
+  // code a minimal scaffold does not keep, and the doc's derived sections
+  // describe composeApp/ (which minimal mode never touches), so regenerating
+  // first is both necessary and correct.
   await regenerateArchDoc(projectDir);
+
+  // (e.3) minimal mode — subtract the machine-owned lane (keeping the preview
+  // entry points + their import closure) and rewrite the hook set to
+  // advisory-only. Marker blocks and manifest paths were already handled by
+  // the standard feature machinery above; this is the part only the engine
+  // can derive. Runs BEFORE writeLaneLock so the lock hashes exactly the
+  // region this app ships.
+  if (config.harness === false) {
+    step("Applying minimal mode (no verification harness)…");
+    const { applyMinimalMode } = await import("./lib/minimal.mjs");
+    applyMinimalMode(projectDir, (m) => process.stdout.write(`${m}\n`));
+  }
 
   // Write local.properties (sdk.dir) so the Gradle build can find the Android
   // SDK even when ANDROID_HOME/ANDROID_SDK_ROOT aren't exported (manifest

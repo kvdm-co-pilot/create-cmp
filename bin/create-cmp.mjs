@@ -15,7 +15,7 @@
 
 import { parseArgs } from "../src/lib/args.mjs";
 
-const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "help"]);
+const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "harden", "attach", "help"]);
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -53,6 +53,16 @@ async function main() {
       await runVerifyCommand(flags, rest[0]);
       return;
     }
+    case "harden": {
+      const { runHarden } = await import("../src/commands/harden.mjs");
+      await runHarden(flags, rest[0]);
+      return;
+    }
+    case "attach": {
+      const { runAttach } = await import("../src/commands/attach.mjs");
+      await runAttach(flags, rest[0]);
+      return;
+    }
     case "create":
     default: {
       const { runCreate } = await import("../src/commands/create.mjs");
@@ -73,9 +83,13 @@ function printHelp() {
       `  npx create-cmp upgrade                 migrate to the next proven-green version set\n` +
       `  npx create-cmp upgrade --harness       refresh engine-owned files of a stamped app (3-way merge)\n` +
       `  npx create-cmp clean                   ~/.konan + Gradle build-output hygiene (consent-gated)\n` +
-      `  npx create-cmp verify                  run the green-build gate on an existing project\n\n` +
+      `  npx create-cmp verify                  run the green-build gate on an existing project\n` +
+      `  npx create-cmp harden                  install the full harness into a --minimal scaffold\n` +
+      `  npx create-cmp attach                  wire the agent contract into an EXISTING Compose/KMP repo\n\n` +
       `create (scaffold) flags:\n` +
       `  --name --package --bundle-id --region --theme-prefix\n` +
+      `  --minimal   (light scaffold: app + tests + previews, no verify lane/receipts —\n` +
+      `               \`harden\` installs the full harness later, idempotently)\n` +
       `  --ios/--no-ios  --firebase/--no-firebase  --auth <email|phone|both|none>\n` +
       `  --room/--no-room  --e2e/--no-e2e  --inspector/--no-inspector\n` +
       `  --dev-client/--no-dev-client   (desktop JVM window + Compose Hot Reload)\n` +
@@ -87,7 +101,9 @@ function printHelp() {
       `  --harness mode flags: --target-dir <dir>  --base-dir <extracted-template>  --dry-run  --yes\n` +
       `  (--harness dry-runs by default; conflicts never clobber — they land as *.cmp-new sidecars)\n` +
       `clean flags:   --target-dir <dir>  --dry-run  --yes\n` +
-      `verify flags:  --target-dir <dir>  --no-ios  --dry-run\n`
+      `verify flags:  --target-dir <dir>  --no-ios  --dry-run\n` +
+      `harden flags:  --target-dir <dir>  --dry-run  --yes  --verify (run the lane after install)\n` +
+      `attach flags:  --target-dir <dir>  --dry-run  --yes\n`
   );
 }
 

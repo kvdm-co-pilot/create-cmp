@@ -1,17 +1,29 @@
 # Architecture
 
+<!-- >>> cmp:feature harness -->
 > **Reading this document.** Every normative sentence below carries a tier tag.
 > `[enforced: CLAUSE-ID]`: a named gate in `node qa/verify.mjs` fails the lane on violation.
 > `[governed]`: the sentence lives inside a hash-bound human approval (`qa/approvals.json`);
 > changing it without re-approval fails the `approvals` gate. `[advisory]`: a documented
 > convention with no mechanical check yet. Every sentence is law, signed intent, or advice —
 > and says which.
+<!-- <<< cmp:feature harness -->
+<!-- >>> cmp:feature !harness -->
+> **Reading this document.** Every normative sentence below carries a tier tag.
+> `[enforced: CLAUSE-ID]`: a named source-scanning gate in the desktopTest conformance
+> suite fails the tests on violation. `[governed]` / `[advisory]`: conventions this
+> minimal scaffold checks by review, not by machine — the full harness
+> (`npx create-cmp-cli harden`) adds the mechanical gates.
+<!-- <<< cmp:feature !harness -->
 
 ## 1. Purpose & quality goals
 
+<!-- >>> cmp:feature harness -->
 This app's purpose, audience, and shape are recorded in [`specs/intent.md`](../specs/intent.md)
 — the root brief this document, the component registry, and the exemplar feature all trace
-back to. The table below is the default quality-goal set a fresh scaffold ships with. The
+back to.
+<!-- <<< cmp:feature harness -->
+The table below is the default quality-goal set a fresh scaffold ships with. The
 genesis walk's architecture conversation is where a human promotes, demotes, or replaces
 them for this app's actual priorities ("offline matters more than a11y for a field-work
 app").
@@ -423,6 +435,11 @@ demotes to a regular feature. To add a feature, mirror the exemplar exactly:
    empty/content split) (+ test using a fake from `testing/fakes/`).
 4. DI: register in `di/AppModule.kt`.
 5. Navigation: add the route in `presentation/navigation/`.
+<!-- >>> cmp:feature harness -->
 6. Run `node qa/verify.mjs` — done means PASS + committed receipt.
+<!-- <<< cmp:feature harness -->
+<!-- >>> cmp:feature !harness -->
+6. Run `./gradlew :composeApp:desktopTest` — green is the bar this scaffold can check.
+<!-- <<< cmp:feature !harness -->
 
 Significant decisions get an ADR in [`docs/adr/`](./adr/) — see the template there.

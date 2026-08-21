@@ -57,6 +57,18 @@
     "whenDisabled": "Remove the marker lines AND the body between them."
   },
   "features": {
+    "harness": {
+      "enabledByDefault": true,
+      "paths": [
+        "specs",
+        ".claude/skills",
+        ".githooks",
+        "qa/approvals.json",
+        "qa/comments.json",
+        "qa/evidence"
+      ],
+      "notes": "The verification harness — the mode split (`--minimal` disables it; `create-cmp harden` installs it back). Three mechanisms share the subtraction, each already owned by the engine: (1) the paths above delete the app-owned governance surfaces (specs/, approvals+comments ledgers, evidence, generator skills, the pre-push receipt hook); (2) `cmp:feature harness`/`!harness` marker blocks give CLAUDE.md, AGENTS.md, README.md, CONTRIBUTING.md, docs/TESTING.md and .github/workflows/verify.yml their two honest renderings from one file; (3) the machine-owned lane region is subtracted by the ENGINE (src/lib/minimal.mjs), which keeps qa/preview-gallery.mjs plus its transitive qa/lib imports — derived from import statements, never listed here, so it cannot rot. .claude/settings.json is rewritten to the advisory-only hook set via the src/lib/hooks.mjs classifier (Stop hook and qa/-referencing nudges are full-mode only). qa/golden/ stays in BOTH modes — the desktopTest golden-tree tests read it and minimal keeps the full JVM test tier. qa/e2e is its own feature and stays orthogonal (Maestro flows run standalone)."
+    },
     "ios": {
       "enabledByDefault": true,
       "paths": [
@@ -113,6 +125,7 @@
   },
   "verify": {
     "android": "node qa/verify.mjs --profile scaffold",
+    "androidMinimal": "./gradlew :composeApp:desktopTest :composeApp:assembleDebug",
     "androidBuildOnly": "./gradlew :composeApp:assembleDebug",
     "androidSmoke": "./gradlew :composeApp:installDebug && maestro test qa/e2e/smoke.yaml",
     "iosLink": "./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64",
