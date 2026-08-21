@@ -33,9 +33,9 @@ everything:
 the MCP). Same deterministic Node engine behind both.
 
 **The frozen version set** (moved as one unit by `upgrade`; never bump a piece in isolation):
-Kotlin `2.2.20` · KSP `2.2.20-2.0.4` · Compose MP `1.10.3` · Room `2.8.4` · AGP `8.7.3` · Koin
-`4.1.1` · Ktor `3.1.0` · Nav Compose `2.9.2` · GitLive Firebase `2.1.0`, with `ksp.useKSP2=true`
-(the Room-on-iOS/native catch-22).
+the authoritative pins live in [`VERSIONS.md`](./VERSIONS.md) and `src/versions/registry.json` —
+Kotlin/KSP in lockstep, Compose MP, Room, AGP, Koin, Ktor, Nav Compose, GitLive Firebase, with
+`ksp.useKSP2=true` (the Room-on-iOS/native catch-22). This doc deliberately quotes no numbers.
 
 > **Scope now:** Android + host-JVM are the active targets. iOS template support is intact and
 > compiles, but iOS CI is parked (manual dispatch). The inspector/live-view/dev-client features are
@@ -68,13 +68,14 @@ Android SDK, Appium + drivers (the legacy e2e path), CocoaPods/XcodeGen — the 
 detects and (with consent) installs. The E2E flows themselves run on Maestro, installed separately
 with `curl -fsSL https://get.maestro.mobile.dev | bash`.
 
-**Get the tool:**
+**Get the tool** — published on npm; no clone, no install:
 
 ```bash
-# From the repo (current path — npm publish is pending):
-node bin/create-cmp.mjs --help
-npx github:kvdm-co-pilot/create-cmp --help        # zero-install
+npm create kmp@latest my-app                      # the lead invocation (alias → create-cmp-cli)
+npx create-cmp-cli@latest --help                  # the engine directly (installs the `create-cmp` command)
 ```
+
+Working from a checkout of this repo instead: `node bin/create-cmp.mjs --help`.
 
 **Claude Code plugin** (adds the 10 skills + the `cmp-inspector` MCP):
 
@@ -510,9 +511,10 @@ Code session can extend it correctly — **the create-cmp plugin is not required
    which shells to `qa/scaffold-feature.mjs`, a deterministic stamper (whole-word rename map,
    anchor injection) that clones the `home` exemplar: Screen + ViewModel + UseCase + Repository +
    DI + navigation, with tests at every layer and a golden-tree baseline, spec-linked from birth.
-3. Claude runs `node qa/verify.mjs` — the lane: specCoverage → build → unitTests → conformance →
-   goldenTrees → tokenDrift → a11y → (device present) e2eSmoke — into one typed PASS/FAIL/SKIP
-   verdict + a schema-validated evidence-pack JSON (`qa/evidence/latest.json`).
+3. Claude runs `node qa/verify.mjs` — the profile-tiered lane (§3: 16 steps at `local`, from
+   `harnessIntegrity` first through build, the full JVM test tier, and the device steps when one
+   is attached) — into one typed PASS/FAIL/SKIP verdict + a schema-validated evidence-pack JSON
+   (`qa/evidence/latest.json`).
 4. The PASS receipt gets committed. The generated `.claude/settings.json` **Stop hook**
    (`qa/receipt-check.mjs`) blocks "done" if the verified surface has changed since the last PASS
    receipt — validity is a content hash of that surface (`inputs.hash`; see
@@ -550,10 +552,10 @@ conforming slice, green tests at every layer, lane PASS.
 
 ```bash
 # scaffold + prove green
-node bin/create-cmp.mjs ./my-app --name MyApp --package com.my.app --no-ios --yes --verify
+npx create-cmp-cli@latest ./my-app --name MyApp --package com.my.app --no-ios --yes --verify
 # maintain (any KMP project)
-node bin/create-cmp.mjs doctor --fix
-node bin/create-cmp.mjs upgrade --dry-run     # then --verify to apply+prove
+npx create-cmp-cli doctor --fix
+npx create-cmp-cli upgrade --dry-run          # then --verify to apply+prove
 # dev-client
 (cd my-app && ./gradlew :composeApp:hotRunDesktop --auto)
 # live inspection
