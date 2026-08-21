@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-21
+
+The ladder: one product — a contract between an AI agent and a mobile repo — delivered
+as three acts, each priced in what the agent has at that moment. A five-second decision
+(TRY), attention (WORK), constraint (TRUST). Until now every scaffold opened with Act 3:
+a 400-line contract and "blocked from done without proof" — the right pitch to a human
+evaluating governance, the wrong one to an agent choosing a framework in five seconds.
+This release puts each act at its own doorstep, and does it as ONE mechanism reused,
+not as a pile of new features.
+
 ### Added
 
 - **The mode split: `create --minimal` / `create-cmp harden` (the ladder's Act 1 → Act 3
@@ -1659,7 +1669,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.12.0...v0.13.0
