@@ -8,6 +8,26 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- **`AGENTS.md` is a discovery surface now, not just a pointer.** The stamped file grew
+  from a 13-line "go read CLAUDE.md" note into a symptom → command table: build broken →
+  `npx create-cmp-cli doctor --fix`; "did my edit break anything" → the fast lane; can't
+  see the UI → `renderScreens` + the gallery; need the running app's real state → the
+  loopback inspector; and so on. Every row leads with a **zero-consent** command — the
+  `qa/` scripts ship in the project and `npx` needs no setup — and the file states
+  outright that the Claude Code plugin is better ergonomics for the same capabilities,
+  never a prerequisite. The reasoning: an agent mid-task does not go install things or
+  re-read long contracts; it reaches for whatever the repo itself offers at the moment
+  it hits a wall. `AGENTS.md` is the vendor-neutral file every coding agent reads, which
+  makes it the cheapest distribution surface the product owns.
+
+  The table is gated, not trusted: `test/agents-md.test.mjs` asserts every cited
+  `qa/` script, project-local skill, engine subcommand, gradle task, and endpoint
+  actually exists in the tree it ships in (evidence-or-silence). The gate earned its
+  keep on its first run — the draft table linked `docs/errors/` relatively, a path that
+  exists in this repo but **not in stamped projects**; the row now names the doctor for
+  offline diagnosis and the upstream URL for the write-ups.
+
+
 - **The library packages are scoped now: `@create-cmp/{harness,receipts,inspector}`.**
   They were heading for the registry as `create-cmp-harness`, `cmp-receipts`, and
   `@create-cmp/inspector-mcp` — three naming conventions for one product family, and
