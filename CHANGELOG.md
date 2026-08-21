@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **`@create-cmp/inspector` 0.6.2 — the `mcpName` field the MCP registry's ownership
+  check requires.** The registry verifies that a server's published npm package carries
+  `"mcpName"` equal to the `server.json` name it is submitted under; that field was
+  prepared in the launch runbook's patch but never landed, and 0.6.1 published without
+  it. npm versions are immutable, so the field arrives as 0.6.2 rather than a
+  re-publish. The package stays independently versioned (`GROUND-TRUTH.md`'s
+  "deliberately independent" note is unchanged) — this is the anti-impersonation
+  handshake, not a version-policy change.
+
 ## [0.15.0] - 2026-08-21
 
 The ladder: one product — a contract between an AI agent and a mobile repo — delivered
