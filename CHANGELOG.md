@@ -6,7 +6,56 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **The mode split: `create --minimal` / `create-cmp harden` (the ladder's Act 1 → Act 3
+  climb).** The default scaffold is unchanged — the full harness. `--minimal` stamps the
+  SAME template filtered: the app, its unit + conformance + golden-tree tests, headless
+  previews, the live inspector, `AGENTS.md`, and advisory-only session hooks — without
+  the verify lane, `specs/`, receipts, approvals, generators, skills, the Stop hook, the
+  pre-push gate, or the lane CI job (the stamped workflow runs `desktopTest` +
+  `assembleDebug` instead). Minimal is a *filter, never a fork*: one template, one
+  version matrix, one suite. Three existing mechanisms do the whole subtraction —
+  `cmp:feature harness`/`!harness` marker blocks for every text surface (CLAUDE.md
+  carries both its 400-line contract and a ~40-line working guide in one file), manifest
+  feature paths for the governance surfaces, and an engine-derived lane subtraction
+  (`src/lib/minimal.mjs` keeps `qa/preview-gallery.mjs` plus its transitive `qa/lib`
+  imports — computed from import statements, never a hand list). The choice is recorded
+  in `create-cmp.json` (`"harness": false`) and an auto-seeded ADR; `qa/harness.lock.json`
+  attests exactly the subset that ships.
+
+  `create-cmp harden` is the in-band climb back: the SAME three-way walk as
+  `upgrade --harness`, pointed at a new pair of trees (base = this app's config stamped
+  minimal, new = stamped full). Everything the mode subtracted classifies as
+  added/applied; a file you edited three-way merges or keeps your bytes with the
+  full-mode content beside it as `*.cmp-new` — never clobbered; app-state seeds
+  (`qa/approvals.json`, `qa/evidence/`) copy only if absent; the lane is re-locked, the
+  spec-of-record flips to `"harness": true`, and a second run finds nothing to do.
+  `test/minimal-mode.test.mjs` pins the whole minimal shape (including that every
+  stamped text surface is mode-honest); `test/harden.test.mjs` pins install,
+  idempotence, and never-clobber.
+
+- **The hook classifier is three-way now (`src/lib/hooks.mjs`).** Enforcement (Stop —
+  by event, it can block), lane-advisory (nudges whose command names `qa/` — they
+  presuppose the lane), portable advisory (true everywhere). Minimal mode ships only the
+  portable class plus a SessionStart context that says what this scaffold is and names
+  `harden` — a discovery surface that lies about absent machinery is worse than none.
+  `test/hooks-split.test.mjs` pins all three classes against the real template settings.
+
+- **`create-cmp attach` (M0, first stage).** For existing Compose/KMP repos that were
+  never scaffolded: wires the vendor-neutral agent contract (AGENTS.md symptom table,
+  advisory hooks) and prints an honest report of what it can NOT wire mechanically.
+  Never clobbers — an existing file gets a `*.cmp-new` sidecar. Design and staging:
+  `docs/features/attach-mode.md`.
+
 ### Changed
+
+- **`AGENTS.md` is mode-aware and gated per mode.** The symptom table now renders per
+  stamped configuration (`harness`/`!harness`, `inspector` markers): a minimal scaffold
+  gets `desktopTest` as its inner loop and the `harden` pointer instead of lane rows; a
+  `--no-inspector` stamp loses the preview/live rows it cannot honor.
+  `test/agents-md.test.mjs` renders every mode combination through the real toggle
+  machinery and pins each visible row to something that exists in that mode's shape.
 
 - **`AGENTS.md` is a discovery surface now, not just a pointer.** The stamped file grew
   from a 13-line "go read CLAUDE.md" note into a symptom → command table: build broken →

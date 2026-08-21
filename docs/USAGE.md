@@ -126,15 +126,28 @@ diagnoses any KMP project it's pointed at.
 ## 3. The engine CLI
 
 `create-cmp <command>` — the default command is `create` (a bare `create-cmp [dir]` scaffolds).
-Every command except `create` works on **any** KMP project, not only ones create-cmp made.
+`doctor`, `upgrade`, `clean`, and `verify` work on **any** KMP project, not only ones
+create-cmp made; `harden` targets a create-cmp `--minimal` scaffold, and `attach` targets
+a Compose/KMP repo create-cmp never touched.
 
 | Command | Purpose | Key flags |
 |---|---|---|
-| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --region --theme-prefix --target-dir <dir>` · `--ios/--no-ios` · `--firebase/--no-firebase --auth <email\|phone\|both\|none>` (sub-toggles, default = `--firebase`'s value: `--firestore/--no-firestore --storage/--no-storage --functions/--no-functions --fcm/--no-fcm`) · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
+| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --region --theme-prefix --target-dir <dir>` · `--minimal` (light mode — see "The two modes" below) · `--ios/--no-ios` · `--firebase/--no-firebase --auth <email\|phone\|both\|none>` (sub-toggles, default = `--firebase`'s value: `--firestore/--no-firestore --storage/--no-storage --functions/--no-functions --fcm/--no-fcm`) · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
 | `doctor` | Toolchain preflight **+** project diagnosis (kotlin↔ksp lockstep, drift vs the proven set, the KSP2/iOS catch-22, `sdk.dir`, `~/.konan` bloat, disk, and an inspector-stays-debug-only check). See also [docs/errors/](errors/README.md) — one page per build failure `doctor` diagnoses, with the exact error text and the manual fix. | `--fix` (safe heals) · `--yes --no-install --no-ios --target-dir <dir>` |
 | `upgrade` | Migrate `gradle/libs.versions.toml` to the next **proven-green** version set: diff table → surgical in-place edits (comments/format preserved) with `.bak-upgrade` backups → optional verify. Lockstep guardrail refuses a broken kotlin↔ksp pairing. | `--target-dir <dir> --set <id> --dry-run --yes --verify` |
 | `clean` | Cache & build-output hygiene: stale `~/.konan` toolchains + project `build/`/`.gradle/` (sizes shown, consent-gated); global Gradle caches are size-reported only. | `--target-dir <dir> --dry-run --yes` |
 | `verify` | Run the green-build gate (Android; iOS on macOS when `iosApp/` exists) against an existing project. | `--target-dir <dir> --no-ios --dry-run` |
+| `harden` | Install the full harness into a `--minimal` scaffold, in place: the verify lane, `specs/`, approvals + comments ledgers, generators + skills, the Stop hook, the pre-push gate, and the lane CI workflow. The same three-way walk as `upgrade --harness` (base = the minimal stamp, new = the full stamp), so it is additive, idempotent, and never clobbers — a file you edited keeps your bytes and the full-mode content lands beside it as `*.cmp-new`. App-state seeds (`qa/approvals.json`, `qa/evidence/`) are copied only if absent. Ends by pointing at the proof: `node qa/verify.mjs --profile scaffold`. | `--target-dir <dir> --dry-run --yes --verify` (run the lane after installing) |
+| `attach` | Wire the agent contract into an **existing, non-create-cmp** Compose/KMP repo: the AGENTS.md symptom table and advisory session hooks — and an honest report of what it can NOT wire mechanically (previews, the lane). Never clobbers: an existing file gets a `*.cmp-new` sidecar. See `docs/features/attach-mode.md` for the staging. | `--target-dir <dir> --dry-run --yes` |
+
+**The two modes.** The default scaffold is **full**: the app plus its entire verification
+harness. `create --minimal` stamps the **same template filtered** — the app, its unit +
+conformance + golden tests, headless previews, the live inspector, AGENTS.md, and
+advisory-only hooks — without `qa/`'s lane, `specs/`, receipts, approvals, generators, or
+enforcement. One template, one version matrix, one test suite; the mode is recorded in
+`create-cmp.json` (`"harness": false`) and an auto-seeded ADR, and `harden` is the
+climb back, in a single step. This is the TRY→WORK→TRUST ladder: choose in five seconds, feel
+the tool work, then opt into constraint when the work should become trustworthy.
 
 **Determinism rule for agents:** never hand-author Gradle files / the iOS shell / navigation / DI —
 that's exactly what makes CMP flaky. Stamp with the engine, then author only per-app screens.

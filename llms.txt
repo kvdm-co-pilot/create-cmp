@@ -10,7 +10,7 @@ Non-interactive one-liner (flags per `options.schema.json` and `create-cmp --hel
 npx create-cmp-cli@latest my-app --name Acme --package com.acme.app --yes --verify
 ```
 
-Other flags: `--bundle-id`, `--region`, `--theme-prefix`, `--ios/--no-ios`, `--firebase/--no-firebase`, `--auth <email|phone|both|none>`, `--room/--no-room`, `--e2e/--no-e2e`, `--inspector/--no-inspector`, `--dev-client/--no-dev-client`, `--tabs Home:home,Profile:person`, `--target-dir`, `--force`. Subcommands `doctor`, `upgrade`, `clean`, and `verify` work on any KMP project.
+Other flags: `--minimal` (light scaffold: same app/tests/previews/inspector, no verify lane/specs/receipts/enforcement — `npx create-cmp-cli harden` installs the full harness later, idempotently, in place), `--bundle-id`, `--region`, `--theme-prefix`, `--ios/--no-ios`, `--firebase/--no-firebase`, `--auth <email|phone|both|none>`, `--room/--no-room`, `--e2e/--no-e2e`, `--inspector/--no-inspector`, `--dev-client/--no-dev-client`, `--tabs Home:home,Profile:person`, `--target-dir`, `--force`. Subcommands `doctor`, `upgrade`, `clean`, and `verify` work on any KMP project; `harden` upgrades a `--minimal` scaffold to the full harness; `attach` wires the agent contract (AGENTS.md symptom table + advisory hooks) into an existing non-create-cmp Compose/KMP repo and reports what it cannot wire mechanically.
 
 Official alias packages (same tool, same flags, same maintainer): `npm create mobile@latest my-app` (the honest front door — opens with a Compose-Multiplatform-vs-React-Native/Flutter fit check, then delegates; in scripts/CI with --yes it prints the note and proceeds), `npm create compose-multiplatform@latest my-app`, and `npm create kmp@latest my-app` all delegate to create-cmp-cli.
 

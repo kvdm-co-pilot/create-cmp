@@ -24,21 +24,24 @@ npm create kmp@latest my-app
 ```
 
 Deterministic (stamps a frozen, CI-verified template), non-interactive with flags, exits non-zero
-on failure. Every generated project ships its own verify lane (`node qa/verify.mjs`, a
-multi-gate check, evidence receipts) with nothing installed. Agent-readable:
-[llms.txt](./llms.txt) · [options.schema.json](./options.schema.json).
+on failure — and it **builds the app to prove it's green** before reporting success.
+Agent-readable: [llms.txt](./llms.txt) · [options.schema.json](./options.schema.json).
 
 ## What is this, in plain words
 
-**Day one, it's a scaffolder.** One command gives you a working Compose Multiplatform app —
-Android and iOS, navigation and insets solved, Clean Architecture wired, tests passing, build
-green. It *stamps* a frozen, CI-verified template — no AI freehanding your project, so every
-scaffold is identical and every scaffold builds.
+One product: a **contract between an AI agent and a mobile repo**. The agent gets *eyes*
+(every screen rendered headlessly as structure, never screenshots), *hands* (generators that
+extend the app correctly by construction), and — when you want it — *a definition of done it
+cannot argue with* (an executable verify lane, evidence receipts, enforcement). You climb in
+three steps, each priced in what you have at that moment:
 
-**Every day after, it's a harness.** AI writes code fast, and confidently — including
-confidently wrong. Every project this tool generates carries a machine-checkable definition of
-"correct" inside it: specs, an executable verify lane, generators that extend the app the right
-way by construction, and enforcement that refuses "done" without evidence. **See it live:**
+| | You pay | You get | How |
+|---|---|---|---|
+| **Try** | a five-second decision | a green Android + iOS build; the emulator/testing/dependency walls pre-solved | `npm create kmp@latest my-app` (add `--minimal` for the light scaffold) |
+| **Work** | attention, repaid immediately | preview on save, a live on-device inspector, a doctor at every wall, feature generators | commands shipped inside the repo — nothing to install, no plugin required |
+| **Trust** | constraint | specs, an executable verify lane, tamper-evident evidence receipts, a Stop hook + CI that refuse "done" without proof | on by default; `--minimal` defers it, one command installs it later: `npx create-cmp-cli harden` |
+
+**See the trust layer live:**
 [create-cmp-showcase](https://github.com/kvdm-co-pilot/create-cmp-showcase) is a public repo
 built entirely by this tool — every commit carries its evidence receipt, and
 [PR #1](https://github.com/kvdm-co-pilot/create-cmp-showcase/pull/1) shows the harness *refusing*
@@ -69,6 +72,21 @@ npx create-cmp-cli@latest my-app --name Acme --package com.acme.app --yes --veri
 Either way it checks your toolchain, stamps the template, and **builds the app to prove it's
 green** before reporting success. (The npm package is `create-cmp-cli` — `create-cmp` was
 already squatted — but the installed command is still `create-cmp`.)
+
+**Two modes, one template.** The default scaffold carries the full harness. `--minimal`
+stamps the same app, tests, previews, and inspector *without* the verify lane, specs,
+receipts, or enforcement — the smallest thing that builds green. Climbing back up is
+in-band and idempotent:
+
+```bash
+npx create-cmp-cli harden
+```
+
+Nothing is forked: minimal is a filter over the one template, and `harden` installs exactly
+the subtraction back (existing files are merged or preserved beside a sidecar, never
+clobbered). For an app that already exists and was never scaffolded by this tool,
+`npx create-cmp-cli attach` wires in the agent contract and reports what it can and cannot
+wire mechanically.
 
 ## The Claude Code plugin (10 skills)
 

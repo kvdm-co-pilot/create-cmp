@@ -68,7 +68,7 @@ here:
 |---|---|---|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | How create-cmp itself works — template / engine / front doors, tokens, feature toggles. | living |
 | [TESTING-ARCHITECTURE.md](./TESTING-ARCHITECTURE.md) | **Normative** test-pyramid specification every generated project implements (frameworks, patterns, evidence packs, spec-driven workflow). Sister of `template/docs/TESTING.md`. | living |
-| [USAGE.md](./USAGE.md) | **The deep reference** — setup, the engine CLI (all 5 commands), the 10 skills, the profile-tiered verify lane, the `cmp-inspector` MCP (15 tools), approvals, comments, what a generated project carries, and the workflows that tie it together. | living |
+| [USAGE.md](./USAGE.md) | **The deep reference** — setup, the engine CLI (every command, including the `--minimal`/`harden` mode split and `attach`), the 10 skills, the profile-tiered verify lane, the `cmp-inspector` MCP (15 tools), approvals, comments, what a generated project carries, and the workflows that tie it together. | living |
 | **DOCUMENTATION.md** (this file) | The charter — doc map, standards ledger, extension rules. | living |
 | [AUTONOMY-GAPS.md](./AUTONOMY-GAPS.md) | Findings from real end-to-end governed-change-flow runs — where the agent needed a human that the flow didn't yet ask for. | living log |
 | [DOGFOODING-FINDINGS.md](./DOGFOODING-FINDINGS.md) | The harness/plugin fix backlog surfaced by building real apps on top of create-cmp — **not** showcase-app work. | living log |
@@ -130,8 +130,8 @@ they are absent from a fresh clone and from anything public-facing:
 
 | Doc | Purpose | Lifecycle |
 |---|---|---|
-| [AGENTS.md](../template/AGENTS.md) | **The vendor-neutral discovery surface** — symptom → zero-consent command table read by ANY coding agent at session start; points at CLAUDE.md for the full contract. Every cited command is pinned to exist by `test/agents-md.test.mjs`. | living |
-| [CLAUDE.md](../template/CLAUDE.md) | **The AI delivery contract** — definition of done (verify lane PASS + receipt), spec-first workflow, architecture and testing rules. The harness's enforcement layer in doc form. | living |
+| [AGENTS.md](../template/AGENTS.md) | **The vendor-neutral discovery surface** — symptom → zero-consent command table read by ANY coding agent at session start; points at CLAUDE.md for the full contract. Mode-aware via `cmp:feature harness`/`!harness` markers; `test/agents-md.test.mjs` renders EVERY mode and pins each visible row to something that exists in that mode's stamped shape. | living |
+| [CLAUDE.md](../template/CLAUDE.md) | **The AI delivery contract** (full mode) and the ~40-line **working guide** (minimal mode) — both bodies in one file under `harness`/`!harness` markers, so the light variant can never drift as a second artifact. Full: definition of done (verify lane PASS + receipt), spec-first workflow, architecture and testing rules. Minimal: build/test/preview commands + what `harden` adds. | living |
 | [README.md](../template/README.md) | App quick-start — build commands, structure, doc pointers. | living |
 | [CONTRIBUTING.md](../template/CONTRIBUTING.md) | Contribution workflow + definition of done for the app team. | living |
 | [CHANGELOG.md](../template/CHANGELOG.md) | Keep-a-Changelog template seeded with the scaffold baseline. | living |
