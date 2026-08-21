@@ -7,7 +7,7 @@
 > for X?" — the answer is here.
 
 Status: living · Owner: harness maintainers · Established: 2026-07-06 · Rebuilt: 2026-08-20
-(against the 0.14.0 tree, after `docs/history/` was introduced)
+(after `docs/history/` was introduced; this doc pins no version numbers — `scripts/ground-truth.mjs` does)
 
 ---
 
@@ -130,6 +130,7 @@ they are absent from a fresh clone and from anything public-facing:
 
 | Doc | Purpose | Lifecycle |
 |---|---|---|
+| [AGENTS.md](../template/AGENTS.md) | **The vendor-neutral discovery surface** — symptom → zero-consent command table read by ANY coding agent at session start; points at CLAUDE.md for the full contract. Every cited command is pinned to exist by `test/agents-md.test.mjs`. | living |
 | [CLAUDE.md](../template/CLAUDE.md) | **The AI delivery contract** — definition of done (verify lane PASS + receipt), spec-first workflow, architecture and testing rules. The harness's enforcement layer in doc form. | living |
 | [README.md](../template/README.md) | App quick-start — build commands, structure, doc pointers. | living |
 | [CONTRIBUTING.md](../template/CONTRIBUTING.md) | Contribution workflow + definition of done for the app team. | living |

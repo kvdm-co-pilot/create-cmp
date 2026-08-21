@@ -1,30 +1,30 @@
 # @create-cmp/receipts
 
 Validate [create-cmp](https://github.com/kvdm-co-pilot/create-cmp) evidence
-receipts (`qa/evidence/latest.json`, schema `cmp-evidence/1`): the inputs-hash
-algorithm, the receipt-attests-this-tree predicate, and the service-grade
-checks (freshness, execution plausibility, SKIP visibility). Plain ESM, zero
-dependencies, Node ≥ 18.
+receipts. Plain ESM, zero dependencies, Node ≥ 18, fully offline.
 
-## The one idea
+## The idea
 
-A create-cmp evidence receipt is a verdict **bound to a content hash of every
-file that could change it** — not the commit SHA, not a timestamp, the actual
-bytes. Recompute that hash over the tree in front of you and compare it to
-the hash recorded in the receipt: if they don't match, the receipt does not
-attest what you're looking at, full stop. A receipt copied from a green run
-onto a tree with one dirty line fails. A receipt someone hand-edited to say
-`"verdict": "PASS"` fails, because the edit itself changes the hash. There is
-no step where you have to trust the claim — you can check it.
+When an AI coding agent (or a person) claims a change is verified, that claim
+is usually just text. A create-cmp project makes it a checkable artifact: its
+verify lane writes `qa/evidence/latest.json` — the verdict, every step's
+PASS/FAIL/SKIP with durations, and an `inputs.hash`: **a sha256 over the
+content of every file that could have changed the verdict.** The surface is
+fixed and public (`VERIFIED_SURFACE`): the app sources, the specs, the lane
+itself, and the Gradle build files.
 
-**This package is the single source of truth for that check.** Every project
-scaffolded by create-cmp carries byte-identical copies of `src/inputs-hash.mjs`
-and `src/receipt-validate.mjs` in its own `qa/lib/` — so a generated project
-stays dependency-free and can validate its own receipt completely offline —
-while any hosted validator (a bot reviewing a PR, a dashboard, `npx
-@create-cmp/receipts` run against a cloned repo) consumes the exact same logic from
-this package. Parity between the vendored copy and this package is pinned in
-the create-cmp repo by `test/harness-parity.test.mjs`.
+Binding to content instead of a commit SHA buys two properties at once:
+
+- **Robust where it's honest.** Rebase, squash, or merge without touching a
+  verified byte and the receipt still attests the tree — history moved, the
+  content didn't.
+- **Fragile where it's forged.** Change one verified byte and the recomputed
+  hash stops matching. Hand-edit the receipt's verdict and the same thing
+  happens — the receipt is inside its own attested world.
+
+This package is the predicate for that check, published standalone so
+anything — a CI job, a bot reviewing a PR, a script over a cloned repo — can
+validate a receipt with the *same* logic the project itself uses.
 
 ## Install
 
@@ -32,51 +32,56 @@ the create-cmp repo by `test/harness-parity.test.mjs`.
 npm install @create-cmp/receipts
 ```
 
+Generated projects don't install it: they carry byte-identical vendored
+copies of these two modules in `qa/lib/`, so `node qa/receipt-check.mjs` runs
+air-gapped with no dependencies. This package is the source of truth those
+copies are synced from (parity is test-pinned in the create-cmp repo).
+
 ## Use
 
 ```js
 import {
-  computeInputsHash, // (root) → { hash, fileCount } — sha256 of the verified surface
-  readReceipt, // (root) → receipt | null, from qa/evidence/latest.json
-  evaluateReceipt, // (receipt, recompute) → { valid, reason, profile } — the local predicate
-  validateReceiptForTree, // ({ root, now?, policy? }) → { status, reason, checks, skips } — hosted composite
+  readReceipt,
+  computeInputsHash,
+  evaluateReceipt,
+  validateReceiptForTree,
 } from "@create-cmp/receipts";
 
-// The local predicate — exactly what a generated project's Stop hook and CI run:
-const receipt = readReceipt(projectRoot);
+// The local predicate — what a generated project's Stop hook and CI run:
+const receipt = readReceipt(projectRoot); // qa/evidence/latest.json, or null
 const result = evaluateReceipt(receipt, () => computeInputsHash(projectRoot));
-console.log(result.valid, result.reason);
-// true - receipt is valid — PASS, attesting profile: local
+// { valid: true,  reason: "receipt is valid — PASS, attesting profile: local", ... }
+// After editing a source file without re-running the lane:
+// { valid: false, reason: "source changed since the receipt — re-run the lane (attesting profile: local)" }
 
-// Edit a source file without re-running the lane, then check again:
-// false - source changed since the receipt — re-run the lane (attesting profile: local)
-
-// The hosted composite — the same predicate plus freshness and execution
-// plausibility, for validating a receipt fetched from somewhere other than
-// the working tree (e.g. a PR's head SHA):
+// The hosted composite — the same predicate plus service-grade checks, for a
+// receipt fetched from somewhere other than your own working tree:
 const hosted = validateReceiptForTree({ root: projectRoot });
-console.log(hosted.status, hosted.reason);
-// "valid" | "invalid" | "missing"
+// hosted.status: "valid" | "invalid" | "missing"
 ```
 
-- `evaluateReceipt` is the core predicate: binding present → verdict not FAIL
-  → recomputed inputs hash matches the receipt's → verdict is PASS. Reasons
-  are the exact refusal strings a generated project's `qa/receipt-check.mjs`
-  prints.
-- `validateReceiptForTree` adds the hosted profile's service-grade checks:
-  **freshness** (default 30-day window — `checkFreshness`) and **execution
-  plausibility** (executed gates must report real, non-negative durations
-  summing above a floor — `checkExecutionPlausibility`; a "PASS" that took
-  0ms is the tell for a replayed cache or a hand-written verdict). A repo
-  with no receipt at all returns `status: "missing"` — distinct from
-  `"invalid"`, because not carrying the harness is not a failure.
-- `listSkippedSteps(receipt)` returns every SKIPped step with its reason.
-  SKIPs are surfaced, never hidden and never punished — green-with-gaps must
-  stay visible.
-- `DEFAULT_POLICY` (`{ maxAgeMs, minExecutedMs }`) is overridable per call via
-  `validateReceiptForTree({ root, policy: { maxAgeMs: ... } })`.
+What each layer checks:
 
-The full export list (from `@create-cmp/receipts`, or the two submodules directly —
+- **`evaluateReceipt`** — binding present, verdict not FAIL, recomputed hash
+  matches, verdict is PASS. Its `reason` strings are the exact refusals a
+  generated project prints. This is deliberately all a project checks against
+  itself: a receipt you just generated is definitionally fresh.
+- **`validateReceiptForTree`** adds the hosted-only checks:
+  - **freshness** — `generatedAt` within a window (default 30 days;
+    `checkFreshness`);
+  - **execution plausibility** — executed steps must report real durations
+    summing above a floor (default 5 s; `checkExecutionPlausibility`). A
+    "PASS" that took 0 ms is the tell for a replayed cache or a hand-written
+    verdict.
+  - A tree with no receipt returns `status: "missing"`, distinct from
+    `"invalid"` — not carrying the harness is not a failure.
+- **`listSkippedSteps`** — every SKIP with its verbatim reason. SKIPs are
+  surfaced, never hidden and never punished: green-with-gaps must stay
+  visible.
+- **`DEFAULT_POLICY`** (`{ maxAgeMs, minExecutedMs }`) is overridable per
+  call: `validateReceiptForTree({ root, policy: { maxAgeMs } })`.
+
+Full export list (also importable from the two submodules,
 `@create-cmp/receipts/inputs-hash` and `@create-cmp/receipts/receipt-validate`):
 `computeInputsHash`, `VERIFIED_SURFACE`, `RECEIPT_REL_PATH`, `readReceipt`,
 `evaluateReceipt`, `DEFAULT_POLICY`, `checkFreshness`,
@@ -84,27 +89,19 @@ The full export list (from `@create-cmp/receipts`, or the two submodules directl
 
 ## What this does NOT do
 
-- **It does not generate receipts.** This package only validates them. A
-  receipt is produced by running the verify lane itself — see
-  [`create-cmp-harness`](https://www.npmjs.com/package/create-cmp-harness),
-  which every create-cmp app carries as `qa/verify.mjs`.
-- **It is not a generic receipt format.** `VERIFIED_SURFACE` (the list of
-  paths whose content is hashed) is create-cmp's own project shape —
-  `composeApp/`, `specs/`, `qa/`, and the root Gradle files. This validates
-  create-cmp evidence receipts specifically, not an arbitrary JSON envelope.
-- **It does not check out git history, fetch anything over the network, or
-  talk to npm.** Every function here takes a `root` you already have on disk
-  and reads/hashes files synchronously. A hosted validator is responsible for
-  getting the tree onto disk (e.g. extracting a tarball at a PR's head SHA)
-  before calling in.
-- **It does not enforce freshness or execution plausibility locally.**
-  `evaluateReceipt` (what a generated project runs against itself) checks
-  binding + verdict + hash only — "now" is definitionally fresh for a receipt
-  you just generated. Those two extra checks are `validateReceiptForTree`'s
-  hosted-only additions.
+- **Generate receipts.** Only the verify lane produces them — see
+  [`@create-cmp/harness`](https://www.npmjs.com/package/@create-cmp/harness),
+  vendored into every generated project as `qa/`.
+- **Validate arbitrary JSON envelopes.** `VERIFIED_SURFACE` is create-cmp's
+  project shape (`composeApp/`, `specs/`, `qa/`, the root Gradle files). This
+  validates create-cmp receipts specifically.
+- **Touch the network or git.** Every function takes a `root` already on disk
+  and reads synchronously. Getting the right tree onto disk (say, a PR's head
+  commit) is the caller's job.
+- **Prove correctness.** A valid receipt is tamper-evident evidence that the
+  lane executed and passed on exactly these bytes — strong, checkable, and
+  still not a formal proof that the software is right.
 
-The receipt format is open by design; this validator is MIT-licensed so
-anyone can check any receipt offline. See
-[`docs/adr/0005-evidence-binding-by-inputs-hash.md`](https://github.com/kvdm-co-pilot/create-cmp/blob/main/docs/adr/0005-evidence-binding-by-inputs-hash.md)
-in the [create-cmp](https://github.com/kvdm-co-pilot/create-cmp) repo for why
-binding is by content hash, not commit SHA.
+The receipt format is open and this validator is MIT so anyone can check any
+receipt offline. Why binding is by content hash rather than commit SHA:
+[ADR-0005](https://github.com/kvdm-co-pilot/create-cmp/blob/main/docs/adr/0005-evidence-binding-by-inputs-hash.md).
