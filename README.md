@@ -25,7 +25,10 @@ npm create kmp@latest my-app
 
 Deterministic (stamps a frozen, CI-verified template), non-interactive with flags, exits non-zero
 on failure — and it **builds the app to prove it's green** before reporting success.
-Agent-readable: [llms.txt](./llms.txt) · [options.schema.json](./options.schema.json).
+Agent-readable: [llms.txt](./llms.txt) · [AGENTS.md](./AGENTS.md) · [options.schema.json](./options.schema.json).
+
+**Claude Code users:** `/plugin marketplace add kvdm-co-pilot/create-cmp` →
+`/plugin install create-cmp` — [10 skills + the cmp-inspector MCP server](#the-claude-code-plugin-10-skills).
 
 ## What is this, in plain words
 

@@ -2,11 +2,15 @@
 
 > Scaffold a production-shaped **Kotlin/Compose Multiplatform** app (Android + iOS) in one
 > command — the official `npm create` alias for
-> [`create-cmp-cli`](https://www.npmjs.com/package/create-cmp-cli).
+> [`create-cmp-cli`](https://github.com/kvdm-co-pilot/create-cmp).
 
 ```bash
 npm create compose-multiplatform@latest my-app
 ```
+
+**Claude Code users:** the same engine ships as a plugin — `/plugin marketplace add
+kvdm-co-pilot/create-cmp` then `/plugin install create-cmp` (10 skills, incl. an honest
+CMP-vs-React-Native/Flutter fit check, plus the cmp-inspector MCP server).
 
 Fully non-interactive (for scripts and AI agents):
 
@@ -26,7 +30,7 @@ LLM-freehanded project code:
 - Optional features by flag: Firebase (GitLive) with auth, Room, Maestro on-device E2E, a live
   UI inspector, a desktop hot-reload dev client. `--verify` builds the app before reporting
   success; the CLI exits non-zero on failure.
-- The **delivery harness** in every generated project: specs with stable clause ids, an 8-gate
+- The **delivery harness** in every generated project: specs with stable clause ids, a spec-driven
   verify lane (`node qa/verify.mjs`), evidence receipts bound to a content hash, and CI that
   refuses "done" without proof. See it working in the
   [public showcase repo](https://github.com/kvdm-co-pilot/create-cmp-showcase) — including
