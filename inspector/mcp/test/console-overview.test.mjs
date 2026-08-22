@@ -160,6 +160,18 @@ test("the rail glyph follows the queue, and drift outranks a plain wait", () => 
   assert.equal(drift.cls, "glyph-drift");
 });
 
+test("the rail glyph reads DRIFT from the ledger, not from the label's wording", () => {
+  // Reword deriveHumanQueue's prose and the glyph must not change: a colour
+  // that depends on a sentence stops going red the day someone edits the
+  // sentence, and nobody finds out.
+  const reworded = [{ artifact: "architecture", tab: "architecture", label: "architecture needs another look" }];
+  assert.equal(overviewGlyph(reworded, [drifted]).cls, "glyph-drift");
+  // …and the converse: drift-sounding prose on a merely-unsigned artifact must
+  // NOT borrow the reserved red.
+  const alarming = [{ artifact: "components", tab: "components", label: "Approve components — it changed since signing" }];
+  assert.equal(overviewGlyph(alarming, [{ id: "components", status: "unreviewed" }]).cls, "glyph-unsigned");
+});
+
 test("a queue glyph states the ACT, not the artifact — an acceptance never reads as done", () => {
   const features = [
     { name: "meal", phase: "proven", provenDone: true, covered: 9, total: 9, receipt: { present: true, verdict: "PASS", attestsTree: true } },
@@ -170,4 +182,34 @@ test("a queue glyph states the ACT, not the artifact — an acceptance never rea
   const html = overviewBodyHtml({ queue: deriveHumanQueue({ statuses, features }), statuses, features, statusGlyph });
   assert.match(html, /glyph-attn/, "the rail's existing 'needs your acceptance' vocabulary, not a green signed dot");
   assert.doesNotMatch(html, /class="glyph glyph-signed"/, "a row that waits on you is never drawn as signed");
+});
+
+// History moved here from the rail strip (2026-08-22): the strip had become a
+// lower-fidelity copy of this page, shown next to this page. Nothing was
+// dropped in the move — the journal is the SIGNING record (verb, who, and a
+// reopen's reason), a different ledger from the digest's git-derived events.
+test("History reads the journal — verb, artifact, via, and the reopen's REASON — newest first, escaped", () => {
+  const html = overviewBodyHtml({
+    queue: [],
+    statuses: [{ id: "intent", status: "approved" }],
+    statusGlyph,
+    formatAge: formatAgeCoarse,
+    journal: [
+      { at: "2026-07-27T06:12:38.016Z", verb: "approve", artifact: "feature-brief:meal-plan", via: "console" },
+      { at: "2026-07-27T16:03:48.381Z", verb: "reopen", artifact: "feature-brief:meal-plan", via: "cli", reason: "reminders <join> the brief" },
+    ],
+  });
+  assert.match(html, /History/);
+  assert.match(html, /reopen feature-brief:meal-plan via cli/);
+  assert.match(html, /reminders &lt;join&gt; the brief/);
+  assert.doesNotMatch(html, /<join>/, "a reason is ledger text — escaped, never markup");
+  assert.ok(
+    html.indexOf("reopen feature-brief:meal-plan") < html.indexOf("approve feature-brief:meal-plan"),
+    "newest first"
+  );
+});
+
+test("an empty journal renders no History block at all", () => {
+  const html = overviewBodyHtml({ queue: [], statuses: [{ id: "intent", status: "approved" }], statusGlyph, journal: [] });
+  assert.doesNotMatch(html, /fd-history/);
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 44d824870c84455fe1bb62c937035b43e846298cbb477b0278500eda164df373
+// cmp:bundle-inputs 12a2316ca0706451cd76752dbac80e9aff3923bb44dcb1dd3c453fed787bbd8d
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34053,7 +34053,7 @@ function deriveHumanQueue({ statuses = [], features = [] }, excludeArtifact) {
   }
   return items;
 }
-function governanceStripHtml({ statuses = [], features = [], journal = [] }, formatAge = formatAgeCoarse) {
+function governanceStripHtml({ statuses = [], features = [] }) {
   if (statuses.length === 0) return "";
   const queue = deriveHumanQueue({ statuses, features });
   const signed = statuses.filter((s) => s.status === "approved").length;
@@ -34072,21 +34072,11 @@ function governanceStripHtml({ statuses = [], features = [], journal = [] }, for
     // data-go-* (NOT data-tab/data-artifact): a strip jump is not a rail tab
     // button, and overloading the rail's attributes would collide with every
     // selector that treats data-tab as "a tab exists here".
-    `<button type="button" class="gov-next" data-go-tab="${esc3(queue[0].tab)}" data-go-artifact="${esc3(queue[0].artifact)}" title="take me there">${esc3(queue[0].label)}${queue.length > 1 ? ` <span class="gov-more">(+${queue.length - 1} more)</span>` : ""}</button>`
+    `<button type="button" class="gov-next" data-go-tab="overview" title="open the front door">${queue.length} thing${queue.length === 1 ? "" : "s"} need${queue.length === 1 ? "s" : ""} you <span class="gov-more">&rarr; Overview</span></button>`
   ) : `<p class="gov-clear">Nothing waits on you.</p>`;
-  const recent = [...journal].slice(-8).reverse();
-  const history = recent.length === 0 ? "" : `<details class="gov-history"><summary>History</summary>
-${recent.map((e) => {
-    const glyph = e.verb === "approve" ? "\u25CF" : e.verb === "reopen" ? "\u25D0" : e.verb === "accept" ? "\u25C6" : "\xB7";
-    const age = e.at && formatAge ? formatAge(Date.now() - Date.parse(e.at)) : "";
-    const who = e.via ? ` via ${e.via}` : "";
-    return `  <p class="gov-event" title="${esc3(e.at || "")}${e.reason ? ` \u2014 ${esc3(e.reason)}` : ""}"><span class="gov-event-glyph">${glyph}</span> ${esc3(e.verb)} ${esc3(e.artifact || "")}${esc3(who)}${age ? ` \xB7 ${esc3(age)}` : ""}${e.reason ? `<span class="gov-event-reason">${esc3(e.reason)}</span>` : ""}</p>`;
-  }).join("\n")}
-</details>`;
   return `<div id="gov-strip">
   <p class="gov-counts">${counts}</p>
   ${next}
-${history}
 </div>`;
 }
 function artifactStatusHtml(record2) {
@@ -34351,6 +34341,7 @@ var SHELL_CSS = `
   .fd-status { display: inline-block; width: 1.4em; color: var(--muted); font-weight: 600; }
   .fd-more { color: var(--muted); }
   .fd-clear { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+  .fd-history { border-top: 1px solid var(--line); padding-top: 8px; }
   /* The digest keeps its own renderer and its own headings; inside the front
      door it is a block, not a page, so its h3s step down a level. Nothing here
      hides any of its content \u2014 the one duplicated line (the window) was deleted
@@ -34833,7 +34824,9 @@ function overviewBodyHtml({
   anchoredDiffs = {},
   digestHtml = "",
   digestSince = null,
-  statusGlyph: statusGlyph2
+  statusGlyph: statusGlyph2,
+  journal = [],
+  formatAge
 } = {}) {
   const byArtifact = new Map(statuses.map((s) => [s.id, s]));
   const byFeature = new Map(features.map((f) => [f.name, f]));
@@ -34856,6 +34849,17 @@ ${itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs })}
     }).join("\n")}
   </ol>`;
   }
+  const recent = [...journal].slice(-8).reverse();
+  const historyHtml = recent.length === 0 ? "" : `  <h3 class="fd-h">History</h3>
+  <div class="fd-history">
+${recent.map((e) => {
+    const glyph = e.verb === "approve" ? "\u25CF" : e.verb === "reopen" ? "\u25D0" : e.verb === "accept" ? "\u25C6" : "\xB7";
+    const ageMs = e.at ? Date.now() - Date.parse(e.at) : NaN;
+    const age = formatAge && !Number.isNaN(ageMs) ? formatAge(ageMs) : "";
+    const who = e.via ? ` via ${e.via}` : "";
+    return `    <p class="gov-event" title="${escAttr(e.at || "")}"><span class="gov-event-glyph">${glyph}</span> ${esc4(e.verb)} ${esc4(e.artifact || "")}${esc4(who)}${age ? ` &middot; ${esc4(age)}` : ""}${e.reason ? `<span class="gov-event-reason">${esc4(e.reason)}</span>` : ""}</p>`;
+  }).join("\n")}
+  </div>`;
   const since = digestSince ? ` <span class="fd-since">window: since ${esc4(digestSince)}</span>` : "";
   const changedBlock = digestHtml ? `  <h3 class="fd-h">What changed${since}</h3>
 <div class="fd-digest">
@@ -34865,12 +34869,17 @@ ${digestHtml}
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
   <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
-${changedBlock}`;
+${changedBlock}
+${historyHtml}`;
 }
 function overviewGlyph(queue = [], statuses = []) {
   if (statuses.length === 0) return null;
   if (queue.length === 0) return { ch: "\u25CF", cls: "glyph-signed", label: "nothing waiting on you" };
-  const drifted = queue.some((q) => /it changed since signing/.test(q.label));
+  const byId = new Map(statuses.map((st) => [st.id, st]));
+  const drifted = queue.some((q) => {
+    const record2 = byId.get(q.artifact);
+    return record2 && record2.status === "changed-since-approval";
+  });
   return drifted ? { ch: "\u26A0", cls: "glyph-drift", label: `${queue.length} act(s) waiting \u2014 drift among them` } : { ch: "\u25CB", cls: "glyph-unsigned", label: `${queue.length} act(s) waiting on you` };
 }
 
@@ -37068,7 +37077,9 @@ function galleryHtml(state) {
         anchoredDiffs,
         digestHtml: digestTabHtml(digest),
         digestSince: digest && digest.available ? digest.since : null,
-        statusGlyph
+        statusGlyph,
+        journal: journal.available ? journal.events : [],
+        formatAge: formatAgeCoarse
       }),
       active: true
     },
@@ -37211,6 +37222,12 @@ ${section.bodyHtml}`;
   // Panels are re-wired individually (never document-wide), so an unswapped
   // panel can never pick up a second listener and double-POST.
   const GOVERNED_PANELS = [
+    // The front door leads the list, and it is the one panel that MUST be
+    // here: its whole body is the queue of what still waits on you, so an
+    // approval that refreshed every other panel while leaving this one stale
+    // would leave the console's entry point advertising an act the human just
+    // completed \u2014 the worst possible place for a stale read.
+    "tab-overview",
     "tab-intent", "tab-features", "tab-architecture", "tab-specs",
     "tab-design-system", "tab-components", "tab-approvals", "tab-evidence", "tab-comments",
   ];
@@ -37651,8 +37668,7 @@ ${section.bodyHtml}`;
     // derivation, so the strip and the prompt can never disagree.
     govStripHtml: governanceStripHtml({
       statuses: approvals.available ? approvals.statuses : [],
-      features: features.available ? features.board.features : [],
-      journal: journal.available ? journal.events : []
+      features: features.available ? features.board.features : []
     }),
     // §3.6: the rail-foot verify line doubles as the deep link to Evidence —
     // the same .tab-btn/data-tab wiring the nav items use (showTab picks it

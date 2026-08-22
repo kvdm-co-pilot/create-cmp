@@ -78,7 +78,7 @@ test("deriveHumanQueue: proven features queue their acceptance; excludeArtifact 
   );
 });
 
-test("governanceStripHtml: counts, the one next act as a jump button, and (+n more)", () => {
+test("governanceStripHtml: counts that name their artifact, then a handoff to the front door", () => {
   const html = governanceStripHtml({
     statuses: [
       status("intent", "approved"),
@@ -97,10 +97,19 @@ test("governanceStripHtml: counts, the one next act as a jump button, and (+n mo
   // the reader nothing about which artifact or where to look (2026-07-28).
   assert.match(html, /in redesign: design-system/); // reopened, unproven — not in the queue
   assert.match(html, /drifted: components/);
-  // The next act is the FIRST queue item, as a jump button speaking the same
-  // data-tab/data-artifact contract the guided prompt's "Take me there" uses.
-  assert.match(html, /class="gov-next" data-go-tab="components" data-go-artifact="components"/);
-  assert.match(html, /\(\+1 more\)/);
+  // The strip stops at the COUNTS and hands off. Naming the next act here as
+  // well (which it did until 2026-08-22) made the rail a lower-fidelity copy of
+  // the front door, rendered alongside the front door — the duplication that
+  // reads as "everything everywhere". The rail says THAT something waits; the
+  // Overview page says WHAT, with the evidence, and owns the acting.
+  assert.match(html, /2 things need you/);
+  // Scoped to the handoff button itself: the COUNTS line above it still names
+  // `drifted: components` and still jumps to that row — that is the 07-28 fix
+  // and it stays. What left is the strip's own copy of the next ACT.
+  const nextBtn = html.match(/<button[^>]*class="gov-next"[^>]*>/)[0];
+  assert.match(nextBtn, /data-go-tab="overview"/);
+  assert.doesNotMatch(nextBtn, /data-go-artifact/, "the strip no longer names the next act — the front door does");
+  assert.doesNotMatch(html, /\(\+1 more\)/, "'+n more' was the tell that the strip was summarising a list it should not own");
 });
 
 // "1 in redesign" is a number with no referent — it names no artifact and offers
@@ -142,20 +151,13 @@ test("governanceStripHtml: nothing pending says so; no statuses at all renders N
   assert.equal(governanceStripHtml({ statuses: [], features: [], journal: [] }), "");
 });
 
-test("governanceStripHtml: History reads the journal — verb, artifact, via, and the reopen's REASON — newest first, escaped", () => {
+// History moved to the front door (2026-08-22) — see console-overview.test.mjs.
+// The strip carries counts and a door; the journal reads as narrative, which is
+// the front door's "What changed" material, not a rail disclosure.
+test("governanceStripHtml: the journal is no longer the strip's to render", () => {
   const html = governanceStripHtml({
     statuses: [status("intent", "approved")],
     features: [],
-    journal: [
-      { at: "2026-07-27T06:12:38.016Z", verb: "approve", artifact: "feature-brief:meal-plan", via: "console" },
-      { at: "2026-07-27T16:03:48.381Z", verb: "reopen", artifact: "feature-brief:meal-plan", via: "cli", reason: "reminders <join> the brief" },
-    ],
   });
-  assert.match(html, /<details class="gov-history">/);
-  assert.match(html, /reopen feature-brief:meal-plan via cli/);
-  // The reason renders, HTML-escaped.
-  assert.match(html, /reminders &lt;join&gt; the brief/);
-  assert.doesNotMatch(html, /<join>/);
-  // Newest first: the reopen (later) appears before the approve (earlier).
-  assert.ok(html.indexOf("reopen feature-brief:meal-plan") < html.indexOf("approve feature-brief:meal-plan"));
+  assert.doesNotMatch(html, /gov-history/);
 });

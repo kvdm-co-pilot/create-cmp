@@ -179,7 +179,13 @@ superseded **only here**: exactly one section may aggregate, it is the first
 one, and every other rule still binds it (composition only, evidence-or-
 silence, sign where you read). Digest is retired as a tab into this page — a
 since-you-last-looked read that must be sought out is not a returning human's
-first read. Overview is also the default landing tab; the hash and the sticky
+first read. The **rail strip collapses to a pointer** in the same move: it
+keeps the counts (the 07-28 requirement — status visible on every tab) and
+hands off with *"N things need you → Overview"*, and the journal's History
+moves onto this page. A rail that also named the next act was a
+lower-fidelity copy of the front door, rendered alongside the front door. The
+division is now: the rail says **that** something waits; the front door says
+**what**, with the evidence, and owns the acting. Overview is also the default landing tab; the hash and the sticky
 tab still win, so a hot-reload session parked on Screens is never bounced off
 the gallery.
 

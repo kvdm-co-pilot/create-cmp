@@ -139,6 +139,9 @@ function itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs }) {
  *   so this module stays acyclic and the digest keeps ONE renderer
  * @param {string} [p.digestSince] the digest window, for the block's own subtitle
  * @param {Function} [p.statusGlyph] console-shell's statusGlyph (injected, one derivation)
+ * @param {object[]} [p.journal] the signing journal's events — History, moved
+ *   here from the rail strip so the strip could stop duplicating this page
+ * @param {Function} [p.formatAge] console-shell's formatAgeCoarse (injected)
  */
 export function overviewBodyHtml({
   queue = [],
@@ -148,6 +151,8 @@ export function overviewBodyHtml({
   digestHtml = "",
   digestSince = null,
   statusGlyph,
+  journal = [],
+  formatAge,
 } = {}) {
   const byArtifact = new Map(statuses.map((s) => [s.id, s]));
   const byFeature = new Map(features.map((f) => [f.name, f]));
@@ -191,6 +196,29 @@ ${itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs })}
   </ol>`;
   }
 
+  // History, moved off the rail strip (2026-08-22) so the strip could stop being
+  // a lower-fidelity copy of this page. The journal is the SIGNING record —
+  // verb, artifact, who, and a reopen's reason — which is a different ledger
+  // from the digest's git-derived events, so it sits alongside them, not
+  // instead of them. Newest first, capped: this is a glance; `--log` is the
+  // full record.
+  const recent = [...journal].slice(-8).reverse();
+  const historyHtml =
+    recent.length === 0
+      ? ""
+      : `  <h3 class="fd-h">History</h3>
+  <div class="fd-history">
+${recent
+  .map((e) => {
+    const glyph = e.verb === "approve" ? "●" : e.verb === "reopen" ? "◐" : e.verb === "accept" ? "◆" : "·";
+    const ageMs = e.at ? Date.now() - Date.parse(e.at) : NaN;
+    const age = formatAge && !Number.isNaN(ageMs) ? formatAge(ageMs) : "";
+    const who = e.via ? ` via ${e.via}` : "";
+    return `    <p class="gov-event" title="${escAttr(e.at || "")}"><span class="gov-event-glyph">${glyph}</span> ${esc(e.verb)} ${esc(e.artifact || "")}${esc(who)}${age ? ` &middot; ${esc(age)}` : ""}${e.reason ? `<span class="gov-event-reason">${esc(e.reason)}</span>` : ""}</p>`;
+  })
+  .join("\n")}
+  </div>`;
+
   const since = digestSince ? ` <span class="fd-since">window: since ${esc(digestSince)}</span>` : "";
   const changedBlock = digestHtml
     ? `  <h3 class="fd-h">What changed${since}</h3>
@@ -203,14 +231,23 @@ ${digestHtml}
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
   <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
-${changedBlock}`;
+${changedBlock}
+${historyHtml}`;
 }
 
 /** The front door's rail glyph — the queue's own state, never a fifth meaning. */
 export function overviewGlyph(queue = [], statuses = []) {
   if (statuses.length === 0) return null;
   if (queue.length === 0) return { ch: "●", cls: "glyph-signed", label: "nothing waiting on you" };
-  const drifted = queue.some((q) => /it changed since signing/.test(q.label));
+  // Drift is read from the LEDGER, never from the label's wording — matching
+  // prose to pick a colour makes the glyph silently wrong the day someone
+  // rewords deriveHumanQueue, and a rail glyph that quietly stops going red is
+  // the failure this console exists to prevent.
+  const byId = new Map(statuses.map((st) => [st.id, st]));
+  const drifted = queue.some((q) => {
+    const record = byId.get(q.artifact);
+    return record && record.status === "changed-since-approval";
+  });
   return drifted
     ? { ch: "⚠", cls: "glyph-drift", label: `${queue.length} act(s) waiting — drift among them` }
     : { ch: "○", cls: "glyph-unsigned", label: `${queue.length} act(s) waiting on you` };

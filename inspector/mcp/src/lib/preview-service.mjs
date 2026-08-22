@@ -910,6 +910,8 @@ export function galleryHtml(state) {
         digestHtml: digestTabHtml(digest),
         digestSince: digest && digest.available ? digest.since : null,
         statusGlyph,
+        journal: journal.available ? journal.events : [],
+        formatAge: formatAgeCoarse,
       }),
       active: true,
     },
@@ -1076,6 +1078,12 @@ export function galleryHtml(state) {
   // Panels are re-wired individually (never document-wide), so an unswapped
   // panel can never pick up a second listener and double-POST.
   const GOVERNED_PANELS = [
+    // The front door leads the list, and it is the one panel that MUST be
+    // here: its whole body is the queue of what still waits on you, so an
+    // approval that refreshed every other panel while leaving this one stale
+    // would leave the console's entry point advertising an act the human just
+    // completed — the worst possible place for a stale read.
+    "tab-overview",
     "tab-intent", "tab-features", "tab-architecture", "tab-specs",
     "tab-design-system", "tab-components", "tab-approvals", "tab-evidence", "tab-comments",
   ];
@@ -1518,7 +1526,6 @@ export function galleryHtml(state) {
     govStripHtml: governanceStripHtml({
       statuses: approvals.available ? approvals.statuses : [],
       features: features.available ? features.board.features : [],
-      journal: journal.available ? journal.events : [],
     }),
     // §3.6: the rail-foot verify line doubles as the deep link to Evidence —
     // the same .tab-btn/data-tab wiring the nav items use (showTab picks it

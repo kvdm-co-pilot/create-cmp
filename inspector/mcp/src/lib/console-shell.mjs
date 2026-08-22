@@ -109,15 +109,18 @@ export function deriveHumanQueue({ statuses = [], features = [] }, excludeArtifa
 
 /**
  * The always-visible aggregate (07-28 audit, fix 5 — the andon-board answer to
- * "I should be able to see the status at all times"): one counts line, the
- * single next human act as a jump button, and the journal's recent history.
- * Renders in the rail, so no tab choice can hide it. Returns "" when there is
- * nothing derivable (no statuses at all — an ungoverned or older project):
- * silence, not a fabricated dashboard.
- * @param {{statuses?: object[], features?: object[], journal?: object[]}} data
- * @param {(ageMs: number) => string} [formatAge]
+ * "I should be able to see the status at all times"): one counts line, plus the
+ * door to the page that explains it. Renders in the rail, so no tab choice can
+ * hide it. Returns "" when there is nothing derivable (no statuses at all — an
+ * ungoverned or older project): silence, not a fabricated dashboard.
+ *
+ * It deliberately stops at the COUNTS. Naming the next act here as well — which
+ * it did until 2026-08-22 — made the rail a lower-fidelity copy of the front
+ * door, shown alongside the front door. The rail says THAT something waits; the
+ * front door says WHAT, with the evidence, and owns the acting.
+ * @param {{statuses?: object[], features?: object[]}} data
  */
-export function governanceStripHtml({ statuses = [], features = [], journal = [] }, formatAge = formatAgeCoarse) {
+export function governanceStripHtml({ statuses = [], features = [] }) {
   if (statuses.length === 0) return "";
   const queue = deriveHumanQueue({ statuses, features });
   const signed = statuses.filter((s) => s.status === "approved").length;
@@ -148,34 +151,25 @@ export function governanceStripHtml({ statuses = [], features = [], journal = []
     .filter(Boolean)
     .join(" · ");
 
+  // The strip is a POINTER now, not a second copy of the front door (2026-08-22).
+  // It used to carry the next act in full and the journal's History — which, once
+  // the Overview page existed, meant the rail said the same things the page said,
+  // on the page itself, at half the fidelity. That duplication is precisely the
+  // "so much happening all over the place" complaint. So the division is: the
+  // rail tells you THAT something waits (on every tab, the 07-28 requirement);
+  // the front door tells you WHAT, with the evidence, and is where you go to act.
+  // History moved with it — see console-overview.mjs — so no fact was dropped.
   const next =
     queue.length > 0
       ? // data-go-* (NOT data-tab/data-artifact): a strip jump is not a rail tab
         // button, and overloading the rail's attributes would collide with every
         // selector that treats data-tab as "a tab exists here".
-        `<button type="button" class="gov-next" data-go-tab="${esc(queue[0].tab)}" data-go-artifact="${esc(queue[0].artifact)}" title="take me there">${esc(queue[0].label)}${queue.length > 1 ? ` <span class="gov-more">(+${queue.length - 1} more)</span>` : ""}</button>`
+        `<button type="button" class="gov-next" data-go-tab="overview" title="open the front door">${queue.length} thing${queue.length === 1 ? "" : "s"} need${queue.length === 1 ? "s" : ""} you <span class="gov-more">&rarr; Overview</span></button>`
       : `<p class="gov-clear">Nothing waits on you.</p>`;
-
-  // Newest first, capped — the strip is a glance, the full history is --log.
-  const recent = [...journal].slice(-8).reverse();
-  const history =
-    recent.length === 0
-      ? ""
-      : `<details class="gov-history"><summary>History</summary>
-${recent
-  .map((e) => {
-    const glyph = e.verb === "approve" ? "●" : e.verb === "reopen" ? "◐" : e.verb === "accept" ? "◆" : "·";
-    const age = e.at && formatAge ? formatAge(Date.now() - Date.parse(e.at)) : "";
-    const who = e.via ? ` via ${e.via}` : "";
-    return `  <p class="gov-event" title="${esc(e.at || "")}${e.reason ? ` — ${esc(e.reason)}` : ""}"><span class="gov-event-glyph">${glyph}</span> ${esc(e.verb)} ${esc(e.artifact || "")}${esc(who)}${age ? ` · ${esc(age)}` : ""}${e.reason ? `<span class="gov-event-reason">${esc(e.reason)}</span>` : ""}</p>`;
-  })
-  .join("\n")}
-</details>`;
 
   return `<div id="gov-strip">
   <p class="gov-counts">${counts}</p>
   ${next}
-${history}
 </div>`;
 }
 
@@ -586,6 +580,7 @@ export const SHELL_CSS = `
   .fd-status { display: inline-block; width: 1.4em; color: var(--muted); font-weight: 600; }
   .fd-more { color: var(--muted); }
   .fd-clear { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+  .fd-history { border-top: 1px solid var(--line); padding-top: 8px; }
   /* The digest keeps its own renderer and its own headings; inside the front
      door it is a block, not a page, so its h3s step down a level. Nothing here
      hides any of its content — the one duplicated line (the window) was deleted

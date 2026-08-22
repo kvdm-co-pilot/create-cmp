@@ -2990,3 +2990,13 @@ test("guard: a live pid whose port does NOT answer is stale too — a recycled p
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });
+
+test("galleryHtml (front door): the Overview panel is in the in-place refresh set", () => {
+  const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+  const list = html.match(/const GOVERNED_PANELS = \[([\s\S]*?)\];/)[1];
+  // Its body IS the queue of what still waits on you. An approval that
+  // refreshed every other panel and left this one stale would leave the
+  // console's entry point advertising an act the human just completed.
+  assert.match(list, /"tab-overview"/, "the front door must refresh on every governed-state event");
+  for (const id of ["tab-approvals", "tab-features", "tab-evidence"]) assert.match(list, new RegExp(`"${id}"`));
+});
