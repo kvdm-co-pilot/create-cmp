@@ -17,6 +17,8 @@ import {
   clausesForScreen,
   signatureBarHtml,
   driftPanelHtml,
+  stepTestCountsHtml,
+  digestTabHtml,
 } from "../src/lib/console-tabs.mjs";
 
 // --- Design language (§3.1: the designer's handoff spec) --------------------
@@ -1914,4 +1916,98 @@ test("specsTabHtml: each spec file's signature bar comes from the REGISTRY, neve
   assert.match(html, /data-artifact="feature-spec:meal"/);
   assert.doesNotMatch(html, /feature-spec:app-base/);
   assert.match(html, /Approve this contract/);
+});
+
+// --- §3.6: the receipt already knew the tally; the page had been dropping it --
+// qa/verify.mjs writes the JUnit summary into each test step's `details`. The
+// bridge used to strip it, so the release-readiness report could only say
+// "unitTests PASS" — a verdict, not a report.
+test("stepTestCountsHtml: a green step still states its tally, explicitly zero-failed", () => {
+  const html = stepTestCountsHtml({ details: { tests: 214, failures: 0, errors: 0, skipped: 3 } });
+  assert.match(html, /214 tests/);
+  assert.match(html, /0 failed/, "on a report the number is unambiguous where silence is not");
+  assert.match(html, /3 skipped/);
+});
+
+test("stepTestCountsHtml: failures and errors are ONE number to the reader, marked red", () => {
+  const html = stepTestCountsHtml({ details: { tests: 214, failures: 2, errors: 1, skipped: 0 } });
+  assert.match(html, /step-failed">3 failed/, "JUnit's failure/error split is not the reader's question");
+  assert.doesNotMatch(html, /0 skipped/, "a zero skip count is noise, not evidence");
+});
+
+test("stepTestCountsHtml: a step that ran no tests renders NOTHING — never '0 tests'", () => {
+  assert.equal(stepTestCountsHtml({}), "");
+  assert.equal(stepTestCountsHtml({ details: {} }), "");
+  assert.equal(stepTestCountsHtml({ details: { affected: ["Foo"] } }), "", "a details object without a tally is still silence");
+});
+
+test("evidenceBodyHtml: the step table shows the tally and the honest fine print", () => {
+  const html = evidenceBodyHtml(
+    {
+      available: true,
+      verdict: "PASS",
+      relPath: "qa/evidence/latest.json",
+      steps: [
+        {
+          name: "unitTests",
+          verdict: "PASS",
+          durationMs: 4200,
+          note: "affected-test filter: MealRepositoryTest",
+          details: { tests: 12, failures: 0, errors: 0, skipped: 1 },
+        },
+      ],
+    },
+    null
+  );
+  assert.match(html, /12 tests/);
+  assert.match(html, /1 skipped/);
+  assert.match(html, /affected-test filter: MealRepositoryTest/, "the receipt's own fine print belongs on the report");
+});
+
+// --- the digest's commit rows: what MOVED, not only what the author meant -----
+test("digestTabHtml: a commit names its files — the only surface a non-governed change gets", () => {
+  const html = digestTabHtml({
+    available: true,
+    since: "7 days ago",
+    commits: [
+      {
+        sha: "abc1234",
+        when: "2026-08-21 10:00:00 +0100",
+        subject: "feat: meal tray",
+        files: [
+          { status: "M", path: "composeApp/src/commonMain/kotlin/data/MealRepository.kt" },
+          { status: "A", path: "gradle/libs.versions.toml" },
+        ],
+      },
+    ],
+    laneRuns: [],
+    approvalEvents: [],
+    openComments: null,
+  });
+  assert.match(html, /2 files/);
+  assert.match(html, /MealRepository\.kt/);
+  assert.match(html, /libs\.versions\.toml/);
+});
+
+test("digestTabHtml: a commit with no file list renders no empty disclosure", () => {
+  const html = digestTabHtml({
+    available: true,
+    since: "7 days ago",
+    commits: [{ sha: "abc1234", when: "2026-08-21 10:00:00 +0100", subject: "docs: readme", files: [] }],
+    laneRuns: [],
+    approvalEvents: [],
+    openComments: null,
+  });
+  assert.match(html, /docs: readme/);
+  assert.doesNotMatch(html, /digest-files/, "an empty file list is silence, not a '0 files' disclosure");
+});
+
+test("digestTabHtml: open comments survive — the front door must not swallow a ledger fact", () => {
+  const html = digestTabHtml({
+    available: true, since: "7 days ago", commits: [], laneRuns: [], approvalEvents: [], openComments: 2,
+  });
+  assert.match(html, /2 open comments awaiting action/);
+  // The window line is the CALLER's (the "What changed" heading owns it); it is
+  // deleted here rather than printed twice and hidden with CSS.
+  assert.doesNotMatch(html, /window: since/);
 });

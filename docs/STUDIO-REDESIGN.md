@@ -154,6 +154,42 @@ their reasons, inputsHash binding vs current tree (stale receipts say
 "stale", visually demoted), links from every verdict to the section it
 governs. The page a release manager reads before shipping.
 
+**7 · Overview — the front door** (the owner's page; added 2026-08-22).
+*Numbered last, rendered FIRST* — §3's numbers are identifiers cited across the
+codebase, not positions, so the front door takes the next free one rather than
+renumbering every section beneath it.
+The three questions a returning owner actually asks, in that order:
+**what needs me** (the human queue, each act naming its artifact and jumping
+to where it is signed) · **what changed** (the digest — commits with their
+file lists, lane runs, approval events, open comments) · **is it still
+proven** (the standing line in the header: the lane's own glyph, verdict,
+rung, and the signing tally). It **owns no facts**: every line is arranged
+from the module that derived it, and it grows no signature control of its
+own — sign-where-you-read is unchanged.
+
+*Why this exists, and what it costs.* §2 ruled that "the dashboard function
+is ambient — never a separate tab." That rule was right about ownership and
+wrong about entry, and it failed twice in the same way: the 07-28 audit had
+to bolt on the governance strip to answer "I should be able to see the status
+at all times", and on 2026-08-22 the same verdict came back against the whole
+console — *"not easy to see and use ... there is so much happening all over
+the place."* Nine peer sections with no hierarchy of attention above them is
+not a navigation problem; it is a missing page. So the ambient rule is
+superseded **only here**: exactly one section may aggregate, it is the first
+one, and every other rule still binds it (composition only, evidence-or-
+silence, sign where you read). Digest is retired as a tab into this page — a
+since-you-last-looked read that must be sought out is not a returning human's
+first read. Overview is also the default landing tab; the hash and the sticky
+tab still win, so a hot-reload session parked on Screens is never bounced off
+the gallery.
+
+*The open question this page is also the experiment for.* If in real use the
+owner enters here and only ever leaves via its links — never reading Intent,
+Architecture or Components as documents — then the sections are not peers at
+all and the console is a signing inbox with references, not a documentation
+site with a strip. That restructure is deliberately **not** taken now: it
+should be decided on observed behavior, not on the first navigation complaint.
+
 ## 4. The content bar (applies to every generated word)
 
 1. **Authored form:** each page must read as if its professional wrote it —

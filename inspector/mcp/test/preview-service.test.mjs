@@ -486,20 +486,24 @@ test("galleryHtml: filter box, persistent changed-badge, hover before/after on c
   assert.doesNotMatch(first, /screen\.prev\.png/);
 });
 
-test("galleryHtml (§2 rail): sections in the genesis definition order, Intent first, Screens the default active page", () => {
+test("galleryHtml (§2 rail): Overview is the front door, then the genesis definition order", () => {
   const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
   const nav = html.match(/<nav class="rail-nav">([\s\S]*?)<\/nav>/)[1];
   const order = [...nav.matchAll(/data-tab="([a-z-]+)"/g)].map((m) => m[1]);
-  // The definition order (decide-first briefs, spec-first behavior, UI-first
-  // visuals): intent → Features (the decide layer — a brief speaks intent's
-  // vocabulary, so it sits DIRECTLY after Intent; CHANGE-FLOW-DESIGN.md §6) →
-  // architecture → the exemplar's surfaces (Specs, Screens) → design language
-  // + components, which lock on / distill from those screens.
+  // Overview leads: the front door (§3.0) — the returning owner's entry point,
+  // and the ONE section permitted to aggregate. Then the definition order
+  // (decide-first briefs, spec-first behavior, UI-first visuals): intent →
+  // Features (the decide layer — a brief speaks intent's vocabulary, so it sits
+  // DIRECTLY after Intent; CHANGE-FLOW-DESIGN.md §6) → architecture → the
+  // exemplar's surfaces (Specs, Screens) → design language + components, which
+  // lock on / distill from those screens.
   // PW-5 extends the arc's tail: Walkthrough sits after Evidence (it IS
-  // evidence, derived from committed manifests), Digest is the returning
-  // human's since-you-last-looked read, and Live device is deliberately LAST —
-  // the console arc ends DRIVE (A1).
+  // evidence, derived from committed manifests) and Live device is deliberately
+  // LAST — the console arc ends DRIVE (A1). Digest is no longer a tab: a
+  // since-you-last-looked read that must be SOUGHT OUT is not a returning
+  // human's first read, so it lives inside the front door.
   assert.deepEqual(order, [
+    "overview",
     "intent",
     "features",
     "architecture",
@@ -511,10 +515,11 @@ test("galleryHtml (§2 rail): sections in the genesis definition order, Intent f
     "walkthrough",
     "approvals",
     "comments",
-    "digest",
     "live-device",
   ]);
-  assert.match(html, /id="tab-screens" class="tab-panel active/, "Screens stays the default page");
+  assert.match(html, /id="tab-overview" class="tab-panel active/, "the front door is the default page");
+  assert.doesNotMatch(html, /data-tab="digest"/, "Digest is retired into the front door — one surface, not two");
+  assert.match(html, /previewTab"\) \|\| "overview"/, "a fresh session lands on the front door; hash + sticky tab still win");
   assert.match(html, /id="tab-intent" class="tab-panel/, "Intent section present");
   assert.match(html, /Not yet captured &mdash; conversation 0 pending/, "no intent data -> the §3.0 pending state");
 });
@@ -1435,7 +1440,8 @@ test("service: compile watchdog — silent recompiler failure surfaces via a com
 
 test("galleryHtml: tab nav present; approvals/specs/designSystem/components default to honest empty states when omitted", () => {
   const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
-  assert.match(html, /class="tab-btn active" data-tab="screens"/);
+  assert.match(html, /class="tab-btn active" data-tab="overview"/);
+  assert.match(html, /data-tab="screens"/);
   assert.match(html, /data-tab="design-system"/);
   assert.match(html, /data-tab="components"/, "Components is its own rail item (§2 genesis order)");
   assert.match(html, /id="tab-components"/, "…and its own section panel");

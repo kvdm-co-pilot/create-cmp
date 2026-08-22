@@ -1788,6 +1788,27 @@ function timelineRowHtml(r) {
 }
 
 /**
+ * A step's test tally, when the step ran tests and the lane recorded the count
+ * (qa/verify.mjs writes the JUnit summary into `details` for unitTests and the
+ * instrumented steps). Evidence-or-silence: a step with no tally renders
+ * nothing — never "0 tests", which would read as a finding rather than as an
+ * absence. `failures` and `errors` are summed because the distinction is
+ * JUnit's, not the reader's: both mean a test did not pass.
+ * @param {{details?: object}} step a receipt step, verbatim from the bridge
+ */
+export function stepTestCountsHtml(step) {
+  const d = step && step.details;
+  if (!d || typeof d !== "object" || typeof d.tests !== "number") return "";
+  const failed = (typeof d.failures === "number" ? d.failures : 0) + (typeof d.errors === "number" ? d.errors : 0);
+  const bits = [`${d.tests} test${d.tests === 1 ? "" : "s"}`];
+  // A green tally says "0 failed" explicitly: on a report, the absence of a
+  // failure count is ambiguous where the number is not.
+  bits.push(failed === 0 ? "0 failed" : `<strong class="step-failed">${failed} failed</strong>`);
+  if (typeof d.skipped === "number" && d.skipped > 0) bits.push(`${d.skipped} skipped`);
+  return `<span class="step-counts">${bits.join(" &middot; ")}</span>`;
+}
+
+/**
  * The Evidence section body (§3.6). Renders ONLY what the receipt attests:
  * - headline: verdict (visually demoted, never green, when the receipt is
  *   stale), profile, commit, generatedAt + age, the three-valued inputs
@@ -1854,13 +1875,18 @@ export function evidenceBodyHtml(lastReceipt, history) {
       const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
       const governs = STEP_GOVERNS[s.name];
       const governsCell = governs ? `<a class="step-link" href="#${esc(governs.section)}">${esc(governs.label)}</a>` : "";
+      // Detail, in falling order of what a release manager needs: the test
+      // tally the step actually earned, its own honest fine print, then the
+      // failure reason. All three come from the receipt verbatim.
+      const counts = stepTestCountsHtml(s);
+      const note = s.note ? `<span class="step-note">${esc(s.note)}</span>` : "";
       const reason = s.reason ? `<span class="step-reason">${esc(s.reason)}</span>` : "";
       return `    <tr>
       <td><code>${esc(s.name)}</code></td>
       <td><span class="${cls}">${esc(s.verdict)}</span></td>
       <td>${esc(formatDurationMs(s.durationMs))}</td>
       <td>${governsCell}</td>
-      <td>${reason}</td>
+      <td>${counts}${note}${reason}</td>
     </tr>`;
     })
     .join("\n");
@@ -2381,6 +2407,11 @@ ${chainHtml}
 
 // --- Digest (B4) — what happened since you last looked -----------------------
 //
+// No longer a tab of its own (2026-08-22): a since-you-last-looked read that a
+// human has to go and find is not a returning human's first read. This renderer
+// is unchanged and now has exactly one caller — the front door's "What changed"
+// block (console-overview.mjs, STUDIO-REDESIGN.md §3.7).
+//
 // The narrative layer over ledgers that already exist (git log, committed
 // receipts, the approvals + comments ledgers). Every line is derived; the
 // digest can never disagree with the audit trail because it IS the audit
@@ -2406,16 +2437,38 @@ ${digest.laneRuns
     ? `  <h3>Approval events</h3>
   <ul class="digest-list">${digest.approvalEvents.map((e) => `<li>${esc(e.when)} · <code>${esc(e.sha)}</code> — ${esc(e.subject)}</li>`).join("")}</ul>`
     : "";
+  // A commit row states what the author MEANT (the subject) and what actually
+  // MOVED (the file list). The second half is the only console surface a
+  // non-governed change ever gets — nothing in qa/approvals.json covers the
+  // data layer or the version catalog, so without this it changes silently.
+  const commitFilesHtml = (files) => {
+    if (!Array.isArray(files) || files.length === 0) return "";
+    const shown = files.slice(0, 12);
+    const more = files.length > shown.length ? `<li class="fd-more">… and ${files.length - shown.length} more</li>` : "";
+    return `<details class="digest-files"><summary>${files.length} file${files.length === 1 ? "" : "s"}</summary>
+      <ul class="digest-filelist">${shown
+        .map((f) => `<li><span class="fd-status">${esc(f.status)}</span> <code>${esc(f.path)}</code></li>`)
+        .join("")}${more}</ul></details>`;
+  };
   const commits = digest.commits.length
     ? `  <h3>Commits</h3>
-  <ul class="digest-list">${digest.commits.map((c) => `<li>${esc(c.when)} · <code>${esc(c.sha)}</code> — ${esc(c.subject)}</li>`).join("")}</ul>`
+  <ul class="digest-list">${digest.commits
+    .map(
+      (c) =>
+        `<li>${esc(c.when)} · <code>${esc(c.sha)}</code> — ${esc(c.subject)}${commitFilesHtml(c.files)}</li>`
+    )
+    .join("")}</ul>`
     : `  <p class="empty-inline">no commits in the window</p>`;
   const comments =
     digest.openComments == null
       ? ""
       : `  <p class="meta">${digest.openComments} open comment${digest.openComments === 1 ? "" : "s"} awaiting action</p>`;
-  return `  <p class="meta">window: since ${esc(digest.since)}</p>
-${comments}
+  // The window line belongs to the CALLER now: digestTabHtml renders only
+  // inside the front door (§3.0), whose "What changed" heading already states
+  // it. Printing it twice and hiding one copy with CSS would suppress a fact
+  // to fix a layout — in a console whose rule is evidence-or-silence, the
+  // duplicate gets deleted, not concealed.
+  return `${comments}
 ${lane}
 ${approvals}
 ${commits}`;

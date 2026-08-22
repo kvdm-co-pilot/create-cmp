@@ -318,7 +318,11 @@ pending acceptances** (a ledger field, not an artifact status), so Features
 and Approvals can never tell different stories. **Ungoverned sections never
 go green**: Screens has no signature to show — its one honest colour is red,
 when the last render/compile failed and the gallery may be stale; Walkthrough,
-Comments, Digest, and Live device stay neutral by design.
+Comments, and Live device stay neutral by design. **Overview** (the front door,
+STUDIO-REDESIGN.md §3.7) is the exception that proves the rule: it carries a
+glyph because it shows the QUEUE, whose state is exactly "what waits on you" —
+green only when the queue is genuinely empty, and no glyph at all on a project
+with no ledger to read. Digest is no longer a tab; it renders inside Overview.
 
 **The change surface — what changed vs. what is still approved** (Karel,
 2026-07-25). A red chip alone says *something* changed; the console must say

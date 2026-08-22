@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs a457166c3b2841e6c65f3861b8516033bd690fe4b4700f0238ddf272c055d938
+// cmp:bundle-inputs 44d824870c84455fe1bb62c937035b43e846298cbb477b0278500eda164df373
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -33160,7 +33160,12 @@ async function getLastReceipt(root) {
   if (!receipt || typeof receipt !== "object" || !Array.isArray(receipt.steps)) {
     return { available: false, reason: `${RECEIPT_REL_PATH} is not a recognizable evidence receipt (no steps[]) \u2014 run node qa/verify.mjs to regenerate it` };
   }
-  const steps = receipt.steps.filter((s) => s && typeof s === "object" && typeof s.name === "string").map((s) => ({ name: s.name, verdict: s.verdict, reason: s.reason, durationMs: s.durationMs }));
+  const steps = receipt.steps.filter((s) => s && typeof s === "object" && typeof s.name === "string").map((s) => {
+    const out = { name: s.name, verdict: s.verdict, reason: s.reason, durationMs: s.durationMs };
+    if (typeof s.note === "string") out.note = s.note;
+    if (s.details && typeof s.details === "object") out.details = s.details;
+    return out;
+  });
   const conformanceStep = steps.find((s) => s.name === "conformance") || null;
   const conformance = conformanceStep ? { verdict: conformanceStep.verdict, reason: conformanceStep.reason, durationMs: conformanceStep.durationMs } : null;
   const parsedAt = Date.parse(receipt.generatedAt ?? "");
@@ -33850,11 +33855,29 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
   const since = `${sinceDays} days ago`;
   let commits;
   try {
-    const raw = await git2(["log", `--since=${since}`, `--max-count=${limit}`, "--pretty=%H%x00%ci%x00%s"]);
-    commits = raw.split("\n").filter(Boolean).map((l) => {
-      const [sha, when, subject] = l.split("\0");
-      return { sha: short(sha), when, subject };
-    });
+    const raw = await git2([
+      "log",
+      `--since=${since}`,
+      `--max-count=${limit}`,
+      "--name-status",
+      "--no-renames",
+      "--pretty=format:%x01%H%x00%ci%x00%s"
+    ]);
+    commits = [];
+    for (const block of raw.split("")) {
+      if (!block.trim()) continue;
+      const [head, ...fileLines] = block.split("\n");
+      const [sha, when, subject] = head.split("\0");
+      if (!sha) continue;
+      const files = [];
+      for (const line of fileLines) {
+        if (!line.trim()) continue;
+        const [status, ...rest] = line.split("	");
+        if (!rest.length) continue;
+        files.push({ status: status.trim(), path: rest.join("	") });
+      }
+      commits.push({ sha: short(sha), when, subject, files });
+    }
   } catch (err) {
     return { available: false, reason: `not a git repo (or git failed): ${err.message}`, since, commits: [], laneRuns: [], approvalEvents: [], openComments: null };
   }
@@ -34303,6 +34326,40 @@ var SHELL_CSS = `
                overflow-wrap: anywhere; }
   .gov-event-glyph { color: var(--muted); }
   .gov-event-reason { display: block; color: var(--muted); font-style: italic; }
+  /* --- the front door (\xA73.7) ---------------------------------------------
+     Deliberately quiet: this page's job is triage, so the only colour on it is
+     the reserved semantic trio carried in by each row's own glyph. The queue
+     is an ordered list because the order is the derivation's (deriveHumanQueue),
+     not a visual choice. */
+  .fd-h { font-size: var(--fs-head); margin: 24px 0 8px; display: flex; align-items: baseline; gap: 8px; }
+  .fd-h:first-of-type { margin-top: 8px; }
+  .fd-count { font-size: var(--fs-meta); font-weight: 600; color: var(--accent);
+              background: var(--accent-bg); border-radius: 999px; padding: 1px 8px; }
+  .fd-since { font-size: var(--fs-meta); font-weight: 400; color: var(--muted); }
+  .fd-queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .fd-item { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--paper); }
+  .fd-act { margin: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+            font-size: var(--fs-body); line-height: 1.5; }
+  .fd-label { flex: 1; min-width: 12ch; color: var(--ink); }
+  .fd-go { flex: none; color: var(--accent); font-size: var(--fs-meta); font-weight: 600; }
+  .fd-evidence { margin: 6px 0 0; font-size: var(--fs-meta); color: var(--ink-2); }
+  .fd-evidence summary { cursor: pointer; color: var(--ink-2); }
+  .fd-evidence-absent { color: var(--muted); font-style: italic; }
+  .fd-files { list-style: none; margin: 6px 0 0; padding: 0 0 0 2px;
+              display: flex; flex-direction: column; gap: 3px; }
+  .fd-files code { overflow-wrap: anywhere; }
+  .fd-status { display: inline-block; width: 1.4em; color: var(--muted); font-weight: 600; }
+  .fd-more { color: var(--muted); }
+  .fd-clear { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+  /* The digest keeps its own renderer and its own headings; inside the front
+     door it is a block, not a page, so its h3s step down a level. Nothing here
+     hides any of its content \u2014 the one duplicated line (the window) was deleted
+     at the source instead. */
+  .fd-digest h3 { font-size: var(--fs-body); margin: 16px 0 6px; color: var(--ink-2); }
+  .digest-files summary { cursor: pointer; color: var(--muted); font-size: var(--fs-meta); }
+  .digest-filelist { list-style: none; margin: 4px 0 0; padding: 0 0 0 2px;
+                     display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-meta); }
+  .digest-filelist code { overflow-wrap: anywhere; }
   .rail-nav { display: flex; flex-direction: column; gap: 1px; }
   .tab-btn { appearance: none; display: flex; align-items: center; gap: 9px; width: 100%;
              padding: 7px 10px; border: none; border-radius: 8px; background: none; cursor: pointer;
@@ -34568,6 +34625,12 @@ var SHELL_CSS = `
                     padding: 0; font-size: var(--fs-meta); color: var(--ink-2); }
   .evidence-binding-stale { color: var(--drift); font-weight: 600; }
   .step-table .step-reason { white-space: pre-wrap; font-size: var(--fs-meta); color: var(--ink-2); }
+  /* The tally leads the Detail cell \u2014 it is the one fact present on a green
+     row, where reason and note are both empty. */
+  .step-table .step-counts { display: block; font-size: var(--fs-meta); color: var(--ink-2);
+                             font-variant-numeric: tabular-nums; }
+  .step-table .step-failed { color: var(--drift); }
+  .step-table .step-note { display: block; font-size: var(--fs-meta); color: var(--muted); font-style: italic; }
   .step-verdict-pass { color: var(--signed); font-weight: 650; }
   .step-verdict-fail { color: var(--drift); font-weight: 650; }
   .step-verdict-skip { color: var(--muted); font-weight: 650; }
@@ -34715,6 +34778,102 @@ var SHELL_CSS = `
     font-size: var(--fs-meta); }
 `;
 
+// src/lib/console-overview.mjs
+var esc4 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr = (s) => esc4(s).replace(/"/g, "&quot;");
+function overviewStatusHtml({ receipt, statuses = [], receiptGlyph: receiptGlyph2, formatAge } = {}) {
+  const g = receiptGlyph2 ? receiptGlyph2(receipt) : null;
+  const lane = g ? `<span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span> ${esc4(g.label)}` : "";
+  const age = receipt && receipt.available && typeof receipt.ageMs === "number" && formatAge ? ` &middot; ${esc4(formatAge(receipt.ageMs))}` : "";
+  const rung = receipt && receipt.available && receipt.evidenceLevel ? ` &middot; <span class="badge evidence-rung">${esc4(receipt.evidenceLevel.rung)} ${esc4(receipt.evidenceLevel.name)}</span>` : "";
+  const tally = statuses.length ? ` &middot; ${statuses.filter((s) => s.status === "approved").length} of ${statuses.length} signed` : "";
+  return `${lane}${age}${rung}${tally}`;
+}
+function itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs }) {
+  const record2 = byArtifact.get(item.artifact) || null;
+  const anchored = anchoredDiffs ? anchoredDiffs[item.artifact] : null;
+  if (record2 && (record2.status === "changed-since-approval" || record2.status === "reopened")) {
+    if (!anchored || !anchored.available) {
+      const why = anchored && anchored.reason ? anchored.reason : "the signed bytes were not located in recent history";
+      return `      <p class="fd-evidence fd-evidence-absent">what changed vs. the signed bytes is not derivable &mdash; ${esc4(why)}</p>`;
+    }
+    const files = anchored.files || { changed: [], unchanged: [] };
+    const changed = files.changed || [];
+    const unchanged = files.unchanged || [];
+    const total = changed.length + unchanged.length;
+    if (changed.length === 0) {
+      return `      <p class="fd-evidence">no file in this artifact differs from the signed bytes &mdash; the hash moved for another reason; open the section for the anchored diff</p>`;
+    }
+    const list = changed.slice(0, 8).map((f) => `<li><span class="fd-status">${esc4(f.status)}</span> <code>${esc4(f.path)}</code></li>`).join("");
+    const more = changed.length > 8 ? `<li class="fd-more">&hellip; and ${changed.length - 8} more</li>` : "";
+    const still = unchanged.length > 0 ? ` &middot; ${unchanged.length} of ${total} still exactly as signed` : "";
+    return `      <details class="fd-evidence">
+        <summary>${changed.length} file${changed.length === 1 ? "" : "s"} changed since you signed${still}</summary>
+        <ul class="fd-files">${list}${more}</ul>
+      </details>`;
+  }
+  const featureName = item.artifact.startsWith("feature-brief:") ? item.artifact.slice("feature-brief:".length) : null;
+  const feature = featureName ? byFeature.get(featureName) : null;
+  if (feature && feature.provenDone) {
+    const clauses = typeof feature.covered === "number" && typeof feature.total === "number" && feature.total > 0 ? `${feature.covered} of ${feature.total} clauses cited` : null;
+    const verdict = feature.receipt && feature.receipt.present ? `receipt ${feature.receipt.verdict}` : null;
+    const attests = feature.receipt && feature.receipt.attestsTree ? "attesting this tree" : null;
+    const bits = [clauses, verdict, attests].filter(Boolean).join(" &middot; ");
+    return bits ? `      <p class="fd-evidence">${bits}</p>` : "";
+  }
+  if (record2 && record2.status === "unreviewed") {
+    return `      <p class="fd-evidence">never signed &mdash; this artifact has had no human judgment yet</p>`;
+  }
+  return "";
+}
+function overviewBodyHtml({
+  queue = [],
+  statuses = [],
+  features = [],
+  anchoredDiffs = {},
+  digestHtml = "",
+  digestSince = null,
+  statusGlyph: statusGlyph2
+} = {}) {
+  const byArtifact = new Map(statuses.map((s) => [s.id, s]));
+  const byFeature = new Map(features.map((f) => [f.name, f]));
+  let queueHtml;
+  if (statuses.length === 0) {
+    queueHtml = `  <p class="empty-inline">no approvals ledger in this project &mdash; nothing here is governed yet, so no signature can be waiting. A project gains a ledger at <code>qa/approvals.json</code>.</p>`;
+  } else if (queue.length === 0) {
+    queueHtml = `  <p class="fd-clear"><span class="glyph glyph-signed">&#9679;</span> Nothing waits on you. Every governed artifact is signed and unchanged since.</p>`;
+  } else {
+    queueHtml = `  <ol class="fd-queue">
+${queue.map((item) => {
+      const record2 = byArtifact.get(item.artifact) || null;
+      const g = record2 && record2.status === "approved" ? { ch: "\u25CF", cls: "glyph-attn", label: "proven \u2014 awaiting your acceptance" } : statusGlyph2 ? statusGlyph2(record2) : null;
+      const glyph = g ? `<span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span>` : `<span class="glyph glyph-unsigned">&#9675;</span>`;
+      return `    <li class="fd-item">
+      <p class="fd-act">${glyph} <span class="fd-label">${esc4(item.label)}</span>
+        <button type="button" class="gov-jump fd-go" data-go-tab="${escAttr(item.tab)}" data-go-artifact="${escAttr(item.artifact)}" title="take me there">take me there</button></p>
+${itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs })}
+    </li>`;
+    }).join("\n")}
+  </ol>`;
+  }
+  const since = digestSince ? ` <span class="fd-since">window: since ${esc4(digestSince)}</span>` : "";
+  const changedBlock = digestHtml ? `  <h3 class="fd-h">What changed${since}</h3>
+<div class="fd-digest">
+${digestHtml}
+</div>` : "";
+  return `  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
+  from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
+  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
+${queueHtml}
+${changedBlock}`;
+}
+function overviewGlyph(queue = [], statuses = []) {
+  if (statuses.length === 0) return null;
+  if (queue.length === 0) return { ch: "\u25CF", cls: "glyph-signed", label: "nothing waiting on you" };
+  const drifted = queue.some((q) => /it changed since signing/.test(q.label));
+  return drifted ? { ch: "\u26A0", cls: "glyph-drift", label: `${queue.length} act(s) waiting \u2014 drift among them` } : { ch: "\u25CB", cls: "glyph-unsigned", label: `${queue.length} act(s) waiting on you` };
+}
+
 // src/lib/design-language.mjs
 import fs15 from "node:fs";
 import path16 from "node:path";
@@ -34835,10 +34994,10 @@ function getTokenUsage(root, catalog = {}) {
 }
 
 // src/lib/console-tabs.mjs
-var esc4 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-var escAttr = (s) => esc4(s).replace(/"/g, "&quot;");
+var esc5 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr2 = (s) => esc5(s).replace(/"/g, "&quot;");
 function commentControlHtml(target, opts = {}) {
-  const targetJson = escAttr(JSON.stringify(target));
+  const targetJson = escAttr2(JSON.stringify(target));
   const testTagField = opts.testTagInput ? `<input type="text" class="comment-testtag" placeholder="testTag (optional \u2014 element-level)">` : "";
   return `<span class="comment-ctl" data-target="${targetJson}">
       <button type="button" class="comment-btn" title="Add comment">&#128172;</button>
@@ -34883,23 +35042,23 @@ function signatureBarHtml(status, opts = {}) {
   if (!status) return "";
   const what = opts.what || status.id;
   const cls = status.status === "approved" ? "badge-approved" : status.status === "changed-since-approval" ? "badge-drift" : status.status === "reopened" ? "badge-reopened" : "badge-unreviewed";
-  const line = status.status === "approved" ? `signed${status.approvedAt ? ` ${esc4(status.approvedAt)}` : ""}${status.mode ? ` \xB7 ${esc4(status.mode)}` : ""}` : status.status === "changed-since-approval" ? "changed since signature \u2014 review the diff below, then re-approve" : status.status === "reopened" ? (
+  const line = status.status === "approved" ? `signed${status.approvedAt ? ` ${esc5(status.approvedAt)}` : ""}${status.mode ? ` \xB7 ${esc5(status.mode)}` : ""}` : status.status === "changed-since-approval" ? "changed since signature \u2014 review the diff below, then re-approve" : status.status === "reopened" ? (
     // The WHY, read straight off the ledger row (07-28 audit: "reopened"
     // with no reason was the state Karel came back to and could not
     // decode). Pre-audit rows carry no reason — the line then says only
     // what it knows.
-    `reopened for redesign${status.reopenedAt ? ` ${esc4(status.reopenedAt)}` : ""}${status.via ? ` via ${esc4(status.via)}` : ""}${status.reason ? ` \u2014 <em>${esc4(status.reason)}</em>` : ""} \u2014 re-approve when the redesign lands`
+    `reopened for redesign${status.reopenedAt ? ` ${esc5(status.reopenedAt)}` : ""}${status.via ? ` via ${esc5(status.via)}` : ""}${status.reason ? ` \u2014 <em>${esc5(status.reason)}</em>` : ""} \u2014 re-approve when the redesign lands`
   ) : "not signed yet \u2014 nothing here is binding until you sign it";
   const canApprove = status.resolvable !== false;
   const approveLabel = status.status === "approved" ? `Re-approve ${what}` : status.status === "unreviewed" ? `Approve ${what}` : `Re-approve ${what}`;
   const buttons = [
-    canApprove ? `<button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">${esc4(approveLabel)}</button>` : `<span class="meta">not approvable yet \u2014 ${status.fileCount} of its expected files resolved</span>`,
-    status.status === "approved" ? `<button type="button" class="reopen-btn" data-artifact="${escAttr(status.id)}">Reopen for redesign</button>` : ""
+    canApprove ? `<button type="button" class="approve-btn" data-artifact="${escAttr2(status.id)}">${esc5(approveLabel)}</button>` : `<span class="meta">not approvable yet \u2014 ${status.fileCount} of its expected files resolved</span>`,
+    status.status === "approved" ? `<button type="button" class="reopen-btn" data-artifact="${escAttr2(status.id)}">Reopen for redesign</button>` : ""
   ].filter(Boolean).join(" ");
   return `  <div class="signature-bar">
-    <span class="badge ${cls}">${esc4(status.status)}</span>
+    <span class="badge ${cls}">${esc5(status.status)}</span>
     <span class="signature-line">${line}</span>
-    <code class="signature-id">${esc4(status.id)}</code>
+    <code class="signature-id">${esc5(status.id)}</code>
     <span class="signature-actions">${buttons}</span>
   </div>`;
 }
@@ -34908,38 +35067,38 @@ function driftPanelHtml(status, anchored, opts = {}) {
   const reopened = status.status === "reopened";
   if (status.status !== "changed-since-approval" && !reopened) return "";
   const withApprove = opts.withApprove !== false;
-  const signedLine = status.approvedAt ? ` It was signed ${esc4(status.approvedAt)}.` : "";
+  const signedLine = status.approvedAt ? ` It was signed ${esc5(status.approvedAt)}.` : "";
   let filesHtml = "";
   let diffHtml = "";
   if (anchored && anchored.available) {
     const { changed = [], unchanged = [] } = anchored.files ?? {};
     const total = changed.length + unchanged.length;
     const verb = { M: "changed", A: "added since signing", D: "deleted" };
-    const changedItems = changed.map((c) => `<li><span class="status-drift">${esc4(verb[c.status] ?? c.status)}</span> <code>${esc4(c.path)}</code></li>`).join("\n");
+    const changedItems = changed.map((c) => `<li><span class="status-drift">${esc5(verb[c.status] ?? c.status)}</span> <code>${esc5(c.path)}</code></li>`).join("\n");
     const stillSigned = unchanged.length > 0 ? `      <details class="drift-still-signed"><summary>${unchanged.length} file(s) still exactly as signed</summary>
-        <ul>${unchanged.map((f) => `<li><span class="ok-inline">\u2713</span> <code>${esc4(f)}</code></li>`).join("\n")}</ul>
+        <ul>${unchanged.map((f) => `<li><span class="ok-inline">\u2713</span> <code>${esc5(f)}</code></li>`).join("\n")}</ul>
       </details>` : "";
     filesHtml = `    <p class="drift-summary">${total > 1 ? `<strong>${unchanged.length} of ${total}</strong> file(s) still exactly as signed &middot; <strong>${changed.length}</strong> changed:` : "what changed:"}</p>
     <ul class="drift-files">
 ${changedItems}
     </ul>
 ${stillSigned}`;
-    diffHtml = `    <details class="drift-diff"><summary>diff against the signed bytes (anchor ${esc4(anchored.anchorSha)} &middot; ${esc4(
+    diffHtml = `    <details class="drift-diff"><summary>diff against the signed bytes (anchor ${esc5(anchored.anchorSha)} &middot; ${esc5(
       anchored.anchorWhen || ""
     )}${anchored.truncated ? " &middot; truncated" : ""})</summary>
-      <pre class="approval-diff">${esc4(anchored.diff)}</pre>
+      <pre class="approval-diff">${esc5(anchored.diff)}</pre>
     </details>`;
   } else if (anchored) {
-    diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc4(anchored.reason)}</p>`;
+    diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc5(anchored.reason)}</p>`;
   }
-  const who = status.via ? ` via ${esc4(status.via)}` : "";
-  const why = status.reason ? ` Reason given: <em>${esc4(status.reason)}</em>.` : " No reason was recorded \u2014 this reopen predates the reason-required rule.";
-  const head = reopened ? `<p class="drift-head"><strong>Reopened for redesign</strong> &mdash; the signature on <code>${esc4(status.id)}</code> was deliberately walked back${status.reopenedAt ? ` ${esc4(status.reopenedAt)}` : ""}${who}.${why} This is sanctioned, not drift: the verify lane skips it rather than failing. Below is what has moved since the bytes you signed. Approve when the rendered result is what you want.</p>` : `<p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc4(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve \u2014 or revert the change.</p>`;
-  return `  <div class="drift-panel${reopened ? " drift-panel-reopened" : ""}" data-artifact="${escAttr(status.id)}">
+  const who = status.via ? ` via ${esc5(status.via)}` : "";
+  const why = status.reason ? ` Reason given: <em>${esc5(status.reason)}</em>.` : " No reason was recorded \u2014 this reopen predates the reason-required rule.";
+  const head = reopened ? `<p class="drift-head"><strong>Reopened for redesign</strong> &mdash; the signature on <code>${esc5(status.id)}</code> was deliberately walked back${status.reopenedAt ? ` ${esc5(status.reopenedAt)}` : ""}${who}.${why} This is sanctioned, not drift: the verify lane skips it rather than failing. Below is what has moved since the bytes you signed. Approve when the rendered result is what you want.</p>` : `<p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc5(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve \u2014 or revert the change.</p>`;
+  return `  <div class="drift-panel${reopened ? " drift-panel-reopened" : ""}" data-artifact="${escAttr2(status.id)}">
     ${head}
 ${filesHtml}
 ${diffHtml}
-    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr(status.id)}">${reopened ? "Approve" : "Re-approve"} ${esc4(status.id)}</button></div>` : ""}
+    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr2(status.id)}">${reopened ? "Approve" : "Re-approve"} ${esc5(status.id)}</button></div>` : ""}
   </div>`;
 }
 function genesisGuide(id) {
@@ -34955,7 +35114,7 @@ function genesisGuide(id) {
 }
 function artifactBannerHtml(s) {
   if (s.status === "unreviewed" || s.status === "reopened") {
-    return `<div class="artifact-banner banner-genesis"><span class="banner-mode">genesis</span> ${esc4(genesisGuide(s.id))}</div>`;
+    return `<div class="artifact-banner banner-genesis"><span class="banner-mode">genesis</span> ${esc5(genesisGuide(s.id))}</div>`;
   }
   if (s.status === "approved") {
     const unshaped = s.mode === "defaults-accepted";
@@ -34973,11 +35132,11 @@ function colorTokenTableHtml(colors, usage) {
   if (entries.length === 0) return `  <p class="empty-inline">no color tokens declared</p>`;
   const counts = usage && usage.available && usage.colors ? usage.colors.counts : null;
   const rows = entries.map(([name, hex3]) => {
-    const usageCell = counts ? `<td class="tok-usage">${esc4(usageText(counts[name] ?? 0))}</td>` : "";
+    const usageCell = counts ? `<td class="tok-usage">${esc5(usageText(counts[name] ?? 0))}</td>` : "";
     return `    <tr>
-      <td class="tok-swatch-cell"><span class="tok-swatch" style="background:${esc4(hex3)}"></span></td>
-      <td>${esc4(name)}${commentControlHtml({ type: "design-system", token: name })}</td>
-      <td><code>${esc4(hex3)}</code></td>
+      <td class="tok-swatch-cell"><span class="tok-swatch" style="background:${esc5(hex3)}"></span></td>
+      <td>${esc5(name)}${commentControlHtml({ type: "design-system", token: name })}</td>
+      <td><code>${esc5(hex3)}</code></td>
       ${usageCell}
     </tr>`;
   }).join("\n");
@@ -34985,7 +35144,7 @@ function colorTokenTableHtml(colors, usage) {
   if (usage && !counts) {
     const reason = usage.available === false && usage.reason || "no Kotlin object declaring these tokens was found under composeApp/src/commonMain/kotlin";
     absence = `
-  <p class="empty-inline">usage counts: Not derivable statically &mdash; ${esc4(reason)}</p>`;
+  <p class="empty-inline">usage counts: Not derivable statically &mdash; ${esc5(reason)}</p>`;
   }
   return `  <table class="tok-table">
     <thead><tr><th></th><th>Token</th><th>Value</th>${counts ? "<th>Usage</th>" : ""}</tr></thead>
@@ -35005,10 +35164,10 @@ function contrastMatrixHtml(colors) {
     const aa = p.aa ? `<span class="wcag-pass">pass</span>` : `<span class="wcag-fail">fail</span>`;
     const aaa = p.aaa ? `<span class="wcag-pass">pass</span>` : `<span class="wcag-fail">fail</span>`;
     return `    <tr>
-      <td><span class="contrast-sample" style="background:${esc4(p.bgHex)};color:${esc4(p.fgHex)}">Aa</span>
-          <code>${esc4(p.fg)}</code> on <code>${esc4(p.bg)}</code></td>
-      <td class="tok-usage">${esc4(p.role)}</td>
-      <td class="contrast-ratio">${esc4(ratio)}</td>
+      <td><span class="contrast-sample" style="background:${esc5(p.bgHex)};color:${esc5(p.fgHex)}">Aa</span>
+          <code>${esc5(p.fg)}</code> on <code>${esc5(p.bg)}</code></td>
+      <td class="tok-usage">${esc5(p.role)}</td>
+      <td class="contrast-ratio">${esc5(ratio)}</td>
       <td>${aa}</td>
       <td>${aaa}</td>
     </tr>`;
@@ -35023,7 +35182,7 @@ ${rows}
 }
 function dimenSubTableHtml(entries) {
   const rows = entries.map(
-    (d) => `    <tr><td>${esc4(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</td><td><code>${esc4(d.value)}</code></td></tr>`
+    (d) => `    <tr><td>${esc5(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</td><td><code>${esc5(d.value)}</code></td></tr>`
   ).join("\n");
   return `  <table class="tok-table"><tbody>
 ${rows}
@@ -35032,9 +35191,9 @@ ${rows}
 function spacingScaleHtml(spacing) {
   const rows = spacing.map(
     (d) => `    <div class="scale-row">
-      <span class="scale-name">${esc4(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</span>
+      <span class="scale-name">${esc5(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</span>
       <span class="scale-bar" style="width:${px(d.dp * SPACING_BAR_PX_PER_DP)}"></span>
-      <span class="scale-value">${esc4(d.value)}</span>
+      <span class="scale-value">${esc5(d.value)}</span>
     </div>`
   ).join("\n");
   return `  <div class="scale-list">
@@ -35071,7 +35230,7 @@ function typeRampHtml(typography) {
       spec.tracking == null ? "tracking unset" : `tracking ${spec.tracking}`
     ].filter(Boolean).join(" &middot; ");
     return `      <tr>
-        <td class="ramp-name"><code>${esc4(spec.name ?? "\u2014")}</code></td>
+        <td class="ramp-name"><code>${esc5(spec.name ?? "\u2014")}</code></td>
         <td class="ramp-specimen"><span style="${style}">Ag</span></td>
         <td class="ramp-numbers">${numbers}</td>
       </tr>`;
@@ -35116,7 +35275,7 @@ ${dimenSubTableHtml(elevation)}`);
 ${dimenSubTableHtml(other)}`);
   }
   const typeRamp = typeRampHtml(typography);
-  return `  <p class="meta">source: ${esc4(sourceLabel)}</p>
+  return `  <p class="meta">source: ${esc5(sourceLabel)}</p>
   <h3>Color tokens</h3>
 ${colorTokenTableHtml(colors, meta3.usage)}
   <h3>Contrast &mdash; WCAG 2.2</h3>
@@ -35137,16 +35296,16 @@ function candidatesStripHtml(variants) {
   const cards = variants.variants.map((v) => {
     const shots = v.screens.map(
       (s) => `        <div class="candidate-shot">
-          <img alt="${escAttr(v.name)} \u2014 ${escAttr(s.id)}" src="/previews/${escAttr(s.png)}">
-          <p class="lbl">${esc4(s.id)}</p>
+          <img alt="${escAttr2(v.name)} \u2014 ${escAttr2(s.id)}" src="/previews/${escAttr2(s.png)}">
+          <p class="lbl">${esc5(s.id)}</p>
         </div>`
     ).join("\n");
     return `    <div class="candidate-card">
-      <h4>${esc4(v.name)}</h4>
+      <h4>${esc5(v.name)}</h4>
       <div class="candidate-shots">
 ${shots || '        <p class="empty-inline">no screens stashed for this candidate</p>'}
       </div>
-      <button type="button" class="pick-btn" data-variant="${escAttr(v.name)}">Pick &ldquo;${esc4(v.name)}&rdquo;</button>
+      <button type="button" class="pick-btn" data-variant="${escAttr2(v.name)}">Pick &ldquo;${esc5(v.name)}&rdquo;</button>
     </div>`;
   }).join("\n");
   return `  <div class="candidates-strip">
@@ -35155,7 +35314,7 @@ ${cards}
   <div id="pick-error" class="banner" hidden></div>`;
 }
 function shortDate(iso) {
-  return iso ? esc4(String(iso)) : "";
+  return iso ? esc5(String(iso)) : "";
 }
 function componentApprovalBadgeHtml(approval, drift, file2) {
   if (!approval) return "";
@@ -35179,10 +35338,10 @@ function paramsTableHtml(paramsParsed, paramDocs = {}) {
     return `<p class="meta">takes no parameters</p>`;
   }
   const rows = paramsParsed.map((p) => {
-    const type = p.type ? `<code>${esc4(p.type)}</code>` : `<span class="empty-inline">not parsed</span>`;
-    const def = p.default ? `<code>${esc4(p.default)}</code>` : `<span class="param-required">required</span>`;
-    const note = paramDocs[p.name] ? esc4(paramDocs[p.name]) : "";
-    return `    <tr><td><code>${esc4(p.name)}</code></td><td>${type}</td><td>${def}</td><td class="param-note">${note}</td></tr>`;
+    const type = p.type ? `<code>${esc5(p.type)}</code>` : `<span class="empty-inline">not parsed</span>`;
+    const def = p.default ? `<code>${esc5(p.default)}</code>` : `<span class="param-required">required</span>`;
+    const note = paramDocs[p.name] ? esc5(paramDocs[p.name]) : "";
+    return `    <tr><td><code>${esc5(p.name)}</code></td><td>${type}</td><td>${def}</td><td class="param-note">${note}</td></tr>`;
   }).join("\n");
   return `<table class="params-table">
     <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Notes</th></tr></thead>
@@ -35195,20 +35354,20 @@ function stateContractHtml(facts, hasScreenTagParam) {
   const items = [];
   if (hasScreenTagParam) {
     items.push(
-      facts.derivedTags && facts.derivedTags.length ? `owns testTags derived from <code>screenTag</code>: ${facts.derivedTags.map((t) => `<code>&lt;screenTag&gt;_${esc4(t)}</code>`).join(", ")}` : `takes a required <code>screenTag</code> parameter (tag suffixes not found in this scan)`
+      facts.derivedTags && facts.derivedTags.length ? `owns testTags derived from <code>screenTag</code>: ${facts.derivedTags.map((t) => `<code>&lt;screenTag&gt;_${esc5(t)}</code>`).join(", ")}` : `takes a required <code>screenTag</code> parameter (tag suffixes not found in this scan)`
     );
   }
   if (facts.contentUiStateArms && facts.contentUiStateArms.length) {
-    items.push(`renders <code>ContentUiState</code> arms: ${facts.contentUiStateArms.map((a) => `<code>${esc4(a)}</code>`).join(", ")}`);
+    items.push(`renders <code>ContentUiState</code> arms: ${facts.contentUiStateArms.map((a) => `<code>${esc5(a)}</code>`).join(", ")}`);
   }
   if (facts.a11yFloorEvidence && facts.a11yFloorEvidence.length) {
-    items.push(`enforces the 48dp a11y touch-target floor (evidence: ${facts.a11yFloorEvidence.map((e) => `<code>${esc4(e)}</code>`).join(", ")})`);
+    items.push(`enforces the 48dp a11y touch-target floor (evidence: ${facts.a11yFloorEvidence.map((e) => `<code>${esc5(e)}</code>`).join(", ")})`);
   }
   if (facts.insetsApis && facts.insetsApis.length) {
-    items.push(`owns insets: ${facts.insetsApis.map((a) => `<code>${esc4(a)}</code>`).join(", ")}`);
+    items.push(`owns insets: ${facts.insetsApis.map((a) => `<code>${esc5(a)}</code>`).join(", ")}`);
   }
   if (facts.tokensReferenced && facts.tokensReferenced.length) {
-    items.push(`tokens: ${facts.tokensReferenced.map((t) => `<code>${esc4(t)}</code>`).join(", ")}`);
+    items.push(`tokens: ${facts.tokensReferenced.map((t) => `<code>${esc5(t)}</code>`).join(", ")}`);
   }
   if (facts.selfReportsDesignToken) {
     items.push(`self-reports resolved values to the inspector (<code>designToken(...)</code>)`);
@@ -35222,16 +35381,16 @@ function componentStoryHtml(name, componentStories, version2, changedVersions) {
   const card = componentStories ? componentStories[kebab] : void 0;
   if (!card) {
     return `  <div class="component-story">
-    <p class="lbl">story render &mdash; <code>${esc4(id)}</code></p>
-    <p class="empty-inline">no story render yet &mdash; run the preview render to produce <code>${esc4(id)}</code></p>
+    <p class="lbl">story render &mdash; <code>${esc5(id)}</code></p>
+    <p class="empty-inline">no story render yet &mdash; run the preview render to produce <code>${esc5(id)}</code></p>
   </div>`;
   }
   const changedIn = changedVersions ? changedVersions[card.id] : void 0;
   const chip = changedIn ? ` <span class="chg">changed #${Number(changedIn)}</span>` : "";
   const buster = version2 ? `?v=${Number(version2)}` : "";
   return `  <div class="component-story">
-    <p class="lbl">story render &mdash; <code>${esc4(card.id)}</code>${chip}</p>
-    <img alt="${escAttr(card.id)} story render" src="/previews/${escAttr(card.png)}${buster}">
+    <p class="lbl">story render &mdash; <code>${esc5(card.id)}</code>${chip}</p>
+    <img alt="${escAttr2(card.id)} story render" src="/previews/${escAttr2(card.png)}${buster}">
   </div>`;
 }
 var STATE_TAG_TO_VARIANT = { loading: "loading", empty: "empty", error: "error", retry: "error" };
@@ -35243,15 +35402,15 @@ function liveVariantsHtml(derivedTags, stateVariants) {
     const entries = sv[state] || [];
     if (entries.length === 0) {
       return `    <div class="state-variant-block">
-      <p class="lbl">live &#64;${esc4(state)} render</p>
-      <p class="empty-inline">Not derivable statically &mdash; no <code>@${esc4(state)}</code> preview-registry entry has rendered yet</p>
+      <p class="lbl">live &#64;${esc5(state)} render</p>
+      <p class="empty-inline">Not derivable statically &mdash; no <code>@${esc5(state)}</code> preview-registry entry has rendered yet</p>
     </div>`;
     }
     const thumbs = entries.map(
-      (v) => `<div class="state-variant-thumb"><img alt="${escAttr(v.id)}" src="/previews/${escAttr(v.png)}"><p class="lbl">${esc4(v.id)}</p></div>`
+      (v) => `<div class="state-variant-thumb"><img alt="${escAttr2(v.id)}" src="/previews/${escAttr2(v.png)}"><p class="lbl">${esc5(v.id)}</p></div>`
     ).join("");
     return `    <div class="state-variant-block">
-      <p class="lbl">live &#64;${esc4(state)} render</p>
+      <p class="lbl">live &#64;${esc5(state)} render</p>
       <div class="state-variant-thumbs">${thumbs}</div>
     </div>`;
   });
@@ -35269,9 +35428,9 @@ function usedInHtml(usedIn, usedInScreens, violationsByFile) {
   );
   const items = ordered.map((f) => {
     const v = violationsByFile.get(f);
-    const chip = v ? `<span class="badge badge-changed violation-chip" title="hand-rolls ${esc4(v.indicators.map((i) => i.name).join(", "))} directly instead of via the components registry">&#9888; hand-rolled state</span>` : "";
+    const chip = v ? `<span class="badge badge-changed violation-chip" title="hand-rolls ${esc5(v.indicators.map((i) => i.name).join(", "))} directly instead of via the components registry">&#9888; hand-rolled state</span>` : "";
     const kind = screenSet.has(f) ? `<span class="badge badge-open">screen</span>` : "";
-    return `<li><code>${esc4(f)}</code> ${kind}${chip}</li>`;
+    return `<li><code>${esc5(f)}</code> ${kind}${chip}</li>`;
   }).join("");
   return `<ul class="component-used-in">${items}</ul>`;
 }
@@ -35279,7 +35438,7 @@ function componentsBodyHtml(components, meta3 = {}) {
   if (!components || !components.available) {
     return `<div class="empty">
       <p>No components scan available yet.</p>
-      <p>${esc4(
+      <p>${esc5(
       components && components.reason || "No presentation/components directory found in this project."
     )}</p>
     </div>`;
@@ -35292,10 +35451,10 @@ function componentsBodyHtml(components, meta3 = {}) {
   );
   const entries = components.components.map((c) => {
     const head = `<header class="component-head">
-      <h3>${esc4(c.name)}${commentControlHtml({ type: "design-system", token: `component:${c.name}` })}</h3>
+      <h3>${esc5(c.name)}${commentControlHtml({ type: "design-system", token: `component:${c.name}` })}</h3>
       ${componentApprovalBadgeHtml(meta3.approval, meta3.drift, c.file)}
     </header>
-    <p class="meta component-file"><code>${esc4(c.file)}</code></p>`;
+    <p class="meta component-file"><code>${esc5(c.file)}</code></p>`;
     const storyHtml = componentStoryHtml(c.name, meta3.componentStories, meta3.version, meta3.changedVersions);
     if (c.parseError) {
       return `  <article class="component-entry">
@@ -35308,7 +35467,7 @@ function componentsBodyHtml(components, meta3 = {}) {
     const facts = c.facts || {};
     const hasScreenTagParam = paramsParsed.some((p) => p.name === "screenTag");
     const doc = c.kdocDescription ?? c.kdoc;
-    const kdocHtml = doc ? `<p class="lbl">usage notes &mdash; from the component's own doc comment</p><blockquote class="component-kdoc">${esc4(doc)}</blockquote>` : "";
+    const kdocHtml = doc ? `<p class="lbl">usage notes &mdash; from the component's own doc comment</p><blockquote class="component-kdoc">${esc5(doc)}</blockquote>` : "";
     return `  <article class="component-entry">
     ${head}
     ${storyHtml}
@@ -35335,9 +35494,9 @@ function promotionQueueHtml(ungoverned) {
   }
   const rows = ungoverned.map(
     (u) => `    <tr>
-      <td><code>${esc4(u.name)}</code></td>
-      <td><code>${esc4(u.file)}</code></td>
-      <td>${esc4(u.feature)}</td>
+      <td><code>${esc5(u.name)}</code></td>
+      <td><code>${esc5(u.file)}</code></td>
+      <td>${esc5(u.feature)}</td>
       <td>${u.crossFeatureUseCount > 0 ? `<strong>${u.crossFeatureUseCount}</strong>` : "0"}</td>
       <td>${u.composesRegistry ? "composes registry components" : "self-contained"}</td>
     </tr>`
@@ -35358,7 +35517,7 @@ ${rows}
 }
 function approvalsTabHtml(approvals, meta3 = {}) {
   if (!approvals || !approvals.available) {
-    const detail = approvals && approvals.error ? esc4(approvals.error) : "This looks like an older scaffold that predates the approvals wave (no qa/lib/approvals.mjs).";
+    const detail = approvals && approvals.error ? esc5(approvals.error) : "This looks like an older scaffold that predates the approvals wave (no qa/lib/approvals.mjs).";
     return `<div class="empty">
       <p>Approvals are not available in this project.</p>
       <p>${detail}</p>
@@ -35382,21 +35541,21 @@ function approvalsTabHtml(approvals, meta3 = {}) {
       `${shortHash2(s.storedHash ?? s.hash)}${s.hashBasis === "raw-bytes" ? " \xB7 signed pre-strip, bytes unchanged" : ""}`
     ) : unresolvable ? "unresolvable" : `would approve at ${shortHash2(s.hash)}`;
     const unresolvableNote = s.resolvable === false ? `<p class="unresolvable-note">unresolvable (${s.fileCount} of expected files resolved) \u2014 not approvable</p>` : "";
-    const missingNote = s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc4(s.missing.join(", "))}</p>` : "";
-    const reopenNote = s.status === "reopened" ? `<p class="reopen-note">reopened${s.reopenedAt ? ` ${esc4(s.reopenedAt)}` : ""}${s.via ? ` via ${esc4(s.via)}` : ""}${s.reason ? ` \u2014 ${esc4(s.reason)}` : ""}</p>` : "";
+    const missingNote = s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc5(s.missing.join(", "))}</p>` : "";
+    const reopenNote = s.status === "reopened" ? `<p class="reopen-note">reopened${s.reopenedAt ? ` ${esc5(s.reopenedAt)}` : ""}${s.via ? ` via ${esc5(s.via)}` : ""}${s.reason ? ` \u2014 ${esc5(s.reason)}` : ""}</p>` : "";
     const btnLabel = s.status === "approved" ? "Re-approve" : "Approve";
-    const reopenBtn = s.status === "approved" ? `<button class="reopen-btn" data-artifact="${esc4(s.id)}">Reopen</button>` : "";
+    const reopenBtn = s.status === "approved" ? `<button class="reopen-btn" data-artifact="${esc5(s.id)}">Reopen</button>` : "";
     const anchored = meta3.anchoredDiffs ? meta3.anchoredDiffs[s.id] : null;
     const diffRow = s.status === "changed-since-approval" || s.status === "reopened" ? `    <tr class="approval-diff-row"><td colspan="6">
 ${driftPanelHtml(s, anchored, { withApprove: false })}
     </td></tr>` : "";
-    return `    <tr class="approval-row" data-artifact="${esc4(s.id)}">
+    return `    <tr class="approval-row" data-artifact="${esc5(s.id)}">
       <td class="order-num">${orderNumber(s.id)}</td>
-      <td>${esc4(s.label)}<div class="artifact-id">${esc4(s.id)}</div>${artifactBannerHtml(s)}</td>
-      <td><span class="badge ${badgeClass}">${esc4(statusLabel)}</span></td>
+      <td>${esc5(s.label)}<div class="artifact-id">${esc5(s.id)}</div>${artifactBannerHtml(s)}</td>
+      <td><span class="badge ${badgeClass}">${esc5(statusLabel)}</span></td>
       <td>${s.fileCount}</td>
-      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc4(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}${reopenNote}</td>
-      <td><button class="approve-btn" data-artifact="${esc4(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
+      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc5(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}${reopenNote}</td>
+      <td><button class="approve-btn" data-artifact="${esc5(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
     </tr>
 ${diffRow}`;
   }).join("\n");
@@ -35417,7 +35576,7 @@ function gateForClause(c) {
 function citingTestsCellHtml(c) {
   if (c.withdrawn) return `<span class="empty-inline">withdrawn &mdash; citation-exempt</span>`;
   if (c.citedBy && c.citedBy.length) {
-    const items = c.citedBy.map((s) => `<li><code>${esc4(s.file)}:${s.line}</code></li>`).join("");
+    const items = c.citedBy.map((s) => `<li><code>${esc5(s.file)}:${s.line}</code></li>`).join("");
     return `<ul class="rtm-tests">${items}</ul>`;
   }
   if (c.cited) {
@@ -35441,19 +35600,19 @@ function specsTabHtml(specs, meta3 = {}) {
       uncovered ? `<span class="rtm-defect">${uncovered} uncovered</span>` : null
     ].filter(Boolean).join(" &middot; ");
     const rows = f.clauses.map((c) => {
-      const prose = esc4(c.prose);
+      const prose = esc5(c.prose);
       const gate = gateForClause(c);
       return `    <tr class="rtm-row${c.withdrawn ? " rtm-withdrawn" : ""}">
-      <td><span class="clause-id"><code>${esc4(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: `specs/${f.file}`, clauseId: c.id })}</td>
+      <td><span class="clause-id"><code>${esc5(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: `specs/${f.file}`, clauseId: c.id })}</td>
       <td class="rtm-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</td>
       <td>${citingTestsCellHtml(c)}</td>
-      <td class="rtm-gate">${gate ? `<code>${esc4(gate)}</code>` : `<span class="empty-inline">&mdash;</span>`}</td>
+      <td class="rtm-gate">${gate ? `<code>${esc5(gate)}</code>` : `<span class="empty-inline">&mdash;</span>`}</td>
       <td>${gate ? stepReceiptCellHtml(meta3.lastReceipt, gate) : `<span class="empty-inline">&mdash;</span>`}</td>
     </tr>`;
     }).join("\n");
     const specStatus = meta3.artifactByFile ? meta3.artifactByFile[`specs/${f.file}`] : null;
     return `  <div class="spec-file">
-    <h3>specs/${esc4(f.file)}</h3>
+    <h3>specs/${esc5(f.file)}</h3>
 ${signatureBarHtml(specStatus, { what: "this contract" })}
     <p class="rtm-counts">${counts}</p>
     ${rows ? `<table class="doc-table rtm-table">
@@ -35471,8 +35630,8 @@ ${rows}
     <ul class="rtm-defect-list">
 ${specs.orphanCitations.map(
       (o) => `      <li class="rtm-defect-item">
-        <code>${esc4(o.file)}:${o.line}</code> cites <code>${esc4(o.id)}</code>
-        <span class="badge badge-changed">${esc4(o.reason)}</span>
+        <code>${esc5(o.file)}:${o.line}</code> cites <code>${esc5(o.id)}</code>
+        <span class="badge badge-changed">${esc5(o.reason)}</span>
       </li>`
     ).join("\n")}
     </ul>
@@ -35482,7 +35641,7 @@ ${specs.orphanCitations.map(
 ${orphansHtml}`;
 }
 function inlineMdHtml(text) {
-  let s = esc4(String(text));
+  let s = esc5(String(text));
   s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
@@ -35490,7 +35649,7 @@ function inlineMdHtml(text) {
 }
 function mdTableHtml(table) {
   if (!table || !table.available) {
-    return `<p class="empty-inline">${esc4(table && table.reason || "not available")}</p>`;
+    return `<p class="empty-inline">${esc5(table && table.reason || "not available")}</p>`;
   }
   const head = `<tr>${table.headers.map((h) => `<th>${inlineMdHtml(h)}</th>`).join("")}</tr>`;
   const body = table.rows.map((r) => `<tr>${r.map((c) => `<td>${inlineMdHtml(c)}</td>`).join("")}</tr>`).join("\n");
@@ -35544,7 +35703,7 @@ function mdProseHtml(md) {
         i++;
       }
       i++;
-      out.push(`<pre class="doc-code">${esc4(code.join("\n"))}</pre>`);
+      out.push(`<pre class="doc-code">${esc5(code.join("\n"))}</pre>`);
       continue;
     }
     if (/^####?\s+/.test(t)) {
@@ -35584,7 +35743,7 @@ function mdProseHtml(md) {
 }
 function docSectionProseHtml(section) {
   if (!section || !section.available) {
-    return `<p class="empty-inline">${esc4(section && section.reason || "docs/ARCHITECTURE.md not found")}</p>`;
+    return `<p class="empty-inline">${esc5(section && section.reason || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   return `<div class="doc-prose">${mdProseHtml(section.body)}</div>`;
 }
@@ -35606,16 +35765,16 @@ ${nodes}
 }
 function systemContextHtml(sc) {
   if (!sc || !sc.available) {
-    return `<p class="empty-inline">${esc4(sc && sc.reason || "docs/ARCHITECTURE.md not found")}</p>`;
+    return `<p class="empty-inline">${esc5(sc && sc.reason || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   const intro = sc.intro ? `<p>${inlineMdHtml(sc.intro)}</p>` : "";
   const diagram = sc.table ? contextDiagramHtml(sc.table) : "";
-  const table = sc.table ? mdTableHtml({ available: true, headers: sc.table.headers, rows: sc.table.rows }) : `<p class="empty-inline">no integration table found under "${esc4(sc.heading)}"</p>`;
+  const table = sc.table ? mdTableHtml({ available: true, headers: sc.table.headers, rows: sc.table.rows }) : `<p class="empty-inline">no integration table found under "${esc5(sc.heading)}"</p>`;
   return `${intro}${diagram}${table}`;
 }
 function versionSetHtml(versionSet) {
   if (!versionSet || !versionSet.available) {
-    return `<p class="empty-inline">${esc4(versionSet && versionSet.reason || "gradle/libs.versions.toml not readable")}</p>`;
+    return `<p class="empty-inline">${esc5(versionSet && versionSet.reason || "gradle/libs.versions.toml not readable")}</p>`;
   }
   const badge = (status) => {
     if (status === "match") return `<span class="glyph glyph-signed">&#10003;</span> pinned as documented`;
@@ -35625,17 +35784,17 @@ function versionSetHtml(versionSet) {
   };
   const rows = versionSet.rows.map(
     (r) => `      <tr>
-        <td>${esc4(r.library)}</td>
-        <td><code>${esc4(r.catalogVersion ?? "\u2014")}</code></td>
-        <td><code>${esc4(r.docVersion ?? "\u2014")}</code></td>
+        <td>${esc5(r.library)}</td>
+        <td><code>${esc5(r.catalogVersion ?? "\u2014")}</code></td>
+        <td><code>${esc5(r.docVersion ?? "\u2014")}</code></td>
         <td>${badge(r.status)}</td>
       </tr>`
   ).join("\n");
   const inv = versionSet.kspInvariant;
-  const invLine = inv.available ? inv.ok ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> KSP is <code>&lt;kotlin&gt;-&lt;ksp&gt;</code> \u2014 <code>${esc4(inv.ksp)}</code> carries Kotlin <code>${esc4(inv.kotlin)}</code>.</p>` : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> KSP <code>${esc4(inv.ksp)}</code> is not prefixed by Kotlin <code>${esc4(inv.kotlin)}</code> \u2014 Room's KMP native compilation breaks on this.</p>` : `<p class="empty-inline">${esc4(inv.reason)}</p>`;
+  const invLine = inv.available ? inv.ok ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> KSP is <code>&lt;kotlin&gt;-&lt;ksp&gt;</code> \u2014 <code>${esc5(inv.ksp)}</code> carries Kotlin <code>${esc5(inv.kotlin)}</code>.</p>` : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> KSP <code>${esc5(inv.ksp)}</code> is not prefixed by Kotlin <code>${esc5(inv.kotlin)}</code> \u2014 Room's KMP native compilation breaks on this.</p>` : `<p class="empty-inline">${esc5(inv.reason)}</p>`;
   return `  <h4>The frozen set, as pinned</h4>
   <table class="doc-table">
-    <thead><tr><th>Library</th><th>${esc4("gradle/libs.versions.toml")}</th><th>\xA72 says</th><th>Verdict</th></tr></thead>
+    <thead><tr><th>Library</th><th>${esc5("gradle/libs.versions.toml")}</th><th>\xA72 says</th><th>Verdict</th></tr></thead>
     <tbody>
 ${rows}
     </tbody>
@@ -35644,7 +35803,7 @@ ${invLine}`;
 }
 function platformViewHtml(pv) {
   if (!pv || !pv.available) {
-    return `<p class="empty-inline">${esc4(pv && pv.reason || "docs/ARCHITECTURE.md not found")}</p>`;
+    return `<p class="empty-inline">${esc5(pv && pv.reason || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   const main2 = mdTableHtml({ available: true, headers: pv.headers, rows: pv.rows });
   const expectActual = pv.expectActual ? `<h4>Expect/actual boundary</h4>${mdTableHtml({ available: true, headers: pv.expectActual.headers, rows: pv.expectActual.rows })}` : "";
@@ -35655,17 +35814,17 @@ function dependencyGraphHtml(graph) {
   if (!graph || !graph.available) {
     return `<div class="empty">
       <p>No dependency graph available.</p>
-      <p>${esc4(graph && graph.reason || "composeApp/src/commonMain/kotlin not found.")}</p>
+      <p>${esc5(graph && graph.reason || "composeApp/src/commonMain/kotlin not found.")}</p>
     </div>`;
   }
   if (graph.edges.length === 0) {
-    return `<p class="empty-inline">no cross-layer imports observed under <code>${esc4(graph.appPackage)}</code></p>
+    return `<p class="empty-inline">no cross-layer imports observed under <code>${esc5(graph.appPackage)}</code></p>
 ${DEP_GRAPH_ADVISORY_HTML}`;
   }
   const rows = graph.edges.map((e) => {
-    const chip = e.violation ? `<span class="badge badge-changed violation-chip">violates ${esc4(e.clauseId)}</span>` : "";
+    const chip = e.violation ? `<span class="badge badge-changed violation-chip">violates ${esc5(e.clauseId)}</span>` : "";
     return `    <li class="dep-edge${e.violation ? " dep-violation" : ""}">
-      <code>${esc4(e.from)}</code> &rarr; <code>${esc4(e.to)}</code>
+      <code>${esc5(e.from)}</code> &rarr; <code>${esc5(e.to)}</code>
       <span class="dep-count">${e.count} import${e.count === 1 ? "" : "s"}</span>
       ${chip}
     </li>`;
@@ -35675,8 +35834,8 @@ ${DEP_GRAPH_ADVISORY_HTML}`;
     <ul class="dep-violation-list">
 ${graph.violations.map(
     (v) => `      <li class="dep-violation-item">
-        <code>${esc4(v.file)}:${v.line}</code> imports <code>${esc4(v.imported)}</code>
-        <span class="badge badge-changed">${esc4(v.from)} &rarr; ${esc4(v.to)} violates ${esc4(v.clauseId)}</span>
+        <code>${esc5(v.file)}:${v.line}</code> imports <code>${esc5(v.imported)}</code>
+        <span class="badge badge-changed">${esc5(v.from)} &rarr; ${esc5(v.to)} violates ${esc5(v.clauseId)}</span>
       </li>`
   ).join("\n")}
     </ul>
@@ -35691,21 +35850,21 @@ function layerMapHtml(layerMap) {
   if (!layerMap || !layerMap.available) {
     return `<div class="empty">
       <p>No layer map available.</p>
-      <p>${esc4(layerMap && layerMap.reason || "composeApp/src/commonMain/kotlin not found.")}</p>
+      <p>${esc5(layerMap && layerMap.reason || "composeApp/src/commonMain/kotlin not found.")}</p>
     </div>`;
   }
   const boxes = layerMap.layers.map(
     (l) => `    <div class="layer-box${l.present ? "" : " layer-empty"}">
-      <h4>${esc4(l.id)}${commentControlHtml({ type: "architecture", path: l.id })}</h4>
-      <p class="layer-desc">${esc4(l.label)}</p>
-      ${l.present ? l.files.length ? `<ul class="layer-files">${l.files.map((f) => `<li><code>${esc4(f)}</code></li>`).join("")}</ul>` : `<p class="empty-inline">no files</p>` : `<p class="empty-inline">directory not present</p>`}
+      <h4>${esc5(l.id)}${commentControlHtml({ type: "architecture", path: l.id })}</h4>
+      <p class="layer-desc">${esc5(l.label)}</p>
+      ${l.present ? l.files.length ? `<ul class="layer-files">${l.files.map((f) => `<li><code>${esc5(f)}</code></li>`).join("")}</ul>` : `<p class="empty-inline">no files</p>` : `<p class="empty-inline">directory not present</p>`}
     </div>`
   ).join("\n");
   const others = layerMap.otherPackages && layerMap.otherPackages.length ? `  <div class="layer-others">
     <p class="lbl">other top-level packages</p>
-    <ul class="layer-files">${layerMap.otherPackages.map((p) => `<li><code>${esc4(p.name)}</code> (${p.files.length} file${p.files.length === 1 ? "" : "s"})</li>`).join("")}</ul>
+    <ul class="layer-files">${layerMap.otherPackages.map((p) => `<li><code>${esc5(p.name)}</code> (${p.files.length} file${p.files.length === 1 ? "" : "s"})</li>`).join("")}</ul>
   </div>` : "";
-  return `  <p class="meta">package <code>${esc4(layerMap.appPackage)}</code> &middot; navigation lives under <code>presentation/navigation</code> (shown as part of presentation, below)</p>
+  return `  <p class="meta">package <code>${esc5(layerMap.appPackage)}</code> &middot; navigation lives under <code>presentation/navigation</code> (shown as part of presentation, below)</p>
   <div class="layer-map">
 ${boxes}
   </div>
@@ -35723,57 +35882,57 @@ function formatReceiptAge(ageMs) {
 function clauseReceiptStatusHtml(lastReceipt) {
   if (!lastReceipt || !lastReceipt.available) {
     const reason = lastReceipt && lastReceipt.reason || "no receipt at qa/evidence/latest.json \u2014 run node qa/verify.mjs";
-    return `<span class="receipt-badge receipt-none" title="${escAttr(reason)}">no receipt yet &mdash; run node qa/verify.mjs</span>`;
+    return `<span class="receipt-badge receipt-none" title="${escAttr2(reason)}">no receipt yet &mdash; run node qa/verify.mjs</span>`;
   }
   if (!lastReceipt.conformance) {
     return `<span class="receipt-badge receipt-none">last receipt has no conformance step &mdash; run node qa/verify.mjs</span>`;
   }
   const age = formatReceiptAge(lastReceipt.ageMs);
-  const generatedTitle = lastReceipt.generatedAt ? ` title="generated ${escAttr(lastReceipt.generatedAt)}"` : "";
+  const generatedTitle = lastReceipt.generatedAt ? ` title="generated ${escAttr2(lastReceipt.generatedAt)}"` : "";
   if (lastReceipt.stale) {
-    return `<span class="receipt-badge receipt-stale"${generatedTitle}>stale receipt</span><span class="receipt-age">conformance was ${esc4(lastReceipt.conformance.verdict)} ${age} &mdash; source changed since</span>`;
+    return `<span class="receipt-badge receipt-stale"${generatedTitle}>stale receipt</span><span class="receipt-age">conformance was ${esc5(lastReceipt.conformance.verdict)} ${age} &mdash; source changed since</span>`;
   }
   const verdictClass = lastReceipt.conformance.verdict === "PASS" ? "receipt-pass" : lastReceipt.conformance.verdict === "FAIL" ? "receipt-fail" : "receipt-none";
   const freshnessNote = lastReceipt.stale === null ? " &middot; freshness unverified" : "";
-  return `<span class="receipt-badge ${verdictClass}"${generatedTitle}>conformance: ${esc4(lastReceipt.conformance.verdict)}</span><span class="receipt-age">${age}${freshnessNote}</span>`;
+  return `<span class="receipt-badge ${verdictClass}"${generatedTitle}>conformance: ${esc5(lastReceipt.conformance.verdict)}</span><span class="receipt-age">${age}${freshnessNote}</span>`;
 }
 function stepReceiptCellHtml(lastReceipt, stepName) {
   if (!lastReceipt || !lastReceipt.available) {
     const reason = lastReceipt && lastReceipt.reason || "no receipt at qa/evidence/latest.json \u2014 run node qa/verify.mjs";
-    return `<span class="receipt-badge receipt-none" title="${escAttr(reason)}">no receipt yet</span>`;
+    return `<span class="receipt-badge receipt-none" title="${escAttr2(reason)}">no receipt yet</span>`;
   }
   const step = (lastReceipt.steps || []).find((s) => s && s.name === stepName);
   if (!step) {
-    const profile = lastReceipt.profile ? ` (profile ${esc4(lastReceipt.profile)})` : "";
+    const profile = lastReceipt.profile ? ` (profile ${esc5(lastReceipt.profile)})` : "";
     return `<span class="receipt-badge receipt-none">not in last receipt${profile}</span>`;
   }
   const age = formatReceiptAge(lastReceipt.ageMs);
   if (lastReceipt.stale) {
-    return `<span class="receipt-badge receipt-stale">stale &mdash; was ${esc4(step.verdict)} ${age}</span>`;
+    return `<span class="receipt-badge receipt-stale">stale &mdash; was ${esc5(step.verdict)} ${age}</span>`;
   }
   const cls = step.verdict === "PASS" ? "receipt-pass" : step.verdict === "FAIL" ? "receipt-fail" : "receipt-none";
   const freshness = lastReceipt.stale === null ? " &middot; freshness unverified" : "";
-  const title = step.reason ? ` title="${escAttr(step.reason)}"` : "";
-  return `<span class="receipt-badge ${cls}"${title}>${esc4(step.verdict)}</span><span class="receipt-age">${age}${freshness}</span>`;
+  const title = step.reason ? ` title="${escAttr2(step.reason)}"` : "";
+  return `<span class="receipt-badge ${cls}"${title}>${esc5(step.verdict)}</span><span class="receipt-age">${age}${freshness}</span>`;
 }
 function governedContractHtml(gc, lastReceipt) {
   if (!gc || !gc.available) {
     return `<div class="empty">
       <p>No governed contract available.</p>
-      <p>${esc4(gc && gc.reason || "specs/app-base.spec.md not found.")}</p>
+      <p>${esc5(gc && gc.reason || "specs/app-base.spec.md not found.")}</p>
     </div>`;
   }
   const items = gc.clauses.map((c) => {
-    const prose = esc4(c.prose);
+    const prose = esc5(c.prose);
     const receiptStatus = /^ARCH-/i.test(c.id) ? clauseReceiptStatusHtml(lastReceipt) : "";
     return `      <li class="clause${c.withdrawn ? " withdrawn" : ""}">
-        <span class="clause-id"><code>${esc4(c.id)}</code></span>
+        <span class="clause-id"><code>${esc5(c.id)}</code></span>
         <span class="clause-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</span>
         ${receiptStatus}
         ${commentControlHtml({ type: "spec-line", file: `specs/${gc.file}`, clauseId: c.id })}
       </li>`;
   }).join("\n");
-  return `  <p class="meta">specs/${esc4(gc.file)}</p>
+  return `  <p class="meta">specs/${esc5(gc.file)}</p>
   <ul class="clause-list">
 ${items || '    <li class="empty-inline">no clauses parsed</li>'}
   </ul>`;
@@ -35782,10 +35941,10 @@ function featureShapeHtml(shape) {
   if (!shape || !shape.available) {
     return `<div class="empty">
       <p>No feature shape available.</p>
-      <p>${esc4(shape && shape.reason || "presentation/home not found.")}</p>
+      <p>${esc5(shape && shape.reason || "presentation/home not found.")}</p>
     </div>`;
   }
-  const items = shape.files.map((f) => `    <li><code>${esc4(f)}</code>${commentControlHtml({ type: "architecture", path: f })}</li>`).join("\n");
+  const items = shape.files.map((f) => `    <li><code>${esc5(f)}</code>${commentControlHtml({ type: "architecture", path: f })}</li>`).join("\n");
   return `  <p class="meta">${shape.files.length} file(s) &mdash; the shape <code>qa/scaffold-feature.mjs</code> clones for a new feature</p>
   <ul class="feature-tree">
 ${items}
@@ -35856,37 +36015,46 @@ function formatDurationMs(ms) {
 }
 function inputsBindingHtml(r) {
   if (r.stale === true) {
-    const move = r.inputsHash && r.currentInputsHash ? ` (<code>${esc4(shortHash2(r.inputsHash))}</code> &rarr; <code>${esc4(shortHash2(r.currentInputsHash))}</code>)` : "";
+    const move = r.inputsHash && r.currentInputsHash ? ` (<code>${esc5(shortHash2(r.inputsHash))}</code> &rarr; <code>${esc5(shortHash2(r.currentInputsHash))}</code>)` : "";
     return `<span class="evidence-binding-stale">inputs no longer match the current tree${move} &mdash; re-run <code>node qa/verify.mjs</code></span>`;
   }
   if (r.stale === false) {
     const files = typeof r.inputsFileCount === "number" ? ` over ${r.inputsFileCount} files` : "";
-    return `inputs bound to the current tree &mdash; hash <code>${esc4(shortHash2(r.inputsHash))}</code> still matches${files}`;
+    return `inputs bound to the current tree &mdash; hash <code>${esc5(shortHash2(r.inputsHash))}</code> still matches${files}`;
   }
-  return `inputs binding unknown &mdash; ${esc4(r.staleReason || "freshness could not be recomputed")}`;
+  return `inputs binding unknown &mdash; ${esc5(r.staleReason || "freshness could not be recomputed")}`;
 }
 function timelineRowHtml(r) {
   const cls = r.verdict === "PASS" ? "step-verdict-pass" : r.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
   const age = typeof r.ageMs === "number" ? formatReceiptAge(r.ageMs) : "age unknown";
-  const commit = r.commitSha ? `<span class="meta">commit <code>${esc4(String(r.commitSha).slice(0, 7))}</code></span>` : "";
-  const author = r.author ? `<span class="meta">by ${esc4(r.author)}</span>` : "";
-  const when = r.committedAt ? esc4(r.committedAt) : "commit date unknown";
-  const rung = r.evidenceLevel ? `<span class="badge evidence-rung">${esc4(r.evidenceLevel.rung)} &middot; ${esc4(r.evidenceLevel.name)}</span>` : "";
+  const commit = r.commitSha ? `<span class="meta">commit <code>${esc5(String(r.commitSha).slice(0, 7))}</code></span>` : "";
+  const author = r.author ? `<span class="meta">by ${esc5(r.author)}</span>` : "";
+  const when = r.committedAt ? esc5(r.committedAt) : "commit date unknown";
+  const rung = r.evidenceLevel ? `<span class="badge evidence-rung">${esc5(r.evidenceLevel.rung)} &middot; ${esc5(r.evidenceLevel.name)}</span>` : "";
   return `    <li>
-      <span class="${cls}">${esc4(r.verdict || "?")}</span>
+      <span class="${cls}">${esc5(r.verdict || "?")}</span>
       ${rung}
-      ${r.profile ? `<span class="meta">profile <code>${esc4(r.profile)}</code></span>` : ""}
+      ${r.profile ? `<span class="meta">profile <code>${esc5(r.profile)}</code></span>` : ""}
       ${commit}
       ${author}
-      <span class="meta">committed ${when} &middot; ${esc4(age)}</span>
+      <span class="meta">committed ${when} &middot; ${esc5(age)}</span>
     </li>`;
+}
+function stepTestCountsHtml(step) {
+  const d = step && step.details;
+  if (!d || typeof d !== "object" || typeof d.tests !== "number") return "";
+  const failed = (typeof d.failures === "number" ? d.failures : 0) + (typeof d.errors === "number" ? d.errors : 0);
+  const bits = [`${d.tests} test${d.tests === 1 ? "" : "s"}`];
+  bits.push(failed === 0 ? "0 failed" : `<strong class="step-failed">${failed} failed</strong>`);
+  if (typeof d.skipped === "number" && d.skipped > 0) bits.push(`${d.skipped} skipped`);
+  return `<span class="step-counts">${bits.join(" &middot; ")}</span>`;
 }
 function evidenceBodyHtml(lastReceipt, history) {
   if (!lastReceipt || !lastReceipt.available) {
     const reason = lastReceipt && lastReceipt.reason || "no receipt at qa/evidence/latest.json";
     return `<div class="empty">
       <p>No verify receipt yet.</p>
-      <p>${esc4(reason)}</p>
+      <p>${esc5(reason)}</p>
       <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>qa/evidence/latest.json</code>,
       and this page renders exactly what that receipt attests. Nothing here is derived any other way.</p>
     </div>`;
@@ -35895,26 +36063,28 @@ function evidenceBodyHtml(lastReceipt, history) {
   const stale = r.stale === true;
   const verdictCls = stale ? "verdict-muted" : r.verdict === "PASS" ? "verdict-pass" : r.verdict === "FAIL" ? "verdict-fail" : "verdict-muted";
   const staleChip = stale ? ` <span class="badge badge-changed">STALE &mdash; the tree changed since this run</span>` : r.stale === null ? ` <span class="badge badge-unreviewed">freshness unknown</span>` : "";
-  const rungChip = r.evidenceLevel ? ` <span class="badge evidence-rung" title="${escAttr(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"}`)}">Evidence: ${esc4(r.evidenceLevel.rung)} &middot; ${esc4(r.evidenceLevel.name)}</span>` : "";
+  const rungChip = r.evidenceLevel ? ` <span class="badge evidence-rung" title="${escAttr2(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"}`)}">Evidence: ${esc5(r.evidenceLevel.rung)} &middot; ${esc5(r.evidenceLevel.name)}</span>` : "";
   const age = formatReceiptAge(r.ageMs);
   const dirty = r.commitDirty && r.commitDirty.length ? ` &middot; ${r.commitDirty.length} uncommitted file${r.commitDirty.length === 1 ? "" : "s"} at run time` : "";
   const facts = [
-    r.profile ? `<li>profile <code>${esc4(r.profile)}</code></li>` : "",
-    r.commitSha ? `<li>commit <code>${esc4(shortHash2(r.commitSha))}</code>${dirty}</li>` : "",
-    `<li>generated ${r.generatedAt ? esc4(r.generatedAt) : "at an unknown time"} &middot; ${esc4(age)}</li>`,
+    r.profile ? `<li>profile <code>${esc5(r.profile)}</code></li>` : "",
+    r.commitSha ? `<li>commit <code>${esc5(shortHash2(r.commitSha))}</code>${dirty}</li>` : "",
+    `<li>generated ${r.generatedAt ? esc5(r.generatedAt) : "at an unknown time"} &middot; ${esc5(age)}</li>`,
     `<li>${inputsBindingHtml(r)}</li>`
   ].filter(Boolean).join("\n      ");
   const stepRows = (r.steps || []).map((s) => {
     const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
     const governs = STEP_GOVERNS[s.name];
-    const governsCell = governs ? `<a class="step-link" href="#${esc4(governs.section)}">${esc4(governs.label)}</a>` : "";
-    const reason = s.reason ? `<span class="step-reason">${esc4(s.reason)}</span>` : "";
+    const governsCell = governs ? `<a class="step-link" href="#${esc5(governs.section)}">${esc5(governs.label)}</a>` : "";
+    const counts = stepTestCountsHtml(s);
+    const note = s.note ? `<span class="step-note">${esc5(s.note)}</span>` : "";
+    const reason = s.reason ? `<span class="step-reason">${esc5(s.reason)}</span>` : "";
     return `    <tr>
-      <td><code>${esc4(s.name)}</code></td>
-      <td><span class="${cls}">${esc4(s.verdict)}</span></td>
-      <td>${esc4(formatDurationMs(s.durationMs))}</td>
+      <td><code>${esc5(s.name)}</code></td>
+      <td><span class="${cls}">${esc5(s.verdict)}</span></td>
+      <td>${esc5(formatDurationMs(s.durationMs))}</td>
       <td>${governsCell}</td>
-      <td>${reason}</td>
+      <td>${counts}${note}${reason}</td>
     </tr>`;
   }).join("\n");
   const stepsHtml = stepRows ? `  <table class="doc-table step-table">
@@ -35925,12 +36095,12 @@ ${stepRows}
   </table>` : `  <p class="empty-inline">the receipt carries no steps</p>`;
   const timelineHtml = history && history.available && history.receipts && history.receipts.length ? `  <ul class="evidence-timeline">
 ${history.receipts.map(timelineRowHtml).join("\n")}
-  </ul>` : `  <p class="empty-inline">${esc4(history && history.reason || "no committed receipt history yet")} &mdash; each commit of <code>qa/evidence/latest.json</code> becomes one entry in the audit trail</p>`;
-  return `  <p class="meta">Rendered from <code>${esc4(r.relPath || "qa/evidence/latest.json")}</code> &mdash; the verify lane's own attestation.
+  </ul>` : `  <p class="empty-inline">${esc5(history && history.reason || "no committed receipt history yet")} &mdash; each commit of <code>qa/evidence/latest.json</code> becomes one entry in the audit trail</p>`;
+  return `  <p class="meta">Rendered from <code>${esc5(r.relPath || "qa/evidence/latest.json")}</code> &mdash; the verify lane's own attestation.
   The lane is the law: nothing on this page is re-derived live.</p>
   <div class="evidence-headline${stale ? " evidence-stale" : ""}">
     <p class="lbl">latest receipt</p>
-    <span class="evidence-verdict ${verdictCls}">${esc4(r.verdict || "?")}</span>${rungChip}${staleChip}
+    <span class="evidence-verdict ${verdictCls}">${esc5(r.verdict || "?")}</span>${rungChip}${staleChip}
     <ul class="evidence-facts">
       ${facts}
     </ul>
@@ -35945,24 +36115,24 @@ function describeTarget(t) {
   if (!t || typeof t !== "object") return '<span class="empty-inline">unknown target</span>';
   switch (t.type) {
     case "screen":
-      return `screen <code>${esc4(t.screen)}</code>`;
+      return `screen <code>${esc5(t.screen)}</code>`;
     case "element":
-      return `screen <code>${esc4(t.screen)}</code>${t.testTag ? ` &middot; element <code>${esc4(t.testTag)}</code>` : ""}`;
+      return `screen <code>${esc5(t.screen)}</code>${t.testTag ? ` &middot; element <code>${esc5(t.testTag)}</code>` : ""}`;
     case "spec-line":
-      return `spec <code>${esc4(t.file)}</code>${t.clauseId ? ` &middot; clause <code>${esc4(t.clauseId)}</code>` : ""}`;
+      return `spec <code>${esc5(t.file)}</code>${t.clauseId ? ` &middot; clause <code>${esc5(t.clauseId)}</code>` : ""}`;
     case "design-system":
-      return `design system <code>${esc4(t.token)}</code>`;
+      return `design system <code>${esc5(t.token)}</code>`;
     case "architecture":
-      return `architecture <code>${esc4(t.path)}</code>`;
+      return `architecture <code>${esc5(t.path)}</code>`;
     case "general":
       return "general";
     default:
-      return `<span class="empty-inline">${esc4(t.type || "unknown target")}</span>`;
+      return `<span class="empty-inline">${esc5(t.type || "unknown target")}</span>`;
   }
 }
 function commentsTabHtml(comments) {
   if (!comments || !comments.available) {
-    const detail = comments && comments.error ? esc4(comments.error) : "This looks like an older scaffold that predates the comments wave (no qa/lib/comments.mjs).";
+    const detail = comments && comments.error ? esc5(comments.error) : "This looks like an older scaffold that predates the comments wave (no qa/lib/comments.mjs).";
     return `<div class="empty">
       <p>Comments are not available in this project.</p>
       <p>${detail}</p>
@@ -35973,14 +36143,14 @@ function commentsTabHtml(comments) {
   }
   const rows = [...comments.comments].sort((a, b) => a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0).map((c) => {
     const badgeClass = c.status === "resolved" ? "badge-resolved" : "badge-open";
-    const resolution = c.status === "resolved" ? `<div class="comment-resolution"><span class="lbl">resolved by ${esc4(c.resolvedBy || "?")}${c.resolvedAt ? ` at ${esc4(c.resolvedAt)}` : ""}</span>${c.resolutionNote ? `<p class="comment-resolution-note">${esc4(c.resolutionNote)}</p>` : ""}</div>` : "";
-    return `    <tr class="comment-row" data-id="${esc4(c.id)}">
-      <td><code>${esc4(c.id)}</code></td>
+    const resolution = c.status === "resolved" ? `<div class="comment-resolution"><span class="lbl">resolved by ${esc5(c.resolvedBy || "?")}${c.resolvedAt ? ` at ${esc5(c.resolvedAt)}` : ""}</span>${c.resolutionNote ? `<p class="comment-resolution-note">${esc5(c.resolutionNote)}</p>` : ""}</div>` : "";
+    return `    <tr class="comment-row" data-id="${esc5(c.id)}">
+      <td><code>${esc5(c.id)}</code></td>
       <td>${describeTarget(c.target)}</td>
-      <td class="comment-text-cell">${esc4(c.text)}</td>
-      <td>${esc4(c.author)}</td>
-      <td>${esc4(c.createdAt)}</td>
-      <td><span class="badge ${badgeClass}">${esc4(c.status)}</span>${resolution}</td>
+      <td class="comment-text-cell">${esc5(c.text)}</td>
+      <td>${esc5(c.author)}</td>
+      <td>${esc5(c.createdAt)}</td>
+      <td><span class="badge ${badgeClass}">${esc5(c.status)}</span>${resolution}</td>
     </tr>`;
   }).join("\n");
   return `  <table class="comments-table">
@@ -36008,19 +36178,19 @@ function clausesForScreen(specs, screenId) {
 }
 function matrixCellHtml(card, state, changedSet, version2) {
   if (!card) {
-    const what = state === "default" ? "no default entry registered" : `no @${escAttr(state)} entry registered`;
+    const what = state === "default" ? "no default entry registered" : `no @${escAttr2(state)} entry registered`;
     return `<div class="matrix-cell matrix-none" title="${what} for this screen">&mdash;</div>`;
   }
   const id = card.screen.id;
   const isChanged = changedSet.has(id);
   const compare = isChanged && version2 > 1;
   const buster = `?v=${Number(version2)}`;
-  const cur = `<img class="cur" alt="${escAttr(id)} render" src="/previews/${escAttr(card.screen.png)}${buster}">`;
+  const cur = `<img class="cur" alt="${escAttr2(id)} render" src="/previews/${escAttr2(card.screen.png)}${buster}">`;
   let inner = cur;
   let label = "";
   if (compare) {
     const prevPng = String(card.screen.png).replace(/screen\.png$/, "screen.prev.png");
-    inner = `<div class="cmp">${cur}<img class="prev" alt="${escAttr(id)} before" src="/previews/${escAttr(prevPng)}${buster}"></div>`;
+    inner = `<div class="cmp">${cur}<img class="prev" alt="${escAttr2(id)} before" src="/previews/${escAttr2(prevPng)}${buster}"></div>`;
     label = `<p class="lbl">hover = before</p>`;
   }
   return `<div class="matrix-cell${isChanged ? " changed" : ""}">${inner}${label}</div>`;
@@ -36033,7 +36203,7 @@ function matrixRowEndHtml(baseId, baseCard, changedVersions) {
     return `<p class="meta">Not derivable statically &mdash; no default render for this screen${chgChip}</p>${comment}`;
   }
   const { summary, a11y } = baseCard;
-  const a11yChip = a11y.pass ? `<span class="pass">PASS</span>` : `<span class="fail">${esc4(`${a11y.violations.length} violation${a11y.violations.length === 1 ? "" : "s"}`)}</span>`;
+  const a11yChip = a11y.pass ? `<span class="pass">PASS</span>` : `<span class="fail">${esc5(`${a11y.violations.length} violation${a11y.violations.length === 1 ? "" : "s"}`)}</span>`;
   return `<p class="meta">${summary.nodes} nodes &middot; ${summary.tokenized} tokenized &middot; ${summary.tagged} tagged</p>
       <p class="meta">a11y ${a11yChip}${chgChip}</p>
       ${comment}`;
@@ -36044,18 +36214,18 @@ function rowClausesHtml(specs, baseId, lastReceipt) {
     return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no specs/ directory found</p>`;
   }
   if (governing.length === 0) {
-    return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no spec clause's citing tests carry a <code>${esc4(baseId)}</code> path segment</p>`;
+    return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no spec clause's citing tests carry a <code>${esc5(baseId)}</code> path segment</p>`;
   }
   const items = governing.map(({ file: file2, clause }) => {
     const gate = gateForClause(clause);
     return `      <li class="clause">
-        <span class="clause-id"><code>${esc4(clause.id)}</code></span>
-        <span class="clause-prose">${esc4(clause.prose)}</span>
+        <span class="clause-id"><code>${esc5(clause.id)}</code></span>
+        <span class="clause-prose">${esc5(clause.prose)}</span>
         ${gate ? stepReceiptCellHtml(lastReceipt, gate) : ""}
         ${commentControlHtml({ type: "spec-line", file: `specs/${file2}`, clauseId: clause.id })}
       </li>`;
   }).join("\n");
-  return `<p class="lbl">governing clauses &mdash; clauses whose citing tests live under <code>${esc4(baseId)}</code></p>
+  return `<p class="lbl">governing clauses &mdash; clauses whose citing tests live under <code>${esc5(baseId)}</code></p>
     <ul class="clause-list">
 ${items}
     </ul>`;
@@ -36088,7 +36258,7 @@ function screensBodyHtml(data) {
   const stateCols = SCREEN_STATE_ORDER.filter(
     (s) => [...byBase.values()].some((row) => row.variants.has(s))
   );
-  const headCols = ["default", ...stateCols].map((c) => `<span class="matrix-col">${esc4(c)}</span>`).join("");
+  const headCols = ["default", ...stateCols].map((c) => `<span class="matrix-col">${esc5(c)}</span>`).join("");
   const rows = [...byBase.entries()].map(([baseId, row]) => {
     const title = row.base ? row.base.screen.title : baseId;
     const rowChanged = changedSet.has(baseId) || [...row.variants.values()].some((c) => changedSet.has(c.screen.id));
@@ -36097,11 +36267,11 @@ function screensBodyHtml(data) {
       ...stateCols.map((s) => matrixCellHtml(row.variants.get(s) || null, s, changedSet, version2))
     ].join("\n        ");
     const wire = row.base ? `<div class="wire">${row.base.svg}</div>` : `<p class="empty-inline">wireframe: Not derivable statically &mdash; no default render for this screen</p>`;
-    return `  <section class="matrix-row${rowChanged ? " changed" : ""}" id="card-${esc4(baseId)}">
+    return `  <section class="matrix-row${rowChanged ? " changed" : ""}" id="card-${esc5(baseId)}">
     <div class="matrix-line">
       <div class="matrix-rowhead">
-        <h3>${esc4(title)}${rowChanged ? '<span class="flag">CHANGED</span>' : ""}</h3>
-        <p class="meta">id <code>${esc4(baseId)}</code></p>
+        <h3>${esc5(title)}${rowChanged ? '<span class="flag">CHANGED</span>' : ""}</h3>
+        <p class="meta">id <code>${esc5(baseId)}</code></p>
       </div>
       <div class="matrix-cells">
         ${cells}
@@ -36185,7 +36355,7 @@ function intentBodyHtml(intent) {
       body = `<p class="brief-pending-inline">Not yet captured &mdash; conversation 0 pending.</p>${guidance}`;
     }
     return `  <section class="brief-section${sec.filled ? "" : " brief-unfilled"}">
-    <h3>${esc4(sec.heading)}${comment}</h3>
+    <h3>${esc5(sec.heading)}${comment}</h3>
     ${body}
   </section>`;
   }).join("\n");
@@ -36208,27 +36378,27 @@ function walkthroughTabHtml(wt) {
   const cards = (m.screens ?? []).map((s) => {
     const a11yLine = (s.a11y?.violations ?? []).length === 0 ? `<span class="ok-inline">a11y 0 violations</span>` : `<span class="bad-inline">a11y ${s.a11y.violations.length} violations</span>`;
     const settled = s.settled === false ? ` <span class="bad-inline">captured mid-load</span>` : "";
-    const spec = s.spec ? ` \xB7 spec ${esc4(s.spec.file)} (${s.spec.clauses.length} clauses)` : "";
+    const spec = s.spec ? ` \xB7 spec ${esc5(s.spec.file)} (${s.spec.clauses.length} clauses)` : "";
     const variants = (s.variants ?? []).length ? ` \xB7 ${s.variants.length} tier-0 variants` : "";
     return `    <div class="wt-card">
-      <img src="/walkthrough/${esc4(latest.relDirBase || "")}/${esc4(s.png)}" loading="lazy">
-      <div class="wt-meta"><strong>${esc4(s.id)}</strong> <span class="chip">${esc4(s.kind)}</span>${settled}<br>
-      route <code>${esc4(s.route ?? "\u2014")}</code> \xB7 ${s.nodes} nodes \xB7 ${a11yLine}${spec}${variants}</div>
+      <img src="/walkthrough/${esc5(latest.relDirBase || "")}/${esc5(s.png)}" loading="lazy">
+      <div class="wt-meta"><strong>${esc5(s.id)}</strong> <span class="chip">${esc5(s.kind)}</span>${settled}<br>
+      route <code>${esc5(s.route ?? "\u2014")}</code> \xB7 ${s.nodes} nodes \xB7 ${a11yLine}${spec}${variants}</div>
     </div>`;
   }).join("\n");
   const notWalked = (m.notWalked ?? []).length ? `  <h3>Not walked</h3>
-  <ul class="wt-notwalked">${m.notWalked.map((n) => `<li><code>${esc4(n.target)}</code> \u2014 ${esc4(n.reason)}</li>`).join("")}</ul>` : "";
+  <ul class="wt-notwalked">${m.notWalked.map((n) => `<li><code>${esc5(n.target)}</code> \u2014 ${esc5(n.reason)}</li>`).join("")}</ul>` : "";
   const db = m.db ? `  <h3>DB at capture time</h3>
   <table class="params-table"><thead><tr><th>table</th><th>rows</th></tr></thead><tbody>
-${m.db.tables.map((t) => `    <tr><td><code>${esc4(t.name)}</code></td><td>${t.error ? esc4(t.error) : t.rowCount ?? "?"}</td></tr>`).join("\n")}
+${m.db.tables.map((t) => `    <tr><td><code>${esc5(t.name)}</code></td><td>${t.error ? esc5(t.error) : t.rowCount ?? "?"}</td></tr>`).join("\n")}
   </tbody></table>` : `  <p class="empty-inline">no DB appendix \u2014 Room off or the app predates /inspect/db</p>`;
   const history = wt.runs.length > 1 ? `  <h3>Previous runs</h3>
   <ul class="wt-history">${wt.runs.slice(1).map(
-    (r) => r.error ? `<li>${esc4(r.relDir)} \u2014 <span class="bad-inline">${esc4(r.error)}</span></li>` : `<li>${esc4(r.generatedAt)} \u2014 ${r.screenCount} screens, ${r.a11yViolations} a11y violations
-          <span class="empty-inline">(diff: <code>node qa/walkthrough.mjs --compare ${esc4(r.relDir)} ${esc4(wt.runs[0].relDir)}</code>)</span></li>`
+    (r) => r.error ? `<li>${esc5(r.relDir)} \u2014 <span class="bad-inline">${esc5(r.error)}</span></li>` : `<li>${esc5(r.generatedAt)} \u2014 ${r.screenCount} screens, ${r.a11yViolations} a11y violations
+          <span class="empty-inline">(diff: <code>node qa/walkthrough.mjs --compare ${esc5(r.relDir)} ${esc5(wt.runs[0].relDir)}</code>)</span></li>`
   ).join("")}</ul>` : "";
-  return `  <p class="meta">latest: ${esc4(latest.generatedAt)} \xB7 ${latest.screenCount} screens \xB7 ${latest.a11yViolations} a11y violations \xB7 ${latest.notWalked} not walked${latest.unsettled ? ` \xB7 <strong>${latest.unsettled} captured mid-load</strong>` : ""} \u2014
-  <a href="/walkthrough/${esc4(latest.relDirBase || "")}/report.html" target="_blank">open full report</a></p>
+  return `  <p class="meta">latest: ${esc5(latest.generatedAt)} \xB7 ${latest.screenCount} screens \xB7 ${latest.a11yViolations} a11y violations \xB7 ${latest.notWalked} not walked${latest.unsettled ? ` \xB7 <strong>${latest.unsettled} captured mid-load</strong>` : ""} \u2014
+  <a href="/walkthrough/${esc5(latest.relDirBase || "")}/report.html" target="_blank">open full report</a></p>
   <div class="wt-grid">
 ${cards}
   </div>
@@ -36239,17 +36409,17 @@ ${history}`;
 function liveDeviceTabHtml(live, session) {
   const chainHtml = session && session.steps && session.steps.length ? `  <ol class="live-steps">
 ${session.steps.map(
-    (s) => `    <li class="live-step-${esc4(s.status)}"><code>${esc4(s.name)}</code> \u2014 ${esc4(s.status)}${s.detail ? `: ${esc4(s.detail)}` : ""}${s.ms != null ? ` <span class="empty-inline">(${Math.round(s.ms / 100) / 10}s)</span>` : ""}</li>`
+    (s) => `    <li class="live-step-${esc5(s.status)}"><code>${esc5(s.name)}</code> \u2014 ${esc5(s.status)}${s.detail ? `: ${esc5(s.detail)}` : ""}${s.ms != null ? ` <span class="empty-inline">(${Math.round(s.ms / 100) / 10}s)</span>` : ""}</li>`
   ).join("\n")}
   </ol>` : "";
   if (live && live.reachable) {
-    return `  <p class="meta"><span class="ok-inline">\u25CF</span> ${esc4(live.appId)} \xB7 ${esc4(live.buildType)} \xB7 process started ${esc4(
+    return `  <p class="meta"><span class="ok-inline">\u25CF</span> ${esc5(live.appId)} \xB7 ${esc5(live.buildType)} \xB7 process started ${esc5(
       live.processStartedAtMs ? new Date(live.processStartedAtMs).toISOString() : "unknown"
-    )} \u2014 <a href="${esc4(live.remoteUrl)}" target="_blank">open in its own tab</a></p>
-  <iframe class="live-remote" src="${esc4(live.remoteUrl)}" title="live device"></iframe>
+    )} \u2014 <a href="${esc5(live.remoteUrl)}" target="_blank">open in its own tab</a></p>
+  <iframe class="live-remote" src="${esc5(live.remoteUrl)}" title="live device"></iframe>
 ${chainHtml}`;
   }
-  return `  <p class="meta"><span class="bad-inline">\u25CB</span> ${esc4(live ? live.reason : "status unknown")}</p>
+  return `  <p class="meta"><span class="bad-inline">\u25CB</span> ${esc5(live ? live.reason : "status unknown")}</p>
   <p>Start the whole chain from here \u2014 boot a headless AVD if no device is attached, install the
   debug build, launch it, forward the inspector port, and wait for health:</p>
   <p><button id="live-start-btn"${session && session.running ? " disabled" : ""}>${session && session.running ? "Starting\u2026" : "Start live session"}</button></p>
@@ -36258,22 +36428,30 @@ ${chainHtml}
 }
 function digestTabHtml(digest) {
   if (!digest || !digest.available) {
-    return `<div class="empty"><p>No digest \u2014 ${esc4(digest ? digest.reason : "unavailable")}</p></div>`;
+    return `<div class="empty"><p>No digest \u2014 ${esc5(digest ? digest.reason : "unavailable")}</p></div>`;
   }
   const lane = digest.laneRuns.length ? `  <h3>Lane runs</h3>
   <table class="params-table"><thead><tr><th>when</th><th>commit</th><th>verdict</th><th>evidence</th></tr></thead><tbody>
 ${digest.laneRuns.map(
-    (r) => `    <tr><td>${esc4(r.when)}</td><td><code>${esc4(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc4(r.verdict)}</span></td><td>${r.rung ? `${esc4(r.rung)} &mdash; ` : ""}${esc4(r.strength ?? "\u2014")}</td></tr>`
+    (r) => `    <tr><td>${esc5(r.when)}</td><td><code>${esc5(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc5(r.verdict)}</span></td><td>${r.rung ? `${esc5(r.rung)} &mdash; ` : ""}${esc5(r.strength ?? "\u2014")}</td></tr>`
   ).join("\n")}
   </tbody></table>` : `  <h3>Lane runs</h3>
   <p class="empty-inline">no committed receipts in the window \u2014 the lane has not run (or its receipt was not committed)</p>`;
   const approvals = digest.approvalEvents.length ? `  <h3>Approval events</h3>
-  <ul class="digest-list">${digest.approvalEvents.map((e) => `<li>${esc4(e.when)} \xB7 <code>${esc4(e.sha)}</code> \u2014 ${esc4(e.subject)}</li>`).join("")}</ul>` : "";
+  <ul class="digest-list">${digest.approvalEvents.map((e) => `<li>${esc5(e.when)} \xB7 <code>${esc5(e.sha)}</code> \u2014 ${esc5(e.subject)}</li>`).join("")}</ul>` : "";
+  const commitFilesHtml = (files) => {
+    if (!Array.isArray(files) || files.length === 0) return "";
+    const shown = files.slice(0, 12);
+    const more = files.length > shown.length ? `<li class="fd-more">\u2026 and ${files.length - shown.length} more</li>` : "";
+    return `<details class="digest-files"><summary>${files.length} file${files.length === 1 ? "" : "s"}</summary>
+      <ul class="digest-filelist">${shown.map((f) => `<li><span class="fd-status">${esc5(f.status)}</span> <code>${esc5(f.path)}</code></li>`).join("")}${more}</ul></details>`;
+  };
   const commits = digest.commits.length ? `  <h3>Commits</h3>
-  <ul class="digest-list">${digest.commits.map((c) => `<li>${esc4(c.when)} \xB7 <code>${esc4(c.sha)}</code> \u2014 ${esc4(c.subject)}</li>`).join("")}</ul>` : `  <p class="empty-inline">no commits in the window</p>`;
+  <ul class="digest-list">${digest.commits.map(
+    (c) => `<li>${esc5(c.when)} \xB7 <code>${esc5(c.sha)}</code> \u2014 ${esc5(c.subject)}${commitFilesHtml(c.files)}</li>`
+  ).join("")}</ul>` : `  <p class="empty-inline">no commits in the window</p>`;
   const comments = digest.openComments == null ? "" : `  <p class="meta">${digest.openComments} open comment${digest.openComments === 1 ? "" : "s"} awaiting action</p>`;
-  return `  <p class="meta">window: since ${esc4(digest.since)}</p>
-${comments}
+  return `${comments}
 ${lane}
 ${approvals}
 ${commits}`;
@@ -36286,71 +36464,71 @@ function featuresTabHtml(features, meta3 = {}) {
   if (!board || board.features.length === 0) {
     return `  <p class="empty-inline">no feature briefs yet. A brief is born by writing <code>docs/features/&lt;name&gt;.md</code> \u2014 the decisions and their why, signed BEFORE the feature is built. Its location is the governance opt-in; it appears here as a governed <code>feature-brief:&lt;name&gt;</code> artifact the moment the file exists.</p>`;
   }
-  const undeclared = board.undeclared.length > 0 ? `  <div class="feature-undeclared"><strong>Undeclared blast:</strong> ${board.undeclared.map((u) => `<code>${esc4(u.id)}</code>`).join(", ")} changed since approval, and no open brief declared touching ${board.undeclared.length === 1 ? "it" : "them"} \u2014 either a brief's <code>touches</code> is incomplete, or this drift belongs to no feature. The approvals gate is already failing on it; the plan should say why.</div>` : "";
+  const undeclared = board.undeclared.length > 0 ? `  <div class="feature-undeclared"><strong>Undeclared blast:</strong> ${board.undeclared.map((u) => `<code>${esc5(u.id)}</code>`).join(", ")} changed since approval, and no open brief declared touching ${board.undeclared.length === 1 ? "it" : "them"} \u2014 either a brief's <code>touches</code> is incomplete, or this drift belongs to no feature. The approvals gate is already failing on it; the plan should say why.</div>` : "";
   const phaseChip = (phase) => {
     const cls = phase === "accepted" ? "phase-accepted" : phase === "proven" ? "phase-proven" : phase === "approved" ? "phase-approved" : phase === "changed-since-approval" ? "phase-drift" : phase === "reopened" ? "phase-reopened" : "phase-proposed";
-    return `<span class="feature-phase ${cls}">${esc4(phase)}</span>`;
+    return `<span class="feature-phase ${cls}">${esc5(phase)}</span>`;
   };
   const cards = board.features.map((f) => {
     const clauseRows = f.clauses.map((c) => {
       const mark = c.withdrawn ? `<span class="pending-inline">\u2014</span>` : c.cited ? `<span class="ok-inline">\u2713</span>` : `<span class="pending-inline">\u25CB</span>`;
-      const id = c.withdrawn ? `<s><code>${esc4(c.id)}</code></s>` : `<code>${esc4(c.id)}</code>`;
+      const id = c.withdrawn ? `<s><code>${esc5(c.id)}</code></s>` : `<code>${esc5(c.id)}</code>`;
       const state = c.withdrawn ? "withdrawn" : c.cited ? "cited by a test" : "no citing test yet";
       return `      <tr><td>${mark}</td><td>${id}</td><td class="feature-check-detail">${state}</td></tr>`;
     }).join("\n");
-    const clauseTable = f.specExists ? f.clauses.length > 0 ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>clause</th><th><code>${esc4(f.specRel)}</code></th></tr></thead><tbody>
+    const clauseTable = f.specExists ? f.clauses.length > 0 ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>clause</th><th><code>${esc5(f.specRel)}</code></th></tr></thead><tbody>
 ${clauseRows}
-    </tbody></table>` : `    <p class="empty-inline"><code>${esc4(f.specRel)}</code> exists but has no clauses yet \u2014 behavior starts as clauses there.</p>` : `    <p class="empty-inline">no spec yet (<code>${esc4(f.specRel)}</code>) \u2014 the contract step: behavior starts as clauses there, signed before the build.</p>`;
-    const receiptNote = f.receipt.present ? `receipt ${esc4(f.receipt.verdict ?? "?")}${f.receipt.verdict === "PASS" ? f.receipt.attestsTree ? " \xB7 attests this tree" : " \xB7 attests an OLDER tree" : ""}` : "no receipt yet";
-    const doneLine = `    <p class="feature-done ${f.provenDone ? "feature-done-yes" : "meta"}">${f.provenDone ? "\u2713 proven done" : "not yet proven done"} \u2014 ${esc4(f.doneReason)}</p>`;
+    </tbody></table>` : `    <p class="empty-inline"><code>${esc5(f.specRel)}</code> exists but has no clauses yet \u2014 behavior starts as clauses there.</p>` : `    <p class="empty-inline">no spec yet (<code>${esc5(f.specRel)}</code>) \u2014 the contract step: behavior starts as clauses there, signed before the build.</p>`;
+    const receiptNote = f.receipt.present ? `receipt ${esc5(f.receipt.verdict ?? "?")}${f.receipt.verdict === "PASS" ? f.receipt.attestsTree ? " \xB7 attests this tree" : " \xB7 attests an OLDER tree" : ""}` : "no receipt yet";
+    const doneLine = `    <p class="feature-done ${f.provenDone ? "feature-done-yes" : "meta"}">${f.provenDone ? "\u2713 proven done" : "not yet proven done"} \u2014 ${esc5(f.doneReason)}</p>`;
     const touches = f.touches.length > 0 ? `    <p class="feature-touches">declares touching: ${f.touches.map((t) => {
       const drifted = t.status === "changed-since-approval";
       const isSpec = t.id.startsWith("feature-spec:");
       const note = drifted ? ` <span class="feature-as-declared">(as declared \u2014 re-approve when shaped)</span>` : isSpec && t.status === "approved" && f.phase !== "accepted" ? ` <span class="feature-as-declared">(this contract will be reopened &amp; amended)</span>` : !isSpec && t.status === "approved" && f.phase !== "accepted" ? ` <span class="feature-as-declared">(re-approval expected when the work lands)</span>` : "";
-      return `<code>${esc4(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc4(t.status)}</span>${note}`;
+      return `<code>${esc5(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc5(t.status)}</span>${note}`;
     }).join(" \xB7 ")}</p>` : `    <p class="feature-touches meta">declares touching nothing beyond its own spec</p>`;
     const sections = Array.isArray(f.sections) ? f.sections : [];
     const decisionSections = sections.filter((s) => /decision/i.test(s.heading));
     const decisionsHtml = decisionSections.map(
       (s) => `    <div class="feature-decisions">
-      <h4>${esc4(s.heading)}</h4>
+      <h4>${esc5(s.heading)}</h4>
       <div class="doc-prose">${mdProseHtml(s.body)}</div>
     </div>`
     ).join("\n");
     const fullBriefHtml = sections.length > 0 ? `    <details class="feature-brief-full"><summary>the full brief (${sections.length} sections \u2014 the signed document)</summary>
-${sections.map((s) => `      <h4>${esc4(s.heading)}</h4>
+${sections.map((s) => `      <h4>${esc5(s.heading)}</h4>
       <div class="doc-prose">${mdProseHtml(s.body)}</div>`).join("\n")}
     </details>` : "";
     const designHtml = f.design ? f.design.status === "approved" ? `    <p class="feature-design meta">design signed \u2014 ${f.design.fileCount} screen file(s) under governance</p>` : f.design.status === "reopened" ? `    <p class="feature-design"><span class="status-reopened">design reopened</span> \u2014 redesign in progress; re-approve when it lands</p>` : !f.design.resolvable ? `    <p class="feature-design meta">design not drafted yet \u2014 the agent drafts the screens on stub data; you sign what renders, in the Screens gallery</p>` : `    <p class="feature-design"><span class="${f.design.status === "changed-since-approval" ? "status-drift" : "pending-inline"}">${f.design.status === "changed-since-approval" ? "design changed since signature" : "design awaits your signature"}</span> \u2014 judge it on the rendered screens, then
-      <button type="button" class="approve-btn" data-artifact="${escAttr(f.design.id)}">${f.design.status === "changed-since-approval" ? "Re-approve design" : "Approve design"}</button></p>` : "";
-    const nextHtml = f.nextStep ? `    <p class="feature-next">next &rarr; ${esc4(f.nextStep.label)}${f.nextStep.owner ? ` <span class="meta">&middot; ${esc4(f.nextStep.owner)}</span>` : ""}</p>` : "";
+      <button type="button" class="approve-btn" data-artifact="${escAttr2(f.design.id)}">${f.design.status === "changed-since-approval" ? "Re-approve design" : "Approve design"}</button></p>` : "";
+    const nextHtml = f.nextStep ? `    <p class="feature-next">next &rarr; ${esc5(f.nextStep.label)}${f.nextStep.owner ? ` <span class="meta">&middot; ${esc5(f.nextStep.owner)}</span>` : ""}</p>` : "";
     const stamps = [];
-    if (f.record && f.record.approvedAt) stamps.push(`signed ${esc4(f.record.approvedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}`);
-    if (f.record && f.record.accepted) stamps.push(`accepted ${esc4(f.record.acceptedAt ?? "?")}`);
+    if (f.record && f.record.approvedAt) stamps.push(`signed ${esc5(f.record.approvedAt)}${f.record.via ? ` via ${esc5(f.record.via)}` : ""}`);
+    if (f.record && f.record.accepted) stamps.push(`accepted ${esc5(f.record.acceptedAt ?? "?")}`);
     if (f.record && f.record.status === "reopened" && f.record.reopenedAt)
       stamps.push(
-        `reopened ${esc4(f.record.reopenedAt)}${f.record.via ? ` via ${esc4(f.record.via)}` : ""}${f.record.reason ? ` \u2014 ${esc4(f.record.reason)}` : ""}`
+        `reopened ${esc5(f.record.reopenedAt)}${f.record.via ? ` via ${esc5(f.record.via)}` : ""}${f.record.reason ? ` \u2014 ${esc5(f.record.reason)}` : ""}`
       );
     const briefAwaitsSignature = f.phase === "proposed" || f.phase === "changed-since-approval" || f.phase === "reopened";
     const actions = [];
     if (briefAwaitsSignature) {
-      actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
+      actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr2(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
     }
     if (f.phase === "proven") {
-      actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr(f.name)}">Accept</button>`);
+      actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr2(f.name)}">Accept</button>`);
     }
     if (f.phase === "approved") {
       actions.push(`<span class="meta">building \u2014 Accept enables when doneness derives (${f.covered}/${f.total} clauses cited, ${receiptNote})</span>`);
     }
     if (f.blockError) {
-      actions.push(`<span class="status-drift">cmp:feature block: ${esc4(f.blockError)}</span>`);
+      actions.push(`<span class="status-drift">cmp:feature block: ${esc5(f.blockError)}</span>`);
     }
     return `  <article class="feature-card${f.phase === "accepted" ? " feature-card-closed" : ""}">
     <header class="feature-card-head">
-      <h3>${esc4(f.name)}</h3>
+      <h3>${esc5(f.name)}</h3>
       ${phaseChip(f.phase)}
       <span class="feature-tally">${f.covered}/${f.total} clauses cited</span>
-      <a class="feature-doc-link" href="#" title="${escAttr(f.rel)}">${esc4(f.rel)}</a>
+      <a class="feature-doc-link" href="#" title="${escAttr2(f.rel)}">${esc5(f.rel)}</a>
     </header>
     ${stamps.length > 0 ? `<p class="meta">${stamps.join(" \xB7 ")}</p>` : ""}
 ${nextHtml}
@@ -36612,7 +36790,7 @@ function extractCompileErrors(text) {
     (l) => /^e: /.test(l) || /Compilation failed/i.test(l) || /^> Task :\S+ FAILED$/.test(l) || /^BUILD FAILED/.test(l)
   );
 }
-var esc5 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var esc6 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 function galleryHtml(state) {
   const {
     appName,
@@ -36744,8 +36922,8 @@ function galleryHtml(state) {
   let evidenceStatus = "no verify receipt yet";
   if (effectiveReceipt && effectiveReceipt.available) {
     const age = typeof effectiveReceipt.ageMs === "number" ? formatAgeCoarse(effectiveReceipt.ageMs) : "age unknown";
-    const rung = effectiveReceipt.evidenceLevel ? ` &middot; ${esc5(effectiveReceipt.evidenceLevel.rung)} ${esc5(effectiveReceipt.evidenceLevel.name)}` : "";
-    evidenceStatus = `verify ${esc5(effectiveReceipt.verdict || "?")}${rung} &middot; ${esc5(age)}${effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""}`;
+    const rung = effectiveReceipt.evidenceLevel ? ` &middot; ${esc6(effectiveReceipt.evidenceLevel.rung)} ${esc6(effectiveReceipt.evidenceLevel.name)}` : "";
+    evidenceStatus = `verify ${esc6(effectiveReceipt.verdict || "?")}${rung} &middot; ${esc6(age)}${effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""}`;
   }
   let approvalsStatus = "approvals not available in this project";
   if (approvals.available && approvals.statuses) {
@@ -36807,8 +36985,21 @@ function galleryHtml(state) {
     const detail = provenAwaiting > 0 ? ` (${provenAwaiting} acceptance${provenAwaiting === 1 ? "" : "s"})` : "";
     approvalsGlyph = c("changed-since-approval") > 0 ? { ch: "\u26A0", cls: "glyph-drift", label: `${pending} decision(s) waiting \u2014 ${c("changed-since-approval")} drifted${detail}` } : pending > 0 ? { ch: "\u25CB", cls: "glyph-unsigned", label: `${pending} decision(s) waiting${detail}` } : { ch: "\u25CF", cls: "glyph-signed", label: "nothing waiting on you" };
   }
+  const overviewStatuses = approvals.available && approvals.statuses ? approvals.statuses : [];
+  const overviewFeatures = features.available && features.board ? features.board.features : [];
+  const humanQueue = deriveHumanQueue({ statuses: overviewStatuses, features: overviewFeatures });
   const railItems = [
-    // §3.0: Intent is genesis order 0 — the root artifact everything else is
+    // §3.7 (front door): the returning owner's entry point — what needs you,
+    // what changed, is it still proven. It owns no facts; it arranges the
+    // sections below it. See console-overview.mjs for why this supersedes the
+    // "dashboard is ambient — never a separate tab" rule of §2.
+    {
+      id: "overview",
+      label: "Overview",
+      glyph: overviewGlyph(humanQueue, overviewStatuses),
+      active: true
+    },
+    // Intent is genesis order 0 — the root artifact everything else is
     // expressed in — so it leads the rail. The rest follows the REVISED
     // definition order (spec-first behavior, UI-first visuals): architecture,
     // then the exemplar's surfaces (Specs, Screens), then the design system
@@ -36828,8 +37019,7 @@ function galleryHtml(state) {
     {
       id: "screens",
       label: "Screens",
-      glyph: error51 ? { ch: "\u2717", cls: "glyph-drift", label: `last ${errorSource || "render"} failed \u2014 the gallery may be stale` } : null,
-      active: true
+      glyph: error51 ? { ch: "\u2717", cls: "glyph-drift", label: `last ${errorSource || "render"} failed \u2014 the gallery may be stale` } : null
     },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
@@ -36848,8 +37038,6 @@ function galleryHtml(state) {
       glyph: null,
       badgeHtml: `<span class="tab-badge" id="comments-badge"${openCommentCount === 0 ? " hidden" : ""}>${openCommentCount}</span>`
     },
-    // B4: the returning human's first read — everything since they last looked.
-    { id: "digest", label: "Digest", glyph: null },
     // A1: the console arc ends DRIVE — Live device is deliberately the final
     // section: define → preview → approve → verify → report → drive. The glyph
     // follows statusGlyph's {ch, cls, label} shape (a bare string renders as
@@ -36861,6 +37049,29 @@ function galleryHtml(state) {
     }
   ];
   const sections = [
+    // §3.7 — the front door. Composition only: it arranges the queue, the
+    // anchored-diff file splits and the digest that other modules derived. It
+    // grows NO signature control of its own — sign where you read stands.
+    {
+      id: "overview",
+      title: "Overview",
+      statusHtml: overviewStatusHtml({
+        receipt: effectiveReceipt,
+        statuses: overviewStatuses,
+        receiptGlyph,
+        formatAge: formatAgeCoarse
+      }),
+      bodyHtml: overviewBodyHtml({
+        queue: humanQueue,
+        statuses: overviewStatuses,
+        features: overviewFeatures,
+        anchoredDiffs,
+        digestHtml: digestTabHtml(digest),
+        digestSince: digest && digest.available ? digest.since : null,
+        statusGlyph
+      }),
+      active: true
+    },
     {
       id: "intent",
       title: "Intent",
@@ -36889,7 +37100,6 @@ function galleryHtml(state) {
       statusHtml: screensStatus,
       headExtraHtml: `<div class="screens-toolbar"><input id="filter" type="search" placeholder="filter screens&hellip;"></div>`,
       bodyHtml: screensBody,
-      active: true,
       fullBleed: true
     },
     {
@@ -36927,12 +37137,6 @@ function galleryHtml(state) {
     },
     { id: "approvals", title: "Approvals", statusHtml: approvalsStatus, bodyHtml: approvalsTabHtml(approvals, { anchoredDiffs }) },
     { id: "comments", title: "Comments", statusHtml: commentsStatus, bodyHtml: commentsTabHtml(comments) },
-    {
-      id: "digest",
-      title: "Digest",
-      statusHtml: `<span class="status-line">since you last looked</span>`,
-      bodyHtml: digestTabHtml(digest)
-    },
     {
       id: "live-device",
       title: "Live device",
@@ -37040,24 +37244,24 @@ ${section.bodyHtml}`;
       syncShellFromDoc(doc);
     }).catch(() => location.reload());
   }
-  // The governance strip's next-act button: jump to the artifact's own
-  // signature bar (sign-where-you-read \u2014 same jump the guided prompt's "Take
-  // me there" performs). Delegated from the strip container because the SSE
-  // shell-sync replaces the strip's innerHTML wholesale.
-  const govStrip = document.getElementById("gov-strip");
-  if (govStrip) {
-    govStrip.addEventListener("click", (e) => {
-      // .gov-next is the single next act; .gov-jump is a count that names its
-      // artifact (in redesign / drifted). Both carry data-go-* and both must
-      // land the reader on the row that explains itself.
-      const btn = e.target.closest(".gov-next, .gov-jump");
-      if (!btn) return;
-      const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
-      if (railBtn) railBtn.click();
-      const target = document.querySelector('#tab-' + btn.dataset.goTab + ' [data-artifact="' + btn.dataset.goArtifact + '"]');
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-  }
+  // The next-act jump: land on the artifact's own signature bar
+  // (sign-where-you-read \u2014 the same jump the guided prompt's "Take me there"
+  // performs). Delegated at DOCUMENT level, because the same contract now
+  // serves the rail strip AND the front door's queue, and it must survive
+  // every SSE swap (both the strip's innerHTML and the Overview panel are
+  // replaced wholesale). One handler, one behavior \u2014 a second copy on the
+  // front door would be a second mechanism.
+  document.addEventListener("click", (e) => {
+    // .gov-next is the single next act; .gov-jump is a count or a queue row
+    // that names its artifact. Both carry data-go-* and both must land the
+    // reader on the row that explains itself.
+    const btn = e.target.closest(".gov-next, .gov-jump");
+    if (!btn) return;
+    const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
+    if (railBtn) railBtn.click();
+    const target = document.querySelector('#tab-' + btn.dataset.goTab + ' [data-artifact="' + btn.dataset.goArtifact + '"]');
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
   const es = new EventSource("/events");
   // EventSource reconnects on its own, but nothing ever wrote the pill back to
   // "live" \u2014 so a one-second blip read as permanently disconnected, which is a
@@ -37124,7 +37328,10 @@ ${section.bodyHtml}`;
     if (validTab(t)) showTab(t);
   });
   const fromHash = location.hash.slice(1);
-  showTab(validTab(fromHash) ? fromHash : (sessionStorage.getItem("previewTab") || "screens"));
+  // The front door is the fallback ONLY \u2014 hash wins, then the sticky tab. A
+  // hot-reload session parked on Screens stays on Screens across every SSE
+  // reload; only a genuinely fresh session lands on Overview.
+  showTab(validTab(fromHash) ? fromHash : (sessionStorage.getItem("previewTab") || "overview"));
   // Approvals \u2014 POST /api/approve; a successful approve is confirmed by the
   // server's SSE "approval" broadcast above (which swaps the Approvals panel
   // in place), not by this handler mutating state itself \u2014 the two never race.

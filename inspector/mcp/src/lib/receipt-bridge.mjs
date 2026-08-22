@@ -139,7 +139,7 @@ async function recomputeStaleness(root, receipt) {
  *   commitDirty?: string[]|null,
  *   generatedAt?: string|null,
  *   ageMs?: number|null,
- *   steps?: Array<{name: string, verdict: string, reason?: string, durationMs?: number}>,
+ *   steps?: Array<{name: string, verdict: string, reason?: string, note?: string, durationMs?: number, details?: object}>,
  *   evidenceLevel?: {rung: string, name: string, satisfiedBy: string[]}|null,
  *   conformance?: {verdict: string, reason?: string, durationMs?: number}|null,
  *   inputsHash?: string|null,
@@ -170,7 +170,19 @@ export async function getLastReceipt(root) {
 
   const steps = receipt.steps
     .filter((s) => s && typeof s === "object" && typeof s.name === "string")
-    .map((s) => ({ name: s.name, verdict: s.verdict, reason: s.reason, durationMs: s.durationMs }));
+    // `note` and `details` ride along verbatim: the lane already computes the
+    // step's own fine print (which unit-test filter ran, when a CACHED verdict
+    // was earned) and its JUnit tally (tests/failures/errors/skipped,
+    // qa/verify.mjs). Dropping them here was why the Evidence page could only
+    // say "unitTests PASS" while the receipt on disk knew the counts.
+    .map((s) => {
+      const out = { name: s.name, verdict: s.verdict, reason: s.reason, durationMs: s.durationMs };
+      // Added only when the receipt HAS them — a step without fine print keeps
+      // exactly the shape it always had, so "verbatim" stays literally true.
+      if (typeof s.note === "string") out.note = s.note;
+      if (s.details && typeof s.details === "object") out.details = s.details;
+      return out;
+    });
   const conformanceStep = steps.find((s) => s.name === "conformance") || null;
   const conformance = conformanceStep
     ? { verdict: conformanceStep.verdict, reason: conformanceStep.reason, durationMs: conformanceStep.durationMs }

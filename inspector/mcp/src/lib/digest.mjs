@@ -11,7 +11,7 @@ const short = (s) => String(s ?? "").slice(0, 7);
  * @param {string} projectDir
  * @param {{ execFileAsync: Function, sinceDays?: number, limit?: number }} deps
  * @returns {Promise<{available: boolean, reason?: string, since: string,
- *   commits: Array<{sha, subject, when}>,
+ *   commits: Array<{sha, subject, when, files: Array<{status, path}>}>,
  *   laneRuns: Array<{sha, when, verdict, strength?: string, rung?: string}>,
  *   approvalEvents: Array<{sha, when, subject}>,
  *   openComments: number|null}>}
@@ -23,14 +23,35 @@ export async function getDigestData(projectDir, { execFileAsync, sinceDays = 7, 
 
   let commits;
   try {
-    const raw = await git(["log", `--since=${since}`, `--max-count=${limit}`, "--pretty=%H%x00%ci%x00%s"]);
-    commits = raw
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => {
-        const [sha, when, subject] = l.split("\0");
-        return { sha: short(sha), when, subject };
-      });
+    // --name-status alongside the subject: a subject line says what the author
+    // MEANT, the file list says what actually moved. Non-governed changes (the
+    // data layer, the version catalog, build files) have no approval row and
+    // therefore no other surface in the console — without this they are
+    // invisible to the human, proven by the lane and reported to no one.
+    // \x01 opens each commit record so the file lines after it are unambiguous.
+    const raw = await git([
+      "log",
+      `--since=${since}`,
+      `--max-count=${limit}`,
+      "--name-status",
+      "--no-renames",
+      "--pretty=format:%x01%H%x00%ci%x00%s",
+    ]);
+    commits = [];
+    for (const block of raw.split("\x01")) {
+      if (!block.trim()) continue;
+      const [head, ...fileLines] = block.split("\n");
+      const [sha, when, subject] = head.split("\0");
+      if (!sha) continue;
+      const files = [];
+      for (const line of fileLines) {
+        if (!line.trim()) continue;
+        const [status, ...rest] = line.split("\t");
+        if (!rest.length) continue;
+        files.push({ status: status.trim(), path: rest.join("\t") });
+      }
+      commits.push({ sha: short(sha), when, subject, files });
+    }
   } catch (err) {
     return { available: false, reason: `not a git repo (or git failed): ${err.message}`, since, commits: [], laneRuns: [], approvalEvents: [], openComments: null };
   }

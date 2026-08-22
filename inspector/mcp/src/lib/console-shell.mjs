@@ -11,8 +11,12 @@
 // - A 4-step type ramp and an 8px spacing scale. Readable measure for prose;
 //   full-bleed only for galleries.
 // - The rail lists sections in the genesis definition order, each with its
-//   live state glyph (● signed · ○ unsigned · ◐ reopened · ⚠ drifted). The
-//   dashboard function is ambient — never a separate tab.
+//   live state glyph (● signed · ○ unsigned · ◐ reopened · ⚠ drifted).
+// - The dashboard function is ambient — with ONE exception, added 2026-08-22
+//   after the rule failed twice in the same way: the Overview section (§3.7,
+//   console-overview.mjs) is the front door, and it is the only section
+//   permitted to aggregate. It owns no facts and grows no signature control;
+//   everything else stays ambient, in the section that owns it.
 // - Every page: header block (title · status line) → document body →
 //   provenance footer ("derived from the live tree … absence = not derivable").
 // - Light + dark via prefers-color-scheme. Pure server-rendered HTML/CSS,
@@ -557,6 +561,40 @@ export const SHELL_CSS = `
                overflow-wrap: anywhere; }
   .gov-event-glyph { color: var(--muted); }
   .gov-event-reason { display: block; color: var(--muted); font-style: italic; }
+  /* --- the front door (§3.7) ---------------------------------------------
+     Deliberately quiet: this page's job is triage, so the only colour on it is
+     the reserved semantic trio carried in by each row's own glyph. The queue
+     is an ordered list because the order is the derivation's (deriveHumanQueue),
+     not a visual choice. */
+  .fd-h { font-size: var(--fs-head); margin: 24px 0 8px; display: flex; align-items: baseline; gap: 8px; }
+  .fd-h:first-of-type { margin-top: 8px; }
+  .fd-count { font-size: var(--fs-meta); font-weight: 600; color: var(--accent);
+              background: var(--accent-bg); border-radius: 999px; padding: 1px 8px; }
+  .fd-since { font-size: var(--fs-meta); font-weight: 400; color: var(--muted); }
+  .fd-queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .fd-item { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--paper); }
+  .fd-act { margin: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+            font-size: var(--fs-body); line-height: 1.5; }
+  .fd-label { flex: 1; min-width: 12ch; color: var(--ink); }
+  .fd-go { flex: none; color: var(--accent); font-size: var(--fs-meta); font-weight: 600; }
+  .fd-evidence { margin: 6px 0 0; font-size: var(--fs-meta); color: var(--ink-2); }
+  .fd-evidence summary { cursor: pointer; color: var(--ink-2); }
+  .fd-evidence-absent { color: var(--muted); font-style: italic; }
+  .fd-files { list-style: none; margin: 6px 0 0; padding: 0 0 0 2px;
+              display: flex; flex-direction: column; gap: 3px; }
+  .fd-files code { overflow-wrap: anywhere; }
+  .fd-status { display: inline-block; width: 1.4em; color: var(--muted); font-weight: 600; }
+  .fd-more { color: var(--muted); }
+  .fd-clear { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+  /* The digest keeps its own renderer and its own headings; inside the front
+     door it is a block, not a page, so its h3s step down a level. Nothing here
+     hides any of its content — the one duplicated line (the window) was deleted
+     at the source instead. */
+  .fd-digest h3 { font-size: var(--fs-body); margin: 16px 0 6px; color: var(--ink-2); }
+  .digest-files summary { cursor: pointer; color: var(--muted); font-size: var(--fs-meta); }
+  .digest-filelist { list-style: none; margin: 4px 0 0; padding: 0 0 0 2px;
+                     display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-meta); }
+  .digest-filelist code { overflow-wrap: anywhere; }
   .rail-nav { display: flex; flex-direction: column; gap: 1px; }
   .tab-btn { appearance: none; display: flex; align-items: center; gap: 9px; width: 100%;
              padding: 7px 10px; border: none; border-radius: 8px; background: none; cursor: pointer;
@@ -822,6 +860,12 @@ export const SHELL_CSS = `
                     padding: 0; font-size: var(--fs-meta); color: var(--ink-2); }
   .evidence-binding-stale { color: var(--drift); font-weight: 600; }
   .step-table .step-reason { white-space: pre-wrap; font-size: var(--fs-meta); color: var(--ink-2); }
+  /* The tally leads the Detail cell — it is the one fact present on a green
+     row, where reason and note are both empty. */
+  .step-table .step-counts { display: block; font-size: var(--fs-meta); color: var(--ink-2);
+                             font-variant-numeric: tabular-nums; }
+  .step-table .step-failed { color: var(--drift); }
+  .step-table .step-note { display: block; font-size: var(--fs-meta); color: var(--muted); font-style: italic; }
   .step-verdict-pass { color: var(--signed); font-weight: 650; }
   .step-verdict-fail { color: var(--drift); font-weight: 650; }
   .step-verdict-skip { color: var(--muted); font-weight: 650; }

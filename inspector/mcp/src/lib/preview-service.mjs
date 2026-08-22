@@ -65,6 +65,7 @@ import { getLiveDeviceStatus, createLiveSession } from "./live-session.mjs";
 import { getDigestData } from "./digest.mjs";
 import { getApprovalAnchoredDiff } from "./approval-diff.mjs";
 import { renderShellPage, statusGlyph, artifactStatusHtml, railReceiptHtml, receiptGlyph, formatAgeCoarse, deriveHumanQueue, governanceStripHtml } from "./console-shell.mjs";
+import { overviewBodyHtml, overviewStatusHtml, overviewGlyph } from "./console-overview.mjs";
 import {
   designLanguageBodyHtml,
   componentsBodyHtml,
@@ -812,11 +813,31 @@ export function galleryHtml(state) {
           : { ch: "●", cls: "glyph-signed", label: "nothing waiting on you" };
   }
 
+  // The human queue, derived ONCE for this render and shared by the front door
+  // and the governance strip — the same deriveHumanQueue the guided prompt
+  // uses. Three surfaces, one derivation: they cannot disagree.
+  const overviewStatuses = approvals.available && approvals.statuses ? approvals.statuses : [];
+  const overviewFeatures = features.available && features.board ? features.board.features : [];
+  const humanQueue = deriveHumanQueue({ statuses: overviewStatuses, features: overviewFeatures });
+
   // Rail + sections share one order: the genesis definition order (§2), with
   // the cross-cutting ledgers (Approvals, Comments) after the artifact pages.
-  // Screens stays the DEFAULT page — the daily hot-reload surface.
+  // Overview is the DEFAULT page — the front door (§3.7). Screens keeps the
+  // hot-reload loop: the tab is sticky (hash + sessionStorage), so an SSE
+  // reload during UI work never bounces the reader off the gallery; only a
+  // genuinely fresh session lands on the front door.
   const railItems = [
-    // §3.0: Intent is genesis order 0 — the root artifact everything else is
+    // §3.7 (front door): the returning owner's entry point — what needs you,
+    // what changed, is it still proven. It owns no facts; it arranges the
+    // sections below it. See console-overview.mjs for why this supersedes the
+    // "dashboard is ambient — never a separate tab" rule of §2.
+    {
+      id: "overview",
+      label: "Overview",
+      glyph: overviewGlyph(humanQueue, overviewStatuses),
+      active: true,
+    },
+    // Intent is genesis order 0 — the root artifact everything else is
     // expressed in — so it leads the rail. The rest follows the REVISED
     // definition order (spec-first behavior, UI-first visuals): architecture,
     // then the exemplar's surfaces (Specs, Screens), then the design system
@@ -839,7 +860,6 @@ export function galleryHtml(state) {
       glyph: error
         ? { ch: "✗", cls: "glyph-drift", label: `last ${errorSource || "render"} failed — the gallery may be stale` }
         : null,
-      active: true,
     },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },
@@ -858,8 +878,6 @@ export function galleryHtml(state) {
       glyph: null,
       badgeHtml: `<span class="tab-badge" id="comments-badge"${openCommentCount === 0 ? " hidden" : ""}>${openCommentCount}</span>`,
     },
-    // B4: the returning human's first read — everything since they last looked.
-    { id: "digest", label: "Digest", glyph: null },
     // A1: the console arc ends DRIVE — Live device is deliberately the final
     // section: define → preview → approve → verify → report → drive. The glyph
     // follows statusGlyph's {ch, cls, label} shape (a bare string renders as
@@ -872,6 +890,29 @@ export function galleryHtml(state) {
   ];
 
   const sections = [
+    // §3.7 — the front door. Composition only: it arranges the queue, the
+    // anchored-diff file splits and the digest that other modules derived. It
+    // grows NO signature control of its own — sign where you read stands.
+    {
+      id: "overview",
+      title: "Overview",
+      statusHtml: overviewStatusHtml({
+        receipt: effectiveReceipt,
+        statuses: overviewStatuses,
+        receiptGlyph,
+        formatAge: formatAgeCoarse,
+      }),
+      bodyHtml: overviewBodyHtml({
+        queue: humanQueue,
+        statuses: overviewStatuses,
+        features: overviewFeatures,
+        anchoredDiffs,
+        digestHtml: digestTabHtml(digest),
+        digestSince: digest && digest.available ? digest.since : null,
+        statusGlyph,
+      }),
+      active: true,
+    },
     {
       id: "intent",
       title: "Intent",
@@ -900,7 +941,6 @@ export function galleryHtml(state) {
       statusHtml: screensStatus,
       headExtraHtml: `<div class="screens-toolbar"><input id="filter" type="search" placeholder="filter screens&hellip;"></div>`,
       bodyHtml: screensBody,
-      active: true,
       fullBleed: true,
     },
     {
@@ -940,12 +980,6 @@ export function galleryHtml(state) {
     },
     { id: "approvals", title: "Approvals", statusHtml: approvalsStatus, bodyHtml: approvalsTabHtml(approvals, { anchoredDiffs }) },
     { id: "comments", title: "Comments", statusHtml: commentsStatus, bodyHtml: commentsTabHtml(comments) },
-    {
-      id: "digest",
-      title: "Digest",
-      statusHtml: `<span class="status-line">since you last looked</span>`,
-      bodyHtml: digestTabHtml(digest),
-    },
     {
       id: "live-device",
       title: "Live device",
@@ -1075,24 +1109,24 @@ export function galleryHtml(state) {
       syncShellFromDoc(doc);
     }).catch(() => location.reload());
   }
-  // The governance strip's next-act button: jump to the artifact's own
-  // signature bar (sign-where-you-read — same jump the guided prompt's "Take
-  // me there" performs). Delegated from the strip container because the SSE
-  // shell-sync replaces the strip's innerHTML wholesale.
-  const govStrip = document.getElementById("gov-strip");
-  if (govStrip) {
-    govStrip.addEventListener("click", (e) => {
-      // .gov-next is the single next act; .gov-jump is a count that names its
-      // artifact (in redesign / drifted). Both carry data-go-* and both must
-      // land the reader on the row that explains itself.
-      const btn = e.target.closest(".gov-next, .gov-jump");
-      if (!btn) return;
-      const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
-      if (railBtn) railBtn.click();
-      const target = document.querySelector('#tab-' + btn.dataset.goTab + ' [data-artifact="' + btn.dataset.goArtifact + '"]');
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-  }
+  // The next-act jump: land on the artifact's own signature bar
+  // (sign-where-you-read — the same jump the guided prompt's "Take me there"
+  // performs). Delegated at DOCUMENT level, because the same contract now
+  // serves the rail strip AND the front door's queue, and it must survive
+  // every SSE swap (both the strip's innerHTML and the Overview panel are
+  // replaced wholesale). One handler, one behavior — a second copy on the
+  // front door would be a second mechanism.
+  document.addEventListener("click", (e) => {
+    // .gov-next is the single next act; .gov-jump is a count or a queue row
+    // that names its artifact. Both carry data-go-* and both must land the
+    // reader on the row that explains itself.
+    const btn = e.target.closest(".gov-next, .gov-jump");
+    if (!btn) return;
+    const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
+    if (railBtn) railBtn.click();
+    const target = document.querySelector('#tab-' + btn.dataset.goTab + ' [data-artifact="' + btn.dataset.goArtifact + '"]');
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
   const es = new EventSource("/events");
   // EventSource reconnects on its own, but nothing ever wrote the pill back to
   // "live" — so a one-second blip read as permanently disconnected, which is a
@@ -1159,7 +1193,10 @@ export function galleryHtml(state) {
     if (validTab(t)) showTab(t);
   });
   const fromHash = location.hash.slice(1);
-  showTab(validTab(fromHash) ? fromHash : (sessionStorage.getItem("previewTab") || "screens"));
+  // The front door is the fallback ONLY — hash wins, then the sticky tab. A
+  // hot-reload session parked on Screens stays on Screens across every SSE
+  // reload; only a genuinely fresh session lands on Overview.
+  showTab(validTab(fromHash) ? fromHash : (sessionStorage.getItem("previewTab") || "overview"));
   // Approvals — POST /api/approve; a successful approve is confirmed by the
   // server's SSE "approval" broadcast above (which swaps the Approvals panel
   // in place), not by this handler mutating state itself — the two never race.
