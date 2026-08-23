@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **The studio console has a front door.** The console had nine peer sections and no
+  hierarchy of attention above them, so the returning owner's three questions were
+  answered in four places: the queue as a rail widget pointing at rows scattered across
+  other tabs, "what changed since I last looked" behind a tab you had to know to open,
+  and the lane verdict behind another. The new **Overview** section (the default landing
+  tab) answers all three in the order they get asked — *what needs you* (the human queue,
+  each act carrying the evidence to judge its urgency: a drifted artifact's
+  changed/still-signed file split, a proven feature's clause tally and receipt) · *what
+  changed* (the digest, retired as a tab into this page) · *is it proven* (lane glyph,
+  verdict, rung, signing tally). It derives nothing of its own and grows no signature
+  control — sign-where-you-read is unchanged, and it jumps you to the section that owns
+  each act. The rail strip collapses to a pointer in the same move: it keeps the counts
+  (status visible on every tab) and hands off with "N things need you → Overview", so the
+  rail says *that* something waits and the front door says *what*.
+- **Evidence renders the test tally the receipt already carried.** `qa/verify.mjs` writes
+  each test step's JUnit summary into `details`; the receipt bridge was stripping it, so
+  the release-readiness report could only say `unitTests PASS` where
+  `214 tests · 0 failed · 3 skipped` was sitting on disk. The step's own `note` (which
+  affected-test filter ran, when a CACHED verdict was earned) renders too.
+- **The digest's commits name their files** (`--name-status`). Non-governed changes — the
+  data layer, the version catalog, build files — have no approval row and therefore had no
+  console surface at all: proven by the lane, reported to no one.
+
 ### Fixed
 
 - **`@create-cmp/inspector` 0.6.2 — the `mcpName` field the MCP registry's ownership

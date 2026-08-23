@@ -3000,3 +3000,54 @@ test("galleryHtml (front door): the Overview panel is in the in-place refresh se
   assert.match(list, /"tab-overview"/, "the front door must refresh on every governed-state event");
   for (const id of ["tab-approvals", "tab-features", "tab-evidence"]) assert.match(list, new RegExp(`"${id}"`));
 });
+
+/**
+ * The front door, end to end against a LIVE console — the proof the unit tests
+ * cannot give. Its whole body is "what still waits on you", so the question
+ * that matters is not whether it renders once, but whether it is CORRECT AGAIN
+ * after the human acts. (The SSE path re-fetches `/` and swaps `#tab-overview`
+ * in place; this pins the server half of that chain, and the GOVERNED_PANELS
+ * test pins the client half.)
+ */
+test("front door (live): the queue names the act, and the act LEAVES the queue once signed", async () => {
+  const { root: projectDir, specFile } = await makeArchitectureFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19893, hot: false, runRender: async () => {} });
+  const overview = (page) => page.match(/<section id="tab-overview"[\s\S]*?<\/section>/)[0];
+  try {
+    const st = await service.start();
+
+    // 1. Unsigned: the front door names the act and points at the section that
+    //    owns the signature — never carrying a signing control of its own.
+    let fd = overview(await (await fetch(st.url)).text());
+    assert.match(fd, /Approve architecture/);
+    assert.match(fd, /data-go-tab="architecture" data-go-artifact="architecture"/);
+    assert.doesNotMatch(fd, /api\/approve/, "sign where you read — the front door jumps, it does not sign");
+
+    // 2. Sign it for real. Same endpoint the human's button uses.
+    const res = await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "architecture" }),
+    });
+    assert.equal((await res.json()).ok, true);
+
+    // 3. THE DEFECT THIS PINS: a re-render must drop the completed act. A front
+    //    door that keeps advertising work the human just finished is worse than
+    //    no front door — it is the console's entry point telling a lie.
+    fd = overview(await (await fetch(st.url)).text());
+    assert.doesNotMatch(fd, /Approve architecture/, "the signed act must leave the queue");
+
+    // 4. Drift the signed bytes: the act comes BACK, and now carries the
+    //    evidence — which files moved since the signature, and which did not.
+    fs.appendFileSync(specFile, "\n<!-- edited after approval -->\n");
+    fd = overview(await (await fetch(st.url)).text());
+    assert.match(fd, /Re-approve architecture — it changed since signing/);
+    assert.match(fd, /changed since you signed|not derivable/, "drift must arrive with its file split, or an honest absence");
+    assert.match(fd, /still exactly as signed|not derivable/, "what the signature STILL covers is half the answer");
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    resetReceiptBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
