@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-23
+
+Ships **`@create-cmp/inspector` 0.7.0** — the console lives in that package, so the
+front door is released there and picked up by `create-cmp-cli` 0.16.0.
+
 ### Added
 
 - **The studio console has a front door.** The console had nine peer sections and no
@@ -1706,6 +1711,7 @@ Initial release.
   marketplace manifest.
 
 [Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.15.0...HEAD
+[0.16.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.13.0...v0.14.0
