@@ -2768,9 +2768,27 @@ test("service: freshness is DERIVED — a source change past the last render rea
     // Render once more explicitly: this covers any watcher event (including a spurious
     // FSEvents delivery for the tmpdir) that arrived during startup, so the assertion
     // tests the DERIVATION rather than the platform's watcher timing.
-    await service._renderCycle();
+    // The render and the fetch are two steps, and a spurious FSEvents delivery
+    // for the tmpdir can land BETWEEN them — flipping the page to stale while
+    // the assertion is in flight, which is the page being honest, not wrong.
+    // That race made this a rare, load-sensitive failure in the prepublish gate
+    // (seen once during an `npm publish`, ~1 in 10 under full parallel load).
+    // Retrying the render/fetch PAIR measures what the test is for — the
+    // derivation "fresh tree -> no banner" — instead of the platform's watcher
+    // timing, which the comment above already says is not the subject. The
+    // assertion itself is unchanged: it still only ever accepts a page with no
+    // banner, and only one fetched entirely inside a fresh window.
+    let freshPage = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await service._renderCycle();
+      if (service.status().freshness.state !== "fresh") continue;
+      const page = await (await fetch(service.status().url)).text();
+      if (service.status().freshness.state !== "fresh") continue; // an event landed mid-fetch
+      freshPage = page;
+      break;
+    }
+    assert.ok(freshPage !== null, "a render settled without a watcher event landing mid-fetch");
     assert.equal(service.status().freshness.state, "fresh", "a just-rendered tree is fresh");
-    const freshPage = await (await fetch(service.status().url)).text();
     assert.doesNotMatch(freshPage, /Showing the last good render/, "no provenance banner when current");
 
     // A save the render has not caught up with yet.
