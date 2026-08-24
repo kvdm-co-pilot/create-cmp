@@ -118,6 +118,15 @@ motion) confirmed the pillars above and added the following:
 - **Watch items:** JetBrains' new default KMP project structure (template conformance review) and
   the Kotlin Toolchain/Amper evolution (keep the engine's build-system assumptions isolated).
 
+## Tracked follow-ups
+
+- **TODO — signature-load pruning, with evidence (Karel, 2026-08-24).** The gate count may be
+  too high, but it has never been measurable. Once walk-status ships (every walk declares
+  "stops for you: N" up front), mine the showcase's journal across features: signatures the
+  walk *declared* vs. stops the human actually *experienced* (interleaved walks, harness
+  waves, unframed re-approvals). Prune gates from that data, not from feel. Blocked on:
+  walk-status (docs/features/walk-status.md). The nav-ia case study: 3 declared, ~8 felt.
+
 ## Sequencing
 
 | Order | Work | Why first |

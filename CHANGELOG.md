@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **The walk — you always know what it's doing and whose turn it is**
+  (docs/features/walk-status.md; born from the navigation-ia session: 20+ prompts, three
+  interleaved walks, no shared map). Every governed change is now a **walk** through six
+  stages spoken in human vocabulary — **Decide · Design · Contract · Build · Prove ·
+  Sign-off** — with spec clauses rendered as **promises** ("keeping promise 5 of 7", in
+  the clause's own words). It is a PROJECTION of the existing feature-board derivation
+  (phase + nextStep), never new state. Surfaces, layered by reliability: `qa/walk-status.mjs`
+  (cards · `--statusline` · `--inject` · `--json`, fail-open by contract), the template's
+  `statusLine` (always-visible position, no agent involved), a `UserPromptSubmit` hook that
+  re-anchors the agent with derived position + protocol on EVERY prompt (decay-proof:
+  re-told, not remembered), and the contract's walk protocol (upfront itinerary with
+  "stops for you: N", quiet one-line transitions, loud stop cards at human gates).
+  Work no open walk accounts for renders as **▲ ARRIVED, UNPLANNED** with the journal's
+  reason — interleaving becomes an explicit choice, never an ambush. Deliberately NOT
+  a second Stop hook: Stop stays the receipt gate alone (test-pinned); the statusline
+  does the footer's job better.
+
+
 ## [0.16.0] - 2026-08-23
 
 Ships **`@create-cmp/inspector` 0.7.0** — the console lives in that package, so the

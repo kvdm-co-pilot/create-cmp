@@ -231,8 +231,82 @@ ${digestHtml}
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
   <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
+${walksHtml(features, statuses)}
 ${changedBlock}
 ${historyHtml}`;
+}
+
+// ── In flight — the walks (docs/features/walk-status.md) ─────────────────────
+//
+// The six-stage projection of the feature board: Decide · Design · Contract ·
+// Build · Prove · Sign-off, promises (clauses) as Build's inner progress.
+// STEP_STAGE mirrors qa/lib/walk.mjs VERBATIM — the harness owns the mapping;
+// this is its rendering. Stage states are positional around the board's own
+// derived nextStep, exactly like walkOfFeature.
+
+const WK_STAGES = [
+  ["decide", "Decide"], ["design", "Design"], ["contract", "Contract"],
+  ["build", "Build"], ["prove", "Prove"], ["signoff", "Sign-off"],
+];
+const WK_STEP_STAGE = {
+  "sign-brief": "decide", "re-approve": "decide",
+  design: "design", audit: "design", "sign-design": "design",
+  contract: "contract", "sign-spec": "contract",
+  build: "build", redesign: "build", prove: "prove", accept: "signoff",
+};
+
+/**
+ * The In-flight block: one card per OPEN walk (most-recent board order), plus
+ * arrivals — REOPENED artifacts no open walk accounts for (a harness wave's
+ * rule-change reopens). Drifted artifacts are deliberately NOT repeated here:
+ * they are already loud in the What-needs-you queue above; one fact, one place.
+ * Empty walks + no arrivals -> "" (silence, never an empty frame).
+ */
+export function walksHtml(features = [], statuses = []) {
+  const open = features.filter((f) => f.phase !== "accepted");
+  const owned = new Set();
+  for (const f of open) {
+    owned.add(`feature-brief:${f.name}`);
+    owned.add(`feature-design:${f.name}`);
+    owned.add(`feature-spec:${f.name}`);
+    for (const t of f.touches || []) owned.add(t.id);
+  }
+  const arrivals = statuses.filter((s) => s.status === "reopened" && !owned.has(s.id));
+  if (open.length === 0 && arrivals.length === 0) return "";
+
+  const cards = open.map((f) => {
+    const currentKey = WK_STEP_STAGE[f.nextStep && f.nextStep.key] ?? null;
+    const idx = currentKey ? WK_STAGES.findIndex(([k]) => k === currentKey) : WK_STAGES.length;
+    const dots = WK_STAGES.map(([key, label], i) => {
+      const state =
+        key === "design" && f.design === null ? "skip" : i < idx ? "done" : i === idx ? "cur" : "todo";
+      const title = state === "skip" ? `${label} — no UI surface` : label;
+      return `<span class="wk-stage wk-${state}" title="${escAttr(title)}"><span class="wk-dot"></span>${esc(label)}</span>`;
+    }).join("");
+    const promises =
+      typeof f.total === "number" && f.total > 0
+        ? `<span class="wk-promises">${f.covered} of ${f.total} promises kept</span>`
+        : "";
+    const owner = f.nextStep ? f.nextStep.label : "";
+    const you =
+      f.nextStep && f.nextStep.owner === "human"
+        ? `<span class="wk-turn">YOUR TURN</span> ${esc(owner)}`
+        : `<span class="wk-agent">agent</span> ${esc(owner)}`;
+    return `  <div class="wk-card" data-walk="${escAttr(f.name)}">
+    <p class="wk-name">${esc(f.name)}${promises}</p>
+    <p class="wk-stages">${dots}</p>
+    <p class="wk-you">${you}</p>
+  </div>`;
+  });
+
+  const arrived = arrivals.map(
+    (a) =>
+      `  <p class="wk-arrival">&#9650; ARRIVED, UNPLANNED &mdash; ${esc(a.label || a.id)} &middot; reopened outside every open walk &mdash; now, or after the current walk lands?</p>`,
+  );
+
+  return `  <h3 class="fd-h">In flight${open.length ? ` <span class="fd-count">${open.length}</span>` : ""}</h3>
+${cards.join("\n")}
+${arrived.join("\n")}`;
 }
 
 /** The front door's rail glyph — the queue's own state, never a fifth meaning. */

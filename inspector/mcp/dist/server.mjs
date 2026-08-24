@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs be844634d37bd798b8a835a19b09ab4231049312c649f3bbdcd9ad1c6ef7bd68
+// cmp:bundle-inputs 8c2aa575463435ac366c9434e7d42cf7d3be631361b4cf65b36dc39019e37022
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34342,6 +34342,21 @@ var SHELL_CSS = `
   .fd-more { color: var(--muted); }
   .fd-clear { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
   .fd-history { border-top: 1px solid var(--line); padding-top: 8px; }
+  /* In flight (walk-status): the six-stage tracker. States: done=signed colour,
+     cur=accent + weight, todo=muted, skip=faint with its honesty note in title. */
+  .wk-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0 0 8px; background: var(--paper); }
+  .wk-name { margin: 0 0 6px; font-weight: 600; display: flex; align-items: baseline; gap: 10px; }
+  .wk-promises { font-size: var(--fs-meta); font-weight: 400; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .wk-stages { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-meta); }
+  .wk-stage { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+  .wk-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--line); }
+  .wk-done { color: var(--ink-2); } .wk-done .wk-dot { background: var(--signed); }
+  .wk-cur { color: var(--accent); font-weight: 650; } .wk-cur .wk-dot { background: var(--accent); }
+  .wk-skip { opacity: .45; }
+  .wk-you { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); }
+  .wk-turn { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 10.5px; }
+  .wk-agent { color: var(--muted); font-weight: 600; }
+  .wk-arrival { margin: 4px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--reopen-bg); color: var(--reopen); font-size: var(--fs-meta); }
   /* The digest keeps its own renderer and its own headings; inside the front
      door it is a block, not a page, so its h3s step down a level. Nothing here
      hides any of its content \u2014 the one duplicated line (the window) was deleted
@@ -34869,8 +34884,65 @@ ${digestHtml}
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
   <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
+${walksHtml(features, statuses)}
 ${changedBlock}
 ${historyHtml}`;
+}
+var WK_STAGES = [
+  ["decide", "Decide"],
+  ["design", "Design"],
+  ["contract", "Contract"],
+  ["build", "Build"],
+  ["prove", "Prove"],
+  ["signoff", "Sign-off"]
+];
+var WK_STEP_STAGE = {
+  "sign-brief": "decide",
+  "re-approve": "decide",
+  design: "design",
+  audit: "design",
+  "sign-design": "design",
+  contract: "contract",
+  "sign-spec": "contract",
+  build: "build",
+  redesign: "build",
+  prove: "prove",
+  accept: "signoff"
+};
+function walksHtml(features = [], statuses = []) {
+  const open = features.filter((f) => f.phase !== "accepted");
+  const owned = /* @__PURE__ */ new Set();
+  for (const f of open) {
+    owned.add(`feature-brief:${f.name}`);
+    owned.add(`feature-design:${f.name}`);
+    owned.add(`feature-spec:${f.name}`);
+    for (const t of f.touches || []) owned.add(t.id);
+  }
+  const arrivals = statuses.filter((s) => s.status === "reopened" && !owned.has(s.id));
+  if (open.length === 0 && arrivals.length === 0) return "";
+  const cards = open.map((f) => {
+    const currentKey = WK_STEP_STAGE[f.nextStep && f.nextStep.key] ?? null;
+    const idx = currentKey ? WK_STAGES.findIndex(([k]) => k === currentKey) : WK_STAGES.length;
+    const dots = WK_STAGES.map(([key, label], i) => {
+      const state = key === "design" && f.design === null ? "skip" : i < idx ? "done" : i === idx ? "cur" : "todo";
+      const title = state === "skip" ? `${label} \u2014 no UI surface` : label;
+      return `<span class="wk-stage wk-${state}" title="${escAttr(title)}"><span class="wk-dot"></span>${esc4(label)}</span>`;
+    }).join("");
+    const promises = typeof f.total === "number" && f.total > 0 ? `<span class="wk-promises">${f.covered} of ${f.total} promises kept</span>` : "";
+    const owner = f.nextStep ? f.nextStep.label : "";
+    const you = f.nextStep && f.nextStep.owner === "human" ? `<span class="wk-turn">YOUR TURN</span> ${esc4(owner)}` : `<span class="wk-agent">agent</span> ${esc4(owner)}`;
+    return `  <div class="wk-card" data-walk="${escAttr(f.name)}">
+    <p class="wk-name">${esc4(f.name)}${promises}</p>
+    <p class="wk-stages">${dots}</p>
+    <p class="wk-you">${you}</p>
+  </div>`;
+  });
+  const arrived = arrivals.map(
+    (a) => `  <p class="wk-arrival">&#9650; ARRIVED, UNPLANNED &mdash; ${esc4(a.label || a.id)} &middot; reopened outside every open walk &mdash; now, or after the current walk lands?</p>`
+  );
+  return `  <h3 class="fd-h">In flight${open.length ? ` <span class="fd-count">${open.length}</span>` : ""}</h3>
+${cards.join("\n")}
+${arrived.join("\n")}`;
 }
 function overviewGlyph(queue = [], statuses = []) {
   if (statuses.length === 0) return null;

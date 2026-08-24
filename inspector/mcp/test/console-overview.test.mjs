@@ -213,3 +213,44 @@ test("an empty journal renders no History block at all", () => {
   const html = overviewBodyHtml({ queue: [], statuses: [{ id: "intent", status: "approved" }], statusGlyph, journal: [] });
   assert.doesNotMatch(html, /fd-history/);
 });
+
+// ── In flight — the walks (docs/features/walk-status.md) ──────────────────────
+import { walksHtml } from "../src/lib/console-overview.mjs";
+
+const buildingFeature = {
+  name: "meal", phase: "approved", design: null, covered: 4, total: 7,
+  touches: [], nextStep: { key: "build", owner: "agent", label: "build & cite: 3 clause(s) have no citing test yet" },
+};
+
+test("walks: a building feature renders the six-stage tracker, promises kept, and the agent's turn", () => {
+  const html = walksHtml([buildingFeature], []);
+  assert.match(html, /In flight/);
+  for (const label of ["Decide", "Design", "Contract", "Build", "Prove", "Sign-off"]) assert.match(html, new RegExp(label));
+  assert.match(html, /wk-cur"[^>]*><span class="wk-dot"><\/span>Build/, "Build is the current stage");
+  assert.match(html, /4 of 7 promises kept/);
+  assert.match(html, /wk-agent/, "building is the agent's turn — quiet, not a YOUR TURN chip");
+  assert.match(html, /Design — no UI surface/, "a skipped Design says why, never silently");
+});
+
+test("walks: a proven feature shows YOUR TURN at Sign-off; an accepted one is absent entirely", () => {
+  const proven = { ...buildingFeature, name: "goals", covered: 7, phase: "proven", nextStep: { key: "accept", owner: "human", label: "accept — the proven thing awaits your judgment" } };
+  const html = walksHtml([proven, { ...buildingFeature, name: "closed", phase: "accepted" }], []);
+  assert.match(html, /wk-turn">YOUR TURN/);
+  assert.doesNotMatch(html, /data-walk="closed"/, "an accepted walk is closed — not in flight");
+});
+
+test("walks: a reopened artifact no open walk accounts for renders as an ARRIVAL; owned ones never do", () => {
+  const statuses = [
+    { id: "feature-design:settings", status: "reopened", label: "Feature design (settings)" },
+    { id: "feature-design:meal", status: "reopened", label: "Feature design (meal)" },
+  ];
+  const withDesign = { ...buildingFeature, design: { id: "feature-design:meal", status: "reopened" } };
+  const html = walksHtml([withDesign], statuses);
+  assert.match(html, /ARRIVED, UNPLANNED &mdash; Feature design \(settings\)/, "the harness-wave reopen surfaces");
+  assert.doesNotMatch(html, /ARRIVED, UNPLANNED &mdash; Feature design \(meal\)/, "an open walk's own design is its Design stage, not an arrival");
+});
+
+test("walks: nothing open and nothing arrived renders NOTHING — silence, not an empty frame", () => {
+  assert.equal(walksHtml([{ ...buildingFeature, phase: "accepted" }], []), "");
+  assert.equal(walksHtml([], []), "");
+});

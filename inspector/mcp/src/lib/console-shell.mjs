@@ -581,6 +581,21 @@ export const SHELL_CSS = `
   .fd-more { color: var(--muted); }
   .fd-clear { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
   .fd-history { border-top: 1px solid var(--line); padding-top: 8px; }
+  /* In flight (walk-status): the six-stage tracker. States: done=signed colour,
+     cur=accent + weight, todo=muted, skip=faint with its honesty note in title. */
+  .wk-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0 0 8px; background: var(--paper); }
+  .wk-name { margin: 0 0 6px; font-weight: 600; display: flex; align-items: baseline; gap: 10px; }
+  .wk-promises { font-size: var(--fs-meta); font-weight: 400; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .wk-stages { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-meta); }
+  .wk-stage { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+  .wk-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--line); }
+  .wk-done { color: var(--ink-2); } .wk-done .wk-dot { background: var(--signed); }
+  .wk-cur { color: var(--accent); font-weight: 650; } .wk-cur .wk-dot { background: var(--accent); }
+  .wk-skip { opacity: .45; }
+  .wk-you { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); }
+  .wk-turn { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 10.5px; }
+  .wk-agent { color: var(--muted); font-weight: 600; }
+  .wk-arrival { margin: 4px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--reopen-bg); color: var(--reopen); font-size: var(--fs-meta); }
   /* The digest keeps its own renderer and its own headings; inside the front
      door it is a block, not a page, so its h3s step down a level. Nothing here
      hides any of its content — the one duplicated line (the window) was deleted

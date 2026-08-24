@@ -37,6 +37,7 @@ prerequisite.
 <!-- >>> cmp:feature harness -->
 | Adding a feature / screen / repository | `node qa/scaffold-feature.mjs <Name>` — clones the tested exemplar through every layer; never freehand the pattern (skills: `add-feature`, `add-screen`, `add-repository`) |
 | A gate failed and looks arbitrary | `node qa/refusal-demo.mjs` — stages canonical violations so each gate names the clause it protects |
+| Where are we / whose turn is it | `node qa/walk-status.mjs` — every open walk's stage card (Decide·Design·Contract·Build·Prove·Sign-off), whose turn, what arrived unplanned; `--statusline` is the one-liner |
 <!-- <<< cmp:feature harness -->
 | Build broken, toolchain suspect | `npx create-cmp-cli doctor --fix` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog drift); asks before any repair |
 | Dependency versions stale or mismatched | `npx create-cmp-cli upgrade --dry-run` — diff against the next proven-green set before touching anything |
