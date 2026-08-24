@@ -1037,7 +1037,7 @@ ${diffRow}`;
 ${rows}
     </tbody>
   </table>
-  <div id="approve-error" class="banner" hidden></div>`;
+  <div id="approve-error" class="banner sig-error" hidden></div>`;
 }
 
 // --- Specs (§3.5) — the QA lead's traceability matrix ------------------------
@@ -2689,5 +2689,5 @@ ${fullBriefHtml}
   <div class="feature-board">
 ${cards}
   </div>
-  <p class="empty-inline" id="feature-error" hidden></p>`;
+  <p class="empty-inline sig-error" id="feature-error" hidden></p>`;
 }

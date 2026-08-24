@@ -164,8 +164,21 @@ to where it is signed) · **what changed** (the digest — commits with their
 file lists, lane runs, approval events, open comments) · **is it still
 proven** (the standing line in the header: the lane's own glyph, verdict,
 rung, and the signing tally). It **owns no facts**: every line is arranged
-from the module that derived it, and it grows no signature control of its
-own — sign-where-you-read is unchanged.
+from the module that derived it.
+
+*Signing, amended 2026-08-24* (Karel: "in the overview give the option to
+approve as well"). The page originally named each act and jumped you to the
+section that owned the signature. Each row now carries the control itself.
+What sign-where-you-read was protecting — never sign what you have not read —
+is preserved by construction rather than by making you travel: the row already
+shows the evidence its signature is about (the drift file split, the promise
+tally and receipt), and **read it first** sits beside the button. What the rule
+was costing was a mandatory round trip for a decision already made. The hard
+constraint survives: it is **not a second path** — the row emits the same
+`.approve-btn` / `.feature-accept-btn` contract the owning section's signature
+bar emits, so there remains one approve endpoint, one accept endpoint, and
+refusals stay the server's to make (and now surface on the panel the click came
+from, which no panel but Approvals and Features could do before).
 
 *Why this exists, and what it costs.* §2 ruled that "the dashboard function
 is ambient — never a separate tab." That rule was right about ownership and

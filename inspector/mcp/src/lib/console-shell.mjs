@@ -570,6 +570,14 @@ export const SHELL_CSS = `
   .fd-act { margin: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
             font-size: var(--fs-body); line-height: 1.5; }
   .fd-label { flex: 1; min-width: 12ch; color: var(--ink); }
+  .fd-actions { flex: none; display: inline-flex; align-items: center; gap: 10px; }
+  /* The row's own signature control. Accent-filled: it IS the primary act of
+     this page. "read it first" stays beside it as the quiet secondary route. */
+  .fd-sign { appearance: none; border: none; border-radius: 8px; padding: 5px 12px; cursor: pointer;
+             font: inherit; font-size: var(--fs-meta); font-weight: 650;
+             background: var(--accent); color: var(--accent-ink); }
+  .fd-sign:hover { filter: brightness(1.08); }
+  .fd-sign:disabled { opacity: .55; cursor: default; }
   .fd-go { flex: none; color: var(--accent); font-size: var(--fs-meta); font-weight: 600; }
   .fd-evidence { margin: 6px 0 0; font-size: var(--fs-meta); color: var(--ink-2); }
   .fd-evidence summary { cursor: pointer; color: var(--ink-2); }

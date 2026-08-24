@@ -19,10 +19,15 @@
 //     deriveHumanQueue, getApprovalAnchoredDiff, getDigestData and the receipt
 //     bridge already returned. If a number here could ever disagree with the
 //     section that owns it, this file is wrong.
-//   - Sign where you read. The front door NAMES the act and TAKES YOU THERE;
-//     it does not grow its own signature controls. A second approve button is a
-//     second mechanism, and the reason this console exists is that the product
-//     has one.
+//   - Sign where you read, AMENDED 2026-08-24 (Karel: "in the overview give the
+//     option to approve as well"). Each row now carries its own signature
+//     control, because the rule's purpose — never sign what you have not read —
+//     is served by the evidence already on the row (the drift file split, the
+//     promise tally and receipt) plus "read it first" one click away, not by
+//     forcing a round trip for a decision already made. The control is NOT a
+//     second mechanism: it emits the exact markup the existing wiring speaks
+//     (.approve-btn / .feature-accept-btn), so there is still one approve path,
+//     one accept path, and refusals stay the server's.
 //   - Evidence-or-silence. An unavailable ledger says so in its own words. No
 //     block invents an empty state that reads like a clean bill of health.
 //
@@ -63,6 +68,42 @@ export function overviewStatusHtml({ receipt, statuses = [], receiptGlyph, forma
     ? ` &middot; ${statuses.filter((s) => s.status === "approved").length} of ${statuses.length} signed`
     : "";
   return `${lane}${age}${rung}${tally}`;
+}
+
+/**
+ * A queue item's own signature control (Karel, 2026-08-24: "in the overview
+ * give the option to approve as well").
+ *
+ * This SUPERSEDES the front door's original "names the act and jumps, never
+ * signs" rule. What that rule was protecting — never sign what you have not
+ * read — is preserved by construction rather than by making you travel: every
+ * row already carries the evidence its signature is about (a drifted
+ * artifact's changed/still-signed file split, a proven feature's promise tally
+ * and receipt), and "read it in full" stays one click away as the secondary
+ * action. What the rule was costing was a mandatory round trip for the
+ * decision you had already made.
+ *
+ * It is NOT a second mechanism: the markup is exactly the contract the
+ * existing wiring speaks (.approve-btn[data-artifact] -> POST /api/approve,
+ * .feature-accept-btn[data-name] -> POST /api/feature/accept), the panel is
+ * already in GOVERNED_PANELS so the SSE swap re-wires these buttons like any
+ * other, and refusals stay the server's to make.
+ */
+function itemActionHtml(item, { byArtifact, byFeature }) {
+  const record = byArtifact.get(item.artifact) || null;
+  const featureName = item.artifact.startsWith("feature-brief:") ? item.artifact.slice("feature-brief:".length) : null;
+  const feature = featureName ? byFeature.get(featureName) : null;
+
+  // Acceptance is a different verb on a different endpoint: the brief is
+  // already signed; what is being said is "the proven thing is what I wanted".
+  if (feature && feature.provenDone && record && record.status === "approved") {
+    return `<button type="button" class="feature-accept-btn fd-sign" data-name="${escAttr(featureName)}">Accept</button>`;
+  }
+  // A refused artifact never gets a button that could only fail on click —
+  // the same honesty signatureBarHtml applies at its own bar.
+  if (record && record.resolvable === false) return "";
+  const label = record && record.status === "unreviewed" ? "Approve" : "Re-approve";
+  return `<button type="button" class="approve-btn fd-sign" data-artifact="${escAttr(item.artifact)}">${label}</button>`;
 }
 
 /**
@@ -164,7 +205,8 @@ export function overviewBodyHtml({
   } else if (queue.length === 0) {
     queueHtml = `  <p class="fd-clear"><span class="glyph glyph-signed">&#9679;</span> Nothing waits on you. Every governed artifact is signed and unchanged since.</p>`;
   } else {
-    queueHtml = `  <ol class="fd-queue">
+    queueHtml = `  <div class="banner sig-error" id="overview-error" hidden></div>
+  <ol class="fd-queue">
 ${queue
   .map((item) => {
     const record = byArtifact.get(item.artifact) || null;
@@ -188,7 +230,7 @@ ${queue
     // handler, one behavior, no second mechanism.
     return `    <li class="fd-item">
       <p class="fd-act">${glyph} <span class="fd-label">${esc(item.label)}</span>
-        <button type="button" class="gov-jump fd-go" data-go-tab="${escAttr(item.tab)}" data-go-artifact="${escAttr(item.artifact)}" title="take me there">take me there</button></p>
+        <span class="fd-actions">${itemActionHtml(item, { byArtifact, byFeature })}<button type="button" class="gov-jump fd-go" data-go-tab="${escAttr(item.tab)}" data-go-artifact="${escAttr(item.artifact)}" title="open the artifact and read it in full">read it first</button></span></p>
 ${itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs })}
     </li>`;
   })

@@ -92,13 +92,44 @@ test("a proven feature awaiting acceptance shows WHY it is proven", () => {
   assert.match(html, /attesting this tree/);
 });
 
-test("the front door grows NO signature control — it names the act and jumps", () => {
+// Karel, 2026-08-24: "in the overview give the option to approve as well" —
+// superseding the original "names the act and jumps, never signs" rule. The
+// hard constraint survives: it must not be a SECOND approve path. The row
+// emits exactly the markup the existing wiring already speaks, so there is one
+// approve endpoint, one accept endpoint, and refusals stay the server's.
+test("each queue row carries its own signature control, on the EXISTING wiring contract", () => {
   const statuses = [drifted, unsigned];
   const html = overviewBodyHtml({ queue: deriveHumanQueue({ statuses, features: [] }), statuses, statusGlyph });
-  assert.doesNotMatch(html, /api\/approve|class="approve|data-approve/, "sign where you read: no second approve button");
-  // The jump reuses the strip's contract so one delegated handler serves both.
+  // .approve-btn[data-artifact] is what wireApproveButtons binds — same class,
+  // same attribute, same POST. A bespoke class here would be a second path.
+  assert.match(html, /class="approve-btn fd-sign" data-artifact="architecture">Re-approve</, "a drifted row re-approves");
+  assert.match(html, /class="approve-btn fd-sign" data-artifact="intent">Approve</, "an unsigned row approves");
+  // Reading it in full stays one click away — the rule's purpose, kept.
   assert.match(html, /class="gov-jump fd-go" data-go-tab="architecture" data-go-artifact="architecture"/);
-  assert.match(html, /data-go-tab="intent"/);
+  assert.match(html, /read it first/);
+  // A refusal must surface on THIS panel, not in a hidden box on another tab.
+  assert.match(html, /class="banner sig-error" id="overview-error" hidden/);
+});
+
+test("a proven feature offers ACCEPT — a different verb on a different endpoint", () => {
+  const features = [{ name: "meal", phase: "proven", provenDone: true, covered: 9, total: 9, receipt: { present: true, verdict: "PASS", attestsTree: true } }];
+  const statuses = [{ id: "feature-brief:meal", status: "approved" }];
+  const html = overviewBodyHtml({ queue: deriveHumanQueue({ statuses, features }), statuses, features, statusGlyph });
+  assert.match(html, /class="feature-accept-btn fd-sign" data-name="meal">Accept</, "acceptance is not an approval");
+  assert.doesNotMatch(html, /data-artifact="feature-brief:meal"/, "the brief is already signed — re-approving it is not the act");
+});
+
+test("an UNRESOLVABLE artifact gets no button that could only fail on click", () => {
+  // Drift stays queued even when unresolvable — deleted signed files MUST
+  // surface (deriveHumanQueue). That is the row that exists but cannot be
+  // signed: it keeps the route to go look, and offers no button that would
+  // only be refused. (An unresolvable UNSIGNED artifact never queues at all —
+  // it is the agent's work, not a decision the human can make.)
+  const statuses = [{ id: "components", status: "changed-since-approval", resolvable: false, fileCount: 0 }];
+  const html = overviewBodyHtml({ queue: deriveHumanQueue({ statuses, features: [] }), statuses, statusGlyph });
+  assert.match(html, /Re-approve components/, "the act is still named");
+  assert.doesNotMatch(html, /approve-btn/, "the same honesty the signature bar applies at its own bar");
+  assert.match(html, /read it first/, "…and the route to go look stays");
 });
 
 test("the digest is embedded, not re-derived — the front door passes it through verbatim", () => {

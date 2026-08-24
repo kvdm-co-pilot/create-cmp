@@ -3039,7 +3039,11 @@ test("front door (live): the queue names the act, and the act LEAVES the queue o
     let fd = overview(await (await fetch(st.url)).text());
     assert.match(fd, /Approve architecture/);
     assert.match(fd, /data-go-tab="architecture" data-go-artifact="architecture"/);
-    assert.doesNotMatch(fd, /api\/approve/, "sign where you read — the front door jumps, it does not sign");
+    // Karel, 2026-08-24: the front door signs too. The constraint that survives
+    // is "not a second path" — the row emits the same .approve-btn contract the
+    // owning section's signature bar does, so one endpoint serves both.
+    assert.match(fd, /class="approve-btn fd-sign" data-artifact="architecture"/, "the row carries its own control");
+    assert.match(fd, /read it first/, "…with reading it in full one click away");
 
     // 2. Sign it for real. Same endpoint the human's button uses.
     const res = await fetch(`${st.url}api/approve`, {
@@ -3062,6 +3066,50 @@ test("front door (live): the queue names the act, and the act LEAVES the queue o
     assert.match(fd, /Re-approve architecture — it changed since signing/);
     assert.match(fd, /changed since you signed|not derivable/, "drift must arrive with its file split, or an honest absence");
     assert.match(fd, /still exactly as signed|not derivable/, "what the signature STILL covers is half the answer");
+  } finally {
+    service.stop();
+    resetApprovalsBridgeCache(projectDir);
+    resetReceiptBridgeCache(projectDir);
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * The front door's own signature control, end to end against a LIVE console.
+ * The unit tests pin the markup; this pins that the markup actually SIGNS —
+ * same endpoint, same ledger, same refusal path as the owning section's bar.
+ */
+test("front door (live): approving from the Overview row signs the real artifact", async () => {
+  const { root: projectDir } = await makeArchitectureFixtureProject();
+  const service = createPreviewService({ projectDir, port: 19894, hot: false, runRender: async () => {} });
+  const overview = (page) => page.match(/<section id="tab-overview"[\s\S]*?<\/section>/)[0];
+  try {
+    const st = await service.start();
+    let fd = overview(await (await fetch(st.url)).text());
+    const btn = fd.match(/<button[^>]*class="approve-btn fd-sign"[^>]*data-artifact="architecture"[^>]*>([^<]*)</);
+    assert.ok(btn, "an unsigned artifact offers its control on the front door");
+    assert.match(btn[1], /^Approve/, "unsigned reads Approve, not Re-approve");
+
+    // The button's contract IS the POST — drive the endpoint it names.
+    const res = await fetch(`${st.url}api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifact: "architecture" }),
+    });
+    assert.equal((await res.json()).ok, true);
+
+    fd = overview(await (await fetch(st.url)).text());
+    assert.doesNotMatch(fd, /data-artifact="architecture"/, "signed — the act and its control both leave the queue");
+
+    // A refusal has somewhere to land ON THIS PANEL: before this, the only
+    // error boxes lived on the Approvals and Features tabs, so a refusal from
+    // here would have been written into a hidden element on another tab.
+    const page = await (await fetch(st.url)).text();
+    const panel = page.match(/<section id="tab-overview"[\s\S]*?<\/section>/)[0];
+    assert.ok(
+      /class="banner sig-error" id="overview-error"/.test(panel) || !/approve-btn/.test(panel),
+      "a panel offering controls must own an error box",
+    );
   } finally {
     service.stop();
     resetApprovalsBridgeCache(projectDir);

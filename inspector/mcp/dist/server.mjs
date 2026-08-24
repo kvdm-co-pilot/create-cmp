@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 8c2aa575463435ac366c9434e7d42cf7d3be631361b4cf65b36dc39019e37022
+// cmp:bundle-inputs 1fdf8f3f04fbec6adcdf4b7305dbbea689ad9425eee47f31cc60f34b4ff62cf1
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34331,6 +34331,14 @@ var SHELL_CSS = `
   .fd-act { margin: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
             font-size: var(--fs-body); line-height: 1.5; }
   .fd-label { flex: 1; min-width: 12ch; color: var(--ink); }
+  .fd-actions { flex: none; display: inline-flex; align-items: center; gap: 10px; }
+  /* The row's own signature control. Accent-filled: it IS the primary act of
+     this page. "read it first" stays beside it as the quiet secondary route. */
+  .fd-sign { appearance: none; border: none; border-radius: 8px; padding: 5px 12px; cursor: pointer;
+             font: inherit; font-size: var(--fs-meta); font-weight: 650;
+             background: var(--accent); color: var(--accent-ink); }
+  .fd-sign:hover { filter: brightness(1.08); }
+  .fd-sign:disabled { opacity: .55; cursor: default; }
   .fd-go { flex: none; color: var(--accent); font-size: var(--fs-meta); font-weight: 600; }
   .fd-evidence { margin: 6px 0 0; font-size: var(--fs-meta); color: var(--ink-2); }
   .fd-evidence summary { cursor: pointer; color: var(--ink-2); }
@@ -34795,6 +34803,17 @@ function overviewStatusHtml({ receipt, statuses = [], receiptGlyph: receiptGlyph
   const tally = statuses.length ? ` &middot; ${statuses.filter((s) => s.status === "approved").length} of ${statuses.length} signed` : "";
   return `${lane}${age}${rung}${tally}`;
 }
+function itemActionHtml(item, { byArtifact, byFeature }) {
+  const record2 = byArtifact.get(item.artifact) || null;
+  const featureName = item.artifact.startsWith("feature-brief:") ? item.artifact.slice("feature-brief:".length) : null;
+  const feature = featureName ? byFeature.get(featureName) : null;
+  if (feature && feature.provenDone && record2 && record2.status === "approved") {
+    return `<button type="button" class="feature-accept-btn fd-sign" data-name="${escAttr(featureName)}">Accept</button>`;
+  }
+  if (record2 && record2.resolvable === false) return "";
+  const label = record2 && record2.status === "unreviewed" ? "Approve" : "Re-approve";
+  return `<button type="button" class="approve-btn fd-sign" data-artifact="${escAttr(item.artifact)}">${label}</button>`;
+}
 function itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs }) {
   const record2 = byArtifact.get(item.artifact) || null;
   const anchored = anchoredDiffs ? anchoredDiffs[item.artifact] : null;
@@ -34851,14 +34870,15 @@ function overviewBodyHtml({
   } else if (queue.length === 0) {
     queueHtml = `  <p class="fd-clear"><span class="glyph glyph-signed">&#9679;</span> Nothing waits on you. Every governed artifact is signed and unchanged since.</p>`;
   } else {
-    queueHtml = `  <ol class="fd-queue">
+    queueHtml = `  <div class="banner sig-error" id="overview-error" hidden></div>
+  <ol class="fd-queue">
 ${queue.map((item) => {
       const record2 = byArtifact.get(item.artifact) || null;
       const g = record2 && record2.status === "approved" ? { ch: "\u25CF", cls: "glyph-attn", label: "proven \u2014 awaiting your acceptance" } : statusGlyph2 ? statusGlyph2(record2) : null;
       const glyph = g ? `<span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span>` : `<span class="glyph glyph-unsigned">&#9675;</span>`;
       return `    <li class="fd-item">
       <p class="fd-act">${glyph} <span class="fd-label">${esc4(item.label)}</span>
-        <button type="button" class="gov-jump fd-go" data-go-tab="${escAttr(item.tab)}" data-go-artifact="${escAttr(item.artifact)}" title="take me there">take me there</button></p>
+        <span class="fd-actions">${itemActionHtml(item, { byArtifact, byFeature })}<button type="button" class="gov-jump fd-go" data-go-tab="${escAttr(item.tab)}" data-go-artifact="${escAttr(item.artifact)}" title="open the artifact and read it in full">read it first</button></span></p>
 ${itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs })}
     </li>`;
     }).join("\n")}
@@ -35646,7 +35666,7 @@ ${diffRow}`;
 ${rows}
     </tbody>
   </table>
-  <div id="approve-error" class="banner" hidden></div>`;
+  <div id="approve-error" class="banner sig-error" hidden></div>`;
 }
 function gateForClause(c) {
   if (c.withdrawn) return null;
@@ -36626,7 +36646,7 @@ ${fullBriefHtml}
   <div class="feature-board">
 ${cards}
   </div>
-  <p class="empty-inline" id="feature-error" hidden></p>`;
+  <p class="empty-inline sig-error" id="feature-error" hidden></p>`;
 }
 
 // src/lib/intent.mjs
@@ -37500,11 +37520,19 @@ ${section.bodyHtml}`;
     document.body.appendChild(bar);
   }
 
+  // A refusal must surface where the click happened. The approve/accept
+  // controls now live on more than one panel (the front door's queue as well
+  // as their owning sections), and the panel-scoped .sig-error box is found
+  // first; the original single ids stay as the fallback so nothing regresses.
+  function errBoxFor(btn, fallbackId) {
+    const panel = btn.closest(".tab-panel");
+    return (panel && panel.querySelector(".sig-error")) || document.getElementById(fallbackId);
+  }
   function wireApproveButtons(scope) {
   scope.querySelectorAll(".approve-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const artifact = btn.dataset.artifact;
-      const errBox = document.getElementById("approve-error");
+      const errBox = errBoxFor(btn, "approve-error");
       if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
       const original = btn.textContent;
       btn.disabled = true;
@@ -37540,7 +37568,7 @@ ${section.bodyHtml}`;
   scope.querySelectorAll(".feature-accept-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const name = btn.dataset.name;
-      const errBox = document.getElementById("feature-error");
+      const errBox = errBoxFor(btn, "feature-error");
       if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
       const original = btn.textContent;
       btn.disabled = true;
@@ -37582,7 +37610,7 @@ ${section.bodyHtml}`;
       // read from the ledger later (07-28 audit). Cancel = no transition.
       const reason = window.prompt("Reopen " + artifact + " \u2014 why, in one sentence?\\n(Recorded on the ledger and in the journal.)");
       if (reason === null || reason.trim() === "") return;
-      const errBox = document.getElementById("approve-error");
+      const errBox = errBoxFor(btn, "approve-error");
       if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
       const original = btn.textContent;
       btn.disabled = true;

@@ -1284,11 +1284,19 @@ export function galleryHtml(state) {
     document.body.appendChild(bar);
   }
 
+  // A refusal must surface where the click happened. The approve/accept
+  // controls now live on more than one panel (the front door's queue as well
+  // as their owning sections), and the panel-scoped .sig-error box is found
+  // first; the original single ids stay as the fallback so nothing regresses.
+  function errBoxFor(btn, fallbackId) {
+    const panel = btn.closest(".tab-panel");
+    return (panel && panel.querySelector(".sig-error")) || document.getElementById(fallbackId);
+  }
   function wireApproveButtons(scope) {
   scope.querySelectorAll(".approve-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const artifact = btn.dataset.artifact;
-      const errBox = document.getElementById("approve-error");
+      const errBox = errBoxFor(btn, "approve-error");
       if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
       const original = btn.textContent;
       btn.disabled = true;
@@ -1324,7 +1332,7 @@ export function galleryHtml(state) {
   scope.querySelectorAll(".feature-accept-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const name = btn.dataset.name;
-      const errBox = document.getElementById("feature-error");
+      const errBox = errBoxFor(btn, "feature-error");
       if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
       const original = btn.textContent;
       btn.disabled = true;
@@ -1366,7 +1374,7 @@ export function galleryHtml(state) {
       // read from the ledger later (07-28 audit). Cancel = no transition.
       const reason = window.prompt("Reopen " + artifact + " — why, in one sentence?\\n(Recorded on the ledger and in the journal.)");
       if (reason === null || reason.trim() === "") return;
-      const errBox = document.getElementById("approve-error");
+      const errBox = errBoxFor(btn, "approve-error");
       if (errBox) { errBox.hidden = true; errBox.textContent = ""; }
       const original = btn.textContent;
       btn.disabled = true;
