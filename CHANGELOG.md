@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-24
+
+Ships **`@create-cmp/inspector` 0.8.0** (the console) and **`@create-cmp/harness` 0.15.0**
+(the walk lands in every generated project's lane).
+
 ### Added
 
 - **The walk — you always know what it's doing and whose turn it is**
@@ -24,6 +29,21 @@ All notable changes to this project are documented here. The format is based on
   reason — interleaving becomes an explicit choice, never an ambush. Deliberately NOT
   a second Stop hook: Stop stays the receipt gate alone (test-pinned); the statusline
   does the footer's job better.
+- **The front door signs.** Every row in Overview's "What needs you" queue now carries its
+  own control — **Approve** / **Re-approve** / **Accept** — with *read it first* beside it.
+  This supersedes the front door's original "names the act, never signs" rule: what that
+  rule protected (never sign what you have not read) is served by the evidence already on
+  the row plus one-click read-through, not by a forced round trip. It is not a second
+  path — the rows emit the same `.approve-btn` / `.feature-accept-btn` contract the owning
+  sections do, so one approve endpoint, one accept endpoint, one ledger.
+
+### Fixed
+
+- **A refusal now surfaces on the panel the click came from.** The approve/accept error
+  path had exactly two boxes, on the Approvals and Features panels; a refusal triggered
+  anywhere else wrote its reason into a hidden element on a tab the human was not looking
+  at — a silent failure. Errors resolve to the clicking panel's `.sig-error` box, with the
+  original ids as fallback.
 
 
 ## [0.16.0] - 2026-08-23
@@ -1731,6 +1751,7 @@ Initial release.
   marketplace manifest.
 
 [Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.15.0...HEAD
+[0.17.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.14.0...v0.14.1
