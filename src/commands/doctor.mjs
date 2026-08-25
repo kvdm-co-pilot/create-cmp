@@ -7,11 +7,13 @@
 //                     [--target-dir <dir>] [--fix]
 //
 // --fix applies only SAFE heals (write local.properties from ANDROID_HOME, add
-// ksp.useKSP2=true); everything else prints the exact manual step.
+// ksp.useKSP2=true, wire the walk into .claude/settings.json); everything else
+// prints the exact manual step.
 
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { flagBool } from "../lib/args.mjs";
 import { colors, ok } from "../lib/log.mjs";
@@ -71,6 +73,65 @@ function freeDiskBytes() {
   }
 }
 
+/** This engine checkout root — the template it ships is the wiring of record. */
+const ENGINE_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/**
+ * The walk wiring the CURRENT engine template declares: the statusLine object
+ * and the UserPromptSubmit hook groups that invoke qa/walk-status.mjs. Read from
+ * template/.claude/settings.json rather than duplicated here, so the heal cannot
+ * drift from what a fresh scaffold gets.
+ * @returns {{statusLine: object|null, promptSubmit: Array|null}}
+ */
+export function templateWalkWiring() {
+  const raw = readIfExists(path.join(ENGINE_ROOT, "template", ".claude", "settings.json"));
+  if (raw === null) return { statusLine: null, promptSubmit: null };
+  try {
+    const t = JSON.parse(raw);
+    const statusLine = invokesWalk(t.statusLine) ? t.statusLine : null;
+    const groups = (t.hooks?.UserPromptSubmit ?? []).filter((g) =>
+      (g?.hooks ?? []).some(invokesWalk)
+    );
+    return { statusLine, promptSubmit: groups.length > 0 ? groups : null };
+  } catch {
+    return { statusLine: null, promptSubmit: null };
+  }
+}
+
+/** Does this settings entry ({type, command}) actually run the walk? */
+function invokesWalk(entry) {
+  return String(entry?.command ?? "").includes("walk-status.mjs");
+}
+
+/**
+ * Is the walk installed, and does .claude/settings.json invoke it? The machinery
+ * and the wiring live in separately-owned files (lane vs app config), so they can
+ * and do come apart — see the walk-wiring finding in project-doctor.mjs.
+ */
+export function gatherWalkInputs(projectDir) {
+  const scriptPresent = fs.existsSync(path.join(projectDir, "qa", "walk-status.mjs"));
+  if (!scriptPresent) return null; // not a walk-carrying lane — nothing to say
+  const raw = readIfExists(path.join(projectDir, ".claude", "settings.json"));
+  if (raw === null) {
+    return { scriptPresent, settingsPresent: false, statusLine: false, promptHook: false };
+  }
+  let settings;
+  try {
+    settings = JSON.parse(raw);
+  } catch {
+    // Unparseable settings invoke nothing, which is exactly what we report.
+    return { scriptPresent, settingsPresent: true, statusLine: false, promptHook: false };
+  }
+  return {
+    scriptPresent,
+    settingsPresent: true,
+    statusLine: invokesWalk(settings.statusLine),
+    promptHook: (settings.hooks?.UserPromptSubmit ?? []).some((g) =>
+      (g?.hooks ?? []).some(invokesWalk)
+    ),
+  };
+}
+
 /** Gather filesystem/env inputs for the pure diagnosis. */
 export function gatherProjectInputs(projectDir) {
   const toml = readIfExists(path.join(projectDir, "gradle", "libs.versions.toml"));
@@ -112,6 +173,7 @@ export function gatherProjectInputs(projectDir) {
     freeDiskBytes: freeDiskBytes(),
     inspectorHits,
     inspectorCatalog,
+    walk: gatherWalkInputs(projectDir),
   };
 }
 
@@ -146,7 +208,7 @@ function scanInspectorSources(projectDir) {
 }
 
 /** Apply the SAFE auto-heals for --fix. Returns ids of findings it fixed. */
-function applySafeFixes(projectDir, findings, inputs) {
+export function applySafeFixes(projectDir, findings, inputs) {
   const fixed = [];
   for (const f of findings) {
     if (!f.fix || !f.fix.auto || f.level === "ok") continue;
@@ -160,6 +222,43 @@ function applySafeFixes(projectDir, findings, inputs) {
       if (changed) {
         fs.writeFileSync(target, content);
         ok(`--fix: wrote sdk.dir=${sdk} to local.properties`);
+        fixed.push(f.id);
+      }
+    }
+
+    if (f.id === "walk-wiring") {
+      const { statusLine, promptSubmit } = templateWalkWiring();
+      const target = path.join(projectDir, ".claude", "settings.json");
+      const raw = readIfExists(target);
+      let settings = {};
+      if (raw !== null) {
+        try {
+          settings = JSON.parse(raw);
+        } catch {
+          // Never overwrite settings we could not read — that is the app's file.
+          continue;
+        }
+      }
+      let changed = false;
+      if (statusLine && !invokesWalk(settings.statusLine)) {
+        // Only claim an unclaimed slot: an app that set its OWN status line keeps it.
+        if (!settings.statusLine) {
+          settings.statusLine = statusLine;
+          changed = true;
+        }
+      }
+      if (promptSubmit) {
+        settings.hooks = settings.hooks ?? {};
+        const existing = settings.hooks.UserPromptSubmit ?? [];
+        if (!existing.some((g) => (g?.hooks ?? []).some(invokesWalk))) {
+          settings.hooks.UserPromptSubmit = [...existing, ...promptSubmit];
+          changed = true;
+        }
+      }
+      if (changed) {
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, `${JSON.stringify(settings, null, 2)}\n`);
+        ok("--fix: wired the walk into .claude/settings.json (statusLine + UserPromptSubmit)");
         fixed.push(f.id);
       }
     }

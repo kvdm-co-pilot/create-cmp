@@ -207,3 +207,50 @@ test("catalog drift tripwire: full coverage → ok; private vals ignored", () =>
   const findings = diagnoseProject(baseInput({ inspectorCatalog: { catalog, theme } }));
   assert.equal(byId(findings, "inspector-catalog-drift").level, "ok");
 });
+
+// --- the walk: machinery and wiring live in separately-owned files -----------
+// qa/walk-status.mjs is lane code (machine-owned, replaced on upgrade);
+// .claude/settings.json is app config (never clobbered). They can come apart,
+// and when they do the walk simply shows nothing — the silent failure this
+// check exists to make loud.
+
+const wired = { scriptPresent: true, settingsPresent: true, statusLine: true, promptHook: true };
+
+test("walk wiring: absent from projects without the walk installed", () => {
+  const findings = diagnoseProject(baseInput({ walk: null }));
+  assert.equal(byId(findings, "walk-wiring"), undefined);
+});
+
+test("walk wiring: fully wired reads ok", () => {
+  const f = byId(diagnoseProject(baseInput({ walk: wired })), "walk-wiring");
+  assert.equal(f.level, "ok");
+});
+
+test("walk wiring: installed but unwired warns, names what is missing, and is auto-fixable", () => {
+  const f = byId(
+    diagnoseProject(baseInput({ walk: { ...wired, statusLine: false, promptHook: false } })),
+    "walk-wiring"
+  );
+  assert.equal(f.level, "warn");
+  assert.equal(f.fix.auto, true);
+  assert.match(f.detail, /no statusLine/);
+  assert.match(f.detail, /no UserPromptSubmit hook/);
+});
+
+test("walk wiring: half-wired still warns and names only the missing half", () => {
+  const f = byId(diagnoseProject(baseInput({ walk: { ...wired, promptHook: false } })), "walk-wiring");
+  assert.equal(f.level, "warn");
+  assert.doesNotMatch(f.detail, /no statusLine/);
+  assert.match(f.detail, /no UserPromptSubmit hook/);
+});
+
+test("walk wiring: no settings file at all says so, rather than blaming its contents", () => {
+  const f = byId(
+    diagnoseProject(
+      baseInput({ walk: { scriptPresent: true, settingsPresent: false, statusLine: false, promptHook: false } })
+    ),
+    "walk-wiring"
+  );
+  assert.equal(f.level, "warn");
+  assert.match(f.detail, /no \.claude\/settings\.json/);
+});
