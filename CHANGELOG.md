@@ -6,6 +6,41 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-08-25
+
+### Fixed
+
+- **The walk can no longer be installed and silently unwired.** `qa/walk-status.mjs` is
+  lane code, replaced wholesale on `upgrade --harness`; its two surfaces are not — the
+  `statusLine` and the `UserPromptSubmit` hook live in `.claude/settings.json`, which is
+  app-owned and, correctly, never clobbered. So an app that hand-edited its settings could
+  take the machinery and lose the wiring, and the failure mode was **silence** — the exact
+  thing the walk exists to end, in the one shape nothing in the system could notice.
+  `create-cmp doctor` now carries a **`walk-wiring`** finding: warn when the script is
+  installed but settings.json does not invoke it, naming which half is missing, healable
+  with `--fix` from the engine's own template (read at fix time, so the heal cannot drift
+  from what a fresh scaffold gets). The heal only ever claims an *unclaimed* slot — an app
+  that set its own status line keeps it, an existing `UserPromptSubmit` is appended to
+  rather than replaced, settings it cannot parse are never written over, and a second run
+  is a no-op.
+- **Minimal mode no longer ships a status line pointing at a lane it deletes.** 0.17.0 added
+  a top-level `statusLine` to the template — a command surface `classifyHook` never saw,
+  because it is not a hook. `minimalHookSettings` therefore passed it through untouched,
+  giving a minimal scaffold a status line reading `qa/walk-status.mjs`, a file minimal
+  removes. The command is guarded (`test -f … || true`), so it printed nothing rather than
+  erroring: dead config that fails silently, which is precisely why it survived review. The
+  lane-reference rule now applies to every settings surface that carries a command, not only
+  to `hooks`.
+
+### Note
+
+`upgrade --harness` was **not** at fault here and needed no change: `.claude/settings.json`
+lands in the sweep's `applied` bucket, so an app that never touched its settings receives the
+walk wiring along with the machinery. Verified against the showcase (0.14.1 → 0.17.0).
+
+No change to `@create-cmp/harness` (0.15.0) or `@create-cmp/inspector` (0.8.0) — both
+version independently and neither was touched.
+
 ## [0.17.0] - 2026-08-24
 
 Ships **`@create-cmp/inspector` 0.8.0** (the console) and **`@create-cmp/harness` 0.15.0**
@@ -1750,7 +1785,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.1...HEAD
+[0.17.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.14.1...v0.15.0
