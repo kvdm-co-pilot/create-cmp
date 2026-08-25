@@ -16,8 +16,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { checkPluginSync } from "../scripts/check-plugin-sync.mjs";
+
+// Resolved the long way round on purpose — see the note in check-plugin-sync.mjs
+// about the Node 18 floor this repo declares in package.json engines.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 /** A throwaway repo-shaped tree: manifest + the load-bearing files. */
 function fixtureRepo({ version = "1.0.0", server = "// bundle\n" } = {}) {
@@ -75,7 +80,7 @@ test("the load-bearing list includes the bundled MCP server — the file whose a
   // being absent from a cache is exactly the drift this check has to catch, so
   // it must never quietly fall off the compared set.
   const source = await fs.promises.readFile(
-    path.join(import.meta.dirname, "..", "scripts", "check-plugin-sync.mjs"),
+    path.join(HERE, "..", "scripts", "check-plugin-sync.mjs"),
     "utf8",
   );
 

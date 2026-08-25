@@ -32,6 +32,15 @@ All notable changes to this project are documented here. The format is based on
   lane-reference rule now applies to every settings surface that carries a command, not only
   to `hooks`.
 
+- **The Node 18 lane was red on main across two releases, and it was telling the truth.**
+  `package.json` declares `engines: ">=18"` and the CI matrix tests 18, but
+  `scripts/check-plugin-sync.mjs` used `import.meta.dirname` (Node 20.11+) — so the
+  plugin-drift detector was dead on load for anyone on the declared floor, and its test
+  file took the whole Node 18 job down with it. Both sites now resolve the long way
+  (`fileURLToPath(import.meta.url)`). A new `test/node-floor.test.mjs` scans every shipped
+  `.mjs` for APIs newer than the declared floor, so the next violation fails locally rather
+  than becoming background noise in a job nobody reads.
+
 ### Note
 
 `upgrade --harness` was **not** at fault here and needed no change: `.claude/settings.json`

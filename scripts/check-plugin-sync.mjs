@@ -22,8 +22,13 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repoRoot = path.resolve(import.meta.dirname, "..");
+// NOT import.meta.dirname: that landed in Node 20.11, and package.json declares
+// engines ">=18" (the CI matrix tests 18). This file crashed on load there, so
+// the drift detector this module exists to BE was itself dead on a supported
+// runtime — and its test file took the whole Node 18 lane red with it.
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** The plugin's declared identity — name and version — from its own manifest. */
 function readManifest(dir) {
