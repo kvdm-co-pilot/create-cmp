@@ -118,3 +118,51 @@ test("the minimal SessionStart hook parses and tells the truth about this scaffo
 test("sessionStartCommand refuses copy the shell quoting cannot carry", () => {
   assert.throws(() => sessionStartCommand("don't do this"), /apostrophe/);
 });
+
+// --- statusLine: a command surface that is not a hook ------------------------
+// The walk added a top-level `statusLine` to the template. It is not in
+// `hooks`, so classifyHook never sees it — and the first cut of the walk let it
+// through the minimal filter unchanged, giving a minimal scaffold a status line
+// that reads `qa/walk-status.mjs`, a file minimal deletes. The command is
+// guarded (`test -f … || true`), so it printed nothing rather than erroring:
+// dead config that fails silently. These pin the lane-reference rule to every
+// surface that carries a command, not just to `hooks`.
+
+test("the template's statusLine runs the walk from the lane — the thing minimal must drop", () => {
+  assert.ok(settings.statusLine, "template no longer declares a statusLine");
+  assert.match(
+    settings.statusLine.command,
+    /qa\/walk-status\.mjs/,
+    "statusLine no longer names the lane — if it moved, revisit the minimal filter"
+  );
+});
+
+test("minimalHookSettings drops a lane-referencing statusLine", () => {
+  const minimal = minimalHookSettings(settings, { sessionContext: MINIMAL_SESSION_CONTEXT });
+  assert.equal(minimal.statusLine, undefined, "minimal kept a status line pointing at a deleted lane");
+});
+
+test("minimal keeps a statusLine the app owns — the rule is lane-reference, not the key", () => {
+  const own = { ...settings, statusLine: { type: "command", command: "echo hi" } };
+  const minimal = minimalHookSettings(own, { sessionContext: MINIMAL_SESSION_CONTEXT });
+  assert.deepEqual(minimal.statusLine, own.statusLine);
+});
+
+test("stripEnforcementHooks leaves statusLine alone — light mode still has the lane", () => {
+  const light = stripEnforcementHooks(settings);
+  assert.deepEqual(light.statusLine, settings.statusLine);
+});
+
+test("NO surviving minimal surface names a lane path minimal deletes (hooks AND statusLine)", () => {
+  const minimal = minimalHookSettings(settings, { sessionContext: MINIMAL_SESSION_CONTEXT });
+  const keep = laneKeepSet(path.join(ROOT, "template"));
+  const commands = [
+    ...allHooks(minimal).map(({ hook }) => hook.command),
+    ...(minimal.statusLine ? [minimal.statusLine.command] : []),
+  ];
+  for (const command of commands) {
+    for (const m of [...command.matchAll(/qa\/(?:lib\/)?[a-z-]+\.mjs/g)]) {
+      assert.ok(keep.has(m[0]), `a surviving minimal surface names ${m[0]}, which minimal deletes: ${command.slice(0, 80)}`);
+    }
+  }
+});

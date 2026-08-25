@@ -100,3 +100,14 @@ ordering is derived from artifacts, never scheduled. Retro-briefs for legacy fea
   beats agent-working), with `+1 walk` suffix; the card and console show all.
 - **Reopened design belonging to an OPEN walk** (e.g. wiring stubs to real state) →
   renders on that walk's card as its Design stage, never as an arrival.
+- **Machinery installed, wiring absent** → `qa/walk-status.mjs` is lane code (replaced
+  wholesale on upgrade) but the statusLine + UserPromptSubmit entries live in
+  `.claude/settings.json`, which is app-owned and never clobbered. An app that
+  hand-edited its settings can therefore take the walk and lose its two surfaces, and
+  the failure mode is silence — the exact thing this feature exists to end. Nothing in
+  the walk can notice itself missing, so `create-cmp doctor` carries a `walk-wiring`
+  finding (warn, `--fix`-healable from the engine template; it claims only unclaimed
+  slots and never rewrites the app's own hooks). Minimal mode is the mirror image: it
+  deletes the lane, so `minimalHookSettings` drops a lane-referencing `statusLine`
+  too — the lane-reference rule applies to every settings surface that carries a
+  command, not only to `hooks`.

@@ -42,7 +42,10 @@ export function isEnforcementEvent(event) {
   return ENFORCEMENT_EVENTS.has(event);
 }
 
-/** Does this hook's command presuppose the verify lane (`qa/`)? */
+/**
+ * Does this entry's command presuppose the verify lane (`qa/`)? Takes anything
+ * settings.json can hold a command in — a hook, or the top-level `statusLine`.
+ */
 export function referencesLane(hook) {
   return String(hook?.command ?? "").includes("qa/");
 }
@@ -118,12 +121,20 @@ export function sessionStartCommand(context) {
 
 /**
  * The minimal-mode hook set, DERIVED from the full one rather than kept as a
- * second file to hold in sync (light is a filter, not a fork). Three edits:
+ * second file to hold in sync (light is a filter, not a fork). Four edits:
  *
  *   (a) enforcement goes — the Stop hook is Act 3;
  *   (b) lane-advisory goes — a nudge naming qa/ presupposes the lane;
  *   (c) SessionStart says what is true HERE — `sessionContext` describes what
- *       this scaffold carries and the one command that adds the rest.
+ *       this scaffold carries and the one command that adds the rest;
+ *   (d) a lane-referencing `statusLine` goes. It is not a hook, so the
+ *       classifier above never saw it, and the first cut of the walk shipped a
+ *       minimal scaffold a status line reading `qa/walk-status.mjs` — a file
+ *       minimal deletes. The command is guarded (`test -f … || true`) so it
+ *       printed nothing rather than erroring, which is exactly what made it
+ *       survive review: dead config that fails silently. The lane-reference
+ *       rule is the same one that drops lane-advisory hooks; it just has to be
+ *       applied to every surface that carries a command, not only to `hooks`.
  *
  * @param {object} settings parsed .claude/settings.json content
  * @param {object} opts
@@ -131,7 +142,9 @@ export function sessionStartCommand(context) {
  */
 export function minimalHookSettings(settings, { sessionContext }) {
   const out = filterHooks(settings, (event, hook) => classifyHook(event, hook) !== "advisory");
-  if (!out || typeof out.hooks !== "object" || out.hooks === null) return out;
+  if (!out || typeof out !== "object") return out;
+  if (referencesLane(out.statusLine)) delete out.statusLine;
+  if (typeof out.hooks !== "object" || out.hooks === null) return out;
   for (const group of out.hooks.SessionStart ?? []) {
     if (!Array.isArray(group?.hooks)) continue;
     for (const hook of group.hooks) hook.command = sessionStartCommand(sessionContext);

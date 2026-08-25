@@ -36,6 +36,10 @@ export const DISK_WARN_BYTES = 3 * GIB;
  * @param {string[]|null} [input.inspectorHits] relative (posix) paths of Kotlin sources that
  *        reference the live-inspector endpoint (`/inspect/` or `InspectorHttpServer`);
  *        null = scan skipped (no composeApp sources), [] = project has no inspector code.
+ * @param {{scriptPresent:boolean, settingsPresent:boolean, statusLine:boolean,
+ *          promptHook:boolean}|null} [input.walk] the walk's wiring: is
+ *        qa/walk-status.mjs installed, and does .claude/settings.json actually
+ *        INVOKE it (statusLine + UserPromptSubmit)? null = skip the check.
  * @param {{catalog:string, theme:string}|null} [input.inspectorCatalog] the stamped
  *        InspectorCatalog.kt content + concatenated theme sources (Tokens.kt/Theme.kt) for
  *        the declared-token drift tripwire; null = skip.
@@ -55,6 +59,7 @@ export function diagnoseProject(input) {
     freeDiskBytes,
     inspectorHits = null,
     inspectorCatalog = null,
+    walk = null,
   } = input;
 
   // --- version catalog ------------------------------------------------------
@@ -309,6 +314,49 @@ export function diagnoseProject(input) {
           `Declared in the theme but absent from InspectorCatalog.kt: ${missing.join(", ")}. ` +
           "These tokens will not appear on /inspect/design-system, so drift on them goes uncaught.",
         fix: { auto: false, description: "Add the missing entries to InspectorCatalog.kt (read from the real theme objects)." },
+      });
+    }
+  }
+
+  // --- the walk: installed but unwired ----------------------------------------
+  // qa/walk-status.mjs is inert on its own. What renders it is .claude/settings.json:
+  // a statusLine (the ambient "where are we") and a UserPromptSubmit hook (the
+  // per-turn position injected into the agent). Both are APP-OWNED config, so an app
+  // that hand-edited settings.json can take the machinery on upgrade and lose the
+  // wiring — and the failure mode is silence, which is precisely the problem the walk
+  // exists to fix. Nothing else in the system can notice, so doctor does.
+  if (walk !== null && walk.scriptPresent) {
+    const missing = [
+      !walk.statusLine ? "no statusLine" : null,
+      !walk.promptHook ? "no UserPromptSubmit hook" : null,
+    ].filter(Boolean);
+    if (missing.length === 0) {
+      findings.push({
+        id: "walk-wiring",
+        level: "ok",
+        title: "The walk is wired",
+        detail:
+          "qa/walk-status.mjs is installed and .claude/settings.json invokes it from both the " +
+          "status line and UserPromptSubmit.",
+      });
+    } else {
+      findings.push({
+        id: "walk-wiring",
+        level: "warn",
+        title: "The walk is installed but not wired up",
+        detail:
+          "qa/walk-status.mjs is present, but " +
+          (walk.settingsPresent
+            ? `.claude/settings.json does not invoke it (${missing.join(", ")}).`
+            : "there is no .claude/settings.json to invoke it from.") +
+          " Nothing will show which stage a feature is at, or tell the agent where it is — " +
+          "the walk runs nowhere. Running node qa/walk-status.mjs by hand still works.",
+        fix: {
+          auto: true,
+          description:
+            "Add the statusLine and UserPromptSubmit entries to .claude/settings.json " +
+            "(copied from the engine template; existing hooks are left untouched).",
+        },
       });
     }
   }
