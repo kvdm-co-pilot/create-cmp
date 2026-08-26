@@ -507,7 +507,7 @@ test("Stop-hook composition: an approvals FAIL fails the lane verdict, and recei
       assert.fail("expected the Stop hook to block (exit 2) over an approvals FAIL");
     } catch (err) {
       assert.equal(err.status, 2, "Stop-hook protocol: INVALID -> exit 2");
-      assert.match(err.stderr, /Not done:/);
+      assert.match(err.stderr, /■ Prove — not done:/, "the Stop hook speaks the walk's vocabulary (L3)");
       assert.match(err.stderr, /FAIL/);
     }
   } finally {

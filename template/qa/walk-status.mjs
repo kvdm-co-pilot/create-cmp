@@ -43,7 +43,7 @@ try {
     } else if (data.walks.length === 0 && data.arrivals.length === 0) {
       process.stdout.write("No open walks. Every accepted feature's brief is its doc-of-record.\n");
     } else {
-      for (const w of data.walks) process.stdout.write(`${renderCard(w)}\n\n`);
+      for (const w of data.walks) process.stdout.write(`${renderCard(w, data)}\n\n`);
       for (const a of data.arrivals)
         process.stdout.write(`▲ ARRIVED, UNPLANNED — ${a.label} (${a.status}): ${a.reason ?? "no recorded reason"}\n`);
     }

@@ -37,7 +37,7 @@ import { renderTreeSvg, countRenderable } from "../src/lib/render.mjs";
 import { readPngMeta } from "../src/lib/png.mjs";
 import { attributeCrash } from "../src/lib/attribution.mjs";
 import { parseLogcat } from "../src/lib/logcat.mjs";
-import { createPreviewService } from "../src/lib/preview-service.mjs";
+import { createPreviewService, ensureConsole } from "../src/lib/preview-service.mjs";
 import { buildStatus, loadedBuildId } from "../src/lib/build-id.mjs";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
@@ -814,8 +814,10 @@ server.registerTool(
       "changedLastRender } — give the human the url (open it for them if you can); assert on " +
       "the returned structure or the per-screen tree paths yourself. After edits use " +
       "preview_status { waitForRender: true } (blocks until the render/compile outcome) and " +
-      "preview_diff { screen } (one-call verified change). The service is owned by " +
-      "this MCP server; call preview_stop to shut it down. First render includes a Gradle " +
+      "preview_diff { screen } (one-call verified change). The console runs as a detached " +
+      "RESIDENT process (it survives this session; reconnecting the MCP adopts it), and is " +
+      "auto-ensured at session start inside a create-cmp app; preview_stop stops it only if " +
+      "this session started it. First render includes a Gradle " +
       "compile (tens of seconds); subsequent saves re-render warm in a few seconds.",
     inputSchema: {
       projectDir: z
@@ -838,6 +840,8 @@ server.registerTool(
   },
   guarded(async ({ projectDir, port, hot }) => {
     const dir = resolvePath(projectDir);
+    // Same-session in-process service (the degraded fallback below can still
+    // create one): keep honoring it.
     if (previewService && previewProjectDir === dir) {
       const st = previewService.status();
       activeConsole = { url: st.url, projectDir: dir, external: false };
@@ -846,7 +850,67 @@ server.registerTool(
     if (previewService) {
       previewService.stop();
       previewService = null;
+      previewProjectDir = null;
     }
+    // The console is a RESIDENT (walk-legibility L6a): never hosted inside
+    // this respawnable process by default. Adopt the console already serving
+    // the project, else spawn the standalone launcher DETACHED and adopt
+    // that — either way the human's window survives every MCP respawn (the
+    // 2026-07-28 failure class this whole path exists to end).
+    const ensured = await ensureConsole(dir, {
+      port,
+      hot,
+      log: (m) => process.stderr.write(`[preview] ${m}\n`),
+    });
+    if (ensured) {
+      // Adoption is right, but SILENT adoption of a console running older
+      // code is exactly how 2026-07-27/28 were lost: ask which build it is
+      // running and say so when it disagrees with ours — one HTTP call. The
+      // console's own /status is the tool result, same shape as before.
+      let remote = null;
+      try {
+        remote = await (await fetch(`${ensured.url}status`, { signal: AbortSignal.timeout(15000) })).json();
+      } catch {
+        /* answers the liveness probe but not a full /status read — report what we have */
+      }
+      const adoptedBuild = remote && remote.build ? remote.build : null;
+      const mine = buildStatus(loadedBuildId().id);
+      const mismatch = adoptedBuild && adoptedBuild.id && mine.id && adoptedBuild.id !== mine.id;
+      activeConsole = {
+        url: ensured.url,
+        projectDir: dir,
+        external: true,
+        // Stop rights follow spawn (see preview_stop): a console THIS call
+        // started may be stopped by this session; an adopted one is the
+        // human's window and stays refused.
+        spawnedPid: ensured.started ? ensured.pid : null,
+      };
+      return ok({
+        ...(remote && typeof remote === "object" ? remote : {}),
+        url: ensured.url,
+        pid: ensured.pid,
+        projectDir: dir,
+        resident: true,
+        startedByThisSession: ensured.started,
+        reusedExternal: !ensured.started,
+        build: adoptedBuild,
+        buildMatchesThisProcess: adoptedBuild && adoptedBuild.id ? !mismatch : null,
+        note:
+          (ensured.started
+            ? `Started the studio console as a detached resident (pid ${ensured.pid}) at ${ensured.url} — it survives this session ending.`
+            : `A studio console for this project is already running (pid ${ensured.pid}). Using it at ${ensured.url} — a second one would render into the same build directory and the two would disagree.`) +
+          (mismatch
+            ? ` WARNING: it is running build ${String(adoptedBuild.id).slice(0, 8)}, but this process is ` +
+              `${String(mine.id).slice(0, 8)} — the page it serves was drawn by different code than you are editing. ` +
+              `Restart it (node inspector/mcp/bin/console.mjs ${dir}) before trusting what it shows.`
+            : adoptedBuild && adoptedBuild.stale === true
+              ? ` WARNING: that console reports itself STALE — the code on disk changed after it started. Restart it.`
+              : ""),
+      });
+    }
+    // Degraded fallback — no standalone launcher beside this build, or the
+    // spawned console never answered its boot window. Hosting in-process
+    // still works, but dies with this session; the note says so honestly.
     const service = createPreviewService({
       projectDir: dir,
       port,
@@ -857,53 +921,20 @@ server.registerTool(
     try {
       st = await service.start();
     } catch (err) {
-      // Another PROCESS already serves this project (the one-console-per-project guard).
-      // This tool's contract is "starts or reuses", so reuse is the honest answer: point
-      // the caller at the console that is actually serving rather than starting a second
-      // render loop against the same build directory.
       if (err && err.code === "CMP_CONSOLE_ALREADY_RUNNING") {
-        // Adoption is right, but SILENT adoption of a console running older code
-        // is exactly how 2026-07-27/28 were lost: the page looked fine and was
-        // built from a previous module graph. Ask it which build it is running
-        // and say so when it disagrees with ours — refusing to pretend costs one
-        // HTTP call.
-        let adoptedBuild = null;
-        try {
-          const remote = await (await fetch(`${err.existing.url}status`, { signal: AbortSignal.timeout(3000) })).json();
-          adoptedBuild = remote && remote.build ? remote.build : null;
-        } catch {
-          /* a console that answers "/" but not "/status" predates the handshake — unknown, not stale */
-        }
-        const mine = buildStatus(loadedBuildId().id);
-        const mismatch = adoptedBuild && adoptedBuild.id && mine.id && adoptedBuild.id !== mine.id;
-        // Adoption resolves the session's console: every console-backed tool
-        // now speaks to it over the wire, identically to an owned one.
-        activeConsole = { url: err.existing.url, projectDir: dir, external: true };
-        return ok({
-          ...err.existing,
-          projectDir: dir,
-          reusedExternal: true,
-          build: adoptedBuild,
-          buildMatchesThisProcess: adoptedBuild && adoptedBuild.id ? !mismatch : null,
-          note:
-            `A studio console for this project is already running in another process ` +
-            `(pid ${err.existing.pid}). Use it at ${err.existing.url} — a second one would ` +
-            `render into the same build directory and the two would disagree.` +
-            (mismatch
-              ? ` WARNING: it is running build ${String(adoptedBuild.id).slice(0, 8)}, but this process is ` +
-                `${String(mine.id).slice(0, 8)} — the page it serves was drawn by different code than you are editing. ` +
-                `Restart it (node inspector/mcp/bin/console.mjs ${dir}) before trusting what it shows.`
-              : adoptedBuild && adoptedBuild.stale === true
-                ? ` WARNING: that console reports itself STALE — the code on disk changed after it started. Restart it.`
-                : ""),
-        });
+        // A console appeared between the ensure and this start — adopt it.
+        activeConsole = { url: err.existing.url, projectDir: dir, external: true, spawnedPid: null };
+        return ok({ ...err.existing, projectDir: dir, reusedExternal: true });
       }
       throw err;
     }
     previewService = service;
     previewProjectDir = dir;
     activeConsole = { url: st.url, projectDir: dir, external: false };
-    return ok(st);
+    return ok({
+      ...st,
+      note: "hosted in-process (no standalone console launcher found beside this build) — this console dies with the session.",
+    });
   })
 );
 
@@ -918,11 +949,23 @@ server.registerTool(
   },
   guarded(async () => {
     // The one tool that does NOT go over the wire (console-protocol.md
-    // decision 5): stopping is an act of ownership. A console another process
-    // serves is the HUMAN's standalone window — an agent tool named "stop
+    // decision 5): stopping is an act of ownership — and ownership follows
+    // SPAWN, not hosting. A resident console THIS session started (L6a's
+    // detached spawn) may be stopped by this session; one adopted from
+    // elsewhere is the HUMAN's standalone window — an agent tool named "stop
     // preview" must not reach through the wire and close it; the human's own
     // verb exists and the refusal names it.
     if (activeConsole && activeConsole.external) {
+      if (typeof activeConsole.spawnedPid === "number") {
+        const { url, projectDir: dir, spawnedPid } = activeConsole;
+        try {
+          process.kill(spawnedPid, "SIGTERM");
+        } catch (err) {
+          return fail(`Could not stop the resident console (pid ${spawnedPid}): ${err && err.message ? err.message : err}`);
+        }
+        activeConsole = null;
+        return ok({ url, projectDir: dir, pid: spawnedPid, stopped: true, note: "stopped the resident console this session started." });
+      }
       return fail(
         `That console (${activeConsole.url}) is a standalone process this session did not start — refusing to stop ` +
           `the human's window. To stop it deliberately: node inspector/mcp/bin/console.mjs ${activeConsole.projectDir} --stop`,
@@ -1168,6 +1211,36 @@ async function main() {
   await server.connect(transport);
   // stderr is safe for logs; stdout is the JSON-RPC channel.
   process.stderr.write("cmp-inspector MCP server running on stdio\n");
+  // Session start ensures the resident console (walk-legibility L6b): when
+  // this server was launched inside a create-cmp app, adopt the console
+  // already serving it — else spawn the standalone launcher detached. Fired
+  // and forgotten AFTER the transport is up: it must never delay or fail the
+  // session (fail-open by contract), and the spawned process outlives us.
+  // Reconnecting the MCP is therefore also the console's healing verb.
+  const bootDir = process.cwd();
+  const looksLikeApp =
+    existsSync(join(bootDir, "create-cmp.json")) || existsSync(join(bootDir, "composeApp"));
+  if (looksLikeApp) {
+    void ensureConsole(bootDir, { log: (m) => process.stderr.write(`[console-ensure] ${m}\n`) })
+      .then((c) => {
+        if (!c) return;
+        process.stderr.write(
+          `[console-ensure] studio console ${c.started ? "started" : "already up"} at ${c.url} (pid ${c.pid})\n`,
+        );
+        // Resolve the session's console right away so console-backed tools
+        // work without an explicit `preview` call first — same adoption
+        // contract, stop rights follow spawn.
+        if (!activeConsole) {
+          activeConsole = {
+            url: c.url,
+            projectDir: bootDir,
+            external: true,
+            spawnedPid: c.started ? c.pid : null,
+          };
+        }
+      })
+      .catch(() => {});
+  }
 }
 
 main().catch((err) => {

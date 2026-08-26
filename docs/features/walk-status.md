@@ -49,6 +49,11 @@ machinery collapsed below. Calm is a designed state, never silence.
 - **UserPromptSubmit hook** (`walk-status --inject`): the derived position prepended
   to EVERY prompt — the agent is mechanically re-anchored each turn, including after
   compaction. Fail-open (any error → exit 0, empty output); <300ms budget.
+- **Chat header** (added by walk-legibility L2, 2026-08-26): every reply opens
+  with the statusline's own string, delivered via the inject and pasted
+  verbatim — the transcript-persistent fourth layer. Reverses the original
+  "do not repeat it in prose" rule, which produced a chat with no position
+  information at all between gates (the week-on report's central finding).
 - CLAUDE.md carries tone and the stop-card/itinerary grammar only — nothing
   load-bearing.
 

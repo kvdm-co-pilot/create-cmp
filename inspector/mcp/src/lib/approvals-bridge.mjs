@@ -231,3 +231,49 @@ export async function acceptFeature(root, name) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
   }
 }
+
+// ── The walk (qa/lib/walk.mjs) ───────────────────────────────────────────────
+// Same bridge stance, different lane file: the walk PROJECTION ships as its
+// own module beside approvals.mjs. The console renders the project's OWN walk
+// derivation (promise titles, stage states, lane timing, whose-turn) rather
+// than mirroring STEP_STAGE by hand — one derivation, rendered twice.
+// Successful loads cached like libCache; absence is a legal, degradable state
+// (pre-walk scaffolds keep their simpler In-flight rendering).
+const walkLibCache = new Map(); // root -> module (successful loads ONLY)
+
+/**
+ * The project's full walk derivation, via its own qa/lib/walk.mjs.
+ * @param {string} root
+ * @returns {Promise<{available: true, walks: object[], arrivals: object[],
+ *   lane: (object|null), console: (object|null)} | {available: false, error?: string}>}
+ */
+export async function getWalksData(root) {
+  let mod = walkLibCache.get(root);
+  if (!mod) {
+    const libPath = path.join(root, "qa", "lib", "walk.mjs");
+    if (!fs.existsSync(libPath)) return { available: false };
+    try {
+      mod = await import(pathToFileURL(libPath).href);
+    } catch (err) {
+      return { available: false, error: err && err.message ? err.message : String(err) };
+    }
+    walkLibCache.set(root, mod);
+  }
+  if (typeof mod.deriveWalks !== "function") return { available: false };
+  try {
+    const d = mod.deriveWalks(root);
+    if (!d || d.available !== true) return { available: false, error: d && d.reason ? d.reason : undefined };
+    return {
+      available: true,
+      walks: d.walks,
+      arrivals: d.arrivals,
+      lane: d.lane ?? null,
+      console: d.console ?? null,
+      // The harness's own plain-words stage glosses (L3) — rendered, never
+      // duplicated here, so the words can only ever come from one place.
+      gloss: mod.STAGE_GLOSS && typeof mod.STAGE_GLOSS === "object" ? mod.STAGE_GLOSS : {},
+    };
+  } catch (err) {
+    return { available: false, error: err && err.message ? err.message : String(err) };
+  }
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 011fb4b40a1787a3929866ba123f76a157e346ec9f165b0a2cf2e5ccd4a2f725
+// cmp:bundle-inputs 1d9b48e41a1614bb3283f95d09f9ecc70dd66ac4d2577ff1ea33c5d5651c2694
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32323,6 +32323,7 @@ import http from "node:http";
 import os3 from "node:os";
 import path18 from "node:path";
 import { execFile, spawn } from "node:child_process";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 import { promisify } from "node:util";
 
 // src/lib/build-id.mjs
@@ -32560,6 +32561,37 @@ async function acceptFeature(root, name) {
     return lib.acceptFeature(root, name);
   } catch (err) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
+  }
+}
+var walkLibCache = /* @__PURE__ */ new Map();
+async function getWalksData(root) {
+  let mod = walkLibCache.get(root);
+  if (!mod) {
+    const libPath = path4.join(root, "qa", "lib", "walk.mjs");
+    if (!fs4.existsSync(libPath)) return { available: false };
+    try {
+      mod = await import(pathToFileURL(libPath).href);
+    } catch (err) {
+      return { available: false, error: err && err.message ? err.message : String(err) };
+    }
+    walkLibCache.set(root, mod);
+  }
+  if (typeof mod.deriveWalks !== "function") return { available: false };
+  try {
+    const d = mod.deriveWalks(root);
+    if (!d || d.available !== true) return { available: false, error: d && d.reason ? d.reason : void 0 };
+    return {
+      available: true,
+      walks: d.walks,
+      arrivals: d.arrivals,
+      lane: d.lane ?? null,
+      console: d.console ?? null,
+      // The harness's own plain-words stage glosses (L3) — rendered, never
+      // duplicated here, so the words can only ever come from one place.
+      gloss: mod.STAGE_GLOSS && typeof mod.STAGE_GLOSS === "object" ? mod.STAGE_GLOSS : {}
+    };
+  } catch (err) {
+    return { available: false, error: err && err.message ? err.message : String(err) };
   }
 }
 
@@ -34365,6 +34397,26 @@ var SHELL_CSS = `
   .wk-turn { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 10.5px; }
   .wk-agent { color: var(--muted); font-weight: 600; }
   .wk-arrival { margin: 4px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--reopen-bg); color: var(--reopen); font-size: var(--fs-meta); }
+  /* Walk-legibility L3/L4/L5 additions: the stage gloss, the promise list
+     with per-promise kept state, Prove's measured cost, and the arrival
+     now-or-after buttons. The list scrolls rather than truncates \u2014 a
+     collapsed tally is exactly what the rich card replaces. */
+  .wk-gloss { font-size: var(--fs-meta); font-weight: 400; color: var(--muted); }
+  .wk-note { font-size: 10.5px; color: var(--muted); font-weight: 400; }
+  .wk-plist { list-style: none; margin: 0 0 8px; padding: 0 0 0 2px; max-height: 180px; overflow-y: auto;
+              display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-meta); }
+  .wk-plist code { font-size: 10.5px; }
+  .wk-p-glyph { display: inline-block; width: 1.2em; text-align: center; }
+  .wk-p-kept { color: var(--muted); } .wk-p-kept .wk-p-glyph { color: var(--signed); }
+  .wk-p-cur { color: var(--ink-2); font-weight: 600; } .wk-p-cur .wk-p-glyph { color: var(--accent); }
+  .wk-p-todo { color: var(--muted); }
+  .wk-stops { color: var(--muted); }
+  .wk-lane { margin: 2px 0 0; font-size: var(--fs-meta); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .wk-arrival-btn { appearance: none; margin-left: 6px; padding: 2px 10px; border: 1px solid var(--reopen);
+                    border-radius: 999px; background: none; color: var(--reopen); cursor: pointer;
+                    font: inherit; font-size: 11px; font-weight: 600; }
+  .wk-arrival-btn:hover { background: var(--reopen); color: var(--paper); }
+  .wk-arrival-btn[disabled] { opacity: .6; cursor: default; }
   /* The digest keeps its own renderer and its own headings; inside the front
      door it is a block, not a page, so its h3s step down a level. Nothing here
      hides any of its content \u2014 the one duplicated line (the window) was deleted
@@ -34860,7 +34912,8 @@ function overviewBodyHtml({
   digestSince = null,
   statusGlyph: statusGlyph2,
   journal = [],
-  formatAge
+  formatAge,
+  walks = null
 } = {}) {
   const byArtifact = new Map(statuses.map((s) => [s.id, s]));
   const byFeature = new Map(features.map((f) => [f.name, f]));
@@ -34904,7 +34957,7 @@ ${digestHtml}
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
   <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
-${walksHtml(features, statuses)}
+${walksHtml(features, statuses, walks)}
 ${changedBlock}
 ${historyHtml}`;
 }
@@ -34929,13 +34982,14 @@ var WK_STEP_STAGE = {
   prove: "prove",
   accept: "signoff"
 };
-function walksHtml(features = [], statuses = []) {
+function walksHtml(features = [], statuses = [], walksData = null) {
+  if (walksData && walksData.available) return walksRichHtml(walksData, statuses);
   const open = features.filter((f) => f.phase !== "accepted");
   const owned = /* @__PURE__ */ new Set();
   for (const f of open) {
     owned.add(`feature-brief:${f.name}`);
     owned.add(`feature-design:${f.name}`);
-    owned.add(`feature-spec:${f.name}`);
+    for (const n of f.specNames || [f.name]) owned.add(`feature-spec:${n}`);
     for (const t of f.touches || []) owned.add(t.id);
   }
   const arrivals = statuses.filter((s) => s.status === "reopened" && !owned.has(s.id));
@@ -34963,6 +35017,63 @@ function walksHtml(features = [], statuses = []) {
   return `  <h3 class="fd-h">In flight${open.length ? ` <span class="fd-count">${open.length}</span>` : ""}</h3>
 ${cards.join("\n")}
 ${arrived.join("\n")}`;
+}
+function walksRichHtml(walksData, statuses = []) {
+  const { walks = [], arrivals = [], gloss = {} } = walksData;
+  if (walks.length === 0 && arrivals.length === 0) return "";
+  const byId = new Map(statuses.map((s) => [s.id, s]));
+  const stageState = { done: "done", current: "cur", pending: "todo", skipped: "skip" };
+  const cards = walks.map((w) => {
+    const dots = w.stages.map((s) => {
+      const cls = stageState[s.state] ?? "todo";
+      const title = s.note ? `${s.label} \u2014 ${s.note}` : s.label;
+      const note = s.note && s.key === "prove" ? ` <span class="wk-note">${esc4(s.note)}</span>` : "";
+      return `<span class="wk-stage wk-${cls}" title="${escAttr(title)}"><span class="wk-dot"></span>${esc4(s.label)}${note}</span>`;
+    }).join("");
+    const g = gloss[w.currentStage];
+    const stageLine = w.currentStage ? `<span class="wk-gloss">${esc4(w.stages.find((s) => s.key === w.currentStage)?.label ?? "")}${g ? ` \u2014 ${esc4(g)}` : ""}</span>` : "";
+    const all = w.promises && w.promises.all || [];
+    const currentId = w.promises && w.promises.current ? w.promises.current.id : null;
+    const promiseList = all.length > 0 ? `    <ul class="wk-plist">
+${all.map((p) => {
+      const cls = p.kept ? "wk-p-kept" : p.id === currentId ? "wk-p-cur" : "wk-p-todo";
+      const glyph = p.kept ? "\u2713" : p.id === currentId ? "\u25B8" : "\u25CB";
+      return `      <li class="${cls}"><span class="wk-p-glyph">${glyph}</span> <code>${esc4(p.id)}</code>${p.title ? ` ${esc4(p.title)}` : ""}</li>`;
+    }).join("\n")}
+    </ul>` : "";
+    const buttons = (w.you.signable || []).map((s) => {
+      if (s.verb === "accept")
+        return `<button type="button" class="feature-accept-btn fd-sign" data-name="${escAttr(s.artifact)}">Accept</button>`;
+      const record2 = byId.get(s.artifact);
+      if (record2 && record2.status === "approved") return "";
+      if (record2 && record2.resolvable === false) return "";
+      const label = record2 && record2.status === "unreviewed" ? "Approve" : "Re-approve";
+      return `<button type="button" class="approve-btn fd-sign" data-artifact="${escAttr(s.artifact)}">${label}</button>`;
+    }).filter(Boolean).join(" ");
+    const you = w.you.turn === "you" ? `<span class="wk-turn">YOUR TURN</span> ${esc4(w.you.act ?? "")}${buttons ? ` ${buttons}` : ""}` : w.you.turn === "agent" ? `<span class="wk-agent">agent</span> ${esc4(w.you.act ?? "")}${w.stops && w.stops.length ? ` <span class="wk-stops">next stop${w.stops.length > 1 ? "s" : ""} for you: ${esc4(w.stops.join(", "))}</span>` : ""}` : esc4(w.doneReason ?? "closed");
+    const tally = w.promises && typeof w.promises.total === "number" && w.promises.total > 0 ? `<span class="wk-promises">${w.promises.kept} of ${w.promises.total} promises kept</span>` : "";
+    return `  <div class="wk-card" data-walk="${escAttr(w.name)}">
+    <p class="wk-name">${esc4(w.name)}${tally} ${stageLine}</p>
+    <p class="wk-stages">${dots}</p>
+${promiseList ? `${promiseList}
+` : ""}    <p class="wk-you">${you}</p>
+  </div>`;
+  });
+  const arrived = arrivals.map(
+    (a) => `  <p class="wk-arrival">&#9650; ARRIVED, UNPLANNED &mdash; ${esc4(a.label || a.id)}${a.reason ? ` &middot; ${esc4(a.reason)}` : ""} &mdash; when?
+    <button type="button" class="wk-arrival-btn" data-arrival="${escAttr(a.id)}" data-choice="now">Now</button>
+    <button type="button" class="wk-arrival-btn" data-arrival="${escAttr(a.id)}" data-choice="after">After the current walk</button>
+  </p>`
+  );
+  const laneLine = walksData.lane && typeof walksData.lane.durationMs === "number" ? `  <p class="wk-lane">full check: ${esc4(fmtLaneMs(walksData.lane.durationMs))} last run (measured)</p>` : "";
+  return `  <h3 class="fd-h">In flight${walks.length ? ` <span class="fd-count">${walks.length}</span>` : ""}</h3>
+${cards.join("\n")}
+${arrived.join("\n")}
+${laneLine}`;
+}
+function fmtLaneMs(ms) {
+  if (!(ms > 0)) return "unknown";
+  return ms < 12e4 ? `${Math.round(ms / 1e3)}s` : `~${Math.round(ms / 6e4)} min`;
 }
 function overviewGlyph(queue = [], statuses = []) {
   if (statuses.length === 0) return null;
@@ -36752,6 +36863,54 @@ async function findLiveConsole(projectDir, { probe } = {}) {
   const answers = probe ? await probe(rec) : await fetch(`http://127.0.0.1:${rec.port}/status`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
   return answers ? rec : null;
 }
+function consoleLauncherPath() {
+  const here = path18.dirname(fileURLToPath2(import.meta.url));
+  const candidates = [
+    path18.join(here, "..", "..", "bin", "console.mjs"),
+    // src/lib/ → package root
+    path18.join(here, "..", "bin", "console.mjs"),
+    // dist/ → package root
+    path18.join(here, "console.mjs")
+    // bin/ (defensive)
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs17.existsSync(c)) return c;
+    } catch {
+    }
+  }
+  return null;
+}
+async function ensureConsole(projectDir, opts = {}) {
+  const { port, hot, spawnImpl = spawn, probe, waitMs = 9e4, pollMs = 500, log = () => {
+  } } = opts;
+  try {
+    const live = await findLiveConsole(projectDir, { probe });
+    if (live) return { ...live, started: false };
+    const launcher = opts.launcher ?? consoleLauncherPath();
+    if (launcher === null) {
+      log("ensureConsole: no standalone launcher found beside this build \u2014 skipping");
+      return null;
+    }
+    const args = [launcher, path18.resolve(projectDir)];
+    if (typeof port === "number") args.push(String(port));
+    if (hot === true) args.push("--hot");
+    const child = spawnImpl(process.execPath, args, { detached: true, stdio: "ignore" });
+    if (child && typeof child.unref === "function") child.unref();
+    log(`ensureConsole: spawned detached console (pid ${child?.pid ?? "?"}) for ${projectDir}`);
+    const deadline = Date.now() + waitMs;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, pollMs));
+      const now = await findLiveConsole(projectDir, { probe });
+      if (now) return { ...now, started: true };
+    }
+    log("ensureConsole: spawned console did not answer within the boot window");
+    return null;
+  } catch (err) {
+    log(`ensureConsole: ${err && err.message ? err.message : err}`);
+    return null;
+  }
+}
 function writeConsoleRegistry(projectDir, port) {
   try {
     fs17.writeFileSync(
@@ -36926,6 +37085,9 @@ function galleryHtml(state) {
     // PW-5: the productization surfaces — each degrades to an honest empty
     // state when its data provider wasn't wired by the caller.
     walkthrough = { available: false, runs: [] },
+    // The project's own walk derivation (qa/lib/walk.mjs via the bridge) —
+    // the In-flight block's rich rendering; null degrades to the board mirror.
+    walks = null,
     liveDevice = null,
     liveSession = null,
     digest = null,
@@ -37166,6 +37328,7 @@ function galleryHtml(state) {
         queue: humanQueue,
         statuses: overviewStatuses,
         features: overviewFeatures,
+        walks,
         anchoredDiffs,
         digestHtml: digestTabHtml(digest),
         digestSince: digest && digest.available ? digest.since : null,
@@ -37343,6 +37506,7 @@ ${section.bodyHtml}`;
         wireFeatureAcceptButtons(el);
         wireCommentButtons(el);
         wirePickButtons(el);
+        wireArrivalButtons(el);
       }
       const freshBadge = doc.querySelector("#comments-badge");
       const curBadge = document.querySelector("#comments-badge");
@@ -37682,6 +37846,43 @@ ${section.bodyHtml}`;
   });
   }
   wirePickButtons(document);
+  // Arrivals (walk-legibility L5) \u2014 the In-flight block's now-or-after choice.
+  // Same contract as wirePickButtons: POST the EXISTING /api/comment endpoint
+  // with a general-target comment the agent observes via
+  // review_comments{waitForComment}. No new decision machinery, no new state \u2014
+  // the button records the human's answer where agent instructions already
+  // flow, and the walk itself stays a pure projection.
+  function wireArrivalButtons(scope) {
+  scope.querySelectorAll(".wk-arrival-btn").forEach((btn) => {
+    if (btn.dataset.wired) return;
+    btn.dataset.wired = "1";
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.arrival;
+      const choice = btn.dataset.choice === "now" ? "handle it now" : "handle it after the current walk lands";
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Sending\u2026";
+      try {
+        const res = await fetch("/api/comment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target: { type: "general" }, text: "arrival " + id + ": " + choice }),
+        });
+        const body = await res.json();
+        if (!body.ok) {
+          btn.disabled = false;
+          btn.textContent = original;
+        } else {
+          btn.textContent = "Sent to the agent";
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  });
+  }
+  wireArrivalButtons(document);
   // Comments (\xA77.3) \u2014 every \u{1F4AC} control (screens, spec clauses, tokens,
   // components, architecture nodes) opens the same inline popover and POSTs
   // to /api/comment; a successful post is confirmed by the server's SSE
@@ -38713,12 +38914,13 @@ function createPreviewService(opts) {
         } catch {
         }
         const walkthrough = getWalkthroughData(projectDir);
-        const [liveDevice, digest, featureBoard, governedArtifacts, journal] = await Promise.all([
+        const [liveDevice, digest, featureBoard, governedArtifacts, journal, walksData] = await Promise.all([
           getLiveDeviceStatus({ port: inspectorPort }),
           getDigestData(projectDir, { execFileAsync }),
           getFeatureBoard(projectDir),
           getGovernedArtifacts(projectDir),
-          getJournal(projectDir)
+          getJournal(projectDir),
+          getWalksData(projectDir)
         ]);
         const anchoredDiffs = {};
         if (approvals.available) {
@@ -38758,6 +38960,7 @@ function createPreviewService(opts) {
             tokenUsage,
             intent,
             features: featureBoard,
+            walks: walksData,
             walkthrough,
             liveDevice,
             liveSession: liveSession.status(),
@@ -39220,8 +39423,8 @@ function createPreviewService(opts) {
 // bin/server.mjs
 import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync2 } from "node:fs";
 import { dirname as dirname2, join as join3, resolve as resolvePath } from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
-var HERE = dirname2(fileURLToPath2(import.meta.url));
+import { fileURLToPath as fileURLToPath3 } from "node:url";
+var HERE = dirname2(fileURLToPath3(import.meta.url));
 var DEFAULT_HARNESS_DIR = join3(HERE, "..", "..", "harness");
 var execFileAsync2 = promisify2(execFile2);
 var sessionDefaultSource = null;
@@ -39662,7 +39865,7 @@ server.registerTool(
   "preview",
   {
     title: "Start the live preview gallery (watch + render + serve)",
-    description: "AI-native previews of a create-cmp app's REAL screens with NO device, emulator, or manual Gradle: starts (or reuses) a resident service that renders every screen in inspector/PreviewRegistry.kt headlessly, serves a LIVE gallery for the human at a local URL (pixels + wireframe + a11y per screen; the page reloads itself via SSE after every re-render), and watches composeApp/src so every save re-renders automatically. Returns { url, screens:[{id, nodes, tokenized, tagged, a11yPass, tree, png}], version, changedLastRender } \u2014 give the human the url (open it for them if you can); assert on the returned structure or the per-screen tree paths yourself. After edits use preview_status { waitForRender: true } (blocks until the render/compile outcome) and preview_diff { screen } (one-call verified change). The service is owned by this MCP server; call preview_stop to shut it down. First render includes a Gradle compile (tens of seconds); subsequent saves re-render warm in a few seconds.",
+    description: "AI-native previews of a create-cmp app's REAL screens with NO device, emulator, or manual Gradle: starts (or reuses) a resident service that renders every screen in inspector/PreviewRegistry.kt headlessly, serves a LIVE gallery for the human at a local URL (pixels + wireframe + a11y per screen; the page reloads itself via SSE after every re-render), and watches composeApp/src so every save re-renders automatically. Returns { url, screens:[{id, nodes, tokenized, tagged, a11yPass, tree, png}], version, changedLastRender } \u2014 give the human the url (open it for them if you can); assert on the returned structure or the per-screen tree paths yourself. After edits use preview_status { waitForRender: true } (blocks until the render/compile outcome) and preview_diff { screen } (one-call verified change). The console runs as a detached RESIDENT process (it survives this session; reconnecting the MCP adopts it), and is auto-ensured at session start inside a create-cmp app; preview_stop stops it only if this session started it. First render includes a Gradle compile (tens of seconds); subsequent saves re-render warm in a few seconds.",
     inputSchema: {
       projectDir: external_exports.string().describe("Root of the create-cmp app (the directory containing composeApp/)."),
       port: external_exports.number().int().optional().describe("First port to try for the gallery server (default 9600, probes upward)."),
@@ -39681,6 +39884,44 @@ server.registerTool(
     if (previewService) {
       previewService.stop();
       previewService = null;
+      previewProjectDir = null;
+    }
+    const ensured = await ensureConsole(dir, {
+      port,
+      hot,
+      log: (m) => process.stderr.write(`[preview] ${m}
+`)
+    });
+    if (ensured) {
+      let remote = null;
+      try {
+        remote = await (await fetch(`${ensured.url}status`, { signal: AbortSignal.timeout(15e3) })).json();
+      } catch {
+      }
+      const adoptedBuild = remote && remote.build ? remote.build : null;
+      const mine = buildStatus(loadedBuildId().id);
+      const mismatch = adoptedBuild && adoptedBuild.id && mine.id && adoptedBuild.id !== mine.id;
+      activeConsole = {
+        url: ensured.url,
+        projectDir: dir,
+        external: true,
+        // Stop rights follow spawn (see preview_stop): a console THIS call
+        // started may be stopped by this session; an adopted one is the
+        // human's window and stays refused.
+        spawnedPid: ensured.started ? ensured.pid : null
+      };
+      return ok({
+        ...remote && typeof remote === "object" ? remote : {},
+        url: ensured.url,
+        pid: ensured.pid,
+        projectDir: dir,
+        resident: true,
+        startedByThisSession: ensured.started,
+        reusedExternal: !ensured.started,
+        build: adoptedBuild,
+        buildMatchesThisProcess: adoptedBuild && adoptedBuild.id ? !mismatch : null,
+        note: (ensured.started ? `Started the studio console as a detached resident (pid ${ensured.pid}) at ${ensured.url} \u2014 it survives this session ending.` : `A studio console for this project is already running (pid ${ensured.pid}). Using it at ${ensured.url} \u2014 a second one would render into the same build directory and the two would disagree.`) + (mismatch ? ` WARNING: it is running build ${String(adoptedBuild.id).slice(0, 8)}, but this process is ${String(mine.id).slice(0, 8)} \u2014 the page it serves was drawn by different code than you are editing. Restart it (node inspector/mcp/bin/console.mjs ${dir}) before trusting what it shows.` : adoptedBuild && adoptedBuild.stale === true ? ` WARNING: that console reports itself STALE \u2014 the code on disk changed after it started. Restart it.` : "")
+      });
     }
     const service = createPreviewService({
       projectDir: dir,
@@ -39694,30 +39935,18 @@ server.registerTool(
       st = await service.start();
     } catch (err) {
       if (err && err.code === "CMP_CONSOLE_ALREADY_RUNNING") {
-        let adoptedBuild = null;
-        try {
-          const remote = await (await fetch(`${err.existing.url}status`, { signal: AbortSignal.timeout(3e3) })).json();
-          adoptedBuild = remote && remote.build ? remote.build : null;
-        } catch {
-        }
-        const mine = buildStatus(loadedBuildId().id);
-        const mismatch = adoptedBuild && adoptedBuild.id && mine.id && adoptedBuild.id !== mine.id;
-        activeConsole = { url: err.existing.url, projectDir: dir, external: true };
-        return ok({
-          ...err.existing,
-          projectDir: dir,
-          reusedExternal: true,
-          build: adoptedBuild,
-          buildMatchesThisProcess: adoptedBuild && adoptedBuild.id ? !mismatch : null,
-          note: `A studio console for this project is already running in another process (pid ${err.existing.pid}). Use it at ${err.existing.url} \u2014 a second one would render into the same build directory and the two would disagree.` + (mismatch ? ` WARNING: it is running build ${String(adoptedBuild.id).slice(0, 8)}, but this process is ${String(mine.id).slice(0, 8)} \u2014 the page it serves was drawn by different code than you are editing. Restart it (node inspector/mcp/bin/console.mjs ${dir}) before trusting what it shows.` : adoptedBuild && adoptedBuild.stale === true ? ` WARNING: that console reports itself STALE \u2014 the code on disk changed after it started. Restart it.` : "")
-        });
+        activeConsole = { url: err.existing.url, projectDir: dir, external: true, spawnedPid: null };
+        return ok({ ...err.existing, projectDir: dir, reusedExternal: true });
       }
       throw err;
     }
     previewService = service;
     previewProjectDir = dir;
     activeConsole = { url: st.url, projectDir: dir, external: false };
-    return ok(st);
+    return ok({
+      ...st,
+      note: "hosted in-process (no standalone console launcher found beside this build) \u2014 this console dies with the session."
+    });
   })
 );
 server.registerTool(
@@ -39729,6 +39958,16 @@ server.registerTool(
   },
   guarded(async () => {
     if (activeConsole && activeConsole.external) {
+      if (typeof activeConsole.spawnedPid === "number") {
+        const { url: url2, projectDir: dir, spawnedPid } = activeConsole;
+        try {
+          process.kill(spawnedPid, "SIGTERM");
+        } catch (err) {
+          return fail(`Could not stop the resident console (pid ${spawnedPid}): ${err && err.message ? err.message : err}`);
+        }
+        activeConsole = null;
+        return ok({ url: url2, projectDir: dir, pid: spawnedPid, stopped: true, note: "stopped the resident console this session started." });
+      }
       return fail(
         `That console (${activeConsole.url}) is a standalone process this session did not start \u2014 refusing to stop the human's window. To stop it deliberately: node inspector/mcp/bin/console.mjs ${activeConsole.projectDir} --stop`
       );
@@ -39853,6 +40092,27 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.stderr.write("cmp-inspector MCP server running on stdio\n");
+  const bootDir = process.cwd();
+  const looksLikeApp = existsSync2(join3(bootDir, "create-cmp.json")) || existsSync2(join3(bootDir, "composeApp"));
+  if (looksLikeApp) {
+    void ensureConsole(bootDir, { log: (m) => process.stderr.write(`[console-ensure] ${m}
+`) }).then((c) => {
+      if (!c) return;
+      process.stderr.write(
+        `[console-ensure] studio console ${c.started ? "started" : "already up"} at ${c.url} (pid ${c.pid})
+`
+      );
+      if (!activeConsole) {
+        activeConsole = {
+          url: c.url,
+          projectDir: bootDir,
+          external: true,
+          spawnedPid: c.started ? c.pid : null
+        };
+      }
+    }).catch(() => {
+    });
+  }
 }
 main().catch((err) => {
   process.stderr.write(`cmp-inspector fatal: ${err && err.stack ? err.stack : err}

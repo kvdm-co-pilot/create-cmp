@@ -6,6 +6,44 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Walk legibility** (`docs/features/walk-legibility.md`, harness → 0.16.0) — the walk
+  speaks human, the console carries it, and the console is always there. Six decisions,
+  from the week-on evidence report (`docs/proposals/walk-status-chat-legibility.md`):
+  - **L1 — briefs name their specs.** The `cmp:feature` block accepts
+    `"specs": ["catalog", "entry-editing"]`; without it the brief's `**Spec:**` paragraph
+    pairs, and the filename stays the default. One pairing function
+    (`pairedSpecNames`) feeds the board, coverage, the walk, and the console — closing
+    the standing false instruction a two-spec brief produced on the primary surface
+    (an agent trusting it would write a second definition of signed behavior).
+  - **L2 — chat is a walk surface.** The per-prompt inject now leads with a
+    `[chat header]` line — the statusline's own string — that the agent opens every
+    reply with, pasted verbatim: machinery-authored (cannot drift) and
+    transcript-persistent (which the statusline never is). CLAUDE.md's
+    "do not repeat it in prose" is reversed accordingly.
+  - **L3 — translate at the boundary.** `STAGE_GLOSS` + `humanArtifact` in
+    `qa/lib/walk.mjs`, used by every rendering — cards, console, and the Stop hook,
+    which now opens `■ Prove — not done: …` in the walk's vocabulary. Ledger ids
+    never change.
+  - **L4 — time is part of position.** `laneTiming` reads the lane's own
+    `qa/flight-recorder.jsonl` (last full run, never `--fast`); Prove says what it
+    costs, measured ("98s last full run"), on the stage itself — ending lane-cost
+    guesses (the observed 3× misquote lost a run).
+  - **L5 — the console leads every call to action.** Your-turn cards point at the
+    studio console first, CLI beneath; the console's In-flight card becomes the walk's
+    primary rendering — the promise list itself with per-promise kept state, the stage
+    gloss, the measured lane cost, the signature button on the your-turn row (the one
+    existing approve/accept wire), and each arrival's now-or-after choice as two
+    buttons that post a general comment for the agent to observe.
+  - **L6 — the console is a resident.** The MCP `preview` tool no longer hosts the
+    console in-process: it spawns the standalone `bin/console.mjs` detached and adopts
+    it, so the human's window survives every MCP respawn; connecting the MCP inside a
+    create-cmp app auto-ensures a console at session start; a crashed console (registry
+    record, dead pid) is loud — the statusline appends `· console down` and
+    `create-cmp doctor` carries a `console-liveness` finding. `preview_stop` stops only
+    a console this session spawned; an adopted one stays the human's.
+
 ## [0.17.1] - 2026-08-25
 
 ### Fixed

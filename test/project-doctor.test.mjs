@@ -254,3 +254,27 @@ test("walk wiring: no settings file at all says so, rather than blaming its cont
   assert.equal(f.level, "warn");
   assert.match(f.detail, /no \.claude\/settings\.json/);
 });
+
+// ── The studio console's liveness (walk-legibility L6c) ──────────────────────
+
+test("console liveness: no registry record means silence — never started is not a fault", () => {
+  const findings = diagnoseProject(baseInput({ consoleRecord: null }));
+  assert.equal(byId(findings, "console-liveness"), undefined);
+});
+
+test("console liveness: a live record reads ok, with its URL", () => {
+  const f = byId(
+    diagnoseProject(baseInput({ consoleRecord: { pidAlive: true, url: "http://127.0.0.1:9600/" } })),
+    "console-liveness"
+  );
+  assert.equal(f.level, "ok");
+  assert.match(f.detail, /http:\/\/127\.0\.0\.1:9600\//);
+});
+
+test("console liveness: a record with a dead pid warns — the console CRASHED", () => {
+  const f = byId(diagnoseProject(baseInput({ consoleRecord: { pidAlive: false, url: null } })), "console-liveness");
+  assert.equal(f.level, "warn");
+  assert.match(f.title, /crashed/);
+  assert.equal(f.fix.auto, false);
+  assert.match(f.fix.description, /cmp-inspector MCP|console\.mjs/);
+});

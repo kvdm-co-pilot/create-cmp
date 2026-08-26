@@ -285,3 +285,101 @@ test("walks: nothing open and nothing arrived renders NOTHING — silence, not a
   assert.equal(walksHtml([{ ...buildingFeature, phase: "accepted" }], []), "");
   assert.equal(walksHtml([], []), "");
 });
+
+// ── The rich In-flight rendering (walk-legibility L5) ────────────────────────
+// walksHtml with the project's OWN walk derivation: the promise list itself,
+// per-promise kept state, the stage gloss, Prove's measured cost, signature
+// buttons on the your-turn row, and arrivals with now-or-after buttons.
+
+const richWalk = {
+  name: "combo",
+  phase: "approved",
+  open: true,
+  currentStage: "contract",
+  stages: [
+    { key: "decide", label: "Decide", state: "done" },
+    { key: "design", label: "Design", state: "skipped", note: "no UI surface" },
+    { key: "contract", label: "Contract", state: "current" },
+    { key: "build", label: "Build", state: "pending" },
+    { key: "prove", label: "Prove", state: "pending", note: "98s last full run" },
+    { key: "signoff", label: "Sign-off", state: "pending" },
+  ],
+  promises: {
+    total: 2,
+    kept: 1,
+    current: { id: "B-01", title: "beta holds" },
+    all: [
+      { id: "A-01", title: "alpha holds", kept: true },
+      { id: "B-01", title: "beta holds", kept: false },
+    ],
+  },
+  you: {
+    turn: "you",
+    act: "sign the contract (feature-spec:alpha, feature-spec:beta)",
+    signable: [
+      { verb: "approve", artifact: "feature-spec:alpha" },
+      { verb: "approve", artifact: "feature-spec:beta" },
+    ],
+  },
+  stops: ["Contract", "Sign-off"],
+  doneReason: "…",
+};
+const richData = {
+  available: true,
+  walks: [richWalk],
+  arrivals: [{ id: "design-system", label: "Design system", status: "reopened", reason: "harness wave" }],
+  lane: { durationMs: 98000, verdict: "PASS" },
+  console: { url: "http://127.0.0.1:9600/" },
+  gloss: { contract: "agreeing what it promises" },
+};
+
+test("L5: the rich card renders the promises THEMSELVES with kept state, not only a tally", () => {
+  const html = walksHtml([], [], richData);
+  assert.match(html, /wk-plist/);
+  assert.match(html, /A-01/);
+  assert.match(html, /alpha holds/);
+  assert.match(html, /wk-p-kept/, "a kept promise is marked kept");
+  assert.match(html, /wk-p-cur/, "the promise being kept NOW is marked current");
+  assert.match(html, /1 of 2 promises kept/);
+  assert.match(html, /agreeing what it promises/, "the harness's own gloss renders (L3)");
+  assert.match(html, /98s last full run/, "Prove carries its measured cost (L4)");
+});
+
+test("L5: the your-turn row carries the signature buttons — the ONE existing approve wire", () => {
+  const statuses = [
+    { id: "feature-spec:alpha", status: "approved" },
+    { id: "feature-spec:beta", status: "unreviewed" },
+  ];
+  const html = walksHtml([], statuses, richData);
+  assert.match(html, /class="approve-btn fd-sign" data-artifact="feature-spec:beta"/);
+  assert.doesNotMatch(
+    html,
+    /data-artifact="feature-spec:alpha"/,
+    "an already-approved artifact never gets a button that could only fail",
+  );
+});
+
+test("L5: arrivals render the now-or-after choice as two buttons", () => {
+  const html = walksHtml([], [], richData);
+  assert.match(html, /wk-arrival-btn" data-arrival="design-system" data-choice="now"/);
+  assert.match(html, /data-choice="after"/);
+  assert.match(html, /harness wave/, "the journal's reason rides along");
+});
+
+test("L5: an accept step renders the feature-accept button", () => {
+  const acceptWalk = {
+    ...richWalk,
+    currentStage: "signoff",
+    you: { turn: "you", act: "accept — the proven thing awaits your judgment", signable: [{ verb: "accept", artifact: "combo" }] },
+  };
+  const html = walksHtml([], [], { ...richData, walks: [acceptWalk], arrivals: [] });
+  assert.match(html, /class="feature-accept-btn fd-sign" data-name="combo"/);
+});
+
+test("L5: without the walk derivation, the board-mirroring fallback still renders", () => {
+  const f = { name: "meal", phase: "approved", nextStep: { key: "build", owner: "agent", label: "build" }, design: null, total: 2, covered: 1, touches: [] };
+  const html = walksHtml([f], [], null);
+  assert.match(html, /wk-card/);
+  assert.match(html, /1 of 2 promises kept/);
+  assert.doesNotMatch(html, /wk-plist/, "the rich list needs the derivation — never fabricated from the board");
+});

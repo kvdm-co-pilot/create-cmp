@@ -604,6 +604,26 @@ export const SHELL_CSS = `
   .wk-turn { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 10.5px; }
   .wk-agent { color: var(--muted); font-weight: 600; }
   .wk-arrival { margin: 4px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--reopen-bg); color: var(--reopen); font-size: var(--fs-meta); }
+  /* Walk-legibility L3/L4/L5 additions: the stage gloss, the promise list
+     with per-promise kept state, Prove's measured cost, and the arrival
+     now-or-after buttons. The list scrolls rather than truncates — a
+     collapsed tally is exactly what the rich card replaces. */
+  .wk-gloss { font-size: var(--fs-meta); font-weight: 400; color: var(--muted); }
+  .wk-note { font-size: 10.5px; color: var(--muted); font-weight: 400; }
+  .wk-plist { list-style: none; margin: 0 0 8px; padding: 0 0 0 2px; max-height: 180px; overflow-y: auto;
+              display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-meta); }
+  .wk-plist code { font-size: 10.5px; }
+  .wk-p-glyph { display: inline-block; width: 1.2em; text-align: center; }
+  .wk-p-kept { color: var(--muted); } .wk-p-kept .wk-p-glyph { color: var(--signed); }
+  .wk-p-cur { color: var(--ink-2); font-weight: 600; } .wk-p-cur .wk-p-glyph { color: var(--accent); }
+  .wk-p-todo { color: var(--muted); }
+  .wk-stops { color: var(--muted); }
+  .wk-lane { margin: 2px 0 0; font-size: var(--fs-meta); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .wk-arrival-btn { appearance: none; margin-left: 6px; padding: 2px 10px; border: 1px solid var(--reopen);
+                    border-radius: 999px; background: none; color: var(--reopen); cursor: pointer;
+                    font: inherit; font-size: 11px; font-weight: 600; }
+  .wk-arrival-btn:hover { background: var(--reopen); color: var(--paper); }
+  .wk-arrival-btn[disabled] { opacity: .6; cursor: default; }
   /* The digest keeps its own renderer and its own headings; inside the front
      door it is a block, not a page, so its h3s step down a level. Nothing here
      hides any of its content — the one duplicated line (the window) was deleted

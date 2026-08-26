@@ -11,6 +11,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -131,6 +132,149 @@ test("the inject renders position + protocol, and is valid UserPromptSubmit hook
   assert.match(ctx, /render this state, never your own memory/i);
   assert.match(ctx, /ARRIVED, UNPLANNED — Design system/);
   assert.match(ctx, /Decide·Design·Contract·Build·Prove·Sign-off/);
+});
+
+test("L1: a brief that NAMES its specs pairs with all of them — no phantom contract", async () => {
+  // The showcase defect this closes: catalog-and-editing's promises live in
+  // TWO approved spec files, and filename pairing derived a standing false
+  // instruction ("write specs/catalog-and-editing.spec.md") forever.
+  fs.writeFileSync(
+    path.join(dir, "docs/features/combo.md"),
+    `# Feature brief: combo\n\n\`\`\`json cmp:feature\n{ "touches": [], "screens": false, "specs": ["alpha", "beta"] }\n\`\`\`\n\n## Decisions\n\nD1 — yes.\n`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "specs/alpha.spec.md"),
+    "# Spec: alpha\n\n- **ALPHA-01** — Given a thing, Then alpha holds.\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "specs/beta.spec.md"),
+    "# Spec: beta\n\n- **BETA-01** — Given a thing, Then beta holds.\n",
+  );
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-brief:combo"], { cwd: dir });
+
+  let w = lib.deriveWalks(dir).walks.find((x) => x.name === "combo");
+  assert.equal(w.currentStage, "contract", "both specs exist but neither is signed — Contract, not phantom-Contract");
+  assert.match(w.you.act, /feature-spec:alpha/, "the step names the real spec artifacts");
+  assert.match(w.you.act, /feature-spec:beta/);
+  assert.equal(w.promises.total, 2, "promises concatenate across the paired specs");
+
+  // Signing ONE of two leaves the step naming only the other.
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:alpha"], { cwd: dir });
+  w = lib.deriveWalks(dir).walks.find((x) => x.name === "combo");
+  assert.match(w.you.act, /feature-spec:beta/);
+  assert.ok(!/feature-spec:alpha/.test(w.you.act), "a signed paired spec is no longer waited on");
+
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:beta"], { cwd: dir });
+  w = lib.deriveWalks(dir).walks.find((x) => x.name === "combo");
+  assert.equal(w.currentStage, "build", "both signed — the walk moves on");
+  assert.deepEqual(
+    w.promises.all.map((pr) => pr.id),
+    ["ALPHA-01", "BETA-01"],
+    "the full promise list (L5) spans both specs in declaration order",
+  );
+
+  // A reopened PAIRED spec belongs to the walk — never an arrival (D7 + L1).
+  execFileSync(
+    "node",
+    [path.join(dir, "qa/approve.mjs"), "--reopen", "feature-spec:alpha", "--reason", "amend alpha"],
+    { cwd: dir },
+  );
+  const d = lib.deriveWalks(dir);
+  assert.ok(!d.arrivals.some((a) => a.id === "feature-spec:alpha"), "a paired spec reopen is the walk's Contract, not an arrival");
+  // Restore for later tests.
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:alpha"], { cwd: dir });
+});
+
+test("L1: the **Spec:** header paragraph pairs when the block declares nothing", async () => {
+  const fb = await import(pathToFileURL(path.join(dir, "qa/lib/feature-brief.mjs")).href);
+  const md = [
+    "# Feature brief: gamma",
+    "",
+    "**Spec:** [`specs/alpha.spec.md`](../../specs/alpha.spec.md) — ALPHA-01, plus",
+    "[`specs/beta.spec.md`](../../specs/beta.spec.md).",
+    "",
+    "Later prose mentioning specs/other.spec.md must NOT redirect the pairing.",
+  ].join("\n");
+  assert.deepEqual(fb.pairedSpecNames(md, "gamma"), ["alpha", "beta"]);
+  assert.deepEqual(fb.pairedSpecNames("# nothing declared", "gamma"), ["gamma"], "filename stays the default");
+  assert.deepEqual(
+    fb.pairedSpecNames(md, "gamma", { specs: ["delta"] }),
+    ["delta"],
+    "an explicit block declaration outranks the header",
+  );
+});
+
+test("L2: the inject leads with the chat header — the statusline's own string, verbatim", () => {
+  const d = lib.deriveWalks(dir);
+  const inject = lib.renderInject(d);
+  const line = lib.renderStatusline(d);
+  assert.match(inject, /\[chat header — open your reply with this exact line/);
+  assert.ok(inject.includes(line), "the header IS the statusline string — pasted, never composed");
+  assert.match(inject, /open every reply with the chat header line/i, "the protocol says so every turn");
+});
+
+test("L3: stages carry plain-words glosses; artifact ids translate at the boundary", () => {
+  for (const s of lib.STAGES) assert.ok(lib.STAGE_GLOSS[s.key], `gloss exists for ${s.key}`);
+  assert.equal(lib.humanArtifact("feature-spec:meal"), "the promises for meal");
+  assert.equal(lib.humanArtifact("feature-brief:meal"), "the decisions for meal");
+  assert.equal(lib.humanArtifact("design-system"), "design-system", "unknown shapes pass through untouched");
+  const w = lib.deriveWalks(dir).walks.find((x) => x.name === "meal");
+  const card = lib.renderCard(w);
+  assert.match(card, /keeping the promises|agreeing what it promises|choosing what to build/, "the card glosses its stage");
+});
+
+test("L4: the lane's cost comes from the flight recorder — never memory", () => {
+  const journal = [
+    JSON.stringify({ profile: "local", mode: "full", verdict: "PASS", durationMs: 98000 }),
+    JSON.stringify({ profile: "local", mode: "fast", verdict: "PASS", durationMs: 9000 }),
+  ].join("\n");
+  fs.writeFileSync(path.join(dir, "qa/flight-recorder.jsonl"), `${journal}\n`);
+  const timing = lib.laneTiming(dir);
+  assert.equal(timing.durationMs, 98000, "fast runs iterate, they don't prove — the FULL run is quoted");
+  assert.equal(lib.humanDuration(98000), "98s");
+  assert.equal(lib.humanDuration(50 * 60000), "~50 min");
+  const d = lib.deriveWalks(dir);
+  assert.equal(d.lane.durationMs, 98000, "the derivation carries the measured cost");
+  const w = d.walks.find((x) => x.name === "meal");
+  const prove = w.stages.find((s) => s.key === "prove");
+  assert.match(prove.note ?? "", /98s last full run/, "Prove says what it costs, on the stage itself");
+  fs.rmSync(path.join(dir, "qa/flight-recorder.jsonl"));
+});
+
+test("L6: a crashed console is loud on the statusline; a live one leads the stop card", () => {
+  const key = crypto.createHash("sha1").update(path.resolve(dir)).digest("hex").slice(0, 12);
+  const regPath = path.join(os.tmpdir(), `cmp-console-${key}.json`);
+  try {
+    // A record whose pid is dead = the console CRASHED (clean stops delete it).
+    fs.writeFileSync(regPath, `${JSON.stringify({ pid: 2 ** 30, port: 9600, url: "http://127.0.0.1:9600/" })}\n`);
+    let d = lib.deriveWalks(dir);
+    assert.equal(d.console.stale, true);
+    assert.match(lib.renderStatusline(d), /console down$/, "the always-visible surface reports the crash");
+
+    // A live record: no alarm, and the YOUR-TURN card leads with the console.
+    fs.writeFileSync(regPath, `${JSON.stringify({ pid: process.pid, port: 9600, url: "http://127.0.0.1:9600/" })}\n`);
+    d = lib.deriveWalks(dir);
+    assert.equal(d.console.url, "http://127.0.0.1:9600/");
+    assert.ok(!/console down/.test(lib.renderStatusline(d)));
+    // A fresh unsigned brief = a your-turn gate (Decide).
+    writeBrief("delta");
+    d = lib.deriveWalks(dir);
+    const yourTurn = d.walks.find((w) => w.you.turn === "you");
+    assert.ok(yourTurn, "fixture has a your-turn walk");
+    assert.match(lib.renderCard(yourTurn, d), /Easiest: the studio console at http:\/\/127\.0\.0\.1:9600\//);
+  } finally {
+    fs.rmSync(regPath, { force: true });
+  }
+});
+
+test("L5: the your-turn step names its signable artifacts for button-carrying surfaces", () => {
+  const w = lib.deriveWalks(dir).walks.find((x) => x.name === "combo");
+  // combo sits at Build (agent) — no signature pending, so nothing signable.
+  assert.deepEqual(w.you.signable, []);
+  const meal = lib.deriveWalks(dir).walks.find((x) => x.name === "meal");
+  if (meal.you.turn === "you") {
+    assert.ok(meal.you.signable.length > 0, "a human gate names the signature it waits for");
+  }
 });
 
 test("fail-open: outside any project, every surface exits 0 and stays silent", () => {
