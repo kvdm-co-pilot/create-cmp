@@ -10,6 +10,7 @@
 // ksp.useKSP2=true, wire the walk into .claude/settings.json); everything else
 // prints the exact manual step.
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -132,6 +133,30 @@ export function gatherWalkInputs(projectDir) {
   };
 }
 
+/**
+ * The studio console's registry record for this app, when one exists — a
+ * CROSS-PACKAGE CONTRACT with the inspector's preview-service.mjs
+ * (consoleRegistryPath) and the harness's walk.mjs (consoleState):
+ * sha1(resolved projectDir).slice(0,12) keys `cmp-console-<key>.json` in
+ * os.tmpdir(), fields {pid, url}. pid-liveness only — no HTTP.
+ */
+export function gatherConsoleInputs(projectDir) {
+  try {
+    const key = crypto.createHash("sha1").update(path.resolve(projectDir)).digest("hex").slice(0, 12);
+    const rec = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), `cmp-console-${key}.json`), "utf8"));
+    if (!rec || typeof rec.pid !== "number") return null;
+    let pidAlive = true;
+    try {
+      process.kill(rec.pid, 0);
+    } catch (err) {
+      pidAlive = Boolean(err && err.code === "EPERM");
+    }
+    return { pidAlive, url: typeof rec.url === "string" ? rec.url : null };
+  } catch {
+    return null; // no record — never started, or stopped cleanly
+  }
+}
+
 /** Gather filesystem/env inputs for the pure diagnosis. */
 export function gatherProjectInputs(projectDir) {
   const toml = readIfExists(path.join(projectDir, "gradle", "libs.versions.toml"));
@@ -174,6 +199,7 @@ export function gatherProjectInputs(projectDir) {
     inspectorHits,
     inspectorCatalog,
     walk: gatherWalkInputs(projectDir),
+    consoleRecord: gatherConsoleInputs(projectDir),
   };
 }
 

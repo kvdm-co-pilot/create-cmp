@@ -324,14 +324,21 @@ your memory of it.**
     Stops for you: 3 (Decide — now · Contract · Sign-off). Build and Prove never stop for you.
     First stop is now: 2 open decisions below.
 
-**While working — quiet:** one line per stage transition, nothing per-file. The
-statusline carries the position continuously; do not repeat it in prose.
+**While working — the header, then quiet:** open EVERY reply with the walk's one-line
+header — the exact `[chat header]` line the per-prompt inject delivers. Paste it
+verbatim, never compose it: it is the derivation's own string, so it cannot drift, and
+it persists in the transcript, which the statusline beneath the input box never does.
+After the header: one line per stage transition, nothing per-file. Stages carry their
+plain-words gloss on first mention ("Contract — agreeing what it promises"); quote the
+lane's cost only from the measured figure in the injected card, never an estimate.
 
-**At every human gate — loud:** a full stop card, never a bare question:
+**At every human gate — loud:** a full stop card, never a bare question — and the
+easiest act leads:
 
-    ■ YOUR TURN — <feature> · stage 3 of 6: Contract
+    ■ YOUR TURN — <feature> · stage 3 of 6: Contract — agreeing what it promises
     <what it is, in plain words — two lines maximum>
-    → <exactly what to do: the command, or the studio tab, or "reply approve">
+    → Easiest: the studio console at <url from the injected card> — the row carries the button.
+    → CLI fallback: <the command>   (or "reply approve" when no console is up)
     After this: <the remaining stages, and which ones stop for the human>
 
 **Arrivals:** work that belongs to no open walk (undeclared drift, a harness

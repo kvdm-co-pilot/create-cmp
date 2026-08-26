@@ -40,6 +40,10 @@ export const DISK_WARN_BYTES = 3 * GIB;
  *          promptHook:boolean}|null} [input.walk] the walk's wiring: is
  *        qa/walk-status.mjs installed, and does .claude/settings.json actually
  *        INVOKE it (statusLine + UserPromptSubmit)? null = skip the check.
+ * @param {{pidAlive:boolean, url:(string|null)}|null} [input.consoleRecord] the studio
+ *        console's tmp-dir registry record for this app, when one exists: is its
+ *        process still alive, and at what URL? null = no record (never started, or
+ *        stopped cleanly — nothing to say).
  * @param {{catalog:string, theme:string}|null} [input.inspectorCatalog] the stamped
  *        InspectorCatalog.kt content + concatenated theme sources (Tokens.kt/Theme.kt) for
  *        the declared-token drift tripwire; null = skip.
@@ -60,6 +64,7 @@ export function diagnoseProject(input) {
     inspectorHits = null,
     inspectorCatalog = null,
     walk = null,
+    consoleRecord = null,
   } = input;
 
   // --- version catalog ------------------------------------------------------
@@ -356,6 +361,38 @@ export function diagnoseProject(input) {
           description:
             "Add the statusLine and UserPromptSubmit entries to .claude/settings.json " +
             "(copied from the engine template; existing hooks are left untouched).",
+        },
+      });
+    }
+  }
+
+  // The studio console's liveness (walk-legibility L6c). A registry record with
+  // a dead pid means the console CRASHED — a clean stop removes the record — and
+  // the human's window silently disappeared. The statusline appends "console
+  // down" live; doctor is the once-over that says the same thing with the fix.
+  if (consoleRecord !== null) {
+    if (consoleRecord.pidAlive) {
+      findings.push({
+        id: "console-liveness",
+        level: "ok",
+        title: "The studio console is running",
+        detail: `A console is registered for this app${consoleRecord.url ? ` at ${consoleRecord.url}` : ""} and its process is alive.`,
+      });
+    } else {
+      findings.push({
+        id: "console-liveness",
+        level: "warn",
+        title: "The studio console crashed",
+        detail:
+          "A console registry record exists for this app but its process is gone — the " +
+          "window died without a clean stop, and every surface that leads with the console " +
+          "is now pointing at nothing.",
+        fix: {
+          auto: false,
+          description:
+            "Reconnect the cmp-inspector MCP (it ensures a resident console at session " +
+            "start), call the preview tool, or start one by hand: " +
+            "node inspector/mcp/bin/console.mjs <projectDir> (detached: nohup … &).",
         },
       });
     }

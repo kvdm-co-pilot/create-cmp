@@ -33,7 +33,7 @@ const [projectDirArg, portArg] = positional;
 
 if (!projectDirArg || flag("--help") || flag("-h")) {
   console.error(
-    "usage: node inspector/mcp/bin/console.mjs <projectDir> [port] [--status|--stop]\n" +
+    "usage: node inspector/mcp/bin/console.mjs <projectDir> [port] [--hot] [--status|--stop]\n" +
       "  (no flag)  start the studio console and serve it until killed\n" +
       "  --status   report the console running for this project: pid, url, and whether\n" +
       "             the build it is running is still the build on disk\n" +
@@ -92,6 +92,7 @@ if (portArg && !Number.isInteger(port)) {
 const service = createPreviewService({
   projectDir: projectDirArg,
   port,
+  hot: flag("--hot"),
   log: (m) => process.stderr.write(`[console] ${m}\n`),
 });
 

@@ -32,6 +32,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { renderTreeSvg } from "./render.mjs";
 import { auditA11y } from "./a11y.mjs";
@@ -47,6 +48,7 @@ import {
   acceptFeature as acceptFeatureViaLib,
   getGovernedArtifacts as getGovernedArtifactsViaLib,
   getJournal as getJournalViaLib,
+  getWalksData as getWalksDataViaLib,
 } from "./approvals-bridge.mjs";
 import {
   getCommentsData,
@@ -220,6 +222,78 @@ export async function findLiveConsole(projectDir, { probe } = {}) {
         .then((r) => r.ok)
         .catch(() => false);
   return answers ? rec : null;
+}
+
+/**
+ * The standalone console launcher (bin/console.mjs), resolved from wherever
+ * THIS module is running: a repo/npm checkout (src/lib → ../../bin) or the
+ * committed bundle (dist/server.mjs → ../bin — the bundle inlines this
+ * module, so import.meta.url is dist/). null when neither exists — the
+ * caller then falls back rather than failing.
+ */
+export function consoleLauncherPath() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.join(here, "..", "..", "bin", "console.mjs"), // src/lib/ → package root
+    path.join(here, "..", "bin", "console.mjs"), // dist/ → package root
+    path.join(here, "console.mjs"), // bin/ (defensive)
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch {}
+  }
+  return null;
+}
+
+/**
+ * The console is a RESIDENT, not a passenger (walk-legibility L6): adopt the
+ * console already serving `projectDir`, else spawn the standalone launcher
+ * DETACHED — its own process group, stdio ignored, unref'd — so the human's
+ * window structurally survives every MCP-server respawn (the 2026-07-28
+ * failure class: three respawns in a day, each killing the page under the
+ * cursor). Fail-open by contract: every failure returns null and the caller
+ * degrades; ensuring a status surface may never block the work.
+ *
+ * @param {string} projectDir
+ * @param {{port?: number, spawnImpl?: Function, launcher?: string,
+ *   probe?: Function, waitMs?: number, pollMs?: number, log?: Function}} [opts]
+ *   test seams: spawnImpl/launcher/probe; waitMs bounds the boot wait.
+ * @returns {Promise<{pid: number, port: number, url: string, started: boolean}|null>}
+ *   `started: true` = this call spawned it (the caller may claim stop rights);
+ *   `started: false` = adopted one already serving. null = could not ensure.
+ */
+export async function ensureConsole(projectDir, opts = {}) {
+  const { port, hot, spawnImpl = spawn, probe, waitMs = 90000, pollMs = 500, log = () => {} } = opts;
+  try {
+    const live = await findLiveConsole(projectDir, { probe });
+    if (live) return { ...live, started: false };
+    const launcher = opts.launcher ?? consoleLauncherPath();
+    if (launcher === null) {
+      log("ensureConsole: no standalone launcher found beside this build — skipping");
+      return null;
+    }
+    const args = [launcher, path.resolve(projectDir)];
+    if (typeof port === "number") args.push(String(port));
+    if (hot === true) args.push("--hot");
+    const child = spawnImpl(process.execPath, args, { detached: true, stdio: "ignore" });
+    if (child && typeof child.unref === "function") child.unref();
+    log(`ensureConsole: spawned detached console (pid ${child?.pid ?? "?"}) for ${projectDir}`);
+    // The console binds its port and writes the registry BEFORE its first
+    // render, so this normally settles in a few seconds; the generous ceiling
+    // covers a cold Gradle daemon. Poll the same liveness proof adoption uses.
+    const deadline = Date.now() + waitMs;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, pollMs));
+      const now = await findLiveConsole(projectDir, { probe });
+      if (now) return { ...now, started: true };
+    }
+    log("ensureConsole: spawned console did not answer within the boot window");
+    return null;
+  } catch (err) {
+    log(`ensureConsole: ${err && err.message ? err.message : err}`);
+    return null;
+  }
 }
 
 function writeConsoleRegistry(projectDir, port) {
@@ -510,6 +584,9 @@ export function galleryHtml(state) {
     // PW-5: the productization surfaces — each degrades to an honest empty
     // state when its data provider wasn't wired by the caller.
     walkthrough = { available: false, runs: [] },
+    // The project's own walk derivation (qa/lib/walk.mjs via the bridge) —
+    // the In-flight block's rich rendering; null degrades to the board mirror.
+    walks = null,
     liveDevice = null,
     liveSession = null,
     digest = null,
@@ -906,6 +983,7 @@ export function galleryHtml(state) {
         queue: humanQueue,
         statuses: overviewStatuses,
         features: overviewFeatures,
+        walks,
         anchoredDiffs,
         digestHtml: digestTabHtml(digest),
         digestSince: digest && digest.available ? digest.since : null,
@@ -1107,6 +1185,7 @@ export function galleryHtml(state) {
         wireFeatureAcceptButtons(el);
         wireCommentButtons(el);
         wirePickButtons(el);
+        wireArrivalButtons(el);
       }
       const freshBadge = doc.querySelector("#comments-badge");
       const curBadge = document.querySelector("#comments-badge");
@@ -1446,6 +1525,43 @@ export function galleryHtml(state) {
   });
   }
   wirePickButtons(document);
+  // Arrivals (walk-legibility L5) — the In-flight block's now-or-after choice.
+  // Same contract as wirePickButtons: POST the EXISTING /api/comment endpoint
+  // with a general-target comment the agent observes via
+  // review_comments{waitForComment}. No new decision machinery, no new state —
+  // the button records the human's answer where agent instructions already
+  // flow, and the walk itself stays a pure projection.
+  function wireArrivalButtons(scope) {
+  scope.querySelectorAll(".wk-arrival-btn").forEach((btn) => {
+    if (btn.dataset.wired) return;
+    btn.dataset.wired = "1";
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.arrival;
+      const choice = btn.dataset.choice === "now" ? "handle it now" : "handle it after the current walk lands";
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Sending…";
+      try {
+        const res = await fetch("/api/comment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target: { type: "general" }, text: "arrival " + id + ": " + choice }),
+        });
+        const body = await res.json();
+        if (!body.ok) {
+          btn.disabled = false;
+          btn.textContent = original;
+        } else {
+          btn.textContent = "Sent to the agent";
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  });
+  }
+  wireArrivalButtons(document);
   // Comments (§7.3) — every 💬 control (screens, spec clauses, tokens,
   // components, architecture nodes) opens the same inline popover and POSTs
   // to /api/comment; a successful post is confirmed by the server's SSE
@@ -2831,12 +2947,13 @@ export function createPreviewService(opts) {
         // probe is sub-second; B5's anchored diffs run ONLY for artifacts
         // currently drifted (bounded per-request work — zero when nothing is).
         const walkthrough = getWalkthroughData(projectDir);
-        const [liveDevice, digest, featureBoard, governedArtifacts, journal] = await Promise.all([
+        const [liveDevice, digest, featureBoard, governedArtifacts, journal, walksData] = await Promise.all([
           getLiveDeviceStatus({ port: inspectorPort }),
           getDigestData(projectDir, { execFileAsync }),
           getFeatureBoardViaLib(projectDir),
           getGovernedArtifactsViaLib(projectDir),
           getJournalViaLib(projectDir),
+          getWalksDataViaLib(projectDir),
         ]);
         const anchoredDiffs = {};
         if (approvals.available) {
@@ -2882,6 +2999,7 @@ export function createPreviewService(opts) {
             tokenUsage,
             intent,
             features: featureBoard,
+            walks: walksData,
             walkthrough,
             liveDevice,
             liveSession: liveSession.status(),

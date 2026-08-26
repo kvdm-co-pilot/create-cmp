@@ -194,6 +194,7 @@ export function overviewBodyHtml({
   statusGlyph,
   journal = [],
   formatAge,
+  walks = null,
 } = {}) {
   const byArtifact = new Map(statuses.map((s) => [s.id, s]));
   const byFeature = new Map(features.map((f) => [f.name, f]));
@@ -273,7 +274,7 @@ ${digestHtml}
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
   <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
-${walksHtml(features, statuses)}
+${walksHtml(features, statuses, walks)}
 ${changedBlock}
 ${historyHtml}`;
 }
@@ -303,14 +304,25 @@ const WK_STEP_STAGE = {
  * rule-change reopens). Drifted artifacts are deliberately NOT repeated here:
  * they are already loud in the What-needs-you queue above; one fact, one place.
  * Empty walks + no arrivals -> "" (silence, never an empty frame).
+ *
+ * Two renderings (walk-legibility L5). When the project's own walk derivation
+ * is available (`walksData` from getWalksData — qa/lib/walk.mjs), the card is
+ * the walk's PRIMARY human surface: the promise list itself with per-promise
+ * kept state, the stage gloss, Prove's measured lane cost, the signature
+ * button ON the your-turn row (the same .approve-btn/.feature-accept-btn wire
+ * every other control speaks — one approve path), and each arrival's
+ * now-or-after choice as two buttons that post a general comment for the
+ * agent to observe (the pick-btn precedent — no new decision machinery).
+ * Without it (pre-walk scaffolds), the original board-mirroring thumbnail.
  */
-export function walksHtml(features = [], statuses = []) {
+export function walksHtml(features = [], statuses = [], walksData = null) {
+  if (walksData && walksData.available) return walksRichHtml(walksData, statuses);
   const open = features.filter((f) => f.phase !== "accepted");
   const owned = new Set();
   for (const f of open) {
     owned.add(`feature-brief:${f.name}`);
     owned.add(`feature-design:${f.name}`);
-    owned.add(`feature-spec:${f.name}`);
+    for (const n of f.specNames || [f.name]) owned.add(`feature-spec:${n}`);
     for (const t of f.touches || []) owned.add(t.id);
   }
   const arrivals = statuses.filter((s) => s.status === "reopened" && !owned.has(s.id));
@@ -349,6 +361,119 @@ export function walksHtml(features = [], statuses = []) {
   return `  <h3 class="fd-h">In flight${open.length ? ` <span class="fd-count">${open.length}</span>` : ""}</h3>
 ${cards.join("\n")}
 ${arrived.join("\n")}`;
+}
+
+/**
+ * The rich In-flight rendering — the walk derivation's own objects
+ * (qa/lib/walk.mjs via getWalksData), arranged. Derives nothing: stage
+ * states, promise kept-ness, the measured lane cost and whose-turn all
+ * arrive computed; this maps them to markup.
+ */
+function walksRichHtml(walksData, statuses = []) {
+  const { walks = [], arrivals = [], gloss = {} } = walksData;
+  if (walks.length === 0 && arrivals.length === 0) return "";
+  const byId = new Map(statuses.map((s) => [s.id, s]));
+
+  const stageState = { done: "done", current: "cur", pending: "todo", skipped: "skip" };
+  const cards = walks.map((w) => {
+    const dots = w.stages
+      .map((s) => {
+        const cls = stageState[s.state] ?? "todo";
+        const title = s.note ? `${s.label} — ${s.note}` : s.label;
+        const note = s.note && s.key === "prove" ? ` <span class="wk-note">${esc(s.note)}</span>` : "";
+        return `<span class="wk-stage wk-${cls}" title="${escAttr(title)}"><span class="wk-dot"></span>${esc(s.label)}${note}</span>`;
+      })
+      .join("");
+
+    const g = gloss[w.currentStage];
+    const stageLine = w.currentStage
+      ? `<span class="wk-gloss">${esc(w.stages.find((s) => s.key === w.currentStage)?.label ?? "")}${g ? ` — ${esc(g)}` : ""}</span>`
+      : "";
+
+    // The promises THEMSELVES (L5): kept ✓ / being-kept ▸ / pending ○, in the
+    // spec's own words. The list scrolls (CSS) rather than truncates — a
+    // collapsed tally is exactly what this rendering replaces.
+    const all = (w.promises && w.promises.all) || [];
+    const currentId = w.promises && w.promises.current ? w.promises.current.id : null;
+    const promiseList =
+      all.length > 0
+        ? `    <ul class="wk-plist">\n${all
+            .map((p) => {
+              const cls = p.kept ? "wk-p-kept" : p.id === currentId ? "wk-p-cur" : "wk-p-todo";
+              const glyph = p.kept ? "✓" : p.id === currentId ? "▸" : "○";
+              return `      <li class="${cls}"><span class="wk-p-glyph">${glyph}</span> <code>${esc(p.id)}</code>${p.title ? ` ${esc(p.title)}` : ""}</li>`;
+            })
+            .join("\n")}\n    </ul>`
+        : "";
+
+    // The signature ON the row (L5): the walk names which signature the step
+    // waits for; the button speaks the one existing wire (.approve-btn /
+    // .feature-accept-btn — refusals stay the server's). An already-approved
+    // artifact gets no button that could only fail on click.
+    const buttons = (w.you.signable || [])
+      .map((s) => {
+        if (s.verb === "accept")
+          return `<button type="button" class="feature-accept-btn fd-sign" data-name="${escAttr(s.artifact)}">Accept</button>`;
+        const record = byId.get(s.artifact);
+        if (record && record.status === "approved") return "";
+        if (record && record.resolvable === false) return "";
+        const label = record && record.status === "unreviewed" ? "Approve" : "Re-approve";
+        return `<button type="button" class="approve-btn fd-sign" data-artifact="${escAttr(s.artifact)}">${label}</button>`;
+      })
+      .filter(Boolean)
+      .join(" ");
+
+    const you =
+      w.you.turn === "you"
+        ? `<span class="wk-turn">YOUR TURN</span> ${esc(w.you.act ?? "")}${buttons ? ` ${buttons}` : ""}`
+        : w.you.turn === "agent"
+          ? `<span class="wk-agent">agent</span> ${esc(w.you.act ?? "")}${
+              w.stops && w.stops.length
+                ? ` <span class="wk-stops">next stop${w.stops.length > 1 ? "s" : ""} for you: ${esc(w.stops.join(", "))}</span>`
+                : ""
+            }`
+          : esc(w.doneReason ?? "closed");
+
+    const tally =
+      w.promises && typeof w.promises.total === "number" && w.promises.total > 0
+        ? `<span class="wk-promises">${w.promises.kept} of ${w.promises.total} promises kept</span>`
+        : "";
+
+    return `  <div class="wk-card" data-walk="${escAttr(w.name)}">
+    <p class="wk-name">${esc(w.name)}${tally} ${stageLine}</p>
+    <p class="wk-stages">${dots}</p>
+${promiseList ? `${promiseList}\n` : ""}    <p class="wk-you">${you}</p>
+  </div>`;
+  });
+
+  // Arrivals: the now-or-after question as two buttons (L5). Each posts a
+  // general comment over the EXISTING /api/comment wire (the pick-btn
+  // precedent) — the agent observes it via review_comments; no new state.
+  const arrived = arrivals.map(
+    (a) =>
+      `  <p class="wk-arrival">&#9650; ARRIVED, UNPLANNED &mdash; ${esc(a.label || a.id)}${
+        a.reason ? ` &middot; ${esc(a.reason)}` : ""
+      } &mdash; when?
+    <button type="button" class="wk-arrival-btn" data-arrival="${escAttr(a.id)}" data-choice="now">Now</button>
+    <button type="button" class="wk-arrival-btn" data-arrival="${escAttr(a.id)}" data-choice="after">After the current walk</button>
+  </p>`,
+  );
+
+  const laneLine =
+    walksData.lane && typeof walksData.lane.durationMs === "number"
+      ? `  <p class="wk-lane">full check: ${esc(fmtLaneMs(walksData.lane.durationMs))} last run (measured)</p>`
+      : "";
+
+  return `  <h3 class="fd-h">In flight${walks.length ? ` <span class="fd-count">${walks.length}</span>` : ""}</h3>
+${cards.join("\n")}
+${arrived.join("\n")}
+${laneLine}`;
+}
+
+/** Mirror of the harness's humanDuration formatting, display-only. */
+function fmtLaneMs(ms) {
+  if (!(ms > 0)) return "unknown";
+  return ms < 120000 ? `${Math.round(ms / 1000)}s` : `~${Math.round(ms / 60000)} min`;
 }
 
 /** The front door's rail glyph — the queue's own state, never a fifth meaning. */
