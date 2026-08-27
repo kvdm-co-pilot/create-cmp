@@ -8,6 +8,30 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **Studio drive mode** (`docs/features/studio-drive-mode.md`) — one driving surface,
+  pages that answer first, and a live chain. Third report of the same complexity
+  failure ("all pages are just a mess of information"), fixed by DEMOTION this time,
+  not another aggregation layer:
+  - **Drive** — the front door retitled and re-led: the live chain strip, the rich
+    walk cards, the what-needs-you queue with buttons, then the page's own digest and
+    history folded. The section id stays `overview` (pinned plumbing).
+  - **Page anatomy** — every mirror section now renders verdict-first with its
+    complete derived corpus behind one "Read the full …" disclosure; a section the
+    human queue points at (or Comments with open threads) greets open, and the
+    "take me there" jump opens every ancestor fold. The spec-mirror principle is
+    untouched — only default expansion changes.
+  - **The live chain** — `Request: <the ask>` · `✓ 1 → ◉ 2 → ○ 3` · `now: step 2 of
+    3`, rendered in the Drive strip, the per-prompt inject, and `qa/walk-status.mjs`.
+    Three provenance tiers, each labeled: the request is recorded mechanically from
+    the human's own prompt (UserPromptSubmit hook → `qa/.request.json`); the steps are
+    agent-declared via the new `node qa/plan.mjs` (`--set/--step/--done`) and always
+    carry their age; what is ACTUALLY running comes from the lane/render markers and
+    overrides. The chain gates nothing — the walk stays the truth — and its ephemeral
+    files are hard-excluded from the receipt's hashed input surface (a prompt must
+    never invalidate a receipt) and gitignored on fresh scaffolds.
+  - **The studio is a standing check** — the inject opens with `[studio: …]` every
+    prompt; a DOWN or absent console is a fault the agent must heal (the `preview`
+    tool now starts a detached resident) or surface, never work silently past.
 - **Walk legibility** (`docs/features/walk-legibility.md`, harness → 0.16.0) — the walk
   speaks human, the console carries it, and the console is always there. Six decisions,
   from the week-on evidence report (`docs/proposals/walk-status-chat-legibility.md`):

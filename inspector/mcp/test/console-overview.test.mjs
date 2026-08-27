@@ -383,3 +383,63 @@ test("L5: without the walk derivation, the board-mirroring fallback still render
   assert.match(html, /1 of 2 promises kept/);
   assert.doesNotMatch(html, /wk-plist/, "the rich list needs the derivation — never fabricated from the board");
 });
+
+// ── The live chain strip + page anatomy (studio-drive-mode) ──────────────────
+
+import { driveChainHtml } from "../src/lib/console-overview.mjs";
+import { renderShellPage } from "../src/lib/console-shell.mjs";
+
+const chainFixture = {
+  request: { text: "add supplements with reminders", at: "now" },
+  plan: {
+    title: "supplement schedules",
+    feature: "supplements",
+    steps: [
+      { n: 1, label: "sign the brief", done: true },
+      { n: 2, label: "build", done: false },
+      { n: 3, label: "full check", done: false },
+    ],
+    current: 2,
+    updatedAt: "now",
+  },
+  planAgeMs: 40000,
+  busy: { lane: true, render: false },
+};
+
+test("chain strip: request, numbered steps with position, freshness, and live corroboration", () => {
+  const html = driveChainHtml(chainFixture);
+  assert.match(html, /Request<\/span> supplement schedules/, "the agent's restated title leads when declared");
+  assert.match(html, /ch-done/);
+  assert.match(html, /ch-cur/);
+  assert.match(html, /now: step 2 of 3 — build/);
+  assert.match(html, /declared by the agent, updated 40s ago/, "declared state always carries its provenance + age");
+  assert.match(html, /the full check is running NOW/, "tier-3 corroboration comes from the markers, not the plan");
+});
+
+test("chain strip: no plan and no request is silence, never an empty frame", () => {
+  assert.equal(driveChainHtml(null), "");
+  assert.equal(driveChainHtml({ request: null, plan: null, busy: {} }), "");
+});
+
+test("chain strip: a bare request (no declared plan) renders honestly as undeclared", () => {
+  const html = driveChainHtml({ ...chainFixture, plan: null, planAgeMs: null, busy: {} });
+  assert.match(html, /add supplements with reminders/, "the human's own words, recorded mechanically");
+  assert.match(html, /no declared step chain/);
+});
+
+test("page anatomy: mirror sections collapse to their verdict; queue-targeted ones open; Drive never folds", () => {
+  const page = renderShellPage({
+    appName: "Acme",
+    railItems: [],
+    railFootHtml: "",
+    bodyScript: "",
+    sections: [
+      { id: "overview", title: "Drive", statusHtml: "s", bodyHtml: "<p>drive body</p>", active: true },
+      { id: "specs", title: "Specs", statusHtml: "verdict", bodyHtml: "<p>the corpus</p>", mirror: true },
+      { id: "architecture", title: "Architecture", statusHtml: "v", bodyHtml: "<p>arch</p>", mirror: true, mirrorOpen: true },
+    ],
+  });
+  assert.match(page, /<details class="mirror-details"><summary>Read the full Specs/);
+  assert.match(page, /<details class="mirror-details" open><summary>Read the full Architecture/, "a section the queue points at greets open");
+  assert.doesNotMatch(page, /Read the full Drive/, "the driving surface is an instrument, never a folded document");
+});

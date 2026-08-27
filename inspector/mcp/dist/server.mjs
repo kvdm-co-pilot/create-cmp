@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 1d9b48e41a1614bb3283f95d09f9ecc70dd66ac4d2577ff1ea33c5d5651c2694
+// cmp:bundle-inputs 7351a7dc9d97650a120c67db8c403b7bb639b424af224b02a0206c6a74f6d7f9
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32586,6 +32586,9 @@ async function getWalksData(root) {
       arrivals: d.arrivals,
       lane: d.lane ?? null,
       console: d.console ?? null,
+      // The live chain (studio-drive-mode): request + declared plan + busy
+      // markers, provenance-tiered by the harness's own plan.mjs.
+      chain: d.chain ?? null,
       // The harness's own plain-words stage glosses (L3) — rendered, never
       // duplicated here, so the words can only ever come from one place.
       gloss: mod.STAGE_GLOSS && typeof mod.STAGE_GLOSS === "object" ? mod.STAGE_GLOSS : {}
@@ -34104,7 +34107,7 @@ function governanceStripHtml({ statuses = [], features = [] }) {
     // data-go-* (NOT data-tab/data-artifact): a strip jump is not a rail tab
     // button, and overloading the rail's attributes would collide with every
     // selector that treats data-tab as "a tab exists here".
-    `<button type="button" class="gov-next" data-go-tab="overview" title="open the front door">${queue.length} thing${queue.length === 1 ? "" : "s"} need${queue.length === 1 ? "s" : ""} you <span class="gov-more">&rarr; Overview</span></button>`
+    `<button type="button" class="gov-next" data-go-tab="overview" title="open the front door">${queue.length} thing${queue.length === 1 ? "" : "s"} need${queue.length === 1 ? "s" : ""} you <span class="gov-more">&rarr; Drive</span></button>`
   ) : `<p class="gov-clear">Nothing waits on you.</p>`;
   return `<div id="gov-strip">
   <p class="gov-counts">${counts}</p>
@@ -34176,13 +34179,16 @@ function railItemHtml(item) {
 }
 function sectionHtml(s, provenanceHtml2) {
   const status = s.statusHtml ? `<p class="page-status">${s.statusHtml}</p>` : "";
+  const body = s.mirror ? `<details class="mirror-details"${s.mirrorOpen ? " open" : ""}><summary>Read the full ${esc3(s.title)} \u2014 every fact, derived from the live tree</summary>
+${s.bodyHtml}
+</details>` : s.bodyHtml;
   return `<section id="tab-${esc3(s.id)}" class="tab-panel${s.active ? " active" : ""}${s.fullBleed ? " full-bleed" : ""}" data-tab="${esc3(s.id)}">
 <header class="page-head">
   <h2>${esc3(s.title)}</h2>
   ${status}${s.headExtraHtml || ""}
 </header>
 <div class="page-body">
-${s.bodyHtml}
+${body}
 </div>
 <footer class="page-foot">${provenanceHtml2}</footer>
 </section>`;
@@ -34417,6 +34423,33 @@ var SHELL_CSS = `
                     font: inherit; font-size: 11px; font-weight: 600; }
   .wk-arrival-btn:hover { background: var(--reopen); color: var(--paper); }
   .wk-arrival-btn[disabled] { opacity: .6; cursor: default; }
+  /* The live chain (studio-drive-mode): request \xB7 step chain \xB7 freshness.
+     The one place the studio renders DECLARED state \u2014 the .ch-age label says
+     so, always. Busy (tier 3, derived) is the only accent that pulses. */
+  .ch-strip { border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin: 0 0 16px;
+              background: var(--accent-bg); }
+  .ch-request { margin: 0 0 8px; font-size: var(--fs-head); font-weight: 600; color: var(--ink); }
+  .ch-request .lbl { margin-right: 8px; }
+  .ch-steps { margin: 0 0 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px;
+              font-size: var(--fs-meta); }
+  .ch-step { display: inline-flex; align-items: baseline; gap: 4px; }
+  .ch-glyph { font-size: 10.5px; }
+  .ch-done { color: var(--muted); } .ch-done .ch-glyph { color: var(--signed); }
+  .ch-cur { color: var(--accent); font-weight: 700; }
+  .ch-todo { color: var(--muted); }
+  .ch-arrow { color: var(--line); margin: 0 2px; }
+  .ch-busy { color: var(--accent); font-weight: 650; animation: ch-pulse 1.6s ease-in-out infinite; }
+  @keyframes ch-pulse { 50% { opacity: .45; } }
+  .ch-meta { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); }
+  .ch-age { color: var(--muted); }
+  /* Page anatomy (studio-drive-mode): the collapsed tails. .fd-fold is
+     Drive's own digest/history; .mirror-details wraps a mirror section's
+     complete body \u2014 verdict stays in the page head, the corpus one click in. */
+  .fd-fold { margin: 16px 0 0; }
+  .fd-fold > summary, .mirror-details > summary { cursor: pointer; color: var(--muted);
+    font-size: var(--fs-body); font-weight: 600; padding: 6px 0; }
+  .fd-fold > summary:hover, .mirror-details > summary:hover { color: var(--ink-2); }
+  .mirror-details { margin: 0; }
   /* The digest keeps its own renderer and its own headings; inside the front
      door it is a block, not a page, so its h3s step down a level. Nothing here
      hides any of its content \u2014 the one duplicated line (the window) was deleted
@@ -34953,13 +34986,46 @@ ${recent.map((e) => {
 <div class="fd-digest">
 ${digestHtml}
 </div>` : "";
-  return `  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
+  const fold = (label, inner) => inner ? `  <details class="fd-fold"><summary>${label}</summary>
+${inner}
+  </details>` : "";
+  return `${driveChainHtml(walks && walks.chain ? walks.chain : null)}  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
   <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
 ${walksHtml(features, statuses, walks)}
-${changedBlock}
-${historyHtml}`;
+${fold("What changed", changedBlock)}
+${fold("History", historyHtml)}`;
+}
+function fmtChainAge(ms) {
+  if (!(ms >= 0)) return "age unknown";
+  if (ms < 9e4) return `${Math.round(ms / 1e3)}s ago`;
+  if (ms < 90 * 6e4) return `${Math.round(ms / 6e4)} min ago`;
+  return `${Math.round(ms / 36e5)}h ago`;
+}
+function driveChainHtml(chain) {
+  if (!chain || !chain.plan && !chain.request) return "";
+  const title = chain.plan && chain.plan.title ? chain.plan.title : chain.request ? chain.request.text : "";
+  const busy = chain.busy && chain.busy.lane ? `<span class="ch-busy">the full check is running NOW</span>` : chain.busy && chain.busy.render ? `<span class="ch-busy">a preview render is in flight</span>` : "";
+  let steps = "";
+  let meta3 = "";
+  if (chain.plan) {
+    const cur = chain.plan.current;
+    steps = `  <p class="ch-steps">${chain.plan.steps.map((st) => {
+      const cls = st.done ? "ch-done" : st.n === cur ? "ch-cur" : "ch-todo";
+      const glyph = st.done ? "\u2713" : st.n === cur ? "\u25C9" : "\u25CB";
+      return `<span class="ch-step ${cls}"><span class="ch-glyph">${glyph}</span> ${st.n}. ${esc4(st.label)}</span>`;
+    }).join('<span class="ch-arrow">\u2192</span>')}</p>`;
+    const now = chain.plan.steps.find((st) => st.n === cur) ?? null;
+    meta3 = `  <p class="ch-meta">${now ? `now: step ${now.n} of ${chain.plan.steps.length} \u2014 ${esc4(now.label)}` : "chain complete"}${busy ? ` &middot; ${busy}` : ""} &middot; <span class="ch-age" title="the steps are declared by the agent; the age says how fresh the claim is">declared by the agent, updated ${esc4(fmtChainAge(chain.planAgeMs))}</span></p>`;
+  } else {
+    meta3 = `  <p class="ch-meta">no declared step chain for this request yet${busy ? ` &middot; ${busy}` : ""}</p>`;
+  }
+  return `  <div class="ch-strip">
+  <p class="ch-request"><span class="lbl">Request</span> ${esc4(title)}</p>
+${steps}${meta3}
+  </div>
+`;
 }
 var WK_STAGES = [
   ["decide", "Decide"],
@@ -37258,7 +37324,7 @@ function galleryHtml(state) {
     // "dashboard is ambient — never a separate tab" rule of §2.
     {
       id: "overview",
-      label: "Overview",
+      label: "Drive",
       glyph: overviewGlyph(humanQueue, overviewStatuses),
       active: true
     },
@@ -37317,7 +37383,10 @@ function galleryHtml(state) {
     // grows NO signature control of its own — sign where you read stands.
     {
       id: "overview",
-      title: "Overview",
+      // Retitled by studio-drive-mode: the front door is the DRIVING surface
+      // (chain + walks + queue); the id stays "overview" — it is pinned by
+      // GOVERNED_PANELS, sessionStorage, and the strip's gov-next jump.
+      title: "Drive",
       statusHtml: overviewStatusHtml({
         receipt: effectiveReceipt,
         statuses: overviewStatuses,
@@ -37411,6 +37480,28 @@ function galleryHtml(state) {
       fullBleed: true
     }
   ];
+  const MIRROR_SECTIONS = /* @__PURE__ */ new Set([
+    "intent",
+    "features",
+    "architecture",
+    "specs",
+    "design-system",
+    "components",
+    "evidence",
+    "walkthrough",
+    "approvals",
+    "comments"
+  ]);
+  const queueTabs = new Set(humanQueue.map((q) => q.tab));
+  for (const section of sections) {
+    if (!MIRROR_SECTIONS.has(section.id)) continue;
+    section.mirror = true;
+    section.mirrorOpen = queueTabs.has(section.id);
+  }
+  if (openCommentCount > 0) {
+    const c = sections.find((x) => x.id === "comments");
+    if (c) c.mirrorOpen = true;
+  }
   if (approvals.available && approvals.statuses) {
     const byId = new Map(approvals.statuses.map((s) => [s.id, s]));
     const bar = (id, what) => byId.has(id) ? signatureBarHtml(byId.get(id), { what }) : "";
@@ -37533,7 +37624,16 @@ ${section.bodyHtml}`;
     const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
     if (railBtn) railBtn.click();
     const target = document.querySelector('#tab-' + btn.dataset.goTab + ' [data-artifact="' + btn.dataset.goArtifact + '"]');
-    if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (target) {
+      // Page anatomy: the row may live inside a collapsed mirror disclosure \u2014
+      // "take me there" opens every ancestor fold so the jump lands ON the row.
+      let fold = target.closest("details");
+      while (fold) {
+        fold.open = true;
+        fold = fold.parentElement ? fold.parentElement.closest("details") : null;
+      }
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   });
   const es = new EventSource("/events");
   // EventSource reconnects on its own, but nothing ever wrote the pill back to
@@ -38784,6 +38884,9 @@ function createPreviewService(opts) {
     // this package cannot import that file statically (it lives in the generated app).
     { rel: "docs/features", kind: "governance" },
     { rel: "qa", kind: "ledger", only: /* @__PURE__ */ new Set(["approvals.json", "comments.json"]) },
+    // The live chain's ephemeral files (studio-drive-mode): a plan advance or
+    // a new request must move the Drive strip without a manual reload.
+    { rel: "qa", kind: "governance", only: /* @__PURE__ */ new Set([".plan.json", ".request.json"]) },
     { rel: "qa/evidence", kind: "governance", only: /* @__PURE__ */ new Set(["latest.json"]) }
   ];
   const pendingGovernance = /* @__PURE__ */ new Set();

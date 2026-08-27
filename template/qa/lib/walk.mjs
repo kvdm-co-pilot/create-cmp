@@ -20,6 +20,7 @@ import path from "node:path";
 
 import { getFeatureBoard, getApprovalStatuses, readJournal } from "./approvals.mjs";
 import { CLAUSE_LINE_RE } from "./spec-coverage.mjs";
+import { deriveChain, renderChain } from "./plan.mjs";
 
 /** The six stages, in walk order. `label` is the only user-facing name (D2). */
 export const STAGES = [
@@ -345,7 +346,10 @@ export function deriveWalks(root) {
   // `lane` (L4) and `console` (L6) ride along so every rendering can say
   // what a check costs and where the buttons are — both derived, never
   // remembered, and both null-safe for projects that have neither yet.
-  return { available: true, walks, arrivals, lane, console: consoleState(root) };
+  // The live CHAIN (studio-drive-mode) rides along too: request + declared
+  // step plan + what is actually running. Declared state, labeled as such by
+  // every renderer; it gates nothing and the walk stays the truth.
+  return { available: true, walks, arrivals, lane, console: consoleState(root), chain: deriveChain(root) };
 }
 
 // ── Renderings — one grammar, four slots (D4) ────────────────────────────────
@@ -416,8 +420,20 @@ export function renderCard(w, ctx = {}) {
  * standing protocol reminders, re-delivered every turn so the narration rules
  * are decay-proof — re-told, never remembered (D5/D6).
  */
+/**
+ * The studio's status, said plainly every prompt (studio-drive-mode: the
+ * agent ALWAYS knows whether the human's window exists, and healing it is a
+ * standing instruction, not a discovery).
+ */
+function studioLine(consoleRec) {
+  if (consoleRec && consoleRec.url) return `[studio: running at ${consoleRec.url}]`;
+  if (consoleRec && consoleRec.stale)
+    return "[studio: DOWN — it crashed (stale registry record). Restore it now: call the cmp-inspector `preview { projectDir }` tool (it starts a detached resident console), or tell the human it is down. Do not proceed silently.]";
+  return "[studio: not running. If the cmp-inspector tools are available, start it now with `preview { projectDir }` — the human's window should exist whenever work is happening. If they are absent, say so once.]";
+}
+
 export function renderInject(data) {
-  const { available, walks, arrivals } = data;
+  const { available, walks, arrivals, chain } = data;
   if (!available || (walks.length === 0 && arrivals.length === 0)) return "";
   const parts = [];
   // L2 — chat is a walk surface: the reply opens with the derivation's OWN
@@ -427,6 +443,18 @@ export function renderInject(data) {
   if (header !== "") {
     parts.push(`[chat header — open your reply with this exact line (verbatim, then a blank line):]\n${header}`);
   }
+  // The studio's status is stated EVERY prompt — its absence was silent once
+  // (the walk-wiring lesson) and never gets to be silent again.
+  parts.push(studioLine(data.console));
+  // The live chain (studio-drive-mode): the current request and the declared
+  // step plan, with its age. Declared by the agent — which is exactly why it
+  // is re-shown every turn: keeping it current is part of the contract.
+  const chainText = renderChain(chain);
+  parts.push(
+    chainText !== ""
+      ? `[the chain — the current request's steps. Keep it CURRENT: advance with \`node qa/plan.mjs --step N\` as steps land, \`--done\` when the request lands. A stale chain misleads the human watching the studio.]\n${chainText}`
+      : '[no chain declared. At kickoff, declare the request\'s steps so the human can watch position live: `node qa/plan.mjs --set "step | step | …" --title "<the ask, restated>"` — mirror the itinerary you print in chat.]',
+  );
   if (walks.length > 0) {
     parts.push("[walk-status — derived from the ledgers; render this state, never your own memory of it]");
     for (const w of walks) parts.push(renderCard(w, data));
@@ -434,7 +462,7 @@ export function renderInject(data) {
   for (const a of arrivals)
     parts.push(`▲ ARRIVED, UNPLANNED — ${a.label} (${a.status}): ${a.reason ?? "no recorded reason"}. Offer: handle now, or after the current walk lands (recommended: after).`);
   parts.push(
-    "Protocol: open every reply with the chat header line above, verbatim. Speak stages as Decide·Design·Contract·Build·Prove·Sign-off — with their plain-words gloss on first mention — and clauses as promises. Quiet between headers (one line per stage transition). At any human gate, render the full stop card: stage, what it is in plain words, then the easiest act first (the studio console when it is up; the CLI as fallback), then what comes after. Quote the lane's cost only from the measured figure in the card — never estimate it. Never open a second walk silently.",
+    "Protocol: open every reply with the chat header line above, verbatim. Speak stages as Decide·Design·Contract·Build·Prove·Sign-off — with their plain-words gloss on first mention — and clauses as promises. Declare the chain at kickoff and advance it as you go; if the studio line above says DOWN or not running, restore it (preview tool) or surface it before proceeding. Quiet between headers (one line per stage transition). At any human gate, render the full stop card: stage, what it is in plain words, then the easiest act first (the studio console when it is up; the CLI as fallback), then what comes after. Quote the lane's cost only from the measured figure in the card — never estimate it. Never open a second walk silently.",
   );
   return parts.join("\n\n");
 }

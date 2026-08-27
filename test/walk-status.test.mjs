@@ -277,6 +277,44 @@ test("L5: the your-turn step names its signable artifacts for button-carrying su
   }
 });
 
+test("chain: declare, advance, close — the CLI round-trip with age and provenance", () => {
+  const planCli = path.join(dir, "qa/plan.mjs");
+  execFileSync("node", [planCli, "--set", "sign the brief | build | full check", "--title", "combo work"], { cwd: dir });
+  let chain = lib.deriveWalks(dir).chain;
+  assert.equal(chain.plan.title, "combo work");
+  assert.equal(chain.plan.steps.length, 3);
+  assert.equal(chain.plan.current, 1);
+  execFileSync("node", [planCli, "--step", "2"], { cwd: dir });
+  chain = lib.deriveWalks(dir).chain;
+  assert.equal(chain.plan.steps[0].done, true);
+  assert.equal(chain.plan.current, 2);
+  assert.ok(chain.planAgeMs >= 0, "the declaration carries its age — a stale chain must read as stale");
+  const out = execFileSync("node", [planCli, "--done"], { cwd: dir, encoding: "utf8" });
+  assert.match(out, /chain complete/);
+  assert.match(out, /declared by the agent/, "provenance is stated on the rendering itself");
+});
+
+test("chain: the inject records the human's prompt (tier 1) and renders studio + chain", () => {
+  const hookInput = JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: "please add supplements with reminders" });
+  const out = execFileSync("node", [cli, "--inject"], { cwd: dir, encoding: "utf8", input: hookInput });
+  const ctx = JSON.parse(out).hookSpecificOutput.additionalContext;
+  assert.match(ctx, /\[studio: /, "the studio's status is stated every prompt");
+  assert.match(ctx, /node qa\/plan\.mjs --step N/, "keeping the chain current is re-told, never remembered");
+  const recorded = JSON.parse(fs.readFileSync(path.join(dir, "qa/.request.json"), "utf8"));
+  assert.equal(recorded.text, "please add supplements with reminders", "the request is the hook's words, machinery-owned");
+});
+
+test("chain: the ephemeral files never enter the receipt's hashed input surface", async () => {
+  const ih = await import(pathToFileURL(path.join(dir, "qa/lib/inputs-hash.mjs")).href);
+  fs.rmSync(path.join(dir, "qa/.plan.json"), { force: true });
+  fs.rmSync(path.join(dir, "qa/.request.json"), { force: true });
+  const before = ih.computeInputsHash(dir).hash;
+  fs.writeFileSync(path.join(dir, "qa/.request.json"), '{"text":"a new prompt","at":"now"}\n');
+  fs.writeFileSync(path.join(dir, "qa/.plan.json"), '{"steps":[{"n":1,"label":"x","done":false}],"current":1,"updatedAt":"now"}\n');
+  const after = ih.computeInputsHash(dir).hash;
+  assert.equal(after, before, "a prompt must never invalidate a receipt");
+});
+
 test("fail-open: outside any project, every surface exits 0 and stays silent", () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-walk-empty-"));
   // The CLI resolves its root from its own location — copy it standalone so a

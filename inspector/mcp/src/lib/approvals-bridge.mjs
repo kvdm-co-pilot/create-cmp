@@ -269,6 +269,9 @@ export async function getWalksData(root) {
       arrivals: d.arrivals,
       lane: d.lane ?? null,
       console: d.console ?? null,
+      // The live chain (studio-drive-mode): request + declared plan + busy
+      // markers, provenance-tiered by the harness's own plan.mjs.
+      chain: d.chain ?? null,
       // The harness's own plain-words stage glosses (L3) — rendered, never
       // duplicated here, so the words can only ever come from one place.
       gloss: mod.STAGE_GLOSS && typeof mod.STAGE_GLOSS === "object" ? mod.STAGE_GLOSS : {},
