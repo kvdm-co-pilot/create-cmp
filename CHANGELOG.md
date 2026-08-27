@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-27
+
 ### Added
 
 - **Studio drive mode** (`docs/features/studio-drive-mode.md`) — one driving surface,
@@ -1856,7 +1858,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.1...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.15.0...v0.16.0
