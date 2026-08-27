@@ -164,7 +164,7 @@ export function governanceStripHtml({ statuses = [], features = [] }) {
       ? // data-go-* (NOT data-tab/data-artifact): a strip jump is not a rail tab
         // button, and overloading the rail's attributes would collide with every
         // selector that treats data-tab as "a tab exists here".
-        `<button type="button" class="gov-next" data-go-tab="overview" title="open the front door">${queue.length} thing${queue.length === 1 ? "" : "s"} need${queue.length === 1 ? "s" : ""} you <span class="gov-more">&rarr; Overview</span></button>`
+        `<button type="button" class="gov-next" data-go-tab="overview" title="open the front door">${queue.length} thing${queue.length === 1 ? "" : "s"} need${queue.length === 1 ? "s" : ""} you <span class="gov-more">&rarr; Drive</span></button>`
       : `<p class="gov-clear">Nothing waits on you.</p>`;
 
   return `<div id="gov-strip">
@@ -295,13 +295,25 @@ function railItemHtml(item) {
  */
 function sectionHtml(s, provenanceHtml) {
   const status = s.statusHtml ? `<p class="page-status">${s.statusHtml}</p>` : "";
+  // Page anatomy (studio-drive-mode): a MIRROR section's default weight is its
+  // verdict (the page-status line above), with the complete derived document
+  // one disclosure away. The mirror stays byte-complete and stays the drift
+  // surface — only its default expansion changes. Tool sections (Drive,
+  // Screens, Live device) and any section the caller marks open render as
+  // before; the gov-jump handler opens the disclosure when a jump lands
+  // inside it, so "take me there" still lands ON the row.
+  const body = s.mirror
+    ? `<details class="mirror-details"${s.mirrorOpen ? " open" : ""}><summary>Read the full ${esc(s.title)} — every fact, derived from the live tree</summary>
+${s.bodyHtml}
+</details>`
+    : s.bodyHtml;
   return `<section id="tab-${esc(s.id)}" class="tab-panel${s.active ? " active" : ""}${s.fullBleed ? " full-bleed" : ""}" data-tab="${esc(s.id)}">
 <header class="page-head">
   <h2>${esc(s.title)}</h2>
   ${status}${s.headExtraHtml || ""}
 </header>
 <div class="page-body">
-${s.bodyHtml}
+${body}
 </div>
 <footer class="page-foot">${provenanceHtml}</footer>
 </section>`;
@@ -624,6 +636,33 @@ export const SHELL_CSS = `
                     font: inherit; font-size: 11px; font-weight: 600; }
   .wk-arrival-btn:hover { background: var(--reopen); color: var(--paper); }
   .wk-arrival-btn[disabled] { opacity: .6; cursor: default; }
+  /* The live chain (studio-drive-mode): request · step chain · freshness.
+     The one place the studio renders DECLARED state — the .ch-age label says
+     so, always. Busy (tier 3, derived) is the only accent that pulses. */
+  .ch-strip { border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin: 0 0 16px;
+              background: var(--accent-bg); }
+  .ch-request { margin: 0 0 8px; font-size: var(--fs-head); font-weight: 600; color: var(--ink); }
+  .ch-request .lbl { margin-right: 8px; }
+  .ch-steps { margin: 0 0 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px;
+              font-size: var(--fs-meta); }
+  .ch-step { display: inline-flex; align-items: baseline; gap: 4px; }
+  .ch-glyph { font-size: 10.5px; }
+  .ch-done { color: var(--muted); } .ch-done .ch-glyph { color: var(--signed); }
+  .ch-cur { color: var(--accent); font-weight: 700; }
+  .ch-todo { color: var(--muted); }
+  .ch-arrow { color: var(--line); margin: 0 2px; }
+  .ch-busy { color: var(--accent); font-weight: 650; animation: ch-pulse 1.6s ease-in-out infinite; }
+  @keyframes ch-pulse { 50% { opacity: .45; } }
+  .ch-meta { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); }
+  .ch-age { color: var(--muted); }
+  /* Page anatomy (studio-drive-mode): the collapsed tails. .fd-fold is
+     Drive's own digest/history; .mirror-details wraps a mirror section's
+     complete body — verdict stays in the page head, the corpus one click in. */
+  .fd-fold { margin: 16px 0 0; }
+  .fd-fold > summary, .mirror-details > summary { cursor: pointer; color: var(--muted);
+    font-size: var(--fs-body); font-weight: 600; padding: 6px 0; }
+  .fd-fold > summary:hover, .mirror-details > summary:hover { color: var(--ink-2); }
+  .mirror-details { margin: 0; }
   /* The digest keeps its own renderer and its own headings; inside the front
      door it is a block, not a page, so its h3s step down a level. Nothing here
      hides any of its content — the one duplicated line (the window) was deleted

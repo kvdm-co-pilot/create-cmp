@@ -910,7 +910,7 @@ export function galleryHtml(state) {
     // "dashboard is ambient — never a separate tab" rule of §2.
     {
       id: "overview",
-      label: "Overview",
+      label: "Drive",
       glyph: overviewGlyph(humanQueue, overviewStatuses),
       active: true,
     },
@@ -972,7 +972,10 @@ export function galleryHtml(state) {
     // grows NO signature control of its own — sign where you read stands.
     {
       id: "overview",
-      title: "Overview",
+      // Retitled by studio-drive-mode: the front door is the DRIVING surface
+      // (chain + walks + queue); the id stays "overview" — it is pinned by
+      // GOVERNED_PANELS, sessionStorage, and the strip's gov-next jump.
+      title: "Drive",
       statusHtml: overviewStatusHtml({
         receipt: effectiveReceipt,
         statuses: overviewStatuses,
@@ -1071,6 +1074,29 @@ export function galleryHtml(state) {
       fullBleed: true,
     },
   ];
+
+  // Page anatomy (studio-drive-mode): every MIRROR section — a complete
+  // signed-doc rendering — collapses to its verdict line by default, with the
+  // corpus one disclosure away. A section the human queue currently points at
+  // renders open: its exception IS the reason the human is coming. Tool
+  // sections (Drive, Screens, Live device) keep their full body — they are
+  // instruments, not documents.
+  const MIRROR_SECTIONS = new Set([
+    "intent", "features", "architecture", "specs", "design-system",
+    "components", "evidence", "walkthrough", "approvals", "comments",
+  ]);
+  const queueTabs = new Set(humanQueue.map((q) => q.tab));
+  for (const section of sections) {
+    if (!MIRROR_SECTIONS.has(section.id)) continue;
+    section.mirror = true;
+    section.mirrorOpen = queueTabs.has(section.id);
+  }
+  // Open feedback is an exception too: a Comments page with open threads
+  // greeting the reader with a closed fold would hide the very thing waiting.
+  if (openCommentCount > 0) {
+    const c = sections.find((x) => x.id === "comments");
+    if (c) c.mirrorOpen = true;
+  }
 
   // Sign where you read: every governed section carries its OWN signature
   // control, so the human reading an artifact is the human who can sign it.
@@ -1212,7 +1238,16 @@ export function galleryHtml(state) {
     const railBtn = document.querySelector('.rail-nav .tab-btn[data-tab="' + btn.dataset.goTab + '"]');
     if (railBtn) railBtn.click();
     const target = document.querySelector('#tab-' + btn.dataset.goTab + ' [data-artifact="' + btn.dataset.goArtifact + '"]');
-    if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (target) {
+      // Page anatomy: the row may live inside a collapsed mirror disclosure —
+      // "take me there" opens every ancestor fold so the jump lands ON the row.
+      let fold = target.closest("details");
+      while (fold) {
+        fold.open = true;
+        fold = fold.parentElement ? fold.parentElement.closest("details") : null;
+      }
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   });
   const es = new EventSource("/events");
   // EventSource reconnects on its own, but nothing ever wrote the pill back to
@@ -2781,6 +2816,9 @@ export function createPreviewService(opts) {
     // this package cannot import that file statically (it lives in the generated app).
     { rel: "docs/features", kind: "governance" },
     { rel: "qa", kind: "ledger", only: new Set(["approvals.json", "comments.json"]) },
+    // The live chain's ephemeral files (studio-drive-mode): a plan advance or
+    // a new request must move the Drive strip without a manual reload.
+    { rel: "qa", kind: "governance", only: new Set([".plan.json", ".request.json"]) },
     { rel: "qa/evidence", kind: "governance", only: new Set(["latest.json"]) },
   ];
   const pendingGovernance = new Set();

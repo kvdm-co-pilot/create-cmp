@@ -270,13 +270,66 @@ ${digestHtml}
 </div>`
     : "";
 
-  return `  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
+  // Page anatomy (studio-drive-mode): Drive leads with the live chain, then
+  // what-needs-you, then the walks; the digest and history are the page's own
+  // MIRROR tail — complete, derived, and collapsed by default.
+  const fold = (label, inner) =>
+    inner ? `  <details class="fd-fold"><summary>${label}</summary>\n${inner}\n  </details>` : "";
+
+  return `${driveChainHtml(walks && walks.chain ? walks.chain : null)}  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
   <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
 ${walksHtml(features, statuses, walks)}
-${changedBlock}
-${historyHtml}`;
+${fold("What changed", changedBlock)}
+${fold("History", historyHtml)}`;
+}
+
+// ── The live chain (studio-drive-mode) ───────────────────────────────────────
+//
+// What the agent is doing in the CURRENT REQUEST: the request itself (tier 1,
+// recorded mechanically from the human's own prompt), the declared step chain
+// (tier 2 — agent-declared, so its AGE is always shown), and what is actually
+// running right now (tier 3 — the lane/render markers, derived, overriding).
+// The chain gates nothing; the walk below stays the truth for doneness.
+
+/** "40s ago" / "12 min ago" — mirror of the harness's formatAge, display-only. */
+function fmtChainAge(ms) {
+  if (!(ms >= 0)) return "age unknown";
+  if (ms < 90000) return `${Math.round(ms / 1000)}s ago`;
+  if (ms < 90 * 60000) return `${Math.round(ms / 60000)} min ago`;
+  return `${Math.round(ms / 3600000)}h ago`;
+}
+
+export function driveChainHtml(chain) {
+  if (!chain || (!chain.plan && !chain.request)) return "";
+  const title = chain.plan && chain.plan.title ? chain.plan.title : chain.request ? chain.request.text : "";
+  const busy = chain.busy && chain.busy.lane
+    ? `<span class="ch-busy">the full check is running NOW</span>`
+    : chain.busy && chain.busy.render
+      ? `<span class="ch-busy">a preview render is in flight</span>`
+      : "";
+  let steps = "";
+  let meta = "";
+  if (chain.plan) {
+    const cur = chain.plan.current;
+    steps = `  <p class="ch-steps">${chain.plan.steps
+      .map((st) => {
+        const cls = st.done ? "ch-done" : st.n === cur ? "ch-cur" : "ch-todo";
+        const glyph = st.done ? "✓" : st.n === cur ? "◉" : "○";
+        return `<span class="ch-step ${cls}"><span class="ch-glyph">${glyph}</span> ${st.n}. ${esc(st.label)}</span>`;
+      })
+      .join('<span class="ch-arrow">→</span>')}</p>`;
+    const now = chain.plan.steps.find((st) => st.n === cur) ?? null;
+    meta = `  <p class="ch-meta">${now ? `now: step ${now.n} of ${chain.plan.steps.length} — ${esc(now.label)}` : "chain complete"}${busy ? ` &middot; ${busy}` : ""} &middot; <span class="ch-age" title="the steps are declared by the agent; the age says how fresh the claim is">declared by the agent, updated ${esc(fmtChainAge(chain.planAgeMs))}</span></p>`;
+  } else {
+    meta = `  <p class="ch-meta">no declared step chain for this request yet${busy ? ` &middot; ${busy}` : ""}</p>`;
+  }
+  return `  <div class="ch-strip">
+  <p class="ch-request"><span class="lbl">Request</span> ${esc(title)}</p>
+${steps}${meta}
+  </div>
+`;
 }
 
 // ── In flight — the walks (docs/features/walk-status.md) ─────────────────────

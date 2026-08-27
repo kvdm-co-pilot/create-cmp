@@ -317,12 +317,31 @@ evidence attached"). `node qa/walk-status.mjs` derives the live position; a
 UserPromptSubmit hook injects it every prompt. **Render the injected state — never
 your memory of it.**
 
-**At kickoff** (with the triage restatement): print the itinerary —
+**At kickoff** (with the triage restatement): print the itinerary — and DECLARE it as
+the live chain, so the studio's Drive strip and the statusline's readers see the same
+steps you just printed:
 
     Navigation redesign — the journey (brief lane)
     Decide → Design → Contract → Build → Prove → Sign-off
     Stops for you: 3 (Decide — now · Contract · Sign-off). Build and Prove never stop for you.
     First stop is now: 2 open decisions below.
+
+```bash
+node qa/plan.mjs --set "sign the brief | draft screens | agree the promises | build | full check | your sign-off" --title "navigation redesign"
+```
+
+**The chain stays current** — this is part of the contract, not a nicety: advance it
+with `node qa/plan.mjs --step N` as each step lands and `--done` when the request
+lands. The current request itself is recorded mechanically (the per-prompt hook), the
+steps are yours to declare, and every surface shows the declaration's age — a stale
+chain reads as stale to the human watching the studio, which is worse than no chain.
+The chain gates nothing; the walk stays the truth for doneness.
+
+**The studio is a standing check:** every injected context opens with a `[studio: …]`
+line. If it says DOWN or not running, restore it before proceeding — call the
+cmp-inspector `preview { projectDir }` tool (it starts a detached resident console
+that survives the session) — or, if the tools are absent, tell the human once. A
+missing window is a fault to heal, never something to work silently past.
 
 **While working — the header, then quiet:** open EVERY reply with the walk's one-line
 header — the exact `[chat header]` line the per-prompt inject delivers. Paste it
