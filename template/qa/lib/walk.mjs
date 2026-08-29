@@ -452,8 +452,8 @@ export function renderInject(data) {
   const chainText = renderChain(chain);
   parts.push(
     chainText !== ""
-      ? `[the chain — the current request's steps. Keep it CURRENT: advance with \`node qa/plan.mjs --step N\` as steps land, \`--done\` when the request lands. A stale chain misleads the human watching the studio.]\n${chainText}`
-      : '[no chain declared. At kickoff, declare the request\'s steps so the human can watch position live: `node qa/plan.mjs --set "step | step | …" --title "<the ask, restated>"` — mirror the itinerary you print in chat.]',
+      ? `[the chain — the current request's steps. Keep it CURRENT: advance with \`node qa/plan.mjs --step N\` as steps land, \`--done\` when the request lands. If the human redirects, re-declare (\`--set\` again) — the chain is an offer they can reshape, not an announcement. A stale chain misleads the human watching the studio.]\n${chainText}`
+      : '[no chain declared. At kickoff, declare the request\'s steps and show them in your first reply AS AN OFFER — the human can reorder or redirect, and you re-declare without ceremony; work starts immediately either way: `node qa/plan.mjs --set "step | step | …" --title "<the ask, restated>"`.]',
   );
   if (walks.length > 0) {
     parts.push("[walk-status — derived from the ledgers; render this state, never your own memory of it]");

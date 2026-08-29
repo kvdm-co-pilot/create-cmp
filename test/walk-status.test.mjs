@@ -308,11 +308,80 @@ test("chain: the ephemeral files never enter the receipt's hashed input surface"
   const ih = await import(pathToFileURL(path.join(dir, "qa/lib/inputs-hash.mjs")).href);
   fs.rmSync(path.join(dir, "qa/.plan.json"), { force: true });
   fs.rmSync(path.join(dir, "qa/.request.json"), { force: true });
+  fs.rmSync(path.join(dir, "qa/.plan-history.jsonl"), { force: true });
   const before = ih.computeInputsHash(dir).hash;
   fs.writeFileSync(path.join(dir, "qa/.request.json"), '{"text":"a new prompt","at":"now"}\n');
   fs.writeFileSync(path.join(dir, "qa/.plan.json"), '{"steps":[{"n":1,"label":"x","done":false}],"current":1,"updatedAt":"now"}\n');
+  fs.writeFileSync(path.join(dir, "qa/.plan-history.jsonl"), '{"schema":"cmp-plan-history/1","at":"now"}\n');
   const after = ih.computeInputsHash(dir).hash;
   assert.equal(after, before, "a prompt must never invalidate a receipt");
+});
+
+// ── drive-narration (docs/features/drive-narration.md) ──────────────────────
+
+test("N1: the declaration's own write stamps become step durations in the rendering", async () => {
+  const plan = await import(pathToFileURL(path.join(dir, "qa/lib/plan.mjs")).href);
+  plan.setPlan(dir, { title: "timed work", steps: ["first", "second"] });
+  // Backdate step 1's start so the closed step has measurable wall time.
+  const raw = JSON.parse(fs.readFileSync(path.join(dir, "qa/.plan.json"), "utf8"));
+  raw.steps[0].startedAt = new Date(Date.now() - 30000).toISOString();
+  fs.writeFileSync(path.join(dir, "qa/.plan.json"), JSON.stringify(raw));
+  plan.markStep(dir, 2);
+  const text = plan.renderChain(plan.deriveChain(dir));
+  assert.match(text, /✓ 1\. first \(30s\)/, "a done step wears its wall time");
+  assert.match(text, /◉ 2\. second · \d+s in/, "the current step wears its elapsed");
+});
+
+test("N2: the lane marker's narration is parsed, spoken with expected durations, and prefixed observed", async () => {
+  const plan = await import(pathToFileURL(path.join(dir, "qa/lib/plan.mjs")).href);
+  const markerDir = path.join(dir, "composeApp", "build");
+  fs.mkdirSync(markerDir, { recursive: true });
+  const marker = path.join(markerDir, ".cmp-lane-in-progress");
+  fs.writeFileSync(
+    marker,
+    `${JSON.stringify({ pid: 1, at: "x", step: "unitTests", index: 10, total: 16, stepStartedAt: new Date(Date.now() - 12000).toISOString(), expectedStepMs: 6000, expectedLaneMs: 52000 })}\n`,
+  );
+  try {
+    const chain = plan.deriveChain(dir);
+    assert.match(chain.busyText, /full check — unitTests \(10\/16\) · 12s of ~6s, usually 52s total/);
+    assert.match(plan.renderChain(chain), /observed: full check — unitTests/, "the machine's word is labeled as the machine's (N3)");
+    // Legacy "pid iso" content still reads as busy — no narration, no breakage.
+    fs.writeFileSync(marker, "123 2026-08-29T00:00:00.000Z\n");
+    assert.equal(plan.deriveChain(dir).busyText, "the full check is running NOW");
+  } finally {
+    fs.rmSync(marker, { force: true });
+  }
+});
+
+test("N5: closing the chain leaves ONE trail entry — request, steps, wall time, receipt at close", async () => {
+  const plan = await import(pathToFileURL(path.join(dir, "qa/lib/plan.mjs")).href);
+  fs.rmSync(path.join(dir, "qa/.plan-history.jsonl"), { force: true });
+  plan.recordRequest(dir, "please add supplements");
+  plan.setPlan(dir, { title: "supplements", feature: "supplements", steps: ["build", "check"] });
+  plan.markStep(dir, 3); // past the end = close
+  plan.markStep(dir, 3); // re-close: must NOT double-write the trail
+  const hist = plan.readPlanHistory(dir, 5);
+  assert.equal(hist.length, 1, "one close, one line — a re-close never doubles the trail");
+  assert.equal(hist[0].title, "supplements");
+  assert.equal(hist[0].request, "please add supplements");
+  assert.deepEqual(hist[0].steps, ["build", "check"]);
+  assert.ok(typeof hist[0].durationMs === "number" && hist[0].durationMs >= 0, "wall time from the chain's own stamps");
+  assert.equal(hist[0].receipt, null, "no receipt in this fixture — stated as null, never invented");
+  assert.ok(plan.deriveChain(dir).history.length >= 1, "the trail rides along on deriveChain for the Drive fold");
+});
+
+test("N5: the trail is capped and newest-first", async () => {
+  const plan = await import(pathToFileURL(path.join(dir, "qa/lib/plan.mjs")).href);
+  fs.rmSync(path.join(dir, "qa/.plan-history.jsonl"), { force: true });
+  for (let i = 1; i <= 60; i++) {
+    plan.setPlan(dir, { title: `req ${i}`, steps: ["only"] });
+    plan.markStep(dir, 2);
+  }
+  const lines = fs.readFileSync(path.join(dir, "qa/.plan-history.jsonl"), "utf8").split("\n").filter((l) => l.trim());
+  assert.equal(lines.length, 50, "the trail holds the last 50, no unbounded growth");
+  const hist = plan.readPlanHistory(dir, 3);
+  assert.equal(hist[0].title, "req 60", "newest first");
+  assert.equal(hist.length, 3);
 });
 
 test("fail-open: outside any project, every surface exits 0 and stays silent", () => {

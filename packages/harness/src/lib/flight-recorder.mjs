@@ -93,7 +93,14 @@ export function buildFlightEntry({ profile, mode, verdict, evidenceLevel, steps,
     verdict,
     evidenceRung: evidenceLevel?.rung ?? null,
     durationMs,
-    steps: stepList.map((s) => ({ name: s.name, verdict: s.verdict })),
+    // durationMs per step (additive, schema id unchanged — old entries stay
+    // readable): the source for the lane's own "usually ~Ns" narration
+    // (drive-narration N4). Quoted from the journal, never from memory.
+    steps: stepList.map((s) => ({
+      name: s.name,
+      verdict: s.verdict,
+      ...(typeof s.durationMs === "number" && s.durationMs >= 0 ? { durationMs: s.durationMs } : {}),
+    })),
     // SKIP reasons verbatim — the journal's core signal (see file header).
     skips: stepList.filter((s) => s.verdict === "SKIP").map((s) => ({ step: s.name, reason: s.reason ?? "" })),
     deviceSteps: Array.isArray(onDeviceSteps) ? onDeviceSteps : [],

@@ -655,6 +655,25 @@ export const SHELL_CSS = `
   @keyframes ch-pulse { 50% { opacity: .45; } }
   .ch-meta { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); }
   .ch-age { color: var(--muted); }
+  .ch-time { color: var(--muted); font-weight: 400; font-size: 10.5px; }
+  /* Provenance chips (drive-narration N3): observed/recorded = the machine's
+     word, declared = the agent's — the same fact the .ch-age label carried in
+     prose, now legible at a glance. */
+  .ch-prov { display: inline-block; padding: 0 5px; border-radius: 7px; font-size: 9.5px;
+             font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+             vertical-align: 1px; cursor: help; }
+  .ch-prov-obs { color: var(--signed); border: 1px solid var(--signed); }
+  .ch-prov-dec { color: var(--muted); border: 1px solid var(--line); }
+  /* Recent requests (drive-narration N5): the closed-chain trail, one collapsed
+     click in — request → steps → outcome, newest first. */
+  .ch-hist { margin: 8px 0 0; }
+  .ch-hist > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-meta);
+                       font-weight: 600; padding: 2px 0; }
+  .ch-hist > summary:hover { color: var(--ink-2); }
+  .ch-hist-row { margin: 4px 0 0 12px; font-size: var(--fs-meta); color: var(--ink-2); }
+  .ch-hist-outcome { font-weight: 650; }
+  .ch-hist-outcome.ok { color: var(--signed); }
+  .ch-hist-outcome.bad { color: var(--reopen); }
   /* Page anatomy (studio-drive-mode): the collapsed tails. .fd-fold is
      Drive's own digest/history; .mirror-details wraps a mirror section's
      complete body — verdict stays in the page head, the corpus one click in. */
