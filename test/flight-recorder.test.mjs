@@ -83,6 +83,17 @@ test("an entry records the run's facts, SKIP reasons verbatim, and nothing about
   assert.ok(!serialized.includes(os.userInfo().username), "no username in the journal");
 });
 
+test("per-step durations ride into the journal (drive-narration N4) — and their absence stays honest", () => {
+  const e = sampleEntry();
+  assert.deepEqual(
+    e.steps.map((s) => s.durationMs),
+    [100, 200, 1],
+    "the lane's own measured step times, verbatim — the source for 'usually ~Ns', never memory",
+  );
+  const bare = sampleEntry({ steps: [{ name: "build", verdict: "PASS" }] });
+  assert.ok(!("durationMs" in bare.steps[0]), "an unmeasured step records no duration rather than a fabricated one");
+});
+
 test("a fast run and a FAILed run record no rung — the journal never borrows evidence", () => {
   const fast = sampleEntry({ mode: "fast", evidenceLevel: null });
   assert.equal(fast.evidenceRung, null);

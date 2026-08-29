@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 7351a7dc9d97650a120c67db8c403b7bb639b424af224b02a0206c6a74f6d7f9
+// cmp:bundle-inputs aed061fac7e3f32d01c493b79fe17bc17614d820d47d69e74ee17fe06788f76c
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34442,6 +34442,25 @@ var SHELL_CSS = `
   @keyframes ch-pulse { 50% { opacity: .45; } }
   .ch-meta { margin: 0; font-size: var(--fs-meta); color: var(--ink-2); }
   .ch-age { color: var(--muted); }
+  .ch-time { color: var(--muted); font-weight: 400; font-size: 10.5px; }
+  /* Provenance chips (drive-narration N3): observed/recorded = the machine's
+     word, declared = the agent's \u2014 the same fact the .ch-age label carried in
+     prose, now legible at a glance. */
+  .ch-prov { display: inline-block; padding: 0 5px; border-radius: 7px; font-size: 9.5px;
+             font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+             vertical-align: 1px; cursor: help; }
+  .ch-prov-obs { color: var(--signed); border: 1px solid var(--signed); }
+  .ch-prov-dec { color: var(--muted); border: 1px solid var(--line); }
+  /* Recent requests (drive-narration N5): the closed-chain trail, one collapsed
+     click in \u2014 request \u2192 steps \u2192 outcome, newest first. */
+  .ch-hist { margin: 8px 0 0; }
+  .ch-hist > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-meta);
+                       font-weight: 600; padding: 2px 0; }
+  .ch-hist > summary:hover { color: var(--ink-2); }
+  .ch-hist-row { margin: 4px 0 0 12px; font-size: var(--fs-meta); color: var(--ink-2); }
+  .ch-hist-outcome { font-weight: 650; }
+  .ch-hist-outcome.ok { color: var(--signed); }
+  .ch-hist-outcome.bad { color: var(--reopen); }
   /* Page anatomy (studio-drive-mode): the collapsed tails. .fd-fold is
      Drive's own digest/history; .mirror-details wraps a mirror section's
      complete body \u2014 verdict stays in the page head, the corpus one click in. */
@@ -35003,28 +35022,69 @@ function fmtChainAge(ms) {
   if (ms < 90 * 6e4) return `${Math.round(ms / 6e4)} min ago`;
   return `${Math.round(ms / 36e5)}h ago`;
 }
+function fmtChainDur(ms) {
+  if (!(ms >= 0)) return "";
+  if (ms < 12e4) return `${Math.max(1, Math.round(ms / 1e3))}s`;
+  return `~${Math.round(ms / 6e4)} min`;
+}
+var CH_PROV = {
+  recorded: `<span class="ch-prov ch-prov-obs" title="recorded mechanically from your own prompt \u2014 not the agent's words">recorded</span>`,
+  declared: `<span class="ch-prov ch-prov-dec" title="declared by the agent \u2014 the age says how fresh the claim is">declared</span>`,
+  observed: `<span class="ch-prov ch-prov-obs" title="observed from the lane's own marker \u2014 not an agent claim">observed</span>`
+};
+function chainBusyPhrase(chain) {
+  if (typeof chain.busyText === "string") return chain.busyText;
+  if (chain.busy && chain.busy.lane) return "the full check is running NOW";
+  if (chain.busy && chain.busy.render) return "a preview render is in flight";
+  return "";
+}
+function chainHistoryHtml(history) {
+  if (!Array.isArray(history) || history.length === 0) return "";
+  const rows = history.map((h) => {
+    const label = h.title || h.request || "(untitled request)";
+    const ageMs = h.at ? Date.now() - Date.parse(h.at) : NaN;
+    const outcome = h.receipt && h.receipt.verdict ? `<span class="ch-hist-outcome ${h.receipt.verdict === "PASS" ? "ok" : "bad"}">${esc4(h.receipt.verdict)}${h.receipt.rung ? ` &middot; ${esc4(h.receipt.rung)}` : ""}</span>` : `<span class="ch-hist-outcome">no receipt at close</span>`;
+    const dur = typeof h.durationMs === "number" && h.durationMs > 0 ? ` &middot; ${esc4(fmtChainDur(h.durationMs))}` : "";
+    const steps = Array.isArray(h.steps) && h.steps.length ? ` &middot; ${h.steps.length} step${h.steps.length === 1 ? "" : "s"}` : "";
+    return `    <p class="ch-hist-row" title="${escAttr(Array.isArray(h.steps) ? h.steps.join(" \u2192 ") : "")}">${esc4(label)}${steps}${dur} &middot; ${outcome}${Number.isNaN(ageMs) ? "" : ` &middot; ${esc4(fmtChainAge(ageMs))}`}</p>`;
+  }).join("\n");
+  return `  <details class="ch-hist"><summary>Recent requests <span class="fd-count">${history.length}</span></summary>
+${rows}
+  </details>
+`;
+}
 function driveChainHtml(chain) {
   if (!chain || !chain.plan && !chain.request) return "";
   const title = chain.plan && chain.plan.title ? chain.plan.title : chain.request ? chain.request.text : "";
-  const busy = chain.busy && chain.busy.lane ? `<span class="ch-busy">the full check is running NOW</span>` : chain.busy && chain.busy.render ? `<span class="ch-busy">a preview render is in flight</span>` : "";
+  const busyPhrase = chainBusyPhrase(chain);
+  const busy = busyPhrase !== "" ? `${CH_PROV.observed} <span class="ch-busy">${esc4(busyPhrase)}</span>` : "";
   let steps = "";
   let meta3 = "";
   if (chain.plan) {
     const cur = chain.plan.current;
+    const nowMs = Date.now();
     steps = `  <p class="ch-steps">${chain.plan.steps.map((st) => {
       const cls = st.done ? "ch-done" : st.n === cur ? "ch-cur" : "ch-todo";
       const glyph = st.done ? "\u2713" : st.n === cur ? "\u25C9" : "\u25CB";
-      return `<span class="ch-step ${cls}"><span class="ch-glyph">${glyph}</span> ${st.n}. ${esc4(st.label)}</span>`;
+      let time3 = "";
+      if (st.done) {
+        const a = Date.parse(st.startedAt || "");
+        const b = Date.parse(st.doneAt || "");
+        if (!Number.isNaN(a) && !Number.isNaN(b)) time3 = ` <span class="ch-time">(${esc4(fmtChainDur(Math.max(0, b - a)))})</span>`;
+      } else if (st.n === cur) {
+        const a = Date.parse(st.startedAt || "");
+        if (!Number.isNaN(a)) time3 = ` <span class="ch-time">${esc4(fmtChainDur(Math.max(0, nowMs - a)))} in</span>`;
+      }
+      return `<span class="ch-step ${cls}"><span class="ch-glyph">${glyph}</span> ${st.n}. ${esc4(st.label)}${time3}</span>`;
     }).join('<span class="ch-arrow">\u2192</span>')}</p>`;
     const now = chain.plan.steps.find((st) => st.n === cur) ?? null;
-    meta3 = `  <p class="ch-meta">${now ? `now: step ${now.n} of ${chain.plan.steps.length} \u2014 ${esc4(now.label)}` : "chain complete"}${busy ? ` &middot; ${busy}` : ""} &middot; <span class="ch-age" title="the steps are declared by the agent; the age says how fresh the claim is">declared by the agent, updated ${esc4(fmtChainAge(chain.planAgeMs))}</span></p>`;
+    meta3 = `  <p class="ch-meta">${now ? `now: step ${now.n} of ${chain.plan.steps.length} \u2014 ${esc4(now.label)}` : "chain complete"}${busy ? ` &middot; ${busy}` : ""} &middot; ${CH_PROV.declared} <span class="ch-age">updated ${esc4(fmtChainAge(chain.planAgeMs))}</span></p>`;
   } else {
     meta3 = `  <p class="ch-meta">no declared step chain for this request yet${busy ? ` &middot; ${busy}` : ""}</p>`;
   }
   return `  <div class="ch-strip">
-  <p class="ch-request"><span class="lbl">Request</span> ${esc4(title)}</p>
-${steps}${meta3}
-  </div>
+  <p class="ch-request"><span class="lbl">Request</span> ${esc4(title)} ${CH_PROV.recorded}</p>
+${steps}${meta3}${chainHistoryHtml(chain.history)}  </div>
 `;
 }
 var WK_STAGES = [
@@ -38885,8 +38945,17 @@ function createPreviewService(opts) {
     { rel: "docs/features", kind: "governance" },
     { rel: "qa", kind: "ledger", only: /* @__PURE__ */ new Set(["approvals.json", "comments.json"]) },
     // The live chain's ephemeral files (studio-drive-mode): a plan advance or
-    // a new request must move the Drive strip without a manual reload.
-    { rel: "qa", kind: "governance", only: /* @__PURE__ */ new Set([".plan.json", ".request.json"]) },
+    // a new request must move the Drive strip without a manual reload — and the
+    // closed-chain trail (drive-narration N5) moves the Recent-requests fold.
+    { rel: "qa", kind: "governance", only: /* @__PURE__ */ new Set([".plan.json", ".request.json", ".plan-history.jsonl"]) },
+    // The lane's own narration (drive-narration N2): verify.mjs rewrites the
+    // lane marker at each step start, so watching it makes the Drive strip's
+    // observed line advance step-by-step while the full check runs. The dir is
+    // non-recursively watched and the `only` filter drops Gradle's churn.
+    // mkdir: the build dir does not exist before the first Gradle run, and a
+    // watch skipped at startup never retries — verify.mjs mkdirs the same path
+    // before stamping, so pre-creating it is claiming nothing Gradle owns.
+    { rel: "composeApp/build", kind: "governance", only: /* @__PURE__ */ new Set([".cmp-lane-in-progress", ".cmp-render-in-progress"]), mkdir: true },
     { rel: "qa/evidence", kind: "governance", only: /* @__PURE__ */ new Set(["latest.json"]) }
   ];
   const pendingGovernance = /* @__PURE__ */ new Set();
@@ -38915,7 +38984,14 @@ function createPreviewService(opts) {
   function watchGovernance() {
     for (const w of GOVERNANCE_WATCHES) {
       const abs = path18.join(projectDir, w.rel);
-      if (!fs17.existsSync(abs)) continue;
+      if (!fs17.existsSync(abs)) {
+        if (!w.mkdir) continue;
+        try {
+          fs17.mkdirSync(abs, { recursive: true });
+        } catch {
+          continue;
+        }
+      }
       try {
         const watcher2 = fs17.watch(abs, (_event, filename) => {
           const base = filename ? path18.basename(filename) : "";

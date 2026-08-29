@@ -2817,8 +2817,17 @@ export function createPreviewService(opts) {
     { rel: "docs/features", kind: "governance" },
     { rel: "qa", kind: "ledger", only: new Set(["approvals.json", "comments.json"]) },
     // The live chain's ephemeral files (studio-drive-mode): a plan advance or
-    // a new request must move the Drive strip without a manual reload.
-    { rel: "qa", kind: "governance", only: new Set([".plan.json", ".request.json"]) },
+    // a new request must move the Drive strip without a manual reload — and the
+    // closed-chain trail (drive-narration N5) moves the Recent-requests fold.
+    { rel: "qa", kind: "governance", only: new Set([".plan.json", ".request.json", ".plan-history.jsonl"]) },
+    // The lane's own narration (drive-narration N2): verify.mjs rewrites the
+    // lane marker at each step start, so watching it makes the Drive strip's
+    // observed line advance step-by-step while the full check runs. The dir is
+    // non-recursively watched and the `only` filter drops Gradle's churn.
+    // mkdir: the build dir does not exist before the first Gradle run, and a
+    // watch skipped at startup never retries — verify.mjs mkdirs the same path
+    // before stamping, so pre-creating it is claiming nothing Gradle owns.
+    { rel: "composeApp/build", kind: "governance", only: new Set([".cmp-lane-in-progress", ".cmp-render-in-progress"]), mkdir: true },
     { rel: "qa/evidence", kind: "governance", only: new Set(["latest.json"]) },
   ];
   const pendingGovernance = new Set();
@@ -2852,7 +2861,14 @@ export function createPreviewService(opts) {
   function watchGovernance() {
     for (const w of GOVERNANCE_WATCHES) {
       const abs = path.join(projectDir, w.rel);
-      if (!fs.existsSync(abs)) continue; // a project without it simply has nothing to watch
+      if (!fs.existsSync(abs)) {
+        if (!w.mkdir) continue; // a project without it simply has nothing to watch
+        try {
+          fs.mkdirSync(abs, { recursive: true });
+        } catch {
+          continue;
+        }
+      }
       try {
         const watcher = fs.watch(abs, (_event, filename) => {
           const base = filename ? path.basename(filename) : "";

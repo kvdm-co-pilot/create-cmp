@@ -330,12 +330,21 @@ steps you just printed:
 node qa/plan.mjs --set "sign the brief | draft screens | agree the promises | build | full check | your sign-off" --title "navigation redesign"
 ```
 
+**The chain is an offer, not an announcement** (drive-narration N6): show the declared
+steps in your first reply and invite the reshape in one breath — "say the word and I'll
+reorder" — then start work immediately; the chain gates nothing, so the offer never
+blocks. If the human redirects, re-declare (`--set` again) without ceremony: their
+reshape IS the new chain.
+
 **The chain stays current** — this is part of the contract, not a nicety: advance it
 with `node qa/plan.mjs --step N` as each step lands and `--done` when the request
-lands. The current request itself is recorded mechanically (the per-prompt hook), the
-steps are yours to declare, and every surface shows the declaration's age — a stale
-chain reads as stale to the human watching the studio, which is worse than no chain.
-The chain gates nothing; the walk stays the truth for doneness.
+lands (closing writes the request's line into the local trail the studio's Recent
+requests fold shows). The current request itself is recorded mechanically (the
+per-prompt hook), the steps are yours to declare, and every surface shows the
+declaration's age — a stale chain reads as stale to the human watching the studio,
+which is worse than no chain. While the full check runs, the chain's observed line
+narrates the lane's own position (step, elapsed, usual cost) — quote THAT, never an
+estimate. The chain gates nothing; the walk stays the truth for doneness.
 
 **The studio is a standing check:** every injected context opens with a `[studio: …]`
 line. If it says DOWN or not running, restore it before proceeding — call the

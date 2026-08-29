@@ -412,8 +412,62 @@ test("chain strip: request, numbered steps with position, freshness, and live co
   assert.match(html, /ch-done/);
   assert.match(html, /ch-cur/);
   assert.match(html, /now: step 2 of 3 — build/);
-  assert.match(html, /declared by the agent, updated 40s ago/, "declared state always carries its provenance + age");
+  assert.match(html, /ch-prov-dec[^>]*>declared<\/span> <span class="ch-age">updated 40s ago/, "declared state always carries its provenance + age");
   assert.match(html, /the full check is running NOW/, "tier-3 corroboration comes from the markers, not the plan");
+});
+
+test("chain strip: provenance chips label all three tiers (drive-narration N3)", () => {
+  const html = driveChainHtml(chainFixture);
+  assert.match(html, /ch-prov-obs[^>]*>recorded</, "the request wears the machine's chip — it is the human's own prompt");
+  assert.match(html, /ch-prov-obs[^>]*>observed</, "the busy line wears the machine's chip");
+  assert.match(html, /ch-prov-dec[^>]*>declared</, "the steps wear the agent's chip");
+});
+
+test("chain strip: the harness's pre-rendered narration is rendered verbatim, never paraphrased (N2)", () => {
+  const html = driveChainHtml({
+    ...chainFixture,
+    busyText: "full check — unitTests (10/16) · 12s of ~6s, usually ~52s total",
+  });
+  assert.match(html, /full check — unitTests \(10\/16\) · 12s of ~6s, usually ~52s total/);
+  assert.doesNotMatch(html, /running NOW/, "the legacy phrase yields to the lane's own narration");
+});
+
+test("chain strip: step timing derives from the declaration's own stamps (N1)", () => {
+  const twoMinAgo = new Date(Date.now() - 120000).toISOString();
+  const oneMinAgo = new Date(Date.now() - 60000).toISOString();
+  const html = driveChainHtml({
+    ...chainFixture,
+    plan: {
+      ...chainFixture.plan,
+      steps: [
+        { n: 1, label: "sign the brief", done: true, startedAt: twoMinAgo, doneAt: oneMinAgo },
+        { n: 2, label: "build", done: false, startedAt: oneMinAgo },
+        { n: 3, label: "full check", done: false },
+      ],
+    },
+  });
+  assert.match(html, /ch-time">\(60s\)/, "a done step wears its wall time");
+  assert.match(html, /ch-time">60s in/, "the current step wears its elapsed");
+});
+
+test("chain strip: closed chains render as the Recent-requests fold (N5)", () => {
+  const html = driveChainHtml({
+    ...chainFixture,
+    history: [
+      {
+        at: new Date(Date.now() - 40000).toISOString(),
+        title: "navigation redesign",
+        steps: ["sign", "build", "check"],
+        durationMs: 95000,
+        receipt: { verdict: "PASS", rung: "L1" },
+      },
+      { at: new Date(Date.now() - 90000).toISOString(), request: "fix the header", steps: ["build"], durationMs: null, receipt: null },
+    ],
+  });
+  assert.match(html, /<details class="ch-hist"><summary>Recent requests/);
+  assert.match(html, /navigation redesign/);
+  assert.match(html, /PASS &middot; L1/, "the outcome is the receipt's word at close, not a claim");
+  assert.match(html, /no receipt at close/, "an absent receipt is stated, never papered over");
 });
 
 test("chain strip: no plan and no request is silence, never an empty frame", () => {

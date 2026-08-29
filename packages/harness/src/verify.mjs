@@ -44,7 +44,7 @@ import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./lib/devi
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-doc.mjs";
 import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "./lib/determinism.mjs";
 import { evaluateAuditCadence } from "./lib/audit-cadence.mjs";
-import { appendFlightRecord, buildFlightEntry } from "./lib/flight-recorder.mjs";
+import { appendFlightRecord, buildFlightEntry, readFlightJournal } from "./lib/flight-recorder.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -1512,12 +1512,65 @@ if (fast) {
 
 // Stamp the lane marker for the run's duration (coexistence defense 1 above);
 // always removed, even on a failing step, so the eyes only ever defer briefly.
-fs.mkdirSync(path.dirname(LANE_MARKER), { recursive: true });
-fs.writeFileSync(LANE_MARKER, `${process.pid} ${new Date().toISOString()}\n`);
+//
+// N2 (docs/features/drive-narration.md): the marker is REWRITTEN at each step
+// start with the lane's own narration — current step name, position, and the
+// expected durations read from the journal's last full run (never memory;
+// walk-legibility L4's rule, per step). Every other consumer of this marker
+// is mtime-only (qa/watch.mjs, the preview daemon), so the content is free
+// to carry meaning for deriveChain's windshield — and the per-step rewrite
+// also refreshes mtime, so a lane longer than the 5-minute freshness bound
+// no longer reads as stale to its own watchers mid-run.
 const laneStartedAt = Date.now(); // for the flight-recorder entry's durationMs
+const expectedByStep = (() => {
+  try {
+    const { entries } = readFlightJournal(ROOT);
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const e = entries[i];
+      if (!e || e.mode === "fast" || !Array.isArray(e.steps)) continue;
+      const byName = new Map();
+      for (const s of e.steps) {
+        if (s && typeof s.name === "string" && typeof s.durationMs === "number" && s.durationMs > 0) byName.set(s.name, s.durationMs);
+      }
+      return { byName, laneMs: typeof e.durationMs === "number" && e.durationMs > 0 ? e.durationMs : null };
+    }
+  } catch {
+    /* narration is optional; the lane never depends on its own journal */
+  }
+  return { byName: new Map(), laneMs: null };
+})();
+// "stepUnitTests" -> "unitTests", "stepSpecCoverageMemo" -> "specCoverage"
+// (the memoized wrappers inherit their const's name) — the same name the
+// result will carry; a wrapped/anonymous step narrates as null rather than
+// guessing.
+const laneStepDisplayName = (fn) => {
+  const raw = typeof fn?.name === "string" ? fn.name.replace(/^step/, "").replace(/Memo$/, "") : "";
+  return raw === "" ? null : raw.charAt(0).toLowerCase() + raw.slice(1);
+};
+function stampLaneMarker(stepFn, index, total) {
+  try {
+    const name = stepFn ? laneStepDisplayName(stepFn) : null;
+    const narration = {
+      pid: process.pid,
+      at: new Date(laneStartedAt).toISOString(),
+      step: name,
+      index,
+      total,
+      stepStartedAt: new Date().toISOString(),
+      expectedStepMs: name !== null ? expectedByStep.byName.get(name) ?? null : null,
+      expectedLaneMs: expectedByStep.laneMs,
+    };
+    fs.writeFileSync(LANE_MARKER, `${JSON.stringify(narration)}\n`);
+  } catch {
+    /* the narration must never break the lane it narrates */
+  }
+}
+fs.mkdirSync(path.dirname(LANE_MARKER), { recursive: true });
+stampLaneMarker(null, 0, laneSteps.length);
 const steps = [];
 try {
-for (const step of laneSteps) {
+for (const [laneStepIndex, step] of laneSteps.entries()) {
+  stampLaneMarker(step, laneStepIndex + 1, laneSteps.length);
   const result = step();
   steps.push(result);
   if (!asJson) {

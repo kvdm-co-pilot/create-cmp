@@ -301,34 +301,89 @@ function fmtChainAge(ms) {
   return `${Math.round(ms / 3600000)}h ago`;
 }
 
+/** "12s" / "~3 min" — mirror of the harness's formatDuration, display-only. */
+function fmtChainDur(ms) {
+  if (!(ms >= 0)) return "";
+  if (ms < 120000) return `${Math.max(1, Math.round(ms / 1000))}s`;
+  return `~${Math.round(ms / 60000)} min`;
+}
+
+// Provenance chips (drive-narration N3) — each chain tier labeled as what it
+// is: the request `recorded` (mechanically, from the human's own prompt), the
+// steps `declared` (by the agent, aged), the busy line `observed` (the lane's
+// own marker). The one distinction no self-reported progress display makes.
+const CH_PROV = {
+  recorded: `<span class="ch-prov ch-prov-obs" title="recorded mechanically from your own prompt — not the agent's words">recorded</span>`,
+  declared: `<span class="ch-prov ch-prov-dec" title="declared by the agent — the age says how fresh the claim is">declared</span>`,
+  observed: `<span class="ch-prov ch-prov-obs" title="observed from the lane's own marker — not an agent claim">observed</span>`,
+};
+
+/**
+ * The busy phrase: the harness's own pre-rendered narration when the project's
+ * plan.mjs provides it (busyText — one voice everywhere), else the legacy
+ * truthiness phrasing for older harnesses.
+ */
+function chainBusyPhrase(chain) {
+  if (typeof chain.busyText === "string") return chain.busyText;
+  if (chain.busy && chain.busy.lane) return "the full check is running NOW";
+  if (chain.busy && chain.busy.render) return "a preview render is in flight";
+  return "";
+}
+
+/** One row per closed chain (N5): request → steps → outcome, newest first. */
+function chainHistoryHtml(history) {
+  if (!Array.isArray(history) || history.length === 0) return "";
+  const rows = history
+    .map((h) => {
+      const label = h.title || h.request || "(untitled request)";
+      const ageMs = h.at ? Date.now() - Date.parse(h.at) : NaN;
+      const outcome = h.receipt && h.receipt.verdict
+        ? `<span class="ch-hist-outcome ${h.receipt.verdict === "PASS" ? "ok" : "bad"}">${esc(h.receipt.verdict)}${h.receipt.rung ? ` &middot; ${esc(h.receipt.rung)}` : ""}</span>`
+        : `<span class="ch-hist-outcome">no receipt at close</span>`;
+      const dur = typeof h.durationMs === "number" && h.durationMs > 0 ? ` &middot; ${esc(fmtChainDur(h.durationMs))}` : "";
+      const steps = Array.isArray(h.steps) && h.steps.length ? ` &middot; ${h.steps.length} step${h.steps.length === 1 ? "" : "s"}` : "";
+      return `    <p class="ch-hist-row" title="${escAttr(Array.isArray(h.steps) ? h.steps.join(" → ") : "")}">${esc(label)}${steps}${dur} &middot; ${outcome}${Number.isNaN(ageMs) ? "" : ` &middot; ${esc(fmtChainAge(ageMs))}`}</p>`;
+    })
+    .join("\n");
+  return `  <details class="ch-hist"><summary>Recent requests <span class="fd-count">${history.length}</span></summary>\n${rows}\n  </details>\n`;
+}
+
 export function driveChainHtml(chain) {
   if (!chain || (!chain.plan && !chain.request)) return "";
   const title = chain.plan && chain.plan.title ? chain.plan.title : chain.request ? chain.request.text : "";
-  const busy = chain.busy && chain.busy.lane
-    ? `<span class="ch-busy">the full check is running NOW</span>`
-    : chain.busy && chain.busy.render
-      ? `<span class="ch-busy">a preview render is in flight</span>`
-      : "";
+  const busyPhrase = chainBusyPhrase(chain);
+  const busy = busyPhrase !== "" ? `${CH_PROV.observed} <span class="ch-busy">${esc(busyPhrase)}</span>` : "";
   let steps = "";
   let meta = "";
   if (chain.plan) {
     const cur = chain.plan.current;
+    const nowMs = Date.now();
     steps = `  <p class="ch-steps">${chain.plan.steps
       .map((st) => {
         const cls = st.done ? "ch-done" : st.n === cur ? "ch-cur" : "ch-todo";
         const glyph = st.done ? "✓" : st.n === cur ? "◉" : "○";
-        return `<span class="ch-step ${cls}"><span class="ch-glyph">${glyph}</span> ${st.n}. ${esc(st.label)}</span>`;
+        // N1: a done step wears its wall time, the current one its elapsed —
+        // derived from the declaration's own write stamps, absent pre-N1.
+        let time = "";
+        if (st.done) {
+          const a = Date.parse(st.startedAt || "");
+          const b = Date.parse(st.doneAt || "");
+          if (!Number.isNaN(a) && !Number.isNaN(b)) time = ` <span class="ch-time">(${esc(fmtChainDur(Math.max(0, b - a)))})</span>`;
+        } else if (st.n === cur) {
+          const a = Date.parse(st.startedAt || "");
+          if (!Number.isNaN(a)) time = ` <span class="ch-time">${esc(fmtChainDur(Math.max(0, nowMs - a)))} in</span>`;
+        }
+        return `<span class="ch-step ${cls}"><span class="ch-glyph">${glyph}</span> ${st.n}. ${esc(st.label)}${time}</span>`;
       })
       .join('<span class="ch-arrow">→</span>')}</p>`;
     const now = chain.plan.steps.find((st) => st.n === cur) ?? null;
-    meta = `  <p class="ch-meta">${now ? `now: step ${now.n} of ${chain.plan.steps.length} — ${esc(now.label)}` : "chain complete"}${busy ? ` &middot; ${busy}` : ""} &middot; <span class="ch-age" title="the steps are declared by the agent; the age says how fresh the claim is">declared by the agent, updated ${esc(fmtChainAge(chain.planAgeMs))}</span></p>`;
+    meta = `  <p class="ch-meta">${now ? `now: step ${now.n} of ${chain.plan.steps.length} — ${esc(now.label)}` : "chain complete"}${busy ? ` &middot; ${busy}` : ""} &middot; ${CH_PROV.declared} <span class="ch-age">updated ${esc(fmtChainAge(chain.planAgeMs))}</span></p>`;
   } else {
     meta = `  <p class="ch-meta">no declared step chain for this request yet${busy ? ` &middot; ${busy}` : ""}</p>`;
   }
   return `  <div class="ch-strip">
-  <p class="ch-request"><span class="lbl">Request</span> ${esc(title)}</p>
-${steps}${meta}
-  </div>
+  <p class="ch-request"><span class="lbl">Request</span> ${esc(title)} ${CH_PROV.recorded}</p>
+${steps}${meta}${chainHistoryHtml(chain.history)}  </div>
 `;
 }
 
