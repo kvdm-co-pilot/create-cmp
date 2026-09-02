@@ -26,7 +26,7 @@ The disease being cured is **capability outrunning proof**. Therefore:
 
 | # | Slice | Cause | Repo | Session | Status |
 |---|---|---|---|---|---|
-| S0 | Mutation out of the per-change lane | C1 | payment-blueprint | blueprint | **AWAITING KAREL'S YES** — the other session has the five-line change ready |
+| S0 | Mutation out of the per-change lane | C1 | payment-blueprint | blueprint | **YES given 2026-09-03** — relayed to the blueprint session; it lands there |
 | S1 | Prove the uncommitted P2/P3 batch | C2 C3 C4 | create-cmp | this | **landed** (see Log) |
 | S2 | Console opens without `composeApp/` | C6 | create-cmp | this | **landed** — proven live on payment-blueprint |
 | S3 | Agent-stage pulse (observed activity between prompt and lane) | C4 | create-cmp | this | **landed** |
@@ -34,8 +34,8 @@ The disease being cured is **capability outrunning proof**. Therefore:
 | S5 | Reopen walks back only what it amends; `touches` stay hash-enforced | C5 | create-cmp | this | **landed** |
 | S6 | `nightly` stage + receipt names its stage | C1 | create-cmp | this | **landed** (no-cache audit deferred to P1) |
 | S7 | Sync path: showcase + blueprint receive S1–S6 | C6 | all three | this, then each | **handed off** — dry-runs done here; the writes belong to the owning sessions (below) |
-| S8 | Spine / step-pack / surface split | C6 | create-cmp | later | not started |
-| S9 | Per-step input hashes (P1) | C1 C5 | create-cmp | later, **conditional** | not started |
+| S8 | Spine / step-pack / surface split | C6 | create-cmp | this | **in progress** (approved 2026-09-03) |
+| S9 | Per-step input hashes (P1) | C1 C5 | create-cmp | after S8, **conditional** | approved 2026-09-03; trigger = the showcase's journal after its upgrade shows the change-stage lane still too slow |
 
 ---
 
@@ -276,3 +276,18 @@ S6. Neither starts until S1–S7 are landed and proven.
   in-flight guard in its own `receipt-check.mjs`, and the ERROR/deadline pattern
   (`step-outcomes.mjs` is dependency-free and can be dropped in as-is). The console already
   opens there (S2).
+- 2026-09-03 — Karel: YES to S0 (relayed to the blueprint session with the proof-of-done), YES to
+  S8 and S9. **Then merge and publish.** S8 shape: (a) `lib/lane-runner.mjs` — the step loop
+  (marker, deadline, narrator, catch → ERROR, verdict) as a function any repo's verify.mjs can
+  call, proven with fake steps; (b) `lib/steps-cmp.mjs` — the CMP steps behind
+  `createCmpSteps(ctx)`, verify.mjs becomes composition; (c) docs for adopting the spine in a
+  non-CMP repo with the blueprint as the worked example. S9's trigger cannot be measured here
+  (no Gradle app in this repo); it is read off the showcase's flight journal after its
+  `upgrade --harness` lands.
+
+- 2026-09-03 — **S8a written.** `lib/lane-runner.mjs`: `runLane(ctx)` — marker narration,
+  per-step deadline via a `setDeadline` hook, the pulse, throw/timeout → one ERROR row, the
+  mark, `laneVerdict`, `onFinally` — pure of project knowledge (no ROOT, no Gradle, no argv);
+  `expectedDurations`, `stepDisplayName`, `verdictMark` exported for step packs. `verify.mjs`
+  now composes it. Proven with fake steps against a real marker file
+  (`test/lane-runner.test.mjs`); the S4 structural pins moved with the code.
