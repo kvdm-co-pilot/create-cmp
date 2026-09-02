@@ -295,7 +295,9 @@ export function neverRunTiers(steps, entries, { floor = 3 } = {}) {
   const out = [];
   for (const st of (Array.isArray(steps) ? steps : []).filter((x) => x && x.verdict === "SKIP")) {
     const seen = full.filter((e) => e.steps.some((s) => s && s.name === st.name));
-    const ran = seen.filter((e) => e.steps.some((s) => s && s.name === st.name && s.verdict !== "SKIP"));
+    // "Ran" means produced a verdict about the tree: PASS or FAIL. An ERROR
+    // tried and could not; it is not evidence that the tier works here.
+    const ran = seen.filter((e) => e.steps.some((s) => s && s.name === st.name && (s.verdict === "PASS" || s.verdict === "FAIL")));
     if (seen.length >= floor && ran.length === 0) out.push({ name: st.name, runs: seen.length, reason: st.reason ?? "" });
   }
   return out;

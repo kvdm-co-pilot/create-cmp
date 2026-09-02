@@ -536,6 +536,17 @@ test("evidence ladder: releaseSmoke PASSed on top of L2 is L3 release", () => {
   assert.ok(level.satisfiedBy.includes("releaseSmoke"));
 });
 
+test("evidence ladder: a step that could not run (ERROR) earns no rung either — 'could not check' is not evidence", () => {
+  const steps = [
+    { name: "harnessIntegrity", verdict: "PASS" }, { name: "specCoverage", verdict: "PASS" }, { name: "approvals", verdict: "PASS" },
+    { name: "componentStories", verdict: "PASS" }, { name: "reachability", verdict: "PASS" }, { name: "archDoc", verdict: "PASS" },
+    { name: "schemaHistory", verdict: "PASS" }, { name: "build", verdict: "PASS" }, { name: "unitTests", verdict: "PASS" },
+    { name: "conformance", verdict: "PASS" }, { name: "goldenTrees", verdict: "PASS" }, { name: "a11y", verdict: "PASS" },
+    { name: "releaseBuild", verdict: "ERROR", reason: "DID NOT COMPLETE — deadline" },
+  ];
+  assert.equal(evidenceLevel(steps, "local"), null);
+});
+
 test("evidence ladder: a FAILed lane has no rung — evidenceLevel is null", () => {
   const steps = desktopPassSteps().map((s) => (s.name === "goldenTrees" ? { name: "goldenTrees", verdict: "FAIL", reason: "drift", durationMs: 100 } : s));
   assert.equal(evidenceLevel(steps, "local"), null);

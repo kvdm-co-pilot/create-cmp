@@ -966,6 +966,7 @@ export const SHELL_CSS = `
   .step-verdict-pass { color: var(--signed); font-weight: 650; }
   .step-verdict-fail { color: var(--drift); font-weight: 650; }
   .step-verdict-skip { color: var(--muted); font-weight: 650; }
+  .step-verdict-error { color: var(--reopen); font-weight: 600; text-decoration: underline dotted; }
   .evidence-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .evidence-timeline li { display: flex; gap: 10px; align-items: baseline; font-size: var(--fs-body);
                           padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
