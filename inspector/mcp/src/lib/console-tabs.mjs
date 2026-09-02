@@ -1872,7 +1872,11 @@ export function evidenceBodyHtml(lastReceipt, history) {
 
   const stepRows = (r.steps || [])
     .map((s) => {
-      const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
+      // ERROR (S4) wears its own class: "could not run" must never read as a
+      // behaviour failure (✗) nor as a quiet skip — it is the row that says
+      // the lane did not get to check this.
+      const cls =
+        s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
       const governs = STEP_GOVERNS[s.name];
       const governsCell = governs ? `<a class="step-link" href="#${esc(governs.section)}">${esc(governs.label)}</a>` : "";
       // Detail, in falling order of what a release manager needs: the test

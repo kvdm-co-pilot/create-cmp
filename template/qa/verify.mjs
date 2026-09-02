@@ -13,7 +13,8 @@
 // done without it). Binary artifacts under qa-artifacts/ are never committed;
 // the receipt references them by path + sha256.
 //
-// Verdicts per step: PASS | FAIL | SKIP. The lane verdict is PASS iff no step
+// Verdicts per step: PASS | FAIL | SKIP | ERROR (could not run — a deadline, zero
+// tests, a throw; never an accusation, never evidence). The lane verdict is PASS iff no step
 // FAILed. SKIPs are recorded with reasons — green-with-gaps is visible, never
 // silent. Exit code: 0 = PASS, 1 = FAIL.
 //
@@ -45,7 +46,7 @@ import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-do
 import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "./lib/determinism.mjs";
 import { evaluateAuditCadence } from "./lib/audit-cadence.mjs";
 import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
-import { androidChecksOutcome } from "./lib/step-outcomes.mjs";
+import { StepTimeout, androidChecksOutcome, spawnTimedOut, stepDeadlineMs, stepErrorResult } from "./lib/step-outcomes.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -192,11 +193,31 @@ const GRADLEW = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
 // do its job; full mode keeps it, byte-identical to before.
 const RERUN = fast ? "" : " --rerun";
 
+// The running step's deadline (evidence-economics S4). Set by the step loop
+// before each step from the journal's measured duration for it; every
+// subprocess the step spawns inherits it. A step with no deadline is a hang
+// waiting to happen: androidChecks sat at 0.5% CPU waiting on a device with
+// no bound at all, and the only signal was silence. Module-level because the
+// lane is sequential and single-threaded — one step runs at a time.
+let CURRENT_STEP_DEADLINE_MS = 30 * 60_000;
+
 function sh(cmd, opts = {}) {
   const started = Date.now();
   // maxBuffer: first-run Gradle output easily exceeds spawnSync's 1MB default,
   // which would surface as a bogus FAIL (status null / ENOBUFS).
-  const res = spawnSync(cmd, { shell: true, cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...opts });
+  const res = spawnSync(cmd, {
+    shell: true,
+    cwd: ROOT,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    timeout: CURRENT_STEP_DEADLINE_MS,
+    killSignal: "SIGTERM",
+    ...opts,
+  });
+  // A deadline is not a failure of the thing under test — it is a failure to
+  // test. Thrown, so the step loop records ERROR instead of the step reading
+  // a null exit status as "the behaviour is broken".
+  if (spawnTimedOut(res)) throw new StepTimeout(cmd, opts.timeout ?? CURRENT_STEP_DEADLINE_MS);
   const ok = res.status === 0 && !res.error;
   return { ok, status: res.status, error: res.error?.message, out: `${res.stdout ?? ""}${res.stderr ?? ""}`, durationMs: Date.now() - started };
 }
@@ -1616,13 +1637,26 @@ const steps = [];
 try {
 for (const [laneStepIndex, step] of laneSteps.entries()) {
   stampLaneMarker(step, laneStepIndex + 1, laneSteps.length);
-  const result = step();
+  // S4: every step runs under a deadline derived from its own measured
+  // history (×3, floor 5 min, ceiling 30). A deadline or a throw is ONE
+  // ERROR row — the lane keeps going, because the other verdicts are still
+  // worth having, and the lane verdict is FAIL either way.
+  const stepName = laneStepDisplayName(step) ?? `step${laneStepIndex + 1}`;
+  CURRENT_STEP_DEADLINE_MS = stepDeadlineMs(expectedByStep.byName.get(stepName));
+  const stepStarted = Date.now();
+  let result;
+  try {
+    result = step();
+  } catch (err) {
+    result = stepErrorResult(stepName, err, Date.now() - stepStarted);
+  }
   steps.push(result);
   if (!asJson) {
     // CACHED (fast mode only — see the memoization block above) renders with
     // its own mark and "unchanged since" note so a reused verdict is never
-    // mistakable for a fresh execution.
-    const mark = result.verdict === "PASS" ? "✓" : result.verdict === "CACHED" ? "⚡" : result.verdict === "SKIP" ? "→" : "✗";
+    // mistakable for a fresh execution. ERROR (⊘) is "could not run", visibly
+    // distinct from FAIL (✗) — see qa/lib/step-outcomes.mjs.
+    const mark = result.verdict === "PASS" ? "✓" : result.verdict === "CACHED" ? "⚡" : result.verdict === "SKIP" ? "→" : result.verdict === "ERROR" ? "⊘" : "✗";
     console.log(`${mark} ${result.name}: ${result.verdict}${result.note ? ` (${result.note})` : ""}${result.reason ? ` — ${result.reason.split("\n")[0]}` : ""}`);
   }
   if (result.name === "build" && result.verdict === "FAIL") break; // nothing downstream is meaningful
@@ -1646,7 +1680,9 @@ for (const [laneStepIndex, step] of laneSteps.entries()) {
 // in fast mode on an unchanged input set) — but it stays CACHED on the
 // receipt, visibly distinct, so a fast receipt can never be read as if every
 // step freshly executed.
-const verdict = steps.some((s) => s.verdict === "FAIL") ? "FAIL" : "PASS";
+// ERROR fails the lane too: "I could not check this" is not green. It is only
+// the ACCUSATION that ERROR withholds, never the refusal.
+const verdict = steps.some((s) => s.verdict === "FAIL" || s.verdict === "ERROR") ? "FAIL" : "PASS";
 
 // Receipt STRENGTH — a desktop-only green and an on-device green are different
 // claims, and the difference should never live only in the SKIP lines. Device-

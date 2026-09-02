@@ -78,3 +78,13 @@ test("local profile: the cheap high-signal tier reports before releaseBuild", ()
   }
   assert.ok(at("Build") < at("UnitTests"), "the debug build still precedes the tests that need it");
 });
+
+// S4 — the fourth verdict and the deadline are wired where they must be.
+test("the lane: every step runs under a deadline, a throw or timeout is one ERROR row, and ERROR fails the lane", () => {
+  assert.match(verifySrc, /CURRENT_STEP_DEADLINE_MS = stepDeadlineMs\(expectedByStep\.byName\.get\(stepName\)\)/, "the deadline is set per step from its own history");
+  assert.match(verifySrc, /timeout: CURRENT_STEP_DEADLINE_MS/, "and every subprocess inherits it");
+  assert.match(verifySrc, /if \(spawnTimedOut\(res\)\) throw new StepTimeout/, "a deadline is thrown, never read as a failed exit");
+  assert.match(verifySrc, /result = stepErrorResult\(stepName, err, Date\.now\(\) - stepStarted\)/, "the loop catches into ERROR and keeps going");
+  assert.match(verifySrc, /s\.verdict === "FAIL" \|\| s\.verdict === "ERROR"\) \? "FAIL" : "PASS"/, "ERROR fails the lane");
+  assert.match(verifySrc, /result\.verdict === "ERROR" \? "⊘"/, "and wears its own mark");
+});

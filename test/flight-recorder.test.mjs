@@ -325,3 +325,14 @@ test("neverRunTiers: below the floor, 'every time' is a coincidence — two skip
   assert.equal(neverRunTiers([skip], fastOnly).length, 0, "the inner loop skips the device tier by design");
   assert.equal(neverRunTiers([{ name: "build", verdict: "PASS" }], fastOnly).length, 0, "a step that PASSed this run is not asked");
 });
+
+test("neverRunTiers: a tier whose only non-SKIP history is ERROR has still never run — an error is not evidence it works here", () => {
+  const skip = { name: "androidChecks", verdict: "SKIP", reason: "no device" };
+  const full = (steps) => ({ ...sampleEntry({ mode: "full" }), steps });
+  const journal = [
+    ...Array.from({ length: 3 }, () => full([{ name: "androidChecks", verdict: "SKIP" }])),
+    full([{ name: "androidChecks", verdict: "ERROR" }]),
+  ];
+  assert.equal(neverRunTiers([skip], journal).length, 1, "three skips and one could-not-run is still never-run");
+  assert.equal(neverRunTiers([skip], [...journal, full([{ name: "androidChecks", verdict: "FAIL" }])]).length, 0, "a FAIL is a run — it measured something");
+});

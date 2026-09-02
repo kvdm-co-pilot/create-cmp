@@ -206,3 +206,13 @@ S6. Neither starts until S1–S7 are landed and proven.
   plan — the undeclared chain was the still photo, and that is the case fixed. The console's src
   watcher broadcasts a debounced governance refresh so the Drive strip moves on what the agent
   DID. Tests in walk-status: since/before/machinery/no-request, stall, lane-wins.
+- 2026-09-02 — **S4 in progress.** Four verdicts: PASS / FAIL / SKIP / ERROR (`lib/step-outcomes.mjs`).
+  ERROR = could not run — a deadline, zero tests executed, a throw. Never an accusation, never
+  evidence (evidence-level: no rung; receipt plausibility: not "executed"; neverRunTiers: not
+  a run; step-cache: never reused), visibly distinct (⊘), and it still FAILs the lane. Every
+  subprocess inherits a per-step deadline from the journal's own measured duration
+  (`stepDeadlineMs`: ×3, floor 5 min, ceiling 30, unknown → 30); a deadline throws
+  `StepTimeout`, the step loop catches ANY throw into one ERROR row and keeps going (a throw
+  used to crash the whole lane). androidChecks' did-not-execute is now ERROR. Planted: a real
+  `sleep 5` under a 150ms deadline classifies as timeout; a `TypeError` inside a step becomes
+  a row. Remaining: the console's step glyph, the bundle, both suites.

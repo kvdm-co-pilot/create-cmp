@@ -527,7 +527,7 @@ Code session can extend it correctly — **the create-cmp plugin is not required
    DI + navigation, with tests at every layer and a golden-tree baseline, spec-linked from birth.
 3. Claude runs `node qa/verify.mjs` — the profile-tiered lane (§3: 16 steps at `local`, from
    `harnessIntegrity` first through build, the full JVM test tier, and the device steps when one
-   is attached) — into one typed PASS/FAIL/SKIP verdict + a schema-validated evidence-pack JSON
+   is attached) — into one typed PASS/FAIL/SKIP/ERROR verdict (ERROR = the step could not run: a deadline, zero tests executed, a throw — it fails the lane but never accuses the change) + a schema-validated evidence-pack JSON
    (`qa/evidence/latest.json`).
 4. The PASS receipt gets committed. The generated `.claude/settings.json` **Stop hook**
    (`qa/receipt-check.mjs`) blocks "done" if the verified surface has changed since the last PASS

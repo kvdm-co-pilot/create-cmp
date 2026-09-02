@@ -263,3 +263,17 @@ test("validateReceiptForTree: policy knobs override the defaults", () => {
     assert.equal(validateReceiptForTree({ root, policy: { minExecutedMs: 500 } }).status, "valid");
   });
 });
+
+// S4 — an ERROR step tried and could not: it is not "executed" for the
+// plausibility floor any more than a SKIP is. A receipt whose every gate is an
+// ERROR verified nothing, and must say so rather than sum its wasted minutes.
+test("plausibility: ERROR steps are not executed gates — a lane of errors verified nothing", () => {
+  const allErrors = { steps: [{ name: "build", verdict: "ERROR", durationMs: 1_800_000 }, { name: "unitTests", verdict: "SKIP" }] };
+  const r = checkExecutionPlausibility(allErrors);
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /every step in the receipt is a SKIP|verified nothing/);
+  const mixed = { steps: [{ name: "build", verdict: "PASS", durationMs: 60_000 }, { name: "releaseBuild", verdict: "ERROR", durationMs: 1_800_000 }] };
+  const m = checkExecutionPlausibility(mixed);
+  assert.equal(m.executedSteps, 1, "only the step that produced a verdict counts");
+  assert.equal(m.executedMs, 60_000, "and thirty wasted minutes do not pad the floor");
+});

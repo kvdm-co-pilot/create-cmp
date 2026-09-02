@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 406ff3084d0626fe78f3efeaf2681b1f858db5d22fe8ece58b8eecf53faa8f12
+// cmp:bundle-inputs 26f469aa4ea255bc1b9488252f39c53412c0e5defb7b787d0166717887a156db
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34762,6 +34762,7 @@ var SHELL_CSS = `
   .step-verdict-pass { color: var(--signed); font-weight: 650; }
   .step-verdict-fail { color: var(--drift); font-weight: 650; }
   .step-verdict-skip { color: var(--muted); font-weight: 650; }
+  .step-verdict-error { color: var(--reopen); font-weight: 600; text-decoration: underline dotted; }
   .evidence-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .evidence-timeline li { display: flex; gap: 10px; align-items: baseline; font-size: var(--fs-body);
                           padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
@@ -36423,7 +36424,7 @@ function evidenceBodyHtml(lastReceipt, history) {
     `<li>${inputsBindingHtml(r)}</li>`
   ].filter(Boolean).join("\n      ");
   const stepRows = (r.steps || []).map((s) => {
-    const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
+    const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
     const governs = STEP_GOVERNS[s.name];
     const governsCell = governs ? `<a class="step-link" href="#${esc5(governs.section)}">${esc5(governs.label)}</a>` : "";
     const counts = stepTestCountsHtml(s);
