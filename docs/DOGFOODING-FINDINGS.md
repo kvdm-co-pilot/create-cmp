@@ -742,6 +742,70 @@ default-parameter position, or give each screen its own fixture. **Karel chose t
 duplication of fixture data, and the same cost for every future screen, is the deliberate price of
 a rule that cannot be argued with case by case — the guarantee is worth more than the keystrokes.
 
+## A clause can be cited by a test structurally incapable of observing it [P1]
+
+*Surfaced 2026-09-02, from the intro-animation walk. The lane went PASS and the promise was
+never observed by anything.*
+
+**The evidence.** `MOTION-13` claims the intro animation "plays once per process start". It was
+cited — by `IntroScreenTest`, running under `runComposeUiTest` on the desktop tier. That test
+asserts the intro ends exactly once and that a tap skips it. Both true. Neither can observe the
+promise: a desktop Compose test has no process lifecycle. No `ON_STOP`, no `ON_START`, no warm
+resume. The concept does not exist on that tier, so "plays once **per process start**" is
+unobservable there by construction. `specCoverage` checks that a citation exists
+(`packages/harness/src/lib/spec-coverage.mjs:39`, `scanSpecClauses` + `scanCitations`). It has
+no notion of whether the citation is *competent*.
+
+**And the harness already knew.** This is the damning part. `clauseTierCoverage`
+(`spec-coverage.mjs:115`) computes `desktopOnly` — live clauses whose every citation is
+desktop-tier — and `verify.mjs:512` puts its `summaryLine` on the receipt as
+`details.tierNote`. The comment above it states the choice outright: *"Tier visibility, not a
+gate (industry rule: instrument before you police)"*, and names the history that motivated it —
+*"both production apps shipped alarm/notification defects behind clauses that were 'covered' by
+JVM tests androidMain never ran under."*
+
+So the instrument exists, it fired, it named the clause, and nothing acted on it. The finding is
+**not** "specCoverage cannot catch this". It is: **the detection was built, deliberately left
+descriptive, and the policing step was never taken — and the same failure class recurred.**
+"Instrument before you police" was the right first move; it was never followed by the second.
+
+**Three things compounded it.**
+
+1. **The contract's list is too narrow.** `template/CLAUDE.md:92` says platform-behavior tests
+   live in `androidInstrumentedTest` "when a feature touches alarms, notifications, lock-screen
+   intents, or audio routing". App/process lifecycle is not on that list, though it is the same
+   class of OS fact — and `ProcessControl` is *already shipped* as a runtime-state organ two
+   lines below. The capability was there; the rule never pointed at it.
+2. **The tiers that could have caught it skipped, non-fatally.** `androidChecks` and
+   `e2eSmoke` SKIP without a device, and a SKIP does not fail the lane. It said PASS.
+3. **The evidence ladder describes, never prescribes.** The receipt honestly recorded L1
+   desktop. Nothing connects "this feature's clauses are about device behavior" to "therefore
+   L1 is not sufficient evidence *for this feature*". The rung is a report, not a requirement.
+
+**Fix.** Let a clause declare the tier it requires, and turn the existing report into a gate for
+those clauses:
+
+- Extend the clause grammar (`CLAUSE_LINE_RE`, `spec-coverage.mjs:16`) with an optional tier
+  requirement — `- **MOTION-13** [tier: device] — Given …`. Note this attaches to the *clause
+  line*, not to `[enforced: …]`, which tags `docs/ARCHITECTURE.md` sentences
+  (`template/CLAUDE.md:47`) and is a different grammar.
+- `clauseTierCoverage` already has `tiersByClause`; add `unmetTier` — live clauses whose
+  declared tier is absent from their citing tiers. No new scanning is needed.
+- `specCoverage` FAILs on a non-empty `unmetTier`, naming clause and required tier. A
+  device-tier clause with no device-tier citation is then a red gate, not a quieter rung — and
+  a device-tier clause whose citation exists but whose tier SKIPped for want of a device is
+  "I could not check this", stated as a failure instead of a pass.
+- Add app/process lifecycle to `template/CLAUDE.md:92`'s list, pointing at `ProcessControl`.
+
+**Why this one is P1.** Every other item in this log costs friction. This one lets a green lane
+and a committed receipt certify a promise that nothing ever observed — the harness's single
+load-bearing claim. A gate that cannot tell a competent citation from an incompetent one will
+swallow anything lifecycle-shaped, and it already has, twice.
+
+**Not yet done.** Recorded here; no code written.
+
+---
+
 ## Carried over (pre-showcase, already flagged)
 
 - Exemplar-aware `featureShape` (spawned task `cc8eaa87`).
