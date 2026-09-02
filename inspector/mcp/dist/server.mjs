@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs ad5461af0f4a71b222cf486db79454b8df328ddb1bd04272b0c5793c079c34a8
+// cmp:bundle-inputs 34d123ade4766eecfdfd7733a91658661d72f8eaa340b0e6ced4625660788c28
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35201,7 +35201,9 @@ ${promiseList ? `${promiseList}
     <button type="button" class="wk-arrival-btn" data-arrival="${escAttr(a.id)}" data-choice="after">After the current walk</button>
   </p>`
   );
-  const laneLine = walksData.lane && typeof walksData.lane.durationMs === "number" ? `  <p class="wk-lane">full check: ${esc4(fmtLaneMs(walksData.lane.durationMs))} last run (measured)</p>` : "";
+  const lane = walksData.lane;
+  const laneSpread = lane && lane.runs > 2 && lane.medianMs > 0 ? ` &middot; typically ${esc4(fmtLaneMs(lane.medianMs))}${lane.maxMs > lane.medianMs ? `, worst ${esc4(fmtLaneMs(lane.maxMs))}` : ""}` : "";
+  const laneLine = lane && typeof lane.durationMs === "number" ? `  <p class="wk-lane">full check: ${esc4(fmtLaneMs(lane.durationMs))} last run${laneSpread} (measured)</p>` : "";
   return `  <h3 class="fd-h">In flight${walks.length ? ` <span class="fd-count">${walks.length}</span>` : ""}</h3>
 ${cards.join("\n")}
 ${arrived.join("\n")}

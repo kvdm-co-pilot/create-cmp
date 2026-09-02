@@ -238,6 +238,35 @@ test("L4: the lane's cost comes from the flight recorder — never memory", () =
   const w = d.walks.find((x) => x.name === "meal");
   const prove = w.stages.find((s) => s.key === "prove");
   assert.match(prove.note ?? "", /98s last full run/, "Prove says what it costs, on the stage itself");
+  assert.ok(!/typically/.test(prove.note ?? ""), "one full run is not a distribution — no spread is claimed over it");
+  fs.rmSync(path.join(dir, "qa/flight-recorder.jsonl"));
+});
+
+// The quoted cost must not be a cache hit. A single last-run figure is dominated
+// by Gradle's cache state: a run that changed nothing reports the no-op cost, and
+// the operator plans a real change around it (observed: 25s advertised, 140s
+// median, 558s worst). Every figure quoted is still a run that HAPPENED.
+test("L4: once the journal can support one, the cost is a spread, not a lucky run", () => {
+  const runs = [25_000, 140_000, 120_000, 558_000, 130_000].map((durationMs) =>
+    JSON.stringify({ profile: "local", mode: "full", verdict: "PASS", durationMs }),
+  );
+  fs.writeFileSync(path.join(dir, "qa/flight-recorder.jsonl"), `${runs.join("\n")}\n`);
+  const timing = lib.laneTiming(dir);
+  assert.equal(timing.durationMs, 130_000, "last is still last");
+  assert.equal(timing.runs, 5);
+  assert.equal(timing.medianMs, 130_000, "the median is a run that happened, never an average of two");
+  assert.equal(timing.maxMs, 558_000);
+  const phrase = lib.laneCostPhrase(timing);
+  assert.match(phrase, /typically/, "the typical cost is named, not just the last one");
+  assert.match(phrase, /worst/, "and the worst, because that is what an operator plans around");
+  assert.match(phrase, /measured over 5 full runs/, "the sample size is stated, never implied");
+  // Two runs is not a distribution; claiming one over them is the same overclaim
+  // in a new costume.
+  fs.writeFileSync(
+    path.join(dir, "qa/flight-recorder.jsonl"),
+    `${runs.slice(0, 2).join("\n")}\n`,
+  );
+  assert.ok(!/typically/.test(lib.laneCostPhrase(lib.laneTiming(dir))));
   fs.rmSync(path.join(dir, "qa/flight-recorder.jsonl"));
 });
 

@@ -145,7 +145,7 @@ function walkOfFeature(root, f, lane = null) {
     // recorded history (the lane journals every run), so it says what it
     // costs — measured, never the agent's memory of it.
     if (s.key === "prove" && lane)
-      return { ...s, state, note: `${humanDuration(lane.durationMs)} last full run` };
+      return { ...s, state, note: laneCostPhrase(lane) };
     return { ...s, state };
   });
 
@@ -224,20 +224,54 @@ export function laneTiming(root) {
   } catch {
     return null;
   }
-  const lines = text.split("\n");
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim();
-    if (line === "") continue;
+  // EVERY recorded full run, not just the last one. A single "last run" figure
+  // is dominated by Gradle's cache state: a run that changed nothing reports the
+  // no-op cost (a 2s releaseBuild cache hit), and the operator plans a real
+  // change around it. Observed spread on one project: last 25s, median 140s,
+  // worst 558s. The distribution is the honest answer to "what will this cost";
+  // `durationMs` stays the last run so existing callers keep their meaning.
+  const full = [];
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
     let e;
     try {
       e = JSON.parse(line);
     } catch {
       continue;
     }
-    if (e && e.mode !== "fast" && typeof e.durationMs === "number" && e.durationMs > 0)
-      return { durationMs: e.durationMs, verdict: e.verdict ?? null };
+    if (e && e.mode !== "fast" && typeof e.durationMs === "number" && e.durationMs > 0) full.push(e);
   }
-  return null;
+  if (full.length === 0) return null;
+  const sorted = full.map((e) => e.durationMs).sort((a, b) => a - b);
+  const last = full[full.length - 1];
+  return {
+    durationMs: last.durationMs,
+    verdict: last.verdict ?? null,
+    runs: sorted.length,
+    // Median over an even count takes the lower of the two middles — a measured
+    // run rather than an average of two, so every figure quoted is one that
+    // actually happened.
+    medianMs: sorted[Math.floor((sorted.length - 1) / 2)],
+    maxMs: sorted[sorted.length - 1],
+  };
+}
+
+/**
+ * What a full check costs, said honestly: the last run when that is all there
+ * is, and last + typical + worst once the journal can support a spread. Never
+ * an estimate — every number here is a run that happened (walk-legibility L4).
+ * @param {{durationMs: number, medianMs?: number, maxMs?: number, runs?: number}|null} lane
+ * @returns {string|null} null when nothing was ever recorded
+ */
+export function laneCostPhrase(lane) {
+  if (!lane || !(lane.durationMs > 0)) return null;
+  const last = `${humanDuration(lane.durationMs)} last full run`;
+  // One or two runs is not a distribution; saying "typical" over them would be
+  // the same overclaim in a new costume.
+  if (!(lane.runs > 2) || !(lane.medianMs > 0)) return `${last} (measured)`;
+  const spread =
+    lane.maxMs > lane.medianMs ? `, typically ${humanDuration(lane.medianMs)}, worst ${humanDuration(lane.maxMs)}` : `, typically ${humanDuration(lane.medianMs)}`;
+  return `${last}${spread} (measured over ${lane.runs} full runs)`;
 }
 
 /** "98s" under two minutes, "~5 min" above — for humans deciding whether to wait. */
@@ -407,7 +441,7 @@ export function renderCard(w, ctx = {}) {
     .join("  ");
   const gloss = STAGE_GLOSS[w.currentStage] ? ` — ${STAGE_GLOSS[w.currentStage]}` : "";
   const laneNote =
-    w.currentStage === "prove" && ctx.lane ? ` (takes ${humanDuration(ctx.lane.durationMs)} here, measured)` : "";
+    w.currentStage === "prove" && ctx.lane ? ` (${laneCostPhrase(ctx.lane)} here)` : "";
   const nowLine =
     w.currentStage === "build" && w.promises.current
       ? `Now: keeping promise ${Math.min(w.promises.kept + 1, w.promises.total)} of ${w.promises.total} — “${w.promises.current.title || w.promises.current.id}”`

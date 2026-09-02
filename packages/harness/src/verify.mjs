@@ -24,7 +24,7 @@
 //   release  — everything ci proves PLUS the release-APK smoke (releaseSmoke): the
 //              ship-time profile, run before cutting a release, never per-change
 
-import { execSync, spawnSync } from "node:child_process";
+import { execSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -33,7 +33,7 @@ import { fileURLToPath } from "node:url";
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
 import { compareTokenDrift } from "./lib/token-drift.mjs";
 import { evaluateApprovalsGate } from "./lib/approvals.mjs";
-import { clauseTierCoverage, scanCitations, scanSpecClauses, walkFiles } from "./lib/spec-coverage.mjs";
+import { TIERS_SATISFYING, clauseTierCoverage, scanCitations, scanSpecClauses, walkFiles } from "./lib/spec-coverage.mjs";
 import { evaluateComponentStoryParity } from "./lib/component-stories.mjs";
 import { evaluateReachability } from "./lib/reachability.mjs";
 import { evidenceLevel } from "./lib/evidence-level.mjs";
@@ -44,10 +44,12 @@ import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./lib/devi
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-doc.mjs";
 import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "./lib/determinism.mjs";
 import { evaluateAuditCadence } from "./lib/audit-cadence.mjs";
-import { appendFlightRecord, buildFlightEntry, readFlightJournal } from "./lib/flight-recorder.mjs";
+import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
+import { androidChecksOutcome } from "./lib/step-outcomes.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, "..");
 const EVIDENCE_DIR = path.join(ROOT, "qa", "evidence");
 const ARTIFACTS_DIR = path.join(ROOT, "qa-artifacts");
 
@@ -503,13 +505,18 @@ function stepSpecCoverage() {
   const orphanClauses = [...clauses.entries()].filter(([, c]) => !c.withdrawn).filter(([id]) => !citedIds.has(id));
   const orphanTags = tags.filter((t) => !clauses.has(t.id) || clauses.get(t.id).withdrawn);
 
-  if (orphanClauses.length === 0 && orphanTags.length === 0) {
-    // Tier visibility, not a gate (industry rule: instrument before you police). A clause
-    // cited only from desktop-tier tests can still hide a platform-behavior bug — both
-    // production apps shipped alarm/notification defects behind clauses that were
-    // "covered" by JVM tests androidMain never ran under. The line names them; the
-    // instrumented seam (androidChecks) is where such clauses earn a citation.
-    const tiers = clauseTierCoverage(clauses, tags);
+  const tiers = clauseTierCoverage(clauses, tags);
+
+  if (orphanClauses.length === 0 && orphanTags.length === 0 && tiers.unmetTier.length === 0) {
+    // Tier visibility, still not a gate for UNDECLARED clauses (industry rule:
+    // instrument before you police). A clause cited only from desktop-tier tests can
+    // still hide a platform-behavior bug — both production apps shipped
+    // alarm/notification defects behind clauses that were "covered" by JVM tests
+    // androidMain never ran under. The line names them; the instrumented seam
+    // (androidChecks) is where such clauses earn a citation.
+    //
+    // A clause that DECLARED `[tier: …]` is policed above — that is the second move
+    // this note's first move was always waiting for.
     return {
       name: "specCoverage",
       verdict: "PASS",
@@ -525,6 +532,18 @@ function stepSpecCoverage() {
   }
 
   const lines = ["Spec coverage broken — the spec and the tests have drifted apart:"];
+  // The competence check, first: an existing-but-blind citation is a subtler
+  // failure than a missing one, and its message has to say WHY the citation it
+  // can see does not count.
+  for (const u of tiers.unmetTier) {
+    const has = u.tiers.length ? `cited only from ${u.tiers.join(", ")}` : "cited by nothing";
+    lines.push(
+      `  [${u.id}] ${u.file} — declares [tier: ${u.requiredTier}] but is ${has}. ` +
+        `A test on those tiers cannot observe this promise (no process lifecycle, no OS facts, no real device). ` +
+        `Add a citing test in ${TIERS_SATISFYING[u.requiredTier].join(" or ")} — and note that tier SKIPPING for want of a device ` +
+        `leaves this clause unproven, which is the point: "I could not check this" is a failure, not a quieter rung.`,
+    );
+  }
   for (const [id, c] of orphanClauses) {
     lines.push(`  [${id}] ${c.file} — no durable test cites this clause. Write the test (tag it '// SPEC: ${id}') or withdraw the clause (strike it through).`);
   }
@@ -1203,14 +1222,18 @@ function stepAndroidChecks() {
   // attest tests that EXECUTED on this tree, never a replayed up-to-date verdict.
   const res = shGradle(`${GRADLEW} :composeApp:connectedDebugAndroidTest --rerun --console=plain`);
   const summary = junitSummary(path.join(ROOT, "composeApp/build/outputs/androidTest-results/connected"));
+  // Verdict separated from invocation (qa/lib/step-outcomes.mjs): a run that
+  // executed zero tests has observed nothing and must not accuse the change.
+  const outcome = androidChecksOutcome(res, summary, { gradlew: GRADLEW });
   return {
     name: "androidChecks",
-    verdict: res.ok ? "PASS" : "FAIL",
-    reason: res.ok
-      ? undefined
-      : `connectedDebugAndroidTest failed (${summary ? `${summary.failures + summary.errors} of ${summary.tests} tests` : "see output"}) — an on-device behavior claim is broken. Fix the behavior, not the test:\n${res.out.split("\n").filter((l) => /FAILED|error:|failed/i.test(l)).slice(0, 12).join("\n")}`,
+    verdict: outcome.verdict,
+    reason: outcome.reason,
     durationMs: Date.now() - started,
-    details: summary ?? undefined,
+    // `executed` rides on the receipt so a reader can tell a red that measured
+    // something from a red that measured nothing. Shape preserved: undefined
+    // when there is no summary AND nothing to add, as before.
+    details: summary ? { ...summary, executed: outcome.executed } : outcome.executed ? undefined : { executed: false },
   };
 }
 
@@ -1390,15 +1413,21 @@ const stepsForProfile = {
     stepArchDocMemo,
     stepSchemaHistory,
     stepBuild,
-    // Release stays OUT of `scaffold`: stamp-time --verify promises a green first build, and
-    // an R8 pass would add minutes to every scaffold to re-prove what this step proves here.
-    // local + ci is where release rot gets caught before it reaches anyone.
-    stepReleaseBuild,
     stepUnitTests,
     stepConformance,
     stepGoldenTrees,
     stepTokenDrift,
     stepA11y,
+    // Release stays OUT of `scaffold`: stamp-time --verify promises a green first build, and
+    // an R8 pass would add minutes to every scaffold to re-prove what this step proves here.
+    // local + ci is where release rot gets caught before it reaches anyone.
+    //
+    // And it sits AFTER the cheap tier, not before it. The lane runs every step
+    // regardless of failures, so the order costs nothing on a green run — but
+    // ahead of them, a red unit test was reported only once R8 had finished,
+    // which on a real change is minutes of waiting to be told something the JVM
+    // knew in seconds. Cheap high-signal checks report first.
+    stepReleaseBuild,
     stepE2eSmoke,
     // androidChecks joins local BY the file's own convention, not despite it: local's
     // contract (see USAGE) is "everything; device-dependent steps SKIP when no device is
@@ -1567,6 +1596,22 @@ function stampLaneMarker(stepFn, index, total) {
 }
 fs.mkdirSync(path.dirname(LANE_MARKER), { recursive: true });
 stampLaneMarker(null, 0, laneSteps.length);
+// The pulse (see qa/lib/lane-narrator.mjs). A separate process because the steps
+// below are synchronous — a timer in THIS process cannot fire while Gradle runs,
+// which is why a multi-minute step used to print nothing at all until it ended.
+// Human runs only: it writes to stderr, but a lane that spawns a narrator during
+// a --json run is a lane doing something unasked in a machine context.
+let narrator = null;
+if (!asJson) {
+  try {
+    narrator = spawn(process.execPath, [path.join(HERE, "lib", "lane-narrator.mjs"), ROOT], {
+      stdio: ["ignore", "ignore", "inherit"], // stderr only — stdout stays the lane's
+    });
+    narrator.on("error", () => {});
+  } catch {
+    /* a missing pulse is a quieter lane, never a failed one */
+  }
+}
 const steps = [];
 try {
 for (const [laneStepIndex, step] of laneSteps.entries()) {
@@ -1583,6 +1628,13 @@ for (const [laneStepIndex, step] of laneSteps.entries()) {
   if (result.name === "build" && result.verdict === "FAIL") break; // nothing downstream is meaningful
 }
 } finally {
+  if (narrator) {
+    try {
+      narrator.kill();
+    } catch {
+      /* the narrator holds nothing; a failed kill must not fail the lane */
+    }
+  }
   fs.rmSync(LANE_MARKER, { force: true });
   // The device lease (if a device step took it) is held to the very end of the
   // run — see the scope decision at leaseDeviceForStep. Release is idempotent
@@ -1759,6 +1811,28 @@ if (asJson) {
   );
 } else {
   console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name}` : ""} (${strengthLabel}) — receipt written to qa/evidence/latest.json${badge.changed ? ` and ${README_REL_PATH}'s evidence badge refreshed` : ""} (commit ${badge.changed ? "them" : "it"} with your change)`);
+}
+
+// A TIER THAT HAS NEVER RUN HERE. A SKIP is non-fatal by design — absence of a
+// device is not a broken promise — but "non-fatal" quietly became "invisible":
+// maestro was never installed on one machine, so e2eSmoke skipped on every one
+// of 37 recorded runs while the lane said PASS each time. The end-to-end flow
+// had never executed once, and nothing ever said so. A single skip is a fact;
+// skipping EVERY recorded run is a different fact, and only the journal can
+// tell them apart. Counted here, from the journal, and stated once per run.
+if (!asJson && !fast) {
+  try {
+    const never = neverRunTiers(steps, readFlightJournal(ROOT).entries);
+    if (never.length > 0) {
+      console.log("\n⚠ tiers that have NEVER run on this machine (skipped every recorded run — the lane still says PASS):");
+      for (const n of never) {
+        console.log(`  ${n.name} — skipped in all ${n.runs} recorded full runs. ${n.reason.split("\n")[0]}`);
+      }
+      console.log("  A promise that only this tier could observe has never been checked here.");
+    }
+  } catch {
+    /* the journal is a convenience for this note; never let it colour a verdict */
+  }
 }
 
 // The audit-cadence nudges print in the human path, not only inside the
