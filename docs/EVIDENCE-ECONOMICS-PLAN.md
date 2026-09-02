@@ -309,3 +309,13 @@ S6. Neither starts until S1–S7 are landed and proven.
   three-step swap, and payment-blueprint as the worked example. **S8 landed.** S9 stays
   conditional: its trigger is the change-stage lane's cost in the showcase's flight journal
   after its `upgrade --harness`; no Gradle app exists in this repo to measure it here.
+- 2026-09-03 — **Merged, published, released.** PR #23 (S1–S8 + console self-renewal) and PR #24
+  (0.19.0 bump, plugin manifests, changelog) rebase-merged to main. **`create-cmp-cli@0.19.0` is
+  live** (`dist-tags.latest = 0.19.0`), tag `v0.19.0` pushed, GitHub release cut from the
+  changelog section. Verified against the REGISTRY, not the local tree: the published tarball
+  carries `template/qa/lib/{lane-runner,steps-cmp,step-outcomes,lane-narrator}.mjs`, both new
+  modules import cleanly and export what the spine expects, the published `verify.mjs` composes
+  `createCmpSteps`, and `npx create-cmp-cli@0.19.0 --help` runs from a clean cache. Release gate
+  before publish: root 1231 / inspector 579 / receipts 17 green, and a fleet check that stamped a
+  scratch app and ran its full lane to PASS at L1 on the split spine+pack. (The first token paste
+  returned E401 — a 43-character value where a granular token is 40; `npm login` resolved it.)
