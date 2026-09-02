@@ -180,7 +180,7 @@ test("governance journal: attribution, memory, the derived split, one-change reo
     assert.match(card.nextStep.label, /redesign proven — re-approve the brief/);
   });
 
-  await t.test("reopenFeature: one recorded change — brief + spec + declared touches, one reason, grouped journal events", () => {
+  await t.test("reopenFeature: one recorded change — the brief + its spec are walked back; the declared touch stays SIGNED and the hash enforces it (S5)", () => {
     // Close the previous redesign so the whole set is approved again.
     runApprove(root, ["feature-brief:meal"]);
     runApprove(root, ["components"]);
@@ -193,16 +193,37 @@ test("governance journal: attribution, memory, the derived split, one-change reo
 
     const res = lib.reopenFeature(root, "meal", { reason: "portion sizes join the meal card", via: "cli" });
     assert.equal(res.ok, true);
-    assert.deepEqual(res.reopened.sort(), ["components", "feature-brief:meal", "feature-spec:meal"].sort());
+    // What the change AMENDS is reopened: the brief and its spec. The declared
+    // touch is NOT — an `approved` artifact is by construction one whose bytes
+    // still match its signature, so reopening it re-asks a question the hash
+    // already answered (twelve identical re-signatures, 2026-09-02).
+    assert.deepEqual(res.reopened.sort(), ["feature-brief:meal", "feature-spec:meal"].sort());
+    assert.deepEqual(
+      res.stillSigned.map((t) => ({ id: t.id, status: t.status })),
+      [{ id: "components", status: "approved" }],
+      "the declared blast radius is REPORTED, with its state, not walked back",
+    );
+    assert.match(res.stillSigned[0].hash, /^[0-9a-f]{8}$/, "and the signed hash it still matches");
     for (const id of res.reopened) {
       const s = lib.getApprovalStatuses(root).find((x) => x.id === id);
       assert.equal(s.status, "reopened");
       assert.equal(s.reason, "portion sizes join the meal card");
     }
-    // The journal groups the walk under the feature's name — one change, readable as one.
+    assert.equal(lib.getApprovalStatuses(root).find((x) => x.id === "components").status, "approved", "still signed on disk too");
+    // The journal groups the walk under the feature's name — one change, readable as one —
+    // and records no reopen for the artifact that was not reopened.
     const events = lib.readJournal(root).filter((e) => e.verb === "reopen" && e.feature === "meal");
-    assert.deepEqual(events.map((e) => e.artifact).sort(), ["components", "feature-brief:meal", "feature-spec:meal"].sort());
+    assert.deepEqual(events.map((e) => e.artifact).sort(), ["feature-brief:meal", "feature-spec:meal"].sort());
     assert.ok(events.every((e) => e.reason === "portion sizes join the meal card"));
+
+    // PLANTED — the enforcement the doc always assigned to the hash. Move the
+    // bytes the components signature covers, with no reopen verb anywhere, and
+    // the signature is demanded again by the hash alone.
+    const componentsDir = path.join(root, "composeApp/src/commonMain/kotlin", ...baseConfig(root).package.split("."), "presentation/components");
+    const aComponent = fs.readdirSync(componentsDir).find((f) => f.endsWith(".kt"));
+    assert.ok(aComponent, "the scaffold ships components");
+    fs.appendFileSync(path.join(componentsDir, aComponent), "\n// S5: a real edit to a touched artifact\n");
+    assert.equal(lib.getApprovalStatuses(root).find((x) => x.id === "components").status, "changed-since-approval", "hashes enforce — a fresh signature is demanded because the bytes moved, not because a verb ran");
 
     // Nothing approved left in the set → honest refusal, naming the states.
     const again = lib.reopenFeature(root, "meal", { reason: "again" });
@@ -224,7 +245,7 @@ test("governance journal: attribution, memory, the derived split, one-change reo
     assert.match(out, /reopened feature "meal" as one change — reason: week view lands/);
     assert.match(out, /↺ feature-brief:meal/);
     assert.match(out, /↺ feature-spec:meal/);
-    assert.match(out, /↺ components/);
+    assert.match(out, /✓ components still signed \(approved @[0-9a-f]{8}\) — re-signature demanded only if it changes/);
     const cli = runApproveExpectFail(root, ["--reopen-feature", "meal"]);
     assert.match(cli.stderr, /without a reason/);
   });
