@@ -19,6 +19,13 @@ import { scaffold } from "../src/scaffold.mjs";
 import { evidenceLevel } from "../template/qa/lib/evidence-level.mjs";
 import { isHarnessFile } from "../packages/harness/src/lib/harness-region.mjs";
 
+// S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
+// qa/lib/steps-cmp.mjs (the step pack). A structural read of "the lane's
+// source" must see both, or it pins a file that no longer holds the steps.
+const laneSrc = (dir) =>
+  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/steps-cmp.mjs"), "utf8")}`;
+
+
 // A parallel lane is mid-flight renaming the device-E2E feature key
 // `appium` -> `e2e` (CLI flags + manifest key). Detect which key the CURRENT
 // options.schema.json actually accepts so this file's config is valid on
@@ -174,7 +181,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       ]) {
         assert.ok(fs.existsSync(path.join(out, rel)), `${rel} exists`);
       }
-      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      const verify = laneSrc(out);
       assert.match(verify, /specCoverage/);
       const receiptCheck = fs.readFileSync(path.join(out, "qa/receipt-check.mjs"), "utf8");
       assert.match(receiptCheck, /\.\/lib\/inputs-hash\.mjs/);
@@ -188,7 +195,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       // named "omposeApp/.../InspectorCatalog.kt", a file that does not exist. Always
       // the first entry, always silently. Exercised for real: a git repo whose first
       // porcelain line is an unstaged modification.
-      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      const verify = laneSrc(out);
       const dirtyLine = verify.split("\n").find((l) => l.includes("dirty:"));
       assert.ok(dirtyLine, "the receipt still records commit.dirty");
       assert.doesNotMatch(
@@ -235,7 +242,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       // already declared non-evidence (mode "fast", no rung, refused by receipt-check) —
       // the integrity mechanism stays with the runs that produce integrity-bearing
       // artifacts. Every desktopTest invocation must carry the scoped flag.
-      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      const verify = laneSrc(out);
       assert.match(verify, /const RERUN = fast \? "" : " --rerun";/, "the rerun flag is mode-scoped: full forces execution, fast omits it");
       const testInvocations = verify.split("\n").filter((l) => l.includes(":composeApp:desktopTest"));
       assert.ok(testInvocations.length >= 2, "lane has desktopTest invocations");
@@ -305,7 +312,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
     });
 
     await t.test("verify.mjs derives the rung via qa/lib/evidence-level.mjs and writes it onto the receipt + verdict line", () => {
-      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      const verify = laneSrc(out);
       assert.match(verify, /from "\.\/lib\/evidence-level\.mjs"/, "the rung derivation lives in the lib, imported by the lane");
       assert.match(verify, /evidenceLevel: level/, "the receipt carries evidenceLevel");
       assert.match(verify, /\$\{level\.rung\} \$\{level\.name\}/, "the verdict line names the rung alongside the strength label");
@@ -314,7 +321,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
     });
 
     await t.test("--fast is the inner loop: exclusion derived from DEVICE_STEPS, mode stamped, banner loud, docs honest", () => {
-      const verify = fs.readFileSync(path.join(out, "qa/verify.mjs"), "utf8");
+      const verify = laneSrc(out);
       // The slow-tier list is DERIVED from DEVICE_STEPS (+ releaseBuild) — one
       // source of truth with the receipt-strength/lease feature, never a
       // second hand-maintained list that can drift.

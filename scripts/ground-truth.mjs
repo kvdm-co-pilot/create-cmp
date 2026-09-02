@@ -75,9 +75,10 @@ function cliCommands() {
  * they are computed the same way the lane computes them.
  */
 function verifyProfiles() {
-  const src = read("template/qa/verify.mjs");
-  const block = src.match(/const stepsForProfile = \{[\s\S]*?\n\};/);
-  if (!block) throw new Error("ground-truth: could not locate stepsForProfile in template/qa/verify.mjs");
+  // S8b: the profiles live in the step pack; the spine (verify.mjs) composes it.
+  const src = read("template/qa/lib/steps-cmp.mjs");
+  const block = src.match(/const stepsForProfile = \{[\s\S]*?\n\s*\};/);
+  if (!block) throw new Error("ground-truth: could not locate stepsForProfile in template/qa/lib/steps-cmp.mjs");
   const stepNames = (text) =>
     text
       .split("\n")

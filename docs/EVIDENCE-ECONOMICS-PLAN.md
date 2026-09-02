@@ -291,3 +291,17 @@ S6. Neither starts until S1–S7 are landed and proven.
   `expectedDurations`, `stepDisplayName`, `verdictMark` exported for step packs. `verify.mjs`
   now composes it. Proven with fake steps against a real marker file
   (`test/lane-runner.test.mjs`); the S4 structural pins moved with the code.
+- 2026-09-03 — **S8b written.** `lib/steps-cmp.mjs` (1,261 lines) — every CMP step, the device
+  lease, the fast-exclusion tables and the profile compositions behind `createCmpSteps(ctx)`;
+  the bodies moved verbatim by string anchor, not by hand. `verify.mjs` 1,835 → 641 lines: the
+  spine — args, `sh()` with its deadline, markers, the runner, the receipt, the journal — and
+  one composition line whose ctx makes the borrowing visible. Pins moved with the code; a new
+  pack test proves construction executes nothing (every borrowed helper is a trap) and hands
+  back the profiles by name in order.
+- 2026-09-03 — **S8b proven.** Two latent defects surfaced the moment step names were asserted at
+  runtime instead of in source: the memoized wrappers and `gradleTestStep`'s returned functions
+  had NO inferred name, so the lane marker narrated specCoverage / approvals / componentStories
+  / reachability / archDoc / conformance / goldenTrees / a11y as `null` and gave them the
+  30-minute default deadline. Both now carry explicit names. Structural tests that grep "the
+  lane's source" read both files (`laneSrc`), and `scripts/ground-truth.mjs` derives the
+  profile counts from the pack.

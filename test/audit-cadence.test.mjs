@@ -36,6 +36,13 @@ import {
 } from "../template/qa/lib/audit-cadence.mjs";
 import { computeInputsHash } from "../template/qa/lib/inputs-hash.mjs";
 
+// S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
+// qa/lib/steps-cmp.mjs (the step pack). A structural read of "the lane's
+// source" must see both, or it pins a file that no longer holds the steps.
+const laneSrc = (dir) =>
+  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/steps-cmp.mjs"), "utf8")}`;
+
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "audit-cadence-engine-"));
 
@@ -230,7 +237,7 @@ test("appending an audit record never moves the receipt's inputs hash (bookkeepi
 });
 
 test("lane wiring: auditCadence is a release-profile REPORT that structurally cannot FAIL", () => {
-  const verify = fs.readFileSync(path.join(REPO_ROOT, "template", "qa", "verify.mjs"), "utf8");
+  const verify = laneSrc(path.join(REPO_ROOT, "template"));
   assert.match(
     verify,
     /stepsForProfile\.release = \[\.\.\.stepsForProfile\.ci, stepAuditCadence, stepReleaseSmoke\]/,
