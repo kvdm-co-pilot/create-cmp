@@ -106,6 +106,9 @@ export const EX_RENEW = 75;
 // settles into ONE renewal instead of a burst of them.
 const RENEW_DEBOUNCE_MS = 1500;
 const RENEW_QUIESCE_POLL_MS = 2000;
+// S3: how long after the last source save the Drive strip refreshes its
+// observed activity line. A save storm is one refresh.
+const ACTIVITY_BROADCAST_MS = 2000;
 // How long findLiveConsole will wait out a declared renewal before calling the
 // console gone. One node boot, with headroom — never a general retry budget.
 const RENEW_REJOIN_MS = 15_000;
@@ -2029,6 +2032,7 @@ export function createPreviewService(opts) {
   // Set by start(); defaults to the full console so every pre-existing caller
   // and test seam behaves exactly as before start() has run.
   let capabilities = { governance: true, screens: true };
+  let activityBroadcastTimer = null;
   let viewport = null;
   const sseClients = new Set();
 
@@ -3039,6 +3043,12 @@ export function createPreviewService(opts) {
       watcher = fs.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
+        // S3: real work moves the Drive strip. The chain's observed tier now
+        // counts writes since the request; a source save is one, so the strip
+        // refreshes on what the agent DID, not only on what it declared.
+        // Debounced: a save storm is one refresh.
+        clearTimeout(activityBroadcastTimer);
+        activityBroadcastTimer = setTimeout(() => broadcast({ type: "governance" }), ACTIVITY_BROADCAST_MS);
         noteSourceChanged(); // freshness: the pixels on screen are now behind the source
         noteSrcChange(); // daemon mode: mark swap-pending + arm the compile watchdog
         // Daemon mode: the hot agent recompiles on save and the classes watcher fires

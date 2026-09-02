@@ -255,6 +255,70 @@ function markerInfo(root, name) {
   }
 }
 
+// The build stage's observed tier (evidence-economics S3). Between the prompt
+// and the lane — most of the working time — the chain moved only if the agent
+// volunteered `plan.mjs --step`, so an undeclared chain was a still photo until
+// the lane landed. The lane marker already corroborates the lane mechanically;
+// this corroborates the build stage the same way: writes in the working tree
+// since the current request began. No agent cooperation required — which is
+// the point.
+const ACTIVITY_ROOTS = ["composeApp/src", "specs", "qa", "docs"];
+const ACTIVITY_SKIP_DIRS = new Set(["build", ".gradle", ".kotlin", ".git", ".idea", "node_modules", "evidence"]);
+// Machinery, not work: the chain's own files and the lane's outputs must not
+// count as "the agent wrote something", or the pulse would corroborate itself.
+const ACTIVITY_SKIP_FILES = new Set([".plan.json", ".request.json", ".plan-history.jsonl", "flight-recorder.jsonl", "approvals.log.jsonl", ".DS_Store"]);
+// Nothing written for this long, with no lane or render running, is a stall
+// worth naming — the human is watching a strip that has stopped moving.
+export const ACTIVITY_STALL_MS = 10 * 60 * 1000;
+
+/**
+ * Files written under the working roots since `sinceIso` — the request stamp.
+ * Pure filesystem, no git: a scaffold before `git init` still answers, and a
+ * mtime is a fact regardless of what is staged.
+ * @param {string} root
+ * @param {string|null|undefined} sinceIso the request's `at`
+ * @param {{now?: number}} [opts]
+ * @returns {{filesChanged: number, lastWriteAgoMs: (number|null), since: string}|null}
+ *   null when there is no request to measure from
+ */
+export function observeActivity(root, sinceIso, { now = Date.now() } = {}) {
+  const since = Date.parse(sinceIso ?? "");
+  if (Number.isNaN(since)) return null;
+  let filesChanged = 0;
+  let newest = -Infinity;
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        if (!ACTIVITY_SKIP_DIRS.has(e.name)) walk(path.join(dir, e.name));
+        continue;
+      }
+      if (!e.isFile() || ACTIVITY_SKIP_FILES.has(e.name)) continue;
+      let m;
+      try {
+        m = fs.statSync(path.join(dir, e.name)).mtimeMs;
+      } catch {
+        continue;
+      }
+      if (m > since) {
+        filesChanged += 1;
+        if (m > newest) newest = m;
+      }
+    }
+  };
+  for (const rel of ACTIVITY_ROOTS) walk(path.join(root, rel));
+  return {
+    filesChanged,
+    lastWriteAgoMs: filesChanged > 0 ? Math.max(0, now - newest) : null,
+    since: new Date(since).toISOString(),
+  };
+}
+
 /**
  * Everything a chain-rendering surface needs, with provenance attached:
  * request (tier 1) + plan with its age (tier 2) + what is ACTUALLY running
@@ -272,15 +336,19 @@ export function deriveChain(root) {
     lane: markerInfo(root, ".cmp-lane-in-progress"),
     render: markerInfo(root, ".cmp-render-in-progress"),
   };
+  const request = readRequest(root);
+  // S3: the build stage's observed tier — writes since the request began.
+  const activity = observeActivity(root, request ? request.at : null);
   return {
-    request: readRequest(root),
+    request,
     plan,
     planAgeMs: Number.isNaN(at) ? null : Math.max(0, Date.now() - at),
     busy,
+    activity,
     // Pre-rendered so every surface (chat, CLI, studio) speaks the observed
     // tier in identical words — the console renders this string, never its
     // own paraphrase of the marker.
-    busyText: describeBusy(busy),
+    busyText: describeBusy(busy, Date.now(), activity),
     history: readPlanHistory(root, 5),
   };
 }
@@ -314,8 +382,8 @@ function stepDurationMs(s) {
  * is running. Shared by the text and HTML renderers so the observed tier
  * speaks identically everywhere.
  */
-export function describeBusy(busy, now = Date.now()) {
-  if (!busy) return "";
+export function describeBusy(busy, now = Date.now(), activity = null) {
+  if (!busy) return describeActivity(activity);
   const lane = busy.lane;
   if (lane) {
     if (typeof lane === "object" && typeof lane.step === "string" && lane.step !== "") {
@@ -330,7 +398,23 @@ export function describeBusy(busy, now = Date.now()) {
     return "the full check is running NOW";
   }
   if (busy.render) return "a preview render is in flight";
-  return "";
+  // Nothing mechanical is running — but the working tree may still be moving.
+  return describeActivity(activity);
+}
+
+/**
+ * The build stage's phrase (S3). Files written since the request, and how
+ * long ago the last one landed; a stall when the tree has stopped moving.
+ * "" when there is no request to measure from, or nothing has happened yet.
+ */
+export function describeActivity(activity) {
+  if (!activity) return "";
+  if (activity.filesChanged === 0) return "";
+  const n = activity.filesChanged;
+  const ago = activity.lastWriteAgoMs;
+  const files = `${n} file${n === 1 ? "" : "s"} written since the request`;
+  if (typeof ago === "number" && ago >= ACTIVITY_STALL_MS) return `${files} · stalled — nothing written for ${formatDuration(ago)}`;
+  return typeof ago === "number" ? `${files} · last ${formatDuration(ago)} ago` : files;
 }
 
 /**
@@ -364,12 +448,19 @@ export function renderChain(chain) {
       .join("  →  ");
     lines.push(seq);
     const cur = p.steps.find((s) => s.n === p.current) ?? null;
-    const busyText = describeBusy(chain.busy, now);
+    const busyText = typeof chain.busyText === "string" ? chain.busyText : describeBusy(chain.busy, now, chain.activity ?? null);
     const busy = busyText !== "" ? ` · observed: ${busyText}` : "";
     const age = chain.planAgeMs !== null ? ` · declared by the agent, updated ${formatAge(chain.planAgeMs)}` : "";
     lines.push(cur ? `now: step ${cur.n} of ${p.steps.length} — ${cur.label}${busy}${age}` : `chain complete${busy}${age}`);
   } else {
     lines.push("(no declared chain for this request yet — node qa/plan.mjs --set \"step | step | …\")");
+    // S3: an undeclared chain is no longer a still photo. The observed tier —
+    // a running lane, a render, or writes since the request — is printed even
+    // when the agent declared nothing, because it is the machine's word and
+    // needs no declaration to exist. This is the case that used to show nothing
+    // for forty minutes.
+    const observed = typeof chain.busyText === "string" ? chain.busyText : describeBusy(chain.busy, Date.now(), chain.activity ?? null);
+    if (observed !== "") lines.push(`observed: ${observed}`);
   }
   return lines.join("\n");
 }
