@@ -25,7 +25,7 @@
 //   release  — everything ci proves PLUS the release-APK smoke (releaseSmoke): the
 //              ship-time profile, run before cutting a release, never per-change
 
-import { execSync, spawn, spawnSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -46,7 +46,8 @@ import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./lib/arch-do
 import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "./lib/determinism.mjs";
 import { evaluateAuditCadence } from "./lib/audit-cadence.mjs";
 import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
-import { StepTimeout, androidChecksOutcome, spawnTimedOut, stepDeadlineMs, stepErrorResult } from "./lib/step-outcomes.mjs";
+import { StepTimeout, androidChecksOutcome, spawnTimedOut } from "./lib/step-outcomes.mjs";
+import { expectedDurations, runLane } from "./lib/lane-runner.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1587,117 +1588,43 @@ if (fast) {
 // also refreshes mtime, so a lane longer than the 5-minute freshness bound
 // no longer reads as stale to its own watchers mid-run.
 const laneStartedAt = Date.now(); // for the flight-recorder entry's durationMs
+// The step loop is the SPINE (qa/lib/lane-runner.mjs, evidence-economics S8a):
+// marker narration, per-step deadlines, the pulse, throw/timeout → one ERROR
+// row, the mark, the verdict. This file supplies only what is this project's:
+// the steps, the marker path, the subprocess deadline hook, the device lease.
 const expectedByStep = (() => {
   try {
-    const { entries } = readFlightJournal(ROOT);
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const e = entries[i];
-      if (!e || e.mode === "fast" || !Array.isArray(e.steps)) continue;
-      const byName = new Map();
-      for (const s of e.steps) {
-        if (s && typeof s.name === "string" && typeof s.durationMs === "number" && s.durationMs > 0) byName.set(s.name, s.durationMs);
-      }
-      return { byName, laneMs: typeof e.durationMs === "number" && e.durationMs > 0 ? e.durationMs : null };
-    }
+    return expectedDurations(readFlightJournal(ROOT).entries);
   } catch {
-    /* narration is optional; the lane never depends on its own journal */
+    return { byName: new Map(), laneMs: null }; // narration is optional; the lane never depends on its own journal
   }
-  return { byName: new Map(), laneMs: null };
 })();
-// "stepUnitTests" -> "unitTests", "stepSpecCoverageMemo" -> "specCoverage"
-// (the memoized wrappers inherit their const's name) — the same name the
-// result will carry; a wrapped/anonymous step narrates as null rather than
-// guessing.
-const laneStepDisplayName = (fn) => {
-  const raw = typeof fn?.name === "string" ? fn.name.replace(/^step/, "").replace(/Memo$/, "") : "";
-  return raw === "" ? null : raw.charAt(0).toLowerCase() + raw.slice(1);
-};
-function stampLaneMarker(stepFn, index, total) {
-  try {
-    const name = stepFn ? laneStepDisplayName(stepFn) : null;
-    const narration = {
-      pid: process.pid,
-      at: new Date(laneStartedAt).toISOString(),
-      step: name,
-      index,
-      total,
-      stepStartedAt: new Date().toISOString(),
-      expectedStepMs: name !== null ? expectedByStep.byName.get(name) ?? null : null,
-      expectedLaneMs: expectedByStep.laneMs,
-    };
-    fs.writeFileSync(LANE_MARKER, `${JSON.stringify(narration)}\n`);
-  } catch {
-    /* the narration must never break the lane it narrates */
-  }
-}
-fs.mkdirSync(path.dirname(LANE_MARKER), { recursive: true });
-stampLaneMarker(null, 0, laneSteps.length);
-// The pulse (see qa/lib/lane-narrator.mjs). A separate process because the steps
-// below are synchronous — a timer in THIS process cannot fire while Gradle runs,
-// which is why a multi-minute step used to print nothing at all until it ended.
-// Human runs only: it writes to stderr, but a lane that spawns a narrator during
-// a --json run is a lane doing something unasked in a machine context.
-let narrator = null;
-if (!asJson) {
-  try {
-    narrator = spawn(process.execPath, [path.join(HERE, "lib", "lane-narrator.mjs"), ROOT], {
-      stdio: ["ignore", "ignore", "inherit"], // stderr only — stdout stays the lane's
-    });
-    narrator.on("error", () => {});
-  } catch {
-    /* a missing pulse is a quieter lane, never a failed one */
-  }
-}
-const steps = [];
-try {
-for (const [laneStepIndex, step] of laneSteps.entries()) {
-  stampLaneMarker(step, laneStepIndex + 1, laneSteps.length);
-  // S4: every step runs under a deadline derived from its own measured
-  // history (×3, floor 5 min, ceiling 30). A deadline or a throw is ONE
-  // ERROR row — the lane keeps going, because the other verdicts are still
-  // worth having, and the lane verdict is FAIL either way.
-  const stepName = laneStepDisplayName(step) ?? `step${laneStepIndex + 1}`;
-  CURRENT_STEP_DEADLINE_MS = stepDeadlineMs(expectedByStep.byName.get(stepName));
-  const stepStarted = Date.now();
-  let result;
-  try {
-    result = step();
-  } catch (err) {
-    result = stepErrorResult(stepName, err, Date.now() - stepStarted);
-  }
-  steps.push(result);
-  if (!asJson) {
-    // CACHED (fast mode only — see the memoization block above) renders with
-    // its own mark and "unchanged since" note so a reused verdict is never
-    // mistakable for a fresh execution. ERROR (⊘) is "could not run", visibly
-    // distinct from FAIL (✗) — see qa/lib/step-outcomes.mjs.
-    const mark = result.verdict === "PASS" ? "✓" : result.verdict === "CACHED" ? "⚡" : result.verdict === "SKIP" ? "→" : result.verdict === "ERROR" ? "⊘" : "✗";
-    console.log(`${mark} ${result.name}: ${result.verdict}${result.note ? ` (${result.note})` : ""}${result.reason ? ` — ${result.reason.split("\n")[0]}` : ""}`);
-  }
-  if (result.name === "build" && result.verdict === "FAIL") break; // nothing downstream is meaningful
-}
-} finally {
-  if (narrator) {
-    try {
-      narrator.kill();
-    } catch {
-      /* the narrator holds nothing; a failed kill must not fail the lane */
-    }
-  }
-  fs.rmSync(LANE_MARKER, { force: true });
+const lane = runLane({
+  steps: laneSteps,
+  markerPath: LANE_MARKER,
+  expected: expectedByStep,
+  startedAt: laneStartedAt,
+  // sh() reads the running step's deadline from this module-level slot.
+  setDeadline: (ms) => {
+    CURRENT_STEP_DEADLINE_MS = ms;
+  },
+  // Human runs print a row per step and get the pulse; --json gets neither
+  // (a narrator during a machine run is a lane doing something unasked).
+  print: asJson ? null : (line) => console.log(line),
+  narrator: { entry: path.join(HERE, "lib", "lane-narrator.mjs"), root: ROOT },
   // The device lease (if a device step took it) is held to the very end of the
   // run — see the scope decision at leaseDeviceForStep. Release is idempotent
   // and never deletes a foreign holder's lease.
-  if (laneDeviceLease) releaseDeviceLease(laneDeviceLease);
-}
-
+  onFinally: () => {
+    if (laneDeviceLease) releaseDeviceLease(laneDeviceLease);
+  },
+});
+const steps = lane.steps;
 // CACHED counts as PASS for the lane verdict (it IS a prior PASS, reused only
 // in fast mode on an unchanged input set) — but it stays CACHED on the
-// receipt, visibly distinct, so a fast receipt can never be read as if every
-// step freshly executed.
-// ERROR fails the lane too: "I could not check this" is not green. It is only
-// the ACCUSATION that ERROR withholds, never the refusal.
-const verdict = steps.some((s) => s.verdict === "FAIL" || s.verdict === "ERROR") ? "FAIL" : "PASS";
+// receipt, visibly distinct. ERROR fails the lane: "I could not check this" is
+// not green; only the ACCUSATION is withheld. (laneVerdict, qa/lib/lane-runner.mjs)
+const verdict = lane.verdict;
 
 // Receipt STRENGTH — a desktop-only green and an on-device green are different
 // claims, and the difference should never live only in the SKIP lines. Device-
