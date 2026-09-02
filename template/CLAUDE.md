@@ -38,6 +38,13 @@ it; CI still enforces it).
 New behavior begins as a spec clause in `specs/<feature>.spec.md`: Given/When/Then with a
 stable id (see [`specs/README.md`](./specs/README.md)). Propose the clause, get it confirmed,
 then implement. Durable tests cite their clause (`// SPEC: HOME-02`).
+
+**A clause about device behavior must say so.** A citation proves a test *exists*; it cannot
+prove that test could ever *observe* the promise. Add `[tier: device]` (or `[tier: e2e]`)
+after the id when the claim is about OS facts a host JVM cannot see — lifecycle, alarms,
+notifications, permissions, real navigation. `specCoverage` then requires a citation from
+`androidInstrumentedTest` or `qa/e2e` and FAILS without one, rather than accepting a
+desktop test that is structurally blind to the claim.
 [`specs/app-base.spec.md`](./specs/app-base.spec.md) states the architecture and shell
 invariants the conformance gates enforce.
 
@@ -90,8 +97,15 @@ the tree. The governed `architecture` artifact (below) hashes the document along
   if the test itself is wrong, say so in your summary and justify the change.
 
 **Platform behavior tests live in `composeApp/src/androidInstrumentedTest`** — when a
-feature touches alarms, notifications, lock-screen intents, or audio routing, its behavior
-test goes there, because no desktop tier can see those OS facts. Assertion helpers:
+feature touches alarms, notifications, lock-screen intents, audio routing, **or app/process
+lifecycle** (cold start vs warm resume, "once per process start", process death and
+restore, `ON_STOP`/`ON_START`), its behavior test goes there, because no desktop tier can
+see those OS facts. A desktop Compose test has no process lifecycle *at all*, so a claim
+about one is unobservable there by construction — and `ProcessControl` below is the organ
+that puts the device into the state such a claim is about. **Declare it on the clause**:
+`- **MOTION-13** [tier: device] — Given a cold start, …`. The lane's `specCoverage` then
+FAILS unless a test from a tier that can actually see it cites the clause, instead of
+accepting a citation from a tier that cannot. Assertion helpers:
 `NotificationAsserts`, `AlarmAsserts`, `SystemState`. **Runtime state control** — put the
 device into the state your claim is about, instead of waiting for it: `TimeWarp` (clock,
 timezone), `DozeControl` (forced idle), `PermissionControl`, `ProcessControl`,

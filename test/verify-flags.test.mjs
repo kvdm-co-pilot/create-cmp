@@ -62,3 +62,19 @@ test("every recognized flag is documented in --help", () => {
   const undocumented = [...recognizedFlags()].filter((f) => !usage[1].includes(f));
   assert.deepEqual(undocumented, [], `recognized but undocumented: ${undocumented.join(", ")}`);
 });
+
+// The slowest step used to run ninth of sixteen, AHEAD of unit tests,
+// conformance, goldens and a11y — so a red unit test was reported only once R8
+// had finished. Order costs nothing on a green run and buys back every minute
+// on a red one. Pinned on the local profile literal, which ci and release extend.
+test("local profile: the cheap high-signal tier reports before releaseBuild", () => {
+  const m = verifySrc.match(/local: \[([\s\S]*?)\n  \],/);
+  assert.ok(m, "the local profile is a literal array the test can read");
+  const order = [...m[1].matchAll(/\bstep([A-Za-z0-9]+?)(?:Memo)?,/g)].map((x) => x[1]);
+  const at = (name) => order.indexOf(name);
+  for (const cheap of ["UnitTests", "Conformance", "GoldenTrees", "A11y"]) {
+    assert.ok(at(cheap) >= 0, `${cheap} is in the local profile`);
+    assert.ok(at(cheap) < at("ReleaseBuild"), `${cheap} (${at(cheap)}) reports before releaseBuild (${at("ReleaseBuild")})`);
+  }
+  assert.ok(at("Build") < at("UnitTests"), "the debug build still precedes the tests that need it");
+});

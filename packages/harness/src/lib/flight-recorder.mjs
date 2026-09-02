@@ -205,7 +205,15 @@ export function summarizeFlightJournal(entries, { now = new Date() } = {}) {
       // JSON-array key: reasons are arbitrary text, so a delimiter-joined
       // string key would be ambiguous — and ambiguity here merges two
       // different problems into one count.
-      const key = JSON.stringify([s.step ?? "?", s.reason ?? ""]);
+      //
+      // Grouped on the reason's FIRST LINE, which is exactly what the report
+      // prints. Several gates (approvals above all) end their reason with a
+      // variable list of artifact names, so keying on the whole string split
+      // ONE recurring reason into seven near-identical rows carrying the same
+      // visible text — a count the reader had to add up by eye. The detail is
+      // not lost: the verbatim reasons are still in the journal, which is the
+      // artifact that owes verbatim. The REPORT owes legibility.
+      const key = JSON.stringify([s.step ?? "?", (s.reason ?? "").split("\n")[0]]);
       skipGroups.set(key, (skipGroups.get(key) ?? 0) + 1);
     }
   }
@@ -263,6 +271,34 @@ export function summarizeFlightJournal(entries, { now = new Date() } = {}) {
     },
     device: { reachedRuns: deviceReached.length, highestRung },
   };
+}
+
+/**
+ * Steps that SKIPped in THIS run and have skipped in EVERY recorded full run —
+ * a tier that has never executed on this machine.
+ *
+ * A single SKIP is a fact; skipping every recorded run is a different fact,
+ * and only the journal can tell them apart. maestro was never installed on one
+ * machine, so e2eSmoke skipped on all 37 recorded runs while the lane said
+ * PASS each time — the end-to-end flow had never run once, and nothing said so.
+ *
+ * Needs a journal long enough to mean something: below `floor` recorded runs
+ * carrying the step, "every time" is a coincidence, not a pattern.
+ *
+ * @param {Array<{name: string, verdict: string, reason?: string}>} steps this run's results
+ * @param {object[]} entries parsed journal entries (any mode; fast runs are ignored)
+ * @param {{floor?: number}} [opts]
+ * @returns {Array<{name: string, runs: number, reason: string}>}
+ */
+export function neverRunTiers(steps, entries, { floor = 3 } = {}) {
+  const full = (Array.isArray(entries) ? entries : []).filter((e) => e && e.mode !== "fast" && Array.isArray(e.steps));
+  const out = [];
+  for (const st of (Array.isArray(steps) ? steps : []).filter((x) => x && x.verdict === "SKIP")) {
+    const seen = full.filter((e) => e.steps.some((s) => s && s.name === st.name));
+    const ran = seen.filter((e) => e.steps.some((s) => s && s.name === st.name && s.verdict !== "SKIP"));
+    if (seen.length >= floor && ran.length === 0) out.push({ name: st.name, runs: seen.length, reason: st.reason ?? "" });
+  }
+  return out;
 }
 
 /**

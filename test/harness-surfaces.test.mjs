@@ -379,6 +379,44 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       }
     });
 
+    // The gate must still refuse while a lane runs — no receipt yet is not done —
+    // but "run the lane" is the wrong instruction when one is already running,
+    // and it fired ~8 times in one observed session. The refusal stays; the
+    // instruction changes.
+    await t.test("receipt-check with a lane IN FLIGHT still refuses, but says WAIT — never 'run the lane' at a running lane", () => {
+      const receiptPath = path.join(out, "qa/evidence/latest.json");
+      const markerPath = path.join(out, "composeApp/build/.cmp-lane-in-progress");
+      fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+      try {
+        fs.writeFileSync(receiptPath, JSON.stringify({ schema: "cmp-evidence/1", profile: "local", verdict: "FAIL", inputs: { hash: "a".repeat(64) }, steps: [] }));
+        fs.writeFileSync(markerPath, JSON.stringify({ pid: process.pid, step: "releaseBuild", index: 9, total: 16, stepStartedAt: new Date().toISOString() }));
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("a running lane has produced no receipt — the hook must still block");
+        } catch (err) {
+          assert.equal(err.status, 2, "still refused");
+          assert.match(String(err.stderr), /ALREADY RUNNING/, "names the fact");
+          assert.match(String(err.stderr), /releaseBuild, step 9 of 16/, "and the step, from the marker the lane stamps");
+          assert.match(String(err.stderr), /Do NOT start a second one/);
+          assert.doesNotMatch(String(err.stderr), /Run `node qa\/verify\.mjs`/, "the wrong instruction is gone");
+        }
+        // A STALE marker (a crashed lane, long ago) is not a running lane.
+        const old = Date.now() / 1000 - 60 * 60;
+        fs.utimesSync(markerPath, old, old);
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("expected refusal");
+        } catch (err) {
+          assert.equal(err.status, 2);
+          assert.match(String(err.stderr), /Run `node qa\/verify\.mjs`/, "back to the normal instruction");
+          assert.doesNotMatch(String(err.stderr), /ALREADY RUNNING/);
+        }
+      } finally {
+        fs.rmSync(receiptPath, { force: true });
+        fs.rmSync(markerPath, { force: true });
+      }
+    });
+
     await t.test("the Bash reminder hook nudges bare full-lane runs toward --fast — allow-only, silent when --fast is present", () => {
       const settings = JSON.parse(fs.readFileSync(path.join(out, ".claude/settings.json"), "utf8"));
       const bashEntry = (settings.hooks?.PreToolUse || []).find((e) => e.matcher === "Bash");

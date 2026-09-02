@@ -34,6 +34,7 @@ import {
   readFlightJournal,
   renderFlightReport,
   summarizeFlightJournal,
+  neverRunTiers,
 } from "../template/qa/lib/flight-recorder.mjs";
 import { computeInputsHash } from "../template/qa/lib/inputs-hash.mjs";
 
@@ -279,4 +280,48 @@ test("the report DISCLOSES the watch gap rather than presenting a partial census
   assert.match(joined, /modes:/);
   assert.match(joined, /deliberate runs only/, "the fast count must not read as a complete census");
   assert.match(joined, /watch\.mjs/, "and it must name what is missing");
+});
+
+// The retrospective's skip grouping did not group: the approvals gate ends its
+// reason with a variable list of artifact names, so ONE recurring reason
+// rendered as seven near-identical rows the reader had to add up by eye.
+// Group on the first line — which is what the report prints.
+test("skip grouping keys on the reason's FIRST LINE, so a variable tail does not split one problem into seven rows", () => {
+  const mk = (tail) => ({
+    ...sampleEntry({ mode: "full" }),
+    steps: [{ name: "approvals", verdict: "SKIP" }],
+    skips: [{ step: "approvals", reason: `governed artifacts await review — the lane cannot attest them:\n${tail}` }],
+  });
+  const entries = [mk("design-system"), mk("design-system, components"), mk("feature-brief:meal"), mk("design-system, components, specs")];
+  const summary = summarizeFlightJournal(entries, { now: new Date("2026-09-02T10:00:00.000Z") });
+  const rows = summary.skipReasons.filter((s) => s.step === "approvals");
+  assert.equal(rows.length, 1, "one problem, one row");
+  assert.equal(rows[0].count, 4);
+  assert.equal(rows[0].reason, "governed artifacts await review — the lane cannot attest them:");
+});
+
+// A tier that has never run here. A single SKIP is a fact; skipping every
+// recorded run is a different fact, and only the journal can tell them apart.
+test("neverRunTiers: PLANTED — e2eSmoke skipped in every recorded full run is named; a tier that ran once is not", () => {
+  const skip = { name: "e2eSmoke", verdict: "SKIP", reason: "maestro CLI not installed — curl -fsSL https://get.maestro.mobile.dev | bash" };
+  const full = (steps) => ({ ...sampleEntry({ mode: "full" }), steps });
+  const journal = Array.from({ length: 37 }, () => full([{ name: "build", verdict: "PASS" }, { name: "e2eSmoke", verdict: "SKIP" }]));
+  const never = neverRunTiers([skip], journal);
+  assert.equal(never.length, 1);
+  assert.equal(never[0].name, "e2eSmoke");
+  assert.equal(never[0].runs, 37);
+  assert.match(never[0].reason, /maestro CLI not installed/);
+  // One PASS anywhere in the history and it is not "never" — it is "not lately".
+  const ranOnce = [...journal, full([{ name: "e2eSmoke", verdict: "PASS" }])];
+  assert.equal(neverRunTiers([skip], ranOnce).length, 0);
+});
+
+test("neverRunTiers: below the floor, 'every time' is a coincidence — two skips name nothing; fast runs never count", () => {
+  const skip = { name: "e2eSmoke", verdict: "SKIP", reason: "no device" };
+  const full = (steps) => ({ ...sampleEntry({ mode: "full" }), steps });
+  const fast = (steps) => ({ ...sampleEntry({ mode: "fast", evidenceLevel: null }), steps });
+  assert.equal(neverRunTiers([skip], [full([{ name: "e2eSmoke", verdict: "SKIP" }]), full([{ name: "e2eSmoke", verdict: "SKIP" }])]).length, 0);
+  const fastOnly = Array.from({ length: 10 }, () => fast([{ name: "e2eSmoke", verdict: "SKIP" }]));
+  assert.equal(neverRunTiers([skip], fastOnly).length, 0, "the inner loop skips the device tier by design");
+  assert.equal(neverRunTiers([{ name: "build", verdict: "PASS" }], fastOnly).length, 0, "a step that PASSed this run is not asked");
 });

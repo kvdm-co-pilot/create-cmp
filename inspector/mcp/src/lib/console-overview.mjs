@@ -567,9 +567,18 @@ ${promiseList ? `${promiseList}\n` : ""}    <p class="wk-you">${you}</p>
   </p>`,
   );
 
+  // The card quotes what a check COSTS, so it must not quote a cache hit. A
+  // single last-run figure is dominated by Gradle's cache state; once the
+  // journal holds more than two full runs the typical and worst runs are named
+  // alongside it. Every figure is a run that happened — never an estimate.
+  const lane = walksData.lane;
+  const laneSpread =
+    lane && lane.runs > 2 && lane.medianMs > 0
+      ? ` &middot; typically ${esc(fmtLaneMs(lane.medianMs))}${lane.maxMs > lane.medianMs ? `, worst ${esc(fmtLaneMs(lane.maxMs))}` : ""}`
+      : "";
   const laneLine =
-    walksData.lane && typeof walksData.lane.durationMs === "number"
-      ? `  <p class="wk-lane">full check: ${esc(fmtLaneMs(walksData.lane.durationMs))} last run (measured)</p>`
+    lane && typeof lane.durationMs === "number"
+      ? `  <p class="wk-lane">full check: ${esc(fmtLaneMs(lane.durationMs))} last run${laneSpread} (measured)</p>`
       : "";
 
   return `  <h3 class="fd-h">In flight${walks.length ? ` <span class="fd-count">${walks.length}</span>` : ""}</h3>
