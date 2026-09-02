@@ -488,6 +488,7 @@ ${p.error ? `<div class="banner">last render FAILED &mdash; showing previous sta
 ${p.sections.map((s) => sectionHtml(s, prov)).join("\n")}
 </main>
 <script>
+const CMP_CONSOLE_BUILD = ${JSON.stringify(p.build && p.build.id ? String(p.build.id) : null)};
 ${p.bodyScript}
 </script>
 `;

@@ -304,6 +304,58 @@ test("chain: the inject records the human's prompt (tier 1) and renders studio +
   assert.equal(recorded.text, "please add supplements with reminders", "the request is the hook's words, machinery-owned");
 });
 
+// studio-self-renewal R5: the console publishes its own staleness on the registry
+// record, so the per-prompt inject and the statusline stop reporting a clean bill
+// of health for a console drawing from code the tree has moved past. The harness
+// reads a boolean — it cannot hash the inspector's sources, and a per-prompt hook
+// must not make an HTTP call.
+function writeConsoleRecord(fields) {
+  // Both spellings of the same directory: the in-process call keys off `dir`,
+  // while the CLI resolves its root through cwd — and on macOS os.tmpdir() is a
+  // symlink, so the two differ. The registry key is sha1 of the resolved path.
+  const written = [];
+  for (const root of new Set([path.resolve(dir), fs.realpathSync(dir)])) {
+    const key = crypto.createHash("sha1").update(root).digest("hex").slice(0, 12);
+    const p = path.join(os.tmpdir(), `cmp-console-${key}.json`);
+    fs.writeFileSync(p, JSON.stringify({ pid: process.pid, port: 9600, url: "http://127.0.0.1:9600/", ...fields }));
+    written.push(p);
+  }
+  return written;
+}
+
+test("studio: a console serving old code reads as STALE, not as running", () => {
+  const rec = writeConsoleRecord({ buildStale: true });
+  try {
+    const state = lib.consoleState(dir);
+    assert.equal(state.buildStale, true, "the console's own verdict is carried, not recomputed");
+    const hookInput = JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: "carry on" });
+    const ctx = JSON.parse(
+      execFileSync("node", [cli, "--inject"], { cwd: dir, encoding: "utf8", input: hookInput }),
+    ).hookSpecificOutput.additionalContext;
+    assert.match(ctx, /STALE/, "the inject says so — silence here is the clean bill of health that hid it");
+    assert.match(ctx, /renews itself/, "and says it heals, so the agent does not reach for a restart");
+    const line = execFileSync("node", [cli, "--statusline"], { cwd: dir, encoding: "utf8" });
+    assert.match(line, /console stale/, "the statusline carries it too");
+  } finally {
+    for (const f of rec) fs.rmSync(f, { force: true });
+  }
+});
+
+test("studio: a healthy console still reads as plainly running", () => {
+  const rec = writeConsoleRecord({ buildStale: false });
+  try {
+    assert.equal(lib.consoleState(dir).buildStale, false);
+    const hookInput = JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: "carry on" });
+    const ctx = JSON.parse(
+      execFileSync("node", [cli, "--inject"], { cwd: dir, encoding: "utf8", input: hookInput }),
+    ).hookSpecificOutput.additionalContext;
+    assert.match(ctx, /\[studio: running at http/, "no alarm where there is no fault");
+    assert.ok(!/STALE/.test(ctx));
+  } finally {
+    for (const f of rec) fs.rmSync(f, { force: true });
+  }
+});
+
 test("chain: the ephemeral files never enter the receipt's hashed input surface", async () => {
   const ih = await import(pathToFileURL(path.join(dir, "qa/lib/inputs-hash.mjs")).href);
   fs.rmSync(path.join(dir, "qa/.plan.json"), { force: true });

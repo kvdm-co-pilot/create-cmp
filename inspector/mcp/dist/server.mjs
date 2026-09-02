@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs aed061fac7e3f32d01c493b79fe17bc17614d820d47d69e74ee17fe06788f76c
+// cmp:bundle-inputs ad5461af0f4a71b222cf486db79454b8df328ddb1bd04272b0c5793c079c34a8
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32346,6 +32346,15 @@ function sourceFiles(root = PKG_ROOT) {
   out.push(path3.join(root, "bin", "server.mjs"));
   return out.sort();
 }
+function sourceRoots(root = PKG_ROOT) {
+  return [path3.join(root, "src"), path3.join(root, "bin")].filter((d) => {
+    try {
+      return fs3.statSync(d).isDirectory();
+    } catch {
+      return false;
+    }
+  });
+}
 function sourcesHash(root = PKG_ROOT) {
   const h = createHash2("sha256");
   for (const f of sourceFiles(root)) {
@@ -34286,6 +34295,7 @@ ${esc3(p.error)}</div>` : ""}
 ${p.sections.map((s) => sectionHtml(s, prov)).join("\n")}
 </main>
 <script>
+const CMP_CONSOLE_BUILD = ${JSON.stringify(p.build && p.build.id ? String(p.build.id) : null)};
 ${p.bodyScript}
 </script>
 `;
@@ -36943,6 +36953,16 @@ function getIntentData(root) {
 // src/lib/preview-service.mjs
 var execFileAsync = promisify(execFile);
 var LOADED_BUILD = loadedBuildId();
+var EX_RENEW = 75;
+var RENEW_DEBOUNCE_MS = 1500;
+var RENEW_QUIESCE_POLL_MS = 2e3;
+var RENEW_REJOIN_MS = 15e3;
+var RENEW_REJOIN_TRIES = 8;
+var RENEW_REJOIN_POLL_MS = 250;
+function renewalDecision({ diskId, loadedId, armed, blockedBy }) {
+  if (diskId === null || loadedId === null || diskId === loadedId) return armed ? "stand-down" : "none";
+  return blockedBy ? "defer" : "renew";
+}
 var DEFAULT_PORT2 = 9600;
 var DEFAULT_DAEMON_PORT = 9601;
 var PORT_ATTEMPTS = 10;
@@ -36986,8 +37006,24 @@ async function findLiveConsole(projectDir, { probe } = {}) {
   }
   if (!rec || typeof rec.pid !== "number" || typeof rec.port !== "number") return null;
   if (!processAlive(rec.pid)) return null;
-  const answers = probe ? await probe(rec) : await fetch(`http://127.0.0.1:${rec.port}/status`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
-  return answers ? rec : null;
+  const ask = () => probe ? probe(rec) : fetch(`http://127.0.0.1:${rec.port}/status`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
+  if (await ask()) return rec;
+  if (rec.renewing === true && Date.now() - Date.parse(rec.renewingAt ?? "") < RENEW_REJOIN_MS) {
+    for (let i = 0; i < RENEW_REJOIN_TRIES; i += 1) {
+      await new Promise((r) => setTimeout(r, RENEW_REJOIN_POLL_MS));
+      let fresh;
+      try {
+        fresh = JSON.parse(fs17.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+      } catch {
+        continue;
+      }
+      if (fresh && typeof fresh.port === "number" && fresh.renewing !== true) {
+        const back = probe ? await probe(fresh) : await fetch(`http://127.0.0.1:${fresh.port}/status`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
+        if (back) return fresh;
+      }
+    }
+  }
+  return null;
 }
 function consoleLauncherPath() {
   const here = path18.dirname(fileURLToPath2(import.meta.url));
@@ -37037,13 +37073,23 @@ async function ensureConsole(projectDir, opts = {}) {
     return null;
   }
 }
-function writeConsoleRegistry(projectDir, port) {
+function writeConsoleRegistry(projectDir, port, extra = {}) {
   try {
     fs17.writeFileSync(
       consoleRegistryPath(projectDir),
-      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path18.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString() })}
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path18.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
 `
     );
+  } catch {
+  }
+}
+function updateConsoleRegistry(projectDir, patch) {
+  try {
+    const p = consoleRegistryPath(projectDir);
+    const rec = JSON.parse(fs17.readFileSync(p, "utf8"));
+    if (!rec || rec.pid !== process.pid) return;
+    fs17.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
+`);
   } catch {
   }
 }
@@ -37705,6 +37751,16 @@ ${section.bodyHtml}`;
   es.onopen = () => { pill.textContent = "live"; pill.className = ""; };
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
+    // studio-self-renewal R6: this page was drawn by CMP_CONSOLE_BUILD; the hello
+    // says which build is serving it NOW. A difference means the console renewed
+    // itself under this tab (or was restarted by hand) \u2014 reload once and the
+    // human sees current code without having touched anything. Guarded on the
+    // constant existing so an older shell simply keeps the old behavior.
+    if (msg.type === "hello" && msg.build && typeof CMP_CONSOLE_BUILD === "string" && msg.build !== CMP_CONSOLE_BUILD) {
+      location.reload();
+      return;
+    }
+    if (msg.type === "renewing") { pill.textContent = "renewing\u2026"; pill.className = "rendering"; }
     if (msg.type === "rendering") { pill.textContent = "rendering\u2026"; pill.className = "rendering"; }
     // A concurrent Gradle build (an ad-hoc ./gradlew) holds the classes dir. Not a
     // failure \u2014 the render is queued and will run. Say exactly that; never the error pill.
@@ -38908,6 +38964,93 @@ function createPreviewService(opts) {
     renderScheduled = true;
     debounceTimer = setTimeout(() => void renderCycle(), delayMs);
   }
+  let serviceApi = null;
+  let selfWatchers = [];
+  let renewTimer = null;
+  let renewQuiesceTimer = null;
+  let renewArmed = false;
+  function renewalBlockedBy() {
+    if (rendering || renderScheduled) return "a render is in flight";
+    if (laneInProgress(projectDir)) return "a verify lane is running";
+    if (daemonBootDeadline && Date.now() < daemonBootDeadline) return "the render daemon is booting";
+    return null;
+  }
+  function attemptRenewal() {
+    const blocked = renewalBlockedBy();
+    const decision = renewalDecision({
+      diskId: diskBuildId(),
+      loadedId: LOADED_BUILD.id,
+      armed: renewArmed,
+      blockedBy: blocked
+    });
+    if (decision === "none") return;
+    if (decision === "stand-down") {
+      renewArmed = false;
+      clearTimeout(renewQuiesceTimer);
+      updateConsoleRegistry(projectDir, { buildStale: false });
+      log("own sources returned to the build already running \u2014 renewal stood down");
+      return;
+    }
+    if (decision === "defer") {
+      log(`own sources changed; renewal deferred \u2014 ${blocked}`);
+      clearTimeout(renewQuiesceTimer);
+      renewQuiesceTimer = setTimeout(attemptRenewal, RENEW_QUIESCE_POLL_MS);
+      return;
+    }
+    log(`own sources changed \u2014 renewing; the supervisor respawns this worker with the new code`);
+    try {
+      broadcast({ type: "renewing" });
+    } catch {
+    }
+    const handoffPort = port;
+    try {
+      if (serviceApi) serviceApi.stop();
+    } catch {
+    }
+    try {
+      fs17.writeFileSync(
+        consoleRegistryPath(projectDir),
+        `${JSON.stringify({
+          pid: process.ppid,
+          port: handoffPort,
+          url: `http://127.0.0.1:${handoffPort}/`,
+          projectDir: path18.resolve(projectDir),
+          startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          renewing: true,
+          renewingAt: (/* @__PURE__ */ new Date()).toISOString(),
+          buildStale: true
+        })}
+`
+      );
+    } catch {
+    }
+    process.exit(EX_RENEW);
+  }
+  function onSelfSourceChange() {
+    clearTimeout(renewTimer);
+    renewTimer = setTimeout(() => {
+      if (renewalDecision({ diskId: diskBuildId(), loadedId: LOADED_BUILD.id, armed: renewArmed, blockedBy: null }) === "renew" && !renewArmed) {
+        renewArmed = true;
+        updateConsoleRegistry(projectDir, { buildStale: true });
+      }
+      attemptRenewal();
+    }, RENEW_DEBOUNCE_MS);
+  }
+  function watchSelfSources() {
+    if (runningFrom().mode !== "source") return;
+    for (const dir of sourceRoots()) {
+      try {
+        selfWatchers.push(
+          fs17.watch(dir, { recursive: true }, (_event, filename) => {
+            if (filename && !String(filename).endsWith(".mjs")) return;
+            onSelfSourceChange();
+          })
+        );
+      } catch {
+      }
+    }
+    if (selfWatchers.length) log(`watching own sources for renewal (${selfWatchers.length} root(s), source mode)`);
+  }
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
   function startWatching() {
     try {
@@ -39158,7 +39301,7 @@ function createPreviewService(opts) {
           "cache-control": "no-cache",
           connection: "keep-alive"
         });
-        res.write(`data: ${JSON.stringify({ type: "hello", version: version2 })}
+        res.write(`data: ${JSON.stringify({ type: "hello", version: version2, build: LOADED_BUILD.id })}
 
 `);
         sseClients.add(res);
@@ -39514,7 +39657,7 @@ function createPreviewService(opts) {
       }))
     };
   }
-  return {
+  const api = {
     /** Initial render (unless fresh previews already exist), then serve + watch. */
     async start() {
       if (!fs17.existsSync(path18.join(projectDir, "composeApp"))) {
@@ -39540,6 +39683,7 @@ function createPreviewService(opts) {
       writeConsoleRegistry(projectDir, port);
       startWatching();
       watchGovernance();
+      watchSelfSources();
       void renderCycle();
       if (hot) void ensureDaemon();
       return status();
@@ -39556,6 +39700,10 @@ function createPreviewService(opts) {
       clearTimeout(governanceTimer);
       for (const w of governanceWatchers) w.close();
       governanceWatchers = [];
+      clearTimeout(renewTimer);
+      clearTimeout(renewQuiesceTimer);
+      for (const w of selfWatchers) w.close();
+      selfWatchers = [];
       fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {
       });
       if (daemonChild) daemonChild.kill("SIGTERM");
@@ -39597,6 +39745,8 @@ function createPreviewService(opts) {
     /** Test seam: simulate a source-change event (swap-pending + watchdog arming). */
     _noteSrcChange: noteSrcChange
   };
+  serviceApi = api;
+  return api;
 }
 
 // bin/server.mjs
