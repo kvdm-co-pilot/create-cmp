@@ -51,7 +51,8 @@
     "./skills/cmp-dev-client",
     "./skills/cmp-firebase-connect",
     "./skills/cmp-test",
-    "./skills/cmp-audit"
+    "./skills/cmp-audit",
+    "./skills/grill-me"
   ],
   "agents": [
     "./agents/cmp-orchestrator.md"

@@ -42,7 +42,16 @@ artifacts are spec-first** (clauses confirmed before the slice is built),
 are *distilled from* the real screens, never authored before them — you
 cannot judge a palette on placeholder stubs).
 
-0. **Intent.** Before anything renders, the agent interviews: what is this
+0. **Intent.** Before anything renders — and before the interview collects a
+   single config answer — the agent **grills** (`grill-me`,
+   [docs/features/grill-me.md](./features/grill-me.md), 2026-09-02): the
+   load-bearing questions about the app itself — who it is for, what day one
+   must do, what it deliberately will not do, what breaks the design if wrong
+   — asked as the frontier of unsettled decisions, in numbered rounds with a
+   recommended answer each, until no answer would change the scaffold or the
+   brief. The interview's option table is *not* grill material (every row has
+   a default); the grill asks about the app, the interview collects the config
+   from settled ground. Then the agent interviews: what is this
    app, who is it for, which platforms, what brand feel, which reference
    apps, what are the first screens you see in your head? Output: the
    **intent brief** — the root artifact everything else traces to. The
