@@ -34,7 +34,7 @@ The disease being cured is **capability outrunning proof**. Therefore:
 | S5 | Reopen walks back only what it amends; `touches` stay hash-enforced | C5 | create-cmp | this | **landed** |
 | S6 | `nightly` stage + receipt names its stage | C1 | create-cmp | this | **landed** (no-cache audit deferred to P1) |
 | S7 | Sync path: showcase + blueprint receive S1–S6 | C6 | all three | this, then each | **handed off** — dry-runs done here; the writes belong to the owning sessions (below) |
-| S8 | Spine / step-pack / surface split | C6 | create-cmp | this | **in progress** (approved 2026-09-03) |
+| S8 | Spine / step-pack / surface split | C6 | create-cmp | this | **landed** (a: runner · b: pack · c: adoption docs) |
 | S9 | Per-step input hashes (P1) | C1 C5 | create-cmp | after S8, **conditional** | approved 2026-09-03; trigger = the showcase's journal after its upgrade shows the change-stage lane still too slow |
 
 ---
@@ -305,3 +305,7 @@ S6. Neither starts until S1–S7 are landed and proven.
   30-minute default deadline. Both now carry explicit names. Structural tests that grep "the
   lane's source" read both files (`laneSrc`), and `scripts/ground-truth.mjs` derives the
   profile counts from the pack.
+- 2026-09-03 — **S8c: adoption documented** in `packages/harness/README.md` — spine vs pack, the
+  three-step swap, and payment-blueprint as the worked example. **S8 landed.** S9 stays
+  conditional: its trigger is the change-stage lane's cost in the showcase's flight journal
+  after its `upgrade --harness`; no Gradle app exists in this repo to measure it here.
