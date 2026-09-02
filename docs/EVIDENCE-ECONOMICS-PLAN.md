@@ -30,9 +30,9 @@ The disease being cured is **capability outrunning proof**. Therefore:
 | S1 | Prove the uncommitted P2/P3 batch | C2 C3 C4 | create-cmp | this | **landed** (see Log) |
 | S2 | Console opens without `composeApp/` | C6 | create-cmp | this | **landed** — proven live on payment-blueprint |
 | S3 | Agent-stage pulse (observed activity between prompt and lane) | C4 | create-cmp | this | **landed** |
-| S4 | `ERROR` verdict + per-step deadlines | C3 C4 | create-cmp | this | in progress |
-| S5 | Reopen diffs, re-signs only what drifted | C5 | create-cmp | this | queued |
-| S6 | `nightly` stage + receipt names its stage | C1 | create-cmp | this | queued |
+| S4 | `ERROR` verdict + per-step deadlines | C3 C4 | create-cmp | this | **landed** |
+| S5 | Reopen walks back only what it amends; `touches` stay hash-enforced | C5 | create-cmp | this | **landed** |
+| S6 | `nightly` stage + receipt names its stage | C1 | create-cmp | this | in progress |
 | S7 | Sync path: showcase + blueprint receive S1–S6 | C6 | all three | this, then each | queued |
 | S8 | Spine / step-pack / surface split | C6 | create-cmp | later | not started |
 | S9 | Per-step input hashes (P1) | C1 C5 | create-cmp | later, **conditional** | not started |
@@ -216,3 +216,20 @@ S6. Neither starts until S1–S7 are landed and proven.
   used to crash the whole lane). androidChecks' did-not-execute is now ERROR. Planted: a real
   `sleep 5` under a 150ms deadline classifies as timeout; a `TypeError` inside a step becomes
   a row. Remaining: the console's step glyph, the bundle, both suites.
+- 2026-09-02 — **S4 landed** (`9dea4de`). **S5 in progress — and its shape changed on reading
+  the decision of record.** The finding said "compare hashes and reopen only what drifted"; but
+  an `approved` artifact is, by construction, one whose bytes still match its signature — so
+  every reopen of a touched artifact was a reopen of an unchanged one, twelve for twelve. Not
+  an accident: `reopenFeature` walked back every declared `touches` entry. CHANGE-FLOW-DESIGN
+  §touches says the opposite — "hashes enforce, declaration lets the console tell as-planned
+  from undeclared blast" — and `feature-brief.mjs:99` repeats it. So the fix aligns the verb
+  with the decided flow: a feature reopen walks back the brief, its declared spec(s), and its
+  design when `screens: true` (the documents the change AMENDS); declared `touches` stay
+  signed and are reported as `stillSigned`, with the hash demanding a fresh signature only if
+  the change actually moves them. No new decision was taken.
+- 2026-09-02 — **S5 landed.** `reopenFeature` walks back the brief, its declared spec(s), and
+  its design when `screens: true`; declared `touches` stay signed and come back as
+  `stillSigned` (id, state, signed hash). CLI prints "N in scope · M reopened · K still signed"
+  and, per touch, "re-signature demanded only if it changes; the hash enforces that". Planted:
+  a real byte edit to a touched component flips it to `changed-since-approval` with no reopen
+  verb anywhere. Twelve-for-zero becomes two-for-two. Tests in governance-journal.
