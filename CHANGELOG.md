@@ -6,6 +6,73 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-03
+
+### Added
+
+- **Evidence economics — the loop made cheap, visible and honest** (`docs/EVIDENCE-ECONOMICS-PLAN.md`,
+  the doc of record across sessions; causes and named practices in
+  `docs/proposals/evidence-economics.md`). Every slice landed with a planted-failure proof.
+  - **A fourth verdict, `ERROR`, and a deadline on every step** (`qa/lib/step-outcomes.mjs`).
+    "Could not run" — zero tests executed, a deadline passed, a throw — is no longer reported as
+    a behaviour failure: it never accuses the change, earns no evidence rung, does not count as
+    executed for receipt plausibility, is never cached, wears its own mark (`⊘`), and still
+    FAILs the lane. Every subprocess inherits a per-step deadline derived from the step's own
+    measured history (×3, floor 5 min, ceiling 30); a throw inside a step becomes one row
+    instead of crashing the lane.
+  - **A clause can declare the tier that can observe it** — `- **MOTION-13** [tier: device] — …`.
+    `specCoverage` FAILs when no citing test comes from a tier that could see the promise; a
+    desktop Compose test citing a process-lifecycle claim is the planted red. App/process
+    lifecycle joins the platform-behaviour list in the generated `CLAUDE.md`.
+  - **Tiers that have never run are named.** The lane reads its own journal and prints
+    `e2eSmoke — skipped in all 37 recorded full runs`; a SKIP is non-fatal, "never" is no longer
+    invisible.
+  - **The lane says what it costs.** Last, typical and worst full-run cost (measured over ≥3
+    runs) replace the single last-run figure that a Gradle cache hit made a lie.
+  - **A pulse during long steps** (`qa/lib/lane-narrator.mjs`) — a separate process, because the
+    steps are synchronous and no in-process timer can fire during a Gradle call. Quiet under
+    20 s, one stderr line every 30 s, "longer than usual" past 1.5×.
+  - **`--profile nightly`**, with the determinism probe forced on; **every receipt names its
+    `stage`** (scaffold / change / merge / nightly / release) and a nightly receipt is refused as
+    done-evidence like `--fast`.
+  - **The build stage is observed, not merely declared.** Files written since the current
+    request move the Drive strip and the inject's chain (`observed: 12 files written since the
+    request · last 4s ago`, or a named stall) — with no declared plan required.
+  - **The lane is a spine plus a step pack.** `qa/lib/lane-runner.mjs` (marker narration,
+    deadlines, the pulse, the catch, the verdict) and `qa/lib/steps-cmp.mjs` (every CMP step
+    behind `createCmpSteps(ctx)`); `qa/verify.mjs` 1,835 → 641 lines. A Kotlin backend keeps the
+    spine and supplies its own pack — `packages/harness/README.md` documents the swap with
+    payment-blueprint as the worked example.
+- **The studio console renews itself** (`docs/features/studio-self-renewal.md`). `bin/console.mjs`
+  supervises a worker; when the console's own sources change and nothing is in flight, the worker
+  exits 75 and is respawned with the new code (budgeted, source-mode only), the page reloads once,
+  and the registry record carries `buildStale` so the per-prompt inject and the statusline stop
+  reporting a clean bill of health for a console drawing from old code.
+- **The studio console opens on `qa/` alone.** Screens, preview and the live device are a
+  capability, not a gate: a repo with no `composeApp/` gets Drive, walks, approvals, evidence,
+  comments and the chain. Proven live on a Kotlin backend repo.
+
+### Changed
+
+- **`releaseBuild` runs after the cheap tier** (unit, conformance, goldens, a11y) in `local`, `ci`
+  and `release` — a red unit test is reported in seconds, not after R8 finishes.
+- **The Stop hook says WAIT at a running lane** instead of "run the lane" — the refusal stands;
+  only the instruction changes, naming the running step from the marker.
+- **A feature reopen walks back only what it amends** — the brief, its declared spec(s), and its
+  design when `screens: true`. Declared `touches` stay signed and are reported as still signed;
+  the hash demands a fresh signature only if the change actually moves them (twelve-for-zero
+  becomes two-for-two).
+- **The retrospective's skip grouping** keys on the reason's first line — seven near-identical
+  approvals rows become one.
+- **`androidChecks` that executed zero tests** reports "DID NOT EXECUTE — not accusing it" with
+  the rerun command, instead of "an on-device behavior claim is broken".
+
+### Fixed
+
+- Memoized step wrappers and `gradleTestStep`'s returned functions had no runtime name, so the
+  lane marker narrated eight steps as `null` and gave them the default deadline. Both now carry
+  explicit names.
+
 ### Added
 
 - **`grill-me` skill + the grill step in the workflow** — the decide step's opening act
@@ -1872,7 +1939,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.16.0...v0.17.0
