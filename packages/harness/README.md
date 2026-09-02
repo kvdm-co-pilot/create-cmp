@@ -98,6 +98,42 @@ Two modules are the exception by design: `lib/inputs-hash.mjs` and
 (parity-tested), kept so this package needs no npm dependency either. If you
 only want receipt validation, depend on `@create-cmp/receipts` directly.
 
+## Adopting the spine in a repo that is not a Compose app
+
+The lane is two things (evidence-economics S8): a **spine** and a **step pack**.
+
+- **Spine** — `verify.mjs` plus `lib/lane-runner.mjs`, `lib/step-outcomes.mjs`,
+  `lib/receipt-validate.mjs`, `lib/inputs-hash.mjs`, `lib/approvals.mjs`, `lib/spec-coverage.mjs`,
+  `lib/flight-recorder.mjs`, `lib/evidence-level.mjs`, `lib/walk.mjs`, `lib/plan.mjs`,
+  `receipt-check.mjs`, `approve.mjs`, `plan.mjs`, `walk-status.mjs`, `retrospective.mjs`. It
+  parses arguments, runs steps under a deadline with a pulse, turns a throw or a timeout into
+  one `ERROR` row, derives the verdict and the evidence rung, writes the receipt bound to the
+  inputs hash, journals the run, and refuses "done" without a PASS. **It knows nothing about
+  Gradle, adb, Maestro or `composeApp/`.**
+- **Step pack** — `lib/steps-cmp.mjs`. Every Compose Multiplatform step, behind one factory:
+  `createCmpSteps(ctx)` returns `{ stepsForProfile, DEVICE_STEPS, FAST_EXCLUDED_NAMES,
+  STEP_FN_BY_NAME, stepDeterminism, releaseLease }`. **It reads no argv and writes no receipt.**
+
+To verify a Kotlin backend, a web service, anything: keep the spine, replace the pack.
+
+1. Vendor the spine files above into `qa/` (the region hash-lock keeps them honest).
+2. Write `qa/lib/steps-<yours>.mjs` exporting `createYourSteps(ctx)` with the same return shape.
+   A step is a function returning `{ name, verdict: "PASS"|"FAIL"|"SKIP"|"ERROR", reason?,
+   durationMs, details? }`. Borrow `ctx.sh` (it throws `StepTimeout` past the step's deadline —
+   never catch that) and push degraded-path notes onto `ctx.DEGRADED_PATHS`. Name each step
+   function `step<Name>` — the runner narrates and deadlines by that name.
+3. In `verify.mjs`, swap the one composition line:
+   `const pack = createYourSteps({ ROOT, HERE, ..., sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS })`.
+   Profiles, `--fast`, the receipt, the hook, the console's Drive/approvals/evidence pages, the
+   flight journal and the retrospective all keep working unchanged.
+
+**Worked example — `payment-blueprint`.** Its steps are `compositeBuild`, `gitleaks`,
+`linkCheck`, `mutation` (nightly), `legacyPlatform`, `unitTests`, `specCoverage`, `approvals`,
+`harnessIntegrity`. Today they live in a hand-written 2,769-line lane that forked the spine
+and now receives no upstream fix. The migration is: keep its step bodies, wrap them in
+`createBlueprintSteps(ctx)`, delete its copies of the spine, vendor ours. The mutation step
+belongs in `stepsForProfile.nightly`, not `local` — that is what S0 decided.
+
 ## What this does NOT do
 
 - **Verify an arbitrary project.** The lane is CMP/Gradle-specific and
