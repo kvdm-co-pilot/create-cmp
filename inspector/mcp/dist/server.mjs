@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 34d123ade4766eecfdfd7733a91658661d72f8eaa340b0e6ced4625660788c28
+// cmp:bundle-inputs 9328d19b979a941b1bc5f2b2b790061f651c6b6042fea7e15d0e6c05cfc0af45
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -37136,6 +37136,16 @@ function resolveAppName(projectDir) {
   }
   return path18.basename(projectDir);
 }
+function detectCapabilities(projectDir) {
+  const has = (rel) => {
+    try {
+      return fs17.statSync(path18.join(projectDir, rel)).isDirectory();
+    } catch {
+      return false;
+    }
+  };
+  return { governance: has("qa"), screens: has("composeApp") };
+}
 function laneInProgress(projectDir, { now = Date.now } = {}) {
   try {
     const st = fs17.statSync(path18.join(projectDir, ...LANE_MARKER_REL));
@@ -37273,7 +37283,11 @@ function galleryHtml(state) {
     // The console's own build handshake (buildStatus). Absent = render no
     // stale banner and no build id: unknown freshness is never dressed up as
     // fresh, nor as a warning.
-    build = null
+    build = null,
+    // What this project can show (detectCapabilities). Older callers get the
+    // full console; a governance-only project drops the sections that need
+    // pixels and says so on the rail.
+    capabilities = { governance: true, screens: true }
   } = state;
   const width = viewport?.width ?? 411;
   const screenCards = cards.filter(({ screen }) => !isComponentStoryId(screen.id));
@@ -38178,9 +38192,15 @@ ${section.bodyHtml}`;
     });
   }
 `;
+  const railFootPlain = `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`;
+  const NEEDS_SCREENS = /* @__PURE__ */ new Set(["screens", "live-device"]);
+  const visibleRail = capabilities.screens ? railItems : railItems.filter((r) => !NEEDS_SCREENS.has(r.id));
+  const visibleSections = capabilities.screens ? sections : sections.filter((s) => !NEEDS_SCREENS.has(s.id));
+  const capabilityNote = capabilities.screens ? "" : `<p class="rail-sub rail-capability" title="This project has no composeApp/. The governance window is complete; screens, preview and the live device need a Compose app.">governance only &middot; no Compose app</p>`;
   return renderShellPage({
     appName,
-    railItems,
+    railItems: visibleRail,
+    railFootHtml: `${capabilityNote}${railFootPlain}`,
     // The governance strip (07-28 audit, fix 5): counts + the one next human
     // act + recent history, rail-resident so it is visible on EVERY tab. Its
     // queue is the SAME deriveHumanQueue the guided prompt uses — one
@@ -38193,8 +38213,7 @@ ${section.bodyHtml}`;
     // the same .tab-btn/data-tab wiring the nav items use (showTab picks it
     // up with no new JS mechanism), styled back to a quiet meta line by the
     // shell's .rail-foot .tab-btn rules.
-    railFootHtml: `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`,
-    sections,
+    sections: visibleSections,
     error: error51,
     // FI-9 Change B: the renderer's OWN health banner, additive to `error`
     // above (which already covers "last render/compile/reload FAILED" as a
@@ -38343,6 +38362,7 @@ function createPreviewService(opts) {
   let staleRetries = 0;
   let watchdogTimer = null;
   let cards = [];
+  let capabilities = { governance: true, screens: true };
   let viewport = null;
   const sseClients = /* @__PURE__ */ new Set();
   function touch(what) {
@@ -38826,6 +38846,7 @@ function createPreviewService(opts) {
     }
   }
   async function renderCycle() {
+    if (!capabilities.screens) return;
     if (rendering) {
       renderQueued = true;
       return;
@@ -39130,7 +39151,7 @@ function createPreviewService(opts) {
     for (const w of GOVERNANCE_WATCHES) {
       const abs = path18.join(projectDir, w.rel);
       if (!fs17.existsSync(abs)) {
-        if (!w.mkdir) continue;
+        if (!w.mkdir || !capabilities.screens) continue;
         try {
           fs17.mkdirSync(abs, { recursive: true });
         } catch {
@@ -39258,6 +39279,7 @@ function createPreviewService(opts) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(
           galleryHtml({
+            capabilities,
             appName,
             viewport,
             cards,
@@ -39635,6 +39657,7 @@ function createPreviewService(opts) {
       // read — a process cannot notice its own staleness any other way, and
       // twice in two days a stale console lied to a human about its own code.
       build: buildStatus(LOADED_BUILD.id),
+      capabilities,
       url: port ? `http://127.0.0.1:${port}/` : null,
       previewsDir,
       mode,
@@ -39662,10 +39685,14 @@ function createPreviewService(opts) {
   const api = {
     /** Initial render (unless fresh previews already exist), then serve + watch. */
     async start() {
-      if (!fs17.existsSync(path18.join(projectDir, "composeApp"))) {
+      capabilities = detectCapabilities(projectDir);
+      if (!capabilities.governance && !capabilities.screens) {
         throw new Error(
-          `'${projectDir}' does not look like a create-cmp app (no composeApp/).`
+          `'${projectDir}' has neither qa/ (the governance surface) nor composeApp/ (the render pipeline) \u2014 nothing here for the console to serve.`
         );
+      }
+      if (!capabilities.screens) {
+        log("no composeApp/ \u2014 serving the governance window only (Drive, walks, approvals, evidence, comments); screens and live device absent");
       }
       if (opts.takeover !== true) {
         const live = await findLiveConsole(projectDir, opts.probeConsole);
@@ -39678,16 +39705,18 @@ function createPreviewService(opts) {
           throw err;
         }
       }
-      if (fs17.existsSync(path18.join(previewsDir, "manifest.json"))) {
+      if (capabilities.screens && fs17.existsSync(path18.join(previewsDir, "manifest.json"))) {
         loadPreviews();
       }
       await listen(opts.port || DEFAULT_PORT2);
       writeConsoleRegistry(projectDir, port);
-      startWatching();
       watchGovernance();
       watchSelfSources();
-      void renderCycle();
-      if (hot) void ensureDaemon();
+      if (capabilities.screens) {
+        startWatching();
+        void renderCycle();
+        if (hot) void ensureDaemon();
+      }
       return status();
     },
     stop() {
