@@ -33,7 +33,7 @@ The disease being cured is **capability outrunning proof**. Therefore:
 | S4 | `ERROR` verdict + per-step deadlines | C3 C4 | create-cmp | this | **landed** |
 | S5 | Reopen walks back only what it amends; `touches` stay hash-enforced | C5 | create-cmp | this | **landed** |
 | S6 | `nightly` stage + receipt names its stage | C1 | create-cmp | this | **landed** (no-cache audit deferred to P1) |
-| S7 | Sync path: showcase + blueprint receive S1–S6 | C6 | all three | this, then each | in progress |
+| S7 | Sync path: showcase + blueprint receive S1–S6 | C6 | all three | this, then each | **handed off** — dry-runs done here; the writes belong to the owning sessions (below) |
 | S8 | Spine / step-pack / surface split | C6 | create-cmp | later | not started |
 | S9 | Per-step input hashes (P1) | C1 C5 | create-cmp | later, **conditional** | not started |
 
@@ -241,3 +241,38 @@ S6. Neither starts until S1–S7 are landed and proven.
   it is P1's mitigation, and without per-step hashes there is no composed receipt to audit
   against. It lands with P1 if P1 lands. In create-cmp's own lane the suite-scaled step is the
   determinism probe; in payment-blueprint it is mutation — S0 is the same decision there.
+- 2026-09-02 — **S7 handed off, with the exact state.** Both target repos have live sessions;
+  nothing was written into either tree from here.
+
+  **create-cmp-showcase** — a real stamped app (`@create-cmp/harness 0.16.0`). Its path is the
+  engine's own three-way upgrade. Dry-run from create-cmp:
+
+  ```bash
+  node bin/create-cmp.mjs upgrade --harness --target-dir /Users/test/dev/create-cmp-showcase --dry-run
+  ```
+
+  Result: **7 lane files refresh cleanly** (machine-owned, untouched since install —
+  `qa/verify.mjs`, `qa/approve.mjs`, `lib/evidence-level`, `lib/flight-recorder`,
+  `lib/receipt-validate`, `lib/spec-coverage`, `lib/step-cache`); **2 added**
+  (`lib/lane-narrator.mjs`, `lib/step-outcomes.mjs`); `specs/README.md` applied; `.gitignore`
+  and `CLAUDE.md` conflict (new content lands beside as `*.cmp-new`, never clobbered).
+  **5 are LOCAL FORKS and are NOT re-applied**: `qa/receipt-check.mjs`, `lib/approvals.mjs`,
+  `lib/inputs-hash.mjs`, `lib/plan.mjs`, `lib/walk.mjs` — the engine's new content goes to
+  `qa/harness-local.patch`. **Consequence, stated plainly:** the Stop-hook in-flight guard
+  (S1), the activity pulse (S3), the cost distribution (S1) and the reopen fix (S5) do NOT
+  reach the showcase until its session reconciles that patch. What DOES land on `--yes`: the
+  ERROR verdict + deadlines (S4), `[tier: device]` (S1), never-run tiers (S1), the narrator
+  (S1), step order (S1), skip grouping (S1), the nightly stage (S6).
+  **Showcase session:** run the dry-run, read it, then `--yes` at a moment with no lane in
+  flight; then reconcile `qa/harness-local.patch` for the five forks. Commit the receipt after
+  the next full lane.
+
+  **payment-blueprint** — NOT a stamped app. Its `qa/harness.lock.json` is its own schema
+  (`pb-harness/1`); its `qa/verify.mjs` is hand-written; every `qa/lib` file is a deep fork
+  (`approvals.mjs` +231/−1353 lines vs the package; `spec-coverage.mjs` +325/−128;
+  `inputs-hash.mjs` +107/−171). There is nothing to refresh — it is a re-implementation, and
+  a copy would destroy its work. It receives S1–S6 only through **S8** (the spine as a
+  dependency), or by hand-porting the two self-contained behaviours it needs today: the
+  in-flight guard in its own `receipt-check.mjs`, and the ERROR/deadline pattern
+  (`step-outcomes.mjs` is dependency-free and can be dropped in as-is). The console already
+  opens there (S2).
