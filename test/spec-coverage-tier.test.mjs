@@ -89,8 +89,8 @@ test("a withdrawn clause declares nothing — struck-through promises are exempt
   assert.equal(tiers.unmetTier.length, 0);
 });
 
-test("the lane's specCoverage step FAILS on an unmet tier — pinned in verify.mjs itself", () => {
-  const src = fs.readFileSync(path.join(REPO_ROOT, "packages/harness/src/verify.mjs"), "utf8");
+test("the lane's specCoverage step FAILS on an unmet tier — pinned in the step pack itself", () => {
+  const src = fs.readFileSync(path.join(REPO_ROOT, "packages/harness/src/lib/steps-cmp.mjs"), "utf8");
   assert.match(src, /tiers\.unmetTier\.length === 0\)/, "PASS requires unmetTier to be empty");
   assert.match(src, /declares \[tier: \$\{u\.requiredTier\}\] but is/, "and the failure names the declared tier and the blind citation");
 });

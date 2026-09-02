@@ -20,6 +20,13 @@ import { pathToFileURL } from "node:url";
 
 import { scaffold } from "../src/scaffold.mjs";
 
+// S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
+// qa/lib/steps-cmp.mjs (the step pack). A structural read of "the lane's
+// source" must see both, or it pins a file that no longer holds the steps.
+const laneSrc = (dir) =>
+  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/steps-cmp.mjs"), "utf8")}`;
+
+
 function baseConfig(targetDir) {
   return {
     appName: "Acme",
@@ -388,12 +395,12 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
 
   await t.test("the deliver/checks machinery is really gone — doneness has ONE definition", () => {
     assert.ok(!fs.existsSync(path.join(root, "qa/lib/intent-checks.mjs")), "intent-checks.mjs must not be stamped");
-    const verify = fs.readFileSync(path.join(root, "qa/verify.mjs"), "utf8");
+    const verify = laneSrc(root);
     assert.ok(!verify.includes("intentChecks"), "the lane must not carry an intentChecks step");
     const cli = runApproveExpectFail(root, ["--deliver", "meal"]);
     assert.match(cli.stderr, /unknown artifact "--deliver"/);
     // ...and the lane's coverage scan IS the doneness scan (same module).
-    assert.match(verify, /from "\.\/lib\/spec-coverage\.mjs"/);
+    assert.match(verify, /from "\.\/(?:lib\/)?spec-coverage\.mjs"/);
   });
 
   fs.rmSync(root, { recursive: true, force: true });

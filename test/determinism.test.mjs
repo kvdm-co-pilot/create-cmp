@@ -24,6 +24,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
+// qa/lib/steps-cmp.mjs (the step pack). A structural read of "the lane's
+// source" must see both, or it pins a file that no longer holds the steps.
+const laneSrc = (dir) =>
+  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/steps-cmp.mjs"), "utf8")}`;
+
+
 import {
   DETERMINISM_TIMEZONES,
   compareOutcomes,
@@ -168,7 +175,7 @@ test("lane-step attribution mirrors the lane's own test filters", () => {
 });
 
 test("verify.mjs wiring: opt-in in ci, refused combinations, --rerun on both legs, no receipt from a bare probe", () => {
-  const verify = fs.readFileSync(path.join(REPO_ROOT, "template", "qa", "verify.mjs"), "utf8");
+  const verify = laneSrc(path.join(REPO_ROOT, "template"));
   // Recognized and documented.
   assert.match(verify, /"--determinism"/, "flag is a recognized argument");
   assert.match(verify, /--determinism {2,}.*run the timezone determinism probe|--determinism\s+run the timezone determinism probe/s, "USAGE documents the flag");

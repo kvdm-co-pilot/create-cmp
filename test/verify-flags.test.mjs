@@ -16,6 +16,8 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const verifySrc = fs.readFileSync(path.join(REPO_ROOT, "packages/harness/src/verify.mjs"), "utf8");
 const watchSrc = fs.readFileSync(path.join(REPO_ROOT, "packages/harness/src/watch.mjs"), "utf8");
+// S8b: the CMP steps and their profile compositions live in the step pack now.
+const packSrc = fs.readFileSync(path.join(REPO_ROOT, "packages/harness/src/lib/steps-cmp.mjs"), "utf8");
 
 /** The flags verify.mjs declares it accepts. */
 function recognizedFlags() {
@@ -68,8 +70,8 @@ test("every recognized flag is documented in --help", () => {
 // had finished. Order costs nothing on a green run and buys back every minute
 // on a red one. Pinned on the local profile literal, which ci and release extend.
 test("local profile: the cheap high-signal tier reports before releaseBuild", () => {
-  const m = verifySrc.match(/local: \[([\s\S]*?)\n  \],/);
-  assert.ok(m, "the local profile is a literal array the test can read");
+  const m = packSrc.match(/local: \[([\s\S]*?)\n  \],/);
+  assert.ok(m, "the local profile is a literal array the test can read (in the step pack since S8b)");
   const order = [...m[1].matchAll(/\bstep([A-Za-z0-9]+?)(?:Memo)?,/g)].map((x) => x[1]);
   const at = (name) => order.indexOf(name);
   for (const cheap of ["UnitTests", "Conformance", "GoldenTrees", "A11y"]) {
@@ -96,9 +98,24 @@ test("the lane: sh() throws on a deadline; the RUNNER sets it per step, catches 
 
 // S6 — the nightly stage, and the receipt naming what it attests.
 test("nightly: a profile that forces the determinism probe and names its stage on the receipt", () => {
-  assert.match(verifySrc, /stepsForProfile\.nightly = \[\.\.\.stepsForProfile\.ci\]/, "same steps as ci — what differs is what is forced and what the receipt may mean");
+  assert.match(packSrc, /stepsForProfile\.nightly = \[\.\.\.stepsForProfile\.ci\]/, "same steps as ci — what differs is what is forced and what the receipt may mean");
   assert.match(verifySrc, /const determinism = args\.includes\("--determinism"\) \|\| profile === "nightly"/, "the probe is not opt-in at nightly");
   assert.match(verifySrc, /stage: STAGE_OF_PROFILE\[profile\] \?\? profile/, "every receipt names its stage");
   assert.match(verifySrc, /local: "change", ci: "merge", nightly: "nightly", release: "release"/, "the mapping is stated once");
   assert.match(verifySrc, /use scaffold \| local \| ci \| nightly \| release/, "and the profile vocabulary admits it");
+});
+
+// S8b — the split itself: verify.mjs is the spine and owns no step; the pack
+// owns every step and borrows the spine's helpers explicitly.
+test("S8b: verify.mjs defines no step; the pack defines them all and is composed with an explicit ctx", () => {
+  assert.doesNotMatch(verifySrc, /^function step[A-Z]/m, "no step body lives in the spine");
+  assert.doesNotMatch(verifySrc, /^const step[A-Z]\w* = /m);
+  assert.match(verifySrc, /const pack = createCmpSteps\(\{ ROOT, HERE, GRADLEW, RERUN, fast, determinism, profile, mode, sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS \}\)/, "the borrowing is visible in one line");
+  assert.match(verifySrc, /onFinally: \(\) => pack\.releaseLease\(\)/, "the device lease is the pack's; the spine only asks it to let go");
+  assert.match(verifySrc, /probe = pack\.stepDeterminism\(\)/, "the bare probe goes through the pack too");
+  for (const name of ["stepHarnessIntegrity", "stepSpecCoverage", "stepBuild", "stepReleaseBuild", "stepUnitTests", "stepTokenDrift", "stepE2eSmoke", "stepAndroidChecks", "stepReleaseSmoke", "stepDeterminism", "stepAuditCadence"]) {
+    assert.match(packSrc, new RegExp(`function ${name}\\(`), `${name} is in the pack`);
+  }
+  assert.match(packSrc, /export function createCmpSteps\(ctx\)/);
+  assert.doesNotMatch(packSrc, /process\.argv|RECOGNIZED_FLAGS|writeFileSync\(path\.join\(EVIDENCE_DIR/, "the pack reads no argv and writes no receipt");
 });

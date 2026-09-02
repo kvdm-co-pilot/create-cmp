@@ -38,6 +38,13 @@ import {
 } from "../template/qa/lib/flight-recorder.mjs";
 import { computeInputsHash } from "../template/qa/lib/inputs-hash.mjs";
 
+// S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
+// qa/lib/steps-cmp.mjs (the step pack). A structural read of "the lane's
+// source" must see both, or it pins a file that no longer holds the steps.
+const laneSrc = (dir) =>
+  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/steps-cmp.mjs"), "utf8")}`;
+
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "flight-recorder-engine-"));
 
@@ -236,7 +243,7 @@ test("appending to the journal never moves the receipt's inputs hash", () => {
 });
 
 test("lane wiring: the entry is appended AFTER the receipt is written, and a failed append is noted, not fatal", () => {
-  const verify = fs.readFileSync(path.join(REPO_ROOT, "template", "qa", "verify.mjs"), "utf8");
+  const verify = laneSrc(path.join(REPO_ROOT, "template"));
   const receiptWrite = verify.indexOf('fs.writeFileSync(path.join(EVIDENCE_DIR, "latest.json")');
   const flightAppend = verify.indexOf("appendFlightRecord(");
   assert.ok(receiptWrite > 0 && flightAppend > receiptWrite, "the journal entry records the final verdict — appended after the receipt");
@@ -262,7 +269,7 @@ test("watch mode passes --no-journal, so save-triggered runs are never journaled
 });
 
 test("the lane honours --no-journal by skipping the append, not by faking one", () => {
-  const verify = fs.readFileSync(new URL("../template/qa/verify.mjs", import.meta.url), "utf8");
+  const verify = laneSrc(new URL("../template", import.meta.url).pathname);
   assert.match(verify, /const noJournal = args\.includes\("--no-journal"\)/);
   // The guard must short-circuit the append itself — not write a placeholder
   // entry, which would put a run in the journal that never happened.
