@@ -385,6 +385,55 @@ test("studio: a healthy console still reads as plainly running", () => {
   }
 });
 
+// S3 — the build stage's observed tier. Between the prompt and the lane the
+// chain moved only if the agent declared steps; a silent agent was a still
+// photo. Writes since the request are a fact no cooperation can withhold.
+test("chain: activity — files written SINCE the request are observed; earlier writes, machinery files and no-request are not", async () => {
+  const planLib = await import(pathToFileURL(path.join(dir, "qa/lib/plan.mjs")).href);
+  const old = Date.now() / 1000 - 3600;
+  const before = path.join(dir, "specs/before.spec.md");
+  fs.writeFileSync(before, "- **B-01** — old\n");
+  fs.utimesSync(before, old, old);
+  // No request yet → nothing to measure from, and the chain says nothing about activity.
+  fs.rmSync(path.join(dir, "qa/.request.json"), { force: true });
+  assert.equal(planLib.observeActivity(dir, null), null);
+  assert.equal(planLib.describeActivity(null), "", "no request, no line — silence, not zero");
+  // Record a request, then work.
+  execFileSync("node", [cli, "--inject"], { cwd: dir, encoding: "utf8", input: JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: "add the thing" }) });
+  await new Promise((r) => setTimeout(r, 20));
+  fs.writeFileSync(path.join(dir, "specs/after.spec.md"), "- **A-01** — new\n");
+  fs.mkdirSync(path.join(dir, "composeApp/src/commonMain/kotlin/x"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "composeApp/src/commonMain/kotlin/x/New.kt"), "class New\n");
+  // Machinery writes must not count as work — or the pulse corroborates itself.
+  fs.writeFileSync(path.join(dir, "qa/.plan.json"), JSON.stringify({ title: "t", steps: [], updatedAt: new Date().toISOString() }));
+  const request = planLib.readRequest(dir);
+  const activity = planLib.observeActivity(dir, request.at);
+  assert.equal(activity.filesChanged, 2, "the two real writes, not the hour-old spec, not .plan.json");
+  assert.ok(activity.lastWriteAgoMs >= 0 && activity.lastWriteAgoMs < 5000);
+  assert.match(planLib.describeActivity(activity), /^2 files written since the request · last \d+s ago$/);
+  fs.rmSync(path.join(dir, "qa/.plan.json"), { force: true });
+  // The chain renders it as the OBSERVED tier — the machine's word, not the
+  // agent's — on every surface that derives the chain. (Not via a second
+  // --inject: a new prompt stamps a NEW request, and activity is per-request —
+  // which is exactly right, and exactly why this asserts on the derivation.)
+  const chain = planLib.deriveChain(dir);
+  assert.equal(chain.activity.filesChanged, 2);
+  assert.match(chain.busyText, /^2 files written since the request/);
+  assert.match(planLib.renderChain(chain), /observed: 2 files written since the request/, "the strip moves on what the agent did");
+  assert.match(lib.deriveWalks(dir).chain.busyText, /2 files written/, "and the walk's own derivation carries the same words");
+  fs.rmSync(before, { force: true });
+  fs.rmSync(path.join(dir, "specs/after.spec.md"), { force: true });
+});
+
+test("chain: activity — a tree that stopped moving is a STALL, named; the lane marker still wins while a lane runs", async () => {
+  const planLib = await import(pathToFileURL(path.join(dir, "qa/lib/plan.mjs")).href);
+  const stalled = { filesChanged: 3, lastWriteAgoMs: planLib.ACTIVITY_STALL_MS + 1000, since: new Date().toISOString() };
+  assert.match(planLib.describeActivity(stalled), /stalled — nothing written for/);
+  const lane = { step: "unitTests", index: 10, total: 16, stepStartedAt: new Date().toISOString() };
+  assert.match(planLib.describeBusy({ lane, render: false }, Date.now(), stalled), /^full check — unitTests/, "a running lane is the stronger observation");
+  assert.match(planLib.describeBusy({ lane: false, render: false }, Date.now(), stalled), /stalled/, "with nothing running, the stall is what is observed");
+});
+
 test("chain: the ephemeral files never enter the receipt's hashed input surface", async () => {
   const ih = await import(pathToFileURL(path.join(dir, "qa/lib/inputs-hash.mjs")).href);
   fs.rmSync(path.join(dir, "qa/.plan.json"), { force: true });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 9328d19b979a941b1bc5f2b2b790061f651c6b6042fea7e15d0e6c05cfc0af45
+// cmp:bundle-inputs 406ff3084d0626fe78f3efeaf2681b1f858db5d22fe8ece58b8eecf53faa8f12
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36958,6 +36958,7 @@ var LOADED_BUILD = loadedBuildId();
 var EX_RENEW = 75;
 var RENEW_DEBOUNCE_MS = 1500;
 var RENEW_QUIESCE_POLL_MS = 2e3;
+var ACTIVITY_BROADCAST_MS = 2e3;
 var RENEW_REJOIN_MS = 15e3;
 var RENEW_REJOIN_TRIES = 8;
 var RENEW_REJOIN_POLL_MS = 250;
@@ -38363,6 +38364,7 @@ function createPreviewService(opts) {
   let watchdogTimer = null;
   let cards = [];
   let capabilities = { governance: true, screens: true };
+  let activityBroadcastTimer = null;
   let viewport = null;
   const sseClients = /* @__PURE__ */ new Set();
   function touch(what) {
@@ -39080,6 +39082,8 @@ function createPreviewService(opts) {
       watcher = fs17.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
+        clearTimeout(activityBroadcastTimer);
+        activityBroadcastTimer = setTimeout(() => broadcast({ type: "governance" }), ACTIVITY_BROADCAST_MS);
         noteSourceChanged();
         noteSrcChange();
         if (mode === "daemon" && classesWatcher) {
