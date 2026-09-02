@@ -48,6 +48,22 @@ export function sourceFiles(root = PKG_ROOT) {
 }
 
 /**
+ * The directories `sourceFiles()` draws from — what a watcher must watch to
+ * observe this package's own code changing. Derived from the same walk, so a
+ * new source root can never be hashed but unwatched (studio-self-renewal R3).
+ * @returns {string[]} absolute directory paths, existing ones only
+ */
+export function sourceRoots(root = PKG_ROOT) {
+  return [path.join(root, "src"), path.join(root, "bin")].filter((d) => {
+    try {
+      return fs.statSync(d).isDirectory();
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
  * Hash of the sources AND the declared dependency versions AND the package
  * version. Dependencies are in the hash on purpose: a bundle built against a
  * different SDK version is a different artifact even when not one first-party

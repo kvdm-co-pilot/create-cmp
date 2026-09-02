@@ -36,7 +36,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { renderTreeSvg } from "./render.mjs";
 import { auditA11y } from "./a11y.mjs";
-import { buildStatus, loadedBuildId } from "./build-id.mjs";
+import { buildStatus, diskBuildId, loadedBuildId, runningFrom, sourceRoots } from "./build-id.mjs";
 import { proveChange } from "./prove.mjs";
 import { gradleEnv } from "./jdk.mjs";
 import { fetchLiveCatalog } from "./live.mjs";
@@ -96,6 +96,44 @@ const execFileAsync = promisify(execFile);
 // catch. Evaluated here (module scope) so it is pinned before any file on disk
 // can change under a long-running console.
 const LOADED_BUILD = loadedBuildId();
+
+// The worker's "respawn me" exit code (studio-self-renewal R2). EX_TEMPFAIL from
+// sysexits.h — an arbitrary number would do, but a borrowed convention says
+// "temporary, retry" to anything that reads exit codes. bin/console.mjs respawns
+// on THIS code and no other, so a crash can never turn into a restart loop.
+export const EX_RENEW = 75;
+// Long enough that a multi-file save (a formatter, a rebase, a branch switch)
+// settles into ONE renewal instead of a burst of them.
+const RENEW_DEBOUNCE_MS = 1500;
+const RENEW_QUIESCE_POLL_MS = 2000;
+// How long findLiveConsole will wait out a declared renewal before calling the
+// console gone. One node boot, with headroom — never a general retry budget.
+const RENEW_REJOIN_MS = 15_000;
+const RENEW_REJOIN_TRIES = 8;
+const RENEW_REJOIN_POLL_MS = 250;
+
+/**
+ * The renewal POLICY, as one pure decision (studio-self-renewal R3/R4) — kept
+ * out of the timers so it can be stated, read and tested as a rule rather than
+ * inferred from the order of callbacks.
+ *
+ *   "none"       nothing to adopt; we are already running the code on disk
+ *   "stand-down" an armed renewal whose reason went away (an undone edit, a
+ *                branch switched away and back) — renewing to the build we
+ *                already serve is a free outage and a cold daemon for nothing
+ *   "defer"      there is new code, but a render or a lane is mid-flight and
+ *                a renewal must never interrupt one
+ *   "renew"      new code, and nothing in flight
+ *
+ * @param {{diskId: string|null, loadedId: string|null, armed: boolean, blockedBy: string|null}} p
+ * @returns {"none"|"stand-down"|"defer"|"renew"}
+ */
+export function renewalDecision({ diskId, loadedId, armed, blockedBy }) {
+  // An unknown hash on either side is not evidence of change (refusal over
+  // fabrication — the same stance buildStatus takes with `stale: null`).
+  if (diskId === null || loadedId === null || diskId === loadedId) return armed ? "stand-down" : "none";
+  return blockedBy ? "defer" : "renew";
+}
 
 const DEFAULT_PORT = 9600;
 const DEFAULT_DAEMON_PORT = 9601;
@@ -216,12 +254,40 @@ export async function findLiveConsole(projectDir, { probe } = {}) {
   // console read as a dead one. The guard then let a second service start,
   // overwrite this record, and delete it on stop — observed 2026-07-28. A
   // liveness probe must cost the server nothing, or load defeats it.
-  const answers = probe
-    ? await probe(rec)
-    : await fetch(`http://127.0.0.1:${rec.port}/status`, { signal: AbortSignal.timeout(2000) })
-        .then((r) => r.ok)
-        .catch(() => false);
-  return answers ? rec : null;
+  const ask = () =>
+    probe
+      ? probe(rec)
+      : fetch(`http://127.0.0.1:${rec.port}/status`, { signal: AbortSignal.timeout(2000) })
+          .then((r) => r.ok)
+          .catch(() => false);
+  if (await ask()) return rec;
+  // A record marked `renewing` is a console that is COMING BACK on this same
+  // port (studio-self-renewal R2): the worker exited for its supervisor to
+  // respawn it, which takes one node boot. Reporting "no console" in that
+  // sub-second window is how a second console gets started against the same
+  // build directory — the 2026-07-28 failure the guard above exists to prevent.
+  // Bounded, and only ever entered when the record itself declares a renewal.
+  if (rec.renewing === true && Date.now() - Date.parse(rec.renewingAt ?? "") < RENEW_REJOIN_MS) {
+    for (let i = 0; i < RENEW_REJOIN_TRIES; i += 1) {
+      await new Promise((r) => setTimeout(r, RENEW_REJOIN_POLL_MS));
+      let fresh;
+      try {
+        fresh = JSON.parse(fs.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+      } catch {
+        continue;
+      }
+      // The respawned worker rewrites the record with its own pid; probe THAT.
+      if (fresh && typeof fresh.port === "number" && fresh.renewing !== true) {
+        const back = probe
+          ? await probe(fresh)
+          : await fetch(`http://127.0.0.1:${fresh.port}/status`, { signal: AbortSignal.timeout(2000) })
+              .then((r) => r.ok)
+              .catch(() => false);
+        if (back) return fresh;
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -296,14 +362,36 @@ export async function ensureConsole(projectDir, opts = {}) {
   }
 }
 
-function writeConsoleRegistry(projectDir, port) {
+// The record carries the console's own build handshake (studio-self-renewal R5)
+// so every consumer stays dumb: qa/lib/walk.mjs reads a boolean instead of
+// hashing the inspector's sources (impossible from a scaffolded app, where the
+// inspector is an npm package elsewhere) and instead of an HTTP call inside a
+// per-prompt hook. The console owns the fact; the record carries it.
+function writeConsoleRegistry(projectDir, port, extra = {}) {
   try {
     fs.writeFileSync(
       consoleRegistryPath(projectDir),
-      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path.resolve(projectDir), startedAt: new Date().toISOString() })}\n`,
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path.resolve(projectDir), startedAt: new Date().toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}\n`,
     );
   } catch {
     /* the guard is best-effort — never block a console from starting over bookkeeping */
+  }
+}
+
+/**
+ * Re-stamp OUR record's fields in place (same pid, same port) — used to publish
+ * `buildStale` the moment the worker observes it, so the fact is visible on the
+ * per-prompt inject and the statusline even while a renewal waits for quiescence
+ * (studio-self-renewal R4/R5). Never touches a record owned by another process.
+ */
+function updateConsoleRegistry(projectDir, patch) {
+  try {
+    const p = consoleRegistryPath(projectDir);
+    const rec = JSON.parse(fs.readFileSync(p, "utf8"));
+    if (!rec || rec.pid !== process.pid) return;
+    fs.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}\n`);
+  } catch {
+    /* bookkeeping only — never throw at a console over its own registry line */
   }
 }
 
@@ -1259,6 +1347,16 @@ export function galleryHtml(state) {
   es.onopen = () => { pill.textContent = "live"; pill.className = ""; };
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
+    // studio-self-renewal R6: this page was drawn by CMP_CONSOLE_BUILD; the hello
+    // says which build is serving it NOW. A difference means the console renewed
+    // itself under this tab (or was restarted by hand) — reload once and the
+    // human sees current code without having touched anything. Guarded on the
+    // constant existing so an older shell simply keeps the old behavior.
+    if (msg.type === "hello" && msg.build && typeof CMP_CONSOLE_BUILD === "string" && msg.build !== CMP_CONSOLE_BUILD) {
+      location.reload();
+      return;
+    }
+    if (msg.type === "renewing") { pill.textContent = "renewing…"; pill.className = "rendering"; }
     if (msg.type === "rendering") { pill.textContent = "rendering…"; pill.className = "rendering"; }
     // A concurrent Gradle build (an ad-hoc ./gradlew) holds the classes dir. Not a
     // failure — the render is queued and will run. Say exactly that; never the error pill.
@@ -2760,6 +2858,133 @@ export function createPreviewService(opts) {
     debounceTimer = setTimeout(() => void renderCycle(), delayMs);
   }
 
+  // ── Self-renewal ────────────────────────────────────────────────────────
+  // docs/features/studio-self-renewal.md. The console detects its own staleness
+  // in three places and, before this, every one of them ended in the same
+  // sentence — "restart it" — a verb only the human held, and only by
+  // interrupting the work they were trying to watch. The verb belongs to the
+  // process that owns the fact (R1): the worker observes its own sources, waits
+  // for a moment when nothing is in flight, and exits EX_RENEW for the
+  // supervisor in bin/console.mjs to respawn with a fresh module graph.
+  //
+  // SOURCE MODE ONLY (R3). A scaffolded app runs the committed bundle, whose
+  // sources cannot change under it — hashing on every save there would be cost
+  // with no finding available.
+  let serviceApi = null;
+  let selfWatchers = [];
+  let renewTimer = null;
+  let renewQuiesceTimer = null;
+  let renewArmed = false;
+
+  /** What a renewal would interrupt right now, or null when nothing would (R4). */
+  function renewalBlockedBy() {
+    if (rendering || renderScheduled) return "a render is in flight";
+    if (laneInProgress(projectDir)) return "a verify lane is running";
+    if (daemonBootDeadline && Date.now() < daemonBootDeadline) return "the render daemon is booting";
+    return null;
+  }
+
+  function attemptRenewal() {
+    const blocked = renewalBlockedBy();
+    const decision = renewalDecision({
+      diskId: diskBuildId(),
+      loadedId: LOADED_BUILD.id,
+      armed: renewArmed,
+      blockedBy: blocked,
+    });
+    if (decision === "none") return;
+    if (decision === "stand-down") {
+      renewArmed = false;
+      clearTimeout(renewQuiesceTimer);
+      updateConsoleRegistry(projectDir, { buildStale: false });
+      log("own sources returned to the build already running — renewal stood down");
+      return;
+    }
+    if (decision === "defer") {
+      // Deferred, never dropped: re-check on a timer. The registry already
+      // carries buildStale, so a deferred renewal stays VISIBLE on the inject
+      // and the statusline — which is exactly when the human needs to know.
+      log(`own sources changed; renewal deferred — ${blocked}`);
+      clearTimeout(renewQuiesceTimer);
+      renewQuiesceTimer = setTimeout(attemptRenewal, RENEW_QUIESCE_POLL_MS);
+      return;
+    }
+    log(`own sources changed — renewing; the supervisor respawns this worker with the new code`);
+    try {
+      broadcast({ type: "renewing" });
+    } catch {
+      /* the page learns either way: its EventSource reconnects and the hello's
+         build id differs, which triggers the same reload (R6) */
+    }
+    // The service's own teardown, not a second copy of it: closes the server,
+    // clears the registry and the render marker, and shuts the Gradle daemon
+    // down rather than orphaning it.
+    const handoffPort = port;
+    try {
+      if (serviceApi) serviceApi.stop();
+    } catch {
+      /* a teardown that throws must not become a console that never comes back */
+    }
+    // stop() released the record. Leave a HANDOFF in its place, owned by the
+    // supervisor's pid (our parent — it outlives this process by design), so a
+    // `preview` call landing in the respawn window waits for the console coming
+    // back instead of starting a second one against the same build directory.
+    try {
+      fs.writeFileSync(
+        consoleRegistryPath(projectDir),
+        `${JSON.stringify({
+          pid: process.ppid,
+          port: handoffPort,
+          url: `http://127.0.0.1:${handoffPort}/`,
+          projectDir: path.resolve(projectDir),
+          startedAt: new Date().toISOString(),
+          renewing: true,
+          renewingAt: new Date().toISOString(),
+          buildStale: true,
+        })}\n`,
+      );
+    } catch {
+      /* the handoff is an optimization; without it the window is simply visible */
+    }
+    process.exit(EX_RENEW);
+  }
+
+  function onSelfSourceChange() {
+    clearTimeout(renewTimer);
+    renewTimer = setTimeout(() => {
+      // Recompute rather than trust the event. Editors save atomically and
+      // touch files whose CONTENT is unchanged; a renewal with nothing to adopt
+      // is a free outage and a cold daemon for no reason.
+      // Arm only when there is genuinely new code to adopt: editors save
+      // atomically and touch files whose CONTENT is unchanged, and a renewal
+      // with nothing to adopt is a free outage. renewalDecision owns the rest,
+      // including standing an armed renewal down when an edit is undone.
+      if (renewalDecision({ diskId: diskBuildId(), loadedId: LOADED_BUILD.id, armed: renewArmed, blockedBy: null }) === "renew" && !renewArmed) {
+        renewArmed = true;
+        updateConsoleRegistry(projectDir, { buildStale: true });
+      }
+      attemptRenewal();
+    }, RENEW_DEBOUNCE_MS);
+  }
+
+  function watchSelfSources() {
+    if (runningFrom().mode !== "source") return; // R3 — a bundle cannot go stale under itself
+    for (const dir of sourceRoots()) {
+      try {
+        selfWatchers.push(
+          fs.watch(dir, { recursive: true }, (_event, filename) => {
+            if (filename && !String(filename).endsWith(".mjs")) return; // the hash covers .mjs only
+            onSelfSourceChange();
+          }),
+        );
+      } catch {
+        /* a watch we cannot open is a renewal we do not get — never fatal, and
+           the stale banner still tells the human what happened */
+      }
+    }
+    if (selfWatchers.length) log(`watching own sources for renewal (${selfWatchers.length} root(s), source mode)`);
+  }
+
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
 
   function startWatching() {
@@ -3072,7 +3297,11 @@ export function createPreviewService(opts) {
           "cache-control": "no-cache",
           connection: "keep-alive",
         });
-        res.write(`data: ${JSON.stringify({ type: "hello", version })}\n\n`);
+        // The hello carries the build the SERVER is running; the page carries the
+        // build it was DRAWN by (CMP_CONSOLE_BUILD). A difference means this page
+        // predates a renewal — the client reloads itself once (R6). EventSource
+        // reconnects on its own, so this costs the human nothing to trigger.
+        res.write(`data: ${JSON.stringify({ type: "hello", version, build: LOADED_BUILD.id })}\n\n`);
         sseClients.add(res);
         req.on("close", () => sseClients.delete(res));
         return;
@@ -3510,7 +3739,9 @@ export function createPreviewService(opts) {
     };
   }
 
-  return {
+  // Named so self-renewal can call the service's own teardown before it exits
+  // for the supervisor (studio-self-renewal R4) — one teardown path, not two.
+  const api = {
     /** Initial render (unless fresh previews already exist), then serve + watch. */
     async start() {
       if (!fs.existsSync(path.join(projectDir, "composeApp"))) {
@@ -3547,6 +3778,7 @@ export function createPreviewService(opts) {
       writeConsoleRegistry(projectDir, port);
       startWatching();
       watchGovernance();
+      watchSelfSources();
       void renderCycle();
       if (hot) void ensureDaemon();
       return status();
@@ -3563,6 +3795,10 @@ export function createPreviewService(opts) {
       clearTimeout(governanceTimer);
       for (const w of governanceWatchers) w.close();
       governanceWatchers = [];
+      clearTimeout(renewTimer);
+      clearTimeout(renewQuiesceTimer);
+      for (const w of selfWatchers) w.close();
+      selfWatchers = [];
       // Best-effort daemon teardown: ask the JVM to exit, then kill the gradle client.
       fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {});
       if (daemonChild) daemonChild.kill("SIGTERM");
@@ -3607,4 +3843,6 @@ export function createPreviewService(opts) {
     /** Test seam: simulate a source-change event (swap-pending + watchdog arming). */
     _noteSrcChange: noteSrcChange,
   };
+  serviceApi = api;
+  return api;
 }

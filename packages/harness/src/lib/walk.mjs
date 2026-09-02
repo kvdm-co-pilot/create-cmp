@@ -251,10 +251,17 @@ export function humanDuration(ms) {
  * record the console itself writes — a CROSS-PACKAGE CONTRACT with the
  * inspector's preview-service.mjs (consoleRegistryPath): sha1(resolved
  * root).slice(0,12), `cmp-console-<key>.json` in os.tmpdir(), fields
- * {pid, port, url}. pid-liveness only, no HTTP — this runs inside a
+ * {pid, port, url, buildStale}. pid-liveness only, no HTTP — this runs inside a
  * statusline with a <300ms budget.
- * @returns {{url: string} | {stale: true} | null} null = no record at all
- *   (never started, or stopped cleanly — silence, not an alarm)
+ *
+ * `buildStale` is the console's OWN verdict on itself (studio-self-renewal R5):
+ * a console serving code that is no longer the code on disk. It is carried on
+ * the record rather than recomputed here on purpose — the harness cannot hash
+ * the inspector's sources (in a scaffolded app the inspector is an npm package
+ * elsewhere), and a per-prompt hook must not make an HTTP call. The process
+ * that owns the fact publishes it; every consumer stays dumb.
+ * @returns {{url: string, buildStale: boolean} | {stale: true} | null} null = no
+ *   record at all (never started, or stopped cleanly — silence, not an alarm)
  */
 export function consoleState(root) {
   try {
@@ -266,7 +273,10 @@ export function consoleState(root) {
     } catch (err) {
       if (!(err && err.code === "EPERM")) return { stale: true }; // record left by a crashed console
     }
-    return { url: typeof rec.url === "string" ? rec.url : `http://127.0.0.1:${rec.port}/` };
+    return {
+      url: typeof rec.url === "string" ? rec.url : `http://127.0.0.1:${rec.port}/`,
+      buildStale: rec.buildStale === true,
+    };
   } catch {
     return null;
   }
@@ -376,7 +386,7 @@ export function renderStatusline({ available, walks, arrivals, console: consoleR
   // L6: the always-visible surface reports the other surface's death. A stale
   // record means the console CRASHED (a clean stop removes it) — the failure
   // mode was silence, and silence is the one thing this line never does.
-  const down = consoleRec && consoleRec.stale ? " · console down" : "";
+  const down = consoleRec && consoleRec.stale ? " · console down" : consoleRec && consoleRec.buildStale ? " · console stale" : "";
   if (w.you.turn === "you") return `■ YOUR TURN — ${w.name}: ${w.you.act}${extra}${arrived}${down}`;
   const now =
     w.currentStage === "build" && w.promises.total > 0
@@ -426,6 +436,12 @@ export function renderCard(w, ctx = {}) {
  * standing instruction, not a discovery).
  */
 function studioLine(consoleRec) {
+  // Order matters: a console that is UP but drawing from old code is not
+  // healthy, and reporting it as "running" is the clean bill of health that
+  // let this go unnoticed for a whole session. It heals itself (the worker
+  // renews on quiescence), so say what is true and why it may be waiting.
+  if (consoleRec && consoleRec.url && consoleRec.buildStale)
+    return `[studio: running at ${consoleRec.url} but STALE — it is serving code older than the tree, and everything it shows was drawn by that older code. It renews itself once no render or lane is in flight; if it stays stale, say so rather than citing what it shows.]`;
   if (consoleRec && consoleRec.url) return `[studio: running at ${consoleRec.url}]`;
   if (consoleRec && consoleRec.stale)
     return "[studio: DOWN — it crashed (stale registry record). Restore it now: call the cmp-inspector `preview { projectDir }` tool (it starts a detached resident console), or tell the human it is down. Do not proceed silently.]";
