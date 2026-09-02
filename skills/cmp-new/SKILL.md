@@ -82,7 +82,16 @@ If CMP is chosen (or was explicitly requested), continue to the interview.
 
 ## 1. Interview
 
-One compact round of questions; don't interrogate. Accept sensible defaults (in brackets).
+**Grill the idea first** (`grill-me` — the plugin skill; its rule holds without it). Before
+this config round, settle the load-bearing questions about the *app*: who it is for, what
+day one must do, what it deliberately will not do, what breaks the design if the answer is
+wrong. Ask them as the frontier of unsettled decisions — a numbered list, at most five per
+round, each with why it matters and a recommended answer — and wait. Stop when no remaining
+answer would change the scaffold or the intent brief. The table below is NOT grill material:
+every row has a default. The grill's answers are what §4 writes into `specs/intent.md`.
+
+Then: one compact round of config questions; don't interrogate. Accept sensible defaults
+(in brackets).
 
 | Option | Question | Default |
 |---|---|---|

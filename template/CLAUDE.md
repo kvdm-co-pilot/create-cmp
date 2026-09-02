@@ -198,6 +198,20 @@ understood the change to be, which lane it takes, and why, before any tool runs.
 can overrule the lane in a word; a silent route is a routing error even when the lane was
 right.
 
+**Grill before the brief** (the `grill-me` plugin skill; the rule holds without the plugin):
+on the brief lane, after the triage restatement and before a word of the brief is drafted,
+settle the load-bearing questions. Read what the repo already answers first — a signed brief
+or spec is a CLOSED decision: cite it, never re-ask it. Then ask the frontier of unsettled
+decisions as a numbered list, at most five per round, each with why it matters and a
+recommended answer — and WAIT for the answers before anything else. Stop when no remaining
+question would change the work; three rounds is the ceiling (more means the request needs
+splitting). Answers land in the brief — settled calls become **Decisions** with their why,
+the human's own calls the **Open decisions** section; the brief's signature closes them. The
+direct lane is not grilled (one inline question at most, only when the restatement cannot
+be made unambiguous); a bug fix or an emergency fix, never. While the grill is open, the
+chain's first step reads `settle the open questions` (declare it before the first round;
+re-declare when the answers reshape the steps).
+
 **Brief lane** — when the change carries **decisions a future contributor could plausibly
 "simplify" away** ("the day boundary is configurable, default 04:00 — not midnight") OR
 **blast radius into other governed artifacts**. After naming the lane:

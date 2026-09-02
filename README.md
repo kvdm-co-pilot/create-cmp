@@ -13,7 +13,7 @@ renders, and blocked from "done" without proof.
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
-[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#the-claude-code-plugin-10-skills)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#the-claude-code-plugin-11-skills)
 
 </div>
 
@@ -28,7 +28,7 @@ on failure — and it **builds the app to prove it's green** before reporting su
 Agent-readable: [llms.txt](./llms.txt) · [AGENTS.md](./AGENTS.md) · [options.schema.json](./options.schema.json).
 
 **Claude Code users:** `/plugin marketplace add kvdm-co-pilot/create-cmp` →
-`/plugin install create-cmp` — [10 skills + the cmp-inspector MCP server](#the-claude-code-plugin-10-skills).
+`/plugin install create-cmp` — [11 skills + the cmp-inspector MCP server](#the-claude-code-plugin-11-skills).
 
 ## What is this, in plain words
 
@@ -91,7 +91,7 @@ clobbered). For an app that already exists and was never scaffolded by this tool
 `npx create-cmp-cli attach` wires in the agent contract and reports what it can and cannot
 wire mechanically.
 
-## The Claude Code plugin (10 skills)
+## The Claude Code plugin (11 skills)
 
 Install with `/plugin marketplace add kvdm-co-pilot/create-cmp` then `/plugin install create-cmp`.
 

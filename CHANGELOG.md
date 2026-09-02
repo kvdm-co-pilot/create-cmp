@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`grill-me` skill + the grill step in the workflow** — the decide step's opening act
+  (`docs/features/grill-me.md`). Before the intent interview at genesis and before the brief on
+  every brief-lane request, the agent reads what the repo already answers (signed briefs and
+  specs are closed — cited, never re-asked), then asks the frontier of unsettled decisions in
+  numbered rounds of ≤5, each with why it matters and a recommended answer, and waits; it stops
+  when no answer would change the work. No new artifact: settled answers become the brief's
+  Decisions with their why, the human's own calls its Open decisions, and the signature closes
+  them. Never grills the direct lane, a bug fix, or a spike. Stated on every entry surface —
+  `CHANGE-FLOW-DESIGN.md` §3, `GENESIS-FLOW-DESIGN.md` step 0, the generated `CLAUDE.md`,
+  `cmp-new` §1 — and pinned to agreement by `test/grill-me.test.mjs`. The plugin now ships
+  11 skills.
+
 ## [0.18.0] - 2026-08-27
 
 ### Added

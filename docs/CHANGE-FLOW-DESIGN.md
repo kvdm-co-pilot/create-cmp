@@ -132,7 +132,21 @@ plain sentences, names the lane, and says why, before any tool runs. The human
 can overrule in a word; a silent route is a routing error even when the lane
 was right. This rule is carried operationally by the generated project's
 `CLAUDE.md` (§"After genesis") and by each stamper skill's step 0, so every
-surface an agent enters through says it. The rule:
+surface an agent enters through says it.
+
+**Then the load-bearing questions are settled before anything is drafted** — the
+`grill-me` skill, [docs/features/grill-me.md](./features/grill-me.md) (Karel,
+2026-09-02). On the genesis walk and every brief-lane entry, after the triage
+restatement and before the brief, the agent reads what the tree already answers
+(a signed brief or spec is a *closed* decision — cited, never re-asked), then
+asks the **frontier** — the unsettled decisions whose prerequisites are settled
+— in numbered rounds of at most five, each question carrying why it matters and
+a recommended answer, and waits. It stops when no remaining question would
+change the work. The grill owns no artifact and signs nothing: settled answers
+become the brief's **Decisions** with their why, the human's own calls its
+**Open decisions**, and the brief's signature closes them. The direct lane is
+never grilled (one inline question at most, only when the restatement cannot be
+made unambiguous); a bug fix, an emergency fix, or a spike, never. The rule:
 
 > **Brief lane** iff the change carries *decisions a future contributor could
 > plausibly unmake* OR *blast radius into contracts already signed*.
@@ -155,6 +169,9 @@ surface an agent enters through says it. The rule:
 
 Rules that keep the router honest:
 
+- **A question the tree already answers is a routing error.** Signed briefs and
+  specs are closed decisions — the grill cites them, never re-asks them
+  (`grill-me` §1). Reopening one is a *named* proposal, not a fresh question.
 - **Legacy features never get retro-briefs.** Governance is not archaeology.
 - **A spike needs nothing.** The moment it becomes real, it enters through
   the row it belongs to.
