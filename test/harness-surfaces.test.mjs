@@ -383,6 +383,26 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
     // but "run the lane" is the wrong instruction when one is already running,
     // and it fired ~8 times in one observed session. The refusal stays; the
     // instruction changes.
+    await t.test("receipt-check REFUSES a nightly-stage receipt — it proves the harness, never this change", () => {
+      const receiptPath = path.join(out, "qa/evidence/latest.json");
+      try {
+        fs.writeFileSync(
+          receiptPath,
+          JSON.stringify({ schema: "cmp-evidence/1", profile: "nightly", stage: "nightly", mode: "full", verdict: "PASS", inputs: { hash: "a".repeat(64) }, steps: [{ name: "build", verdict: "PASS", durationMs: 60_000 }] }),
+        );
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("a nightly receipt must not end a session as done");
+        } catch (err) {
+          assert.equal(err.status, 2);
+          assert.match(String(err.stderr), /nightly stage/, "refused by name");
+          assert.match(String(err.stderr), /proves the harness, not this change/);
+        }
+      } finally {
+        fs.rmSync(receiptPath, { force: true });
+      }
+    });
+
     await t.test("receipt-check with a lane IN FLIGHT still refuses, but says WAIT — never 'run the lane' at a running lane", () => {
       const receiptPath = path.join(out, "qa/evidence/latest.json");
       const markerPath = path.join(out, "composeApp/build/.cmp-lane-in-progress");
