@@ -89,6 +89,16 @@ function evaluate() {
       profile: receipt.profile,
     };
   }
+  // A nightly receipt proves the HARNESS and the tree's invariants under a
+  // forced double-run — never a change. Refused as done-evidence for the same
+  // reason --fast is: the receipt's own stage says what it is allowed to mean.
+  if (receipt.stage === "nightly" || receipt.profile === "nightly") {
+    return {
+      valid: false,
+      reason: "the last verify run was the nightly stage (it proves the harness, not this change); run the change-stage lane (`node qa/verify.mjs`) before finishing",
+      profile: receipt.profile,
+    };
+  }
   const result = evaluateReceipt(receipt, () => computeInputsHash(ROOT));
   // Surface the receipt's evidence rung (the ladder — qa/lib/evidence-level.mjs)
   // alongside the verdict: the rung is the receipt's own derived field, read

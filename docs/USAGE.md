@@ -169,7 +169,10 @@ never a fixed number. Bare `node qa/verify.mjs` (no `--profile`) defaults to `lo
 | `scaffold` | 9 | What `create-cmp --verify` proves at stamp time: harness integrity, specCoverage, approvals, componentStories, reachability, archDoc, schemaHistory, build, unitTests. |
 | `local` | 16 | The full JVM tier (conformance, goldenTrees, tokenDrift, a11y), the release-build compile check, `androidChecks`, and (device attached) `e2eSmoke` — device-dependent steps SKIP honestly with no device. |
 | `ci` | 17 | `local` plus the determinism probe's row (the probe itself stays opt-in behind `--determinism`; the row records whether it ran, so a SKIP is visible rather than absent). |
+| `nightly` | 17 | `ci` with the determinism probe **forced on** (it doubles the JVM test tier — the budget a scheduled run has and a per-change run does not). Proves the harness and the tree's invariants, never a change: its receipt carries `stage: "nightly"` and is refused as done-evidence by `qa/receipt-check.mjs`. The stage where any future suite-scaled proof (mutation, load, chaos) lands. |
 | `release` | 19 | `ci` plus the audit-cadence report and the release-APK behavior smoke (`releaseSmoke`) — the ship-time profile, run before cutting a release, never per-change. |
+
+Every receipt names its **stage** — `scaffold` / `change` (local) / `merge` (ci) / `nightly` / `release` — so an evidence rung can never be read as more than its stage allows.
 
 `--fast` runs the resolved profile minus the device/release-gated steps — the inner loop
 `qa/watch.mjs` re-runs on every save. Every run produces one typed `PASS`/`FAIL`/`SKIP`

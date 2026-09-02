@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The verify lane — this project's single verification gate.
 //
-//   node qa/verify.mjs [--profile scaffold|local|ci|release] [--fast] [--json]
+//   node qa/verify.mjs [--profile scaffold|local|ci|nightly|release] [--fast] [--json]
 //
 // Runs every verification step this project carries, aggregates a typed
 // PASS/FAIL verdict, and writes the evidence receipt to qa/evidence/latest.json.
@@ -60,7 +60,7 @@ const ARTIFACTS_DIR = path.join(ROOT, "qa-artifacts");
 // killed). Same refusal-over-fabrication stance as qa/approve.mjs, which
 // refuses an unknown artifact by name rather than guessing: an unknown
 // argument here is refused by name, not swallowed into "run everything".
-const USAGE = `node qa/verify.mjs [--profile scaffold|local|ci|release] [--fast] [--json] [--help]
+const USAGE = `node qa/verify.mjs [--profile scaffold|local|ci|nightly|release] [--fast] [--json] [--help]
 
 The verify lane — this project's single verification gate. Runs every
 verification step this project carries, aggregates a typed PASS/FAIL
@@ -68,7 +68,7 @@ verdict, and writes the evidence receipt to qa/evidence/latest.json (commit
 it with your change — see CLAUDE.md). Exit code: 0 = PASS, 1 = FAIL.
 
 Flags:
-  --profile <scaffold|local|ci|release>
+  --profile <scaffold|local|ci|nightly|release>
                                  which step set to run (default: local)
   --fast                         INNER LOOP ONLY — run the resolved profile
                                   minus the device/release tier (releaseBuild,
@@ -115,6 +115,10 @@ Profiles:
   local     everything; device-dependent steps SKIP when no device is
             attached
   ci        everything; SKIPs are recorded so the pipeline stays honest
+  nightly   everything ci proves with the determinism probe FORCED ON (it doubles
+            the JVM test tier — the budget a scheduled run has and a per-change run
+            does not). Proves the HARNESS, not a change: its receipt is refused as
+            done-evidence by qa/receipt-check.mjs. Schedule it; never wait on it.
   release   everything ci proves PLUS the release-APK smoke (releaseSmoke) —
             the ship-time profile; run it before cutting a release, never
             per-change
@@ -164,7 +168,9 @@ const mode = fast ? "fast" : "full";
 //    lane row; asking for it in local/scaffold is refused with the two ways
 //    that DO work, instead of silently running a step the requested profile
 //    does not own.
-const determinism = args.includes("--determinism");
+// evidence-economics S6: the nightly stage carries the probe unconditionally —
+// a scheduled run is exactly where a deliberate double-run belongs.
+const determinism = args.includes("--determinism") || profile === "nightly";
 const profileExplicit = args.includes("--profile");
 if (determinism && fast) {
   console.error(
@@ -1480,9 +1486,18 @@ stepsForProfile.ci = [...stepsForProfile.local, stepDeterminism];
 // releaseSmoke runs last so the device ends the run holding the exact build
 // that was proven.
 stepsForProfile.release = [...stepsForProfile.ci, stepAuditCadence, stepReleaseSmoke];
+// nightly (evidence-economics S6 / proposal P4): the stage for proofs whose cost
+// scales with the SUITE rather than with the change — the determinism probe
+// today (forced on above; `--determinism` is implied), and the place any
+// future mutation / load / chaos step lands, so the placement decision is made
+// once instead of per expensive step. It proves the harness and the tree's
+// invariants, not a change: qa/receipt-check.mjs refuses its receipt as
+// done-evidence, exactly as it refuses --fast. Same step set as ci on purpose —
+// what differs is what is forced, and what the receipt is allowed to mean.
+stepsForProfile.nightly = [...stepsForProfile.ci];
 
 if (!stepsForProfile[profile]) {
-  console.error(`Unknown profile "${profile}" — use scaffold | local | ci | release.`);
+  console.error(`Unknown profile "${profile}" — use scaffold | local | ci | nightly | release.`);
   process.exit(2);
 }
 
@@ -1746,9 +1761,16 @@ const inputs = computeInputsHash(ROOT);
 // The receipt. Deterministic key order; ONE volatile timestamp field.
 // commit.sha is the parent HEAD at run time (you cannot know the sha of the
 // commit the receipt will be part of); commit.dirty lists what was uncommitted.
+// The STAGE a receipt attests (evidence-economics S6): what "done" means at
+// this gate, named on the receipt so an evidence rung can never be read as
+// more than its stage allows. scaffold → scaffold, local → change (per commit),
+// ci → merge, nightly → nightly (proves the harness, never a change), release →
+// release. Receipts predating this field are read as their profile's stage.
+const STAGE_OF_PROFILE = { scaffold: "scaffold", local: "change", ci: "merge", nightly: "nightly", release: "release" };
 const receipt = {
   schema: "cmp-evidence/1",
   profile,
+  stage: STAGE_OF_PROFILE[profile] ?? profile,
   // "full" is the done-gate; "fast" (--fast) excluded the device/release tier
   // and is REFUSED by qa/receipt-check.mjs — a fast run can never end a session
   // as "done". Receipts predating this field are treated as full.

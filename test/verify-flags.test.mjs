@@ -88,3 +88,12 @@ test("the lane: every step runs under a deadline, a throw or timeout is one ERRO
   assert.match(verifySrc, /s\.verdict === "FAIL" \|\| s\.verdict === "ERROR"\) \? "FAIL" : "PASS"/, "ERROR fails the lane");
   assert.match(verifySrc, /result\.verdict === "ERROR" \? "⊘"/, "and wears its own mark");
 });
+
+// S6 — the nightly stage, and the receipt naming what it attests.
+test("nightly: a profile that forces the determinism probe and names its stage on the receipt", () => {
+  assert.match(verifySrc, /stepsForProfile\.nightly = \[\.\.\.stepsForProfile\.ci\]/, "same steps as ci — what differs is what is forced and what the receipt may mean");
+  assert.match(verifySrc, /const determinism = args\.includes\("--determinism"\) \|\| profile === "nightly"/, "the probe is not opt-in at nightly");
+  assert.match(verifySrc, /stage: STAGE_OF_PROFILE\[profile\] \?\? profile/, "every receipt names its stage");
+  assert.match(verifySrc, /local: "change", ci: "merge", nightly: "nightly", release: "release"/, "the mapping is stated once");
+  assert.match(verifySrc, /use scaffold \| local \| ci \| nightly \| release/, "and the profile vocabulary admits it");
+});

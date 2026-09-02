@@ -32,8 +32,8 @@ The disease being cured is **capability outrunning proof**. Therefore:
 | S3 | Agent-stage pulse (observed activity between prompt and lane) | C4 | create-cmp | this | **landed** |
 | S4 | `ERROR` verdict + per-step deadlines | C3 C4 | create-cmp | this | **landed** |
 | S5 | Reopen walks back only what it amends; `touches` stay hash-enforced | C5 | create-cmp | this | **landed** |
-| S6 | `nightly` stage + receipt names its stage | C1 | create-cmp | this | in progress |
-| S7 | Sync path: showcase + blueprint receive S1–S6 | C6 | all three | this, then each | queued |
+| S6 | `nightly` stage + receipt names its stage | C1 | create-cmp | this | **landed** (no-cache audit deferred to P1) |
+| S7 | Sync path: showcase + blueprint receive S1–S6 | C6 | all three | this, then each | in progress |
 | S8 | Spine / step-pack / surface split | C6 | create-cmp | later | not started |
 | S9 | Per-step input hashes (P1) | C1 C5 | create-cmp | later, **conditional** | not started |
 
@@ -233,3 +233,11 @@ S6. Neither starts until S1–S7 are landed and proven.
   and, per touch, "re-signature demanded only if it changes; the hash enforces that". Planted:
   a real byte edit to a touched component flips it to `changed-since-approval` with no reopen
   verb anywhere. Twelve-for-zero becomes two-for-two. Tests in governance-journal.
+
+- 2026-09-02 — **S6 in progress, scope stated honestly.** `--profile nightly` = ci with the
+  determinism probe forced on; the receipt carries `stage` (scaffold / change / merge / nightly
+  / release) and the Stop hook refuses a nightly receipt as done-evidence exactly as it refuses
+  `--fast`. The "no-cache audit that must agree with the composed receipt" is NOT built here:
+  it is P1's mitigation, and without per-step hashes there is no composed receipt to audit
+  against. It lands with P1 if P1 lands. In create-cmp's own lane the suite-scaled step is the
+  determinism probe; in payment-blueprint it is mutation — S0 is the same decision there.
