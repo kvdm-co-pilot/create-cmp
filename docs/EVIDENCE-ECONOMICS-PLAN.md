@@ -28,8 +28,8 @@ The disease being cured is **capability outrunning proof**. Therefore:
 |---|---|---|---|---|---|
 | S0 | Mutation out of the per-change lane | C1 | payment-blueprint | blueprint | **AWAITING KAREL'S YES** — the other session has the five-line change ready |
 | S1 | Prove the uncommitted P2/P3 batch | C2 C3 C4 | create-cmp | this | **landed** (see Log) |
-| S2 | Console opens without `composeApp/` | C6 | create-cmp | this | in progress |
-| S3 | Agent-stage pulse (observed activity between prompt and lane) | C4 | create-cmp | this | queued |
+| S2 | Console opens without `composeApp/` | C6 | create-cmp | this | **landed** — proven live on payment-blueprint |
+| S3 | Agent-stage pulse (observed activity between prompt and lane) | C4 | create-cmp | this | in progress |
 | S4 | `ERROR` verdict + per-step deadlines | C3 C4 | create-cmp | this | queued |
 | S5 | Reopen diffs, re-signs only what drifted | C5 | create-cmp | this | queued |
 | S6 | `nightly` stage + receipt names its stage | C1 | create-cmp | this | queued |
@@ -184,3 +184,15 @@ S6. Neither starts until S1–S7 are landed and proven.
   marker), verify-flags (cheap tier before `releaseBuild`). Two extractions made the untestable
   testable: `lib/step-outcomes.mjs` (`androidChecksOutcome`) and `neverRunTiers` in
   `lib/flight-recorder.mjs`. S2 next.
+- 2026-09-02 — **S2 landed.** `detectCapabilities(projectDir)` → `{governance, screens}`;
+  `start()` refuses only when BOTH are absent; without composeApp/ the src watcher, classes
+  watcher, render cycle and daemon are never started, Screens and Live device are absent from
+  the rail and the page, one rail line says "governance only · no Compose app", `/status`
+  carries `capabilities`. The governance watch's `mkdir` is gated on `screens` so the console
+  can never manufacture a composeApp/ inside a backend repo. **Proven live:** started against
+  the real `/Users/test/dev/payment-blueprint` — `{"governance":true,"screens":false}`, eleven
+  sections served, no composeApp/ created. Tests: `inspector/mcp/test/console-capabilities.test.mjs`
+  (governance-only, CMP unchanged, planted refusal on neither). **Blueprint session: the
+  console now opens there** — `node <create-cmp>/inspector/mcp/bin/console.mjs
+  /Users/test/dev/payment-blueprint`. Walks and the chain need its hand-built lane to carry
+  `walk.mjs`/`plan.mjs` (S7).

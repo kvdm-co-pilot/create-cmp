@@ -461,6 +461,33 @@ export function resolveAppName(projectDir) {
   return path.basename(projectDir);
 }
 
+/**
+ * What this project can show (evidence-economics S2). The console used to
+ * refuse any project without composeApp/ — but Drive, walks, approvals,
+ * evidence, comments, the chain and the retrospective derive from qa/ alone.
+ * Only Screens, preview, live device and token drift need a Compose app.
+ * payment-blueprint ran a fifteen-phase programme under the full governance
+ * stack with no window at all, because its window was welded to the pixels.
+ *
+ *   governance — qa/ exists: the human's window is available
+ *   screens    — composeApp/ exists: the render pipeline can run
+ *
+ * Neither → the project is not something this console can serve, and start()
+ * says so. Pure; the same answer the page and /status carry.
+ * @param {string} projectDir
+ * @returns {{governance: boolean, screens: boolean}}
+ */
+export function detectCapabilities(projectDir) {
+  const has = (rel) => {
+    try {
+      return fs.statSync(path.join(projectDir, rel)).isDirectory();
+    } catch {
+      return false;
+    }
+  };
+  return { governance: has("qa"), screens: has("composeApp") };
+}
+
 /** True while a verify lane holds the project (fresh marker file present). */
 export function laneInProgress(projectDir, { now = Date.now } = {}) {
   try {
@@ -687,6 +714,10 @@ export function galleryHtml(state) {
     // stale banner and no build id: unknown freshness is never dressed up as
     // fresh, nor as a warning.
     build = null,
+    // What this project can show (detectCapabilities). Older callers get the
+    // full console; a governance-only project drops the sections that need
+    // pixels and says so on the rail.
+    capabilities = { governance: true, screens: true },
   } = state;
   const width = viewport?.width ?? 411;
   // §3.3: component stories render through the same pipeline but are not
@@ -1773,9 +1804,22 @@ export function galleryHtml(state) {
   }
 `;
 
+  // Sections that need the render pipeline are absent — not empty, not
+  // greyed — when there is no Compose app to render. Everything else derives
+  // from qa/ and stays. One quiet rail line says what is absent and why, so the
+  // reader never wonders whether Screens failed to load.
+  const railFootPlain = `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`;
+  const NEEDS_SCREENS = new Set(["screens", "live-device"]);
+  const visibleRail = capabilities.screens ? railItems : railItems.filter((r) => !NEEDS_SCREENS.has(r.id));
+  const visibleSections = capabilities.screens ? sections : sections.filter((s) => !NEEDS_SCREENS.has(s.id));
+  const capabilityNote = capabilities.screens
+    ? ""
+    : `<p class="rail-sub rail-capability" title="This project has no composeApp/. The governance window is complete; screens, preview and the live device need a Compose app.">governance only &middot; no Compose app</p>`;
+
   return renderShellPage({
     appName,
-    railItems,
+    railItems: visibleRail,
+    railFootHtml: `${capabilityNote}${railFootPlain}`,
     // The governance strip (07-28 audit, fix 5): counts + the one next human
     // act + recent history, rail-resident so it is visible on EVERY tab. Its
     // queue is the SAME deriveHumanQueue the guided prompt uses — one
@@ -1788,8 +1832,7 @@ export function galleryHtml(state) {
     // the same .tab-btn/data-tab wiring the nav items use (showTab picks it
     // up with no new JS mechanism), styled back to a quiet meta line by the
     // shell's .rail-foot .tab-btn rules.
-    railFootHtml: `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`,
-    sections,
+    sections: visibleSections,
     error,
     // FI-9 Change B: the renderer's OWN health banner, additive to `error`
     // above (which already covers "last render/compile/reload FAILED" as a
@@ -1983,6 +2026,9 @@ export function createPreviewService(opts) {
   let staleRetries = 0;
   let watchdogTimer = null;
   let cards = [];
+  // Set by start(); defaults to the full console so every pre-existing caller
+  // and test seam behaves exactly as before start() has run.
+  let capabilities = { governance: true, screens: true };
   let viewport = null;
   const sseClients = new Set();
 
@@ -2674,6 +2720,7 @@ export function createPreviewService(opts) {
   }
 
   async function renderCycle() {
+    if (!capabilities.screens) return; // nothing to render, and nothing to render with
     if (rendering) {
       renderQueued = true;
       return;
@@ -3087,7 +3134,11 @@ export function createPreviewService(opts) {
     for (const w of GOVERNANCE_WATCHES) {
       const abs = path.join(projectDir, w.rel);
       if (!fs.existsSync(abs)) {
-        if (!w.mkdir) continue; // a project without it simply has nothing to watch
+        // mkdir only where the pipeline that stamps into it exists. Creating
+        // composeApp/build inside a governance-only project would manufacture
+        // a composeApp/ directory — and flip the project's own capability on
+        // the next start. A console must never edit the project it observes.
+        if (!w.mkdir || !capabilities.screens) continue; // a project without it simply has nothing to watch
         try {
           fs.mkdirSync(abs, { recursive: true });
         } catch {
@@ -3252,6 +3303,7 @@ export function createPreviewService(opts) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(
           galleryHtml({
+            capabilities,
             appName,
             viewport,
             cards,
@@ -3714,6 +3766,7 @@ export function createPreviewService(opts) {
       // read — a process cannot notice its own staleness any other way, and
       // twice in two days a stale console lied to a human about its own code.
       build: buildStatus(LOADED_BUILD.id),
+      capabilities,
       url: port ? `http://127.0.0.1:${port}/` : null,
       previewsDir,
       mode,
@@ -3744,10 +3797,14 @@ export function createPreviewService(opts) {
   const api = {
     /** Initial render (unless fresh previews already exist), then serve + watch. */
     async start() {
-      if (!fs.existsSync(path.join(projectDir, "composeApp"))) {
+      capabilities = detectCapabilities(projectDir);
+      if (!capabilities.governance && !capabilities.screens) {
         throw new Error(
-          `'${projectDir}' does not look like a create-cmp app (no composeApp/).`,
+          `'${projectDir}' has neither qa/ (the governance surface) nor composeApp/ (the render pipeline) — nothing here for the console to serve.`,
         );
+      }
+      if (!capabilities.screens) {
+        log("no composeApp/ — serving the governance window only (Drive, walks, approvals, evidence, comments); screens and live device absent");
       }
       // One console per project. A second service against the same tree would run its
       // own render loop against the same build dir — the collision that produced the
@@ -3767,7 +3824,7 @@ export function createPreviewService(opts) {
           throw err;
         }
       }
-      if (fs.existsSync(path.join(previewsDir, "manifest.json"))) {
+      if (capabilities.screens && fs.existsSync(path.join(previewsDir, "manifest.json"))) {
         // Serve what's on disk immediately; a fresh render still runs right after,
         // so the human sees SOMETHING at once and current state seconds later.
         loadPreviews();
@@ -3776,11 +3833,16 @@ export function createPreviewService(opts) {
       // Claim the project only once we are actually listening — a service that failed
       // to bind must never leave a record that blocks the next honest attempt.
       writeConsoleRegistry(projectDir, port);
-      startWatching();
+      // The governance watchers are the window; the render pipeline is a
+      // capability on top of it. Without composeApp/ there is no source tree to
+      // watch, no classes to hot-swap, nothing to render and no daemon to boot.
       watchGovernance();
       watchSelfSources();
-      void renderCycle();
-      if (hot) void ensureDaemon();
+      if (capabilities.screens) {
+        startWatching();
+        void renderCycle();
+        if (hot) void ensureDaemon();
+      }
       return status();
     },
     stop() {
