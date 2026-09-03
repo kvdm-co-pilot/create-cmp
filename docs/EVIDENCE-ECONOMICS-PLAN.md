@@ -391,3 +391,10 @@ S6. Neither starts until S1–S7 are landed and proven.
   allowlist's silence about new top-level dirs), and a seam paragraph in
   docs/proposals/cross-stack-console.md as the record of the one new kind of proof. Shipped
   as 0.21.0 with PR #31's console work. Everything else waits for the pinned-issue trigger.
+- 2026-09-03 — **0.21.0 proven at L2 after publish** (Karel: "did you run the e2e maestro tests?
+  they can be run headlessly"). The release had been gated at L1 with the device tier SKIPped —
+  a visible gap reported as proof, which is the wrong order. Re-run on a headless
+  Medium_Phone_API_35 (boot 36 s): fleet check `--min-level L2` PASS, rung L2 device; e2eSmoke
+  109 s (installDebug + Maestro), androidChecks 64 s (connectedDebugAndroidTest), lane 218 s.
+  releaseBuild is assembleRelease compile-only — nothing from it is installed; the device steps
+  run the DEBUG build. Rule from here: a publish is gated at L2; the emulator costs minutes.
