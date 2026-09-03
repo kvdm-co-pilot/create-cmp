@@ -433,3 +433,14 @@ S6. Neither starts until S1–S7 are landed and proven.
   PASS L2 in 70 s. Under another session's load (avg 70–80) Maestro never started its driver —
   hence the run bound and the `pgrep` rule in memory. `scripts/framework-check.mjs` is now the
   planted-failure matrix over every skipped-test guard: six plants + three hook refusals, 1.7 s.
+- 2026-09-03 — **payment-blueprint is current with 0.22.0** (bcbf76f): step-outcomes, lane-runner,
+  inputs-hash, flight-recorder, lane-narrator byte-identical. ONE exception, theirs by decision
+  and now closed on our side: harness-lock.mjs was not vendored because the spine's lock region
+  covered only the `.mjs` files directly under qa/ and qa/lib/, while their lane's own tests live
+  under qa/test/** — taking ours would have silently dropped the suite that proves their gates
+  out of the integrity claim. The spine now covers qa/test/** recursively (harness-region.mjs);
+  a Compose app has no qa/test, so its region and lock are unchanged. They kept the 0.22.0
+  region-digest print without the narrowing. Mutation testing is out of their repo (aaad821,
+  ADR-0036). Their pack test now pins every step narrates as a string, names are unique (an
+  aliasing factory passes a null check), and smoke stays four pure-Node gates — the last two
+  adopted here as well.

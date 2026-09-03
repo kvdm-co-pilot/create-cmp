@@ -185,3 +185,19 @@ test("every step function in every profile has a runtime NAME — a factory-buil
   }
   for (const [name, fn] of Object.entries(pack.STEP_FN_BY_NAME)) assert.equal(stepDisplayName(fn), name);
 });
+
+test("step names are UNIQUE within a profile — a factory that names every inner function after one local variable passes a null check while aliasing every step onto one deadline history (blueprint, 2026-09-03)", () => {
+  const pack = createCmpSteps(ctx());
+  for (const [profile, fns] of Object.entries(pack.stepsForProfile)) {
+    const names = fns.map((fn) => stepDisplayName(fn));
+    assert.equal(new Set(names).size, names.length, `${profile}: duplicate step names ${JSON.stringify(names)}`);
+  }
+});
+
+test("smoke stays pure-Node: framework-check drives it and the bound IS the assertion — one Gradle step there turns a 2 s instrument check into minutes", () => {
+  const pack = createCmpSteps(ctx());
+  const PURE_NODE = new Set(["harnessIntegrity", "specCoverage", "approvals", "componentStories", "reachability", "e2eCoverage", "archDoc", "schemaHistory"]);
+  for (const fn of pack.stepsForProfile.smoke) {
+    assert.ok(PURE_NODE.has(stepDisplayName(fn)), `smoke carries ${stepDisplayName(fn)}, which is not a pure-Node gate`);
+  }
+});

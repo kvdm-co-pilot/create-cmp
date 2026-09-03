@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **The lock region covers the lane's own tests.** `qa/test/**` (every `.mjs`, recursively) is
+  part of the machine-owned region when a project has it, so an adopter's suite that proves its
+  gates is locked with the gates. Found by payment-blueprint, which could not vendor
+  `harness-lock.mjs` without narrowing its integrity claim. A Compose app has no `qa/test`; its
+  region and lock are unchanged. Pack tests now pin unique step names per profile (an aliasing
+  factory passes a null check) and that the smoke profile stays pure-Node.
+
 ## [0.22.0] - 2026-09-03
 
 The device tier always runs, every Maestro flow runs, a device journey per feature is a lane
