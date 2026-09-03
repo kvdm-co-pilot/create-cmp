@@ -54,14 +54,40 @@ import path from "node:path";
 export const HARNESS_DIRS = ["qa", "qa/lib"];
 
 /**
+ * The lane's OWN tests, when a project carries them (payment-blueprint's
+ * qa/test/**, 2026-09-03). Every `.mjs` under it, recursively, is in the
+ * region: the tests that prove the gates are locked WITH the gates, or the
+ * lane can no longer tell you that the suite vouching for its verdicts is the
+ * one it was locked with — a narrower claim in the same words, which is the
+ * failure this mechanism exists to prevent. A Compose app has no qa/test and
+ * its region (and lock) is unchanged.
+ */
+export const HARNESS_TEST_DIR = "qa/test";
+
+/**
  * Is this project-relative path part of the machine-owned harness region?
  * @param {string} relPath project-relative path, "/"-separated
  * @returns {boolean}
  */
 export function isHarnessFile(relPath) {
   if (typeof relPath !== "string" || !relPath.endsWith(".mjs")) return false;
+  if (relPath.startsWith(`${HARNESS_TEST_DIR}/`)) return true;
   const dir = relPath.includes("/") ? relPath.slice(0, relPath.lastIndexOf("/")) : "";
   return HARNESS_DIRS.includes(dir);
+}
+
+function walkMjs(dirAbs, relPrefix, out) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dirAbs, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const ent of entries) {
+    const rel = `${relPrefix}/${ent.name}`;
+    if (ent.isDirectory()) walkMjs(path.join(dirAbs, ent.name), rel, out);
+    else if (ent.isFile() && isHarnessFile(rel)) out.push(rel);
+  }
 }
 
 /**
@@ -85,6 +111,7 @@ export function listHarnessFiles(root) {
       if (isHarnessFile(rel)) found.push(rel);
     }
   }
+  walkMjs(path.join(root, HARNESS_TEST_DIR), HARNESS_TEST_DIR, found);
   return found.sort();
 }
 

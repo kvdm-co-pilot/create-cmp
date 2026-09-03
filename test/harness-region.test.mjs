@@ -29,10 +29,14 @@ function tmpTree(files) {
   return root;
 }
 
-test("the region is the .mjs files directly under qa/ and qa/lib/", () => {
+test("the region is the .mjs files directly under qa/ and qa/lib/ — plus the lane's own tests under qa/test/**, when a project has them", () => {
   assert.deepEqual(HARNESS_DIRS, ["qa", "qa/lib"]);
   assert.ok(isHarnessFile("qa/verify.mjs"));
   assert.ok(isHarnessFile("qa/lib/render.mjs"));
+  assert.ok(isHarnessFile("qa/test/steps.test.mjs"), "the tests that prove the gates are locked with the gates");
+  assert.ok(isHarnessFile("qa/test/nested/deep.test.mjs"), "recursively");
+  assert.ok(!isHarnessFile("qa/test/fixture.json"), "only .mjs — fixtures are data");
+  assert.ok(!isHarnessFile("qa/lib/nested/x.mjs"), "qa/lib stays direct children only — a nested dir is not swept in silently");
 });
 
 test("app state, app content and app source are NOT machine-owned", () => {
@@ -128,5 +132,23 @@ test("app-owned surfaces are named as app-owned, not left ambiguous", () => {
   const claude = fs.readFileSync(path.join(REPO_ROOT, "template/CLAUDE.md"), "utf8");
   for (const owned of ["approvals.json", "golden/", "evidence/", "e2e/*.yaml", "specs/"]) {
     assert.ok(claude.includes(owned), `CLAUDE.md says ${owned} is the app's`);
+  }
+});
+
+test("listHarnessFiles: a project with qa/test/** counts those files; a Compose app without it has the same region as before", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-region-test-"));
+  try {
+    fs.mkdirSync(path.join(root, "qa", "lib"), { recursive: true });
+    fs.writeFileSync(path.join(root, "qa", "verify.mjs"), "// lane\n");
+    fs.writeFileSync(path.join(root, "qa", "lib", "x.mjs"), "// lib\n");
+    const before = listHarnessFiles(root);
+    assert.deepEqual(before, ["qa/lib/x.mjs", "qa/verify.mjs"]);
+    fs.mkdirSync(path.join(root, "qa", "test", "deep"), { recursive: true });
+    fs.writeFileSync(path.join(root, "qa", "test", "a.test.mjs"), "// t\n");
+    fs.writeFileSync(path.join(root, "qa", "test", "deep", "b.test.mjs"), "// t\n");
+    fs.writeFileSync(path.join(root, "qa", "test", "fixture.json"), "{}");
+    assert.deepEqual(listHarnessFiles(root), ["qa/lib/x.mjs", "qa/test/a.test.mjs", "qa/test/deep/b.test.mjs", "qa/verify.mjs"]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });
