@@ -26,6 +26,10 @@ app with no manifest behaves exactly as before.
   a backend it graded the strongest run L0, L1 unreachable by construction. The ladder is now
   the pack's (`createCmpSteps` returns `evidenceLadder`; `evidenceLevel` takes `ladder`); a
   pack that declares none earns no rung. Compose apps: unchanged rungs.
+- **The release gate itself failed on timing.** The bundle-boot test slept 700 ms + 1800 ms and
+  read whatever had arrived; under `npm publish` on a loaded machine the bundle answered late
+  and `prepublishOnly` went red on a healthy bundle. It now waits for the response, bounded
+  at 20 s — the bound is the assertion, never a fixed sleep.
 - **A new top-level directory was silently unattested** by the surface allowlist. The
   receipt now carries `inputs.undeclared` and the lane prints it — a report, never a gate,
   because the Compose default deliberately omits `docs/`, the README and the wrapper.
