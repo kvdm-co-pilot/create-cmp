@@ -175,3 +175,27 @@ test("the template ships the marker block, so a stamped app gets the badge", () 
   assert.doesNotMatch(seeded, RUNGS);
   assert.match(seeded, /no verify receipt yet/);
 });
+
+test("PLANTED: a smoke or nightly receipt never rewrites the badge — those receipts are refused as done-evidence, and a smoke run must not demote a true L1 badge", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-badge-smoke-"));
+  try {
+    fs.mkdirSync(path.join(root, "qa", "evidence"), { recursive: true });
+    const readme = `# App\n\n<!-- cmp:generated evidence -->\nL1 badge as written by a real lane\n<!-- /cmp:generated -->\n`;
+    fs.writeFileSync(path.join(root, "README.md"), readme);
+    for (const stage of ["smoke", "nightly"]) {
+      fs.writeFileSync(
+        path.join(root, "qa", "evidence", "latest.json"),
+        JSON.stringify(receipt({ mode: "full", profile: stage, stage, evidenceLevel: null, commit: { sha: "abcdef01", dirty: [] } })),
+      );
+      const out = updateReadmeBadge(root);
+      assert.equal(out.changed, false, stage);
+      assert.match(out.reason, new RegExp(`${stage} run`));
+      assert.equal(fs.readFileSync(path.join(root, "README.md"), "utf8"), readme, `${stage}: README untouched`);
+    }
+    // A receipt predating `stage` is read by profile.
+    fs.writeFileSync(path.join(root, "qa", "evidence", "latest.json"), JSON.stringify({ ...receipt({ mode: "full", profile: "smoke", evidenceLevel: null }), stage: undefined }));
+    assert.equal(updateReadmeBadge(root).changed, false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

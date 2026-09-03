@@ -61,3 +61,28 @@ refusals name "a pack that does not govern this" beside "an older scaffold".
   change detection (`affected-tests`), or every run fails integrity / `--fast` falls open.
 - A surface allowlist silently leaves a new top-level directory unattested; the blueprint
   added a test that every top-level entry `git ls-files` sees is declared. Worth a spine test.
+
+## Seams — the one new kind of proof (recorded 2026-09-03, not built)
+
+Everything above scales a per-part lane. A multi-part repo has a proof no part owns: the
+**seam** — the contract between two units (BFF ↔ service, app ↔ API, service ↔ schema). It is
+where agents break things silently: a response field renamed on the producer compiles on the
+consumer. The rule, when a second unit exists in the same lane, is Principle 3 applied across
+parts: **a seam's proof runs when either side changes and belongs to neither side's pack.**
+Industry forms of that proof exist and need no invention — consumer-driven contract tests,
+an OpenAPI/protobuf additive-only diff, a schema-migration golden. One worked seam in the
+blueprint (its HTTP surface, additive-only golden, planted rename → red) is the trigger to
+make seams a declared object; until then this paragraph is the record.
+
+## The three defects the adoption found in the spine — closed 2026-09-03
+
+- `qa/flight-recorder.jsonl` counted as a working-tree change (the qa/** hatch), so `--fast`
+  fell open to the full suite after the first run — in every Compose app. Now a lane output
+  (`affected-tests.mjs`), pinned by a planted test.
+- The evidence ladder was Compose step names inside the spine. Now the pack's
+  (`createCmpSteps` returns `evidenceLadder`); a pack that declares none earns no rung.
+- A new top-level directory was silently unattested by the surface allowlist. The receipt now
+  carries `inputs.undeclared` and the lane prints it — a report, never a gate, because the
+  Compose default deliberately omits docs/, the README and the wrapper.
+- Found while deriving the first: a smoke run rewrote the README's evidence badge from a true
+  L1 to "rung unrecorded". Smoke and nightly receipts now leave the badge alone, like `--fast`.

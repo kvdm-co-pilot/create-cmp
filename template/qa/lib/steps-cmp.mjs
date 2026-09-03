@@ -33,6 +33,7 @@ import { evaluateAuditCadence } from "./audit-cadence.mjs";
 import { androidChecksOutcome } from "./step-outcomes.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./harness-lock.mjs";
 import { stepDisplayName } from "./lane-runner.mjs";
+import { CMP_LADDER } from "./evidence-level.mjs";
 
 /**
  * @param {object} ctx
@@ -1298,6 +1299,10 @@ for (const name of FAST_EXCLUDED_NAMES) {
     FAST_EXCLUDED_NAMES,
     STEP_FN_BY_NAME,
     stepDeterminism,
+    // The ladder this pack's steps can earn (evidence-level.mjs). A pack that
+    // returns none earns no rung — the spine never grades a pack by another
+    // pack's step names.
+    evidenceLadder: CMP_LADDER,
     // The device lease is held to the very end of the run (see the scope
     // decision above); the spine releases it in the runner's finally.
     releaseLease: () => {

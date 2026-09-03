@@ -76,7 +76,14 @@ test("package→filter mapping: parent-dir segment becomes *seg*, unioned, dedup
 });
 
 test("lane outputs never count as changes: a dirty receipt neither forces the full suite nor drives the filter", () => {
-  assert.deepEqual(LANE_OUTPUT_PREFIXES, ["qa/evidence", "qa-artifacts"]);
+  assert.deepEqual(LANE_OUTPUT_PREFIXES, ["qa/evidence", "qa-artifacts", "qa/flight-recorder.jsonl"]);
+
+  // PLANTED: the flight journal is appended by every run and committed. Counted
+  // as a change it matches the qa/** hatch, and --fast falls open to the full
+  // suite forever after the first run. It must be a lane output.
+  const journalOnly = deriveAffectedFilter(["qa/flight-recorder.jsonl", `${SRC}/presentation/home/HomeViewModel.kt`]);
+  assert.equal(journalOnly.mode, "filtered", "the journal must not widen the filter");
+  assert.deepEqual(journalOnly.patterns, ["*home*"]);
 
   // Receipt + one scoped edit → still filtered (the qa/** hatch must not self-trigger).
   const withEdit = deriveAffectedFilter(["qa/evidence/latest.json", `${SRC}/presentation/home/HomeViewModel.kt`]);
