@@ -433,6 +433,43 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       }
     });
 
+    await t.test("receipt-check REFUSES a receipt whose device tier was skipped for an ENVIRONMENTAL reason; a structural skip is honest and allowed", () => {
+      const receiptPath = path.join(out, "qa/evidence/latest.json");
+      const base = { schema: "cmp-evidence/1", profile: "local", stage: "change", mode: "full", verdict: "PASS", inputs: { hash: "a".repeat(64) } };
+      try {
+        // Environmental: the one explicit opt-out. Visible on the receipt, never done.
+        fs.writeFileSync(receiptPath, JSON.stringify({ ...base, steps: [{ name: "build", verdict: "PASS", durationMs: 5 }, { name: "e2eSmoke", verdict: "SKIP", skipKind: "environment", reason: "device tier disabled by CMP_DEVICE=none", durationMs: 0 }] }));
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("an opted-out device tier must not end a session as done");
+        } catch (err) {
+          assert.equal(err.status, 2);
+          assert.match(String(err.stderr), /device tier did not run — e2eSmoke: device tier disabled by CMP_DEVICE=none/);
+          assert.match(String(err.stderr), /boots a headless emulator itself/);
+        }
+        // A receipt predating skipKind is read by its reason text.
+        fs.writeFileSync(receiptPath, JSON.stringify({ ...base, steps: [{ name: "androidChecks", verdict: "SKIP", reason: "no Android device/emulator attached (adb)", durationMs: 0 }] }));
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("an old-style 'no device' skip is the same gap");
+        } catch (err) {
+          assert.equal(err.status, 2);
+          assert.match(String(err.stderr), /device tier did not run — androidChecks: no Android device/);
+        }
+        // Structural: the project has no instrumented sources / no e2e harness. Not a gap the environment can close — the check moves on to the hash.
+        fs.writeFileSync(receiptPath, JSON.stringify({ ...base, steps: [{ name: "androidChecks", verdict: "SKIP", skipKind: "structure", reason: "no instrumented tests", durationMs: 0 }, { name: "e2eSmoke", verdict: "SKIP", skipKind: "structure", reason: "e2e harness not included in this project (--no-e2e)", durationMs: 0 }] }));
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("the hash is wrong on purpose, so this still refuses — but for the hash");
+        } catch (err) {
+          assert.equal(err.status, 2);
+          assert.doesNotMatch(String(err.stderr), /device tier did not run/, "a structural skip is not the device-tier refusal");
+        }
+      } finally {
+        fs.rmSync(receiptPath, { force: true });
+      }
+    });
+
     await t.test("receipt-check REFUSES a nightly-stage receipt — it proves the harness, never this change", () => {
       const receiptPath = path.join(out, "qa/evidence/latest.json");
       try {

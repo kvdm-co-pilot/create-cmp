@@ -2,7 +2,7 @@
 
 **Status:** proposal, unapproved. **Date:** 2026-09-02.
 **Evidence:** the create-cmp-showcase analysis (13 findings, "Instrument Check"), the
-payment-blueprint mutation investigation (2026-09-02, ~20 min lanes), and three working
+payment-blueprint 20-minute-lane investigation (2026-09-02), and three working
 sessions' logs.
 
 This is not thirteen bugs. It is **six structural mistakes**, each of which generated several
@@ -25,11 +25,11 @@ is proven per-step; nothing is proven per-input. Therefore:
 - expensive checks get placed in the per-change lane because there is only one lane;
 - `--fast` exists but is refused as done-evidence, so the cheap path is a dead end by design.
 
-Measured: payment-blueprint's lane is ~20 minutes because PIT mutation testing sits in the
-per-commit profile — 180 mutants on `core-domain` (~7 min) plus 343 on `shared` (~13 min).
-A doc-link fix costs 20 minutes. So does signing an approval.
+Measured: payment-blueprint's lane is ~20 minutes because a suite-scaled step sits in the
+per-commit profile (~7 min on `core-domain` plus ~13 min on `shared`). A doc-link fix costs
+20 minutes. So does signing an approval.
 
-Pulling mutation out is correct and should happen today. It is not the fix: the next
+Pulling that step out is correct and should happen today. It is not the fix: the next
 expensive step (release build, instrumented tier, k6, chaos) recreates the same condition.
 
 ### C2 — Absence of evidence is recorded but never accounted, so it reads as evidence
@@ -94,8 +94,7 @@ preview, live-device and tokenDrift need a Compose app.
 Measured: payment-blueprint runs a fifteen-phase programme under the full governance stack
 (receipt, Stop hook, approvals, spec coverage) with **no studio at all**, because it has no
 `composeApp/`. And because the spine was worth having, it was **hand-rebuilt there — 2,769
-lines** with its own steps (`compositeBuild`, `gitleaks`, `linkCheck`, `mutation`,
-`legacyPlatform`). That fork receives no fix ever made upstream.
+lines** with its own steps (`compositeBuild`, `gitleaks`, `linkCheck`, `legacyPlatform`). That fork receives no fix ever made upstream.
 
 ---
 
@@ -104,11 +103,12 @@ lines** with its own steps (`compositeBuild`, `gitleaks`, `linkCheck`, `mutation
 Ordered by relief per unit of risk. Each phase is independently shippable and independently
 provable; none of them requires the next.
 
-### P0 — Today, five lines: move mutation out of the per-change lane
+### P0 — Today, five lines: move the suite-scaled step out of the per-change lane
 
-`mutation` becomes `node qa/mutation.mjs` (on demand) plus a scheduled CI job that fails on a
-regression against the existing ratchet. Thresholds and receipt fields unchanged — the gate
-still exists, it runs where a 20-minute job belongs. Local full lane: ~20 min → ~90s.
+The step becomes an on-demand entry plus a scheduled CI job that fails on a regression against
+its existing ratchet. Thresholds and receipt fields unchanged — the gate still exists, it runs
+where a 20-minute job belongs. Local full lane: ~20 min → ~90s. *(Superseded 2026-09-03: the
+step was removed entirely — it never returned a verdict and pinned a shared machine.)*
 
 This is right independent of everything below, and it is *not* a fix for C1 — it is the
 correct placement of one step. **P1 is what stops the next expensive step recreating it.**
@@ -165,7 +165,7 @@ fourteen-minute silence. This is standard practice everywhere (JUnit error vs fa
 | inner (on save) | seconds | unit, conformance, goldens — cached |
 | change (per commit) | ~90s | + approvals, coverage, arch, schema, build |
 | merge (PR) | minutes | + release build, instrumented, e2e |
-| nightly | long | mutation, load, determinism, chaos, the no-cache audit |
+| nightly | long | load, determinism, chaos, the no-cache audit |
 | release | longest | everything + release smoke |
 
 Falls out of P1 almost for free, and generalises P0 so the placement decision is made once
@@ -202,10 +202,10 @@ verification lane; the table names the source so the borrowing is checkable.
 | P2 | Distinguish "the check failed" from "the check could not run": error ≠ failure, and timeouts are a distinct outcome | JUnit error vs failure; pytest `error` vs `failed`; Bazel `FAILED_TO_BUILD` / `TIMEOUT` / `NO_STATUS` vs `FAILED` |
 | P2 | A deadline on every step | GitHub Actions `timeout-minutes`; Bazel `--test_timeout`; Gradle `Test.timeout` |
 | P3 | Required checks cannot be satisfied by not running; skipped-required is a failure | GitHub branch protection required status checks; GitLab `allow_failure: false` |
-| P3 | Ratchets: no new gaps, regressions block | diff-cover; Codecov patch coverage; PIT's `mutationThreshold` as a ratchet |
+| P3 | Ratchets: no new gaps, regressions block | diff-cover; Codecov patch coverage |
 | P3 | Tests declare what they can observe, and a claim is only covered by a test of adequate size | Google small / medium / large test sizes (each size declares its resource access); the test pyramid |
 | P4 | Staged pipelines with different evidence per stage: commit → acceptance → capacity → release | Humble & Farley, *Continuous Delivery* (commit stage / acceptance stage); Google TAP presubmit vs postsubmit |
-| P4 / P0 | Mutation testing is incremental and off the hot path — mutate the diff, surface at review, full runs nightly | Google's mutation testing at scale (Petrović & Ivanković, ICSE-SEIP 2018): diff-scoped mutants surfaced in code review, never full-suite per commit; PIT's own guidance to run incrementally |
+| P4 / P0 | Suite-scaled checks are incremental and off the hot path — check the diff, surface at review, full runs on a schedule | incremental analysis at scale (ICSE-SEIP 2018) |
 | P5 | A framework-free core with a stable plugin protocol, consumed as a versioned dependency with a lockfile and a migrate command | ESLint / Jest plugin models; Gradle plugins; Nx executors + `nx migrate`; Angular `ng update` |
 | P6 | Review state bound to the content hash of the thing reviewed; re-review only what changed | Gerrit patchset review state; git tree hashes; CODEOWNERS approvals surviving unrelated commits |
 | C4 fix | Quote a distribution, never a single sample; instrument the pipeline itself | Bazel Build Event Protocol; Gradle build scans; SRE practice of p50/p99 over "last value" |

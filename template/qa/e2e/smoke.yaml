@@ -1,4 +1,4 @@
-# E2E smoke — Maestro flow. SPEC: SHELL-01, SHELL-02.
+# E2E smoke — Maestro flow. SPEC: SHELL-01, SHELL-02, HOME-02.
 #
 # Proves the real app boots on a device/emulator and the bottom-nav shell works.
 # Selectors go by testTag (surfaced as resource-ids on Android via TestTagAutomation),
@@ -29,6 +29,14 @@ appId: __PACKAGE__
     timeout: 60000
 - assertVisible:
     id: "app_bottom_nav"
+
+# SPEC: HOME-02 — when loading completes, the items are listed: the first item's row
+# is on screen (the exemplar's device journey; the lane's e2eCoverage gate asks every
+# feature with a screen and a spec for at least one clause proven by a flow).
+- extendedWaitUntil:
+    visible:
+      id: "home_item_1"
+    timeout: 30000
 
 # SPEC: SHELL-02 — switching tabs keeps the shell
 - tapOn:

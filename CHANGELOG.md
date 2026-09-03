@@ -6,6 +6,81 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-03
+
+The device tier always runs, every Maestro flow runs, a device journey per feature is a lane
+verdict, mutation testing is gone, and every skipped-test guard is read by a planted failure
+before release. No migration: an app with no emulator attached will now boot one (set
+`CMP_AVD` if the lane cannot choose; `CMP_DEVICE=none` is the visible opt-out and is never
+done-evidence), and a feature with a screen and a spec now needs one clause proven by a flow.
+
+### Removed
+
+- **Every mention of mutation testing.** Karel, 2026-09-03: overkill; it broke development
+  completely and caused the last days' issues; tests are written from the spec and that is the
+  guard. Derived before the decision: the step had never returned a verdict, one module measured
+  zero against a 60 % threshold, and a run pinned a shared machine at load 70–80 for 25 minutes.
+  Nothing of it remains in the pack, the docs of record, the proposals or the adoption example.
+
+### Added — every skipped-test guard is read, on a real scaffold
+
+- **`scripts/framework-check.mjs` is a planted-failure matrix.** On a freshly stamped app it
+  plants, one at a time, an orphaned citation, an unbound citation (a `SPEC:` tag on a class
+  with no test in the binding window), a `[tier: e2e]` clause cited only from the JVM, a real
+  feature whose flow stops citing its clause, a citation in a nested flow the lane never runs,
+  and one edited byte in the machine-owned region — and asserts each FAILs BY NAME, that the
+  Stop hook refuses a FAIL receipt, refuses the forgery (verdict flipped to PASS over a failed
+  harnessIntegrity row), and refuses a receipt whose device tier was skipped for an
+  environmental reason; then reverts everything and asserts PASS. Six plants, under two
+  seconds, no Gradle, no device. This is Rule 0 and Rule 1 for every guard that catches a
+  skipped or fake test, run before any release.
+
+### Changed — the device tier always runs
+
+- **The lane boots its own headless emulator.** With no device attached, the first device
+  step boots an AVD headless (`CMP_AVD`, else the doctor's `cmp_pixel`, else the only one),
+  bounded at 4 minutes, and the lane shuts it down on exit (`CMP_KEEP_DEVICE=1` keeps it). A
+  device that cannot be provisioned is an ERROR row and the lane FAILs. `CMP_DEVICE=none` is
+  the one explicit opt-out; `qa/receipt-check.mjs` refuses a receipt whose device tier was
+  skipped for an environmental reason as done-evidence. Until now every device row SKIPped
+  "no device" on every receipt anyone looked at, and 0.21.0 shipped on a fleet check with
+  the whole tier skipped.
+- **Every Maestro flow runs.** e2eSmoke ran `smoke.yaml` by name while spec coverage counted
+  citations from any yaml under `qa/e2e` — four hand-written per-feature flows on the
+  showcase satisfied clauses without ever executing. The directory now runs in one Maestro
+  session; the receipt row lists each flow's result; the executed list and the coverage scan
+  read the same list, so a citation can only come from a flow that ran.
+- **A flow per feature.** `qa/scaffold-feature.mjs` stamps `qa/e2e/<feature>.yaml`, a passing
+  skeleton naming the screen id and clauses to prove; it cites nothing until it is the
+  journey. `[tier: e2e]` clauses fail coverage until a flow cites them.
+- **A device journey per feature is a lane verdict.** New pure-Node gate `e2eCoverage` (every
+  profile that runs the pure tier): a feature with a screen AND a spec must have at least one
+  live clause cited from a flow the lane runs; FAIL names the feature and the flow file to
+  write. A screen without a spec is a placeholder (reported, not failed); a screen declared
+  `{ "unrouted": true }` in its brief is exempt. Feature-brief doneness gains the same
+  conjunct: a `screens: true` brief is not done until one of its clauses is cited from
+  `qa/e2e/`. The template smoke flow now proves HOME-02 on device (the first item renders), so
+  a fresh scaffold passes; a freshly stamped feature FAILs until its flow is the journey —
+  that is the point ("is anything forcing e2e tests to be written per feature?" — now yes).
+- **The post-run ANR/crash sweep is scoped to the app under test.** The first self-booted lane
+  went red on an ANR in another app that lived on the emulator. Incidents in other packages
+  are not this lane's failure; with no app id known the sweep stays unscoped and says so.
+### Fixed — from the showcase's 0.21.0 upgrade report
+
+- **The template `.gitignore` carries the Android signing-key ignores** (`keystore.properties`,
+  `keystore/`, `*.jks`, `*.keystore`). Three consecutive upgrades produced a `.gitignore`
+  sidecar without them; an agent taking the sidecar would leave the keystore one `git add -A`
+  from a public repo. The upgrade now also names what taking a sidecar would drop.
+- **Receipts name the lane in words.** `harnessIntegrity` prints the region digest beside the
+  version (`@create-cmp/harness 0.17.0 (region b56cd4f8) — 45 files verified`): two lanes with
+  the same package version and different content are told apart on the receipt, not only in
+  the lock. The harness package is 0.17.0.
+- **Stale `*.bak-upgrade` files from earlier upgrades are removed** before a new upgrade writes
+  its own; nothing cleaned them and one set accumulated per upgrade.
+
+- `scripts/fleet-check.mjs` defaults to `--min-level L2`; the template CI workflow sets
+  `CMP_DEVICE=none` explicitly on its hosted runner.
+
 ## [0.21.0] - 2026-09-03
 
 The console follows the project's layout, and four spine defects the first non-Compose

@@ -21,16 +21,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { compareTokenDrift } from "./token-drift.mjs";
 import { evaluateApprovalsGate } from "./approvals.mjs";
-import { TIERS_SATISFYING, clauseTierCoverage, scanCitations, scanSpecClauses, walkFiles } from "./spec-coverage.mjs";
+import { E2E_FLOW_DIR, TIERS_SATISFYING, clauseTierCoverage, listFlowFiles, scanCitations, scanSpecClauses, walkFiles } from "./spec-coverage.mjs";
 import { evaluateComponentStoryParity } from "./component-stories.mjs";
 import { evaluateReachability } from "./reachability.mjs";
+import { evaluateE2eCoverage } from "./e2e-coverage.mjs";
 import { memoizeStep } from "./step-cache.mjs";
 import { changedWorkingTreePaths, deriveAffectedFilter } from "./affected-tests.mjs";
 import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./device-lease.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./arch-doc.mjs";
 import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "./determinism.mjs";
 import { evaluateAuditCadence } from "./audit-cadence.mjs";
-import { androidChecksOutcome } from "./step-outcomes.mjs";
+import { androidChecksOutcome, deviceLogIncidents, maestroOutcome, parseMaestroJunit } from "./step-outcomes.mjs";
+import { ensureDevice, releaseDevice } from "./device-provider.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./harness-lock.mjs";
 import { stepDisplayName } from "./lane-runner.mjs";
 import { CMP_LADDER } from "./evidence-level.mjs";
@@ -115,6 +117,33 @@ function deviceAttached() {
 // honest and visible is exactly why SKIP is the right verdict.
 let laneDeviceLease = null;
 
+// ── The lane's device (qa/lib/device-provider.mjs) ──────────────────────────
+// Provisioned ONCE per run by the first device step that needs it: an attached
+// device is used as-is; with none attached the lane boots a headless emulator
+// (bounded) and shuts it down in the runner's finally. A device that cannot
+// be provisioned is an ERROR row — "could not check" — never a SKIP that
+// reads as an honest gap and is then ignored forever (2026-09-03: the whole
+// tier had SKIPped on every receipt anyone looked at). The one SKIP left is
+// the explicit opt-out CMP_DEVICE=none, marked skipKind "environment" so the
+// receipt check refuses it as done-evidence.
+let laneDevice = null;
+
+function deviceRow(stepName, d) {
+  if (d.optOut) return { name: stepName, verdict: "SKIP", skipKind: "environment", reason: d.reason, durationMs: 0 };
+  return { name: stepName, verdict: "ERROR", reason: `could not provision a device: ${d.reason}`, durationMs: 0 };
+}
+
+/** null when the lane has a device; otherwise the row the step returns verbatim. */
+function ensureLaneDevice(stepName) {
+  if (!laneDevice) {
+    laneDevice = ensureDevice({ sh, log: (line) => console.error(`· ${line}`) });
+    if (laneDevice.ok && laneDevice.booted) {
+      console.error(`· booted ${laneDevice.avd} headless (${laneDevice.serial}) in ${Math.round(laneDevice.bootMs / 1000)} s — shut down when the lane exits (CMP_KEEP_DEVICE=1 keeps it)`);
+    }
+  }
+  return laneDevice.ok ? null : deviceRow(stepName, laneDevice);
+}
+
 /** Serials of devices currently in `device` state (same parse as deviceAttached). */
 function attachedDeviceSerials() {
   const res = sh("adb devices", { timeout: 10_000 });
@@ -150,6 +179,7 @@ function leaseDeviceForStep(stepName) {
       return {
         name: stepName,
         verdict: "SKIP",
+        skipKind: "environment",
         reason: `${serials.length} devices attached (${serials.join(", ")}) — the lane cannot tell which one it would drive, so it leases none rather than guessing. Set ANDROID_SERIAL to the device this lane should own, or detach the extras.`,
         durationMs: 0,
       };
@@ -160,6 +190,7 @@ function leaseDeviceForStep(stepName) {
     return {
       name: stepName,
       verdict: "SKIP",
+      skipKind: "environment",
       reason: `device ${serial} is held by ${formatHolder(res.heldBy)} — device evidence is batched, not concurrent; wait for it or run once when it finishes`,
       durationMs: 0,
     };
@@ -383,6 +414,16 @@ function stepReachability() {
 // (regenerateArchDoc); this step only adds the name/duration bookkeeping every
 // step in this file carries, plus wording the FAIL reason for an AI
 // collaborator (name the stale/missing section, name the fix command).
+// Every real feature has a device journey (qa/lib/e2e-coverage.mjs): a screen
+// plus a spec means at least one live clause cited from a flow the lane runs.
+// Pure Node. This is the gate that makes "write the Maestro flow" a lane
+// verdict instead of a habit (Karel, 2026-09-03).
+function stepE2eCoverage() {
+  const started = Date.now();
+  const { verdict, reason, details } = evaluateE2eCoverage(ROOT);
+  return { name: "e2eCoverage", verdict, reason, durationMs: Date.now() - started, details };
+}
+
 function stepArchDoc() {
   const started = Date.now();
   const elapsed = () => Date.now() - started;
@@ -789,14 +830,8 @@ function stepTokenDrift() {
   const started = Date.now();
   const elapsed = () => Date.now() - started;
 
-  if (!deviceAttached()) {
-    return {
-      name: "tokenDrift",
-      verdict: "SKIP",
-      reason: "no Android device/emulator attached (adb) — runtime token drift needs the live inspector tier",
-      durationMs: elapsed(),
-    };
-  }
+  const device = ensureLaneDevice("tokenDrift");
+  if (device) return { ...device, durationMs: elapsed() };
 
   const unreachable = () => ({
     name: "tokenDrift",
@@ -870,15 +905,17 @@ function maestroAvailable() {
 // The e2e guard trio, shared by every step that drives the smoke flow on a device.
 // Returns null when the harness is fully available, else the SKIP result for [name].
 function maestroGuards(name) {
-  if (!fs.existsSync(path.join(ROOT, "qa/e2e"))) {
-    return { name, verdict: "SKIP", reason: "e2e harness not included in this project (--no-e2e)", durationMs: 0 };
+  if (!fs.existsSync(path.join(ROOT, E2E_FLOW_DIR))) {
+    return { name, verdict: "SKIP", skipKind: "structure", reason: "e2e harness not included in this project (--no-e2e)", durationMs: 0 };
   }
-  if (!deviceAttached()) {
-    return { name, verdict: "SKIP", reason: "no Android device/emulator attached (adb)", durationMs: 0 };
+  if (listFlowFiles(ROOT).length === 0) {
+    return { name, verdict: "SKIP", skipKind: "structure", reason: `${E2E_FLOW_DIR}/ holds no flows (*.yaml) — nothing to drive`, durationMs: 0 };
   }
   if (!maestroAvailable()) {
-    return { name, verdict: "SKIP", reason: "maestro CLI not installed — curl -fsSL https://get.maestro.mobile.dev | bash", durationMs: 0 };
+    return { name, verdict: "SKIP", skipKind: "environment", reason: "maestro CLI not installed — curl -fsSL https://get.maestro.mobile.dev | bash", durationMs: 0 };
   }
+  const device = ensureLaneDevice(name);
+  if (device) return device;
   return null;
 }
 
@@ -897,32 +934,59 @@ function maestroGuards(name) {
 // hide_error_dialogs suppresses the OS dialog, NEVER the underlying event — so after the
 // run we grep the device log for ANR/crash lines the dialog would have shown, and FAIL on
 // them. The eyes must report what automation stability had to hide.
+// EVERY flow runs (2026-09-03). This used to run qa/e2e/smoke.yaml by name
+// while spec coverage counted a citation from ANY yaml under qa/e2e — four
+// hand-written per-feature flows on the showcase satisfied clauses without
+// ever executing. The directory runs in ONE Maestro session (one driver
+// start-up, per-flow rows from the JUnit report); listFlowFiles is the same
+// list the coverage scan reads, so cited ⊆ executed holds by construction.
+/** Driver start-up plus three minutes per flow: the Maestro run's own bound, whatever the journal says. */
+const E2E_RUN_BOUND_MS = (flowCount) => 120_000 + 180_000 * Math.max(1, flowCount);
+
 function runMaestroSmoke(name, priorDurationMs) {
+  const flows = listFlowFiles(ROOT);
+  const report = path.join(ROOT, "qa-artifacts", `maestro-${name}.xml`);
+  fs.mkdirSync(path.dirname(report), { recursive: true });
+  fs.rmSync(report, { force: true });
   const prevHideErrorDialogs = sh("adb shell settings get global hide_error_dialogs").out.trim();
   sh("adb shell settings put global hide_error_dialogs 1");
   sh("adb logcat -c"); // clear so the post-run dump only reflects this run
   try {
-    const res = sh("maestro test qa/e2e/smoke.yaml", { env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "120000" } });
-    if (!res.ok) {
-      return {
-        name,
-        verdict: "FAIL",
-        reason: `Maestro smoke failed (flow cites the SHELL spec clauses it proves):\n${res.out.split("\n").slice(-15).join("\n")}`,
-        durationMs: priorDurationMs + res.durationMs,
-      };
+    // Bounded on its own, not only by the step deadline: a FIRST run has no
+    // journal, so its deadline is the 30-minute ceiling — and on 2026-09-03
+    // Maestro selected the device and then sat, driver never started, app
+    // never in the foreground, under another lane's build load. Two
+    // minutes of driver start-up plus three per flow is generous for a
+    // healthy device; past it the run is killed and the row reads ERROR
+    // (StepTimeout), which is what "did not get to check" should say.
+    const runBoundMs = E2E_RUN_BOUND_MS(flows.length);
+    const res = sh(`maestro test ${E2E_FLOW_DIR} --format junit --output "${report}"`, { env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "120000" }, timeout: runBoundMs });
+    let xml = null;
+    try {
+      xml = fs.readFileSync(report, "utf8");
+    } catch {
+      xml = null;
     }
+    const outcome = maestroOutcome(res, parseMaestroJunit(xml), flows);
+    if (outcome.verdict !== "PASS") {
+      return { name, verdict: outcome.verdict, reason: outcome.reason, durationMs: priorDurationMs + res.durationMs, details: outcome.details };
+    }
+    // The post-run sweep is scoped to THIS app's process(es): the flows' own
+    // appId lines say which. Another app misbehaving on a shared emulator is
+    // not this lane's red (deviceLogIncidents).
+    const appIds = [...new Set(flows.map((rel) => (fs.readFileSync(path.join(ROOT, rel), "utf8").match(/^appId:\s*(\S+)/m) || [])[1]).filter(Boolean))];
     const anrDump = sh("adb logcat -d -b system,crash,main");
-    const anrRe = /ANR in |FATAL EXCEPTION/i;
-    if (anrDump.ok && anrRe.test(anrDump.out)) {
-      const anrLines = anrDump.out.split("\n").filter((l) => anrRe.test(l)).slice(0, 10).join("\n");
+    const incidents = anrDump.ok ? deviceLogIncidents(anrDump.out, appIds) : { lines: [], scoped: appIds.length > 0 };
+    if (incidents.lines.length) {
       return {
         name,
         verdict: "FAIL",
-        reason: `Maestro smoke passed, but the device log shows an ANR/crash during the run (hide_error_dialogs only suppresses the OS dialog, never the underlying event):\n${anrLines}`,
+        reason: `Maestro flows passed, but the device log shows an ANR/crash in ${incidents.scoped ? appIds.join(", ") : "some process (no appId known to scope by)"} during the run (hide_error_dialogs only suppresses the OS dialog, never the underlying event):\n${incidents.lines.slice(0, 10).join("\n")}`,
         durationMs: priorDurationMs + res.durationMs,
+        details: outcome.details,
       };
     }
-    return { name, verdict: "PASS", durationMs: priorDurationMs + res.durationMs };
+    return { name, verdict: "PASS", durationMs: priorDurationMs + res.durationMs, note: `${flows.length} flow${flows.length === 1 ? "" : "s"}`, details: outcome.details, ...(outcome.reason ? { reason: outcome.reason } : {}) };
   } finally {
     if (prevHideErrorDialogs && prevHideErrorDialogs !== "null") {
       sh(`adb shell settings put global hide_error_dialogs ${prevHideErrorDialogs}`);
@@ -968,18 +1032,13 @@ function stepAndroidChecks() {
     return {
       name: "androidChecks",
       verdict: "SKIP",
+      skipKind: "structure",
       reason: "no instrumented tests (composeApp/src/androidInstrumentedTest has no Kotlin sources)",
       durationMs: Date.now() - started,
     };
   }
-  if (!deviceAttached()) {
-    return {
-      name: "androidChecks",
-      verdict: "SKIP",
-      reason: "no Android device/emulator attached (adb) — instrumented behavior needs the real process boundary",
-      durationMs: Date.now() - started,
-    };
-  }
+  const device = ensureLaneDevice("androidChecks");
+  if (device) return { ...device, durationMs: Date.now() - started };
   // Machine-global lease before the first device touch (contention = SKIP).
   const leaseSkip = leaseDeviceForStep("androidChecks");
   if (leaseSkip) return { ...leaseSkip, durationMs: Date.now() - started };
@@ -1154,6 +1213,7 @@ const MEMOIZED_STEP_INPUTS = {
   approvals: ["qa/approvals.json", "specs", "docs/features", "docs/ARCHITECTURE.md", "composeApp/src"],
   componentStories: ["composeApp/src"],
   reachability: ["composeApp/src", "docs/features"],
+  e2eCoverage: ["composeApp/src", "docs/features", "specs", "qa/e2e"],
   archDoc: ["docs/ARCHITECTURE.md", "docs/adr", "specs", "composeApp/src"],
 };
 
@@ -1173,12 +1233,13 @@ const stepSpecCoverageMemo = memoized("specCoverage", stepSpecCoverage);
 const stepApprovalsMemo = memoized("approvals", stepApprovals);
 const stepComponentStoriesMemo = memoized("componentStories", stepComponentStories);
 const stepReachabilityMemo = memoized("reachability", stepReachability);
+const stepE2eCoverageMemo = memoized("e2eCoverage", stepE2eCoverage);
 const stepArchDocMemo = memoized("archDoc", stepArchDoc);
 
 const stepsForProfile = {
   // scaffold: what `create-cmp --verify` proves at stamp time — specCoverage,
   // the full JVM tier (unit + conformance + golden + UI tests) plus the Android build.
-  scaffold: [stepHarnessIntegrity, stepSpecCoverageMemo, stepApprovalsMemo, stepComponentStoriesMemo, stepReachabilityMemo, stepArchDocMemo, stepSchemaHistory, stepBuild, stepUnitTests],
+  scaffold: [stepHarnessIntegrity, stepSpecCoverageMemo, stepApprovalsMemo, stepComponentStoriesMemo, stepReachabilityMemo, stepE2eCoverageMemo, stepArchDocMemo, stepSchemaHistory, stepBuild, stepUnitTests],
   // smoke (docs/GATE-RULES.md Rule 0, docs/PRINCIPLES.md #2): the smallest
   // end-to-end lane — every pure-Node step through the REAL runner, marker,
   // receipt and journal, and NO Gradle, no device, no network. Its job is to
@@ -1187,7 +1248,7 @@ const stepsForProfile = {
   // fresh scaffold, then FAIL BY NAME on one planted spec edit, each bounded
   // in seconds. Its receipt is refused as done-evidence (qa/receipt-check.mjs)
   // exactly like --fast: it proves the instrument, never the change.
-  smoke: [stepHarnessIntegrity, stepSpecCoverageMemo, stepApprovalsMemo, stepComponentStoriesMemo, stepReachabilityMemo, stepArchDocMemo, stepSchemaHistory],
+  smoke: [stepHarnessIntegrity, stepSpecCoverageMemo, stepApprovalsMemo, stepComponentStoriesMemo, stepReachabilityMemo, stepE2eCoverageMemo, stepArchDocMemo, stepSchemaHistory],
   local: [
     // First, always: every verdict below is only worth what the lane issuing
     // it is worth.
@@ -1196,6 +1257,7 @@ const stepsForProfile = {
     stepApprovalsMemo,
     stepComponentStoriesMemo,
     stepReachabilityMemo,
+    stepE2eCoverageMemo,
     stepArchDocMemo,
     stepSchemaHistory,
     stepBuild,
@@ -1248,7 +1310,7 @@ stepsForProfile.release = [...stepsForProfile.ci, stepAuditCadence, stepReleaseS
 // nightly (evidence-economics S6 / proposal P4): the stage for proofs whose cost
 // scales with the SUITE rather than with the change — the determinism probe
 // today (forced on above; `--determinism` is implied), and the place any
-// future mutation / load / chaos step lands, so the placement decision is made
+// future load / chaos step lands, so the placement decision is made
 // once instead of per expensive step. It proves the harness and the tree's
 // invariants, not a change: qa/receipt-check.mjs refuses its receipt as
 // done-evidence, exactly as it refuses --fast. Same step set as ci on purpose —
@@ -1266,7 +1328,7 @@ stepsForProfile.nightly = [...stepsForProfile.ci];
 // physical device. Layer names are free-form strings on the wire; these are
 // this pack's. Derived by NAME after the lists are built so a step listed in
 // two profiles is tagged once, and a step nobody listed is never tagged.
-const SPINE_STEP_NAMES = new Set(["harnessIntegrity", "specCoverage", "approvals", "componentStories", "reachability", "archDoc", "schemaHistory", "auditCadence", "determinism"]);
+const SPINE_STEP_NAMES = new Set(["harnessIntegrity", "specCoverage", "approvals", "componentStories", "reachability", "e2eCoverage", "archDoc", "schemaHistory", "auditCadence", "determinism"]);
 function layerForStep(name) {
   if (DEVICE_STEPS.includes(name)) return "device";
   if (SPINE_STEP_NAMES.has(name)) return "spine";
@@ -1307,6 +1369,10 @@ for (const name of FAST_EXCLUDED_NAMES) {
     // decision above); the spine releases it in the runner's finally.
     releaseLease: () => {
       if (laneDeviceLease) releaseDeviceLease(laneDeviceLease);
+      // The emulator this lane booted goes down with the lane; an attached
+      // device is never touched (device-provider.mjs).
+      const down = releaseDevice(laneDevice, { sh });
+      if (down.shutdown) console.error(`· shut down ${laneDevice.avd} (${laneDevice.serial})`);
     },
   };
 }

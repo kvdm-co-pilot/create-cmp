@@ -134,7 +134,12 @@ export function checkHarnessIntegrity(root) {
  */
 export function describeIntegrity(r) {
   if (r.status === "intact") {
-    return `${r.name ?? "harness"} ${r.version ?? "?"} — ${r.fileCount} files verified`;
+    // The region digest rides beside the version: two lanes can carry the same
+    // package version with different content (create-cmp-showcase, 2026-09-03 —
+    // seven files changed, "0.16.0" on both receipts), and a receipt must name
+    // WHICH lane produced it in words a human reads, not only in the lock file.
+    const region = typeof r.sha256 === "string" && r.sha256 ? ` (region ${r.sha256.slice(0, 8)})` : "";
+    return `${r.name ?? "harness"} ${r.version ?? "?"}${region} — ${r.fileCount} files verified`;
   }
   if (r.status === "unlocked") {
     return `no ${LOCK_PATH} — this app's lane version is unrecorded`;

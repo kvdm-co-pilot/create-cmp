@@ -1,6 +1,6 @@
 {
   "name": "@create-cmp/harness",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "The create-cmp verify lane — the machine-owned harness code every stamped app carries byte-identical: evidence receipts, spec coverage, approvals, conformance reporting, golden trees, a11y, and the preview/inspector libs. Dependency-free ESM, vendored into each generated project so the lane runs offline with no install step, and content-hashed so a receipt can name the exact lane that issued it.",
   "type": "module",
   "main": "src/verify.mjs",

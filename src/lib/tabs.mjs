@@ -155,10 +155,25 @@ ${entries}
  * the static template file for the default tabs.
  * @param {ReturnType<typeof tabInfos>} infos
  */
+const HOME_ITEM_BLOCK = `
+
+# SPEC: HOME-02 — when loading completes, the items are listed: the first item's row
+# is on screen (the exemplar's device journey; the lane's e2eCoverage gate asks every
+# feature with a screen and a spec for at least one clause proven by a flow).
+- extendedWaitUntil:
+    visible:
+      id: "home_item_1"
+    timeout: 30000`;
+
 export function renderSmokeYaml(infos) {
   const [first, ...rest] = infos;
   const lines = [];
-  lines.push(`# E2E smoke — Maestro flow. SPEC: SHELL-01, SHELL-02.
+  // The exemplar tab (`home`, HomeScreen over the stub repository) carries the
+  // one device-proven HOME clause a fresh scaffold needs to pass e2eCoverage:
+  // after loading, the first item's row is on screen. Emitted only for that
+  // tab — a placeholder tab has no clauses to prove.
+  const homeBlock = (tab) => (tab.slug === "home" ? HOME_ITEM_BLOCK : "");
+  lines.push(`# E2E smoke — Maestro flow. SPEC: SHELL-01, SHELL-02${infos.some((t) => t.slug === "home") ? ", HOME-02" : ""}.
 #
 # Proves the real app boots on a device/emulator and the bottom-nav shell works.
 # Selectors go by testTag (surfaced as resource-ids on Android via TestTagAutomation),
@@ -188,7 +203,7 @@ appId: __PACKAGE__
       id: "${first.slug}_title"
     timeout: 60000
 - assertVisible:
-    id: "app_bottom_nav"`);
+    id: "app_bottom_nav"${homeBlock(first)}`);
 
   rest.forEach((tab, i) => {
     lines.push("");
@@ -198,7 +213,7 @@ appId: __PACKAGE__
 - assertVisible:
     id: "${tab.slug}_title"
 - assertVisible:
-    id: "app_bottom_nav"`);
+    id: "app_bottom_nav"${homeBlock(tab)}`);
   });
 
   if (rest.length > 0) {

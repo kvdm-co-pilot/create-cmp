@@ -32,7 +32,7 @@ this kind, not the other:
   wedged were indistinguishable without checking the daemon by hand.
 - Maestro's driver startup wedged the emulator; a stale adb transport read as
   `device offline` and killed the next driver before its first assertion.
-- A scheduled mutation audit died as **exit 143** with no row on any receipt.
+- A scheduled long-running audit died as **exit 143** with no row on any receipt.
 
 Per-step deadlines were added in 0.19.0 *because* of the first of these —
 reactively, hours into runs. Rule 0 is that same discovery made in the first
@@ -60,9 +60,15 @@ node scripts/framework-check.mjs        # bound 10 s per direction; --bound-ms t
 ```
 
 It stamps a scratch app, runs `--profile smoke` (every pure-Node gate, no
-Gradle) and asserts PASS; plants one edit in the stamped spec so a citation
-points at nothing, asserts FAIL **naming** `specCoverage` and the clause; asserts
-the Stop hook refuses; reverts and asserts PASS again. A direction that does not
+Gradle) and asserts PASS; then plants, one at a time, every way a test can be
+skipped or faked — an orphaned citation, a `SPEC:` tag on a class with no test
+under it, a device-only clause cited only from the JVM, a feature whose flow
+stops citing its clause, a citation in a nested flow the lane never runs, one
+edited byte in the machine-owned region — and asserts each FAILs **naming** the
+step and the clause or feature; asserts the Stop hook refuses a FAIL receipt,
+the forgery (verdict flipped to PASS over a failed `harnessIntegrity` row), and
+a receipt whose device tier was skipped for an environmental reason; reverts
+everything and asserts PASS again. A direction that does not
 return inside the bound is killed and reported as a hang — the bound is the
 assertion. Measured on this tree: 947 ms for all four legs. For a greenfield
 repo it is the first thing built, before the first real gate.
@@ -94,20 +100,21 @@ red on an identical commit, then proven by copying the tree to a path without a
 `test` segment. One planted magic number at adoption would have shown it in
 seconds, because the calibration would have failed to fail.
 
-**PIT sat in the per-change lane at ~20 minutes.** 523 mutants over two modules.
-Its cost scales with mutant count × test-suite startup, not with the size of the
-change being checked — and because a receipt binds the whole tree, every
-unrelated edit paid it. Signing an approval, which cannot move a mutation score,
-cost a full 20-minute re-run. Wiring it to one small module first and reading the
-clock would have tiered it correctly on day one. It cost roughly three hours of
-waiting before it was moved to a nightly profile.
+**A suite-scaled step sat in the per-change lane at ~20 minutes.** Its cost scaled
+with the size of the test suite times its start-up, not with the size of the change
+being checked — and because a receipt binds the whole tree, every unrelated edit
+paid it. Signing an approval, which cannot move that step's result, cost a full
+20-minute re-run. Wiring it to one small module first and reading the clock would
+have tiered it correctly on day one. It cost roughly three hours of waiting before
+it was moved out — and days more before it was removed (2026-09-03): it never once
+returned a verdict, and it pinned every core of a shared machine when it ran.
 
 **A threshold was set 11 points above an unreachable ceiling.** An agent raised a
-mutation threshold from 70 to 95. Kotlin `inline fun` bodies report
-`NO_COVERAGE` under PIT regardless of test quality — 12 of 30 in that kernel were
-`Result`'s inlined combinators, all genuinely tested — so even killing every
-surviving mutant capped the score at 83.6%. The agent ground against an
-arithmetically impossible target with nothing committed. One measured run at
+score threshold from 70 to 95 on a tool whose instrumentation could not see
+Kotlin `inline fun` bodies — 12 of 30 in that kernel were `Result`'s inlined
+combinators, all genuinely tested — so even a perfect suite capped the score at
+83.6%. The agent ground against an arithmetically impossible target with nothing
+committed. One measured run at
 adoption gives you the ceiling.
 
 **The strongest evidence is that an agent invented this rule under duress.**

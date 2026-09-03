@@ -41,6 +41,7 @@ const SCAFFOLD_CORE = [
   "approvals",
   "componentStories",
   "reachability",
+  "e2eCoverage",
   "archDoc",
   "schemaHistory",
   "build",
@@ -69,7 +70,7 @@ const RUNG_NAMES = { L0: "scaffold", L1: "desktop", L2: "device", L3: "release" 
  * The Compose Multiplatform pack's ladder — the step names above, as one
  * object a pack hands to the spine. THE LADDER IS THE PACK'S, NOT THE SPINE'S
  * (2026-09-03): vendored into a Kotlin backend, these names graded its
- * strongest run — detekt, Konsist, mutation, gitleaks — as L0 "scaffold" and
+ * strongest run — detekt, Konsist, gitleaks — as L0 "scaffold" and
  * made L1 unreachable by construction. A fixed-amount understatement is not
  * conservative, it is wrong, and receipts are where labels get quoted. So a
  * pack declares its ladder (`evidenceLadder` on createXSteps' return); a pack

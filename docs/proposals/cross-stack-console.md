@@ -38,14 +38,13 @@ refusals name "a pack that does not govern this" beside "an older scaffold".
    → report artifacts. The console would render any pack from that with zero pack-specific code
    — the structural fix for "a fourth stack breaks the console the way the second did". Today
    the manifest + layer tags cover the same ground declaratively; `describe()` earns its keep
-   when a pack has per-step report artifacts the console should link (JUnit XML, mutation
-   reports, SBOMs).
+   when a pack has per-step report artifacts the console should link (JUnit XML, SBOMs).
 4. **Per-layer inspectors as MCP servers** on the Compose inspector's principle (structured
    JSON, never screenshots): api-inspector (OpenAPI + live routes + DI graph), db-inspector
    (`information_schema` + policies), infra-inspector (`terraform show -json`). Each layer pack
    needs a Rule-1 planted proof (docs/GATE-RULES.md): drop one RLS policy → red; one
    unbalanced ledger leg → red; rename an OpenAPI field → red; open a port in a plan → red;
-   SBOM/vuln ratchet like mutation.
+   SBOM/vuln ratchet.
 
    The showcase-specific pane worth designing here: a **PCI control matrix rendered from
    evidence** — each CODE control cites the gate enforcing it and the console renders

@@ -76,3 +76,72 @@ test("a step that THROWS is an ERROR row too — it used to crash the whole lane
   assert.match(r.reason, /Nothing here is a claim about your change/);
   assert.equal(r.details.kind, "threw");
 });
+
+// ── Maestro directory run → per-flow outcome ────────────────────────────────
+import { parseMaestroJunit, maestroOutcome } from "../packages/harness/src/lib/step-outcomes.mjs";
+
+const JUNIT_ALL_GREEN = `<?xml version="1.0"?><testsuites><testsuite name="Test Suite" tests="3" failures="0">
+<testcase id="meals" name="meals" classname="meals" status="SUCCESS"/>
+<testcase id="smoke" name="smoke" classname="smoke" status="SUCCESS"/>
+<testcase id="week" name="week" classname="week" status="SUCCESS"/>
+</testsuite></testsuites>`;
+const JUNIT_ONE_RED = JUNIT_ALL_GREEN.replace(
+  '<testcase id="week" name="week" classname="week" status="SUCCESS"/>',
+  '<testcase id="week" name="week" classname="week" status="ERROR"><failure message="Assertion is false: id: week_title">Element not found</failure></testcase>',
+);
+const FLOWS = ["qa/e2e/meals.yaml", "qa/e2e/smoke.yaml", "qa/e2e/week.yaml"];
+
+test("parseMaestroJunit: one row per flow, failure message carried; missing/unparsable → null, never a fabricated list", () => {
+  assert.deepEqual(parseMaestroJunit(JUNIT_ALL_GREEN), [{ flow: "meals", ok: true }, { flow: "smoke", ok: true }, { flow: "week", ok: true }]);
+  const red = parseMaestroJunit(JUNIT_ONE_RED);
+  assert.deepEqual(red[2], { flow: "week", ok: false, message: "Assertion is false: id: week_title" });
+  assert.equal(parseMaestroJunit(null), null);
+  assert.equal(parseMaestroJunit("<testsuites/>"), null);
+});
+
+test("maestroOutcome: PASS lists every flow; PLANTED one red flow → FAIL naming it; fewer rows than flows → ERROR, not a claim", () => {
+  const pass = maestroOutcome({ ok: true, out: "" }, parseMaestroJunit(JUNIT_ALL_GREEN), FLOWS);
+  assert.equal(pass.verdict, "PASS");
+  assert.deepEqual(pass.details.flows, FLOWS);
+  assert.equal(pass.details.results.length, 3);
+
+  const fail = maestroOutcome({ ok: false, out: "boom" }, parseMaestroJunit(JUNIT_ONE_RED), FLOWS);
+  assert.equal(fail.verdict, "FAIL");
+  assert.match(fail.reason, /1 of 3 flows failed — week \(Assertion is false: id: week_title\)/);
+
+  const partial = maestroOutcome({ ok: true, out: "" }, parseMaestroJunit(JUNIT_ALL_GREEN), [...FLOWS, "qa/e2e/extra.yaml"]);
+  assert.equal(partial.verdict, "ERROR");
+  assert.match(partial.reason, /reported 3 flows but qa\/e2e holds 4/);
+
+  const noReport = maestroOutcome({ ok: false, out: "driver died" }, null, FLOWS);
+  assert.equal(noReport.verdict, "FAIL");
+  assert.match(noReport.reason, /no per-flow report was written/);
+  const noReportGreen = maestroOutcome({ ok: true, out: "" }, null, FLOWS);
+  assert.equal(noReportGreen.verdict, "PASS");
+  assert.match(noReportGreen.reason, /verdict from the exit code only/);
+});
+
+// ── The post-run device-log sweep is scoped to the app under test ───────────
+import { deviceLogIncidents } from "../packages/harness/src/lib/step-outcomes.mjs";
+
+test("PLANTED (2026-09-03, first self-booted lane): an ANR in ANOTHER app on the emulator is not our red; our own ANR and our own FATAL EXCEPTION are", () => {
+  const log = [
+    "09-03 19:39:29.594   527  2969 E ActivityManager: ANR in com.karel.bratometer",
+    "09-03 19:39:30.000   527  2969 E ActivityManager: ANR in com.fleet.check:remote",
+    "09-03 19:39:31.000  1234  1234 E AndroidRuntime: FATAL EXCEPTION: main",
+    "09-03 19:39:31.001  1234  1234 E AndroidRuntime: Process: com.other.app, PID: 1234",
+    "09-03 19:39:32.000  2222  2222 E AndroidRuntime: FATAL EXCEPTION: main",
+    "09-03 19:39:32.001  2222  2222 E AndroidRuntime: Process: com.fleet.check, PID: 2222",
+  ].join("\n");
+  const ours = deviceLogIncidents(log, ["com.fleet.check"]);
+  assert.equal(ours.scoped, true);
+  assert.deepEqual(ours.lines, [
+    "09-03 19:39:30.000   527  2969 E ActivityManager: ANR in com.fleet.check:remote",
+    "09-03 19:39:32.000  2222  2222 E AndroidRuntime: FATAL EXCEPTION: main",
+  ]);
+  const unscoped = deviceLogIncidents(log, []);
+  assert.equal(unscoped.scoped, false);
+  assert.equal(unscoped.lines.length, 4, "with no appId known, every incident counts — and the reason says so");
+  assert.deepEqual(deviceLogIncidents("", ["com.fleet.check"]).lines, []);
+  assert.equal(deviceLogIncidents(log, ["__PACKAGE__"]).scoped, false, "an unreplaced token is not an app id");
+});

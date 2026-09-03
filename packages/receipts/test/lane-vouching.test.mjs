@@ -50,9 +50,9 @@ test("THE FORGERY: a PASS verdict over a FAILing row is refused, and the row is 
 });
 
 test("an ERROR row is refused too — 'could not check' is not green", () => {
-  const r = checkLaneVouching(receipt([ok("harnessIntegrity"), { name: "mutation", verdict: "ERROR", durationMs: 5 }]));
+  const r = checkLaneVouching(receipt([ok("harnessIntegrity"), { name: "loadTest", verdict: "ERROR", durationMs: 5 }]));
   assert.equal(r.ok, false);
-  assert.match(r.detail, /mutation \(ERROR\)/);
+  assert.match(r.detail, /loadTest \(ERROR\)/);
 });
 
 test("THE DELETED LOCK: no harnessIntegrity row at all is refused", () => {

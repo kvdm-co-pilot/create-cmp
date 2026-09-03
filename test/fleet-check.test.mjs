@@ -28,7 +28,9 @@ test("--help exits 0 and documents --min-level (incl. the attached-device defaul
   assert.equal(res.status, 0, res.stderr);
   assert.match(res.stdout, /--min-level/);
   assert.match(res.stdout, /L1\s*\|\s*L2\s*\|\s*L3/);
-  assert.match(res.stdout, /adb\s+devices/, "help must explain the auto L2 default on an attached device");
+  assert.match(res.stdout, /Default L2/, "help states the L2 default");
+  assert.match(res.stdout, /boots a\s+headless emulator itself/, "and explains that the lane provisions the device");
+  assert.match(res.stdout, /CMP_DEVICE=none/, "and names the one opt-out, which fails this check");
 });
 
 test("unknown flag / bad min-level are usage errors (exit 2)", () => {
