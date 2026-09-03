@@ -500,6 +500,7 @@ test("Stop-hook composition: an approvals FAIL fails the lane verdict, and recei
       commit: { sha: null, dirty: [] },
       inputs: { hash: "0".repeat(64), fileCount: 0 },
       steps: [
+        { name: "harnessIntegrity", verdict: "PASS", durationMs: 12 },
         { name: "specCoverage", verdict: "PASS", durationMs: 1 },
         { name: "approvals", verdict: "FAIL", reason: "Approval invalidated — a governed artifact changed after sign-off:\n  [design-system] ... Re-approve: node qa/approve.mjs design-system", durationMs: 1 },
       ],
@@ -543,6 +544,7 @@ test("Stop-hook composition: a genuinely valid receipt (approvals PASS included)
       commit: { sha: null, dirty: [] },
       inputs: { hash: inputs.hash, fileCount: inputs.fileCount },
       steps: [
+        { name: "harnessIntegrity", verdict: "PASS", durationMs: 12 },
         { name: "specCoverage", verdict: "PASS", durationMs: 1 },
         { name: "approvals", verdict: "PASS", durationMs: 1 },
       ],

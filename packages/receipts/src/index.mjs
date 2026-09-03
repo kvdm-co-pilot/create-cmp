@@ -13,4 +13,5 @@ export {
   checkExecutionPlausibility,
   listSkippedSteps,
   validateReceiptForTree,
+  checkLaneVouching,
 } from "./receipt-validate.mjs";
