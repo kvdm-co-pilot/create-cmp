@@ -390,6 +390,32 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
     // but "run the lane" is the wrong instruction when one is already running,
     // and it fired ~8 times in one observed session. The refusal stays; the
     // instruction changes.
+    // evidence-economics S8 follow-up (peer finding): the spine used to hash a
+    // surface it could not see and return the sha256 of the empty set —
+    // e3b0c442…, a valid-looking digest attesting NOTHING. It now throws, and
+    // the Stop hook must turn that into a refusal with the reason, never a
+    // stack trace: this runs on every turn end.
+    await t.test("receipt-check REFUSES cleanly when the verified surface cannot be resolved — never an unhandled crash", () => {
+      const receiptPath = path.join(out, "qa/evidence/latest.json");
+      const surfacePath = path.join(out, "qa/verified-surface.json");
+      try {
+        fs.writeFileSync(receiptPath, JSON.stringify({ schema: "cmp-evidence/1", profile: "local", mode: "full", verdict: "PASS", inputs: { hash: "a".repeat(64), fileCount: 1 }, steps: [{ name: "build", verdict: "PASS", durationMs: 60_000 }] }));
+        fs.writeFileSync(surfacePath, '{ "surface": [] }');
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("expected the hook to refuse");
+        } catch (err) {
+          assert.equal(err.status, 2, "a refusal, not a crash (a crash would exit 1 with a stack trace)");
+          assert.match(String(err.stderr), /cannot verify this receipt/);
+          assert.match(String(err.stderr), /declares no surface/, "and it names what is wrong");
+          assert.doesNotMatch(String(err.stderr), /at Module\._load|node:internal/, "no stack trace reaches the human");
+        }
+      } finally {
+        fs.rmSync(receiptPath, { force: true });
+        fs.rmSync(surfacePath, { force: true });
+      }
+    });
+
     await t.test("receipt-check REFUSES a nightly-stage receipt — it proves the harness, never this change", () => {
       const receiptPath = path.join(out, "qa/evidence/latest.json");
       try {

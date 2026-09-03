@@ -99,7 +99,21 @@ function evaluate() {
       profile: receipt.profile,
     };
   }
-  const result = evaluateReceipt(receipt, () => computeInputsHash(ROOT));
+  // A surface this project cannot resolve is a REFUSAL with an explanation,
+  // never an unhandled stack trace: this runs as the Stop hook on every turn
+  // end, and a crash there reads as a broken harness rather than as the
+  // misconfiguration it is. (evidence-economics S8 follow-up: computeInputsHash
+  // now throws rather than returning a confident hash of the empty set.)
+  let result;
+  try {
+    result = evaluateReceipt(receipt, () => computeInputsHash(ROOT));
+  } catch (err) {
+    return {
+      valid: false,
+      reason: `cannot verify this receipt — ${err && err.message ? err.message : String(err)}`,
+      profile: receipt.profile,
+    };
+  }
   // Surface the receipt's evidence rung (the ladder — qa/lib/evidence-level.mjs)
   // alongside the verdict: the rung is the receipt's own derived field, read
   // verbatim, never recomputed here. Older receipts without it stay valid.
