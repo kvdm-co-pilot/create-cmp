@@ -89,7 +89,9 @@ test("getSpecsData: cited=true for a tagged clause, false for an uncited live cl
 test("getSpecsData: {available:false} when the project has no specs/ directory — never fabricated", () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-specs-empty2-"));
   try {
-    assert.deepEqual(getSpecsData(empty), { available: false });
+    const result = getSpecsData(empty);
+    assert.equal(result.available, false);
+    assert.equal(result.specsDir, "specs/", "names the directory it looked in (the layout's), so the empty state is specific");
   } finally {
     fs.rmSync(empty, { recursive: true, force: true });
   }
@@ -136,6 +138,107 @@ test("getSpecsData: a clean tree yields orphanCitations: [] — the scan ran and
   try {
     assert.deepEqual(getSpecsData(root).orphanCitations, []);
   } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── The project's OWN scanner is the law when it ships one ───────────────────
+// payment-blueprint's specs are `### ID — title` headings with a `status:` line;
+// its lane's specCoverage reads all thirteen files and this console said "no
+// clauses parsed" about every one. The console now bridges to the project's
+// qa/lib/spec-coverage.mjs (scanSpecClauses/scanCitations) exactly as it
+// bridges to approvals.mjs, and falls back to its own scan otherwise.
+import { getProjectSpecsData, resetSpecsBridgeCache } from "../src/lib/specs.mjs";
+
+function adopterFixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-specs-adopter-"));
+  fs.mkdirSync(path.join(root, "specs"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "specs", "money.spec.md"),
+    ["# Spec: money", "", "### MN-01 — The table is the single source of truth", "", "status: active", "", "- **Given** a currency", "", "### MN-02 — Lookup trims", "", "status: draft", ""].join("\n"),
+  );
+  fs.mkdirSync(path.join(root, "services", "core", "src", "test", "kotlin"), { recursive: true });
+  fs.writeFileSync(path.join(root, "services", "core", "src", "test", "kotlin", "MoneyTest.kt"), "class MoneyTest {\n  // SPEC: MN-01\n  @Test fun t() {}\n}\n");
+  fs.mkdirSync(path.join(root, "qa", "lib"), { recursive: true });
+  // An adopter-shaped scanner: {clauses: Map} and {citations: Array}, with specFiles().
+  fs.writeFileSync(
+    path.join(root, "qa", "lib", "spec-coverage.mjs"),
+    `import fs from "node:fs"; import path from "node:path";
+export function specFiles(root) { return fs.readdirSync(path.join(root, "specs")).filter((f) => f.endsWith(".spec.md")).map((f) => "specs/" + f).sort(); }
+export function scanSpecClauses(root) {
+  const clauses = new Map();
+  for (const rel of specFiles(root)) {
+    const lines = fs.readFileSync(path.join(root, rel), "utf8").split("\\n");
+    lines.forEach((line, i) => {
+      const m = line.match(/^###\\s+([A-Z][A-Z0-9]*-\\d{2,})\\s+—\\s+(.+)$/);
+      if (!m) return;
+      const status = (lines.slice(i + 1, i + 6).map((l) => l.match(/^status:\\s*(\\w+)/)).find(Boolean) || [])[1] || "active";
+      clauses.set(m[1], { id: m[1], title: m[2].trim(), status, file: rel, line: i + 1 });
+    });
+  }
+  return { clauses, malformed: [], duplicates: [] };
+}
+export function scanCitations(root) {
+  return { citations: [{ id: "MN-01", file: "services/core/src/test/kotlin/MoneyTest.kt", line: 2 }, { id: "MN-99", file: "services/core/src/test/kotlin/MoneyTest.kt", line: 9 }], unparsable: [], unbound: [] };
+}
+`,
+  );
+  return root;
+}
+
+test("getProjectSpecsData: bridges to the project's scanner — its grammar, its citations, its file order; prose falls back to the clause title", async () => {
+  const root = adopterFixture();
+  try {
+    const data = await getProjectSpecsData(root);
+    assert.equal(data.available, true, data.reason);
+    assert.equal(data.source, "project-lib");
+    assert.equal(data.files.length, 1);
+    assert.equal(data.files[0].file, "money.spec.md");
+    assert.equal(data.files[0].relPath, "specs/money.spec.md");
+    const ids = data.files[0].clauses.map((c) => c.id);
+    assert.deepEqual(ids, ["MN-01", "MN-02"], "the console's own `- **ID**` grammar found nothing here; the project's did");
+    const mn01 = data.files[0].clauses[0];
+    assert.equal(mn01.prose, "The table is the single source of truth", "title stands in for prose the console grammar cannot read");
+    assert.equal(mn01.cited, true);
+    assert.deepEqual(mn01.citedBy, [{ file: "services/core/src/test/kotlin/MoneyTest.kt", line: 2 }]);
+    assert.equal(mn01.status, "active");
+    const mn02 = data.files[0].clauses[1];
+    assert.equal(mn02.withdrawn, false, "draft is live-but-uncounted, never struck through");
+    assert.equal(mn02.cited, false);
+    assert.deepEqual(data.orphanCitations, [{ id: "MN-99", file: "services/core/src/test/kotlin/MoneyTest.kt", line: 9, reason: "cites no clause in any spec file" }]);
+  } finally {
+    resetSpecsBridgeCache(root);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("getProjectSpecsData: without a project scanner, the console's own scan runs under the manifest's specs dir and citation roots", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-specs-manifest-"));
+  try {
+    fs.mkdirSync(path.join(root, "qa"), { recursive: true });
+    fs.writeFileSync(path.join(root, "qa", "harness-manifest.json"), JSON.stringify({ specs: "contracts", citationRoots: ["src"] }));
+    fs.mkdirSync(path.join(root, "contracts"), { recursive: true });
+    fs.writeFileSync(path.join(root, "contracts", "api.spec.md"), "# Spec: api\n\n- **API-01** — Given a request, Then a response.\n- **API-02** — Given nothing, Then nothing.\n");
+    fs.mkdirSync(path.join(root, "src"), { recursive: true });
+    fs.writeFileSync(path.join(root, "src", "ApiTest.kt"), "class ApiTest {\n  // SPEC: API-01\n  fun t() {}\n}\n");
+    const data = await getProjectSpecsData(root);
+    assert.equal(data.available, true);
+    assert.equal(data.source, "console-scan");
+    assert.equal(data.specsDir, "contracts/");
+    assert.equal(data.files[0].relPath, "contracts/api.spec.md");
+    assert.deepEqual(
+      data.files[0].clauses.map((c) => [c.id, c.cited]),
+      [["API-01", true], ["API-02", false]],
+      "citations found under the manifest's roots, not under composeApp/src",
+    );
+    assert.deepEqual(data.files[0].clauses[0].citedBy, [{ file: "src/ApiTest.kt", line: 2 }]);
+
+    fs.writeFileSync(path.join(root, "qa", "harness-manifest.json"), "{ nope");
+    const refused = await getProjectSpecsData(root);
+    assert.equal(refused.available, false);
+    assert.match(refused.reason, /not valid JSON/);
+  } finally {
+    resetSpecsBridgeCache(root);
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

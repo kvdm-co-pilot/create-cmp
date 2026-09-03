@@ -15,6 +15,18 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { resolveProjectLayout, DEFAULT_LAYOUT } from "./project-layout.mjs";
+
+// The project's spec directory and citation roots (qa/harness-manifest.json,
+// or the Compose default). A malformed manifest resolves to the default HERE
+// only for the synchronous helpers below, which older callers and tests use
+// directly; getProjectSpecsData — the console's entry point — refuses it.
+function layoutOf(root) {
+  const resolved = resolveProjectLayout(root);
+  return resolved.ok ? resolved.layout : DEFAULT_LAYOUT;
+}
+const specsDirOf = (root) => path.join(root, ...layoutOf(root).specs.split("/"));
 
 const CLAUSE_LINE_RE = /^-\s+(~~)?\*\*([A-Z][A-Z0-9]*-\d{2,})\*\*(.*)$/;
 const TAG_LINE_RE = /^(?:\/\/|#)\s*SPEC:/;
@@ -53,7 +65,7 @@ function walkCodeFiles(dir) {
  * @returns {Map<string, Array<{file: string, line: number}>>}
  */
 function citationIndex(root) {
-  const dirs = [path.join(root, "composeApp", "src"), path.join(root, "qa", "e2e")];
+  const dirs = layoutOf(root).citationRoots.map((rel) => path.join(root, ...rel.split("/")));
   const index = new Map();
   for (const dir of dirs) {
     for (const file of walkCodeFiles(dir)) {
@@ -75,7 +87,7 @@ function citationIndex(root) {
 
 /** @returns {string[]} `*.spec.md` file names under specs/, sorted; [] if no specs/ dir. */
 export function listSpecFiles(root) {
-  const specsDir = path.join(root, "specs");
+  const specsDir = specsDirOf(root);
   if (!fs.existsSync(specsDir)) return [];
   return fs
     .readdirSync(specsDir)
@@ -90,7 +102,12 @@ export function listSpecFiles(root) {
  * @returns {Array<{id: string, withdrawn: boolean, prose: string}>}
  */
 export function parseSpecClauses(root, file) {
-  const lines = fs.readFileSync(path.join(root, "specs", file), "utf8").split("\n");
+  return parseClauseLines(fs.readFileSync(path.join(specsDirOf(root), file), "utf8"));
+}
+
+/** parseSpecClauses over raw text — the grammar, separated from the file lookup. */
+export function parseClauseLines(text) {
+  const lines = String(text).split("\n");
   const clauses = [];
   let current = null;
   const flush = () => {
@@ -133,10 +150,11 @@ export function parseSpecClauses(root, file) {
  * @returns {{available: boolean, files?: Array<{file: string, clauses: Array<{id: string, withdrawn: boolean, prose: string, cited: boolean|null, citedBy: Array<{file: string, line: number}>}>}>, orphanCitations?: Array<{id: string, file: string, line: number, reason: string}>}}
  */
 export function getSpecsData(root) {
+  const specsRel = layoutOf(root).specs;
   const files = listSpecFiles(root);
-  if (files.length === 0) return { available: false };
+  if (files.length === 0) return { available: false, specsDir: `${specsRel}/` };
   const citations = citationIndex(root);
-  const parsed = files.map((file) => ({ file, clauses: parseSpecClauses(root, file) }));
+  const parsed = files.map((file) => ({ file, relPath: `${specsRel}/${file}`, clauses: parseSpecClauses(root, file) }));
   const liveIds = new Set();
   const withdrawnIds = new Set();
   for (const f of parsed) {
@@ -151,8 +169,11 @@ export function getSpecsData(root) {
   orphanCitations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
   return {
     available: true,
-    files: parsed.map(({ file, clauses }) => ({
+    source: "console-scan",
+    specsDir: `${specsRel}/`,
+    files: parsed.map(({ file, relPath, clauses }) => ({
       file,
+      relPath,
       clauses: clauses.map((c) => ({
         ...c,
         cited: c.withdrawn ? null : citations.has(c.id),
@@ -161,4 +182,169 @@ export function getSpecsData(root) {
     })),
     orphanCitations,
   };
+}
+
+// ── Bridge: the project's OWN spec-coverage scanner ─────────────────────────
+// The grammar above is the Compose template's. An adopter may govern a
+// different one — payment-blueprint's clauses are `### ID — title` headings
+// with a `status:` line, and its citations are bound to the test under them
+// — and its lane's specCoverage step reads them fine while this console said
+// "no clauses parsed" about the same thirteen files. Forking that grammar in
+// here would be the "keep in sync BY HAND" mistake a second time. So, the
+// same stance approvals-bridge.mjs takes for qa/lib/approvals.mjs: when the
+// project ships qa/lib/spec-coverage.mjs with scanSpecClauses/scanCitations,
+// THOSE are the law and the console renders what they return; the scan above
+// is the fallback for a project without them.
+//
+// Two return shapes are known and both are read, never re-derived:
+//   create-cmp's:  scanSpecClauses → Map<id, {file, withdrawn, requiredTier}>
+//                  scanCitations   → Array<{id, file, line, tier}>
+//   an adopter's:  scanSpecClauses → {clauses: Map<id, {id, title, status, file, line}>, …}
+//                  scanCitations   → {citations: Array<{id, file, line}>, …}
+// Anything else degrades to the console's own scan with the reason recorded.
+
+const SPEC_COVERAGE_REL_PATH = "qa/lib/spec-coverage.mjs";
+const specLibCache = new Map(); // root -> module (successful loads only; a miss is re-probed)
+
+async function loadSpecCoverageLib(root) {
+  if (specLibCache.has(root)) return specLibCache.get(root);
+  const libPath = path.join(root, ...SPEC_COVERAGE_REL_PATH.split("/"));
+  if (!fs.existsSync(libPath)) return null;
+  let mod;
+  try {
+    mod = await import(pathToFileURL(libPath).href);
+  } catch {
+    return null;
+  }
+  specLibCache.set(root, mod);
+  return mod;
+}
+
+/** Test/ops seam, mirroring resetApprovalsBridgeCache. */
+export function resetSpecsBridgeCache(root) {
+  if (root) specLibCache.delete(root);
+  else specLibCache.clear();
+}
+
+function normalizeClauses(scanned) {
+  const map = scanned instanceof Map ? scanned : scanned && scanned.clauses instanceof Map ? scanned.clauses : null;
+  if (!map) return null;
+  const out = [];
+  for (const [id, entry] of map) {
+    if (!entry || typeof entry !== "object") continue;
+    const file = typeof entry.file === "string" ? entry.file.split(path.sep).join("/") : null;
+    if (!file) continue;
+    // Withdrawn: create-cmp's flag, or an adopter status that is not active
+    // and not draft (a draft clause is live-but-uncounted, never struck).
+    const withdrawn = entry.withdrawn === true || (typeof entry.status === "string" && !["active", "draft"].includes(entry.status));
+    out.push({
+      id,
+      file,
+      withdrawn,
+      status: typeof entry.status === "string" ? entry.status : null,
+      title: typeof entry.title === "string" ? entry.title : null,
+      line: typeof entry.line === "number" ? entry.line : null,
+    });
+  }
+  return out;
+}
+
+function normalizeCitations(scanned) {
+  const list = Array.isArray(scanned) ? scanned : scanned && Array.isArray(scanned.citations) ? scanned.citations : null;
+  if (!list) return null;
+  const index = new Map();
+  for (const c of list) {
+    if (!c || typeof c.id !== "string" || typeof c.file !== "string") continue;
+    if (!index.has(c.id)) index.set(c.id, []);
+    index.get(c.id).push({ file: c.file.split(path.sep).join("/"), line: typeof c.line === "number" ? c.line : 0 });
+  }
+  return index;
+}
+
+/**
+ * Specs section data via the project's own scanner when it has one, else the
+ * console's scan (getSpecsData). Same shape as getSpecsData plus `source`
+ * ("project-lib" | "console-scan") so the page can say whose reading it is.
+ * A malformed qa/harness-manifest.json is refused here with its reason.
+ * @param {string} root
+ */
+export async function getProjectSpecsData(root) {
+  const resolved = resolveProjectLayout(root);
+  if (!resolved.ok) return { available: false, reason: resolved.reason };
+  const specsRel = resolved.layout.specs;
+  const lib = await loadSpecCoverageLib(root);
+  if (!lib || typeof lib.scanSpecClauses !== "function" || typeof lib.scanCitations !== "function") {
+    return getSpecsData(root);
+  }
+  let clauseRows;
+  let citations;
+  try {
+    clauseRows = normalizeClauses(lib.scanSpecClauses(root));
+    citations = normalizeCitations(lib.scanCitations(root));
+  } catch (err) {
+    const fallback = getSpecsData(root);
+    return { ...fallback, bridgeError: `${SPEC_COVERAGE_REL_PATH} threw (${err && err.message ? err.message : String(err)}) — showing the console's own scan` };
+  }
+  if (!clauseRows || !citations) {
+    const fallback = getSpecsData(root);
+    return { ...fallback, bridgeError: `${SPEC_COVERAGE_REL_PATH} returned a shape this console does not read — showing the console's own scan` };
+  }
+
+  // Group by spec file, in the project's own file order (its specFiles() when
+  // exported, else the directory listing), so a file with zero clauses still
+  // gets its heading and an honest "no clauses parsed".
+  let fileOrder;
+  if (typeof lib.specFiles === "function") {
+    try {
+      fileOrder = lib.specFiles(root).map((f) => String(f).split(path.sep).join("/"));
+    } catch {
+      fileOrder = null;
+    }
+  }
+  if (!fileOrder) fileOrder = listSpecFiles(root).map((f) => `${specsRel}/${f}`);
+  for (const c of clauseRows) if (!fileOrder.includes(c.file)) fileOrder.push(c.file);
+  if (fileOrder.length === 0) return { available: false, source: "project-lib", specsDir: `${specsRel}/` };
+
+  // Prose: the console's own grammar can still read a `- **ID** —` line for
+  // the requirement text; where it cannot (another grammar), the project
+  // scanner's title stands in. Never invented.
+  const proseByFile = new Map();
+  const proseFor = (relFile, id, title) => {
+    if (!proseByFile.has(relFile)) {
+      let parsed = [];
+      try {
+        parsed = parseClauseLines(fs.readFileSync(path.join(root, ...relFile.split("/")), "utf8"));
+      } catch {
+        parsed = [];
+      }
+      proseByFile.set(relFile, new Map(parsed.map((c) => [c.id, c.prose])));
+    }
+    return proseByFile.get(relFile).get(id) ?? title ?? "";
+  };
+
+  const liveIds = new Set();
+  const withdrawnIds = new Set();
+  for (const c of clauseRows) (c.withdrawn ? withdrawnIds : liveIds).add(c.id);
+  const files = fileOrder.map((relFile) => ({
+    file: relFile.split("/").pop(),
+    relPath: relFile,
+    clauses: clauseRows
+      .filter((c) => c.file === relFile)
+      .map((c) => ({
+        id: c.id,
+        withdrawn: c.withdrawn,
+        status: c.status,
+        prose: proseFor(relFile, c.id, c.title),
+        cited: c.withdrawn ? null : citations.has(c.id),
+        citedBy: c.withdrawn ? [] : citations.get(c.id) || [],
+      })),
+  }));
+  const orphanCitations = [];
+  for (const [id, sites] of citations) {
+    if (liveIds.has(id)) continue;
+    const reason = withdrawnIds.has(id) ? "cites a withdrawn clause" : "cites no clause in any spec file";
+    for (const site of sites) orphanCitations.push({ id, file: site.file, line: site.line, reason });
+  }
+  orphanCitations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
+  return { available: true, source: "project-lib", specsDir: `${specsRel}/`, files, orphanCitations };
 }

@@ -6,6 +6,34 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Project manifest for the console** — `qa/harness-manifest.json` declares where a project
+  keeps its receipt, architecture document, spec directory and citation roots (and which step
+  packs it composes). The console read one layout — a create-cmp Compose app's — as constants,
+  so the first spine adopter with its own (`payment-blueprint`: `qa/evidence/receipt.json`,
+  `ARCHITECTURE.md` at the root, Kotlin under `services/`) got an Evidence pane, verdict history,
+  audit trail, digest and Architecture page that said "not found" about files that existed. The
+  layout is now resolved per project exactly like the verified surface: Compose default, manifest
+  override, and a present-but-malformed manifest is refused with every problem named rather than
+  silently defaulted. `--status` reports the layout in use; the rail names the manifest.
+- **Layer-tagged receipt rows** — a step pack may tag a step function with the layer it proves
+  (`fn.layer = "backend"`); the runner stamps it onto the receipt row and the Evidence page
+  groups steps per layer with a per-layer tally. Backward compatible: untagged rows and receipts
+  render exactly as before. The Compose pack tags `spine` / `compose` / `device`.
+- **Specs page bridges to the project's own scanner** — when `qa/lib/spec-coverage.mjs` exports
+  `scanSpecClauses`/`scanCitations`, the console renders their reading (the project's clause
+  grammar and citation-binding rule), the same "bridge, never fork" stance it takes for
+  `approvals.mjs`. The console's own scan remains the fallback.
+- The receipt bridge reads a flat receipt schema (`inputsHash`/`gitSha`/`timestamp`) alongside
+  the nested `cmp-evidence/1` one.
+
+### Changed
+
+- Approvals-bridge refusals for a library without `reopenArtifact`/`acceptFeature` no longer
+  assume an "older scaffold": a step pack that does not govern reopen or briefs is the other,
+  named, possibility.
+
 ## [0.20.0] - 2026-09-03
 
 Three gates that read as green while holding nothing, closed. **Each is breaking by design**

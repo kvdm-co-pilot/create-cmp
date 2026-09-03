@@ -76,3 +76,39 @@ test("PLANTED: a directory with neither qa/ nor composeApp/ is still refused —
   const service = createPreviewService({ projectDir, port: 19933, hot: false, runRender: async () => {} });
   await assert.rejects(() => service.start(), /neither qa\/ .* nor composeApp\//);
 });
+
+// ── The layout the console reads a project through ───────────────────────────
+test("a project with qa/harness-manifest.json: /status reports the layout in use, the rail names the manifest and its packs, and a refused manifest is said out loud", async () => {
+  const projectDir = fixture("manifest", { qa: true, composeApp: false });
+  fs.writeFileSync(
+    path.join(projectDir, "qa", "harness-manifest.json"),
+    JSON.stringify({ receipt: "qa/evidence/receipt.json", architectureDoc: "ARCHITECTURE.md", packs: ["blueprint"] }),
+  );
+  fs.writeFileSync(
+    path.join(projectDir, "qa", "evidence", "receipt.json"),
+    JSON.stringify({ schema: "pb-evidence/1", verdict: "PASS", profile: "local", gitSha: "abc", inputsHash: null, steps: [{ name: "compositeBuild", verdict: "PASS", durationMs: 3, layer: "backend" }], timestamp: new Date().toISOString() }),
+  );
+  const service = createPreviewService({ projectDir, port: 19935, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    const status = await (await fetch(`${st.url}status`)).json();
+    assert.equal(status.layout.source, "manifest");
+    assert.equal(status.layout.receipt, "qa/evidence/receipt.json");
+    assert.equal(status.layout.architectureDoc, "ARCHITECTURE.md");
+    assert.equal(status.layout.specs, "specs", "undeclared fields report the default they resolve to");
+    const page = await (await fetch(st.url)).text();
+    assert.match(page, /layout: qa\/harness-manifest\.json &middot; packs blueprint/, "the rail says which manifest and packs");
+    assert.match(page, /Rendered from <code>qa\/evidence\/receipt\.json<\/code>/, "Evidence reads the declared receipt");
+    assert.match(page, /data-layer="backend"/, "and groups its layer-tagged rows");
+
+    fs.writeFileSync(path.join(projectDir, "qa", "harness-manifest.json"), JSON.stringify({ receipt: "../elsewhere.json" }));
+    const refusedStatus = await (await fetch(`${st.url}status`)).json();
+    assert.equal(refusedStatus.layout.source, "refused");
+    assert.match(refusedStatus.layout.reason, /may not escape/);
+    const refusedPage = await (await fetch(st.url)).text();
+    assert.match(refusedPage, /qa\/harness-manifest\.json refused/, "the rail names the refused file");
+    assert.match(refusedPage, /is malformed/, "and the Evidence pane carries the reason");
+  } finally {
+    service.stop();
+  }
+});

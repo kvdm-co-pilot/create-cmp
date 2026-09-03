@@ -2011,3 +2011,39 @@ test("digestTabHtml: open comments survive — the front door must not swallow a
   // deleted here rather than printed twice and hidden with CSS.
   assert.doesNotMatch(html, /window: since/);
 });
+
+// ── Layer-tagged receipt rows (cross-stack lanes) ────────────────────────────
+test("evidenceBodyHtml: steps tagged with a layer group under one header row per layer with that layer's tally; untagged receipts render exactly as before", () => {
+  const base = { available: true, relPath: "qa/evidence/receipt.json", verdict: "PASS", profile: "local", stale: false, ageMs: 1000, generatedAt: "2026-09-03T10:00:00Z" };
+  const tagged = evidenceBodyHtml(
+    {
+      ...base,
+      steps: [
+        { name: "harnessIntegrity", verdict: "PASS", durationMs: 10, layer: "spine" },
+        { name: "compositeBuild", verdict: "PASS", durationMs: 100, layer: "backend" },
+        { name: "mutation", verdict: "SKIP", durationMs: 0, layer: "backend" },
+        { name: "gitleaks", verdict: "PASS", durationMs: 5, layer: "security" },
+        { name: "legacyPlatform", verdict: "SKIP", durationMs: 0 },
+      ],
+    },
+    { available: false, reason: "no history" },
+  );
+  const headers = [...tagged.matchAll(/<tr class="step-layer" data-layer="([^"]+)"><th colspan="5">[^<]*<span class="step-layer-tally">([^<]*)<\/span>/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(headers, [
+    ["spine", "1 PASS"],
+    ["backend", "1 PASS &middot; 1 SKIP"],
+    ["security", "1 PASS"],
+    ["other", "1 SKIP"],
+  ], "first-seen order; a step without a layer sits under 'other' only because others have one");
+  assert.ok(tagged.indexOf('data-layer="backend"') < tagged.indexOf("<code>compositeBuild</code>"), "rows sit under their header");
+  assert.match(tagged, /Rendered from <code>qa\/evidence\/receipt\.json<\/code>/, "the project's receipt path, not the default");
+  assert.match(tagged, /Every commit of <code>qa\/evidence\/receipt\.json<\/code>/);
+  assert.doesNotMatch(tagged, /latest\.json/);
+
+  const untagged = evidenceBodyHtml({ ...base, steps: [{ name: "build", verdict: "PASS", durationMs: 1 }] }, { available: false });
+  assert.doesNotMatch(untagged, /step-layer/, "no layer tags → no grouping rows at all");
+
+  const missing = evidenceBodyHtml({ available: false, relPath: "qa/evidence/receipt.json", reason: "no receipt at qa/evidence/receipt.json — run node qa/verify.mjs" }, null);
+  assert.match(missing, /the lane writes <code>qa\/evidence\/receipt\.json<\/code>/);
+  assert.doesNotMatch(missing, /latest\.json/);
+});

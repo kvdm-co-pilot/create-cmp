@@ -158,8 +158,8 @@ export async function reopenArtifact(root, artifactId, options = {}) {
     return {
       ok: false,
       reason:
-        "this project's qa/lib/approvals.mjs predates the reopen wave (no reopenArtifact export) — " +
-        "upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock Reopen.",
+        "this project's qa/lib/approvals.mjs has no reopenArtifact export — either it predates the reopen wave " +
+        "(upgrade the scaffold: the cmp-upgrade skill, or re-stamp) or its step pack does not govern reopen.",
     };
   }
   try {
@@ -229,8 +229,8 @@ export async function acceptFeature(root, name) {
     return {
       ok: false,
       reason:
-        "this project's qa/lib/approvals.mjs predates the feature-brief wave (no acceptFeature export) — " +
-        "upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock feature acceptance.",
+        "this project's qa/lib/approvals.mjs has no acceptFeature export — either it predates the feature-brief wave " +
+        "(upgrade the scaffold: the cmp-upgrade skill, or re-stamp) or its step pack does not govern feature briefs.",
     };
   }
   try {

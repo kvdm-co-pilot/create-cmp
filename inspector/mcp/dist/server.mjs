@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 56835687400fd9c9aeb9e276fd2e3aafe0798b80636a4962fa19ad8384faccfd
+// cmp:bundle-inputs 17a4879aabd788515a0c570e7dc1a1a357e4455a347042c802441dc6c594ccb8
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -3235,8 +3235,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path19) {
-      let input = path19;
+    function removeDotSegments(path20) {
+      let input = path20;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3488,8 +3488,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path19, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path19 && path19 !== "/" ? path19 : void 0;
+        const [path20, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path20 && path20 !== "/" ? path20 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6882,12 +6882,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs18, exportName) {
+    function addFormats(ajv, list, fs19, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs18[f]);
+        ajv.addFormat(f, fs19[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7254,8 +7254,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path19, errorMaps, issueData } = params;
-  const fullPath = [...path19, ...issueData.path || []];
+  const { data, path: path20, errorMaps, issueData } = params;
+  const fullPath = [...path20, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7370,11 +7370,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path19, key) {
+  constructor(parent, value, path20, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path19;
+    this._path = path20;
     this._key = key;
   }
   get path() {
@@ -11294,10 +11294,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path19) {
-  if (!path19)
+function getElementAtPath(obj, path20) {
+  if (!path20)
     return obj;
-  return path19.reduce((acc, key) => acc?.[key], obj);
+  return path20.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11706,11 +11706,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path19, issues) {
+function prefixIssues(path20, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path19);
+    iss.path.unshift(path20);
     return iss;
   });
 }
@@ -11857,16 +11857,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path19 = []) => {
+  const processError = (error52, path20 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path19, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path20, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
       } else {
-        const fullpath = [...path19, ...issue2.path];
+        const fullpath = [...path20, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -11893,17 +11893,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path19 = []) => {
+  const processError = (error52, path20 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path19, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path20, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
       } else {
-        const fullpath = [...path19, ...issue2.path];
+        const fullpath = [...path20, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -11935,8 +11935,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path19 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path19) {
+  const path20 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path20) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -25061,13 +25061,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path19 = ref.slice(1).split("/").filter(Boolean);
-  if (path19.length === 0) {
+  const path20 = ref.slice(1).split("/").filter(Boolean);
+  if (path20.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path19[0] === defsKey) {
-    const key = path19[1];
+  if (path20[0] === defsKey) {
+    const key = path20[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -31014,11 +31014,11 @@ function* walk(tree) {
   if (!root || typeof root !== "object") return;
   yield* walkNode(root, "root");
 }
-function* walkNode(node, path19) {
-  yield { node, path: path19 };
+function* walkNode(node, path20) {
+  yield { node, path: path20 };
   const children = Array.isArray(node.children) ? node.children : [];
   for (let i = 0; i < children.length; i++) {
-    yield* walkNode(children[i], `${path19}.children[${i}]`);
+    yield* walkNode(children[i], `${path20}.children[${i}]`);
   }
 }
 function findByTestTag(tree, tag) {
@@ -31057,18 +31057,18 @@ function layoutGaps(a, b) {
 }
 function siblingLayoutGaps(tree) {
   const out = [];
-  const visit = (node, path19) => {
+  const visit = (node, path20) => {
     const children = Array.isArray(node.children) ? node.children : [];
     const tagged = children.filter((c) => c && c.testTag != null && c.bounds);
     for (let i = 0; i + 1 < tagged.length; i++) {
       out.push({
-        parentPath: path19,
+        parentPath: path20,
         a: tagged[i].testTag,
         b: tagged[i + 1].testTag,
         gaps: layoutGaps(tagged[i], tagged[i + 1])
       });
     }
-    children.forEach((c, i) => c && visit(c, `${path19}.children[${i}]`));
+    children.forEach((c, i) => c && visit(c, `${path20}.children[${i}]`));
   };
   if (tree && tree.root) visit(tree.root, "root");
   return out;
@@ -31142,9 +31142,9 @@ function auditA11y(tree, opts = {}) {
   const violations = [];
   const warnings = [];
   let passCount = 0;
-  for (const { node, path: path19 } of walk(tree)) {
+  for (const { node, path: path20 } of walk(tree)) {
     const entryBase = {
-      path: path19,
+      path: path20,
       testTag: node.testTag ?? null,
       bounds: node.bounds ?? null
     };
@@ -31556,16 +31556,16 @@ function diffTrees(currentTree, goldenTree, tolerancePx = 1) {
   diffNode(cur, gold, "root", tol, diffs);
   return diffs;
 }
-function diffNode(cur, gold, path19, tol, out) {
+function diffNode(cur, gold, path20, tol, out) {
   if (cur.testTag !== gold.testTag) {
-    out.push({ path: path19, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
+    out.push({ path: path20, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
   }
   if (cur.text !== gold.text) {
-    out.push({ path: path19, kind: "text-changed", before: gold.text, after: cur.text });
+    out.push({ path: path20, kind: "text-changed", before: gold.text, after: cur.text });
   }
   if (cur.contentDescription !== gold.contentDescription) {
     out.push({
-      path: path19,
+      path: path20,
       kind: "contentDescription-changed",
       before: gold.contentDescription,
       after: cur.contentDescription
@@ -31573,29 +31573,29 @@ function diffNode(cur, gold, path19, tol, out) {
   }
   const roleB = gold.role ?? null;
   const roleA = cur.role ?? null;
-  if (roleA !== roleB) out.push({ path: path19, kind: "role-changed", before: roleB, after: roleA });
+  if (roleA !== roleB) out.push({ path: path20, kind: "role-changed", before: roleB, after: roleA });
   const clickB = gold.clickable ?? false;
   const clickA = cur.clickable ?? false;
-  if (clickA !== clickB) out.push({ path: path19, kind: "clickable-changed", before: clickB, after: clickA });
+  if (clickA !== clickB) out.push({ path: path20, kind: "clickable-changed", before: clickB, after: clickA });
   const disB = gold.disabled ?? false;
   const disA = cur.disabled ?? false;
-  if (disA !== disB) out.push({ path: path19, kind: "disabled-changed", before: disB, after: disA });
+  if (disA !== disB) out.push({ path: path20, kind: "disabled-changed", before: disB, after: disA });
   if (JSON.stringify(cur.designToken) !== JSON.stringify(gold.designToken)) {
-    out.push({ path: path19, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
+    out.push({ path: path20, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
   }
   const moved = boundsMovedBeyond(cur.bounds, gold.bounds, tol);
   if (moved) {
-    out.push({ path: path19, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
+    out.push({ path: path20, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
   }
   const curKids = cur.children || [];
   const goldKids = gold.children || [];
   const shared = Math.min(curKids.length, goldKids.length);
   for (let i = 0; i < shared; i++) {
-    diffNode(curKids[i], goldKids[i], `${path19}.children[${i}]`, tol, out);
+    diffNode(curKids[i], goldKids[i], `${path20}.children[${i}]`, tol, out);
   }
   for (let i = shared; i < curKids.length; i++) {
     out.push({
-      path: `${path19}.children[${i}]`,
+      path: `${path20}.children[${i}]`,
       kind: "node-added",
       before: null,
       after: summarize(curKids[i])
@@ -31603,7 +31603,7 @@ function diffNode(cur, gold, path19, tol, out) {
   }
   for (let i = shared; i < goldKids.length; i++) {
     out.push({
-      path: `${path19}.children[${i}]`,
+      path: `${path20}.children[${i}]`,
       kind: "node-removed",
       before: summarize(goldKids[i]),
       after: null
@@ -31649,8 +31649,8 @@ function parsePngHeader(buf) {
   }
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
-function readPngMeta(path19) {
-  const abs = resolve(path19);
+function readPngMeta(path20) {
+  const abs = resolve(path20);
   let buf;
   try {
     buf = readFileSync3(abs);
@@ -32110,9 +32110,9 @@ function renderTreeSvg(tree, opts = {}) {
   const originY = LEGEND_H + MARGIN / 2;
   let nodeCount = 0;
   const body = [];
-  for (const { node, path: path19 } of walk(root)) {
+  for (const { node, path: path20 } of walk(root)) {
     nodeCount++;
-    if (depthOf(path19) > maxDepth) continue;
+    if (depthOf(path20) > maxDepth) continue;
     const b = node.bounds;
     const w = boundsDim(b, "width");
     const h = boundsDim(b, "height");
@@ -32123,10 +32123,10 @@ function renderTreeSvg(tree, opts = {}) {
     const sh = h * scale;
     const tokenized = node.designToken != null;
     const clickable = node.clickable === true;
-    const rules = violationsByPath.get(path19);
+    const rules = violationsByPath.get(path20);
     const base = tokenized ? STYLE.tokenized : STYLE.plain;
     body.push(
-      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path19)}"/>`
+      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path20)}"/>`
     );
     if (clickable) {
       body.push(
@@ -32217,8 +32217,8 @@ var ABBREV = {
 function abbrev(key) {
   return ABBREV[key] ?? key;
 }
-function depthOf(path19) {
-  return (path19.match(/\.children\[/g) || []).length;
+function depthOf(path20) {
+  return (path20.match(/\.children\[/g) || []).length;
 }
 function boundsDim(b, key) {
   return b && typeof b[key] === "number" ? b[key] : 0;
@@ -32238,9 +32238,9 @@ function countRenderable(tree, opts = {}) {
   const maxDepth = typeof opts.maxDepth === "number" && opts.maxDepth >= 0 ? opts.maxDepth : Infinity;
   let total = 0;
   let drawn = 0;
-  for (const { node, path: path19 } of walk(root)) {
+  for (const { node, path: path20 } of walk(root)) {
     total++;
-    if (depthOf(path19) > maxDepth) continue;
+    if (depthOf(path20) > maxDepth) continue;
     if (boundsDim(node.bounds, "width") > 0 && boundsDim(node.bounds, "height") > 0) drawn++;
   }
   return { total, drawn };
@@ -32318,10 +32318,10 @@ function parseLogcat(raw, opts = {}) {
 
 // src/lib/preview-service.mjs
 import crypto from "node:crypto";
-import fs17 from "node:fs";
+import fs18 from "node:fs";
 import http from "node:http";
 import os3 from "node:os";
-import path18 from "node:path";
+import path19 from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 import { promisify } from "node:util";
@@ -32410,7 +32410,7 @@ function diffAgainstDesignSystem(tree, catalog) {
   const colors = catalog && catalog.colors || {};
   const dimens = catalog && catalog.dimens || {};
   const out = [];
-  for (const { node, path: path19 } of walk(tree)) {
+  for (const { node, path: path20 } of walk(tree)) {
     const dt = node.designToken;
     if (!dt || !Array.isArray(dt.tokens) || dt.tokens.length === 0) continue;
     const resolved = dt.resolved && typeof dt.resolved === "object" ? dt.resolved : {};
@@ -32424,7 +32424,7 @@ function diffAgainstDesignSystem(tree, catalog) {
       const matches = resolvedValues.includes(declaredNorm);
       if (!matches) {
         out.push({
-          path: path19,
+          path: path20,
           token,
           declared,
           // report the node's resolved value most likely intended for this token:
@@ -32525,7 +32525,7 @@ async function reopenArtifact(root, artifactId, options = {}) {
   if (typeof lib.reopenArtifact !== "function") {
     return {
       ok: false,
-      reason: "this project's qa/lib/approvals.mjs predates the reopen wave (no reopenArtifact export) \u2014 upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock Reopen."
+      reason: "this project's qa/lib/approvals.mjs has no reopenArtifact export \u2014 either it predates the reopen wave (upgrade the scaffold: the cmp-upgrade skill, or re-stamp) or its step pack does not govern reopen."
     };
   }
   try {
@@ -32563,7 +32563,7 @@ async function acceptFeature(root, name) {
   if (typeof lib.acceptFeature !== "function") {
     return {
       ok: false,
-      reason: "this project's qa/lib/approvals.mjs predates the feature-brief wave (no acceptFeature export) \u2014 upgrade the scaffold (the cmp-upgrade skill, or re-stamp) to unlock feature acceptance."
+      reason: "this project's qa/lib/approvals.mjs has no acceptFeature export \u2014 either it predates the feature-brief wave (upgrade the scaffold: the cmp-upgrade skill, or re-stamp) or its step pack does not govern feature briefs."
     };
   }
   try {
@@ -32665,8 +32665,99 @@ async function resolveComment(root, id, input) {
 }
 
 // src/lib/specs.mjs
+import fs7 from "node:fs";
+import path7 from "node:path";
+import { pathToFileURL as pathToFileURL3 } from "node:url";
+
+// src/lib/project-layout.mjs
 import fs6 from "node:fs";
 import path6 from "node:path";
+var MANIFEST_REL_PATH = "qa/harness-manifest.json";
+var DEFAULT_LAYOUT = Object.freeze({
+  receipt: "qa/evidence/latest.json",
+  architectureDoc: "docs/ARCHITECTURE.md",
+  specs: "specs",
+  citationRoots: Object.freeze(["composeApp/src", "qa/e2e"]),
+  approvals: "qa/approvals.json",
+  packs: Object.freeze(["cmp"])
+});
+var PATH_FIELDS = ["receipt", "architectureDoc", "specs", "approvals"];
+var LIST_FIELDS = ["citationRoots", "packs"];
+var KNOWN_FIELDS = /* @__PURE__ */ new Set([...PATH_FIELDS, ...LIST_FIELDS]);
+function pathProblem(field, value) {
+  if (typeof value !== "string" || value.trim() === "") return `${field} must be a non-empty string`;
+  if (value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value)) return `${field} must be relative to the project root (got "${value}")`;
+  if (value.includes("\\")) return `${field} must use "/" separators (got "${value}")`;
+  if (value.split("/").some((seg) => seg === "..")) return `${field} may not escape the project root (got "${value}")`;
+  return null;
+}
+function manifestProblems(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return ["the manifest must be a JSON object"];
+  const problems = [];
+  for (const key of Object.keys(parsed)) {
+    if (!KNOWN_FIELDS.has(key)) problems.push(`unknown field "${key}" (known: ${[...KNOWN_FIELDS].join(", ")})`);
+  }
+  for (const field of PATH_FIELDS) {
+    if (!(field in parsed)) continue;
+    const p = pathProblem(field, parsed[field]);
+    if (p) problems.push(p);
+  }
+  for (const field of LIST_FIELDS) {
+    if (!(field in parsed)) continue;
+    const list = parsed[field];
+    if (!Array.isArray(list) || list.length === 0) {
+      problems.push(`${field} must be a non-empty array of strings`);
+      continue;
+    }
+    list.forEach((entry, i) => {
+      const p = field === "citationRoots" ? pathProblem(`${field}[${i}]`, entry) : typeof entry === "string" && entry.trim() ? null : `${field}[${i}] must be a non-empty string`;
+      if (p) problems.push(p);
+    });
+  }
+  return problems;
+}
+function resolveProjectLayout(root) {
+  const file2 = path6.join(root, ...MANIFEST_REL_PATH.split("/"));
+  if (!fs6.existsSync(file2)) {
+    return { ok: true, layout: DEFAULT_LAYOUT, source: "default", relPath: MANIFEST_REL_PATH };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(fs6.readFileSync(file2, "utf8"));
+  } catch (err) {
+    return {
+      ok: false,
+      source: "manifest",
+      relPath: MANIFEST_REL_PATH,
+      reason: `${MANIFEST_REL_PATH} is not valid JSON (${err && err.message ? err.message : String(err)}) \u2014 fix it; the default layout is NOT assumed while a manifest is present`
+    };
+  }
+  const problems = manifestProblems(parsed);
+  if (problems.length) {
+    return {
+      ok: false,
+      source: "manifest",
+      relPath: MANIFEST_REL_PATH,
+      reason: `${MANIFEST_REL_PATH} is malformed: ${problems.join("; ")} \u2014 fix it; the default layout is NOT assumed while a manifest is present`
+    };
+  }
+  const layout = { ...DEFAULT_LAYOUT };
+  for (const field of PATH_FIELDS) if (field in parsed) layout[field] = parsed[field];
+  for (const field of LIST_FIELDS) if (field in parsed) layout[field] = Object.freeze([...parsed[field]]);
+  return { ok: true, layout: Object.freeze(layout), source: "manifest", relPath: MANIFEST_REL_PATH };
+}
+function layoutPath(root, field) {
+  const resolved = resolveProjectLayout(root);
+  if (!resolved.ok) return { ok: false, reason: resolved.reason };
+  return { ok: true, rel: resolved.layout[field], source: resolved.source };
+}
+
+// src/lib/specs.mjs
+function layoutOf(root) {
+  const resolved = resolveProjectLayout(root);
+  return resolved.ok ? resolved.layout : DEFAULT_LAYOUT;
+}
+var specsDirOf = (root) => path7.join(root, ...layoutOf(root).specs.split("/"));
 var CLAUSE_LINE_RE = /^-\s+(~~)?\*\*([A-Z][A-Z0-9]*-\d{2,})\*\*(.*)$/;
 var TAG_LINE_RE = /^(?:\/\/|#)\s*SPEC:/;
 var TAG_IDS_RE = /SPEC:\s*([A-Z0-9,\s-]+)/;
@@ -32678,24 +32769,24 @@ function walkCodeFiles(dir) {
   const out = [];
   let entries;
   try {
-    entries = fs6.readdirSync(dir, { withFileTypes: true });
+    entries = fs7.readdirSync(dir, { withFileTypes: true });
   } catch {
     return out;
   }
   for (const e of entries) {
-    const p = path6.join(dir, e.name);
+    const p = path7.join(dir, e.name);
     if (e.isDirectory()) out.push(...walkCodeFiles(p));
     else if (CODE_EXTS.some((ext) => e.name.endsWith(ext))) out.push(p);
   }
   return out;
 }
 function citationIndex(root) {
-  const dirs = [path6.join(root, "composeApp", "src"), path6.join(root, "qa", "e2e")];
+  const dirs = layoutOf(root).citationRoots.map((rel) => path7.join(root, ...rel.split("/")));
   const index = /* @__PURE__ */ new Map();
   for (const dir of dirs) {
     for (const file2 of walkCodeFiles(dir)) {
-      const rel = path6.relative(root, file2).split(path6.sep).join("/");
-      fs6.readFileSync(file2, "utf8").split("\n").forEach((line, idx) => {
+      const rel = path7.relative(root, file2).split(path7.sep).join("/");
+      fs7.readFileSync(file2, "utf8").split("\n").forEach((line, idx) => {
         const trimmed = line.trim();
         if (!TAG_LINE_RE.test(trimmed)) return;
         const m = trimmed.match(TAG_IDS_RE);
@@ -32710,12 +32801,15 @@ function citationIndex(root) {
   return index;
 }
 function listSpecFiles(root) {
-  const specsDir = path6.join(root, "specs");
-  if (!fs6.existsSync(specsDir)) return [];
-  return fs6.readdirSync(specsDir).filter((f) => f.endsWith(".spec.md")).sort((a, b) => a.localeCompare(b));
+  const specsDir = specsDirOf(root);
+  if (!fs7.existsSync(specsDir)) return [];
+  return fs7.readdirSync(specsDir).filter((f) => f.endsWith(".spec.md")).sort((a, b) => a.localeCompare(b));
 }
 function parseSpecClauses(root, file2) {
-  const lines = fs6.readFileSync(path6.join(root, "specs", file2), "utf8").split("\n");
+  return parseClauseLines(fs7.readFileSync(path7.join(specsDirOf(root), file2), "utf8"));
+}
+function parseClauseLines(text) {
+  const lines = String(text).split("\n");
   const clauses = [];
   let current = null;
   const flush = () => {
@@ -32743,10 +32837,11 @@ function parseSpecClauses(root, file2) {
   return clauses;
 }
 function getSpecsData(root) {
+  const specsRel = layoutOf(root).specs;
   const files = listSpecFiles(root);
-  if (files.length === 0) return { available: false };
+  if (files.length === 0) return { available: false, specsDir: `${specsRel}/` };
   const citations = citationIndex(root);
-  const parsed = files.map((file2) => ({ file: file2, clauses: parseSpecClauses(root, file2) }));
+  const parsed = files.map((file2) => ({ file: file2, relPath: `${specsRel}/${file2}`, clauses: parseSpecClauses(root, file2) }));
   const liveIds = /* @__PURE__ */ new Set();
   const withdrawnIds = /* @__PURE__ */ new Set();
   for (const f of parsed) {
@@ -32761,8 +32856,11 @@ function getSpecsData(root) {
   orphanCitations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
   return {
     available: true,
-    files: parsed.map(({ file: file2, clauses }) => ({
+    source: "console-scan",
+    specsDir: `${specsRel}/`,
+    files: parsed.map(({ file: file2, relPath, clauses }) => ({
       file: file2,
+      relPath,
       clauses: clauses.map((c) => ({
         ...c,
         cited: c.withdrawn ? null : citations.has(c.id),
@@ -32772,10 +32870,125 @@ function getSpecsData(root) {
     orphanCitations
   };
 }
+var SPEC_COVERAGE_REL_PATH = "qa/lib/spec-coverage.mjs";
+var specLibCache = /* @__PURE__ */ new Map();
+async function loadSpecCoverageLib(root) {
+  if (specLibCache.has(root)) return specLibCache.get(root);
+  const libPath = path7.join(root, ...SPEC_COVERAGE_REL_PATH.split("/"));
+  if (!fs7.existsSync(libPath)) return null;
+  let mod;
+  try {
+    mod = await import(pathToFileURL3(libPath).href);
+  } catch {
+    return null;
+  }
+  specLibCache.set(root, mod);
+  return mod;
+}
+function normalizeClauses(scanned) {
+  const map2 = scanned instanceof Map ? scanned : scanned && scanned.clauses instanceof Map ? scanned.clauses : null;
+  if (!map2) return null;
+  const out = [];
+  for (const [id, entry] of map2) {
+    if (!entry || typeof entry !== "object") continue;
+    const file2 = typeof entry.file === "string" ? entry.file.split(path7.sep).join("/") : null;
+    if (!file2) continue;
+    const withdrawn = entry.withdrawn === true || typeof entry.status === "string" && !["active", "draft"].includes(entry.status);
+    out.push({
+      id,
+      file: file2,
+      withdrawn,
+      status: typeof entry.status === "string" ? entry.status : null,
+      title: typeof entry.title === "string" ? entry.title : null,
+      line: typeof entry.line === "number" ? entry.line : null
+    });
+  }
+  return out;
+}
+function normalizeCitations(scanned) {
+  const list = Array.isArray(scanned) ? scanned : scanned && Array.isArray(scanned.citations) ? scanned.citations : null;
+  if (!list) return null;
+  const index = /* @__PURE__ */ new Map();
+  for (const c of list) {
+    if (!c || typeof c.id !== "string" || typeof c.file !== "string") continue;
+    if (!index.has(c.id)) index.set(c.id, []);
+    index.get(c.id).push({ file: c.file.split(path7.sep).join("/"), line: typeof c.line === "number" ? c.line : 0 });
+  }
+  return index;
+}
+async function getProjectSpecsData(root) {
+  const resolved = resolveProjectLayout(root);
+  if (!resolved.ok) return { available: false, reason: resolved.reason };
+  const specsRel = resolved.layout.specs;
+  const lib = await loadSpecCoverageLib(root);
+  if (!lib || typeof lib.scanSpecClauses !== "function" || typeof lib.scanCitations !== "function") {
+    return getSpecsData(root);
+  }
+  let clauseRows;
+  let citations;
+  try {
+    clauseRows = normalizeClauses(lib.scanSpecClauses(root));
+    citations = normalizeCitations(lib.scanCitations(root));
+  } catch (err) {
+    const fallback = getSpecsData(root);
+    return { ...fallback, bridgeError: `${SPEC_COVERAGE_REL_PATH} threw (${err && err.message ? err.message : String(err)}) \u2014 showing the console's own scan` };
+  }
+  if (!clauseRows || !citations) {
+    const fallback = getSpecsData(root);
+    return { ...fallback, bridgeError: `${SPEC_COVERAGE_REL_PATH} returned a shape this console does not read \u2014 showing the console's own scan` };
+  }
+  let fileOrder;
+  if (typeof lib.specFiles === "function") {
+    try {
+      fileOrder = lib.specFiles(root).map((f) => String(f).split(path7.sep).join("/"));
+    } catch {
+      fileOrder = null;
+    }
+  }
+  if (!fileOrder) fileOrder = listSpecFiles(root).map((f) => `${specsRel}/${f}`);
+  for (const c of clauseRows) if (!fileOrder.includes(c.file)) fileOrder.push(c.file);
+  if (fileOrder.length === 0) return { available: false, source: "project-lib", specsDir: `${specsRel}/` };
+  const proseByFile = /* @__PURE__ */ new Map();
+  const proseFor = (relFile, id, title) => {
+    if (!proseByFile.has(relFile)) {
+      let parsed = [];
+      try {
+        parsed = parseClauseLines(fs7.readFileSync(path7.join(root, ...relFile.split("/")), "utf8"));
+      } catch {
+        parsed = [];
+      }
+      proseByFile.set(relFile, new Map(parsed.map((c) => [c.id, c.prose])));
+    }
+    return proseByFile.get(relFile).get(id) ?? title ?? "";
+  };
+  const liveIds = /* @__PURE__ */ new Set();
+  const withdrawnIds = /* @__PURE__ */ new Set();
+  for (const c of clauseRows) (c.withdrawn ? withdrawnIds : liveIds).add(c.id);
+  const files = fileOrder.map((relFile) => ({
+    file: relFile.split("/").pop(),
+    relPath: relFile,
+    clauses: clauseRows.filter((c) => c.file === relFile).map((c) => ({
+      id: c.id,
+      withdrawn: c.withdrawn,
+      status: c.status,
+      prose: proseFor(relFile, c.id, c.title),
+      cited: c.withdrawn ? null : citations.has(c.id),
+      citedBy: c.withdrawn ? [] : citations.get(c.id) || []
+    }))
+  }));
+  const orphanCitations = [];
+  for (const [id, sites] of citations) {
+    if (liveIds.has(id)) continue;
+    const reason = withdrawnIds.has(id) ? "cites a withdrawn clause" : "cites no clause in any spec file";
+    for (const site of sites) orphanCitations.push({ id, file: site.file, line: site.line, reason });
+  }
+  orphanCitations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
+  return { available: true, source: "project-lib", specsDir: `${specsRel}/`, files, orphanCitations };
+}
 
 // src/lib/architecture.mjs
-import fs7 from "node:fs";
-import path7 from "node:path";
+import fs8 from "node:fs";
+import path8 from "node:path";
 var KNOWN_LAYERS = [
   { id: "presentation", label: "presentation (screens, navigation, theme \u2014 the human-facing layer)" },
   { id: "domain", label: "domain (models, repository interfaces, use cases \u2014 no platform/UI deps)" },
@@ -32783,13 +32996,13 @@ var KNOWN_LAYERS = [
   { id: "di", label: "di (dependency wiring \u2014 composes the above)" }
 ];
 function findPackageDir(kotlinRoot) {
-  if (!fs7.existsSync(kotlinRoot)) return null;
+  if (!fs8.existsSync(kotlinRoot)) return null;
   let found = null;
   (function walk2(dir) {
     if (found) return;
     let entries;
     try {
-      entries = fs7.readdirSync(dir, { withFileTypes: true });
+      entries = fs8.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
@@ -32799,7 +33012,7 @@ function findPackageDir(kotlinRoot) {
     }
     for (const e of entries) {
       if (found) return;
-      if (e.isDirectory()) walk2(path7.join(dir, e.name));
+      if (e.isDirectory()) walk2(path8.join(dir, e.name));
     }
   })(kotlinRoot);
   return found;
@@ -32808,12 +33021,12 @@ function walkKotlinFiles(dir, relPrefix = "") {
   const out = [];
   let entries;
   try {
-    entries = fs7.readdirSync(dir, { withFileTypes: true });
+    entries = fs8.readdirSync(dir, { withFileTypes: true });
   } catch {
     return out;
   }
   for (const e of entries) {
-    const abs = path7.join(dir, e.name);
+    const abs = path8.join(dir, e.name);
     const rel = relPrefix ? `${relPrefix}/${e.name}` : e.name;
     if (e.isDirectory()) out.push(...walkKotlinFiles(abs, rel));
     else if (e.name.endsWith(".kt") || e.name.endsWith(".kts")) out.push(rel);
@@ -32821,35 +33034,37 @@ function walkKotlinFiles(dir, relPrefix = "") {
   return out.sort((a, b) => a.localeCompare(b));
 }
 function toPosix(p) {
-  return p.split(path7.sep).join("/");
+  return p.split(path8.sep).join("/");
 }
 function getLayerMap(root) {
-  const kotlinRoot = path7.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path8.join(root, "composeApp", "src", "commonMain", "kotlin");
   const packageDir = findPackageDir(kotlinRoot);
   if (!packageDir) {
-    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path7.relative(root, kotlinRoot))}` };
+    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path8.relative(root, kotlinRoot))}` };
   }
-  const appPackage = toPosix(path7.relative(kotlinRoot, packageDir)).split("/").join(".");
+  const appPackage = toPosix(path8.relative(kotlinRoot, packageDir)).split("/").join(".");
   let topLevel;
   try {
-    topLevel = fs7.readdirSync(packageDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+    topLevel = fs8.readdirSync(packageDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
   } catch {
     topLevel = [];
   }
   const knownIds = new Set(KNOWN_LAYERS.map((l) => l.id));
   const layers = KNOWN_LAYERS.map(({ id, label }) => {
-    const dir = path7.join(packageDir, id);
-    const present = fs7.existsSync(dir);
+    const dir = path8.join(packageDir, id);
+    const present = fs8.existsSync(dir);
     return { id, label, present, files: present ? walkKotlinFiles(dir) : [] };
   });
-  const otherPackages = topLevel.filter((name) => !knownIds.has(name)).sort((a, b) => a.localeCompare(b)).map((name) => ({ name, files: walkKotlinFiles(path7.join(packageDir, name)) }));
-  return { available: true, appPackage, kotlinRoot: toPosix(path7.relative(root, kotlinRoot)), layers, otherPackages };
+  const otherPackages = topLevel.filter((name) => !knownIds.has(name)).sort((a, b) => a.localeCompare(b)).map((name) => ({ name, files: walkKotlinFiles(path8.join(packageDir, name)) }));
+  return { available: true, appPackage, kotlinRoot: toPosix(path8.relative(root, kotlinRoot)), layers, otherPackages };
 }
 function getGovernedContract(root) {
   const file2 = "app-base.spec.md";
-  const specPath = path7.join(root, "specs", file2);
-  if (!fs7.existsSync(specPath)) {
-    return { available: false, reason: `specs/${file2} not found` };
+  const specsDir = layoutPath(root, "specs");
+  if (!specsDir.ok) return { available: false, reason: specsDir.reason };
+  const specPath = path8.join(root, ...specsDir.rel.split("/"), file2);
+  if (!fs8.existsSync(specPath)) {
+    return { available: false, reason: `${specsDir.rel}/${file2} not found` };
   }
   try {
     return { available: true, file: file2, clauses: parseSpecClauses(root, file2) };
@@ -32876,19 +33091,19 @@ var SOURCE_SETS = {
 };
 var EXEMPLAR_SPEC_REL = "specs/home.spec.md";
 function getFeatureShape(root) {
-  const kotlinRoot = path7.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path8.join(root, "composeApp", "src", "commonMain", "kotlin");
   const packageDir = findPackageDir(kotlinRoot);
   if (!packageDir) {
-    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path7.relative(root, kotlinRoot))}` };
+    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path8.relative(root, kotlinRoot))}` };
   }
-  const packageRel = toPosix(path7.relative(kotlinRoot, packageDir));
-  const homeDir = path7.join(packageDir, "presentation", "home");
+  const packageRel = toPosix(path8.relative(kotlinRoot, packageDir));
+  const homeDir = path8.join(packageDir, "presentation", "home");
   const presentationBase = `composeApp/src/commonMain/kotlin/${packageRel}/presentation/home`;
-  const presentationFiles = fs7.existsSync(homeDir) ? walkKotlinFiles(homeDir).map((f) => `${presentationBase}/${f}`) : [];
+  const presentationFiles = fs8.existsSync(homeDir) ? walkKotlinFiles(homeDir).map((f) => `${presentationBase}/${f}`) : [];
   const knownFiles = EXEMPLAR_FEATURE_FILES.map(
     ({ sourceSet, rel }) => `${SOURCE_SETS[sourceSet]}/${packageRel}/${rel}`
-  ).filter((relPath) => fs7.existsSync(path7.join(root, ...relPath.split("/"))));
-  if (fs7.existsSync(path7.join(root, ...EXEMPLAR_SPEC_REL.split("/")))) knownFiles.push(EXEMPLAR_SPEC_REL);
+  ).filter((relPath) => fs8.existsSync(path8.join(root, ...relPath.split("/"))));
+  if (fs8.existsSync(path8.join(root, ...EXEMPLAR_SPEC_REL.split("/")))) knownFiles.push(EXEMPLAR_SPEC_REL);
   const files = [.../* @__PURE__ */ new Set([...presentationFiles, ...knownFiles])].sort((a, b) => a.localeCompare(b));
   if (files.length === 0) {
     return {
@@ -32919,32 +33134,32 @@ var IMPORT_RE = /^\s*import\s+([\w.]+)/;
 function collectPackageBuckets(packageDir) {
   let entries;
   try {
-    entries = fs7.readdirSync(packageDir, { withFileTypes: true });
+    entries = fs8.readdirSync(packageDir, { withFileTypes: true });
   } catch {
     return [];
   }
   return entries.filter((e) => e.isDirectory()).map((e) => e.name);
 }
 function getDependencyGraph(root, clauses) {
-  const kotlinRoot = path7.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path8.join(root, "composeApp", "src", "commonMain", "kotlin");
   const packageDir = findPackageDir(kotlinRoot);
   if (!packageDir) {
-    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path7.relative(root, kotlinRoot))}` };
+    return { available: false, reason: `no 'presentation' directory found under ${toPosix(path8.relative(root, kotlinRoot))}` };
   }
-  const appPackage = toPosix(path7.relative(kotlinRoot, packageDir)).split("/").join(".");
+  const appPackage = toPosix(path8.relative(kotlinRoot, packageDir)).split("/").join(".");
   const buckets = collectPackageBuckets(packageDir);
   const bucketSet = new Set(buckets);
   const rules = deriveLayerRules(clauses);
   const forbidden = new Map(rules.map((r) => [`${r.from}->${r.to}`, r.clauseId]));
   const edgeMap = /* @__PURE__ */ new Map();
   for (const bucket of buckets) {
-    const dir = path7.join(packageDir, bucket);
+    const dir = path8.join(packageDir, bucket);
     for (const relFile of walkKotlinFiles(dir)) {
-      const absFile = path7.join(dir, relFile);
-      const relFromRoot = toPosix(path7.relative(root, absFile));
+      const absFile = path8.join(dir, relFile);
+      const relFromRoot = toPosix(path8.relative(root, absFile));
       let text;
       try {
-        text = fs7.readFileSync(absFile, "utf8");
+        text = fs8.readFileSync(absFile, "utf8");
       } catch {
         continue;
       }
@@ -33033,7 +33248,7 @@ var LOCKSTEP = [
 function parseVersionCatalog(root) {
   let text;
   try {
-    text = fs7.readFileSync(path7.join(root, VERSIONS_REL), "utf8");
+    text = fs8.readFileSync(path8.join(root, VERSIONS_REL), "utf8");
   } catch (err) {
     return { available: false, reason: err && err.message ? err.message : String(err) };
   }
@@ -33078,11 +33293,14 @@ function deriveVersionSet(root, constraintsBody) {
   };
 }
 function getArchitectureDoc(root) {
-  const docPath = path7.join(root, ...DOC_REL.split("/"));
-  if (!fs7.existsSync(docPath)) return { available: false, reason: `${DOC_REL} not found` };
+  const resolved = layoutPath(root, "architectureDoc");
+  if (!resolved.ok) return { available: false, reason: resolved.reason };
+  const docRel = resolved.rel;
+  const docPath = path8.join(root, ...docRel.split("/"));
+  if (!fs8.existsSync(docPath)) return { available: false, reason: `${docRel} not found` };
   let text;
   try {
-    text = fs7.readFileSync(docPath, "utf8");
+    text = fs8.readFileSync(docPath, "utf8");
   } catch (err) {
     return { available: false, reason: err && err.message ? err.message : String(err) };
   }
@@ -33134,20 +33352,38 @@ function getArchitectureData(root) {
 }
 
 // src/lib/receipt-bridge.mjs
-import fs8 from "node:fs";
-import path8 from "node:path";
+import fs9 from "node:fs";
+import path9 from "node:path";
 import { execFileSync as execFileSync2 } from "node:child_process";
-import { pathToFileURL as pathToFileURL3 } from "node:url";
-var RECEIPT_REL_PATH = "qa/evidence/latest.json";
+import { pathToFileURL as pathToFileURL4 } from "node:url";
+function resolveReceiptRelPath(root) {
+  return layoutPath(root, "receipt");
+}
+function receiptInputsHash(receipt) {
+  if (receipt.inputs && typeof receipt.inputs.hash === "string") return receipt.inputs.hash;
+  return typeof receipt.inputsHash === "string" ? receipt.inputsHash : null;
+}
+function receiptInputsFileCount(receipt) {
+  if (receipt.inputs && typeof receipt.inputs.fileCount === "number") return receipt.inputs.fileCount;
+  return typeof receipt.inputsFileCount === "number" ? receipt.inputsFileCount : null;
+}
+function receiptCommitSha(receipt) {
+  if (receipt.commit && typeof receipt.commit.sha === "string") return receipt.commit.sha;
+  return typeof receipt.gitSha === "string" ? receipt.gitSha : null;
+}
+function receiptGeneratedAt(receipt) {
+  if (typeof receipt.generatedAt === "string") return receipt.generatedAt;
+  return typeof receipt.timestamp === "string" ? receipt.timestamp : null;
+}
 var INPUTS_HASH_REL_PATH = "qa/lib/inputs-hash.mjs";
 var inputsHashLibCache = /* @__PURE__ */ new Map();
 async function loadInputsHashLib(root) {
   if (inputsHashLibCache.has(root)) return inputsHashLibCache.get(root);
-  const libPath = path8.join(root, INPUTS_HASH_REL_PATH);
-  if (!fs8.existsSync(libPath)) return null;
+  const libPath = path9.join(root, INPUTS_HASH_REL_PATH);
+  if (!fs9.existsSync(libPath)) return null;
   let mod;
   try {
-    mod = await import(pathToFileURL3(libPath).href);
+    mod = await import(pathToFileURL4(libPath).href);
   } catch {
     return null;
   }
@@ -33164,7 +33400,7 @@ function readEvidenceLevel(receipt) {
   };
 }
 async function recomputeStaleness(root, receipt) {
-  const receiptHash = receipt.inputs && typeof receipt.inputs.hash === "string" ? receipt.inputs.hash : null;
+  const receiptHash = receiptInputsHash(receipt);
   if (!receiptHash) {
     return { stale: null, currentInputsHash: null, staleReason: "receipt predates evidence binding (no inputs.hash) \u2014 freshness unknown" };
   }
@@ -33188,13 +33424,16 @@ async function recomputeStaleness(root, receipt) {
   return { stale: currentInputsHash !== receiptHash, currentInputsHash };
 }
 async function getLastReceipt(root) {
-  const receiptPath = path8.join(root, RECEIPT_REL_PATH);
-  if (!fs8.existsSync(receiptPath)) {
-    return { available: false, reason: `no receipt at ${RECEIPT_REL_PATH} \u2014 run node qa/verify.mjs` };
+  const resolved = resolveReceiptRelPath(root);
+  if (!resolved.ok) return { available: false, reason: resolved.reason };
+  const RECEIPT_REL_PATH = resolved.rel;
+  const receiptPath = path9.join(root, ...RECEIPT_REL_PATH.split("/"));
+  if (!fs9.existsSync(receiptPath)) {
+    return { available: false, relPath: RECEIPT_REL_PATH, reason: `no receipt at ${RECEIPT_REL_PATH} \u2014 run node qa/verify.mjs` };
   }
   let receipt;
   try {
-    receipt = JSON.parse(fs8.readFileSync(receiptPath, "utf8"));
+    receipt = JSON.parse(fs9.readFileSync(receiptPath, "utf8"));
   } catch (err) {
     return {
       available: false,
@@ -33208,11 +33447,13 @@ async function getLastReceipt(root) {
     const out = { name: s.name, verdict: s.verdict, reason: s.reason, durationMs: s.durationMs };
     if (typeof s.note === "string") out.note = s.note;
     if (s.details && typeof s.details === "object") out.details = s.details;
+    if (typeof s.layer === "string" && s.layer.trim()) out.layer = s.layer;
     return out;
   });
   const conformanceStep = steps.find((s) => s.name === "conformance") || null;
   const conformance = conformanceStep ? { verdict: conformanceStep.verdict, reason: conformanceStep.reason, durationMs: conformanceStep.durationMs } : null;
-  const parsedAt = Date.parse(receipt.generatedAt ?? "");
+  const generatedAt = receiptGeneratedAt(receipt);
+  const parsedAt = Date.parse(generatedAt ?? "");
   const ageMs = Number.isNaN(parsedAt) ? null : Date.now() - parsedAt;
   const { stale, currentInputsHash, staleReason } = await recomputeStaleness(root, receipt);
   const evidenceLevel = readEvidenceLevel(receipt);
@@ -33221,15 +33462,15 @@ async function getLastReceipt(root) {
     relPath: RECEIPT_REL_PATH,
     verdict: receipt.verdict ?? null,
     profile: typeof receipt.profile === "string" ? receipt.profile : null,
-    commitSha: receipt.commit && typeof receipt.commit.sha === "string" ? receipt.commit.sha : null,
+    commitSha: receiptCommitSha(receipt),
     commitDirty: receipt.commit && Array.isArray(receipt.commit.dirty) ? receipt.commit.dirty : null,
-    generatedAt: receipt.generatedAt ?? null,
+    generatedAt,
     ageMs,
     steps,
     evidenceLevel,
     conformance,
-    inputsHash: receipt.inputs && typeof receipt.inputs.hash === "string" ? receipt.inputs.hash : null,
-    inputsFileCount: receipt.inputs && typeof receipt.inputs.fileCount === "number" ? receipt.inputs.fileCount : null,
+    inputsHash: receiptInputsHash(receipt),
+    inputsFileCount: receiptInputsFileCount(receipt),
     currentInputsHash,
     stale,
     staleReason
@@ -33248,6 +33489,9 @@ function git(root, args) {
   });
 }
 function listReceiptHistory(root) {
+  const resolved = resolveReceiptRelPath(root);
+  if (!resolved.ok) return { available: false, reason: resolved.reason };
+  const RECEIPT_REL_PATH = resolved.rel;
   let logOut;
   try {
     logOut = git(root, [
@@ -33291,7 +33535,7 @@ function listReceiptHistory(root) {
       verdict: parsed.verdict ?? null,
       profile: typeof parsed.profile === "string" ? parsed.profile : null,
       evidenceLevel: readEvidenceLevel(parsed),
-      generatedAt: parsed.generatedAt ?? null
+      generatedAt: receiptGeneratedAt(parsed)
     });
   }
   if (receipts.length === 0) {
@@ -33301,8 +33545,8 @@ function listReceiptHistory(root) {
 }
 
 // src/lib/components.mjs
-import fs9 from "node:fs";
-import path9 from "node:path";
+import fs10 from "node:fs";
+import path10 from "node:path";
 function kebabCase(name) {
   return String(name).replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2").toLowerCase();
 }
@@ -33313,12 +33557,12 @@ function walkKtFiles(dir) {
   const out = [];
   let entries;
   try {
-    entries = fs9.readdirSync(dir, { withFileTypes: true });
+    entries = fs10.readdirSync(dir, { withFileTypes: true });
   } catch {
     return out;
   }
   for (const e of entries) {
-    const p = path9.join(dir, e.name);
+    const p = path10.join(dir, e.name);
     if (e.isDirectory()) out.push(...walkKtFiles(p));
     else if (e.name.endsWith(".kt")) out.push(p);
   }
@@ -33329,13 +33573,13 @@ function findPresentationDirs(kotlinRoot) {
   (function walk2(dir) {
     let entries;
     try {
-      entries = fs9.readdirSync(dir, { withFileTypes: true });
+      entries = fs10.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of entries) {
       if (!e.isDirectory()) continue;
-      const p = path9.join(dir, e.name);
+      const p = path10.join(dir, e.name);
       if (e.name === "presentation") out.push(p);
       else walk2(p);
     }
@@ -33510,36 +33754,36 @@ function scanComposables(text) {
 }
 var SCREEN_FILE_RE = /Screen\.kt$/;
 function getComponentsData(root) {
-  const kotlinRoot = path9.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path10.join(root, "composeApp", "src", "commonMain", "kotlin");
   const presentationDirs = findPresentationDirs(kotlinRoot);
   if (presentationDirs.length === 0) {
     return {
       available: false,
-      reason: `no 'presentation' directory found under ${path9.relative(root, kotlinRoot).split(path9.sep).join("/")}`
+      reason: `no 'presentation' directory found under ${path10.relative(root, kotlinRoot).split(path10.sep).join("/")}`
     };
   }
-  const componentsDirs = presentationDirs.map((p) => path9.join(p, "components")).filter((p) => fs9.existsSync(p));
+  const componentsDirs = presentationDirs.map((p) => path10.join(p, "components")).filter((p) => fs10.existsSync(p));
   if (componentsDirs.length === 0) {
     return { available: false, reason: "no presentation/components directory found" };
   }
   const componentFiles = componentsDirs.flatMap(
-    (dir) => fs9.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(".kt")).map((e) => path9.join(dir, e.name))
+    (dir) => fs10.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(".kt")).map((e) => path10.join(dir, e.name))
   );
   if (componentFiles.length === 0) {
     return { available: true, components: [] };
   }
   const allPresentationFiles = presentationDirs.flatMap(walkKtFiles);
-  const fileTexts = new Map(allPresentationFiles.map((f) => [f, fs9.readFileSync(f, "utf8")]));
+  const fileTexts = new Map(allPresentationFiles.map((f) => [f, fs10.readFileSync(f, "utf8")]));
   const components = [];
   for (const file2 of componentFiles) {
-    const text = fileTexts.get(file2) ?? fs9.readFileSync(file2, "utf8");
-    const relFile = path9.relative(root, file2).split(path9.sep).join("/");
+    const text = fileTexts.get(file2) ?? fs10.readFileSync(file2, "utf8");
+    const relFile = path10.relative(root, file2).split(path10.sep).join("/");
     for (const sig of scanComposables(text)) {
       const callRe = new RegExp(`\\b${sig.name}\\s*\\(`);
       const usedIn = [];
       for (const [otherFile, otherText] of fileTexts) {
         if (otherFile === file2) continue;
-        if (callRe.test(otherText)) usedIn.push(path9.relative(root, otherFile).split(path9.sep).join("/"));
+        if (callRe.test(otherText)) usedIn.push(path10.relative(root, otherFile).split(path10.sep).join("/"));
       }
       usedIn.sort((a, b) => a.localeCompare(b));
       components.push({
@@ -33563,11 +33807,11 @@ function getComponentsData(root) {
 var SEAM_NAME_RE = /(Screen|Route|Preview)$/;
 function scanUngoverned(root, presentationDirs, registryComponents) {
   const registryNames = new Set(registryComponents.map((c) => c.name));
-  const featureFiles = presentationDirs.flatMap(walkKtFiles).filter((f) => !f.split(path9.sep).includes("components"));
-  const fileTexts = new Map(featureFiles.map((f) => [f, fs9.readFileSync(f, "utf8")]));
+  const featureFiles = presentationDirs.flatMap(walkKtFiles).filter((f) => !f.split(path10.sep).includes("components"));
+  const fileTexts = new Map(featureFiles.map((f) => [f, fs10.readFileSync(f, "utf8")]));
   const out = [];
   for (const [file2, text] of fileTexts) {
-    const relFile = path9.relative(root, file2).split(path9.sep).join("/");
+    const relFile = path10.relative(root, file2).split(path10.sep).join("/");
     const featureOf = (rel) => {
       const after = rel.split("/presentation/")[1] ?? "";
       return after.includes("/") ? after.split("/")[0] : "(root)";
@@ -33579,7 +33823,7 @@ function scanUngoverned(root, presentationDirs, registryComponents) {
       const usedIn = [];
       for (const [otherFile, otherText] of fileTexts) {
         if (otherFile === file2) continue;
-        if (callRe.test(otherText)) usedIn.push(path9.relative(root, otherFile).split(path9.sep).join("/"));
+        if (callRe.test(otherText)) usedIn.push(path10.relative(root, otherFile).split(path10.sep).join("/"));
       }
       const features = /* @__PURE__ */ new Set([featureOf(relFile), ...usedIn.map(featureOf)]);
       out.push({
@@ -33598,35 +33842,35 @@ function scanUngoverned(root, presentationDirs, registryComponents) {
 }
 
 // src/lib/variants.mjs
-import fs10 from "node:fs";
-import path10 from "node:path";
+import fs11 from "node:fs";
+import path11 from "node:path";
 function getVariantsData(root) {
-  const variantsDir = path10.join(root, "composeApp", "build", "previews", "variants");
+  const variantsDir = path11.join(root, "composeApp", "build", "previews", "variants");
   let entries;
   try {
-    entries = fs10.readdirSync(variantsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+    entries = fs11.readdirSync(variantsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
   } catch {
     return { available: false };
   }
   if (entries.length === 0) return { available: false };
   const variants = entries.map((e) => e.name).sort().map((name) => {
-    const dir = path10.join(variantsDir, name);
+    const dir = path11.join(variantsDir, name);
     let screenDirs = [];
     try {
-      screenDirs = fs10.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
+      screenDirs = fs11.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
     } catch {
       screenDirs = [];
     }
-    const screens = screenDirs.map((e) => e.name).filter((id) => fs10.existsSync(path10.join(dir, id, "screen.png"))).sort().map((id) => ({ id, png: `variants/${name}/${id}/screen.png` }));
-    const hasDesignSystem = fs10.existsSync(path10.join(dir, "design-system.json"));
+    const screens = screenDirs.map((e) => e.name).filter((id) => fs11.existsSync(path11.join(dir, id, "screen.png"))).sort().map((id) => ({ id, png: `variants/${name}/${id}/screen.png` }));
+    const hasDesignSystem = fs11.existsSync(path11.join(dir, "design-system.json"));
     return { name, screens, hasDesignSystem };
   });
   return { available: true, variants };
 }
 
 // src/lib/component-drift.mjs
-import fs11 from "node:fs";
-import path11 from "node:path";
+import fs12 from "node:fs";
+import path12 from "node:path";
 function getComponentDriftInfo(root, files, approvalRecord) {
   if (!approvalRecord) {
     return { available: false, reason: "no approvals record for the components artifact" };
@@ -33647,7 +33891,7 @@ function getComponentDriftInfo(root, files, approvalRecord) {
   const byFile = {};
   for (const relFile of files) {
     try {
-      const stat = fs11.statSync(path11.join(root, relFile));
+      const stat = fs12.statSync(path12.join(root, relFile));
       byFile[relFile] = { modifiedSinceApproval: stat.mtimeMs > approvedAtMs, mtime: stat.mtime.toISOString() };
     } catch {
       byFile[relFile] = { modifiedSinceApproval: null, mtime: null };
@@ -33657,19 +33901,19 @@ function getComponentDriftInfo(root, files, approvalRecord) {
 }
 
 // src/lib/handrolled-state.mjs
-import fs12 from "node:fs";
-import path12 from "node:path";
+import fs13 from "node:fs";
+import path13 from "node:path";
 var INDICATORS = ["CircularProgressIndicator", "LinearProgressIndicator"];
 function isUnderComponentsDir(absFile) {
-  return absFile.split(path12.sep).includes("components");
+  return absFile.split(path13.sep).includes("components");
 }
 function getHandRolledStateViolations(root) {
-  const kotlinRoot = path12.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path13.join(root, "composeApp", "src", "commonMain", "kotlin");
   const presentationDirs = findPresentationDirs(kotlinRoot);
   if (presentationDirs.length === 0) {
     return {
       available: false,
-      reason: `no 'presentation' directory found under ${path12.relative(root, kotlinRoot).split(path12.sep).join("/")}`
+      reason: `no 'presentation' directory found under ${path13.relative(root, kotlinRoot).split(path13.sep).join("/")}`
     };
   }
   const files = presentationDirs.flatMap(walkKtFiles).filter((f) => !isUnderComponentsDir(f));
@@ -33677,7 +33921,7 @@ function getHandRolledStateViolations(root) {
   for (const file2 of files) {
     let text;
     try {
-      text = fs12.readFileSync(file2, "utf8");
+      text = fs13.readFileSync(file2, "utf8");
     } catch {
       continue;
     }
@@ -33692,7 +33936,7 @@ function getHandRolledStateViolations(root) {
       if (lines.length) indicators.push({ name, lines });
     }
     if (indicators.length) {
-      violations.push({ file: path12.relative(root, file2).split(path12.sep).join("/"), indicators });
+      violations.push({ file: path13.relative(root, file2).split(path13.sep).join("/"), indicators });
     }
   }
   violations.sort((a, b) => a.file.localeCompare(b.file));
@@ -33700,29 +33944,29 @@ function getHandRolledStateViolations(root) {
 }
 
 // src/lib/walkthrough-data.mjs
-import fs13 from "node:fs";
-import path13 from "node:path";
-var WALKTHROUGH_REL_DIR = path13.join("qa", "evidence", "walkthrough");
+import fs14 from "node:fs";
+import path14 from "node:path";
+var WALKTHROUGH_REL_DIR = path14.join("qa", "evidence", "walkthrough");
 function getWalkthroughData(projectDir, { limit = 8 } = {}) {
-  const root = path13.join(projectDir, WALKTHROUGH_REL_DIR);
-  if (!fs13.existsSync(root)) {
+  const root = path14.join(projectDir, WALKTHROUGH_REL_DIR);
+  if (!fs14.existsSync(root)) {
     return { available: false, reason: "no walkthrough runs yet \u2014 node qa/walkthrough.mjs against the live app", runs: [] };
   }
   const runs = [];
-  for (const entry of fs13.readdirSync(root)) {
-    const dir = path13.join(root, entry);
-    const manifestPath = path13.join(dir, "manifest.json");
-    if (!fs13.existsSync(manifestPath)) continue;
+  for (const entry of fs14.readdirSync(root)) {
+    const dir = path14.join(root, entry);
+    const manifestPath = path14.join(dir, "manifest.json");
+    if (!fs14.existsSync(manifestPath)) continue;
     let manifest;
     try {
-      manifest = JSON.parse(fs13.readFileSync(manifestPath, "utf8"));
+      manifest = JSON.parse(fs14.readFileSync(manifestPath, "utf8"));
     } catch (err) {
-      runs.push({ dir, relDir: path13.join(WALKTHROUGH_REL_DIR, entry), error: `manifest unreadable: ${err.message}` });
+      runs.push({ dir, relDir: path14.join(WALKTHROUGH_REL_DIR, entry), error: `manifest unreadable: ${err.message}` });
       continue;
     }
     runs.push({
       dir,
-      relDir: path13.join(WALKTHROUGH_REL_DIR, entry),
+      relDir: path14.join(WALKTHROUGH_REL_DIR, entry),
       relDirBase: entry,
       // the console's /walkthrough/<base>/… static route key
       generatedAt: manifest.generatedAt ?? entry,
@@ -33731,7 +33975,7 @@ function getWalkthroughData(projectDir, { limit = 8 } = {}) {
       a11yViolations: (manifest.screens ?? []).reduce((a, s) => a + (s.a11y?.violations ?? []).length, 0),
       unsettled: (manifest.screens ?? []).filter((s) => s.settled === false).length,
       notWalked: (manifest.notWalked ?? []).length,
-      hasReport: fs13.existsSync(path13.join(dir, "report.html")),
+      hasReport: fs14.existsSync(path14.join(dir, "report.html")),
       manifest
     });
   }
@@ -33741,7 +33985,7 @@ function getWalkthroughData(projectDir, { limit = 8 } = {}) {
 }
 
 // src/lib/live-session.mjs
-import path14 from "node:path";
+import path15 from "node:path";
 var HEALTH_TIMEOUT_MS = 900;
 async function getLiveDeviceStatus({ port = 9500, fetchImpl = fetch } = {}) {
   const url2 = `http://127.0.0.1:${port}/inspect/health`;
@@ -33861,11 +34105,11 @@ function createLiveSession({
     });
   }
   async function resolveAppId2() {
-    const fs18 = await import("node:fs");
+    const fs19 = await import("node:fs");
     for (const f of ["composeApp/build.gradle.kts", "composeApp/build.gradle"]) {
-      const p = path14.join(projectDir, f);
-      if (!fs18.existsSync(p)) continue;
-      const m = fs18.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
+      const p = path15.join(projectDir, f);
+      if (!fs19.existsSync(p)) continue;
+      const m = fs19.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
       if (m) return m[1];
     }
     throw new Error("could not resolve applicationId from composeApp/build.gradle(.kts)");
@@ -33897,6 +34141,11 @@ var short = (s) => String(s ?? "").slice(0, 7);
 async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceDays = 7, limit = 30 } = {}) {
   const git2 = async (args) => (await execFileAsync3("git", args, { cwd: projectDir, timeout: 8e3, maxBuffer: 4 * 1024 * 1024 })).stdout;
   const since = `${sinceDays} days ago`;
+  const resolvedLayout = resolveProjectLayout(projectDir);
+  if (!resolvedLayout.ok) {
+    return { available: false, reason: resolvedLayout.reason, since, commits: [], laneRuns: [], approvalEvents: [], openComments: null };
+  }
+  const layout = resolvedLayout.layout ?? DEFAULT_LAYOUT;
   let commits;
   try {
     const raw = await git2([
@@ -33927,11 +34176,11 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
   }
   const laneRuns = [];
   try {
-    const raw = await git2(["log", `--since=${since}`, "--pretty=%H%x00%ci", "--", "qa/evidence/latest.json"]);
+    const raw = await git2(["log", `--since=${since}`, "--pretty=%H%x00%ci", "--", layout.receipt]);
     for (const line of raw.split("\n").filter(Boolean).slice(0, 12)) {
       const [sha, when] = line.split("\0");
       try {
-        const body = await git2(["show", `${sha}:qa/evidence/latest.json`]);
+        const body = await git2(["show", `${sha}:${layout.receipt}`]);
         const receipt = JSON.parse(body);
         const onDevice = receipt.strength?.onDeviceSteps ?? [];
         const level = receipt.evidenceLevel;
@@ -33950,7 +34199,7 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
   }
   let approvalEvents = [];
   try {
-    const raw = await git2(["log", `--since=${since}`, "--pretty=%H%x00%ci%x00%s", "--", "qa/approvals.json"]);
+    const raw = await git2(["log", `--since=${since}`, "--pretty=%H%x00%ci%x00%s", "--", layout.approvals]);
     approvalEvents = raw.split("\n").filter(Boolean).slice(0, 12).map((l) => {
       const [sha, when, subject] = l.split("\0");
       return { sha: short(sha), when, subject };
@@ -33959,11 +34208,11 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
   }
   let openComments = null;
   try {
-    const fs18 = await import("node:fs");
-    const path19 = await import("node:path");
-    const ledger = path19.join(projectDir, "qa", "comments.json");
-    if (fs18.existsSync(ledger)) {
-      const data = JSON.parse(fs18.readFileSync(ledger, "utf8"));
+    const fs19 = await import("node:fs");
+    const path20 = await import("node:path");
+    const ledger = path20.join(projectDir, "qa", "comments.json");
+    if (fs19.existsSync(ledger)) {
+      const data = JSON.parse(fs19.readFileSync(ledger, "utf8"));
       openComments = (data.comments ?? []).filter((c) => c.status === "open").length;
     }
   } catch {
@@ -33973,29 +34222,29 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
 }
 
 // src/lib/approval-diff.mjs
-import fs14 from "node:fs";
+import fs15 from "node:fs";
 import os2 from "node:os";
-import path15 from "node:path";
-import { pathToFileURL as pathToFileURL4 } from "node:url";
+import path16 from "node:path";
+import { pathToFileURL as pathToFileURL5 } from "node:url";
 var SEARCH_DEPTH = 120;
 var MAX_DIFF_LINES = 400;
 async function importProjectApprovals(projectDir) {
-  const lib = path15.join(projectDir, "qa", "lib", "approvals.mjs");
-  if (!fs14.existsSync(lib)) return null;
+  const lib = path16.join(projectDir, "qa", "lib", "approvals.mjs");
+  if (!fs15.existsSync(lib)) return null;
   try {
-    return await import(pathToFileURL4(lib).href);
+    return await import(pathToFileURL5(lib).href);
   } catch {
     return null;
   }
 }
 async function materialize(git2, sha, relFiles, alsoNeeded) {
-  const tmp = fs14.mkdtempSync(path15.join(os2.tmpdir(), "cmp-approval-anchor-"));
+  const tmp = fs15.mkdtempSync(path16.join(os2.tmpdir(), "cmp-approval-anchor-"));
   for (const rel of [...relFiles, ...alsoNeeded]) {
     try {
       const { stdout } = await git2(["show", `${sha}:${rel}`]);
-      const dest = path15.join(tmp, rel);
-      fs14.mkdirSync(path15.dirname(dest), { recursive: true });
-      fs14.writeFileSync(dest, stdout);
+      const dest = path16.join(tmp, rel);
+      fs15.mkdirSync(path16.dirname(dest), { recursive: true });
+      fs15.writeFileSync(dest, stdout);
     } catch {
     }
   }
@@ -34047,7 +34296,7 @@ async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: 
       }
     } catch {
     } finally {
-      if (tmp) fs14.rmSync(tmp, { recursive: true, force: true });
+      if (tmp) fs15.rmSync(tmp, { recursive: true, force: true });
     }
   }
   return {
@@ -35226,8 +35475,8 @@ function overviewGlyph(queue = [], statuses = []) {
 }
 
 // src/lib/design-language.mjs
-import fs15 from "node:fs";
-import path16 from "node:path";
+import fs16 from "node:fs";
+import path17 from "node:path";
 var DP_RE = /^(\d+(?:\.\d+)?)\s*dp$/;
 function classifyDimens(dimens = {}) {
   const spacing = [];
@@ -35317,7 +35566,7 @@ function countReferences(fileTexts, objectName, tokenNames) {
   return counts;
 }
 function getTokenUsage(root, catalog = {}) {
-  const kotlinRoot = path16.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path17.join(root, "composeApp", "src", "commonMain", "kotlin");
   const files = walkKtFiles(kotlinRoot);
   if (files.length === 0) {
     return { available: false, reason: "no .kt files found under composeApp/src/commonMain/kotlin" };
@@ -35325,11 +35574,11 @@ function getTokenUsage(root, catalog = {}) {
   const fileTexts = /* @__PURE__ */ new Map();
   for (const f of files) {
     try {
-      fileTexts.set(f, fs15.readFileSync(f, "utf8"));
+      fileTexts.set(f, fs16.readFileSync(f, "utf8"));
     } catch {
     }
   }
-  const rel = (abs) => path16.relative(root, abs).split(path16.sep).join("/");
+  const rel = (abs) => path17.relative(root, abs).split(path17.sep).join("/");
   const group = (tokens) => {
     const names = Object.keys(tokens || {});
     const decl = findDeclaringObject(fileTexts, names);
@@ -35937,7 +36186,9 @@ function citingTestsCellHtml(c) {
 }
 function specsTabHtml(specs, meta3 = {}) {
   if (!specs || !specs.available) {
-    return `<div class="empty"><p>No specs/ directory found in this project.</p></div>`;
+    const where = specs && specs.specsDir || "specs/";
+    const why = specs && specs.reason ? ` ${esc5(specs.reason)}` : "";
+    return `<div class="empty"><p>No ${esc5(where)} directory found in this project.${why}</p></div>`;
   }
   const matrices = specs.files.map((f) => {
     const live = f.clauses.filter((c) => !c.withdrawn);
@@ -35954,16 +36205,17 @@ function specsTabHtml(specs, meta3 = {}) {
       const prose = esc5(c.prose);
       const gate = gateForClause(c);
       return `    <tr class="rtm-row${c.withdrawn ? " rtm-withdrawn" : ""}">
-      <td><span class="clause-id"><code>${esc5(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: `specs/${f.file}`, clauseId: c.id })}</td>
+      <td><span class="clause-id"><code>${esc5(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: f.relPath || `specs/${f.file}`, clauseId: c.id })}</td>
       <td class="rtm-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</td>
       <td>${citingTestsCellHtml(c)}</td>
       <td class="rtm-gate">${gate ? `<code>${esc5(gate)}</code>` : `<span class="empty-inline">&mdash;</span>`}</td>
       <td>${gate ? stepReceiptCellHtml(meta3.lastReceipt, gate) : `<span class="empty-inline">&mdash;</span>`}</td>
     </tr>`;
     }).join("\n");
-    const specStatus = meta3.artifactByFile ? meta3.artifactByFile[`specs/${f.file}`] : null;
+    const specRel = f.relPath || `specs/${f.file}`;
+    const specStatus = meta3.artifactByFile ? meta3.artifactByFile[specRel] : null;
     return `  <div class="spec-file">
-    <h3>specs/${esc5(f.file)}</h3>
+    <h3>${esc5(specRel)}</h3>
 ${signatureBarHtml(specStatus, { what: "this contract" })}
     <p class="rtm-counts">${counts}</p>
     ${rows ? `<table class="doc-table rtm-table">
@@ -36232,7 +36484,7 @@ function formatReceiptAge(ageMs) {
 }
 function clauseReceiptStatusHtml(lastReceipt) {
   if (!lastReceipt || !lastReceipt.available) {
-    const reason = lastReceipt && lastReceipt.reason || "no receipt at qa/evidence/latest.json \u2014 run node qa/verify.mjs";
+    const reason = lastReceipt && lastReceipt.reason || `no receipt at ${lastReceipt && lastReceipt.relPath || "qa/evidence/latest.json"} \u2014 run node qa/verify.mjs`;
     return `<span class="receipt-badge receipt-none" title="${escAttr2(reason)}">no receipt yet &mdash; run node qa/verify.mjs</span>`;
   }
   if (!lastReceipt.conformance) {
@@ -36249,7 +36501,7 @@ function clauseReceiptStatusHtml(lastReceipt) {
 }
 function stepReceiptCellHtml(lastReceipt, stepName) {
   if (!lastReceipt || !lastReceipt.available) {
-    const reason = lastReceipt && lastReceipt.reason || "no receipt at qa/evidence/latest.json \u2014 run node qa/verify.mjs";
+    const reason = lastReceipt && lastReceipt.reason || `no receipt at ${lastReceipt && lastReceipt.relPath || "qa/evidence/latest.json"} \u2014 run node qa/verify.mjs`;
     return `<span class="receipt-badge receipt-none" title="${escAttr2(reason)}">no receipt yet</span>`;
   }
   const step = (lastReceipt.steps || []).find((s) => s && s.name === stepName);
@@ -36401,12 +36653,13 @@ function stepTestCountsHtml(step) {
   return `<span class="step-counts">${bits.join(" &middot; ")}</span>`;
 }
 function evidenceBodyHtml(lastReceipt, history) {
+  const relPath = lastReceipt && lastReceipt.relPath || "qa/evidence/latest.json";
   if (!lastReceipt || !lastReceipt.available) {
-    const reason = lastReceipt && lastReceipt.reason || "no receipt at qa/evidence/latest.json";
+    const reason = lastReceipt && lastReceipt.reason || `no receipt at ${relPath}`;
     return `<div class="empty">
       <p>No verify receipt yet.</p>
       <p>${esc5(reason)}</p>
-      <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>qa/evidence/latest.json</code>,
+      <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>${esc5(relPath)}</code>,
       and this page renders exactly what that receipt attests. Nothing here is derived any other way.</p>
     </div>`;
   }
@@ -36423,7 +36676,7 @@ function evidenceBodyHtml(lastReceipt, history) {
     `<li>generated ${r.generatedAt ? esc5(r.generatedAt) : "at an unknown time"} &middot; ${esc5(age)}</li>`,
     `<li>${inputsBindingHtml(r)}</li>`
   ].filter(Boolean).join("\n      ");
-  const stepRows = (r.steps || []).map((s) => {
+  const stepRowHtml = (s) => {
     const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
     const governs = STEP_GOVERNS[s.name];
     const governsCell = governs ? `<a class="step-link" href="#${esc5(governs.section)}">${esc5(governs.label)}</a>` : "";
@@ -36437,7 +36690,25 @@ function evidenceBodyHtml(lastReceipt, history) {
       <td>${governsCell}</td>
       <td>${counts}${note}${reason}</td>
     </tr>`;
-  }).join("\n");
+  };
+  const stepsList = r.steps || [];
+  const anyLayer = stepsList.some((s) => typeof s.layer === "string" && s.layer);
+  let stepRows;
+  if (!anyLayer) {
+    stepRows = stepsList.map(stepRowHtml).join("\n");
+  } else {
+    const groups = /* @__PURE__ */ new Map();
+    for (const s of stepsList) {
+      const key = typeof s.layer === "string" && s.layer ? s.layer : "other";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(s);
+    }
+    stepRows = [...groups.entries()].map(([layer, steps]) => {
+      const tally = ["PASS", "FAIL", "ERROR", "SKIP"].map((v) => [v, steps.filter((s) => s.verdict === v).length]).filter(([, n]) => n > 0).map(([v, n]) => `${n} ${v}`).join(" &middot; ");
+      return `    <tr class="step-layer" data-layer="${escAttr2(layer)}"><th colspan="5">${esc5(layer)} <span class="step-layer-tally">${tally}</span></th></tr>
+${steps.map(stepRowHtml).join("\n")}`;
+    }).join("\n");
+  }
   const stepsHtml = stepRows ? `  <table class="doc-table step-table">
     <thead><tr><th>Step</th><th>Verdict</th><th>Duration</th><th>Governs</th><th>Detail</th></tr></thead>
     <tbody>
@@ -36446,8 +36717,8 @@ ${stepRows}
   </table>` : `  <p class="empty-inline">the receipt carries no steps</p>`;
   const timelineHtml = history && history.available && history.receipts && history.receipts.length ? `  <ul class="evidence-timeline">
 ${history.receipts.map(timelineRowHtml).join("\n")}
-  </ul>` : `  <p class="empty-inline">${esc5(history && history.reason || "no committed receipt history yet")} &mdash; each commit of <code>qa/evidence/latest.json</code> becomes one entry in the audit trail</p>`;
-  return `  <p class="meta">Rendered from <code>${esc5(r.relPath || "qa/evidence/latest.json")}</code> &mdash; the verify lane's own attestation.
+  </ul>` : `  <p class="empty-inline">${esc5(history && history.reason || "no committed receipt history yet")} &mdash; each commit of <code>${esc5(relPath)}</code> becomes one entry in the audit trail</p>`;
+  return `  <p class="meta">Rendered from <code>${esc5(relPath)}</code> &mdash; the verify lane's own attestation.
   The lane is the law: nothing on this page is re-derived live.</p>
   <div class="evidence-headline${stale ? " evidence-stale" : ""}">
     <p class="lbl">latest receipt</p>
@@ -36459,7 +36730,7 @@ ${history.receipts.map(timelineRowHtml).join("\n")}
   <h3>Steps</h3>
 ${stepsHtml}
   <h3>Audit trail &mdash; committed receipts</h3>
-  <p class="meta">Every commit of <code>qa/evidence/latest.json</code> is one verified state of record, attributed from git. Newest first.</p>
+  <p class="meta">Every commit of <code>${esc5(relPath)}</code> is one verified state of record, attributed from git. Newest first.</p>
 ${timelineHtml}`;
 }
 function describeTarget(t) {
@@ -36809,7 +37080,7 @@ ${commits}`;
 }
 function featuresTabHtml(features, meta3 = {}) {
   if (!features || !features.available) {
-    return `  <p class="empty-inline">feature briefs are not available in this project \u2014 qa/lib/approvals.mjs predates the feature-brief wave (or is absent). A feature brief is a <code>docs/features/&lt;name&gt;.md</code>; its location is the governance opt-in.</p>`;
+    return `  <p class="empty-inline">feature briefs are not available in this project \u2014 its qa/lib/approvals.mjs has no acceptFeature export (it predates the feature-brief wave, or its step pack does not govern briefs), or the library is absent. A feature brief is a <code>docs/features/&lt;name&gt;.md</code>; its location is the governance opt-in.</p>`;
   }
   const { board } = features;
   if (!board || board.features.length === 0) {
@@ -36900,8 +37171,8 @@ ${cards}
 }
 
 // src/lib/intent.mjs
-import fs16 from "node:fs";
-import path17 from "node:path";
+import fs17 from "node:fs";
+import path18 from "node:path";
 var INTENT_REL_PATH = "specs/intent.md";
 var PLACEHOLDER_LEAD_RE = /^_not yet captured[^_]*_\s*/i;
 function parseIntentMarkdown(md) {
@@ -36943,10 +37214,10 @@ function parseIntentMarkdown(md) {
   };
 }
 function getIntentData(root) {
-  const file2 = path17.join(root, "specs", "intent.md");
+  const file2 = path18.join(root, "specs", "intent.md");
   let raw;
   try {
-    raw = fs16.readFileSync(file2, "utf8");
+    raw = fs17.readFileSync(file2, "utf8");
   } catch {
     return { available: false, reason: `${INTENT_REL_PATH} not found` };
   }
@@ -36990,8 +37261,8 @@ var MAX_TRANSIENT_RETRIES = 12;
 var STUCK_RETRY_MS = 3e4;
 var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
 function consoleRegistryPath(projectDir) {
-  const key = crypto.createHash("sha1").update(path18.resolve(projectDir)).digest("hex").slice(0, 12);
-  return path18.join(os3.tmpdir(), `cmp-console-${key}.json`);
+  const key = crypto.createHash("sha1").update(path19.resolve(projectDir)).digest("hex").slice(0, 12);
+  return path19.join(os3.tmpdir(), `cmp-console-${key}.json`);
 }
 function processAlive(pid) {
   try {
@@ -37004,7 +37275,7 @@ function processAlive(pid) {
 async function findLiveConsole(projectDir, { probe } = {}) {
   let rec;
   try {
-    rec = JSON.parse(fs17.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+    rec = JSON.parse(fs18.readFileSync(consoleRegistryPath(projectDir), "utf8"));
   } catch {
     return null;
   }
@@ -37017,7 +37288,7 @@ async function findLiveConsole(projectDir, { probe } = {}) {
       await new Promise((r) => setTimeout(r, RENEW_REJOIN_POLL_MS));
       let fresh;
       try {
-        fresh = JSON.parse(fs17.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+        fresh = JSON.parse(fs18.readFileSync(consoleRegistryPath(projectDir), "utf8"));
       } catch {
         continue;
       }
@@ -37030,18 +37301,18 @@ async function findLiveConsole(projectDir, { probe } = {}) {
   return null;
 }
 function consoleLauncherPath() {
-  const here = path18.dirname(fileURLToPath2(import.meta.url));
+  const here = path19.dirname(fileURLToPath2(import.meta.url));
   const candidates = [
-    path18.join(here, "..", "..", "bin", "console.mjs"),
+    path19.join(here, "..", "..", "bin", "console.mjs"),
     // src/lib/ → package root
-    path18.join(here, "..", "bin", "console.mjs"),
+    path19.join(here, "..", "bin", "console.mjs"),
     // dist/ → package root
-    path18.join(here, "console.mjs")
+    path19.join(here, "console.mjs")
     // bin/ (defensive)
   ];
   for (const c of candidates) {
     try {
-      if (fs17.existsSync(c)) return c;
+      if (fs18.existsSync(c)) return c;
     } catch {
     }
   }
@@ -37058,7 +37329,7 @@ async function ensureConsole(projectDir, opts = {}) {
       log("ensureConsole: no standalone launcher found beside this build \u2014 skipping");
       return null;
     }
-    const args = [launcher, path18.resolve(projectDir)];
+    const args = [launcher, path19.resolve(projectDir)];
     if (typeof port === "number") args.push(String(port));
     if (hot === true) args.push("--hot");
     const child = spawnImpl(process.execPath, args, { detached: true, stdio: "ignore" });
@@ -37079,9 +37350,9 @@ async function ensureConsole(projectDir, opts = {}) {
 }
 function writeConsoleRegistry(projectDir, port, extra = {}) {
   try {
-    fs17.writeFileSync(
+    fs18.writeFileSync(
       consoleRegistryPath(projectDir),
-      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path18.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path19.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
 `
     );
   } catch {
@@ -37090,9 +37361,9 @@ function writeConsoleRegistry(projectDir, port, extra = {}) {
 function updateConsoleRegistry(projectDir, patch) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs17.readFileSync(p, "utf8"));
+    const rec = JSON.parse(fs18.readFileSync(p, "utf8"));
     if (!rec || rec.pid !== process.pid) return;
-    fs17.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
+    fs18.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
 `);
   } catch {
   }
@@ -37100,16 +37371,16 @@ function updateConsoleRegistry(projectDir, patch) {
 function clearConsoleRegistry(projectDir) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs17.readFileSync(p, "utf8"));
-    if (rec && rec.pid === process.pid) fs17.rmSync(p, { force: true });
+    const rec = JSON.parse(fs18.readFileSync(p, "utf8"));
+    if (rec && rec.pid === process.pid) fs18.rmSync(p, { force: true });
   } catch {
   }
 }
 function stampRenderMarker(projectDir) {
   try {
-    const p = path18.join(projectDir, ...RENDER_MARKER_REL);
-    fs17.mkdirSync(path18.dirname(p), { recursive: true });
-    fs17.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+    const p = path19.join(projectDir, ...RENDER_MARKER_REL);
+    fs18.mkdirSync(path19.dirname(p), { recursive: true });
+    fs18.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
 `);
   } catch {
   }
@@ -37117,31 +37388,31 @@ function stampRenderMarker(projectDir) {
 function touchRenderMarker(projectDir) {
   try {
     const now = /* @__PURE__ */ new Date();
-    fs17.utimesSync(path18.join(projectDir, ...RENDER_MARKER_REL), now, now);
+    fs18.utimesSync(path19.join(projectDir, ...RENDER_MARKER_REL), now, now);
   } catch {
   }
 }
 function clearRenderMarker(projectDir) {
   try {
-    fs17.rmSync(path18.join(projectDir, ...RENDER_MARKER_REL), { force: true });
+    fs18.rmSync(path19.join(projectDir, ...RENDER_MARKER_REL), { force: true });
   } catch {
   }
 }
 function resolveAppName(projectDir) {
   for (const f of ["settings.gradle.kts", "settings.gradle"]) {
     try {
-      const text = fs17.readFileSync(path18.join(projectDir, f), "utf8");
+      const text = fs18.readFileSync(path19.join(projectDir, f), "utf8");
       const m = text.match(/rootProject\.name\s*=\s*["']([^"']+)["']/);
       if (m) return m[1];
     } catch {
     }
   }
-  return path18.basename(projectDir);
+  return path19.basename(projectDir);
 }
 function detectCapabilities(projectDir) {
   const has = (rel) => {
     try {
-      return fs17.statSync(path18.join(projectDir, rel)).isDirectory();
+      return fs18.statSync(path19.join(projectDir, rel)).isDirectory();
     } catch {
       return false;
     }
@@ -37150,7 +37421,7 @@ function detectCapabilities(projectDir) {
 }
 function laneInProgress(projectDir, { now = Date.now } = {}) {
   try {
-    const st = fs17.statSync(path18.join(projectDir, ...LANE_MARKER_REL));
+    const st = fs18.statSync(path19.join(projectDir, ...LANE_MARKER_REL));
     return now() - st.mtimeMs < LANE_MARKER_STALE_MS;
   } catch {
     return false;
@@ -37163,22 +37434,22 @@ async function withKspSelfHeal(projectDir, log, run) {
     const text = `${err && err.message ? err.message : err}${err && err.stdout ? err.stdout : ""}${err && err.stderr ? err.stderr : ""}`;
     if (!KSP_COLLISION_RE.test(text)) throw err;
     log("KSP cache collision (concurrent Gradle \u2014 verify lane?) \u2014 clearing kspCaches, retrying once");
-    fs17.rmSync(path18.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
+    fs18.rmSync(path19.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
     return await run();
   }
 }
 function detectAppPackage(projectDir) {
-  const spec = path18.join(projectDir, "create-cmp.json");
-  if (fs17.existsSync(spec)) {
+  const spec = path19.join(projectDir, "create-cmp.json");
+  if (fs18.existsSync(spec)) {
     try {
-      const pkg = JSON.parse(fs17.readFileSync(spec, "utf8")).package;
+      const pkg = JSON.parse(fs18.readFileSync(spec, "utf8")).package;
       if (pkg) return pkg;
     } catch {
     }
   }
-  const gradle = path18.join(projectDir, "composeApp", "build.gradle.kts");
-  if (fs17.existsSync(gradle)) {
-    const m = fs17.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
+  const gradle = path19.join(projectDir, "composeApp", "build.gradle.kts");
+  if (fs18.existsSync(gradle)) {
+    const m = fs18.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
     if (m) return m[1];
   }
   throw new Error(
@@ -37237,6 +37508,7 @@ function extractCompileErrors(text) {
   );
 }
 var esc6 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr3 = (s) => esc6(s).replace(/"/g, "&quot;");
 function galleryHtml(state) {
   const {
     appName,
@@ -37289,7 +37561,10 @@ function galleryHtml(state) {
     // What this project can show (detectCapabilities). Older callers get the
     // full console; a governance-only project drops the sections that need
     // pixels and says so on the rail.
-    capabilities = { governance: true, screens: true }
+    capabilities = { governance: true, screens: true },
+    // Where this project keeps its receipt/specs/doc (project-layout.mjs's
+    // resolveProjectLayout result). null = older caller; nothing is shown.
+    layout = null
   } = state;
   const width = viewport?.width ?? 411;
   const screenCards = cards.filter(({ screen }) => !isComponentStoryId(screen.id));
@@ -38214,10 +38489,11 @@ ${section.bodyHtml}`;
   const visibleRail = capabilities.screens ? railItems : railItems.filter((r) => !NEEDS_SCREENS.has(r.id));
   const visibleSections = capabilities.screens ? sections : sections.filter((s) => !NEEDS_SCREENS.has(s.id));
   const capabilityNote = capabilities.screens ? "" : `<p class="rail-sub rail-capability" title="This project has no composeApp/. The governance window is complete; screens, preview and the live device need a Compose app.">governance only &middot; no Compose app</p>`;
+  const layoutNote = !layout ? "" : !layout.ok ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr3(layout.reason || "")}">${esc6(layout.relPath || MANIFEST_REL_PATH)} refused &mdash; see Evidence</p>` : layout.source === "manifest" ? `<p class="rail-sub rail-capability" title="${escAttr3(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc6(layout.relPath)} &middot; packs ${esc6((layout.layout.packs || []).join(", "))}</p>` : "";
   return renderShellPage({
     appName,
     railItems: visibleRail,
-    railFootHtml: `${capabilityNote}${railFootPlain}`,
+    railFootHtml: `${capabilityNote}${layoutNote}${railFootPlain}`,
     // The governance strip (07-28 audit, fix 5): counts + the one next human
     // act + recent history, rail-resident so it is visible on EVERY tab. Its
     // queue is the SAME deriveHumanQueue the guided prompt uses — one
@@ -38272,10 +38548,10 @@ ${section.bodyHtml}`;
   });
 }
 function createPreviewService(opts) {
-  const projectDir = path18.resolve(opts.projectDir);
+  const projectDir = path19.resolve(opts.projectDir);
   const appName = opts.appName || resolveAppName(projectDir);
-  const previewsDir = path18.join(projectDir, "composeApp", "build", "previews");
-  const srcDir = path18.join(projectDir, "composeApp", "src");
+  const previewsDir = path19.join(projectDir, "composeApp", "build", "previews");
+  const srcDir = path19.join(projectDir, "composeApp", "src");
   const log = opts.log || (() => {
   });
   const hot = opts.hot !== false;
@@ -38538,10 +38814,10 @@ function createPreviewService(opts) {
     return result;
   }
   async function getDesignSystemData() {
-    const catalogPath = path18.join(previewsDir, "design-system.json");
-    if (fs17.existsSync(catalogPath)) {
+    const catalogPath = path19.join(previewsDir, "design-system.json");
+    if (fs18.existsSync(catalogPath)) {
       try {
-        return { available: true, source: "previews", catalog: JSON.parse(fs17.readFileSync(catalogPath, "utf8")) };
+        return { available: true, source: "previews", catalog: JSON.parse(fs18.readFileSync(catalogPath, "utf8")) };
       } catch (err) {
         log(`design-system.json at ${catalogPath} is not valid JSON (${err.message}) \u2014 trying a live session`);
       }
@@ -38567,26 +38843,26 @@ function createPreviewService(opts) {
         reason: "no current render to stash \u2014 call preview {projectDir} and wait for a render to complete first"
       };
     }
-    const variantDir = path18.join(previewsDir, "variants", name);
+    const variantDir = path19.join(previewsDir, "variants", name);
     try {
-      fs17.rmSync(variantDir, { recursive: true, force: true });
-      fs17.mkdirSync(variantDir, { recursive: true });
+      fs18.rmSync(variantDir, { recursive: true, force: true });
+      fs18.mkdirSync(variantDir, { recursive: true });
     } catch (err) {
       return { ok: false, reason: `could not prepare ${variantDir}: ${err && err.message ? err.message : err}` };
     }
     const screens = [];
     for (const { screen } of cards) {
-      const src = path18.join(previewsDir, screen.png);
-      if (!fs17.existsSync(src)) continue;
-      const dst = path18.join(variantDir, screen.png);
-      fs17.mkdirSync(path18.dirname(dst), { recursive: true });
-      fs17.copyFileSync(src, dst);
+      const src = path19.join(previewsDir, screen.png);
+      if (!fs18.existsSync(src)) continue;
+      const dst = path19.join(variantDir, screen.png);
+      fs18.mkdirSync(path19.dirname(dst), { recursive: true });
+      fs18.copyFileSync(src, dst);
       screens.push(screen.id);
     }
     let designSystemStashed = false;
-    const dsSrc = path18.join(previewsDir, "design-system.json");
-    if (fs17.existsSync(dsSrc)) {
-      fs17.copyFileSync(dsSrc, path18.join(variantDir, "design-system.json"));
+    const dsSrc = path19.join(previewsDir, "design-system.json");
+    if (fs18.existsSync(dsSrc)) {
+      fs18.copyFileSync(dsSrc, path19.join(variantDir, "design-system.json"));
       designSystemStashed = true;
     }
     touch("variant-snapshot");
@@ -38648,17 +38924,17 @@ function createPreviewService(opts) {
     }
   }
   function loadPreviews() {
-    const manifestPath = path18.join(previewsDir, "manifest.json");
-    const manifest = JSON.parse(fs17.readFileSync(manifestPath, "utf8"));
+    const manifestPath = path19.join(previewsDir, "manifest.json");
+    const manifest = JSON.parse(fs18.readFileSync(manifestPath, "utf8"));
     try {
-      lastRenderAt = fs17.statSync(manifestPath).mtimeMs;
+      lastRenderAt = fs18.statSync(manifestPath).mtimeMs;
     } catch {
       lastRenderAt = Date.now();
     }
     viewport = manifest.viewport;
     const trees = /* @__PURE__ */ new Map();
     cards = manifest.screens.map((screen) => {
-      const treeJson = fs17.readFileSync(path18.join(previewsDir, screen.tree), "utf8");
+      const treeJson = fs18.readFileSync(path19.join(previewsDir, screen.tree), "utf8");
       trees.set(screen.id, treeJson);
       const tree = JSON.parse(treeJson);
       const a11y = auditA11y(tree);
@@ -38695,8 +38971,8 @@ function createPreviewService(opts) {
       };
     }
     let catalog;
-    const catalogPath = path18.join(previewsDir, "design-system.json");
-    if (fs17.existsSync(catalogPath)) catalog = JSON.parse(fs17.readFileSync(catalogPath, "utf8"));
+    const catalogPath = path19.join(previewsDir, "design-system.json");
+    if (fs18.existsSync(catalogPath)) catalog = JSON.parse(fs18.readFileSync(catalogPath, "utf8"));
     return {
       ok: true,
       screen,
@@ -38713,10 +38989,10 @@ function createPreviewService(opts) {
   }
   function snapshotPngs() {
     for (const { screen } of cards) {
-      const src = path18.join(previewsDir, screen.png);
-      const dst = path18.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
+      const src = path19.join(previewsDir, screen.png);
+      const dst = path19.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
       try {
-        if (fs17.existsSync(src)) fs17.copyFileSync(src, dst);
+        if (fs18.existsSync(src)) fs18.copyFileSync(src, dst);
       } catch {
       }
     }
@@ -38747,8 +39023,8 @@ function createPreviewService(opts) {
     } catch {
       return false;
     }
-    const theirs = health && typeof health.previewsDir === "string" ? path18.resolve(health.previewsDir) : null;
-    if (theirs && theirs !== path18.resolve(previewsDir)) {
+    const theirs = health && typeof health.previewsDir === "string" ? path19.resolve(health.previewsDir) : null;
+    if (theirs && theirs !== path19.resolve(previewsDir)) {
       log(`a daemon is running on ${daemonUrl} but serves ${theirs} \u2014 not this project; staying on the gradle path`);
       return false;
     }
@@ -38851,9 +39127,9 @@ function createPreviewService(opts) {
   }
   function watchClasses() {
     if (classesWatcher) return;
-    const classesDir = path18.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
+    const classesDir = path19.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
     try {
-      classesWatcher = fs17.watch(classesDir, { recursive: true }, () => {
+      classesWatcher = fs18.watch(classesDir, { recursive: true }, () => {
         touch("classes-change");
         scheduleRender(CLASSES_DEBOUNCE_MS);
       });
@@ -39049,13 +39325,13 @@ function createPreviewService(opts) {
     } catch {
     }
     try {
-      fs17.writeFileSync(
+      fs18.writeFileSync(
         consoleRegistryPath(projectDir),
         `${JSON.stringify({
           pid: process.ppid,
           port: handoffPort,
           url: `http://127.0.0.1:${handoffPort}/`,
-          projectDir: path18.resolve(projectDir),
+          projectDir: path19.resolve(projectDir),
           startedAt: (/* @__PURE__ */ new Date()).toISOString(),
           renewing: true,
           renewingAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -39082,7 +39358,7 @@ function createPreviewService(opts) {
     for (const dir of sourceRoots()) {
       try {
         selfWatchers.push(
-          fs17.watch(dir, { recursive: true }, (_event, filename) => {
+          fs18.watch(dir, { recursive: true }, (_event, filename) => {
             if (filename && !String(filename).endsWith(".mjs")) return;
             onSelfSourceChange();
           })
@@ -39095,7 +39371,7 @@ function createPreviewService(opts) {
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
   function startWatching() {
     try {
-      watcher = fs17.watch(srcDir, { recursive: true }, (_event, filename) => {
+      watcher = fs18.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
         clearTimeout(activityBroadcastTimer);
@@ -39124,8 +39400,13 @@ function createPreviewService(opts) {
       log(`watching ${srcDir} (poll fallback)`);
     }
   }
+  const watchLayoutResolved = resolveProjectLayout(projectDir);
+  const watchLayout = watchLayoutResolved.ok ? watchLayoutResolved.layout : DEFAULT_LAYOUT;
+  const receiptRelParts = watchLayout.receipt.split("/");
+  const receiptBase = receiptRelParts.pop();
+  const receiptDirRel = receiptRelParts.join("/") || ".";
   const GOVERNANCE_WATCHES = [
-    { rel: "specs", kind: "governance" },
+    { rel: watchLayout.specs, kind: "governance" },
     // Mirrors FEATURES_DIR_REL in the project's own qa/lib/feature-brief.mjs;
     // this package cannot import that file statically (it lives in the generated app).
     { rel: "docs/features", kind: "governance" },
@@ -39142,7 +39423,12 @@ function createPreviewService(opts) {
     // watch skipped at startup never retries — verify.mjs mkdirs the same path
     // before stamping, so pre-creating it is claiming nothing Gradle owns.
     { rel: "composeApp/build", kind: "governance", only: /* @__PURE__ */ new Set([".cmp-lane-in-progress", ".cmp-render-in-progress"]), mkdir: true },
-    { rel: "qa/evidence", kind: "governance", only: /* @__PURE__ */ new Set(["latest.json"]) }
+    { rel: receiptDirRel, kind: "governance", only: /* @__PURE__ */ new Set([receiptBase]) },
+    // The manifest itself: editing it re-points every reader, so the page
+    // must re-render (the watch set is fixed for the process — a moved
+    // receipt path takes effect on the next console start, and the page's
+    // layout line names the manifest so that is visible).
+    { rel: "qa", kind: "governance", only: /* @__PURE__ */ new Set([MANIFEST_REL_PATH.split("/").pop()]) }
   ];
   const pendingGovernance = /* @__PURE__ */ new Set();
   let governanceWatchers = [];
@@ -39169,18 +39455,18 @@ function createPreviewService(opts) {
   }
   function watchGovernance() {
     for (const w of GOVERNANCE_WATCHES) {
-      const abs = path18.join(projectDir, w.rel);
-      if (!fs17.existsSync(abs)) {
+      const abs = path19.join(projectDir, w.rel);
+      if (!fs18.existsSync(abs)) {
         if (!w.mkdir || !capabilities.screens) continue;
         try {
-          fs17.mkdirSync(abs, { recursive: true });
+          fs18.mkdirSync(abs, { recursive: true });
         } catch {
           continue;
         }
       }
       try {
-        const watcher2 = fs17.watch(abs, (_event, filename) => {
-          const base = filename ? path18.basename(filename) : "";
+        const watcher2 = fs18.watch(abs, (_event, filename) => {
+          const base = filename ? path19.basename(filename) : "";
           if (w.only && !w.only.has(base)) return;
           pendingGovernance.add(w.kind === "ledger" ? base === "comments.json" ? "comment" : "approval" : "governance");
           clearTimeout(governanceTimer);
@@ -39197,17 +39483,17 @@ function createPreviewService(opts) {
     (function walk2(dir) {
       let entries;
       try {
-        entries = fs17.readdirSync(dir, { withFileTypes: true });
+        entries = fs18.readdirSync(dir, { withFileTypes: true });
       } catch {
         return;
       }
       for (const e of entries) {
-        const p = path18.join(dir, e.name);
+        const p = path19.join(dir, e.name);
         if (IGNORE.test(p)) continue;
         if (e.isDirectory()) walk2(p);
         else {
           try {
-            stamp = Math.max(stamp, fs17.statSync(p).mtimeMs);
+            stamp = Math.max(stamp, fs18.statSync(p).mtimeMs);
           } catch {
           }
         }
@@ -39242,7 +39528,7 @@ function createPreviewService(opts) {
           commentsSnapshot(),
           getLastReceipt(projectDir)
         ]);
-        const specs = getSpecsData(projectDir);
+        const specs = await getProjectSpecsData(projectDir);
         const intent = getIntentData(projectDir);
         const receiptHistory = listReceiptHistory(projectDir);
         const architecture = getArchitectureData(projectDir);
@@ -39300,6 +39586,7 @@ function createPreviewService(opts) {
         res.end(
           galleryHtml({
             capabilities,
+            layout: resolveProjectLayout(projectDir),
             appName,
             viewport,
             cards,
@@ -39587,30 +39874,30 @@ function createPreviewService(opts) {
         return;
       }
       if (url2.pathname.startsWith("/walkthrough/")) {
-        const wtRoot = path18.join(projectDir, WALKTHROUGH_REL_DIR);
+        const wtRoot = path19.join(projectDir, WALKTHROUGH_REL_DIR);
         const rel = decodeURIComponent(url2.pathname.slice("/walkthrough/".length));
-        const file2 = path18.normalize(path18.join(wtRoot, rel));
-        if (!file2.startsWith(wtRoot) || !fs17.existsSync(file2) || !fs17.statSync(file2).isFile()) {
+        const file2 = path19.normalize(path19.join(wtRoot, rel));
+        if (!file2.startsWith(wtRoot) || !fs18.existsSync(file2) || !fs18.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".html") ? "text/html; charset=utf-8" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs17.createReadStream(file2).pipe(res);
+        fs18.createReadStream(file2).pipe(res);
         return;
       }
       if (url2.pathname.startsWith("/previews/")) {
         const rel = decodeURIComponent(url2.pathname.slice("/previews/".length));
-        const file2 = path18.normalize(path18.join(previewsDir, rel));
-        if (!file2.startsWith(previewsDir) || !fs17.existsSync(file2) || !fs17.statSync(file2).isFile()) {
+        const file2 = path19.normalize(path19.join(previewsDir, rel));
+        if (!file2.startsWith(previewsDir) || !fs18.existsSync(file2) || !fs18.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".svg") ? "image/svg+xml" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs17.createReadStream(file2).pipe(res);
+        fs18.createReadStream(file2).pipe(res);
         return;
       }
       res.writeHead(404);
@@ -39671,8 +39958,13 @@ function createPreviewService(opts) {
     };
   }
   function status() {
+    const layoutResolved = resolveProjectLayout(projectDir);
     return {
       projectDir,
+      // The layout this console reads the project through — the manifest's
+      // or the default — so `--status` shows WHERE it looks before a reader
+      // wonders why a pane is empty. A refused manifest is reported as such.
+      layout: layoutResolved.ok ? { source: layoutResolved.source, manifest: layoutResolved.relPath, ...layoutResolved.layout } : { source: "refused", manifest: layoutResolved.relPath, reason: layoutResolved.reason },
       // Which build is serving this, and is it the build on disk? Captured ONCE
       // at module load (LOADED_BUILD, below) and compared against disk on every
       // read — a process cannot notice its own staleness any other way, and
@@ -39698,8 +39990,8 @@ function createPreviewService(opts) {
         a11yPass: a11y.pass,
         a11yViolations: a11y.violations.length,
         lastChangedVersion: changedAt.get(screen.id) ?? null,
-        tree: path18.join(previewsDir, screen.tree),
-        png: path18.join(previewsDir, screen.png)
+        tree: path19.join(previewsDir, screen.tree),
+        png: path19.join(previewsDir, screen.png)
       }))
     };
   }
@@ -39726,7 +40018,7 @@ function createPreviewService(opts) {
           throw err;
         }
       }
-      if (capabilities.screens && fs17.existsSync(path18.join(previewsDir, "manifest.json"))) {
+      if (capabilities.screens && fs18.existsSync(path19.join(previewsDir, "manifest.json"))) {
         loadPreviews();
       }
       await listen(opts.port || DEFAULT_PORT2);

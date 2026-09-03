@@ -29,6 +29,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { layoutPath } from "./project-layout.mjs";
 import { parseSpecClauses } from "./specs.mjs";
 
 const KNOWN_LAYERS = [
@@ -141,9 +142,11 @@ export function getLayerMap(root) {
  */
 export function getGovernedContract(root) {
   const file = "app-base.spec.md";
-  const specPath = path.join(root, "specs", file);
+  const specsDir = layoutPath(root, "specs");
+  if (!specsDir.ok) return { available: false, reason: specsDir.reason };
+  const specPath = path.join(root, ...specsDir.rel.split("/"), file);
   if (!fs.existsSync(specPath)) {
-    return { available: false, reason: `specs/${file} not found` };
+    return { available: false, reason: `${specsDir.rel}/${file} not found` };
   }
   try {
     return { available: true, file, clauses: parseSpecClauses(root, file) };
@@ -512,8 +515,14 @@ function deriveVersionSet(root, constraintsBody) {
  * @param {string} root
  */
 export function getArchitectureDoc(root) {
-  const docPath = path.join(root, ...DOC_REL.split("/"));
-  if (!fs.existsSync(docPath)) return { available: false, reason: `${DOC_REL} not found` };
+  // The doc lives where the project says it does (qa/harness-manifest.json's
+  // architectureDoc), defaulting to docs/ARCHITECTURE.md. payment-blueprint
+  // keeps it at the repo root and the console said "not found" five times.
+  const resolved = layoutPath(root, "architectureDoc");
+  if (!resolved.ok) return { available: false, reason: resolved.reason };
+  const docRel = resolved.rel;
+  const docPath = path.join(root, ...docRel.split("/"));
+  if (!fs.existsSync(docPath)) return { available: false, reason: `${docRel} not found` };
   let text;
   try {
     text = fs.readFileSync(docPath, "utf8");

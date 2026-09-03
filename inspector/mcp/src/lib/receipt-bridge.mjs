@@ -27,9 +27,46 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { layoutPath } from "./project-layout.mjs";
 
-/** Where a generated project writes its evidence receipt (qa/verify.mjs). */
+/**
+ * Where a create-cmp Compose app writes its evidence receipt (qa/verify.mjs).
+ * A DEFAULT, not a law: an adopter declares its own path in
+ * qa/harness-manifest.json (project-layout.mjs) and every reader here follows it.
+ */
 export const RECEIPT_REL_PATH = "qa/evidence/latest.json";
+
+/**
+ * The receipt path this project uses — the manifest's, or the default. A
+ * malformed manifest is a refusal (`ok:false`), never a silent default.
+ * @param {string} root
+ * @returns {{ok: true, rel: string} | {ok: false, reason: string}}
+ */
+export function resolveReceiptRelPath(root) {
+  return layoutPath(root, "receipt");
+}
+
+// Two receipt schemas name the same facts differently: cmp-evidence/1 nests
+// them (inputs.hash, commit.sha, generatedAt) while a spine adopter's own
+// writer may keep them flat (inputsHash, gitSha, timestamp — payment-blueprint's
+// pb-evidence/1). Both are READ here, never re-derived; a field absent in
+// both spellings is null.
+function receiptInputsHash(receipt) {
+  if (receipt.inputs && typeof receipt.inputs.hash === "string") return receipt.inputs.hash;
+  return typeof receipt.inputsHash === "string" ? receipt.inputsHash : null;
+}
+function receiptInputsFileCount(receipt) {
+  if (receipt.inputs && typeof receipt.inputs.fileCount === "number") return receipt.inputs.fileCount;
+  return typeof receipt.inputsFileCount === "number" ? receipt.inputsFileCount : null;
+}
+function receiptCommitSha(receipt) {
+  if (receipt.commit && typeof receipt.commit.sha === "string") return receipt.commit.sha;
+  return typeof receipt.gitSha === "string" ? receipt.gitSha : null;
+}
+function receiptGeneratedAt(receipt) {
+  if (typeof receipt.generatedAt === "string") return receipt.generatedAt;
+  return typeof receipt.timestamp === "string" ? receipt.timestamp : null;
+}
 const INPUTS_HASH_REL_PATH = "qa/lib/inputs-hash.mjs";
 
 // One resolved-module lookup per project root, success-only (see
@@ -86,7 +123,7 @@ function readEvidenceLevel(receipt) {
  * @returns {Promise<{stale: boolean|null, currentInputsHash: string|null, staleReason?: string}>}
  */
 async function recomputeStaleness(root, receipt) {
-  const receiptHash = receipt.inputs && typeof receipt.inputs.hash === "string" ? receipt.inputs.hash : null;
+  const receiptHash = receiptInputsHash(receipt);
   if (!receiptHash) {
     return { stale: null, currentInputsHash: null, staleReason: "receipt predates evidence binding (no inputs.hash) — freshness unknown" };
   }
@@ -150,9 +187,12 @@ async function recomputeStaleness(root, receipt) {
  * }>}
  */
 export async function getLastReceipt(root) {
-  const receiptPath = path.join(root, RECEIPT_REL_PATH);
+  const resolved = resolveReceiptRelPath(root);
+  if (!resolved.ok) return { available: false, reason: resolved.reason };
+  const RECEIPT_REL_PATH = resolved.rel;
+  const receiptPath = path.join(root, ...RECEIPT_REL_PATH.split("/"));
   if (!fs.existsSync(receiptPath)) {
-    return { available: false, reason: `no receipt at ${RECEIPT_REL_PATH} — run node qa/verify.mjs` };
+    return { available: false, relPath: RECEIPT_REL_PATH, reason: `no receipt at ${RECEIPT_REL_PATH} — run node qa/verify.mjs` };
   }
 
   let receipt;
@@ -181,6 +221,10 @@ export async function getLastReceipt(root) {
       // exactly the shape it always had, so "verbatim" stays literally true.
       if (typeof s.note === "string") out.note = s.note;
       if (s.details && typeof s.details === "object") out.details = s.details;
+      // `layer` — which layer of the stack the step proves (backend, security,
+      // spine, frontend, …), stamped by the lane from the step pack. The
+      // Evidence pane groups by it when present; absent rows stay ungrouped.
+      if (typeof s.layer === "string" && s.layer.trim()) out.layer = s.layer;
       return out;
     });
   const conformanceStep = steps.find((s) => s.name === "conformance") || null;
@@ -188,7 +232,8 @@ export async function getLastReceipt(root) {
     ? { verdict: conformanceStep.verdict, reason: conformanceStep.reason, durationMs: conformanceStep.durationMs }
     : null;
 
-  const parsedAt = Date.parse(receipt.generatedAt ?? "");
+  const generatedAt = receiptGeneratedAt(receipt);
+  const parsedAt = Date.parse(generatedAt ?? "");
   const ageMs = Number.isNaN(parsedAt) ? null : Date.now() - parsedAt;
 
   const { stale, currentInputsHash, staleReason } = await recomputeStaleness(root, receipt);
@@ -200,15 +245,15 @@ export async function getLastReceipt(root) {
     relPath: RECEIPT_REL_PATH,
     verdict: receipt.verdict ?? null,
     profile: typeof receipt.profile === "string" ? receipt.profile : null,
-    commitSha: receipt.commit && typeof receipt.commit.sha === "string" ? receipt.commit.sha : null,
+    commitSha: receiptCommitSha(receipt),
     commitDirty: receipt.commit && Array.isArray(receipt.commit.dirty) ? receipt.commit.dirty : null,
-    generatedAt: receipt.generatedAt ?? null,
+    generatedAt,
     ageMs,
     steps,
     evidenceLevel,
     conformance,
-    inputsHash: receipt.inputs && typeof receipt.inputs.hash === "string" ? receipt.inputs.hash : null,
-    inputsFileCount: receipt.inputs && typeof receipt.inputs.fileCount === "number" ? receipt.inputs.fileCount : null,
+    inputsHash: receiptInputsHash(receipt),
+    inputsFileCount: receiptInputsFileCount(receipt),
     currentInputsHash,
     stale,
     staleReason,
@@ -248,6 +293,9 @@ function git(root, args) {
  * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, commitSha: string, author: string|null, committedAt: string|null, ageMs: number|null, verdict: string|null, profile: string|null, evidenceLevel: {rung: string, name: string, satisfiedBy: string[]}|null, generatedAt: string|null}>}}
  */
 export function listReceiptHistory(root) {
+  const resolved = resolveReceiptRelPath(root);
+  if (!resolved.ok) return { available: false, reason: resolved.reason };
+  const RECEIPT_REL_PATH = resolved.rel;
   let logOut;
   try {
     logOut = git(root, [
@@ -293,7 +341,7 @@ export function listReceiptHistory(root) {
       verdict: parsed.verdict ?? null,
       profile: typeof parsed.profile === "string" ? parsed.profile : null,
       evidenceLevel: readEvidenceLevel(parsed),
-      generatedAt: parsed.generatedAt ?? null,
+      generatedAt: receiptGeneratedAt(parsed),
     });
   }
   if (receipts.length === 0) {
