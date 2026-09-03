@@ -46,7 +46,7 @@ function baseConfig(targetDir) {
 }
 
 function runApprove(root, args) {
-  return execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args], {
+  return execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args, "--as", "Test Signer <test@example.com>"], {
     cwd: root,
     encoding: "utf8",
   });
@@ -54,7 +54,7 @@ function runApprove(root, args) {
 
 function runApproveExpectFail(root, args) {
   try {
-    execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args], {
+    execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args, "--as", "Test Signer <test@example.com>"], {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
@@ -263,7 +263,7 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
   });
 
   await t.test("via is recorded; a fresh signature clears the old acceptance", () => {
-    const res = lib.approveArtifact(root, "feature-brief:meal", { via: "console" });
+    const res = lib.approveArtifact(root, "feature-brief:meal", { approvedBy: "Test Signer <test@example.com>", via: "console" });
     assert.equal(res.ok, true);
     const raw = JSON.parse(fs.readFileSync(path.join(root, "qa/approvals.json"), "utf8"));
     const row = raw.artifacts.find((a) => a.artifact === "feature-brief:meal");
@@ -329,7 +329,7 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     assert.ok(ids.indexOf("feature-design:wizard") < ids.indexOf("feature-spec:meal"));
 
     // Nothing rendered → nothing signable: the refusal is the point.
-    assert.equal(lib.approveArtifact(root, "feature-design:wizard").ok, false);
+    assert.equal(lib.approveArtifact(root, "feature-design:wizard", { approvedBy: "Test Signer <test@example.com>" }).ok, false);
 
     // Unsigned brief + undrafted design → the DESIGN rung, agent-owned. The
     // ladder asks for no signature yet: drafting and auditing come first, so the

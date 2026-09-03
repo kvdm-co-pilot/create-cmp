@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 26f469aa4ea255bc1b9488252f39c53412c0e5defb7b787d0166717887a156db
+// cmp:bundle-inputs 56835687400fd9c9aeb9e276fd2e3aafe0798b80636a4962fa19ad8384faccfd
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32500,7 +32500,7 @@ async function getGovernedArtifacts(root) {
     return { available: false, error: err && err.message ? err.message : String(err) };
   }
 }
-async function approveArtifact(root, artifactId) {
+async function approveArtifact(root, artifactId, approvedBy) {
   const lib = await loadLib(root);
   if (!lib) {
     return {
@@ -32509,7 +32509,7 @@ async function approveArtifact(root, artifactId) {
     };
   }
   try {
-    return lib.approveArtifact(root, artifactId, { via: "console" });
+    return lib.approveArtifact(root, artifactId, { via: "console", ...approvedBy ? { approvedBy } : {} });
   } catch (err) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
   }
@@ -37936,10 +37936,25 @@ ${section.bodyHtml}`;
       btn.disabled = true;
       btn.textContent = "Approving\u2026";
       try {
+        // WHO is signing. Asked once per session and kept in sessionStorage \u2014
+        // not localStorage, because a signature should be a deliberate act by
+        // whoever is at the keyboard now, not a name a browser remembers
+        // forever. Cancelling declines to sign, which is a valid answer.
+        let approvedBy = sessionStorage.getItem("approvalSigner") || "";
+        if (!approvedBy) {
+          approvedBy = (window.prompt("Sign this approval as (name and email) \u2014 recorded on the approval:", "") || "").trim();
+          if (!approvedBy) {
+            if (errBox) { errBox.hidden = false; errBox.textContent = "not signed \u2014 an approval records who signed it"; }
+            btn.disabled = false;
+            btn.textContent = original;
+            return;
+          }
+          sessionStorage.setItem("approvalSigner", approvedBy);
+        }
         const res = await fetch("/api/approve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ artifact }),
+          body: JSON.stringify({ artifact, approvedBy }),
         });
         const body = await res.json();
         if (!body.ok) {
@@ -39445,7 +39460,8 @@ function createPreviewService(opts) {
           res.end(JSON.stringify({ ok: false, reason: "missing `artifact` (string) in the request body" }));
           return;
         }
-        const result = await approveArtifact(projectDir, artifact);
+        const approvedBy = body && typeof body.approvedBy === "string" ? body.approvedBy.trim() : "";
+        const result = await approveArtifact(projectDir, artifact, approvedBy || void 0);
         if (result.ok) result.whatNext = await whatNextAfter(`Signed ${artifact}`, artifact);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));

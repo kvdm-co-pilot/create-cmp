@@ -28,6 +28,7 @@ const laneSrc = (dir) =>
 
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SIGNER = "Test Signer <test@example.com>";
 
 function baseConfig(targetDir, overrides = {}) {
   return {
@@ -62,7 +63,11 @@ async function loadLib(projectRoot) {
 }
 
 function runApprove(root, args) {
-  return execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args], {
+  // Every approval records WHO signed it, so the CLI requires --as. Defaulted
+  // here (never overriding an explicit one) so each test states only what it is
+  // actually about.
+  const signed = args.some((a) => a === "--as" || a === "--status" || a === "--reopen" || a === "--reopen-feature") ? args : [...args, "--as", SIGNER];
+  return execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...signed], {
     cwd: root,
     encoding: "utf8",
   });
@@ -70,7 +75,8 @@ function runApprove(root, args) {
 
 function runApproveExpectFail(root, args) {
   try {
-    execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args], {
+    const signed2 = args.some((a) => a === "--as" || a === "--status" || a === "--reopen" || a === "--reopen-feature") ? args : [...args, "--as", SIGNER];
+    execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...signed2], {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
@@ -274,7 +280,7 @@ test("vacuous approvals refused: approveArtifact rejects an artifact that resolv
     const { approveArtifact } = await loadLib(out);
 
     // Unresolvable-package flavor (empty file list).
-    const res = approveArtifact(out, "design-system");
+    const res = approveArtifact(out, "design-system", { approvedBy: "Test Signer <test@example.com>" });
     assert.equal(res.ok, false, "zero-file approval must be refused");
     assert.match(res.reason, /cannot approve "design-system"/);
     assert.match(res.reason, /package is not resolvable/);
@@ -284,7 +290,7 @@ test("vacuous approvals refused: approveArtifact rejects an artifact that resolv
 
     // Partially-resolvable flavor: exemplar-feature still resolves its spec
     // file (1 of 11) — a PARTIAL approval is just as vacuous and must refuse.
-    const partial = approveArtifact(out, "exemplar-feature");
+    const partial = approveArtifact(out, "exemplar-feature", { approvedBy: "Test Signer <test@example.com>" });
     assert.equal(partial.ok, false, "partial (kotlin-unresolved) approval must be refused too");
     assert.match(partial.reason, /cannot approve "exemplar-feature"/);
     assert.match(partial.reason, /only 1 file\(s\) resolved/);
@@ -309,7 +315,7 @@ test("vacuous approvals refused: all-files-missing flavor names the expected fil
     fs.rmSync(path.join(themeDir, "Tokens.kt"));
 
     const { approveArtifact } = await loadLib(out);
-    const res = approveArtifact(out, "design-system");
+    const res = approveArtifact(out, "design-system", { approvedBy: "Test Signer <test@example.com>" });
     assert.equal(res.ok, false);
     assert.match(res.reason, /it resolves to 0 files/);
     assert.match(res.reason, /expected files are all missing on disk/);

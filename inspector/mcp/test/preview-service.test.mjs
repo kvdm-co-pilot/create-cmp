@@ -291,7 +291,7 @@ test("service: Architecture tab — boots against a real layer tree + the REAL a
     const approveRes = await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "architecture" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "architecture" }),
     });
     assert.equal((await approveRes.json()).ok, true);
 
@@ -1496,7 +1496,7 @@ test("service: POST /api/approve calls the REAL library, writes qa/approvals.jso
     const res = await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
     assert.equal(res.status, 200);
     const body = await res.json();
@@ -1526,7 +1526,7 @@ test("service: POST /api/approve surfaces the library's refusal verbatim (vacuou
     const unknown = await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "not-a-real-artifact" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "not-a-real-artifact" }),
     });
     assert.equal(unknown.status, 409);
     const unknownBody = await unknown.json();
@@ -1576,7 +1576,7 @@ test("service: Components section — boots against a real components dir + the 
     const approveRes = await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "components" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "components" }),
     });
     assert.equal((await approveRes.json()).ok, true);
 
@@ -1630,7 +1630,7 @@ test("service: POST /api/approve broadcasts an SSE 'approval' event", async () =
     await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
 
     const evt = await nextEvent();
@@ -1655,7 +1655,7 @@ test("service: waitForApprovalDecision resolves (event-driven) the moment POST /
     await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
     const settled = await pending;
     assert.equal(settled.timedOut, false);
@@ -2050,13 +2050,13 @@ test("service: POST /api/reopen moves an approved artifact to reopened, writes t
     await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
 
     const res = await fetch(`${st.url}api/reopen`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
     assert.equal(res.status, 200);
     const body = await res.json();
@@ -2087,7 +2087,7 @@ test("service: POST /api/reopen surfaces the library's refusal verbatim (non-app
     const neverApproved = await fetch(`${st.url}api/reopen`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "architecture" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "architecture" }),
     });
     assert.equal(neverApproved.status, 409);
     const neverApprovedBody = await neverApproved.json();
@@ -2097,7 +2097,7 @@ test("service: POST /api/reopen surfaces the library's refusal verbatim (non-app
     const unknown = await fetch(`${st.url}api/reopen`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "not-a-real-artifact" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "not-a-real-artifact" }),
     });
     assert.equal(unknown.status, 409);
     assert.match((await unknown.json()).reason, /unknown artifact/);
@@ -2140,7 +2140,7 @@ test("service: POST /api/reopen against a project whose lib predates reopenArtif
     const res = await fetch(`${st.url}api/reopen`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
     assert.equal(res.status, 409);
     const body = await res.json();
@@ -2163,7 +2163,7 @@ test("service: POST /api/reopen broadcasts the SAME SSE 'approval' event type as
     await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
 
     const sseRes = await fetch(`${st.url}events`);
@@ -2186,7 +2186,7 @@ test("service: POST /api/reopen broadcasts the SAME SSE 'approval' event type as
     await fetch(`${st.url}api/reopen`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
 
     const evt = await nextEvent();
@@ -2209,14 +2209,14 @@ test("service: waitForApprovalDecision also settles on a reopen (it's just anoth
     await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
 
     const pending = service.waitForApprovalDecision(5000);
     await fetch(`${st.url}api/reopen`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
     const settled = await pending;
     assert.equal(settled.timedOut, false);
@@ -2313,7 +2313,7 @@ test("service: the served gallery page's candidates strip appears only in genesi
     await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "design-system" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "design-system" }),
     });
     const stewardPage = await (await fetch(st.url)).text();
     assert.doesNotMatch(stewardPage, /class="candidates-strip"/);
@@ -2591,7 +2591,7 @@ test("service: every decision response carries whatNext — the guided-flow prom
 
     // Approve one artifact: the response must say what happened, and list the
     // rest of the human's queue (the other unreviewed artifacts).
-    const first = await post("/api/approve", { artifact: "design-system" });
+    const first = await post("/api/approve", { approvedBy: "Test Signer <test@example.com>", artifact: "design-system" });
     assert.equal(first.ok, true);
     assert.ok(first.whatNext, "decision responses carry whatNext");
     assert.equal(first.whatNext.did, "Signed design-system");
@@ -3049,7 +3049,7 @@ test("front door (live): the queue names the act, and the act LEAVES the queue o
     const res = await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "architecture" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "architecture" }),
     });
     assert.equal((await res.json()).ok, true);
 
@@ -3094,7 +3094,7 @@ test("front door (live): approving from the Overview row signs the real artifact
     const res = await fetch(`${st.url}api/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact: "architecture" }),
+      body: JSON.stringify({ approvedBy: "Test Signer <test@example.com>", artifact: "architecture" }),
     });
     assert.equal((await res.json()).ok, true);
 

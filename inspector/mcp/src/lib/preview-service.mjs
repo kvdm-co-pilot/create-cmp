@@ -1548,10 +1548,25 @@ export function galleryHtml(state) {
       btn.disabled = true;
       btn.textContent = "Approving…";
       try {
+        // WHO is signing. Asked once per session and kept in sessionStorage —
+        // not localStorage, because a signature should be a deliberate act by
+        // whoever is at the keyboard now, not a name a browser remembers
+        // forever. Cancelling declines to sign, which is a valid answer.
+        let approvedBy = sessionStorage.getItem("approvalSigner") || "";
+        if (!approvedBy) {
+          approvedBy = (window.prompt("Sign this approval as (name and email) — recorded on the approval:", "") || "").trim();
+          if (!approvedBy) {
+            if (errBox) { errBox.hidden = false; errBox.textContent = "not signed — an approval records who signed it"; }
+            btn.disabled = false;
+            btn.textContent = original;
+            return;
+          }
+          sessionStorage.setItem("approvalSigner", approvedBy);
+        }
         const res = await fetch("/api/approve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ artifact }),
+          body: JSON.stringify({ artifact, approvedBy }),
         });
         const body = await res.json();
         if (!body.ok) {
@@ -3486,7 +3501,11 @@ export function createPreviewService(opts) {
           res.end(JSON.stringify({ ok: false, reason: "missing `artifact` (string) in the request body" }));
           return;
         }
-        const result = await approveArtifactViaLib(projectDir, artifact);
+        // The signer travels with the request. The console asks the human once
+        // per session; the server never fabricates one, so a request without it
+        // gets the library's own refusal rather than a signature nobody made.
+        const approvedBy = body && typeof body.approvedBy === "string" ? body.approvedBy.trim() : "";
+        const result = await approveArtifactViaLib(projectDir, artifact, approvedBy || undefined);
         if (result.ok) result.whatNext = await whatNextAfter(`Signed ${artifact}`, artifact);
         res.writeHead(result.ok ? 200 : 409, { "content-type": "application/json" });
         res.end(JSON.stringify(result));
