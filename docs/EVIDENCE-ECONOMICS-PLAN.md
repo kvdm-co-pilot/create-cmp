@@ -319,3 +319,24 @@ S6. Neither starts until S1–S7 are landed and proven.
   before publish: root 1231 / inspector 579 / receipts 17 green, and a fleet check that stamped a
   scratch app and ran its full lane to PASS at L1 on the split spine+pack. (The first token paste
   returned E401 — a 43-character value where a granular token is 40; `npm login` resolved it.)
+- 2026-09-03 — **Peer finding on S8, verified and partly fixed.** The blueprint session flagged
+  four things its `qa/` has that the 0.19.0 spine does not. All four confirmed in this tree.
+  **#4 was a defect in what I shipped, and it was mine**: `VERIFIED_SURFACE` was hardcoded inside
+  `packages/receipts/src/inputs-hash.mjs` — the spine — so a repo whose code lives outside
+  `composeApp/` that followed my own S8c adoption doc had its verified surface silently shrink.
+  Reproduced in our own tree: the published 0.19.0 spine, run on `myapp/` (nested, not a git
+  root), returns `e3b0c44298fc1c14…` — the sha256 of the empty string — a confident 64-hex digest
+  attesting **0 files**, with no error and no failed step.
+  **Fixed:** the surface is per-project via `qa/verified-surface.json` (one file both
+  `verify.mjs` and `receipt-check.mjs` read, so they can never disagree), the CMP list stays the
+  default, a malformed or empty declaration is refused rather than silently defaulted, a surface
+  matching zero files throws instead of hashing nothing, and the Stop hook turns that throw into
+  a refusal with its reason rather than a stack trace. **Back-compat proven**: create-cmp-showcase
+  hashes 485 files to `6e1b0a095c23667a` before and after — byte-identical, no receipt
+  invalidated. S8c's adoption doc now tells adopters to declare the surface.
+  **#1–#3 are NOT fixed and need Karel's call** — each is a real gap AND a breaking change to
+  existing gates: approver identity (`approvedBy`, absent everywhere — an agent's approval is
+  indistinguishable from a human's), citation binding (`scanCitations` counts a SPEC tag on any
+  line, so one comment turns a red coverage gate green — this also weakens S1's `[tier: device]`,
+  since a device-tier citation can be a bare comment), and the unvouched-lane guard (the receipt
+  validator never checks that `harnessIntegrity` PASSed).

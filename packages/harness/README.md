@@ -116,7 +116,15 @@ The lane is two things (evidence-economics S8): a **spine** and a **step pack**.
 
 To verify a Kotlin backend, a web service, anything: keep the spine, replace the pack.
 
-1. Vendor the spine files above into `qa/` (the region hash-lock keeps them honest).
+1. Vendor the spine files above into `qa/`, then **declare your verified surface** in
+   `qa/verified-surface.json` — `{"surface": ["services", "docs", "build-logic", ".github", "qa"]}`.
+   Without it the surface defaults to a Compose app's (`composeApp`, `specs`, `qa`, the Gradle
+   files) and everything outside it stops being attested. Absent a declaration this is loud, not
+   silent: a surface matching no files is refused rather than hashed, and the Stop hook reports
+   the refusal with its reason. But a surface matching *some* of your tree — a backend that has
+   `qa/` and `specs/` — resolves to a valid, smaller hash, so declare it deliberately rather than
+   relying on the guard. The file lives inside the surface, so changing it invalidates receipts,
+   which is correct: the coverage changed.
 2. Write `qa/lib/steps-<yours>.mjs` exporting `createYourSteps(ctx)` with the same return shape.
    A step is a function returning `{ name, verdict: "PASS"|"FAIL"|"SKIP"|"ERROR", reason?,
    durationMs, details? }`. Borrow `ctx.sh` (it throws `StepTimeout` past the step's deadline —

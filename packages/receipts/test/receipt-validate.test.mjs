@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { computeInputsHash } from "../src/inputs-hash.mjs";
+import { SURFACE_CONFIG_REL, VERIFIED_SURFACE, computeInputsHash, resolveVerifiedSurface } from "../src/inputs-hash.mjs";
 import {
   evaluateReceipt,
   readReceipt,
@@ -276,4 +276,41 @@ test("plausibility: ERROR steps are not executed gates — a lane of errors veri
   const m = checkExecutionPlausibility(mixed);
   assert.equal(m.executedSteps, 1, "only the step that produced a verdict counts");
   assert.equal(m.executedMs, 60_000, "and thirty wasted minutes do not pad the floor");
+});
+
+// evidence-economics S8 follow-up (peer finding, 2026-09-03): VERIFIED_SURFACE
+// was hardcoded in the SPINE. A repo whose code lives outside composeApp/ that
+// vendored this module had its verified surface silently shrink — no error, no
+// failed step, a receipt that still validated and still looked identical, and a
+// hash that had quietly stopped covering the application.
+test("the verified surface is per-project: absent config keeps the CMP default byte-for-byte", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-surface-"));
+  assert.deepEqual(resolveVerifiedSurface(root), VERIFIED_SURFACE, "no declaration → the default, unchanged");
+  assert.ok(VERIFIED_SURFACE.includes("composeApp"), "which is still a Compose app's surface");
+});
+
+test("a backend repo declares its own surface and gets it", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-surface-be-"));
+  fs.mkdirSync(path.join(root, "qa"), { recursive: true });
+  fs.writeFileSync(path.join(root, SURFACE_CONFIG_REL), JSON.stringify({ surface: ["services", "docs", "build-logic", ".github", "qa"] }));
+  assert.deepEqual(resolveVerifiedSurface(root), ["services", "docs", "build-logic", ".github", "qa"]);
+});
+
+test("PLANTED: a surface that matches nothing is REFUSED, not hashed into a confident-looking digest", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-surface-empty-"));
+  fs.mkdirSync(path.join(root, "services"), { recursive: true });
+  fs.writeFileSync(path.join(root, "services", "Main.kt"), "fun main() {}\n");
+  // The backend vendors the spine and never declares a surface: composeApp/,
+  // specs/, qa/ and the Gradle files are all absent, so the CMP default matches
+  // zero files. Before this guard that returned a valid hash of the empty set.
+  assert.throws(() => computeInputsHash(root), /matched no files|nothing would be attested/);
+});
+
+test("a malformed or empty declaration is refused — never silently defaulted to a smaller surface", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-surface-bad-"));
+  fs.mkdirSync(path.join(root, "qa"), { recursive: true });
+  fs.writeFileSync(path.join(root, SURFACE_CONFIG_REL), "{ not json");
+  assert.throws(() => resolveVerifiedSurface(root), /not valid JSON/);
+  fs.writeFileSync(path.join(root, SURFACE_CONFIG_REL), JSON.stringify({ surface: [] }));
+  assert.throws(() => resolveVerifiedSurface(root), /declares no surface/);
 });
