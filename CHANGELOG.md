@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-04
+
+Two spine fixes from payment-blueprint's adoption: the locked region now covers a lane's own
+tests and the declarations it reads. No migration — a Compose app has neither `qa/test/` nor a
+surface declaration by default, so its region, lock and receipts are unchanged.
+
 ### Changed
 
 - **The lock region covers the lane's own tests.** `qa/test/**` (every `.mjs`, recursively) is
