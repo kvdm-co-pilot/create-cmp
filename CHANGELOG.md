@@ -14,6 +14,13 @@ All notable changes to this project are documented here. The format is based on
   `harness-lock.mjs` without narrowing its integrity claim. A Compose app has no `qa/test`; its
   region and lock are unchanged. Pack tests now pin unique step names per profile (an aliasing
   factory passes a null check) and that the smoke profile stays pure-Node.
+- **The lock region covers the declarations the lane reads**: `qa/verified-surface.json` and
+  `qa/harness-manifest.json`. payment-blueprint's planted proof: one entry removed from the
+  surface declaration un-attested 203 files while every checker stayed intact and the next
+  receipt validated over the smaller surface. An edited definition of what the checker looks at
+  is the same attack as an edited checker. State a lane writes (ledgers, journal, evidence) stays
+  out. The framework check now plants a narrowed declaration and asserts `harnessIntegrity`
+  names it (7 plants).
 
 ## [0.22.0] - 2026-09-03
 

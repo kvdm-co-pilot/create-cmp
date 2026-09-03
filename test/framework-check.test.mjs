@@ -22,6 +22,7 @@ test("the framework returns both ways inside the bound — PASS on a fresh scaff
   assert.match(r.stdout, /FAIL: tier unmet\s+\d+ms\s+✓ specCoverage FAIL naming HOME-98/);
   assert.match(r.stdout, /FAIL: feature without a flow\s+\d+ms\s+✓ e2eCoverage FAIL naming \[home\]/);
   assert.match(r.stdout, /FAIL: flow the lane never runs\s+\d+ms\s+✓ e2eCoverage FAIL naming \[home\]/);
+  assert.match(r.stdout, /FAIL: narrowed surface declaration\s+\d+ms\s+✓ harnessIntegrity FAIL naming unrecorded/);
   assert.match(r.stdout, /FAIL: edited lane cannot vouch\s+\d+ms\s+✓ harnessIntegrity FAIL naming modified/);
   assert.match(r.stdout, /Stop hook\s+refuses a FAIL receipt ✓/);
   assert.match(r.stdout, /Stop hook\s+refuses a skipped device tier ✓/);
