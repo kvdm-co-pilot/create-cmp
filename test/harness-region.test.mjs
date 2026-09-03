@@ -37,6 +37,10 @@ test("the region is the .mjs files directly under qa/ and qa/lib/ — plus the l
   assert.ok(isHarnessFile("qa/test/nested/deep.test.mjs"), "recursively");
   assert.ok(!isHarnessFile("qa/test/fixture.json"), "only .mjs — fixtures are data");
   assert.ok(!isHarnessFile("qa/lib/nested/x.mjs"), "qa/lib stays direct children only — a nested dir is not swept in silently");
+  // Declarations the lane READS to decide what it attests are locked with the lane.
+  assert.ok(isHarnessFile("qa/verified-surface.json"), "the surface declaration defines what the inputs hash attests");
+  assert.ok(isHarnessFile("qa/harness-manifest.json"), "the manifest tells the console where the receipt and specs live");
+  assert.ok(!isHarnessFile("qa/approvals.json"), "state a lane writes is not a declaration");
 });
 
 test("app state, app content and app source are NOT machine-owned", () => {
@@ -148,6 +152,9 @@ test("listHarnessFiles: a project with qa/test/** counts those files; a Compose 
     fs.writeFileSync(path.join(root, "qa", "test", "deep", "b.test.mjs"), "// t\n");
     fs.writeFileSync(path.join(root, "qa", "test", "fixture.json"), "{}");
     assert.deepEqual(listHarnessFiles(root), ["qa/lib/x.mjs", "qa/test/a.test.mjs", "qa/test/deep/b.test.mjs", "qa/verify.mjs"]);
+    fs.writeFileSync(path.join(root, "qa", "verified-surface.json"), JSON.stringify({ surface: ["services", "qa"] }));
+    fs.writeFileSync(path.join(root, "qa", "approvals.json"), "{}");
+    assert.deepEqual(listHarnessFiles(root), ["qa/lib/x.mjs", "qa/test/a.test.mjs", "qa/test/deep/b.test.mjs", "qa/verified-surface.json", "qa/verify.mjs"], "the declaration enters the region; the ledger does not");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

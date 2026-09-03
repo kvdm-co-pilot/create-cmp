@@ -195,6 +195,18 @@ const PLANTS = [
     names: ["[home]"],
   },
   {
+    label: "narrowed surface declaration",
+    // payment-blueprint's planted proof: one entry removed from the surface
+    // declaration un-attests a whole layer while every checker is intact. A
+    // fresh Compose app has no declaration; writing a narrow one is the same
+    // edit — the declaration enters the region unrecorded, and the lock says so.
+    plant: () => fs.writeFileSync(path.join(appDir, "qa", "verified-surface.json"), JSON.stringify({ surface: ["qa"] })),
+    revert: () => fs.rmSync(path.join(appDir, "qa", "verified-surface.json"), { force: true }),
+    step: "harnessIntegrity",
+    names: ["unrecorded"],
+    hook: /harnessIntegrity|vouch/i,
+  },
+  {
     label: "edited lane cannot vouch",
     // One byte in the machine-owned region: the lane that issues verdicts is no
     // longer the lane this app was given, and the hook must refuse its receipt.

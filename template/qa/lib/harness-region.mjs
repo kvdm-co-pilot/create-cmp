@@ -65,12 +65,27 @@ export const HARNESS_DIRS = ["qa", "qa/lib"];
 export const HARNESS_TEST_DIR = "qa/test";
 
 /**
+ * DECLARATIONS the lane READS to decide what it attests — locked for the same
+ * reason verify.mjs is. payment-blueprint's planted proof (2026-09-03): remove
+ * one entry from qa/verified-surface.json and 203 files — the whole backend —
+ * stop being attested; the next lane run mints a fresh receipt over the smaller
+ * surface, harnessIntegrity PASS, nothing in the chain says the coverage moved.
+ * An edited checker and an edited definition of what the checker looks at are
+ * the same attack. State a lane WRITES (approvals.json, comments.json, the
+ * journal, evidence/) stays out — that is the EXCLUDED_PREFIXES distinction.
+ * Neither file exists in a Compose app by default; its region is unchanged.
+ */
+export const HARNESS_DECLARATIONS = ["qa/verified-surface.json", "qa/harness-manifest.json"];
+
+/**
  * Is this project-relative path part of the machine-owned harness region?
  * @param {string} relPath project-relative path, "/"-separated
  * @returns {boolean}
  */
 export function isHarnessFile(relPath) {
-  if (typeof relPath !== "string" || !relPath.endsWith(".mjs")) return false;
+  if (typeof relPath !== "string") return false;
+  if (HARNESS_DECLARATIONS.includes(relPath)) return true;
+  if (!relPath.endsWith(".mjs")) return false;
   if (relPath.startsWith(`${HARNESS_TEST_DIR}/`)) return true;
   const dir = relPath.includes("/") ? relPath.slice(0, relPath.lastIndexOf("/")) : "";
   return HARNESS_DIRS.includes(dir);
@@ -112,7 +127,13 @@ export function listHarnessFiles(root) {
     }
   }
   walkMjs(path.join(root, HARNESS_TEST_DIR), HARNESS_TEST_DIR, found);
-  return found.sort();
+  // A declaration directly under qa/ is already seen by the scan above (it is
+  // a harness file by name); the explicit loop covers one that lives deeper.
+  // Deduplicated so no path is hashed twice.
+  for (const rel of HARNESS_DECLARATIONS) {
+    if (fs.existsSync(path.join(root, ...rel.split("/")))) found.push(rel);
+  }
+  return [...new Set(found)].sort();
 }
 
 /** sha256 of one file's bytes, hex. */
