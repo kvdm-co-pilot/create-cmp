@@ -106,8 +106,9 @@ being checked — and because a receipt binds the whole tree, every unrelated ed
 paid it. Signing an approval, which cannot move that step's result, cost a full
 20-minute re-run. Wiring it to one small module first and reading the clock would
 have tiered it correctly on day one. It cost roughly three hours of waiting before
-it was moved out — and days more before it was removed (2026-09-03): it never once
-returned a verdict, and it pinned every core of a shared machine when it ran.
+it was moved out — and days more before it was removed (2026-09-03): two verdicts in
+24 runs, the last at 24 m 26 s against a 30-minute cap, and it pinned every core of a
+shared machine when it ran.
 
 **A threshold was set 11 points above an unreachable ceiling.** An agent raised a
 score threshold from 70 to 95 on a tool whose instrumentation could not see

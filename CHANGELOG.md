@@ -18,8 +18,10 @@ done-evidence), and a feature with a screen and a spec now needs one clause prov
 
 - **Every mention of mutation testing.** Karel, 2026-09-03: overkill; it broke development
   completely and caused the last days' issues; tests are written from the spec and that is the
-  guard. Derived before the decision: the step had never returned a verdict, one module measured
-  zero against a 60 % threshold, and a run pinned a shared machine at load 70–80 for 25 minutes.
+  guard. The cost case, corrected from the blueprint's own journal and PIT reports (my first
+  numbers were read mid-run and were wrong): two verdicts in 24 runs, the last PASS at 24 m 26 s
+  against a 30-minute deadline — under six minutes of headroom, so every run was a coin toss
+  between a verdict and an ERROR — and a run pinned a shared machine at load 70–80 for 25 minutes.
   Nothing of it remains in the pack, the docs of record, the proposals or the adoption example.
 
 ### Added — every skipped-test guard is read, on a real scaffold
