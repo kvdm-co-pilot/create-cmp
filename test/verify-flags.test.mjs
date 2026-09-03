@@ -101,8 +101,8 @@ test("nightly: a profile that forces the determinism probe and names its stage o
   assert.match(packSrc, /stepsForProfile\.nightly = \[\.\.\.stepsForProfile\.ci\]/, "same steps as ci — what differs is what is forced and what the receipt may mean");
   assert.match(verifySrc, /const determinism = args\.includes\("--determinism"\) \|\| profile === "nightly"/, "the probe is not opt-in at nightly");
   assert.match(verifySrc, /stage: STAGE_OF_PROFILE\[profile\] \?\? profile/, "every receipt names its stage");
-  assert.match(verifySrc, /local: "change", ci: "merge", nightly: "nightly", release: "release"/, "the mapping is stated once");
-  assert.match(verifySrc, /use scaffold \| local \| ci \| nightly \| release/, "and the profile vocabulary admits it");
+  assert.match(verifySrc, /smoke: "smoke", scaffold: "scaffold", local: "change", ci: "merge", nightly: "nightly", release: "release"/, "the mapping is stated once");
+  assert.match(verifySrc, /use smoke \| scaffold \| local \| ci \| nightly \| release/, "and the profile vocabulary admits it");
 });
 
 // S8b — the split itself: verify.mjs is the spine and owns no step; the pack

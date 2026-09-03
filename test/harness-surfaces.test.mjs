@@ -416,6 +416,23 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       }
     });
 
+    await t.test("receipt-check REFUSES a smoke-stage receipt — it proves the framework returns, never the change (Rule 0)", () => {
+      const receiptPath = path.join(out, "qa/evidence/latest.json");
+      try {
+        fs.writeFileSync(receiptPath, JSON.stringify({ schema: "cmp-evidence/1", profile: "smoke", stage: "smoke", mode: "full", verdict: "PASS", inputs: { hash: "a".repeat(64) }, steps: [{ name: "harnessIntegrity", verdict: "PASS", durationMs: 5 }] }));
+        try {
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          assert.fail("a smoke receipt must not end a session as done");
+        } catch (err) {
+          assert.equal(err.status, 2);
+          assert.match(String(err.stderr), /smoke profile/);
+          assert.match(String(err.stderr), /proves the instrument, not this change/);
+        }
+      } finally {
+        fs.rmSync(receiptPath, { force: true });
+      }
+    });
+
     await t.test("receipt-check REFUSES a nightly-stage receipt — it proves the harness, never this change", () => {
       const receiptPath = path.join(out, "qa/evidence/latest.json");
       try {

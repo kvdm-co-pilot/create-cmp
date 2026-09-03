@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 
-const PROFILES = new Set(["scaffold", "local", "ci", "release"]);
+const PROFILES = new Set(["smoke", "scaffold", "local", "ci", "nightly", "release"]);
 const APP_NAME = "FleetCheck";
 const APP_PACKAGE = "com.fleet.check";
 
@@ -198,7 +198,7 @@ async function main() {
     process.exit(0);
   }
   if (!PROFILES.has(args.profile)) {
-    process.stderr.write(`Unknown profile "${args.profile}" — use scaffold | local | ci | release.\n`);
+    process.stderr.write(`Unknown profile "${args.profile}" — use smoke | scaffold | local | ci | nightly | release.\n`);
     process.exit(2);
   }
   let minLevel = normalizeLevel(args.minLevel);

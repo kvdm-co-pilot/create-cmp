@@ -88,6 +88,7 @@ function verifyProfiles() {
       .map((s) => s.trim())
       .filter((s) => /^step[A-Za-z]/.test(s));
 
+  const smoke = stepNames(block[0].match(/smoke:\s*\[([\s\S]*?)\],/)[1]);
   const scaffold = stepNames(block[0].match(/scaffold:\s*\[([\s\S]*?)\],/)[1]);
   const local = stepNames(block[0].match(/local:\s*\[([\s\S]*?)\n\s*\],/)[1]);
 
@@ -99,6 +100,7 @@ function verifyProfiles() {
 
   const strip = (n) => n.replace(/^step/, "").replace(/Memo$/, "").replace(/^./, (c) => c.toLowerCase());
   return {
+    smoke: { count: smoke.length, steps: smoke.map(strip) },
     scaffold: { count: scaffold.length, steps: scaffold.map(strip) },
     local: { count: local.length, steps: local.map(strip) },
     ci: { count: local.length + ciExtra.length, steps: [...local, ...ciExtra].map(strip) },

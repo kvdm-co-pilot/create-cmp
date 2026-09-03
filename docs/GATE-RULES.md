@@ -49,13 +49,23 @@ it does not answer Rule 0: it establishes its baseline with a Gradle lane, and i
 own guard is a **ten-minute** timeout, which is the hang, bounded, not a fast
 deterministic failure.
 
-### What it requires
+### What it requires — and the command that does it
 
 One trivially-passing and one trivially-failing case, wired through the *real*
 lane machinery (the runner, the marker, the receipt, the hook), asserting both
-verdicts and the wall time, bounded in **seconds**. For this repo the pieces
-exist: stamping a scratch app is 0.26 s and the Gradle-free gates run in 0.06 s.
-For a greenfield repo it is the first thing built, before the first real gate.
+verdicts and the wall time, bounded in **seconds**.
+
+```bash
+node scripts/framework-check.mjs        # bound 10 s per direction; --bound-ms to change
+```
+
+It stamps a scratch app, runs `--profile smoke` (every pure-Node gate, no
+Gradle) and asserts PASS; plants one edit in the stamped spec so a citation
+points at nothing, asserts FAIL **naming** `specCoverage` and the clause; asserts
+the Stop hook refuses; reverts and asserts PASS again. A direction that does not
+return inside the bound is killed and reported as a hang — the bound is the
+assertion. Measured on this tree: 947 ms for all four legs. For a greenfield
+repo it is the first thing built, before the first real gate.
 
 ---
 
