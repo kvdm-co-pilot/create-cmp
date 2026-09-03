@@ -340,3 +340,12 @@ S6. Neither starts until S1–S7 are landed and proven.
   line, so one comment turns a red coverage gate green — this also weakens S1's `[tier: device]`,
   since a device-tier citation can be a bare comment), and the unvouched-lane guard (the receipt
   validator never checks that `harnessIntegrity` PASSed).
+- 2026-09-03 — **Governing principles landed** (`docs/PRINCIPLES.md`, seven rules, each with its
+  episode, requirements and enforcement; `docs/GATE-RULES.md` as the deep-dive behind 2 and 3,
+  now three rules with Rule 0 — prove the framework returns before pointing work at it — ahead
+  of calibration). Placed where sessions actually load instructions: the one-line form in
+  `template/CLAUDE.md` (every scaffolded app), `agents/cmp-orchestrator.md` (the planner), this
+  repo's `AGENTS.md`, and the three in-the-moment rules re-told every prompt by the inject.
+  Karel's correction recorded: the expensive class is the hang, not the wrong verdict; R0 is the
+  smallest end-to-end harness proving fast deterministic pass AND fail before any gate. Next: R0
+  built as a script (step 2, approved). Still open: SKIP-vs-PASS for pre-lock apps → 0.20.0.

@@ -4,6 +4,13 @@
 > read that for the full capability map, flags, and the stack-selection case. This file
 > is the short router.
 
+**Principles** — the north star for this plugin and every project it governs, each with the
+episode that produced it: [docs/PRINCIPLES.md](./docs/PRINCIPLES.md). One line: derived, never
+claimed · prove the instrument before you read it · the layer you changed cannot certify itself
+· proof costs what the change costs and never runs silent · never wait on nothing · a signature
+binds content, a decision is closed · one record, read first. If you are changing the harness,
+the console, or a project's `qa/`, read that file before this one.
+
 ## What this is
 
 create-cmp is the AI delivery harness for Kotlin/Compose Multiplatform mobile apps
