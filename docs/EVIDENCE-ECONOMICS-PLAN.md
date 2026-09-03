@@ -381,3 +381,13 @@ S6. Neither starts until S1–S7 are landed and proven.
   spine/compose/device. Items 3–4 of the peer's proposal (`describe()` on the pack contract;
   per-layer MCP inspectors with Rule-1 planted proofs) are recorded as roadmap in
   docs/proposals/cross-stack-console.md, not built. Verified against a clone of the blueprint.
+- 2026-09-03 — **Replanned from scratch and grilled** (Karel: "see if it's needed"). A nine-slice
+  cross-stack programme (units, seams, in-toto, OSCAL, OTel, per-layer inspectors) was drafted
+  and rejected on the repo's own rules: VISION §6 forbids a cross-stack port without countable
+  demand (none: no open issues, the only adopter is Karel's own repo); three of its slices
+  restated S9, Rule 1 and Rule 0; the standards carried no repo file:line showing the gap.
+  What survived: four spine defects the blueprint adoption found, each derived and closed
+  (journal widening `--fast`; smoke rewriting the badge; the Compose ladder in the spine; the
+  allowlist's silence about new top-level dirs), and a seam paragraph in
+  docs/proposals/cross-stack-console.md as the record of the one new kind of proof. Shipped
+  as 0.21.0 with PR #31's console work. Everything else waits for the pinned-issue trigger.

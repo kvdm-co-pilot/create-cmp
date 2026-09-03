@@ -26,7 +26,12 @@
       "required": ["hash", "fileCount"],
       "properties": {
         "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "fileCount": { "type": "number" }
+        "fileCount": { "type": "number" },
+        "undeclared": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Top-level entries git would commit that no verified-surface entry covers — unattested by this receipt. A report, never a gate; absent when the surface covers everything."
+        }
       }
     },
     "steps": {

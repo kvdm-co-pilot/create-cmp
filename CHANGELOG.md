@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-03
+
+The console follows the project's layout, and four spine defects the first non-Compose
+adopter found are closed. No migration: every change is additive or a bug fix, and a Compose
+app with no manifest behaves exactly as before.
+
+### Fixed
+
+- **`--fast` fell open to the full suite after the first lane run — in every Compose app.**
+  `qa/flight-recorder.jsonl` is appended by every run and committed, so it sat in the
+  changed set as a modified file under `qa/`, which is the "harness itself" escape hatch.
+  It is now a lane output (`affected-tests.mjs`), pinned by a planted test. Derived on a
+  fresh scaffold before the fix: the journal in the changed set, filter mode `all`.
+- **A smoke run rewrote the README's evidence badge** from a true L1 to "rung unrecorded".
+  Smoke and nightly receipts are refused as done-evidence and now leave the badge alone,
+  like `--fast`.
+- **The evidence ladder was the Compose pack's step names inside the spine.** Vendored into
+  a backend it graded the strongest run L0, L1 unreachable by construction. The ladder is now
+  the pack's (`createCmpSteps` returns `evidenceLadder`; `evidenceLevel` takes `ladder`); a
+  pack that declares none earns no rung. Compose apps: unchanged rungs.
+- **A new top-level directory was silently unattested** by the surface allowlist. The
+  receipt now carries `inputs.undeclared` and the lane prints it — a report, never a gate,
+  because the Compose default deliberately omits `docs/`, the README and the wrapper.
+
 ### Added
 
 - **Project manifest for the console** — `qa/harness-manifest.json` declares where a project

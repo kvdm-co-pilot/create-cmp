@@ -330,7 +330,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.match(verify, /mode: fast \? "fast" : "full"|const mode = fast \? "fast" : "full"/, "the receipt records mode fast/full distinctly");
       assert.match(verify, /INNER LOOP ONLY, NOT THE DONE-GATE/, "the start banner is loud and unambiguous");
       assert.match(verify, /FAST — INNER LOOP ONLY, NOT DONE/, "the fast verdict line is visually distinct from done-green");
-      assert.match(verify, /evidenceLevel\(steps, profile, \{ mode \}\)/, "the rung derivation is told the mode — fast derives no rung");
+      assert.match(verify, /evidenceLevel\(steps, profile, \{ mode, ladder: pack\.evidenceLadder \?\? null \}\)/, "the rung derivation is told the mode — fast derives no rung");
       // Docs: CLAUDE.md commands table + TESTING.md both teach the flag honestly.
       const claudeMd = fs.readFileSync(path.join(out, "CLAUDE.md"), "utf8");
       assert.match(claudeMd, /node qa\/verify\.mjs --fast/, "CLAUDE.md commands table lists --fast");
