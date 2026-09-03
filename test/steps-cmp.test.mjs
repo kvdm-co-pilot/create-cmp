@@ -67,3 +67,23 @@ test("releaseLease is safe with no lease held, and the determinism probe is expo
   assert.equal(r.verdict, "SKIP");
   assert.match(r.reason, /opt-in/);
 });
+
+test("layers: every step in every profile carries the layer it proves — device steps `device`, the harness's own checks `spine`, the app's JVM tier `compose`", () => {
+  const pack = createCmpSteps(ctx());
+  const seen = new Map();
+  for (const [profile, fns] of Object.entries(pack.stepsForProfile)) {
+    for (const fn of fns) {
+      assert.equal(typeof fn.layer, "string", `${profile}: ${stepDisplayName(fn)} has no layer`);
+      seen.set(stepDisplayName(fn), fn.layer);
+    }
+  }
+  for (const name of pack.DEVICE_STEPS) assert.equal(seen.get(name), "device", name);
+  assert.equal(seen.get("harnessIntegrity"), "spine");
+  assert.equal(seen.get("specCoverage"), "spine");
+  assert.equal(seen.get("approvals"), "spine");
+  assert.equal(seen.get("archDoc"), "spine");
+  assert.equal(seen.get("build"), "compose");
+  assert.equal(seen.get("unitTests"), "compose");
+  assert.equal(seen.get("releaseBuild"), "compose");
+  assert.equal(seen.get("determinism"), "spine");
+});

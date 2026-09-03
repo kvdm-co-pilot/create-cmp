@@ -370,3 +370,14 @@ S6. Neither starts until S1–S7 are landed and proven.
   sessions handed the four-step migration. Local fix/tmp branches deleted (content on main via
   PR #29). Open: S7 execution in the showcase (its upgrade + five forks) and the blueprint's
   spine adoption; S9 conditional on the showcase's measured change-stage cost.
+- 2026-09-03 — **Console follows the project's layout** (peer finding from the blueprint's
+  spine adoption, c00fa67: the console had the VERIFIED_SURFACE bug one level up — receipt
+  path, architecture doc, spec dir and citation roots as Compose constants; Evidence, history,
+  audit trail, digest and Architecture blind for an adopter). Landed: `qa/harness-manifest.json`
+  resolved per project (`inspector/mcp/src/lib/project-layout.mjs`; default = Compose, malformed
+  = refused, never defaulted), every console reader routed through it, the Specs page bridging
+  to the project's own `qa/lib/spec-coverage.mjs`, layer-tagged receipt rows stamped by the
+  runner from `fn.layer` and grouped on the Evidence page, the Compose pack tagged
+  spine/compose/device. Items 3–4 of the peer's proposal (`describe()` on the pack contract;
+  per-layer MCP inspectors with Rule-1 planted proofs) are recorded as roadmap in
+  docs/proposals/cross-stack-console.md, not built. Verified against a clone of the blueprint.

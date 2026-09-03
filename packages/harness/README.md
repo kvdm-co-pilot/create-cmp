@@ -135,6 +135,34 @@ To verify a Kotlin backend, a web service, anything: keep the spine, replace the
    Profiles, `--fast`, the receipt, the hook, the console's Drive/approvals/evidence pages, the
    flight journal and the retrospective all keep working unchanged.
 
+4. **Tell the console where things are** — `qa/harness-manifest.json`. The console (the studio,
+   `inspector/mcp`) reads the receipt, the architecture document, the spec directory and the
+   citation roots; without a manifest it assumes the Compose layout (`qa/evidence/latest.json`,
+   `docs/ARCHITECTURE.md`, `specs/`, citations under `composeApp/src` and `qa/e2e`). Declare
+   yours field by field — undeclared fields keep the default:
+
+   ```json
+   {
+     "receipt": "qa/evidence/receipt.json",
+     "architectureDoc": "ARCHITECTURE.md",
+     "specs": "specs",
+     "citationRoots": ["services", "qa/test"],
+     "packs": ["blueprint"]
+   }
+   ```
+
+   Every path is relative to the repo root, `/`-separated, and may not escape it. A manifest
+   that is present but malformed is **refused**, not defaulted: every pane it feeds says why,
+   and the rail names the file — the console never quietly looks in the wrong place and reports
+   an honest-looking absence. When your `qa/lib/spec-coverage.mjs` exports `scanSpecClauses` and
+   `scanCitations`, the console's Specs page renders *their* reading (your grammar, your
+   binding rule), and `citationRoots` is only used by the console's own fallback scan.
+5. **Tag your steps with the layer they prove** — `stepCompositeBuild.layer = "backend"`. The
+   runner stamps the tag onto the receipt row (`{ name, layer, verdict, … }`; rows without a
+   tag are unchanged) and the Evidence page groups steps per layer with a per-layer tally, so a
+   lane over a backend, a security scan and the spine reads as one lane with three reports.
+   Layer names are free-form strings; the Compose pack uses `spine`, `compose`, `device`.
+
 **Worked example — `payment-blueprint`.** Its steps are `compositeBuild`, `gitleaks`,
 `linkCheck`, `mutation` (nightly), `legacyPlatform`, `unitTests`, `specCoverage`, `approvals`,
 `harnessIntegrity`. Today they live in a hand-written 2,769-line lane that forked the spine

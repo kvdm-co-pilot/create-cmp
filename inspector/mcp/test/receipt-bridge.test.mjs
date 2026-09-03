@@ -376,3 +376,112 @@ test("listReceiptHistory: each committed entry carries the rung as attested AT t
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ── The receipt lives where the PROJECT says (qa/harness-manifest.json) ──────
+// payment-blueprint writes qa/evidence/receipt.json in its own pb-evidence/1
+// shape (inputsHash / gitSha / timestamp, flat) and the console said "no
+// receipt at qa/evidence/latest.json" — Evidence pane, verdict history and
+// audit trail all blind to a file ten characters away.
+import { listReceiptHistory } from "../src/lib/receipt-bridge.mjs";
+
+function pbReceipt({ hash = "cafe0001", steps } = {}) {
+  return {
+    schema: "pb-evidence/1",
+    profile: "local",
+    mode: "full",
+    verdict: "PASS",
+    gitSha: "0123456789abcdef0123456789abcdef01234567",
+    inputsHash: hash,
+    inputsFileCount: 487,
+    steps: steps ?? [
+      { name: "harnessIntegrity", verdict: "PASS", durationMs: 12, layer: "spine" },
+      { name: "compositeBuild", verdict: "PASS", durationMs: 30000, layer: "backend" },
+      { name: "gitleaks", verdict: "PASS", durationMs: 900, layer: "security" },
+    ],
+    toolVersions: { node: process.version },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+test("manifest: the receipt is read from the declared path, and the flat pb-evidence/1 fields are read as the nested cmp-evidence/1 ones", async () => {
+  const root = makeFixtureProject();
+  try {
+    fs.writeFileSync(path.join(root, "qa", "harness-manifest.json"), JSON.stringify({ receipt: "qa/evidence/receipt.json", packs: ["blueprint"] }));
+    fs.mkdirSync(path.join(root, "qa", "evidence"), { recursive: true });
+    fs.writeFileSync(path.join(root, "qa", "evidence", "receipt.json"), JSON.stringify(pbReceipt()));
+    const result = await getLastReceipt(root);
+    assert.equal(result.available, true, result.reason);
+    assert.equal(result.relPath, "qa/evidence/receipt.json");
+    assert.equal(result.verdict, "PASS");
+    assert.equal(result.commitSha, "0123456789abcdef0123456789abcdef01234567", "gitSha read as the commit");
+    assert.equal(result.inputsHash, "cafe0001", "flat inputsHash read as inputs.hash");
+    assert.equal(result.inputsFileCount, 487);
+    assert.ok(typeof result.generatedAt === "string", "timestamp read as generatedAt");
+    assert.ok(result.ageMs !== null && result.ageMs < 60_000);
+    assert.equal(result.stale, true, "the fixture's hash is not the tree's — recomputed against the real algorithm, so STALE, never fresh by default");
+    assert.deepEqual(
+      result.steps.map((s) => s.layer),
+      ["spine", "backend", "security"],
+      "layer tags ride along verbatim",
+    );
+  } finally {
+    resetReceiptBridgeCache(root);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("manifest: a missing receipt names the DECLARED path, and a malformed manifest is refused rather than defaulted", async () => {
+  const root = makeFixtureProject();
+  try {
+    fs.writeFileSync(path.join(root, "qa", "harness-manifest.json"), JSON.stringify({ receipt: "qa/evidence/receipt.json" }));
+    const missing = await getLastReceipt(root);
+    assert.equal(missing.available, false);
+    assert.equal(missing.relPath, "qa/evidence/receipt.json");
+    assert.match(missing.reason, /no receipt at qa\/evidence\/receipt\.json/);
+
+    // Now the default file exists but the manifest points elsewhere: the
+    // console must NOT read latest.json — the project said where its receipt is.
+    writeReceipt(root, makeReceipt());
+    const stillMissing = await getLastReceipt(root);
+    assert.equal(stillMissing.available, false, "latest.json is not this project's receipt");
+
+    fs.writeFileSync(path.join(root, "qa", "harness-manifest.json"), JSON.stringify({ receipt: "../escape.json" }));
+    const refused = await getLastReceipt(root);
+    assert.equal(refused.available, false);
+    assert.match(refused.reason, /qa\/harness-manifest\.json is malformed/);
+    assert.match(refused.reason, /may not escape/);
+    const history = listReceiptHistory(root);
+    assert.equal(history.available, false);
+    assert.match(history.reason, /malformed/);
+  } finally {
+    resetReceiptBridgeCache(root);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("manifest: the committed audit trail follows the declared path through git", () => {
+  const root = makeFixtureProject();
+  const git = (...args) => execFileSync("git", args, { cwd: root, stdio: ["ignore", "pipe", "ignore"], encoding: "utf8" });
+  try {
+    git("init", "-q");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "T");
+    fs.writeFileSync(path.join(root, "qa", "harness-manifest.json"), JSON.stringify({ receipt: "qa/evidence/receipt.json" }));
+    fs.mkdirSync(path.join(root, "qa", "evidence"), { recursive: true });
+    fs.writeFileSync(path.join(root, "qa", "evidence", "receipt.json"), JSON.stringify(pbReceipt({ hash: "a1" })));
+    git("add", "-A");
+    git("commit", "-q", "-m", "receipt 1");
+    fs.writeFileSync(path.join(root, "qa", "evidence", "receipt.json"), JSON.stringify({ ...pbReceipt({ hash: "a2" }), verdict: "FAIL" }));
+    git("add", "-A");
+    git("commit", "-q", "-m", "receipt 2");
+    const history = listReceiptHistory(root);
+    assert.equal(history.available, true, history.reason);
+    assert.equal(history.receipts.length, 2);
+    assert.deepEqual(history.receipts.map((r) => r.verdict), ["FAIL", "PASS"], "newest first, verdict as attested at that commit");
+    assert.match(history.receipts[0].file, /^qa\/evidence\/receipt\.json@[0-9a-f]{7}$/);
+    assert.ok(typeof history.receipts[0].generatedAt === "string", "pb timestamp read as generatedAt");
+  } finally {
+    resetReceiptBridgeCache(root);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

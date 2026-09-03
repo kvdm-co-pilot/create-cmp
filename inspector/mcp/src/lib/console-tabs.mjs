@@ -1095,7 +1095,9 @@ function citingTestsCellHtml(c) {
  */
 export function specsTabHtml(specs, meta = {}) {
   if (!specs || !specs.available) {
-    return `<div class="empty"><p>No specs/ directory found in this project.</p></div>`;
+    const where = (specs && specs.specsDir) || "specs/";
+    const why = specs && specs.reason ? ` ${esc(specs.reason)}` : "";
+    return `<div class="empty"><p>No ${esc(where)} directory found in this project.${why}</p></div>`;
   }
   const matrices = specs.files
     .map((f) => {
@@ -1116,7 +1118,7 @@ export function specsTabHtml(specs, meta = {}) {
           const prose = esc(c.prose);
           const gate = gateForClause(c);
           return `    <tr class="rtm-row${c.withdrawn ? " rtm-withdrawn" : ""}">
-      <td><span class="clause-id"><code>${esc(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: `specs/${f.file}`, clauseId: c.id })}</td>
+      <td><span class="clause-id"><code>${esc(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: f.relPath || `specs/${f.file}`, clauseId: c.id })}</td>
       <td class="rtm-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</td>
       <td>${citingTestsCellHtml(c)}</td>
       <td class="rtm-gate">${gate ? `<code>${esc(gate)}</code>` : `<span class="empty-inline">&mdash;</span>`}</td>
@@ -1129,9 +1131,10 @@ export function specsTabHtml(specs, meta = {}) {
       // project's OWN registry (id + files), never guessed from the filename —
       // so app-base maps to `architecture`, the CONFIGURED exemplar's spec to
       // `exemplar-spec`, and every other file to its `feature-spec:<name>`.
-      const specStatus = meta.artifactByFile ? meta.artifactByFile[`specs/${f.file}`] : null;
+      const specRel = f.relPath || `specs/${f.file}`;
+      const specStatus = meta.artifactByFile ? meta.artifactByFile[specRel] : null;
       return `  <div class="spec-file">
-    <h3>specs/${esc(f.file)}</h3>
+    <h3>${esc(specRel)}</h3>
 ${signatureBarHtml(specStatus, { what: "this contract" })}
     <p class="rtm-counts">${counts}</p>
     ${
@@ -1542,7 +1545,7 @@ function formatReceiptAge(ageMs) {
  */
 function clauseReceiptStatusHtml(lastReceipt) {
   if (!lastReceipt || !lastReceipt.available) {
-    const reason = (lastReceipt && lastReceipt.reason) || "no receipt at qa/evidence/latest.json — run node qa/verify.mjs";
+    const reason = (lastReceipt && lastReceipt.reason) || `no receipt at ${(lastReceipt && lastReceipt.relPath) || "qa/evidence/latest.json"} — run node qa/verify.mjs`;
     return `<span class="receipt-badge receipt-none" title="${escAttr(reason)}">no receipt yet &mdash; run node qa/verify.mjs</span>`;
   }
   if (!lastReceipt.conformance) {
@@ -1569,7 +1572,7 @@ function clauseReceiptStatusHtml(lastReceipt) {
  */
 function stepReceiptCellHtml(lastReceipt, stepName) {
   if (!lastReceipt || !lastReceipt.available) {
-    const reason = (lastReceipt && lastReceipt.reason) || "no receipt at qa/evidence/latest.json — run node qa/verify.mjs";
+    const reason = (lastReceipt && lastReceipt.reason) || `no receipt at ${(lastReceipt && lastReceipt.relPath) || "qa/evidence/latest.json"} — run node qa/verify.mjs`;
     return `<span class="receipt-badge receipt-none" title="${escAttr(reason)}">no receipt yet</span>`;
   }
   const step = (lastReceipt.steps || []).find((s) => s && s.name === stepName);
@@ -1824,12 +1827,16 @@ export function stepTestCountsHtml(step) {
  * @param {{available: boolean, reason?: string, receipts?: object[]}} [history] listReceiptHistory() result
  */
 export function evidenceBodyHtml(lastReceipt, history) {
+  // The receipt path is the PROJECT's (receipt-bridge resolves it from
+  // qa/harness-manifest.json, defaulting to the Compose layout) — every
+  // mention below names that path, never the default by habit.
+  const relPath = (lastReceipt && lastReceipt.relPath) || "qa/evidence/latest.json";
   if (!lastReceipt || !lastReceipt.available) {
-    const reason = (lastReceipt && lastReceipt.reason) || "no receipt at qa/evidence/latest.json";
+    const reason = (lastReceipt && lastReceipt.reason) || `no receipt at ${relPath}`;
     return `<div class="empty">
       <p>No verify receipt yet.</p>
       <p>${esc(reason)}</p>
-      <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>qa/evidence/latest.json</code>,
+      <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>${esc(relPath)}</code>,
       and this page renders exactly what that receipt attests. Nothing here is derived any other way.</p>
     </div>`;
   }
@@ -1870,30 +1877,60 @@ export function evidenceBodyHtml(lastReceipt, history) {
     .filter(Boolean)
     .join("\n      ");
 
-  const stepRows = (r.steps || [])
-    .map((s) => {
-      // ERROR (S4) wears its own class: "could not run" must never read as a
-      // behaviour failure (✗) nor as a quiet skip — it is the row that says
-      // the lane did not get to check this.
-      const cls =
-        s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
-      const governs = STEP_GOVERNS[s.name];
-      const governsCell = governs ? `<a class="step-link" href="#${esc(governs.section)}">${esc(governs.label)}</a>` : "";
-      // Detail, in falling order of what a release manager needs: the test
-      // tally the step actually earned, its own honest fine print, then the
-      // failure reason. All three come from the receipt verbatim.
-      const counts = stepTestCountsHtml(s);
-      const note = s.note ? `<span class="step-note">${esc(s.note)}</span>` : "";
-      const reason = s.reason ? `<span class="step-reason">${esc(s.reason)}</span>` : "";
-      return `    <tr>
+  const stepRowHtml = (s) => {
+    // ERROR (S4) wears its own class: "could not run" must never read as a
+    // behaviour failure (✗) nor as a quiet skip — it is the row that says
+    // the lane did not get to check this.
+    const cls =
+      s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
+    const governs = STEP_GOVERNS[s.name];
+    const governsCell = governs ? `<a class="step-link" href="#${esc(governs.section)}">${esc(governs.label)}</a>` : "";
+    // Detail, in falling order of what a release manager needs: the test
+    // tally the step actually earned, its own honest fine print, then the
+    // failure reason. All three come from the receipt verbatim.
+    const counts = stepTestCountsHtml(s);
+    const note = s.note ? `<span class="step-note">${esc(s.note)}</span>` : "";
+    const reason = s.reason ? `<span class="step-reason">${esc(s.reason)}</span>` : "";
+    return `    <tr>
       <td><code>${esc(s.name)}</code></td>
       <td><span class="${cls}">${esc(s.verdict)}</span></td>
       <td>${esc(formatDurationMs(s.durationMs))}</td>
       <td>${governsCell}</td>
       <td>${counts}${note}${reason}</td>
     </tr>`;
-    })
-    .join("\n");
+  };
+  // Layer grouping: when the pack tagged its steps with the layer of the
+  // stack each one proves (backend, security, spine, frontend, …), the table
+  // groups them under a header row per layer with that layer's own tally —
+  // the per-layer report falls out of the receipt, nothing is re-derived.
+  // Layers appear in first-seen receipt order; rows keep receipt order within
+  // a layer; a step without a layer sits under "other" only when at least one
+  // step HAS one (an untagged receipt renders exactly as it always did).
+  const stepsList = r.steps || [];
+  const anyLayer = stepsList.some((s) => typeof s.layer === "string" && s.layer);
+  let stepRows;
+  if (!anyLayer) {
+    stepRows = stepsList.map(stepRowHtml).join("\n");
+  } else {
+    const groups = new Map();
+    for (const s of stepsList) {
+      const key = typeof s.layer === "string" && s.layer ? s.layer : "other";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(s);
+    }
+    stepRows = [...groups.entries()]
+      .map(([layer, steps]) => {
+        const tally = ["PASS", "FAIL", "ERROR", "SKIP"]
+          .map((v) => [v, steps.filter((s) => s.verdict === v).length])
+          .filter(([, n]) => n > 0)
+          .map(([v, n]) => `${n} ${v}`)
+          .join(" &middot; ");
+        return `    <tr class="step-layer" data-layer="${escAttr(layer)}"><th colspan="5">${esc(layer)} <span class="step-layer-tally">${tally}</span></th></tr>\n${steps
+          .map(stepRowHtml)
+          .join("\n")}`;
+      })
+      .join("\n");
+  }
   const stepsHtml = stepRows
     ? `  <table class="doc-table step-table">
     <thead><tr><th>Step</th><th>Verdict</th><th>Duration</th><th>Governs</th><th>Detail</th></tr></thead>
@@ -1908,9 +1945,9 @@ ${stepRows}
       ? `  <ul class="evidence-timeline">
 ${history.receipts.map(timelineRowHtml).join("\n")}
   </ul>`
-      : `  <p class="empty-inline">${esc((history && history.reason) || "no committed receipt history yet")} &mdash; each commit of <code>qa/evidence/latest.json</code> becomes one entry in the audit trail</p>`;
+      : `  <p class="empty-inline">${esc((history && history.reason) || "no committed receipt history yet")} &mdash; each commit of <code>${esc(relPath)}</code> becomes one entry in the audit trail</p>`;
 
-  return `  <p class="meta">Rendered from <code>${esc(r.relPath || "qa/evidence/latest.json")}</code> &mdash; the verify lane's own attestation.
+  return `  <p class="meta">Rendered from <code>${esc(relPath)}</code> &mdash; the verify lane's own attestation.
   The lane is the law: nothing on this page is re-derived live.</p>
   <div class="evidence-headline${stale ? " evidence-stale" : ""}">
     <p class="lbl">latest receipt</p>
@@ -1922,7 +1959,7 @@ ${history.receipts.map(timelineRowHtml).join("\n")}
   <h3>Steps</h3>
 ${stepsHtml}
   <h3>Audit trail &mdash; committed receipts</h3>
-  <p class="meta">Every commit of <code>qa/evidence/latest.json</code> is one verified state of record, attributed from git. Newest first.</p>
+  <p class="meta">Every commit of <code>${esc(relPath)}</code> is one verified state of record, attributed from git. Newest first.</p>
 ${timelineHtml}`;
 }
 
@@ -2502,7 +2539,7 @@ ${commits}`;
  */
 export function featuresTabHtml(features, meta = {}) {
   if (!features || !features.available) {
-    return `  <p class="empty-inline">feature briefs are not available in this project — qa/lib/approvals.mjs predates the feature-brief wave (or is absent). A feature brief is a <code>docs/features/&lt;name&gt;.md</code>; its location is the governance opt-in.</p>`;
+    return `  <p class="empty-inline">feature briefs are not available in this project — its qa/lib/approvals.mjs has no acceptFeature export (it predates the feature-brief wave, or its step pack does not govern briefs), or the library is absent. A feature brief is a <code>docs/features/&lt;name&gt;.md</code>; its location is the governance opt-in.</p>`;
   }
   const { board } = features;
   if (!board || board.features.length === 0) {

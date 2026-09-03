@@ -602,3 +602,20 @@ test("getArchitectureDoc: against the REAL template/docs/ARCHITECTURE.md — eve
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ── The doc lives where the project says ─────────────────────────────────────
+test("getArchitectureDoc: qa/harness-manifest.json's architectureDoc is followed (payment-blueprint keeps it at the repo root), and absence names THAT path", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-arch-manifest-"));
+  try {
+    fs.mkdirSync(path.join(root, "qa"), { recursive: true });
+    fs.writeFileSync(path.join(root, "qa", "harness-manifest.json"), JSON.stringify({ architectureDoc: "ARCHITECTURE.md" }));
+    const missing = getArchitectureDoc(root);
+    assert.equal(missing.available, false);
+    assert.equal(missing.reason, "ARCHITECTURE.md not found");
+    fs.writeFileSync(path.join(root, "ARCHITECTURE.md"), "# Arch\n\n## 1. Purpose\n\nhello\n\n## 2. Constraints\n\nprose\n");
+    const found = getArchitectureDoc(root);
+    assert.equal(found.available, true, found.reason);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

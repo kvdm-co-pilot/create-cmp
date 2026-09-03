@@ -5,6 +5,8 @@
 // comments. Nothing here is a new record — every line is derived from git or
 // a committed ledger, so the digest can never disagree with the audit trail.
 
+import { resolveProjectLayout, DEFAULT_LAYOUT } from "./project-layout.mjs";
+
 const short = (s) => String(s ?? "").slice(0, 7);
 
 /**
@@ -20,6 +22,16 @@ export async function getDigestData(projectDir, { execFileAsync, sinceDays = 7, 
   const git = async (args) =>
     (await execFileAsync("git", args, { cwd: projectDir, timeout: 8000, maxBuffer: 4 * 1024 * 1024 })).stdout;
   const since = `${sinceDays} days ago`;
+  // Where THIS project keeps its receipt and its approvals ledger (qa/harness-
+  // manifest.json, or the Compose default). A malformed manifest is surfaced
+  // as the digest's own unavailability — the lane runs and approval events
+  // below would otherwise be read from the wrong files and come back empty,
+  // which reads exactly like "nothing happened".
+  const resolvedLayout = resolveProjectLayout(projectDir);
+  if (!resolvedLayout.ok) {
+    return { available: false, reason: resolvedLayout.reason, since, commits: [], laneRuns: [], approvalEvents: [], openComments: null };
+  }
+  const layout = resolvedLayout.layout ?? DEFAULT_LAYOUT;
 
   let commits;
   try {
@@ -61,11 +73,11 @@ export async function getDigestData(projectDir, { execFileAsync, sinceDays = 7, 
   // evidence discipline (commit each receipt; git history is the ledger).
   const laneRuns = [];
   try {
-    const raw = await git(["log", `--since=${since}`, "--pretty=%H%x00%ci", "--", "qa/evidence/latest.json"]);
+    const raw = await git(["log", `--since=${since}`, "--pretty=%H%x00%ci", "--", layout.receipt]);
     for (const line of raw.split("\n").filter(Boolean).slice(0, 12)) {
       const [sha, when] = line.split("\0");
       try {
-        const body = await git(["show", `${sha}:qa/evidence/latest.json`]);
+        const body = await git(["show", `${sha}:${layout.receipt}`]);
         const receipt = JSON.parse(body);
         const onDevice = receipt.strength?.onDeviceSteps ?? [];
         // The evidence-ladder rung as attested at that commit (verbatim from
@@ -90,7 +102,7 @@ export async function getDigestData(projectDir, { execFileAsync, sinceDays = 7, 
   // the human-readable record of WHAT was approved/reopened.
   let approvalEvents = [];
   try {
-    const raw = await git(["log", `--since=${since}`, "--pretty=%H%x00%ci%x00%s", "--", "qa/approvals.json"]);
+    const raw = await git(["log", `--since=${since}`, "--pretty=%H%x00%ci%x00%s", "--", layout.approvals]);
     approvalEvents = raw
       .split("\n")
       .filter(Boolean)

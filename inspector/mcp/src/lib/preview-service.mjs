@@ -55,7 +55,8 @@ import {
   addComment as addCommentViaLib,
   resolveComment as resolveCommentViaLib,
 } from "./comments-bridge.mjs";
-import { getSpecsData } from "./specs.mjs";
+import { getProjectSpecsData } from "./specs.mjs";
+import { resolveProjectLayout, DEFAULT_LAYOUT, MANIFEST_REL_PATH } from "./project-layout.mjs";
 import { getArchitectureData } from "./architecture.mjs";
 import { getLastReceipt, listReceiptHistory } from "./receipt-bridge.mjs";
 import { getComponentsData } from "./components.mjs";
@@ -652,6 +653,7 @@ export function extractCompileErrors(text) {
 
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
 
 /**
  * The studio console page (docs/STUDIO-REDESIGN.md §2): ONE shell — the
@@ -721,6 +723,9 @@ export function galleryHtml(state) {
     // full console; a governance-only project drops the sections that need
     // pixels and says so on the rail.
     capabilities = { governance: true, screens: true },
+    // Where this project keeps its receipt/specs/doc (project-layout.mjs's
+    // resolveProjectLayout result). null = older caller; nothing is shown.
+    layout = null,
   } = state;
   const width = viewport?.width ?? 411;
   // §3.3: component stories render through the same pipeline but are not
@@ -1833,11 +1838,22 @@ export function galleryHtml(state) {
   const capabilityNote = capabilities.screens
     ? ""
     : `<p class="rail-sub rail-capability" title="This project has no composeApp/. The governance window is complete; screens, preview and the live device need a Compose app.">governance only &middot; no Compose app</p>`;
+  // The layout line: which manifest (if any) the console is reading this
+  // project through. A refused manifest is said out loud on the rail — every
+  // section it feeds already carries the reason, but the rail is where a
+  // reader looks first when a pane is unexpectedly empty.
+  const layoutNote = !layout
+    ? ""
+    : !layout.ok
+      ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr(layout.reason || "")}">${esc(layout.relPath || MANIFEST_REL_PATH)} refused &mdash; see Evidence</p>`
+      : layout.source === "manifest"
+        ? `<p class="rail-sub rail-capability" title="${escAttr(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc(layout.relPath)} &middot; packs ${esc((layout.layout.packs || []).join(", "))}</p>`
+        : "";
 
   return renderShellPage({
     appName,
     railItems: visibleRail,
-    railFootHtml: `${capabilityNote}${railFootPlain}`,
+    railFootHtml: `${capabilityNote}${layoutNote}${railFootPlain}`,
     // The governance strip (07-28 audit, fix 5): counts + the one next human
     // act + recent history, rail-resident so it is visible on EVERY tab. Its
     // queue is the SAME deriveHumanQueue the guided prompt uses — one
@@ -3107,8 +3123,16 @@ export function createPreviewService(opts) {
   // manual refresh, which is exactly the lie this console exists to prevent.
   // These watchers close it: the governed files are watched, and a change
   // broadcasts the same events the in-place swaps already listen for.
+  // The layout decides WHICH specs dir and WHICH receipt file to watch. A
+  // refused manifest watches the default paths (the page says why it is
+  // refused); watching nothing would freeze the page as well as blind it.
+  const watchLayoutResolved = resolveProjectLayout(projectDir);
+  const watchLayout = watchLayoutResolved.ok ? watchLayoutResolved.layout : DEFAULT_LAYOUT;
+  const receiptRelParts = watchLayout.receipt.split("/");
+  const receiptBase = receiptRelParts.pop();
+  const receiptDirRel = receiptRelParts.join("/") || ".";
   const GOVERNANCE_WATCHES = [
-    { rel: "specs", kind: "governance" },
+    { rel: watchLayout.specs, kind: "governance" },
     // Mirrors FEATURES_DIR_REL in the project's own qa/lib/feature-brief.mjs;
     // this package cannot import that file statically (it lives in the generated app).
     { rel: "docs/features", kind: "governance" },
@@ -3125,7 +3149,12 @@ export function createPreviewService(opts) {
     // watch skipped at startup never retries — verify.mjs mkdirs the same path
     // before stamping, so pre-creating it is claiming nothing Gradle owns.
     { rel: "composeApp/build", kind: "governance", only: new Set([".cmp-lane-in-progress", ".cmp-render-in-progress"]), mkdir: true },
-    { rel: "qa/evidence", kind: "governance", only: new Set(["latest.json"]) },
+    { rel: receiptDirRel, kind: "governance", only: new Set([receiptBase]) },
+    // The manifest itself: editing it re-points every reader, so the page
+    // must re-render (the watch set is fixed for the process — a moved
+    // receipt path takes effect on the next console start, and the page's
+    // layout line names the manifest so that is visible).
+    { rel: "qa", kind: "governance", only: new Set([MANIFEST_REL_PATH.split("/").pop()]) },
   ];
   const pendingGovernance = new Set();
   let governanceWatchers = [];
@@ -3238,7 +3267,9 @@ export function createPreviewService(opts) {
           commentsSnapshot(),
           getLastReceipt(projectDir),
         ]);
-        const specs = getSpecsData(projectDir);
+        // The project's own scanner when it ships one (qa/lib/spec-coverage.mjs),
+        // else the console's scan — both under the project's declared layout.
+        const specs = await getProjectSpecsData(projectDir);
         // §3.0: the product brief — specs/intent.md parsed in its own order.
         const intent = getIntentData(projectDir);
         // §3.6: prior receipts, if this project keeps any beyond latest.json —
@@ -3329,6 +3360,7 @@ export function createPreviewService(opts) {
         res.end(
           galleryHtml({
             capabilities,
+            layout: resolveProjectLayout(projectDir),
             appName,
             viewport,
             cards,
@@ -3788,8 +3820,15 @@ export function createPreviewService(opts) {
   }
 
   function status() {
+    const layoutResolved = resolveProjectLayout(projectDir);
     return {
       projectDir,
+      // The layout this console reads the project through — the manifest's
+      // or the default — so `--status` shows WHERE it looks before a reader
+      // wonders why a pane is empty. A refused manifest is reported as such.
+      layout: layoutResolved.ok
+        ? { source: layoutResolved.source, manifest: layoutResolved.relPath, ...layoutResolved.layout }
+        : { source: "refused", manifest: layoutResolved.relPath, reason: layoutResolved.reason },
       // Which build is serving this, and is it the build on disk? Captured ONCE
       // at module load (LOADED_BUILD, below) and compared against disk on every
       // read — a process cannot notice its own staleness any other way, and

@@ -133,3 +133,19 @@ test("verdicts: CACHED counts as PASS; SKIP never fails; FAIL and ERROR do", () 
   assert.equal(laneVerdict([{ verdict: "PASS" }, { verdict: "ERROR" }]), "FAIL");
   assert.deepEqual(["PASS", "CACHED", "SKIP", "ERROR", "FAIL"].map(verdictMark), ["✓", "⚡", "→", "⊘", "✗"]);
 });
+
+test("layer: a step function tagged with fn.layer stamps its receipt row; a row that names its own layer keeps it; untagged rows carry none", () => {
+  const dir = tmp();
+  const backend = Object.defineProperty(() => ({ name: "compositeBuild", verdict: "PASS", durationMs: 1 }), "name", { value: "stepCompositeBuild" });
+  backend.layer = "backend";
+  const selfTagged = Object.defineProperty(() => ({ name: "gitleaks", verdict: "PASS", durationMs: 1, layer: "security" }), "name", { value: "stepGitleaks" });
+  selfTagged.layer = "wrong";
+  const lane = runLane({
+    steps: [backend, selfTagged, ok("plain")],
+    markerPath: markerIn(dir),
+    expected: { byName: new Map(), laneMs: null },
+    setDeadline: () => {},
+    print: null,
+  });
+  assert.deepEqual(lane.steps.map((s) => s.layer), ["backend", "security", undefined]);
+});
