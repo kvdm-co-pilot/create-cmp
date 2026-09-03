@@ -200,3 +200,34 @@ test("template-marker detection softens messaging only (never refuses)", () => {
   assert.equal(plan.fromOurTemplate, false);
   assert.ok(plan.diff.changes.length > 0);
 });
+
+// ── Two upgrade courtesies (create-cmp-showcase, 2026-09-03) ────────────────
+import os from "node:os";
+import { execFileSync } from "node:child_process";
+import { sidecarDroppedLines, staleBackupPaths, BACKUP_SUFFIX } from "../src/lib/upgrade.mjs";
+
+test("sidecarDroppedLines: names the content lines YOUR file has that the sidecar lacks — the signing-key ignores, three upgrades running", () => {
+  const yours = "# comment\nbuild/\n\nkeystore.properties\nkeystore/\n*.jks\n*.keystore\n.DS_Store\n";
+  const sidecar = "# new engine comment\nbuild/\n.DS_Store\n";
+  assert.deepEqual(sidecarDroppedLines(yours, sidecar), ["keystore.properties", "keystore/", "*.jks", "*.keystore"]);
+  assert.deepEqual(sidecarDroppedLines(sidecar, yours), [], "a sidecar that is a superset drops nothing");
+  assert.deepEqual(sidecarDroppedLines("", ""), []);
+});
+
+test("staleBackupPaths: gitignored *.bak-upgrade files from earlier upgrades are found through git; without git, nothing is touched", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-stale-bak-"));
+  try {
+    const git = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "ignore"] });
+    git("init", "-q");
+    fs.writeFileSync(path.join(root, ".gitignore"), `*${BACKUP_SUFFIX}\n`);
+    fs.writeFileSync(path.join(root, "AGENTS.md"), "x\n");
+    fs.writeFileSync(path.join(root, `AGENTS.md${BACKUP_SUFFIX}`), "old\n");
+    fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(root, "docs", `ARCHITECTURE.md${BACKUP_SUFFIX}`), "old\n");
+    fs.writeFileSync(path.join(root, "keep.txt"), "not a backup\n");
+    assert.deepEqual(staleBackupPaths(root), [`AGENTS.md${BACKUP_SUFFIX}`, `docs/ARCHITECTURE.md${BACKUP_SUFFIX}`]);
+    assert.deepEqual(staleBackupPaths(root, { runGit: () => null }), [], "git unavailable → [] (nothing is deleted on a guess)");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

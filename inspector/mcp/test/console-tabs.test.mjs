@@ -2021,7 +2021,7 @@ test("evidenceBodyHtml: steps tagged with a layer group under one header row per
       steps: [
         { name: "harnessIntegrity", verdict: "PASS", durationMs: 10, layer: "spine" },
         { name: "compositeBuild", verdict: "PASS", durationMs: 100, layer: "backend" },
-        { name: "mutation", verdict: "SKIP", durationMs: 0, layer: "backend" },
+        { name: "loadTest", verdict: "SKIP", durationMs: 0, layer: "backend" },
         { name: "gitleaks", verdict: "PASS", durationMs: 5, layer: "security" },
         { name: "legacyPlatform", verdict: "SKIP", durationMs: 0 },
       ],

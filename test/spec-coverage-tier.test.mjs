@@ -94,3 +94,23 @@ test("the lane's specCoverage step FAILS on an unmet tier — pinned in the step
   assert.match(src, /tiers\.unmetTier\.length === 0\)/, "PASS requires unmetTier to be empty");
   assert.match(src, /declares \[tier: \$\{u\.requiredTier\}\] but is/, "and the failure names the declared tier and the blind citation");
 });
+
+// ── One flow list for the runner and the scan ───────────────────────────────
+import { listFlowFiles, scanCitations as scanCitationsForFlows } from "../packages/harness/src/lib/spec-coverage.mjs";
+
+test("listFlowFiles: top-level *.yaml/*.yml under qa/e2e, sorted; a nested flow is neither run nor counted as a citation", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-flows-"));
+  try {
+    fs.mkdirSync(path.join(root, "qa", "e2e", "wip"), { recursive: true });
+    fs.writeFileSync(path.join(root, "qa", "e2e", "smoke.yaml"), "appId: x\n---\n# SPEC: SHELL-01\n- launchApp\n");
+    fs.writeFileSync(path.join(root, "qa", "e2e", "meals.yml"), "appId: x\n---\n# SPEC: MEAL-01\n- launchApp\n");
+    fs.writeFileSync(path.join(root, "qa", "e2e", "README.md"), "# not a flow\n");
+    fs.writeFileSync(path.join(root, "qa", "e2e", "wip", "draft.yaml"), "appId: x\n---\n# SPEC: DRAFT-01\n- launchApp\n");
+    assert.deepEqual(listFlowFiles(root), ["qa/e2e/meals.yml", "qa/e2e/smoke.yaml"]);
+    const ids = scanCitationsForFlows(root).map((c) => c.id).sort();
+    assert.deepEqual(ids, ["MEAL-01", "SHELL-01"], "the nested flow's citation does not count — it would never execute");
+    assert.deepEqual(listFlowFiles(path.join(root, "nope")), []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

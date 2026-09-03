@@ -16,7 +16,7 @@ test("no ladder argument → the Compose ladder, unchanged for every existing ca
 
 test("ladder: null → no rung at all: a pack that declares none is not graded by another pack's step names", () => {
   assert.equal(evidenceLevel(CMP_L1, "local", { mode: "full", ladder: null }), null);
-  const backend = pass("harnessIntegrity", "compositeBuild", "detekt", "mutation", "gitleaks");
+  const backend = pass("harnessIntegrity", "compositeBuild", "detekt", "konsist", "gitleaks");
   assert.equal(evidenceLevel(backend, "local", { mode: "full", ladder: null }), null);
   // PLANTED: the same backend run under the Compose ladder is the wrong grade this closes.
   assert.equal(evidenceLevel(backend, "local", { mode: "full" }), null, "no build/unitTests → not even L0 under the Compose ladder");

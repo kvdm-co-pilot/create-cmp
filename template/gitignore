@@ -44,3 +44,12 @@ qa/.plan.json
 # The closed-chain trail (drive-narration N5): local because it carries raw
 # human prompts — the committed journal for lane runs stays qa/flight-recorder.jsonl.
 qa/.plan-history.jsonl
+
+# Android signing. The keystore IS the app's identity on Android — it cannot be reissued —
+# and keystore.properties holds its passwords. Never committed, never in a sidecar diff.
+# (create-cmp-showcase, 2026-09-03: three consecutive upgrades' .gitignore sidecars lacked
+# these four lines, leaving the key one `git add -A` from a public repo.)
+keystore.properties
+keystore/
+*.jks
+*.keystore

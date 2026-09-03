@@ -64,7 +64,16 @@ jobs:
       # verdict and an evidence receipt. If the build step fails after a
       # dependency bump, remember: Kotlin / KSP / Compose / Room / AGP move as
       # ONE set (see the comments in gradle/libs.versions.toml).
+      # CMP_DEVICE=none is the ONE explicit opt-out of the device tier: this
+      # hosted runner has no emulator, so e2eSmoke/androidChecks SKIP with that
+      # reason on the merge-stage receipt (visible, never silent). The lane boots
+      # a headless emulator itself everywhere else — locally that is the
+      # change-stage gate, and qa/receipt-check.mjs refuses a receipt whose
+      # device tier was opted out. To prove L2 here too, drop the variable and
+      # boot an emulator first (e.g. reactivecircus/android-emulator-runner).
       - name: Verify lane
+        env:
+          CMP_DEVICE: none
         run: node qa/verify.mjs --profile ci
 
       # The receipt this run produced, kept as a build artifact. The receipt

@@ -149,11 +149,12 @@ skill (.claude/skills/npm-publish/SKILL.md).
   --profile <scaffold|local|ci|release>   lane profile for the scratch app's
                                           qa/verify.mjs (default: local)
   --min-level <L1|L2|L3>   minimum evidence rung: L1 desktop / L2 on-device /
-                           L3 release-proven. Default L1 — but when \`adb
-                           devices\` shows an attached device the default rises
-                           to L2 automatically (a lane that silently skipped
-                           its device tier must not pass while a device sits
-                           there). Pass --min-level L1 to override.
+                           L3 release-proven. Default L2: the lane boots a
+                           headless emulator itself when none is attached, so
+                           the device tier always runs (CMP_AVD picks the AVD;
+                           CMP_DEVICE=none is the explicit opt-out and fails
+                           this check). Pass --min-level L1 for a deliberately
+                           desktop-only check.
   --keep                   retain the scratch app dir even on success (on
                            failure it is always kept and its path printed)
   --help                   this text
@@ -217,7 +218,13 @@ async function main() {
   }
 
   const attached = deviceAttached();
-  if (!minLevel) minLevel = attached ? "L2" : "L1";
+  // Default L2 (2026-09-03): the lane provisions its own headless emulator, so
+  // the device tier runs whether or not something was attached beforehand. A
+  // fleet check that accepts L1 would accept a release whose device rows all
+  // SKIPped — which is exactly how 0.21.0 shipped. --min-level L1 is still
+  // accepted for a deliberately desktop-only check.
+  if (!minLevel) minLevel = "L2";
+  void attached;
 
   process.stdout.write(
     `fleet check: profile=${args.profile} min-level=${minLevel}` +

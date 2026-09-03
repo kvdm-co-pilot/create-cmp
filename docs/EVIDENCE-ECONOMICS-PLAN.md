@@ -26,7 +26,7 @@ The disease being cured is **capability outrunning proof**. Therefore:
 
 | # | Slice | Cause | Repo | Session | Status |
 |---|---|---|---|---|---|
-| S0 | Mutation out of the per-change lane | C1 | payment-blueprint | blueprint | **YES given 2026-09-03** — relayed to the blueprint session; it lands there |
+| S0 | The 20-minute suite-scaled step out of the per-change lane | C1 | payment-blueprint | blueprint | **superseded 2026-09-03** — the step was REMOVED entirely on Karel's decision (see Log); nothing of it remains in either repo |
 | S1 | Prove the uncommitted P2/P3 batch | C2 C3 C4 | create-cmp | this | **landed** (see Log) |
 | S2 | Console opens without `composeApp/` | C6 | create-cmp | this | **landed** — proven live on payment-blueprint |
 | S3 | Agent-stage pulse (observed activity between prompt and lane) | C4 | create-cmp | this | **landed** |
@@ -39,14 +39,14 @@ The disease being cured is **capability outrunning proof**. Therefore:
 
 ---
 
-## S0 — payment-blueprint: mutation leaves the per-change lane
+## S0 — payment-blueprint: the suite-scaled step leaves the per-change lane (superseded: removed)
 
 **Owner:** the blueprint session, on Karel's yes. Do not run another full lane before this lands.
 
-1. `qa/verify.mjs`: remove `mutation` from the `local` profile; keep it in a new `nightly`
+1. `qa/verify.mjs`: remove the step from the `local` profile; keep it in a new `nightly`
    profile (or `ci --nightly`).
-2. `qa/mutation.mjs`: on-demand entry that runs the same step and writes its score into the
-   receipt's existing field.
+2. An on-demand entry that runs the same step and writes its score into the receipt's
+   existing field.
 3. CI: a scheduled job running `node qa/verify.mjs --profile nightly` that fails on a ratchet
    regression. Thresholds unchanged.
 4. Keep the inputs-keyed cache already written there — it makes the nightly job skip when no
@@ -240,7 +240,7 @@ S6. Neither starts until S1–S7 are landed and proven.
   `--fast`. The "no-cache audit that must agree with the composed receipt" is NOT built here:
   it is P1's mitigation, and without per-step hashes there is no composed receipt to audit
   against. It lands with P1 if P1 lands. In create-cmp's own lane the suite-scaled step is the
-  determinism probe; in payment-blueprint it is mutation — S0 is the same decision there.
+  determinism probe; in payment-blueprint it was the step S0 moved — the same decision there.
 - 2026-09-02 — **S7 handed off, with the exact state.** Both target repos have live sessions;
   nothing was written into either tree from here.
 
@@ -398,3 +398,35 @@ S6. Neither starts until S1–S7 are landed and proven.
   109 s (installDebug + Maestro), androidChecks 64 s (connectedDebugAndroidTest), lane 218 s.
   releaseBuild is assembleRelease compile-only — nothing from it is installed; the device steps
   run the DEBUG build. Rule from here: a publish is gated at L2; the emulator costs minutes.
+- 2026-09-03 — **Showcase measured `--fast` after the journal fix**: the hatch is closed (a lane-
+  output-only tree now says "no working-tree changes to scope by"; a leaf edit scopes to
+  `*usecase*`), but the scoped run took 270 s against 8–35 s cached full runs — Gradle
+  recompilation after a source edit dominates, not test selection (n=1, possibly a cold daemon).
+  **S9's trigger input is not supplied by this data point**; a second measurement is needed
+  before per-step hashes are justified by "fast gets faster".
+- 2026-09-03 — **The suite-scaled step is gone, not tiered.** Karel: overkill; it broke
+  development completely and caused the last days' issues; tests are written from the spec and
+  that is the guard. Derived before the decision: the step had never returned a verdict (every
+  journal row SKIP, one ERROR at the 30-min cap), one of its two modules measured zero against a
+  60% threshold, and the run pinned a shared machine at load 70–80 for 25 minutes, stalling a
+  device lane in another session. Removed from payment-blueprint (relayed) and every mention
+  removed from this harness. What guards skipped tests instead: citation binding, tier
+  requirements, e2eCoverage, lane vouching, the device tier that always runs, and the
+  receipt-check refusals — each proven by a planted failure in scripts/framework-check.mjs.
+- 2026-09-03 — **The device tier runs itself; e2e is forced per feature; 0.22.0.** Karel: "make
+  the changes in the plugin that will force this after every step and also move to always run
+  headless"; then "is anything forcing e2e maestro tests to be written when we implement a
+  feature?" Landed: `qa/lib/device-provider.mjs` (an attached device as-is, else a headless boot
+  of CMP_AVD / cmp_pixel / the only AVD, bounded 240 s, shut down on exit; a device that cannot
+  be provisioned is an ERROR row); e2eSmoke runs the whole `qa/e2e/` directory in one Maestro
+  session with per-flow rows from the JUnit report and its own run bound; the coverage scan and
+  the runner read one flow list; the post-run ANR sweep is scoped to the app under test (the
+  first self-booted lane went red on another app's ANR); `e2eCoverage` gate — a screen plus a
+  spec needs one clause cited from a flow; brief doneness needs the same for `screens: true`;
+  `scaffold-feature` stamps `qa/e2e/<f>.yaml`; the template smoke flow proves HOME-02 on device;
+  receipt-check refuses an environmentally skipped device tier; fleet check defaults to L2.
+  Calibrated on a real app, machine free: boot 24 s; A PASS L2; B planted bad assertion →
+  e2eSmoke FAIL naming the flow and assertion in 34 s (lane 81 s, emulator kept); C revert →
+  PASS L2 in 70 s. Under another session's load (avg 70–80) Maestro never started its driver —
+  hence the run bound and the `pgrep` rule in memory. `scripts/framework-check.mjs` is now the
+  planted-failure matrix over every skipped-test guard: six plants + three hook refusals, 1.7 s.

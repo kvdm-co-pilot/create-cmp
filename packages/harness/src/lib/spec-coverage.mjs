@@ -58,7 +58,29 @@ const TYPE_DECL_RE = /^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\
 
 // A YAML flow's own shape counts as its test: a Maestro file IS the test, so a
 // tag in one binds to the flow rather than to a declaration inside it.
-const FLOW_EXTS = [".yaml", ".yml"];
+export const FLOW_EXTS = [".yaml", ".yml"];
+/** Where Maestro flows live. The lane runs this DIRECTORY (every top-level flow). */
+export const E2E_FLOW_DIR = "qa/e2e";
+
+/**
+ * The flows the lane executes: top-level `*.yaml`/`*.yml` under qa/e2e, sorted,
+ * root-relative. ONE list serves two readers — the e2eSmoke step (what runs)
+ * and scanCitations (what may count as coverage) — so a citation can only
+ * ever come from a flow that executes. Before 2026-09-03 the step ran ONE
+ * file by name (smoke.yaml) while the scan walked the whole directory: four
+ * hand-written flows on the showcase satisfied clauses without ever running.
+ * @param {string} root
+ * @returns {string[]}
+ */
+export function listFlowFiles(root) {
+  const dir = path.join(root, E2E_FLOW_DIR);
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile() && FLOW_EXTS.some((ext) => e.name.endsWith(ext)))
+    .map((e) => `${E2E_FLOW_DIR}/${e.name}`)
+    .sort();
+}
 
 /**
  * Does a test declaration follow `index` within BINDING_WINDOW non-blank lines,
@@ -170,8 +192,10 @@ export const DESKTOP_TIERS = Object.freeze(["commonTest", "desktopTest"]);
  */
 export function scanCitations(root) {
   const tags = [];
-  const searchDirs = [path.join(root, "composeApp/src"), path.join(root, "qa/e2e")];
-  const files = searchDirs.flatMap((d) => walkFiles(d, [".kt", ".kts", ".yaml", ".yml"]));
+  // Kotlin sources anywhere under composeApp/src; flows ONLY from the list the
+  // lane runs (listFlowFiles) — a flow in a subfolder, or a yaml under
+  // composeApp/src, is not executed by e2eSmoke and therefore proves nothing.
+  const files = [...walkFiles(path.join(root, "composeApp/src"), [".kt", ".kts"]), ...listFlowFiles(root).map((rel) => path.join(root, rel))];
   for (const f of files) {
     const rel = path.relative(root, f);
     const tier = tierForFile(rel);

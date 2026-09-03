@@ -6,6 +6,8 @@
 
 import { parseVersions, updateTomlValues, upsertProperty, parseProperties } from "./toml.mjs";
 
+import { execFileSync } from "node:child_process";
+
 export const BACKUP_SUFFIX = ".bak-upgrade";
 
 /** Marker comment the golden template ships in libs.versions.toml. */
@@ -200,4 +202,52 @@ export function planUpgrade({ tomlContent, gradlePropertiesContent, wrapperPrope
     newBuildGradleContent,
     fromOurTemplate: looksLikeOurTemplate(tomlContent),
   };
+}
+
+// ── Two upgrade courtesies the showcase asked for (2026-09-03) ──────────────
+/**
+ * Lines of YOUR file a conflict sidecar does not carry — what "take the
+ * sidecar" would silently drop. Third consecutive upgrade on the showcase:
+ * the .gitignore sidecar lacked the four signing-key ignores, and an agent
+ * resolving by taking the sidecar would leave the keystore one `git add -A`
+ * from a public repo. Blank and comment lines are not content.
+ * @param {string} yours
+ * @param {string} sidecar
+ * @returns {string[]}
+ */
+export function sidecarDroppedLines(yours, sidecar) {
+  const content = (text) =>
+    String(text ?? "")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#"));
+  const have = new Set(content(sidecar));
+  return [...new Set(content(yours).filter((l) => !have.has(l)))];
+}
+
+/**
+ * Backups (*BACKUP_SUFFIX) left by EARLIER upgrades — gitignored, so git sees
+ * them as ignored-untracked. One set per upgrade accumulated and nothing
+ * cleaned them (the showcase carried 0.19.0's and 0.20.0's). Returns root-
+ * relative paths; [] when git is unavailable (then nothing is touched).
+ * @param {string} projectDir
+ * @param {{runGit?: (args: string[], cwd: string) => string|null}} [deps]
+ * @returns {string[]}
+ */
+export function staleBackupPaths(projectDir, { runGit } = {}) {
+  const git =
+    runGit ??
+    ((args, cwd) => {
+      try {
+        return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      } catch {
+        return null;
+      }
+    });
+  const out = git(["ls-files", "-z", "--others", "--ignored", "--exclude-standard"], projectDir);
+  if (out === null) return [];
+  return out
+    .split("\0")
+    .filter((p) => p.endsWith(BACKUP_SUFFIX))
+    .sort();
 }

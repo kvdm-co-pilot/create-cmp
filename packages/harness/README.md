@@ -164,11 +164,28 @@ To verify a Kotlin backend, a web service, anything: keep the spine, replace the
    Layer names are free-form strings; the Compose pack uses `spine`, `compose`, `device`.
 
 **Worked example — `payment-blueprint`.** Its steps are `compositeBuild`, `gitleaks`,
-`linkCheck`, `mutation` (nightly), `legacyPlatform`, `unitTests`, `specCoverage`, `approvals`,
+`linkCheck`, `legacyPlatform`, `unitTests`, `specCoverage`, `approvals`,
 `harnessIntegrity`. Today they live in a hand-written 2,769-line lane that forked the spine
 and now receives no upstream fix. The migration is: keep its step bodies, wrap them in
-`createBlueprintSteps(ctx)`, delete its copies of the spine, vendor ours. The mutation step
-belongs in `stepsForProfile.nightly`, not `local` — that is what S0 decided.
+`createBlueprintSteps(ctx)`, delete its copies of the spine, vendor ours. Anything whose cost
+scales with the suite rather than the change belongs in `stepsForProfile.nightly`, never
+`local` — and a step that has never returned a verdict does not belong in the lane at all.
+
+## The device tier runs itself
+
+The full lane (every profile but `smoke`, `scaffold` and `--fast`) drives a device: tokenDrift,
+e2eSmoke (every flow in `qa/e2e/`, debug build), androidChecks (`connectedDebugAndroidTest`).
+With nothing attached it boots a headless emulator (`lib/device-provider.mjs`) and shuts it
+down when the lane exits. Environment variables:
+
+| Variable | Effect |
+|---|---|
+| `CMP_AVD=<name>` | the AVD to boot; else the doctor's `cmp_pixel`, else the only AVD; several and no way to choose is a refusal naming them |
+| `CMP_KEEP_DEVICE=1` | leave a booted emulator running for the next lane |
+| `CMP_DEVICE=none` | the ONE explicit opt-out (CI runners without an emulator). The device rows SKIP with `skipKind: "environment"`, and `receipt-check.mjs` refuses that receipt as done-evidence |
+
+A device that cannot be provisioned within the boot bound is an ERROR row, and the lane FAILs:
+a device that never came up is a failure to test, not a gap to record.
 
 ## What this does NOT do
 

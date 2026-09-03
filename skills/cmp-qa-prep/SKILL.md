@@ -36,7 +36,9 @@ emulator. On legacy projects this wraps the template's old `qa/appium/` client +
 
 1. **Disk check first** (builds fail with "No space left on device"): `df -h ~` — want ≥ 3 GB free.
 2. **Boot an emulator** from the AVD that `cmp-doctor` created (`emulator -avd <name>` /
-   `adb wait-for-device`).
+   `adb wait-for-device`). Note: the verify lane no longer needs this — with nothing
+   attached it boots that AVD headless itself (`CMP_AVD` overrides), runs every flow in
+   `qa/e2e/`, and shuts the emulator down after. Boot by hand only for an interactive session.
 3. **Build + install** the debug app: `./gradlew :composeApp:installDebug` (exit 0 = success).
 4. **Reverse-port** any local services the harness needs (`adb reverse`), if applicable.
 5. **Start Appium + create a session.** Prefer the Appium MCP tools (`appium_session_management`

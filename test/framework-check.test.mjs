@@ -16,8 +16,15 @@ test("the framework returns both ways inside the bound — PASS on a fresh scaff
   const r = spawnSync(process.execPath, [SCRIPT], { cwd: REPO_ROOT, encoding: "utf8", timeout: 120_000 });
   assert.equal(r.status, 0, `exit ${r.status}\n${r.stdout}\n${r.stderr}`);
   assert.match(r.stdout, /PASS direction\s+\d+ms\s+✓ \d+ steps, verdict PASS, stage smoke/);
-  assert.match(r.stdout, /FAIL direction\s+\d+ms\s+✓ verdict FAIL, specCoverage FAIL naming HOME-\d+/);
-  assert.match(r.stdout, /Stop hook\s+refuses ✓/);
+  // Every skipped-test guard, planted on the REAL scaffold and failing by name.
+  assert.match(r.stdout, /FAIL: orphaned citation\s+\d+ms\s+✓ specCoverage FAIL naming HOME-\d+/);
+  assert.match(r.stdout, /FAIL: unbound citation\s+\d+ms\s+✓ specCoverage FAIL naming HOME-99/);
+  assert.match(r.stdout, /FAIL: tier unmet\s+\d+ms\s+✓ specCoverage FAIL naming HOME-98/);
+  assert.match(r.stdout, /FAIL: feature without a flow\s+\d+ms\s+✓ e2eCoverage FAIL naming \[home\]/);
+  assert.match(r.stdout, /FAIL: flow the lane never runs\s+\d+ms\s+✓ e2eCoverage FAIL naming \[home\]/);
+  assert.match(r.stdout, /FAIL: edited lane cannot vouch\s+\d+ms\s+✓ harnessIntegrity FAIL naming modified/);
+  assert.match(r.stdout, /Stop hook\s+refuses a FAIL receipt ✓/);
+  assert.match(r.stdout, /Stop hook\s+refuses a skipped device tier ✓/);
   assert.match(r.stdout, /revert → PASS/);
   assert.match(r.stdout, /framework check: PASS/);
 });

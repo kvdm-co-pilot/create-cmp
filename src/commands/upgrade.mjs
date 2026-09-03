@@ -41,7 +41,7 @@ import { flagBool } from "../lib/args.mjs";
 import { colors, ok, warn, fail, step } from "../lib/log.mjs";
 import { consent } from "../bootstrap/exec.mjs";
 import { loadRegistry, latestSet, getSet } from "../lib/registry.mjs";
-import { planUpgrade, BACKUP_SUFFIX } from "../lib/upgrade.mjs";
+import { planUpgrade, BACKUP_SUFFIX, sidecarDroppedLines, staleBackupPaths } from "../lib/upgrade.mjs";
 import { writeHarnessLock, checkHarnessIntegrity, describeIntegrity } from "../../packages/harness/src/lib/harness-lock.mjs";
 import { LOCAL_PATCH_PATH, stampBaseWith } from "../lib/harness-upgrade.mjs";
 import { buildTokenMap } from "../lib/tokens.mjs";
@@ -383,11 +383,25 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
   const actionable = plan.entries.filter(
     (e) => e.write !== null || e.sidecar !== null || e.remove
   );
+  removeStaleBackups(projectDir);
   const result = applyHarnessPlan(projectDir, actionable);
   for (const f of result.written) ok(`wrote ${f} ${colors.dim(`(backup: ${f}${BACKUP_SUFFIX})`)}`);
   for (const f of result.created) ok(`created ${f}`);
   for (const f of result.deleted) ok(`deleted ${f} ${colors.dim(`(backup: ${f}${BACKUP_SUFFIX})`)}`);
-  for (const f of result.sidecars) warn(`conflict sidecar ${f} — resolve by hand, then delete it`);
+  for (const f of result.sidecars) {
+    warn(`conflict sidecar ${f} — resolve by hand, then delete it`);
+    // Name what taking the sidecar would DROP, so the obvious resolution is
+    // never a silent loss (the showcase's signing-key ignores, three upgrades running).
+    let dropped = [];
+    try {
+      dropped = sidecarDroppedLines(fs.readFileSync(path.join(projectDir, f), "utf8"), fs.readFileSync(path.join(projectDir, f + SIDECAR_SUFFIX), "utf8"));
+    } catch {
+      dropped = [];
+    }
+    if (dropped.length) {
+      warn(`  the sidecar lacks ${dropped.length} line${dropped.length === 1 ? "" : "s"} your ${f} has — taking it as-is would drop: ${dropped.slice(0, 4).join("  |  ")}${dropped.length > 4 ? "  |  …" : ""}`);
+    }
+  }
 
   // ── Re-lock the lane ──────────────────────────────────────────────────────
   // The machine-owned region always lands on the new engine's content, whether
@@ -576,6 +590,7 @@ export async function runUpgrade(flags, positional) {
     { path: wrapperPropsPath, content: plan.newWrapperPropertiesContent },
     { path: buildGradlePath, content: plan.newBuildGradleContent },
   ];
+  removeStaleBackups(projectDir);
   for (const w of writes) {
     if (w.content === null) continue;
     fs.copyFileSync(w.path, w.path + BACKUP_SUFFIX);
@@ -601,4 +616,18 @@ export async function runUpgrade(flags, positional) {
     `\n${colors.green("Applied.")} Prove the build: ${colors.cyan(`create-cmp verify --target-dir ${targetDir}`)}\n`
   );
   process.exit(0);
+}
+
+
+/** Backups an EARLIER upgrade left (gitignored *.bak-upgrade) go before this one writes its own. */
+function removeStaleBackups(projectDir) {
+  const stale = staleBackupPaths(projectDir);
+  for (const rel of stale) {
+    try {
+      fs.rmSync(path.join(projectDir, rel), { force: true });
+    } catch {
+      /* a backup that cannot be removed is left, and named below either way */
+    }
+  }
+  if (stale.length) ok(`removed ${stale.length} stale *${BACKUP_SUFFIX} file${stale.length === 1 ? "" : "s"} from earlier upgrades`);
 }

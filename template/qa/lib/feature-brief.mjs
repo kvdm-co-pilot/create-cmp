@@ -334,15 +334,24 @@ export function deriveFeatureStatus(root, brief, pre = {}) {
   const specRels = specNames.map((n) => `specs/${n}.spec.md`);
   const specExists = specRels.every((rel) => fs.existsSync(path.join(root, rel)));
   const specRel = specRels.join(" + ");
-  const citedIds = new Set((pre.citations ?? scanCitations(root)).map((t) => t.id));
+  const citations = pre.citations ?? scanCitations(root);
+  const citedIds = new Set(citations.map((t) => t.id));
+  // Which clauses a DEVICE journey proves: citations from qa/e2e flows (tier
+  // "e2e" — spec-coverage's tierForFile). A UI feature (screens: true) is not
+  // done until at least one of its live clauses is cited from a flow: JVM
+  // tests prove logic and structure, the flow proves the journey on a device.
+  const e2eCitedIds = new Set(citations.filter((t) => t.tier === "e2e").map((t) => t.id));
   const clauses = specRels
     .flatMap((rel) => clausesOfSpec(root, rel))
-    .map((c) => ({ ...c, cited: citedIds.has(c.id) }));
+    .map((c) => ({ ...c, cited: citedIds.has(c.id), e2eCited: e2eCitedIds.has(c.id) }));
   const live = clauses.filter((c) => !c.withdrawn);
   const covered = live.filter((c) => c.cited).length;
+  const e2eCovered = live.filter((c) => c.e2eCited).length;
+  const needsJourney = block.screens === true && block.unrouted !== true;
 
   const receipt = pre.receipt ?? receiptAttestation(root);
-  const provenDone = live.length > 0 && covered === live.length && receipt.verdict === "PASS" && receipt.attestsTree;
+  const provenDone =
+    live.length > 0 && covered === live.length && (!needsJourney || e2eCovered > 0) && receipt.verdict === "PASS" && receipt.attestsTree;
 
   return {
     name: brief.name,
@@ -361,6 +370,8 @@ export function deriveFeatureStatus(root, brief, pre = {}) {
     specExists,
     clauses,
     covered,
+    e2eCovered,
+    needsJourney,
     total: live.length,
     receipt,
     provenDone,
@@ -372,6 +383,8 @@ export function deriveFeatureStatus(root, brief, pre = {}) {
         ? `no spec yet (${specRel}) — behavior starts as clauses there`
         : live.length === 0
           ? `${specRel} has no live clauses — nothing is promised yet`
+          : needsJourney && covered === live.length && e2eCovered === 0
+            ? `${covered}/${live.length} clauses cited, but none from a qa/e2e flow — a UI feature is proven on a device: write the journey in qa/e2e/${brief.name}.yaml and cite the clause it proves`
           : covered < live.length
             ? `${covered}/${live.length} clauses cited — ${live.length - covered} promise(s) have no citing test`
             : !receipt.present

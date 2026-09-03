@@ -113,39 +113,163 @@ if (pass.receipt.verdict !== "PASS") {
 if (pass.receipt.stage !== "smoke") fail(`receipt names stage "${pass.receipt.stage}", expected "smoke"`, scratchRoot);
 out(`  PASS direction       ${pass.ms}ms   ✓ ${pass.receipt.steps.length} steps, verdict PASS, stage smoke`);
 
-// 3. FAIL direction — plant ONE deterministic violation in the REAL stamped
-//    spec (not a fixture): turn a clause bullet from `-` to `*`, which the
-//    clause scanner does not read, so exactly one clause goes uncited... except
-//    that makes it vanish, not orphan. Orphan the CITATION instead: rename one
-//    clause id in the spec so the test's `// SPEC:` tag points at nothing.
+// 3. FAIL directions — one planted violation per guard that catches a SKIPPED
+//    or FAKE test, each in the REAL stamped app (never a fixture), each asserted
+//    to FAIL BY NAME and then reverted. A guard that has only ever passed is an
+//    unread instrument (docs/PRINCIPLES.md #2); this is where each one is read.
 const specPath = path.join(appDir, "specs", "home.spec.md");
 const specText = fs.readFileSync(specPath, "utf8");
 const m = specText.match(/^- \*\*(HOME-\d{2,})\*\*/m);
 if (!m) fail(`could not find a HOME-NN clause to plant against in ${specPath}`, scratchRoot);
 const clause = m[1];
-fs.writeFileSync(specPath, specText.replace(`**${clause}**`, `**${clause}X**`));
-const failRun = runSmoke(appDir);
-if (failRun.hung) fail(`FAIL direction did not return inside ${BOUND_MS}ms — the framework HANGS on a failing input`, scratchRoot);
-if (!failRun.receipt) fail(`FAIL direction returned no receipt (exit ${failRun.exit}):\n${failRun.stderr.slice(-600)}`, scratchRoot);
-const sc = (failRun.receipt.steps ?? []).find((s) => s.name === "specCoverage");
-if (failRun.receipt.verdict !== "FAIL" || !sc || sc.verdict !== "FAIL") {
-  fail(`planted an orphaned citation for ${clause} and the lane said ${failRun.receipt.verdict} (specCoverage: ${sc ? sc.verdict : "no row"}) — the gate did not FAIL BY NAME`, scratchRoot);
+const smokePath = path.join(appDir, "qa", "e2e", "smoke.yaml");
+const smokeText = fs.readFileSync(smokePath, "utf8");
+if (!/^# SPEC: HOME-02/m.test(smokeText)) fail(`the stamped smoke flow does not cite HOME-02 — e2eCoverage has nothing to lose`, scratchRoot);
+const testDir = path.join(appDir, "composeApp", "src", "commonTest", "kotlin", "com", "example");
+const plantedTest = path.join(testDir, "PlantedTest.kt");
+const spineFile = path.join(appDir, "qa", "lib", "spec-coverage.mjs");
+const spineText = fs.readFileSync(spineFile, "utf8");
+const receiptPath = path.join(appDir, "qa", "evidence", "latest.json");
+
+/** @type {Array<{label: string, plant: () => void, revert: () => void, step: string, names: string[], hook?: RegExp}>} */
+const PLANTS = [
+  {
+    label: "orphaned citation",
+    plant: () => fs.writeFileSync(specPath, specText.replace(`**${clause}**`, `**${clause}X**`)),
+    revert: () => fs.writeFileSync(specPath, specText),
+    step: "specCoverage",
+    names: [clause],
+  },
+  {
+    label: "unbound citation",
+    // A tag on a CLASS declaration, no test within the binding window: the
+    // clause exists, the tag exists, and nothing runs. Must read as uncited.
+    plant: () => {
+      fs.writeFileSync(specPath, `${specText.trimEnd()}\n- **HOME-99** — Given a planted clause, Then a class-level tag must not count.\n`);
+      fs.mkdirSync(testDir, { recursive: true });
+      fs.writeFileSync(plantedTest, "package com.example\n\n// SPEC: HOME-99\nclass PlantedTest {\n  val notATest = 1\n  val stillNot = 2\n  val nope = 3\n  val nah = 4\n  val no = 5\n  val never = 6\n  fun helper() {}\n}\n");
+    },
+    revert: () => {
+      fs.writeFileSync(specPath, specText);
+      fs.rmSync(plantedTest, { force: true });
+    },
+    step: "specCoverage",
+    names: ["HOME-99"],
+  },
+  {
+    label: "tier unmet",
+    // A clause only a device can observe, cited only from the JVM.
+    plant: () => {
+      fs.writeFileSync(specPath, `${specText.trimEnd()}\n- **HOME-98** [tier: e2e] — Given a planted device-only clause, Then a JVM citation cannot satisfy it.\n`);
+      fs.mkdirSync(testDir, { recursive: true });
+      fs.writeFileSync(plantedTest, "package com.example\n\nimport kotlin.test.Test\n\nclass PlantedTest {\n  // SPEC: HOME-98\n  @Test\n  fun planted() {}\n}\n");
+    },
+    revert: () => {
+      fs.writeFileSync(specPath, specText);
+      fs.rmSync(plantedTest, { force: true });
+    },
+    step: "specCoverage",
+    names: ["HOME-98"],
+  },
+  {
+    label: "feature without a flow",
+    // The exemplar's flow stops citing its clause: a real feature with no device journey.
+    plant: () => fs.writeFileSync(smokePath, smokeText.replace(/^# SPEC: HOME-02.*$/m, "# (citation removed by the framework check)")),
+    revert: () => fs.writeFileSync(smokePath, smokeText),
+    step: "e2eCoverage",
+    names: ["[home]"],
+  },
+  {
+    label: "flow the lane never runs",
+    // The citation lives in a nested flow Maestro's directory run does not execute.
+    plant: () => {
+      fs.writeFileSync(smokePath, smokeText.replace(/^# SPEC: HOME-02.*$/m, "# (moved to a nested flow by the framework check)"));
+      fs.mkdirSync(path.join(appDir, "qa", "e2e", "wip"), { recursive: true });
+      fs.writeFileSync(path.join(appDir, "qa", "e2e", "wip", "planted.yaml"), smokeText);
+    },
+    revert: () => {
+      fs.writeFileSync(smokePath, smokeText);
+      fs.rmSync(path.join(appDir, "qa", "e2e", "wip"), { recursive: true, force: true });
+    },
+    step: "e2eCoverage",
+    names: ["[home]"],
+  },
+  {
+    label: "edited lane cannot vouch",
+    // One byte in the machine-owned region: the lane that issues verdicts is no
+    // longer the lane this app was given, and the hook must refuse its receipt.
+    plant: () => fs.writeFileSync(spineFile, `${spineText}\n// planted by the framework check\n`),
+    revert: () => fs.writeFileSync(spineFile, spineText),
+    step: "harnessIntegrity",
+    names: ["modified"],
+    hook: /harnessIntegrity|vouch/i,
+  },
+];
+
+let plantsMs = 0;
+for (const plant of PLANTS) {
+  plant.plant();
+  const run = runSmoke(appDir);
+  plantsMs += run.ms;
+  if (run.hung) fail(`"${plant.label}" did not return inside ${BOUND_MS}ms — the framework HANGS on a failing input`, scratchRoot);
+  if (!run.receipt) fail(`"${plant.label}" returned no receipt (exit ${run.exit}):\n${run.stderr.slice(-600)}`, scratchRoot);
+  const row = (run.receipt.steps ?? []).find((s) => s.name === plant.step);
+  if (run.receipt.verdict !== "FAIL" || !row || row.verdict !== "FAIL") {
+    fail(`planted "${plant.label}" and the lane said ${run.receipt.verdict} (${plant.step}: ${row ? row.verdict : "no row"}) — the guard did not FAIL BY NAME`, scratchRoot);
+  }
+  const reason = String(row.reason ?? "");
+  for (const name of plant.names) {
+    if (!reason.includes(name)) fail(`${plant.step} FAILed on "${plant.label}" but did not NAME ${name}:\n${reason}`, scratchRoot);
+  }
+  if (plant.hook) {
+    // The hook refuses a smoke-stage receipt on its stage, and a FAIL receipt
+    // on its verdict, before the vouching check runs. The vouching guard exists
+    // for the FORGERY — the top-level verdict edited to PASS over rows that say
+    // the lane could not vouch for itself — so that is the receipt presented:
+    // the same rows, change stage, verdict flipped. The hook must still refuse,
+    // and for the vouching reason.
+    fs.writeFileSync(receiptPath, JSON.stringify({ ...run.receipt, profile: "local", stage: "change", verdict: "PASS" }, null, 2));
+    const h = hookRefuses(appDir);
+    if (!h.refused || !plant.hook.test(h.stderr)) fail(`the Stop hook did not refuse the "${plant.label}" receipt for the right reason:\n${h.stderr.slice(-400)}`, scratchRoot);
+  }
+  out(`  FAIL: ${plant.label.padEnd(26)} ${String(run.ms).padStart(5)}ms   ✓ ${plant.step} FAIL naming ${plant.names.join(", ")}`);
+  plant.revert();
 }
-if (!String(sc.reason ?? "").includes(clause)) fail(`specCoverage FAILed but did not NAME ${clause}:\n${sc.reason}`, scratchRoot);
-out(`  FAIL direction       ${failRun.ms}ms   ✓ verdict FAIL, specCoverage FAIL naming ${clause}`);
+const failRun = { ms: plantsMs };
 
-// 4. The Stop hook must refuse the failing receipt — the framework's last link.
-const hook = hookRefuses(appDir);
-if (!hook.refused) fail(`the Stop hook did not refuse a FAIL receipt`, scratchRoot);
-out(`  Stop hook            refuses ✓`);
+// 4. The Stop hook must refuse a FAIL receipt — the framework's last link. And
+//    a receipt whose device tier SKIPped for an ENVIRONMENTAL reason is refused
+//    too, on this real app: a synthetic row with the tree's own valid hash.
+{
+  PLANTS[0].plant();
+  const r = runSmoke(appDir);
+  PLANTS[0].revert();
+  if (!r.receipt || r.receipt.verdict !== "FAIL") fail(`could not produce a FAIL receipt for the hook check`, scratchRoot);
+  const hook = hookRefuses(appDir);
+  if (!hook.refused) fail(`the Stop hook did not refuse a FAIL receipt`, scratchRoot);
+  out(`  Stop hook            refuses a FAIL receipt ✓`);
+}
+{
+  const green = runSmoke(appDir);
+  if (!green.receipt || green.receipt.verdict !== "PASS") fail(`could not produce a PASS receipt for the device-tier hook check`, scratchRoot);
+  // Local-profile shape: the hook refuses smoke receipts on stage alone, so the
+  // planted row must sit on a change-stage receipt with this tree's real hash.
+  const planted = { ...green.receipt, profile: "local", stage: "change", steps: [...green.receipt.steps, { name: "e2eSmoke", verdict: "SKIP", skipKind: "environment", reason: "device tier disabled by CMP_DEVICE=none (planted)", durationMs: 0 }] };
+  fs.writeFileSync(receiptPath, JSON.stringify(planted, null, 2));
+  const hook = hookRefuses(appDir);
+  if (!hook.refused || !/device tier did not run/.test(hook.stderr)) fail(`the Stop hook did not refuse a receipt whose device tier was skipped for an environmental reason:\n${hook.stderr.slice(-400)}`, scratchRoot);
+  out(`  Stop hook            refuses a skipped device tier ✓`);
+}
 
-// 5. Revert, and it passes again — the plant was the only cause.
-fs.writeFileSync(specPath, specText);
+// 5. Everything reverted, and it passes again — the plants were the only cause.
 const again = runSmoke(appDir);
-if (again.hung || !again.receipt || again.receipt.verdict !== "PASS") fail(`after reverting the plant the lane did not return PASS`, scratchRoot);
+if (again.hung || !again.receipt || again.receipt.verdict !== "PASS") {
+  const bad = ((again.receipt && again.receipt.steps) || []).filter((s) => s.verdict === "FAIL" || s.verdict === "ERROR").map((s) => `${s.name}: ${String(s.reason ?? "").split("\n")[0]}`).join("; ");
+  fail(`after reverting every plant the lane did not return PASS (${bad || "no receipt"})`, scratchRoot);
+}
 out(`  revert → PASS        ${again.ms}ms   ✓`);
 
 const total = stampMs + pass.ms + failRun.ms + again.ms;
-out(`\nframework check: PASS — the lane returns, both ways, in ${total}ms total (bound ${BOUND_MS}ms per direction).`);
+out(`\nframework check: PASS — the lane returns, both ways, and every skipped-test guard fails by name: ${PLANTS.length} plants, ${total}ms total (bound ${BOUND_MS}ms per direction).`);
 if (keep) out(`Scratch app kept: ${scratchRoot}`);
 else fs.rmSync(scratchRoot, { recursive: true, force: true });

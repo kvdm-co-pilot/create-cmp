@@ -59,8 +59,8 @@ its measured cost picks its tier. A gate that has only ever passed is an unread 
 
 *Episode.* `specCoverage` returned PASS on a spec file it could not parse — two promises on
 disk, zero read. detekt matched a `test` path segment and silently ran none of its rules for a
-phase. `androidChecks` sat at 0.5% CPU for hours with no bound. Mutation testing was wired
-per-change at twenty minutes and discovered four hours in.
+phase. `androidChecks` sat at 0.5% CPU for hours with no bound. A twenty-minute suite-scaled
+step was wired per-change and discovered four hours in.
 
 *Requires.* Two moments, kept apart: **before adoption** (R0) the smallest harness proves it
 returns, both ways, in seconds; **at each gate's adoption** (R1) plant the violation in the real
@@ -96,7 +96,7 @@ every finish (mechanical, planned). Independent review by a fresh agent, not sel
 **The price of a change is the price of checking that change — never the price of the slowest
 step in the lane. And a running step is never indistinguishable from a hung one.**
 
-*Episode.* A doc-link fix cost twenty minutes because mutation testing sat in the per-change
+*Episode.* A doc-link fix cost twenty minutes because a suite-scaled step sat in the per-change
 lane and the receipt bound the whole tree. Signing an approval cost nine. A release build ran
 fourteen minutes without a byte of output; the only way to tell grinding from wedged was to
 check the daemon's CPU by hand.

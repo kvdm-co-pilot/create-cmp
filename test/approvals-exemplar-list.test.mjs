@@ -95,3 +95,24 @@ test("the stamper's dry-run clone-source list for a fresh scaffold matches exemp
     fs.rmSync(out, { recursive: true, force: true });
   }
 });
+
+// ── The feature's Maestro flow is stamped with the feature ──────────────────
+test("scaffold-feature stamps qa/e2e/<feature>.yaml: a passing skeleton with the app's id, the screen id and the clause prefix named, and NO citation it has not earned", async () => {
+  const out = await makeProject("cmp-exemplar-e2e-");
+  try {
+    execFileSync(process.execPath, [path.join(out, "qa/scaffold-feature.mjs"), "Favorites"], { cwd: out, encoding: "utf8" });
+    const flowPath = path.join(out, "qa", "e2e", "favorites.yaml");
+    assert.ok(fs.existsSync(flowPath), "the flow is stamped beside smoke.yaml");
+    const flow = fs.readFileSync(flowPath, "utf8");
+    assert.match(flow, /^appId: com\.acme\.demo$/m, "the real app id, never the token");
+    assert.match(flow, /favorites_title/);
+    assert.match(flow, /FAVORITES-NN/);
+    assert.match(flow, /launchApp/);
+    assert.doesNotMatch(flow, /^# SPEC:/m, "a skeleton cites nothing — coverage is earned by the journey");
+    // The stamped flow is in the list the lane runs and the coverage scan reads.
+    const { listFlowFiles } = await import(pathToFileURL(path.join(out, "qa/lib/spec-coverage.mjs")));
+    assert.deepEqual(listFlowFiles(out), ["qa/e2e/favorites.yaml", "qa/e2e/smoke.yaml"]);
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
