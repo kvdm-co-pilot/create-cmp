@@ -363,3 +363,10 @@ S6. Neither starts until S1–S7 are landed and proven.
   current main; gate on the composition: root 1260 · inspector 579 + bundle current · receipts 21
   · fleet check PASS L1 · framework check 989 ms. CHANGELOG 0.20.0 carries the four-step
   migration in order. Version + plugin manifests 0.20.0. Publish follows on main.
+- 2026-09-03 — **0.20.0 published** (`create-cmp-cli@0.20.0`, `latest`; tag v0.20.0 → e866dea;
+  GitHub release from the changelog). Verified against the registry: the tarball carries
+  citationIsBound, checkLaneVouching, approvedBy, the smoke profile, the per-project surface and
+  the principles block; `npx create-cmp-cli@0.20.0 --help` runs from a clean cache. Both peer
+  sessions handed the four-step migration. Local fix/tmp branches deleted (content on main via
+  PR #29). Open: S7 execution in the showcase (its upgrade + five forks) and the blueprint's
+  spine adoption; S9 conditional on the showcase's measured change-stage cost.
