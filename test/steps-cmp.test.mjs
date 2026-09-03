@@ -175,3 +175,13 @@ test("no device: CMP_DEVICE=none is a SKIP marked environment; a device that can
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("every step function in every profile has a runtime NAME — a factory-built arrow has none, and a nameless step narrates as null and takes the default deadline (blueprint, 2026-09-03; 0.20.0 here)", () => {
+  const pack = createCmpSteps(ctx());
+  for (const [profile, fns] of Object.entries(pack.stepsForProfile)) {
+    for (const fn of fns) {
+      assert.notEqual(stepDisplayName(fn), null, `${profile}: a step with no name (fn.name=${JSON.stringify(fn.name)})`);
+    }
+  }
+  for (const [name, fn] of Object.entries(pack.STEP_FN_BY_NAME)) assert.equal(stepDisplayName(fn), name);
+});

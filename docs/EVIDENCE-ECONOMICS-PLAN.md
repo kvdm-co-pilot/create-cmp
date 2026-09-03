@@ -406,10 +406,13 @@ S6. Neither starts until S1–S7 are landed and proven.
   before per-step hashes are justified by "fast gets faster".
 - 2026-09-03 — **The suite-scaled step is gone, not tiered.** Karel: overkill; it broke
   development completely and caused the last days' issues; tests are written from the spec and
-  that is the guard. Derived before the decision: the step had never returned a verdict (every
-  journal row SKIP, one ERROR at the 30-min cap), one of its two modules measured zero against a
-  60% threshold, and the run pinned a shared machine at load 70–80 for 25 minutes, stalling a
-  device lane in another session. Removed from payment-blueprint (relayed) and every mention
+  that is the guard. The cost case, CORRECTED by the blueprint session from its journal and PIT
+  reports (my first numbers were read from report files mid-run and a journal grep that missed
+  a row — wrong, and nearly written into their ADR; re-read the source at send time): two
+  verdicts in 24 runs (one ERROR at the 30-min cap, one PASS at 24 m 26 s), shared 403 mutants /
+  278 killed (69 %), core-domain 149 killed (76 %); under six minutes of headroom per run, so a
+  verdict was a coin toss, and the run pinned a shared machine at load 70–80 for 25 minutes,
+  stalling a device lane in another session. Their ADR-0036 records it. Removed from payment-blueprint (relayed) and every mention
   removed from this harness. What guards skipped tests instead: citation binding, tier
   requirements, e2eCoverage, lane vouching, the device tier that always runs, and the
   receipt-check refusals — each proven by a planted failure in scripts/framework-check.mjs.
