@@ -63,27 +63,46 @@ test("dist/server.mjs boots and serves every tool with NO node_modules in scope"
     proc.stderr.on("data", (d) => (stderr += d));
 
     const send = (msg) => proc.stdin.write(`${JSON.stringify(msg)}\n`);
+    const parsed = () =>
+      stdout
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => {
+          try {
+            return JSON.parse(l);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+    // Wait for the RESPONSE, bounded — never a fixed sleep. This test used to
+    // sleep 700 ms then 1800 ms and read whatever had arrived; under a loaded
+    // machine (the whole root suite in parallel inside `npm publish`, three
+    // Gradle daemons, two consoles) the bundle answered late and the test
+    // failed the release gate on timing, not on the bundle. The bound is the
+    // assertion: a bundle that has not answered in 20 s is broken, and a
+    // healthy one is not made to wait.
+    const waitFor = async (id, what) => {
+      const deadline = Date.now() + 20_000;
+      while (Date.now() < deadline) {
+        const hit = parsed().find((m) => m.id === id);
+        if (hit) return hit;
+        if (proc.exitCode !== null) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return parsed().find((m) => m.id === id) ?? null;
+    };
     send({
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",
       params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "freshness", version: "0" } },
     });
-    await new Promise((r) => setTimeout(r, 700));
+    await waitFor(1, "initialize");
     send({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
-    await new Promise((r) => setTimeout(r, 1800));
+    await waitFor(2, "tools/list");
 
-    const messages = stdout
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => {
-        try {
-          return JSON.parse(l);
-        } catch {
-          return null;
-        }
-      })
-      .filter(Boolean);
+    const messages = parsed();
 
     const init = messages.find((m) => m.id === 1);
     assert.ok(init && init.result, `the bundle never completed initialize. stderr: ${stderr.slice(0, 400)}`);
