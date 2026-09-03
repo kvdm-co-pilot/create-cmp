@@ -357,3 +357,9 @@ S6. Neither starts until S1–S7 are landed and proven.
   asserts PASS (237 ms): **947 ms total**, each direction killed and reported as a hang past
   `--bound-ms` (default 10 s). Tested by running it, plus a planted absurd bound that must read
   as a hang. USAGE, template CLAUDE.md, GATE-RULES and ground-truth carry the profile.
+- 2026-09-03 — **0.20.0 composed, gated, release-prepped.** Karel: **strict** — a receipt whose
+  `harnessIntegrity` row is not PASS is refused; pre-lock apps run `create-cmp upgrade --harness`
+  first (it writes the lock). The three peer fixes (signer, citation binding, lane vouching) on
+  current main; gate on the composition: root 1260 · inspector 579 + bundle current · receipts 21
+  · fleet check PASS L1 · framework check 989 ms. CHANGELOG 0.20.0 carries the four-step
+  migration in order. Version + plugin manifests 0.20.0. Publish follows on main.

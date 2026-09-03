@@ -6,6 +6,65 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-03
+
+Three gates that read as green while holding nothing, closed. **Each is breaking by design**
+— every one closes a hole that currently reports PASS — and each has a one-command migration.
+Read the migration before upgrading.
+
+### Migration
+
+Do these once, in this order, after upgrading the harness (`create-cmp upgrade --harness`):
+
+1. **If your app predates harness locks** (no `qa/harness.lock.json`): the upgrade writes one.
+   Without it, `harnessIntegrity` SKIPs, and 0.20.0 refuses a receipt whose lane did not vouch
+   for itself — strict, decided 2026-09-03: a lane that could not check its own integrity is not
+   trusted. Apps generated since locks existed, and any app already upgraded, are unaffected.
+2. **Re-approve each governed artifact with a signer**: `node qa/approve.mjs <artifact> --as
+   "Name <email>"`. Every existing approved row lacks `approvedBy`; the gate FAILs naming each
+   until it carries one. Hashes, statuses and the journal are untouched — only the signer is
+   added. The studio console asks once per session and signs with what you type.
+3. **Move any `// SPEC:` citation onto the test it claims.** A tag now counts only when a test
+   declaration follows within five meaningful lines, and never when it sits on a type
+   declaration. `specCoverage` may go red naming clauses that were never really covered — each
+   is a gap the old rule hid, not a regression.
+4. **Run the full lane once** so the receipt carries the new rows.
+
+### Added
+
+- **Approvals record who signed** (`approvedBy`). `approveArtifact` refuses without one and the
+  refusal names the flag; `approve.mjs` requires `--as "Name <email>"`; the express lane carries
+  the signer through to each artifact; the console asks once per session (sessionStorage — a
+  signature is a deliberate act by whoever is at the keyboard now, not a name a browser
+  remembers). Deliberately NOT defaulted from git config: that is whatever the machine says, and
+  an agent on a developer's laptop would sign with that developer's name. `--reopen` takes no
+  signer — it walks a signature back.
+- **A citation must sit on a test.** `scanCitations` counts a `// SPEC:` tag only when a test
+  declaration follows within `BINDING_WINDOW` (5) non-blank lines; block comments are skipped;
+  a tag whose first meaningful line declares a type is refused structurally — the real drift
+  that motivated this sat on `class PaymentWorkerTest` above a genuine `@Test`. Maestro flows
+  are exempt (a flow file is its own test). This also closes the hole under 0.19.0's
+  `[tier: device]` gate, where a device-tier citation could be a bare comment. The rule caught
+  the template's own `ARCH-04` tag, and the fixtures written to prove the tier gate.
+- **A PASS must be vouched by the lane's own rows** (`checkLaneVouching`, in
+  `@create-cmp/receipts`). A receipt whose verdict is PASS is refused if any row is FAIL or
+  ERROR, if it has no `harnessIntegrity` row, or if that row is not PASS — the receipt is
+  necessarily excluded from its own inputs hash, so `steps[]` is the only thing between the
+  gate and a text editor.
+
+### Fixed
+
+- `VERIFIED_SURFACE` was hardcoded in the spine. A repo whose code lives outside `composeApp/`
+  that vendored it had its verified surface silently shrink — the published 0.19.0 spine, run on
+  a nested project, returned the sha256 of the empty string as a valid-looking digest attesting
+  zero files. The surface now resolves per project from `qa/verified-surface.json`; the CMP
+  default is unchanged (the showcase hashes 485 files to the same digest before and after); a
+  malformed or empty declaration is refused; a surface matching nothing throws, and the Stop
+  hook reports that as a refusal with its reason rather than a stack trace.
+- The lane marker narrated eight steps as `null` (memoized wrappers and `gradleTestStep`'s
+  returned functions had no runtime name), giving each the default deadline. Named.
+
+
 ## [0.19.0] - 2026-09-03
 
 ### Added
@@ -1939,7 +1998,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.0...v0.17.1
