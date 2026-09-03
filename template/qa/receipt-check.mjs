@@ -99,6 +99,15 @@ function evaluate() {
       profile: receipt.profile,
     };
   }
+  // smoke (GATE-RULES Rule 0) runs no Gradle: it proves the framework returns,
+  // never that the change is good. Refused like --fast, for the same reason.
+  if (receipt.stage === "smoke" || receipt.profile === "smoke") {
+    return {
+      valid: false,
+      reason: "the last verify run was the smoke profile (the framework check — no build, no tests; it proves the instrument, not this change); run the change-stage lane (`node qa/verify.mjs`) before finishing",
+      profile: receipt.profile,
+    };
+  }
   // A surface this project cannot resolve is a REFUSAL with an explanation,
   // never an unhandled stack trace: this runs as the Stop hook on every turn
   // end, and a crash there reads as a broken harness rather than as the

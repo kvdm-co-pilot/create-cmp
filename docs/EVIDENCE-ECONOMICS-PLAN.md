@@ -349,3 +349,11 @@ S6. Neither starts until S1–S7 are landed and proven.
   Karel's correction recorded: the expensive class is the hang, not the wrong verdict; R0 is the
   smallest end-to-end harness proving fast deterministic pass AND fail before any gate. Next: R0
   built as a script (step 2, approved). Still open: SKIP-vs-PASS for pre-lock apps → 0.20.0.
+- 2026-09-03 — **R0 built and proven** (step 2, approved). `--profile smoke` — every pure-Node gate,
+  no Gradle — through the real runner/marker/receipt/journal; its receipt names `stage: "smoke"`
+  and is refused as done-evidence like `--fast` and `nightly`. `scripts/framework-check.mjs`
+  stamps a scratch app (229 ms), asserts PASS (245 ms), plants one spec edit and asserts FAIL BY
+  NAME — `specCoverage` naming `HOME-01` (236 ms) — asserts the Stop hook refuses, reverts and
+  asserts PASS (237 ms): **947 ms total**, each direction killed and reported as a hang past
+  `--bound-ms` (default 10 s). Tested by running it, plus a planted absurd bound that must read
+  as a hang. USAGE, template CLAUDE.md, GATE-RULES and ground-truth carry the profile.

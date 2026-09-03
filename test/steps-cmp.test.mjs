@@ -39,6 +39,9 @@ test("the profiles, by name and in order — the cheap tier before releaseBuild,
   const pack = createCmpSteps(ctx());
   const names = (profile) => pack.stepsForProfile[profile].map(stepDisplayName);
   assert.deepEqual(names("scaffold"), ["harnessIntegrity", "specCoverage", "approvals", "componentStories", "reachability", "archDoc", "schemaHistory", "build", "unitTests"]);
+  // smoke (GATE-RULES Rule 0): every pure-Node gate and NO Gradle — the lane that proves the framework returns.
+  assert.deepEqual(names("smoke"), ["harnessIntegrity", "specCoverage", "approvals", "componentStories", "reachability", "archDoc", "schemaHistory"]);
+  assert.ok(!names("smoke").includes("build") && !names("smoke").includes("unitTests"), "smoke never touches Gradle");
   assert.deepEqual(names("local"), [
     "harnessIntegrity", "specCoverage", "approvals", "componentStories", "reachability", "archDoc", "schemaHistory",
     "build", "unitTests", "conformance", "goldenTrees", "tokenDrift", "a11y", "releaseBuild", "e2eSmoke", "androidChecks",
