@@ -45,6 +45,10 @@ function makeReceipt(root, overrides = {}) {
     commit: { sha: null, dirty: [] },
     inputs: { hash, fileCount },
     steps: [
+      // A real lane's first row: the harness vouching for its own code. Fixtures
+      // that omitted it were modelling a receipt no lane produces, and
+      // checkLaneVouching now says so.
+      { name: "harnessIntegrity", verdict: "PASS", durationMs: 12 },
       { name: "specCoverage", verdict: "PASS", durationMs: 40 },
       { name: "androidBuild", verdict: "PASS", durationMs: 21_800 },
       { name: "unitTests", verdict: "PASS", durationMs: 9_500 },
@@ -257,7 +261,15 @@ test("validateReceiptForTree: multiple violations are ALL named at once", () => 
 
 test("validateReceiptForTree: policy knobs override the defaults", () => {
   withTree((root) => {
-    const receipt = makeReceipt(root, { steps: [{ name: "androidBuild", verdict: "PASS", durationMs: 800 }] });
+    // harnessIntegrity is present because this test is about the plausibility
+    // FLOOR, not about vouching — a fixture missing it would fail for the wrong
+    // reason and stop testing the knob.
+    const receipt = makeReceipt(root, {
+      steps: [
+        { name: "harnessIntegrity", verdict: "PASS", durationMs: 12 },
+        { name: "androidBuild", verdict: "PASS", durationMs: 800 },
+      ],
+    });
     write(root, RECEIPT_REL_PATH, JSON.stringify(receipt));
     assert.equal(validateReceiptForTree({ root }).status, "invalid");
     assert.equal(validateReceiptForTree({ root, policy: { minExecutedMs: 500 } }).status, "valid");
