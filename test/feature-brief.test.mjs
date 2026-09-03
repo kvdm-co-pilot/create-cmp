@@ -150,7 +150,10 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     // Clauses cited, but no receipt.
     const testDir = path.join(root, "composeApp/src/commonTest/kotlin/com/acme/demo");
     fs.mkdirSync(testDir, { recursive: true });
-    fs.writeFileSync(path.join(testDir, "MealTest.kt"), "// SPEC: MEAL-01, MEAL-02\nclass MealTest\n");
+    fs.writeFileSync(
+      path.join(testDir, "MealTest.kt"),
+      "class MealTest {\n  // SPEC: MEAL-01, MEAL-02\n  @Test\n  fun `meal`() {}\n}\n",
+    );
     res = lib.acceptFeature(root, "meal");
     assert.equal(res.ok, false);
     assert.match(res.reason, /no receipt — run node qa\/verify\.mjs/);

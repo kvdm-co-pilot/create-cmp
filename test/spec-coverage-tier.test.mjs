@@ -25,7 +25,7 @@ function project(spec, citations) {
   for (const [rel, ids] of Object.entries(citations)) {
     const abs = path.join(root, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, `// SPEC: ${ids}\nclass T\n`);
+    fs.writeFileSync(abs, `class T {\n  // SPEC: ${ids}\n  @Test\n  fun \`t\`() {}\n}\n`);
   }
   return root;
 }

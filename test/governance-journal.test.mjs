@@ -149,7 +149,10 @@ test("governance journal: attribution, memory, the derived split, one-change reo
     runApprove(root, ["feature-spec:meal"]);
     const testDir = path.join(root, "composeApp/src/commonTest/kotlin/com/acme/demo");
     fs.mkdirSync(testDir, { recursive: true });
-    fs.writeFileSync(path.join(testDir, "MealTest.kt"), "// SPEC: MEAL-01\nclass MealTest\n");
+    fs.writeFileSync(
+      path.join(testDir, "MealTest.kt"),
+      "class MealTest {\n  // SPEC: MEAL-01\n  @Test\n  fun `meal`() {}\n}\n",
+    );
     const writeReceipt = () => {
       fs.mkdirSync(path.join(root, "qa/evidence"), { recursive: true });
       fs.writeFileSync(
