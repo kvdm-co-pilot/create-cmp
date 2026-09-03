@@ -119,7 +119,6 @@ class ArchitectureConformanceTest {
         )
     }
 
-    // SPEC: ARCH-04
     // Component-derived tags (component-system-deep-dive.md §6.4) count as tag provenance:
     // a screen built entirely from registry components (ScreenColumn/AppHeader/
     // ContentStateContainer/…) is automation-reachable through the tags THOSE components
@@ -138,6 +137,7 @@ class ArchitectureConformanceTest {
         return text.contains("testTag") || (importsComponents && screenTagArgument.containsMatchIn(text))
     }
 
+    // SPEC: ARCH-04
     @Test
     fun `ARCH-04 every feature composable file is automation-reachable - literal testTag or screenTag provenance`() {
         // Scoped by CONTENT (contains @Composable), not by *Screen.kt filename: real apps

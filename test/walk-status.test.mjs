@@ -92,7 +92,10 @@ test("citing tests move Build's inner progress; whose-turn follows the board's o
 
   const testsDir = path.join(dir, "composeApp/src/commonTest/kotlin/com/acme/demo");
   fs.mkdirSync(testsDir, { recursive: true });
-  fs.writeFileSync(path.join(testsDir, "MealTest.kt"), "package com.acme.demo\n// SPEC: MEAL-01\nclass MealTest\n");
+  fs.writeFileSync(
+    path.join(testsDir, "MealTest.kt"),
+    "package com.acme.demo\nclass MealTest {\n  // SPEC: MEAL-01\n  @Test\n  fun `meal`() {}\n}\n",
+  );
   w = lib.deriveWalks(dir).walks.find((x) => x.name === "meal");
   assert.equal(w.promises.kept, 1);
   assert.equal(w.promises.current.id, "MEAL-02", "the NOW promise is the first unkept one");
