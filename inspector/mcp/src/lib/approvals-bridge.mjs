@@ -97,7 +97,7 @@ export async function getGovernedArtifacts(root) {
  * @param {string} root
  * @param {string} artifactId
  */
-export async function approveArtifact(root, artifactId) {
+export async function approveArtifact(root, artifactId, approvedBy) {
   const lib = await loadLib(root);
   if (!lib) {
     return {
@@ -111,7 +111,15 @@ export async function approveArtifact(root, artifactId) {
     // `via` is an audit field on the ledger row ("which surface did this
     // signature come through") — older project libs simply ignore unknown
     // options, so this stays compatible with pre-feature-intent scaffolds.
-    return lib.approveArtifact(root, artifactId, { via: "console" });
+    //
+    // `approvedBy` is WHO signed, and the console cannot invent it. It is not
+    // defaulted from git config on purpose: that is whatever the machine says,
+    // and the console is precisely the surface a human uses when they are NOT
+    // on the CLI — an agent driving it would sign with the laptop owner's name.
+    // So the console asks, once per session, and passes what the human typed;
+    // when it has nothing, the project library's own refusal is what surfaces,
+    // and older libs that predate signers ignore the option as before.
+    return lib.approveArtifact(root, artifactId, { via: "console", ...(approvedBy ? { approvedBy } : {}) });
   } catch (err) {
     return { ok: false, reason: err && err.message ? err.message : String(err) };
   }

@@ -63,7 +63,7 @@ test("a fresh brief opens a walk at Decide, YOUR TURN, with the remaining stops 
 });
 
 test("signing the brief moves the walk to Contract; the promises are the spec's own words", () => {
-  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-brief:meal"], { cwd: dir });
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-brief:meal", "--as", "Test Signer <test@example.com>"], { cwd: dir });
   let w = lib.deriveWalks(dir).walks.find((x) => x.name === "meal");
   assert.equal(w.currentStage, "contract");
   assert.equal(w.stages.find((s) => s.key === "decide").state, "done");
@@ -85,7 +85,7 @@ test("signing the brief moves the walk to Contract; the promises are the spec's 
 });
 
 test("citing tests move Build's inner progress; whose-turn follows the board's owner verbatim", () => {
-  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:meal"], { cwd: dir });
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:meal", "--as", "Test Signer <test@example.com>"], { cwd: dir });
   let w = lib.deriveWalks(dir).walks.find((x) => x.name === "meal");
   assert.equal(w.currentStage, "build");
   assert.equal(w.you.turn, "agent", "building is the agent's turn");
@@ -100,7 +100,7 @@ test("citing tests move Build's inner progress; whose-turn follows the board's o
 
 test("an arrival is a reopened/drifted artifact no open walk accounts for — with the journal's reason", () => {
   // Sign it first — a reopen presupposes a signature to reopen.
-  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "design-system"], { cwd: dir });
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "design-system", "--as", "Test Signer <test@example.com>"], { cwd: dir });
   execFileSync(
     "node",
     [path.join(dir, "qa/approve.mjs"), "--reopen", "design-system", "--reason", "swatch grid rebuild"],
@@ -150,7 +150,7 @@ test("L1: a brief that NAMES its specs pairs with all of them — no phantom con
     path.join(dir, "specs/beta.spec.md"),
     "# Spec: beta\n\n- **BETA-01** — Given a thing, Then beta holds.\n",
   );
-  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-brief:combo"], { cwd: dir });
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-brief:combo", "--as", "Test Signer <test@example.com>"], { cwd: dir });
 
   let w = lib.deriveWalks(dir).walks.find((x) => x.name === "combo");
   assert.equal(w.currentStage, "contract", "both specs exist but neither is signed — Contract, not phantom-Contract");
@@ -159,12 +159,12 @@ test("L1: a brief that NAMES its specs pairs with all of them — no phantom con
   assert.equal(w.promises.total, 2, "promises concatenate across the paired specs");
 
   // Signing ONE of two leaves the step naming only the other.
-  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:alpha"], { cwd: dir });
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:alpha", "--as", "Test Signer <test@example.com>"], { cwd: dir });
   w = lib.deriveWalks(dir).walks.find((x) => x.name === "combo");
   assert.match(w.you.act, /feature-spec:beta/);
   assert.ok(!/feature-spec:alpha/.test(w.you.act), "a signed paired spec is no longer waited on");
 
-  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:beta"], { cwd: dir });
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:beta", "--as", "Test Signer <test@example.com>"], { cwd: dir });
   w = lib.deriveWalks(dir).walks.find((x) => x.name === "combo");
   assert.equal(w.currentStage, "build", "both signed — the walk moves on");
   assert.deepEqual(
@@ -182,7 +182,7 @@ test("L1: a brief that NAMES its specs pairs with all of them — no phantom con
   const d = lib.deriveWalks(dir);
   assert.ok(!d.arrivals.some((a) => a.id === "feature-spec:alpha"), "a paired spec reopen is the walk's Contract, not an arrival");
   // Restore for later tests.
-  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:alpha"], { cwd: dir });
+  execFileSync("node", [path.join(dir, "qa/approve.mjs"), "feature-spec:alpha", "--as", "Test Signer <test@example.com>"], { cwd: dir });
 });
 
 test("L1: the **Spec:** header paragraph pairs when the block declares nothing", async () => {

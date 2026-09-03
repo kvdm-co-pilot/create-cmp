@@ -16,6 +16,9 @@ import {
   getJournal,
   resetApprovalsBridgeCache,
 } from "../src/lib/approvals-bridge.mjs";
+
+// An approval records WHO signed it; the console passes what the human typed.
+const SIGNER = "Test Signer <test@example.com>";
 import { copyProjectLib } from "./fixtures/copy-project-lib.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -92,7 +95,7 @@ test("getApprovalsData: available + statuses, calling the REAL library — resol
 test("approveArtifact: approves a resolvable artifact and writes qa/approvals.json (the same file the CLI writes)", async () => {
   const root = makeFixtureProject();
   try {
-    const result = await approveArtifact(root, "design-system");
+    const result = await approveArtifact(root, "design-system", SIGNER);
     assert.equal(result.ok, true);
     assert.match(result.hash, /^[0-9a-f]{64}$/);
     assert.ok(result.approvedAt);
@@ -113,11 +116,11 @@ test("approveArtifact: approves a resolvable artifact and writes qa/approvals.js
 test("approveArtifact: refuses a vacuous (0-file) approval and an unknown id, verbatim from the library", async () => {
   const root = makeFixtureProject();
   try {
-    const vacuous = await approveArtifact(root, "architecture");
+    const vacuous = await approveArtifact(root, "architecture", SIGNER);
     assert.equal(vacuous.ok, false);
     assert.match(vacuous.reason, /0 files|missing on disk/);
 
-    const unknown = await approveArtifact(root, "not-a-real-artifact");
+    const unknown = await approveArtifact(root, "not-a-real-artifact", SIGNER);
     assert.equal(unknown.ok, false);
     assert.match(unknown.reason, /unknown artifact/);
   } finally {
@@ -128,7 +131,7 @@ test("approveArtifact: refuses a vacuous (0-file) approval and an unknown id, ve
 test("approveArtifact: honest refusal (not a throw) when the project has no approvals library", async () => {
   const root = makeFixtureProject({ withApprovalsLib: false });
   try {
-    const result = await approveArtifact(root, "design-system");
+    const result = await approveArtifact(root, "design-system", SIGNER);
     assert.equal(result.ok, false);
     assert.match(result.reason, /not present in this project/);
   } finally {
@@ -155,7 +158,7 @@ test("mid-session library install: a library added AFTER a (miss) lookup is pick
     assert.equal(data.available, true, "the next call must re-probe — misses are never cached");
 
     // And the write path works immediately too, on the same un-reset bridge.
-    const result = await approveArtifact(root, "design-system");
+    const result = await approveArtifact(root, "design-system", SIGNER);
     assert.equal(result.ok, true);
   } finally {
     cleanup(root);
@@ -183,7 +186,7 @@ function makeReopenFixtureProject() {
 test("reopenArtifact: approved -> reopened, recording reopenedAt, via the fixture library (bridge passthrough, nothing re-implemented here)", async () => {
   const root = makeReopenFixtureProject();
   try {
-    const approved = await approveArtifact(root, "design-system");
+    const approved = await approveArtifact(root, "design-system", SIGNER);
     assert.equal(approved.ok, true);
 
     const result = await reopenArtifact(root, "design-system");
@@ -217,7 +220,7 @@ test("reopenArtifact: refuses an unreviewed artifact (nothing to reopen) and an 
 test("reopenArtifact: the console's reason + via ride through to the library (07-28 audit: attribution is mechanical)", async () => {
   const root = makeReopenFixtureProject();
   try {
-    await approveArtifact(root, "design-system");
+    await approveArtifact(root, "design-system", SIGNER);
     const result = await reopenArtifact(root, "design-system", { reason: "the hero reads too dense" });
     assert.equal(result.ok, true);
     // The fixture records what it was handed — proving the bridge passed

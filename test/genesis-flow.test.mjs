@@ -49,8 +49,17 @@ async function loadLib(projectRoot) {
   return import(pathToFileURL(path.join(projectRoot, "qa/lib/approvals.mjs")));
 }
 
+// An approval records WHO signed it, so the CLI requires --as. Defaulted here
+// for approval invocations only: --reopen and --reopen-feature walk a signature
+// BACK, take no signer, and would read a stray --as as their artifact.
+const SIGNER = "Test Signer <test@example.com>";
+const signArgs = (args) =>
+  args.some((a) => a === "--as" || a === "--status" || a === "--reopen" || a === "--reopen-feature")
+    ? args
+    : [...args, "--as", SIGNER];
+
 function runApprove(root, args) {
-  return execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args], {
+  return execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...signArgs(args)], {
     cwd: root,
     encoding: "utf8",
   });
@@ -58,7 +67,7 @@ function runApprove(root, args) {
 
 function runApproveExpectFail(root, args) {
   try {
-    execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args], {
+    execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...signArgs(args)], {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
@@ -102,11 +111,11 @@ test("intent artifact: order 0, resolves specs/intent.md, approvable; deletion r
     const seed = fs.readFileSync(path.join(out, "specs/intent.md"), "utf8");
     assert.match(seed, /not yet captured — filled by the cmp-new interview/);
 
-    const ok = approveArtifact(out, "intent");
+    const ok = approveArtifact(out, "intent", { approvedBy: "Test Signer <test@example.com>" });
     assert.equal(ok.ok, true, "a present intent brief is approvable");
 
     fs.rmSync(path.join(out, "specs/intent.md"));
-    const refused = approveArtifact(out, "intent");
+    const refused = approveArtifact(out, "intent", { approvedBy: "Test Signer <test@example.com>" });
     assert.equal(refused.ok, false);
     assert.match(refused.reason, /resolves to 0 files/);
     assert.match(refused.reason, /specs\/intent\.md/);
@@ -133,7 +142,7 @@ test("components artifact: order 5 (distilled AFTER the exemplar), dynamic sorte
     assert.ok(onDisk.length > 0, "sanity: the template ships common components");
     assert.deepEqual(registry[5].files, onDisk, "components resolves the sorted presentation/components/*.kt glob");
 
-    const ok = approveArtifact(out, "components");
+    const ok = approveArtifact(out, "components", { approvedBy: "Test Signer <test@example.com>" });
     assert.equal(ok.ok, true);
 
     // Empty the glob: the artifact is now unresolvable — the standing approval
@@ -146,7 +155,7 @@ test("components artifact: order 5 (distilled AFTER the exemplar), dynamic sorte
     assert.equal(comp.status, "changed-since-approval");
     assert.equal(comp.resolvable, false);
 
-    const refused = approveArtifact(out, "components");
+    const refused = approveArtifact(out, "components", { approvedBy: "Test Signer <test@example.com>" });
     assert.equal(refused.ok, false, "a components glob matching zero files is unresolvable, not approvable-empty");
     assert.match(refused.reason, /nothing currently matches this artifact's pattern/);
     assert.match(refused.reason, /vacuous/);
@@ -183,7 +192,7 @@ test("architecture artifact: editing AUTHORED prose in docs/ARCHITECTURE.md inva
   const out = await makeProject("cmp-gen-arch-drift-");
   try {
     const { approveArtifact, getApprovalStatuses } = await loadLib(out);
-    assert.equal(approveArtifact(out, "architecture").ok, true);
+    assert.equal(approveArtifact(out, "architecture", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     assert.equal(getApprovalStatuses(out).find((s) => s.id === "architecture").status, "approved");
 
     const docPath = path.join(out, ARCH_DOC_REL);
@@ -206,7 +215,7 @@ test("architecture artifact: regenerating a cmp:generated section (mechanical, t
     // approval below is over exactly what a genesis "approve the architecture
     // as generated" moment would sign.
     runArchDoc(out);
-    assert.equal(approveArtifact(out, "architecture").ok, true);
+    assert.equal(approveArtifact(out, "architecture", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     assert.equal(getApprovalStatuses(out).find((s) => s.id === "architecture").status, "approved");
 
     // Touch a source file the layer-file-inventory section walks, then
@@ -238,7 +247,7 @@ test("architecture artifact: line-ending normalization — CRLF-ifying the doc's
   const out = await makeProject("cmp-gen-arch-crlf-");
   try {
     const { approveArtifact, getApprovalStatuses } = await loadLib(out);
-    assert.equal(approveArtifact(out, "architecture").ok, true);
+    assert.equal(approveArtifact(out, "architecture", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
 
     const docPath = path.join(out, ARCH_DOC_REL);
     const content = fs.readFileSync(docPath, "utf8");
@@ -307,7 +316,7 @@ test("exemplar reconfigure: registry hashes the CONFIGURED feature's 11-file set
     assert.deepEqual(featureSpecIds, ["feature-spec:home"], "favorites.spec.md is the exemplar's; home.spec.md is now a plain feature spec");
 
     // Approving the exemplar records the hash over THAT set.
-    const approved = approveArtifact(out, "exemplar-feature");
+    const approved = approveArtifact(out, "exemplar-feature", { approvedBy: "Test Signer <test@example.com>" });
     assert.equal(approved.ok, true);
     assert.equal(approved.hash, hashArtifactFiles(out, exemplar.files).hash, "the stored hash is the recompute over the configured set");
   } finally {
@@ -472,12 +481,12 @@ test("express lane: approveAllDefaults approves every resolvable artifact with m
 
     // Give design-system a REAL approval first: the express lane must never
     // overwrite a standing approval.
-    assert.equal(approveArtifact(out, "design-system").ok, true);
+    assert.equal(approveArtifact(out, "design-system", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
 
     // Make intent unresolvable: the skip path (never a silent skip).
     fs.rmSync(path.join(out, "specs/intent.md"));
 
-    const result = approveAllDefaults(out);
+    const result = approveAllDefaults(out, "Test Signer <test@example.com>");
     assert.equal(result.ok, true);
     assert.deepEqual(
       result.approved.sort(),
@@ -503,12 +512,12 @@ test("express lane: approveAllDefaults approves every resolvable artifact with m
     assert.equal(statuses.find((s) => s.id === "design-system").mode, undefined);
 
     // A later real approval CLEARS the mode.
-    assert.equal(approveArtifact(out, "architecture").ok, true);
+    assert.equal(approveArtifact(out, "architecture", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     assert.equal(readLedger(out).artifacts.find((a) => a.artifact === "architecture").mode, undefined, "shaping clears defaults-accepted");
     assert.equal(getApprovalStatuses(out).find((s) => s.id === "architecture").mode, undefined);
 
     // Idempotence: a second run approves nothing new (all settled or skipped).
-    const again = approveAllDefaults(out);
+    const again = approveAllDefaults(out, "Test Signer <test@example.com>");
     assert.deepEqual(again.approved, []);
     assert.equal(again.skipped.length, 1, "intent is still honestly skipped, not silently dropped");
   } finally {
@@ -552,7 +561,7 @@ test("reopen: refusals are precise (unknown id, unreviewed, already-reopened, dr
 
     // Approved -> reopened works; the result's `artifact` is the ID STRING
     // (same convention as approveArtifact — the console bridge relies on it).
-    assert.equal(approveArtifact(out, "design-system").ok, true);
+    assert.equal(approveArtifact(out, "design-system", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     const reopened = reopenArtifact(out, "design-system", { reason: "test redesign" });
     assert.equal(reopened.ok, true);
     assert.equal(reopened.artifact, "design-system", "reopenArtifact returns the artifact id string, like approveArtifact");
@@ -564,7 +573,7 @@ test("reopen: refusals are precise (unknown id, unreviewed, already-reopened, dr
 
     // A drifted (changed-since-approval) artifact cannot be reopened either —
     // there is nothing sanctioned to walk back from.
-    assert.equal(approveArtifact(out, "architecture").ok, true);
+    assert.equal(approveArtifact(out, "architecture", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     fs.appendFileSync(path.join(out, "specs/app-base.spec.md"), "\n<!-- drift -->\n");
     const drifted = reopenArtifact(out, "architecture", { reason: "test redesign" });
     assert.equal(drifted.ok, false);
@@ -580,8 +589,8 @@ test("reopen: status surfaces reopened+reopenedAt; edits while reopened stay reo
     const { approveArtifact, reopenArtifact, getApprovalStatuses } = await loadLib(out);
 
     // Both flavors reopen: a real approval and a defaults-accepted one.
-    assert.equal(approveArtifact(out, "design-system").ok, true);
-    assert.equal(approveArtifact(out, "components", { mode: "defaults-accepted" }).ok, true);
+    assert.equal(approveArtifact(out, "design-system", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
+    assert.equal(approveArtifact(out, "components", { approvedBy: "Test Signer <test@example.com>", mode: "defaults-accepted" }).ok, true);
     assert.equal(reopenArtifact(out, "design-system", { reason: "test redesign" }).ok, true);
     assert.equal(reopenArtifact(out, "components", { reason: "test redesign" }).ok, true, "a defaults-accepted approval is reopenable too");
 
@@ -599,7 +608,7 @@ test("reopen: status surfaces reopened+reopenedAt; edits while reopened stay reo
     assert.equal(statuses.find((s) => s.id === "design-system").status, "reopened", "a reopened artifact stays reopened through edits");
 
     // Re-approval closes the genesis loop: approved again, reopenedAt gone.
-    assert.equal(approveArtifact(out, "design-system").ok, true);
+    assert.equal(approveArtifact(out, "design-system", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     const after = getApprovalStatuses(out).find((s) => s.id === "design-system");
     assert.equal(after.status, "approved");
     assert.equal(after.reopenedAt, undefined);
@@ -615,13 +624,13 @@ test("THE asymmetry, one run: a reopened artifact + a drifted artifact ⇒ gate 
     const { approveArtifact, reopenArtifact, evaluateApprovalsGate } = await loadLib(out);
 
     // design-system: approved then REOPENED (sanctioned redesign)…
-    assert.equal(approveArtifact(out, "design-system").ok, true);
+    assert.equal(approveArtifact(out, "design-system", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     assert.equal(reopenArtifact(out, "design-system", { reason: "test redesign" }).ok, true);
     const themeFile = path.join(out, "composeApp/src/commonMain/kotlin", PKG_DIR, "presentation/theme/Theme.kt");
     fs.appendFileSync(themeFile, "\n// sanctioned redesign edit\n");
 
     // …architecture: approved then MUTATED without reopening (drift).
-    assert.equal(approveArtifact(out, "architecture").ok, true);
+    assert.equal(approveArtifact(out, "architecture", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     fs.appendFileSync(path.join(out, "specs/app-base.spec.md"), "\n<!-- unsanctioned drift -->\n");
 
     const gate = evaluateApprovalsGate(out);
@@ -633,7 +642,7 @@ test("THE asymmetry, one run: a reopened artifact + a drifted artifact ⇒ gate 
 
     // Fix the drift: the reopened artifact alone downgrades the verdict to a
     // non-blocking SKIP that names it as pending.
-    assert.equal(approveArtifact(out, "architecture").ok, true);
+    assert.equal(approveArtifact(out, "architecture", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     const gate2 = evaluateApprovalsGate(out);
     assert.equal(gate2.verdict, "SKIP", "reopened behaves exactly like unreviewed: SKIP with warning, non-blocking");
     assert.match(gate2.reason, /\[design-system\].*reopened for redesign/, "the SKIP warning explains the reopened state");

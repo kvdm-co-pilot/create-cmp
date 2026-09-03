@@ -46,12 +46,12 @@ function baseConfig(targetDir) {
 }
 
 function runApprove(root, args) {
-  return execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args], { cwd: root, encoding: "utf8" });
+  return execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args, "--as", "Test Signer <test@example.com>"], { cwd: root, encoding: "utf8" });
 }
 
 function runApproveExpectFail(root, args) {
   try {
-    execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args], {
+    execFileSync(process.execPath, [path.join(root, "qa/approve.mjs"), ...args, "--as", "Test Signer <test@example.com>"], {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
