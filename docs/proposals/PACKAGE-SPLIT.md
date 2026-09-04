@@ -32,8 +32,8 @@ Measured 2026-09-04 at `ddfa634`.
 | Fact | Value |
 |---|---|
 | Published CLI | `create-cmp-cli@0.24.0` (2026-09-04T02:20Z) |
-| Published core | `@create-cmp/harness@0.15.0` — **local tree is 0.19.0** |
-| Published reader | `@create-cmp/receipts@0.1.0` |
+| Published core | `prooflane-harness@0.15.0` — **local tree is 0.19.0** |
+| Published reader | `prooflane-receipts@0.1.0` |
 | Front door | `create-mobile@0.1.0`, claimed 2026-07-15 |
 | **`create-cmp` on npm** | **owned by `termosa`, published 2022-04-27, version 0.0.0 — not ours** |
 | npm workspaces | none — `packages/` is directories, not a workspace |
@@ -239,7 +239,7 @@ a language and a falsehood, and the integrity refusal that hid the paths it refu
 O1 is decided (`prooflane`, §5). Confirm the `prooflane` scope is claimable, then claim
 `prooflane`, `prooflane` and `create-ktor`. Blocks everything below.
 
-### Phase C — the split
+### Phase C — the split *(C1 landed 2026-09-05: packages renamed, workspaces declared, ADR-0007 drafted)*
 `prooflane-harness` (core only) → `profile-cmp` (golden tree moves in) → `studio-cmp` →
 `prooflane-cli` → `create-cmp-cli` becomes a shim. `studio-cmp` is sequenced LAST inside Phase C
 but must land **before Stage 0.5 opens** — it is not allowed to slip into the next stage. The
@@ -320,7 +320,7 @@ reopening**, never a fresh question.
 | D10 | **Independent semver per package**, with the profile's `protocol` export carrying compatibility. Lockstep would make `harness.version` a synonym for the CLI's release number, which is the decoration being fixed. |
 | D11 | **`studio-cmp` is a separate package**, sequenced last inside Phase C and landing **before Stage 0.5 opens**. If the provider interface proves premature it folds back into `profile-cmp` without having blocked anything. |
 
-| D12 | **Phase A ends in a `0.25.0` publish under the current name.** Measured 2026-09-04: `create-cmp-cli` took 1,844 downloads in a month and `@create-cmp/harness` 265 — discounting CI and crawlers, the scoped package is hard to explain as noise, so real adopters are walking into the entrance defects now. The rename churn is bounded and half-designed for already (D3's reader accepts both names; `create-cmp-cli` stays published as a deprecated shim). The dead end's cost is not bounded. |
+| D12 | **Phase A ends in a `0.25.0` publish under the current name.** Measured 2026-09-04: `create-cmp-cli` took 1,844 downloads in a month and `prooflane-harness` 265 — discounting CI and crawlers, the scoped package is hard to explain as noise, so real adopters are walking into the entrance defects now. The rename churn is bounded and half-designed for already (D3's reader accepts both names; `create-cmp-cli` stays published as a deprecated shim). The dead end's cost is not bounded. |
 
 ### Open
 

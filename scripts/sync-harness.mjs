@@ -7,13 +7,13 @@
 // Two ordered stages, because two packages own parts of the lane:
 //
 //   1. packages/receipts/src → packages/harness/src/lib
-//      `@create-cmp/receipts` is the single source of truth for the inputs-hash
+//      `prooflane-receipts` is the single source of truth for the inputs-hash
 //      algorithm and the receipt predicate. It is published standalone (the
 //      hosted receipt check consumes it), so the harness carries a COPY rather
 //      than a dependency — the vendored lane must stay dependency-free.
 //
 //   2. packages/harness/src → template/qa
-//      `@create-cmp/harness` is the single source of truth for the whole lane.
+//      `prooflane-harness` is the single source of truth for the whole lane.
 //      The template ships byte-identical copies so a generated project runs
 //      `node qa/verify.mjs` with no install step: offline, in CI, air-gapped.
 //
@@ -149,11 +149,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const checkOnly = process.argv.includes("--check");
   let problems = 0;
 
-  console.log("stage 1  @create-cmp/receipts → @create-cmp/harness");
+  console.log("stage 1  prooflane-receipts → prooflane-harness");
   problems += syncPairs(RECEIPTS_FILES, checkOnly);
 
   // Re-derive AFTER stage 1, so a file stage 1 just created is carried down.
-  console.log("stage 2  @create-cmp/harness → template/qa");
+  console.log("stage 2  prooflane-harness → template/qa");
   problems += syncPairs(harnessFiles(), checkOnly);
 
   for (const orphan of orphanFiles()) {

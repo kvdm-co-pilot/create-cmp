@@ -1,7 +1,7 @@
 # Publishing — the `@create-cmp/*` packages
 
 The runbook for first-publishing the three scoped library packages:
-`@create-cmp/receipts` (`packages/receipts`), `@create-cmp/harness`
+`prooflane-receipts` (`packages/receipts`), `prooflane-harness`
 (`packages/harness`), and `@create-cmp/inspector` (`inspector/mcp`).
 
 **Human-run, deliberately.** Nothing here executes itself, and a first
@@ -17,14 +17,14 @@ Two tiers, deliberately, and the split is not an inconsistency to fix:
 | Tier | Names | Why this shape |
 |---|---|---|
 | Front doors | `create-cmp-cli`, `create-kmp`, `create-compose-multiplatform`, `create-mobile` | `npm create X` resolves to the package `create-X` — npm's convention forces it; these can never be scoped |
-| Libraries | `@create-cmp/harness`, `@create-cmp/receipts`, `@create-cmp/inspector` | free choice — scoped |
+| Libraries | `prooflane-harness`, `prooflane-receipts`, `@create-cmp/inspector` | free choice — scoped |
 
 Why scoped rather than a `cmp-*` prefix, in order of weight:
 
 1. **The stack-agnostic tension.** The receipt pipeline is committed to
    outgrowing one stack. `cmp-receipts` would hard-code Compose Multiplatform
    into the artifact's own name; under a scope, "cmp" sits in the *vendor*
-   position — `@create-cmp/receipts` can describe any stack's receipts
+   position — `prooflane-receipts` can describe any stack's receipts
    without lying.
 2. **One move reserves the whole namespace.** Owning the org reserves every
    future `@create-cmp/*` name. Unscoped, each new `cmp-<thing>` is a fresh
@@ -62,16 +62,16 @@ read, echo, or move the token; no repo-level `.npmrc`, ever.
   version happens to equal the CLI's, that is coincidence, not an invariant —
   do not "fix" a divergence. The gate only asserts each package has *a* valid
   semver, never that they match.
-- `@create-cmp/harness` vendors two `@create-cmp/receipts` files
+- `prooflane-harness` vendors two `prooflane-receipts` files
   byte-identically (synced by `scripts/sync-harness.mjs`, pinned by
   `test/harness-parity.test.mjs`) precisely so neither package needs the
   other as an npm dependency. Vendoring couples bytes, not version numbers.
 
 ## Order, and why
 
-1. **`@create-cmp/receipts`** — smallest, zero dependencies, most
+1. **`prooflane-receipts`** — smallest, zero dependencies, most
    foundational; confirms auth/registry mechanics on the lowest-risk tarball.
-2. **`@create-cmp/harness`** — also dependency-free; no install-time relation
+2. **`prooflane-harness`** — also dependency-free; no install-time relation
    to receipts (source-level vendoring only).
 3. **`@create-cmp/inspector`** — real dependencies
    (`@modelcontextprotocol/sdk`, `zod` — both declared), largest tarball, and
@@ -99,30 +99,30 @@ Each package.json already carries `publishConfig.access: "public"` — required
 knowledge, not boilerplate: **scoped names default to restricted**, and this
 field is what makes the publish public without a CLI flag.
 
-### `@create-cmp/receipts`
+### `prooflane-receipts`
 
 ```sh
 cd packages/receipts
-npm view @create-cmp/receipts version   # expect E404 (name unclaimed). A version here
+npm view prooflane-receipts version   # expect E404 (name unclaimed). A version here
                                         # means someone claimed it — STOP, do not publish over it
 npm pack --dry-run                      # eyeball the file list one last time
 npm publish                             # prepublishOnly runs the package's own tests
 # verify:
-npm view @create-cmp/receipts version
-cd "$(mktemp -d)" && npm init -y >/dev/null && npm i @create-cmp/receipts
-node -e "import('@create-cmp/receipts').then(m => console.log(Object.keys(m).length, 'exports'))"
+npm view prooflane-receipts version
+cd "$(mktemp -d)" && npm init -y >/dev/null && npm i prooflane-receipts
+node -e "import('prooflane-receipts').then(m => console.log(Object.keys(m).length, 'exports'))"
 ```
 
-### `@create-cmp/harness`
+### `prooflane-harness`
 
 ```sh
 cd packages/harness
-npm view @create-cmp/harness version    # expect E404
+npm view prooflane-harness version    # expect E404
 npm pack --dry-run
 npm publish
 # verify:
-cd "$(mktemp -d)" && npm init -y >/dev/null && npm i @create-cmp/harness
-node -e "import('@create-cmp/harness/harness-region').then(m => console.log(typeof m.hashHarnessRegion))"   # → function
+cd "$(mktemp -d)" && npm init -y >/dev/null && npm i prooflane-harness
+node -e "import('prooflane-harness/harness-region').then(m => console.log(typeof m.hashHarnessRegion))"   # → function
 ```
 
 No `prepublishOnly` here, deliberately: the package's real proof is the two
@@ -153,12 +153,12 @@ Then — and only then — the MCP registry submission (internal SUBMIT.md).
   discouraged even inside it; after that: deprecate, never remove, and a
   fully-unpublished name cannot be reused. Treat each first publish as a
   go/no-go decision.
-- **`@create-cmp/receipts` at 0.1.0 vs 1.0.0.** Its docs present the receipt
+- **`prooflane-receipts` at 0.1.0 vs 1.0.0.** Its docs present the receipt
   format as stable and single-source-of-truth; `0.1.0` says "no compatibility
   promise yet". Shipping `1.0.0` makes the promise explicit — breaking
   `evaluateReceipt` or `VERIFIED_SURFACE` then costs a major. The repo's gate
   requires only *a* valid semver; the promise level is your call.
-- **`@create-cmp/harness` is the whole lane, not just the lock.** Most of the
+- **`prooflane-harness` is the whole lane, not just the lock.** Most of the
   tarball only runs vendored inside a scaffolded app; the standalone value is
   the region hash-lock. The README says so — this is an expectation to set at
   publish time, not a defect.

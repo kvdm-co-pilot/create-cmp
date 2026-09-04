@@ -75,7 +75,7 @@ function readStdinJson() {
 }
 
 // The predicate itself lives in qa/lib/receipt-validate.mjs (vendored from the
-// @create-cmp/receipts package — one definition everywhere a receipt is judged); this
+// prooflane-receipts package — one definition everywhere a receipt is judged); this
 // CLI only reads the receipt and frames the exit codes.
 function evaluate() {
   const receipt = readReceipt(ROOT);

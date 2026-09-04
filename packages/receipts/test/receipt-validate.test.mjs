@@ -1,4 +1,4 @@
-// Unit tests for the @create-cmp/receipts predicate + service-grade checks.
+// Unit tests for the prooflane-receipts predicate + service-grade checks.
 // Discovered by the repo root's `node --test` and runnable standalone via
 // `npm test` inside packages/receipts/.
 

@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **The packages are renamed to `prooflane-*`, and the repo declares workspaces.** Phase C1 of
+  the split. `@create-cmp/harness` becomes **`prooflane-harness`** and `@create-cmp/receipts`
+  becomes **`prooflane-receipts`**, across 24 files. The CHANGELOG and the two historical
+  execution records keep the old names deliberately: they record what was true, and a decision
+  log that rewrites its own history is worth nothing.
+
+  This changes one field on every future receipt. `harness.name` is the package that issued the
+  verdict, and it now reads `prooflane-harness` — a more accurate statement, not a different
+  claim, and the receipt FORMAT is untouched (that rename is ADR-0007, awaiting signature). A
+  reader matching receipts by `harness.name` will see a discontinuity at this release; `pack` is
+  what makes two rungs incomparable, and `pack` has not moved.
+
+  Two placeholder packages published on 2026-09-05 to claim the names are **deleted** here,
+  because the real packages now carry them — two workspaces with one name makes npm refuse the
+  entire tree (`EDUPLICATEWORKSPACE`), which is how this was caught before it landed.
+
+  The workspaces are declared and not yet load-bearing: nothing installs against them until the
+  package extraction that follows.
+
 ### Added
 
 - **A second stack now holds the protocol open on every commit.** Until 2026-09-04 exactly one

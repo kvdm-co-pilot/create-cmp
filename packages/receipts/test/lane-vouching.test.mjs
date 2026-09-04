@@ -3,7 +3,7 @@
 // Lives in packages/receipts because that is the SOURCE OF TRUTH:
 // scripts/sync-harness.mjs copies packages/receipts/src/receipt-validate.mjs into
 // packages/harness/src/lib/ and template/qa/lib/, so a change made in the vendored
-// copy is silently deleted by the next sync. @create-cmp/receipts also publishes
+// copy is silently deleted by the next sync. prooflane-receipts also publishes
 // independently, so its behaviour needs a test that travels with it.
 //
 // The receipt is necessarily excluded from the inputs hash it carries — a file

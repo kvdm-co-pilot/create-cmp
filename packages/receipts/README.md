@@ -1,4 +1,4 @@
-# @create-cmp/receipts
+# prooflane-receipts
 
 Validate [create-cmp](https://github.com/kvdm-co-pilot/create-cmp) evidence
 receipts. Plain ESM, zero dependencies, Node ≥ 18, fully offline.
@@ -29,7 +29,7 @@ validate a receipt with the *same* logic the project itself uses.
 ## Install
 
 ```sh
-npm install @create-cmp/receipts
+npm install prooflane-receipts
 ```
 
 Generated projects don't install it: they carry byte-identical vendored
@@ -45,7 +45,7 @@ import {
   computeInputsHash,
   evaluateReceipt,
   validateReceiptForTree,
-} from "@create-cmp/receipts";
+} from "prooflane-receipts";
 
 // The local predicate — what a generated project's Stop hook and CI run:
 const receipt = readReceipt(projectRoot); // qa/evidence/latest.json, or null
@@ -82,7 +82,7 @@ What each layer checks:
   call: `validateReceiptForTree({ root, policy: { maxAgeMs } })`.
 
 Full export list (also importable from the two submodules,
-`@create-cmp/receipts/inputs-hash` and `@create-cmp/receipts/receipt-validate`):
+`prooflane-receipts/inputs-hash` and `prooflane-receipts/receipt-validate`):
 `computeInputsHash`, `VERIFIED_SURFACE`, `RECEIPT_REL_PATH`, `readReceipt`,
 `evaluateReceipt`, `DEFAULT_POLICY`, `checkFreshness`,
 `checkExecutionPlausibility`, `listSkippedSteps`, `validateReceiptForTree`.
@@ -90,7 +90,7 @@ Full export list (also importable from the two submodules,
 ## What this does NOT do
 
 - **Generate receipts.** Only the verify lane produces them — see
-  [`@create-cmp/harness`](https://www.npmjs.com/package/@create-cmp/harness),
+  [`prooflane-harness`](https://www.npmjs.com/package/prooflane-harness),
   vendored into every generated project as `qa/`.
 - **Validate arbitrary JSON envelopes.** `VERIFIED_SURFACE` is create-cmp's
   project shape (`composeApp/`, `specs/`, `qa/`, the root Gradle files). This
