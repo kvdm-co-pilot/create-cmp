@@ -25,6 +25,7 @@
 // the failing receipt. Anything else is a framework defect and exits 1 with the
 // scratch app kept for inspection.
 
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -280,6 +281,60 @@ if (again.hung || !again.receipt || again.receipt.verdict !== "PASS") {
   fail(`after reverting every plant the lane did not return PASS (${bad || "no receipt"})`, scratchRoot);
 }
 out(`  revert → PASS        ${again.ms}ms   ✓`);
+
+// 6. The SHIPPED twin. Everything above proves the ENGINE's lane returns, using
+//    a script that lives in this repo and has never existed inside a generated
+//    project. `qa/framework-check.mjs` is the half an app runs against itself,
+//    and until 0.24.0 it did not ship at all while four shipped files named it
+//    — so payment-blueprint hand-built its own copy and, later, briefed a whole
+//    wave to plant-and-build by hand at 30–60 s a cycle. An advertised tool
+//    nobody was given is worse than no tool. This leg proves the one we now
+//    hand over actually runs, on the tree as shipped, and leaves it as it was.
+{
+  // Snapshot by hashing the tree, NOT by `git status`: the scratch app is a
+  // bare temp directory with no repo, so a git-based guard exits non-zero and
+  // a `status === 0` condition around it skips silently — the check would then
+  // print "tree unchanged" having compared nothing. (It did, for one run, until
+  // this comment's author read the output he had just written.)
+  // Build output is excluded for the same reason inputs-hash excludes lane
+  // outputs: a run legitimately writes composeApp/build/.cmp-step-cache.json,
+  // and hashing it would report the lane doing its job as tree damage.
+  const IGNORED_DIRS = new Set(["build", ".gradle", ".git", "node_modules"]);
+  const snapshot = (dir) => {
+    const h = createHash("sha256");
+    const walk = (abs, rel) => {
+      for (const ent of fs.readdirSync(abs, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+        const childAbs = path.join(abs, ent.name);
+        const childRel = rel ? `${rel}/${ent.name}` : ent.name;
+        if (ent.isDirectory()) {
+          if (IGNORED_DIRS.has(ent.name)) continue;
+          h.update(`D:${childRel}\0`);
+          walk(childAbs, childRel);
+        } else if (ent.isFile()) {
+          h.update(`F:${childRel}\0`).update(fs.readFileSync(childAbs)).update("\0");
+        }
+      }
+    };
+    walk(dir, "");
+    return h.digest("hex");
+  };
+  const before = snapshot(appDir);
+  const t6 = t();
+  const twin = spawnSync(process.execPath, [path.join(appDir, "qa", "framework-check.mjs")], {
+    cwd: appDir,
+    encoding: "utf8",
+    timeout: 120_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  const twinMs = t() - t6;
+  if (twin.status !== 0) fail(`the shipped qa/framework-check.mjs did not pass in a fresh scaffold:\n${(twin.stdout ?? "") + (twin.stderr ?? "")}`, scratchRoot);
+  // It plants into a real tree. If it can leave residue, nobody will run it
+  // twice — and an instrument nobody runs is the failure this whole file is about.
+  const after = snapshot(appDir);
+  if (before !== after) fail(`qa/framework-check.mjs changed the tree it ran in (${before.slice(0, 12)} → ${after.slice(0, 12)})`, scratchRoot);
+  const plantCount = (twin.stdout.match(/^\s+FAIL: /gm) || []).length;
+  out(`  shipped twin         ${twinMs}ms   ✓ qa/framework-check.mjs: ${plantCount} plants, tree unchanged`);
+}
 
 const total = stampMs + pass.ms + failRun.ms + again.ms;
 out(`\nframework check: PASS — the lane returns, both ways, and every skipped-test guard fails by name: ${PLANTS.length} plants, ${total}ms total (bound ${BOUND_MS}ms per direction).`);

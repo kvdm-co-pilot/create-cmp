@@ -149,10 +149,10 @@ export function updateReadmeBadge(root) {
   // The same rule for the two other receipts qa/receipt-check.mjs refuses as
   // done-evidence: smoke (Rule 0 — proves the framework, never the change) and
   // nightly (proves the harness and the tree's invariants). Both derive no
-  // rung, and a smoke run — scripts/framework-check.mjs runs one on every
-  // scaffold — was rewriting a true L1 badge to "rung unrecorded". Found on
-  // 2026-09-03 by deriving the affected filter on a fresh app: README.md was
-  // the dirty file. Receipts predating `stage` are read by profile.
+  // rung, and a smoke run — qa/framework-check.mjs runs several, and restores
+  // this file afterwards — was rewriting a true L1 badge to "rung unrecorded".
+  // Found on 2026-09-03 by deriving the affected filter on a fresh app:
+  // README.md was the dirty file. Receipts predating `stage` are read by profile.
   const stage = receipt && (typeof receipt.stage === "string" ? receipt.stage : receipt.profile);
   if (stage === "smoke" || stage === "nightly") {
     return { changed: false, reason: `${stage} run — refused as done-evidence, so the badge is left as it stands` };

@@ -6,6 +6,56 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-04
+
+The Rule 0 instrument now ships. Four files in every generated project pointed adopters at
+`scripts/framework-check.mjs` — a path that exists only inside the create-cmp repo. The tool it
+named has never been in an adopter's tree, so the fast way to calibrate a gate was advertised
+and withheld, and the expensive way was the only one available.
+
+### Added
+
+- **`qa/framework-check.mjs` — Rule 0, in your own tree.** Proves the lane returns a fast
+  deterministic PASS and FAIL through the real machinery: runner, receipt, Stop hook. No Gradle,
+  no device, no network. Measured on a fresh scaffold: **7 plants, 1.9 s**.
+  - Plants are **derived from the tree**, not hardcoded — a project with no specs, no flows or
+    no Kotlin tests still gets the region plants, and every plant it cannot make is reported
+    *with its reason*. It refuses rather than printing PASS over an empty plant list.
+  - **Restores everything it touched**, including the receipt and the README badge — a smoke
+    receipt is refused as done-evidence, so leaving one in place would overwrite a real L1/L2
+    receipt with one that proves nothing. Empty directories it created are removed too.
+  - **Refuses to start** when a file it plants into has uncommitted changes.
+  - `--budget-ms` (default 5 s/cycle) reports any calibration cycle slower than Rule 1's stated
+    "seconds each" — the bound was prose, and prose does not refuse.
+- **`qa/lib/framework-check.mjs`** — the plant selection and run assessment as pure functions,
+  unit-tested without a scaffold (27 new tests; suite 1306 → 1333).
+- **`scripts/framework-check.mjs` proves the shipped twin.** A sixth leg runs
+  `qa/framework-check.mjs` inside the scratch app it already stamps and asserts the tree is
+  byte-identical afterwards — the tool we hand adopters is proven on the tree as shipped, not
+  merely shipped. (Its first version compared `git status` in a directory that is not a repo and
+  therefore compared nothing; it hashes the tree now, build output excluded.)
+
+### Changed
+
+- **GATE-RULES Rule 1 names its instrument at the point of authoring.** Rule 1 states a
+  *property* — this gate fails, by name, on its own violation — not a procedure to perform by
+  hand, and it now says so where a gate author reads it rather than inside a Rule 0 aside.
+  Measured cost of the procedural reading, three occurrences in one adoption: a wave briefed to
+  plant → `./gradlew` → confirm red → revert → build, at 30–60 s per cycle, ~38 minutes with
+  nothing committed. It had violated Rule 1's own "seconds each" from the first cycle, and
+  nothing noticed, because a bound in prose cannot refuse. A plant kept in the instrument is run
+  by everyone forever in milliseconds; a plant performed by hand is run once and lost.
+- **The orchestrator agent has standing to refuse an expensive instruction.** It could already
+  escalate before changing a *number*; it now costs a mandated *mechanism* the same way —
+  instances × seconds-per-instance against the stage budget — names a cheaper instrument if one
+  exists, and answers "what in this repo already does this, and why is it insufficient?" before
+  briefing any mechanism. It also owes visible progress: a line per subagent start and finish, a
+  status upward for anything past ~5 minutes with no output, and proof wall-clock as its own
+  report line. A silent agent is indistinguishable from a wedged one.
+- The four dangling `scripts/framework-check.mjs` references in shipped files now name
+  `qa/framework-check.mjs` (`verify.mjs`, `lib/steps-cmp.mjs`, `lib/evidence-badge.mjs`,
+  `docs/USAGE.md`).
+
 ## [0.23.0] - 2026-09-04
 
 Two spine fixes from payment-blueprint's adoption: the locked region now covers a lane's own
