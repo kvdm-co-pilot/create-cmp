@@ -70,7 +70,7 @@ test("the cmp profile exists where the loader looks, and is the only place the p
 // here the moment its last stack fact moves into the profile, so it cannot
 // come back by accident.
 const STACK_FACTS = ["composeApp", "androidInstrumentedTest", "desktopTest", "commonTest", "qa/e2e", "steps-cmp", "gradlew", "kspCaches"];
-const STACK_FREE_CORE = ["lib/spec-coverage.mjs", "lib/spec-model.mjs", "lib/profile-loader.mjs", "lib/harness-manifest.mjs", "lib/approvals.mjs", "lib/step-outcomes.mjs", "lib/lane-runner.mjs", "lib/lane-markers.mjs", "lib/plan.mjs", "watch.mjs", "receipt-check.mjs", "verify.mjs"];
+const STACK_FREE_CORE = ["lib/spec-coverage.mjs", "lib/spec-model.mjs", "lib/profile-loader.mjs", "lib/harness-manifest.mjs", "lib/approvals.mjs", "lib/step-outcomes.mjs", "lib/lane-runner.mjs", "lib/lane-markers.mjs", "lib/plan.mjs", "watch.mjs", "receipt-check.mjs", "verify.mjs", "lib/affected-tests.mjs", "lib/feature-brief.mjs"];
 
 test("parameterised core modules name no Compose path, tier or pack (comments stripped)", () => {
   const offenders = [];

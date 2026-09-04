@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The fast lane's blast radius is the profile's.** `qa/lib/affected-tests.mjs` kept the
+  honesty contract — fail open never fail silent, lane outputs are not changes, an unmapped
+  change runs everything, and `qa/` is the harness judging itself — and gave up the stack
+  rules. Which other paths fan out (`.gradle.kts` rewires compilation, `di/` rewires the
+  object graph, `theme/` and `presentation/components/` render into every screen) and how a
+  changed source becomes a test filter (`…/presentation/home/HomeViewModel.kt` → `*home*`)
+  now live in `profiles/cmp/affected.mjs`, which the pack hands to the core directly — no
+  manifest lookup, because the pack already is the profile. A profile with no mapping gets
+  `mode: "all"` with that as the stated reason. Vendored into a repo whose sources are not
+  under `composeApp/src`, the old rules made every path broad-impact, so every fast run fell
+  open to the full suite with the optimisation silently off. Stage 0 PR 6d.
+
 - **The Stop hook's did-not-run rule works on any stack, and the journey message names a
   file your project could have.** The hook refused "done" over a tier that skipped for an
   environmental reason by testing `["e2eSmoke", "androidChecks"]` by name and matching

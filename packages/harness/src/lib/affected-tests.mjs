@@ -14,11 +14,18 @@
 //     and the caller reports which case it was in the step's output and the
 //     receipt, so a filtered run can never be mistaken for the full suite.
 //   - The BLAST-RADIUS ESCAPE HATCH is mandatory: some paths fan out too
-//     widely to subset safely (build files rewire compilation, DI rewires
-//     object graphs, theme/tokens and shared components render into every
-//     screen, qa/ is the harness judging itself, and anything outside
-//     composeApp/src is by definition not a scoped source edit). Any one such
-//     change disables filtering for the run.
+//     widely to subset safely. qa/ is the harness judging itself — that one is
+//     the core's, on every stack. WHICH OTHER paths fan out, and how a changed
+//     source maps to a test filter, are facts about one build tool and one
+//     source layout, so they come from the PROFILE (Stage 0 PR 6d;
+//     profiles/cmp/affected.mjs). Any one broad-impact change disables
+//     filtering for the run.
+//
+// A profile that supplies no mapping gets `mode: "all"` with that as the
+// reason — fail open, said out loud. Vendored into a repo whose sources are
+// not under composeApp/src, the old hardcoded rules did something worse than
+// nothing: every path failed the layout test, so every fast run fell open to
+// the full suite with the optimisation silently off.
 //
 // Pure functions over path lists — git access is injected/separate so the
 // engine suite can test every branch with no repo state.
@@ -52,43 +59,28 @@ function isLaneOutput(p) {
 }
 
 /**
- * The mandatory blast-radius escape hatch: paths whose change fans out too
- * widely to subset the suite safely. Returns the human-readable category when
- * `p` is broad-impact, else null. Checked in order; the first match names the
- * reason.
+ * The core's own blast-radius rule, on every stack: a change under qa/ is the
+ * harness judging itself, so nothing may be subsetted by it.
  * @param {string} p POSIX relpath from the project root
  * @returns {string|null}
  */
-export function broadImpactReason(p) {
-  if (p.endsWith(".gradle.kts") || p === "gradle.properties" || p === "gradle/libs.versions.toml") {
-    return "build files rewire compilation";
-  }
-  if (/(^|\/)di\//.test(p)) return "DI rewires the object graph";
-  if (/(^|\/)theme\//.test(p)) return "theme/tokens render into every screen";
-  if (p.includes("presentation/components/")) return "shared components render into every screen";
+export function coreBroadImpactReason(p) {
   if (p === "qa" || p.startsWith("qa/")) return "qa/ is the harness itself";
-  if (!p.startsWith("composeApp/src/")) return "outside composeApp/src";
   return null;
 }
 
 /**
  * Derive the fast-mode unit-test filter from a list of changed paths.
  *
- * Mapping (deliberately simple and defensible): each changed `.kt` file under
- * composeApp/src contributes its package's last segment — the parent
- * directory name (`…/presentation/home/HomeViewModel.kt` → `home`, which the
- * template's package-mirrors-path conformance makes a package segment) — and
- * the union becomes Gradle `--tests "*<seg>*"` patterns matched against test
- * class FQNs. Coarse on purpose: `*home*` runs every test whose FQN mentions
- * the feature, which over-selects a little and under-maintains nothing.
- *
  * @param {string[]} changedPaths relpaths (either separator style) — tracked
  *   diffs plus untracked files, as from changedWorkingTreePaths()
+ * @param {{broadImpact: (p: string) => (string|null), patternsFor: (paths: string[]) => {patterns: string[], sourcePaths: string[]}}} [mapping]
+ *   the profile's rules (profiles/<id>/affected.mjs). Absent = no subsetting.
  * @returns {{mode: "filtered", patterns: string[], sourcePaths: string[]} |
  *   {mode: "all", reason: string, patterns: [], sourcePaths: string[]}}
  *   mode "all" ALWAYS carries the honest reason to report.
  */
-export function deriveAffectedFilter(changedPaths) {
+export function deriveAffectedFilter(changedPaths, mapping = null) {
   const paths = [...new Set((changedPaths ?? [])
     .filter((p) => typeof p === "string" && p.length > 0)
     .map((p) => p.split(path.sep).join("/")))]
@@ -99,32 +91,28 @@ export function deriveAffectedFilter(changedPaths) {
     return { mode: "all", reason: "no working-tree changes to scope by", patterns: [], sourcePaths: [] };
   }
 
+  // No mapping, no subsetting — and the reason says which half is missing, so
+  // a profile author sees the optimisation is off rather than wondering why
+  // the fast lane costs what the full one does.
+  if (!mapping || typeof mapping.broadImpact !== "function" || typeof mapping.patternsFor !== "function") {
+    return { mode: "all", reason: "this profile declares no affected-test mapping — every fast run tests everything", patterns: [], sourcePaths: paths };
+  }
+
   for (const p of paths) {
-    const broad = broadImpactReason(p);
+    const broad = coreBroadImpactReason(p) ?? mapping.broadImpact(p);
     if (broad) {
       return { mode: "all", reason: `broad-impact change — ${broad} (${p})`, patterns: [], sourcePaths: paths };
     }
   }
 
-  // Every remaining path is a scoped file under composeApp/src. Only .kt
-  // files map to test patterns; a change that maps to nothing (resources,
-  // manifests) falls open to the full suite below.
-  const ktPaths = paths.filter((p) => p.endsWith(".kt"));
-  const segments = new Set();
-  for (const p of ktPaths) {
-    const seg = path.posix.basename(path.posix.dirname(p));
-    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(seg)) segments.add(seg);
-  }
-
-  if (segments.size === 0) {
+  // Every remaining path is a scoped source edit by the profile's own reckoning.
+  // A change that maps to no pattern (resources, manifests) falls open below.
+  const { patterns, sourcePaths } = mapping.patternsFor(paths);
+  if (!Array.isArray(patterns) || patterns.length === 0) {
     return { mode: "all", reason: "changed files map to no test filter", patterns: [], sourcePaths: paths };
   }
 
-  return {
-    mode: "filtered",
-    patterns: [...segments].sort().map((s) => `*${s}*`),
-    sourcePaths: ktPaths,
-  };
+  return { mode: "filtered", patterns, sourcePaths: Array.isArray(sourcePaths) ? sourcePaths : paths };
 }
 
 function defaultRunGit(args, root) {
