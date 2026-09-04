@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { evaluateE2eCoverage } from "../packages/harness/src/lib/e2e-coverage.mjs";
+import { evaluateE2eCoverage } from "../packages/harness/src/lib/profiles/cmp/e2e-coverage.mjs";
 
 const PKG = "composeApp/src/commonMain/kotlin/com/acme/demo";
 function project({ flows = {}, briefs = {} } = {}) {

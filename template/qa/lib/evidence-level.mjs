@@ -35,57 +35,12 @@
 //     exported schemas) are visible there; only the always-run steps gate
 //     the desktop rungs, and only executed PASSes gate the device rungs.
 
-/** The scaffold profile's step set (verify.mjs stepsForProfile.scaffold). */
-const SCAFFOLD_CORE = [
-  "specCoverage",
-  "approvals",
-  "componentStories",
-  "reachability",
-  "e2eCoverage",
-  "archDoc",
-  "schemaHistory",
-  "build",
-  "unitTests",
-];
-
-/** Steps every PASS must carry to claim even L0 — they run in every profile and never SKIP. */
-const L0_REQUIRED = ["build", "unitTests"];
-
-/**
- * The steps that distinguish full desktop evidence (L1) from the scaffold
- * checks. None of these can SKIP — they PASS or FAIL — so "PASSed" is exactly
- * "ran green".
- */
-const L1_REQUIRED = ["releaseBuild", "conformance", "goldenTrees", "a11y"];
-
-/** On-device EXECUTION steps — the only steps that can earn L2. */
-const DEVICE_EXECUTION = ["e2eSmoke", "tokenDrift", "androidChecks"];
-
-/** The one step that can lift L2 to L3. */
-const RELEASE_EXECUTION = "releaseSmoke";
-
-const RUNG_NAMES = { L0: "scaffold", L1: "desktop", L2: "device", L3: "release" };
-
-/**
- * The Compose Multiplatform pack's ladder — the step names above, as one
- * object a pack hands to the spine. THE LADDER IS THE PACK'S, NOT THE SPINE'S
- * (2026-09-03): vendored into a Kotlin backend, these names graded its
- * strongest run — detekt, Konsist, gitleaks — as L0 "scaffold" and
- * made L1 unreachable by construction. A fixed-amount understatement is not
- * conservative, it is wrong, and receipts are where labels get quoted. So a
- * pack declares its ladder (`evidenceLadder` on createXSteps' return); a pack
- * that declares none earns no rung at all, which is the honest grade for a
- * ladder nobody has calibrated. Every field is a list of step names except
- * `release`, one name. `names` maps rung → label.
- */
-export const CMP_LADDER = Object.freeze({
-  scaffoldCore: Object.freeze(SCAFFOLD_CORE),
-  l0Required: Object.freeze(L0_REQUIRED),
-  l1Required: Object.freeze(L1_REQUIRED),
-  deviceExecution: Object.freeze(DEVICE_EXECUTION),
-  release: RELEASE_EXECUTION,
-  names: Object.freeze(RUNG_NAMES),
-});
+// The Compose ladder that used to live here is qa/lib/profiles/cmp/ladder.mjs
+// (Stage 0 PR 3). This module derives a rung from WHATEVER ladder the profile's
+// step pack hands the runner (`evidenceLadder`); it carries no step names of
+// its own and defaults to none — a profile that declares no ladder earns no
+// rung. The rung vocabulary above is one profile's example, kept because it is
+// the clearest statement of what a rung is for.
 
 /**
  * Derive the receipt's evidence rung from the lane's step results.
@@ -105,16 +60,18 @@ export const CMP_LADDER = Object.freeze({
  */
 export function evidenceLevel(stepResults, profile, { mode, ladder } = {}) { // eslint-disable-line no-unused-vars
   if (mode === "fast") return null; // the inner loop derives no rung — ever
-  // `ladder` absent → the Compose ladder (every caller before packs declared
-  // one). `ladder: null` → the pack declares none: no rung, by decision.
-  if (ladder === null) return null;
-  const L = ladder ?? CMP_LADDER;
+  // No ladder → no rung. There is no default: a rung is a claim in a
+  // profile's own vocabulary, and the spine has none to lend. `null` and
+  // `undefined` mean the same thing here — the pack declared nothing.
+  if (!ladder || typeof ladder !== "object") return null;
+  const L = ladder;
   const SCAFFOLD_CORE = L.scaffoldCore ?? [];
   const L0_REQUIRED = L.l0Required ?? [];
   const L1_REQUIRED = L.l1Required ?? [];
   const DEVICE_EXECUTION = L.deviceExecution ?? [];
   const RELEASE_EXECUTION = L.release ?? null;
-  const RUNG_NAMES = L.names ?? CMP_LADDER.names;
+  // A ladder without labels still grades — the rung id is its own label.
+  const RUNG_NAMES = L.names ?? { L0: "L0", L1: "L1", L2: "L2", L3: "L3" };
   const steps = Array.isArray(stepResults) ? stepResults.filter((s) => s && typeof s.name === "string") : [];
   // A failed lane has no rung — and a lane with a step that could not run
   // (ERROR) has none either: a rung is evidence, and "could not check" is not.

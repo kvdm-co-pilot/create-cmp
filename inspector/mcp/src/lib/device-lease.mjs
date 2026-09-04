@@ -4,8 +4,8 @@
 //
 // ── ON-DISK CONTRACT ────────────────────────────────────────────────────────
 // This exact contract is implemented independently by the generated app's
-// verify lane (template/qa/lib/device-lease.mjs in the create-cmp repo — the
-// acquiring side; stamped into every app as qa/lib/device-lease.mjs). The two
+// verify lane (template/qa/lib/profiles/cmp/device-lease.mjs in the create-cmp repo — the
+// acquiring side; stamped into every app as qa/lib/profiles/cmp/device-lease.mjs). The two
 // codebases ship separately and cannot import each other, so the contract
 // lives verbatim in BOTH file headers, each pointing at the other. Changing
 // anything below means changing it there too.
@@ -48,7 +48,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/** Same value and reasoning as the acquiring side (template qa/lib/device-lease.mjs). */
+/** Same value and reasoning as the acquiring side (template qa/lib/profiles/cmp/device-lease.mjs). */
 export const MAX_LEASE_AGE_MS = 30 * 60 * 1000;
 
 /** Serial → safe file stem: anything outside [A-Za-z0-9._-] becomes "_". */

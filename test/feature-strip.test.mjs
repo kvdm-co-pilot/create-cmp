@@ -253,7 +253,7 @@ test("default (inspector ON): debug module + release no-op twin stamped under th
 // rewriteNavHost drops the import + appTabs() entry for a shipped default
 // feature the config did not ask for, and renderPreviewRegistryKt drops its
 // preview — but the SOURCES used to stay on disk, wired to nothing. The
-// reachability lane step (qa/lib/reachability.mjs) then FAILed the scaffold at
+// reachability lane step (qa/lib/profiles/cmp/reachability.mjs) then FAILed the scaffold at
 // `create-cmp --verify` time, correctly: it was dead code. Don't ship what you
 // don't wire.
 
@@ -267,7 +267,7 @@ test("single-tab config: the unconfigured profile feature is stripped, and the t
   );
   assert.deepEqual(grepSources(out, /ProfileScreen/), [], "no ProfileScreen reference may survive");
 
-  const { evaluateReachability } = await import(path.join(out, "qa/lib/reachability.mjs"));
+  const { evaluateReachability } = await import(path.join(out, "qa/lib/profiles/cmp/reachability.mjs"));
   const result = evaluateReachability(out);
   assert.equal(result.verdict, "PASS", `reachability must pass: ${result.reason ?? ""}`);
 
@@ -280,7 +280,7 @@ test("profile tab configured: the profile feature SURVIVES and stays reachable",
   const profileDir = path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/presentation/profile");
   assert.ok(fs.existsSync(profileDir), "a configured profile tab keeps its feature");
 
-  const { evaluateReachability } = await import(path.join(out, "qa/lib/reachability.mjs"));
+  const { evaluateReachability } = await import(path.join(out, "qa/lib/profiles/cmp/reachability.mjs"));
   const result = evaluateReachability(out);
   assert.equal(result.verdict, "PASS", `reachability must pass: ${result.reason ?? ""}`);
   const profile = result.details.features.find((f) => f.name === "profile");
@@ -300,7 +300,7 @@ test("no home tab: home SURVIVES (it is the exemplar and owns the Detail destina
   // Home stays REACHABLE with no tab of its own: AppNavHost registers DetailScreen
   // (which home owns) as a destination unconditionally. That is what keeps the
   // exemplar honest rather than exempt.
-  const { evaluateReachability } = await import(path.join(out, "qa/lib/reachability.mjs"));
+  const { evaluateReachability } = await import(path.join(out, "qa/lib/profiles/cmp/reachability.mjs"));
   const result = evaluateReachability(out);
   assert.equal(result.verdict, "PASS", `reachability must pass: ${result.reason ?? ""}`);
   const home = result.details.features.find((f) => f.name === "home");

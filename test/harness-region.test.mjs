@@ -32,7 +32,7 @@ function tmpTree(files) {
 test("the region is the .mjs files directly under qa/ and qa/lib/ — plus the lane's own tests under qa/test/**, when a project has them", () => {
   assert.deepEqual(HARNESS_DIRS, ["qa", "qa/lib"]);
   assert.ok(isHarnessFile("qa/verify.mjs"));
-  assert.ok(isHarnessFile("qa/lib/render.mjs"));
+  assert.ok(isHarnessFile("qa/lib/profiles/cmp/render.mjs"));
   assert.ok(isHarnessFile("qa/test/steps.test.mjs"), "the tests that prove the gates are locked with the gates");
   assert.ok(isHarnessFile("qa/test/nested/deep.test.mjs"), "recursively");
   assert.ok(!isHarnessFile("qa/test/fixture.json"), "only .mjs — fixtures are data");

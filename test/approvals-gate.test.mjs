@@ -21,10 +21,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { scaffold } from "../src/scaffold.mjs";
 
 // S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
-// qa/lib/steps-cmp.mjs (the step pack). A structural read of "the lane's
+// qa/lib/profiles/cmp/steps-cmp.mjs (the step pack). A structural read of "the lane's
 // source" must see both, or it pins a file that no longer holds the steps.
 const laneSrc = (dir) =>
-  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/steps-cmp.mjs"), "utf8")}`;
+  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/profiles/cmp/steps-cmp.mjs"), "utf8")}`;
 
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -465,7 +465,7 @@ test("verify.mjs registers the approvals step in the scaffold and local (and the
   const out = await makeProject("cmp-appr-wiring-");
   try {
     const text = laneSrc(out);
-    assert.match(text, /import \{ evaluateApprovalsGate \} from "\.\/(?:lib\/)?approvals\.mjs";/);
+    assert.match(text, /import \{ evaluateApprovalsGate \} from "(?:\.\/(?:lib\/)?|\.\.\/\.\.\/)approvals\.mjs";/);
     assert.match(text, /function stepApprovals\(\)/);
     // Deliberately ABSENT (CHANGE-FLOW-DESIGN.md §7): no feature-doneness lane
     // step — doneness is derived from gates the lane already runs.

@@ -78,7 +78,7 @@ test("a step that THROWS is an ERROR row too — it used to crash the whole lane
 });
 
 // ── Maestro directory run → per-flow outcome ────────────────────────────────
-import { parseMaestroJunit, maestroOutcome } from "../packages/harness/src/lib/step-outcomes.mjs";
+import { parseMaestroJunit, maestroOutcome } from "../packages/harness/src/lib/profiles/cmp/maestro.mjs";
 
 const JUNIT_ALL_GREEN = `<?xml version="1.0"?><testsuites><testsuite name="Test Suite" tests="3" failures="0">
 <testcase id="meals" name="meals" classname="meals" status="SUCCESS"/>
@@ -122,7 +122,7 @@ test("maestroOutcome: PASS lists every flow; PLANTED one red flow → FAIL namin
 });
 
 // ── The post-run device-log sweep is scoped to the app under test ───────────
-import { deviceLogIncidents } from "../packages/harness/src/lib/step-outcomes.mjs";
+import { deviceLogIncidents } from "../packages/harness/src/lib/profiles/cmp/maestro.mjs";
 
 test("PLANTED (2026-09-03, first self-booted lane): an ANR in ANOTHER app on the emulator is not our red; our own ANR and our own FATAL EXCEPTION are", () => {
   const log = [

@@ -136,8 +136,11 @@ one verified, attributed state — so committing each receipt is what builds the
 
 ## The lane is not yours to edit
 
-Every `.mjs` file directly under `qa/` and `qa/lib/` is **machine-owned**: harness code
-that is byte-identical in every create-cmp app and carries no app content at all. It
+Every `.mjs` file directly under `qa/` and `qa/lib/`, every `.mjs` under
+`qa/lib/profiles/**` (this app's stack profile — its steps, tiers, ladder and device
+glue), and the declarations the lane reads (`qa/harness-manifest.json`,
+`qa/verified-surface.json`) are **machine-owned**: harness code that is byte-identical in
+every create-cmp app and carries no app content at all. It
 belongs to `create-cmp-harness`, versioned independently of the engine that stamped this
 app's shape, and `qa/harness.lock.json` records a sha256 of every one of those files.
 
@@ -147,7 +150,8 @@ honestly vouch for itself. Without that check the receipt was unfalsifiable in o
 specific way: force every step to PASS in `qa/verify.mjs` and the receipt still validated,
 since the edited file was simply part of the hashed input surface.
 
-**So: do not edit `qa/*.mjs` or `qa/lib/*.mjs`.** If the lane is wrong, the fix is
+**So: do not edit `qa/*.mjs`, `qa/lib/*.mjs`, `qa/lib/profiles/**`, or
+`qa/harness-manifest.json`.** If the lane is wrong, the fix is
 upstream in the engine, not here. If you genuinely must fork it, know that
 `npx create-cmp-cli upgrade --harness` will replace the region and preserve your edits as
 `qa/harness-local.patch` for you to re-apply or upstream — nothing is lost, but the fork

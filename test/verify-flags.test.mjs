@@ -17,7 +17,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const verifySrc = fs.readFileSync(path.join(REPO_ROOT, "packages/harness/src/verify.mjs"), "utf8");
 const watchSrc = fs.readFileSync(path.join(REPO_ROOT, "packages/harness/src/watch.mjs"), "utf8");
 // S8b: the CMP steps and their profile compositions live in the step pack now.
-const packSrc = fs.readFileSync(path.join(REPO_ROOT, "packages/harness/src/lib/steps-cmp.mjs"), "utf8");
+const packSrc = fs.readFileSync(path.join(REPO_ROOT, "packages/harness/src/lib/profiles/cmp/steps-cmp.mjs"), "utf8");
 
 /** The flags verify.mjs declares it accepts. */
 function recognizedFlags() {

@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 
 import { computeInputsHash } from "../packages/harness/src/lib/inputs-hash.mjs";
 import { evaluateReceipt } from "../packages/harness/src/lib/receipt-validate.mjs";
-import { createCmpSteps } from "../packages/harness/src/lib/steps-cmp.mjs";
+import { createCmpSteps } from "../packages/harness/src/lib/profiles/cmp/steps-cmp.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 

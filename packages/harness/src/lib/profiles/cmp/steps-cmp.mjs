@@ -20,22 +20,23 @@
 import fs from "node:fs";
 import path from "node:path";
 import { compareTokenDrift } from "./token-drift.mjs";
-import { evaluateApprovalsGate } from "./approvals.mjs";
-import { E2E_FLOW_DIR, TIERS_SATISFYING, clauseTierCoverage, listFlowFiles, scanCitations, scanSpecClauses, walkFiles } from "./spec-coverage.mjs";
-import { evaluateComponentStoryParity } from "./component-stories.mjs";
+import { evaluateApprovalsGate } from "../../approvals.mjs";
+import { E2E_FLOW_DIR, TIERS_SATISFYING, clauseTierCoverage, listFlowFiles, scanCitations, scanSpecClauses, walkFiles } from "../../spec-coverage.mjs";
+import { evaluateComponentStoryParity } from "../../component-stories.mjs";
 import { evaluateReachability } from "./reachability.mjs";
 import { evaluateE2eCoverage } from "./e2e-coverage.mjs";
-import { memoizeStep } from "./step-cache.mjs";
-import { changedWorkingTreePaths, deriveAffectedFilter } from "./affected-tests.mjs";
+import { memoizeStep } from "../../step-cache.mjs";
+import { changedWorkingTreePaths, deriveAffectedFilter } from "../../affected-tests.mjs";
 import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./device-lease.mjs";
-import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "./arch-doc.mjs";
-import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "./determinism.mjs";
-import { evaluateAuditCadence } from "./audit-cadence.mjs";
-import { androidChecksOutcome, deviceLogIncidents, maestroOutcome, parseMaestroJunit } from "./step-outcomes.mjs";
+import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "../../arch-doc.mjs";
+import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "../../determinism.mjs";
+import { evaluateAuditCadence } from "../../audit-cadence.mjs";
+import { androidChecksOutcome } from "../../step-outcomes.mjs";
+import { deviceLogIncidents, maestroOutcome, parseMaestroJunit } from "./maestro.mjs";
 import { ensureDevice, releaseDevice } from "./device-provider.mjs";
-import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./harness-lock.mjs";
-import { stepDisplayName } from "./lane-runner.mjs";
-import { CMP_LADDER } from "./evidence-level.mjs";
+import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "../../harness-lock.mjs";
+import { stepDisplayName } from "../../lane-runner.mjs";
+import { CMP_LADDER } from "./ladder.mjs";
 
 /**
  * @param {object} ctx

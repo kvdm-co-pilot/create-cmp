@@ -25,10 +25,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 // S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
-// qa/lib/steps-cmp.mjs (the step pack). A structural read of "the lane's
+// qa/lib/profiles/cmp/steps-cmp.mjs (the step pack). A structural read of "the lane's
 // source" must see both, or it pins a file that no longer holds the steps.
 const laneSrc = (dir) =>
-  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/steps-cmp.mjs"), "utf8")}`;
+  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/profiles/cmp/steps-cmp.mjs"), "utf8")}`;
 
 
 import {

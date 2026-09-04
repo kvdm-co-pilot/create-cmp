@@ -62,5 +62,5 @@ test("the cmp profile exists where the loader looks, and is the only place the p
   const src = fs.readFileSync(entry, "utf8");
   assert.match(src, /export const id = "cmp"/);
   assert.match(src, /export const protocol = 1/);
-  assert.match(src, /from "\.\.\/\.\.\/steps-cmp\.mjs"/);
+  assert.match(src, /from "\.\/steps-cmp\.mjs"/);
 });

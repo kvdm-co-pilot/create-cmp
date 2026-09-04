@@ -12,7 +12,7 @@
 // each. A profile that claimed all nine today would be claiming code it does
 // not own yet.
 
-import { createCmpSteps } from "../../steps-cmp.mjs";
+import { createCmpSteps } from "./steps-cmp.mjs";
 
 export const id = "cmp";
 export const protocol = 1;

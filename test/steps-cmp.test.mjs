@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import os from "node:os";
 
-import { createCmpSteps } from "../packages/harness/src/lib/steps-cmp.mjs";
+import { createCmpSteps } from "../packages/harness/src/lib/profiles/cmp/steps-cmp.mjs";
 import { stepDisplayName } from "../packages/harness/src/lib/lane-runner.mjs";
 
 function ctx(overrides = {}) {

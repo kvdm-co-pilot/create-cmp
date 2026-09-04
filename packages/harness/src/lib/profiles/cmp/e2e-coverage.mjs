@@ -19,7 +19,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { evaluateReachability } from "./reachability.mjs";
-import { E2E_FLOW_DIR, scanCitations, scanSpecClauses } from "./spec-coverage.mjs";
+import { E2E_FLOW_DIR, scanCitations, scanSpecClauses } from "../../spec-coverage.mjs";
 
 /**
  * @param {string} root
