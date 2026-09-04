@@ -1,9 +1,9 @@
 {
-  "name": "prooflane-harness",
+  "name": "prooflane-studio-cmp",
   "version": "0.0.1",
-  "description": "The evidence core: profile loader, lane runner, receipts, lock, Stop hook, the walk, and the Rule 0/1/2 instruments. Knows no stack.",
+  "description": "The mobile eyes: preview registry, headless render, live inspector. Providers behind the console's interfaces.",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/kvdm-co-pilot/create-cmp.git", "directory": "packages/aliases/prooflane-harness" },
+  "repository": { "type": "git", "url": "git+https://github.com/kvdm-co-pilot/create-cmp.git", "directory": "packages/aliases/prooflane-studio-cmp" },
   "homepage": "https://github.com/kvdm-co-pilot/create-cmp/blob/main/docs/proposals/PACKAGE-SPLIT.md",
   "keywords": ["prooflane", "verification", "evidence", "receipts", "agents"],
   "type": "module",

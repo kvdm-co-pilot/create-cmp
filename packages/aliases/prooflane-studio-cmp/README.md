@@ -1,10 +1,10 @@
-# `prooflane-harness`
+# `prooflane-studio-cmp`
 
 **Reserved, not released.** Held for the [prooflane](https://www.npmjs.com/package/prooflane)
 harness: a stack-agnostic verify lane that derives *done* from evidence rather than
 taking an agent's word for it.
 
-The evidence core: profile loader, lane runner, receipts, lock, Stop hook, the walk, and the Rule 0/1/2 instruments. Knows no stack.
+The mobile eyes: preview registry, headless render, live inspector. Providers behind the console's interfaces.
 
 Nothing useful installs from here yet. What works today:
 

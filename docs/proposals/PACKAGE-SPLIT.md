@@ -100,26 +100,26 @@ harness new   --profile ktor    a fresh repo. Manifest + profile + the golden tr
 ## 3. The package map
 
 ```
-@prooflane/harness       the core. profile loader, runner, journal, inputs-hash,
+prooflane-harness       the core. profile loader, runner, journal, inputs-hash,
                      receipt, lock, Stop hook, liveness, spec-citation binding,
                      hash-bound approvals, the walk, grill-me, Rule 0/1/2
                      instruments, the console, the neutral MCP server.
                      Knows no stack. THIS IS THE PRODUCT.
 
-@prooflane/cli           the verbs: init | new | attach | doctor | upgrade.
+prooflane-cli           the verbs: init | new | attach | doctor | upgrade.
                      Resolves and installs profiles. Owns no stack knowledge.
 
-@prooflane/profile-cmp   layout, tiers, steps, ladder, plants, artifacts, governable,
+prooflane-profile-cmp   layout, tiers, steps, ladder, plants, artifacts, governable,
                      affected-map, architecture rules — and the CMP golden tree.
 
-@prooflane/studio-cmp    the eyes: preview registry, headless render, live inspector,
+prooflane-studio-cmp    the eyes: preview registry, headless render, live inspector,
                      drift, runtime, data. Providers behind the console's
                      interfaces. OPTIONAL — a Compose repo may want the lane and
                      not the emulator.
 
-@prooflane/profile-ktor  the ktor profile and its golden tree.
+prooflane-profile-ktor  the ktor profile and its golden tree.
 
-@prooflane/receipts      the standalone reader/validator. Exists, published, unchanged.
+prooflane-receipts      the standalone reader/validator. Exists, published, unchanged.
 
 create-cmp-cli       thin shim → cli --profile cmp     (the name we own)
 create-ktor          thin shim → cli --profile ktor
@@ -164,28 +164,33 @@ unclaimed, and that check must happen before we commit.
 
 **Taken: `prooflane`.** It is free; it keeps the noun the codebase already uses everywhere
 (`lane-runner`, "the verify lane", "the lane returns"); it reads correctly in all three
-positions that matter — `npx prooflane init`, `@prooflane/harness`, `prooflane-evidence/1`;
+positions that matter — `npx prooflane init`, `prooflane-harness`, `prooflane-evidence/1`;
 and it describes what the thing does without claiming to be a notary, which is Gatekeeper's
 role.
 
-Claim `prooflane`, the `@prooflane` scope, and `create-ktor` in one pass. **`create-cmp` is
+Claim `prooflane`, the `prooflane` scope, and `create-ktor` in one pass. **`create-cmp` is
 treated as permanently lost and nothing is designed around it** — `cmp` is one scaffold among
 many into the harness, not the product's name.
 
-> **CLAIMED 2026-09-05.** `prooflane@0.0.1` and `create-ktor@0.0.1` are published as honest
-> placeholders (they print what they are, name `create-cmp-cli` as the working tool, and link
-> this document). Both verified live from the registry.
+> **CLAIMED AND SETTLED 2026-09-05 — seven names, all verified live from the registry:**
+> `prooflane`, `create-ktor`, `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`,
+> `prooflane-studio-cmp`, `prooflane-receipts`. Each is an honest placeholder: it prints what
+> it is, says plainly that it is not released, names `create-cmp-cli` as the working tool, and
+> links this document.
 >
-> **The `@prooflane` SCOPE is not claimed and Phase C is blocked on it.** Publishing
-> `@prooflane/harness` failed `E404 PUT` while the same token published two unscoped names in
-> the same second — npm requires an *organization* named `prooflane` for a scope that is not
-> the publisher's username, and `npm org ls prooflane` returns 403. Creating a free org is a
-> one-time web action at npmjs.com and cannot be done from the CLI, so it is Karel's step,
-> like the token itself.
+> **UNSCOPED, because the `prooflane` organisation was not available.** npm requires an
+> organisation for any scope that is not the publisher's username; publishing under
+> `prooflane` failed `E404 PUT` while the same token published two unscoped names in the same
+> second. `prooflane` the *package* — the name a human actually types, `npx prooflane init` —
+> is ours, which is the one that matters.
 >
-> **Fallback if the org is unwanted:** unscoped `prooflane-harness`, `prooflane-cli`,
-> `prooflane-profile-cmp`. Uglier, and it gives up the namespace guarantee a scope provides —
-> anyone can publish `prooflane-anything`. Recommended only if the org is refused.
+> **What that costs, stated rather than glossed:** a scope guarantees the namespace; unscoped
+> names do not. Anyone may publish `prooflane-profile-django` and it will look official. For a
+> verification product that is a supply-chain concern, not a cosmetic one. It is mitigated by
+> claiming every name in §3's map up front — done — and the residual risk is names nobody has
+> thought of yet. The alternative was renaming the product a second time on day two, which
+> costs two governing docs, five published packages, and the credibility of a decision log
+> whose first rule is that settled decisions stay settled.
 
 ---
 
@@ -194,7 +199,7 @@ many into the harness, not the product's name.
 A profile resolves in this order, first hit wins:
 
 1. `qa/lib/profiles/<id>/` — vendored in the repo. **Always preferred.**
-2. `node_modules/@prooflane/profile-<id>/`
+2. `node_modules/prooflane-profile-<id>/`
 3. the registry
 4. a git URL
 
@@ -230,13 +235,13 @@ a language and a falsehood, and the integrity refusal that hid the paths it refu
 | A4 ✅ | Bring the fuelled-api profile in as a **second profile in the suite** (as a conformance fixture — it belongs in neither `template/` nor the shipped profiles). | every seam test and the agnostic lint now run against two stacks |
 | A5 | **Cold re-run:** a fresh agent authors a profile from `harness init` output + README only, forbidden from opening core source. | **This is Stage 0's exit measurement.** |
 
-### Phase B — claim the name
-O1 is decided (`prooflane`, §5). Confirm the `@prooflane` scope is claimable, then claim
-`prooflane`, `@prooflane` and `create-ktor`. Blocks everything below.
+### Phase B — claim the name ✅ *landed 2026-09-05*
+O1 is decided (`prooflane`, §5). Confirm the `prooflane` scope is claimable, then claim
+`prooflane`, `prooflane` and `create-ktor`. Blocks everything below.
 
 ### Phase C — the split
-`@prooflane/harness` (core only) → `profile-cmp` (golden tree moves in) → `studio-cmp` →
-`@prooflane/cli` → `create-cmp-cli` becomes a shim. `studio-cmp` is sequenced LAST inside Phase C
+`prooflane-harness` (core only) → `profile-cmp` (golden tree moves in) → `studio-cmp` →
+`prooflane-cli` → `create-cmp-cli` becomes a shim. `studio-cmp` is sequenced LAST inside Phase C
 but must land **before Stage 0.5 opens** — it is not allowed to slip into the next stage. The
 receipt format rename lands here, because this is the first moment the new name exists. Vendoring becomes a derived, checked copy
 rather than a coincidence.
@@ -279,7 +284,7 @@ two profiles exist in the suite before any boundary is drawn.
 
 **Five packages is more release surface than one.** Real cost, accepted deliberately: the
 alternative is a Ktor team installing a Compose scaffolder, which is the defect this fixes.
-Independent versioning of `@prooflane/harness` is what makes `harness.version` on a receipt mean
+Independent versioning of `prooflane-harness` is what makes `harness.version` on a receipt mean
 something, and that field is load-bearing for Gatekeeper.
 
 **A golden tree per profile is a maintenance burden that grows linearly with stacks.** The §4
@@ -310,8 +315,8 @@ reopening**, never a fresh question.
 | D5 | `laneStepForTestClass` moves to the profile; `compareOutcomes` stays in core taking an attribution function; `determinism.mjs` joins the agnostic lint. |
 | D6 | The profile is the unit of distribution; a scaffolder is a consumer of a profile (§2). |
 | D7 | **One repo, real npm workspaces** — not separate repos. The §4 golden-tree gate is a loop in one repo and a cross-repo CI problem in many. Polyrepo earns its cost only when different people own different packages, and an external profile author is external by definition. |
-| D8 | **The name is `prooflane`** (§5). `create-cmp` is permanently lost and nothing is designed around it; `cmp` becomes one scaffold among many. |
-| D9 | **`profile-cmp` takes the app tree, not `template/qa`.** The vendored harness copy stops being stored and is written by `harness init` from `@prooflane/harness` at stamp time — which retires §1's two-copies-nothing-checks problem as a side effect. |
+| D8 | **The name is `prooflane`, and the packages are UNSCOPED `prooflane-*`** (§5) — the organisation a scope requires was unavailable, and renaming the product a second time on day two costs more than the namespace guarantee is worth. Seven names claimed and verified 2026-09-05. `create-cmp` is permanently lost and nothing is designed around it; `cmp` becomes one scaffold among many. |
+| D9 | **`profile-cmp` takes the app tree, not `template/qa`.** The vendored harness copy stops being stored and is written by `harness init` from `prooflane-harness` at stamp time — which retires §1's two-copies-nothing-checks problem as a side effect. |
 | D10 | **Independent semver per package**, with the profile's `protocol` export carrying compatibility. Lockstep would make `harness.version` a synonym for the CLI's release number, which is the decoration being fixed. |
 | D11 | **`studio-cmp` is a separate package**, sequenced last inside Phase C and landing **before Stage 0.5 opens**. If the provider interface proves premature it folds back into `profile-cmp` without having blocked anything. |
 
