@@ -555,7 +555,7 @@ test("region: a hand-mirrored engine change is ABSORBED, silently", () => {
 
   // And the same when the app reached that content by its own edit path.
   const d2 = decideRegionFile({
-    relPath: "qa/lib/render.mjs",
+    relPath: "qa/lib/profiles/cmp/render.mjs",
     base,
     next,
     theirs: Buffer.from("one\ntwo ENGINE\nthree\n"),
@@ -565,7 +565,7 @@ test("region: a hand-mirrored engine change is ABSORBED, silently", () => {
 
 test("region: a GENUINE local fork is replaced, but preserved as a patch", () => {
   const d = decideRegionFile({
-    relPath: "qa/lib/render.mjs",
+    relPath: "qa/lib/profiles/cmp/render.mjs",
     base: Buffer.from("one\ntwo\nthree\nfour\nfive\n"),
     next: Buffer.from("one\ntwo\nthree\nfour\nfive ENGINE\n"),
     theirs: Buffer.from("one APP\ntwo\nthree\nfour\nfive\n"),
@@ -574,7 +574,7 @@ test("region: a GENUINE local fork is replaced, but preserved as a patch", () =>
   assert.equal(d.write.toString(), "one\ntwo\nthree\nfour\nfive ENGINE\n", "the region always lands on the new engine");
   // Nothing is lost: the app's divergence survives as a reviewable patch that
   // names the real project-relative path, so `git apply` can re-apply it.
-  assert.match(d.patch, /^diff --git a\/qa\/lib\/render\.mjs b\/qa\/lib\/render\.mjs$/m);
+  assert.match(d.patch, /^diff --git a\/qa\/lib\/profiles\/cmp\/render\.mjs b\/qa\/lib\/profiles\/cmp\/render\.mjs$/m);
   assert.match(d.patch, /^\+one APP$/m);
   assert.match(d.patch, /^-one$/m);
 });
@@ -606,7 +606,7 @@ test("region: a lane file the engine dropped is removed, with no orphan case", (
 test("region: decideFile routes lane files to the region table, app files to merge", () => {
   const three = { base: Buffer.from("x\ny\nz\n"), next: Buffer.from("x\ny E\nz\n"), theirs: Buffer.from("x\ny A\nz\n") };
   assert.equal(decideFile({ relPath: "qa/verify.mjs", ...three }).bucket, "region-patched");
-  assert.equal(decideFile({ relPath: "qa/lib/tree.mjs", ...three }).bucket, "region-patched");
+  assert.equal(decideFile({ relPath: "qa/lib/profiles/cmp/tree.mjs", ...three }).bucket, "region-patched");
   // Not the region: app state, app flows, app source.
   assert.equal(decideFile({ relPath: "qa/approvals.json", ...three }).bucket, "conflicted");
   assert.equal(decideFile({ relPath: "qa/e2e/smoke.yaml", ...three }).bucket, "conflicted");

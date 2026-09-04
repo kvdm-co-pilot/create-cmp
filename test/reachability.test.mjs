@@ -16,7 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { evaluateReachability, findEntryComposables } from "../template/qa/lib/reachability.mjs";
+import { evaluateReachability, findEntryComposables } from "../template/qa/lib/profiles/cmp/reachability.mjs";
 import { scaffold } from "../src/scaffold.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -249,7 +249,7 @@ test("shipped template: a fresh scaffold's own home/profile screens are reachabl
   try {
     // Cache-bust via a project-unique module URL (mirrors approvals-gate.test.mjs's loadLib).
     const { evaluateReachability: evaluateReachabilityInProject } = await import(
-      pathToFileURL(path.join(out, "qa/lib/reachability.mjs"))
+      pathToFileURL(path.join(out, "qa/lib/profiles/cmp/reachability.mjs"))
     );
     const r = evaluateReachabilityInProject(out);
     assert.equal(

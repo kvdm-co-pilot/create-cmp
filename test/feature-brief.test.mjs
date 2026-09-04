@@ -21,10 +21,10 @@ import { pathToFileURL } from "node:url";
 import { scaffold } from "../src/scaffold.mjs";
 
 // S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
-// qa/lib/steps-cmp.mjs (the step pack). A structural read of "the lane's
+// qa/lib/profiles/cmp/steps-cmp.mjs (the step pack). A structural read of "the lane's
 // source" must see both, or it pins a file that no longer holds the steps.
 const laneSrc = (dir) =>
-  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/steps-cmp.mjs"), "utf8")}`;
+  `${fs.readFileSync(path.join(dir, "qa/verify.mjs"), "utf8")}\n${fs.readFileSync(path.join(dir, "qa/lib/profiles/cmp/steps-cmp.mjs"), "utf8")}`;
 
 
 function baseConfig(targetDir) {
@@ -403,7 +403,9 @@ test("feature briefs: location opt-in, derived doneness, acceptance, board", asy
     const cli = runApproveExpectFail(root, ["--deliver", "meal"]);
     assert.match(cli.stderr, /unknown artifact "--deliver"/);
     // ...and the lane's coverage scan IS the doneness scan (same module).
-    assert.match(verify, /from "\.\/(?:lib\/)?spec-coverage\.mjs"/);
+    // The pack now lives in profiles/cmp/ and reaches the spine's scan by
+    // "../../"; the point is unchanged — one coverage scan, the lane's.
+    assert.match(verify, /from "(?:\.\/(?:lib\/)?|\.\.\/\.\.\/)spec-coverage\.mjs"/);
   });
 
   fs.rmSync(root, { recursive: true, force: true });

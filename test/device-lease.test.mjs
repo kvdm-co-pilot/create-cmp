@@ -1,4 +1,4 @@
-// The machine-global device lease (template/qa/lib/device-lease.mjs) — the
+// The machine-global device lease (template/qa/lib/profiles/cmp/device-lease.mjs) — the
 // mutual-exclusion primitive keyed by the DEVICE (adb serial), not the project,
 // because the lane marker is per-project while the emulator is machine-global.
 //
@@ -30,7 +30,7 @@ import {
   releaseDeviceLease,
   sanitizeSerial,
   withDeviceLease,
-} from "../template/qa/lib/device-lease.mjs";
+} from "../template/qa/lib/profiles/cmp/device-lease.mjs";
 import {
   MAX_LEASE_AGE_MS as INSPECTOR_MAX_LEASE_AGE_MS,
   readDeviceLease as inspectorReadDeviceLease,
@@ -38,7 +38,7 @@ import {
 } from "../inspector/mcp/src/lib/device-lease.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const TEMPLATE_LIB = path.join(HERE, "..", "template", "qa", "lib", "device-lease.mjs");
+const TEMPLATE_LIB = path.join(HERE, "..", "template", "qa", "lib", "profiles", "cmp", "device-lease.mjs");
 const INSPECTOR_LIB = path.join(HERE, "..", "inspector", "mcp", "src", "lib", "device-lease.mjs");
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "lease-engine-"));
@@ -236,7 +236,7 @@ test("two processes, one device: the second is refused naming the first; killing
 });
 
 // ── Cross-codebase contract parity: the inspector's independent reader ────────
-// template/qa/lib/device-lease.mjs (acquirer, ships in every stamped app) and
+// template/qa/lib/profiles/cmp/device-lease.mjs (acquirer, ships in every stamped app) and
 // inspector/mcp/src/lib/device-lease.mjs (check-only reader, ships in the
 // plugin bundle) cannot import each other. These pins are the drift guard.
 test("contract parity: a lease the template side acquires is exactly what the inspector reader reports", () => {
@@ -259,7 +259,7 @@ test("contract parity: both headers document the shared contract and point at ea
   const templateSrc = fs.readFileSync(TEMPLATE_LIB, "utf8");
   const inspectorSrc = fs.readFileSync(INSPECTOR_LIB, "utf8");
   assert.match(templateSrc, /inspector\/mcp\/src\/lib\/device-lease\.mjs/, "template header names the inspector implementation");
-  assert.match(inspectorSrc, /template\/qa\/lib\/device-lease\.mjs/, "inspector header names the template implementation");
+  assert.match(inspectorSrc, /template\/qa\/lib\/profiles\/cmp\/device-lease\.mjs/, "inspector header names the template implementation");
   for (const src of [templateSrc, inspectorSrc]) {
     assert.match(src, /create-cmp\/device-leases/, "same on-disk location");
     assert.match(src, /A-Za-z0-9._-/, "same sanitization rule");

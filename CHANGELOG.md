@@ -16,6 +16,14 @@ All notable changes to this project are documented here. The format is based on
   versioned on their own. Additive: the shipped schema declares it optional, and a receipt
   that predates it validates exactly as before. Stage 0 PR 1 of
   `docs/proposals/AGNOSTIC-HARNESS-ARCHITECTURE.md` (§8.1).
+- **The Compose glue moves into its profile.** `steps-cmp`, `render`, `token-drift`, `tree`,
+  `reachability`, `device-lease`, `device-provider`, `e2e-coverage` now live at
+  `qa/lib/profiles/cmp/`; the Maestro per-flow verdict and the device-log sweep leave
+  `step-outcomes.mjs` for `profiles/cmp/maestro.mjs`; `CMP_LADDER` leaves `evidence-level.mjs`
+  for `profiles/cmp/ladder.mjs`, and the spine's rung derivation no longer defaults to the
+  Compose ladder — a pack that declares none earns no rung. `qa/lib/` is now the spine, plus
+  `a11y.mjs` and `component-stories.mjs`, which follow in a later PR. The shipped
+  `CLAUDE.md` names `qa/lib/profiles/**` and the manifest as machine-owned. Stage 0 PR 3.
 - **The lane loads its stack profile from the manifest — never by name.** `qa/verify.mjs`
   no longer imports the Compose step pack; it resolves `qa/harness-manifest.json`
   (`qa/lib/harness-manifest.mjs`), loads `qa/lib/profiles/<id>/index.mjs`

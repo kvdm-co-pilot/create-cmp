@@ -3,13 +3,14 @@
 // construction. A pack declares its ladder or earns no rung.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evidenceLevel, CMP_LADDER } from "../packages/harness/src/lib/evidence-level.mjs";
+import { evidenceLevel } from "../packages/harness/src/lib/evidence-level.mjs";
+import { CMP_LADDER } from "../packages/harness/src/lib/profiles/cmp/ladder.mjs";
 
 const pass = (...names) => names.map((name) => ({ name, verdict: "PASS", durationMs: 1 }));
 const CMP_L1 = pass(...CMP_LADDER.scaffoldCore, ...CMP_LADDER.l1Required);
 
 test("no ladder argument → the Compose ladder, unchanged for every existing caller", () => {
-  const level = evidenceLevel(CMP_L1, "local", { mode: "full" });
+  const level = evidenceLevel(CMP_L1, "local", { mode: "full", ladder: CMP_LADDER });
   assert.equal(level.rung, "L1");
   assert.equal(level.name, "desktop");
 });
@@ -19,7 +20,7 @@ test("ladder: null → no rung at all: a pack that declares none is not graded b
   const backend = pass("harnessIntegrity", "compositeBuild", "detekt", "konsist", "gitleaks");
   assert.equal(evidenceLevel(backend, "local", { mode: "full", ladder: null }), null);
   // PLANTED: the same backend run under the Compose ladder is the wrong grade this closes.
-  assert.equal(evidenceLevel(backend, "local", { mode: "full" }), null, "no build/unitTests → not even L0 under the Compose ladder");
+  assert.equal(evidenceLevel(backend, "local", { mode: "full", ladder: CMP_LADDER }), null, "no build/unitTests → not even L0 under the Compose ladder");
 });
 
 test("a pack's own ladder grades its own steps, with its own rung names", () => {
@@ -38,4 +39,10 @@ test("a pack's own ladder grades its own steps, with its own rung names", () => 
   assert.deepEqual([l3.rung, l3.name], ["L3", "load-proven"]);
   const failed = evidenceLevel([...pass("compositeBuild", "unitTests"), { name: "detekt", verdict: "FAIL", durationMs: 1 }], "local", { mode: "full", ladder });
   assert.equal(failed, null, "a failed lane has no rung under any ladder");
+});
+
+test("no ladder means no rung — the spine has no Compose default to lend (Stage 0 PR 3)", () => {
+  assert.equal(evidenceLevel(CMP_L1, "local", { mode: "full" }), null);
+  assert.equal(evidenceLevel(CMP_L1, "local", { mode: "full", ladder: null }), null);
+  assert.equal(evidenceLevel(CMP_L1, "local", { mode: "full", ladder: CMP_LADDER }).rung, "L1");
 });

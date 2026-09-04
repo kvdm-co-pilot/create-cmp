@@ -35,7 +35,7 @@ import { computeInputsHash, undeclaredTopLevel } from "./lib/inputs-hash.mjs";
 import { evidenceLevel } from "./lib/evidence-level.mjs";
 import { updateReadmeBadge, README_REL_PATH } from "./lib/evidence-badge.mjs";
 import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
-import { StepTimeout, androidChecksOutcome, spawnTimedOut } from "./lib/step-outcomes.mjs";
+import { StepTimeout, spawnTimedOut } from "./lib/step-outcomes.mjs";
 import { expectedDurations, runLane } from "./lib/lane-runner.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfile } from "./lib/profile-loader.mjs";

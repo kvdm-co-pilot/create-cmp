@@ -76,9 +76,9 @@ function cliCommands() {
  */
 function verifyProfiles() {
   // S8b: the profiles live in the step pack; the spine (verify.mjs) composes it.
-  const src = read("template/qa/lib/steps-cmp.mjs");
+  const src = read("template/qa/lib/profiles/cmp/steps-cmp.mjs");
   const block = src.match(/const stepsForProfile = \{[\s\S]*?\n\s*\};/);
-  if (!block) throw new Error("ground-truth: could not locate stepsForProfile in template/qa/lib/steps-cmp.mjs");
+  if (!block) throw new Error("ground-truth: could not locate stepsForProfile in template/qa/lib/profiles/cmp/steps-cmp.mjs");
   const stepNames = (text) =>
     text
       .split("\n")

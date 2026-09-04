@@ -2,7 +2,7 @@
 // the decision tree, with no SDK: `sh` and `spawnImpl` are fakes.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ensureDevice, releaseDevice, chooseAvd, parseAdbDevices, emulatorBinary, HEADLESS_ARGS, PREFERRED_AVD } from "../packages/harness/src/lib/device-provider.mjs";
+import { ensureDevice, releaseDevice, chooseAvd, parseAdbDevices, emulatorBinary, HEADLESS_ARGS, PREFERRED_AVD } from "../packages/harness/src/lib/profiles/cmp/device-provider.mjs";
 
 const ADB_NONE = "List of devices attached\n\n";
 const ADB_ONE = "List of devices attached\nemulator-5554\tdevice\n\n";
