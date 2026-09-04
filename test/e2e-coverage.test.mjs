@@ -124,7 +124,10 @@ test("a screens:true brief whose clauses are all cited from the JVM is NOT done,
     assert.equal(jvmOnly.e2eCovered, 0);
     assert.equal(jvmOnly.needsJourney, true);
     assert.equal(jvmOnly.provenDone, false);
-    assert.match(jvmOnly.doneReason, /1\/1 clauses cited, but none from a qa\/e2e flow — a UI feature is proven on a device: write the journey in qa\/e2e\/meal\.yaml/);
+    // Stage 0 PR 6c: the sentence names the profile's own journey tier and a
+    // file this project could actually have — not a Maestro path on every stack.
+    assert.match(jvmOnly.doneReason, /1\/1 clauses cited, but none from the e2e tier/);
+    assert.match(jvmOnly.doneReason, /write it in qa\/e2e\/meal\.yaml and cite the clause it proves/);
 
     w("qa/e2e/meal.yaml", "appId: x\n---\n# SPEC: MEAL-01\n- launchApp\n");
     const withFlow = deriveFeatureStatus(root, brief, { receipt, model: MODEL });

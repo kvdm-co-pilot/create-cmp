@@ -479,10 +479,12 @@ try {
     };
     write(RECEIPT_REL, JSON.stringify(planted, null, 2));
     const hook = hookRefuses();
-    if (!hook.refused || !/device tier did not run/.test(hook.stderr)) {
-      die(`the Stop hook did not refuse a receipt whose device tier was skipped for an environmental reason:\n${hook.stderr.slice(-400)}`);
+    // Stage 0 PR 6c: the refusal is stack-free — ANY step that skipped for an
+    // environmental reason blocks done, whatever it is called.
+    if (!hook.refused || !/a tier did not run/.test(hook.stderr)) {
+      die(`the Stop hook did not refuse a receipt whose tier was skipped for an environmental reason:\n${hook.stderr.slice(-400)}`);
     }
-    out(`  Stop hook            refuses a skipped device tier ✓`);
+    out(`  Stop hook            refuses a skipped tier ✓`);
   }
 
   // 5. Everything reverted, and it passes again — the plants were the only cause.

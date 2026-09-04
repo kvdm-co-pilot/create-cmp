@@ -862,9 +862,16 @@ Smallest blast radius first, so each step is a small PR with the fleet check gre
      (`walkthrough.mjs`, `preview-gallery.mjs`) are core-located Compose tools, so moving
      it alone would create the violation it is meant to remove. That trio belongs with the
      provider boundary in Stage 0.5.
-   - **6c** `arch-doc` sections from data, `feature-brief`'s journey wording,
-     `affected-tests`' blast radius, `inputs-hash`' default surface,
-     `receipt-check`'s device tier — all from the profile.
+   - **6c ✅ the two messages the core asserted straight to the operator.**
+     `receipt-check`'s did-not-run rule is `skipKind`-based (stack-free) with the legacy
+     name list read from the profile's ladder; `feature-brief`'s journey sentence names
+     the profile's flow directory and journey tier. The profile now exports `ladder` at
+     the top level (§4.2 #6).
+   - **6d** `affected-tests`' blast radius and test-filter mapping from the profile.
+   - **6e** `arch-doc`'s generated sections from `profile.architecture` — the largest
+     remaining module, and the one whose content genuinely IS Compose (expect/actual
+     tables, source sets, layer inventory). Candidate for Stage 0.5 as a provider
+     rather than a parameterisation.
 7. `framework-check`: plants from the profile. Fleet green; framework-check green in
    both the Compose scratch app and the blueprint.
 

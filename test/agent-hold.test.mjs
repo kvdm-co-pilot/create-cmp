@@ -162,10 +162,10 @@ test("a hold NEVER explains a red receipt, however the tree moved", () => {
   assert.equal(holdExplains({ valid: false, reason: "the committed receipt is a FAIL (attesting profile: local)" }, { verdict: "FAIL" }), false);
 });
 
-test("a hold NEVER explains a forgery, a skipped device tier, or an inner-loop receipt", () => {
+test("a hold NEVER explains a forgery, a tier that did not run, or an inner-loop receipt", () => {
   const cases = [
     ["vouching", "harnessIntegrity FAILed — the lane cannot vouch for itself (attesting profile: local)"],
-    ["device tier", "the device tier did not run — e2eSmoke: no Android device"],
+    ["a tier that did not run", "a tier did not run — e2eSmoke: no Android device"],
     ["--fast", "the last verify run was --fast (inner-loop only); run the full lane"],
     ["smoke", "the last verify run was the smoke profile (the framework check — no build, no tests)"],
     ["nightly", "the last verify run was the nightly stage (it proves the harness, not this change)"],

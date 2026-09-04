@@ -24,6 +24,15 @@ export { layout, tiers } from "./declarations.mjs";
 /** What a human signs, in definition order; and whether this tree may record signatures at all. */
 export { artifacts, governable } from "./artifacts.mjs";
 
+/**
+ * The evidence ladder: which of THIS profile's steps earn which rung, and what
+ * the rungs are called. Exported at the top level (not only on the pack's
+ * return) so a reader that must not start a lane — the Stop hook deciding
+ * whether a tier that could have run did — can ask without instantiating
+ * anything. AGNOSTIC-HARNESS-ARCHITECTURE.md §4.2 #6.
+ */
+export { CMP_LADDER as ladder } from "./ladder.mjs";
+
 /** The step pack — today's createCmpSteps, unchanged. */
 export function steps(ctx) {
   return createCmpSteps(ctx);
