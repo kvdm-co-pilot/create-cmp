@@ -1,0 +1,33 @@
+{
+  "name": "create-ktor",
+  "version": "0.0.1",
+  "description": "Scaffolder for a Ktor service with the prooflane verify lane. Name reserved; not yet released.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kvdm-co-pilot/create-cmp.git",
+    "directory": "packages/aliases/create-ktor"
+  },
+  "homepage": "https://github.com/kvdm-co-pilot/create-cmp/blob/main/docs/proposals/PACKAGE-SPLIT.md",
+  "keywords": [
+    "verification",
+    "evidence",
+    "receipts",
+    "ci",
+    "agents"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "README.md",
+    "bin",
+    "index.mjs"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "bin": {
+    "create-ktor": "bin/cli.mjs"
+  }
+}

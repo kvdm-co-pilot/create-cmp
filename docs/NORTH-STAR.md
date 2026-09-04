@@ -404,7 +404,7 @@ proof: suite 1402/1402, framework-check 5.2 s, fleet L2 PASS · de-fork 11→9 �
 
 | # | Decision | Blocks | Owner |
 |---|---|---|---|
-| ~~O1~~ | ~~Name the harness and its console.~~ **CLOSED 2026-09-04: `prooflane`.** Claim `prooflane`, the `@prooflane` scope and `create-ktor` in one pass; `create-cmp` on npm belongs to someone else and is treated as permanently lost. *Owed:* confirm the scope is claimable before the first package publishes. | — | — |
+| ~~O1~~ | ~~Name the harness and its console.~~ **CLOSED 2026-09-04: `prooflane`.** Claim `prooflane`, the `@prooflane` scope and `create-ktor` in one pass; `create-cmp` on npm belongs to someone else and is treated as permanently lost. **`prooflane@0.0.1` and `create-ktor@0.0.1` claimed 2026-09-05.** The `@prooflane` *scope* still needs a free npm organization created at npmjs.com — a web action the CLI cannot perform — and Phase C of PACKAGE-SPLIT is blocked until it exists. | — | — |
 | O2 | **The Stage 1 ADR** — what a pinned (fetched) receipt means versus a vendored one; whether Gatekeeper accepts both and how it shows the difference. | Stage 1 | architect drafts, Karel signs |
 | ~~O3~~ | ~~The `ktor-backend` profile.~~ **CLOSED 2026-09-04** by the fuelled-api adoption report: a backend profile is ~230 lines and needs no core change. It comes into this repo as the suite's second profile (PACKAGE-SPLIT A4). | — | — |
 | O4 | **The receipt-format ADR** — `cmp-evidence/1` is renamed to the `prooflane` name with the reader accepting both (PACKAGE-SPLIT D3). What a receipt in the old format means once the new one exists, and what Gatekeeper does with each. | the rename, in Phase C | architect drafts, Karel signs |
