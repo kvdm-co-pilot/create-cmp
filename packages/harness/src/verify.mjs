@@ -37,7 +37,8 @@ import { updateReadmeBadge, README_REL_PATH } from "./lib/evidence-badge.mjs";
 import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
 import { StepTimeout, androidChecksOutcome, spawnTimedOut } from "./lib/step-outcomes.mjs";
 import { expectedDurations, runLane } from "./lib/lane-runner.mjs";
-import { createCmpSteps } from "./lib/steps-cmp.mjs";
+import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
+import { loadProfile } from "./lib/profile-loader.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -316,11 +317,25 @@ function tryGitLines(cmd) {
   }
 }
 
-// ── The step pack (qa/lib/steps-cmp.mjs, evidence-economics S8b) ─────────────
-// Every step this lane runs, behind one factory that borrows the spine's
-// helpers explicitly. Swap the pack and the same spine verifies a different
-// kind of project.
-const pack = createCmpSteps({ ROOT, HERE, GRADLEW, RERUN, fast, determinism, profile, mode, sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS });
+// ── The stack profile (qa/harness-manifest.json → qa/lib/profiles/<id>/) ─────
+// Every step this lane runs comes from the profile the MANIFEST names, loaded
+// by id — never imported by name. This runner does not know what Compose is;
+// it knows the shape of a profile (qa/lib/profile-loader.mjs) and asks the
+// project which one it uses. No manifest, no profile, no lane: there is no
+// default, and each refusal names the command that fixes it. Refused before a
+// single step runs, on the same exit code as an unknown argument — the lane
+// was asked to do something it cannot honestly do.
+const manifest = resolveHarnessManifest(ROOT);
+if (!manifest.ok) {
+  console.error(manifest.reason);
+  process.exit(2);
+}
+const loaded = await loadProfile(ROOT, manifest.manifest.profile);
+if (!loaded.ok) {
+  console.error(loaded.reason);
+  process.exit(2);
+}
+const pack = loaded.profile.steps({ ROOT, HERE, GRADLEW, RERUN, fast, determinism, profile, mode, sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS });
 const { stepsForProfile, DEVICE_STEPS, FAST_EXCLUDED_NAMES, STEP_FN_BY_NAME } = pack;
 
 

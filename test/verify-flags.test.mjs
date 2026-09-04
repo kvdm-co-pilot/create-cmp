@@ -110,7 +110,11 @@ test("nightly: a profile that forces the determinism probe and names its stage o
 test("S8b: verify.mjs defines no step; the pack defines them all and is composed with an explicit ctx", () => {
   assert.doesNotMatch(verifySrc, /^function step[A-Z]/m, "no step body lives in the spine");
   assert.doesNotMatch(verifySrc, /^const step[A-Z]\w* = /m);
-  assert.match(verifySrc, /const pack = createCmpSteps\(\{ ROOT, HERE, GRADLEW, RERUN, fast, determinism, profile, mode, sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS \}\)/, "the borrowing is visible in one line");
+  // Stage 0 PR 2: the pack is no longer named — it is whatever profile the
+  // manifest declares, loaded by id. The borrowing is still one visible line;
+  // what changed is that the spine no longer knows the pack's name.
+  assert.match(verifySrc, /const pack = loaded\.profile\.steps\(\{ ROOT, HERE, GRADLEW, RERUN, fast, determinism, profile, mode, sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS \}\)/, "the borrowing is visible in one line");
+  assert.doesNotMatch(verifySrc, /createCmpSteps/, "the spine names no profile");
   assert.match(verifySrc, /onFinally: \(\) => pack\.releaseLease\(\)/, "the device lease is the pack's; the spine only asks it to let go");
   assert.match(verifySrc, /probe = pack\.stepDeterminism\(\)/, "the bare probe goes through the pack too");
   for (const name of ["stepHarnessIntegrity", "stepSpecCoverage", "stepBuild", "stepReleaseBuild", "stepUnitTests", "stepTokenDrift", "stepE2eSmoke", "stepAndroidChecks", "stepReleaseSmoke", "stepDeterminism", "stepAuditCadence"]) {

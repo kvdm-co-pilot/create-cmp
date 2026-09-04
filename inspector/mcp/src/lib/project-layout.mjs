@@ -41,7 +41,14 @@ export const DEFAULT_LAYOUT = Object.freeze({
 
 const PATH_FIELDS = ["receipt", "architectureDoc", "specs", "approvals"];
 const LIST_FIELDS = ["citationRoots", "packs"];
-const KNOWN_FIELDS = new Set([...PATH_FIELDS, ...LIST_FIELDS]);
+// `schema` and `profile` arrived with harness-manifest/2 (the lane's own
+// reader, qa/lib/harness-manifest.mjs): every stamped app now ships a manifest
+// naming its stack profile, and a reader that refused those two keys would
+// blind the console on every app at once. Validated to the same contract the
+// lane applies; the lane, not the console, is what REQUIRES `profile`.
+const META_FIELDS = ["schema", "profile"];
+const KNOWN_FIELDS = new Set([...META_FIELDS, ...PATH_FIELDS, ...LIST_FIELDS]);
+const PROFILE_ID_RE = /^[a-z][a-z0-9-]*$/;
 
 function pathProblem(field, value) {
   if (typeof value !== "string" || value.trim() === "") return `${field} must be a non-empty string`;
@@ -63,6 +70,16 @@ export function manifestProblems(parsed) {
   const problems = [];
   for (const key of Object.keys(parsed)) {
     if (!KNOWN_FIELDS.has(key)) problems.push(`unknown field "${key}" (known: ${[...KNOWN_FIELDS].join(", ")})`);
+  }
+  if ("schema" in parsed && (typeof parsed.schema !== "string" || !parsed.schema.startsWith("harness-manifest/"))) {
+    problems.push(`schema must be a string of the form "harness-manifest/<n>" (got ${JSON.stringify(parsed.schema)})`);
+  }
+  if ("profile" in parsed) {
+    const p = parsed.profile;
+    if (!p || typeof p !== "object" || Array.isArray(p)) problems.push("profile must be an object { id, version? }");
+    else if (typeof p.id !== "string" || !PROFILE_ID_RE.test(p.id)) {
+      problems.push(`profile.id must match ${PROFILE_ID_RE} (got ${JSON.stringify(p.id)})`);
+    }
   }
   for (const field of PATH_FIELDS) {
     if (!(field in parsed)) continue;

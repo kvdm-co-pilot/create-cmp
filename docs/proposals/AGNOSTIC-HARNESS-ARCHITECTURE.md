@@ -305,8 +305,16 @@ name. Refusal semantics:
     it. This is M0b of [attach-mode.md](../features/attach-mode.md), promoted from
     staged to Stage 0 (§11).
 
-The layout block is a *project* override of the profile's defaults, never the other way
+The layout fields are a *project* override of the profile's defaults, never the other way
 round.
+
+> **As built (PR 2):** the manifest is **flat** — the layout fields sit beside `schema` and
+> `profile`, not under a nested `layout` key. The console's reader validates field by field
+> and refuses unknown keys, and a stamped app must satisfy both readers with one file until
+> Stage 0.5 unifies them. The nested form above is the target shape at schema/3.
+> Stage 0 PR 2 also promoted the manifest interview into `attach`; a stamped app needs no
+> derivation at all — the manifest ships in the template and flows to upgraded apps as a
+> region file, which is the derivation.
 
 ### 4.2 The nine declarations
 

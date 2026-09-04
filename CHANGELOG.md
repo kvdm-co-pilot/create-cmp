@@ -16,6 +16,18 @@ All notable changes to this project are documented here. The format is based on
   versioned on their own. Additive: the shipped schema declares it optional, and a receipt
   that predates it validates exactly as before. Stage 0 PR 1 of
   `docs/proposals/AGNOSTIC-HARNESS-ARCHITECTURE.md` (§8.1).
+- **The lane loads its stack profile from the manifest — never by name.** `qa/verify.mjs`
+  no longer imports the Compose step pack; it resolves `qa/harness-manifest.json`
+  (`qa/lib/harness-manifest.mjs`), loads `qa/lib/profiles/<id>/index.mjs`
+  (`qa/lib/profile-loader.mjs`), and asks the profile for its steps. The first profile,
+  `cmp`, only re-exports what the pack already returns; the other declarations move in the
+  PRs that follow. **There is no default profile** (decision 3): an absent manifest is refused
+  naming the command that writes one — `create-cmp upgrade --harness` for a stamped app,
+  `create-cmp attach` for a foreign repo — and a malformed one is refused naming every
+  problem. Every stamped app now ships a manifest and the profile, both inside the lock
+  (`qa/lib/profiles/**` joins the region by a named rule, like `qa/test/**`). A test pins the
+  rule itself: no core module may import `steps-cmp.mjs`. Stage 0 PR 2 of
+  `docs/proposals/AGNOSTIC-HARNESS-ARCHITECTURE.md` (§4.1, §5.3, §11.3).
 - **`docs/proposals/AGNOSTIC-HARNESS-ARCHITECTURE.md`** — the stack-agnostic harness:
   four layers measured, the seam the blueprint's fork drew (five spine files byte-identical,
   six rewritten), the Stack Profile's nine declarations with the `cmp` profile written out
