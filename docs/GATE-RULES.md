@@ -56,11 +56,20 @@ lane machinery (the runner, the marker, the receipt, the hook), asserting both
 verdicts and the wall time, bounded in **seconds**.
 
 ```bash
-node scripts/framework-check.mjs        # bound 10 s per direction; --bound-ms to change
+node qa/framework-check.mjs             # in YOUR app — bound 10 s per direction
+node scripts/framework-check.mjs        # in the create-cmp repo — proves the engine and the shipped twin
 ```
 
-It stamps a scratch app, runs `--profile smoke` (every pure-Node gate, no
-Gradle) and asserts PASS; then plants, one at a time, every way a test can be
+**Which one you want is almost always the first.** `qa/framework-check.mjs`
+ships in every scaffold and runs against the tree you are standing in: it
+derives which plants your project can support, reports each one it *cannot*
+make and why, and restores every file it touched — including the receipt and
+the README badge, so a smoke run cannot overwrite a real L1/L2 receipt with one
+that proves nothing. It refuses to start if a file it plants into has
+uncommitted changes. Measured on a fresh scaffold: **7 plants, 1.9 s.**
+
+The engine script stamps a scratch app, runs `--profile smoke` (every pure-Node
+gate, no Gradle) and asserts PASS; then plants, one at a time, every way a test can be
 skipped or faked — an orphaned citation, a `SPEC:` tag on a class with no test
 under it, a device-only clause cited only from the JVM, a feature whose flow
 stops citing its clause, a citation in a nested flow the lane never runs, one
@@ -70,8 +79,11 @@ the forgery (verdict flipped to PASS over a failed `harnessIntegrity` row), and
 a receipt whose device tier was skipped for an environmental reason; reverts
 everything and asserts PASS again. A direction that does not
 return inside the bound is killed and reported as a hang — the bound is the
-assertion. Measured on this tree: 947 ms for all four legs. For a greenfield
-repo it is the first thing built, before the first real gate.
+assertion. Finally it runs the shipped `qa/framework-check.mjs` inside that
+same scratch app and asserts the tree is byte-identical afterwards — the tool
+we hand adopters is proven on the tree as shipped, not merely shipped.
+Measured on this tree: 5.2 s for all six legs. For a greenfield repo it is the
+first thing built, before the first real gate.
 
 ---
 
@@ -84,6 +96,31 @@ only ever passed is an unread instrument. The runtime you measured decides its
 stage — change, merge, or nightly.**
 
 Four steps, seconds each.
+
+### Where the plant goes — the instrument, not the ceremony
+
+**Add the plant to `qa/framework-check.mjs` and run that.** Rule 1 states a
+PROPERTY that must hold — this gate fails, by name, on its own violation — not a
+procedure you perform by hand. The distinction is the whole of this section,
+because the procedural reading is the natural one for anyone writing an
+instruction, and it is expensive:
+
+> payment-blueprint read Rule 1 as a sequence and briefed a wave to prove each
+> new gate by hand: plant the defect, run `./gradlew`, confirm red by name,
+> revert, build again. On a composite build that is 30–60 s per cycle. Dozens of
+> cycles is ~38 minutes with nothing committed — and the instruction *reads* as
+> uncompromising, so nobody costed it. It had already violated this rule's own
+> "seconds each" on the first cycle. Third occurrence of the class; the first
+> two are the episodes below.
+
+A plant that lives in the instrument is run by everyone, forever, in
+milliseconds. A plant performed by hand is run once, by one person, and is gone
+the moment they close the terminal — you paid the full cost of a calibration and
+kept none of it. **If a gate is worth calibrating, its plant is worth keeping.**
+
+The instrument reports its own cost for the same reason: `--budget-ms` (default
+5 s per cycle) turns "seconds each" from prose into a line in the output. Prose
+does not refuse.
 
 ### Why: a broken gate does not fail, it reports confidently and wrong
 

@@ -104,7 +104,7 @@ Profiles:
   smoke     the smallest end-to-end lane: every pure-Node gate through the real
             runner, receipt and journal — no Gradle, no device. Seconds. Proves the
             FRAMEWORK returns, both ways; never the change (its receipt is refused
-            as done-evidence). Driven by scripts/framework-check.mjs.
+            as done-evidence). Driven by qa/framework-check.mjs.
   scaffold  spec coverage + build + unit tests (what \`create-cmp --verify\`
             proves at stamp time)
   local     everything; device-dependent steps SKIP when no device is

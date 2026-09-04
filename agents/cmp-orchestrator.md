@@ -87,6 +87,57 @@ as much as at the agent level:
   stop and re-sequence: cheap deterministic evidence first, from every agent, in parallel;
   device evidence once, last, alone.
 
+## Standing to refuse an expensive instruction
+You already escalate before changing a **number** — a threshold moved without a measured
+ceiling. You have the same standing on **mechanism cost**, and you are expected to use it:
+
+> **A mandated procedure is a threshold.** It is a per-instance cost multiplied by every
+> instance it touches. An instruction that specifies HOW to prove something — rather than
+> WHAT must be true — gets costed before it is executed: instances x seconds-per-instance.
+> If that product exceeds the stage budget (change ~90 s, merge minutes), say so BEFORE
+> starting, name the cheaper instrument if one exists, and proceed only on a confirmed
+> answer.
+
+This exists because of a measured failure. A brief mandated proving each new gate by hand —
+plant, `./gradlew`, confirm red, revert, build again — at 30-60 s per cycle. The executing
+agent followed it exactly, which was correct: it had standing to question numbers and none
+to question mechanism, so ~38 minutes went into reproducing what `qa/framework-check.mjs`
+does in milliseconds. Nobody in the loop was wrong under the rules as written. The rules
+were missing this paragraph.
+
+Two things make raising it cheap, so raise it early:
+- **Costing is one line of arithmetic**, not a research task. If you cannot estimate it,
+  that itself is the finding.
+- **You are not overruling the brief.** You are reporting a number the author did not have.
+  A signed brief still wins; it just wins with its cost visible.
+
+Before briefing any mechanism, answer once, in the brief: **what in this repo already does
+this, and why is it insufficient?** "Nothing" is a legitimate answer. Not having looked is
+not — and `grep` is cheaper than every alternative on this page.
+
+## Progress must be visible while it happens
+A silent agent is indistinguishable from a stalled one, and from an agent grinding on
+something expensive. Both failures above were invisible *while they were happening* and
+obvious afterwards. So:
+- **Post a line when each subagent starts and finishes** — what it was asked for, and the
+  verdict, not a summary of its reasoning.
+- **A subagent past ~5 minutes with nothing reported is a status you owe upward**, even if
+  the status is "still running, no output yet." Do not wait for completion to say so.
+- **Never report progress you have not verified against the tree.** A hollow "done" reads
+  exactly like a real one; `git status` is the difference.
+- **Claim the tree while you hold it**, so "is it working or wedged?" is a file read rather
+  than filesystem archaeology:
+  ```bash
+  node qa/plan.mjs --hold "adopting the ports" --as orchestrator   # starting
+  node qa/plan.mjs --beat "compiling module 3"                     # every few minutes
+  node qa/plan.mjs --release                                       # done, or handing back
+  ```
+  A heartbeat older than five minutes reads as a crashed writer; a hold older than the
+  ceiling reads as a wedge and the alarm comes back. This gates nothing and locks nothing —
+  it changes what the Stop hook ADVISES, from "run the lane" to "wait for it", which is the
+  correct advice at a tree that is mid-edit and would not compile. It never lifts a refusal,
+  and it never explains a red receipt.
+
 ## RE-DELEGATE, DON'T ABSORB
 When a subagent returns a **hollow / no-op report** — a plan with no file edits, "I dispatched a
 background agent", large token spend with an unchanged `git status` — do NOT pick up the
@@ -107,5 +158,7 @@ genuinely needs all prior results together.
 ## Report
 Lead with the gate verdict (lane PASS/FAIL + receipt, engine test count, any negative proofs
 run). Then: what each subagent did, what you verified independently vs. took on trust, any
-scope calls you made, and the next lane with its brief. Flag anything Karel-facing for a
+scope calls you made, and the next lane with its brief. **Include proof wall-clock as its own
+line** ("proofs: 6 min / 41 total") — grind is only visible as a ratio, and the lane's journal
+cannot see it because hand-run cycles never reach the journal. Flag anything Karel-facing for a
 decision rather than deciding silently.

@@ -6,6 +6,99 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-04
+
+The Rule 0 instrument now ships. Four files in every generated project pointed adopters at
+`scripts/framework-check.mjs` — a path that exists only inside the create-cmp repo. The tool it
+named has never been in an adopter's tree, so the fast way to calibrate a gate was advertised
+and withheld, and the expensive way was the only one available.
+
+### Added
+
+- **`qa/framework-check.mjs` — Rule 0, in your own tree.** Proves the lane returns a fast
+  deterministic PASS and FAIL through the real machinery: runner, receipt, Stop hook. No Gradle,
+  no device, no network. Measured on a fresh scaffold: **7 plants, 1.9 s**.
+  - Plants are **derived from the tree**, not hardcoded — a project with no specs, no flows or
+    no Kotlin tests still gets the region plants, and every plant it cannot make is reported
+    *with its reason*. It refuses rather than printing PASS over an empty plant list.
+  - **Restores everything it touched**, including the receipt and the README badge — a smoke
+    receipt is refused as done-evidence, so leaving one in place would overwrite a real L1/L2
+    receipt with one that proves nothing. Empty directories it created are removed too.
+  - **Refuses to start** when a file it plants into has uncommitted changes.
+  - `--budget-ms` (default 5 s/cycle) reports any calibration cycle slower than Rule 1's stated
+    "seconds each" — the bound was prose, and prose does not refuse.
+- **`qa/lib/framework-check.mjs`** — the plant selection and run assessment as pure functions,
+  unit-tested without a scaffold (27 new tests; suite 1306 → 1333).
+- **`scripts/framework-check.mjs` proves the shipped twin.** A sixth leg runs
+  `qa/framework-check.mjs` inside the scratch app it already stamps and asserts the tree is
+  byte-identical afterwards — the tool we hand adopters is proven on the tree as shipped, not
+  merely shipped. (Its first version compared `git status` in a directory that is not a repo and
+  therefore compared nothing; it hashes the tree now, build output excluded.)
+
+### Added
+
+- **`qa/lib/agent-hold.mjs` + `qa/plan.mjs --hold/--beat/--release` — liveness for a working
+  agent.** Two failures reported from payment-blueprint on 2026-09-04 were the same missing
+  fact. (a) There was no cheap way to answer "is the agent working or wedged?", so the question
+  was answered by filesystem archaeology — twice with broken instruments (a `find` that excluded
+  `build/`, the only directory a proof run writes to; then a `find -newermt` that reported zero
+  writes in 45 minutes while `ls -lT` showed one at 10) — and a healthy agent was killed
+  mid-proof. (b) The Stop hook fired ~15 times in one evening while the correct action every
+  time was to wait, because it cannot tell a receipt stale from laziness from one stale because
+  a subagent is mid-commit on a half-adopted port.
+  - **A hold changes the ADVICE, never the verdict.** The hook still refuses — a file an agent
+    writes about itself must never be able to end a turn. It follows the precedent already set
+    for a lane in flight: same refusal, different instruction.
+  - **It explains only the two refusals a working agent legitimately causes** — no receipt yet,
+    and a tree that moved under a *PASSing* receipt. A FAIL, a forgery, a skipped device tier or
+    an unreadable surface are never explained by a hold, because there the hold is not the cause
+    and offering it would send the reader to wait on an agent when a test is red.
+  - Heartbeat older than 5 min reads as a crashed writer; a hold older than the 45 min ceiling
+    reads as a wedge and the alarm returns — a heartbeat proves a process is alive, never that
+    it is progressing.
+  - Ephemeral like its siblings: gitignored and excluded from the receipt's hashed input surface,
+    so a note about who is typing can never invalidate a receipt.
+  - 19 tests, including the whole safety asymmetry (suite 1333 → 1352).
+- The orchestrator agent now claims, beats and releases the hold, and owes a visible line per
+  subagent start and finish.
+
+### Fixed
+
+- **Signing N artifacts costs one receipt invalidation, not N.** A signature changes
+  `qa/approvals.json`'s `status`, and the approvals gate reads `status` — so a signature
+  legitimately moves the receipt's input hash. Signed one at a time *after* a green lane, that
+  means N signatures kill the receipt N times and cost N lane re-runs and N bookkeeping commits.
+  Measured in payment-blueprint's log (2026-09-04, 00:12–03:54): 21 commits, of which 7 were
+  code, 6 docs and **8 pure bookkeeping** ("sign the approval", "bind the green receipt"); every
+  code change cost two to three commits and fired the Stop hook after each. It compounds as a
+  repo accumulates governed artifacts, which is what makes a session start fast and grind later.
+  - `node qa/approve.mjs <a> <b> <c> --as "…"` signs them in one write — the idiom
+    `--reopen-feature` already established ("one recorded change, not N commands").
+  - The CLI states the other half with its reason attached: **sign before the final lane run**,
+    so the receipt you keep already covers the signatures.
+  - An unrecognised flag is still refused by name rather than filtered out silently.
+
+### Changed
+
+- **GATE-RULES Rule 1 names its instrument at the point of authoring.** Rule 1 states a
+  *property* — this gate fails, by name, on its own violation — not a procedure to perform by
+  hand, and it now says so where a gate author reads it rather than inside a Rule 0 aside.
+  Measured cost of the procedural reading, three occurrences in one adoption: a wave briefed to
+  plant → `./gradlew` → confirm red → revert → build, at 30–60 s per cycle, ~38 minutes with
+  nothing committed. It had violated Rule 1's own "seconds each" from the first cycle, and
+  nothing noticed, because a bound in prose cannot refuse. A plant kept in the instrument is run
+  by everyone forever in milliseconds; a plant performed by hand is run once and lost.
+- **The orchestrator agent has standing to refuse an expensive instruction.** It could already
+  escalate before changing a *number*; it now costs a mandated *mechanism* the same way —
+  instances × seconds-per-instance against the stage budget — names a cheaper instrument if one
+  exists, and answers "what in this repo already does this, and why is it insufficient?" before
+  briefing any mechanism. It also owes visible progress: a line per subagent start and finish, a
+  status upward for anything past ~5 minutes with no output, and proof wall-clock as its own
+  report line. A silent agent is indistinguishable from a wedged one.
+- The four dangling `scripts/framework-check.mjs` references in shipped files now name
+  `qa/framework-check.mjs` (`verify.mjs`, `lib/steps-cmp.mjs`, `lib/evidence-badge.mjs`,
+  `docs/USAGE.md`).
+
 ## [0.23.0] - 2026-09-04
 
 Two spine fixes from payment-blueprint's adoption: the locked region now covers a lane's own
