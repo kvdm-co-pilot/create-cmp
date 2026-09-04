@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **The published receipt schema describes the receipt the lane actually writes.**
+  `qa/evidence/schema.json` is a contract nothing validates at runtime, which is exactly why
+  it drifted: the lane had been emitting `stage`, `harness` and `strength` at the top level
+  and `skipKind`, `layer` and a per-step `harness` on rows, running the `smoke` and `nightly`
+  profiles the schema did not list, and writing the `ERROR` verdict it did not allow. One
+  ordinary smoke run violated the old contract six ways. The receipt format is the thing we
+  tell people is open, so an open format nobody checks is a format that lies. Two enums also
+  belonged to the profile rather than the core and are now widened: `evidenceLevel.name` is a
+  free string (enumerating mobile's four rung names made every other pack's receipt invalid
+  by the published contract), and the `mode` description no longer names five Compose steps
+  as "the device/release tier". `test/receipt-schema-drift.test.mjs` runs a real lane and
+  holds every key and enum value against the schema, so the next undocumented field fails in
+  the second it is written.
+
 ### Added
 
 - **The Rule 0 instrument's planted source is the profile's.** A citation must sit on a
