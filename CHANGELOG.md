@@ -62,6 +62,22 @@ and withheld, and the expensive way was the only one available.
 - The orchestrator agent now claims, beats and releases the hold, and owes a visible line per
   subagent start and finish.
 
+### Fixed
+
+- **Signing N artifacts costs one receipt invalidation, not N.** A signature changes
+  `qa/approvals.json`'s `status`, and the approvals gate reads `status` — so a signature
+  legitimately moves the receipt's input hash. Signed one at a time *after* a green lane, that
+  means N signatures kill the receipt N times and cost N lane re-runs and N bookkeeping commits.
+  Measured in payment-blueprint's log (2026-09-04, 00:12–03:54): 21 commits, of which 7 were
+  code, 6 docs and **8 pure bookkeeping** ("sign the approval", "bind the green receipt"); every
+  code change cost two to three commits and fired the Stop hook after each. It compounds as a
+  repo accumulates governed artifacts, which is what makes a session start fast and grind later.
+  - `node qa/approve.mjs <a> <b> <c> --as "…"` signs them in one write — the idiom
+    `--reopen-feature` already established ("one recorded change, not N commands").
+  - The CLI states the other half with its reason attached: **sign before the final lane run**,
+    so the receipt you keep already covers the signatures.
+  - An unrecognised flag is still refused by name rather than filtered out silently.
+
 ### Changed
 
 - **GATE-RULES Rule 1 names its instrument at the point of authoring.** Rule 1 states a
