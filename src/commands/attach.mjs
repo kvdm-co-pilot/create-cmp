@@ -19,6 +19,12 @@ import { colors, ok, warn, fail } from "../lib/log.mjs";
 import { consent } from "../bootstrap/exec.mjs";
 import { sessionStartCommand } from "../lib/hooks.mjs";
 import { SIDECAR_SUFFIX } from "../lib/harness-upgrade.mjs";
+import {
+  MANIFEST_REL_PATH,
+  PROFILE_ID_RE,
+  manifestFor,
+  manifestProblems,
+} from "../../packages/harness/src/lib/harness-manifest.mjs";
 
 const COMPOSE_SIGNALS = [
   "org.jetbrains.compose",
@@ -155,7 +161,7 @@ export function classifyTarget(projectDir) {
  * @param {boolean} [params.apply=false]
  * @returns {{units: Array<{relPath:string, action:string}>, notWired: string[]}}
  */
-export function attachProject({ projectDir, apply = false }) {
+export function attachProject({ projectDir, apply = false, manifest = null }) {
   const target = classifyTarget(projectDir);
   if (!target.ok) throw new Error(target.reason);
 
@@ -163,6 +169,17 @@ export function attachProject({ projectDir, apply = false }) {
     { relPath: "AGENTS.md", content: attachAgentsMd() },
     { relPath: ".claude/settings.json", content: attachSettings() },
   ];
+  // The harness manifest — WHICH STACK PROFILE this repo uses, and where its
+  // specs, sources and receipt live. The lane refuses to run without one and
+  // there is no default (decision 3, 2026-09-04), so for a repo create-cmp
+  // never stamped this is the interview's output, landed as one more unit.
+  // Only ever offered when the caller resolved one: a manifest already on disk
+  // is the repo's own declaration and is never touched here.
+  if (manifest) {
+    const problems = manifestProblems(manifest);
+    if (problems.length) throw new Error(`refusing to write an invalid manifest: ${problems.join("; ")}`);
+    files.push({ relPath: MANIFEST_REL_PATH, content: `${JSON.stringify(manifest, null, 2)}\n` });
+  }
   const units = [];
   for (const { relPath, content } of files) {
     const abs = path.join(projectDir, relPath);
@@ -191,9 +208,107 @@ export function attachProject({ projectDir, apply = false }) {
     notWired: [
       "headless screen previews (PreviewRegistry + renderScreens) — staged M0b, needs a per-repo Gradle wiring design",
       "live on-device inspector — ships with scaffolded apps; not injectable into a foreign build yet",
-      "verify lane / evidence receipts / enforcement — the lane addresses the stamped layout by name",
+      "verify lane / evidence receipts / enforcement — the manifest above tells the lane which profile and where things live; vendoring the lane itself into a foreign repo is the next M0b step",
     ],
   };
+}
+
+/**
+ * A manifest from flags alone — the non-interactive path (`--yes`). Pure:
+ * returns null when no `--profile` was given, otherwise the manifest with its
+ * problems (empty when valid) so the caller decides how to refuse.
+ * @param {object} flags
+ * @returns {{manifest: object, problems: string[]} | null}
+ */
+export function manifestFromFlags(flags) {
+  if (typeof flags.profile !== "string") return null;
+  const layout = {};
+  if (typeof flags.specs === "string") layout.specs = flags.specs;
+  if (typeof flags.receipt === "string") layout.receipt = flags.receipt;
+  if (typeof flags["citation-roots"] === "string") {
+    const roots = flags["citation-roots"]
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    // An empty value is "no override", never an empty list — the lane would
+    // refuse `citationRoots: []` and the user would have to decode why.
+    if (roots.length) layout.citationRoots = roots;
+  }
+  const manifest = manifestFor(flags.profile, layout);
+  return { manifest, problems: manifestProblems(manifest) };
+}
+
+/**
+ * The manifest interview — the questions a foreign repo has to answer before
+ * the lane can know what a step or a test root is here. Four questions, each
+ * with a default a Compose/KMP repo would accept unchanged; a backend types
+ * its own. Validated to the same contract the lane applies before it is
+ * written, so the interview can never produce a manifest the lane refuses.
+ */
+async function interviewManifest() {
+  let prompts;
+  try {
+    prompts = (await import("prompts")).default;
+  } catch {
+    process.stderr.write(
+      "The manifest interview needs the 'prompts' package. Re-run with --yes --profile <id> [--specs <dir>] [--citation-roots a,b] [--receipt <path>] for non-interactive use.\n"
+    );
+    process.exit(1);
+  }
+  const onCancel = () => {
+    process.stdout.write("Cancelled — no manifest written.\n");
+    process.exit(1);
+  };
+  const a = await prompts(
+    [
+      {
+        type: "text",
+        name: "profile",
+        message: "Stack profile id (a directory under qa/lib/profiles/)",
+        initial: "cmp",
+        validate: (v) => (PROFILE_ID_RE.test(String(v).trim()) ? true : `must match ${PROFILE_ID_RE}`),
+      },
+      { type: "text", name: "specs", message: "Where do specs live?", initial: "specs" },
+      { type: "text", name: "citationRoots", message: "Source roots the lane scans for SPEC: citations (comma-separated)", initial: "composeApp/src, qa/e2e" },
+      { type: "text", name: "receipt", message: "Where should the receipt be written?", initial: "qa/evidence/latest.json" },
+    ],
+    { onCancel }
+  );
+  return manifestFor(String(a.profile).trim(), {
+    specs: String(a.specs).trim(),
+    citationRoots: String(a.citationRoots)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    receipt: String(a.receipt).trim(),
+  });
+}
+
+/**
+ * Resolve the manifest `attach` should land, if any: none when one is already
+ * on disk (never overwritten here — valid or not, it is the repo's own
+ * declaration; a malformed one is the lane's refusal to explain); from flags
+ * when `--profile` is given; from the interview otherwise; and a refusal when
+ * `--yes` forbids asking and no flags answer.
+ */
+async function manifestForAttach(projectDir, flags) {
+  if (fs.existsSync(path.join(projectDir, ...MANIFEST_REL_PATH.split("/")))) return null;
+  const fromFlags = manifestFromFlags(flags);
+  if (fromFlags) {
+    if (fromFlags.problems.length) {
+      fail(`the manifest from your flags is invalid: ${fromFlags.problems.join("; ")}`);
+      process.exit(1);
+    }
+    return fromFlags.manifest;
+  }
+  if (flags.yes === true) {
+    fail(
+      `${MANIFEST_REL_PATH} is missing and --yes forbids asking. Pass --profile <id> ` +
+        `[--specs <dir>] [--citation-roots a,b] [--receipt <path>], or run without --yes to be asked.`
+    );
+    process.exit(1);
+  }
+  return interviewManifest();
 }
 
 /**
@@ -209,9 +324,18 @@ export async function runAttach(flags, positional) {
       `  project: ${colors.cyan(projectDir)}\n\n`
   );
 
+  // Classify BEFORE asking anything: a stamped app or a non-Gradle tree is
+  // refused with its reason, not interviewed and then refused.
+  const target = classifyTarget(projectDir);
+  if (!target.ok) {
+    fail(target.reason);
+    process.exit(1);
+  }
+  const manifest = await manifestForAttach(projectDir, flags);
+
   let plan;
   try {
-    plan = attachProject({ projectDir, apply: false });
+    plan = attachProject({ projectDir, apply: false, manifest });
   } catch (e) {
     fail(e.message);
     process.exit(1);
@@ -241,7 +365,7 @@ export async function runAttach(flags, positional) {
     process.exit(0);
   }
 
-  const applied = attachProject({ projectDir, apply: true });
+  const applied = attachProject({ projectDir, apply: true, manifest });
   for (const u of applied.units) {
     if (u.action === "written") ok(`wrote ${u.relPath}`);
     if (u.action === "sidecar") warn(`wrote ${u.relPath}${SIDECAR_SUFFIX} (yours untouched)`);

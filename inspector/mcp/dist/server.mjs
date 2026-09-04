@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 17a4879aabd788515a0c570e7dc1a1a357e4455a347042c802441dc6c594ccb8
+// cmp:bundle-inputs da0da1346fbb5d07f81cb1fd4f4edb9bf309344b9b12dc291f9ba3c05cc539a2
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32683,7 +32683,9 @@ var DEFAULT_LAYOUT = Object.freeze({
 });
 var PATH_FIELDS = ["receipt", "architectureDoc", "specs", "approvals"];
 var LIST_FIELDS = ["citationRoots", "packs"];
-var KNOWN_FIELDS = /* @__PURE__ */ new Set([...PATH_FIELDS, ...LIST_FIELDS]);
+var META_FIELDS = ["schema", "profile"];
+var KNOWN_FIELDS = /* @__PURE__ */ new Set([...META_FIELDS, ...PATH_FIELDS, ...LIST_FIELDS]);
+var PROFILE_ID_RE = /^[a-z][a-z0-9-]*$/;
 function pathProblem(field, value) {
   if (typeof value !== "string" || value.trim() === "") return `${field} must be a non-empty string`;
   if (value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value)) return `${field} must be relative to the project root (got "${value}")`;
@@ -32696,6 +32698,16 @@ function manifestProblems(parsed) {
   const problems = [];
   for (const key of Object.keys(parsed)) {
     if (!KNOWN_FIELDS.has(key)) problems.push(`unknown field "${key}" (known: ${[...KNOWN_FIELDS].join(", ")})`);
+  }
+  if ("schema" in parsed && (typeof parsed.schema !== "string" || !parsed.schema.startsWith("harness-manifest/"))) {
+    problems.push(`schema must be a string of the form "harness-manifest/<n>" (got ${JSON.stringify(parsed.schema)})`);
+  }
+  if ("profile" in parsed) {
+    const p = parsed.profile;
+    if (!p || typeof p !== "object" || Array.isArray(p)) problems.push("profile must be an object { id, version? }");
+    else if (typeof p.id !== "string" || !PROFILE_ID_RE.test(p.id)) {
+      problems.push(`profile.id must match ${PROFILE_ID_RE} (got ${JSON.stringify(p.id)})`);
+    }
   }
   for (const field of PATH_FIELDS) {
     if (!(field in parsed)) continue;

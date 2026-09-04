@@ -60,16 +60,31 @@ test("nesting is not swept in silently — only DIRECT children count", () => {
   assert.ok(!isHarnessFile("qa/e2e/helpers/thing.mjs"));
 });
 
-test("the real template's region is exactly its qa .mjs files", () => {
+test("the real template's region is exactly its qa .mjs files, its profiles, and its declarations", () => {
   const rels = listHarnessFiles(path.join(REPO_ROOT, "template"));
+  const walk = (abs, rel) =>
+    fs.readdirSync(abs, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(abs, e.name), `${rel}/${e.name}`) : [`${rel}/${e.name}`]));
   const onDisk = [
     ...fs.readdirSync(path.join(REPO_ROOT, "template/qa")).map((n) => `qa/${n}`),
     ...fs.readdirSync(path.join(REPO_ROOT, "template/qa/lib")).map((n) => `qa/lib/${n}`),
+    ...walk(path.join(REPO_ROOT, "template/qa/lib/profiles"), "qa/lib/profiles"),
   ]
-    .filter((r) => r.endsWith(".mjs"))
+    .filter((r) => r.endsWith(".mjs") || r === "qa/harness-manifest.json")
     .sort();
   assert.deepEqual(rels, onDisk);
   assert.ok(rels.length >= 30, `expected the full lane, got ${rels.length}`);
+  // The stamped manifest and the cmp profile are IN the region: the lane reads
+  // the first to find the second, and a lane that could not vouch for either
+  // could not vouch for its own verdicts.
+  assert.ok(rels.includes("qa/harness-manifest.json"));
+  assert.ok(rels.includes("qa/lib/profiles/cmp/index.mjs"));
+});
+
+test("profiles are machine-owned, recursively, by a NAMED rule — nesting elsewhere still is not", () => {
+  assert.ok(isHarnessFile("qa/lib/profiles/cmp/index.mjs"));
+  assert.ok(isHarnessFile("qa/lib/profiles/ktor-backend/steps/build.mjs"));
+  assert.ok(!isHarnessFile("qa/lib/profiles/cmp/notes.md"), "only .mjs is lane code");
+  assert.ok(!isHarnessFile("qa/lib/vendor/thing.mjs"), "an unnamed nested dir is still outside");
 });
 
 test("the region hash covers content AND path, and is order-independent", () => {
