@@ -21,7 +21,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { compareTokenDrift } from "./token-drift.mjs";
 import { evaluateApprovalsGate } from "../../approvals.mjs";
-import { E2E_FLOW_DIR, TIERS_SATISFYING, clauseTierCoverage, listFlowFiles, scanCitations, scanSpecClauses, walkFiles } from "../../spec-coverage.mjs";
+import { clauseTierCoverage, listFlowFiles, scanCitations, scanSpecClauses, walkFiles } from "../../spec-coverage.mjs";
+import { specModelFrom } from "../../spec-model.mjs";
+import { layout as cmpLayout, tiers as cmpTiers } from "./declarations.mjs";
+
+// The scanner's model, built from this profile's own declarations — the pack
+// hands its facts to the core rather than round-tripping through the manifest.
+const SPEC_MODEL = (() => {
+  const r = specModelFrom({ id: "cmp", layout: cmpLayout, tiers: cmpTiers });
+  if (!r.ok) throw new Error(r.reason);
+  return r.model;
+})();
+/** Where the flows the lane runs live. */
+const E2E_FLOW_DIR = cmpLayout.flows.dir;
 import { evaluateComponentStoryParity } from "../../component-stories.mjs";
 import { evaluateReachability } from "./reachability.mjs";
 import { evaluateE2eCoverage } from "./e2e-coverage.mjs";
@@ -291,16 +303,16 @@ function stepSpecCoverage() {
     return { name: "specCoverage", verdict: "SKIP", reason: "no specs/ directory in this project", durationMs: Date.now() - started };
   }
 
-  const clauses = scanSpecClauses(ROOT);
-  const tags = scanCitations(ROOT);
-  const searchDirs = [path.join(ROOT, "composeApp/src"), path.join(ROOT, "qa/e2e")];
-  const files = searchDirs.flatMap((d) => walkFiles(d, [".kt", ".kts", ".yaml", ".yml"]));
+  const clauses = scanSpecClauses(ROOT, SPEC_MODEL);
+  const tags = scanCitations(ROOT, SPEC_MODEL);
+  const searchDirs = SPEC_MODEL.citationRoots.map((rel) => path.join(ROOT, ...rel.split("/")));
+  const files = searchDirs.flatMap((d) => walkFiles(d, [...SPEC_MODEL.citationExts, ...(SPEC_MODEL.flows ? SPEC_MODEL.flows.exts : [])]));
 
   const citedIds = new Set(tags.map((t) => t.id));
   const orphanClauses = [...clauses.entries()].filter(([, c]) => !c.withdrawn).filter(([id]) => !citedIds.has(id));
   const orphanTags = tags.filter((t) => !clauses.has(t.id) || clauses.get(t.id).withdrawn);
 
-  const tiers = clauseTierCoverage(clauses, tags);
+  const tiers = clauseTierCoverage(clauses, tags, SPEC_MODEL);
 
   if (orphanClauses.length === 0 && orphanTags.length === 0 && tiers.unmetTier.length === 0) {
     // Tier visibility, still not a gate for UNDECLARED clauses (industry rule:
@@ -331,11 +343,18 @@ function stepSpecCoverage() {
   // failure than a missing one, and its message has to say WHY the citation it
   // can see does not count.
   for (const u of tiers.unmetTier) {
+    if (u.unknown) {
+      lines.push(
+        `  [${u.id}] ${u.file} — declares [tier: ${u.requiredTier}], a requirement this profile does not define. ` +
+          `Declared requirements: ${Object.keys(SPEC_MODEL.tiers.satisfying).join(", ")}. Fix the tag or declare the tier in the profile.`,
+      );
+      continue;
+    }
     const has = u.tiers.length ? `cited only from ${u.tiers.join(", ")}` : "cited by nothing";
     lines.push(
       `  [${u.id}] ${u.file} — declares [tier: ${u.requiredTier}] but is ${has}. ` +
         `A test on those tiers cannot observe this promise (no process lifecycle, no OS facts, no real device). ` +
-        `Add a citing test in ${TIERS_SATISFYING[u.requiredTier].join(" or ")} — and note that tier SKIPPING for want of a device ` +
+        `Add a citing test in ${SPEC_MODEL.tiers.satisfying[u.requiredTier].join(" or ")} — and note that tier SKIPPING for want of a device ` +
         `leaves this clause unproven, which is the point: "I could not check this" is a failure, not a quieter rung.`,
     );
   }
@@ -909,7 +928,7 @@ function maestroGuards(name) {
   if (!fs.existsSync(path.join(ROOT, E2E_FLOW_DIR))) {
     return { name, verdict: "SKIP", skipKind: "structure", reason: "e2e harness not included in this project (--no-e2e)", durationMs: 0 };
   }
-  if (listFlowFiles(ROOT).length === 0) {
+  if (listFlowFiles(ROOT, SPEC_MODEL).length === 0) {
     return { name, verdict: "SKIP", skipKind: "structure", reason: `${E2E_FLOW_DIR}/ holds no flows (*.yaml) — nothing to drive`, durationMs: 0 };
   }
   if (!maestroAvailable()) {
@@ -945,7 +964,7 @@ function maestroGuards(name) {
 const E2E_RUN_BOUND_MS = (flowCount) => 120_000 + 180_000 * Math.max(1, flowCount);
 
 function runMaestroSmoke(name, priorDurationMs) {
-  const flows = listFlowFiles(ROOT);
+  const flows = listFlowFiles(ROOT, SPEC_MODEL);
   const report = path.join(ROOT, "qa-artifacts", `maestro-${name}.xml`);
   fs.mkdirSync(path.dirname(report), { recursive: true });
   fs.rmSync(report, { force: true });

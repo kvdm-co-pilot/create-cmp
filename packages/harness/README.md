@@ -104,12 +104,17 @@ The lane is two things (evidence-economics S8): a **spine** and a **step pack**.
 
 - **Spine** — `verify.mjs` plus `lib/lane-runner.mjs`, `lib/step-outcomes.mjs`,
   `lib/receipt-validate.mjs`, `lib/inputs-hash.mjs`, `lib/approvals.mjs`, `lib/spec-coverage.mjs`,
+  `lib/spec-model.mjs`, `lib/harness-manifest.mjs`, `lib/profile-loader.mjs`,
   `lib/flight-recorder.mjs`, `lib/evidence-level.mjs`, `lib/walk.mjs`, `lib/plan.mjs`,
   `receipt-check.mjs`, `approve.mjs`, `plan.mjs`, `walk-status.mjs`, `retrospective.mjs`. It
   parses arguments, runs steps under a deadline with a pulse, turns a throw or a timeout into
   one `ERROR` row, derives the verdict and the evidence rung, writes the receipt bound to the
   inputs hash, journals the run, and refuses "done" without a PASS. **It knows nothing about
-  Gradle, adb, Maestro or `composeApp/`.**
+  Gradle, adb, Maestro or `composeApp/`.** What it needs to know about a stack it reads from
+  the **profile** the manifest names (`qa/lib/profiles/<id>/index.mjs`): `steps(ctx)` — the
+  pack — plus `layout` (where specs, sources, tests and flows live) and `tiers` (which test
+  tiers exist, which run host-only, which satisfy a clause's `[tier: …]`), which
+  `lib/spec-model.mjs` validates into the scanner's model.
 - **Step pack** — `lib/steps-cmp.mjs`. Every Compose Multiplatform step, behind one factory:
   `createCmpSteps(ctx)` returns `{ stepsForProfile, DEVICE_STEPS, FAST_EXCLUDED_NAMES,
   STEP_FN_BY_NAME, stepDeterminism, releaseLease }`. **It reads no argv and writes no receipt.**
@@ -156,7 +161,9 @@ To verify a Kotlin backend, a web service, anything: keep the spine, replace the
    and the rail names the file — the console never quietly looks in the wrong place and reports
    an honest-looking absence. When your `qa/lib/spec-coverage.mjs` exports `scanSpecClauses` and
    `scanCitations`, the console's Specs page renders *their* reading (your grammar, your
-   binding rule), and `citationRoots` is only used by the console's own fallback scan.
+   binding rule). The lane reads `specs` and `citationRoots` too: they override the profile's
+   `layout`, field by field, so a foreign repo attached with its own paths gets the same scan
+   from the lane and the console.
 5. **Tag your steps with the layer they prove** — `stepCompositeBuild.layer = "backend"`. The
    runner stamps the tag onto the receipt row (`{ name, layer, verdict, … }`; rows without a
    tag are unchanged) and the Evidence page groups steps per layer with a per-layer tally, so a

@@ -19,7 +19,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { evaluateReachability } from "./reachability.mjs";
-import { E2E_FLOW_DIR, scanCitations, scanSpecClauses } from "../../spec-coverage.mjs";
+import { scanCitations, scanSpecClauses } from "../../spec-coverage.mjs";
+import { specModelFrom } from "../../spec-model.mjs";
+import { layout as cmpLayout, tiers as cmpTiers } from "./declarations.mjs";
+
+const SPEC_MODEL = (() => {
+  const r = specModelFrom({ id: "cmp", layout: cmpLayout, tiers: cmpTiers });
+  if (!r.ok) throw new Error(r.reason);
+  return r.model;
+})();
+const E2E_FLOW_DIR = cmpLayout.flows.dir;
+const JOURNEY_TIER = cmpTiers.journey;
 
 /**
  * @param {string} root
@@ -34,8 +44,8 @@ export function evaluateE2eCoverage(root) {
   if (screenFeatures.length === 0) {
     return { verdict: "SKIP", reason: reach.reason ?? "no presentation/<feature> directory has a *Screen.kt file — nothing to cover", details: { features: [] } };
   }
-  const clauses = scanSpecClauses(root);
-  const e2eTags = scanCitations(root).filter((t) => t.tier === "e2e");
+  const clauses = scanSpecClauses(root, SPEC_MODEL);
+  const e2eTags = scanCitations(root, SPEC_MODEL).filter((t) => t.tier === JOURNEY_TIER);
   const features = screenFeatures.map((f) => {
     const specRel = `specs/${f.name}.spec.md`;
     const spec = fs.existsSync(path.join(root, specRel)) ? specRel : null;

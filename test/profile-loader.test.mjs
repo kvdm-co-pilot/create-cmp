@@ -23,37 +23,40 @@ function install(root, id, source) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "index.mjs"), source);
 }
-const GOOD = (id) => `export const id = ${JSON.stringify(id)};\nexport const protocol = ${PROFILE_PROTOCOL};\nexport function steps(ctx) { return { ctx, stepsForProfile: {} }; }\n`;
+// The two declarations protocol 1 requires beside the pack (Stage 0 PR 4).
+const DECL_SRC = `export const layout = { specs: "specs", citationRoots: ["src"], citationExts: [".kt"], flows: null };\nexport const tiers = { names: ["unit"], hostOnly: ["unit"], satisfying: {}, journey: null, forFile: () => "unit" };\n`;
+const DECL = { layout: { specs: "specs", citationRoots: ["src"], citationExts: [".kt"], flows: null }, tiers: { names: ["unit"], hostOnly: ["unit"], satisfying: {}, journey: null, forFile: () => "unit" } };
+const GOOD = (id) => `export const id = ${JSON.stringify(id)};\nexport const protocol = ${PROFILE_PROTOCOL};\n${DECL_SRC}export function steps(ctx) { return { ctx, stepsForProfile: {} }; }\n`;
 
 // ── The pure judge ───────────────────────────────────────────────────────────
 
-test("a module with id, protocol and steps(ctx) passes", () => {
-  assert.deepEqual(validateProfileModule({ id: "cmp", protocol: PROFILE_PROTOCOL, steps: () => ({}) }, "cmp"), { ok: true });
+test("a module with id, protocol, layout, tiers and steps(ctx) passes", () => {
+  assert.deepEqual(validateProfileModule({ id: "cmp", protocol: PROFILE_PROTOCOL, ...DECL, steps: () => ({}) }, "cmp"), { ok: true });
 });
 
 test("missing exports are named, all at once", () => {
   const v = validateProfileModule({ id: "cmp" }, "cmp");
   assert.equal(v.ok, false);
-  assert.match(v.reason, /missing required export\(s\): protocol, steps/);
+  assert.match(v.reason, /missing required export\(s\): protocol, layout, tiers, steps/);
   assert.match(v.reason, new RegExp(REQUIRED_EXPORTS.join(", ")));
 });
 
 test("the manifest and the profile must agree about what this project is", () => {
-  const v = validateProfileModule({ id: "ktor-backend", protocol: PROFILE_PROTOCOL, steps: () => ({}) }, "cmp");
+  const v = validateProfileModule({ id: "ktor-backend", protocol: PROFILE_PROTOCOL, ...DECL, steps: () => ({}) }, "cmp");
   assert.equal(v.ok, false);
   assert.match(v.reason, /exports id "ktor-backend"/);
   assert.match(v.reason, /disagree/);
 });
 
 test("a protocol the lane does not speak is refused with the upgrade command", () => {
-  const v = validateProfileModule({ id: "cmp", protocol: PROFILE_PROTOCOL + 1, steps: () => ({}) }, "cmp");
+  const v = validateProfileModule({ id: "cmp", protocol: PROFILE_PROTOCOL + 1, ...DECL, steps: () => ({}) }, "cmp");
   assert.equal(v.ok, false);
   assert.match(v.reason, new RegExp(`speaks ${PROFILE_PROTOCOL}`));
   assert.match(v.reason, /upgrade --harness/);
 });
 
 test("steps must be a function", () => {
-  const v = validateProfileModule({ id: "cmp", protocol: PROFILE_PROTOCOL, steps: {} }, "cmp");
+  const v = validateProfileModule({ id: "cmp", protocol: PROFILE_PROTOCOL, ...DECL, steps: {} }, "cmp");
   assert.equal(v.ok, false);
   assert.match(v.reason, /steps\(ctx\) as a function/);
 });
@@ -110,4 +113,13 @@ test("a loaded module still has to pass the judge — id mismatch on disk is ref
   const r = await loadProfile(root, { id: "cmp" });
   assert.equal(r.ok, false);
   assert.match(r.reason, /disagree/);
+});
+
+test("layout and tiers are required beside the pack — a profile without them is refused by name", () => {
+  const noTiers = validateProfileModule({ id: "cmp", protocol: PROFILE_PROTOCOL, layout: DECL.layout, steps: () => ({}) }, "cmp");
+  assert.equal(noTiers.ok, false);
+  assert.match(noTiers.reason, /missing required export\(s\): tiers/);
+  const badLayout = validateProfileModule({ id: "cmp", protocol: PROFILE_PROTOCOL, layout: "specs", tiers: DECL.tiers, steps: () => ({}) }, "cmp");
+  assert.equal(badLayout.ok, false);
+  assert.match(badLayout.reason, /layout as an object/);
 });

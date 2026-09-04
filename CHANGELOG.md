@@ -8,6 +8,25 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The spec scanner takes its model from the profile.** `qa/lib/spec-coverage.mjs` no
+  longer knows where specs live, which trees hold citations, what a source file is called,
+  or what the test tiers are: the `cmp` profile declares `layout` (specs, citation roots and
+  extensions, the flow directory) and `tiers` (names, host-only tiers, which tier satisfies
+  `[tier: device]`, the journey tier, `forFile`), and the new `qa/lib/spec-model.mjs`
+  validates them into one model every scanner takes. A caller with only a project root — the
+  console's Specs bridge, feature-brief's derived doneness, `qa/framework-check.mjs` — gets
+  the model resolved from the manifest, synchronously, with the manifest's `specs` /
+  `citationRoots` overriding the profile's field by field (the console's rule). A clause
+  that names a requirement the profile does not declare is now unmet **by name**. No
+  fallback: a profile without `layout` and `tiers` is refused at load. Stage 0 PR 4;
+  `docs/NORTH-STAR.md` §6.
+
+### Changed
+
+- **Node floor is 20.19 / 22.12.** Sync profile resolution uses `require()` of ES modules,
+  supported from Node 20.19 and 22.12. Node 18 and 20.18 are end-of-life; `engines` and the
+  CI matrix (20, 22, 24) now say so.
+
 - **The receipt names its step pack.** `pack: { id, version }` beside the existing
   `harness` field. The receipt already said which lane ran; it did not say which step pack
   the lane loaded — so once a second pack exists, a `cmp` L2 (device e2e) and a backend L2
