@@ -307,7 +307,11 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.ok(level, "schema declares evidenceLevel");
       assert.deepEqual(level.type, ["object", "null"], "evidenceLevel is nullable (a FAILed lane has no rung)");
       assert.deepEqual(level.properties.rung.enum, ["L0", "L1", "L2", "L3"]);
-      assert.deepEqual(level.properties.name.enum, ["scaffold", "desktop", "device", "release"]);
+      // The rung's NAME is the PACK's, not the core's: enumerating mobile's four
+      // names made every other pack's receipt invalid by the published contract
+      // (2026-09-04). The letters are the core's shape; the words are the ladder's.
+      assert.equal(level.properties.name.type, "string");
+      assert.ok(!level.properties.name.enum, "a ladder the core does not own cannot be enumerated by it");
       // A release-profile receipt (the only way to reach L3) must not violate its own schema.
       assert.ok(schema.properties.profile.enum.includes("release"), "profile enum accepts 'release'");
     });

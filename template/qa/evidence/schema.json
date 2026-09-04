@@ -3,34 +3,87 @@
   "$id": "cmp-evidence/1",
   "title": "create-cmp verify-lane evidence receipt",
   "type": "object",
-  "required": ["schema", "profile", "verdict", "commit", "steps", "artifacts", "toolVersions", "generatedAt"],
+  "required": [
+    "schema",
+    "profile",
+    "verdict",
+    "commit",
+    "steps",
+    "artifacts",
+    "toolVersions",
+    "generatedAt"
+  ],
   "properties": {
-    "schema": { "const": "cmp-evidence/1" },
-    "profile": { "enum": ["scaffold", "local", "ci", "release"] },
-    "mode": {
-      "enum": ["full", "fast"],
-      "description": "How the lane was run. \"full\" is the done-gate. \"fast\" (verify --fast) excluded the device/release tier (releaseBuild, tokenDrift, e2eSmoke, androidChecks, releaseSmoke): an inner-loop signal whose receipt derives no evidence rung and is REFUSED by qa/receipt-check.mjs — it can never satisfy done. Absent on receipts predating the flag — treated as full."
+    "schema": {
+      "const": "cmp-evidence/1"
     },
-    "verdict": { "enum": ["PASS", "FAIL"] },
+    "profile": {
+      "enum": [
+        "smoke",
+        "scaffold",
+        "local",
+        "ci",
+        "nightly",
+        "release"
+      ],
+      "description": "Which step set ran. `smoke` is the framework check (Rule 0) and `nightly` proves the harness, not a change; both are refused as done-evidence by qa/receipt-check.mjs."
+    },
+    "mode": {
+      "enum": [
+        "full",
+        "fast"
+      ],
+      "description": "How the lane was run. \"full\" is the done-gate. \"fast\" (verify --fast) excluded the pack's expensive tier (whatever it names in FAST_EXCLUDED_NAMES): an inner-loop signal whose receipt derives no evidence rung and is REFUSED by qa/receipt-check.mjs \u2014 it can never satisfy done. Absent on receipts predating the flag \u2014 treated as full."
+    },
+    "verdict": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
     "commit": {
       "type": "object",
-      "required": ["sha", "dirty"],
+      "required": [
+        "sha",
+        "dirty"
+      ],
       "properties": {
-        "sha": { "type": ["string", "null"], "description": "Parent HEAD at run time (the receipt is part of the NEXT commit)" },
-        "dirty": { "type": "array", "items": { "type": "string" } }
+        "sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Parent HEAD at run time (the receipt is part of the NEXT commit)"
+        },
+        "dirty": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "inputs": {
       "type": "object",
       "description": "Content-hash binding of the receipt to the verified surface (ADR-0005). Absent on receipts predating evidence binding.",
-      "required": ["hash", "fileCount"],
+      "required": [
+        "hash",
+        "fileCount"
+      ],
       "properties": {
-        "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "fileCount": { "type": "number" },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fileCount": {
+          "type": "number"
+        },
         "undeclared": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Top-level entries git would commit that no verified-surface entry covers — unattested by this receipt. A report, never a gate; absent when the surface covers everything."
+          "items": {
+            "type": "string"
+          },
+          "description": "Top-level entries git would commit that no verified-surface entry covers \u2014 unattested by this receipt. A report, never a gate; absent when the surface covers everything."
         }
       }
     },
@@ -38,51 +91,195 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "verdict", "durationMs"],
+        "required": [
+          "name",
+          "verdict",
+          "durationMs"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "verdict": {
-            "enum": ["PASS", "FAIL", "SKIP", "CACHED"],
-            "description": "CACHED appears ONLY on mode:\"fast\" receipts: a pure-Node step's last PASS reused because its content-hashed input set is unchanged (qa/lib/step-cache.mjs). Counts as PASS for the lane verdict but stays visibly distinct — the full lane never consults the cache, so a full receipt never carries it."
+          "name": {
+            "type": "string"
           },
-          "reason": { "type": "string" },
-          "note": { "type": "string", "description": "Honest fine print on a non-FAIL step (fast mode): which unit-test filter ran, or when a CACHED verdict was originally earned." },
-          "durationMs": { "type": "number" },
-          "details": { "type": "object" }
+          "verdict": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "SKIP",
+              "ERROR",
+              "CACHED"
+            ],
+            "description": "ERROR means the step COULD NOT RUN \u2014 a deadline, a throw, a tier that observed nothing. It is never FAIL: 'I could not check this' is not an accusation about the change, and it earns no rung. CACHED appears ONLY on mode:\"fast\" receipts: a pure-Node step's last PASS reused because its content-hashed input set is unchanged (qa/lib/step-cache.mjs). Counts as PASS for the lane verdict but stays visibly distinct \u2014 the full lane never consults the cache."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "description": "Honest fine print on a non-FAIL step (fast mode): which unit-test filter ran, or when a CACHED verdict was originally earned."
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "details": {
+            "type": "object"
+          },
+          "skipKind": {
+            "enum": [
+              "structure",
+              "environment"
+            ],
+            "description": "WHY a step skipped, and the distinction is load-bearing: `structure` means this project genuinely has no such tier (honest, allowed), `environment` means it could have run and did not (a gap a human can close \u2014 qa/receipt-check.mjs refuses done over it, whatever the step is called)."
+          },
+          "layer": {
+            "type": "string",
+            "description": "The layer of the stack this step proves, tagged by the pack (fn.layer). Free-form; the console groups the Evidence page by it. Absent when the pack tags nothing."
+          },
+          "harness": {
+            "type": "object",
+            "description": "The integrity check's own findings, on the harnessIntegrity row only."
+          }
         }
       }
     },
     "evidenceLevel": {
-      "type": ["object", "null"],
-      "description": "The evidence ladder rung (qa/lib/evidence-level.mjs), DERIVED from which steps actually ran and PASSed — never declared. L0 scaffold / L1 desktop / L2 device / L3 release; a SKIPped step never upgrades a rung. null when the lane FAILed (a failed lane has no rung). Absent on receipts predating the ladder.",
-      "required": ["rung", "name", "satisfiedBy"],
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "The evidence ladder rung (qa/lib/evidence-level.mjs), DERIVED from which steps actually ran and PASSed \u2014 never declared. A SKIPped step never upgrades a rung; null when the lane FAILed (a failed lane has no rung); absent when the pack declares no ladder, which is the honest grade for a ladder nobody has calibrated. THE RUNG IS THE PACK'S: L2 under one pack and L2 under another are different claims that happen to share a letter, which is why `pack` travels on every receipt. Compare rungs only within a pack.",
+      "required": [
+        "rung",
+        "name",
+        "satisfiedBy"
+      ],
       "properties": {
-        "rung": { "enum": ["L0", "L1", "L2", "L3"] },
-        "name": { "enum": ["scaffold", "desktop", "device", "release"] },
-        "satisfiedBy": { "type": "array", "items": { "type": "string" }, "description": "The PASSed step names the rung counts as its evidence, in lane order" }
+        "rung": {
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "The pack's own name for this rung (mobile: scaffold / desktop / device / release). Not an enum \u2014 the ladder is the profile's."
+        },
+        "satisfiedBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The PASSed step names the rung counts as its evidence, in lane order"
+        }
       }
     },
     "pack": {
       "type": "object",
-      "description": "WHICH STEP PACK produced the step rows — `harness` names the lane that ran, `pack` names the pack it loaded. A cmp L2 (device e2e) and a backend pack's L2 (integration tests) are different claims; this is what keeps them distinguishable on the wire. Optional until schema/2, once every writer emits it. Version is the harness lock's until profiles are versioned on their own.",
-      "required": ["id", "version"],
+      "description": "WHICH STEP PACK produced the step rows \u2014 `harness` names the lane that ran, `pack` names the pack it loaded. A cmp L2 (device e2e) and a backend pack's L2 (integration tests) are different claims; this is what keeps them distinguishable on the wire. Optional until schema/2, once every writer emits it. Version is the harness lock's until profiles are versioned on their own.",
+      "required": [
+        "id",
+        "version"
+      ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "version": { "type": ["string", "null"] }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "artifacts": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["path", "sha256"],
+        "required": [
+          "path",
+          "sha256"
+        ],
         "properties": {
-          "path": { "type": "string" },
-          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
         }
       }
     },
-    "toolVersions": { "type": "object" },
-    "generatedAt": { "type": "string", "format": "date-time" }
+    "toolVersions": {
+      "type": "object"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stage": {
+      "enum": [
+        "smoke",
+        "scaffold",
+        "change",
+        "merge",
+        "nightly",
+        "release"
+      ],
+      "description": "The lifecycle stage this run belongs to, derived from the run profile: local->change, ci->merge. What a proof COST is judged against its stage, so the receipt carries it. Absent on receipts predating stages."
+    },
+    "harness": {
+      "type": "object",
+      "description": "WHICH LANE issued this verdict \u2014 the harness package, its version, and the sha256 of its machine-owned region. `intact` is a LOCAL claim (unmodified since installed): a checksum, not a signature. What the editor of a lane cannot edit is what the registry published under that version, which is why version and sha256 travel together. Absent on receipts predating harness vouching.",
+      "required": [
+        "name",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "status": {
+          "enum": [
+            "intact",
+            "modified",
+            "unlocked"
+          ],
+          "description": "unlocked = installed before locks existed; nothing is known to be wrong and nothing is proven either."
+        },
+        "intact": {
+          "type": "boolean"
+        }
+      }
+    },
+    "strength": {
+      "type": "object",
+      "description": "Fine print about what the run actually exercised, beyond the rung. `onDeviceSteps` lists the steps that ran against a real target rather than the host. Absent on receipts predating it.",
+      "properties": {
+        "onDeviceSteps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
   }
 }
