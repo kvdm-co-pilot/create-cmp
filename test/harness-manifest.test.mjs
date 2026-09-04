@@ -28,14 +28,21 @@ const put = (root, obj) => {
 
 // ── Absent: refused, and told how ────────────────────────────────────────────
 
-test("an absent manifest is refused — and a foreign repo is sent to attach", () => {
+test("an absent manifest is refused — and a foreign repo is sent to a command that can serve it", () => {
   const root = tmp();
   const r = resolveHarnessManifest(root);
   assert.equal(r.ok, false);
   assert.equal(r.absent, true);
   assert.match(r.reason, /is missing/);
   assert.match(r.reason, /there is no default/);
-  assert.match(r.reason, /create-cmp attach/);
+  assert.match(r.reason, /create-cmp harness init/);
+  // NOT attach. This refusal used to name it, and attach refuses any repo
+  // without a Compose or KMP plugin signal — so the one documented exit from
+  // this refusal was closed to precisely the repos it was written for. A Ktor
+  // backend hit that loop on 2026-09-04 and could only escape by reading the
+  // engine's source. A refusal that names an unusable remedy is worse than one
+  // that names none: it costs the reader the time to find out.
+  assert.doesNotMatch(r.reason, /create-cmp attach/);
   assert.doesNotMatch(r.reason, /upgrade --harness/);
 });
 

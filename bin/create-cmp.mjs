@@ -15,7 +15,7 @@
 
 import { parseArgs } from "../src/lib/args.mjs";
 
-const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "harden", "attach", "help"]);
+const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "harden", "attach", "harness", "help"]);
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -63,6 +63,22 @@ async function main() {
       await runAttach(flags, rest[0]);
       return;
     }
+    // `harness` takes a subcommand because it is stack-neutral and will grow
+    // siblings (`upgrade`, `doctor`) that must not collide with the Compose
+    // verbs above. It is also the form that survives the rename: when the
+    // binary is named after the harness, `harness init` becomes `<name> init`.
+    case "harness": {
+      const sub = rest[0];
+      if (sub !== "init") {
+        process.stderr.write(
+          `create-cmp harness: unknown subcommand ${JSON.stringify(sub ?? "")}\n` +
+            `  usage: create-cmp harness init [--profile <id>] [--target-dir <dir>] [--dry-run]\n`
+        );
+        process.exit(2);
+      }
+      const { runHarnessInit } = await import("../src/commands/harness-init.mjs");
+      process.exit((await runHarnessInit(flags, rest[1])) ?? 0);
+    }
     case "create":
     default: {
       const { runCreate } = await import("../src/commands/create.mjs");
@@ -85,7 +101,8 @@ function printHelp() {
       `  npx create-cmp clean                   ~/.konan + Gradle build-output hygiene (consent-gated)\n` +
       `  npx create-cmp verify                  run the green-build gate on an existing project\n` +
       `  npx create-cmp harden                  install the full harness into a --minimal scaffold\n` +
-      `  npx create-cmp attach                  wire the agent contract into an EXISTING Compose/KMP repo\n\n` +
+      `  npx create-cmp attach                  wire the agent contract into an EXISTING Compose/KMP repo\n` +
+      `  npx create-cmp harness init            install the verify lane into a repo of ANY stack\n\n` +
       `create (scaffold) flags:\n` +
       `  --name --package --bundle-id --region --theme-prefix\n` +
       `  --minimal   (light scaffold: app + tests + previews, no verify lane/receipts —\n` +

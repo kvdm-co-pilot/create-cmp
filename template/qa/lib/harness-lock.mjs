@@ -144,9 +144,23 @@ export function describeIntegrity(r) {
   if (r.status === "unlocked") {
     return `no ${LOCK_PATH} — this app's lane version is unrecorded`;
   }
+  // NAME THE FILES. This used to report counts only — "1 unrecorded" — while
+  // holding the paths in `r.extra` and never showing them. The first adopter to
+  // hit it was following our own README, whose step 1 writes a file that is in
+  // HARNESS_DECLARATIONS: a correct refusal they could not act on, because the
+  // one fact that makes it actionable was in the object and not in the sentence.
+  // Evidence-or-silence: a gate that refuses names what it refused over.
   const parts = [];
-  if (r.modified.length) parts.push(`${r.modified.length} modified`);
-  if (r.missing.length) parts.push(`${r.missing.length} missing`);
-  if (r.extra.length) parts.push(`${r.extra.length} unrecorded`);
-  return `${r.name ?? "harness"} ${r.version ?? "?"} — ${parts.join(", ")}`;
+  const show = (list, label) => {
+    if (!list.length) return;
+    const head = list.slice(0, 3).join(", ");
+    parts.push(`${list.length} ${label}: ${head}${list.length > 3 ? `, +${list.length - 3} more` : ""}`);
+  };
+  show(r.modified, "modified");
+  show(r.missing, "missing");
+  show(r.extra, "unrecorded");
+  const fix = r.extra.length && !r.modified.length && !r.missing.length
+    ? " — re-lock with `create-cmp upgrade --harness`, or remove the file if it should not be there"
+    : "";
+  return `${r.name ?? "harness"} ${r.version ?? "?"} — ${parts.join("; ")}${fix}`;
 }

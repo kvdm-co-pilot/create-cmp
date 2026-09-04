@@ -125,64 +125,54 @@ The lane is two things (evidence-economics S8): a **spine** and a **step pack**.
   `createCmpSteps(ctx)` returns `{ stepsForProfile, DEVICE_STEPS, FAST_EXCLUDED_NAMES,
   STEP_FN_BY_NAME, stepDeterminism, releaseLease }`. **It reads no argv and writes no receipt.**
 
-To verify a Kotlin backend, a web service, anything: keep the spine, replace the pack.
+To verify a Kotlin backend, a web service, anything: **one command.**
 
-1. Vendor the spine files above into `qa/`, then **declare your verified surface** in
-   `qa/verified-surface.json` — `{"surface": ["services", "docs", "build-logic", ".github", "qa"]}`.
-   Without it the surface defaults to a Compose app's (`composeApp`, `specs`, `qa`, the Gradle
-   files) and everything outside it stops being attested. Absent a declaration this is loud, not
-   silent: a surface matching no files is refused rather than hashed, and the Stop hook reports
-   the refusal with its reason. But a surface matching *some* of your tree — a backend that has
-   `qa/` and `specs/` — resolves to a valid, smaller hash, so declare it deliberately rather than
-   relying on the guard. The file lives inside the surface, so changing it invalidates receipts,
-   which is correct: the coverage changed.
-2. Write `qa/lib/steps-<yours>.mjs` exporting `createYourSteps(ctx)` with the same return shape.
-   A step is a function returning `{ name, verdict: "PASS"|"FAIL"|"SKIP"|"ERROR", reason?,
-   durationMs, details? }`. Borrow `ctx.sh` (it throws `StepTimeout` past the step's deadline —
-   never catch that) and push degraded-path notes onto `ctx.DEGRADED_PATHS`. Name each step
-   function `step<Name>` — the runner narrates and deadlines by that name.
-3. In `verify.mjs`, swap the one composition line:
-   `const pack = createYourSteps({ ROOT, HERE, ..., sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS })`.
-   Profiles, `--fast`, the receipt, the hook, the console's Drive/approvals/evidence pages, the
-   flight journal and the retrospective all keep working unchanged.
+```
+npx create-cmp-cli harness init [--profile <id>]
+```
 
-4. **Tell the console where things are** — `qa/harness-manifest.json`. The console (the studio,
-   `inspector/mcp`) reads the receipt, the architecture document, the spec directory and the
-   citation roots; without a manifest it assumes the Compose layout (`qa/evidence/latest.json`,
-   `docs/ARCHITECTURE.md`, `specs/`, citations under `composeApp/src` and `qa/e2e`). Declare
-   yours field by field — undeclared fields keep the default:
+It vendors the spine, writes `qa/harness-manifest.json`, generates a working profile at
+`qa/lib/profiles/<id>/index.mjs`, seeds `qa/verified-surface.json` from your own tree, takes
+the lock, and then runs `qa/framework-check.mjs` so you watch the lane refuse and recover
+before you trust it. A repo with sources, a spec and a test goes from that to a green lane
+and a passing Rule 0 with nothing hand-edited.
 
-   ```json
-   {
-     "receipt": "qa/evidence/receipt.json",
-     "architectureDoc": "ARCHITECTURE.md",
-     "specs": "specs",
-     "citationRoots": ["services", "qa/test"],
-     "packs": ["blueprint"]
-   }
-   ```
+**The generated profile is the specification.** Prose about the protocol drifts from
+`lib/profile-loader.mjs` silently; a skeleton that has to load cannot. Read the file init
+writes rather than a description of it — the five required exports are real code with their
+reasons, and the four optional ones (`artifacts`, `governable`, `ladder`, `plants`) are
+present as commented blocks carrying their true field names.
 
-   Every path is relative to the repo root, `/`-separated, and may not escape it. A manifest
-   that is present but malformed is **refused**, not defaulted: every pane it feeds says why,
-   and the rail names the file — the console never quietly looks in the wrong place and reports
-   an honest-looking absence. When your `qa/lib/spec-coverage.mjs` exports `scanSpecClauses` and
-   `scanCitations`, the console's Specs page renders *their* reading (your grammar, your
-   binding rule). The lane reads `specs` and `citationRoots` too: they override the profile's
-   `layout`, field by field, so a foreign repo attached with its own paths gets the same scan
-   from the lane and the console.
-5. **Tag your steps with the layer they prove** — `stepCompositeBuild.layer = "backend"`. The
-   runner stamps the tag onto the receipt row (`{ name, layer, verdict, … }`; rows without a
-   tag are unchanged) and the Evidence page groups steps per layer with a per-layer tally, so a
-   lane over a backend, a security scan and the spine reads as one lane with three reports.
-   Layer names are free-form strings; the Compose pack uses `spine`, `compose`, `device`.
+Two steps ship in it, chosen because they prove something on a stack nobody has seen:
+`harnessIntegrity` (this lane is the one that was locked) and `specCoverage` (every promise
+is cited from a test that can observe it). Add your build and test steps beside them.
 
-**Worked example — `payment-blueprint`.** Its steps are `compositeBuild`, `gitleaks`,
-`linkCheck`, `legacyPlatform`, `unitTests`, `specCoverage`, `approvals`,
-`harnessIntegrity`. Today they live in a hand-written 2,769-line lane that forked the spine
-and now receives no upstream fix. The migration is: keep its step bodies, wrap them in
-`createBlueprintSteps(ctx)`, delete its copies of the spine, vendor ours. Anything whose cost
-scales with the suite rather than the change belongs in `stepsForProfile.nightly`, never
-`local` — and a step that has never returned a verdict does not belong in the lane at all.
+### What you edit, and what you must not
+
+Everything under `qa/lib/profiles/<id>/` is **yours**. Everything else under `qa/` is
+machine-owned, hash-locked, and vouched for on every receipt. If you find yourself needing to
+edit a core file, that is a defect in the harness worth reporting — not a local patch. A
+forked spine receives no upstream fix, and `harnessIntegrity` will say so on every run.
+
+A step is a function returning `{ name, verdict: "PASS"|"FAIL"|"SKIP"|"ERROR", reason?,
+durationMs, details?, skipKind?, layer? }`. Borrow `ctx.sh` (it throws `StepTimeout` past the
+step's deadline — never catch that) and push degraded-path notes onto `ctx.DEGRADED_PATHS`.
+`ERROR` means the step COULD NOT RUN and is never `FAIL`: "I could not check this" is not an
+accusation about the change. Tag a step with `fn.layer = "backend"` and the Evidence page
+groups by it; tag `fn.timeoutHint` and the runner says where to look when it times out.
+
+### Adjusting what init guessed
+
+Init derives your source roots from the tree and writes them into the manifest's
+`citationRoots`, so a wrong guess is one visible line rather than a buried scanner default.
+Correct it there. The manifest's `specs` and `citationRoots` override the profile's `layout`
+field by field, so the lane and the console read the same paths.
+
+The seeded `qa/verified-surface.json` is what the receipt attests. It lives inside the
+surface, so changing it invalidates receipts — which is correct, the coverage changed. Do not
+leave it undeclared: a surface matching *none* of your tree is refused loudly, but one
+matching *some* of it resolves to a valid, smaller hash, and that is how a receipt comes to
+attest a fraction of a project while looking complete.
 
 ## The device tier runs itself
 
