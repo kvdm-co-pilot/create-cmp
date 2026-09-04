@@ -445,8 +445,14 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
           assert.fail("an opted-out device tier must not end a session as done");
         } catch (err) {
           assert.equal(err.status, 2);
-          assert.match(String(err.stderr), /device tier did not run — e2eSmoke: device tier disabled by CMP_DEVICE=none/);
-          assert.match(String(err.stderr), /boots a headless emulator itself/);
+          assert.match(String(err.stderr), /a tier did not run — e2eSmoke: device tier disabled by CMP_DEVICE=none/);
+          // Stage 0 PR 6c: the hook QUOTES the step's own reason and adds no
+          // remediation of its own — it cannot know the toolchain. The cmp
+          // pack's device reasons already carry theirs (set CMP_AVD, run
+          // cmp-doctor); the hook telling every stack about emulators was the
+          // core asserting a stack fact straight to the operator.
+          assert.match(String(err.stderr), /skipped for an environmental reason, not because this project lacks them/);
+          assert.doesNotMatch(String(err.stderr), /emulator|CMP_AVD/, "the hook adds no toolchain advice of its own");
         }
         // A receipt predating skipKind is read by its reason text.
         fs.writeFileSync(receiptPath, JSON.stringify({ ...base, steps: [{ name: "androidChecks", verdict: "SKIP", reason: "no Android device/emulator attached (adb)", durationMs: 0 }] }));
@@ -455,7 +461,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
           assert.fail("an old-style 'no device' skip is the same gap");
         } catch (err) {
           assert.equal(err.status, 2);
-          assert.match(String(err.stderr), /device tier did not run — androidChecks: no Android device/);
+          assert.match(String(err.stderr), /a tier did not run — androidChecks: no Android device/);
         }
         // Structural: the project has no instrumented sources / no e2e harness. Not a gap the environment can close — the check moves on to the hash.
         fs.writeFileSync(receiptPath, JSON.stringify({ ...base, steps: [{ name: "androidChecks", verdict: "SKIP", skipKind: "structure", reason: "no instrumented tests", durationMs: 0 }, { name: "e2eSmoke", verdict: "SKIP", skipKind: "structure", reason: "e2e harness not included in this project (--no-e2e)", durationMs: 0 }] }));
@@ -464,7 +470,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
           assert.fail("the hash is wrong on purpose, so this still refuses — but for the hash");
         } catch (err) {
           assert.equal(err.status, 2);
-          assert.doesNotMatch(String(err.stderr), /device tier did not run/, "a structural skip is not the device-tier refusal");
+          assert.doesNotMatch(String(err.stderr), /a tier did not run/, "a structural skip is honest — the project simply has no such tier");
         }
       } finally {
         fs.rmSync(receiptPath, { force: true });

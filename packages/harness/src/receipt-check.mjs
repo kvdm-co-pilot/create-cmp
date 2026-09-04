@@ -23,6 +23,8 @@ import { computeInputsHash } from "./lib/inputs-hash.mjs";
 import { evaluateReceipt, readReceipt } from "./lib/receipt-validate.mjs";
 import { readHold, assessHold, describeHold, holdExplains } from "./lib/agent-hold.mjs";
 import { LANE_MARKER_STALE_MS, laneMarkerPath } from "./lib/lane-markers.mjs";
+import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
+import { loadProfileSync } from "./lib/profile-loader.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -109,28 +111,46 @@ function evaluate() {
       profile: receipt.profile,
     };
   }
-  // The device tier must have RUN (2026-09-03). The lane boots a headless
-  // emulator itself, so e2eSmoke/androidChecks only SKIP for two kinds of
-  // reason: the project's own structure (no qa/e2e harness, no instrumented
-  // sources — honest, allowed) or the ENVIRONMENT (CMP_DEVICE=none, maestro
-  // not installed, a lease held elsewhere, an ambiguous serial). The second
-  // kind is a gap a human can close, and a change is not done while it stands.
-  // Receipts predating `skipKind` are read by their reason text.
-  const DEVICE_TIER = ["e2eSmoke", "androidChecks"];
-  const envSkipped = (Array.isArray(receipt.steps) ? receipt.steps : []).filter(
-    (s) =>
-      s &&
-      DEVICE_TIER.includes(s.name) &&
-      s.verdict === "SKIP" &&
-      (s.skipKind === "environment" ||
-        (!s.skipKind && /no Android device|maestro CLI not installed|is held by|devices attached|CMP_DEVICE=none/.test(String(s.reason ?? "")))),
-  );
+  // A step that COULD have run and did not is a gap a human can close, and a
+  // change is not done while it stands (2026-09-03). The lane boots its own
+  // device, so an environment SKIP — no device, a tool not installed, a lease
+  // held elsewhere — is never the project's honest structure; a `structure`
+  // SKIP (this project has no such tier at all) is, and is allowed.
+  //
+  // Stage 0 PR 6c: this used to test `["e2eSmoke", "androidChecks"]` by name
+  // and match Android reason text. On any other stack it therefore checked
+  // nothing — the one gate that refuses "done" over a tier that never ran,
+  // silently inert. `skipKind` is the stack-free signal and every current
+  // receipt carries it, so the rule is now: ANY step that skipped for an
+  // environmental reason blocks done, whatever it is called.
+  //
+  // Receipts predating `skipKind` (0.19.0 and earlier) are still read by their
+  // reason text, and THAT list is the profile's — read from the ladder's
+  // execution tier when the profile is loadable, and simply not applied when
+  // it is not. A legacy fallback that guessed would be worse than none.
+  const legacyPatterns = /no Android device|maestro CLI not installed|is held by|devices attached|CMP_DEVICE=none/;
+  let legacyNames = null;
+  try {
+    const manifest = resolveHarnessManifest(ROOT);
+    if (manifest.ok) {
+      const loaded = loadProfileSync(ROOT, manifest.manifest.profile);
+      const ladder = loaded.ok && loaded.profile.ladder ? loaded.profile.ladder : null;
+      if (ladder && Array.isArray(ladder.deviceExecution)) legacyNames = ladder.deviceExecution;
+    }
+  } catch {
+    // The Stop hook never crashes over a legacy-compat lookup.
+  }
+  const envSkipped = (Array.isArray(receipt.steps) ? receipt.steps : []).filter((s) => {
+    if (!s || s.verdict !== "SKIP") return false;
+    if (s.skipKind) return s.skipKind === "environment";
+    return Boolean(legacyNames && legacyNames.includes(s.name) && legacyPatterns.test(String(s.reason ?? "")));
+  });
   if (envSkipped.length) {
     return {
       valid: false,
       reason:
-        `the device tier did not run — ${envSkipped.map((s) => `${s.name}: ${String(s.reason ?? "").split("\n")[0]}`).join("; ")}. ` +
-        "The lane boots a headless emulator itself (set CMP_AVD if it cannot choose one); fix the cause and run `node qa/verify.mjs` again before finishing",
+        `a tier did not run — ${envSkipped.map((s) => `${s.name}: ${String(s.reason ?? "").split("\n")[0]}`).join("; ")}. ` +
+        "Those steps skipped for an environmental reason, not because this project lacks them; fix the cause and run `node qa/verify.mjs` again before finishing",
       profile: receipt.profile,
     };
   }

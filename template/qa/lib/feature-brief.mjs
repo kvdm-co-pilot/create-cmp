@@ -316,6 +316,25 @@ export function receiptAttestation(root) {
  *   shared scans (callers resolving many features pass these once)
  * @returns {object}
  */
+/**
+ * Where this stack's journey for `name` is written — the profile's flow
+ * directory when it declares one, else the tier's own name.
+ *
+ * Stage 0 PR 6c: the doneReason used to say "write the journey in
+ * qa/e2e/<name>.yaml" on every stack, which is a Maestro flow path. The
+ * sentence a human is told to act on must name a file their project could
+ * actually have.
+ * @param {import("./spec-model.mjs").SpecModel} model
+ * @param {string} name
+ * @returns {string}
+ */
+function journeyWhere(model, name) {
+  if (model.flows && model.flows.dir && model.flows.exts.length) {
+    return `write it in ${model.flows.dir}/${name}${model.flows.exts[0]} and cite the clause it proves`;
+  }
+  return `add a ${model.tiers.journey} test that cites one of its clauses`;
+}
+
 export function deriveFeatureStatus(root, brief, pre = {}) {
   let markdown = "";
   let readable = true;
@@ -387,7 +406,7 @@ export function deriveFeatureStatus(root, brief, pre = {}) {
         : live.length === 0
           ? `${specRel} has no live clauses — nothing is promised yet`
           : needsJourney && covered === live.length && e2eCovered === 0
-            ? `${covered}/${live.length} clauses cited, but none from a qa/e2e flow — a UI feature is proven on a device: write the journey in qa/e2e/${brief.name}.yaml and cite the clause it proves`
+            ? `${covered}/${live.length} clauses cited, but none from the ${journeyTier} tier — a feature with a surface is proven where it runs, not only on the host: ${journeyWhere(model, brief.name)}`
           : covered < live.length
             ? `${covered}/${live.length} clauses cited — ${live.length - covered} promise(s) have no citing test`
             : !receipt.present

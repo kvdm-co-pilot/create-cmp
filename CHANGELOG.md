@@ -8,6 +8,21 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The Stop hook's did-not-run rule works on any stack, and the journey message names a
+  file your project could have.** The hook refused "done" over a tier that skipped for an
+  environmental reason by testing `["e2eSmoke", "androidChecks"]` by name and matching
+  Android reason text — so on any other stack the one gate that catches a tier that never
+  ran was silently inert. `skipKind` is the stack-free signal: ANY step that skipped for an
+  environmental reason now blocks done, whatever it is called, and a `structure` skip stays
+  honest and allowed. Legacy receipts without `skipKind` are read by reason text against the
+  **profile's** ladder (`ladder.deviceExecution`, newly exported from the profile so a
+  reader that must not start a lane can ask), and a profile with no ladder gets no legacy
+  fallback rather than a guess. The hook now quotes the step's own reason and adds no
+  remediation of its own — the cmp pack's device reasons already carry theirs, and telling a
+  backend team about Android emulators was the core asserting a stack fact straight to the
+  operator. Feature doneness says the same thing: `write the journey in qa/e2e/<name>.yaml`
+  is now derived from the profile's flow directory and journey tier. Stage 0 PR 6c.
+
 - **The spine stops naming a build tool.** `component-stories.mjs` (a `@Composable` ↔
   preview-story parity gate) and `androidChecksOutcome` (a Gradle invocation, a device's
   JUnit output, an APK) move into `qa/lib/profiles/cmp/`. `step-outcomes.mjs` keeps only the

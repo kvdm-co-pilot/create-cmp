@@ -25,7 +25,7 @@ test("the framework returns both ways inside the bound — PASS on a fresh scaff
   assert.match(r.stdout, /FAIL: narrowed surface declaration\s+\d+ms\s+✓ harnessIntegrity FAIL naming unrecorded/);
   assert.match(r.stdout, /FAIL: edited lane cannot vouch\s+\d+ms\s+✓ harnessIntegrity FAIL naming modified/);
   assert.match(r.stdout, /Stop hook\s+refuses a FAIL receipt ✓/);
-  assert.match(r.stdout, /Stop hook\s+refuses a skipped device tier ✓/);
+  assert.match(r.stdout, /Stop hook\s+refuses a skipped tier ✓/);
   assert.match(r.stdout, /revert → PASS/);
   assert.match(r.stdout, /framework check: PASS/);
 });
