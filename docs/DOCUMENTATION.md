@@ -48,7 +48,8 @@ here:
 
 | Doc | Purpose | Lifecycle |
 |---|---|---|
-| [HARNESS-PLAN.md](./HARNESS-PLAN.md) | **Authoritative product definition** — the AI delivery harness, its layers, the decision that the contract lives in the generated project. | living |
+| [NORTH-STAR.md](./NORTH-STAR.md) | **The governing document (2026-09-04)** — goals ranked, the four products and their dependency direction, the enforced workflow, the "declare your stack up front" mechanism, the guarantees, the staged road, the fit test every PR answers, decisions taken and open, and the precedence map over every other doc. Resolves every conflict. | living |
+| [HARNESS-PLAN.md](./HARNESS-PLAN.md) | The mobile product's five layers as built in 2026-07 — historical product definition; superseded on identity by NORTH-STAR. | historical |
 | [ROADMAP.md](./ROADMAP.md) | **Public** roadmap — the pillars, the "what and why" for users/contributors. | plan/roadmap |
 | [WHY-CMP.md](./WHY-CMP.md) | The honest CMP-vs-React-Native/Flutter case `cmp-new`'s fit check draws on — never claims either alternative is deprecated. | living |
 | [VERSIONS.md](./VERSIONS.md) | The proven-green version set(s) — why Kotlin/KSP/Compose MP/Room/AGP move together, not independently. | living |

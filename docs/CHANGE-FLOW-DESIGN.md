@@ -1,5 +1,8 @@
 # The Change Flow — every way work enters a create-cmp app
 
+Governed by [`NORTH-STAR.md`](./NORTH-STAR.md) (2026-09-04): the loop below is the
+core's; which stack facts belong to a Stack Profile is NORTH-STAR §5's table.
+
 Status: **doc of record** for the post-genesis delivery flow (supersedes the
 checks/deliver design shipped in `394e4f1`, reworked by decision 2026-07-25).
 Genesis itself is specified in [GENESIS-FLOW-DESIGN.md](./GENESIS-FLOW-DESIGN.md);

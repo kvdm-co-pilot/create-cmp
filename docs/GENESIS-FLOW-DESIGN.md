@@ -1,5 +1,9 @@
 # The Genesis Flow — design of record
 
+Governed by [`NORTH-STAR.md`](./NORTH-STAR.md) (2026-09-04): the definition order and
+"nothing generic ever gets signed" are the core's; what each artifact *is* for a given
+stack is the Stack Profile's (NORTH-STAR §5, §6).
+
 Companion to `VERIFICATION-LAYER-DESIGN.md` (VL). VL built the second half of
 the product — verify what was built, sign what you saw. This document is the
 first half, built second: **defining the app interactively before the harness

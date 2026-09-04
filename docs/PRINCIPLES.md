@@ -1,6 +1,8 @@
 # create-cmp — governing principles
 
-> The north star for this plugin and every project it governs. Seven rules, each with the
+> The engineering doctrine under [`NORTH-STAR.md`](./NORTH-STAR.md) — the governing document
+> names the goals these principles serve and ranks them; this file keeps the rules, each with
+> the episode that produced it and its enforcement. Seven rules, each with the
 > episode that produced it, what it requires, and how it is enforced. Written 2026-09-03 from
 > two days in which every one of these was violated at least once and each violation cost
 > hours. **Read this first in any session touching the harness, the console, or a project's

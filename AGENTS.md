@@ -4,7 +4,11 @@
 > read that for the full capability map, flags, and the stack-selection case. This file
 > is the short router.
 
-**Principles** — the north star for this plugin and every project it governs, each with the
+**North star** — the governing document for the product: goals ranked, guarantees, the staged
+road, and the fit test every feature answers: [docs/NORTH-STAR.md](./docs/NORTH-STAR.md). Read
+it before proposing or building anything; name the goal a change serves.
+
+**Principles** — the engineering doctrine under it, each with the
 episode that produced it: [docs/PRINCIPLES.md](./docs/PRINCIPLES.md). One line: derived, never
 claimed · prove the instrument before you read it · the layer you changed cannot certify itself
 · proof costs what the change costs and never runs silent · never wait on nothing · a signature
