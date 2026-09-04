@@ -1356,6 +1356,14 @@ for (const name of FAST_EXCLUDED_NAMES) {
 }
 
   return {
+    // WHICH PACK this is. The receipt names it (verify.mjs → receipt.pack) so a
+    // cmp L2 and some other pack's L2 can never be mistaken for the same claim
+    // on the wire. The pack declares its own identity — the spine writes what it
+    // is told, never a name it assumed (docs/proposals/AGNOSTIC-HARNESS-
+    // ARCHITECTURE.md §8.1, Stage 0 PR 1). Versioned with the harness until the
+    // profile loader lands, so no `version` here yet: the spine pairs `id` with
+    // the lock's version.
+    id: "cmp",
     stepsForProfile,
     DEVICE_STEPS,
     FAST_EXCLUDED_NAMES,

@@ -62,6 +62,15 @@
         "satisfiedBy": { "type": "array", "items": { "type": "string" }, "description": "The PASSed step names the rung counts as its evidence, in lane order" }
       }
     },
+    "pack": {
+      "type": "object",
+      "description": "WHICH STEP PACK produced the step rows — `harness` names the lane that ran, `pack` names the pack it loaded. A cmp L2 (device e2e) and a backend pack's L2 (integration tests) are different claims; this is what keeps them distinguishable on the wire. Optional until schema/2, once every writer emits it. Version is the harness lock's until profiles are versioned on their own.",
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": ["string", "null"] }
+      }
+    },
     "artifacts": {
       "type": "array",
       "items": {

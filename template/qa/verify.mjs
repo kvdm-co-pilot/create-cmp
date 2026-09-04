@@ -516,6 +516,9 @@ if (undeclared.length) {
 // ci → merge, nightly → nightly (proves the harness, never a change), release →
 // release. Receipts predating this field are read as their profile's stage.
 const STAGE_OF_PROFILE = { smoke: "smoke", scaffold: "scaffold", local: "change", ci: "merge", nightly: "nightly", release: "release" };
+// Computed once: `harness` and `pack` both read it, and checkHarnessIntegrity
+// hashes the whole region.
+const harnessSummary = harnessForReceipt();
 const receipt = {
   schema: "cmp-evidence/1",
   profile,
@@ -547,7 +550,16 @@ const receipt = {
   // checksum, not a signature, and someone who edits the lane can edit this
   // too. What they cannot edit is what the registry published under that
   // version, which is why `version` + `sha256` travel together.
-  harness: harnessForReceipt(),
+  harness: harnessSummary,
+  // WHICH PACK produced these rows. `harness` says which lane ran; `pack` says
+  // which step pack the lane loaded — and the two can differ once a profile is
+  // versioned on its own. Without this a cmp L2 and a backend pack's L2 are the
+  // same bytes on the wire and an auditor cannot tell "device e2e passed" from
+  // "integration tests passed" (AGNOSTIC-HARNESS-ARCHITECTURE.md §8). Named
+  // `pack` because `profile` is taken by the RUN profile (scaffold/local/ci/…);
+  // the collision is resolved at schema/2, not here. The pack declares its id;
+  // its version is the lock's until the profile loader gives it its own.
+  pack: { id: pack.id, version: harnessSummary.version },
   strength: { onDeviceSteps },
   evidenceLevel: level,
   artifacts,
