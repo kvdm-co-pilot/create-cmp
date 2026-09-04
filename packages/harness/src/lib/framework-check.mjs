@@ -118,7 +118,8 @@ export function clauseFamily(clause) {
  * @param {{specs?: Array<{rel: string, text: string}>,
  *          flows?: Array<{rel: string, text: string}>,
  *          harnessLib?: string[],
- *          testDir?: string|null}} tree
+ *          testDir?: string|null,
+ *          plantsDeclared?: boolean}} tree
  * @returns {{plants: Array<{kind: string, label: string, step: string,
  *            names: string[], target: object}>,
  *           unavailable: Array<{kind: string, reason: string}>}}
@@ -166,7 +167,17 @@ export function selectPlants(tree) {
     // exists, the tag exists, and nothing runs. The two remaining spec plants
     // need somewhere to put that Kotlin, so they hang on a test source dir.
     if (!testDir) {
-      const why = "no Kotlin test source directory — a planted citation has nowhere to live";
+      // TWO different causes reached this branch and the message named only
+      // one of them, wrongly: a profile that declares no `plants` never even
+      // looks for a test directory (framework-check.mjs passes testDir: null),
+      // so an adopter with two perfectly good test directories was told they
+      // had none. Worse, the plant this silently skips is `tier-unmet` — the
+      // one that calibrates the gate the whole instrument exists to prove —
+      // and the run still printed PASS. Saying which cause it is turns an
+      // invisible gap into a one-line fix. (And the core names no language.)
+      const why = tree?.plantsDeclared === false
+        ? "this profile declares no plants — add a `plants` export { testFileBasename, unboundCitationSource, tierUnmetCitationSource, unmeetableTier }"
+        : "no test source directory found — a planted citation has nowhere to live";
       skip(PLANT_KINDS.UNBOUND_CITATION, why);
       skip(PLANT_KINDS.TIER_UNMET, why);
     } else {
@@ -235,7 +246,14 @@ export function selectPlants(tree) {
     kind: PLANT_KINDS.NARROWED_SURFACE,
     label: "narrowed surface declaration",
     step: "harnessIntegrity",
-    names: ["unrecorded"],
+    // Assert the FILE, not an internal state word. "unrecorded" only holds when
+    // the declaration is absent from the lock — true for a stamped Compose app,
+    // false for a repo whose lock was taken after `harness init` wrote the
+    // surface, where the identical edit reads as "modified". Both are the same
+    // correct refusal; pinning one of them made the instrument fail on a lane
+    // that was working. What the plant actually cares about is that the refusal
+    // NAMES what it refused over, which is now true in either state.
+    names: ["qa/verified-surface.json"],
     hookPattern: "harnessIntegrity|vouch",
     target: { declaration: "qa/verified-surface.json" },
   });

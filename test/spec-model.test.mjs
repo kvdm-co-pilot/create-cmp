@@ -190,7 +190,7 @@ test("a root without a manifest is refused with the command that writes one — 
     const r = resolveSpecModel(root);
     assert.equal(r.ok, false);
     assert.match(r.reason, /harness-manifest\.json is missing/);
-    assert.match(r.reason, /create-cmp attach/);
+    assert.match(r.reason, /create-cmp harness init/, "the remedy must be a command that works on a repo of any stack");
     assert.throws(() => requireSpecModel(root), /harness-manifest\.json is missing/);
     assert.throws(() => scanCitations(root), /harness-manifest\.json is missing/, "root-only scanning refuses rather than scanning nothing");
   } finally {

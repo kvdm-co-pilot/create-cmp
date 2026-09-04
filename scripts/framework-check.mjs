@@ -204,7 +204,11 @@ const PLANTS = [
     plant: () => fs.writeFileSync(path.join(appDir, "qa", "verified-surface.json"), JSON.stringify({ surface: ["qa"] })),
     revert: () => fs.rmSync(path.join(appDir, "qa", "verified-surface.json"), { force: true }),
     step: "harnessIntegrity",
-    names: ["unrecorded"],
+    // The FILE, not the state word: "unrecorded" holds only while the surface
+    // declaration is absent from the lock. A repo locked after `harness init`
+    // reads the identical edit as "modified" — the same correct refusal in
+    // different words. Assert what the refusal must NAME, which is stable.
+    names: ["qa/verified-surface.json"],
     hook: /harnessIntegrity|vouch/i,
   },
   {

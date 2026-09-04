@@ -17,8 +17,10 @@
 //
 //   a stamped app (create-cmp.json present)  →  create-cmp upgrade --harness
 //                                                derives it from what it knows
-//   a foreign repo                            →  create-cmp attach
-//                                                asks, then writes it
+//   a foreign repo, any stack                 →  create-cmp harness init
+//                                                writes the manifest, a working
+//                                                profile, the surface and the
+//                                                lock, then runs Rule 0
 //
 // A PRESENT-BUT-MALFORMED manifest is refused too, naming every problem at
 // once — never silently defaulted, for the reason the console's reader gives:
@@ -130,7 +132,7 @@ export function absentManifestReason(root) {
   const stamped = fs.existsSync(path.join(root, "create-cmp.json"));
   const how = stamped
     ? "This is a create-cmp app: run `create-cmp upgrade --harness` and it will write the manifest from what it already knows."
-    : "Run `create-cmp attach` — it asks which profile and where your specs, sources and tests live, then writes the manifest.";
+    : "Run `create-cmp harness init` — it writes the manifest, a working profile for this project, the verified surface and the lock, then proves the lane returns.";
   return (
     `${MANIFEST_REL_PATH} is missing — the lane cannot run without knowing which stack profile this project uses, ` +
     `and there is no default. ${how}`

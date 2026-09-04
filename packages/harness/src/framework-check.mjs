@@ -266,6 +266,8 @@ const tree = {
   flows: readFlows(),
   harnessLib: listHarnessFiles(ROOT).filter((rel) => rel.startsWith("qa/lib/")),
   testDir: PROFILE_PLANTS ? findTestDir() : null,
+  // So the skip can name the REAL cause instead of blaming the tree.
+  plantsDeclared: Boolean(PROFILE_PLANTS),
   flowsDir: SPEC_MODEL && SPEC_MODEL.flows ? SPEC_MODEL.flows.dir : null,
 };
 
@@ -473,9 +475,21 @@ try {
     const first = plants[0];
     applyPlant(first);
     const r = runSmoke();
-    revertPlant(first);
     if (!r.receipt || r.receipt.verdict !== "FAIL") die("could not produce a FAIL receipt for the hook check");
+    // ASK THE HOOK BEFORE REVERTING. `revertPlant` restores RECEIPT_REL from
+    // what was on disk when this run started, so reverting first meant the hook
+    // was never shown the FAIL receipt the lane had just written. On a tree with
+    // no prior receipt the revert DELETED it and the hook refused because there
+    // was no receipt at all — green, for a reason that has nothing to do with
+    // this assertion. On a tree where the lane had already run, the revert put
+    // the earlier PASS back and the check failed on a working lane. Neither
+    // outcome tested "the Stop hook refuses a FAIL receipt". A check that cannot
+    // fail for its own reason is the exact defect this instrument exists to
+    // catch, which is why it is worth the four lines to say so. Found by the
+    // first non-Compose adoption, 2026-09-04. (`die` is safe here: every touched
+    // file is restored in the outer finally, plant reverted or not.)
     if (!hookRefuses().refused) die("the Stop hook did not refuse a FAIL receipt");
+    revertPlant(first);
     out(`  Stop hook            refuses a FAIL receipt ✓`);
   }
 

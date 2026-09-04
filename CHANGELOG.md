@@ -6,7 +6,53 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`create-cmp harness init` — one command from a repo of any stack to a green lane.** The
+  only documented entrance for a non-Compose repo was a closed loop, and it was measured: the
+  absent-manifest refusal named `create-cmp attach`, which refuses any repo without a Compose
+  or KMP plugin signal and — by its own header — does not write a lane even for the repos it
+  accepts. A Ktor backend adopting the harness got past it only by reading the engine's source.
+  `harness init` vendors the spine (skipping the five Compose-profile tools, one of which
+  cannot even load without a `cmp` profile), writes the manifest, generates a **working**
+  profile, seeds the verified surface from the project's own tree rather than a Compose app's
+  directory names, takes the lock, and runs `qa/framework-check.mjs` so the adopter watches the
+  lane refuse and recover before trusting it. A repo with sources, a spec and a test reaches a
+  green lane and a passing Rule 0 with nothing hand-edited.
+
+  The generated profile is the specification, not a description of one: prose about the
+  protocol drifts from `profile-loader.mjs` silently, a skeleton that must load cannot. Five
+  required exports as real code, the four optional ones commented with their true field names —
+  every one of which was an undocumented guess in that adoption report. The harness README's
+  adoption section is rewritten around the command; it previously instructed adopters to edit
+  `verify.mjs` (a fork, and forbidden) passing a `shGradle` that no longer exists.
+
 ### Fixed
+
+- **The Rule 0 instrument's Stop-hook check could not fail for its own reason.** It reverted
+  the plant — which restores the receipt — *before* asking the hook whether it refused a FAIL
+  receipt. On a tree with no prior receipt the revert deleted it and the hook refused because
+  there was no receipt at all: green, for a reason unrelated to the assertion. On a tree where
+  the lane had already run, the earlier PASS was restored and the check failed on a working
+  lane. The hook is now asked before the revert. Found by the first non-Compose adoption.
+
+- **A plant skip named a language and stated a falsehood.** `not planted — no Kotlin test
+  source directory` was printed to a project with two Kotlin test directories; the real cause
+  was that its profile declares no `plants`, in which case the instrument never looks for a
+  test directory at all. The plant silently skipped was `tier-unmet` — the one that calibrates
+  the gate the whole instrument exists to prove — while the run printed PASS. The skip now
+  names the real cause and the export that fixes it, and the core names no language.
+
+- **An integrity refusal reported counts and hid the paths.** `1 unrecorded` named nothing,
+  while `describeIntegrity` held the file list in its argument. The first adopter to hit it was
+  following the README's own step 1. It now names the files and, for the unrecorded-only case,
+  how to re-lock. Evidence-or-silence: a gate that refuses names what it refused over.
+
+- **A region plant asserted an internal state word rather than the file.** `narrowed surface
+  declaration` required the refusal to contain "unrecorded", which holds only while the surface
+  declaration is absent from the lock — false for any repo locked after `harness init`, where
+  the identical edit reads as "modified". Both are the same correct refusal. The plant now
+  asserts the filename, which is stable in either state and is what the refusal must name.
 
 - **The published receipt schema describes the receipt the lane actually writes.**
   `qa/evidence/schema.json` is a contract nothing validates at runtime, which is exactly why
