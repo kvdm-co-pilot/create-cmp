@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **A second stack now holds the protocol open on every commit.** Until 2026-09-04 exactly one
+  profile had ever loaded through the seam, and a protocol with one implementer is a protocol
+  that has only ever agreed with itself — every place the core still assumed Compose was
+  undiscovered, and the ones that were found were found in a separate repository by a Ktor
+  backend nobody here could have measured. That profile is preserved as authored at
+  `test/fixtures/profiles/ktor-backend/`, and `test/second-stack-conformance.test.mjs` runs the
+  core's own loader, spec model, tier arithmetic and plant selection against it.
+
+  Four shapes it holds that `cmp` cannot, by construction: `flows: null` (cmp always has
+  `qa/e2e/*.yaml`, so "where are the flows" had only ever been answered yes); **overlapping**
+  tiers, where an integration citation legally satisfies a unit clause and cmp's map has no
+  overlap at all; a `journey` tier that is not a flow tier; and `DEVICE_STEPS` naming a
+  container rather than a phone. A test also pins that the fixture carries none of cmp's facts
+  — the moment it starts resembling the first stack it stops being evidence.
+
 ### Changed
 
 - **The spine stops knowing a stack — six leaks closed.** Every one was found by the first
