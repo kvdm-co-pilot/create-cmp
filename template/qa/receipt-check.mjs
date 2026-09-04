@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
 import { evaluateReceipt, readReceipt } from "./lib/receipt-validate.mjs";
+import { readHold, assessHold, describeHold, holdExplains } from "./lib/agent-hold.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -175,12 +176,24 @@ if (asHook) {
     // INSTRUCTION: "run the lane" is wrong advice when one is already running,
     // and a gate that tells you to do the thing you are doing trains you to
     // stop reading it.
+    //
+    // An agent HOLDING the tree is the same shape of correction one level out:
+    // a lane in flight explains a receipt that is about to arrive, a hold
+    // explains a tree that is mid-edit and would not compile if you ran one.
+    // Reported ~15 false alarms in one evening at payment-blueprint, every one
+    // of which should have said "wait". It only ever changes the instruction —
+    // and only for the two refusals a working agent legitimately causes
+    // (holdExplains), never for a FAIL, a forgery or a skipped device tier,
+    // where the hold is not the cause and offering it would misdirect.
     const flight = laneInFlight();
+    const hold = holdExplains(result, readReceipt(ROOT)) ? assessHold(readHold(ROOT)) : null;
     const act = flight
       ? `A full check is ALREADY RUNNING${flight.step ? ` (${flight.step}${flight.index && flight.total ? `, step ${flight.index} of ${flight.total}` : ""})` : ""} — ` +
         `wait for it to finish and commit its receipt. Do NOT start a second one; two lanes fight over the same build directory.`
-      : "Run `node qa/verify.mjs` (it checks every promise and writes the receipt), " +
-        "commit the receipt, or see README §Verification enforcement to bypass.";
+      : hold?.held
+        ? describeHold(hold)
+        : "Run `node qa/verify.mjs` (it checks every promise and writes the receipt), " +
+          "commit the receipt, or see README §Verification enforcement to bypass.";
     process.stderr.write(
       `■ Prove — not done: the promises are not yet checked against this tree. ${result.reason}. ${act}\n`,
     );

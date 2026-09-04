@@ -35,6 +35,33 @@ and withheld, and the expensive way was the only one available.
   merely shipped. (Its first version compared `git status` in a directory that is not a repo and
   therefore compared nothing; it hashes the tree now, build output excluded.)
 
+### Added
+
+- **`qa/lib/agent-hold.mjs` + `qa/plan.mjs --hold/--beat/--release` — liveness for a working
+  agent.** Two failures reported from payment-blueprint on 2026-09-04 were the same missing
+  fact. (a) There was no cheap way to answer "is the agent working or wedged?", so the question
+  was answered by filesystem archaeology — twice with broken instruments (a `find` that excluded
+  `build/`, the only directory a proof run writes to; then a `find -newermt` that reported zero
+  writes in 45 minutes while `ls -lT` showed one at 10) — and a healthy agent was killed
+  mid-proof. (b) The Stop hook fired ~15 times in one evening while the correct action every
+  time was to wait, because it cannot tell a receipt stale from laziness from one stale because
+  a subagent is mid-commit on a half-adopted port.
+  - **A hold changes the ADVICE, never the verdict.** The hook still refuses — a file an agent
+    writes about itself must never be able to end a turn. It follows the precedent already set
+    for a lane in flight: same refusal, different instruction.
+  - **It explains only the two refusals a working agent legitimately causes** — no receipt yet,
+    and a tree that moved under a *PASSing* receipt. A FAIL, a forgery, a skipped device tier or
+    an unreadable surface are never explained by a hold, because there the hold is not the cause
+    and offering it would send the reader to wait on an agent when a test is red.
+  - Heartbeat older than 5 min reads as a crashed writer; a hold older than the 45 min ceiling
+    reads as a wedge and the alarm returns — a heartbeat proves a process is alive, never that
+    it is progressing.
+  - Ephemeral like its siblings: gitignored and excluded from the receipt's hashed input surface,
+    so a note about who is typing can never invalidate a receipt.
+  - 19 tests, including the whole safety asymmetry (suite 1333 → 1352).
+- The orchestrator agent now claims, beats and releases the hold, and owes a visible line per
+  subagent start and finish.
+
 ### Changed
 
 - **GATE-RULES Rule 1 names its instrument at the point of authoring.** Rule 1 states a

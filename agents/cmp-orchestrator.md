@@ -125,6 +125,18 @@ obvious afterwards. So:
   the status is "still running, no output yet." Do not wait for completion to say so.
 - **Never report progress you have not verified against the tree.** A hollow "done" reads
   exactly like a real one; `git status` is the difference.
+- **Claim the tree while you hold it**, so "is it working or wedged?" is a file read rather
+  than filesystem archaeology:
+  ```bash
+  node qa/plan.mjs --hold "adopting the ports" --as orchestrator   # starting
+  node qa/plan.mjs --beat "compiling module 3"                     # every few minutes
+  node qa/plan.mjs --release                                       # done, or handing back
+  ```
+  A heartbeat older than five minutes reads as a crashed writer; a hold older than the
+  ceiling reads as a wedge and the alarm comes back. This gates nothing and locks nothing —
+  it changes what the Stop hook ADVISES, from "run the lane" to "wait for it", which is the
+  correct advice at a tree that is mid-edit and would not compile. It never lifts a refusal,
+  and it never explains a red receipt.
 
 ## RE-DELEGATE, DON'T ABSORB
 When a subagent returns a **hollow / no-op report** — a plan with no file edits, "I dispatched a

@@ -69,6 +69,11 @@ const EXCLUDED_PREFIXES = [
   "qa/.plan.json",
   "qa/.request.json",
   "qa/.plan-history.jsonl",
+  // Who is typing right now (qa/lib/agent-hold.mjs). A liveness declaration
+  // that could invalidate a receipt would mean an agent saying "I am here"
+  // un-proves the tree — the exact inversion this family of exclusions exists
+  // to prevent.
+  "qa/.agent-hold.json",
   "qa/evidence",
   "qa-artifacts",
   "qa/comments.json",
