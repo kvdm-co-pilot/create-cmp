@@ -128,6 +128,14 @@ export function selectPlants(tree) {
   const flows = Array.isArray(tree?.flows) ? tree.flows : [];
   const harnessLib = Array.isArray(tree?.harnessLib) ? tree.harnessLib : [];
   const testDir = tree?.testDir ?? null;
+  // Where this stack keeps the flow-shaped citation files the lane executes
+  // (the profile's `layout.flows.dir`). The nested-flow plant must land INSIDE
+  // it — a subdirectory the runner walks past — so the directory cannot be a
+  // constant here. Derived from the flows themselves when the caller does not
+  // say, so a caller with flows always gets the plant.
+  const flowsDir = typeof tree?.flowsDir === "string" && tree.flowsDir
+    ? tree.flowsDir
+    : (flows.find((f) => typeof f?.rel === "string" && f.rel.includes("/"))?.rel.replace(/\/[^/]*$/, "") ?? null);
 
   const plants = [];
   const unavailable = [];
@@ -190,7 +198,7 @@ export function selectPlants(tree) {
   if (!citingFlows.length) {
     const why = flows.length
       ? `no "# SPEC:" citation in ${flows.length} flow file(s) — e2eCoverage has nothing to lose`
-      : "no qa/e2e flows — this project declares no device journeys";
+      : `no flows${flowsDir ? ` under ${flowsDir}` : ""} — this project declares no journeys`;
     skip(PLANT_KINDS.FEATURE_WITHOUT_FLOW, why);
     skip(PLANT_KINDS.NESTED_FLOW, why);
   } else {
@@ -215,7 +223,7 @@ export function selectPlants(tree) {
       step: "e2eCoverage",
       names: [],
       reasonPattern: String.raw`\[[^\]\s]+\]`,
-      target: { flows: rels, nestInto: "qa/e2e/wip" },
+      target: { flows: rels, nestInto: `${flowsDir}/wip` },
     });
   }
 

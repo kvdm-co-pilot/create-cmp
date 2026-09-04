@@ -875,8 +875,11 @@ Smallest blast radius first, so each step is a small PR with the fleet check gre
      remaining module, and the one whose content genuinely IS Compose (expect/actual
      tables, source sets, layer inventory). Candidate for Stage 0.5 as a provider
      rather than a parameterisation.
-7. `framework-check`: plants from the profile. Fleet green; framework-check green in
-   both the Compose scratch app and the blueprint.
+7. ✅ `framework-check`: the planted SOURCE from the profile (`profiles/cmp/plants.mjs`)
+   and the nested-flow directory from `layout.flows.dir`. Which plants a tree supports was
+   already derived from the tree; the clause grammar and citation marker are the core
+   scanner's. A profile with no plant source loses exactly those two plants, named. Fleet
+   green; framework-check green in the Compose scratch app and on the shipped twin.
 
 Each step's PR carries its own plant where it changed a gate (Rule 1), and the de-fork
 count in its description.

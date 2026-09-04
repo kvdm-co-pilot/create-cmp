@@ -104,9 +104,14 @@ test("no Kotlin test directory: the two citation plants stand down, the rename s
 });
 
 test("no flows, or flows that cite nothing: both e2e plants stand down with a reason", () => {
-  const none = selectPlants({ ...fullTree(), flows: [] });
-  assert.match(reasonFor(none.unavailable, PLANT_KINDS.FEATURE_WITHOUT_FLOW), /no qa\/e2e flows/);
-  assert.match(reasonFor(none.unavailable, PLANT_KINDS.NESTED_FLOW), /no qa\/e2e flows/);
+  // Stage 0 PR 7: the flow directory is the profile's (layout.flows.dir), so the
+  // reason names whatever this project declared — and says only "no flows" when
+  // the project declares no flow directory at all.
+  const none = selectPlants({ ...fullTree(), flows: [], flowsDir: "qa/e2e" });
+  assert.match(reasonFor(none.unavailable, PLANT_KINDS.FEATURE_WITHOUT_FLOW), /no flows under qa\/e2e/);
+  assert.match(reasonFor(none.unavailable, PLANT_KINDS.NESTED_FLOW), /no flows under qa\/e2e/);
+  const backend = selectPlants({ ...fullTree(), flows: [], flowsDir: null });
+  assert.match(reasonFor(backend.unavailable, PLANT_KINDS.NESTED_FLOW), /^no flows — this project declares no journeys/);
 
   const uncited = selectPlants({ ...fullTree(), flows: [{ rel: "qa/e2e/smoke.yaml", text: "- launchApp\n" }] });
   assert.match(reasonFor(uncited.unavailable, PLANT_KINDS.FEATURE_WITHOUT_FLOW), /nothing to lose/);
@@ -253,4 +258,46 @@ test("an empty or malformed cycle list is within budget rather than a crash", ()
 
 test("the budget is smaller than the hang bound — a slow cycle is a finding long before it is a hang", () => {
   assert.ok(CALIBRATION_BUDGET_MS < DEFAULT_BOUND_MS);
+});
+
+// ── Stage 0 PR 7: the planted SOURCE is the profile's ────────────────────────
+// Which plants a tree supports is derived from the tree (above); WHAT a planted
+// citation is written into is not derivable — a citation must sit on a test, so
+// two plants have to write one in this stack's language. The cmp profile
+// supplies it; a profile that supplies none ships without those two plants and
+// says so, rather than reporting a quieter green (§5.2: no plants, no badge).
+import { plants as cmpPlants } from "../packages/harness/src/lib/profiles/cmp/plants.mjs";
+import { BINDING_WINDOW, citationIsBound } from "../packages/harness/src/lib/spec-coverage.mjs";
+
+test("the cmp profile's planted sources actually produce the violations they claim", () => {
+  const unbound = cmpPlants.unboundCitationSource("HOME-99").split("\n");
+  const tagLine = unbound.findIndex((l) => l.includes("SPEC: HOME-99"));
+  assert.ok(tagLine >= 0, "the unbound plant carries the citation");
+  assert.equal(citationIsBound(unbound, tagLine), false, "…and the core's binder must refuse it — that IS the plant");
+  // Longer than the window, so a real test cannot wander into range and launder
+  // it: this is payment-blueprint's drift, where a tag on a class three
+  // properties above a genuine @Test vouched for the whole file.
+  const bodyLines = unbound.slice(tagLine + 1).filter((l) => l.trim() && !l.trim().startsWith("//"));
+  assert.ok(bodyLines.length > BINDING_WINDOW, `the class body must outlast the ${BINDING_WINDOW}-line binding window`);
+
+  const tier = cmpPlants.tierUnmetCitationSource("HOME-98").split("\n");
+  const tierTag = tier.findIndex((l) => l.includes("SPEC: HOME-98"));
+  assert.ok(tierTag >= 0);
+  assert.equal(citationIsBound(tier, tierTag), true, "the tier plant's citation IS bound — a real, running test that simply cannot observe the claim");
+  assert.equal(cmpPlants.unmeetableTier, "e2e");
+  assert.match(cmpPlants.testFileBasename, /\.kt$/, "and it lands somewhere this stack compiles");
+});
+
+test("the instrument names the plants it cannot make — a profile with no planted source loses exactly two", () => {
+  // selectPlants already reports an unavailable plant by kind and reason; with
+  // no test directory (which is what a profile with no plant material yields)
+  // the two source-writing plants are the ones that go.
+  const withoutTestDir = selectPlants({ ...fullTree(), testDir: null });
+  const gone = withoutTestDir.unavailable.map((u) => u.kind).sort();
+  assert.deepEqual(gone, ["tier-unmet", "unbound-citation"]);
+  for (const u of withoutTestDir.unavailable) {
+    assert.match(u.reason, /planted citation has nowhere to live/, "and the reason says why, never a silent drop");
+  }
+  // Everything else still runs: the instrument degrades, it does not stand down.
+  assert.ok(withoutTestDir.plants.length >= 5, "the region and flow plants need no source file");
 });
