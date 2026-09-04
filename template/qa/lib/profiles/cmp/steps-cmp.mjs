@@ -40,6 +40,7 @@ import { evaluateReachability } from "./reachability.mjs";
 import { evaluateE2eCoverage } from "./e2e-coverage.mjs";
 import { memoizeStep } from "../../step-cache.mjs";
 import { changedWorkingTreePaths, deriveAffectedFilter } from "../../affected-tests.mjs";
+import { affected as cmpAffected } from "./affected.mjs";
 import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./device-lease.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "../../arch-doc.mjs";
 import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "../../determinism.mjs";
@@ -725,7 +726,7 @@ function stepUnitTests() {
     if (changed === null) {
       note = "full suite — git unavailable, cannot derive the change (fail open)";
     } else {
-      const filter = deriveAffectedFilter(changed);
+      const filter = deriveAffectedFilter(changed, cmpAffected);
       if (filter.mode === "filtered") {
         testsArgs = filter.patterns.map((p) => ` --tests "${p}"`).join("");
         note = `affected: ${filter.patterns.join(", ")} — ${filter.sourcePaths.length} changed source file(s)`;

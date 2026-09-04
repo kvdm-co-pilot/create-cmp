@@ -867,7 +867,10 @@ Smallest blast radius first, so each step is a small PR with the fleet check gre
      name list read from the profile's ladder; `feature-brief`'s journey sentence names
      the profile's flow directory and journey tier. The profile now exports `ladder` at
      the top level (§4.2 #6).
-   - **6d** `affected-tests`' blast radius and test-filter mapping from the profile.
+   - **6d ✅** `affected-tests`' blast radius and test-filter mapping from the profile
+     (`profiles/cmp/affected.mjs`, handed to the core by the pack). The core keeps the
+     honesty contract and its own `qa/` rule; a profile with no mapping subsets nothing
+     and says so.
    - **6e** `arch-doc`'s generated sections from `profile.architecture` — the largest
      remaining module, and the one whose content genuinely IS Compose (expect/actual
      tables, source sets, layer inventory). Candidate for Stage 0.5 as a provider

@@ -23,10 +23,18 @@ import path from "node:path";
 
 import {
   LANE_OUTPUT_PREFIXES,
-  broadImpactReason,
+  coreBroadImpactReason,
   changedWorkingTreePaths,
   deriveAffectedFilter,
 } from "../template/qa/lib/affected-tests.mjs";
+// Stage 0 PR 6d: qa/ is the core's blast-radius rule on every stack; WHICH
+// other paths fan out, and how a source maps to a test filter, are the
+// profile's. The pack hands the core its own mapping — nothing resolves a
+// manifest, because the pack already is the profile.
+import { affected as cmpAffected, broadImpact as cmpBroadImpact } from "../template/qa/lib/profiles/cmp/affected.mjs";
+
+/** The whole rule as the cmp lane applies it: core first, then the profile's. */
+const broadImpactReason = (p) => coreBroadImpactReason(p) ?? cmpBroadImpact(p);
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "affected-engine-"));
 
@@ -50,7 +58,7 @@ test("blast-radius escape hatch: each broad category disables filtering, named i
   for (const [p, reasonRe] of cases) {
     assert.match(broadImpactReason(p) ?? "", reasonRe, `broadImpactReason(${p})`);
     // Even alongside an innocuous scoped edit, one broad path forces the full suite.
-    const res = deriveAffectedFilter([`${SRC}/presentation/home/HomeViewModel.kt`, p]);
+    const res = deriveAffectedFilter([`${SRC}/presentation/home/HomeViewModel.kt`, p], cmpAffected);
     assert.equal(res.mode, "all", `deriveAffectedFilter with ${p}`);
     assert.match(res.reason, /broad-impact change/);
     assert.match(res.reason, reasonRe);
@@ -69,7 +77,7 @@ test("package→filter mapping: parent-dir segment becomes *seg*, unioned, dedup
     `${SRC}/presentation/home/HomeScreen.kt`, // same segment — deduped
     `${SRC}/presentation/profile/ProfileViewModel.kt`,
     `${SRC}/data/repository/ItemRepositoryImpl.kt`,
-  ]);
+  ], cmpAffected);
   assert.equal(res.mode, "filtered");
   assert.deepEqual(res.patterns, ["*home*", "*profile*", "*repository*"]);
   assert.equal(res.sourcePaths.length, 4);
@@ -82,35 +90,35 @@ test("lane outputs never count as changes: a dirty receipt neither forces the fu
   // Compose build directory) is present for exactly the duration of the run
   // that would read it. Uncounted, it matches the qa/** hatch and every
   // in-lane --fast filter falls open — the flight-journal bug, one file over.
-  const markerOnly = deriveAffectedFilter(["qa/.lane-in-progress", `${SRC}/presentation/home/HomeViewModel.kt`]);
+  const markerOnly = deriveAffectedFilter(["qa/.lane-in-progress", `${SRC}/presentation/home/HomeViewModel.kt`], cmpAffected);
   assert.equal(markerOnly.mode, "filtered", markerOnly.reason);
   assert.deepEqual(markerOnly.patterns, ["*home*"]);
 
   // PLANTED: the flight journal is appended by every run and committed. Counted
   // as a change it matches the qa/** hatch, and --fast falls open to the full
   // suite forever after the first run. It must be a lane output.
-  const journalOnly = deriveAffectedFilter(["qa/flight-recorder.jsonl", `${SRC}/presentation/home/HomeViewModel.kt`]);
+  const journalOnly = deriveAffectedFilter(["qa/flight-recorder.jsonl", `${SRC}/presentation/home/HomeViewModel.kt`], cmpAffected);
   assert.equal(journalOnly.mode, "filtered", "the journal must not widen the filter");
   assert.deepEqual(journalOnly.patterns, ["*home*"]);
 
   // Receipt + one scoped edit → still filtered (the qa/** hatch must not self-trigger).
-  const withEdit = deriveAffectedFilter(["qa/evidence/latest.json", `${SRC}/presentation/home/HomeViewModel.kt`]);
+  const withEdit = deriveAffectedFilter(["qa/evidence/latest.json", `${SRC}/presentation/home/HomeViewModel.kt`], cmpAffected);
   assert.equal(withEdit.mode, "filtered");
   assert.deepEqual(withEdit.patterns, ["*home*"]);
 
   // Receipt alone → nothing changed, honestly reported.
-  const alone = deriveAffectedFilter(["qa/evidence/latest.json", "qa-artifacts/smoke.png"]);
+  const alone = deriveAffectedFilter(["qa/evidence/latest.json", "qa-artifacts/smoke.png"], cmpAffected);
   assert.equal(alone.mode, "all");
   assert.match(alone.reason, /no working-tree changes/);
 });
 
 test("fail open: empty change set and unmappable changes run everything, with the reason named", () => {
-  const empty = deriveAffectedFilter([]);
+  const empty = deriveAffectedFilter([], cmpAffected);
   assert.equal(empty.mode, "all");
   assert.match(empty.reason, /no working-tree changes/);
 
   // Scoped but non-.kt (a resource) maps to no filter → full suite, never a silent skip.
-  const unmappable = deriveAffectedFilter(["composeApp/src/commonMain/composeResources/values/strings.xml"]);
+  const unmappable = deriveAffectedFilter(["composeApp/src/commonMain/composeResources/values/strings.xml"], cmpAffected);
   assert.equal(unmappable.mode, "all");
   assert.match(unmappable.reason, /map to no test filter/);
 });
@@ -147,7 +155,43 @@ test("changedWorkingTreePaths: real repo reports tracked modifications plus untr
   assert.ok(changed.includes(untracked), `untracked file missing: ${changed}`);
 
   // ...and the derivation over the real change scopes to the feature.
-  const res = deriveAffectedFilter(changed);
+  const res = deriveAffectedFilter(changed, cmpAffected);
   assert.equal(res.mode, "filtered");
   assert.deepEqual(res.patterns, ["*home*"]);
+});
+
+// ── The split: the contract is the core's, the rules are the profile's ───────
+
+test("PLANTED: with NO profile mapping the fast lane subsets nothing, and says so — fail open, never fail silent", () => {
+  // The failure this prevents: vendored into a repo whose sources are not under
+  // composeApp/src, the old hardcoded rules made EVERY path broad-impact, so
+  // every fast run fell open to the full suite with the optimisation silently
+  // off — visible only in one parenthetical nobody reads.
+  const res = deriveAffectedFilter([`${SRC}/presentation/home/HomeViewModel.kt`]);
+  assert.equal(res.mode, "all");
+  assert.match(res.reason, /this profile declares no affected-test mapping/);
+  assert.deepEqual(res.patterns, []);
+  for (const half of [{ broadImpact: () => null }, { patternsFor: () => ({ patterns: ["*x*"] }) }]) {
+    assert.equal(deriveAffectedFilter([`${SRC}/x/Y.kt`], half).mode, "all", "half a mapping is no mapping");
+  }
+});
+
+test("a BACKEND-shaped mapping subsets by its own rules — the core supplies only the honesty contract", () => {
+  const backend = {
+    broadImpact: (p) => (p.endsWith("pom.xml") ? "the reactor rewires every module" : p.startsWith("services/") ? null : "outside services/"),
+    patternsFor: (paths) => {
+      const modules = [...new Set(paths.filter((p) => p.endsWith(".java")).map((p) => p.split("/")[1]))].sort();
+      return { patterns: modules.map((m) => `${m}/**`), sourcePaths: paths };
+    },
+  };
+  const scoped = deriveAffectedFilter(["services/ledger/src/Money.java", "services/api/src/Routes.java"], backend);
+  assert.equal(scoped.mode, "filtered", scoped.reason);
+  assert.deepEqual(scoped.patterns, ["api/**", "ledger/**"]);
+
+  assert.match(deriveAffectedFilter(["pom.xml"], backend).reason, /reactor rewires every module/);
+  assert.match(deriveAffectedFilter(["docs/README.md"], backend).reason, /outside services\//);
+  // The core's own rule still applies first, whatever the profile thinks.
+  assert.match(deriveAffectedFilter(["qa/verify.mjs"], backend).reason, /qa\/ is the harness itself/);
+  // And lane outputs are still never changes.
+  assert.equal(deriveAffectedFilter(["qa/evidence/latest.json"], backend).reason, "no working-tree changes to scope by");
 });
