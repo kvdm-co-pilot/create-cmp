@@ -49,7 +49,7 @@ test("shortDuration fits on one line", () => {
 
 test("as a process: it reads the marker the lane stamps and writes ONE line to stderr, nothing to stdout", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-narrator-"));
-  const markerPath = path.join(root, "composeApp", "build", ".cmp-lane-in-progress");
+  const markerPath = path.join(root, "qa", ".lane-in-progress");
   fs.mkdirSync(path.dirname(markerPath), { recursive: true });
   // A step that started 25s ago — already past the quiet window, so the first
   // poll (1s) must speak.

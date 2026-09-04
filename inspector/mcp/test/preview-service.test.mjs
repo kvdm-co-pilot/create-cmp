@@ -749,7 +749,7 @@ test("touchRenderMarker: refreshes mtime when a marker is stamped; a no-op (neve
 test("render marker vs. lane marker: independent files, same '<pid> <ISO>' contract, distinguishable by name", () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-render-marker-"));
   try {
-    const laneMarkerPath = path.join(projectDir, "composeApp", "build", ".cmp-lane-in-progress");
+    const laneMarkerPath = path.join(projectDir, "qa", ".lane-in-progress");
     fs.mkdirSync(path.dirname(laneMarkerPath), { recursive: true });
     fs.writeFileSync(laneMarkerPath, `${process.pid} ${new Date().toISOString()}\n`);
     assert.equal(laneInProgress(projectDir), true, "the lane marker still reads as in-progress");
@@ -758,7 +758,7 @@ test("render marker vs. lane marker: independent files, same '<pid> <ISO>' contr
     // Both markers coexist without clobbering each other.
     assert.ok(fs.existsSync(laneMarkerPath));
     assert.ok(fs.existsSync(path.join(projectDir, ...RENDER_MARKER_REL)));
-    assert.notEqual(RENDER_MARKER_REL.at(-1), ".cmp-lane-in-progress");
+    assert.notEqual(RENDER_MARKER_REL.at(-1), ".lane-in-progress");
 
     clearRenderMarker(projectDir);
     assert.ok(!fs.existsSync(path.join(projectDir, ...RENDER_MARKER_REL)));

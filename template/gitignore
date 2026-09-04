@@ -45,6 +45,7 @@ qa/.plan.json
 # human prompts — the committed journal for lane runs stays qa/flight-recorder.jsonl.
 qa/.plan-history.jsonl
 qa/.agent-hold.json
+qa/.lane-in-progress
 
 # Android signing. The keystore IS the app's identity on Android — it cannot be reissued —
 # and keystore.properties holds its passwords. Never committed, never in a sidecar diff.

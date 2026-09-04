@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The lane marker is core state; the runner carries no build tool.** The lane's
+  in-flight marker moved from `composeApp/build/.cmp-lane-in-progress` to
+  `qa/.lane-in-progress` (`qa/lib/lane-markers.mjs`) — it is the lane's, not a stack's, and
+  in a repo with no `composeApp/build` every reader (the Stop hook, the narrator, the
+  watcher, the chain view, the console) reported an honest-looking "nothing running". It is
+  gitignored, excluded from the inputs hash and from the fast filter, so a running lane
+  never un-proves its own tree. The eyes' render marker stays the provider's: it lives under
+  the profile's declared `layout.buildDir`, and a profile that declares none has no render
+  marker at all. `qa/verify.mjs` no longer builds `GRADLEW`, the `--rerun` flag or the
+  KSP/render coexistence wrapper — the pack builds them from `fast` and its own `buildDir`,
+  and the runner hands it a plain subprocess helper. Stage 0 PR 6a.
+
 - **The approvals registry is the profile's.** `qa/lib/approvals.mjs` keeps the mechanic —
   an artifact is a path set with a hash, a signature binds the hash, status is derived on
   every read, reopen and accept are attributed, the gate reads it all — and stops knowing

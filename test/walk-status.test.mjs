@@ -467,9 +467,9 @@ test("N1: the declaration's own write stamps become step durations in the render
 
 test("N2: the lane marker's narration is parsed, spoken with expected durations, and prefixed observed", async () => {
   const plan = await import(pathToFileURL(path.join(dir, "qa/lib/plan.mjs")).href);
-  const markerDir = path.join(dir, "composeApp", "build");
+  const markerDir = path.join(dir, "qa");
   fs.mkdirSync(markerDir, { recursive: true });
-  const marker = path.join(markerDir, ".cmp-lane-in-progress");
+  const marker = path.join(markerDir, ".lane-in-progress");
   fs.writeFileSync(
     marker,
     `${JSON.stringify({ pid: 1, at: "x", step: "unitTests", index: 10, total: 16, stepStartedAt: new Date(Date.now() - 12000).toISOString(), expectedStepMs: 6000, expectedLaneMs: 52000 })}\n`,

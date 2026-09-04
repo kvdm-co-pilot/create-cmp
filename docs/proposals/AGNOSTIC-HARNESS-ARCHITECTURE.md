@@ -840,7 +840,20 @@ Smallest blast radius first, so each step is a small PR with the fleet check gre
    blueprint's 322-line replacement can now be a profile `artifacts` array over the
    core's mechanic — their adoption, measured when they take it.
 6. `feature-brief`, `arch-doc`, `verify` markers, `inputs-hash`, `receipt-validate`,
-   `affected-tests`. Fleet green after each.
+   `affected-tests`. Fleet green after each. Sliced, because one PR over seven modules is
+   the badly-sliced change §12 warns about:
+   - **6a ✅ the lane marker + the runner's build tool.** The marker is core state at
+     `qa/.lane-in-progress` (`lane-markers.mjs`); the render marker comes from the
+     profile's `layout.buildDir`; `GRADLEW`, `--rerun` and the KSP/render coexistence
+     wrapper leave `verify.mjs` for the pack. **Residue, named and pinned by
+     `test/lane-markers.test.mjs`:** `WATCH_ROOTS` (watch.mjs) and `ACTIVITY_ROOTS`
+     (plan.mjs) still hardcode `composeApp/src`; `verify.mjs --help` still prints the
+     pack's step names. Those are 6b's.
+   - **6b** the source roots and the help text from the profile; `a11y.mjs`,
+     `component-stories.mjs` and `androidChecksOutcome` into `profiles/cmp/`.
+   - **6c** `arch-doc` sections from data, `feature-brief`'s journey wording,
+     `affected-tests`' blast radius, `inputs-hash`' default surface,
+     `receipt-check`'s device tier — all from the profile.
 7. `framework-check`: plants from the profile. Fleet green; framework-check green in
    both the Compose scratch app and the blueprint.
 

@@ -170,10 +170,13 @@ const MAX_STALE_RETRIES = 3;
 // and share composeApp/build/kspCaches; KSP's incremental storage is single-owner, so
 // concurrent builds throw "Storage for [...] is already registered" and one side dies
 // (historically: render-failed + a manual preview_stop/--stop/rm dance). Two defenses:
-//   1. COORDINATE — the lane stamps .cmp-lane-in-progress for its duration; renders
+//   1. COORDINATE — the lane stamps qa/.lane-in-progress for its duration; renders
 //      DEFER while it exists. mtime-bounded so a crashed lane never wedges the eyes.
 //   2. SELF-HEAL — a spawn that still collides clears kspCaches and retries once.
-const LANE_MARKER_REL = ["composeApp", "build", ".cmp-lane-in-progress"];
+// The lane marker is core state under qa/ (the project's qa/lib/lane-markers.mjs,
+// Stage 0 PR 6a); the render marker below stays under composeApp/build because
+// it is THIS provider's.
+const LANE_MARKER_REL = ["qa", ".lane-in-progress"];
 const LANE_MARKER_STALE_MS = 30 * 60 * 1000;
 const LANE_POLL_MS = 5000;
 export const KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
@@ -3148,7 +3151,8 @@ export function createPreviewService(opts) {
     // mkdir: the build dir does not exist before the first Gradle run, and a
     // watch skipped at startup never retries — verify.mjs mkdirs the same path
     // before stamping, so pre-creating it is claiming nothing Gradle owns.
-    { rel: "composeApp/build", kind: "governance", only: new Set([".cmp-lane-in-progress", ".cmp-render-in-progress"]), mkdir: true },
+    { rel: "composeApp/build", kind: "governance", only: new Set([".cmp-render-in-progress"]), mkdir: true },
+    { rel: "qa", kind: "governance", only: new Set([".lane-in-progress"]) },
     { rel: receiptDirRel, kind: "governance", only: new Set([receiptBase]) },
     // The manifest itself: editing it re-points every reader, so the page
     // must re-render (the watch set is fixed for the process — a moved

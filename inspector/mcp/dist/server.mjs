@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs a1f6a23139adcda1d23991bf886ef1ac1f72e7fd1a2e9ad8ee2f31b4d987bcc5
+// cmp:bundle-inputs fa5166b8f6b8cca2648c6b8ff4fe9c684172e44c3adee8d7b7483733cdd21110
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -37263,7 +37263,7 @@ var DAEMON_RENDER_TIMEOUT_MS = 12e4;
 var COMPILE_WATCHDOG_MS = 2e4;
 var STALE_RETRY_MS = 2500;
 var MAX_STALE_RETRIES = 3;
-var LANE_MARKER_REL = ["composeApp", "build", ".cmp-lane-in-progress"];
+var LANE_MARKER_REL = ["qa", ".lane-in-progress"];
 var LANE_MARKER_STALE_MS = 30 * 60 * 1e3;
 var LANE_POLL_MS = 5e3;
 var KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
@@ -39434,7 +39434,8 @@ function createPreviewService(opts) {
     // mkdir: the build dir does not exist before the first Gradle run, and a
     // watch skipped at startup never retries — verify.mjs mkdirs the same path
     // before stamping, so pre-creating it is claiming nothing Gradle owns.
-    { rel: "composeApp/build", kind: "governance", only: /* @__PURE__ */ new Set([".cmp-lane-in-progress", ".cmp-render-in-progress"]), mkdir: true },
+    { rel: "composeApp/build", kind: "governance", only: /* @__PURE__ */ new Set([".cmp-render-in-progress"]), mkdir: true },
+    { rel: "qa", kind: "governance", only: /* @__PURE__ */ new Set([".lane-in-progress"]) },
     { rel: receiptDirRel, kind: "governance", only: /* @__PURE__ */ new Set([receiptBase]) },
     // The manifest itself: editing it re-points every reader, so the page
     // must re-render (the watch set is fixed for the process — a moved

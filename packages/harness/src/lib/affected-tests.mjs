@@ -43,7 +43,9 @@ import path from "node:path";
 // first fell open to the full suite, visible only in one parenthetical.
 // Found by payment-blueprint's spine adoption (2026-09-03), where the same
 // line also landed in their locked region.
-export const LANE_OUTPUT_PREFIXES = ["qa/evidence", "qa-artifacts", "qa/flight-recorder.jsonl"];
+// qa/.lane-in-progress is the lane's own marker (qa/lib/lane-markers.mjs) —
+// present, untracked, for exactly the duration of the run that would read it.
+export const LANE_OUTPUT_PREFIXES = ["qa/evidence", "qa-artifacts", "qa/flight-recorder.jsonl", "qa/.lane-in-progress"];
 
 function isLaneOutput(p) {
   return LANE_OUTPUT_PREFIXES.some((prefix) => p === prefix || p.startsWith(`${prefix}/`));

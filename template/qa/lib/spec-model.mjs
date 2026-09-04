@@ -68,6 +68,10 @@ export function specDeclarationProblems(profile) {
     if (!isStringList(layout.citationRoots)) out.push("layout.citationRoots must be a non-empty list of project-relative paths");
     else for (const r of layout.citationRoots) { const q = relPathProblem("layout.citationRoots[]", r); if (q) out.push(q); }
     if (!isStringList(layout.citationExts) || !layout.citationExts.every((e) => e.startsWith("."))) out.push('layout.citationExts must be a non-empty list of file extensions, each starting with "."');
+    if (layout.buildDir != null) {
+      const q = relPathProblem("layout.buildDir", layout.buildDir);
+      if (q) out.push(q);
+    }
     if (layout.flows != null) {
       if (typeof layout.flows !== "object") out.push("layout.flows must be null or {dir, exts}");
       else {
@@ -119,6 +123,7 @@ export function specModelFrom(profile, overrides = {}) {
       citationRoots: Object.freeze(citationRoots),
       citationExts: Object.freeze([...layout.citationExts]),
       flows: flows ? Object.freeze(flows) : null,
+      buildDir: typeof layout.buildDir === "string" ? layout.buildDir : null,
       tiers: Object.freeze({
         names: Object.freeze([...tiers.names]),
         hostOnly: Object.freeze([...tiers.hostOnly]),
@@ -165,5 +170,6 @@ export function requireSpecModel(root) {
  * @property {readonly string[]} citationRoots
  * @property {readonly string[]} citationExts
  * @property {{dir: string, exts: readonly string[]}|null} flows
+ * @property {string|null} buildDir
  * @property {{names: readonly string[], hostOnly: readonly string[], satisfying: Record<string, readonly string[]>, journey: string|null, forFile: (rel: string) => string}} tiers
  */

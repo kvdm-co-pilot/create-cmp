@@ -21,6 +21,8 @@
  *   specs          the directory of `*.spec.md` files
  *   citationRoots  the trees walked for `// SPEC:` citations
  *   citationExts   the source files a citation may sit in
+ *   buildDir       the stack's build output directory, when it has one — the
+ *                  provider's render marker lives there (optional)
  *   flows          flow-shaped citation files: the file IS the test, so a tag
  *                  in one binds to the flow rather than to a declaration
  *                  inside it. Only TOP-LEVEL files in `dir` count — the lane
@@ -33,6 +35,10 @@ export const layout = Object.freeze({
   citationRoots: Object.freeze(["composeApp/src", "qa/e2e"]),
   citationExts: Object.freeze([".kt", ".kts"]),
   flows: Object.freeze({ dir: "qa/e2e", exts: Object.freeze([".yaml", ".yml"]) }),
+  // Gradle's output directory for the app module — where the eyes stamp their
+  // render marker (qa/lib/lane-markers.mjs) and where KSP's single-owner
+  // incremental storage lives (steps-cmp.mjs's coexistence self-heal).
+  buildDir: "composeApp/build",
 });
 
 /**

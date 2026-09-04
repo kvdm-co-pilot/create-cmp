@@ -76,7 +76,15 @@ test("package→filter mapping: parent-dir segment becomes *seg*, unioned, dedup
 });
 
 test("lane outputs never count as changes: a dirty receipt neither forces the full suite nor drives the filter", () => {
-  assert.deepEqual(LANE_OUTPUT_PREFIXES, ["qa/evidence", "qa-artifacts", "qa/flight-recorder.jsonl"]);
+  assert.deepEqual(LANE_OUTPUT_PREFIXES, ["qa/evidence", "qa-artifacts", "qa/flight-recorder.jsonl", "qa/.lane-in-progress"]);
+
+  // The lane's own in-flight marker (Stage 0 PR 6a moved it under qa/, out of a
+  // Compose build directory) is present for exactly the duration of the run
+  // that would read it. Uncounted, it matches the qa/** hatch and every
+  // in-lane --fast filter falls open — the flight-journal bug, one file over.
+  const markerOnly = deriveAffectedFilter(["qa/.lane-in-progress", `${SRC}/presentation/home/HomeViewModel.kt`]);
+  assert.equal(markerOnly.mode, "filtered", markerOnly.reason);
+  assert.deepEqual(markerOnly.patterns, ["*home*"]);
 
   // PLANTED: the flight journal is appended by every run and committed. Counted
   // as a change it matches the qa/** hatch, and --fast falls open to the full

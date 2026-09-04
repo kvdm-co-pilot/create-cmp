@@ -24,6 +24,7 @@ import { evaluateApprovalsGate } from "../../approvals.mjs";
 import { clauseTierCoverage, listFlowFiles, scanCitations, scanSpecClauses, walkFiles } from "../../spec-coverage.mjs";
 import { specModelFrom } from "../../spec-model.mjs";
 import { layout as cmpLayout, tiers as cmpTiers } from "./declarations.mjs";
+import { RENDER_MARKER_FRESH_MS, RENDER_MARKER_NAME } from "../../lane-markers.mjs";
 
 // The scanner's model, built from this profile's own declarations — the pack
 // hands its facts to the core rather than round-tripping through the manifest.
@@ -54,14 +55,11 @@ import { CMP_LADDER } from "./ladder.mjs";
  * @param {object} ctx
  * @param {string} ctx.ROOT project root
  * @param {string} ctx.HERE the qa/ directory
- * @param {string} ctx.GRADLEW the wrapper invocation
- * @param {string} ctx.RERUN " --rerun" in full mode, "" in fast
  * @param {boolean} ctx.fast
  * @param {boolean} ctx.determinism
  * @param {string} ctx.profile
  * @param {"full"|"fast"} ctx.mode
  * @param {Function} ctx.sh subprocess helper (throws StepTimeout past the step's deadline)
- * @param {Function} ctx.shGradle sh + the KSP-collision self-heal
  * @param {Function} ctx.tryGit
  * @param {Function} ctx.tryGitLines
  * @param {string[]} ctx.DEGRADED_PATHS degraded-path activations the receipt reports
@@ -70,7 +68,87 @@ import { CMP_LADDER } from "./ladder.mjs";
  *   stepDeterminism: Function, releaseLease: () => void}}
  */
 export function createCmpSteps(ctx) {
-  const { ROOT, HERE, GRADLEW, RERUN, fast, determinism, profile, mode, sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS } = ctx;
+  const { ROOT, HERE, fast, determinism, profile, mode, sh, tryGit, tryGitLines, DEGRADED_PATHS } = ctx;
+
+  // ── Gradle is THIS profile's build tool ───────────────────────────────────
+  // The wrapper invocation, the integrity flag and the coexistence dance used
+  // to live in qa/verify.mjs and arrive through ctx — which meant the runner,
+  // the spine every stack shares, knew what Gradle is, where composeApp/build
+  // sits, and what a KSP cache collision looks like. Stage 0 PR 6a moved them
+  // here: the runner hands the pack a plain subprocess helper, and the pack
+  // wraps it with whatever its own toolchain needs.
+  const GRADLEW = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
+
+  // `--rerun` exists for evidence integrity: it stops Gradle's build cache
+  // replaying a PASS recorded against a different tree into a receipt that
+  // claims tests executed. That belongs to runs producing integrity-bearing
+  // artifacts — and a --fast run does not: its receipt already declares itself
+  // non-evidence (mode "fast", no evidence rung, refused by
+  // qa/receipt-check.mjs), so forcing execution there paid an integrity tax to
+  // protect an artifact with nothing to protect.
+  const RERUN = fast ? "" : " --rerun";
+
+  // ── Preview-daemon coexistence ───────────────────────────────────────────
+  // The preview daemon (the eyes) and this lane both spawn Gradle against this
+  // project and share <buildDir>/kspCaches, whose KSP incremental storage is
+  // single-owner — two concurrent builds throw "Storage for [...] is already
+  // registered" and one side dies. Three defenses, all automatic:
+  //   1. COORDINATE (this lane -> the daemon): the lane stamps its marker for
+  //      its duration (qa/.lane-in-progress, core state); the preview service
+  //      defers renders while it exists (mtime-bounded, so a crashed lane
+  //      never wedges the eyes for long).
+  //   2. COORDINATE (the daemon -> this lane), the symmetric half: the daemon
+  //      stamps its OWN marker for the duration of a render's Gradle build;
+  //      shGradle waits for it to clear (or go stale) before launching this
+  //      lane's own Gradle command — same mtime-bounded shape, so a crashed
+  //      daemon never wedges the lane for long either.
+  //   3. SELF-HEAL: a Gradle step that still hits the collision clears
+  //      kspCaches and retries once — the manual recovery that always worked,
+  //      automated.
+  // The render marker is the PROVIDER's, so it lives under this profile's own
+  // buildDir; qa/lib/lane-markers.mjs names the file and the freshness bound
+  // so the daemon and the lane can never disagree about either.
+  const KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
+  const BUILD_DIR = cmpLayout.buildDir;
+  const RENDER_MARKER = path.join(ROOT, ...BUILD_DIR.split("/"), RENDER_MARKER_NAME);
+  const RENDER_WAIT_TIMEOUT_MS = 3 * 60 * 1000; // give up waiting after this long regardless
+  const RENDER_WAIT_POLL_MS = 2000;
+
+  /**
+   * Defer this lane's next Gradle command while the preview daemon's render
+   * marker is present AND fresh (mtime younger than RENDER_MARKER_FRESH_MS).
+   * Polls every RENDER_WAIT_POLL_MS; gives up and proceeds anyway after
+   * RENDER_WAIT_TIMEOUT_MS, or the moment the marker disappears or goes stale —
+   * whichever comes first. A missing/unreadable marker returns immediately:
+   * this is a coexistence courtesy, never a hard dependency on the daemon.
+   */
+  function waitForRenderMarker() {
+    const deadline = Date.now() + RENDER_WAIT_TIMEOUT_MS;
+    for (;;) {
+      let stat;
+      try {
+        stat = fs.statSync(RENDER_MARKER);
+      } catch {
+        return; // no render in flight
+      }
+      if (Date.now() - stat.mtimeMs >= RENDER_MARKER_FRESH_MS) return; // gone stale
+      if (Date.now() >= deadline) return; // waited long enough — proceed regardless
+      sh(`sleep ${RENDER_WAIT_POLL_MS / 1000}`);
+    }
+  }
+
+  function shGradle(cmd, opts = {}) {
+    waitForRenderMarker();
+    const first = sh(cmd, opts);
+    if (first.ok || !KSP_COLLISION_RE.test(first.out)) return first;
+    console.error("· KSP cache collision (concurrent Gradle — the preview daemon?) — clearing kspCaches, retrying once");
+    fs.rmSync(path.join(ROOT, ...BUILD_DIR.split("/"), "kspCaches"), { recursive: true, force: true });
+    const retry = sh(cmd, opts);
+    retry.durationMs += first.durationMs;
+    retry.selfHealed = "ksp-cache-collision";
+    DEGRADED_PATHS.push("ksp-cache-collision: cleared kspCaches and retried the Gradle step");
+    return retry;
+  }
 
 // Recursive: desktopTest writes TEST-*.xml flat, but connected (instrumented) results
 // land one directory level down per device (build/outputs/androidTest-results/connected/

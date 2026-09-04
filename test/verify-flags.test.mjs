@@ -113,7 +113,13 @@ test("S8b: verify.mjs defines no step; the pack defines them all and is composed
   // Stage 0 PR 2: the pack is no longer named — it is whatever profile the
   // manifest declares, loaded by id. The borrowing is still one visible line;
   // what changed is that the spine no longer knows the pack's name.
-  assert.match(verifySrc, /const pack = loaded\.profile\.steps\(\{ ROOT, HERE, GRADLEW, RERUN, fast, determinism, profile, mode, sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS \}\)/, "the borrowing is visible in one line");
+  // Stage 0 PR 6a: the ctx carries no build tool. GRADLEW, the --rerun flag and
+  // the KSP/render coexistence wrapper were the spine knowing what Gradle is;
+  // they are the pack's now, built from `fast` and the profile's own buildDir.
+  assert.match(verifySrc, /const pack = loaded\.profile\.steps\(\{ ROOT, HERE, fast, determinism, profile, mode, sh, tryGit, tryGitLines, DEGRADED_PATHS \}\)/, "the borrowing is visible in one line");
+  for (const gradleism of [/\bGRADLEW\b/, /\bshGradle\b/, /const RERUN =/, /kspCaches/]) {
+    assert.doesNotMatch(verifySrc.replace(/^\s*\/\/.*$/gm, ""), gradleism, `the spine carries no build-tool knowledge: ${gradleism}`);
+  }
   assert.doesNotMatch(verifySrc, /createCmpSteps/, "the spine names no profile");
   assert.match(verifySrc, /onFinally: \(\) => pack\.releaseLease\(\)/, "the device lease is the pack's; the spine only asks it to let go");
   assert.match(verifySrc, /probe = pack\.stepDeterminism\(\)/, "the bare probe goes through the pack too");
