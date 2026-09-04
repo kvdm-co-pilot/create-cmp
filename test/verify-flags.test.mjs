@@ -91,7 +91,11 @@ test("the lane: sh() throws on a deadline; the RUNNER sets it per step, catches 
   assert.match(verifySrc, /const lane = runLane\(\{/, "verify.mjs composes the runner");
   assert.doesNotMatch(verifySrc, /stepErrorResult\(/, "and no longer owns the catch — the spine does");
   assert.match(runnerSrc, /setDeadline\(stepDeadlineMs\(expected\.byName\.get\(name\)\)\)/, "the deadline is set per step from its own history");
-  assert.match(runnerSrc, /result = stepErrorResult\(name, err, Date\.now\(\) - stepStarted\)/, "the loop catches into ERROR and keeps going");
+  assert.match(runnerSrc, /result = stepErrorResult\(name, err, Date\.now\(\) - stepStarted, \{ hint:/, "the loop catches into ERROR and keeps going");
+  // Stage 0 PR 6b.2: WHERE to look is the pack's sentence, carried through the
+  // spine — never written by it.
+  assert.match(runnerSrc, /step\.timeoutHint/, "the hint is the pack's, marked on the step function like fn.layer");
+  assert.doesNotMatch(runnerSrc.replace(/^[ \t]*\/\/.*$/gm, ""), /gradlew|adb /, "the runner names no build tool");
   assert.match(runnerSrc, /s\.verdict === "FAIL" \|\| s\.verdict === "ERROR"\)\) \? "FAIL" : "PASS"/, "ERROR fails the lane");
   assert.match(runnerSrc, /verdict === "ERROR" \? "⊘"/, "and wears its own mark");
 });

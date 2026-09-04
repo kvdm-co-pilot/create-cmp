@@ -20,7 +20,7 @@ import {
   kebabCase as templateKebabCase,
   componentStoryId as templateStoryId,
   findComposableNames,
-} from "../template/qa/lib/component-stories.mjs";
+} from "../template/qa/lib/profiles/cmp/component-stories.mjs";
 import {
   kebabCase as inspectorKebabCase,
   componentStoryId as inspectorStoryId,

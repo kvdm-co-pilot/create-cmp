@@ -35,7 +35,7 @@ const SPEC_MODEL = (() => {
 })();
 /** Where the flows the lane runs live. */
 const E2E_FLOW_DIR = cmpLayout.flows.dir;
-import { evaluateComponentStoryParity } from "../../component-stories.mjs";
+import { evaluateComponentStoryParity } from "./component-stories.mjs";
 import { evaluateReachability } from "./reachability.mjs";
 import { evaluateE2eCoverage } from "./e2e-coverage.mjs";
 import { memoizeStep } from "../../step-cache.mjs";
@@ -44,7 +44,7 @@ import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./device-l
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "../../arch-doc.mjs";
 import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "../../determinism.mjs";
 import { evaluateAuditCadence } from "../../audit-cadence.mjs";
-import { androidChecksOutcome } from "../../step-outcomes.mjs";
+import { androidChecksOutcome } from "./android-checks.mjs";
 import { deviceLogIncidents, maestroOutcome, parseMaestroJunit } from "./maestro.mjs";
 import { ensureDevice, releaseDevice } from "./device-provider.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "../../harness-lock.mjs";
@@ -1445,6 +1445,14 @@ const STEP_FN_BY_NAME = {
   releaseSmoke: stepReleaseSmoke,
   releaseBuild: stepReleaseBuild,
 };
+// Where to look when one of THIS pack's steps blows its deadline. The spine
+// prints it verbatim and knows nothing about Gradle or adb (Stage 0 PR 6b.2);
+// marked on the step function, like `fn.layer`.
+const GRADLE_TIMEOUT_HINT = "A wedged Gradle daemon or a device that stopped answering are the usual causes; check `./gradlew --status` and `adb devices`.";
+for (const fn of [stepBuild, stepReleaseBuild, stepUnitTests, stepConformance, stepGoldenTrees, stepA11y, ...Object.values(STEP_FN_BY_NAME)]) {
+  if (typeof fn === "function") fn.timeoutHint = GRADLE_TIMEOUT_HINT;
+}
+
 for (const name of FAST_EXCLUDED_NAMES) {
   if (!STEP_FN_BY_NAME[name]) {
     // Drift guard: a new device-tier step must be mapped here or --fast would silently run it.
