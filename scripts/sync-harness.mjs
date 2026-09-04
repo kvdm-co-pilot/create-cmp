@@ -45,6 +45,32 @@ const REGION_DIRS = [
   { pkg: "src/lib", tpl: "qa/lib" },
 ];
 
+/**
+ * Subtrees vendored RECURSIVELY. Stack profiles live at qa/lib/profiles/<id>/
+ * and may nest freely inside their own directory; the one-level rule above is
+ * deliberate for the spine and would silently drop them. Mirrors
+ * HARNESS_PROFILES_DIR in harness-region.mjs — the lock and the sync must agree
+ * on what the region is, or a vendored file could sit outside the lock.
+ */
+const REGION_TREES = [{ pkg: "src/lib/profiles", tpl: "qa/lib/profiles" }];
+
+/** Every .mjs under a directory, recursively, as posix paths relative to it. */
+function mjsUnder(absDir, relPrefix = "") {
+  let entries;
+  try {
+    entries = fs.readdirSync(absDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    const rel = relPrefix ? `${relPrefix}/${e.name}` : e.name;
+    if (e.isDirectory()) out.push(...mjsUnder(path.join(absDir, e.name), rel));
+    else if (e.isFile() && e.name.endsWith(".mjs")) out.push(rel);
+  }
+  return out;
+}
+
 function mjsIn(absDir) {
   let names;
   try {
@@ -66,6 +92,11 @@ export function harnessFiles() {
       pairs.push({ from: `packages/harness/${pkg}/${name}`, to: `template/${tpl}/${name}` });
     }
   }
+  for (const { pkg, tpl } of REGION_TREES) {
+    for (const rel of mjsUnder(path.join(REPO_ROOT, "packages/harness", pkg))) {
+      pairs.push({ from: `packages/harness/${pkg}/${rel}`, to: `template/${tpl}/${rel}` });
+    }
+  }
   return pairs;
 }
 
@@ -77,6 +108,12 @@ export function orphanFiles() {
     for (const name of mjsIn(path.join(REPO_ROOT, "template", tpl))) {
       const rel = `template/${tpl}/${name}`;
       if (!expected.has(rel)) found.push(rel);
+    }
+  }
+  for (const { tpl } of REGION_TREES) {
+    for (const rel of mjsUnder(path.join(REPO_ROOT, "template", tpl))) {
+      const full = `template/${tpl}/${rel}`;
+      if (!expected.has(full)) found.push(full);
     }
   }
   return found;

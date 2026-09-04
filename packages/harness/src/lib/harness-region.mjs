@@ -65,6 +65,18 @@ export const HARNESS_DIRS = ["qa", "qa/lib"];
 export const HARNESS_TEST_DIR = "qa/test";
 
 /**
+ * STACK PROFILES — qa/lib/profiles/<id>/**. Every `.mjs` under it, recursively,
+ * is machine-owned: a profile is the set of gates, tiers and steps the lane
+ * runs for this project, loaded by id from qa/harness-manifest.json
+ * (qa/lib/profile-loader.mjs). An edited profile that stayed outside the lock
+ * could redefine what "done" means and still have the lane vouch for the
+ * result — GATE-RULES Rule 2, the layer you changed cannot certify itself.
+ * Named and recursive on purpose, like HARNESS_TEST_DIR: a nested directory
+ * enters the region only by someone widening the rule here, never by shape.
+ */
+export const HARNESS_PROFILES_DIR = "qa/lib/profiles";
+
+/**
  * DECLARATIONS the lane READS to decide what it attests — locked for the same
  * reason verify.mjs is. payment-blueprint's planted proof (2026-09-03): remove
  * one entry from qa/verified-surface.json and 203 files — the whole backend —
@@ -87,6 +99,7 @@ export function isHarnessFile(relPath) {
   if (HARNESS_DECLARATIONS.includes(relPath)) return true;
   if (!relPath.endsWith(".mjs")) return false;
   if (relPath.startsWith(`${HARNESS_TEST_DIR}/`)) return true;
+  if (relPath.startsWith(`${HARNESS_PROFILES_DIR}/`)) return true;
   const dir = relPath.includes("/") ? relPath.slice(0, relPath.lastIndexOf("/")) : "";
   return HARNESS_DIRS.includes(dir);
 }
@@ -127,6 +140,7 @@ export function listHarnessFiles(root) {
     }
   }
   walkMjs(path.join(root, HARNESS_TEST_DIR), HARNESS_TEST_DIR, found);
+  walkMjs(path.join(root, HARNESS_PROFILES_DIR), HARNESS_PROFILES_DIR, found);
   // A declaration directly under qa/ is already seen by the scan above (it is
   // a harness file by name); the explicit loop covers one that lives deeper.
   // Deduplicated so no path is hashed twice.
