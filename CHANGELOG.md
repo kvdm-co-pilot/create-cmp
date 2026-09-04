@@ -8,6 +8,19 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The spine stops naming a build tool.** `component-stories.mjs` (a `@Composable` ↔
+  preview-story parity gate) and `androidChecksOutcome` (a Gradle invocation, a device's
+  JUnit output, an APK) move into `qa/lib/profiles/cmp/`. `step-outcomes.mjs` keeps only the
+  neutral helpers — deadlines, timeouts, turning a throw into one `ERROR` row — and its
+  deadline message no longer ends with "check `./gradlew --status` and `adb devices`", which
+  is confident wrong advice in a repo that has neither. Where to look is the pack's sentence
+  now: a pack marks a step with `fn.timeoutHint` (the same mechanism as `fn.layer`), the
+  runner carries it through, and a step with no hint gets a message that says what it
+  honestly knows and stops. `test/agnostic-lint.test.mjs` now holds `verify.mjs`,
+  `watch.mjs`, `receipt-check.mjs`, `plan.mjs`, `lane-runner.mjs`, `lane-markers.mjs` and
+  `step-outcomes.mjs` to the no-stack-facts rule, with `gradlew` and `kspCaches` added to the
+  banned words. Stage 0 PR 6b.2.
+
 - **The watcher, the chain view and `--help` describe the project they are in.** Three
   surfaces still spoke Compose. `qa/watch.mjs` watched a hardcoded `composeApp/src`, so the
   inner loop in any other repo watched two roots out of three and never fired on a source

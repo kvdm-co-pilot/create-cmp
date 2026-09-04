@@ -3,7 +3,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { StepTimeout, androidChecksOutcome, spawnTimedOut, stepDeadlineMs, stepErrorResult } from "../packages/harness/src/lib/step-outcomes.mjs";
+import { StepTimeout, spawnTimedOut, stepDeadlineMs, stepErrorResult } from "../packages/harness/src/lib/step-outcomes.mjs";
+// Stage 0 PR 6b.2: the instrumented-test verdict reads a Gradle invocation and
+// a device's JUnit output, so it is the cmp profile's — the spine keeps only
+// the neutral helpers (deadlines, timeouts, throw → one ERROR row).
+import { androidChecksOutcome } from "../packages/harness/src/lib/profiles/cmp/android-checks.mjs";
 
 test("PLANTED: the 2026-09-02 collision — Gradle failed, zero tests ran — is 'did not execute', never 'your behavior is broken'", () => {
   const o = androidChecksOutcome({ ok: false, out: "FAILED\nINSTALL_FAILED_UPDATE_INCOMPATIBLE" }, { tests: 0, failures: 0, errors: 0 });
@@ -57,15 +61,43 @@ test("the deadline comes from the step's own measured history: ×3, floored at 5
   assert.equal(stepDeadlineMs(0), 30 * MIN);
 });
 
-test("a deadline becomes ONE ERROR row that names the cause and the checks — and does not accuse the change", () => {
-  const r = stepErrorResult("releaseBuild", new StepTimeout("./gradlew assembleRelease", 12 * 60_000), 720_100);
+test("a deadline becomes ONE ERROR row that names the cause and the PACK's checks — and does not accuse the change", () => {
+  // Stage 0 PR 6b.2: where to look is the pack's to say. The spine used to end
+  // this message with "check `./gradlew --status` and `adb devices`" — confident
+  // wrong advice in a repo that has neither.
+  const hint = "A wedged Gradle daemon or a device that stopped answering are the usual causes; check `./gradlew --status` and `adb devices`.";
+  const r = stepErrorResult("releaseBuild", new StepTimeout("./gradlew assembleRelease", 12 * 60_000), 720_100, { hint });
   assert.equal(r.verdict, "ERROR");
   assert.equal(r.name, "releaseBuild");
   assert.match(r.reason, /DID NOT COMPLETE — no result within its deadline \(12 min\)/);
   assert.match(r.reason, /not accusing it/);
   assert.match(r.reason, /gradlew --status/);
   assert.match(r.reason, /adb devices/);
+  assert.match(r.reason, /Re-run the step alone/);
   assert.deepEqual(r.details, { executed: false, kind: "deadline" });
+});
+
+test("with NO hint the message says what it honestly knows and stops — no build tool, no device, no invented advice", () => {
+  const r = stepErrorResult("integrationTests", new StepTimeout("./mvnw verify", 9 * 60_000), 540_000);
+  assert.equal(r.verdict, "ERROR");
+  assert.match(r.reason, /DID NOT COMPLETE — no result within its deadline \(9 min\)/);
+  assert.match(r.reason, /not accusing it/);
+  assert.match(r.reason, /Re-run the step alone/);
+  for (const tool of [/gradlew/, /adb/, /Gradle/, /daemon/]) {
+    assert.doesNotMatch(r.reason, tool, `a hintless step must not be told to check ${tool}`);
+  }
+  assert.match(r.reason, /\.\/mvnw verify/, "it still names the command that did not return");
+});
+
+test("the cmp pack marks its build and device steps with its own where-to-look sentence", async () => {
+  const { createCmpSteps } = await import("../packages/harness/src/lib/profiles/cmp/steps-cmp.mjs");
+  const pack = createCmpSteps({
+    ROOT: process.cwd(), HERE: process.cwd(), fast: false, determinism: false, profile: "local", mode: "full",
+    sh: () => ({ ok: true, out: "" }), tryGit: () => null, tryGitLines: () => [], DEGRADED_PATHS: [],
+  });
+  for (const [name, fn] of Object.entries(pack.STEP_FN_BY_NAME)) {
+    assert.match(fn.timeoutHint ?? "", /gradlew --status/, `${name} carries the pack's hint`);
+  }
 });
 
 test("a step that THROWS is an ERROR row too — it used to crash the whole lane", () => {

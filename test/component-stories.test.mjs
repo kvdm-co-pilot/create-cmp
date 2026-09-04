@@ -20,7 +20,7 @@ import {
   componentStoryId,
   kebabCase,
   findComposableNames,
-} from "../template/qa/lib/component-stories.mjs";
+} from "../template/qa/lib/profiles/cmp/component-stories.mjs";
 import { tabInfos, renderPreviewRegistryKt } from "../src/lib/tabs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));

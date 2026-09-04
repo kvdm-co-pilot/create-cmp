@@ -143,7 +143,9 @@ export function runLane(ctx) {
       try {
         result = step();
       } catch (err) {
-        result = stepErrorResult(name, err, Date.now() - stepStarted);
+        // `step.timeoutHint` is the pack's where-to-look sentence, marked on the
+        // step function like `step.layer`. The spine carries it; it never writes one.
+        result = stepErrorResult(name, err, Date.now() - stepStarted, { hint: typeof step.timeoutHint === "string" ? step.timeoutHint : undefined });
       }
       // Layer tag: a pack may mark a step function with the layer of the
       // stack it proves (`fn.layer = "backend"`). The runner stamps it onto

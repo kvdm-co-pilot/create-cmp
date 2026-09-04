@@ -10,7 +10,7 @@
 // the step — a gate that misattributes its own failures corrodes the gates that
 // are right.
 //
-// Pure, so the wording and the rule are testable without Gradle or a device.
+// Pure, so the wording and the rule are testable without a build tool or a device.
 // (docs/proposals/evidence-economics.md C3, S4.)
 //
 // FOUR VERDICTS. PASS / FAIL / SKIP had no way to say "I could not run": a
@@ -23,47 +23,6 @@
 // not green. This is JUnit's error-vs-failure, Bazel's FAILED_TO_BUILD /
 // TIMEOUT vs FAILED, pytest's error vs failed — the distinction every mature
 // runner makes and this one did not.
-
-/**
- * The androidChecks outcome from Gradle's exit and the JUnit summary.
- *
- * @param {{ok: boolean, out: string}} res the Gradle invocation
- * @param {{tests: number, failures: number, errors: number}|null} summary parsed JUnit
- *   results, or null when none were written
- * @param {{gradlew?: string}} [opts]
- * @returns {{verdict: "PASS"|"FAIL"|"ERROR", executed: boolean, reason?: string}}
- */
-export function androidChecksOutcome(res, summary, { gradlew = "./gradlew" } = {}) {
-  const executed = Boolean(summary && summary.tests > 0);
-  if (res.ok) return { verdict: "PASS", executed };
-  const tail = String(res.out ?? "")
-    .split("\n")
-    .filter((l) => /FAILED|error:|failed/i.test(l))
-    .slice(0, 12)
-    .join("\n");
-  if (executed) {
-    return {
-      verdict: "FAIL",
-      executed,
-      reason:
-        `connectedDebugAndroidTest failed (${summary.failures + summary.errors} of ${summary.tests} tests) — ` +
-        `an on-device behavior claim is broken. Fix the behavior, not the test:\n${tail}`,
-    };
-  }
-  // ERROR, not FAIL: the step could not execute. A device tier that could not
-  // run is not evidence (the lane still FAILs), and going green would be the
-  // worse lie — but "your behaviour is broken" is withdrawn, and the receipt
-  // can tell a red that measured something from a red that measured nothing.
-  return {
-    verdict: "ERROR",
-    executed,
-    reason:
-      "connectedDebugAndroidTest DID NOT EXECUTE — the run reported no tests at all, so this step has observed " +
-      "nothing about your change and is not accusing it. Usual cause: another adb/Gradle session touching the same " +
-      "device (a manual `adb` command, a second lane, a running preview), or an install that never landed. " +
-      `Re-run this step alone with nothing else on the device before suspecting the code:\n  ${gradlew} :composeApp:connectedDebugAndroidTest --rerun\n${tail}`,
-  };
-}
 
 /** Thrown by the lane's subprocess helper when a step's deadline passes. */
 export class StepTimeout extends Error {
@@ -90,7 +49,7 @@ export function spawnTimedOut(res) {
 
 /**
  * A step's own deadline, from the journal's last measured duration for it:
- * three times what it usually takes, never under five minutes (a cold Gradle
+ * three times what it usually takes, never under five minutes (a cold build
  * daemon is slow, not wedged), never over thirty (past that it IS wedged).
  * Unknown steps get the ceiling — a first run is never cut short.
  * @param {number|null|undefined} expectedMs
@@ -106,16 +65,24 @@ export function stepDeadlineMs(expectedMs, { floorMs = 5 * 60_000, ceilingMs = 3
  * out of the step's own body (which used to crash the whole lane; now it is
  * one ERROR row and the lane keeps going, because the other steps' verdicts
  * are still worth having).
+ * WHERE TO LOOK is the pack's to say, never the spine's: this used to end with
+ * "check `./gradlew --status` and `adb devices`", which is confident wrong
+ * advice in a repo that has neither. A pack marks a step with `fn.timeoutHint`
+ * (the same mechanism as `fn.layer`) and the runner passes it through; with no
+ * hint the message says what it honestly knows and stops.
+ *
  * @param {string} name the step's display name
  * @param {unknown} err
  * @param {number} durationMs
+ * @param {{hint?: string}} [opts] `hint` — the pack's own where-to-look sentence
  * @returns {{name: string, verdict: "ERROR", reason: string, durationMs: number, details: {executed: false, kind: string}}}
  */
-export function stepErrorResult(name, err, durationMs) {
+export function stepErrorResult(name, err, durationMs, { hint } = {}) {
   const timeout = err instanceof StepTimeout;
+  const where = typeof hint === "string" && hint.trim() ? ` ${hint.trim()}` : "";
   const reason = timeout
-    ? `DID NOT COMPLETE — no result within its deadline (${Math.round(err.deadlineMs / 60000)} min). This step has observed nothing about your change and is not accusing it. ` +
-      `A wedged Gradle daemon or a device that stopped answering are the usual causes; check \`./gradlew --status\` and \`adb devices\`, then re-run the step alone.
+    ? `DID NOT COMPLETE — no result within its deadline (${Math.round(err.deadlineMs / 60000)} min). This step has observed nothing about your change and is not accusing it.${where} ` +
+      `Re-run the step alone before suspecting the code.
   ${err.cmd}`
     : `DID NOT RUN — the step threw before producing a verdict: ${err && err.message ? err.message : String(err)}. ` +
       `Nothing here is a claim about your change.`;
@@ -123,5 +90,8 @@ export function stepErrorResult(name, err, durationMs) {
 }
 
 // The Maestro per-flow verdict and the device-log sweep moved to
-// qa/lib/profiles/cmp/maestro.mjs (Stage 0 PR 3): facts about an Android device
-// are a mobile profile's, not the spine's.
+// qa/lib/profiles/cmp/maestro.mjs (Stage 0 PR 3); androidChecksOutcome moved to
+// qa/lib/profiles/cmp/android-checks.mjs (Stage 0 PR 6b.2). Facts about an
+// Android device, a Gradle task and an APK are a mobile profile's, not the
+// spine's. What is left here is neutral: deadlines, timeouts, and turning a
+// throw into one ERROR row.

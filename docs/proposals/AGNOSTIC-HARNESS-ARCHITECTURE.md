@@ -855,8 +855,13 @@ Smallest blast radius first, so each step is a small PR with the fleet check gre
      step lists from the loaded pack and still prints in full, exit 0, when there is no
      manifest. The residue 6a named is closed, and `test/lane-markers.test.mjs` now
      asserts the rule unconditionally for all four readers.
-   - **6b.2** `a11y.mjs`, `component-stories.mjs` and `androidChecksOutcome` into
-     `profiles/cmp/`.
+   - **6b.2 ✅** `component-stories.mjs` and `androidChecksOutcome` into `profiles/cmp/`;
+     the deadline message's where-to-look sentence becomes the pack's (`fn.timeoutHint`,
+     like `fn.layer`). Eleven core modules now pass the stack-fact lint, `verify.mjs`
+     among them. **`a11y.mjs` deliberately did NOT move:** its consumers
+     (`walkthrough.mjs`, `preview-gallery.mjs`) are core-located Compose tools, so moving
+     it alone would create the violation it is meant to remove. That trio belongs with the
+     provider boundary in Stage 0.5.
    - **6c** `arch-doc` sections from data, `feature-brief`'s journey wording,
      `affected-tests`' blast radius, `inputs-hash`' default surface,
      `receipt-check`'s device tier — all from the profile.
