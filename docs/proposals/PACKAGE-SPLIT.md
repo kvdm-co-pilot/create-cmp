@@ -172,9 +172,20 @@ Claim `prooflane`, the `@prooflane` scope, and `create-ktor` in one pass. **`cre
 treated as permanently lost and nothing is designed around it** — `cmp` is one scaffold among
 many into the harness, not the product's name.
 
-> **Owed before Phase C:** the `@prooflane` scope is used throughout this document on the
-> strength of an unscoped-name check only. Confirm the scope is claimable before the first
-> package is published.
+> **CLAIMED 2026-09-05.** `prooflane@0.0.1` and `create-ktor@0.0.1` are published as honest
+> placeholders (they print what they are, name `create-cmp-cli` as the working tool, and link
+> this document). Both verified live from the registry.
+>
+> **The `@prooflane` SCOPE is not claimed and Phase C is blocked on it.** Publishing
+> `@prooflane/harness` failed `E404 PUT` while the same token published two unscoped names in
+> the same second — npm requires an *organization* named `prooflane` for a scope that is not
+> the publisher's username, and `npm org ls prooflane` returns 403. Creating a free org is a
+> one-time web action at npmjs.com and cannot be done from the CLI, so it is Karel's step,
+> like the token itself.
+>
+> **Fallback if the org is unwanted:** unscoped `prooflane-harness`, `prooflane-cli`,
+> `prooflane-profile-cmp`. Uglier, and it gives up the namespace guarantee a scope provides —
+> anyone can publish `prooflane-anything`. Recommended only if the org is refused.
 
 ---
 
