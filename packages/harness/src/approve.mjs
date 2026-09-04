@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 // The approvals CLI — thin shell over qa/lib/approvals.mjs.
 //
-//   node qa/approve.mjs <artifact>          records approval (recomputes the artifact's
-//                                            hash now, stamps the time, writes qa/approvals.json)
+//   node qa/approve.mjs <artifact> [<artifact> …]
+//                                            records approval (recomputes each artifact's
+//                                            hash now, stamps the time, writes qa/approvals.json).
+//                                            Sign every pending artifact in ONE command: each
+//                                            signature moves the receipt's input hash, so N
+//                                            separate signings cost N lane re-runs.
 //   node qa/approve.mjs --status            lists every governed artifact + live state
 //                                            (unreviewed / approved / changed-since-approval /
 //                                            reopened, + mode when set) + short hash
@@ -251,7 +255,27 @@ if (args.length === 0) {
 
 refuseIfUnresolvable();
 
-const artifactId = args[0];
+// EVERY artifact named in one command — one write, one invalidation.
+//
+// A signature changes qa/approvals.json's `status`, which the approvals gate
+// reads, so it legitimately moves the receipt's input hash. Signed one at a
+// time AFTER a green lane, that means N signatures invalidate the receipt N
+// times and cost N lane re-runs and N bookkeeping commits. Measured in
+// payment-blueprint's log on 2026-09-04: of 21 commits in one session, 8 were
+// "sign the approval" / "bind the receipt" with no product content, and every
+// code change cost two to three commits. It compounds as a repo accumulates
+// governed artifacts, which is what makes a session start fast and grind later.
+//
+// Two halves to the fix: sign them together (here), and sign BEFORE the final
+// lane run so the receipt you keep is already the one that covers the
+// signatures. `--reopen-feature` established the idiom — one recorded change,
+// not N commands.
+const artifactIds = args.filter((a, i) => !a.startsWith("--") && (i === 0 || !args[i - 1].startsWith("--")));
+// An unrecognised flag must still be REFUSED by name, never silently skipped:
+// filtering flags out is how `node qa/approve.mjs --delivr meal` would quietly
+// approve nothing and exit 0. Falling back to the first argument reproduces the
+// exact refusal an unknown verb has always produced.
+if (artifactIds.length === 0) artifactIds.push(args[0]);
 // The signer is REQUIRED, not optional: see approveArtifact's refusal. Parsed
 // here rather than defaulted from git config on purpose — `git config user.name`
 // is whatever the machine says, and an agent running on a developer's laptop
@@ -267,9 +291,14 @@ if (!approvedBy || approvedBy.startsWith("--")) {
   );
   process.exit(1);
 }
-const result = approveArtifact(ROOT, artifactId, { via: "cli", approvedBy });
-if (!result.ok) {
-  console.error(`error: ${result.reason}`);
-  process.exit(1);
+const results = artifactIds.map((id) => ({ id, result: approveArtifact(ROOT, id, { via: "cli", approvedBy }) }));
+const failed = results.filter((r) => !r.result.ok);
+for (const { id, result } of results) {
+  if (result.ok) console.log(`✓ approved ${result.artifact} — hash ${shortHash(result.hash)}, at ${result.approvedAt}`);
+  else console.error(`error: ${id}: ${result.reason}`);
 }
-console.log(`✓ approved ${result.artifact} — hash ${shortHash(result.hash)}, at ${result.approvedAt}`);
+if (results.length > 1) {
+  const signed = results.length - failed.length;
+  console.log(`\n${signed} signature${signed === 1 ? "" : "s"} in one write. Run the lane AFTER signing, not before — a signature moves the receipt's input hash, so signing after a green run costs you that run.`);
+}
+if (failed.length) process.exit(1);
