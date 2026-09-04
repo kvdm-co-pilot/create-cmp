@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **The receipt names its step pack.** `pack: { id, version }` beside the existing
+  `harness` field. The receipt already said which lane ran; it did not say which step pack
+  the lane loaded — so once a second pack exists, a `cmp` L2 (device e2e) and a backend L2
+  (integration tests) are the same bytes on the wire. The pack declares its own `id`; the
+  spine writes what it is told and pairs it with the lock's version until profiles are
+  versioned on their own. Additive: the shipped schema declares it optional, and a receipt
+  that predates it validates exactly as before. Stage 0 PR 1 of
+  `docs/proposals/AGNOSTIC-HARNESS-ARCHITECTURE.md` (§8.1).
+- **`docs/proposals/AGNOSTIC-HARNESS-ARCHITECTURE.md`** — the stack-agnostic harness:
+  four layers measured, the seam the blueprint's fork drew (five spine files byte-identical,
+  six rewritten), the Stack Profile's nine declarations with the `cmp` profile written out
+  from today's constants, the profile protocol, the console as neutral section types fed by
+  profile providers, and a seven-PR migration by subtraction with the mobile fleet-check
+  green at every PR. Decisions 1–4 taken 2026-09-04; not signed.
+
 ## [0.24.0] - 2026-09-04
 
 The Rule 0 instrument now ships. Four files in every generated project pointed adopters at
