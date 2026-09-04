@@ -70,7 +70,7 @@ test("the cmp profile exists where the loader looks, and is the only place the p
 // here the moment its last stack fact moves into the profile, so it cannot
 // come back by accident.
 const STACK_FACTS = ["composeApp", "androidInstrumentedTest", "desktopTest", "commonTest", "qa/e2e", "steps-cmp"];
-const STACK_FREE_CORE = ["lib/spec-coverage.mjs", "lib/spec-model.mjs", "lib/profile-loader.mjs", "lib/harness-manifest.mjs"];
+const STACK_FREE_CORE = ["lib/spec-coverage.mjs", "lib/spec-model.mjs", "lib/profile-loader.mjs", "lib/harness-manifest.mjs", "lib/approvals.mjs"];
 
 test("parameterised core modules name no Compose path, tier or pack (comments stripped)", () => {
   const offenders = [];
@@ -82,10 +82,12 @@ test("parameterised core modules name no Compose path, tier or pack (comments st
   assert.deepEqual(offenders, [], `stack facts in core code:\n  ${offenders.join("\n  ")}`);
 });
 
-// Two spine files still reach into the profile: a11y.mjs (through tree.mjs)
-// and component-stories.mjs. They move into profiles/cmp/ in Stage 0 PR 6;
-// this list is deleted in that PR, and the lint then holds for every core file.
-const NOT_YET_MOVED = ["lib/a11y.mjs", "lib/component-stories.mjs"];
+// Three files under src/ still reach into the profile: a11y.mjs (through
+// tree.mjs), component-stories.mjs, and scaffold-feature.mjs — the Kotlin
+// stamper, which is the cmp profile's tool and imports its exemplar shape.
+// They move into profiles/cmp/ in Stage 0 PR 6; this list is deleted in that
+// PR, and the lint then holds for every core file.
+const NOT_YET_MOVED = ["lib/a11y.mjs", "lib/component-stories.mjs", "scaffold-feature.mjs"];
 
 test("the cmp profile declares layout and tiers, and the core reads them only through the loader", () => {
   const entry = fs.readFileSync(path.join(PROFILES, "cmp", "index.mjs"), "utf8");

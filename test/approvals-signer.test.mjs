@@ -20,10 +20,12 @@ import os from "node:os";
 import path from "node:path";
 
 import { approveArtifact, evaluateApprovalsGate, loadApprovals, saveApprovals } from "../packages/harness/src/lib/approvals.mjs";
+import { installHarnessLib } from "./helpers/harness-fixture.mjs";
 
 /** A tree with one resolvable governed artifact (exemplar-spec), needing no scaffold. */
 function tinyProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "approvals-signer-"));
+  installHarnessLib(dir);
   fs.mkdirSync(path.join(dir, "specs"), { recursive: true });
   fs.writeFileSync(path.join(dir, "specs/home.spec.md"), "### HM-01 — a clause\n\nstatus: active\n");
   return dir;

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 274de9d6e8906b7e6f6c05e73a92385118695dd61153759fbe9e1b933b201c48
+// cmp:bundle-inputs a1f6a23139adcda1d23991bf886ef1ac1f72e7fd1a2e9ad8ee2f31b4d987bcc5
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34285,7 +34285,7 @@ async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: 
     let tmp = null;
     try {
       tmp = await materialize(git2, sha, artifact.files, alsoNeeded);
-      const h = artifact.id === "architecture" ? lib.hashArchitectureArtifact(tmp) : lib.hashArtifactFiles(tmp, artifact.files);
+      const h = typeof artifact.hash === "function" ? artifact.hash(tmp) : lib.hashArtifactFiles(tmp, artifact.files);
       if (h.hash === stored) {
         const { stdout: diff } = await git2(["diff", sha, "--", ...artifact.files]);
         const { stdout: nameStatus } = await git2(["diff", "--name-status", sha, "--", ...artifact.files]);

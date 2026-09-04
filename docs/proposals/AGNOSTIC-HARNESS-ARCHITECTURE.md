@@ -833,8 +833,12 @@ Smallest blast radius first, so each step is a small PR with the fleet check gre
    mechanic, not a layout fact. Collapsing that difference would need a grammar declaration
    in the profile — a new mechanism, refused under NORTH-STAR §8.8 until a second stack
    asks for it with a plant. The layout and tier facts they forked are now declarations.
-5. `approvals`: artifact list from the profile. Fleet green; blueprint's diff → their
-   artifact array.
+5. ✅ `approvals`: artifact list from the profile (`profiles/cmp/artifacts.mjs`
+   `artifacts(root)`, composed from the core's `featureBriefArtifacts` /
+   `featureDesignArtifacts` / `featureSpecArtifacts` / `architectureArtifact`; an artifact
+   may carry its own `hash(root)`; `governable(root)` guards writes). Fleet green. The
+   blueprint's 322-line replacement can now be a profile `artifacts` array over the
+   core's mechanic — their adoption, measured when they take it.
 6. `feature-brief`, `arch-doc`, `verify` markers, `inputs-hash`, `receipt-validate`,
    `affected-tests`. Fleet green after each.
 7. `framework-check`: plants from the profile. Fleet green; framework-check green in

@@ -84,6 +84,11 @@ export function validateProfileModule(mod, id) {
   if (typeof mod.steps !== "function") return { ok: false, reason: `profile "${id}" must export steps(ctx) as a function` };
   if (!mod.layout || typeof mod.layout !== "object") return { ok: false, reason: `profile "${id}" must export layout as an object (where specs, sources, tests and flows live)` };
   if (!mod.tiers || typeof mod.tiers !== "object") return { ok: false, reason: `profile "${id}" must export tiers as an object (which test tiers exist and which can observe which promise)` };
+  // Optional declarations: absent is allowed (the core then applies its floor);
+  // present-but-wrong is refused, never ignored.
+  for (const name of ["artifacts", "governable"]) {
+    if (name in mod && typeof mod[name] !== "function") return { ok: false, reason: `profile "${id}" exports ${name} but it is not a function (${name}(root))` };
+  }
   return { ok: true };
 }
 

@@ -93,10 +93,11 @@ export async function getApprovalAnchoredDiff(projectDir, artifactId, { execFile
     let tmp = null;
     try {
       tmp = await materialize(git, sha, artifact.files, alsoNeeded);
-      const h =
-        artifact.id === "architecture"
-          ? lib.hashArchitectureArtifact(tmp)
-          : lib.hashArtifactFiles(tmp, artifact.files);
+      // The artifact's own hasher when the profile attached one (the
+      // architecture artifact: spec + doc with generated sections stripped),
+      // else raw file bytes — the same dispatch the library's status
+      // derivation uses, so the anchor search can never disagree with it.
+      const h = typeof artifact.hash === "function" ? artifact.hash(tmp) : lib.hashArtifactFiles(tmp, artifact.files);
       if (h.hash === stored) {
         const { stdout: diff } = await git(["diff", sha, "--", ...artifact.files]);
         // Per-file split: which files drifted from the signed bytes, and which
