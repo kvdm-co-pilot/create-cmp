@@ -56,6 +56,18 @@ const failCase = (cls, name, time, message, body = "stack\n  at Foo.kt:12") =>
   `  <testcase name="${name}" classname="${cls}" time="${time}">\n    <failure message="${message}" type="org.opentest4j.AssertionFailedError">${body}</failure>\n  </testcase>`;
 const skipCase = (cls, name, time) => `  <testcase name="${name}" classname="${cls}" time="${time}">\n    <skipped/>\n  </testcase>`;
 
+/**
+ * The cmp pack's own attribution, mirrored here so these tests exercise the
+ * same mapping the lane does. It lives in profiles/cmp/steps-cmp.mjs, and the
+ * final assertion below pins that this copy has not drifted from it.
+ */
+const CMP_ATTRIBUTION = (classname) => {
+  if (/GoldenTreeTest$/.test(classname)) return "goldenTrees";
+  if (/ArchitectureConformanceTest$/.test(classname)) return "conformance";
+  if (/A11yConformanceTest$/.test(classname)) return "a11y";
+  return "unitTests";
+};
+
 test("probe timezones: 26 hours apart, so the two legs never share a calendar date", () => {
   assert.equal(DETERMINISM_TIMEZONES.length, 2);
   const [a, b] = DETERMINISM_TIMEZONES;
@@ -101,7 +113,7 @@ test("duration-only differences are NOT differences: identical suites with diffe
   });
   writeResults(a, mk("0.100", "0.900"));
   writeResults(b, mk("7.777", "0.001")); // wildly different timings, same verdicts, same failure text
-  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B");
+  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B", CMP_ATTRIBUTION);
   assert.deepEqual(diffs, [], "a timing wobble must not register as nondeterminism");
 });
 
@@ -116,7 +128,7 @@ test("a verdict flip names the test, the owning lane step, both legs, and the fa
       failCase("com.acme.HomeGoldenTreeTest", "home renders today header", "0.1", "expected 'Aug 20' but was 'Aug 21'"),
     ]),
   });
-  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=Etc/GMT+12 (UTC-12)", "TZ=Etc/GMT-14 (UTC+14)");
+  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=Etc/GMT+12 (UTC-12)", "TZ=Etc/GMT-14 (UTC+14)", CMP_ATTRIBUTION);
   assert.equal(diffs.length, 1);
   const d = diffs[0];
   assert.equal(d.kind, "verdict-flip");
@@ -135,7 +147,7 @@ test("identical failures under both legs are deterministic — no difference rep
   });
   writeResults(a, mk());
   writeResults(b, mk());
-  assert.deepEqual(compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B"), []);
+  assert.deepEqual(compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B", CMP_ATTRIBUTION), []);
 });
 
 test("failing in both legs with DIFFERENT output is a difference (a date in the message is still a leak)", () => {
@@ -143,7 +155,7 @@ test("failing in both legs with DIFFERENT output is a difference (a date in the 
   const b = tmp();
   writeResults(a, { "TEST-com.acme.FooTest.xml": suiteXml([failCase("com.acme.FooTest", "boundary", "0.5", "expected day 2026-08-19")]) });
   writeResults(b, { "TEST-com.acme.FooTest.xml": suiteXml([failCase("com.acme.FooTest", "boundary", "0.5", "expected day 2026-08-21")]) });
-  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B");
+  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B", CMP_ATTRIBUTION);
   assert.equal(diffs.length, 1);
   assert.equal(diffs[0].kind, "failure-text-changed");
   assert.match(diffs[0].detail, /2026-08-19/);
@@ -160,18 +172,33 @@ test("a test that executed in only one leg is a difference, attributed to its st
     ]),
   });
   writeResults(b, { "TEST-com.acme.BarTest.xml": suiteXml([passCase("com.acme.BarTest", "stable one", "0.1")]) });
-  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B");
+  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B", CMP_ATTRIBUTION);
   assert.equal(diffs.length, 1);
   assert.equal(diffs[0].kind, "only-in-one-leg");
   assert.equal(diffs[0].step, "unitTests");
   assert.match(diffs[0].detail, /no result under TZ=B/);
 });
 
-test("lane-step attribution mirrors the lane's own test filters", () => {
-  assert.equal(laneStepForTestClass("com.acme.HomeGoldenTreeTest"), "goldenTrees");
-  assert.equal(laneStepForTestClass("com.acme.ArchitectureConformanceTest"), "conformance");
-  assert.equal(laneStepForTestClass("com.acme.A11yConformanceTest"), "a11y");
-  assert.equal(laneStepForTestClass("com.acme.HomeViewModelTest"), "unitTests");
+test("lane-step attribution is the PROFILE'S — the core supplies no names of its own", () => {
+  // This mapping used to live in qa/lib/determinism.mjs, and compareOutcomes
+  // called it unconditionally: three of its four answers exist only in the cmp
+  // pack, so ANY profile reusing the core's determinism comparison got another
+  // stack's step names stamped onto its diffs. Handed the profile's mapping the
+  // answers are the same as they always were.
+  assert.equal(laneStepForTestClass("com.acme.HomeGoldenTreeTest", CMP_ATTRIBUTION), "goldenTrees");
+  assert.equal(laneStepForTestClass("com.acme.ArchitectureConformanceTest", CMP_ATTRIBUTION), "conformance");
+  assert.equal(laneStepForTestClass("com.acme.A11yConformanceTest", CMP_ATTRIBUTION), "a11y");
+  assert.equal(laneStepForTestClass("com.acme.HomeViewModelTest", CMP_ATTRIBUTION), "unitTests");
+
+  // Handed nothing, it answers NOTHING. An honest absence, not a borrowed name.
+  assert.equal(laneStepForTestClass("com.acme.HomeGoldenTreeTest"), null);
+  assert.equal(laneStepForTestClass("whatever.AnythingAtAll"), null);
+
+  // And the mapping the cmp pack actually ships is the one asserted above.
+  const packSrc = fs.readFileSync(path.join(REPO_ROOT, "template/qa/lib/profiles/cmp/steps-cmp.mjs"), "utf8");
+  for (const name of ["goldenTrees", "conformance", "a11y", "unitTests"]) {
+    assert.match(packSrc, new RegExp(`return "${name}"`), `the cmp pack owns the "${name}" attribution`);
+  }
 });
 
 test("verify.mjs wiring: opt-in in ci, refused combinations, --rerun on both legs, no receipt from a bare probe", () => {

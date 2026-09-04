@@ -70,7 +70,13 @@ test("the cmp profile exists where the loader looks, and is the only place the p
 // here the moment its last stack fact moves into the profile, so it cannot
 // come back by accident.
 const STACK_FACTS = ["composeApp", "androidInstrumentedTest", "desktopTest", "commonTest", "qa/e2e", "steps-cmp", "gradlew", "kspCaches"];
-const STACK_FREE_CORE = ["lib/spec-coverage.mjs", "lib/spec-model.mjs", "lib/profile-loader.mjs", "lib/harness-manifest.mjs", "lib/approvals.mjs", "lib/step-outcomes.mjs", "lib/lane-runner.mjs", "lib/lane-markers.mjs", "lib/plan.mjs", "watch.mjs", "receipt-check.mjs", "verify.mjs", "lib/affected-tests.mjs", "lib/feature-brief.mjs", "framework-check.mjs", "lib/framework-check.mjs"];
+const STACK_FREE_CORE = ["lib/spec-coverage.mjs", "lib/spec-model.mjs", "lib/profile-loader.mjs", "lib/harness-manifest.mjs", "lib/approvals.mjs", "lib/step-outcomes.mjs",
+  // Added Stage 0 A3. It answered "which lane step owns this test class" with
+  // four names, three of which exist only in the cmp pack, and compareOutcomes
+  // called it unconditionally — so any profile reusing the core's determinism
+  // comparison got another stack's step names stamped onto its diffs. It passed
+  // review for weeks because it was not in this list.
+  "lib/determinism.mjs", "lib/lane-runner.mjs", "lib/lane-markers.mjs", "lib/plan.mjs", "watch.mjs", "receipt-check.mjs", "verify.mjs", "lib/affected-tests.mjs", "lib/feature-brief.mjs", "framework-check.mjs", "lib/framework-check.mjs"];
 
 test("parameterised core modules name no Compose path, tier or pack (comments stripped)", () => {
   const offenders = [];

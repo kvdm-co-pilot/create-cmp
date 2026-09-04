@@ -119,7 +119,8 @@ export function clauseFamily(clause) {
  *          flows?: Array<{rel: string, text: string}>,
  *          harnessLib?: string[],
  *          testDir?: string|null,
- *          plantsDeclared?: boolean}} tree
+ *          plantsDeclared?: boolean,
+ *          unmeetableTier?: string}} tree
  * @returns {{plants: Array<{kind: string, label: string, step: string,
  *            names: string[], target: object}>,
  *           unavailable: Array<{kind: string, reason: string}>}}
@@ -188,13 +189,26 @@ export function selectPlants(tree) {
         names: [`${family}-99`],
         target: { spec: spec.rel, clause: `${family}-99`, testDir },
       });
-      plants.push({
-        kind: PLANT_KINDS.TIER_UNMET,
-        label: "tier unmet",
-        step: "specCoverage",
-        names: [`${family}-98`],
-        target: { spec: spec.rel, clause: `${family}-98`, testDir },
-      });
+      // The tier this plant declares must be the PROFILE'S. The core used to
+      // fall back to `?? "e2e"` at the write site — a CMP tier name, asserted
+      // by the spine into any stack's spec file. A profile that ships plants
+      // but names no unmeetable tier would then plant a clause tagged with a
+      // tier it does not define, and the resulting FAIL would be right for
+      // entirely the wrong reason. There is no default; there is a skip.
+      if (!tree?.unmeetableTier) {
+        skip(
+          PLANT_KINDS.TIER_UNMET,
+          "this profile's plants declare no `unmeetableTier` — name a tier in `tiers.satisfying` that a host-tier test cannot satisfy",
+        );
+      } else {
+        plants.push({
+          kind: PLANT_KINDS.TIER_UNMET,
+          label: "tier unmet",
+          step: "specCoverage",
+          names: [`${family}-98`],
+          target: { spec: spec.rel, clause: `${family}-98`, testDir, unmeetableTier: tree.unmeetableTier },
+        });
+      }
     }
   }
 

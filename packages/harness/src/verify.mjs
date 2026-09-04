@@ -99,19 +99,21 @@ Flags:
   --help, -h                     print this usage and exit 0 without
                                   running anything
 
-Profiles:
-  smoke     the smallest end-to-end lane: every pure-Node gate through the real
-            runner, receipt and journal — no build tool, no device. Seconds. Proves the
-            FRAMEWORK returns, both ways; never the change (its receipt is refused
-            as done-evidence). Driven by qa/framework-check.mjs.
-  scaffold  spec coverage + build + unit tests (what a stamp-time verify proves)
-  local     everything; device-dependent steps SKIP when no device is
-            attached
+Profiles — WHAT EACH ONE IS FOR. Which steps each runs is your profile's, and
+they are listed under "This project" below.
+  smoke     the smallest end-to-end lane: the pack's pure-Node gates only,
+            through the real runner, receipt and journal. Seconds. Proves the
+            FRAMEWORK returns, both ways; never the change (its receipt is
+            refused as done-evidence). Driven by qa/framework-check.mjs.
+  scaffold  what a stamp-time verify proves — enough to trust a fresh tree
+  local     everything; steps needing a resource this host lacks SKIP, and the
+            reason is recorded rather than swallowed
   ci        everything; SKIPs are recorded so the pipeline stays honest
-  nightly   everything ci proves with the determinism probe FORCED ON (it doubles
-            the host test tier — the budget a scheduled run has and a per-change run
-            does not). Proves the HARNESS, not a change: its receipt is refused as
-            done-evidence by qa/receipt-check.mjs. Schedule it; never wait on it.
+  nightly   everything ci proves with the determinism probe FORCED ON (it
+            doubles the host test tier — the budget a scheduled run has and a
+            per-change run does not). Proves the HARNESS, not a change: its
+            receipt is refused as done-evidence by qa/receipt-check.mjs.
+            Schedule it; never wait on it.
   release   everything ci proves PLUS the pack's ship-time step; run it before
             cutting a release, never per-change
 `;
@@ -419,13 +421,21 @@ const steps = lane.steps;
 // not green; only the ACCUSATION is withheld. (laneVerdict, qa/lib/lane-runner.mjs)
 const verdict = lane.verdict;
 
-// Receipt STRENGTH — a desktop-only green and an on-device green are different
-// claims, and the difference should never live only in the SKIP lines. Device-
-// dependent steps that actually RAN (PASSed) are named on the receipt and in the
-// verdict line: "PASS (on-device: e2eSmoke)" vs "PASS (desktop-only)".
-// (DEVICE_STEPS itself is defined above the lane — it also drives --fast.)
+// Receipt STRENGTH — a green that reached the harder tier and a green that did
+// not are different claims, and the difference should never live only in the
+// SKIP lines. Which steps needed a resource the host may not have is the pack's
+// (DEVICE_STEPS, which also drives --fast); those that actually RAN are named on
+// the receipt.
+//
+// THE LABEL IS THE PACK'S TOO. The core used to compose it here, and its
+// negative case was the word "desktop-only" — printed on the verdict line of
+// every lane in every repo, including a backend service with no desktop and no
+// device. A profile could name its device steps and still could not name the
+// CATEGORY, so the most-read string the lane emits asserted a stack fact the
+// core has no way to know. Now the core prints what it is handed and prints
+// NOTHING when it is handed nothing: silence is honest, a borrowed noun is not.
 const onDeviceSteps = steps.filter((s) => DEVICE_STEPS.includes(s.name) && s.verdict === "PASS").map((s) => s.name);
-const strengthLabel = onDeviceSteps.length ? `on-device: ${onDeviceSteps.join("+")}` : "desktop-only";
+const strengthLabel = typeof pack.strengthLabel === "function" ? pack.strengthLabel(onDeviceSteps) : null;
 
 // Receipt RUNG — the evidence ladder (qa/lib/evidence-level.mjs): the coarse,
 // named grade (L0 scaffold / L1 desktop / L2 device / L3 release) DERIVED from
@@ -616,7 +626,7 @@ if (asJson) {
     `\n${verdict === "PASS" ? "⚡⚡" : "❌"} verify lane [FAST — INNER LOOP ONLY, NOT DONE]: ${verdict} (skipped device/release tier: ${fastExcluded.join(", ") || "none"}) — this fast receipt satisfies no done-gate; run the full lane (node qa/verify.mjs) once before you finish`,
   );
 } else {
-  console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name}` : ""} (${strengthLabel}) — receipt written to qa/evidence/latest.json${badge.changed ? ` and ${README_REL_PATH}'s evidence badge refreshed` : ""} (commit ${badge.changed ? "them" : "it"} with your change)`);
+  console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name}` : ""}${strengthLabel ? ` (${strengthLabel})` : ""} — receipt written to qa/evidence/latest.json${badge.changed ? ` and ${README_REL_PATH}'s evidence badge refreshed` : ""} (commit ${badge.changed ? "them" : "it"} with your change)`);
 }
 
 // A TIER THAT HAS NEVER RUN HERE. A SKIP is non-fatal by design — absence of a

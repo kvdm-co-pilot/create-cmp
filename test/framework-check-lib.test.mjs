@@ -29,6 +29,12 @@ const fullTree = () => ({
   flows: [{ rel: "qa/e2e/smoke.yaml", text: FLOW }],
   harnessLib: ["qa/lib/spec-coverage.mjs", "qa/lib/verify.mjs"],
   testDir: "composeApp/src/commonTest/kotlin/com/example",
+  // The tier the tier-unmet plant declares is the PROFILE'S. The core used to
+  // fall back to `?? "e2e"` at the write site — a CMP tier name asserted by the
+  // spine into any stack's spec file — so this field did not have to exist and
+  // a profile shipping plants without it planted a clause tagged with a tier it
+  // does not define. There is no default now; there is a skip with a reason.
+  unmeetableTier: "e2e",
 });
 
 const kinds = (plants) => plants.map((p) => p.kind);

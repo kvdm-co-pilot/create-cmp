@@ -100,17 +100,25 @@ export function parseJUnitOutcomes(dir) {
 }
 
 /**
- * Which lane step owns a test class — so the probe's failure message names
- * the step a reader would re-run, not just a class name. The patterns are
- * the same filters the lane's own gradleTestStep calls use.
+ * Which lane step owns a test class — so the probe's failure message names the
+ * step a reader would re-run, not just a class name.
+ *
+ * THIS IS THE PROFILE'S KNOWLEDGE and it moved there (profiles/cmp/steps-cmp.mjs).
+ * The core used to answer it with four names — `goldenTrees`, `conformance`,
+ * `a11y`, `unitTests` — three of which exist only in the cmp pack, matched
+ * against Kotlin class-name conventions. `compareOutcomes` called it
+ * unconditionally, so ANY profile reusing the core's determinism comparison got
+ * another stack's step names stamped onto its own diffs. It survived the lint
+ * only because this module was not in the lint's list; it is now.
+ *
+ * A caller that supplies no attribution gets `null` and the diff carries no
+ * step — an honest absence, not a borrowed name.
  * @param {string} classname fully-qualified test class
- * @returns {"goldenTrees"|"conformance"|"a11y"|"unitTests"}
+ * @param {((classname: string) => string|null)} [attribute] the profile's mapping
+ * @returns {string|null}
  */
-export function laneStepForTestClass(classname) {
-  if (/GoldenTreeTest$/.test(classname)) return "goldenTrees";
-  if (/ArchitectureConformanceTest$/.test(classname)) return "conformance";
-  if (/A11yConformanceTest$/.test(classname)) return "a11y";
-  return "unitTests";
+export function laneStepForTestClass(classname, attribute) {
+  return typeof attribute === "function" ? (attribute(classname) ?? null) : null;
 }
 
 function classnameOf(testId) {
@@ -143,11 +151,11 @@ function classnameOf(testId) {
  * @param {string} labelB human label for leg B
  * @returns {Array<{test: string, step: string, kind: string, detail: string}>}
  */
-export function compareOutcomes(a, b, labelA, labelB) {
+export function compareOutcomes(a, b, labelA, labelB, attribute) {
   const diffs = [];
   const ids = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
   for (const id of ids) {
-    const step = laneStepForTestClass(classnameOf(id));
+    const step = laneStepForTestClass(classnameOf(id), attribute);
     const inA = a[id];
     const inB = b[id];
     if (!inA || !inB) {

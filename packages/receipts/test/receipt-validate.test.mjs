@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { SURFACE_CONFIG_REL, VERIFIED_SURFACE, computeInputsHash, resolveVerifiedSurface } from "../src/inputs-hash.mjs";
+import { SURFACE_CONFIG_REL, defaultSurface, computeInputsHash, resolveVerifiedSurface } from "../src/inputs-hash.mjs";
 import {
   evaluateReceipt,
   readReceipt,
@@ -297,8 +297,14 @@ test("plausibility: ERROR steps are not executed gates — a lane of errors veri
 // hash that had quietly stopped covering the application.
 test("the verified surface is per-project: absent config keeps the CMP default byte-for-byte", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-surface-"));
-  assert.deepEqual(resolveVerifiedSurface(root), VERIFIED_SURFACE, "no declaration → the default, unchanged");
-  assert.ok(VERIFIED_SURFACE.includes("composeApp"), "which is still a Compose app's surface");
+  assert.deepEqual(resolveVerifiedSurface(root), defaultSurface(root), "no declaration → the tree's own top level");
+  // NOT a stack's directory names. The fallback used to be the constant
+  // ["composeApp", "specs", "qa", …]: in a repo whose code lives under
+  // services/ it matched qa/ and specs/ and nothing else, so the lane minted a
+  // valid, confident, SMALLER hash — a receipt attesting a fraction of a project
+  // while looking complete. Derived from the tree it errs WIDE, and only one of
+  // those two directions is a lie.
+  assert.ok(!resolveVerifiedSurface(root).includes("composeApp"), "the fallback names no stack's directories");
 });
 
 test("a backend repo declares its own surface and gets it", () => {
@@ -312,10 +318,29 @@ test("PLANTED: a surface that matches nothing is REFUSED, not hashed into a conf
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-surface-empty-"));
   fs.mkdirSync(path.join(root, "services"), { recursive: true });
   fs.writeFileSync(path.join(root, "services", "Main.kt"), "fun main() {}\n");
-  // The backend vendors the spine and never declares a surface: composeApp/,
-  // specs/, qa/ and the Gradle files are all absent, so the CMP default matches
-  // zero files. Before this guard that returned a valid hash of the empty set.
+  // A DECLARED surface that matches nothing. This plant used to come for free
+  // from the undeclared case, because the fallback was a Compose app's
+  // directory names and a backend has none of them — the whole reason that
+  // fallback was a defect. Now an undeclared backend hashes its own tree
+  // correctly (asserted below), so the plant has to name a surface that really
+  // matches nothing to keep proving the guard bites.
+  fs.mkdirSync(path.join(root, "qa"), { recursive: true });
+  fs.writeFileSync(path.join(root, SURFACE_CONFIG_REL), JSON.stringify({ surface: ["composeApp"] }));
   assert.throws(() => computeInputsHash(root), /matched no files|nothing would be attested/);
+});
+
+test("a backend that declares NO surface hashes its own tree, rather than a Compose app's", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-surface-none-"));
+  fs.mkdirSync(path.join(root, "services"), { recursive: true });
+  fs.writeFileSync(path.join(root, "services", "Main.kt"), "fun main() {}\n");
+  // The failure this replaces was not a crash. In a repo that HAD qa/ and
+  // specs/ but kept its code under services/, the Compose fallback matched
+  // some of the tree and produced a valid, confident, SMALLER hash: a receipt
+  // attesting a fraction of a project while looking complete. The header of
+  // inputs-hash.mjs calls that the worst failure this harness can have.
+  const r = computeInputsHash(root);
+  assert.ok(r.fileCount >= 1, "the backend's own sources are attested");
+  assert.ok(resolveVerifiedSurface(root).includes("services"));
 });
 
 test("a malformed or empty declaration is refused — never silently defaulted to a smaller surface", () => {
