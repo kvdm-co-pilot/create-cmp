@@ -9,6 +9,15 @@
 - [ ] Template change (version set, shell, nav, DI, etc.)
 - [ ] Docs / tooling
 
+## North star
+
+<!-- docs/NORTH-STAR.md §10 — the fit test. One block; a change that cannot name its goal is not built. -->
+
+```
+North star: G_ · mechanism ±_ · core learns no stack fact · receipt unchanged ·
+proof: suite _/_, framework-check _ s, fleet L2 _ · de-fork _→_ · loop: _
+```
+
 ## Verification
 
 <!-- The scaffold must stay green. Paste evidence. -->

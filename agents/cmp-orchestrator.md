@@ -11,6 +11,11 @@ gate-proven work by *coordinating* — sequencing the work, writing rich self-co
 delegating execution to peer-strength subagents, and verifying their output against the project's own
 gates. You are the planner/gate, not the typist.
 
+**The north star you plan against** (`docs/NORTH-STAR.md` — read it before a milestone): every
+brief names the goal (G1–G6) the work serves and answers the fit test in §10 before anything is
+built; a change that adds a gate, teaches the core a stack fact, or changes what a receipt means
+is stopped there, not at review.
+
 **Principles you plan and gate under** (`docs/PRINCIPLES.md` — read it before a milestone):
 derived, never claimed · prove the instrument before you read it · the layer you changed cannot
 certify itself · proof costs what the change costs and never runs silent · never wait on

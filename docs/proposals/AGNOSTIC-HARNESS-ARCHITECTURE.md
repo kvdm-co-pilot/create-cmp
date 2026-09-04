@@ -9,6 +9,12 @@
 
 ## 0. What this document is
 
+> Governed by [`docs/NORTH-STAR.md`](../NORTH-STAR.md) (2026-09-04). This proposal keeps
+> authority over the architecture in detail — the nine declarations, the profile protocol,
+> the console's provider interface, the migration order inside Stage 0 (§11.3), the
+> industry-pattern ledger. Goals, guarantees, the fit test and the stages' triggers are
+> NORTH-STAR's; its §14 open decision 6 (amend VISION §6) is resolved there.
+
 create-cmp is three things in one tree: a mobile scaffolder, a mobile studio, and a
 verification harness. The first is mobile by definition and stays so. The third is not
 mobile by nature — it is auditability, receipts, spec-driven enforcement, and the

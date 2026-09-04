@@ -1,7 +1,13 @@
 # The AI CMP Harness — product definition & plan
 
-> **This document is the product definition.** It supersedes the "scaffolder" framing everywhere
-> it conflicts with older docs. Date: 2026-07-06.
+> **Superseded as the product definition, 2026-09-04, by [`NORTH-STAR.md`](./NORTH-STAR.md).**
+> This file remains the record of the mobile product's five layers as built in 2026-07 — how
+> the harness first arrived inside a Compose app. Its framing of the harness as
+> Kotlin/Compose-only is replaced by NORTH-STAR §3: the harness is stack-agnostic and
+> create-cmp is its first Stack Profile. Where the two disagree, NORTH-STAR wins.
+>
+> **This document was the product definition of 2026-07-06.** It superseded the "scaffolder"
+> framing everywhere it conflicted with older docs.
 >
 > **One-liner:** `create-cmp` is a **complete AI delivery harness for Kotlin/Compose
 > Multiplatform** — industry best practices at every layer, encoded as executable patterns,

@@ -1,10 +1,16 @@
 # create-cmp Roadmap
 
+> **The governing document is [`NORTH-STAR.md`](./NORTH-STAR.md)** (2026-09-04): the goals,
+> the guarantees, the staged road with exit criteria and triggers, and the fit test every
+> feature answers. This roadmap keeps the public pillars below for users and contributors and
+> defers to NORTH-STAR §9 on sequencing. Where they disagree, NORTH-STAR wins.
+>
 > **The goal:** make `create-cmp` the **complete AI delivery harness for Kotlin/Compose
-> Multiplatform** — industry best practices at every layer, from the UI tools to the verification
-> layer to the testing architecture base, encoded as executable patterns and gates that AI
-> assistants are mechanically bound to. Scaffolding (removing every point of friction from first
-> scaffold to store release) is how the harness arrives; the harness is the product. Full product
+> Multiplatform** — the reference Stack Profile of a stack-agnostic harness — industry best
+> practices at every layer, from the UI tools to the verification layer to the testing
+> architecture base, encoded as executable patterns and gates that AI assistants are
+> mechanically bound to. Scaffolding (removing every point of friction from first scaffold to
+> store release) is how the harness arrives; the harness is the product. Historical product
 > definition: [`HARNESS-PLAN.md`](./HARNESS-PLAN.md).
 
 The roadmap is organised as seven pillars. The strategic through-line: `create-cmp` must be useful
