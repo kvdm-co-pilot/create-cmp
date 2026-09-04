@@ -48,6 +48,10 @@ async function makeProject(prefix, overrides = {}) {
 async function loadLib(projectRoot) {
   return import(pathToFileURL(path.join(projectRoot, "qa/lib/approvals.mjs")));
 }
+// The exemplar's names and shape are the cmp profile's (Stage 0 PR 5).
+async function loadProfileLib(projectRoot) {
+  return import(pathToFileURL(path.join(projectRoot, "qa/lib/profiles/cmp/artifacts.mjs")));
+}
 
 // An approval records WHO signed it, so the CLI requires --as. Defaulted here
 // for approval invocations only: --reopen and --reopen-feature walk a signature
@@ -265,7 +269,8 @@ test("architecture artifact: line-ending normalization — CRLF-ifying the doc's
 test("legacy ledger equivalence: a ledger WITHOUT exemplarFeature behaves byte-identically to the shipped 'home' config", async () => {
   const out = await makeProject("cmp-gen-legacy-");
   try {
-    const { getApprovalStatuses, getExemplarFeature, listGovernedArtifacts } = await loadLib(out);
+    const { getApprovalStatuses, listGovernedArtifacts } = await loadLib(out);
+    const { getExemplarFeature } = await loadProfileLib(out);
 
     assert.equal(getExemplarFeature(out), "home", "shipped seed configures home explicitly");
     const withKey = getApprovalStatuses(out);
@@ -279,7 +284,10 @@ test("legacy ledger equivalence: a ledger WITHOUT exemplarFeature behaves byte-i
 
     assert.equal(getExemplarFeature(out), "home", "absent key ⇒ home (every legacy ledger keeps meaning what it meant)");
     assert.deepEqual(getApprovalStatuses(out), withKey, "statuses are identical with and without the key");
-    assert.deepEqual(listGovernedArtifacts(out), registryWithKey, "registry is identical with and without the key");
+    // An artifact may carry its hasher as a function (the profile's); compare the
+    // ledger-meaningful projection, not closure identity.
+    const shape = (list) => list.map(({ id, label, files, complete }) => ({ id, label, files, complete }));
+    assert.deepEqual(shape(listGovernedArtifacts(out)), shape(registryWithKey), "registry is identical with and without the key");
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }
@@ -294,7 +302,8 @@ test("exemplar reconfigure: registry hashes the CONFIGURED feature's 11-file set
     ledger.exemplarFeature = "favorites";
     writeLedger(out, ledger);
 
-    const { listGovernedArtifacts, hashArtifactFiles, approveArtifact, resolveExemplarNames } = await loadLib(out);
+    const { listGovernedArtifacts, hashArtifactFiles, approveArtifact } = await loadLib(out);
+    const { resolveExemplarNames } = await loadProfileLib(out);
 
     assert.deepEqual(resolveExemplarNames(out), { f: "favorites", F: "Favorites", F_UPPER: "FAVORITES", E: "Favorite" });
 

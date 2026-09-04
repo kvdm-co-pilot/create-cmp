@@ -21,6 +21,9 @@ export const protocol = 1;
 /** Where specs, sources, tests and flows live; which tiers observe what. */
 export { layout, tiers } from "./declarations.mjs";
 
+/** What a human signs, in definition order; and whether this tree may record signatures at all. */
+export { artifacts, governable } from "./artifacts.mjs";
+
 /** The step pack — today's createCmpSteps, unchanged. */
 export function steps(ctx) {
   return createCmpSteps(ctx);

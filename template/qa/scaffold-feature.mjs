@@ -181,10 +181,18 @@ try {
 } catch {
   approvalsLib = null;
 }
+// The exemplar's shape and names are the cmp profile's (Stage 0 PR 5 —
+// qa/lib/profiles/cmp/artifacts.mjs); this stamper is that profile's tool.
+let profileLib = null;
+try {
+  profileLib = await import("./lib/profiles/cmp/artifacts.mjs");
+} catch {
+  profileLib = null;
+}
 
 function resolveSourceNames() {
-  if (approvalsLib && typeof approvalsLib.resolveExemplarNames === "function") {
-    return approvalsLib.resolveExemplarNames(ROOT);
+  if (profileLib && typeof profileLib.resolveExemplarNames === "function") {
+    return profileLib.resolveExemplarNames(ROOT);
   }
   return { f: "home", F: "Home", F_UPPER: "HOME", E: "Item" };
 }

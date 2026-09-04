@@ -48,7 +48,7 @@ import {
   approveArtifact,
   getApprovalStatuses,
   getFeatureBoard,
-  isPackageResolvable,
+  isProjectGovernable,
   listGovernedArtifacts,
   readJournal,
   reopenArtifact,
@@ -122,17 +122,16 @@ if (args.includes("--status")) {
   process.exit(0);
 }
 
-// Write guard: refuse to RECORD approvals in a tree whose package is not
-// resolvable (the raw template / a pre-stamp tree). Approvals belong to a
-// generated project; writing qa/approvals.json into the template pollutes the
+// Write guard: refuse to RECORD approvals in a tree that cannot be governed —
+// no manifest, no loadable profile, or a tree the profile itself refuses (the
+// raw template, whose package is still a placeholder). Approvals belong to a
+// real project; writing qa/approvals.json into the template pollutes the
 // template itself. Read-only --status (above) stays available anywhere. Applies
 // to every write operation below (single approve, express lane, reopen).
 function refuseIfUnresolvable() {
-  if (isPackageResolvable(ROOT)) return;
-  console.error(
-    "error: this tree's package is not resolvable (composeApp/build.gradle.kts namespace is missing or still a placeholder) — " +
-      "this looks like the raw template or a pre-stamp tree. Approvals are recorded in a generated project; refusing to write qa/approvals.json here.",
-  );
+  const v = isProjectGovernable(ROOT);
+  if (v.ok) return;
+  console.error(`error: ${v.reason}`);
   process.exit(1);
 }
 

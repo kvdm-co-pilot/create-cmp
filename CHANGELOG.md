@@ -8,6 +8,19 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The approvals registry is the profile's.** `qa/lib/approvals.mjs` keeps the mechanic —
+  an artifact is a path set with a hash, a signature binds the hash, status is derived on
+  every read, reopen and accept are attributed, the gate reads it all — and stops knowing
+  which artifacts exist. The profile the manifest names exports `artifacts(root)`; mobile's
+  six genesis artifacts, the Kotlin source-set roots, the namespace lookup and the
+  exemplar's eleven-file shape now live in `qa/lib/profiles/cmp/artifacts.mjs`. The neutral
+  entries every profile shares — feature briefs, feature designs (the profile says what a
+  surface is), feature specs, the architecture artifact — are core helpers a profile
+  composes; an artifact may carry its own `hash(root)`. A profile with no `artifacts` still
+  governs its briefs (the Decide layer is the loop's). `isProjectGovernable(root)` replaces
+  the CLI's namespace check: manifest + profile + the profile's own `governable(root)`.
+  Stage 0 PR 5.
+
 - **The spec scanner takes its model from the profile.** `qa/lib/spec-coverage.mjs` no
   longer knows where specs live, which trees hold citations, what a source file is called,
   or what the test tiers are: the `cmp` profile declares `layout` (specs, citation roots and

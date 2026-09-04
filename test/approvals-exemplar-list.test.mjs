@@ -57,7 +57,7 @@ test("exemplarKotlinFileSet(Home, home, Item) matches EXEMPLAR_FEATURE_KOTLIN_FI
   const out = await makeProject("cmp-exemplar-shape-");
   try {
     const { exemplarKotlinFileSet, EXEMPLAR_FEATURE_KOTLIN_FILES, EXEMPLAR_SPEC_REL } = await import(
-      pathToFileURL(path.join(out, "qa/lib/approvals.mjs"))
+      pathToFileURL(path.join(out, "qa/lib/profiles/cmp/artifacts.mjs"))
     );
 
     const predicted = exemplarKotlinFileSet("Home", "home", "Item");
@@ -81,7 +81,7 @@ test("the stamper's dry-run clone-source list for a fresh scaffold matches exemp
       cwd: out,
       encoding: "utf8",
     });
-    const { exemplarKotlinFileSet } = await import(pathToFileURL(path.join(out, "qa/lib/approvals.mjs")));
+    const { exemplarKotlinFileSet } = await import(pathToFileURL(path.join(out, "qa/lib/profiles/cmp/artifacts.mjs")));
     const predicted = exemplarKotlinFileSet("Home", "home", "Item");
 
     for (const f of predicted) {

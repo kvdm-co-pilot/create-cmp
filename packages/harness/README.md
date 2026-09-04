@@ -114,7 +114,13 @@ The lane is two things (evidence-economics S8): a **spine** and a **step pack**.
   the **profile** the manifest names (`qa/lib/profiles/<id>/index.mjs`): `steps(ctx)` — the
   pack — plus `layout` (where specs, sources, tests and flows live) and `tiers` (which test
   tiers exist, which run host-only, which satisfy a clause's `[tier: …]`), which
-  `lib/spec-model.mjs` validates into the scanner's model.
+  `lib/spec-model.mjs` validates into the scanner's model; and, optionally, `artifacts(root)`
+  — what a human signs, in definition order, each entry a path set with an optional
+  `hash(root)` of its own — composed from the core's helpers (`featureBriefArtifacts`,
+  `featureDesignArtifacts`, `featureSpecArtifacts`, `architectureArtifact`) plus the
+  stack's own entries, and `governable(root)` to refuse recording signatures in a tree
+  that is not a real project. A profile with no `artifacts` still governs its feature
+  briefs. `lib/approvals.mjs` keeps the mechanic and signs whatever list it is handed.
 - **Step pack** — `lib/steps-cmp.mjs`. Every Compose Multiplatform step, behind one factory:
   `createCmpSteps(ctx)` returns `{ stepsForProfile, DEVICE_STEPS, FAST_EXCLUDED_NAMES,
   STEP_FN_BY_NAME, stepDeterminism, releaseLease }`. **It reads no argv and writes no receipt.**
