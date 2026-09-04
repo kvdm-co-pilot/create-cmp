@@ -14,7 +14,7 @@
 //      rendering carries the declaration's age — a stale plan reads as
 //      stale, never as true.
 //   3. The CORROBORATION is derived and overrides: the lane/render markers
-//      (composeApp/build/.cmp-lane-in-progress / .cmp-render-in-progress,
+//      (qa/.lane-in-progress / the profile's <buildDir>/.cmp-render-in-progress,
 //      mtime-bounded like every other consumer) say what is ACTUALLY running
 //      right now, regardless of what was declared.
 //
@@ -30,6 +30,8 @@
 
 import fs from "node:fs";
 import path from "node:path";
+
+import { laneMarkerPath, renderMarkerPath } from "./lane-markers.mjs";
 
 export const PLAN_REL = "qa/.plan.json";
 export const REQUEST_REL = "qa/.request.json";
@@ -235,8 +237,8 @@ export function clearPlan(root) {
  * reads as a bare truthy {} — busy, no narration. Stale/absent -> false.
  * @returns {object|false}
  */
-function markerInfo(root, name) {
-  const p = path.join(root, "composeApp", "build", name);
+function markerInfo(p) {
+  if (!p) return false;
   try {
     const st = fs.statSync(p);
     if (Date.now() - st.mtimeMs >= MARKER_FRESH_MS) return false;
@@ -333,8 +335,8 @@ export function deriveChain(root) {
   const plan = readPlan(root);
   const at = plan ? Date.parse(plan.updatedAt) : NaN;
   const busy = {
-    lane: markerInfo(root, ".cmp-lane-in-progress"),
-    render: markerInfo(root, ".cmp-render-in-progress"),
+    lane: markerInfo(laneMarkerPath(root)),
+    render: markerInfo(renderMarkerPath(root)),
   };
   const request = readRequest(root);
   // S3: the build stage's observed tier — writes since the request began.

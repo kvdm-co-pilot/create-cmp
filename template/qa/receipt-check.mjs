@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
 import { evaluateReceipt, readReceipt } from "./lib/receipt-validate.mjs";
 import { readHold, assessHold, describeHold, holdExplains } from "./lib/agent-hold.mjs";
+import { LANE_MARKER_STALE_MS, laneMarkerPath } from "./lib/lane-markers.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -30,9 +31,8 @@ const asHook = args.includes("--hook");
 const asJson = args.includes("--json");
 
 // The lane's own in-flight marker (verify.mjs stamps it, rewriting it at each
-// step start with the step name and index). Mirrors qa/watch.mjs's bound.
-const LANE_MARKER_REL = ["composeApp", "build", ".cmp-lane-in-progress"];
-const LANE_MARKER_STALE_MS = 30 * 60 * 1000;
+// step start with the step name and index) — qa/lib/lane-markers.mjs, one
+// path and one bound for every reader.
 
 /**
  * The full check running RIGHT NOW, or null. The gate must still refuse — a
@@ -44,7 +44,7 @@ const LANE_MARKER_STALE_MS = 30 * 60 * 1000;
  */
 function laneInFlight() {
   try {
-    const p = path.join(ROOT, ...LANE_MARKER_REL);
+    const p = laneMarkerPath(ROOT);
     const st = fs.statSync(p);
     if (Date.now() - st.mtimeMs >= LANE_MARKER_STALE_MS) return null;
     // Content is a bonus, never a requirement: legacy markers hold "pid iso".

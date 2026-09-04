@@ -493,7 +493,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
 
     await t.test("receipt-check with a lane IN FLIGHT still refuses, but says WAIT — never 'run the lane' at a running lane", () => {
       const receiptPath = path.join(out, "qa/evidence/latest.json");
-      const markerPath = path.join(out, "composeApp/build/.cmp-lane-in-progress");
+      const markerPath = path.join(out, "qa/.lane-in-progress");
       fs.mkdirSync(path.dirname(markerPath), { recursive: true });
       try {
         fs.writeFileSync(receiptPath, JSON.stringify({ schema: "cmp-evidence/1", profile: "local", verdict: "FAIL", inputs: { hash: "a".repeat(64) }, steps: [] }));

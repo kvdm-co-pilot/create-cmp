@@ -36,6 +36,7 @@ import {
   parseWatchArgs,
   shouldIgnorePath,
 } from "../template/qa/watch.mjs";
+import { installHarnessLib } from "./helpers/harness-fixture.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WATCH_SRC = path.join(HERE, "..", "template", "qa", "watch.mjs");
@@ -287,6 +288,10 @@ test("parseReceipt: whole-JSON, prefixed-noise JSON, and garbage", () => {
 function makeFakeProject({ verdict = "PASS", exitCode = 0 } = {}) {
   const root = tmp();
   fs.mkdirSync(path.join(root, "qa"), { recursive: true });
+  // The vendored lib + manifest a real project carries: since Stage 0 PR 6a
+  // watch.mjs resolves both markers through qa/lib/lane-markers.mjs, which
+  // asks the manifest for the profile whose buildDir holds the render marker.
+  installHarnessLib(root);
   fs.copyFileSync(WATCH_SRC, path.join(root, "qa", "watch.mjs"));
   const receipt = {
     schema: "cmp-evidence/1",
@@ -364,9 +369,9 @@ test("--once in human mode: the block carries the step table and the footer; no 
 
 test("--once with a STALE lane marker present does not wedge — stale means proceed", () => {
   const root = makeFakeProject({ verdict: "PASS", exitCode: 0 });
-  const markerDir = path.join(root, "composeApp", "build");
+  const markerDir = path.join(root, "qa");
   fs.mkdirSync(markerDir, { recursive: true });
-  const marker = path.join(markerDir, ".cmp-lane-in-progress");
+  const marker = path.join(markerDir, ".lane-in-progress");
   fs.writeFileSync(marker, "99999 2026-01-01T00:00:00.000Z\n");
   const old = new Date(Date.now() - LANE_MARKER_STALE_MS - 60_000);
   fs.utimesSync(marker, old, old);

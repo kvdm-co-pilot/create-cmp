@@ -26,8 +26,9 @@
 // COORDINATION (non-negotiable): two concurrent Gradle invocations against one
 // project corrupt each other's output (KSP cache collisions, half-written
 // classes dirs — a real 20+ bogus-failure cascade). The lane and the preview
-// daemon already coordinate via marker files under composeApp/build:
-//   .cmp-lane-in-progress    — stamped by verify.mjs for a run's duration
+// daemon already coordinate via marker files:
+//   qa/.lane-in-progress     — stamped by verify.mjs for a run's duration (core
+//                              state; qa/lib/lane-markers.mjs)
 //   .cmp-render-in-progress  — stamped by the preview daemon while its Gradle
 //                              build is in flight
 // Watch mode participates as a third citizen: it never launches a run while a
@@ -51,17 +52,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { LANE_MARKER_REL, LANE_MARKER_STALE_MS, RENDER_MARKER_FRESH_MS, laneMarkerPath, renderMarkerPath } from "./lib/lane-markers.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
 export const USAGE = `node qa/watch.mjs [--once] [--json] [--help]
 
-Resident watch mode — the inner verification loop. Watches composeApp/src,
-specs/, and qa/ and runs \`node qa/verify.mjs --fast\` on every save (debounced;
+Resident watch mode — the inner verification loop. Watches the project's
+source roots, specs/, and qa/ and runs \`node qa/verify.mjs --fast\` on every save (debounced;
 a save storm triggers ONE run, changes during a run coalesce into one
 follow-up). It defers while a verify lane or a preview-daemon render holds the
-project (the .cmp-*-in-progress markers under composeApp/build), so two Gradle
+project (qa/.lane-in-progress and the eyes' own render marker), so two build
 invocations never collide.
 
 THIS IS NOT A GATE. It runs the fast tier only: every receipt records
@@ -106,7 +109,7 @@ export function shouldIgnorePath(rel) {
   const norm = String(rel).replace(/\\/g, "/");
   if (!norm) return true;
   const parts = norm.split("/");
-  // Any dotted segment: .git, .gradle, .DS_Store, .cmp-lane-in-progress, …
+  // Any dotted segment: .git, .gradle, .DS_Store, .lane-in-progress, …
   if (parts.some((s) => s.startsWith("."))) return true;
   // Any build dir at any depth (composeApp/build, qa/**/build, …).
   if (parts.includes("build")) return true;
@@ -133,10 +136,11 @@ export const POLL_MS = 2000; // marker-wait poll AND the no-recursive-watch fall
 // around its Gradle builds. Freshness is mtime-bounded so a crashed stamper
 // never wedges us.
 
-export const LANE_MARKER_REL = ["composeApp", "build", ".cmp-lane-in-progress"];
-export const RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
-export const LANE_MARKER_STALE_MS = 30 * 60 * 1000; // preview-service.mjs's bound for this marker
-export const RENDER_MARKER_FRESH_MS = 5 * 60 * 1000; // verify.mjs's bound for this marker
+// Paths and bounds are qa/lib/lane-markers.mjs's — the lane marker is core state
+// under qa/, the render marker is the profile's (under its buildDir, or none).
+// Re-exported because markerDecision's bounds are part of this module's
+// contract (qa/watch.mjs --json consumers and the engine suite read them).
+export { LANE_MARKER_STALE_MS, RENDER_MARKER_FRESH_MS };
 
 /**
  * The launch decision, pure: given the two markers' mtimes (null = absent) and
@@ -145,7 +149,7 @@ export const RENDER_MARKER_FRESH_MS = 5 * 60 * 1000; // verify.mjs's bound for t
  */
 export function markerDecision({ laneMtimeMs = null, renderMtimeMs = null, nowMs = Date.now() } = {}) {
   if (laneMtimeMs != null && nowMs - laneMtimeMs < LANE_MARKER_STALE_MS) {
-    return { launch: false, reason: "a verify lane is in progress (.cmp-lane-in-progress is fresh) — deferring; changes coalesce into one run when it finishes" };
+    return { launch: false, reason: `a verify lane is in progress (${LANE_MARKER_REL} is fresh) — deferring; changes coalesce into one run when it finishes` };
   }
   if (renderMtimeMs != null && nowMs - renderMtimeMs < RENDER_MARKER_FRESH_MS) {
     return { launch: false, reason: "the preview daemon has a Gradle build in flight (.cmp-render-in-progress is fresh) — deferring; changes coalesce into one run when it finishes" };
@@ -304,8 +308,8 @@ function markerMtime(absPath) {
 
 function launchDecisionNow() {
   return markerDecision({
-    laneMtimeMs: markerMtime(path.join(ROOT, ...LANE_MARKER_REL)),
-    renderMtimeMs: markerMtime(path.join(ROOT, ...RENDER_MARKER_REL)),
+    laneMtimeMs: markerMtime(laneMarkerPath(ROOT)),
+    renderMtimeMs: markerMtime(renderMarkerPath(ROOT)),
   });
 }
 
@@ -383,7 +387,7 @@ function main() {
         currentChild = null;
         // A signal-killed child never ran verify's `finally` — clean the lane
         // marker it stamped so nothing defers on a ghost for 30 minutes.
-        if (signal) clearMarkerIfOwnedBy(path.join(ROOT, ...LANE_MARKER_REL), child.pid);
+        if (signal) clearMarkerIfOwnedBy(laneMarkerPath(ROOT), child.pid);
         const durationMs = Date.now() - started;
         const receipt = parseReceipt(stdout);
         const rawTail = `${stdout}\n${stderr}`.split("\n").filter(Boolean);
@@ -533,7 +537,7 @@ function main() {
   // Startup: what is watched, what is respected, what this is NOT.
   say("qa/watch.mjs — resident inner loop: runs `node qa/verify.mjs --fast` on save");
   say(`watching: ${watchedRoots.join(", ")}  (ignoring **/build/**, qa/evidence/**, dotfiles)`);
-  say("coordination: defers while composeApp/build/.cmp-lane-in-progress or .cmp-render-in-progress is fresh — never two Gradle invocations against this project");
+  say(`coordination: defers while ${LANE_MARKER_REL} or the eyes' render marker is fresh — never two builds against this project`);
   say(`debounce: ${DEBOUNCE_MS}ms — a save storm triggers one run; changes during a run coalesce into one follow-up`);
   say(FOOTER);
   say("waiting for changes… (Ctrl-C to stop · --once for a single pass · --json for line-per-run output)");
@@ -543,7 +547,7 @@ function main() {
     watching: watchedRoots,
     ignoring: ["**/build/**", "qa/evidence/**", "dotfiles"],
     debounceMs: DEBOUNCE_MS,
-    coordinates: [LANE_MARKER_REL.join("/"), RENDER_MARKER_REL.join("/")],
+    coordinates: [LANE_MARKER_REL, renderMarkerPath(ROOT) ? path.relative(ROOT, renderMarkerPath(ROOT)).split(path.sep).join("/") : null].filter(Boolean),
     runs: "node qa/verify.mjs --fast",
     note: FOOTER,
   });
@@ -598,7 +602,7 @@ function installSignalHandlers(stopWork, getChild, emit, say) {
         signalTree("SIGKILL");
         await Promise.race([exited, sleep(1000)]);
       }
-      clearMarkerIfOwnedBy(path.join(ROOT, ...LANE_MARKER_REL), child.pid);
+      clearMarkerIfOwnedBy(laneMarkerPath(ROOT), child.pid);
     }
     say(`watch mode stopped (${sig}) — no receipt was made valid by watching; the done-gate is still one full \`node qa/verify.mjs\` run`);
     emit({ event: "shutdown", reason: sig });

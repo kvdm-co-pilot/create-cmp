@@ -39,6 +39,7 @@ import { StepTimeout, spawnTimedOut } from "./lib/step-outcomes.mjs";
 import { expectedDurations, runLane } from "./lib/lane-runner.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfile } from "./lib/profile-loader.mjs";
+import { laneMarkerPath } from "./lib/lane-markers.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -181,19 +182,9 @@ if (determinism && profileExplicit && profile !== "ci" && profile !== "release")
   process.exit(2);
 }
 
-const GRADLEW = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
-
-// ── `--rerun` is scoped to FULL mode ────────────────────────────────────────
-// `--rerun` exists for evidence integrity (see stepUnitTests's comment): it
-// stops Gradle's build cache replaying a PASS recorded against a different
-// tree into a receipt that claims tests executed. That mechanism belongs to
-// the runs that produce integrity-bearing artifacts — and a --fast run does
-// not: its receipt already declares itself non-evidence (mode "fast", no
-// evidence rung, refused by qa/receipt-check.mjs), so forcing execution there
-// paid an integrity tax to protect an artifact with nothing to protect. Fast
-// mode therefore omits the flag and lets Gradle's up-to-date/cache machinery
-// do its job; full mode keeps it, byte-identical to before.
-const RERUN = fast ? "" : " --rerun";
+// `--rerun` (evidence integrity: no build cache replaying a PASS from a
+// different tree) is the pack's to apply — it knows its build tool. The pack
+// reads `fast` from ctx and scopes the flag to FULL mode itself.
 
 // The running step's deadline (evidence-economics S4). Set by the step loop
 // before each step from the journal's measured duration for it; every
@@ -205,8 +196,8 @@ let CURRENT_STEP_DEADLINE_MS = 30 * 60_000;
 
 function sh(cmd, opts = {}) {
   const started = Date.now();
-  // maxBuffer: first-run Gradle output easily exceeds spawnSync's 1MB default,
-  // which would surface as a bogus FAIL (status null / ENOBUFS).
+  // maxBuffer: a build tool's first-run output easily exceeds spawnSync's 1MB
+  // default, which would surface as a bogus FAIL (status null / ENOBUFS).
   const res = spawnSync(cmd, {
     shell: true,
     cwd: ROOT,
@@ -224,23 +215,13 @@ function sh(cmd, opts = {}) {
   return { ok, status: res.status, error: res.error?.message, out: `${res.stdout ?? ""}${res.stderr ?? ""}`, durationMs: Date.now() - started };
 }
 
-// ── Preview-daemon coexistence ──────────────────────────────────────────────
-// The preview daemon (the eyes) and this lane both spawn Gradle against this
-// project and share composeApp/build/kspCaches, whose KSP incremental storage
-// is single-owner — two concurrent builds throw "Storage for [...] is already
-// registered" and one side dies. Three defenses, all automatic:
-//   1. COORDINATE (this lane -> the daemon): this lane stamps a marker file
-//      for its duration; the preview service defers renders while it exists
-//      (mtime-bounded, so a crashed lane never wedges the eyes for long).
-//   2. COORDINATE (the daemon -> this lane), the symmetric half: the daemon
-//      stamps its OWN marker for the duration of a render's Gradle build;
-//      shGradle waits for it to clear (or go stale) before launching this
-//      lane's own Gradle command — same mtime-bounded shape, so a crashed
-//      daemon never wedges the lane for long either.
-//   3. SELF-HEAL: a Gradle step that still hits the collision clears kspCaches
-//      and retries once — the manual recovery that always worked, automated.
-const LANE_MARKER = path.join(ROOT, "composeApp", "build", ".cmp-lane-in-progress");
-const KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
+// ── The lane marker ─────────────────────────────────────────────────────────
+// Stamped for the run's duration and rewritten at every step start (the
+// narration the narrator, the watcher, the Stop hook and the chain view read).
+// Core state, under qa/, beside the agent hold — qa/lib/lane-markers.mjs.
+// Coexistence with the eyes' own builds (the render marker, the KSP self-heal)
+// is the pack's: it knows its build tool and its build directory.
+const LANE_MARKER = laneMarkerPath(ROOT);
 
 // Degraded-path activations observed during this run — self-heals and
 // fallbacks that kept the lane moving without failing it. Collected for the
@@ -249,49 +230,6 @@ const KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
 // quietly rotting under a green lane — and only a journal can tell those
 // two apart.
 const DEGRADED_PATHS = [];
-
-// The daemon's half of defense 2 above — pid + ISO timestamp, mirroring
-// LANE_MARKER's own content shape (see where LANE_MARKER is stamped, below).
-const RENDER_MARKER = path.join(ROOT, "composeApp", "build", ".cmp-render-in-progress");
-const RENDER_MARKER_FRESH_MS = 5 * 60 * 1000; // older than this = a crashed daemon's stale marker, ignore it
-const RENDER_WAIT_TIMEOUT_MS = 3 * 60 * 1000; // give up waiting after this long regardless
-const RENDER_WAIT_POLL_MS = 2000;
-
-/**
- * Defer this lane's next Gradle command while the preview daemon's render
- * marker is present AND fresh (mtime younger than RENDER_MARKER_FRESH_MS).
- * Polls every RENDER_WAIT_POLL_MS; gives up and proceeds anyway after
- * RENDER_WAIT_TIMEOUT_MS, or the moment the marker disappears or goes stale —
- * whichever comes first. A missing/unreadable marker returns immediately:
- * this is a coexistence courtesy, never a hard dependency on the daemon.
- */
-function waitForRenderMarker() {
-  const deadline = Date.now() + RENDER_WAIT_TIMEOUT_MS;
-  for (;;) {
-    let stat;
-    try {
-      stat = fs.statSync(RENDER_MARKER);
-    } catch {
-      return; // no render in flight
-    }
-    if (Date.now() - stat.mtimeMs >= RENDER_MARKER_FRESH_MS) return; // gone stale
-    if (Date.now() >= deadline) return; // waited long enough — proceed regardless
-    sh(`sleep ${RENDER_WAIT_POLL_MS / 1000}`);
-  }
-}
-
-function shGradle(cmd, opts = {}) {
-  waitForRenderMarker();
-  const first = sh(cmd, opts);
-  if (first.ok || !KSP_COLLISION_RE.test(first.out)) return first;
-  console.error("· KSP cache collision (concurrent Gradle — the preview daemon?) — clearing kspCaches, retrying once");
-  fs.rmSync(path.join(ROOT, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
-  const retry = sh(cmd, opts);
-  retry.durationMs += first.durationMs;
-  retry.selfHealed = "ksp-cache-collision";
-  DEGRADED_PATHS.push("ksp-cache-collision: cleared kspCaches and retried the Gradle step");
-  return retry;
-}
 
 function tryGit(cmd) {
   try {
@@ -335,7 +273,7 @@ if (!loaded.ok) {
   console.error(loaded.reason);
   process.exit(2);
 }
-const pack = loaded.profile.steps({ ROOT, HERE, GRADLEW, RERUN, fast, determinism, profile, mode, sh, shGradle, tryGit, tryGitLines, DEGRADED_PATHS });
+const pack = loaded.profile.steps({ ROOT, HERE, fast, determinism, profile, mode, sh, tryGit, tryGitLines, DEGRADED_PATHS });
 const { stepsForProfile, DEVICE_STEPS, FAST_EXCLUDED_NAMES, STEP_FN_BY_NAME } = pack;
 
 
@@ -349,8 +287,8 @@ if (!stepsForProfile[profile]) {
 // qa/evidence/latest.json. The done-gate (qa/receipt-check.mjs) validates a
 // receipt by verdict + content hash — a receipt whose steps are one probe
 // would satisfy it while attesting almost nothing, so a probe-only run must
-// never mint one. The lane marker IS still stamped: the probe runs Gradle
-// and owes the preview daemon the same coexistence courtesy as the lane.
+// never mint one. The lane marker IS still stamped: the probe runs the pack's
+// own build steps and owes every other watcher the same courtesy as the lane.
 if (determinism && !profileExplicit) {
   fs.mkdirSync(path.dirname(LANE_MARKER), { recursive: true });
   fs.writeFileSync(LANE_MARKER, `${process.pid} ${new Date().toISOString()}\n`);
@@ -371,19 +309,17 @@ if (determinism && !profileExplicit) {
 }
 
 // ── --fast: the inner loop, mechanically unable to claim done ───────────────
-// The genuinely slow tier is device/release work — every DEVICE_STEPS entry
-// (Gradle install + emulator + Maestro + instrumented runner) plus
-// releaseBuild (R8 + lintVital, the slow release COMPILE). --fast filters
-// that tier out of whatever profile resolved, UNCONDITIONALLY — device
-// attached or not — so a small change gets its did-I-break-anything-obvious
-// signal in JVM time. The rest of the profile still runs — but cheaply: the
-// pure-Node steps reuse an unchanged PASS from the step cache (CACHED — see
-// the memoization block above), the Gradle test steps drop --rerun (see
-// RERUN above), and unitTests scopes itself to the working-tree change
-// (see stepUnitTests). The loophole is closed at the receipt, not by
-// convention: mode "fast" is
-// recorded, no evidence rung is derived (qa/lib/evidence-level.mjs), and
-// qa/receipt-check.mjs refuses a fast receipt as done evidence.
+// The genuinely slow tier is the pack's own: whatever it names in
+// FAST_EXCLUDED_NAMES (on mobile, the device and release steps). --fast
+// filters that tier out of whatever profile resolved, UNCONDITIONALLY — so a
+// small change gets its did-I-break-anything-obvious signal without paying
+// for the expensive half. The rest of the profile still runs, but cheaply:
+// the pure-Node steps reuse an unchanged PASS from the step cache (CACHED —
+// see the memoization block above), and the pack scopes its own test steps to
+// the working-tree change (it reads `fast` from ctx). The loophole is closed
+// at the receipt, not by convention: mode "fast" is recorded, no evidence
+// rung is derived (qa/lib/evidence-level.mjs), and qa/receipt-check.mjs
+// refuses a fast receipt as done evidence.
 const FAST_EXCLUDED_FNS = new Set(FAST_EXCLUDED_NAMES.map((name) => STEP_FN_BY_NAME[name]));
 const laneSteps = fast
   ? stepsForProfile[profile].filter((fn) => !FAST_EXCLUDED_FNS.has(fn))

@@ -74,6 +74,10 @@ const EXCLUDED_PREFIXES = [
   // un-proves the tree — the exact inversion this family of exclusions exists
   // to prevent.
   "qa/.agent-hold.json",
+  // The lane's own in-flight marker (qa/lib/lane-markers.mjs): stamped for a
+  // run's duration, rewritten at every step. Hashing it would make the lane
+  // invalidate its own receipt mid-run.
+  "qa/.lane-in-progress",
   "qa/evidence",
   "qa-artifacts",
   "qa/comments.json",
