@@ -36,9 +36,9 @@ import { evidenceLevel } from "./lib/evidence-level.mjs";
 import { updateReadmeBadge, README_REL_PATH } from "./lib/evidence-badge.mjs";
 import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
 import { StepTimeout, spawnTimedOut } from "./lib/step-outcomes.mjs";
-import { expectedDurations, runLane } from "./lib/lane-runner.mjs";
+import { expectedDurations, runLane, stepDisplayName } from "./lib/lane-runner.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
-import { loadProfile } from "./lib/profile-loader.mjs";
+import { loadProfile, loadProfileSync } from "./lib/profile-loader.mjs";
 import { laneMarkerPath } from "./lib/lane-markers.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
 
@@ -64,22 +64,19 @@ Flags:
   --profile <smoke|scaffold|local|ci|nightly|release>
                                  which step set to run (default: local)
   --fast                         INNER LOOP ONLY — run the resolved profile
-                                  minus the device/release tier (releaseBuild,
-                                  tokenDrift, e2eSmoke, androidChecks,
-                                  releaseSmoke), unconditionally, device
-                                  attached or not. Also reuses the pure-Node
-                                  steps' last PASS when their inputs are
-                                  unchanged (verdict CACHED), lets Gradle's
-                                  up-to-date checks stand (no --rerun), and
-                                  scopes unit tests to the working-tree change
-                                  (broad-impact changes run everything). The
+                                  minus this pack's expensive tier (named
+                                  under "This project" below), unconditionally,
+                                  device attached or not. Also reuses the
+                                  pure-Node steps' last PASS when their inputs
+                                  are unchanged (verdict CACHED), and lets the
+                                  pack scope its own build and test steps to
+                                  the working-tree change. The
                                   receipt records mode "fast", derives no
                                   evidence rung, and can NEVER satisfy the
                                   done-gate — run the full lane once before
                                   you call it done
-  --determinism                  run the timezone determinism probe: the JVM
-                                  test tier (unit + golden + the other
-                                  desktop suites) executes TWICE, under
+  --determinism                  run the timezone determinism probe: the
+                                  pack's host test tier executes TWICE, under
                                   TZ=Etc/GMT+12 (UTC-12) and TZ=Etc/GMT-14
                                   (UTC+14), and the probe FAILs naming every
                                   test whose verdict or failure output
@@ -104,27 +101,62 @@ Flags:
 
 Profiles:
   smoke     the smallest end-to-end lane: every pure-Node gate through the real
-            runner, receipt and journal — no Gradle, no device. Seconds. Proves the
+            runner, receipt and journal — no build tool, no device. Seconds. Proves the
             FRAMEWORK returns, both ways; never the change (its receipt is refused
             as done-evidence). Driven by qa/framework-check.mjs.
-  scaffold  spec coverage + build + unit tests (what \`create-cmp --verify\`
-            proves at stamp time)
+  scaffold  spec coverage + build + unit tests (what a stamp-time verify proves)
   local     everything; device-dependent steps SKIP when no device is
             attached
   ci        everything; SKIPs are recorded so the pipeline stays honest
   nightly   everything ci proves with the determinism probe FORCED ON (it doubles
-            the JVM test tier — the budget a scheduled run has and a per-change run
+            the host test tier — the budget a scheduled run has and a per-change run
             does not). Proves the HARNESS, not a change: its receipt is refused as
             done-evidence by qa/receipt-check.mjs. Schedule it; never wait on it.
-  release   everything ci proves PLUS the release-APK smoke (releaseSmoke) —
-            the ship-time profile; run it before cutting a release, never
-            per-change
+  release   everything ci proves PLUS the pack's ship-time step; run it before
+            cutting a release, never per-change
 `;
+
+/**
+ * What THIS project's lane actually runs, appended to the neutral usage above.
+ *
+ * The help text used to enumerate a Compose app's step names — releaseBuild,
+ * tokenDrift, e2eSmoke, androidChecks — so `--help` in any other repo
+ * described a lane that repo does not have. The step names belong to the pack,
+ * so they are read from it. A project with no usable manifest still gets full
+ * help plus the one line that says why the rest is missing: `--help` must
+ * never refuse, and must never invent a lane either.
+ * @param {string} root
+ * @returns {string}
+ */
+function projectSection(root) {
+  const manifest = resolveHarnessManifest(root);
+  if (!manifest.ok) return `\nThis project:\n  ${manifest.reason}\n`;
+  const loaded = loadProfileSync(root, manifest.manifest.profile);
+  if (!loaded.ok) return `\nThis project:\n  ${loaded.reason}\n`;
+  let pack;
+  try {
+    pack = loaded.profile.steps({
+      ROOT: root, HERE: path.join(root, "qa"), fast: false, determinism: false, profile: "local", mode: "full",
+      sh: () => ({ ok: true, out: "" }), tryGit: () => null, tryGitLines: () => [], DEGRADED_PATHS: [],
+    });
+  } catch (err) {
+    return `\nThis project:\n  profile "${loaded.profile.id}" could not describe its steps: ${err && err.message ? err.message : String(err)}\n`;
+  }
+  const names = (fns) => (Array.isArray(fns) ? fns.map((fn) => stepDisplayName(fn)).filter(Boolean) : []);
+  const lines = [`\nThis project (profile "${loaded.profile.id}"):`];
+  for (const [name, fns] of Object.entries(pack.stepsForProfile ?? {})) {
+    const list = names(fns);
+    if (list.length) lines.push(`  ${name.padEnd(9)} ${list.join(", ")}`);
+  }
+  const excluded = Array.isArray(pack.FAST_EXCLUDED_NAMES) ? pack.FAST_EXCLUDED_NAMES : [];
+  if (excluded.length) lines.push(`  --fast omits: ${excluded.join(", ")}`);
+  return `${lines.join("\n")}\n`;
+}
 
 const rawArgs = process.argv.slice(2);
 
 if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
-  console.log(USAGE);
+  console.log(USAGE + projectSection(ROOT));
   process.exit(0);
 }
 

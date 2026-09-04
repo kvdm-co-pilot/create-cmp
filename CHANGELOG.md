@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The watcher, the chain view and `--help` describe the project they are in.** Three
+  surfaces still spoke Compose. `qa/watch.mjs` watched a hardcoded `composeApp/src`, so the
+  inner loop in any other repo watched two roots out of three and never fired on a source
+  edit — a watcher that looks idle and is. The chain view's activity tier had the same list,
+  so it reported an idle agent that was working. And `verify.mjs --help` enumerated a Compose
+  app's step names as the tier `--fast` omits, confidently describing a lane the repo does not
+  have. All three now read the profile: `layout.sourceRoots` (new, optional — absent means the
+  citation roots) for the watched and observed trees, and the loaded pack for the step lists.
+  A project with no usable manifest gets the core roots and a said-out-loud note, never a
+  guessed layout; `--help` still prints in full and exits 0, with one line naming the command
+  that fixes it. Stage 0 PR 6b.
+
 - **The lane marker is core state; the runner carries no build tool.** The lane's
   in-flight marker moved from `composeApp/build/.cmp-lane-in-progress` to
   `qa/.lane-in-progress` (`qa/lib/lane-markers.mjs`) — it is the lane's, not a stack's, and

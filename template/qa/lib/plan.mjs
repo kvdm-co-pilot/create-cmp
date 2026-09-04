@@ -32,6 +32,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { laneMarkerPath, renderMarkerPath } from "./lane-markers.mjs";
+import { resolveSpecModel } from "./spec-model.mjs";
 
 export const PLAN_REL = "qa/.plan.json";
 export const REQUEST_REL = "qa/.request.json";
@@ -264,7 +265,21 @@ function markerInfo(p) {
 // this corroborates the build stage the same way: writes in the working tree
 // since the current request began. No agent cooperation required — which is
 // the point.
-const ACTIVITY_ROOTS = ["composeApp/src", "specs", "qa", "docs"];
+/**
+ * The trees whose writes count as observed agent activity: the profile's own
+ * source roots and specs directory, plus qa/ and docs/ (the harness and the
+ * governed prose — always core). Stage 0 PR 6b: this was a hardcoded
+ * ["composeApp/src", …], so on any other stack the build stage's observed tier
+ * saw nothing and the chain view reported an idle agent that was working.
+ * A project with no usable manifest gets the core roots alone — never a guess.
+ * @param {string} root
+ * @returns {string[]}
+ */
+function activityRoots(root) {
+  const model = resolveSpecModel(root);
+  if (!model.ok) return ["qa", "docs"];
+  return [...new Set([...model.model.sourceRoots, model.model.specsDir, "qa", "docs"])];
+}
 const ACTIVITY_SKIP_DIRS = new Set(["build", ".gradle", ".kotlin", ".git", ".idea", "node_modules", "evidence"]);
 // Machinery, not work: the chain's own files and the lane's outputs must not
 // count as "the agent wrote something", or the pulse would corroborate itself.
@@ -313,7 +328,7 @@ export function observeActivity(root, sinceIso, { now = Date.now() } = {}) {
       }
     }
   };
-  for (const rel of ACTIVITY_ROOTS) walk(path.join(root, rel));
+  for (const rel of activityRoots(root)) walk(path.join(root, rel));
   return {
     filesChanged,
     lastWriteAgoMs: filesChanged > 0 ? Math.max(0, now - newest) : null,
