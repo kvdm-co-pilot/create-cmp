@@ -668,7 +668,7 @@ stops colliding with the stack profile:
 ```json
 {
   "schema": "cmp-evidence/1",
-  "harness": { "name": "@create-cmp/harness", "version": "0.19.0", "sha256": "…", "status": "intact", "intact": true },
+  "harness": { "name": "prooflane-harness", "version": "0.19.0", "sha256": "…", "status": "intact", "intact": true },
   "pack":    { "id": "cmp", "version": "0.19.0" },
   "evidenceLevel": { "rung": "L2", "name": "device" },
   …

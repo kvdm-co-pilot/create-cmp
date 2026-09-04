@@ -77,7 +77,7 @@ test("a fresh scaffold lands byte-identical copies of every lane file", async ()
 
     // The scaffold ships a lock, and the lane can vouch for itself with it.
     const lock = JSON.parse(fs.readFileSync(path.join(out, "qa/harness.lock.json"), "utf8"));
-    assert.equal(lock.name, "@create-cmp/harness");
+    assert.equal(lock.name, "prooflane-harness");
     assert.equal(
       lock.version,
       JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "packages/harness/package.json"), "utf8")).version,

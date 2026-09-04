@@ -1,4 +1,4 @@
-# @create-cmp/harness
+# prooflane-harness
 
 The verify lane every [create-cmp](https://github.com/kvdm-co-pilot/create-cmp)
 app carries — the machine-owned half of a stamped project, published as the
@@ -46,7 +46,7 @@ byte-equality across package ↔ template ↔ fresh scaffold.
 ## Install
 
 ```sh
-npm install @create-cmp/harness
+npm install prooflane-harness
 ```
 
 ## Use — the region hash-lock
@@ -56,22 +56,22 @@ check — the same check `qa/verify.mjs` runs as its first step in every
 profile, as plain functions over a directory tree:
 
 ```js
-import { isHarnessFile } from "@create-cmp/harness/harness-region";
+import { isHarnessFile } from "prooflane-harness/harness-region";
 import {
   writeHarnessLock,
   checkHarnessIntegrity,
   describeIntegrity,
-} from "@create-cmp/harness/lib/harness-lock.mjs";
+} from "prooflane-harness/lib/harness-lock.mjs";
 
 isHarnessFile("qa/verify.mjs");     // true  — machine-owned
 isHarnessFile("qa/approvals.json"); // false — app state, never part of the region
 
 writeHarnessLock(projectRoot, { version: "1.0.0" });
 describeIntegrity(checkHarnessIntegrity(projectRoot));
-// "@create-cmp/harness 1.0.0 — 2 files verified"
+// "prooflane-harness 1.0.0 — 2 files verified"
 
 // …edit a lane file in place, then check again:
-// "@create-cmp/harness 1.0.0 — 1 modified"
+// "prooflane-harness 1.0.0 — 1 modified"
 ```
 
 `checkHarnessIntegrity` returns `{ status: "intact" | "modified" | "unlocked",
@@ -87,16 +87,16 @@ intact.
 `qa/verify.mjs`), composed from the `src/lib/*.mjs` modules: spec-coverage
 scanning, the approvals gate, golden-tree / a11y / conformance wiring, the
 device lease, the step cache, the flight recorder, the evidence-receipt
-writer. Each is individually importable (`@create-cmp/harness/lib/<name>.mjs`,
+writer. Each is individually importable (`prooflane-harness/lib/<name>.mjs`,
 extension optional), but they are written to run *inside* a scaffolded
 Compose Multiplatform project — they expect `composeApp/`, `specs/`, and
 `gradlew` on disk. They are not a general-purpose toolkit.
 
 Two modules are the exception by design: `lib/inputs-hash.mjs` and
 `lib/receipt-validate.mjs` are byte-identical vendored copies of
-[`@create-cmp/receipts`](https://www.npmjs.com/package/@create-cmp/receipts)
+[`prooflane-receipts`](https://www.npmjs.com/package/prooflane-receipts)
 (parity-tested), kept so this package needs no npm dependency either. If you
-only want receipt validation, depend on `@create-cmp/receipts` directly.
+only want receipt validation, depend on `prooflane-receipts` directly.
 
 ## Adopting the spine in a repo that is not a Compose app
 
@@ -199,7 +199,7 @@ a device that never came up is a failure to test, not a gap to record.
   upgrade time.
 - **Prove authenticity.** The lock is a checksum, not a signature: it answers
   "has this tree's lane changed since it was locked?" — locally, offline,
-  every run. "Is this really the published `@create-cmp/harness@X`?" needs a
+  every run. "Is this really the published `prooflane-harness@X`?" needs a
   comparison against the published package's own digests, which is the
   upgrade flow's job, not the lock's.
 - **Publish evidence anywhere.** Receipts land in `qa/evidence/latest.json`

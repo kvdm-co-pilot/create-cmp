@@ -1,4 +1,4 @@
-// @create-cmp/receipts — validate create-cmp evidence receipts.
+// prooflane-receipts — validate create-cmp evidence receipts.
 // Single source of truth for the inputs-hash algorithm and the receipt
 // predicate; vendored byte-identical into every generated project's qa/lib/
 // and consumed by hosted validators. Dependency-free ESM.
