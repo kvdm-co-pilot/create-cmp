@@ -856,7 +856,17 @@ function stepDeterminism() {
     };
   }
 
-  const diffs = compareOutcomes(a.outcomes, b.outcomes, labelA, labelB);
+  // WHICH STEP owns a test class is this stack's knowledge: Kotlin class-name
+  // conventions on the left, this pack's step names on the right. It lived in
+  // qa/lib/determinism.mjs until Stage 0 A3, where the core knowing four step
+  // names was stamping them onto other stacks' determinism diffs.
+  const attribute = (classname) => {
+    if (/GoldenTreeTest$/.test(classname)) return "goldenTrees";
+    if (/ArchitectureConformanceTest$/.test(classname)) return "conformance";
+    if (/A11yConformanceTest$/.test(classname)) return "a11y";
+    return "unitTests";
+  };
+  const diffs = compareOutcomes(a.outcomes, b.outcomes, labelA, labelB, attribute);
   if (diffs.length > 0) {
     const lines = [
       `Nondeterminism under timezone shift — the same tree produced different outcomes under ${labelA} vs ${labelB}. Something reads ambient time or zone past the ARCH-13 net (a library default, an uninjected clock, a golden that captures "today"):`,
@@ -1473,6 +1483,12 @@ for (const name of FAST_EXCLUDED_NAMES) {
     id: "cmp",
     stepsForProfile,
     DEVICE_STEPS,
+    // The verdict line's strength phrase. The core prints what it is handed and
+    // nothing when handed nothing: "desktop-only" is THIS stack's word for the
+    // absence of a device, not the harness's word for the absence of anything.
+    // It used to be composed in verify.mjs, so a backend service with neither a
+    // desktop nor a device read "(desktop-only)" on every verdict it ever printed.
+    strengthLabel: (onDeviceSteps) => (onDeviceSteps.length ? `on-device: ${onDeviceSteps.join("+")}` : "desktop-only"),
     FAST_EXCLUDED_NAMES,
     STEP_FN_BY_NAME,
     stepDeterminism,

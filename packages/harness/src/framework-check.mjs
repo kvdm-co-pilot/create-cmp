@@ -205,7 +205,19 @@ function readSpecs() {
 // asks the profile, never a constant. A tree with no usable profile has no
 // spec plants to make, and says so per plant rather than guessing.
 const SPEC_MODEL_RESULT = resolveSpecModel(ROOT);
-const SPEC_MODEL = SPEC_MODEL_RESULT.ok ? SPEC_MODEL_RESULT.model : null;
+// REFUSE FIRST. With no manifest there is no layout, so every plant that reads
+// the tree reported an honest-looking absence of files that exist: a project
+// with two specs and nine clauses was told "no spec files — nothing declares
+// behavior to plant against", four lines before the manifest refusal explained
+// the real problem. That is the exact failure harness-manifest.mjs names in its
+// own header as the reason there is no default profile, reproduced inside the
+// instrument built to prove the lane returns. A reader who cannot know the
+// layout says so and stops, rather than describing a tree it cannot see.
+if (!SPEC_MODEL_RESULT.ok) {
+  process.stderr.write(`\n${SPEC_MODEL_RESULT.reason}\n`);
+  process.exit(2);
+}
+const SPEC_MODEL = SPEC_MODEL_RESULT.model;
 
 // The SOURCE this profile's planted citations live in. A citation must sit on
 // a test, so two of the plants have to WRITE a test — in this stack's
@@ -268,6 +280,8 @@ const tree = {
   testDir: PROFILE_PLANTS ? findTestDir() : null,
   // So the skip can name the REAL cause instead of blaming the tree.
   plantsDeclared: Boolean(PROFILE_PLANTS),
+  // No `?? "e2e"` anywhere: the tier a plant declares is the profile's or absent.
+  unmeetableTier: PROFILE_PLANTS?.unmeetableTier ?? null,
   flowsDir: SPEC_MODEL && SPEC_MODEL.flows ? SPEC_MODEL.flows.dir : null,
 };
 
@@ -370,7 +384,7 @@ function applyPlant(plant) {
       const text = read(target.spec);
       write(
         target.spec,
-        `${text.trimEnd()}\n- **${target.clause}** [tier: ${PROFILE_PLANTS.unmeetableTier ?? "e2e"}] — Given a planted clause only the target can observe, Then a host-tier citation cannot satisfy it.\n`,
+        `${text.trimEnd()}\n- **${target.clause}** [tier: ${target.unmeetableTier}] — Given a planted clause only the target can observe, Then a host-tier citation cannot satisfy it.\n`,
       );
       write(PLANTED_TEST_REL(target.testDir), PROFILE_PLANTS.tierUnmetCitationSource(target.clause));
       break;
@@ -497,7 +511,19 @@ try {
   //    synthetic row over this tree's own valid hash, so only the skip is new.
   {
     const green = runSmoke();
-    if (!green.receipt || green.receipt.verdict !== "PASS") die("could not produce a PASS receipt for the device-tier hook check");
+    if (!green.receipt || green.receipt.verdict !== "PASS") {
+      // NAME THE STEPS. "could not produce a PASS receipt" told a reader that
+      // something was wrong and nothing about what, in the one place where the
+      // instrument has the whole receipt in hand. Evidence-or-silence applies to
+      // the instrument's own refusals too.
+      const bad = (green.receipt?.steps ?? [])
+        .filter((s) => s.verdict === "FAIL" || s.verdict === "ERROR")
+        .map((s) => `${s.name}: ${s.reason ?? s.verdict}`);
+      die(
+        `could not produce a PASS receipt for the device-tier hook check` +
+          (bad.length ? ` — ${bad.join("; ")}` : green.receipt ? ` (verdict ${green.receipt.verdict}, no failing step)` : " (no receipt at all)"),
+      );
+    }
     const planted = {
       ...green.receipt,
       profile: "local",

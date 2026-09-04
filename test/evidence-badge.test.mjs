@@ -12,6 +12,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
 
@@ -21,7 +22,7 @@ import {
   README_REL_PATH,
   BADGE_SECTION_ID,
 } from "../template/qa/lib/evidence-badge.mjs";
-import { VERIFIED_SURFACE } from "../template/qa/lib/inputs-hash.mjs";
+import { resolveVerifiedSurface } from "../template/qa/lib/inputs-hash.mjs";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "evidence-badge-"));
 
@@ -163,7 +164,10 @@ test("README.md is outside the verified surface, so writing the badge cannot inv
   // The badge is written AFTER the receipt's inputs hash is computed. If
   // README.md were part of the hashed surface, every lane run would leave a
   // receipt that no longer attests its own tree.
-  const covered = VERIFIED_SURFACE.some((s) => README_REL_PATH === s || README_REL_PATH.startsWith(`${s}/`));
+  // The template now DECLARES its surface (qa/verified-surface.json), so this
+  // reads the declaration rather than a constant the core no longer holds.
+  const surface = resolveVerifiedSurface(fileURLToPath(new URL("../template/", import.meta.url)));
+  const covered = surface.some((s) => README_REL_PATH === s || README_REL_PATH.startsWith(`${s}/`));
   assert.equal(covered, false);
 });
 

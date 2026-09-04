@@ -6,6 +6,54 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **The spine stops knowing a stack — six leaks closed.** Every one was found by the first
+  non-Compose adoption, and each is a fact the core had no way to know and asserted anyway.
+
+  `verify.mjs` composed the verdict line's strength phrase, whose negative case was the word
+  **`desktop-only`** — printed by every lane in every repo, including a backend service with
+  neither a desktop nor a device. A profile could name its device steps and still not name the
+  *category*. The label is the pack's now; the core prints what it is handed and **nothing**
+  when handed nothing, because silence is honest and a borrowed noun is not.
+
+  `determinism.mjs` answered "which lane step owns this test class" with four names, three of
+  which exist only in the `cmp` pack, and `compareOutcomes` called it unconditionally — so any
+  profile reusing the core's determinism comparison got another stack's step names stamped on
+  its diffs. The mapping is the profile's; the core keeps the mechanic and learns no names.
+  The module is now in `test/agnostic-lint.test.mjs`, whose absence is why this survived.
+
+  `framework-check.mjs` fell back to `?? "e2e"` — a CMP tier name — when planting a
+  tier-unmet clause, so a profile shipping plants without an `unmeetableTier` planted a clause
+  tagged with a tier it does not define and the resulting FAIL was right for the wrong reason.
+  There is no default now; there is a skip that names the missing field.
+
+  `inputs-hash.mjs` held a Compose app's directory names as the fallback verified surface. In
+  a repo whose code lives under `services/` that matched `qa/` and `specs/` and nothing else,
+  so the lane minted a valid, confident, **smaller** hash — a receipt attesting a fraction of
+  a project while looking complete, which the file's own header calls the worst failure this
+  harness can have. The fallback is derived from the tree and errs deliberately wide: over-
+  attesting costs a hash that moves too often, under-attesting is a lie. The template now
+  declares its surface explicitly, so no stamped app's hash moves.
+
+  The instrument reported plant skips **before** the manifest refusal, so a project with two
+  specs and nine clauses was told "no spec files — nothing declares behavior to plant against"
+  four lines before the real problem was named. It refuses first: a reader that cannot know
+  the layout says so and stops, rather than describing a tree it cannot see.
+
+  And `--help`'s generic Profiles block described one stack's lane ("no build tool, no
+  device", "device-dependent steps SKIP"). It now says what each profile is *for*; which steps
+  each runs was already correct in the "This project" block beneath it.
+
+### Fixed
+
+- **A revert that assumed the file it reverted did not exist.** The engine instrument's
+  narrowed-surface plant deleted `qa/verified-surface.json` on revert, correct only while a
+  stamped app had no declaration. Once the template shipped one, the plant destroyed a locked
+  declaration and every later step failed on a tree the instrument itself had broken. It
+  captures and restores. Two refusals that reported a failure without naming it now name the
+  steps and the files.
+
 ### Added
 
 - **`create-cmp harness init` — one command from a repo of any stack to a green lane.** The

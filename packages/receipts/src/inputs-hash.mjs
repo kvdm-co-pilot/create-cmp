@@ -30,15 +30,43 @@ import path from "node:path";
 // looking the same is the worst failure this harness can have, so the surface
 // is now resolved per project (see resolveVerifiedSurface) and an empty one is
 // refused rather than hashed.
-export const VERIFIED_SURFACE = [
-  "composeApp",
-  "specs",
-  "qa",
-  "gradle/libs.versions.toml",
-  "build.gradle.kts",
-  "settings.gradle.kts",
-  "gradle.properties",
-];
+/**
+ * The surface a project gets when it has NOT declared one.
+ *
+ * This used to be a constant: `composeApp`, `specs`, `qa`, and the Gradle files
+ * — one stack's directory names, in the module every adopter's receipt is
+ * computed by. Vendored into a repo whose code lives under `services/`, it
+ * matched `qa/` and `specs/` and nothing else, so the lane produced a valid,
+ * confident, SMALLER hash: a receipt attesting a fraction of a project while
+ * looking complete. The file's own header calls that the worst failure this
+ * harness can have, and then shipped it as the default.
+ *
+ * Derived from the tree instead, and deliberately WIDE. Over-attesting costs a
+ * hash that moves more often than it needs to; under-attesting silently drops
+ * files from what a receipt claims. Only one of those is a lie, so the error is
+ * taken in the safe direction. Build output and dependency directories are
+ * excluded because they are outputs, not the thing being attested.
+ *
+ * A project that wants a narrower or pinned surface DECLARES one — `harness
+ * init` writes it, and the template ships one, so this fallback is for repos
+ * that predate the declaration rather than the normal path.
+ *
+ * @param {string} root
+ * @returns {string[]}
+ */
+export function defaultSurface(root) {
+  const skip = new Set(["node_modules", "build", "dist", "out", "target", ".gradle", "qa-artifacts"]);
+  let entries;
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((e) => !e.name.startsWith(".") && !skip.has(e.name))
+    .map((e) => e.name)
+    .sort();
+}
 
 // Paths EXCLUDED even though they fall under an included surface dir above.
 // qa/evidence and qa-artifacts are lane OUTPUTS — including them would make
@@ -195,7 +223,7 @@ export function resolveVerifiedSurface(root) {
   try {
     raw = fs.readFileSync(p, "utf8");
   } catch {
-    return VERIFIED_SURFACE; // no declaration — the CMP default, unchanged
+    return defaultSurface(root); // no declaration — the tree's own top level
   }
   let parsed;
   try {
@@ -212,13 +240,13 @@ export function resolveVerifiedSurface(root) {
 
 // Resolve the verified surface to a flat, sorted list of paths (relative to
 // root, POSIX-style `/` separators) that currently exist on disk.
-function resolveSurfaceFiles(root, VERIFIED_SURFACE) {
+function resolveSurfaceFiles(root, surfaceEntries) {
   const gitFiles = tryGitLsFiles(root);
 
   if (gitFiles) {
     return gitFiles
       .map((p) => p.split(path.sep).join("/"))
-      .filter((relPath) => VERIFIED_SURFACE.some((surface) => relPath === surface || relPath.startsWith(`${surface}/`)))
+      .filter((relPath) => surfaceEntries.some((surface) => relPath === surface || relPath.startsWith(`${surface}/`)))
       .filter((relPath) => !isExcluded(relPath))
       .filter((relPath) => fs.existsSync(path.join(root, relPath)) && fs.statSync(path.join(root, relPath)).isFile());
   }
@@ -226,7 +254,7 @@ function resolveSurfaceFiles(root, VERIFIED_SURFACE) {
   // Fallback: no git available — walk the surface directories directly so a
   // non-git scaffold still produces a stable hash.
   const collected = [];
-  for (const surface of VERIFIED_SURFACE) {
+  for (const surface of surfaceEntries) {
     const abs = path.join(root, surface);
     if (!fs.existsSync(abs)) continue;
     const stat = fs.statSync(abs);

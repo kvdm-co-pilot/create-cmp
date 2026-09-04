@@ -133,6 +133,9 @@ const spineText = fs.readFileSync(spineFile, "utf8");
 const receiptPath = path.join(appDir, "qa", "evidence", "latest.json");
 
 /** @type {Array<{label: string, plant: () => void, revert: () => void, step: string, names: string[], hook?: RegExp}>} */
+/** What qa/verified-surface.json held before the narrowed-surface plant, so the revert restores rather than deletes. */
+let surfaceBefore = null;
+
 const PLANTS = [
   {
     label: "orphaned citation",
@@ -198,11 +201,24 @@ const PLANTS = [
   {
     label: "narrowed surface declaration",
     // payment-blueprint's planted proof: one entry removed from the surface
-    // declaration un-attests a whole layer while every checker is intact. A
-    // fresh Compose app has no declaration; writing a narrow one is the same
-    // edit — the declaration enters the region unrecorded, and the lock says so.
-    plant: () => fs.writeFileSync(path.join(appDir, "qa", "verified-surface.json"), JSON.stringify({ surface: ["qa"] })),
-    revert: () => fs.rmSync(path.join(appDir, "qa", "verified-surface.json"), { force: true }),
+    // declaration un-attests a whole layer while every checker is intact.
+    //
+    // RESTORE, never delete. This revert used to `rm` the file, which was
+    // correct only while a stamped app HAD no declaration — writing a narrow one
+    // where none existed was the whole plant. The template ships one now, so a
+    // deleting revert destroys a locked declaration and every step after this
+    // plant fails on a tree the instrument itself broke. A revert that assumes
+    // the file it is reverting did not exist is a revert that can eat work.
+    plant: () => {
+      const f = path.join(appDir, "qa", "verified-surface.json");
+      surfaceBefore = fs.existsSync(f) ? fs.readFileSync(f, "utf8") : null;
+      fs.writeFileSync(f, JSON.stringify({ surface: ["qa"] }));
+    },
+    revert: () => {
+      const f = path.join(appDir, "qa", "verified-surface.json");
+      if (surfaceBefore === null) fs.rmSync(f, { force: true });
+      else fs.writeFileSync(f, surfaceBefore);
+    },
     step: "harnessIntegrity",
     // The FILE, not the state word: "unrecorded" holds only while the surface
     // declaration is absent from the lock. A repo locked after `harness init`
@@ -260,15 +276,26 @@ const failRun = { ms: plantsMs };
 {
   PLANTS[0].plant();
   const r = runSmoke(appDir);
-  PLANTS[0].revert();
   if (!r.receipt || r.receipt.verdict !== "FAIL") fail(`could not produce a FAIL receipt for the hook check`, scratchRoot);
+  // ASK BEFORE REVERTING — the same defect as the shipped instrument carried:
+  // the revert restores the receipt, so asking afterwards showed the hook either
+  // no receipt at all (fresh tree: green for an unrelated reason) or an earlier
+  // PASS (a working lane failing). This check never tested its own sentence.
   const hook = hookRefuses(appDir);
+  PLANTS[0].revert();
   if (!hook.refused) fail(`the Stop hook did not refuse a FAIL receipt`, scratchRoot);
   out(`  Stop hook            refuses a FAIL receipt ✓`);
 }
 {
   const green = runSmoke(appDir);
-  if (!green.receipt || green.receipt.verdict !== "PASS") fail(`could not produce a PASS receipt for the device-tier hook check`, scratchRoot);
+  if (!green.receipt || green.receipt.verdict !== "PASS") {
+    // Name the steps: "could not produce a PASS receipt" said something was
+    // wrong and nothing about what, in the one place holding the whole receipt.
+    const bad = (green.receipt?.steps ?? [])
+      .filter((st) => st.verdict === "FAIL" || st.verdict === "ERROR")
+      .map((st) => `${st.name}: ${st.reason ?? st.verdict}`);
+    fail(`could not produce a PASS receipt for the device-tier hook check${bad.length ? ` — ${bad.join("; ")}` : ""}`, scratchRoot);
+  }
   // Local-profile shape: the hook refuses smoke receipts on stage alone, so the
   // planted row must sit on a change-stage receipt with this tree's real hash.
   const planted = { ...green.receipt, profile: "local", stage: "change", steps: [...green.receipt.steps, { name: "e2eSmoke", verdict: "SKIP", skipKind: "environment", reason: "device tier disabled by CMP_DEVICE=none (planted)", durationMs: 0 }] };

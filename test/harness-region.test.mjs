@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  HARNESS_DECLARATIONS,
   HARNESS_DIRS,
   isHarnessFile,
   listHarnessFiles,
@@ -69,7 +70,7 @@ test("the real template's region is exactly its qa .mjs files, its profiles, and
     ...fs.readdirSync(path.join(REPO_ROOT, "template/qa/lib")).map((n) => `qa/lib/${n}`),
     ...walk(path.join(REPO_ROOT, "template/qa/lib/profiles"), "qa/lib/profiles"),
   ]
-    .filter((r) => r.endsWith(".mjs") || r === "qa/harness-manifest.json")
+    .filter((r) => r.endsWith(".mjs") || HARNESS_DECLARATIONS.includes(r))
     .sort();
   assert.deepEqual(rels, onDisk);
   assert.ok(rels.length >= 30, `expected the full lane, got ${rels.length}`);
@@ -78,6 +79,11 @@ test("the real template's region is exactly its qa .mjs files, its profiles, and
   // could not vouch for its own verdicts.
   assert.ok(rels.includes("qa/harness-manifest.json"));
   assert.ok(rels.includes("qa/lib/profiles/cmp/index.mjs"));
+  // The template DECLARES its verified surface now, rather than relying on a
+  // fallback the core no longer holds. It is in the region for the reason every
+  // declaration is: an edited checker and an edited definition of what the
+  // checker looks at are the same attack.
+  assert.ok(rels.includes("qa/verified-surface.json"));
 });
 
 test("profiles are machine-owned, recursively, by a NAMED rule — nesting elsewhere still is not", () => {

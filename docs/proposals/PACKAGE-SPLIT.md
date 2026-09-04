@@ -205,7 +205,7 @@ it ships later.
 ### Phase A — fix the findings, take the exit measurement
 *No naming needed. Nothing breaking. Ships value immediately.*
 
-**A1 and A2 landed 2026-09-04.** A repo with JS sources, a spec and a test reached a green
+**A1, A2 and A3 landed 2026-09-04.** A repo with JS sources, a spec and a test reached a green
 lane and a PASSing Rule 0 (3 plants, 781 ms, tree restored byte-for-byte) from one command,
 with nothing hand-edited. Three defects in the instrument itself surfaced on the way and are
 fixed: the Stop-hook check that could not fail for its own reason, the plant skip that named
@@ -215,7 +215,7 @@ a language and a falsehood, and the integrity refusal that hid the paths it refu
 |---|---|---|
 | A1 ✅ | `harness init [--profile <id>]` writes manifest, profile skeleton (5 required exports stubbed, 4 optional present and commented with real field names), seeded `verified-surface.json`, lock — then runs framework-check and prints the result. Manifest refusal repointed at it. | suite + framework-check; a fixture repo goes from empty to green lane |
 | A2 ✅ | README: delete the step that instructs editing `verify.mjs`; fix step 1 breaking `harnessIntegrity`; correct the spine list. | link-check + the adoption walkthrough runs clean |
-| A3 | The §8.6 leaks, one PR each: profile-supplied strength label; `laneStepForTestClass` → profile, `determinism.mjs` → the lint; `?? "e2e"`; the Compose default surface; the false "no Kotlin test source directory"; the pre-manifest "no spec files" lie. | agnostic-lint grows a module per PR; fleet L2 |
+| A3 ✅ | The §8.6 leaks (landed as ONE PR — they are one change, and per-fix ceremony is what the standing rule forbids): profile-supplied strength label; `laneStepForTestClass` → profile, `determinism.mjs` → the lint; `?? "e2e"`; the Compose default surface; the false "no Kotlin test source directory"; the pre-manifest "no spec files" lie. | agnostic-lint grows a module per PR; fleet L2 |
 | A4 | Bring the fuelled-api profile in as a **second profile in the suite**. | every seam test and the agnostic lint now run against two stacks |
 | A5 | **Cold re-run:** a fresh agent authors a profile from `harness init` output + README only, forbidden from opening core source. | **This is Stage 0's exit measurement.** |
 
