@@ -21,6 +21,7 @@
 // source, then run `node scripts/sync-harness.mjs`.
 
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -30,14 +31,24 @@ import { PROFILE_ID_RE } from "./harness-manifest.mjs";
  * The profile protocol this core speaks. A profile declares the protocol it
  * implements; mismatch is a refusal naming both, with the upgrade command.
  * One integer — the Terraform handshake.
+ *
+ * Protocol 1 is still being drawn: its required exports grew during Stage 0
+ * (`layout` and `tiers` in PR 4) while the only implementer ships in this
+ * tree, vendored beside the core it matches. It freezes at Stage 2, when a
+ * profile can be versioned apart from the harness; from then on a new
+ * required export is a new protocol number.
  */
 export const PROFILE_PROTOCOL = 1;
 
 /** Where profiles live, relative to the project root. Inside the lock region. */
 export const PROFILES_DIR_REL = "qa/lib/profiles";
 
-/** The exports a profile MUST provide for the runner to start. Grows with the protocol. */
-export const REQUIRED_EXPORTS = Object.freeze(["id", "protocol", "steps"]);
+/**
+ * The exports a profile MUST provide for the runner to start. `layout` and
+ * `tiers` are the spec scanner's model (qa/lib/spec-model.mjs validates their
+ * shape); `steps(ctx)` is the pack.
+ */
+export const REQUIRED_EXPORTS = Object.freeze(["id", "protocol", "layout", "tiers", "steps"]);
 
 /**
  * The project-relative path of a profile's entry module.
@@ -71,16 +82,19 @@ export function validateProfileModule(mod, id) {
     };
   }
   if (typeof mod.steps !== "function") return { ok: false, reason: `profile "${id}" must export steps(ctx) as a function` };
+  if (!mod.layout || typeof mod.layout !== "object") return { ok: false, reason: `profile "${id}" must export layout as an object (where specs, sources, tests and flows live)` };
+  if (!mod.tiers || typeof mod.tiers !== "object") return { ok: false, reason: `profile "${id}" must export tiers as an object (which test tiers exist and which can observe which promise)` };
   return { ok: true };
 }
 
 /**
- * Load and validate the profile the manifest names.
- * @param {string} root project root
- * @param {{id: string}} named the manifest's `profile`
- * @returns {Promise<{ok: true, profile: object, entryRel: string} | {ok: false, reason: string}>}
+ * Locate the profile's entry module for `id`, refusing an unsafe id or a
+ * missing directory by name. Shared by the async and sync loaders.
+ * @param {string} root
+ * @param {string} id
+ * @returns {{ok: true, entryRel: string, entryAbs: string} | {ok: false, reason: string}}
  */
-export async function loadProfile(root, { id } = {}) {
+function locateProfile(root, id) {
   if (typeof id !== "string" || !PROFILE_ID_RE.test(id)) {
     return { ok: false, reason: `profile id ${JSON.stringify(id)} is not a valid profile name (${PROFILE_ID_RE}) — it names a directory under ${PROFILES_DIR_REL}/` };
   }
@@ -99,13 +113,55 @@ export async function loadProfile(root, { id } = {}) {
     const have = present.length ? `profiles present: ${present.join(", ")}` : `no profiles are installed under ${PROFILES_DIR_REL}/`;
     return { ok: false, reason: `the manifest names profile "${id}" but ${entryRel} does not exist (${have}) — install the profile or fix ${"qa/harness-manifest.json"}` };
   }
+  return { ok: true, entryRel, entryAbs };
+}
+
+/**
+ * loadProfile, synchronously — for the readers that only have a project root
+ * and sit in a sync chain (the spec scanner via feature-brief and approvals,
+ * the console's Specs bridge). A profile is plain ESM without top-level
+ * await, so `require()` loads it: supported since Node 20.19 / 22.12 and
+ * sharing the module cache with `import()`, so both loaders hand back the
+ * same instance. On an older Node the refusal names the floor instead of
+ * guessing a layout.
+ * @param {string} root project root
+ * @param {{id: string}} named the manifest's `profile`
+ * @returns {{ok: true, profile: object, entryRel: string} | {ok: false, reason: string}}
+ */
+export function loadProfileSync(root, { id } = {}) {
+  const where = locateProfile(root, id);
+  if (!where.ok) return where;
   let mod;
   try {
-    mod = await import(pathToFileURL(entryAbs).href);
+    mod = createRequire(import.meta.url)(where.entryAbs);
   } catch (err) {
-    return { ok: false, reason: `profile "${id}" failed to load from ${entryRel}: ${err && err.message ? err.message : String(err)}` };
+    const code = err && err.code;
+    if (code === "ERR_REQUIRE_ESM" || code === "ERR_REQUIRE_ASYNC_MODULE") {
+      return { ok: false, reason: `profile "${id}" cannot be loaded synchronously on Node ${process.version} — the harness needs Node 20.19 or 22.12 or newer (require() of ES modules); upgrade Node` };
+    }
+    return { ok: false, reason: `profile "${id}" failed to load from ${where.entryRel}: ${err && err.message ? err.message : String(err)}` };
   }
   const verdict = validateProfileModule(mod, id);
   if (!verdict.ok) return verdict;
-  return { ok: true, profile: mod, entryRel };
+  return { ok: true, profile: mod, entryRel: where.entryRel };
+}
+
+/**
+ * Load and validate the profile the manifest names.
+ * @param {string} root project root
+ * @param {{id: string}} named the manifest's `profile`
+ * @returns {Promise<{ok: true, profile: object, entryRel: string} | {ok: false, reason: string}>}
+ */
+export async function loadProfile(root, { id } = {}) {
+  const where = locateProfile(root, id);
+  if (!where.ok) return where;
+  let mod;
+  try {
+    mod = await import(pathToFileURL(where.entryAbs).href);
+  } catch (err) {
+    return { ok: false, reason: `profile "${id}" failed to load from ${where.entryRel}: ${err && err.message ? err.message : String(err)}` };
+  }
+  const verdict = validateProfileModule(mod, id);
+  if (!verdict.ok) return verdict;
+  return { ok: true, profile: mod, entryRel: where.entryRel };
 }

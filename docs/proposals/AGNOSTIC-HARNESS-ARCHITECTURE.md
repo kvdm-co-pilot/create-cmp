@@ -825,8 +825,14 @@ Smallest blast radius first, so each step is a small PR with the fleet check gre
    repos) — M0b, promoted. The stamper writes a manifest on every new app. Fleet green.
 3. Move the six glue files + `e2e-coverage` + Maestro helpers into `profiles/cmp/`.
    Update imports. Fleet green.
-4. `spec-coverage`: `tierForFile` / `TIERS_SATISFYING` / roots from the profile. Fleet
-   green; blueprint's `spec-coverage.mjs` diff → 0.
+4. ✅ `spec-coverage`: `tierForFile` / `TIERS_SATISFYING` / roots from the profile
+   (`profiles/cmp/declarations.mjs` → `spec-model.mjs`; resolved synchronously from a
+   root via `loadProfileSync`). Fleet green. **Measured against the blueprint:** their
+   `spec-coverage.mjs` diff does *not* go to 0 — they changed the clause grammar itself
+   (`### ID — title` + `status:` lines, a phase-1 decision of theirs), which is the core's
+   mechanic, not a layout fact. Collapsing that difference would need a grammar declaration
+   in the profile — a new mechanism, refused under NORTH-STAR §8.8 until a second stack
+   asks for it with a plant. The layout and tier facts they forked are now declarations.
 5. `approvals`: artifact list from the profile. Fleet green; blueprint's diff → their
    artifact array.
 6. `feature-brief`, `arch-doc`, `verify` markers, `inputs-hash`, `receipt-validate`,

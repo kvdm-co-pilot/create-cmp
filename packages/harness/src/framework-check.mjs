@@ -53,7 +53,8 @@ import {
   assessCalibrationCost,
 } from "./lib/framework-check.mjs";
 import { listHarnessFiles } from "./lib/harness-region.mjs";
-import { listFlowFiles, scanCitations, walkFiles, DESKTOP_TIERS } from "./lib/spec-coverage.mjs";
+import { listFlowFiles, scanCitations, walkFiles } from "./lib/spec-coverage.mjs";
+import { resolveSpecModel } from "./lib/spec-model.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RECEIPT_REL = "qa/evidence/latest.json";
@@ -188,36 +189,53 @@ function hookRefuses() {
 // ── Read the tree, decide what can be planted ───────────────────────────────
 
 function readSpecs() {
-  const dir = path.join(ROOT, "specs");
+  if (!SPEC_MODEL) return [];
+  const dir = path.join(ROOT, ...SPEC_MODEL.specsDir.split("/"));
   if (!fs.existsSync(dir)) return [];
   return fs
     .readdirSync(dir)
     .filter((n) => n.endsWith(".spec.md"))
     .sort()
-    .map((n) => ({ rel: `specs/${n}`, text: fs.readFileSync(path.join(dir, n), "utf8") }));
+    .map((n) => ({ rel: `${SPEC_MODEL.specsDir}/${n}`, text: fs.readFileSync(path.join(dir, n), "utf8") }));
 }
 
+// The scanner's model — the profile's layout and tiers. This runner plants
+// into specs, flows and test sources, so it has to know where they are; it
+// asks the profile, never a constant. A tree with no usable profile has no
+// spec plants to make, and says so per plant rather than guessing.
+const SPEC_MODEL_RESULT = resolveSpecModel(ROOT);
+const SPEC_MODEL = SPEC_MODEL_RESULT.ok ? SPEC_MODEL_RESULT.model : null;
+
 function readFlows() {
-  return listFlowFiles(ROOT).map((rel) => ({ rel, text: fs.readFileSync(abs(rel), "utf8") }));
+  if (!SPEC_MODEL) return [];
+  return listFlowFiles(ROOT, SPEC_MODEL).map((rel) => ({ rel, text: fs.readFileSync(abs(rel), "utf8") }));
 }
 
 /**
- * A directory that already holds a desktop-tier test, derived from the tree's
- * own citations rather than guessed from a package convention — an adopted
- * project's source layout is not ours to assume.
+ * A directory that already holds a host-only-tier test, derived from the
+ * tree's own citations rather than guessed from a package convention — an
+ * adopted project's source layout is not ours to assume.
  */
 function findTestDir() {
+  if (!SPEC_MODEL) return null;
   let tags = [];
   try {
-    tags = scanCitations(ROOT);
+    tags = scanCitations(ROOT, SPEC_MODEL);
   } catch {
     return null;
   }
-  const desktop = tags.find((tag) => DESKTOP_TIERS.includes(tag.tier));
-  if (desktop) return path.dirname(desktop.file);
-  // No citations yet: fall back to any directory holding a Kotlin test source.
-  const kt = walkFiles(path.join(ROOT, "composeApp/src"), [".kt"]).find((f) => /(commonTest|desktopTest)/.test(f));
-  return kt ? path.dirname(path.relative(ROOT, kt)) : null;
+  const hostOnly = SPEC_MODEL.tiers.hostOnly;
+  const cited = tags.find((tag) => hostOnly.includes(tag.tier));
+  if (cited) return path.dirname(cited.file);
+  // No citations yet: fall back to any source under a citation root that the
+  // profile's own tiering places on a host-only tier.
+  for (const rootRel of SPEC_MODEL.citationRoots) {
+    const hit = walkFiles(path.join(ROOT, ...rootRel.split("/")), SPEC_MODEL.citationExts).find((f) =>
+      hostOnly.includes(SPEC_MODEL.tiers.forFile(path.relative(ROOT, f))),
+    );
+    if (hit) return path.dirname(path.relative(ROOT, hit));
+  }
+  return null;
 }
 
 out(`framework check: bound=${BOUND_MS}ms per direction, profile=smoke (no Gradle, no device, no network)`);

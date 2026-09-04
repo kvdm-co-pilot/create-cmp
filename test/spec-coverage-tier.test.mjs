@@ -14,7 +14,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { TIERS_SATISFYING, clauseTierCoverage, scanCitations, scanSpecClauses } from "../packages/harness/src/lib/spec-coverage.mjs";
+import { clauseTierCoverage, scanCitations, scanSpecClauses } from "../packages/harness/src/lib/spec-coverage.mjs";
+import { specModelFrom } from "../packages/harness/src/lib/spec-model.mjs";
+import * as cmp from "../packages/harness/src/lib/profiles/cmp/index.mjs";
+
+// The mobile profile's model, passed explicitly: these fixtures are bare temp
+// roots with no manifest, and the scanner guesses nothing.
+const MODEL = specModelFrom(cmp).model;
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -40,7 +46,7 @@ test("a clause may declare the tier that can observe it, on the clause line", ()
       "- **MOTION-14** — Given a tap, When skip is pressed, Then the intro ends.\n",
     {},
   );
-  const clauses = scanSpecClauses(root);
+  const clauses = scanSpecClauses(root, MODEL);
   assert.equal(clauses.get("MOTION-13").requiredTier, "device");
   assert.equal(clauses.get("MOTION-14").requiredTier, null, "undeclared stays undeclared — no tier is inferred");
 });
@@ -49,7 +55,7 @@ test("PLANTED FAILURE: the MOTION-13 case — a device-tier clause cited only fr
   const root = project("- **MOTION-13** [tier: device] — Given a cold start, Then the intro plays once per process start.\n", {
     [DESKTOP]: "MOTION-13",
   });
-  const tiers = clauseTierCoverage(scanSpecClauses(root), scanCitations(root));
+  const tiers = clauseTierCoverage(scanSpecClauses(root, MODEL), scanCitations(root, MODEL), MODEL);
   assert.equal(tiers.unmetTier.length, 1, "the citation exists and is incompetent — that is the hole, and it is now red");
   assert.equal(tiers.unmetTier[0].id, "MOTION-13");
   assert.equal(tiers.unmetTier[0].requiredTier, "device");
@@ -62,7 +68,7 @@ test("a device-tier clause is satisfied by an instrumented citation, or by e2e",
       [DESKTOP]: "MOTION-13",
       [file]: "MOTION-13",
     });
-    const tiers = clauseTierCoverage(scanSpecClauses(root), scanCitations(root));
+    const tiers = clauseTierCoverage(scanSpecClauses(root, MODEL), scanCitations(root, MODEL), MODEL);
     assert.equal(tiers.unmetTier.length, 0, `${file} can observe the promise`);
   }
 });
@@ -71,21 +77,21 @@ test("an e2e-tier clause is NOT satisfied by an instrumented test — only the f
   const root = project("- **FLOW-01** [tier: e2e] — Given the installed app, When the journey runs, Then it lands on Home.\n", {
     [DEVICE]: "FLOW-01",
   });
-  const tiers = clauseTierCoverage(scanSpecClauses(root), scanCitations(root));
+  const tiers = clauseTierCoverage(scanSpecClauses(root, MODEL), scanCitations(root, MODEL), MODEL);
   assert.equal(tiers.unmetTier.length, 1);
-  assert.deepEqual(TIERS_SATISFYING.e2e, ["e2e"]);
+  assert.deepEqual(MODEL.tiers.satisfying.e2e, ["e2e"]);
 });
 
 test("undeclared clauses are unchanged: any citation still covers them (instrument before you police)", () => {
   const root = project("- **HOME-01** — Given Home, Then the title reads Home.\n", { [DESKTOP]: "HOME-01" });
-  const tiers = clauseTierCoverage(scanSpecClauses(root), scanCitations(root));
+  const tiers = clauseTierCoverage(scanSpecClauses(root, MODEL), scanCitations(root, MODEL), MODEL);
   assert.equal(tiers.unmetTier.length, 0);
-  assert.deepEqual(tiers.desktopOnly, ["HOME-01"], "still REPORTED as desktop-only — the descriptive half stays");
+  assert.deepEqual(tiers.hostOnly, ["HOME-01"], "still REPORTED as host-only — the descriptive half stays");
 });
 
 test("a withdrawn clause declares nothing — struck-through promises are exempt", () => {
   const root = project("- ~~**MOTION-13**~~ [tier: device] — withdrawn.\n", {});
-  const tiers = clauseTierCoverage(scanSpecClauses(root), scanCitations(root));
+  const tiers = clauseTierCoverage(scanSpecClauses(root, MODEL), scanCitations(root, MODEL), MODEL);
   assert.equal(tiers.unmetTier.length, 0);
 });
 
@@ -106,10 +112,10 @@ test("listFlowFiles: top-level *.yaml/*.yml under qa/e2e, sorted; a nested flow 
     fs.writeFileSync(path.join(root, "qa", "e2e", "meals.yml"), "appId: x\n---\n# SPEC: MEAL-01\n- launchApp\n");
     fs.writeFileSync(path.join(root, "qa", "e2e", "README.md"), "# not a flow\n");
     fs.writeFileSync(path.join(root, "qa", "e2e", "wip", "draft.yaml"), "appId: x\n---\n# SPEC: DRAFT-01\n- launchApp\n");
-    assert.deepEqual(listFlowFiles(root), ["qa/e2e/meals.yml", "qa/e2e/smoke.yaml"]);
-    const ids = scanCitationsForFlows(root).map((c) => c.id).sort();
+    assert.deepEqual(listFlowFiles(root, MODEL), ["qa/e2e/meals.yml", "qa/e2e/smoke.yaml"]);
+    const ids = scanCitationsForFlows(root, MODEL).map((c) => c.id).sort();
     assert.deepEqual(ids, ["MEAL-01", "SHELL-01"], "the nested flow's citation does not count — it would never execute");
-    assert.deepEqual(listFlowFiles(path.join(root, "nope")), []);
+    assert.deepEqual(listFlowFiles(path.join(root, "nope"), MODEL), []);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

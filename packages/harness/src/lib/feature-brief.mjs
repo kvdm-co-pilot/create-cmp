@@ -50,6 +50,7 @@ import path from "node:path";
 
 import { computeInputsHash } from "./inputs-hash.mjs";
 import { CLAUSE_LINE_RE, scanCitations } from "./spec-coverage.mjs";
+import { requireSpecModel } from "./spec-model.mjs";
 
 export const FEATURES_DIR_REL = "docs/features";
 
@@ -334,13 +335,15 @@ export function deriveFeatureStatus(root, brief, pre = {}) {
   const specRels = specNames.map((n) => `specs/${n}.spec.md`);
   const specExists = specRels.every((rel) => fs.existsSync(path.join(root, rel)));
   const specRel = specRels.join(" + ");
-  const citations = pre.citations ?? scanCitations(root);
+  const model = pre.model ?? requireSpecModel(root);
+  const citations = pre.citations ?? scanCitations(root, model);
   const citedIds = new Set(citations.map((t) => t.id));
-  // Which clauses a DEVICE journey proves: citations from qa/e2e flows (tier
-  // "e2e" — spec-coverage's tierForFile). A UI feature (screens: true) is not
-  // done until at least one of its live clauses is cited from a flow: JVM
-  // tests prove logic and structure, the flow proves the journey on a device.
-  const e2eCitedIds = new Set(citations.filter((t) => t.tier === "e2e").map((t) => t.id));
+  // Which clauses a JOURNEY proves: citations from the profile's journey tier
+  // (mobile: flows under qa/e2e). A UI feature (screens: true) is not done
+  // until at least one of its live clauses is cited from that tier: JVM tests
+  // prove logic and structure, the journey proves it on the target.
+  const journeyTier = model.tiers.journey;
+  const e2eCitedIds = new Set(citations.filter((t) => journeyTier && t.tier === journeyTier).map((t) => t.id));
   const clauses = specRels
     .flatMap((rel) => clausesOfSpec(root, rel))
     .map((c) => ({ ...c, cited: citedIds.has(c.id), e2eCited: e2eCitedIds.has(c.id) }));
@@ -404,6 +407,7 @@ export function deriveFeatureStatus(root, brief, pre = {}) {
 export function deriveAllFeatures(root) {
   const briefs = listFeatureBriefs(root);
   if (briefs.length === 0) return [];
-  const pre = { citations: scanCitations(root), receipt: receiptAttestation(root) };
+  const model = requireSpecModel(root);
+  const pre = { model, citations: scanCitations(root, model), receipt: receiptAttestation(root) };
   return briefs.map((b) => deriveFeatureStatus(root, b, pre));
 }

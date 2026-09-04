@@ -64,3 +64,36 @@ test("the cmp profile exists where the loader looks, and is the only place the p
   assert.match(src, /export const protocol = 1/);
   assert.match(src, /from "\.\/steps-cmp\.mjs"/);
 });
+
+// ── Stage 0 PR 4: the spec scanner's core files carry no stack facts ─────────
+// Grows one file per PR as each core module is parameterised. A file is added
+// here the moment its last stack fact moves into the profile, so it cannot
+// come back by accident.
+const STACK_FACTS = ["composeApp", "androidInstrumentedTest", "desktopTest", "commonTest", "qa/e2e", "steps-cmp"];
+const STACK_FREE_CORE = ["lib/spec-coverage.mjs", "lib/spec-model.mjs", "lib/profile-loader.mjs", "lib/harness-manifest.mjs"];
+
+test("parameterised core modules name no Compose path, tier or pack (comments stripped)", () => {
+  const offenders = [];
+  for (const rel of STACK_FREE_CORE) {
+    const src = fs.readFileSync(path.join(CORE, rel), "utf8");
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+    for (const fact of STACK_FACTS) if (code.includes(fact)) offenders.push(`${rel}: ${fact}`);
+  }
+  assert.deepEqual(offenders, [], `stack facts in core code:\n  ${offenders.join("\n  ")}`);
+});
+
+// Two spine files still reach into the profile: a11y.mjs (through tree.mjs)
+// and component-stories.mjs. They move into profiles/cmp/ in Stage 0 PR 6;
+// this list is deleted in that PR, and the lint then holds for every core file.
+const NOT_YET_MOVED = ["lib/a11y.mjs", "lib/component-stories.mjs"];
+
+test("the cmp profile declares layout and tiers, and the core reads them only through the loader", () => {
+  const entry = fs.readFileSync(path.join(PROFILES, "cmp", "index.mjs"), "utf8");
+  assert.match(entry, /export \{ layout, tiers \} from "\.\/declarations\.mjs"/);
+  for (const abs of mjsUnder(CORE)) {
+    if (abs.startsWith(PROFILES + path.sep)) continue;
+    if (NOT_YET_MOVED.includes(path.relative(CORE, abs).split(path.sep).join("/"))) continue;
+    const bad = importsOf(fs.readFileSync(abs, "utf8")).filter((s) => /profiles\/cmp\//.test(s));
+    assert.deepEqual(bad, [], `${path.relative(REPO_ROOT, abs)} imports the cmp profile directly: ${bad.join(", ")}`);
+  }
+});

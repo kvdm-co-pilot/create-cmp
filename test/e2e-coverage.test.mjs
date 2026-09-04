@@ -99,6 +99,11 @@ test("no qa/e2e harness → SKIP (structure), never a verdict about journeys tha
 
 // ── Brief doneness: a UI feature is proven on a device ──────────────────────
 import { deriveFeatureStatus } from "../packages/harness/src/lib/feature-brief.mjs";
+import { specModelFrom } from "../packages/harness/src/lib/spec-model.mjs";
+import * as cmp from "../packages/harness/src/lib/profiles/cmp/index.mjs";
+// A bare temp root has no manifest, so the model is handed in — as the lane
+// hands it to every scanner. deriveAllFeatures resolves it from the root.
+const MODEL = specModelFrom(cmp).model;
 
 test("a screens:true brief whose clauses are all cited from the JVM is NOT done, and says why; one flow citation makes it done; an unrouted screen needs none", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-brief-e2e-"));
@@ -114,7 +119,7 @@ test("a screens:true brief whose clauses are all cited from the JVM is NOT done,
     const receipt = { verdict: "PASS", attestsTree: true };
     const brief = { name: "meal", rel: "docs/features/meal.md" };
 
-    const jvmOnly = deriveFeatureStatus(root, brief, { receipt });
+    const jvmOnly = deriveFeatureStatus(root, brief, { receipt, model: MODEL });
     assert.equal(jvmOnly.covered, 1);
     assert.equal(jvmOnly.e2eCovered, 0);
     assert.equal(jvmOnly.needsJourney, true);
@@ -122,18 +127,18 @@ test("a screens:true brief whose clauses are all cited from the JVM is NOT done,
     assert.match(jvmOnly.doneReason, /1\/1 clauses cited, but none from a qa\/e2e flow — a UI feature is proven on a device: write the journey in qa\/e2e\/meal\.yaml/);
 
     w("qa/e2e/meal.yaml", "appId: x\n---\n# SPEC: MEAL-01\n- launchApp\n");
-    const withFlow = deriveFeatureStatus(root, brief, { receipt });
+    const withFlow = deriveFeatureStatus(root, brief, { receipt, model: MODEL });
     assert.equal(withFlow.e2eCovered, 1);
     assert.equal(withFlow.provenDone, true, withFlow.doneReason);
 
     w("docs/features/meal.md", "# meal\n\n```json cmp:feature\n{ \"screens\": true, \"unrouted\": true }\n```\n");
     fs.rmSync(path.join(root, "qa", "e2e", "meal.yaml"));
-    const unrouted = deriveFeatureStatus(root, brief, { receipt });
+    const unrouted = deriveFeatureStatus(root, brief, { receipt, model: MODEL });
     assert.equal(unrouted.needsJourney, false);
     assert.equal(unrouted.provenDone, true, "no journey exists for a screen that is not reachable yet");
 
     w("docs/features/meal.md", "# meal\n\n```json cmp:feature\n{ \"screens\": false }\n```\n");
-    assert.equal(deriveFeatureStatus(root, brief, { receipt }).provenDone, true, "a pure-logic feature has no device journey to prove");
+    assert.equal(deriveFeatureStatus(root, brief, { receipt, model: MODEL }).provenDone, true, "a pure-logic feature has no device journey to prove");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
