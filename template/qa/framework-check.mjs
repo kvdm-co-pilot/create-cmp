@@ -33,7 +33,7 @@
 // changes, because a crash mid-plant must never be able to lose your work.
 //
 // Which plants are possible is DERIVED from the tree (qa/lib/framework-check.mjs).
-// A project with no specs, no flows, or no Kotlin tests still gets the region
+// A project with no specs, no flows, or no test sources still gets the region
 // plants; each unavailable plant is reported WITH ITS REASON. Nothing here ever
 // prints PASS because it found nothing to do.
 
@@ -55,12 +55,13 @@ import {
 import { listHarnessFiles } from "./lib/harness-region.mjs";
 import { listFlowFiles, scanCitations, walkFiles } from "./lib/spec-coverage.mjs";
 import { resolveSpecModel } from "./lib/spec-model.mjs";
+import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
+import { loadProfileSync } from "./lib/profile-loader.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RECEIPT_REL = "qa/evidence/latest.json";
 const SURFACE_REL = "qa/verified-surface.json";
 const README_REL = "README.md";
-const PLANTED_TEST_BASENAME = "CmpFrameworkCheckPlanted.kt";
 
 const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(n);
@@ -206,6 +207,24 @@ function readSpecs() {
 const SPEC_MODEL_RESULT = resolveSpecModel(ROOT);
 const SPEC_MODEL = SPEC_MODEL_RESULT.ok ? SPEC_MODEL_RESULT.model : null;
 
+// The SOURCE this profile's planted citations live in. A citation must sit on
+// a test, so two of the plants have to WRITE a test — in this stack's
+// language, with its test-declaration syntax, at a path it compiles. Everything
+// else about a plant is stack-free: the clause grammar and the citation marker
+// are the core scanner's, and which plants a tree can support is derived from
+// the tree. A profile that declares none simply ships without those two, said
+// out loud per plant (§5.2: no plants, no badge).
+const PROFILE_PLANTS = (() => {
+  const manifest = resolveHarnessManifest(ROOT);
+  if (!manifest.ok) return null;
+  const loaded = loadProfileSync(ROOT, manifest.manifest.profile);
+  if (!loaded.ok) return null;
+  const p = loaded.profile.plants;
+  if (!p || typeof p.unboundCitationSource !== "function" || typeof p.tierUnmetCitationSource !== "function" || typeof p.testFileBasename !== "string") return null;
+  return p;
+})();
+const PLANTED_TEST_REL = (testDir) => `${testDir}/${PROFILE_PLANTS.testFileBasename}`;
+
 function readFlows() {
   if (!SPEC_MODEL) return [];
   return listFlowFiles(ROOT, SPEC_MODEL).map((rel) => ({ rel, text: fs.readFileSync(abs(rel), "utf8") }));
@@ -240,11 +259,14 @@ function findTestDir() {
 
 out(`framework check: bound=${BOUND_MS}ms per direction, profile=smoke (no Gradle, no device, no network)`);
 
+// With no plant material the instrument cannot write a test, so the two plants
+// that need one are unavailable — reported by name, never quietly dropped.
 const tree = {
   specs: readSpecs(),
   flows: readFlows(),
   harnessLib: listHarnessFiles(ROOT).filter((rel) => rel.startsWith("qa/lib/")),
-  testDir: findTestDir(),
+  testDir: PROFILE_PLANTS ? findTestDir() : null,
+  flowsDir: SPEC_MODEL && SPEC_MODEL.flows ? SPEC_MODEL.flows.dir : null,
 };
 
 const { plants, unavailable } = selectPlants(tree);
@@ -263,7 +285,7 @@ for (const p of plants) {
   if (p.target.flow) touched.add(p.target.flow);
   if (p.target.file) touched.add(p.target.file);
   if (p.target.declaration) touched.add(p.target.declaration);
-  if (p.target.testDir) touched.add(`${p.target.testDir}/${PLANTED_TEST_BASENAME}`);
+  if (p.target.testDir) touched.add(PLANTED_TEST_REL(p.target.testDir));
 }
 
 {
@@ -307,7 +329,7 @@ function plantFiles(plant) {
   if (plant.target.flows) rels.push(...plant.target.flows);
   if (plant.target.file) rels.push(plant.target.file);
   if (plant.target.declaration) rels.push(plant.target.declaration);
-  if (plant.target.testDir) rels.push(`${plant.target.testDir}/${PLANTED_TEST_BASENAME}`);
+  if (plant.target.testDir) rels.push(PLANTED_TEST_REL(plant.target.testDir));
   if (plant.target.nestInto) {
     for (const rel of plant.target.flows ?? []) rels.push(`${plant.target.nestInto}/${path.basename(rel)}`);
   }
@@ -338,10 +360,7 @@ function applyPlant(plant) {
       // the clause exists, the tag exists, and nothing runs.
       const text = read(target.spec);
       write(target.spec, `${text.trimEnd()}\n- **${target.clause}** — Given a planted clause, Then a class-level tag must not count.\n`);
-      write(
-        `${target.testDir}/${PLANTED_TEST_BASENAME}`,
-        `// Planted by qa/framework-check.mjs — reverted automatically.\n\n// SPEC: ${target.clause}\nclass CmpFrameworkCheckPlanted {\n  val a = 1\n  val b = 2\n  val c = 3\n  val d = 4\n  val e = 5\n  val f = 6\n  fun helper() {}\n}\n`,
-      );
+      write(PLANTED_TEST_REL(target.testDir), PROFILE_PLANTS.unboundCitationSource(target.clause));
       break;
     }
     case PLANT_KINDS.TIER_UNMET: {
@@ -349,12 +368,9 @@ function applyPlant(plant) {
       const text = read(target.spec);
       write(
         target.spec,
-        `${text.trimEnd()}\n- **${target.clause}** [tier: e2e] — Given a planted device-only clause, Then a JVM citation cannot satisfy it.\n`,
+        `${text.trimEnd()}\n- **${target.clause}** [tier: ${PROFILE_PLANTS.unmeetableTier ?? "e2e"}] — Given a planted clause only the target can observe, Then a host-tier citation cannot satisfy it.\n`,
       );
-      write(
-        `${target.testDir}/${PLANTED_TEST_BASENAME}`,
-        `// Planted by qa/framework-check.mjs — reverted automatically.\n\nimport kotlin.test.Test\n\nclass CmpFrameworkCheckPlanted {\n  // SPEC: ${target.clause}\n  @Test\n  fun planted() {}\n}\n`,
-      );
+      write(PLANTED_TEST_REL(target.testDir), PROFILE_PLANTS.tierUnmetCitationSource(target.clause));
       break;
     }
     case PLANT_KINDS.FEATURE_WITHOUT_FLOW: {

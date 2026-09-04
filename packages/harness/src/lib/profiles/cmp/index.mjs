@@ -33,6 +33,13 @@ export { artifacts, governable } from "./artifacts.mjs";
  */
 export { CMP_LADDER as ladder } from "./ladder.mjs";
 
+/**
+ * The source this profile's Rule 0 instrument plants — a citation must sit on
+ * a test, so the instrument has to write one in this stack's language
+ * (AGNOSTIC-HARNESS-ARCHITECTURE.md §4.2 #8, §7.2).
+ */
+export { plants } from "./plants.mjs";
+
 /** The step pack — today's createCmpSteps, unchanged. */
 export function steps(ctx) {
   return createCmpSteps(ctx);

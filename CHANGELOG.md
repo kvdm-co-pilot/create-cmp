@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The Rule 0 instrument's planted source is the profile's.** A citation must sit on a
+  test, so two of `qa/framework-check.mjs`'s plants have to *write* one — in the stack's
+  language, with its test-declaration syntax, at a path it compiles. That source moves to
+  `profiles/cmp/plants.mjs`; the flow directory the nested-flow plant hides citations in
+  comes from `layout.flows.dir`. Everything else about a plant was already stack-free: the
+  clause grammar and the citation marker are the core scanner's, and which plants a tree
+  can support is derived from the tree. A profile that declares no plant source ships
+  without those two plants and the instrument names each one it cannot make — no plants, no
+  badge, never a quieter green. Stage 0 PR 7, the last numbered item of the lane seam.
+
 - **The fast lane's blast radius is the profile's.** `qa/lib/affected-tests.mjs` kept the
   honesty contract — fail open never fail silent, lane outputs are not changes, an unmapped
   change runs everything, and `qa/` is the harness judging itself — and gave up the stack
