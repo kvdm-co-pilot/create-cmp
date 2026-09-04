@@ -53,6 +53,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { LANE_MARKER_REL, LANE_MARKER_STALE_MS, RENDER_MARKER_FRESH_MS, laneMarkerPath, renderMarkerPath } from "./lib/lane-markers.mjs";
+import { resolveSpecModel } from "./lib/spec-model.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -96,13 +97,32 @@ export function parseWatchArgs(rawArgs) {
 }
 
 // ── The watch set ───────────────────────────────────────────────────────────
-// composeApp/src (the app), specs/ (the contract), qa/ (the harness itself —
-// a golden-tree or e2e-flow edit should re-verify too). NOT watched: build
-// output anywhere, qa/evidence/ (verify.mjs writes latest.json there on every
-// run — watching your own output is an infinite loop), and dotfiles (VCS
-// internals, editor droppings, and the .cmp-*-in-progress markers themselves).
+// The profile's source roots (the app), its specs directory (the contract),
+// and qa/ (the harness itself — a golden-tree or flow edit should re-verify
+// too). NOT watched: build output anywhere, qa/evidence/ (verify.mjs writes
+// latest.json there on every run — watching your own output is an infinite
+// loop), and dotfiles (VCS internals, editor droppings, and the in-progress
+// markers themselves).
 
-export const WATCH_ROOTS = ["composeApp/src", "specs", "qa"];
+/**
+ * The trees this loop watches: the profile's own source roots and specs
+ * directory, plus qa/ (the harness judging itself — always core).
+ *
+ * Stage 0 PR 6b: this was `["composeApp/src", "specs", "qa"]`, so the inner
+ * loop in a repo whose code lives anywhere else watched two directories out of
+ * three and never fired on a source edit — a watcher that looks idle and is.
+ * A project with no usable manifest gets the core roots alone and the startup
+ * banner says so, rather than guessing a source layout.
+ * @param {string} root
+ * @returns {{roots: string[], degraded: string|null}}
+ */
+export function watchRoots(root) {
+  const model = resolveSpecModel(root);
+  if (!model.ok) {
+    return { roots: ["specs", "qa"], degraded: model.reason };
+  }
+  return { roots: [...new Set([...model.model.sourceRoots, model.model.specsDir, "qa"])], degraded: null };
+}
 
 /** Ignore predicate over a ROOT-relative path (forward slashes or backslashes). */
 export function shouldIgnorePath(rel) {
@@ -457,7 +477,8 @@ function main() {
 
   const watchers = [];
   const pollTimers = [];
-  const watchedRoots = WATCH_ROOTS.filter((rel) => fs.existsSync(path.join(ROOT, rel)));
+  const { roots: declaredRoots, degraded: rootsDegraded } = watchRoots(ROOT);
+  const watchedRoots = declaredRoots.filter((rel) => fs.existsSync(path.join(ROOT, rel)));
 
   // Poll fallback for platforms without recursive fs.watch: a full mtime scan
   // per tick, diffed against the previous one so changed paths still get
@@ -537,6 +558,9 @@ function main() {
   // Startup: what is watched, what is respected, what this is NOT.
   say("qa/watch.mjs — resident inner loop: runs `node qa/verify.mjs --fast` on save");
   say(`watching: ${watchedRoots.join(", ")}  (ignoring **/build/**, qa/evidence/**, dotfiles)`);
+  // Never watch a guessed layout silently: if the manifest could not be read,
+  // the source roots are unknown and this loop is watching less than it looks.
+  if (rootsDegraded) say(`NOTE: watching the core roots only — ${rootsDegraded}`);
   say(`coordination: defers while ${LANE_MARKER_REL} or the eyes' render marker is fresh — never two builds against this project`);
   say(`debounce: ${DEBOUNCE_MS}ms — a save storm triggers one run; changes during a run coalesce into one follow-up`);
   say(FOOTER);

@@ -849,8 +849,14 @@ Smallest blast radius first, so each step is a small PR with the fleet check gre
      `test/lane-markers.test.mjs`:** `WATCH_ROOTS` (watch.mjs) and `ACTIVITY_ROOTS`
      (plan.mjs) still hardcode `composeApp/src`; `verify.mjs --help` still prints the
      pack's step names. Those are 6b's.
-   - **6b** the source roots and the help text from the profile; `a11y.mjs`,
-     `component-stories.mjs` and `androidChecksOutcome` into `profiles/cmp/`.
+   - **6b ✅ the source roots and the help text from the profile.**
+     `layout.sourceRoots` (optional; absent means the citation roots) feeds
+     `watchRoots` and the chain view's activity tier; `verify.mjs --help` derives its
+     step lists from the loaded pack and still prints in full, exit 0, when there is no
+     manifest. The residue 6a named is closed, and `test/lane-markers.test.mjs` now
+     asserts the rule unconditionally for all four readers.
+   - **6b.2** `a11y.mjs`, `component-stories.mjs` and `androidChecksOutcome` into
+     `profiles/cmp/`.
    - **6c** `arch-doc` sections from data, `feature-brief`'s journey wording,
      `affected-tests`' blast radius, `inputs-hash`' default surface,
      `receipt-check`'s device tier — all from the profile.

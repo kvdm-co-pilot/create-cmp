@@ -33,6 +33,11 @@ import { installHarnessLib } from "./helpers/harness-fixture.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = (p) => fs.mkdtempSync(path.join(os.tmpdir(), p));
+/** Code with prose removed — a comment explaining history is not a coupling. */
+function stripComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+}
+
 function write(root, rel, text) {
   const abs = path.join(root, ...rel.split("/"));
   fs.mkdirSync(path.dirname(abs), { recursive: true });
@@ -117,26 +122,19 @@ test("the bounds are one definition — a reader that waits longer than the stam
   // Every reader takes the path from here rather than restating it.
   const READERS = ["src/watch.mjs", "src/receipt-check.mjs", "src/lib/plan.mjs", "src/lib/lane-narrator.mjs"];
   for (const rel of READERS) {
-    const src = fs.readFileSync(path.join(REPO_ROOT, "packages", "harness", rel), "utf8").replace(/^[ \t]*\/\/.*$/gm, "");
+    const src = stripComments(fs.readFileSync(path.join(REPO_ROOT, "packages", "harness", rel), "utf8"));
     assert.doesNotMatch(src, /\.cmp-lane-in-progress/, `${rel} must not carry the old Compose-rooted marker path`);
   }
 
-  // NAMED RESIDUE, pinned so it cannot grow: two readers still hardcode which
-  // SOURCE ROOTS they watch, and those are a stack's, not the lane's. They come
-  // from the profile's layout in a later Stage 0 PR; until then this test says
-  // exactly which lines are left, so a third one cannot appear unnoticed.
-  const stillNamesRoots = {
-    "src/watch.mjs": /export const WATCH_ROOTS = \["composeApp\/src", "specs", "qa"\];/,
-    "src/lib/plan.mjs": /const ACTIVITY_ROOTS = \["composeApp\/src", "specs", "qa", "docs"\];/,
-  };
+  // Stage 0 PR 6b closed the residue 6a named: the source roots come from the
+  // profile, and the runner's help describes the pack it loaded. So the rule
+  // is now unconditional for every reader — a stack name here is a defect.
   for (const rel of READERS) {
-    const code = fs.readFileSync(path.join(REPO_ROOT, "packages", "harness", rel), "utf8").replace(/^[ \t]*\/\/.*$/gm, "");
-    const hits = code.split("\n").filter((l) => l.includes("composeApp"));
-    if (!stillNamesRoots[rel]) {
-      assert.deepEqual(hits, [], `${rel} names a stack directory — the marker move left it clean, keep it that way`);
-      continue;
-    }
-    assert.equal(hits.length, 1, `${rel}: exactly one known stack reference remains (the source roots), found ${hits.length}`);
-    assert.match(hits[0], stillNamesRoots[rel], `${rel}: the remaining stack reference must be the declared source-roots line`);
+    const code = stripComments(fs.readFileSync(path.join(REPO_ROOT, "packages", "harness", rel), "utf8"));
+    assert.deepEqual(
+      code.split("\n").filter((l) => l.includes("composeApp")),
+      [],
+      `${rel} names a stack directory — the roots and the marker are both derived now`,
+    );
   }
 });

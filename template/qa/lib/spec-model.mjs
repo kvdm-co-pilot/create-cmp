@@ -68,6 +68,10 @@ export function specDeclarationProblems(profile) {
     if (!isStringList(layout.citationRoots)) out.push("layout.citationRoots must be a non-empty list of project-relative paths");
     else for (const r of layout.citationRoots) { const q = relPathProblem("layout.citationRoots[]", r); if (q) out.push(q); }
     if (!isStringList(layout.citationExts) || !layout.citationExts.every((e) => e.startsWith("."))) out.push('layout.citationExts must be a non-empty list of file extensions, each starting with "."');
+    if (layout.sourceRoots != null) {
+      if (!isStringList(layout.sourceRoots)) out.push("layout.sourceRoots must be a non-empty list of project-relative paths");
+      else for (const r of layout.sourceRoots) { const q = relPathProblem("layout.sourceRoots[]", r); if (q) out.push(q); }
+    }
     if (layout.buildDir != null) {
       const q = relPathProblem("layout.buildDir", layout.buildDir);
       if (q) out.push(q);
@@ -122,6 +126,9 @@ export function specModelFrom(profile, overrides = {}) {
       specsDir,
       citationRoots: Object.freeze(citationRoots),
       citationExts: Object.freeze([...layout.citationExts]),
+      // Absent means "the citation roots are the source roots" — a profile that
+      // never distinguished them keeps working, and nothing is invented.
+      sourceRoots: Object.freeze(isStringList(layout.sourceRoots) ? [...layout.sourceRoots] : [...citationRoots]),
       flows: flows ? Object.freeze(flows) : null,
       buildDir: typeof layout.buildDir === "string" ? layout.buildDir : null,
       tiers: Object.freeze({
@@ -169,6 +176,7 @@ export function requireSpecModel(root) {
  * @property {string} specsDir
  * @property {readonly string[]} citationRoots
  * @property {readonly string[]} citationExts
+ * @property {readonly string[]} sourceRoots
  * @property {{dir: string, exts: readonly string[]}|null} flows
  * @property {string|null} buildDir
  * @property {{names: readonly string[], hostOnly: readonly string[], satisfying: Record<string, readonly string[]>, journey: string|null, forFile: (rel: string) => string}} tiers

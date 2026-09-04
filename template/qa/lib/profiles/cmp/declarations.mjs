@@ -20,6 +20,8 @@
  *
  *   specs          the directory of `*.spec.md` files
  *   citationRoots  the trees walked for `// SPEC:` citations
+ *   sourceRoots    the trees a human edits — watched by the inner loop, counted
+ *                  as activity by the chain view
  *   citationExts   the source files a citation may sit in
  *   buildDir       the stack's build output directory, when it has one — the
  *                  provider's render marker lives there (optional)
@@ -33,6 +35,10 @@
 export const layout = Object.freeze({
   specs: "specs",
   citationRoots: Object.freeze(["composeApp/src", "qa/e2e"]),
+  // The trees a human edits when they work on this app — what the inner-loop
+  // watcher watches and what the chain view counts as observed activity.
+  // Narrower than citationRoots: qa/e2e is a citation source but not app source.
+  sourceRoots: Object.freeze(["composeApp/src"]),
   citationExts: Object.freeze([".kt", ".kts"]),
   flows: Object.freeze({ dir: "qa/e2e", exts: Object.freeze([".yaml", ".yml"]) }),
   // Gradle's output directory for the app module — where the eyes stamp their

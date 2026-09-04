@@ -26,7 +26,7 @@ import {
   FOOTER,
   LANE_MARKER_STALE_MS,
   RENDER_MARKER_FRESH_MS,
-  WATCH_ROOTS,
+  watchRoots,
   clearMarkerIfOwnedBy,
   createRunLoop,
   formatRunBlock,
@@ -80,8 +80,19 @@ test("shouldIgnorePath: build dirs, dotfiles/markers, and qa/evidence are out; s
   assert.equal(shouldIgnorePath(""), true);
 });
 
-test("the watch set is exactly the documented three roots", () => {
-  assert.deepEqual(WATCH_ROOTS, ["composeApp/src", "specs", "qa"]);
+test("the watch set is the PROFILE's source roots + its specs dir + qa/; no manifest means the core roots and a said-out-loud note", () => {
+  // Stage 0 PR 6b: this was a hardcoded ["composeApp/src", "specs", "qa"], so
+  // the inner loop in a repo whose code lives anywhere else watched two of
+  // three roots and never fired on a source edit — a watcher that looks idle
+  // and is. The roots come from the profile now.
+  const app = tmp();
+  installHarnessLib(app);
+  assert.deepEqual(watchRoots(app), { roots: ["composeApp/src", "specs", "qa"], degraded: null });
+
+  const bare = tmp();
+  const bareRoots = watchRoots(bare);
+  assert.deepEqual(bareRoots.roots, ["specs", "qa"], "never guess a source layout");
+  assert.match(bareRoots.degraded, /harness-manifest\.json is missing/, "and never watch less than it looks, silently");
 });
 
 // ── Marker coordination ─────────────────────────────────────────────────────
