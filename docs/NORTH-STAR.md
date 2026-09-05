@@ -327,13 +327,44 @@ is built before its trigger; the runway owns the calendar. Migration is **by sub
 the current tree, never a second harness built beside the first**, with the mobile fleet green
 at every PR.
 
-| Stage | What | Exit criterion (measured) | Trigger | State on 2026-09-04 |
+| Stage | What | Exit criterion (measured) | Trigger | State 2026-09-05 |
 |---|---|---|---|---|
-| **0 — the lane seam** | `pack` in receipts; manifest v2 + loader; absent manifest refused; Compose glue into `profiles/cmp/`; parameterise `spec-coverage`, `approvals`, `feature-brief`, `arch-doc`, `verify` markers, `inputs-hash`, `receipt-validate`, `affected-tests`, `framework-check` plants | ~~De-fork count 11 → ≤ 3 against the backend's fork~~ **RETIRED 2026-09-04** — payment-blueprint is a separate track and is not re-vendoring until this work is finished, so the criterion named a measurement we had decided not to take. **Replaced by:** a second profile authored from `harness init` output and the README, *without opening core source* (PACKAGE-SPLIT A5). Fleet L2 green per PR. | taken — a dependency-direction fix | PRs 1–3 landed (`f6363c1`, `94905f6`, `647c45d`); PRs 4–7 next |
-| **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; backend provider sketched on paper first; console + MCP server move into the harness; section types formalised; tool listing profile-driven; `cmp` providers extracted; neutral skills moved | The console renders a stamped Compose app exactly as today **and** a manifest-only backend fixture with every section present and honest | Stage 0 exit; before Stage 1 so the package boundary is drawn with the console inside | not started |
-| **1 — distribution** | The harness as its own package, console included; `create-cmp-cli` depends on it; the lock becomes a stamper-written manifest; pin + fetch + cache as an option, vendored stays default | A backend repo installs the harness without create-cmp; a core fix reaches it by version bump | Stage 0.5 exit **and** an ADR on what a pinned receipt means versus a vendored one | blocked on the ADR and the name |
-| **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows in the router from the profile | A second profile authored by someone who is not the maintainer passes framework-check and mints a receipt Gatekeeper accepts | a second external profile, or the pinned port-demand issue | — |
+| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **not exited.** Seam holds (two foreign profiles, zero core edits); grammar moved; 7 known-wrong verdicts remain (§9.1) |
+| **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; console + MCP server into the harness; section types formalised; tool listing profile-driven; `cmp` providers extracted; neutral skills moved | The console renders a stamped Compose app exactly as today **and** a manifest-only backend fixture with every section present and honest | Stage 0 exit; before Stage 1 so the package boundary is drawn with the console inside | not started |
+| **1 — distribution** | The package split (PACKAGE-SPLIT Phases C–E): `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`, `prooflane-studio-cmp`; the lock as a stamper-written manifest; resolve local → node_modules → registry → git URL, fetch at init/new only | A backend repo installs the harness without create-cmp; a core fix reaches it by version bump | Stage 0.5 exit **and** ADR-0007 signed (O4) **and** the Stage 1 ADR (O2) | **started early**: names claimed, packages renamed, `prooflane-harness@0.19.0` published, workspaces declared but inert |
+| **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows from the profile | A profile authored by a team **outside this project** passes framework-check and mints a receipt Gatekeeper accepts. Our own agents authoring one no longer counts — two have, and both found defects rather than proving absence of them | a genuinely external adopter, or the pinned port-demand issue | — |
 | **3 — fleet** | `fleet-check` / `upgrade --harness` across a pinned fleet; the console as a fleet view | 10 repos upgraded by one command; receipts comparable within pack | first evidence prospect with more than 10 repos | — |
+
+### 9.1 Why Stage 0 has outlived two exit criteria
+
+Both previous criteria were wrong in the same way, and naming it is worth more than either.
+
+**De-fork count against payment-blueprint** (retired 2026-09-04) measured a repo we had
+decided not to touch. An exit condition pointing at work that is out of scope cannot be met.
+
+**A foreign profile adopted with zero core edits** (2026-09-05) was met — twice — and was still
+not sufficient. A Ktor backend and a Python service both reached a green lane without editing
+the core, while the core carried at least five rules that produce **silently wrong verdicts** on
+any ecosystem but the first: a citation binder that spoke Kotlin and JavaScript only, a JUnit
+attribute reader that returned the classname as the name, a report parser that read one build
+tool's filename, a doneness deriver that ignored the declared spec directory, and a journey
+requirement that never asked whether a journey tier existed. Every one passed the lint, passed
+1,458 tests, and passed adoption.
+
+The lesson, which is now fit-test question 4: **a stack assumption that names no stack cannot be
+found by reading, only by running.** Adoption proves the seam accepts a profile. It does not
+prove the core computes the same answer for both. Only differential execution does, and that is
+why it is the third and final exit criterion.
+
+**Known-wrong and unfixed at 2026-09-05** — the residue Stage 0 must clear, from an adversarial
+audit that verified each by execution: the walk-mode ignore set disagrees with itself so a
+`git init` invalidates a valid receipt; `harnessIntegrity` is required as a literal step name by
+the receipt validator and by two Rule 0 plants, so a profile spelling it otherwise mints receipts
+that are invalid forever; the flow-citation regex accepts only `#`; the watcher identifies build
+output by the single directory name `build`; a 5-second plausibility floor calls a fast stack's
+honest lane fabricated; the lane's short-circuit is keyed to a step literally named `build`; and
+a 30-minute deadline ceiling with no profile channel kills a cold `xcodebuild` or `cargo test`.
+The agnostic lint is also an opt-in allowlist with seven core modules outside it.
 
 **In parallel, and unchanged in intent:** the mobile studio modules (attach ✓, runtime
 feedback, device-as-structure, profiling, data inspectors, release lane) proceed as
