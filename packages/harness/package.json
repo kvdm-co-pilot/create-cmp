@@ -1,7 +1,7 @@
 {
   "name": "prooflane-harness",
   "version": "0.19.0",
-  "description": "The create-cmp verify lane — the machine-owned harness code every stamped app carries byte-identical: evidence receipts, spec coverage, approvals, conformance reporting, golden trees, a11y, and the preview/inspector libs. Dependency-free ESM, vendored into each generated project so the lane runs offline with no install step, and content-hashed so a receipt can name the exact lane that issued it.",
+  "description": "The prooflane verify lane: a stack-agnostic evidence harness that derives done from evidence rather than an agent's word. Profile loader, lane runner, receipts, hash-locked region, Stop hook, spec-to-citation binding and the Rule 0/1/2 instruments. Dependency-free ESM, vendored into each project so a receipt is checkable offline from the repo alone, and content-hashed so a receipt names the exact lane that issued it. NOTE: this release still carries the `cmp` (Compose Multiplatform) stack profile as its source of truth; it moves to prooflane-profile-cmp in the package split.",
   "type": "module",
   "main": "src/verify.mjs",
   "exports": {
@@ -21,13 +21,14 @@
     "node": ">=20.19.0"
   },
   "keywords": [
-    "create-cmp",
+    "prooflane",
     "verify",
     "evidence",
     "receipt",
     "harness",
-    "compose-multiplatform",
-    "kotlin-multiplatform"
+    "stack-agnostic",
+    "ci",
+    "agents"
   ],
   "license": "MIT",
   "author": "Karel van der Merwe",
