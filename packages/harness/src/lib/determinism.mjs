@@ -55,7 +55,13 @@ function unescapeXml(s) {
 }
 
 function attr(attrs, name) {
-  const m = attrs.match(new RegExp(`${name}="([^"]*)"`));
+  // ANCHORED. Unanchored, `name="…"` matches inside `classname="…"`, so for any
+  // writer that emits classname FIRST — pytest, jest-junit, gotestsum all do —
+  // `attr(attrs, "name")` returned the CLASSNAME. Every test in a class then
+  // collapsed onto one `classname.classname` key, last-write-wins, and the
+  // determinism probe reported a genuine timezone flip as deterministic. Gradle
+  // emits name first and worked by luck, which is why this survived.
+  const m = attrs.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`));
   return m ? unescapeXml(m[1]) : null;
 }
 
@@ -74,7 +80,14 @@ export function parseJUnitOutcomes(dir) {
   const outcomes = {};
   if (!fs.existsSync(dir)) return outcomes;
   for (const entry of fs.readdirSync(dir)) {
-    if (!entry.startsWith("TEST-") || !entry.endsWith(".xml")) continue;
+    // ANY .xml, not just `TEST-*.xml`. That prefix is the Ant/Gradle/Surefire
+    // filename convention; pytest writes `junit.xml`, jest-junit `junit.xml`,
+    // gotestsum `junit.xml`, cargo2junit `results.xml`, `dotnet test`
+    // `TestResults.xml`. Every one of them parsed to {} — and an empty leg
+    // compared against an empty leg yields no differences, so the probe passed
+    // having read nothing. The `<testcase` match below is the real filter: a
+    // file with no test cases contributes nothing either way.
+    if (!entry.endsWith(".xml")) continue;
     const xml = fs.readFileSync(path.join(dir, entry), "utf8");
     const caseRe = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
     for (const m of xml.matchAll(caseRe)) {

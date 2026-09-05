@@ -154,6 +154,20 @@ machine-owned, hash-locked, and vouched for on every receipt. If you find yourse
 edit a core file, that is a defect in the harness worth reporting — not a local patch. A
 forked spine receives no upstream fix, and `harnessIntegrity` will say so on every run.
 
+Your profile is inside the lock too — an edited step pack that could certify itself is the
+same hole as an edited spine — so the first edit you make to it FAILs `harnessIntegrity` until
+you re-take the lock:
+
+```
+npx create-cmp-cli harness relock
+```
+
+It re-hashes the region and rewrites `qa/harness.lock.json`, **only** when every difference is
+a file you own (`qa/lib/profiles/<id>/**`, `qa/verified-surface.json`, `qa/harness-manifest.json`).
+A machine-owned file among them and it refuses by name: that is a fork, and `create-cmp upgrade
+--harness` restores it. It never changes the harness version the lock records — re-locking is
+not an upgrade. Commit the lock with the edit that caused it.
+
 A step is a function returning `{ name, verdict: "PASS"|"FAIL"|"SKIP"|"ERROR", reason?,
 durationMs, details?, skipKind?, layer? }`. Borrow `ctx.sh` (it throws `StepTimeout` past the
 step's deadline — never catch that) and push degraded-path notes onto `ctx.DEGRADED_PATHS`.
@@ -165,8 +179,10 @@ groups by it; tag `fn.timeoutHint` and the runner says where to look when it tim
 
 Init derives your source roots from the tree and writes them into the manifest's
 `citationRoots`, so a wrong guess is one visible line rather than a buried scanner default.
-Correct it there. The manifest's `specs` and `citationRoots` override the profile's `layout`
-field by field, so the lane and the console read the same paths.
+Correct it there, then `harness relock` — the manifest and the surface are declarations the
+lane READS, so they are locked like the code that reads them. The manifest's `specs` and
+`citationRoots` override the profile's `layout` field by field, so the lane and the console
+read the same paths.
 
 The seeded `qa/verified-surface.json` is what the receipt attests. It lives inside the
 surface, so changing it invalidates receipts — which is correct, the coverage changed. Do not

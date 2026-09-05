@@ -198,7 +198,7 @@ export function parseFeatureBlock(markdown) {
         ...new Set(
           parsed.specs
             .filter((s) => typeof s === "string" && s.trim() !== "")
-            .map((s) => s.trim().replace(/^specs\//, "").replace(/\.spec\.md$/, "")),
+            .map((s) => s.trim().replace(/^[A-Za-z0-9_./-]*?specs\//, "").replace(/\.spec\.md$/, "")),
         ),
       ]
     : [];
@@ -224,10 +224,10 @@ export function parseFeatureBlock(markdown) {
  *   caller already has one (avoids re-parsing; same answer either way)
  * @returns {string[]} spec names, e.g. ["catalog", "entry-editing"]
  */
-export function pairedSpecNames(markdown, name, block) {
+export function pairedSpecNames(markdown, name, block, specsDir = "specs") {
   const declared = (block ?? parseFeatureBlock(markdown)).specs ?? [];
   if (declared.length > 0) return declared;
-  const fromHeader = specHeaderNames(markdown);
+  const fromHeader = specHeaderNames(markdown, specsDir);
   if (fromHeader.length > 0) return fromHeader;
   return [name];
 }
@@ -237,7 +237,7 @@ export function pairedSpecNames(markdown, name, block) {
  * paragraph — the line starting `**Spec:**` through the next blank line, so
  * later prose that merely MENTIONS a spec path never redirects the pairing.
  */
-function specHeaderNames(markdown) {
+function specHeaderNames(markdown, specsDir = "specs") {
   if (typeof markdown !== "string") return [];
   const lines = markdown.split("\n");
   const start = lines.findIndex((l) => /^\*\*Spec:?\*\*/.test(l.trim()));
@@ -245,7 +245,7 @@ function specHeaderNames(markdown) {
   const para = [];
   for (let i = start; i < lines.length && lines[i].trim() !== ""; i++) para.push(lines[i]);
   const out = [];
-  for (const m of para.join("\n").matchAll(/specs\/([A-Za-z0-9_-]+)\.spec\.md/g)) {
+  for (const m of para.join("\n").matchAll(new RegExp(`${specsDir}/([A-Za-z0-9_-]+)\\.spec\\.md`, "g"))) {
     if (!out.includes(m[1])) out.push(m[1]);
   }
   return out;
@@ -350,11 +350,19 @@ export function deriveFeatureStatus(root, brief, pre = {}) {
   // The paired specs (walk-legibility L1): usually one, by filename; a brief
   // may name several. Clauses concatenate in declaration order — "done" means
   // every live clause across ALL of them is cited.
-  const specNames = pairedSpecNames(markdown, brief.name, block);
-  const specRels = specNames.map((n) => `specs/${n}.spec.md`);
+  // The MODEL first, because the spec directory is the profile's and this
+  // module used to hardcode `specs/`. A project declaring `"specs": "docs/specs"`
+  // — a legal, validated manifest field the lane's own scanner honours — had
+  // `deriveFeatureStatus` looking somewhere else entirely: specExists false,
+  // total 0, provenDone false forever, and the Features view telling a human to
+  // start writing a spec that already existed. The header of spec-coverage.mjs
+  // says these two readers exist so the Features view and the lane can never
+  // disagree about the same clause. They disagreed.
+  const model = pre.model ?? requireSpecModel(root);
+  const specNames = pairedSpecNames(markdown, brief.name, block, model.specsDir);
+  const specRels = specNames.map((n) => `${model.specsDir}/${n}.spec.md`);
   const specExists = specRels.every((rel) => fs.existsSync(path.join(root, rel)));
   const specRel = specRels.join(" + ");
-  const model = pre.model ?? requireSpecModel(root);
   const citations = pre.citations ?? scanCitations(root, model);
   const citedIds = new Set(citations.map((t) => t.id));
   // Which clauses a JOURNEY proves: citations from the profile's journey tier
@@ -369,7 +377,13 @@ export function deriveFeatureStatus(root, brief, pre = {}) {
   const live = clauses.filter((c) => !c.withdrawn);
   const covered = live.filter((c) => c.cited).length;
   const e2eCovered = live.filter((c) => c.e2eCited).length;
-  const needsJourney = block.screens === true && block.unrouted !== true;
+  // A journey is only required when the profile HAS a journey tier.
+  // `tiers.journey` is documented as nullable ("or null when this stack has no
+  // journey tier") and the citation filter above already yields nothing for
+  // null — but this condition never asked, so on a backend, a CLI or a library
+  // every feature with a surface was permanently un-done and the remedy printed
+  // was literally "add a null test that cites one of its clauses".
+  const needsJourney = block.screens === true && block.unrouted !== true && Boolean(model.tiers.journey);
 
   const receipt = pre.receipt ?? receiptAttestation(root);
   const provenDone =

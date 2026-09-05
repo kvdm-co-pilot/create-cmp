@@ -69,15 +69,20 @@ async function main() {
     // binary is named after the harness, `harness init` becomes `<name> init`.
     case "harness": {
       const sub = rest[0];
-      if (sub !== "init") {
-        process.stderr.write(
-          `create-cmp harness: unknown subcommand ${JSON.stringify(sub ?? "")}\n` +
-            `  usage: create-cmp harness init [--profile <id>] [--target-dir <dir>] [--dry-run]\n`
-        );
-        process.exit(2);
+      if (sub === "init") {
+        const { runHarnessInit } = await import("../src/commands/harness-init.mjs");
+        process.exit((await runHarnessInit(flags, rest[1])) ?? 0);
       }
-      const { runHarnessInit } = await import("../src/commands/harness-init.mjs");
-      process.exit((await runHarnessInit(flags, rest[1])) ?? 0);
+      if (sub === "relock") {
+        const { runHarnessRelock } = await import("../src/commands/harness-relock.mjs");
+        process.exit((await runHarnessRelock(flags, rest[1])) ?? 0);
+      }
+      process.stderr.write(
+        `create-cmp harness: unknown subcommand ${JSON.stringify(sub ?? "")}\n` +
+          `  usage: create-cmp harness init   [--profile <id>] [--target-dir <dir>] [--dry-run]\n` +
+          `         create-cmp harness relock [--target-dir <dir>] [--dry-run]\n`
+      );
+      process.exit(2);
     }
     case "create":
     default: {
@@ -102,7 +107,8 @@ function printHelp() {
       `  npx create-cmp verify                  run the green-build gate on an existing project\n` +
       `  npx create-cmp harden                  install the full harness into a --minimal scaffold\n` +
       `  npx create-cmp attach                  wire the agent contract into an EXISTING Compose/KMP repo\n` +
-      `  npx create-cmp harness init            install the verify lane into a repo of ANY stack\n\n` +
+      `  npx create-cmp harness init            install the verify lane into a repo of ANY stack\n` +
+      `  npx create-cmp harness relock          re-take the lock after editing YOUR profile or declarations\n\n` +
       `create (scaffold) flags:\n` +
       `  --name --package --bundle-id --region --theme-prefix\n` +
       `  --minimal   (light scaffold: app + tests + previews, no verify lane/receipts —\n` +
@@ -120,7 +126,11 @@ function printHelp() {
       `clean flags:   --target-dir <dir>  --dry-run  --yes\n` +
       `verify flags:  --target-dir <dir>  --no-ios  --dry-run\n` +
       `harden flags:  --target-dir <dir>  --dry-run  --yes  --verify (run the lane after install)\n` +
-      `attach flags:  --target-dir <dir>  --dry-run  --yes\n`
+      `attach flags:  --target-dir <dir>  --dry-run  --yes\n` +
+      `harness init flags:   --profile <id>  --target-dir <dir>  --dry-run\n` +
+      `harness relock flags: --target-dir <dir>  --dry-run\n` +
+      `  (relock covers qa/lib/profiles/<id>/** and qa/{verified-surface,harness-manifest}.json only —\n` +
+      `   a machine-owned edit is a fork and is refused by name; \`upgrade --harness\` restores it)\n`
   );
 }
 

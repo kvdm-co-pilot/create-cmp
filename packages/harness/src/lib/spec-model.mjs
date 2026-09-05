@@ -57,6 +57,45 @@ function relPathProblem(field, value) {
  * @param {{layout?: unknown, tiers?: unknown}} profile
  * @returns {string[]}
  */
+/**
+ * The core's fallback grammar: Kotlin/JVM and JavaScript. It is a FALLBACK and
+ * not a default in the approving sense — `SpecModel.grammar.isDefault` records
+ * that a profile declared none of it, and the coverage scan says so out loud
+ * when nothing binds. A stack whose tests look like anything else declares its
+ * own `grammar` export; `create-cmp harness init` seeds one from the language
+ * it detects.
+ */
+export const DEFAULT_GRAMMAR = Object.freeze({
+  citationMarker: /^(?:\/\/|#)\s*SPEC:/,
+  // COMMENT SYNTAX, which the first version of this declaration forgot and an
+  // audit caught the same day. It matters twice over. A line comment is SKIPPED
+  // rather than counted, so a language whose comments the core does not
+  // recognise burns its binding window on prose and silently loses the citation
+  // — measured: five `#` lines between a Python citation and its test discards
+  // it, while five `//` lines in Kotlin do not. And a citation inside a BLOCK
+  // comment must not bind at all, which is the laundering hole the binder
+  // exists to close; with only `/* */` known, a `# SPEC:` inside a Python
+  // docstring counted as a real citation over an unrelated test.
+  lineComment: /^(?:\/\/|\*)/,
+  blockComment: Object.freeze({ open: "/*", close: "*/" }),
+  testDeclaration: /@Test\b|\bfun\s+`[^`]+`\s*\(|\b(?:test|it)\s*\(/,
+  typeDeclaration: /^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\b/,
+  bindingWindow: 5,
+});
+
+/** A profile may declare a pattern as a RegExp or as a source string. */
+function regexOr(value, fallback) {
+  if (value instanceof RegExp) return value;
+  if (typeof value === "string" && value.trim()) {
+    try {
+      return new RegExp(value);
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
 export function specDeclarationProblems(profile) {
   const out = [];
   const layout = profile?.layout;
@@ -131,6 +170,35 @@ export function specModelFrom(profile, overrides = {}) {
       sourceRoots: Object.freeze(isStringList(layout.sourceRoots) ? [...layout.sourceRoots] : [...citationRoots]),
       flows: flows ? Object.freeze(flows) : null,
       buildDir: typeof layout.buildDir === "string" ? layout.buildDir : null,
+      // THE GRAMMAR — what a citation and a test declaration LOOK LIKE in this
+      // stack's language. Stage 0 moved names, paths and tier names into the
+      // profile and left this behind, which was the more dangerous half: a
+      // directory name that is wrong produces a refusal, and a grammar that is
+      // wrong produces a WRONG VERDICT. The core's fallbacks match Kotlin/JVM
+      // and JavaScript only, so a Python or Go project scanned with them finds
+      // every marker and binds none — every clause reads as uncited and the
+      // message points at the spec file, which is not the problem. Measured on
+      // a real Python adoption, 2026-09-05. Field-by-field override: a profile
+      // that declares only `testDeclaration` keeps the rest.
+      grammar: Object.freeze({
+        citationMarker: regexOr(profile.grammar?.citationMarker, DEFAULT_GRAMMAR.citationMarker),
+        testDeclaration: regexOr(profile.grammar?.testDeclaration, DEFAULT_GRAMMAR.testDeclaration),
+        typeDeclaration: regexOr(profile.grammar?.typeDeclaration, DEFAULT_GRAMMAR.typeDeclaration),
+        lineComment: regexOr(profile.grammar?.lineComment, DEFAULT_GRAMMAR.lineComment),
+        blockComment: Object.freeze(
+          profile.grammar?.blockComment && typeof profile.grammar.blockComment.open === "string" && typeof profile.grammar.blockComment.close === "string"
+            ? { open: profile.grammar.blockComment.open, close: profile.grammar.blockComment.close }
+            : DEFAULT_GRAMMAR.blockComment,
+        ),
+        bindingWindow:
+          Number.isInteger(profile.grammar?.bindingWindow) && profile.grammar.bindingWindow > 0
+            ? profile.grammar.bindingWindow
+            : DEFAULT_GRAMMAR.bindingWindow,
+        // TRUE when this profile declared none of it and is running on the
+        // core's JVM/JS fallbacks. The scan reports it when nothing binds, so a
+        // language mismatch names itself instead of looking like an empty spec.
+        isDefault: !profile.grammar,
+      }),
       tiers: Object.freeze({
         names: Object.freeze([...tiers.names]),
         hostOnly: Object.freeze([...tiers.hostOnly]),

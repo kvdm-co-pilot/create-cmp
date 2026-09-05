@@ -6,7 +6,101 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`create-cmp harness relock` — the command whose absence bricked an adopter's first edit.**
+  `qa/lib/profiles/<id>/**` is inside the hash-locked region and is also the one directory the
+  harness tells you to edit. So the first legitimate profile change failed `harnessIntegrity`
+  with no way out: `harness init` refused ("already exists") and `upgrade --harness` refused
+  (no `create-cmp.json`, which init never writes). A cold adopter escaped by writing their own
+  script against `writeHarnessLock`.
+
+  **The safety constraint is the whole design.** A relock that re-baselines blindly is a
+  gate-disabling tool — edit `qa/lib/spec-coverage.mjs`, relock, and every later receipt vouches
+  for a forked core. So it re-locks only when *every* differing file is adopter-owned
+  (`isAdopterOwned`: the profile directory and the declarations), and refuses all-or-nothing
+  otherwise, naming the machine-owned files and pointing at `upgrade --harness`. It also refuses
+  profiles the engine SHIPS — `qa/lib/profiles/cmp/**` is the entire Compose gate pack, and
+  allowing that would be the same attack one directory over. Exit 2 on every refusal.
+
+### Fixed
+
+- **Four ecosystem assumptions in the core that produced silently wrong verdicts.** Found by an
+  adversarial audit hunting the pattern the grammar defect exposed: rules that assume a language
+  or tool *without naming one*, which is why the agnostic lint could never see them.
+
+  `determinism.mjs` read JUnit attributes with an **unanchored** regex, so `name="…"` matched the
+  tail of `classname="…"` for any writer emitting classname first — pytest, jest-junit and
+  gotestsum all do; Gradle emits name first and worked by luck. Every test in a class collapsed
+  onto one key, last-write-wins, and **a genuine timezone flip was reported as deterministic** —
+  the only thing the probe exists to catch. The same parser accepted only `TEST-*.xml`, an
+  Ant/Gradle filename convention, so pytest's `junit.xml` parsed to `{}` and an empty leg
+  compared against an empty leg passed having read nothing.
+
+  `feature-brief.mjs` hardcoded `specs/` while the lane's scanner read the declared `specsDir`,
+  so a project declaring `"specs": "docs/specs"` had `provenDone` false forever and was told to
+  start writing a spec that already existed — the two-truths problem `spec-coverage.mjs`'s header
+  says these readers exist to prevent. And `needsJourney` never asked whether `tiers.journey` was
+  null, though the contract documents it as nullable, so every feature on a backend or CLI was
+  permanently un-done with the remedy "add a null test that cites one of its clauses".
+
+  The citation binder's **comment syntax** was C-family: `//` and `*` lines were skipped while
+  `#` lines counted, so five `#` prose lines between a Python citation and its test discarded it
+  while the byte-identical Kotlin arrangement bound. Worse, `insideBlockComment` knew only
+  `/* */`, so a citation inside a Python docstring bound to an unrelated test — the laundering
+  hole the binder exists to close, open for every language outside the C family. `grammar` now
+  carries `lineComment` and `blockComment`, and same-delimiter blocks (`"""`) are read by parity.
+
 ### Changed
+
+- **The citation GRAMMAR moves to the profile — the half of Stage 0 that was never done.** Stage
+  0 moved names, paths, tier names and step names out of the spine. It left behind the rules
+  that decide whether a citation counts at all, and those are the more dangerous half: a
+  directory name that is wrong produces a refusal, and a grammar that is wrong produces a
+  **wrong verdict**.
+
+  `spec-coverage.mjs` held `TEST_DECL_RE = /@Test\b|\bfun\s+`…`\s*\(|\b(?:test|it)\s*\(/`. A
+  `SPEC:` citation counts only when a test declaration follows it within five lines, and that
+  pattern matches Kotlin and JavaScript alone. Python's `def test_x():`, Go's
+  `func TestX(t *testing.T)` and Rust's `#[test]` all fail it, so on those languages **every
+  citation was silently discarded, every clause reported as uncited, and the message pointed at
+  the spec file** — the one place that was not the problem. Measured on a real Python adoption:
+  twenty markers found, none bound, six minutes lost, escaped only by monkey-patching
+  `RegExp.prototype.exec` in the running process.
+
+  A profile now declares `grammar` — `citationMarker`, `testDeclaration`, `typeDeclaration`,
+  `bindingWindow` — as regexes or as source strings, overriding field by field. The core keeps
+  the Kotlin/JVM + JS patterns as an explicitly-named **fallback**, and `SpecModel.grammar.isDefault`
+  records when a profile is running on it.
+
+  **The fix that matters is not the better default — it is that the default stops being
+  silent.** `citationScanDiagnostic` compares markers seen against citations kept, and when a
+  scan finds markers and binds none it says so, names the fallback as the cause, and gives the
+  field and a pattern to copy. `harness init` seeds the grammar from the language it detects
+  (ten languages) and prints the right comment marker, so a Python project's citations bind on
+  the first run rather than after a debugger session.
+
+  Nothing changes for Compose: the fallback is byte-for-byte what the spine already used.
+
+### Fixed
+
+- **The generated profile crashed on the first `[tier:]` clause anyone wrote.** The skeleton —
+  the file the README calls "the specification" — read `u.declared` and `u.observed` from
+  `clauseTierCoverage`, whose fields are `requiredTier` and `tiers`. So `specCoverage` threw
+  `Cannot read properties of undefined` in the gate the README calls the one that matters most,
+  and it can never have been executed against a spec that uses the feature. Mine, shipped in the
+  same release that called the skeleton normative.
+
+### Added
+
+- **A citation scan now EXECUTES in languages the spine never spoke.**
+  `test/citation-grammar.test.mjs` runs the real scanner over real Python and Go trees. This is
+  the gate whose absence hid the defect above: agnosticism was guarded by a lint that greps core
+  modules for banned words, and a conformance suite that checks a foreign profile's
+  *declarations*. No stack name appears in a regex, and no scan ran in a third language, so
+  neither could see it — a promise proved at a tier that cannot observe it, in the suite of the
+  product built to refuse exactly that.
+
 
 - **The packages are renamed to `prooflane-*`, and the repo declares workspaces.** Phase C1 of
   the split. `@create-cmp/harness` becomes **`prooflane-harness`** and `@create-cmp/receipts`
