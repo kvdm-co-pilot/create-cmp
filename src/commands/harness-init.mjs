@@ -90,6 +90,71 @@ const NOT_SOURCE = new Set([
   "gradle", ".git", ".github", ".idea", ".vscode", ".gradle", "qa-artifacts",
 ]);
 
+
+/**
+ * What a test declaration looks like, per language — seeded into the generated
+ * profile so a citation BINDS on the first run.
+ *
+ * This is the fix for the worst defect the first cold adoption found. A `SPEC:`
+ * citation counts only when a test declaration follows it within a few lines,
+ * and that pattern lived in the spine matching Kotlin and JavaScript alone. A
+ * Python project therefore found every marker, bound none, and read "declared
+ * but never cited" — a message about the spec file, which was not the problem.
+ * Seeding the pattern here makes it one visible, editable line in the adopter's
+ * own profile, which is the same principle `citationRoots` already follows: a
+ * wrong guess should be one line you can see, never a default you must
+ * reverse-engineer.
+ *
+ * Keys are file extensions found in the tree. `marker` is the comment form the
+ * language uses, so the printed next-steps do not tell a Python project to
+ * write `//`.
+ */
+export const LANGUAGE_GRAMMARS = Object.freeze({
+  ".py": { marker: "#", test: String.raw`^\s*(?:async\s+)?def\s+test\w*\s*\(|^\s*class\s+Test\w*\s*[(:]`, type: String.raw`^\s*class\s+\w+` },
+  ".go": { marker: "//", test: String.raw`^\s*func\s+(?:Test|Benchmark|Example)\w*\s*\(`, type: String.raw`^\s*type\s+\w+\s+(?:struct|interface)\b` },
+  ".rs": { marker: "//", test: String.raw`^\s*#\[(?:test|tokio::test|rstest)\]|^\s*fn\s+test\w*\s*\(`, type: String.raw`^\s*(?:pub\s+)?(?:struct|enum|trait|impl)\b` },
+  ".rb": { marker: "#", test: String.raw`^\s*(?:def\s+test_\w+|it\s+["']|describe\s+["'])`, type: String.raw`^\s*(?:class|module)\s+\w+` },
+  ".ts": { marker: "//", test: String.raw`\b(?:test|it)\s*\(|^\s*@Test\b`, type: String.raw`^\s*(?:export\s+)?(?:abstract\s+)?(?:class|interface)\b` },
+  ".js": { marker: "//", test: String.raw`\b(?:test|it)\s*\(`, type: String.raw`^\s*(?:export\s+)?class\b` },
+  ".kt": { marker: "//", test: String.raw`@Test\b|\bfun\s+\x60[^\x60]+\x60\s*\(`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\b` },
+  ".java": { marker: "//", test: String.raw`@Test\b`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|abstract\s+)*(?:class|interface|enum)\b` },
+  ".cs": { marker: "//", test: String.raw`\[(?:Test|Fact|Theory)\]`, type: String.raw`^\s*(?:public\s+|internal\s+)?(?:sealed\s+|abstract\s+)?class\b` },
+  ".php": { marker: "//", test: String.raw`function\s+test\w*\s*\(|@test\b`, type: String.raw`^\s*(?:abstract\s+|final\s+)?class\b` },
+});
+
+/**
+ * The dominant source language under the given roots, by file count. Returns
+ * the extension key, or null when nothing recognisable is there — in which case
+ * the profile ships the core's fallback and SAYS it is doing so.
+ * @param {string} root
+ * @param {string[]} roots
+ * @returns {string|null}
+ */
+export function detectLanguage(root, roots) {
+  const counts = new Map();
+  const walk = (dir) => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.name.startsWith(".") || e.name === "node_modules" || e.name === "build") continue;
+      const abs = path.join(dir, e.name);
+      if (e.isDirectory()) walk(abs);
+      else {
+        const ext = path.extname(e.name);
+        if (Object.hasOwn(LANGUAGE_GRAMMARS, ext)) counts.set(ext, (counts.get(ext) ?? 0) + 1);
+      }
+    }
+  };
+  for (const rel of roots) walk(path.join(root, ...rel.split("/")));
+  let best = null;
+  for (const [ext, n] of counts) if (!best || n > counts.get(best)) best = ext;
+  return best;
+}
+
 /**
  * A profile id from a directory name: lowercase, dashes, must start with a
  * letter. The id becomes a directory name and is validated by the manifest
@@ -214,8 +279,13 @@ export function manifestFor(id, sourceRoots) {
  * @param {{sourceRoots: string[], tiers: string[]}} opts
  * @returns {string}
  */
-export function profileSkeleton(id, { sourceRoots, tiers }) {
+export function profileSkeleton(id, { sourceRoots, tiers, lang = null }) {
   const roots = JSON.stringify(sourceRoots.length ? sourceRoots : ["src"]);
+  const g = lang ? LANGUAGE_GRAMMARS[lang] : null;
+  const exts = lang ? JSON.stringify([lang]) : '[".kt", ".kts", ".java", ".ts", ".js", ".py", ".go", ".rs"]';
+  const grammarBlock = g
+    ? `\n/**\n * THE GRAMMAR — what a citation and a test declaration look like HERE.\n *\n * A \`SPEC:\` citation counts only when a test declaration follows it within\n * \`bindingWindow\` non-blank lines. That rule decides whether ANY promise is\n * proved, and the pattern is language-specific, so it is yours rather than the\n * harness's. Seeded from the ${lang} sources found in this tree — correct it if\n * your tests look different, and the lane will say so if nothing binds.\n */\nexport const grammar = {\n  citationMarker: /^(?:\\/\\/|#)\\s*SPEC:/,\n  testDeclaration: /${g.test}/,\n  typeDeclaration: /${g.type}/,\n  bindingWindow: 5,\n};\n`
+    : `\n// No recognised source language was found, so this profile uses the core's\n// FALLBACK grammar, which matches Kotlin/JVM and JavaScript only. If your\n// citations report as "declared but never cited" while the markers are plainly\n// there, that is why — declare a grammar:\n//\n// export const grammar = {\n//   citationMarker: /^(?:\\/\\/|#)\\s*SPEC:/,\n//   testDeclaration: /^\\\\s*def\\\\s+test\\\\w*\\\\s*\\\\(/,   // ← your language's test form\n//   typeDeclaration: /^\\\\s*class\\\\s+\\\\w+/,\n//   bindingWindow: 5,\n// };\n`;
   const tierNames = JSON.stringify(tiers);
   const hostTier = tiers[0];
   return `// The "${id}" stack profile — what a stack IS, to this harness.
@@ -234,7 +304,7 @@ import path from "node:path";
 
 import { checkHarnessIntegrity, describeIntegrity } from "../../harness-lock.mjs";
 import { requireSpecModel } from "../../spec-model.mjs";
-import { scanSpecClauses, scanCitations, clauseTierCoverage } from "../../spec-coverage.mjs";
+import { scanSpecClauses, scanCitations, clauseTierCoverage, citationScanDiagnostic } from "../../spec-coverage.mjs";
 
 /** Must equal qa/harness-manifest.json's profile.id, or the lane refuses. */
 export const id = "${id}";
@@ -253,10 +323,11 @@ export const protocol = ${PROFILE_PROTOCOL};
  *   sourceRoots    what the watcher watches (defaults to citationRoots)
  *   buildDir       build output, so the lane can ignore it (optional)
  */
+${grammarBlock}
 export const layout = {
   specs: "specs",
   citationRoots: ${roots},
-  citationExts: [".kt", ".kts", ".java", ".ts", ".js", ".py", ".go", ".rs"],
+  citationExts: ${exts},
   flows: null,
   sourceRoots: ${roots},
 };
@@ -332,8 +403,15 @@ function stepSpecCoverage(ROOT) {
   const problems = [
     ...orphanClauses.map(([cid, c]) => \`\${cid} is declared but never cited from a test (\${c.file})\`),
     ...orphanTags.map((t) => \`\${t.file}:\${t.line} cites \${t.id}, which no spec declares\`),
-    ...unmetTier.map((u) => \`\${u.id} declares [tier: \${u.declared}] but is cited only from \${u.observed.join(", ")} — only \${u.declared} can observe it (\${u.file})\`),
+    ...unmetTier.map((u) => \`\${u.id} declares [tier: \${u.requiredTier}] but is cited only from \${u.tiers.length ? u.tiers.join(", ") : "nowhere"} — only \${(model.tiers.satisfying[u.requiredTier] ?? []).join(" or ")} can observe it (\${u.file})\`),
   ];
+
+  // A scan that saw markers and bound none is NOT "you wrote no citations" —
+  // it means this profile's grammar does not match the language. Without this
+  // sentence the failure points at the spec file, which is the one place that
+  // is not the problem. It cost a real adopter six minutes and a debugger.
+  const scanNote = citationScanDiagnostic(tags, model);
+  if (scanNote) problems.unshift(scanNote);
 
   return {
     name: "specCoverage",
@@ -431,13 +509,15 @@ export function steps({ ROOT }) {
 export function planInit(root, { id }) {
   const sourceRoots = detectSourceRoots(root);
   const tiers = ["unit"];
+  const lang = detectLanguage(root, sourceRoots);
   return {
     id,
     sourceRoots,
+    lang,
     vendor: vendorPlan(),
     write: [
       { rel: MANIFEST_REL_PATH, content: JSON.stringify(manifestFor(id, sourceRoots), null, 2) + "\n" },
-      { rel: profileEntryRel(id), content: profileSkeleton(id, { sourceRoots, tiers }) },
+      { rel: profileEntryRel(id), content: profileSkeleton(id, { sourceRoots, tiers, lang }) },
       { rel: SURFACE_CONFIG_REL, content: JSON.stringify({ surface: seedSurface(root) }, null, 2) + "\n" },
     ],
   };
@@ -477,9 +557,18 @@ export async function runHarnessInit(flags, positional) {
   const manifestAbs = path.join(root, MANIFEST_REL_PATH);
   if (fs.existsSync(manifestAbs)) {
     warn(`${MANIFEST_REL_PATH} already exists — this project has already declared its stack.`);
+    // NAME THE OTHER COMMAND. This branch used to offer `upgrade --harness`
+    // alone, and that was the second wall of a closed loop: an adopter whose
+    // lane FAILs harnessIntegrity after editing the profile init told them was
+    // theirs re-runs init, is sent to `upgrade --harness`, and that refuses too
+    // (it needs the create-cmp.json only a stamp writes). The profile-edit case
+    // is the common one and gets named first.
     process.stdout.write(
-      `  Nothing was changed. To re-vendor the spine after a harness upgrade, use\n` +
-        `  ${colors.cyan("create-cmp upgrade --harness")}, which merges rather than overwrites.\n\n`
+      `  Nothing was changed.\n\n` +
+        `  Edited your profile or a declaration, and the lane now FAILs harnessIntegrity?\n` +
+        `    ${colors.cyan("create-cmp harness relock")}     re-takes the lock over the files you own\n` +
+        `  Re-vendoring the spine after a harness upgrade?\n` +
+        `    ${colors.cyan("create-cmp upgrade --harness")}  merges rather than overwrites\n\n`
     );
     return 0;
   }
@@ -527,6 +616,7 @@ export async function runHarnessInit(flags, positional) {
   process.stdout.write(
     `\n  ${colors.bold("profile")}  ${id}  →  ${profileEntryRel(id)}\n` +
       `  ${colors.bold("sources")}  ${plan.sourceRoots.length ? plan.sourceRoots.join(", ") : colors.yellow("none detected — edit citationRoots in the manifest")}\n` +
+      `  ${colors.bold("language")} ${plan.lang ? `${plan.lang} — grammar seeded so citations bind on the first run` : colors.yellow("not detected — the profile uses the Kotlin/JS fallback grammar; declare your own if citations do not bind")}\n` +
       `  ${colors.bold("skipped")}  ${PROFILE_TOOLS.length + PROFILE_LIB.length} Compose-profile tools (not the spine)\n\n`
   );
 
@@ -557,7 +647,7 @@ export async function runHarnessInit(flags, positional) {
         `  name and then recovers. ${colors.bold("Do not skip it")} — an unproven lane is a\n` +
         `  lane whose green means nothing.\n\n`
     );
-    printNextSteps(id);
+    printNextSteps(id, plan.lang);
     return 0;
   }
 
@@ -577,7 +667,7 @@ export async function runHarnessInit(flags, positional) {
     return check.status ?? 1;
   }
 
-  printNextSteps(id);
+  printNextSteps(id, plan.lang);
   return 0;
 }
 
@@ -586,11 +676,13 @@ export async function runHarnessInit(flags, positional) {
  * exits so the advice does not depend on whether their tree happened to be clean.
  * @param {string} id
  */
-function printNextSteps(id) {
+function printNextSteps(id, lang = null) {
+  const marker = (lang && LANGUAGE_GRAMMARS[lang]?.marker) || "//";
   process.stdout.write(
     `${colors.bold("Then:")}\n` +
       `  1. Write a promise in ${colors.cyan("specs/")} — a clause line like ${colors.cyan("- **APP-01** the app …")}\n` +
-      `  2. Cite it from a test with ${colors.cyan("// SPEC: APP-01")}\n` +
+      `  2. Cite it from a test with ${colors.cyan(`${marker} SPEC: APP-01`)} ${colors.bold("directly above a test")}\n` +
+      `     — a citation counts only when a test declaration follows within 5 lines\n` +
       `  3. ${colors.cyan("node qa/verify.mjs")} — the lane proves it, and writes a receipt\n` +
       `  4. Add your build and test steps to ${colors.cyan(profileEntryRel(id))}\n\n`
   );

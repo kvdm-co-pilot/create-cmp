@@ -30,7 +30,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { hashHarnessRegion, compareHarnessRegion } from "./harness-region.mjs";
+import { hashHarnessRegion, compareHarnessRegion, isAdopterOwned } from "./harness-region.mjs";
 
 export const LOCK_PATH = "qa/harness.lock.json";
 export const LOCK_SCHEMA = "cmp-harness-lock/1";
@@ -159,8 +159,27 @@ export function describeIntegrity(r) {
   show(r.modified, "modified");
   show(r.missing, "missing");
   show(r.extra, "unrecorded");
-  const fix = r.extra.length && !r.modified.length && !r.missing.length
-    ? " — re-lock with `create-cmp upgrade --harness`, or remove the file if it should not be there"
-    : "";
+  // WHICH command helps depends on WHOSE files differ, and the two answers are
+  // opposites. An adopter editing their own profile or declaration is doing the
+  // one thing the harness tells them to do (the profile header says "This file
+  // is YOURS"), and the cure is to re-take the lock. A machine-owned file
+  // differing is a fork, and re-taking the lock over THAT would make every
+  // later receipt vouch for code the harness has never seen. Naming one command
+  // for both is how the first adopter to edit their profile got a lane that
+  // could not be un-failed: `harness init` refused ("already exists") and
+  // `upgrade --harness` refused (no create-cmp.json).
+  //
+  // CONDITIONAL on purpose. `isAdopterOwned` is a name rule and cannot know
+  // whether a given profile is one the ENGINE vendors (`qa/lib/profiles/cmp/`
+  // in every stamped Compose app) — teaching this module a profile id is the
+  // coupling Stage 0 removed. So this offers the command rather than asserting
+  // the ownership; `create-cmp harness relock` is where the decision is made,
+  // and it refuses a shipped profile by name.
+  const differing = [...r.modified, ...r.missing, ...r.extra];
+  const fix = differing.every(isAdopterOwned)
+    ? " — if these are yours (your profile, your declarations), re-lock with `create-cmp harness relock`"
+    : r.extra.length && !r.modified.length && !r.missing.length
+      ? " — re-lock with `create-cmp upgrade --harness`, or remove the file if it should not be there"
+      : "";
   return `${r.name ?? "harness"} ${r.version ?? "?"} — ${parts.join("; ")}${fix}`;
 }

@@ -90,6 +90,43 @@ export const HARNESS_PROFILES_DIR = "qa/lib/profiles";
 export const HARNESS_DECLARATIONS = ["qa/verified-surface.json", "qa/harness-manifest.json"];
 
 /**
+ * Of the locked region, WHICH files does the adopter author?
+ *
+ * The region is one lock but two kinds of file, and conflating them is what
+ * bricked the first foreign adopter (2026-09-05). `harness init` generates
+ * qa/lib/profiles/<id>/index.mjs with a header that says "This file is YOURS",
+ * and the README tells adopters to correct qa/harness-manifest.json and
+ * qa/verified-surface.json — then the first such edit FAILs harnessIntegrity
+ * with no command that could re-take the lock. Their profile is inside the
+ * lock for a good reason (an edited gate pack must not certify itself
+ * silently), so the answer is not to unlock it; it is to name the subset a
+ * re-lock may cover:
+ *
+ *   qa/lib/profiles/<id>/**        the profile they wrote — <id> REQUIRED, so a
+ *                                  loose qa/lib/profiles/*.mjs stays machine-owned
+ *   HARNESS_DECLARATIONS           the two files the lane READS from them
+ *
+ * Everything else — every .mjs directly under qa/ and qa/lib/, and qa/test/**
+ * — is engine code. An edit there is a fork, and `create-cmp harness relock`
+ * refuses it rather than re-baselining a lane the harness has never seen.
+ *
+ * This rule is deliberately NAME-based and stack-free: it says nothing about
+ * which profile ids the engine itself vendors (`create-cmp harness relock`
+ * layers that on, from the harness package it ships with — the core does not
+ * learn a profile id). So a vendored lane can use this to point a failing
+ * adopter at the right command; the command is where the gate actually is.
+ *
+ * @param {string} relPath project-relative path, "/"-separated
+ * @returns {boolean}
+ */
+export function isAdopterOwned(relPath) {
+  if (!isHarnessFile(relPath)) return false;
+  if (HARNESS_DECLARATIONS.includes(relPath)) return true;
+  const prefix = `${HARNESS_PROFILES_DIR}/`;
+  return relPath.startsWith(prefix) && relPath.slice(prefix.length).includes("/");
+}
+
+/**
  * Is this project-relative path part of the machine-owned harness region?
  * @param {string} relPath project-relative path, "/"-separated
  * @returns {boolean}

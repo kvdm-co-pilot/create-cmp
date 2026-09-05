@@ -362,7 +362,12 @@ change that cannot answer 1 is not built.
    where is the kept plant, what did it cost, which stage did the cost choose? The presumption
    is against adding.
 4. **Stack knowledge.** Does the core learn a stack fact — a profile import, a path, a tier
-   name, a step name? If yes, it belongs in the profile.
+   name, a step name, **or a GRAMMAR**: a regex, constant or heuristic that only one language,
+   build tool or ecosystem satisfies? If yes, it belongs in the profile. The grammar half is the
+   one that hides: it names no stack, so a lint that greps for stack words cannot see it, and it
+   fails by producing a wrong verdict rather than a refusal. Ask it of every pattern that decides
+   PASS or FAIL from the shape of text — and prove the answer by EXECUTING in a second language,
+   never by reading the code.
 5. **Receipt meaning.** Does this change what a receipt claims, its schema, or its
    comparability? If yes, an ADR first.
 6. **Proof at altitude.** Suite and `scripts/framework-check.mjs` on every commit. Fleet L2
@@ -398,6 +403,7 @@ proof: suite 1402/1402, framework-check 5.2 s, fleet L2 PASS · de-fork 11→9 �
 | 2026-09-04 | **The harness becomes stack-agnostic by inverting one dependency.** (1) Governance is mechanic-in-core, model-in-profile. (2) The `cmp` profile is isolated completely, studio included; the console lives in the harness as neutral section types; no profile-owned tabs. (3) No default profile — absent manifest refused; derived for stamped apps, interviewed for foreign repos. (4) Stage 0 starts, gated: fleet L2 per PR, suite + framework-check per commit, de-fork count in every PR. |
 | 2026-09-04 | **The cross-stack rule is amended.** The earlier rule (no cross-stack port without a pinned-issue trigger) is kept for the *eyes*: no renderer or inspector for another stack is written without countable demand. It no longer applies to the *harness*, whose agnosticism is a dependency-direction fix triggered by the in-house second stack. This document is where that amendment is recorded. |
 | 2026-09-04 | Trunk-based development: merge each PR the moment its gate is green, before the next is branched |
+| 2026-09-05 | **Stage 0 moved declarations; it never moved GRAMMAR — and grammar is what decides verdicts.** Names, paths, tier names and step names went to the profile while the rules deciding whether a citation *counts* stayed in the spine, matching Kotlin and JavaScript alone. A wrong directory name produces a refusal; a wrong grammar produces a **silently wrong verdict**: on Python, Go or Rust every citation was discarded, every clause read as uncited, and the message pointed at the spec file. The profile now declares `grammar` (marker, test declaration, type declaration, binding window); the core's patterns become an explicitly-named fallback; and the scan REPORTS when it saw markers and bound none, because the defect was never the wrong default but the *silent* one. Measured by the first Python adoption, 2026-09-05. |
 | 2026-09-04 | **The profile is the unit of distribution; a scaffolder is a consumer of one.** Falsified by the first foreign stack (a Ktor backend, adopted with **zero core edits**), which also showed the packaging — not the seam — is now the bottleneck. Twelve decisions in `docs/proposals/PACKAGE-SPLIT.md`: one repo with workspaces; the harness, the CLI, each profile and each studio split into packages under independent semver with `protocol` carrying compatibility; every profile carries its golden tree, which must reach L1 under its own lane or it does not ship; `harness init` becomes the on-ramp for every stack; the harness is named **`prooflane`**; Phase A ships as 0.25.0 before the rename. |
 
 **Open (each named with what it blocks):**
