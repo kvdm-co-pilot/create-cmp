@@ -9,18 +9,26 @@
 //              but the tree and this file.
 //
 //   AUTHENTICITY  "is my lane the real published prooflane-harness@X?"
-//              Answered REMOTELY, on request, by comparing this file's
-//              `sha256` against the published version's — `create-cmp
-//              upgrade --harness` does it, and so can any third party
-//              holding a receipt.
+//              NOT ANSWERED ANYWHERE IN THIS REPO — see below. The per-file
+//              map this lock records is what such a check would compare
+//              against a published artifact; nothing performs the comparison.
 //
-// Being honest about that split matters. Someone who edits the lane AND
-// rewrites this lock defeats the local check — of course they do; it is a
-// checksum, not a signature. What it cannot survive is the remote comparison,
-// because the attacker cannot change what the registry published under that
-// version number. Local integrity catches the accident and the drift (an
-// agent "fixing" a lane file, a half-applied upgrade); the remote comparison
-// catches the lie. Neither claim is stretched to cover the other's job.
+// Being honest about that split matters, and this comment was not. It used to
+// say `create-cmp upgrade --harness` performed the remote comparison. It does
+// not and never has: that command reads the version out of a LOCAL
+// packages/harness/package.json and re-locks from local bytes
+// (src/commands/upgrade.mjs:410-413). The only registry call in the tree packs
+// `create-cmp-cli@<v>` as an upgrade's merge base. So the sentence promising
+// that "the attacker cannot change what the registry published" described a
+// defence that does not exist — in the module whose whole job is to be precise
+// about which question it answers, which is the failure this harness exists to
+// refuse (ADR-0008, which found it).
+//
+// What is true: someone who edits the lane AND rewrites this lock defeats the
+// local check — of course they do; it is a checksum, not a signature. Local
+// integrity catches the accident and the drift (an agent "fixing" a lane file,
+// a half-applied upgrade). It catches no lie, and until a remote comparison is
+// built, nothing here does.
 //
 // The lock is deliberately NOT a .mjs file, so it is not part of the region it
 // describes — a manifest inside its own manifest could never settle.

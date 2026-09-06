@@ -24,8 +24,12 @@ function repo() {
 test("a tree the surface covers reports nothing; a planted top-level dir is named; lane outputs and the surface file itself never count", () => {
   const { root } = repo();
   try {
-    // .gitignore is a top-level file outside the surface — the honest answer names it.
-    assert.deepEqual(undeclaredTopLevel(root), [".gitignore"]);
+    // `.gitignore` is a top-level file outside the declared surface and is NOT
+    // named: it is a RESOLUTION INPUT, attested structurally whatever the
+    // surface says, so reporting it as unattested would contradict the hash
+    // standing next to it on the same receipt.
+    assert.deepEqual(undeclaredTopLevel(root), []);
+    // Declaring it explicitly is harmless and changes nothing either way.
     fs.writeFileSync(path.join(root, "qa", "verified-surface.json"), JSON.stringify({ surface: ["services", "qa", ".gitignore"] }));
     assert.deepEqual(undeclaredTopLevel(root), []);
 

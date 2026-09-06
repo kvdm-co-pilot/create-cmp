@@ -171,7 +171,79 @@ function tryGitLsFiles(root) {
 // "INVALID — source changed" the moment the user runs `git init`, even though
 // no source changed. Pre-git and post-git hashes must agree for identical
 // source; that is the invariant the regression test pins.
-const WALK_EXCLUDED_DIRS = new Set(["build", ".gradle", ".kotlin", ".git", ".idea", "node_modules"]);
+// A FLOOR, not the rule. This used to BE the rule, and it was one ecosystem's:
+// it knew build/.gradle/.kotlin/.idea/node_modules and nothing of __pycache__,
+// venv, target (Rust, Maven), bin and obj (.NET), vendor (Go, PHP), Pods or
+// DerivedData. So a Python tree hashed one set of bytes before `git init` and a
+// different set after, and the stamp-time PASS receipt read "source changed
+// since the receipt" the instant a user ran `git init` — with no source change.
+// That is the exact invariant the constant was written to hold, broken for
+// every ecosystem but the first.
+const WALK_EXCLUDED_DIRS = new Set([".git", "node_modules", "build", ".gradle", ".kotlin", ".idea"]);
+
+/**
+ * The directories THIS repo ignores, read from its own `.gitignore`.
+ *
+ * Walk mode exists only before `git init`, and its whole job is to agree with
+ * what `git ls-files --exclude-standard` will say afterwards. Maintaining a
+ * hand-written list of every ecosystem's build directory is a losing game and
+ * was already lost; reading the file git reads makes the two modes agree BY
+ * CONSTRUCTION rather than by vigilance.
+ *
+ * Deliberately a small subset of gitignore syntax — bare directory names, with
+ * or without a leading or trailing slash. Globs, negations and nested paths are
+ * left to git, which is running in every case that matters. Missing one costs a
+ * hash that moves too often; that is the safe direction, and the same one
+ * `defaultSurface` errs in.
+ *
+ * @param {string} root
+ * @returns {Set<string>}
+ */
+function gitignoredDirs(root) {
+  let text;
+  try {
+    text = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
+  } catch {
+    return new Set();
+  }
+  const out = new Set();
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#") || line.startsWith("!")) continue;
+    if (line.includes("*") || line.includes("?") || line.includes("[")) continue;
+    const name = line.replace(/^\//, "").replace(/\/$/, "");
+    if (name && !name.includes("/")) out.add(name);
+  }
+  return out;
+}
+/**
+ * Files that are INPUTS TO THE RESOLUTION rather than members of the surface.
+ *
+ * `.gitignore` decides what is attested: `git ls-files --exclude-standard`
+ * honours it, and `gitignoredDirs` above makes the walk fallback honour it too.
+ * A file that decides the attested set and is not itself attested is a hole —
+ * edit one line and a directory silently leaves every future receipt, with
+ * nothing in the chain saying the coverage moved. That is the narrowing failure
+ * this module's header calls the worst one it can have, arriving through the
+ * side door.
+ *
+ * Attested STRUCTURALLY, outside `surfaceEntries`, because a declaration that
+ * could omit it would reopen exactly the hole: `defaultSurface` skips dotfiles,
+ * the shipped template surface lists none, and no adopter writing
+ * `qa/verified-surface.json` by hand would think to add it. It is not the
+ * adopter's to declare — it is the resolver's own input.
+ *
+ * Not locked: adopters edit `.gitignore` legitimately and often. Attestation is
+ * the right instrument — a change makes the receipt say "source changed", which
+ * is true, and re-running mints a valid one.
+ */
+const RESOLUTION_INPUTS = Object.freeze([".gitignore"]);
+
+/** @param {string} relPath @returns {boolean} */
+function isResolutionInput(relPath) {
+  return RESOLUTION_INPUTS.includes(relPath);
+}
+
 // File-level mirror of the same principle (OS/editor junk the .gitignore covers).
 const WALK_EXCLUDED_FILES = new Set([".DS_Store"]);
 const WALK_EXCLUDED_SUFFIXES = [".iml", ".log"];
@@ -182,14 +254,16 @@ function walkIncludesFile(name) {
 }
 
 // Dependency-free recursive walk, used when git is unavailable (non-git scaffold).
-function walkAllFiles(dir) {
+// `ignored` is the floor plus whatever this repo's own .gitignore names, so the
+// pre-git hash agrees with the post-git one for any ecosystem, not just the first.
+function walkAllFiles(dir, ignored = WALK_EXCLUDED_DIRS) {
   const out = [];
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (WALK_EXCLUDED_DIRS.has(entry.name)) continue; // non-source scratch — see note above
-      out.push(...walkAllFiles(p));
+      if (ignored.has(entry.name)) continue; // non-source scratch — see note above
+      out.push(...walkAllFiles(p, ignored));
     } else if (entry.isFile() && walkIncludesFile(entry.name)) out.push(p);
   }
   return out;
@@ -246,13 +320,17 @@ function resolveSurfaceFiles(root, surfaceEntries) {
   if (gitFiles) {
     return gitFiles
       .map((p) => p.split(path.sep).join("/"))
-      .filter((relPath) => surfaceEntries.some((surface) => relPath === surface || relPath.startsWith(`${surface}/`)))
+      .filter((relPath) => isResolutionInput(relPath) || surfaceEntries.some((surface) => relPath === surface || relPath.startsWith(`${surface}/`)))
       .filter((relPath) => !isExcluded(relPath))
       .filter((relPath) => fs.existsSync(path.join(root, relPath)) && fs.statSync(path.join(root, relPath)).isFile());
   }
 
   // Fallback: no git available — walk the surface directories directly so a
-  // non-git scaffold still produces a stable hash.
+  // non-git scaffold still produces a stable hash. The ignore set is the floor
+  // PLUS this repo's own .gitignore, which is what `git ls-files
+  // --exclude-standard` will honour the moment the tree becomes a repo. Reading
+  // the same file is what makes the two modes agree by construction.
+  const ignored = new Set([...WALK_EXCLUDED_DIRS, ...gitignoredDirs(root)]);
   const collected = [];
   for (const surface of surfaceEntries) {
     const abs = path.join(root, surface);
@@ -261,10 +339,15 @@ function resolveSurfaceFiles(root, surfaceEntries) {
     if (stat.isFile()) {
       collected.push(surface);
     } else if (stat.isDirectory()) {
-      for (const file of walkAllFiles(abs)) {
+      for (const file of walkAllFiles(abs, ignored)) {
         collected.push(path.relative(root, file).split(path.sep).join("/"));
       }
     }
+  }
+  // The resolver's own inputs, attested whatever the surface declares.
+  for (const rel of RESOLUTION_INPUTS) {
+    const abs = path.join(root, rel);
+    if (!collected.includes(rel) && fs.existsSync(abs) && fs.statSync(abs).isFile()) collected.push(rel);
   }
   return collected.filter((relPath) => !isExcluded(relPath));
 }
@@ -278,7 +361,9 @@ function resolveSurfaceFiles(root, surfaceEntries) {
  * it belongs in qa/verified-surface.json. Sorted; [] when git is unavailable
  * (the walk fallback has no notion of "what git sees") or everything is
  * covered. Lane outputs (EXCLUDED_PREFIXES) are not "undeclared" — they are
- * excluded by decision.
+ * excluded by decision, and RESOLUTION_INPUTS are not undeclared either: they
+ * are attested structurally, so naming them here would report a file as
+ * unattested that the very same hash attests.
  * @param {string} root
  * @param {string[]} [surface] defaults to resolveVerifiedSurface(root)
  * @returns {string[]}
@@ -286,7 +371,8 @@ function resolveSurfaceFiles(root, surfaceEntries) {
 export function undeclaredTopLevel(root, surface = resolveVerifiedSurface(root)) {
   const gitFiles = tryGitLsFiles(root);
   if (!gitFiles) return [];
-  const covered = (relPath) => surface.some((entry) => relPath === entry || relPath.startsWith(`${entry}/`)) || isExcluded(relPath);
+  const covered = (relPath) =>
+    surface.some((entry) => relPath === entry || relPath.startsWith(`${entry}/`)) || isExcluded(relPath) || isResolutionInput(relPath);
   const out = new Set();
   for (const raw of gitFiles) {
     const relPath = raw.split(path.sep).join("/");
