@@ -74,20 +74,31 @@ export function checkLaneVouching(receipt) {
       detail: `the receipt's verdict is PASS but ${failed.length} step(s) did not pass: ${names} — the row is the more specific truth`,
     };
   }
-  const integrity = steps.find((s) => s && s.name === "harnessIntegrity");
+  // THE ROW THAT VOUCHES IS THE ROW CARRYING THE VOUCHING DATA, not the row with
+  // a particular name. This found a step named exactly `harnessIntegrity` — a
+  // name the cmp pack chose, that `REQUIRED_EXPORTS` never mentions, and that a
+  // profile author has no way to discover. A green lane whose self-vouching step
+  // was spelled `harness_integrity` minted receipts that were invalid FOREVER,
+  // in every reader, and the refusal accused the lane of not vouching for
+  // itself. The `harness` object on a step row is what the schema already
+  // documents as the integrity check's own findings, so it is the honest key.
+  // The name is kept as a fallback for receipts written before rows carried it.
+  const integrity = steps.find((s) => s && s.harness && typeof s.harness === "object") ?? steps.find((s) => s && s.name === "harnessIntegrity");
   if (!integrity) {
     return {
       ok: false,
-      detail: "receipt has no harnessIntegrity row — nothing vouches that the lane's own code is the code that ran",
+      detail:
+        "no step on this receipt vouches for the lane — no row carries a `harness` object and none is named harnessIntegrity, " +
+        "so nothing attests that the lane's own code is the code that ran",
     };
   }
   if (integrity.verdict !== "PASS") {
     return {
       ok: false,
-      detail: `harnessIntegrity is ${integrity.verdict}, not PASS — the lane did not vouch for itself, so its PASS over the tree cannot be trusted`,
+      detail: `${integrity.name ?? "the integrity step"} is ${integrity.verdict}, not PASS — the lane did not vouch for itself, so its PASS over the tree cannot be trusted`,
     };
   }
-  return { ok: true, detail: "lane vouched for itself (harnessIntegrity PASS, no failing rows)" };
+  return { ok: true, detail: `lane vouched for itself (${integrity.name ?? "integrity step"} PASS, no failing rows)` };
 }
 
 export function evaluateReceipt(receipt, recompute) {

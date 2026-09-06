@@ -329,7 +329,7 @@ at every PR.
 
 | Stage | What | Exit criterion (measured) | Trigger | State 2026-09-05 |
 |---|---|---|---|---|
-| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **not exited.** Seam holds (two foreign profiles, zero core edits); grammar moved; 7 known-wrong verdicts remain (§9.1) |
+| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **not exited.** Seam holds (two foreign profiles, zero core edits); grammar moved; differential suite standing; 2 of 7 known-wrong verdicts closed, 5 remain (§9.1) |
 | **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; console + MCP server into the harness; section types formalised; tool listing profile-driven; `cmp` providers extracted; neutral skills moved | The console renders a stamped Compose app exactly as today **and** a manifest-only backend fixture with every section present and honest | Stage 0 exit; before Stage 1 so the package boundary is drawn with the console inside | not started |
 | **1 — distribution** | The package split (PACKAGE-SPLIT Phases C–E): `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`, `prooflane-studio-cmp`; the lock as a stamper-written manifest; resolve local → node_modules → registry → git URL, fetch at init/new only | A backend repo installs the harness without create-cmp; a core fix reaches it by version bump | Stage 0.5 exit **and** ADR-0007 signed (O4) **and** the Stage 1 ADR (O2) | **started early**: names claimed, packages renamed, `prooflane-harness@0.19.0` published, workspaces declared but inert |
 | **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows from the profile | A profile authored by a team **outside this project** passes framework-check and mints a receipt Gatekeeper accepts. Our own agents authoring one no longer counts — two have, and both found defects rather than proving absence of them | a genuinely external adopter, or the pinned port-demand issue | — |
@@ -356,15 +356,38 @@ found by reading, only by running.** Adoption proves the seam accepts a profile.
 prove the core computes the same answer for both. Only differential execution does, and that is
 why it is the third and final exit criterion.
 
-**Known-wrong and unfixed at 2026-09-05** — the residue Stage 0 must clear, from an adversarial
-audit that verified each by execution: the walk-mode ignore set disagrees with itself so a
-`git init` invalidates a valid receipt; `harnessIntegrity` is required as a literal step name by
-the receipt validator and by two Rule 0 plants, so a profile spelling it otherwise mints receipts
-that are invalid forever; the flow-citation regex accepts only `#`; the watcher identifies build
-output by the single directory name `build`; a 5-second plausibility floor calls a fast stack's
-honest lane fabricated; the lane's short-circuit is keyed to a step literally named `build`; and
-a 30-minute deadline ceiling with no profile channel kills a cold `xcodebuild` or `cargo test`.
-The agnostic lint is also an opt-in allowlist with seven core modules outside it.
+**The residue Stage 0 must clear**, from an adversarial audit that verified each by execution.
+Each line is a wrong VERDICT, not a refusal, which is why none was found by reading.
+
+*Closed 2026-09-06, each with a differential test that was watched failing on the alien profile
+and passing on `cmp` before the fix landed:*
+
+- **The walk-mode ignore set disagreed with itself**, so a `git init` invalidated a valid receipt
+  on any ecosystem but the first. Walk mode now reads the repo's own `.gitignore` — the file
+  `git ls-files --exclude-standard` honours — so the two modes agree by construction rather than
+  by list maintenance. `.gitignore` is consequently attested as a RESOLUTION INPUT, outside the
+  declared surface, because a file that decides what is attested and is not itself attested is
+  the narrowing failure arriving through the side door.
+- **`harnessIntegrity` was required as a literal step name by the receipt validator** — a name
+  the `cmp` pack chose, that the profile protocol never mentions, so a pack spelling it
+  `harness_integrity` minted receipts invalid FOREVER, in every reader. The vouching row is now
+  found by the `harness` object it carries: the data, not the name. **Half open:** two Rule 0
+  plants in `framework-check` still name the step as a literal.
+
+*Open:* the flow-citation regex accepts only `#`; the watcher identifies build output by the
+single directory name `build`; a 5-second plausibility floor calls a fast stack's honest lane
+fabricated; the lane's short-circuit is keyed to a step literally named `build`; a 30-minute
+deadline ceiling with no profile channel kills a cold `xcodebuild` or `cargo test`; and the two
+plants above. The agnostic lint is also an opt-in allowlist with seven core modules outside it.
+
+*Found while closing the above, and not smuggled into that fix:* **an empty region reads
+`intact`.** A tree holding two declaration files and no engine code at all locks, passes
+`checkHarnessIntegrity` with `fileCount: 2`, and mints a PASS vouching row — a vacuous
+self-vouch. It is a missing floor, not a missing `status` value (ADR-0008), and being a gate it
+needs a kept plant and a measured cost (§8). Related and now corrected: `harness-lock.mjs`'s
+header promised that `upgrade --harness` performs a REMOTE authenticity comparison against the
+registry. It does not and never has — it re-locks from a local `package.json`. A module whose
+whole job is precision about which question it answers was imprecise about exactly that.
 
 **In parallel, and unchanged in intent:** the mobile studio modules (attach ✓, runtime
 feedback, device-as-structure, profiling, data inspectors, release lane) proceed as

@@ -55,11 +55,27 @@ test("an ERROR row is refused too — 'could not check' is not green", () => {
   assert.match(r.detail, /loadTest \(ERROR\)/);
 });
 
-test("THE DELETED LOCK: no harnessIntegrity row at all is refused", () => {
+test("THE DELETED LOCK: a receipt with no vouching row at all is refused", () => {
   const r = checkLaneVouching(receipt([ok("build"), ok("unitTests")]));
   assert.equal(r.ok, false);
-  assert.match(r.detail, /no harnessIntegrity row/);
-  assert.match(r.detail, /vouches/);
+  assert.match(r.detail, /no step on this receipt vouches for the lane/);
+  // The refusal must name BOTH ways a row can vouch, because the name alone was
+  // the defect: `harnessIntegrity` is a name the cmp pack chose and the profile
+  // protocol never mentions, so a pack spelling it `harness_integrity` minted
+  // receipts that were invalid forever. The `harness` object on the row is the
+  // honest key; the name is kept only for receipts written before rows carried it.
+  assert.match(r.detail, /`harness` object/);
+  assert.match(r.detail, /named harnessIntegrity/);
+});
+
+test("the row that VOUCHES is the row carrying the vouching data, not a particular name", () => {
+  const snake = receipt([
+    { name: "harness_integrity", verdict: "PASS", durationMs: 4, harness: { status: "intact" } },
+    ok("py_tests"),
+  ]);
+  const r = checkLaneVouching(snake);
+  assert.equal(r.ok, true, r.detail);
+  assert.match(r.detail, /harness_integrity/, "and the message names the step the pack actually ran");
 });
 
 test("a SKIPped harnessIntegrity cannot carry a PASS", () => {
