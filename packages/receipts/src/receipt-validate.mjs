@@ -157,12 +157,33 @@ export const DEFAULT_POLICY = {
   /** A receipt older than this no longer counts as fresh (hosted check only). */
   maxAgeMs: 30 * 24 * 60 * 60 * 1000, // 30 days
   /**
-   * Executed (non-SKIP) gates must report at least this much total wall time.
-   * A "PASS" receipt whose executed gates sum to less cannot attest a real
-   * lane run — the tell for replayed/cached or hand-written verdicts
-   * (evidence must attest execution, not results).
+   * An absolute wall-time floor for executed (non-SKIP) gates. `null` — OFF by
+   * default, and that is a decision rather than an omission.
+   *
+   * This was 5000, with the reasoning that a PASS receipt summing to less
+   * cannot attest a real lane run: the tell for a replayed/cached green or a
+   * hand-written verdict. That reasoning holds for a Gradle lane and is FALSE
+   * for a Go service, a Rust crate, a Python package or a TypeScript library,
+   * whose lanes honestly finish in hundreds of milliseconds. Those adopters
+   * were told their evidence was fabricated — the one accusation this product
+   * cannot afford to make wrongly.
+   *
+   * The number was not the defect. ONE receipt carries nothing that could
+   * justify any number: no start time, no top-level duration, no baseline —
+   * `generatedAt` is a timestamp, not an interval — so nothing on it can be
+   * cross-checked against anything else on it. A floor is therefore a fact
+   * about the STACK, and this module does not know the stack. It is the
+   * notary's to set, from data the notary has and the receipt does not: a
+   * lane that has taken thirty seconds every day for a month and today claims
+   * forty-two milliseconds is a real finding, and it is a finding about a
+   * HISTORY, not about a receipt.
+   *
+   * What is lost, said plainly: a hand-written receipt claiming small
+   * durations is no longer refused here. It was never much of a defence — a
+   * forger types a larger number — and every stack-independent check that
+   * does catch fabrication is untouched below.
    */
-  minExecutedMs: 5000,
+  minExecutedMs: null,
 };
 
 /**
@@ -187,9 +208,15 @@ export function checkFreshness(receipt, { now = Date.now(), maxAgeMs = DEFAULT_P
 }
 
 /**
- * Execution plausibility: do the executed (non-SKIP) gates report durations a
- * real lane run could produce? Catches replayed/cached greens and hand-edited
- * receipts whose numbers were never lived.
+ * Execution plausibility: did this lane execute anything, and are its numbers
+ * real numbers?
+ *
+ * Three refusals, all stack-independent and all about the SHAPE of the
+ * evidence rather than its size: a receipt with no steps, a receipt whose every
+ * step is a SKIP or an ERROR (neither measured anything), and a step whose
+ * duration is not a finite non-negative number. An absolute wall-time floor is
+ * a fourth check and is OFF unless a caller sets `minExecutedMs` — see
+ * DEFAULT_POLICY for why a default one is a claim about the stack.
  * @returns {{ok: boolean, detail: string, executedMs?: number, executedSteps?: number}}
  */
 export function checkExecutionPlausibility(receipt, { minExecutedMs = DEFAULT_POLICY.minExecutedMs } = {}) {
@@ -211,10 +238,13 @@ export function checkExecutionPlausibility(receipt, { minExecutedMs = DEFAULT_PO
     }
     total += step.durationMs;
   }
-  if (total < minExecutedMs) {
+  // Applied only when a caller supplies one. The message attributes the floor
+  // to whoever set it and states the measurement, rather than asserting that a
+  // fast receipt cannot be real — which this module has no way to know.
+  if (typeof minExecutedMs === "number" && minExecutedMs > 0 && total < minExecutedMs) {
     return {
       ok: false,
-      detail: `implausibly fast — executed gates report ${total}ms total, below the ${minExecutedMs}ms floor; a receipt this fast cannot attest a real lane run (evidence must attest execution)`,
+      detail: `executed gates report ${total}ms total, below this validator's configured ${minExecutedMs}ms floor — for a fast stack that may be honest, so treat it as a finding to explain rather than proof of fabrication`,
       executedMs: total,
       executedSteps: executed.length,
     };

@@ -99,10 +99,11 @@ export function parseWatchArgs(rawArgs) {
 // ── The watch set ───────────────────────────────────────────────────────────
 // The profile's source roots (the app), its specs directory (the contract),
 // and qa/ (the harness itself — a golden-tree or flow edit should re-verify
-// too). NOT watched: build output anywhere, qa/evidence/ (verify.mjs writes
-// latest.json there on every run — watching your own output is an infinite
-// loop), and dotfiles (VCS internals, editor droppings, and the in-progress
-// markers themselves).
+// too). NOT watched: the build output directory the PROFILE declares, at any
+// depth (see shouldIgnorePath); qa/evidence/ (verify.mjs writes latest.json
+// there on every run — watching your own output is an infinite loop); and
+// dotfiles (VCS internals, editor droppings, and the in-progress markers
+// themselves).
 
 /**
  * The trees this loop watches: the profile's own source roots and specs
@@ -124,15 +125,78 @@ export function watchRoots(root) {
   return { roots: [...new Set([...model.model.sourceRoots, model.model.specsDir, "qa"])], degraded: null };
 }
 
-/** Ignore predicate over a ROOT-relative path (forward slashes or backslashes). */
-export function shouldIgnorePath(rel) {
+// ── Build output: the profile's word, not one stack's ───────────────────────
+// The ignore set's whole job is to keep the loop from watching its own output.
+// It used to find that output by the single literal directory name `build`,
+// which is Gradle's — Rust writes `target/`, .NET `bin/` and `obj/`, Python
+// `__pycache__`, Xcode `DerivedData`. Both halves were wrong, and both
+// silently, with a watcher that looked like it was working:
+//
+//   on those stacks the lane's own writes woke the watcher, which ran the lane
+//   again — a feedback loop, in the one process whose entire purpose is to fire
+//   on a human's edit
+//   and on EVERY stack a real source directory named `build/` (a build script
+//   package, a `build/` module, Python's `app/build/`) was never watched at
+//   all — the "watcher that looks idle and is" that Stage 0 PR 6b already
+//   fixed once for source ROOTS and left in place here
+//
+// The profile declares `layout.buildDir` (qa/lib/spec-model.mjs), so the name
+// is available and was simply not asked for.
+//
+// THE DECLARED DIRECTORY'S NAME MATCHES AT ANY DEPTH, not just the one declared
+// path. A profile declares its app module's output, but a multi-module tree has
+// one such directory PER MODULE (Gradle writes one into every module; the
+// harness's own qa/ subtrees get one too — see test/watch-loop.test.mjs's
+// `qa/somewhere/build/out.json`). Ignoring only the declared path would re-open
+// the feedback loop one directory over. Only that name matches, so a stack that
+// calls its output `target` starts watching `build/` as the ordinary source it
+// is there.
+//
+// That rule is deliberately BROADER than the declaration, and the price is
+// named here rather than discovered: a profile declaring a nested `buildDir`
+// gets its LEAF name ignored everywhere (`build/outputs` ignores every
+// `outputs/` in the tree, not just that one). The startup banner prints the
+// glob it settled on for exactly this reason — an ignore set a reader can see
+// is one they can correct in `layout.buildDir`.
+
+/**
+ * The historical name, kept ONLY for a project whose profile could not be
+ * resolved or which declares no `layout.buildDir`. It is a FALLBACK and not a
+ * default in the approving sense — the startup banner names it, exactly as
+ * spec-model.mjs's `DEFAULT_GRAMMAR.isDefault` makes the borrowed citation
+ * grammar say so out loud. The two failures are not symmetric: watching your
+ * own output loops forever, while missing a source directory named `build/`
+ * costs one manual run. When we know nothing, we take the cheaper mistake.
+ */
+export const FALLBACK_BUILD_OUTPUT_NAME = "build";
+
+/**
+ * The directory NAMES this project's build output wears, from the profile's
+ * declaration. `composeApp/build` → ["build"]; `target` → ["target"].
+ * @param {{buildDir?: string|null}|null} [model] a SpecModel, or null when none resolved
+ * @returns {string[]}
+ */
+export function buildOutputNames(model) {
+  const declared = typeof model?.buildDir === "string" ? model.buildDir : "";
+  const name = declared.replace(/\\/g, "/").split("/").filter(Boolean).pop();
+  return name ? [name] : [FALLBACK_BUILD_OUTPUT_NAME];
+}
+
+/**
+ * Ignore predicate over a ROOT-relative path (forward slashes or backslashes).
+ * @param {string} rel
+ * @param {{buildDir?: string|null}|null} [model] the project's SpecModel — supplies the
+ *   build output name. Omitted/null falls back to FALLBACK_BUILD_OUTPUT_NAME.
+ */
+export function shouldIgnorePath(rel, model = null) {
   const norm = String(rel).replace(/\\/g, "/");
   if (!norm) return true;
   const parts = norm.split("/");
   // Any dotted segment: .git, .gradle, .DS_Store, .lane-in-progress, …
   if (parts.some((s) => s.startsWith("."))) return true;
-  // Any build dir at any depth (composeApp/build, qa/**/build, …).
-  if (parts.includes("build")) return true;
+  // This profile's build output, at any depth (see the note above).
+  const buildNames = buildOutputNames(model);
+  if (parts.some((s) => buildNames.includes(s))) return true;
   // The lane's own output — the one path that would make watch feed itself.
   if (norm === "qa/evidence" || norm.startsWith("qa/evidence/")) return true;
   return false;
@@ -479,6 +543,16 @@ function main() {
   const pollTimers = [];
   const { roots: declaredRoots, degraded: rootsDegraded } = watchRoots(ROOT);
   const watchedRoots = declaredRoots.filter((rel) => fs.existsSync(path.join(ROOT, rel)));
+  // The ignore set is this profile's too: WHICH directory holds build output is
+  // a stack fact (`layout.buildDir`), and a watcher that guesses it either
+  // feeds itself or skips real source. resolveSpecModel shares the module cache
+  // with watchRoots's own call, so this is a map lookup, not a second load.
+  const specModel = (() => {
+    const r = resolveSpecModel(ROOT);
+    return r.ok ? r.model : null;
+  })();
+  const ignoredBuildNames = buildOutputNames(specModel);
+  const ignorePath = (rel) => shouldIgnorePath(rel, specModel);
 
   // Poll fallback for platforms without recursive fs.watch: a full mtime scan
   // per tick, diffed against the previous one so changed paths still get
@@ -495,7 +569,7 @@ function main() {
       }
       for (const e of entries) {
         const rel = `${dirRel}/${e.name}`;
-        if (shouldIgnorePath(rel)) continue;
+        if (ignorePath(rel)) continue;
         const abs = path.join(dirAbs, e.name);
         if (e.isDirectory()) walk(abs, rel);
         else {
@@ -536,7 +610,7 @@ function main() {
     try {
       const w = fs.watch(path.join(ROOT, rootRel), { recursive: true }, (_event, filename) => {
         const rel = filename ? `${rootRel}/${String(filename).replace(/\\/g, "/")}` : rootRel;
-        if (shouldIgnorePath(rel)) return;
+        if (ignorePath(rel)) return;
         loop.change(rel);
       });
       w.on("error", () => {
@@ -556,11 +630,22 @@ function main() {
   }
 
   // Startup: what is watched, what is respected, what this is NOT.
+  // The ignore globs are PRINTED, never assumed: they name the directory this
+  // profile declared, so a reader can see at a glance that the loop is ignoring
+  // this stack's output and not some other stack's word for it.
+  const ignoreGlobs = [...ignoredBuildNames.map((n) => `**/${n}/**`), "qa/evidence/**", "dotfiles"];
   say("qa/watch.mjs — resident inner loop: runs `node qa/verify.mjs --fast` on save");
-  say(`watching: ${watchedRoots.join(", ")}  (ignoring **/build/**, qa/evidence/**, dotfiles)`);
+  say(`watching: ${watchedRoots.join(", ")}  (ignoring ${ignoreGlobs.join(", ")})`);
   // Never watch a guessed layout silently: if the manifest could not be read,
   // the source roots are unknown and this loop is watching less than it looks.
   if (rootsDegraded) say(`NOTE: watching the core roots only — ${rootsDegraded}`);
+  // And never ignore a guessed layout silently either. A profile that declares
+  // no layout.buildDir leaves this loop on FALLBACK_BUILD_OUTPUT_NAME — one
+  // stack's convention, applied to a stack that never claimed it — so it says
+  // so, the way a borrowed citation grammar does (spec-model.mjs).
+  else if (specModel && typeof specModel.buildDir !== "string") {
+    say(`NOTE: this profile declares no layout.buildDir — ignoring **/${FALLBACK_BUILD_OUTPUT_NAME}/** as a fallback, which may be this project's real source`);
+  }
   say(`coordination: defers while ${LANE_MARKER_REL} or the eyes' render marker is fresh — never two builds against this project`);
   say(`debounce: ${DEBOUNCE_MS}ms — a save storm triggers one run; changes during a run coalesce into one follow-up`);
   say(FOOTER);
@@ -569,7 +654,7 @@ function main() {
     event: "start",
     pid: process.pid,
     watching: watchedRoots,
-    ignoring: ["**/build/**", "qa/evidence/**", "dotfiles"],
+    ignoring: ignoreGlobs,
     debounceMs: DEBOUNCE_MS,
     coordinates: [LANE_MARKER_REL, renderMarkerPath(ROOT) ? path.relative(ROOT, renderMarkerPath(ROOT)).split(path.sep).join("/") : null].filter(Boolean),
     runs: "node qa/verify.mjs --fast",

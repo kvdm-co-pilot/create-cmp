@@ -1492,6 +1492,14 @@ for (const name of FAST_EXCLUDED_NAMES) {
     FAST_EXCLUDED_NAMES,
     STEP_FN_BY_NAME,
     stepDeterminism,
+    // The step whose failure makes every verdict behind it meaningless — for
+    // this stack, `./gradlew :composeApp:assembleDebug`. The spine stops the
+    // lane there (qa/lib/lane-runner.mjs's compileShortCircuit) and it used to
+    // find this step by the literal name "build", which is Gradle's word for
+    // the task and Gradle's word for the output directory, and nobody else's.
+    // Declared here so the spine reads a name instead of assuming one; the
+    // value is unchanged, so this lane stops exactly where it always did.
+    compileStepName: "build",
     // The ladder this pack's steps can earn (evidence-level.mjs). A pack that
     // returns none earns no rung — the spine never grades a pack by another
     // pack's step names.

@@ -329,7 +329,7 @@ at every PR.
 
 | Stage | What | Exit criterion (measured) | Trigger | State 2026-09-05 |
 |---|---|---|---|---|
-| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **not exited.** Seam holds (two foreign profiles, zero core edits); grammar moved; differential suite standing; 2 of 7 known-wrong verdicts closed, 5 remain (§9.1) |
+| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **not exited.** Seam holds (two foreign profiles, zero core edits); grammar moved; differential suite standing; 6 of 7 known-wrong verdicts closed + the lint inverted to deny-by-default, 1 remains (§9.1) |
 | **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; console + MCP server into the harness; section types formalised; tool listing profile-driven; `cmp` providers extracted; neutral skills moved | The console renders a stamped Compose app exactly as today **and** a manifest-only backend fixture with every section present and honest | Stage 0 exit; before Stage 1 so the package boundary is drawn with the console inside | not started |
 | **1 — distribution** | The package split (PACKAGE-SPLIT Phases C–E): `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`, `prooflane-studio-cmp`; the lock as a stamper-written manifest; resolve local → node_modules → registry → git URL, fetch at init/new only | A backend repo installs the harness without create-cmp; a core fix reaches it by version bump | Stage 0.5 exit **and** ADR-0007 signed (O4) **and** the Stage 1 ADR (O2) | **started early**: names claimed, packages renamed, `prooflane-harness@0.19.0` published, workspaces declared but inert |
 | **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows from the profile | A profile authored by a team **outside this project** passes framework-check and mints a receipt Gatekeeper accepts. Our own agents authoring one no longer counts — two have, and both found defects rather than proving absence of them | a genuinely external adopter, or the pinned port-demand issue | — |
@@ -371,14 +371,62 @@ and passing on `cmp` before the fix landed:*
 - **`harnessIntegrity` was required as a literal step name by the receipt validator** — a name
   the `cmp` pack chose, that the profile protocol never mentions, so a pack spelling it
   `harness_integrity` minted receipts invalid FOREVER, in every reader. The vouching row is now
-  found by the `harness` object it carries: the data, not the name. **Half open:** two Rule 0
-  plants in `framework-check` still name the step as a literal.
+  found by the `harness` object it carries: the data, not the name — in the validator AND in the
+  two Rule 0 floor plants, whose Stop-hook assertion no longer names the step either. It matches
+  the core's own refusal wording instead, so the plant is calibrated against what the gate
+  actually says.
 
-*Open:* the flow-citation regex accepts only `#`; the watcher identifies build output by the
-single directory name `build`; a 5-second plausibility floor calls a fast stack's honest lane
-fabricated; the lane's short-circuit is keyed to a step literally named `build`; a 30-minute
-deadline ceiling with no profile channel kills a cold `xcodebuild` or `cargo test`; and the two
-plants above. The agnostic lint is also an opt-in allowlist with seven core modules outside it.
+- **A 5-second plausibility floor called a fast stack's honest lane fabricated.** A Go, Rust,
+  Python or TypeScript lane finishes in hundreds of milliseconds and was told its evidence could
+  not attest a real run — the one accusation this product cannot afford to make wrongly. The
+  number was not the defect: ONE receipt carries no start time, no total duration and no
+  baseline, so nothing on it can justify any floor. A floor is a fact about the STACK, and the
+  validator does not know the stack — so it is now the notary's policy (`minExecutedMs: null` by
+  default), set from a history the receipt does not carry. Every stack-independent fabrication
+  check is untouched: no steps, all-SKIP, all-ERROR, and durations that are not real numbers.
+  Nothing in this repo enforced the floor — `qa/receipt-check.mjs` calls `evaluateReceipt`, not
+  `validateReceiptForTree` — so no adopter's lane changes; what changes is what a hosted notary
+  built on `prooflane-receipts` would have refused.
+- **The agnostic lint was an opt-in allowlist, and is now deny-by-default.** Twenty files were
+  listed; every core module outside the list could name `composeApp` or `gradlew` freely, and
+  seven did. The list's own comment admitted the mechanism — `determinism.mjs` "passed review for
+  weeks because it was not in this list". Now every `.mjs` under `packages/harness/src` is
+  required to be stack-free unless explicitly excused with a reason and an exit, a **new file is
+  covered the day it is written**, and the exception list is checked for EXACTNESS: a file that
+  becomes clean must be removed or the test goes red. An allowlist rots silently; a denylist that
+  cannot hold a stale entry shrinks or breaks. Seven entries remain — four are `cmp` profile
+  TOOLS at the wrong path that `harness init` already refuses to vendor, and three are core
+  library modules (`step-cache`, `arch-doc`, `audit-cadence`) whose facts degrade rather than
+  lie.
+
+- **The journey-citation grammar was `#`, in three places that had to agree and did not.** The
+  plant selector read `^#\s*SPEC:`, so a project citing with `//`, `--`, `;` or `%` had both
+  flow plants silently SKIPPED — a gate nobody was calibrating, which is the same as no gate.
+  The selector now reads the profile's declared `citationMarker`. That alone would have made
+  things worse rather than better: the runner's `stripCitations` also matched `^#\s*SPEC:` and
+  wrote a `#` comment in its place, so a newly-selected plant would have failed to bite and the
+  instrument would have reported a framework defect that was its own. The two failures had been
+  cancelling. `stripCitations` now REMOVES the citation line rather than rewriting it, which is
+  what makes it language-free — deleting a comment is safe in every syntax; composing one is
+  not — and the runner passes the profile's grammar down so all three agree.
+- **The watcher identified build output by the single directory name `build`.** Wrong in both
+  directions off-Gradle: it re-triggered the lane on a Rust or Python tree's real output (a
+  feedback loop) and refused to watch any real source directory named `build/`. It now reads
+  `layout.buildDir`, and prints the glob it actually settled on instead of a hardcoded string
+  that could disagree with its own behaviour. Proven at process level, not just unit level: the
+  resident loop was run against both ecosystems, before and after, touching files and counting
+  lane runs.
+- **The lane's compile short-circuit was keyed to a step literally named `build`** — Gradle's
+  word for the task and for the directory, and nobody else's. A pack compiling in `py_build`
+  never short-circuited, so its whole slow tier ran against a tree that does not compile; a pack
+  with any *other* step named `build` — a packaging step, a container image — had its lane
+  truncated there and real verdicts dropped. The pack now declares `compileStepName`, and the
+  distinction is the KEY's presence, not its value: a caller that predates the declaration keeps
+  today's behaviour, and a pack that declares none short-circuits on NOTHING rather than
+  inheriting another stack's step name.
+
+*Open — one of the seven:* a 30-minute deadline ceiling with no profile channel kills a cold
+`xcodebuild` or `cargo test`. `stepDeadlineMs` already takes overrides; no caller supplies them.
 
 *Found while closing the above, and not smuggled into that fix:* **an empty region reads
 `intact`.** A tree holding two declaration files and no engine code at all locks, passes

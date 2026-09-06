@@ -129,9 +129,13 @@ it: the governance mechanic is the core's; the governance model is the profile's
   `checkFreshness`, `checkExecutionPlausibility`, `validateReceiptForTree`. The neutral
   seed, published-shape, dependency-free. Two of the five proven-neutral files already
   live here.
-- The de-facto pack protocol, read by `verify.mjs:323–456`: `stepsForProfile`,
+- The de-facto pack protocol, read by `verify.mjs:323–456`: `id`, `stepsForProfile`,
   `DEVICE_STEPS`, `FAST_EXCLUDED_NAMES`, `STEP_FN_BY_NAME`, `stepDeterminism()`,
-  `releaseLease()`, `evidenceLadder`. Undeclared, but real and load-bearing.
+  `releaseLease()`, `strengthLabel`, `evidenceLadder`, `compileStepName`. Undeclared, but real
+  and load-bearing — and undeclared is the problem: `compileStepName` was added (2026-09-06)
+  only after the spine was caught guessing it, and nothing validates a pack's return object.
+  `specDeclarationProblems` covers `layout` and `tiers` only, so a pack that returns a malformed
+  `compileStepName` degrades silently instead of being refused.
 - `receipt.harness` — the receipt already names the lane that issued it, with the region
   digest, so a third party can ask "was this the real published lane?" without the tree.
 - `qa/harness-manifest.json` + `inspector/mcp/src/lib/project-layout.mjs` — a
@@ -397,8 +401,9 @@ export const review = {
 };
 
 export function steps(ctx) {
-  // Today's createCmpSteps, unchanged. Returns stepsForProfile, DEVICE_STEPS,
-  // FAST_EXCLUDED_NAMES, STEP_FN_BY_NAME, stepDeterminism, releaseLease.
+  // Today's createCmpSteps, unchanged. Returns id, stepsForProfile, DEVICE_STEPS,
+  // FAST_EXCLUDED_NAMES, STEP_FN_BY_NAME, stepDeterminism, releaseLease,
+  // strengthLabel, evidenceLadder, compileStepName.
 }
 
 export function plants(tree) {
