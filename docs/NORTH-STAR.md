@@ -467,8 +467,25 @@ none is skipped.
 
 ## 10. The fit test — what every feature and PR answers
 
-Answer all eight, in the PR description, in one block. A "no" to 4, 5 or 7 stops the PR. A
-change that cannot answer 1 is not built.
+All eight are asked. **Six are answered by a human; two are DERIVED.**
+
+Questions 6 and 7 ask for facts this repo already produces, and typing them by hand put a
+CLAIM where a DERIVATION exists — the one thing this product refuses everywhere else, sitting
+in the document that defines it. A number copied out of terminal scrollback into a commit
+message is also unverifiable the moment the scrollback is gone, and it drifted: the same
+sentence was retyped into three commits on 2026-09-06, and question 7 still asked for a
+de-fork count whose measurement §9.1 had retired two days earlier.
+
+```bash
+node scripts/fit-test.mjs
+```
+
+runs the gates, reads the recorded device run, and prints 6 and 7 ready to paste — including
+its refusals: a device run recorded against a different commit is printed as STALE and never
+as proof, and a required device run with no record says so. Questions 1-5 and 8 stay written,
+because they are judgements and nothing can derive them.
+
+A "no" to 4, 5 or 7 stops the PR. A change that cannot answer 1 is not built.
 
 1. **Goal.** Which of G1–G6 does this serve? Name them. If none — why does it exist?
 2. **Derived or claimed.** Does this introduce any state only an agent's word supports? A
@@ -485,19 +502,26 @@ change that cannot answer 1 is not built.
    never by reading the code.
 5. **Receipt meaning.** Does this change what a receipt claims, its schema, or its
    comparability? If yes, an ADR first.
-6. **Proof at altitude.** Suite and `scripts/framework-check.mjs` on every commit. Fleet L2
-   (`scripts/fleet-check.mjs --min-level L2`) when the locked region or the template moved. Name
-   what consumes the change and say that you ran it.
-7. **Mobile.** Does a Compose app stamped from this tree do everything it did before, with the
-   same commands? What is the de-fork count before and after?
+6. **Proof at altitude.** *(DERIVED — `scripts/fit-test.mjs`.)* Suite and
+   `scripts/framework-check.mjs` on every commit. Fleet L2 (`scripts/fleet-check.mjs
+   --min-level L2`) when the locked region or the template moved — which paths those are is
+   derived, not remembered, and the answer names which trigger fired. `fleet-check` records
+   every run (PASS *and* FAIL) to `qa-artifacts/fleet-latest.json` with the commit it ran
+   against, because until 2026-09-06 the scratch app was deleted and "fleet L2 PASS" was a
+   sentence a human typed with nothing behind it.
+7. **Mobile.** *(DERIVED — same command.)* Does a Compose app stamped from this tree do
+   everything it did before, with the same commands? Answered by the recorded stamped-app run:
+   its step count, its FAILs, its SKIPs by name. The de-fork count this question used to ask
+   for was retired with the exit criterion it belonged to (§9.1) and is not asked again.
 8. **Loop cost.** What does this do to the wall-clock between prompt and merged change — the
    fast tier, the lane, signatures, waiting? Measured, not estimated.
 
-The one-line form for the PR body:
+The one-line form for the PR body — the judgement half, since the rest is pasted from the
+command:
 
 ```
 North star: G2 G3 · mechanism −1 · core learns no stack fact · receipt unchanged ·
-proof: suite 1402/1402, framework-check 5.2 s, fleet L2 PASS · de-fork 11→9 · loop: −1 lane per signing round
+loop: −1 lane per signing round · residue: <named, or none>
 ```
 
 ---
