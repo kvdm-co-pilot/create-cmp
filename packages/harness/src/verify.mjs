@@ -422,6 +422,10 @@ const lane = runLane({
   // `pack.compileStepName ?? "build"` here would put the literal back and
   // undo the fix.
   compileStepName: pack.compileStepName,
+  // How long a step may take before it is wedged — the pack's judgement about
+  // its own toolchain, never the spine's about somebody else's. A pack that
+  // declares none gets the fallback and its ERROR rows say so.
+  stepDeadlines: pack.stepDeadlines,
 });
 const steps = lane.steps;
 // CACHED counts as PASS for the lane verdict (it IS a prior PASS, reused only

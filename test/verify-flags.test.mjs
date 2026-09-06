@@ -90,8 +90,15 @@ test("the lane: sh() throws on a deadline; the RUNNER sets it per step, catches 
   assert.match(verifySrc, /setDeadline: \(ms\) => \{\s*CURRENT_STEP_DEADLINE_MS = ms;/, "verify.mjs hands the runner the slot sh() reads");
   assert.match(verifySrc, /const lane = runLane\(\{/, "verify.mjs composes the runner");
   assert.doesNotMatch(verifySrc, /stepErrorResult\(/, "and no longer owns the catch — the spine does");
-  assert.match(runnerSrc, /setDeadline\(stepDeadlineMs\(expected\.byName\.get\(name\)\)\)/, "the deadline is set per step from its own history");
-  assert.match(runnerSrc, /result = stepErrorResult\(name, err, Date\.now\(\) - stepStarted, \{ hint:/, "the loop catches into ERROR and keeps going");
+  // Per step, from its own history — bounded by the PACK's floor and ceiling
+  // rather than the spine's, which is the channel that did not exist until
+  // 2026-09-06 (a 30-minute ceiling killed a cold `xcodebuild` and called it
+  // wedged). `DEADLINES` is resolved once per lane so the bound and the ERROR
+  // row that explains it cannot disagree.
+  assert.match(runnerSrc, /const DEADLINES = resolveStepDeadlines\(stepDeadlines\)/, "the pack's bounds are resolved once per lane");
+  assert.match(runnerSrc, /setDeadline\(stepDeadlineMs\(expected\.byName\.get\(name\), DEADLINES\)\)/, "the deadline is set per step from its own history, inside the pack's bounds");
+  assert.match(runnerSrc, /result = stepErrorResult\(name, err, Date\.now\(\) - stepStarted, \{/, "the loop catches into ERROR and keeps going");
+  assert.match(runnerSrc, /deadlineWasDefault: DEADLINES\.isDefault/, "and a killed step is told when the bound it hit was not its own stack's");
   // Stage 0 PR 6b.2: WHERE to look is the pack's sentence, carried through the
   // spine — never written by it.
   assert.match(runnerSrc, /step\.timeoutHint/, "the hint is the pack's, marked on the step function like fn.layer");
