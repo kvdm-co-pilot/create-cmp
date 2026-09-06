@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-import { stepDeadlineMs, stepErrorResult } from "./step-outcomes.mjs";
+import { stepDeadlineMs, stepErrorResult, resolveStepDeadlines } from "./step-outcomes.mjs";
 
 /**
  * Per-step expected durations from the journal's LAST FULL run — the source
@@ -141,12 +141,22 @@ export function runLane(ctx) {
     markerPath,
     expected = { byName: new Map(), laneMs: null },
     setDeadline = () => {},
+    // HOW LONG a step may take before it is wedged is the pack's to say, the
+    // same way `compileStepName` and `timeoutHint` are. Absent, the spine's
+    // fallback applies AND the ERROR row says so, so an adopter whose cold
+    // toolchain was cut short learns the knob exists.
+    stepDeadlines = undefined,
     print = null,
     narrator = null,
     stopAfter = compileShortCircuit(ctx),
     onFinally = () => {},
     startedAt = Date.now(),
   } = ctx;
+
+  // Resolved once per lane, not once per step: the bounds cannot change mid-run
+  // and `isDefault` must be the same answer in the deadline and in the ERROR row
+  // that explains it.
+  const DEADLINES = resolveStepDeadlines(stepDeadlines);
 
   const stamp = (stepFn, index, total) => {
     try {
@@ -188,7 +198,7 @@ export function runLane(ctx) {
       // S4: every step under a deadline from its own history (×3, floor 5 min,
       // ceiling 30). A deadline or a throw is ONE ERROR row — the lane keeps
       // going, because the other verdicts are still worth having.
-      setDeadline(stepDeadlineMs(expected.byName.get(name)));
+      setDeadline(stepDeadlineMs(expected.byName.get(name), DEADLINES));
       const stepStarted = Date.now();
       let result;
       try {
@@ -196,7 +206,10 @@ export function runLane(ctx) {
       } catch (err) {
         // `step.timeoutHint` is the pack's where-to-look sentence, marked on the
         // step function like `step.layer`. The spine carries it; it never writes one.
-        result = stepErrorResult(name, err, Date.now() - stepStarted, { hint: typeof step.timeoutHint === "string" ? step.timeoutHint : undefined });
+        result = stepErrorResult(name, err, Date.now() - stepStarted, {
+          hint: typeof step.timeoutHint === "string" ? step.timeoutHint : undefined,
+          deadlineWasDefault: DEADLINES.isDefault,
+        });
       }
       // Layer tag: a pack may mark a step function with the layer of the
       // stack it proves (`fn.layer = "backend"`). The runner stamps it onto

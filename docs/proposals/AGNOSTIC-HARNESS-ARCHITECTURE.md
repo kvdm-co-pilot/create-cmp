@@ -131,7 +131,7 @@ it: the governance mechanic is the core's; the governance model is the profile's
   live here.
 - The de-facto pack protocol, read by `verify.mjs:323–456`: `id`, `stepsForProfile`,
   `DEVICE_STEPS`, `FAST_EXCLUDED_NAMES`, `STEP_FN_BY_NAME`, `stepDeterminism()`,
-  `releaseLease()`, `strengthLabel`, `evidenceLadder`, `compileStepName`. Undeclared, but real
+  `releaseLease()`, `strengthLabel`, `evidenceLadder`, `compileStepName`, `stepDeadlines`. Undeclared, but real
   and load-bearing — and undeclared is the problem: `compileStepName` was added (2026-09-06)
   only after the spine was caught guessing it, and nothing validates a pack's return object.
   `specDeclarationProblems` covers `layout` and `tiers` only, so a pack that returns a malformed
@@ -403,7 +403,7 @@ export const review = {
 export function steps(ctx) {
   // Today's createCmpSteps, unchanged. Returns id, stepsForProfile, DEVICE_STEPS,
   // FAST_EXCLUDED_NAMES, STEP_FN_BY_NAME, stepDeterminism, releaseLease,
-  // strengthLabel, evidenceLadder, compileStepName.
+  // strengthLabel, evidenceLadder, compileStepName, stepDeadlines.
 }
 
 export function plants(tree) {

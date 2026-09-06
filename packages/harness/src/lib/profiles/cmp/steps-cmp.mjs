@@ -1500,6 +1500,13 @@ for (const name of FAST_EXCLUDED_NAMES) {
     // Declared here so the spine reads a name instead of assuming one; the
     // value is unchanged, so this lane stops exactly where it always did.
     compileStepName: "build",
+    // The bounds on a step's derived deadline. These are the spine's historical
+    // fallback to the millisecond, so this lane does not move — but they are a
+    // judgement about how long a cold Gradle daemon plus an Android build can
+    // honestly take, and that judgement belongs to whoever owns the toolchain.
+    // Declared so the numbers have an owner rather than being inherited by
+    // every stack that never chose them.
+    stepDeadlines: { floorMs: 5 * 60_000, ceilingMs: 30 * 60_000 },
     // The ladder this pack's steps can earn (evidence-level.mjs). A pack that
     // returns none earns no rung — the spine never grades a pack by another
     // pack's step names.

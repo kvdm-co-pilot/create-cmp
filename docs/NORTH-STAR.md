@@ -329,7 +329,7 @@ at every PR.
 
 | Stage | What | Exit criterion (measured) | Trigger | State 2026-09-05 |
 |---|---|---|---|---|
-| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **not exited.** Seam holds (two foreign profiles, zero core edits); grammar moved; differential suite standing; 6 of 7 known-wrong verdicts closed + the lint inverted to deny-by-default, 1 remains (§9.1) |
+| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **not exited.** Seam holds (two foreign profiles, zero core edits); grammar moved; differential suite standing; all 7 known-wrong verdicts closed + the lint inverted to deny-by-default (§9.1) |
 | **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; console + MCP server into the harness; section types formalised; tool listing profile-driven; `cmp` providers extracted; neutral skills moved | The console renders a stamped Compose app exactly as today **and** a manifest-only backend fixture with every section present and honest | Stage 0 exit; before Stage 1 so the package boundary is drawn with the console inside | not started |
 | **1 — distribution** | The package split (PACKAGE-SPLIT Phases C–E): `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`, `prooflane-studio-cmp`; the lock as a stamper-written manifest; resolve local → node_modules → registry → git URL, fetch at init/new only | A backend repo installs the harness without create-cmp; a core fix reaches it by version bump | Stage 0.5 exit **and** ADR-0007 signed (O4) **and** the Stage 1 ADR (O2) | **started early**: names claimed, packages renamed, `prooflane-harness@0.19.0` published, workspaces declared but inert |
 | **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows from the profile | A profile authored by a team **outside this project** passes framework-check and mints a receipt Gatekeeper accepts. Our own agents authoring one no longer counts — two have, and both found defects rather than proving absence of them | a genuinely external adopter, or the pinned port-demand issue | — |
@@ -425,8 +425,21 @@ and passing on `cmp` before the fix landed:*
   today's behaviour, and a pack that declares none short-circuits on NOTHING rather than
   inheriting another stack's step name.
 
-*Open — one of the seven:* a 30-minute deadline ceiling with no profile channel kills a cold
-`xcodebuild` or `cargo test`. `stepDeadlineMs` already takes overrides; no caller supplies them.
+- **A 30-minute deadline ceiling had no profile channel.** "Never under five minutes, never over
+  thirty" is a judgement about how long a build can honestly take before it is wedged, made once
+  for one toolchain: a cold `xcodebuild`, a cold `cargo test` against an empty target dir, or a
+  Gradle daemon starting on a cold CI runner can each exceed it honestly, and the lane killed the
+  step and wrote an ERROR row — a wrong verdict about a healthy build. `stepDeadlineMs` had
+  always accepted overrides; nothing supplied them, so the numbers were unreachable from the only
+  place that knows the stack. **That was the defect, not the constants**, which survive as the
+  fallback rather than being replaced by a different guess. The pack declares `stepDeadlines`,
+  and the other half of the fix is that a killed step now NAMES the knob when the bound was
+  inherited — before, an adopter had no way to learn the bound existed, let alone that it was
+  another stack's number. `cmp` declares today's values to the millisecond, so the shipped lane
+  does not move; what changed is that the numbers have an owner.
+
+**All seven are closed.** What remains is not audit residue but the two things found while
+closing them, both recorded below.
 
 *Found while closing the above, and not smuggled into that fix:* **an empty region reads
 `intact`.** A tree holding two declaration files and no engine code at all locks, passes
