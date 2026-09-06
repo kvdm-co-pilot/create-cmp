@@ -413,6 +413,15 @@ const lane = runLane({
   // run — see the scope decision at leaseDeviceForStep. Release is idempotent
   // and never deletes a foreign holder's lease.
   onFinally: () => pack.releaseLease(),
+  // WHICH step's failure makes every verdict behind it meaningless is the
+  // PACK's to name, never the spine's to guess (lane-runner.mjs's
+  // compileShortCircuit). Passed unconditionally, so the KEY is always present:
+  // presence is what tells the runner "this caller knows about the
+  // declaration", and a pack that declares nothing then short-circuits on
+  // NOTHING rather than inheriting another stack's step name. Writing
+  // `pack.compileStepName ?? "build"` here would put the literal back and
+  // undo the fix.
+  compileStepName: pack.compileStepName,
 });
 const steps = lane.steps;
 // CACHED counts as PASS for the lane verdict (it IS a prior PASS, reused only

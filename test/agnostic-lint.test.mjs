@@ -65,27 +65,120 @@ test("the cmp profile exists where the loader looks, and is the only place the p
   assert.match(src, /from "\.\/steps-cmp\.mjs"/);
 });
 
-// ── Stage 0 PR 4: the spec scanner's core files carry no stack facts ─────────
-// Grows one file per PR as each core module is parameterised. A file is added
-// here the moment its last stack fact moves into the profile, so it cannot
-// come back by accident.
+// ── Every core module is stack-free unless explicitly excused ───────────────
+//
+// THIS LIST USED TO BE AN OPT-IN ALLOWLIST, and that is how five wrong verdicts
+// shipped. A file was added the moment its last stack fact moved out, which
+// means every file NOT yet added — and every file created after — could carry
+// `composeApp` or `gradlew` freely and pass this test. The list's own comment
+// admitted it: determinism.mjs "passed review for weeks because it was not in
+// this list."
+//
+// So it is inverted. Every .mjs under packages/harness/src is now required to
+// be stack-free, except the files named below, each with the reason it is not
+// yet. A new core file is covered the day it is written, by default, with
+// nobody remembering to add it — which is the only kind of rule that survives.
+//
+// The exception list is checked for EXACTNESS in both directions: a file that
+// no longer carries a stack fact must be REMOVED from it, or this test fails.
+// An allowlist rots silently; a denylist that cannot hold a stale entry
+// shrinks or breaks. That difference is the whole point of the inversion.
 const STACK_FACTS = ["composeApp", "androidInstrumentedTest", "desktopTest", "commonTest", "qa/e2e", "steps-cmp", "gradlew", "kspCaches"];
-const STACK_FREE_CORE = ["lib/spec-coverage.mjs", "lib/spec-model.mjs", "lib/profile-loader.mjs", "lib/harness-manifest.mjs", "lib/approvals.mjs", "lib/step-outcomes.mjs",
-  // Added Stage 0 A3. It answered "which lane step owns this test class" with
-  // four names, three of which exist only in the cmp pack, and compareOutcomes
-  // called it unconditionally — so any profile reusing the core's determinism
-  // comparison got another stack's step names stamped onto its diffs. It passed
-  // review for weeks because it was not in this list.
-  "lib/determinism.mjs", "lib/lane-runner.mjs", "lib/lane-markers.mjs", "lib/plan.mjs", "watch.mjs", "receipt-check.mjs", "verify.mjs", "lib/affected-tests.mjs", "lib/feature-brief.mjs", "framework-check.mjs", "lib/framework-check.mjs"];
 
-test("parameterised core modules name no Compose path, tier or pack (comments stripped)", () => {
+/**
+ * Core modules that still name a stack, and why. Each entry is a debt with a
+ * named exit, not a permanent exemption.
+ */
+const STACK_COUPLED = new Map([
+  // The four `cmp` profile TOOLS. `harness init` already knows these are not
+  // portable — PROFILE_TOOLS in src/commands/harness-init.mjs deliberately
+  // omits all four when seeding a foreign repo, so no adopter runs them. They
+  // are the cmp profile's tools living at the wrong path. Exit: they move into
+  // lib/profiles/cmp/ and these entries are deleted.
+  ["preview-gallery.mjs", "a cmp profile tool (PROFILE_TOOLS); not vendored into a foreign repo"],
+  ["refusal-demo.mjs", "a cmp profile tool (PROFILE_TOOLS); not vendored into a foreign repo"],
+  ["scaffold-feature.mjs", "a cmp profile tool (PROFILE_TOOLS); the Kotlin stamper"],
+  ["walkthrough.mjs", "a cmp profile tool (PROFILE_TOOLS); drives the Compose inspector"],
+
+  // Three core library modules. Ranked honestly by what they actually cost,
+  // which is less than it first appears — the first draft of this comment
+  // claimed step-cache.mjs writes a spurious composeApp/ directory into any
+  // foreign tree, and that is FALSE: `memoizeStep` has exactly one caller,
+  // lib/profiles/cmp/steps-cmp.mjs, so off-cmp it never runs. It is a fifth
+  // cmp-only module at the wrong path, not a live defect. Exit is the same as
+  // the tools above: it moves, or its path becomes a parameter the profile
+  // supplies from layout.buildDir.
+  ["lib/step-cache.mjs", "cmp-only in practice (sole caller is the cmp pack); STEP_CACHE_REL_PATH hardcodes composeApp/build"],
+  // These two DEGRADE rather than lie — arch-doc finds no Kotlin source sets
+  // and says so; audit-cadence cannot read composeApp/build.gradle.kts and
+  // returns {ok:false, reason}. A graceful refusal is not a wrong verdict, but
+  // a step that can only ever refuse on a foreign stack is a vacuous gate, so
+  // these stay listed until they read the profile's declared source roots.
+  ["lib/arch-doc.mjs", "Kotlin source-set paths hardcoded — degrades to an empty doc off-cmp"],
+  ["lib/audit-cadence.mjs", "derives the app package from composeApp/build.gradle.kts — refuses off-cmp"],
+]);
+
+/** Stack facts in a module's CODE, comments stripped. */
+function stackFactsIn(abs) {
+  const code = fs.readFileSync(abs, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  return STACK_FACTS.filter((f) => code.includes(f));
+}
+
+/** Every core module the rule applies to — a profile is exempt by definition. */
+function coreModules() {
+  return mjsUnder(CORE)
+    .filter((abs) => !abs.startsWith(PROFILES + path.sep))
+    .map((abs) => path.relative(CORE, abs).split(path.sep).join("/"));
+}
+
+test("no core module names a Compose path, tier or pack unless it is a listed exception", () => {
   const offenders = [];
-  for (const rel of STACK_FREE_CORE) {
-    const src = fs.readFileSync(path.join(CORE, rel), "utf8");
-    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
-    for (const fact of STACK_FACTS) if (code.includes(fact)) offenders.push(`${rel}: ${fact}`);
+  for (const rel of coreModules()) {
+    if (STACK_COUPLED.has(rel)) continue;
+    const hits = stackFactsIn(path.join(CORE, rel));
+    if (hits.length) offenders.push(`${rel}: ${hits.join(", ")}`);
   }
-  assert.deepEqual(offenders, [], `stack facts in core code:\n  ${offenders.join("\n  ")}`);
+  assert.deepEqual(
+    offenders,
+    [],
+    `stack facts in core code — move them into the profile, or add the file to STACK_COUPLED with the reason and its exit:\n  ${offenders.join("\n  ")}`,
+  );
+});
+
+test("the exception list is EXACT — a file that is now clean must be removed from it", () => {
+  // The property the old allowlist could not have. A stale exception is a lie
+  // about the state of the codebase that costs nothing to keep, so it must
+  // cost a red test instead.
+  const stale = [];
+  const missing = [];
+  for (const [rel, why] of STACK_COUPLED) {
+    const abs = path.join(CORE, rel);
+    if (!fs.existsSync(abs)) {
+      missing.push(`${rel} (listed, but no such file — ${why})`);
+      continue;
+    }
+    if (stackFactsIn(abs).length === 0) stale.push(`${rel} — ${why}`);
+  }
+  assert.deepEqual(missing, [], `STACK_COUPLED names files that do not exist:\n  ${missing.join("\n  ")}`);
+  assert.deepEqual(
+    stale,
+    [],
+    `these are stack-free now — DELETE them from STACK_COUPLED so the list keeps shrinking:\n  ${stale.join("\n  ")}`,
+  );
+});
+
+test("the rule covers every core module, so a NEW file is stack-free by default", () => {
+  // The inversion, asserted directly: coverage is derived from the tree, not
+  // from a list someone maintains. A file created tomorrow is subject to the
+  // rule tomorrow.
+  const all = coreModules();
+  assert.ok(all.length >= 30, `expected the whole core to be scanned, saw ${all.length} modules`);
+  const excused = [...STACK_COUPLED.keys()];
+  assert.ok(
+    excused.every((rel) => all.includes(rel)),
+    "every excused file must be one the scan actually reaches, or the exception is meaningless",
+  );
+  assert.ok(excused.length <= 7, `the exception list must shrink, never grow — it holds ${excused.length}`);
 });
 
 // Three files under src/ still reach into the profile: a11y.mjs (through

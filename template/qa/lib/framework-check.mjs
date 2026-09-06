@@ -38,6 +38,13 @@
 // byte-identical at scaffold time — edit the package source, then run
 // `node scripts/sync-harness.mjs`.
 
+// The core's fallback grammar, for the ONE thing this file reads out of a flow:
+// the citation marker. Importing it rather than re-declaring the pattern is the
+// point — a second copy of "what a citation looks like" is how the selector and
+// the scanner came to disagree about the same file (see `flowCitation`). The
+// import performs no IO; every function below still takes data and returns data.
+import { DEFAULT_GRAMMAR } from "./spec-model.mjs";
+
 /**
  * Per-direction bound. Rule 0's whole claim is about SPEED of refusal, so the
  * default is small on purpose: the smoke profile is every pure-Node gate and no
@@ -62,18 +69,58 @@ export const PLANT_KINDS = Object.freeze({
 });
 
 /**
- * The plants that need nothing but a lane. `harnessIntegrity` reads the machine-
- * owned region, which exists in every project that has a lane at all — so these
- * two are the floor. If even these cannot run, the tree has no harness to check
- * and the instrument must say so rather than report a vacuous PASS.
+ * The plants that need nothing but a lane. The step that reads the machine-owned
+ * region exists in every project that has a lane at all — so these two are the
+ * floor. If even these cannot run, the tree has no harness to check and the
+ * instrument must say so rather than report a vacuous PASS.
  */
 export const FLOOR_KINDS = Object.freeze([PLANT_KINDS.NARROWED_SURFACE, PLANT_KINDS.EDITED_LANE]);
+
+/**
+ * How the two floor plants say which receipt row they are about.
+ *
+ * THE ROW THAT VOUCHES IS THE ROW CARRYING THE VOUCHING DATA, not the row with
+ * a particular name — the principle qa/lib/receipt-validate.mjs settled in
+ * `checkLaneVouching` one layer out, mirrored here rather than re-invented.
+ * These two plants used to declare `step: "harnessIntegrity"` as a literal.
+ * That is a name the cmp pack chose for its own step; REQUIRED_EXPORTS never
+ * mentions it and a profile author has no way to discover it. On a pack that
+ * spells its self-check `harness_integrity`, both floor plants looked for a row
+ * that does not exist and the instrument reported "the guard did not FAIL BY
+ * NAME" — about a guard that had failed, by name, on the row immediately beside
+ * it. An adopter's Rule 0 check therefore fails on a working lane, and the
+ * message sends them into the harness instead of into the spelling.
+ *
+ * `vouching` says: find the row whose `harness` object carries the integrity
+ * check's own findings (the field the receipt schema documents, written by
+ * every row that performs it). `step` stays as the FALLBACK name, for receipts
+ * written before rows carried one — the same two-step lookup checkLaneVouching
+ * uses, and the same reason.
+ *
+ * `hookPattern` is matched against the Stop hook's refusal when the plant's
+ * receipt is forged to PASS. It named `harnessIntegrity` too, and the hook's
+ * refusal quotes the failing ROW'S name — so on that same pack the hook refused
+ * correctly and the instrument called the correct refusal a framework defect.
+ * The alternatives here are the core's own two wordings for this class of
+ * refusal (qa/lib/receipt-validate.mjs `checkLaneVouching`: the failing-rows
+ * branch and the did-not-vouch branch), neither of which is any pack's to spell.
+ */
+const VOUCHING_STEP = Object.freeze({
+  step: "harnessIntegrity",
+  vouching: true,
+  hookPattern: "vouch|the row is the more specific truth",
+});
 
 /** A clause id at the head of a spec list item: `- **HOME-02** — …`. */
 const CLAUSE_RE = /^-\s+\*\*([A-Z][A-Z0-9]*-\d{2,})\*\*/m;
 
-/** `# SPEC: HOME-02` in a flow file — the citation an e2e journey carries. */
-const FLOW_CITATION_RE = /^#\s*SPEC:\s*([A-Z][A-Z0-9]*-\d{2,})/m;
+/**
+ * The ids on a citation line, once the MARKER has already matched it:
+ * `# SPEC: HOME-02, HOME-03 — …`. The id grammar is the core's (it is the same
+ * one scanCitations uses); the marker in front of it is the profile's.
+ */
+const CITATION_IDS_RE = /SPEC:\s*([A-Z0-9,\s-]+)/;
+const CLAUSE_ID_RE = /^[A-Z][A-Z0-9]*-\d{2,}$/;
 
 /**
  * The first clause id in a spec, or null. Used to pick something real to plant
@@ -90,13 +137,41 @@ export function firstClauseId(text) {
 
 /**
  * The clause a flow cites, or null.
+ *
+ * THE MARKER IS THE PROFILE'S. This matched `^#\s*SPEC:` and nothing else,
+ * which is true of Maestro YAML and false of a stack whose journeys are .ts,
+ * .kt, .rb or anything C-family. The cost was not a refusal: a project whose
+ * journeys cite with `//` was told `no "# SPEC:" citation in N flow file(s)`,
+ * both e2eCoverage plants stood down, and the check printed PASS with the
+ * reason folded into an ⓘ line — a gate reported as calibrated that had never
+ * been read. And the disagreement was internal: the core's own fallback marker
+ * (spec-model.mjs `DEFAULT_GRAMMAR.citationMarker`) has always accepted `//`,
+ * so qa/lib/spec-coverage.mjs `scanCitations` was counting the very citation
+ * this function could not see, in the same file, in the same tree.
+ *
+ * Same shape as scanCitations: test the profile's marker against the trimmed
+ * line, then read the ids after it. A profile that declares no `grammar` gets
+ * the same fallback the scan uses, so the two answers cannot drift apart again.
+ *
  * @param {string} text
+ * @param {{citationMarker?: RegExp}} [grammar] the SpecModel's grammar
  * @returns {string|null}
  */
-export function flowCitation(text) {
+export function flowCitation(text, grammar = DEFAULT_GRAMMAR) {
   if (typeof text !== "string") return null;
-  const m = text.match(FLOW_CITATION_RE);
-  return m ? m[1] : null;
+  const MARKER = grammar?.citationMarker ?? DEFAULT_GRAMMAR.citationMarker;
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!MARKER.test(trimmed)) continue;
+    const m = trimmed.match(CITATION_IDS_RE);
+    if (!m) continue;
+    const id = m[1]
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .find((s) => CLAUSE_ID_RE.test(s));
+    if (id) return id;
+  }
+  return null;
 }
 
 /**
@@ -115,12 +190,19 @@ export function clauseFamily(clause) {
  * Decide which plants this tree can support, and say WHY each unavailable one
  * is unavailable.
  *
+ * `grammar` is the SpecModel's (qa/lib/spec-model.mjs): the caller passes the
+ * profile's, and a caller that passes none gets the same fallback the coverage
+ * scan uses. It decides one thing here — what a citation in a journey looks
+ * like — and getting it from the profile is what stops this instrument from
+ * disagreeing with the gate it is calibrating (see `flowCitation`).
+ *
  * @param {{specs?: Array<{rel: string, text: string}>,
  *          flows?: Array<{rel: string, text: string}>,
  *          harnessLib?: string[],
  *          testDir?: string|null,
  *          plantsDeclared?: boolean,
- *          unmeetableTier?: string}} tree
+ *          unmeetableTier?: string,
+ *          grammar?: {citationMarker?: RegExp}}} tree
  * @returns {{plants: Array<{kind: string, label: string, step: string,
  *            names: string[], target: object}>,
  *           unavailable: Array<{kind: string, reason: string}>}}
@@ -215,14 +297,21 @@ export function selectPlants(tree) {
   // ── Flow-derived plants ──────────────────────────────────────────────────
   // Both strip EVERY citation from every flow, not just one line. e2eCoverage
   // asks whether a screen feature has any device journey at all, so removing a
-  // single `# SPEC:` from a flow that carries several leaves the feature
+  // single citation from a flow that carries several leaves the feature
   // covered and the gate — correctly — green. A plant that does not actually
   // produce the violation is worse than no plant: it reads as a calibrated
   // gate while proving nothing.
-  const citingFlows = flows.filter((f) => flowCitation(f?.text));
+  //
+  // WHICH flows cite is decided by the profile's citation marker, never by `#`:
+  // see `flowCitation`. The skip below prints the marker it used, because "no
+  // citation in 3 flow files" over three flows that all carry one is a sentence
+  // that sends the reader to the flows instead of to the grammar.
+  const grammar = tree?.grammar ?? DEFAULT_GRAMMAR;
+  const marker = grammar?.citationMarker ?? DEFAULT_GRAMMAR.citationMarker;
+  const citingFlows = flows.filter((f) => flowCitation(f?.text, grammar));
   if (!citingFlows.length) {
     const why = flows.length
-      ? `no "# SPEC:" citation in ${flows.length} flow file(s) — e2eCoverage has nothing to lose`
+      ? `no citation matching /${marker.source}/ in ${flows.length} flow file(s) — e2eCoverage has nothing to lose`
       : `no flows${flowsDir ? ` under ${flowsDir}` : ""} — this project declares no journeys`;
     skip(PLANT_KINDS.FEATURE_WITHOUT_FLOW, why);
     skip(PLANT_KINDS.NESTED_FLOW, why);
@@ -239,9 +328,10 @@ export function selectPlants(tree) {
       reasonPattern: String.raw`\[[^\]\s]+\]`,
       target: { flows: rels },
     });
-    // The citations move into a subdirectory Maestro's directory run never
-    // executes. The tags exist, the YAML is real, and nothing runs it — which
-    // must read exactly like having no journey.
+    // The citations move into a subdirectory of the flows directory that the
+    // lane's own directory run does not descend into. The tags exist, the flow
+    // is real, and nothing executes it — which must read exactly like having no
+    // journey at all.
     plants.push({
       kind: PLANT_KINDS.NESTED_FLOW,
       label: "flow the lane never runs",
@@ -255,20 +345,20 @@ export function selectPlants(tree) {
   // ── Region plants — the floor ────────────────────────────────────────────
   // A narrowed declaration un-attests a whole layer while every checker stays
   // intact (payment-blueprint's planted proof); an edited lane cannot vouch for
-  // its own verdict. Both are read by harnessIntegrity, which needs only a lane.
+  // its own verdict. Both are read by the step that vouches for the lane, which
+  // needs only a lane — see `vouching` below for how that row is found.
   plants.push({
     kind: PLANT_KINDS.NARROWED_SURFACE,
     label: "narrowed surface declaration",
-    step: "harnessIntegrity",
+    ...VOUCHING_STEP,
     // Assert the FILE, not an internal state word. "unrecorded" only holds when
-    // the declaration is absent from the lock — true for a stamped Compose app,
+    // the declaration is absent from the lock — true for a freshly stamped app,
     // false for a repo whose lock was taken after `harness init` wrote the
     // surface, where the identical edit reads as "modified". Both are the same
     // correct refusal; pinning one of them made the instrument fail on a lane
     // that was working. What the plant actually cares about is that the refusal
     // NAMES what it refused over, which is now true in either state.
     names: ["qa/verified-surface.json"],
-    hookPattern: "harnessIntegrity|vouch",
     target: { declaration: "qa/verified-surface.json" },
   });
 
@@ -279,9 +369,11 @@ export function selectPlants(tree) {
     plants.push({
       kind: PLANT_KINDS.EDITED_LANE,
       label: "edited lane cannot vouch",
-      step: "harnessIntegrity",
+      ...VOUCHING_STEP,
+      // "modified" is the integrity check's own status word (qa/lib/harness-
+      // region.mjs), not a step name and not a stack's — every pack's row
+      // reports it, because the core computes it.
       names: ["modified"],
-      hookPattern: "harnessIntegrity|vouch",
       target: { file: spine },
     });
   }
@@ -317,6 +409,28 @@ export function assessCoverage(plants) {
 }
 
 /**
+ * The receipt row a plant's assertion is about.
+ *
+ * Most plants aim at a specific gate and find it by name: the plant says
+ * `specCoverage` because that is the gate whose reading is being proven, and a
+ * different row failing instead is exactly the mix-up this instrument exists to
+ * catch. The two floor plants are different in kind — their assertion is about
+ * the step that VOUCHES FOR THE LANE, whatever the pack calls it — so they find
+ * it by the data it carries (`harness`), with the name as the pre-`harness`
+ * fallback. See VOUCHING_STEP for what that literal name cost.
+ *
+ * @param {Array<object>} steps
+ * @param {{step?: string, vouching?: boolean}} plant
+ * @returns {object|null}
+ */
+export function plantRow(steps, plant) {
+  const rows = Array.isArray(steps) ? steps : [];
+  const byName = rows.find((s) => s && s.name === plant?.step) ?? null;
+  if (!plant?.vouching) return byName;
+  return rows.find((s) => s && s.harness && typeof s.harness === "object") ?? byName;
+}
+
+/**
  * Judge one planted run. Every branch here is a distinct framework defect and
  * says which one it is: a hang, a lane that produced no receipt, a guard that
  * did not fail, or a guard that failed WITHOUT NAMING what it caught.
@@ -326,10 +440,15 @@ export function assessCoverage(plants) {
  * told apart from a gate failing for an unrelated reason, which is how a
  * calibration passes on a gate that was never actually read.
  *
+ * Every message below names the row it ACTUALLY READ, not the row the plant
+ * asked for: on a pack whose steps are spelled differently those are two
+ * different strings, and reporting the request instead of the finding is how a
+ * lookup miss reads as a gate defect.
+ *
  * @param {{hung?: boolean, ms?: number, exit?: number|null,
  *          receipt?: {verdict?: string, steps?: Array<object>}|null,
  *          stderr?: string}} run
- * @param {{label: string, step: string, names?: string[]}} plant
+ * @param {{label: string, step: string, names?: string[], vouching?: boolean}} plant
  * @param {number} boundMs
  * @returns {{ok: true}|{ok: false, reason: string}}
  */
@@ -343,24 +462,33 @@ export function assessPlantRun(run, plant, boundMs) {
     const tail = String(run?.stderr ?? "").slice(-600);
     return { ok: false, reason: `"${label}" returned no receipt (exit ${run?.exit ?? "?"})${tail ? `:\n${tail}` : ""}` };
   }
-  const row = (receipt.steps ?? []).find((s) => s?.name === plant.step);
+  const row = plantRow(receipt.steps, plant);
+  const rowName = row?.name ?? plant.step;
   if (receipt.verdict !== "FAIL" || !row || row.verdict !== "FAIL") {
+    // A missing row says what was looked for. "harnessIntegrity: no row" over a
+    // receipt whose vouching row is called something else is a true sentence
+    // that points at the wrong thing.
+    const found = row
+      ? `${rowName}: ${row.verdict}`
+      : plant.vouching
+        ? `no row carries a \`harness\` object and none is named ${plant.step}`
+        : `${plant.step}: no row`;
     return {
       ok: false,
-      reason: `planted "${label}" and the lane said ${receipt.verdict} (${plant.step}: ${row ? row.verdict : "no row"}) — the guard did not FAIL BY NAME`,
+      reason: `planted "${label}" and the lane said ${receipt.verdict} (${found}) — the guard did not FAIL BY NAME`,
     };
   }
   const reason = String(row.reason ?? "");
   for (const name of plant.names ?? []) {
     if (!reason.includes(name)) {
-      return { ok: false, reason: `${plant.step} FAILed on "${label}" but did not NAME ${name}:\n${reason}` };
+      return { ok: false, reason: `${rowName} FAILed on "${label}" but did not NAME ${name}:\n${reason}` };
     }
   }
   // Some gates name something the selector cannot know in advance — a feature
   // this project happens to have. The pattern is how those still assert FAIL BY
   // NAME instead of settling for "it went red".
   if (plant.reasonPattern && !new RegExp(plant.reasonPattern).test(reason)) {
-    return { ok: false, reason: `${plant.step} FAILed on "${label}" but named nothing matching /${plant.reasonPattern}/:\n${reason}` };
+    return { ok: false, reason: `${rowName} FAILed on "${label}" but named nothing matching /${plant.reasonPattern}/:\n${reason}` };
   }
   return { ok: true };
 }

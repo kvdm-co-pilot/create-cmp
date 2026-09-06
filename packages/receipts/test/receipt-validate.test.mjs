@@ -156,15 +156,19 @@ test("checkFreshness: recent receipt is fresh; old receipt is stale; future is r
 
 // ── execution plausibility ──────────────────────────────────────────────────
 
-test("checkExecutionPlausibility: real durations pass; impossibly-fast receipts are named", () => {
+test("checkExecutionPlausibility: real durations pass; a configured floor names what fell below it", () => {
   const real = { steps: [{ name: "build", verdict: "PASS", durationMs: 21_800 }] };
   assert.equal(checkExecutionPlausibility(real).ok, true);
 
+  // The floor is the NOTARY'S policy now, not this module's default: one
+  // receipt carries nothing that could justify a number, so a stack-independent
+  // default would be a claim about a stack the validator cannot see. Passed
+  // explicitly here, it still bites — see execution-plausibility-floor.test.mjs.
   const fast = { steps: [{ name: "build", verdict: "PASS", durationMs: 42 }] };
-  const fastRes = checkExecutionPlausibility(fast);
+  assert.equal(checkExecutionPlausibility(fast).ok, true, "no default floor");
+  const fastRes = checkExecutionPlausibility(fast, { minExecutedMs: 5000 });
   assert.equal(fastRes.ok, false);
-  assert.match(fastRes.detail, /implausibly fast/);
-  assert.match(fastRes.detail, /evidence must attest execution/);
+  assert.match(fastRes.detail, /below this validator's configured 5000ms floor/);
 
   const negative = { steps: [{ name: "build", verdict: "PASS", durationMs: -5 }] };
   assert.equal(checkExecutionPlausibility(negative).ok, false);
@@ -228,18 +232,25 @@ test("validateReceiptForTree: stale receipt → invalid on freshness even when t
   });
 });
 
-test("validateReceiptForTree: impossibly-fast receipt → invalid on plausibility", () => {
+test("validateReceiptForTree: a fast receipt is valid by default, and invalid under a notary's floor", () => {
   withTree((root) => {
     const receipt = makeReceipt(root, {
+      // The vouching row is present because this test is about the FLOOR, not
+      // about vouching — without it the receipt fails for the wrong reason and
+      // stops testing the knob.
       steps: [
+        { name: "harnessIntegrity", verdict: "PASS", durationMs: 12, harness: { status: "intact" } },
         { name: "androidBuild", verdict: "PASS", durationMs: 30 },
         { name: "unitTests", verdict: "PASS", durationMs: 12 },
       ],
     });
     write(root, RECEIPT_REL_PATH, JSON.stringify(receipt));
-    const res = validateReceiptForTree({ root });
+    // 54ms is implausible for THIS lane and unremarkable for a Go service. The
+    // validator cannot tell them apart from one receipt, so it does not try.
+    assert.equal(validateReceiptForTree({ root }).status, "valid");
+    const res = validateReceiptForTree({ root, policy: { minExecutedMs: 5000 } });
     assert.equal(res.status, "invalid");
-    assert.match(res.reason, /implausibly fast/);
+    assert.match(res.reason, /configured 5000ms floor/);
   });
 });
 
@@ -251,11 +262,12 @@ test("validateReceiptForTree: multiple violations are ALL named at once", () => 
     });
     write(root, RECEIPT_REL_PATH, JSON.stringify(receipt));
     fs.appendFileSync(path.join(root, "qa/verify.mjs"), "// drift\n");
-    const res = validateReceiptForTree({ root, now: Date.parse("2026-07-13T00:00:00Z") });
+    // The floor must be supplied for it to be one of the violations at all.
+    const res = validateReceiptForTree({ root, now: Date.parse("2026-07-13T00:00:00Z"), policy: { minExecutedMs: 5000 } });
     assert.equal(res.status, "invalid");
     assert.match(res.reason, /source changed/);
     assert.match(res.reason, /stale/);
-    assert.match(res.reason, /implausibly fast/);
+    assert.match(res.reason, /configured 5000ms floor/);
   });
 });
 
@@ -271,8 +283,11 @@ test("validateReceiptForTree: policy knobs override the defaults", () => {
       ],
     });
     write(root, RECEIPT_REL_PATH, JSON.stringify(receipt));
-    assert.equal(validateReceiptForTree({ root }).status, "invalid");
+    // 812ms total: valid with no floor, valid under a 500ms floor, invalid
+    // under a 5s one. The knob is the whole mechanism now.
+    assert.equal(validateReceiptForTree({ root }).status, "valid");
     assert.equal(validateReceiptForTree({ root, policy: { minExecutedMs: 500 } }).status, "valid");
+    assert.equal(validateReceiptForTree({ root, policy: { minExecutedMs: 5000 } }).status, "invalid");
   });
 });
 

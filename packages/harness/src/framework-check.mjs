@@ -54,7 +54,7 @@ import {
 } from "./lib/framework-check.mjs";
 import { listHarnessFiles } from "./lib/harness-region.mjs";
 import { listFlowFiles, scanCitations, walkFiles } from "./lib/spec-coverage.mjs";
-import { resolveSpecModel } from "./lib/spec-model.mjs";
+import { resolveSpecModel, DEFAULT_GRAMMAR } from "./lib/spec-model.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfileSync } from "./lib/profile-loader.mjs";
 
@@ -269,7 +269,11 @@ function findTestDir() {
   return null;
 }
 
-out(`framework check: bound=${BOUND_MS}ms per direction, profile=smoke (no Gradle, no device, no network)`);
+// `smoke` is the lane's cheapest profile: the steps that need no build tool, no
+// device and no network. Naming the build tool here ("no Gradle") was one
+// stack's word in the instrument that exists to prove this file has none — a
+// small lie, but in the one place that can least afford it.
+out(`framework check: bound=${BOUND_MS}ms per direction, profile=smoke (host-only steps: no build tool, no device, no network)`);
 
 // With no plant material the instrument cannot write a test, so the two plants
 // that need one are unavailable — reported by name, never quietly dropped.
@@ -283,6 +287,12 @@ const tree = {
   // No `?? "e2e"` anywhere: the tier a plant declares is the profile's or absent.
   unmeetableTier: PROFILE_PLANTS?.unmeetableTier ?? null,
   flowsDir: SPEC_MODEL && SPEC_MODEL.flows ? SPEC_MODEL.flows.dir : null,
+  // What a citation LOOKS like is the profile's, never `#`. Without this the
+  // selector falls back to DEFAULT_GRAMMAR, which accepts `//` and `#` and so
+  // happens to serve C-family and YAML journeys — and silently refuses to
+  // select either flow plant for a stack whose comments start `--`, `;` or `%`.
+  // A plant that is never selected is a gate nobody is calibrating.
+  grammar: SPEC_MODEL ? SPEC_MODEL.grammar : null,
 };
 
 const { plants, unavailable } = selectPlants(tree);
@@ -356,9 +366,31 @@ function read(rel) {
   return fs.readFileSync(abs(rel), "utf8");
 }
 
-/** Every `# SPEC:` citation line neutralised — the flow stays valid YAML. */
-function stripCitations(text) {
-  return text.replace(/^#\s*SPEC:.*$/gm, "# (citation removed by the framework check)");
+/**
+ * Every citation line REMOVED — in whatever comment syntax this stack writes.
+ *
+ * This replaced a line that neutralised `^#\s*SPEC:` and wrote a `#` comment in
+ * its place, which is one stack's syntax twice over. It was survivable only
+ * while the plant selector was ALSO keyed to `#`: a `//`-citing project had
+ * both flow plants skipped, silently, and the two failures cancelled. Now that
+ * the selector reads the profile's declared marker, this one would be reached
+ * with a marker it cannot match — the citation would stay, the plant would not
+ * bite, and the instrument would report a framework defect that is its own.
+ *
+ * Removing the whole line rather than rewriting it is what makes this
+ * language-free: deleting a comment is safe in YAML, in every C-family flow, in
+ * Python and in Lua, whereas writing a replacement comment requires knowing the
+ * syntax. The marker is matched on the TRIMMED line, agreeing with
+ * `scanCitations` and with the selector about indented citations.
+ */
+function stripCitations(text, marker = SPEC_MODEL?.grammar?.citationMarker ?? DEFAULT_GRAMMAR.citationMarker) {
+  // A profile could declare its marker with /g, which makes `.test()` stateful
+  // across calls. Rebuild without flags rather than trust the declaration.
+  const probe = new RegExp(marker.source);
+  return text
+    .split("\n")
+    .filter((line) => !probe.test(line.trim()))
+    .join("\n");
 }
 
 function applyPlant(plant) {

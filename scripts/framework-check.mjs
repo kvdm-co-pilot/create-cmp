@@ -88,7 +88,7 @@ function hookRefuses(appDir) {
   return { refused: res.status === 2, stderr: res.stderr ?? "" };
 }
 
-out(`framework check: bound=${BOUND_MS}ms per direction, profile=smoke (no Gradle, no device)`);
+out(`framework check: bound=${BOUND_MS}ms per direction, profile=smoke (host-only steps: no build tool, no device)`);
 
 // 1. Stamp — the same shape fleet-check uses, so this proves the tree as shipped.
 const scratchRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-framework-check-"));
@@ -132,9 +132,49 @@ const spineFile = path.join(appDir, "qa", "lib", "spec-coverage.mjs");
 const spineText = fs.readFileSync(spineFile, "utf8");
 const receiptPath = path.join(appDir, "qa", "evidence", "latest.json");
 
-/** @type {Array<{label: string, plant: () => void, revert: () => void, step: string, names: string[], hook?: RegExp}>} */
+/** @type {Array<{label: string, plant: () => void, revert: () => void, step: string, names: string[], vouching?: boolean, hook?: RegExp}>} */
 /** What qa/verified-surface.json held before the narrowed-surface plant, so the revert restores rather than deletes. */
 let surfaceBefore = null;
+
+/**
+ * How the two region plants say which receipt row they are about.
+ *
+ * THE ROW THAT VOUCHES IS THE ROW CARRYING THE VOUCHING DATA, not the row with
+ * a particular name. Both plants declared `step: "harnessIntegrity"` and both
+ * matched the receipt on it. That is a name the cmp pack chose for its own step
+ * (packages/harness/src/lib/profiles/cmp/steps-cmp.mjs) and nothing in the
+ * profile contract mentions; the app THIS script stamps is a cmp app, so the
+ * literal happened to be right here — and it is the same literal that made the
+ * shipped instrument (qa/lib/framework-check.mjs) report "the guard did not
+ * FAIL BY NAME" on a pack spelling its self-check `harness_integrity`, about a
+ * guard that had just failed by name. A mirror that keeps the defect teaches it
+ * back. The rule is the one qa/lib/receipt-validate.mjs `checkLaneVouching`
+ * settled: match the `harness` object the row carries, keep the name as the
+ * fallback for receipts written before rows carried one.
+ *
+ * Stated here rather than imported, deliberately: this script is the engine's
+ * INDEPENDENT check — it must be able to fail when the shipped lib is wrong,
+ * which it cannot do if it judges receipts with the lib's own function.
+ *
+ * `hook` matches the Stop hook's refusal of the forged receipt. It named the
+ * step too, and the hook quotes the failing ROW'S name, so the same rename made
+ * a correct refusal read as a hook defect. Both alternatives below are the
+ * core's own wordings for this refusal (checkLaneVouching's failing-rows branch
+ * and its did-not-vouch branch), neither of which is a pack's to spell.
+ */
+const VOUCHING_ROW = {
+  step: "harnessIntegrity",
+  vouching: true,
+  hook: /vouch|the row is the more specific truth/i,
+};
+
+/** The row a plant's assertion is about — by data for the vouching plants, by name for the rest. */
+function rowFor(receipt, plant) {
+  const steps = Array.isArray(receipt.steps) ? receipt.steps : [];
+  const byName = steps.find((s) => s && s.name === plant.step) ?? null;
+  if (!plant.vouching) return byName;
+  return steps.find((s) => s && s.harness && typeof s.harness === "object") ?? byName;
+}
 
 const PLANTS = [
   {
@@ -219,13 +259,12 @@ const PLANTS = [
       if (surfaceBefore === null) fs.rmSync(f, { force: true });
       else fs.writeFileSync(f, surfaceBefore);
     },
-    step: "harnessIntegrity",
+    ...VOUCHING_ROW,
     // The FILE, not the state word: "unrecorded" holds only while the surface
     // declaration is absent from the lock. A repo locked after `harness init`
     // reads the identical edit as "modified" — the same correct refusal in
     // different words. Assert what the refusal must NAME, which is stable.
     names: ["qa/verified-surface.json"],
-    hook: /harnessIntegrity|vouch/i,
   },
   {
     label: "edited lane cannot vouch",
@@ -233,9 +272,8 @@ const PLANTS = [
     // longer the lane this app was given, and the hook must refuse its receipt.
     plant: () => fs.writeFileSync(spineFile, `${spineText}\n// planted by the framework check\n`),
     revert: () => fs.writeFileSync(spineFile, spineText),
-    step: "harnessIntegrity",
+    ...VOUCHING_ROW,
     names: ["modified"],
-    hook: /harnessIntegrity|vouch/i,
   },
 ];
 
@@ -246,13 +284,22 @@ for (const plant of PLANTS) {
   plantsMs += run.ms;
   if (run.hung) fail(`"${plant.label}" did not return inside ${BOUND_MS}ms — the framework HANGS on a failing input`, scratchRoot);
   if (!run.receipt) fail(`"${plant.label}" returned no receipt (exit ${run.exit}):\n${run.stderr.slice(-600)}`, scratchRoot);
-  const row = (run.receipt.steps ?? []).find((s) => s.name === plant.step);
+  // Every message below names the row actually READ, never the row asked for:
+  // on a pack whose steps are spelled differently those are two strings, and
+  // reporting the request is how a lookup miss reads as a gate defect.
+  const row = rowFor(run.receipt, plant);
+  const rowName = row?.name ?? plant.step;
   if (run.receipt.verdict !== "FAIL" || !row || row.verdict !== "FAIL") {
-    fail(`planted "${plant.label}" and the lane said ${run.receipt.verdict} (${plant.step}: ${row ? row.verdict : "no row"}) — the guard did not FAIL BY NAME`, scratchRoot);
+    const found = row
+      ? `${rowName}: ${row.verdict}`
+      : plant.vouching
+        ? `no row carries a \`harness\` object and none is named ${plant.step}`
+        : `${plant.step}: no row`;
+    fail(`planted "${plant.label}" and the lane said ${run.receipt.verdict} (${found}) — the guard did not FAIL BY NAME`, scratchRoot);
   }
   const reason = String(row.reason ?? "");
   for (const name of plant.names) {
-    if (!reason.includes(name)) fail(`${plant.step} FAILed on "${plant.label}" but did not NAME ${name}:\n${reason}`, scratchRoot);
+    if (!reason.includes(name)) fail(`${rowName} FAILed on "${plant.label}" but did not NAME ${name}:\n${reason}`, scratchRoot);
   }
   if (plant.hook) {
     // The hook refuses a smoke-stage receipt on its stage, and a FAIL receipt
@@ -265,7 +312,7 @@ for (const plant of PLANTS) {
     const h = hookRefuses(appDir);
     if (!h.refused || !plant.hook.test(h.stderr)) fail(`the Stop hook did not refuse the "${plant.label}" receipt for the right reason:\n${h.stderr.slice(-400)}`, scratchRoot);
   }
-  out(`  FAIL: ${plant.label.padEnd(26)} ${String(run.ms).padStart(5)}ms   ✓ ${plant.step} FAIL naming ${plant.names.join(", ")}`);
+  out(`  FAIL: ${plant.label.padEnd(26)} ${String(run.ms).padStart(5)}ms   ✓ ${rowName} FAIL naming ${plant.names.join(", ")}`);
   plant.revert();
 }
 const failRun = { ms: plantsMs };
