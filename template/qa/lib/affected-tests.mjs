@@ -115,6 +115,58 @@ export function deriveAffectedFilter(changedPaths, mapping = null) {
   return { mode: "filtered", patterns, sourcePaths: Array.isArray(sourcePaths) ? sourcePaths : paths };
 }
 
+/**
+ * Can the expensive tier OBSERVE this change at all?
+ *
+ * The most costly thing an agent does is run a device or journey tier — minutes
+ * of emulator, build and flow — to prove something about a change that tier
+ * cannot see. A docs edit does not move a screen. Running it anyway is not
+ * rigour, it is latency, and latency is what makes an agent give up and claim
+ * instead of derive (G2).
+ *
+ * This does NOT skip anything. It answers a question and always carries the
+ * reason, because a tier that is quietly not run is exactly the green-with-gaps
+ * this harness exists to refuse: the caller's job is to record the answer, so a
+ * receipt says "journey tier not run — no path feeding it changed" and a reader
+ * can disagree with the reasoning. An unrecorded skip is a lie; a recorded one
+ * is evidence.
+ *
+ * FAILS OPEN in every uncertain case — no paths, no declared roots, no git.
+ * Being wrong toward running costs minutes; being wrong toward skipping costs a
+ * regression nobody saw.
+ *
+ * @param {string[]|null} changedPaths relpaths, or null when git could not say
+ * @param {{observedRoots?: string[], tierName?: string}} [decl] the paths that
+ *   feed the tier — for a stamped app, `layout.sourceRoots` plus the flows dir
+ * @returns {{required: boolean, reason: string, matched: string[]}}
+ */
+export function deriveTierNeed(changedPaths, { observedRoots = [], tierName = "the device tier" } = {}) {
+  if (!Array.isArray(changedPaths)) {
+    return { required: true, reason: `cannot tell what changed — ${tierName} runs`, matched: [] };
+  }
+  const roots = (observedRoots ?? []).filter((r) => typeof r === "string" && r.length > 0);
+  if (roots.length === 0) {
+    return { required: true, reason: `this profile declares no paths feeding ${tierName} — it runs`, matched: [] };
+  }
+  const paths = changedPaths
+    .filter((p) => typeof p === "string" && p.length > 0)
+    .map((p) => p.split(path.sep).join("/"))
+    .filter((p) => !isLaneOutput(p));
+  if (paths.length === 0) {
+    return { required: true, reason: `no change to reason about — ${tierName} runs`, matched: [] };
+  }
+  // The harness judging itself is always broad impact — the same rule the
+  // fast-lane filter uses, so the two cannot disagree about the same edit.
+  const core = paths.find((p) => coreBroadImpactReason(p));
+  if (core) {
+    return { required: true, reason: `broad-impact change — ${coreBroadImpactReason(core)} (${core})`, matched: [core] };
+  }
+  const matched = paths.filter((p) => roots.some((r) => p === r || p.startsWith(r.endsWith("/") ? r : `${r}/`)));
+  return matched.length > 0
+    ? { required: true, reason: `${matched.length} changed path(s) feed ${tierName}`, matched }
+    : { required: false, reason: `no changed path feeds ${tierName} (${roots.join(", ")})`, matched: [] };
+}
+
 function defaultRunGit(args, root) {
   try {
     return execSync(`git ${args}`, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });

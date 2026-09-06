@@ -304,6 +304,8 @@ async function main() {
     ` | required: >=${minLevel} | verdict: ${receipt.verdict}\n`
   );
 
+  writeFleetRecord({ receipt, rung, minLevel, failures, avd: process.env.CMP_AVD ?? null });
+
   if (failures.length) {
     process.stderr.write(`\nfleet check: FAIL\n`);
     for (const f of failures) process.stderr.write(`  - ${f}\n`);
@@ -318,6 +320,61 @@ async function main() {
     process.stdout.write(`\nfleet check: PASS — scratch app verified and deleted.\n`);
   }
   process.exit(0);
+}
+
+/**
+ * Record the run where something other than terminal scrollback can read it.
+ *
+ * Until this existed, "fleet L2 PASS" was a sentence a human typed into a commit
+ * message with nothing behind it — a claim, in the repo whose product is that
+ * claims are not evidence. The scratch app is deleted, so its receipt goes with
+ * it; this is what survives.
+ *
+ * Written on FAIL too. A record that exists only when green cannot refute
+ * anything, which would make it decoration.
+ *
+ * Lives under qa/evidence/, which inputs-hash excludes as lane output, so
+ * recording a run never invalidates a receipt.
+ */
+export function writeFleetRecord({ receipt, rung, minLevel, failures, avd, root = REPO_ROOT }) {
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+  const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
+  const record = {
+    schema: "cmp-fleet-check/1",
+    ranAt: new Date().toISOString(),
+    verdict: failures.length ? "FAIL" : "PASS",
+    rung,
+    requiredLevel: minLevel,
+    failures,
+    avd,
+    // WHICH TREE this ran against. A record that does not say cannot be checked
+    // against the tree it is quoted for, and a stale green is worse than none.
+    commit: head.status === 0 ? head.stdout.trim() : null,
+    treeWasDirty: dirty.status !== 0 || (dirty.stdout ?? "").trim() !== "",
+    laneVerdict: receipt?.verdict ?? null,
+    // The REASON on anything that did not pass. The first FAIL this recorder
+    // ever wrote could not say why e2eSmoke errored — the reason was only in
+    // the scratch app's receipt, which is deleted on the success path. A record
+    // that cannot diagnose is a record you have to reproduce to read.
+    steps: (receipt?.steps ?? []).map((x) => ({
+      name: x.name,
+      verdict: x.verdict,
+      durationMs: x.durationMs,
+      ...(x.verdict === "PASS" ? {} : { reason: typeof x.reason === "string" ? x.reason.split("\n")[0] : null }),
+    })),
+  };
+  // qa-artifacts/ — already gitignored, and already this repo's home for
+  // generated run output. NOT qa/evidence/: create-cmp is the engine, not a
+  // stamped app, and inventing a lane directory here would imply it has a lane.
+  // The record is local evidence that stops a human typing a number they did
+  // not measure; what travels to a reviewer is the fit-test block, not the file.
+  const dir = path.join(root, "qa-artifacts");
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "fleet-latest.json"), `${JSON.stringify(record, null, 2)}\n`);
+  } catch {
+    // Never let bookkeeping fail a gate.
+  }
 }
 
 // Main guard: the module is import-safe for tests (comparator exports above).
