@@ -23,6 +23,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 import { galleryHtml } from "../inspector/mcp/src/lib/preview-service.mjs";
 
@@ -170,16 +171,25 @@ function criteria() {
   // the first draft of this gate, and adding it turned a passing stage back to
   // failing — which is the point of a fence you are allowed to tighten but not
   // to ignore. A gate written to match the work already done is not a gate.
-  const consoleHome = path.join(REPO_ROOT, "packages", "harness", "src", "console");
-  const sibling = path.join(REPO_ROOT, "inspector", "mcp", "src", "lib", "preview-service.mjs");
-  const inHarness = fs.existsSync(consoleHome);
-  out.push({
-    what: "the console lives inside the harness package, so distribution can ship it",
-    ok: inHarness,
-    detail: inHarness
-      ? `packages/harness/src/console`
-      : `still at ${path.relative(REPO_ROOT, sibling)} — a sibling package Stage 1 would not ship`,
-  });
+  // Checked by RENDERING from the harness path, not by `existsSync` on a
+  // directory — which `mkdir` satisfies. The first draft did exactly that, and
+  // a criterion an agent can satisfy with mkdir is not a criterion.
+  const home = path.join(REPO_ROOT, "packages", "harness", "src", "console", "preview-service.mjs");
+  let detail = `still at inspector/mcp/src/lib/preview-service.mjs — a sibling package Stage 1 would not ship`;
+  let ok = false;
+  if (fs.existsSync(home)) {
+    const probe = `import { galleryHtml } from ${JSON.stringify(home)};
+const html = galleryHtml({ appName: "P", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+const n = html.split('<section id="tab-').length - 1;
+if (n < 5) { process.stderr.write("rendered " + n + " sections"); process.exit(1); }
+process.stdout.write(String(n));`;
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", probe], { cwd: REPO_ROOT, encoding: "utf8" });
+    ok = r.status === 0;
+    detail = ok
+      ? `packages/harness/src/console renders ${r.stdout.trim()} sections`
+      : `packages/harness/src/console exists but does not render: ${(r.stderr || "").trim().split("\n")[0]}`;
+  }
+  out.push({ what: "the console lives inside the harness package, so distribution can ship it", ok, detail });
 
   return out;
 }
