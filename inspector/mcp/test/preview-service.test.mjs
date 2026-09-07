@@ -238,6 +238,22 @@ function archHeaderStatus(page) {
 }
 
 /**
+ * A port the OS says is free, right now.
+ *
+ * A named port is a bet that nothing else holds it, and a killed run leaves a
+ * listener behind — which the suite then reports as an unhandled EADDRINUSE
+ * crash rather than a test failure. There is a small race between closing this
+ * and rebinding it, and it is still strictly better than a constant.
+ */
+async function freePort() {
+  const srv = http.createServer();
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const { port } = srv.address();
+  await new Promise((r) => srv.close(r));
+  return port;
+}
+
+/**
  * Wait for a condition instead of guessing how long it takes.
  *
  * A fixed `setTimeout(300)` is a bet that the machine is idle, and it loses
@@ -1163,14 +1179,15 @@ test("service: daemon fast path renders via HTTP and falls back to gradle when i
     res.writeHead(404);
     res.end();
   });
-  await new Promise((r) => daemon.listen(19740, "127.0.0.1", r));
+  await new Promise((r) => daemon.listen(0, "127.0.0.1", r));
+  const daemonPort = daemon.address().port;
 
   let gradleRenders = 0;
   const service = createPreviewService({
     projectDir,
     port: 19730,
     hot: true,
-    daemonUrl: "http://127.0.0.1:19740",
+    daemonUrl: `http://127.0.0.1:${daemonPort}`,
     spawnDaemon: () => {
       throw new Error("should reuse the healthy daemon, not spawn");
     },
@@ -1245,14 +1262,15 @@ test("service: a healthy daemon serving ANOTHER project is refused, not adopted"
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ rendered: ["someone-elses-screen"], ms: 1 }));
   });
-  await new Promise((r) => daemon.listen(19760, "127.0.0.1", r));
+  await new Promise((r) => daemon.listen(0, "127.0.0.1", r));
+  const daemonPort = daemon.address().port;
 
   let gradleRenders = 0;
   const service = createPreviewService({
     projectDir,
     port: 19750,
     hot: true,
-    daemonUrl: "http://127.0.0.1:19760",
+    daemonUrl: `http://127.0.0.1:${daemonPort}`,
     spawnDaemon: () => {
       throw new Error("no daemon of our own in this test");
     },
@@ -1311,13 +1329,14 @@ test("service: swap-aware renders — stale render retried until the reload land
     res.writeHead(404);
     res.end();
   });
-  await new Promise((r) => daemon.listen(19800, "127.0.0.1", r));
+  await new Promise((r) => daemon.listen(0, "127.0.0.1", r));
+  const daemonPort = daemon.address().port;
 
   const service = createPreviewService({
     projectDir,
     port: 19810,
     hot: true,
-    daemonUrl: "http://127.0.0.1:19800",
+    daemonUrl: `http://127.0.0.1:${daemonPort}`,
     staleRetryMs: 50,
     watchdogMs: 60000, // out of the way for this test
     spawnDaemon: () => {
@@ -1378,13 +1397,14 @@ test("service: failed hot swap (reloadErrors bump) surfaces as lastError(reload)
     res.writeHead(404);
     res.end();
   });
-  await new Promise((r) => daemon.listen(19840, "127.0.0.1", r));
+  await new Promise((r) => daemon.listen(0, "127.0.0.1", r));
+  const daemonPort = daemon.address().port;
 
   const service = createPreviewService({
     projectDir,
     port: 19850,
     hot: true,
-    daemonUrl: "http://127.0.0.1:19840",
+    daemonUrl: `http://127.0.0.1:${daemonPort}`,
     watchdogMs: 60000,
     spawnDaemon: () => {
       throw new Error("should reuse the healthy daemon");
@@ -1434,14 +1454,15 @@ test("service: compile watchdog — silent recompiler failure surfaces via a com
     res.writeHead(404);
     res.end();
   });
-  await new Promise((r) => daemon.listen(19820, "127.0.0.1", r));
+  await new Promise((r) => daemon.listen(0, "127.0.0.1", r));
+  const daemonPort = daemon.address().port;
 
   let compileChecks = 0;
   const service = createPreviewService({
     projectDir,
     port: 19830,
     hot: true,
-    daemonUrl: "http://127.0.0.1:19820",
+    daemonUrl: `http://127.0.0.1:${daemonPort}`,
     watchdogMs: 80,
     runCompileCheck: async () => {
       compileChecks++;
@@ -2941,11 +2962,13 @@ test("guard: a second console for the same project is refused, and told where th
       runRender: async () => writeFakePreviews(previewsDir, ["shell"]),
     });
 
-  const first = mk(19740);
+  const firstPort = await freePort();
+  const secondPort = await freePort();
+  const first = mk(firstPort);
   let second;
   try {
     await first.start();
-    second = mk(19741);
+    second = mk(secondPort);
     const err = await second.start().then(
       () => null,
       (e) => e,
@@ -2953,13 +2976,13 @@ test("guard: a second console for the same project is refused, and told where th
     assert.ok(err, "the second console must not start");
     assert.equal(err.code, "CMP_CONSOLE_ALREADY_RUNNING");
     assert.match(err.message, /already serving this project/);
-    assert.match(err.message, /19740/, "it names the URL of the console that IS serving");
+    assert.match(err.message, new RegExp(String(firstPort)), "it names the URL of the console that IS serving");
     assert.equal(err.existing.pid, process.pid);
 
     // Releasing the project lets the next console have it — the guard is not a wedge.
     first.stop();
     await second.start();
-    assert.ok(second.status().url.includes("19741"));
+    assert.ok(second.status().url.includes(String(secondPort)));
   } finally {
     try { first.stop(); } catch { /* already stopped */ }
     try { if (second) second.stop(); } catch { /* never started */ }
