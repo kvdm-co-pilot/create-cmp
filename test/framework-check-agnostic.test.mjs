@@ -47,8 +47,7 @@ import {
   PLANT_KINDS,
   assessPlantRun,
   flowCitation,
-  selectPlants,
-} from "../packages/harness/src/lib/framework-check.mjs";
+  selectPlants, assessCoverage } from "../packages/harness/src/lib/framework-check.mjs";
 
 /** A profile's declarations, through the real builder — never a hand-made grammar. */
 function grammarOf(profile) {
@@ -322,5 +321,29 @@ test("the Stop-hook pattern matches the refusal in both dialects", () => {
         `${plant.kind}: the hook refused "${stepName}" correctly and hookPattern did not recognise the refusal:\n${r.reason}`,
       );
     }
+  }
+});
+
+test("the instrument refuses a tree it cannot calibrate — same rule, both ecosystems", () => {
+  // assessCoverage is the floor: the two REGION plants need nothing but a lane,
+  // so if neither can be made there is no harness here to check and the
+  // instrument must say so rather than report a vacuous PASS over nothing.
+  // Stack-independent by construction — but "by construction" is the claim that
+  // has been wrong five times, so it is executed against both.
+  const floor = [{ kind: "narrowed-surface" }, { kind: "edited-lane" }];
+
+  for (const [label, extra] of [
+    ["cmp (Kotlin)", { kind: "orphaned-citation" }],
+    ["py-alien (Python)", { kind: "unbound-citation" }],
+  ]) {
+    assert.equal(assessCoverage([...floor, extra]).ok, true, `${label}: a tree with both region plants is calibratable`);
+    const noFloor = assessCoverage([extra]);
+    assert.equal(noFloor.ok, false, `${label}: no region plant means no lane to check`);
+    assert.match(noFloor.reason, /no machine-owned lane|no plant could be made/, `${label}: and it names the real cause`);
+    // Exactly one of the two floor plants is not enough, and the refusal must
+    // name WHICH is missing rather than blaming the tree in general.
+    const half = assessCoverage([floor[0], extra]);
+    assert.equal(half.ok, false, `${label}: the region plants are the floor, both of them`);
+    assert.match(half.reason, /edited-lane/, `${label}: the missing one is named`);
   }
 });

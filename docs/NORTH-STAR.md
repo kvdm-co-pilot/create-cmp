@@ -329,7 +329,7 @@ at every PR.
 
 | Stage | What | Exit criterion (measured) | Trigger | State 2026-09-05 |
 |---|---|---|---|---|
-| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **not exited.** Seam holds (two foreign profiles, zero core edits); grammar moved; differential suite standing; all 7 known-wrong verdicts closed + the lint inverted to deny-by-default (§9.1) |
+| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **criterion 1 MET, not yet exited.** 24/24 profile-dependent verdict-bearing core functions proved against two unlike profiles, enforced by `test/stage0-differential-coverage.test.mjs` — the criterion is now a gate, not a sentence. All 7 known-wrong verdicts closed; lint inverted to deny-by-default (§9.1). REMAINING: the cold adoption re-run |
 | **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; console + MCP server into the harness; section types formalised; tool listing profile-driven; `cmp` providers extracted; neutral skills moved | The console renders a stamped Compose app exactly as today **and** a manifest-only backend fixture with every section present and honest | Stage 0 exit; before Stage 1 so the package boundary is drawn with the console inside | not started |
 | **1 — distribution** | The package split (PACKAGE-SPLIT Phases C–E): `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`, `prooflane-studio-cmp`; the lock as a stamper-written manifest; resolve local → node_modules → registry → git URL, fetch at init/new only | A backend repo installs the harness without create-cmp; a core fix reaches it by version bump | Stage 0.5 exit **and** ADR-0007 signed (O4) **and** the Stage 1 ADR (O2) | **started early**: names claimed, packages renamed, `prooflane-harness@0.19.0` published, workspaces declared but inert |
 | **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows from the profile | A profile authored by a team **outside this project** passes framework-check and mints a receipt Gatekeeper accepts. Our own agents authoring one no longer counts — two have, and both found defects rather than proving absence of them | a genuinely external adopter, or the pinned port-demand issue | — |
@@ -350,6 +350,16 @@ attribute reader that returned the classname as the name, a report parser that r
 tool's filename, a doneness deriver that ignored the declared spec directory, and a journey
 requirement that never asked whether a journey tier existed. Every one passed the lint, passed
 1,458 tests, and passed adoption.
+
+**And the criterion itself had the same disease.** "Every verdict-bearing core function" named no
+list, so nobody could evaluate it — a standard nobody can apply is a mood, in the document whose
+subject is that done must be DERIVED. It is derived now, in three steps that are facts about the
+source rather than judgements: a function is VERDICT-BEARING if it returns a verdict, an ok/valid
+judgement or a set of offenders; it is PROFILE-DEPENDENT if profile-derived data reaches it — a
+function that never receives a model, grammar, layout, tiers or pack **cannot** answer differently
+for two profiles, which is a proof and is what makes the target 24 rather than the whole core; and
+it is COVERED when it is CALLED inside a test exercising two unlike profiles. Anything uncovered
+sits in a ledger checked for EXACTNESS, so it shrinks or the test goes red.
 
 The lesson, which is now fit-test question 4: **a stack assumption that names no stack cannot be
 found by reading, only by running.** Adoption proves the seam accepts a profile. It does not
