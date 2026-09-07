@@ -49,11 +49,7 @@ const STAGES = [
   {
     id: "0.5",
     name: "the console into the harness",
-    criteria: null,
-    pending:
-      "\"renders a stamped Compose app exactly as today AND a manifest-only backend fixture with every " +
-      "section present and honest\" — `exactly as today` needs a recorded baseline to diff against, and " +
-      "`honest` needs a definition that a section can fail. Neither exists.",
+    criteria: [{ what: "console baseline, honesty floor, declared sections, no Compose furniture off-Compose", cmd: ["scripts/stage05-gate.mjs"] }],
   },
   {
     id: "1",

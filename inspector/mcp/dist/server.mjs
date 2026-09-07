@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs fa5166b8f6b8cca2648c6b8ff4fe9c684172e44c3adee8d7b7483733cdd21110
+// cmp:bundle-inputs adc18eb201b9a3d610348d389deee032814ba384627de17d0395309031261997
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -37574,6 +37574,12 @@ function galleryHtml(state) {
     // full console; a governance-only project drops the sections that need
     // pixels and says so on the rail.
     capabilities = { governance: true, screens: true },
+    // WHICH SECTIONS this project's console has, declared rather than assumed.
+    // `capabilities` can only say "Compose or not" — one bit, chosen here, for
+    // every stack there will ever be. A declaration says "these sections, in
+    // this order", which is what lets a backend have a console that is about a
+    // backend. Absent, every section renders exactly as before.
+    sections: declaredSectionIds = null,
     // Where this project keeps its receipt/specs/doc (project-layout.mjs's
     // resolveProjectLayout result). null = older caller; nothing is shown.
     layout = null
@@ -38497,9 +38503,13 @@ ${section.bodyHtml}`;
   }
 `;
   const railFootPlain = `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`;
-  const NEEDS_SCREENS = /* @__PURE__ */ new Set(["screens", "live-device"]);
-  const visibleRail = capabilities.screens ? railItems : railItems.filter((r) => !NEEDS_SCREENS.has(r.id));
-  const visibleSections = capabilities.screens ? sections : sections.filter((s) => !NEEDS_SCREENS.has(s.id));
+  const NEEDS_SCREENS = /* @__PURE__ */ new Set(["screens", "live-device", "design-system"]);
+  const declared = Array.isArray(declaredSectionIds) && declaredSectionIds.length ? declaredSectionIds : null;
+  const pick2 = (items) => declared ? declared.map((id) => items.find((x) => x.id === id)).filter(Boolean) : items;
+  const declaredRail = pick2(railItems);
+  const declaredSections = pick2(sections);
+  const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
+  const visibleSections = capabilities.screens ? declaredSections : declaredSections.filter((s) => !NEEDS_SCREENS.has(s.id));
   const capabilityNote = capabilities.screens ? "" : `<p class="rail-sub rail-capability" title="This project has no composeApp/. The governance window is complete; screens, preview and the live device need a Compose app.">governance only &middot; no Compose app</p>`;
   const layoutNote = !layout ? "" : !layout.ok ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr3(layout.reason || "")}">${esc6(layout.relPath || MANIFEST_REL_PATH)} refused &mdash; see Evidence</p>` : layout.source === "manifest" ? `<p class="rail-sub rail-capability" title="${escAttr3(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc6(layout.relPath)} &middot; packs ${esc6((layout.layout.packs || []).join(", "))}</p>` : "";
   return renderShellPage({
