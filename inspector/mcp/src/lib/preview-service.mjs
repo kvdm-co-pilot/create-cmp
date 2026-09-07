@@ -726,6 +726,12 @@ export function galleryHtml(state) {
     // full console; a governance-only project drops the sections that need
     // pixels and says so on the rail.
     capabilities = { governance: true, screens: true },
+    // WHICH SECTIONS this project's console has, declared rather than assumed.
+    // `capabilities` can only say "Compose or not" — one bit, chosen here, for
+    // every stack there will ever be. A declaration says "these sections, in
+    // this order", which is what lets a backend have a console that is about a
+    // backend. Absent, every section renders exactly as before.
+    sections: declaredSectionIds = null,
     // Where this project keeps its receipt/specs/doc (project-layout.mjs's
     // resolveProjectLayout result). null = older caller; nothing is shown.
     layout = null,
@@ -1835,9 +1841,25 @@ export function galleryHtml(state) {
   // from qa/ and stays. One quiet rail line says what is absent and why, so the
   // reader never wonders whether Screens failed to load.
   const railFootPlain = `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`;
-  const NEEDS_SCREENS = new Set(["screens", "live-device"]);
-  const visibleRail = capabilities.screens ? railItems : railItems.filter((r) => !NEEDS_SCREENS.has(r.id));
-  const visibleSections = capabilities.screens ? sections : sections.filter((s) => !NEEDS_SCREENS.has(s.id));
+  // Sections that need a Compose app to mean anything. `design-system` joined
+  // screens and live-device on 2026-09-07: a design LANGUAGE is Theme.kt and
+  // Tokens.kt, and a service with no UI was being shown a visual vocabulary it
+  // does not have — the console being honest about its own defaults rather than
+  // about the project. This is the fallback for a project that declares no
+  // sections; a profile that declares them gets exactly what it declared.
+  const NEEDS_SCREENS = new Set(["screens", "live-device", "design-system"]);
+  // The declaration comes first: it says which sections this project HAS.
+  // Capability filtering then removes what it cannot show — a project may
+  // declare Screens and still not have a Compose app to render, and that stays
+  // an absence with a stated reason rather than a contradiction. An id declared
+  // but unknown to this console is dropped rather than invented, because a rail
+  // entry leading to an empty panel is the dishonesty this whole section fights.
+  const declared = Array.isArray(declaredSectionIds) && declaredSectionIds.length ? declaredSectionIds : null;
+  const pick = (items) => (declared ? declared.map((id) => items.find((x) => x.id === id)).filter(Boolean) : items);
+  const declaredRail = pick(railItems);
+  const declaredSections = pick(sections);
+  const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
+  const visibleSections = capabilities.screens ? declaredSections : declaredSections.filter((s) => !NEEDS_SCREENS.has(s.id));
   const capabilityNote = capabilities.screens
     ? ""
     : `<p class="rail-sub rail-capability" title="This project has no composeApp/. The governance window is complete; screens, preview and the live device need a Compose app.">governance only &middot; no Compose app</p>`;
