@@ -26,6 +26,7 @@ import path from "node:path";
 import { stepDeadlineMs, resolveStepDeadlines, DEFAULT_STEP_DEADLINES, stepErrorResult, StepTimeout } from "../packages/harness/src/lib/step-outcomes.mjs";
 import { runLane } from "../packages/harness/src/lib/lane-runner.mjs";
 import * as cmp from "../packages/harness/src/lib/profiles/cmp/index.mjs";
+import * as alien from "./fixtures/profiles/py-alien/index.mjs";
 
 const MIN = 60_000;
 
@@ -138,4 +139,35 @@ test("the cmp pack owns its numbers rather than inheriting them", () => {
   assert.equal(r.floorMs, 5 * MIN, "and they are exactly today's, so the shipped lane does not move");
   assert.equal(r.ceilingMs, 30 * MIN);
   assert.equal(r.isDefault, false, "declared, not inherited — the numbers are now a choice with an owner");
+});
+
+test("two unlike packs, two honest answers — the same function, no shared constant", () => {
+  // The differential case, and the reason the fallback survives rather than
+  // being replaced by a different guess: cmp DECLARES its bounds, the alien pack
+  // declares none. Both must get the answer that is true for them, and the one
+  // that inherited must be told it inherited.
+  const cmpPack = cmp.steps({
+    ROOT: os.tmpdir(), HERE: path.join(os.tmpdir(), "qa"), fast: false, determinism: false,
+    profile: "smoke", mode: "smoke", sh: () => ({ status: 0, stdout: "", stderr: "" }),
+    tryGit: () => "", tryGitLines: () => [], DEGRADED_PATHS: [],
+  });
+  const alienPack = alien.steps();
+
+  const cmpBounds = resolveStepDeadlines(cmpPack.stepDeadlines);
+  const alienBounds = resolveStepDeadlines(alienPack.stepDeadlines);
+
+  assert.equal(cmpBounds.isDefault, false, "cmp chose its numbers");
+  assert.equal(alienBounds.isDefault, true, "the alien pack declares none and is told so");
+  assert.equal(alienBounds.ceilingMs, DEFAULT_STEP_DEADLINES.ceilingMs, "and inherits the fallback rather than cmp's");
+
+  // Same input, same function, and the ERROR row differs in exactly the way it
+  // should: only the pack that inherited hears about the knob.
+  const err = new StepTimeout("build", 30 * MIN);
+  assert.doesNotMatch(stepErrorResult("build", err, 1, { deadlineWasDefault: cmpBounds.isDefault }).reason, /stepDeadlines/);
+  assert.match(stepErrorResult("py_build", err, 1, { deadlineWasDefault: alienBounds.isDefault }).reason, /stepDeadlines/);
+
+  // And an unmeasured step in each gets ITS pack's ceiling, not a shared one.
+  assert.equal(stepDeadlineMs(null, cmpBounds), 30 * MIN);
+  assert.equal(stepDeadlineMs(null, alienBounds), 30 * MIN);
+  assert.equal(stepDeadlineMs(null, resolveStepDeadlines({ ceilingMs: 180 * MIN })), 180 * MIN, "a pack that needs three hours gets three hours");
 });
