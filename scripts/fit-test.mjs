@@ -21,19 +21,11 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
+import { observedTreeHash, DEVICE_TIER_TRIGGERS } from "./observed-tree.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FLEET_RECORD = path.join(REPO_ROOT, "qa-artifacts", "fleet-latest.json");
 
-/**
- * The paths a device run can observe, for THIS repo.
- *
- * create-cmp is the engine, not a stamped app, so its "device tier" is
- * `fleet-check` and what feeds it is the template plus the package sources the
- * template is built from. A stamped project passes its own — `layout.sourceRoots`
- * plus the flows dir — to the same harness function.
- */
-const DEVICE_TIER_TRIGGERS = ["template/", "packages/harness/src/", "packages/receipts/src/"];
 
 function sh(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...opts });
@@ -86,19 +78,26 @@ export function parseFrameworkCheck(stdout) {
  * stop: quoting yesterday's device run as today's proof. Said plainly rather
  * than silently accepted.
  */
-export function readFleetRecord(recordPath = FLEET_RECORD, head = null) {
+export function readFleetRecord(recordPath = FLEET_RECORD, currentHash = null) {
   let record;
   try {
     record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
   } catch {
     return { present: false };
   }
-  const at = head ?? (sh("git", ["rev-parse", "HEAD"]).stdout ?? "").trim();
+  const now = currentHash ?? observedTreeHash(REPO_ROOT, DEVICE_TIER_TRIGGERS);
+  // A record written before content-binding has no hash to compare. It is not
+  // trusted and not silently discarded: it is named as unverifiable, which is
+  // the honest third answer.
+  if (typeof record.observedHash !== "string") {
+    return { present: true, record, current: false, staleReason: "written before the record was content-bound — cannot be verified against this tree" };
+  }
+  const current = record.observedHash === now;
   return {
     present: true,
     record,
-    forThisCommit: Boolean(at) && record.commit === at,
-    staleReason: record.commit === at ? null : `recorded against ${String(record.commit).slice(0, 7)}, HEAD is ${at.slice(0, 7)}`,
+    current,
+    staleReason: current ? null : `the code feeding the device tier changed since this run (${record.observedHash.slice(0, 7)} → ${now.slice(0, 7)})`,
   };
 }
 
@@ -116,14 +115,17 @@ function render(d) {
   L.push(`   suite             ${d.suite ? `${d.suite.pass}/${d.suite.tests}${d.suite.fail ? ` — ${d.suite.fail} FAILING` : ""}` : "not run (--no-run)"}`);
   L.push(`   framework-check   ${d.frameworkCheck ? `${d.frameworkCheck.verdict} · ${d.frameworkCheck.plants} plants · ${d.frameworkCheck.ms} ms` : "not run (--no-run)"}`);
 
-  const { required, why } = d.device;
-  L.push(`   fleet L2          ${required ? `REQUIRED — ${why.join(", ")} moved` : "not required — nothing under the locked region or template moved"}`);
+  // The reason comes from deriveTierNeed and is PRINTED, not reconstructed. The
+  // first version rebuilt it from a path list and produced "REQUIRED —  moved"
+  // whenever the honest answer was a fail-open one, throwing away the only
+  // sentence a reader could argue with.
+  L.push(`   fleet L2          ${d.device.required ? "REQUIRED" : "not required"} — ${d.device.reason}`);
   if (d.fleet.present) {
     const r = d.fleet.record;
     const dev = r.steps.filter((s) => ["e2eSmoke", "androidChecks"].includes(s.name));
     L.push(`                     ${r.verdict} · rung ${r.rung ?? "none"} (required >=${r.requiredLevel})${dev.length ? ` · ${dev.map((s) => `${s.name} ${(s.durationMs / 1000).toFixed(1)}s`).join(", ")}` : ""}`);
-    L.push(`                     ${d.fleet.forThisCommit ? "ran against this commit ✓" : `STALE — ${d.fleet.staleReason}`}${r.treeWasDirty ? " · tree was dirty when it ran" : ""}`);
-  } else if (required) {
+    L.push(`                     ${d.fleet.current ? "ran against this exact code ✓" : `STALE — ${d.fleet.staleReason}`}${r.treeWasDirty ? " · tree was dirty when it ran" : ""}`);
+  } else if (d.device.required) {
     L.push("                     NO RECORD — a device run is required and none is recorded for this tree");
   }
 
