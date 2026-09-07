@@ -37,7 +37,7 @@ import { walkKtFiles } from "./components.mjs";
 // test/design-language.test.mjs keep their door. One definition, two doors.
 // What stays below is `getTokenUsage`, which scans Kotlin source for the
 // declaring object — the stack-coupled half, which belongs on this side.
-export { classifyDimens, deriveContrastPairs, WCAG_AA_NORMAL, WCAG_AAA_NORMAL } from "../../../../packages/harness/src/console/console-data.mjs";
+export { classifyDimens, deriveContrastPairs, WCAG_AA_NORMAL, WCAG_AAA_NORMAL } from "prooflane-harness/console/console-data.mjs";
 
 // --- per-token usage counts ---------------------------------------------------
 

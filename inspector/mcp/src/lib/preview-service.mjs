@@ -79,13 +79,13 @@ import { getApprovalAnchoredDiff } from "./approval-diff.mjs";
 // Only two symbols cross for this file's own use: deriveHumanQueue (the ONE
 // derivation of the human queue, shared with the page so the rail and the
 // status endpoint cannot disagree) and componentStoryCards.
-import { deriveHumanQueue } from "../../../../packages/harness/src/console/console-shell.mjs";
-import { componentStoryCards, galleryHtml } from "../../../../packages/harness/src/console/preview-service.mjs";
+import { deriveHumanQueue } from "prooflane-harness/console/console-shell.mjs";
+import { componentStoryCards, galleryHtml } from "prooflane-harness/console/preview-service.mjs";
 
 // Re-exported at their historical import site so every existing caller — the
 // MCP server, bin/console.mjs, scripts/stage05-gate.mjs, and the console tests
 // — keeps working without knowing the console moved. One definition, two doors.
-export { galleryHtml, isComponentStoryId, componentStoryCards } from "../../../../packages/harness/src/console/preview-service.mjs";
+export { galleryHtml, isComponentStoryId, componentStoryCards } from "prooflane-harness/console/preview-service.mjs";
 import { getTokenUsage } from "./design-language.mjs";
 import { getIntentData } from "./intent.mjs";
 

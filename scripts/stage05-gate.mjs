@@ -195,42 +195,70 @@ process.stdout.write(String(n));`;
   //
   // Criterion F asks whether the console renders from the harness path. It
   // passed while `@create-cmp/inspector`'s published tarball was BROKEN: six
-  // imports in four files reached out through `../../../../packages/harness/`,
-  // which resolves in this checkout and nowhere else. `npm pack` the inspector,
-  // extract it with no node_modules above it, import its entry — ERR_MODULE_NOT_FOUND.
+  // imports reached out through `../../../../packages/harness/`, which resolves
+  // in this checkout and nowhere else. Moving a thing out of a package is half
+  // the move; the half that proves it is the package you left.
   //
-  // Moving a thing out of a package is only half the move; the half that proves
-  // it is the package you left. A path that climbs out of a package root is not
-  // a dependency, it is a checkout-shaped assumption, and the difference is
-  // invisible until someone installs it.
-  const escapes = [];
-  const libDir = path.join(REPO_ROOT, "inspector", "mcp", "src");
-  const walk = (dir) => {
+  // The rule is the real invariant, not the absence of a string: EVERY import
+  // either stays inside the package or is a DECLARED dependency. Checking only
+  // for `../../../../` would be satisfied by rewriting the specifier — the same
+  // escape wearing a bare name — which is why an undeclared bare import fails
+  // here too.
+  const pkgDir = path.join(REPO_ROOT, "inspector", "mcp");
+  const declaredDeps = (() => {
+    try {
+      const j = JSON.parse(fs.readFileSync(path.join(pkgDir, "package.json"), "utf8"));
+      return new Set([...Object.keys(j.dependencies ?? {}), ...Object.keys(j.peerDependencies ?? {})]);
+    } catch {
+      return new Set();
+    }
+  })();
+  const offences = [];
+  const walkPkg = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const abs = path.join(dir, e.name);
-      if (e.isDirectory()) walk(abs);
+      if (e.isDirectory()) walkPkg(abs);
       else if (e.name.endsWith(".mjs")) {
         // LINE comments first, then block. The other order — which the shipped
-        // agnostic lint still uses — lets a `/*` appearing inside a `//` line
-        // swallow everything to the next `*/`, hiding real code. Writing this
-        // detector reproduced that bug immediately: it reported 2 escapes where
-        // grep found 6.
+        // agnostic lint still uses — lets a `/*` inside a `//` line swallow
+        // everything to the next `*/`. Writing this reproduced that bug
+        // immediately: it reported 2 escapes where grep found 6.
         const src = fs.readFileSync(abs, "utf8").replace(/^[ \t]*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+        const rel = path.relative(REPO_ROOT, abs);
         for (const m of src.matchAll(/from\s+["']([^"']+)["']/g)) {
-          if (m[1].includes("../../../../packages/") || m[1].includes("/packages/harness/")) {
-            escapes.push(`${path.relative(REPO_ROOT, abs)} → ${m[1]}`);
+          const spec = m[1];
+          // A TRAILING line comment is still a comment. The stripper above is
+          // anchored to line start (as the shipped agnostic lint's is), so
+          // `let x = null; // tell "quiet" from "dead"` survived it and read as
+          // an import of `dead`. Anything after a `//` on the match's own line
+          // is prose.
+          const lineStart = src.lastIndexOf("\n", m.index) + 1;
+          const before = src.slice(lineStart, m.index);
+          if (before.includes("//")) continue;
+          if (spec.startsWith("node:")) continue;
+          // A `from '...'` inside a template literal is prose, not an import —
+          // connect.mjs has an error message reading "cannot resolve … from
+          // '${projectDir}'". Nothing statically checkable is spelled with an
+          // interpolation, so this is a safe exclusion rather than a blind spot.
+          if (spec.includes("${")) continue;
+          if (spec.startsWith(".")) {
+            const resolved = path.resolve(path.dirname(abs), spec);
+            if (!resolved.startsWith(pkgDir + path.sep)) offences.push(`${rel} → ${spec} (climbs out of the package)`);
+            continue;
           }
+          const name = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0];
+          if (!declaredDeps.has(name)) offences.push(`${rel} → ${spec} (bare import of an UNDECLARED dependency)`);
         }
       }
     }
   };
-  if (fs.existsSync(libDir)) walk(libDir);
+  if (fs.existsSync(path.join(pkgDir, "src"))) walkPkg(path.join(pkgDir, "src"));
   out.push({
-    what: "the package the console left still stands alone (no undeclared cross-package import)",
-    ok: escapes.length === 0,
-    detail: escapes.length
-      ? `${escapes.length} import(s) climb out of inspector/mcp — its published tarball cannot be imported:\n        ${escapes.slice(0, 4).join("\n        ")}`
-      : "no import climbs out of a package root",
+    what: "the package the console left still stands alone (every import inside it, or declared)",
+    ok: offences.length === 0,
+    detail: offences.length
+      ? `${offences.length} import(s) it cannot resolve once installed:\n        ${offences.slice(0, 4).join("\n        ")}`
+      : `every import stays inside inspector/mcp or names a declared dependency`,
   });
 
   return out;

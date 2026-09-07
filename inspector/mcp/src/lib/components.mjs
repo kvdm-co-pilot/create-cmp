@@ -35,7 +35,7 @@ import path from "node:path";
 // Re-exported unchanged, so test/component-scan-parity.test.mjs still compares
 // THIS definition against the cmp profile's copy. A third copy here would have
 // defeated the gate that exists to catch exactly that divergence.
-export { kebabCase, componentStoryId } from "../../../../packages/harness/src/console/console-data.mjs";
+export { kebabCase, componentStoryId } from "prooflane-harness/console/console-data.mjs";
 
 /** Every `.kt` file under `dir` (recursive), as absolute paths. Exported for handrolled-state.mjs's ARCH-11 mirror. */
 export function walkKtFiles(dir) {
