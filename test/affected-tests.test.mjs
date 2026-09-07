@@ -26,6 +26,7 @@ import {
   coreBroadImpactReason,
   changedWorkingTreePaths,
   deriveAffectedFilter,
+  deriveTierNeed,
 } from "../template/qa/lib/affected-tests.mjs";
 // Stage 0 PR 6d: qa/ is the core's blast-radius rule on every stack; WHICH
 // other paths fan out, and how a source maps to a test filter, are the
@@ -194,4 +195,56 @@ test("a BACKEND-shaped mapping subsets by its own rules — the core supplies on
   assert.match(deriveAffectedFilter(["qa/verify.mjs"], backend).reason, /qa\/ is the harness itself/);
   // And lane outputs are still never changes.
   assert.equal(deriveAffectedFilter(["qa/evidence/latest.json"], backend).reason, "no working-tree changes to scope by");
+});
+
+// ── deriveTierNeed: the declaration is of IRRELEVANCE ────────────────────────
+// The first version asked "is any changed path under a root that FEEDS the
+// tier?" — an allowlist, so anything nobody listed was silently deferred. The
+// falsifying case is concrete and shipped: `cmp` declares
+// `sourceRoots: ["composeApp/src"]`, which excludes `build.gradle.kts` and
+// `gradle/libs.versions.toml`. A dependency bump changes what runs on the
+// device and would have skipped the device tier, confidently.
+test("a dependency bump obliges the device tier — the case the allowlist deferred", () => {
+  const bump = ["gradle/libs.versions.toml"];
+
+  // What the old shape did, reconstructed: cmp's declared source roots as an
+  // allowlist. Nothing matches, so nothing is required. That is the bug.
+  const asAllowlist = bump.some((p) => ["composeApp/src"].some((r) => p.startsWith(`${r}/`)));
+  assert.equal(asAllowlist, false, "the allowlist could not see a dependency bump — this is what was shipped");
+
+  // Inverted: it is not declared irrelevant, so it obliges.
+  const need = deriveTierNeed(bump, { irrelevantRoots: ["docs/", "*.md"], tierName: "the device tier" });
+  assert.equal(need.required, true, "a path nobody classified must oblige the tier");
+  assert.deepEqual(need.obliging, bump);
+  assert.match(need.reason, /not declared irrelevant/);
+});
+
+test("only explicitly-declared irrelevance reduces the obligation", () => {
+  const decl = { irrelevantRoots: ["docs/", "test/", "*.md"], tierName: "the device tier" };
+  assert.equal(deriveTierNeed(["docs/NORTH-STAR.md", "README.md", "test/x.test.mjs"], decl).required, false);
+  // One unclassified path among many irrelevant ones is enough to oblige.
+  const mixed = deriveTierNeed(["docs/a.md", "composeApp/src/Main.kt"], decl);
+  assert.equal(mixed.required, true);
+  assert.deepEqual(mixed.obliging, ["composeApp/src/Main.kt"], "and it names WHICH path obliged, so the answer is arguable");
+});
+
+test("every uncertain case fails OPEN — being wrong toward running costs minutes", () => {
+  const decl = { irrelevantRoots: ["docs/"], tierName: "the device tier" };
+  assert.equal(deriveTierNeed(null, decl).required, true, "git could not say");
+  assert.equal(deriveTierNeed([], decl).required, true, "nothing to reason about");
+  assert.equal(deriveTierNeed(["docs/a.md"], { tierName: "t" }).required, true, "nothing declared irrelevant");
+  assert.equal(deriveTierNeed(["docs/a.md"], { irrelevantRoots: [], tierName: "t" }).required, true, "an empty declaration is not a licence");
+  // The harness judging itself is always broad impact.
+  const core = deriveTierNeed(["qa/verify.mjs"], decl);
+  assert.equal(core.required, true);
+  assert.match(core.reason, /qa\/ is the harness itself/);
+});
+
+test("lane output never obliges anything — a receipt is not a change", () => {
+  const decl = { irrelevantRoots: ["docs/"], tierName: "the device tier" };
+  // Only lane output changed: nothing real moved, and it fails open rather than
+  // pretending the empty set is a licence to skip.
+  const r = deriveTierNeed(["qa/evidence/latest.json", "qa-artifacts/x.png"], decl);
+  assert.equal(r.required, true);
+  assert.match(r.reason, /no change to reason about/);
 });

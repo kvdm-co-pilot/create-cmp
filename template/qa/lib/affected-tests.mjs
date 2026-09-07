@@ -116,55 +116,68 @@ export function deriveAffectedFilter(changedPaths, mapping = null) {
 }
 
 /**
- * Can the expensive tier OBSERVE this change at all?
+ * Must the expensive tier run for this change?
  *
  * The most costly thing an agent does is run a device or journey tier — minutes
  * of emulator, build and flow — to prove something about a change that tier
- * cannot see. A docs edit does not move a screen. Running it anyway is not
- * rigour, it is latency, and latency is what makes an agent give up and claim
- * instead of derive (G2).
+ * cannot see. Running it anyway is not rigour, it is latency, and latency is
+ * how an agent ends up CLAIMING instead of deriving (G1, G2).
  *
- * This does NOT skip anything. It answers a question and always carries the
- * reason, because a tier that is quietly not run is exactly the green-with-gaps
- * this harness exists to refuse: the caller's job is to record the answer, so a
- * receipt says "journey tier not run — no path feeding it changed" and a reader
- * can disagree with the reasoning. An unrecorded skip is a lie; a recorded one
- * is evidence.
+ * THE DECLARATION IS OF IRRELEVANCE, NOT OF RELEVANCE, and getting that
+ * backwards turns this into the defect it prevents. The first version of this
+ * function asked "is any changed path under a root that FEEDS the tier?" and
+ * answered "not required" when none matched — an allowlist, so anything nobody
+ * thought to list was silently deferred. `cmp` declares
+ * `sourceRoots: ["composeApp/src"]`, which excludes `build.gradle.kts` and
+ * `gradle/libs.versions.toml` — both of which absolutely change what runs on a
+ * device. A dependency bump would have skipped the device tier and said so
+ * confidently (ADR-0009, "what would make this wrong").
  *
- * FAILS OPEN in every uncertain case — no paths, no declared roots, no git.
- * Being wrong toward running costs minutes; being wrong toward skipping costs a
- * regression nobody saw.
+ * So: the tier RUNS unless every changed path is under something explicitly
+ * declared unable to affect it. A path nobody classified obliges the tier,
+ * which is the safe direction — being wrong toward running costs minutes, being
+ * wrong toward deferring costs a regression nobody saw.
+ *
+ * This does not skip anything; it answers a question and always carries the
+ * reason, so a caller can record it and a reader can disagree with it. An
+ * unrecorded skip is a lie; a recorded one is evidence.
  *
  * @param {string[]|null} changedPaths relpaths, or null when git could not say
- * @param {{observedRoots?: string[], tierName?: string}} [decl] the paths that
- *   feed the tier — for a stamped app, `layout.sourceRoots` plus the flows dir
- * @returns {{required: boolean, reason: string, matched: string[]}}
+ * @param {{irrelevantRoots?: string[], tierName?: string}} [decl] paths declared
+ *   unable to affect the tier: a `dir/` prefix, or a `*.ext` suffix
+ * @returns {{required: boolean, reason: string, obliging: string[]}}
  */
-export function deriveTierNeed(changedPaths, { observedRoots = [], tierName = "the device tier" } = {}) {
+export function deriveTierNeed(changedPaths, { irrelevantRoots = [], tierName = "the device tier" } = {}) {
   if (!Array.isArray(changedPaths)) {
-    return { required: true, reason: `cannot tell what changed — ${tierName} runs`, matched: [] };
-  }
-  const roots = (observedRoots ?? []).filter((r) => typeof r === "string" && r.length > 0);
-  if (roots.length === 0) {
-    return { required: true, reason: `this profile declares no paths feeding ${tierName} — it runs`, matched: [] };
+    return { required: true, reason: `cannot tell what changed — ${tierName} runs`, obliging: [] };
   }
   const paths = changedPaths
     .filter((p) => typeof p === "string" && p.length > 0)
     .map((p) => p.split(path.sep).join("/"))
     .filter((p) => !isLaneOutput(p));
   if (paths.length === 0) {
-    return { required: true, reason: `no change to reason about — ${tierName} runs`, matched: [] };
+    return { required: true, reason: `no change to reason about — ${tierName} runs`, obliging: [] };
   }
   // The harness judging itself is always broad impact — the same rule the
   // fast-lane filter uses, so the two cannot disagree about the same edit.
   const core = paths.find((p) => coreBroadImpactReason(p));
   if (core) {
-    return { required: true, reason: `broad-impact change — ${coreBroadImpactReason(core)} (${core})`, matched: [core] };
+    return { required: true, reason: `broad-impact change — ${coreBroadImpactReason(core)} (${core})`, obliging: [core] };
   }
-  const matched = paths.filter((p) => roots.some((r) => p === r || p.startsWith(r.endsWith("/") ? r : `${r}/`)));
-  return matched.length > 0
-    ? { required: true, reason: `${matched.length} changed path(s) feed ${tierName}`, matched }
-    : { required: false, reason: `no changed path feeds ${tierName} (${roots.join(", ")})`, matched: [] };
+  const declared = (irrelevantRoots ?? []).filter((r) => typeof r === "string" && r.length > 0);
+  if (declared.length === 0) {
+    return { required: true, reason: `nothing is declared unable to affect ${tierName} — it runs`, obliging: paths };
+  }
+  const isIrrelevant = (p) =>
+    declared.some((r) => (r.startsWith("*.") ? p.endsWith(r.slice(1)) : p === r.replace(/\/$/, "") || p.startsWith(r.endsWith("/") ? r : `${r}/`)));
+  const obliging = paths.filter((p) => !isIrrelevant(p));
+  return obliging.length > 0
+    ? {
+        required: true,
+        reason: `${obliging.length} changed path(s) are not declared irrelevant to ${tierName}: ${obliging.slice(0, 3).join(", ")}${obliging.length > 3 ? ", …" : ""}`,
+        obliging,
+      }
+    : { required: false, reason: `every changed path is declared unable to affect ${tierName} (${declared.join(", ")})`, obliging: [] };
 }
 
 function defaultRunGit(args, root) {

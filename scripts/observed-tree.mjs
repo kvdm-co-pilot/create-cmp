@@ -17,12 +17,32 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 
 /**
- * The paths a device run can observe, for THIS repo. create-cmp is the engine,
- * not a stamped app, so what feeds `fleet-check` is the template plus the
- * package sources the template is built from. A stamped project passes its own
- * (`layout.sourceRoots` plus the flows dir) to the same functions.
+ * The content a device run's validity depends on, for THIS repo — the template
+ * plus the package sources it is built from. create-cmp is the engine, not a
+ * stamped app, so this is what `fleet-check` actually exercises.
  */
 export const DEVICE_TIER_TRIGGERS = Object.freeze(["template/", "packages/harness/src/", "packages/receipts/src/"]);
+
+/**
+ * What CANNOT affect a device run here. Declared as irrelevance rather than
+ * relevance on purpose (see deriveTierNeed): anything unclassified obliges the
+ * tier, so forgetting to list a new directory costs a device run, never a
+ * missed regression. Markdown cannot change what executes on a phone; this
+ * repo's own tests, scripts and CI config do not ship into the stamped app.
+ */
+export const DEVICE_TIER_IRRELEVANT = Object.freeze([
+  "docs/",
+  "test/",
+  "scripts/",
+  ".github/",
+  "*.md",
+  // The inspector SHIPS (the tokenDrift step talks to it), so `inspector/` as a
+  // whole is not irrelevant — but its own test suite never reaches a device.
+  // Named specifically rather than widening to `inspector/`, because the cost of
+  // a too-narrow entry is one device run and the cost of a too-wide one is a
+  // missed regression.
+  "inspector/mcp/test/",
+]);
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "build", "dist", "out"]);
 

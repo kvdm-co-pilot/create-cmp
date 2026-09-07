@@ -13,13 +13,17 @@ import { execFileSync } from "node:child_process";
 import { deviceTierRequired, parseSuite, parseFrameworkCheck, readFleetRecord, render } from "../scripts/fit-test.mjs";
 import { observedTreeHash, DEVICE_TIER_TRIGGERS } from "../scripts/observed-tree.mjs";
 
-test("the device tier is required when the locked region or template moved, and not otherwise", () => {
-  assert.equal(deviceTierRequired(["docs/NORTH-STAR.md", "scripts/x.mjs"]).required, false);
-  assert.equal(deviceTierRequired(["template/qa/lib/watch.mjs"]).required, true);
-  assert.equal(deviceTierRequired(["packages/harness/src/verify.mjs"]).required, true);
-  assert.equal(deviceTierRequired(["packages/receipts/src/inputs-hash.mjs"]).required, true);
-  // And it names WHY, so the answer can be argued with rather than trusted.
-  assert.deepEqual(deviceTierRequired(["template/a", "packages/harness/src/b"]).why, ["template/", "packages/harness/src/"]);
+test("the device tier runs unless every changed path is declared unable to affect it", () => {
+  // Declared IRRELEVANCE, not relevance. The allowlist shape this replaced could
+  // not see `gradle/libs.versions.toml` — outside cmp's declared sourceRoots and
+  // absolutely able to change what runs on a device (ADR-0009).
+  assert.equal(deviceTierRequired(["docs/NORTH-STAR.md", "scripts/x.mjs", "test/y.test.mjs"]).required, false);
+  assert.equal(deviceTierRequired(["README.md"]).required, false, "markdown cannot change what executes on a phone");
+  for (const p of ["template/qa/lib/watch.mjs", "packages/harness/src/verify.mjs", "packages/receipts/src/inputs-hash.mjs", "template/gradle/libs.versions.toml", "package.json", "src/scaffold.mjs"]) {
+    assert.equal(deviceTierRequired([p]).required, true, `${p} must oblige the device tier`);
+  }
+  // And it names WHICH paths obliged, so the answer can be argued with.
+  assert.deepEqual(deviceTierRequired(["docs/a.md", "template/x"]).obliging, ["template/x"]);
 });
 
 test("the gate outputs are read, not retyped", () => {
