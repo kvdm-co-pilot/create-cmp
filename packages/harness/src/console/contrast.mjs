@@ -1,3 +1,14 @@
+// MOVED from inspector/mcp/src/lib/contrast.mjs — NORTH-STAR §9, stage 0.5, "the
+// console into the harness". Unchanged in the move.
+//
+// It is under `console/` because the console is what dragged it across: the
+// Design-language section's WCAG matrix (console-data.mjs deriveContrastPairs)
+// needs this math, and a console module may not import back into inspector/mcp
+// — `prooflane-harness` ships `src/` alone, so that import would be a dangling
+// path in the published tarball. inspector/mcp's a11y.mjs now imports it from
+// here; the arrow points down (studio -> harness), which is the direction
+// PACKAGE-SPLIT.md §3 requires.
+//
 // contrast.mjs — WCAG 2.x relative luminance + contrast ratio over resolved design-token
 // colors. Pure math, no MCP imports — unit-testable in isolation, like every other lib.
 //

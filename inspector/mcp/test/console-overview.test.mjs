@@ -4,8 +4,8 @@
 // is stated as absent rather than dressed up as "nothing to do".
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { overviewBodyHtml, overviewStatusHtml, overviewGlyph } from "../src/lib/console-overview.mjs";
-import { statusGlyph, receiptGlyph, formatAgeCoarse, deriveHumanQueue } from "../src/lib/console-shell.mjs";
+import { overviewBodyHtml, overviewStatusHtml, overviewGlyph } from "../../../packages/harness/src/console/console-overview.mjs";
+import { statusGlyph, receiptGlyph, formatAgeCoarse, deriveHumanQueue } from "../../../packages/harness/src/console/console-shell.mjs";
 
 const drifted = { id: "architecture", status: "changed-since-approval" };
 const unsigned = { id: "intent", status: "unreviewed" };
@@ -246,7 +246,7 @@ test("an empty journal renders no History block at all", () => {
 });
 
 // ── In flight — the walks (docs/features/walk-status.md) ──────────────────────
-import { walksHtml } from "../src/lib/console-overview.mjs";
+import { walksHtml } from "../../../packages/harness/src/console/console-overview.mjs";
 
 const buildingFeature = {
   name: "meal", phase: "approved", design: null, covered: 4, total: 7,
@@ -386,8 +386,8 @@ test("L5: without the walk derivation, the board-mirroring fallback still render
 
 // ── The live chain strip + page anatomy (studio-drive-mode) ──────────────────
 
-import { driveChainHtml } from "../src/lib/console-overview.mjs";
-import { renderShellPage } from "../src/lib/console-shell.mjs";
+import { driveChainHtml } from "../../../packages/harness/src/console/console-overview.mjs";
+import { renderShellPage } from "../../../packages/harness/src/console/console-shell.mjs";
 
 const chainFixture = {
   request: { text: "add supplements with reminders", at: "now" },

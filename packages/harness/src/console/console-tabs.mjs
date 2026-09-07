@@ -1,3 +1,18 @@
+// MOVED from inspector/mcp/src/lib/console-tabs.mjs — NORTH-STAR §9, stage 0.5,
+// "the console into the harness". Two changes came with the move, both forced by
+// the boundary rather than chosen:
+//
+//   1. Its two imports (design-language.mjs, components.mjs) pointed at modules
+//      that did NOT move, because both also scan Kotlin source. The three pure
+//      functions it actually used came across into ./console-data.mjs and the
+//      originals re-export them, so nothing here imports back into inspector/mcp.
+//   2. Five hardcoded `composeApp/...` paths in fallback copy were replaced by
+//      what the DATA says. Each sat behind `x.reason || "<a cmp path>"`, so a
+//      project with no composeApp/ whose provider returned no reason was told a
+//      file was missing from a directory it does not have. That is the §9.1
+//      failure class — a wrong answer, not a refusal — and this package may not
+//      name a stack (test/agnostic-lint.test.mjs, deny-by-default).
+//
 // console-tabs.mjs — pure (data) -> html generators for the console's section
 // bodies, each in its profession's §3 form (docs/STUDIO-REDESIGN.md): Design
 // language (§3.1), Architecture (§3.2), Components (§3.3), Specs (§3.5, the
@@ -13,8 +28,7 @@
 // values, and every absence uses the one standardized form
 // ("Not derivable statically — <reason>").
 
-import { classifyDimens, deriveContrastPairs } from "./design-language.mjs";
-import { componentStoryId } from "./components.mjs";
+import { classifyDimens, deriveContrastPairs, componentStoryId } from "./console-data.mjs";
 
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -325,7 +339,7 @@ function colorTokenTableHtml(colors, usage) {
   if (usage && !counts) {
     const reason =
       (usage.available === false && usage.reason) ||
-      "no Kotlin object declaring these tokens was found under composeApp/src/commonMain/kotlin";
+      "no source object declaring these tokens was found";
     absence = `\n  <p class="empty-inline">usage counts: Not derivable statically &mdash; ${esc(reason)}</p>`;
   }
   return `  <table class="tok-table">
@@ -485,8 +499,9 @@ export function designLanguageBodyHtml(ds, meta = {}) {
   if (!ds || !ds.available) {
     return `<div class="empty">
       <p>No design-system catalog available yet.</p>
-      <p>Produce one by letting the preview gallery render at least once (writes
-      <code>composeApp/build/previews/design-system.json</code>), or connect a running
+      <p>Produce one by letting the preview gallery render at least once${
+        ds && ds.sourcePath ? ` (writes <code>${esc(ds.sourcePath)}</code>)` : ""
+      }, or connect a running
       DEBUG build (<code>connect_live</code>) so it can be read live from
       <code>/inspect/design-system</code>.</p>
     </div>${candidatesSection}`;
@@ -495,7 +510,7 @@ export function designLanguageBodyHtml(ds, meta = {}) {
   const dimens = (ds.catalog && ds.catalog.dimens) || {};
   const typography = ds.catalog && ds.catalog.typography;
   const sourceLabel =
-    ds.source === "live" ? "running app (GET /inspect/design-system)" : "composeApp/build/previews/design-system.json";
+    ds.source === "live" ? "running app (GET /inspect/design-system)" : ds.sourcePath || "the preview render's design-system catalog";
 
   const { spacing, radius, elevation, other } = classifyDimens(dimens);
   const dimenSections = [];
@@ -1435,7 +1450,7 @@ function dependencyGraphHtml(graph) {
   if (!graph || !graph.available) {
     return `<div class="empty">
       <p>No dependency graph available.</p>
-      <p>${esc((graph && graph.reason) || "composeApp/src/commonMain/kotlin not found.")}</p>
+      <p>${esc((graph && graph.reason) || "the scan reported no graph and gave no reason.")}</p>
     </div>`;
   }
   if (graph.edges.length === 0) {
@@ -1482,7 +1497,7 @@ function layerMapHtml(layerMap) {
   if (!layerMap || !layerMap.available) {
     return `<div class="empty">
       <p>No layer map available.</p>
-      <p>${esc((layerMap && layerMap.reason) || "composeApp/src/commonMain/kotlin not found.")}</p>
+      <p>${esc((layerMap && layerMap.reason) || "the scan reported no layer map and gave no reason.")}</p>
     </div>`;
   }
   const boxes = layerMap.layers

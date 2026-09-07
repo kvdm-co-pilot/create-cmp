@@ -191,6 +191,48 @@ process.stdout.write(String(n));`;
   }
   out.push({ what: "the console lives inside the harness package, so distribution can ship it", ok, detail });
 
+  // G — AND THE PACKAGE IT LEFT MUST STILL STAND ALONE.
+  //
+  // Criterion F asks whether the console renders from the harness path. It
+  // passed while `@create-cmp/inspector`'s published tarball was BROKEN: six
+  // imports in four files reached out through `../../../../packages/harness/`,
+  // which resolves in this checkout and nowhere else. `npm pack` the inspector,
+  // extract it with no node_modules above it, import its entry — ERR_MODULE_NOT_FOUND.
+  //
+  // Moving a thing out of a package is only half the move; the half that proves
+  // it is the package you left. A path that climbs out of a package root is not
+  // a dependency, it is a checkout-shaped assumption, and the difference is
+  // invisible until someone installs it.
+  const escapes = [];
+  const libDir = path.join(REPO_ROOT, "inspector", "mcp", "src");
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, e.name);
+      if (e.isDirectory()) walk(abs);
+      else if (e.name.endsWith(".mjs")) {
+        // LINE comments first, then block. The other order — which the shipped
+        // agnostic lint still uses — lets a `/*` appearing inside a `//` line
+        // swallow everything to the next `*/`, hiding real code. Writing this
+        // detector reproduced that bug immediately: it reported 2 escapes where
+        // grep found 6.
+        const src = fs.readFileSync(abs, "utf8").replace(/^[ \t]*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+        for (const m of src.matchAll(/from\s+["']([^"']+)["']/g)) {
+          if (m[1].includes("../../../../packages/") || m[1].includes("/packages/harness/")) {
+            escapes.push(`${path.relative(REPO_ROOT, abs)} → ${m[1]}`);
+          }
+        }
+      }
+    }
+  };
+  if (fs.existsSync(libDir)) walk(libDir);
+  out.push({
+    what: "the package the console left still stands alone (no undeclared cross-package import)",
+    ok: escapes.length === 0,
+    detail: escapes.length
+      ? `${escapes.length} import(s) climb out of inspector/mcp — its published tarball cannot be imported:\n        ${escapes.slice(0, 4).join("\n        ")}`
+      : "no import climbs out of a package root",
+  });
+
   return out;
 }
 

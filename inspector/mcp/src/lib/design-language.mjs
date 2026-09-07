@@ -22,78 +22,22 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { contrastRatio } from "./contrast.mjs";
 import { walkKtFiles } from "./components.mjs";
 
-// --- dimens classification ----------------------------------------------------
-
-const DP_RE = /^(\d+(?:\.\d+)?)\s*dp$/;
-
-/**
- * @param {Record<string, string>} dimens catalog dimens (name -> "16dp"-style value)
- * @returns {{spacing: Array<{name:string,value:string,dp:number}>,
- *            radius: Array<{name:string,value:string,dp:(number|null)}>,
- *            elevation: Array<{name:string,value:string,dp:(number|null)}>,
- *            other: Array<{name:string,value:string,dp:(number|null)}>}}
- *   spacing sorted ascending by dp (it is rendered as a scale); the rest in
- *   catalog order. A `Padding`/`Gap` token whose value doesn't parse as dp
- *   cannot be drawn to scale — it goes to `other` (stated, not stretched).
- */
-export function classifyDimens(dimens = {}) {
-  const spacing = [];
-  const radius = [];
-  const elevation = [];
-  const other = [];
-  for (const [name, value] of Object.entries(dimens)) {
-    const m = DP_RE.exec(String(value).trim());
-    const dp = m ? Number(m[1]) : null;
-    if (/^(Padding|Gap|Spacing)/.test(name) && dp !== null) spacing.push({ name, value, dp });
-    else if (/^Radius/.test(name)) radius.push({ name, value, dp });
-    else if (/^Elevation/.test(name)) elevation.push({ name, value, dp });
-    else other.push({ name, value, dp });
-  }
-  spacing.sort((a, b) => a.dp - b.dp || a.name.localeCompare(b.name));
-  return { spacing, radius, elevation, other };
-}
-
-// --- WCAG contrast pairs ------------------------------------------------------
-
-// Normal-text thresholds, WCAG 2.2 SC 1.4.3 (AA) / SC 1.4.6 (AAA).
-export const WCAG_AA_NORMAL = 4.5;
-export const WCAG_AAA_NORMAL = 7;
-
-/**
- * @param {Record<string, string>} colors catalog colors (name -> hex)
- * @returns {Array<{fg:string,bg:string,fgHex:string,bgHex:string,ratio:number,aa:boolean,aaa:boolean,role:string}>}
- */
-export function deriveContrastPairs(colors = {}) {
-  const pairs = [];
-  const seen = new Set();
-  const add = (fg, bg, role) => {
-    if (!(fg in colors) || !(bg in colors)) return;
-    const key = `${fg}/${bg}`;
-    if (seen.has(key)) return;
-    const ratio = contrastRatio(colors[fg], colors[bg]);
-    if (ratio === null) return; // unparseable hex -> the pair is absent, not guessed
-    seen.add(key);
-    pairs.push({
-      fg,
-      bg,
-      fgHex: colors[fg],
-      bgHex: colors[bg],
-      ratio,
-      aa: ratio >= WCAG_AA_NORMAL,
-      aaa: ratio >= WCAG_AAA_NORMAL,
-      role,
-    });
-  };
-  for (const name of Object.keys(colors)) {
-    if (/^On.+/.test(name)) add(name, name.slice(2), "text on its own surface");
-  }
-  add("OnSurfaceVariant", "Surface", "secondary text on Surface");
-  add("OnSurface", "Background", "body text on Background");
-  return pairs;
-}
+// --- dimens classification and WCAG pairs — the console's now, re-exported ----
+//
+// `classifyDimens` and `deriveContrastPairs` MOVED to
+// packages/harness/src/console/console-data.mjs when the console moved into the
+// harness package (NORTH-STAR §9, stage 0.5). Their only production caller was
+// console-tabs.mjs, and a console module may not import back into this package:
+// `prooflane-harness` ships `src/` alone, so such an import would be a dangling
+// relative path in the published tarball.
+//
+// Re-exported here unchanged, so this module's existing import sites and
+// test/design-language.test.mjs keep their door. One definition, two doors.
+// What stays below is `getTokenUsage`, which scans Kotlin source for the
+// declaring object — the stack-coupled half, which belongs on this side.
+export { classifyDimens, deriveContrastPairs, WCAG_AA_NORMAL, WCAG_AAA_NORMAL } from "../../../../packages/harness/src/console/console-data.mjs";
 
 // --- per-token usage counts ---------------------------------------------------
 

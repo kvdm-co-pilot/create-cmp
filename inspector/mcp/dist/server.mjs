@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs adc18eb201b9a3d610348d389deee032814ba384627de17d0395309031261997
+// cmp:bundle-inputs 734e82fc67cd76f227d0783c23453b018e9c7f69f1807e875dc379bbb9218ff3
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -31086,7 +31086,7 @@ function requireBounds(node, label) {
   return node.bounds;
 }
 
-// src/lib/contrast.mjs
+// ../../packages/harness/src/console/contrast.mjs
 var HEX_RE = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 function parseColor(hex3) {
   if (typeof hex3 !== "string") return null;
@@ -32333,6 +32333,14 @@ import path3 from "node:path";
 import { fileURLToPath } from "node:url";
 var PKG_ROOT = path3.resolve(path3.dirname(fileURLToPath(import.meta.url)), "..", "..");
 var BUNDLE_MARKER = "cmp:bundle-inputs";
+function consoleDir(root) {
+  const dir = path3.resolve(root, "..", "..", "packages", "harness", "src", "console");
+  try {
+    return fs3.statSync(dir).isDirectory() ? dir : null;
+  } catch {
+    return null;
+  }
+}
 function sourceFiles(root = PKG_ROOT) {
   const out = [];
   const walk2 = (dir) => {
@@ -32343,11 +32351,14 @@ function sourceFiles(root = PKG_ROOT) {
     }
   };
   walk2(path3.join(root, "src"));
+  const console_ = consoleDir(root);
+  if (console_) walk2(console_);
   out.push(path3.join(root, "bin", "server.mjs"));
   return out.sort();
 }
 function sourceRoots(root = PKG_ROOT) {
-  return [path3.join(root, "src"), path3.join(root, "bin")].filter((d) => {
+  return [path3.join(root, "src"), path3.join(root, "bin"), consoleDir(root)].filter((d) => {
+    if (!d) return false;
     try {
       return fs3.statSync(d).isDirectory();
     } catch {
@@ -33559,12 +33570,63 @@ function listReceiptHistory(root) {
 // src/lib/components.mjs
 import fs10 from "node:fs";
 import path10 from "node:path";
+
+// ../../packages/harness/src/console/console-data.mjs
 function kebabCase(name) {
   return String(name).replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2").toLowerCase();
 }
 function componentStoryId(name) {
   return `component.${kebabCase(name)}`;
 }
+var DP_RE = /^(\d+(?:\.\d+)?)\s*dp$/;
+function classifyDimens(dimens = {}) {
+  const spacing = [];
+  const radius = [];
+  const elevation = [];
+  const other = [];
+  for (const [name, value] of Object.entries(dimens)) {
+    const m = DP_RE.exec(String(value).trim());
+    const dp = m ? Number(m[1]) : null;
+    if (/^(Padding|Gap|Spacing)/.test(name) && dp !== null) spacing.push({ name, value, dp });
+    else if (/^Radius/.test(name)) radius.push({ name, value, dp });
+    else if (/^Elevation/.test(name)) elevation.push({ name, value, dp });
+    else other.push({ name, value, dp });
+  }
+  spacing.sort((a, b) => a.dp - b.dp || a.name.localeCompare(b.name));
+  return { spacing, radius, elevation, other };
+}
+var WCAG_AA_NORMAL = 4.5;
+var WCAG_AAA_NORMAL = 7;
+function deriveContrastPairs(colors = {}) {
+  const pairs = [];
+  const seen = /* @__PURE__ */ new Set();
+  const add = (fg, bg, role) => {
+    if (!(fg in colors) || !(bg in colors)) return;
+    const key = `${fg}/${bg}`;
+    if (seen.has(key)) return;
+    const ratio = contrastRatio(colors[fg], colors[bg]);
+    if (ratio === null) return;
+    seen.add(key);
+    pairs.push({
+      fg,
+      bg,
+      fgHex: colors[fg],
+      bgHex: colors[bg],
+      ratio,
+      aa: ratio >= WCAG_AA_NORMAL,
+      aaa: ratio >= WCAG_AAA_NORMAL,
+      role
+    });
+  };
+  for (const name of Object.keys(colors)) {
+    if (/^On.+/.test(name)) add(name, name.slice(2), "text on its own surface");
+  }
+  add("OnSurfaceVariant", "Surface", "secondary text on Surface");
+  add("OnSurface", "Background", "body text on Background");
+  return pairs;
+}
+
+// src/lib/components.mjs
 function walkKtFiles(dir) {
   const out = [];
   let entries;
@@ -34317,7 +34379,7 @@ async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: 
   };
 }
 
-// src/lib/console-shell.mjs
+// ../../packages/harness/src/console/console-shell.mjs
 var esc3 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 function statusGlyph(record2) {
   if (!record2 || !record2.status) return null;
@@ -35168,7 +35230,14 @@ var SHELL_CSS = `
     font-size: var(--fs-meta); }
 `;
 
-// src/lib/console-overview.mjs
+// ../../packages/harness/src/lib/harness-manifest.mjs
+var MANIFEST_REL_PATH2 = "qa/harness-manifest.json";
+var LAYOUT_PATH_FIELDS = ["receipt", "architectureDoc", "specs", "approvals"];
+var LAYOUT_LIST_FIELDS = ["citationRoots", "packs"];
+var META_FIELDS2 = ["schema", "profile"];
+var KNOWN_FIELDS2 = /* @__PURE__ */ new Set([...META_FIELDS2, ...LAYOUT_PATH_FIELDS, ...LAYOUT_LIST_FIELDS]);
+
+// ../../packages/harness/src/console/console-overview.mjs
 var esc4 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 var escAttr = (s) => esc4(s).replace(/"/g, "&quot;");
 function overviewStatusHtml({ receipt, statuses = [], receiptGlyph: receiptGlyph2, formatAge } = {}) {
@@ -35486,126 +35555,7 @@ function overviewGlyph(queue = [], statuses = []) {
   return drifted ? { ch: "\u26A0", cls: "glyph-drift", label: `${queue.length} act(s) waiting \u2014 drift among them` } : { ch: "\u25CB", cls: "glyph-unsigned", label: `${queue.length} act(s) waiting on you` };
 }
 
-// src/lib/design-language.mjs
-import fs16 from "node:fs";
-import path17 from "node:path";
-var DP_RE = /^(\d+(?:\.\d+)?)\s*dp$/;
-function classifyDimens(dimens = {}) {
-  const spacing = [];
-  const radius = [];
-  const elevation = [];
-  const other = [];
-  for (const [name, value] of Object.entries(dimens)) {
-    const m = DP_RE.exec(String(value).trim());
-    const dp = m ? Number(m[1]) : null;
-    if (/^(Padding|Gap|Spacing)/.test(name) && dp !== null) spacing.push({ name, value, dp });
-    else if (/^Radius/.test(name)) radius.push({ name, value, dp });
-    else if (/^Elevation/.test(name)) elevation.push({ name, value, dp });
-    else other.push({ name, value, dp });
-  }
-  spacing.sort((a, b) => a.dp - b.dp || a.name.localeCompare(b.name));
-  return { spacing, radius, elevation, other };
-}
-var WCAG_AA_NORMAL = 4.5;
-var WCAG_AAA_NORMAL = 7;
-function deriveContrastPairs(colors = {}) {
-  const pairs = [];
-  const seen = /* @__PURE__ */ new Set();
-  const add = (fg, bg, role) => {
-    if (!(fg in colors) || !(bg in colors)) return;
-    const key = `${fg}/${bg}`;
-    if (seen.has(key)) return;
-    const ratio = contrastRatio(colors[fg], colors[bg]);
-    if (ratio === null) return;
-    seen.add(key);
-    pairs.push({
-      fg,
-      bg,
-      fgHex: colors[fg],
-      bgHex: colors[bg],
-      ratio,
-      aa: ratio >= WCAG_AA_NORMAL,
-      aaa: ratio >= WCAG_AAA_NORMAL,
-      role
-    });
-  };
-  for (const name of Object.keys(colors)) {
-    if (/^On.+/.test(name)) add(name, name.slice(2), "text on its own surface");
-  }
-  add("OnSurfaceVariant", "Surface", "secondary text on Surface");
-  add("OnSurface", "Background", "body text on Background");
-  return pairs;
-}
-function findDeclaringObject(fileTexts, tokenNames) {
-  if (tokenNames.length === 0) return null;
-  let best = null;
-  for (const [file2, text] of fileTexts) {
-    const objRe = /\bobject\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/g;
-    let m;
-    while (m = objRe.exec(text)) {
-      let depth = 0;
-      let end = -1;
-      for (let i = m.index + m[0].length - 1; i < text.length; i++) {
-        if (text[i] === "{") depth++;
-        else if (text[i] === "}") {
-          depth--;
-          if (depth === 0) {
-            end = i;
-            break;
-          }
-        }
-      }
-      if (end === -1) continue;
-      const body = text.slice(m.index, end + 1);
-      const declared = tokenNames.filter((n) => new RegExp(`\\bval\\s+${n}\\b`).test(body)).length;
-      if (declared > 0 && (!best || declared > best.declared)) {
-        best = { name: m[1], file: file2, declared };
-      }
-    }
-  }
-  return best ? { name: best.name, file: best.file } : null;
-}
-function countReferences(fileTexts, objectName, tokenNames) {
-  const counts = {};
-  for (const name of tokenNames) counts[name] = 0;
-  for (const text of fileTexts.values()) {
-    for (const name of tokenNames) {
-      const re = new RegExp(`\\b${objectName}\\.${name}\\b`, "g");
-      const matches = text.match(re);
-      if (matches) counts[name] += matches.length;
-    }
-  }
-  return counts;
-}
-function getTokenUsage(root, catalog = {}) {
-  const kotlinRoot = path17.join(root, "composeApp", "src", "commonMain", "kotlin");
-  const files = walkKtFiles(kotlinRoot);
-  if (files.length === 0) {
-    return { available: false, reason: "no .kt files found under composeApp/src/commonMain/kotlin" };
-  }
-  const fileTexts = /* @__PURE__ */ new Map();
-  for (const f of files) {
-    try {
-      fileTexts.set(f, fs16.readFileSync(f, "utf8"));
-    } catch {
-    }
-  }
-  const rel = (abs) => path17.relative(root, abs).split(path17.sep).join("/");
-  const group = (tokens) => {
-    const names = Object.keys(tokens || {});
-    const decl = findDeclaringObject(fileTexts, names);
-    if (!decl) return null;
-    return { object: decl.name, file: rel(decl.file), counts: countReferences(fileTexts, decl.name, names) };
-  };
-  return {
-    available: true,
-    scanRoot: "composeApp/src/commonMain/kotlin",
-    colors: group(catalog.colors),
-    dimens: group(catalog.dimens)
-  };
-}
-
-// src/lib/console-tabs.mjs
+// ../../packages/harness/src/console/console-tabs.mjs
 var esc5 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 var escAttr2 = (s) => esc5(s).replace(/"/g, "&quot;");
 function commentControlHtml(target, opts = {}) {
@@ -35754,7 +35704,7 @@ function colorTokenTableHtml(colors, usage) {
   }).join("\n");
   let absence = "";
   if (usage && !counts) {
-    const reason = usage.available === false && usage.reason || "no Kotlin object declaring these tokens was found under composeApp/src/commonMain/kotlin";
+    const reason = usage.available === false && usage.reason || "no source object declaring these tokens was found";
     absence = `
   <p class="empty-inline">usage counts: Not derivable statically &mdash; ${esc5(reason)}</p>`;
   }
@@ -35861,8 +35811,7 @@ ${candidatesStripHtml(meta3.variants)}` : "";
   if (!ds || !ds.available) {
     return `<div class="empty">
       <p>No design-system catalog available yet.</p>
-      <p>Produce one by letting the preview gallery render at least once (writes
-      <code>composeApp/build/previews/design-system.json</code>), or connect a running
+      <p>Produce one by letting the preview gallery render at least once${ds && ds.sourcePath ? ` (writes <code>${esc5(ds.sourcePath)}</code>)` : ""}, or connect a running
       DEBUG build (<code>connect_live</code>) so it can be read live from
       <code>/inspect/design-system</code>.</p>
     </div>${candidatesSection}`;
@@ -35870,7 +35819,7 @@ ${candidatesStripHtml(meta3.variants)}` : "";
   const colors = ds.catalog && ds.catalog.colors || {};
   const dimens = ds.catalog && ds.catalog.dimens || {};
   const typography = ds.catalog && ds.catalog.typography;
-  const sourceLabel = ds.source === "live" ? "running app (GET /inspect/design-system)" : "composeApp/build/previews/design-system.json";
+  const sourceLabel = ds.source === "live" ? "running app (GET /inspect/design-system)" : ds.sourcePath || "the preview render's design-system catalog";
   const { spacing, radius, elevation, other } = classifyDimens(dimens);
   const dimenSections = [];
   if (Object.keys(dimens).length === 0) {
@@ -36429,7 +36378,7 @@ function dependencyGraphHtml(graph) {
   if (!graph || !graph.available) {
     return `<div class="empty">
       <p>No dependency graph available.</p>
-      <p>${esc5(graph && graph.reason || "composeApp/src/commonMain/kotlin not found.")}</p>
+      <p>${esc5(graph && graph.reason || "the scan reported no graph and gave no reason.")}</p>
     </div>`;
   }
   if (graph.edges.length === 0) {
@@ -36465,7 +36414,7 @@ function layerMapHtml(layerMap) {
   if (!layerMap || !layerMap.available) {
     return `<div class="empty">
       <p>No layer map available.</p>
-      <p>${esc5(layerMap && layerMap.reason || "composeApp/src/commonMain/kotlin not found.")}</p>
+      <p>${esc5(layerMap && layerMap.reason || "the scan reported no layer map and gave no reason.")}</p>
     </div>`;
   }
   const boxes = layerMap.layers.map(
@@ -37182,325 +37131,7 @@ ${cards}
   <p class="empty-inline sig-error" id="feature-error" hidden></p>`;
 }
 
-// src/lib/intent.mjs
-import fs17 from "node:fs";
-import path18 from "node:path";
-var INTENT_REL_PATH = "specs/intent.md";
-var PLACEHOLDER_LEAD_RE = /^_not yet captured[^_]*_\s*/i;
-function parseIntentMarkdown(md) {
-  const lines = String(md).split("\n");
-  let title = null;
-  const preambleLines = [];
-  const sections = [];
-  let current = null;
-  for (const line of lines) {
-    const h2 = line.match(/^##\s+(.+?)\s*$/);
-    if (h2) {
-      if (current) sections.push(current);
-      current = { heading: h2[1], bodyLines: [] };
-      continue;
-    }
-    const h1 = line.match(/^#\s+(.+?)\s*$/);
-    if (h1 && !current && title === null) {
-      title = h1[1];
-      continue;
-    }
-    if (current) current.bodyLines.push(line);
-    else preambleLines.push(line);
-  }
-  if (current) sections.push(current);
-  return {
-    title,
-    preamble: preambleLines.join("\n").trim(),
-    sections: sections.map(({ heading, bodyLines }) => {
-      const body = bodyLines.join("\n").trim();
-      const placeholder = PLACEHOLDER_LEAD_RE.test(body);
-      const filled = body !== "" && !placeholder;
-      return {
-        heading,
-        body,
-        filled,
-        guidance: placeholder ? body.replace(PLACEHOLDER_LEAD_RE, "").trim() || null : null
-      };
-    })
-  };
-}
-function getIntentData(root) {
-  const file2 = path18.join(root, "specs", "intent.md");
-  let raw;
-  try {
-    raw = fs17.readFileSync(file2, "utf8");
-  } catch {
-    return { available: false, reason: `${INTENT_REL_PATH} not found` };
-  }
-  return { available: true, ...parseIntentMarkdown(raw) };
-}
-
-// src/lib/preview-service.mjs
-var execFileAsync = promisify(execFile);
-var LOADED_BUILD = loadedBuildId();
-var EX_RENEW = 75;
-var RENEW_DEBOUNCE_MS = 1500;
-var RENEW_QUIESCE_POLL_MS = 2e3;
-var ACTIVITY_BROADCAST_MS = 2e3;
-var RENEW_REJOIN_MS = 15e3;
-var RENEW_REJOIN_TRIES = 8;
-var RENEW_REJOIN_POLL_MS = 250;
-function renewalDecision({ diskId, loadedId, armed, blockedBy }) {
-  if (diskId === null || loadedId === null || diskId === loadedId) return armed ? "stand-down" : "none";
-  return blockedBy ? "defer" : "renew";
-}
-var DEFAULT_PORT2 = 9600;
-var DEFAULT_DAEMON_PORT = 9601;
-var PORT_ATTEMPTS = 10;
-var DEBOUNCE_MS = 400;
-var CLASSES_DEBOUNCE_MS = 1500;
-var POLL_FALLBACK_MS = 2e3;
-var GOVERNANCE_DEBOUNCE_MS = 200;
-var SELF_WRITE_ECHO_MS = 1500;
-var DAEMON_BOOT_TIMEOUT_MS = 24e4;
-var DAEMON_RENDER_TIMEOUT_MS = 12e4;
-var COMPILE_WATCHDOG_MS = 2e4;
-var STALE_RETRY_MS = 2500;
-var MAX_STALE_RETRIES = 3;
-var LANE_MARKER_REL = ["qa", ".lane-in-progress"];
-var LANE_MARKER_STALE_MS = 30 * 60 * 1e3;
-var LANE_POLL_MS = 5e3;
-var KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
-var TRANSIENT_RENDER_RE = /Could not find or load main class|java\.lang\.(?:ClassNotFoundException|NoClassDefFoundError)|Timeout waiting to lock|Could not create service of type/;
-var TRANSIENT_RETRY_MS = 4e3;
-var MAX_TRANSIENT_RETRIES = 12;
-var STUCK_RETRY_MS = 3e4;
-var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
-function consoleRegistryPath(projectDir) {
-  const key = crypto.createHash("sha1").update(path19.resolve(projectDir)).digest("hex").slice(0, 12);
-  return path19.join(os3.tmpdir(), `cmp-console-${key}.json`);
-}
-function processAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return err && err.code === "EPERM";
-  }
-}
-async function findLiveConsole(projectDir, { probe } = {}) {
-  let rec;
-  try {
-    rec = JSON.parse(fs18.readFileSync(consoleRegistryPath(projectDir), "utf8"));
-  } catch {
-    return null;
-  }
-  if (!rec || typeof rec.pid !== "number" || typeof rec.port !== "number") return null;
-  if (!processAlive(rec.pid)) return null;
-  const ask = () => probe ? probe(rec) : fetch(`http://127.0.0.1:${rec.port}/status`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
-  if (await ask()) return rec;
-  if (rec.renewing === true && Date.now() - Date.parse(rec.renewingAt ?? "") < RENEW_REJOIN_MS) {
-    for (let i = 0; i < RENEW_REJOIN_TRIES; i += 1) {
-      await new Promise((r) => setTimeout(r, RENEW_REJOIN_POLL_MS));
-      let fresh;
-      try {
-        fresh = JSON.parse(fs18.readFileSync(consoleRegistryPath(projectDir), "utf8"));
-      } catch {
-        continue;
-      }
-      if (fresh && typeof fresh.port === "number" && fresh.renewing !== true) {
-        const back = probe ? await probe(fresh) : await fetch(`http://127.0.0.1:${fresh.port}/status`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
-        if (back) return fresh;
-      }
-    }
-  }
-  return null;
-}
-function consoleLauncherPath() {
-  const here = path19.dirname(fileURLToPath2(import.meta.url));
-  const candidates = [
-    path19.join(here, "..", "..", "bin", "console.mjs"),
-    // src/lib/ → package root
-    path19.join(here, "..", "bin", "console.mjs"),
-    // dist/ → package root
-    path19.join(here, "console.mjs")
-    // bin/ (defensive)
-  ];
-  for (const c of candidates) {
-    try {
-      if (fs18.existsSync(c)) return c;
-    } catch {
-    }
-  }
-  return null;
-}
-async function ensureConsole(projectDir, opts = {}) {
-  const { port, hot, spawnImpl = spawn, probe, waitMs = 9e4, pollMs = 500, log = () => {
-  } } = opts;
-  try {
-    const live = await findLiveConsole(projectDir, { probe });
-    if (live) return { ...live, started: false };
-    const launcher = opts.launcher ?? consoleLauncherPath();
-    if (launcher === null) {
-      log("ensureConsole: no standalone launcher found beside this build \u2014 skipping");
-      return null;
-    }
-    const args = [launcher, path19.resolve(projectDir)];
-    if (typeof port === "number") args.push(String(port));
-    if (hot === true) args.push("--hot");
-    const child = spawnImpl(process.execPath, args, { detached: true, stdio: "ignore" });
-    if (child && typeof child.unref === "function") child.unref();
-    log(`ensureConsole: spawned detached console (pid ${child?.pid ?? "?"}) for ${projectDir}`);
-    const deadline = Date.now() + waitMs;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, pollMs));
-      const now = await findLiveConsole(projectDir, { probe });
-      if (now) return { ...now, started: true };
-    }
-    log("ensureConsole: spawned console did not answer within the boot window");
-    return null;
-  } catch (err) {
-    log(`ensureConsole: ${err && err.message ? err.message : err}`);
-    return null;
-  }
-}
-function writeConsoleRegistry(projectDir, port, extra = {}) {
-  try {
-    fs18.writeFileSync(
-      consoleRegistryPath(projectDir),
-      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path19.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
-`
-    );
-  } catch {
-  }
-}
-function updateConsoleRegistry(projectDir, patch) {
-  try {
-    const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs18.readFileSync(p, "utf8"));
-    if (!rec || rec.pid !== process.pid) return;
-    fs18.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
-`);
-  } catch {
-  }
-}
-function clearConsoleRegistry(projectDir) {
-  try {
-    const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs18.readFileSync(p, "utf8"));
-    if (rec && rec.pid === process.pid) fs18.rmSync(p, { force: true });
-  } catch {
-  }
-}
-function stampRenderMarker(projectDir) {
-  try {
-    const p = path19.join(projectDir, ...RENDER_MARKER_REL);
-    fs18.mkdirSync(path19.dirname(p), { recursive: true });
-    fs18.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
-`);
-  } catch {
-  }
-}
-function touchRenderMarker(projectDir) {
-  try {
-    const now = /* @__PURE__ */ new Date();
-    fs18.utimesSync(path19.join(projectDir, ...RENDER_MARKER_REL), now, now);
-  } catch {
-  }
-}
-function clearRenderMarker(projectDir) {
-  try {
-    fs18.rmSync(path19.join(projectDir, ...RENDER_MARKER_REL), { force: true });
-  } catch {
-  }
-}
-function resolveAppName(projectDir) {
-  for (const f of ["settings.gradle.kts", "settings.gradle"]) {
-    try {
-      const text = fs18.readFileSync(path19.join(projectDir, f), "utf8");
-      const m = text.match(/rootProject\.name\s*=\s*["']([^"']+)["']/);
-      if (m) return m[1];
-    } catch {
-    }
-  }
-  return path19.basename(projectDir);
-}
-function detectCapabilities(projectDir) {
-  const has = (rel) => {
-    try {
-      return fs18.statSync(path19.join(projectDir, rel)).isDirectory();
-    } catch {
-      return false;
-    }
-  };
-  return { governance: has("qa"), screens: has("composeApp") };
-}
-function laneInProgress(projectDir, { now = Date.now } = {}) {
-  try {
-    const st = fs18.statSync(path19.join(projectDir, ...LANE_MARKER_REL));
-    return now() - st.mtimeMs < LANE_MARKER_STALE_MS;
-  } catch {
-    return false;
-  }
-}
-async function withKspSelfHeal(projectDir, log, run) {
-  try {
-    return await run();
-  } catch (err) {
-    const text = `${err && err.message ? err.message : err}${err && err.stdout ? err.stdout : ""}${err && err.stderr ? err.stderr : ""}`;
-    if (!KSP_COLLISION_RE.test(text)) throw err;
-    log("KSP cache collision (concurrent Gradle \u2014 verify lane?) \u2014 clearing kspCaches, retrying once");
-    fs18.rmSync(path19.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
-    return await run();
-  }
-}
-function detectAppPackage(projectDir) {
-  const spec = path19.join(projectDir, "create-cmp.json");
-  if (fs18.existsSync(spec)) {
-    try {
-      const pkg = JSON.parse(fs18.readFileSync(spec, "utf8")).package;
-      if (pkg) return pkg;
-    } catch {
-    }
-  }
-  const gradle = path19.join(projectDir, "composeApp", "build.gradle.kts");
-  if (fs18.existsSync(gradle)) {
-    const m = fs18.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
-    if (m) return m[1];
-  }
-  throw new Error(
-    "cannot detect the app package (no create-cmp.json `package`, no `namespace` in composeApp/build.gradle.kts)"
-  );
-}
-function summarizeTree(tree) {
-  let nodes = 0;
-  let tokenized = 0;
-  let tagged = 0;
-  (function walk2(n) {
-    nodes++;
-    if (n.designToken) tokenized++;
-    if (n.testTag) tagged++;
-    (n.children || []).forEach(walk2);
-  })(tree.root);
-  return { nodes, tokenized, tagged };
-}
-function diffScreenTrees(prev, next) {
-  if (!prev) return [];
-  const changed = [];
-  for (const [id, json2] of next) {
-    if (!prev.has(id) || prev.get(id) !== json2) changed.push(id);
-  }
-  for (const id of prev.keys()) {
-    if (!next.has(id)) changed.push(id);
-  }
-  return changed;
-}
-var STATE_VARIANT_ID_RE = /^(.+)@(loading|empty|error)$/;
-function stateVariantCards(cards) {
-  const out = { loading: [], empty: [], error: [] };
-  for (const { screen } of cards) {
-    const m = STATE_VARIANT_ID_RE.exec(screen.id);
-    if (!m) continue;
-    out[m[2]].push({ id: screen.id, title: screen.title, png: screen.png, baseScreen: m[1] });
-  }
-  return out;
-}
+// ../../packages/harness/src/console/preview-service.mjs
 var COMPONENT_STORY_ID_RE = /^component\.(.+)$/;
 function isComponentStoryId(id) {
   return COMPONENT_STORY_ID_RE.test(String(id));
@@ -37513,11 +37144,6 @@ function componentStoryCards(cards) {
     out[m[1]] = { id: screen.id, title: screen.title, png: screen.png };
   }
   return out;
-}
-function extractCompileErrors(text) {
-  return String(text).split(/\r?\n/).map((l) => l.trim()).filter(
-    (l) => /^e: /.test(l) || /Compilation failed/i.test(l) || /^> Task :\S+ FAILED$/.test(l) || /^BUILD FAILED/.test(l)
-  );
 }
 var esc6 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 var escAttr3 = (s) => esc6(s).replace(/"/g, "&quot;");
@@ -38510,8 +38136,8 @@ ${section.bodyHtml}`;
   const declaredSections = pick2(sections);
   const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
   const visibleSections = capabilities.screens ? declaredSections : declaredSections.filter((s) => !NEEDS_SCREENS.has(s.id));
-  const capabilityNote = capabilities.screens ? "" : `<p class="rail-sub rail-capability" title="This project has no composeApp/. The governance window is complete; screens, preview and the live device need a Compose app.">governance only &middot; no Compose app</p>`;
-  const layoutNote = !layout ? "" : !layout.ok ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr3(layout.reason || "")}">${esc6(layout.relPath || MANIFEST_REL_PATH)} refused &mdash; see Evidence</p>` : layout.source === "manifest" ? `<p class="rail-sub rail-capability" title="${escAttr3(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc6(layout.relPath)} &middot; packs ${esc6((layout.layout.packs || []).join(", "))}</p>` : "";
+  const capabilityNote = capabilities.screens ? "" : `<p class="rail-sub rail-capability" title="This project declares no screen-rendering capability. The governance window is complete; screens, preview and the live device all need one.">governance only &middot; no Compose app</p>`;
+  const layoutNote = !layout ? "" : !layout.ok ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr3(layout.reason || "")}">${esc6(layout.relPath || MANIFEST_REL_PATH2)} refused &mdash; see Evidence</p>` : layout.source === "manifest" ? `<p class="rail-sub rail-capability" title="${escAttr3(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc6(layout.relPath)} &middot; packs ${esc6((layout.layout.packs || []).join(", "))}</p>` : "";
   return renderShellPage({
     appName,
     railItems: visibleRail,
@@ -38568,6 +38194,403 @@ ${section.bodyHtml}`;
     // tests that render a bare page) renders no banner rather than a fake one.
     build
   });
+}
+
+// src/lib/design-language.mjs
+import fs16 from "node:fs";
+import path17 from "node:path";
+function findDeclaringObject(fileTexts, tokenNames) {
+  if (tokenNames.length === 0) return null;
+  let best = null;
+  for (const [file2, text] of fileTexts) {
+    const objRe = /\bobject\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/g;
+    let m;
+    while (m = objRe.exec(text)) {
+      let depth = 0;
+      let end = -1;
+      for (let i = m.index + m[0].length - 1; i < text.length; i++) {
+        if (text[i] === "{") depth++;
+        else if (text[i] === "}") {
+          depth--;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
+      }
+      if (end === -1) continue;
+      const body = text.slice(m.index, end + 1);
+      const declared = tokenNames.filter((n) => new RegExp(`\\bval\\s+${n}\\b`).test(body)).length;
+      if (declared > 0 && (!best || declared > best.declared)) {
+        best = { name: m[1], file: file2, declared };
+      }
+    }
+  }
+  return best ? { name: best.name, file: best.file } : null;
+}
+function countReferences(fileTexts, objectName, tokenNames) {
+  const counts = {};
+  for (const name of tokenNames) counts[name] = 0;
+  for (const text of fileTexts.values()) {
+    for (const name of tokenNames) {
+      const re = new RegExp(`\\b${objectName}\\.${name}\\b`, "g");
+      const matches = text.match(re);
+      if (matches) counts[name] += matches.length;
+    }
+  }
+  return counts;
+}
+function getTokenUsage(root, catalog = {}) {
+  const kotlinRoot = path17.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const files = walkKtFiles(kotlinRoot);
+  if (files.length === 0) {
+    return { available: false, reason: "no .kt files found under composeApp/src/commonMain/kotlin" };
+  }
+  const fileTexts = /* @__PURE__ */ new Map();
+  for (const f of files) {
+    try {
+      fileTexts.set(f, fs16.readFileSync(f, "utf8"));
+    } catch {
+    }
+  }
+  const rel = (abs) => path17.relative(root, abs).split(path17.sep).join("/");
+  const group = (tokens) => {
+    const names = Object.keys(tokens || {});
+    const decl = findDeclaringObject(fileTexts, names);
+    if (!decl) return null;
+    return { object: decl.name, file: rel(decl.file), counts: countReferences(fileTexts, decl.name, names) };
+  };
+  return {
+    available: true,
+    scanRoot: "composeApp/src/commonMain/kotlin",
+    colors: group(catalog.colors),
+    dimens: group(catalog.dimens)
+  };
+}
+
+// src/lib/intent.mjs
+import fs17 from "node:fs";
+import path18 from "node:path";
+var INTENT_REL_PATH = "specs/intent.md";
+var PLACEHOLDER_LEAD_RE = /^_not yet captured[^_]*_\s*/i;
+function parseIntentMarkdown(md) {
+  const lines = String(md).split("\n");
+  let title = null;
+  const preambleLines = [];
+  const sections = [];
+  let current = null;
+  for (const line of lines) {
+    const h2 = line.match(/^##\s+(.+?)\s*$/);
+    if (h2) {
+      if (current) sections.push(current);
+      current = { heading: h2[1], bodyLines: [] };
+      continue;
+    }
+    const h1 = line.match(/^#\s+(.+?)\s*$/);
+    if (h1 && !current && title === null) {
+      title = h1[1];
+      continue;
+    }
+    if (current) current.bodyLines.push(line);
+    else preambleLines.push(line);
+  }
+  if (current) sections.push(current);
+  return {
+    title,
+    preamble: preambleLines.join("\n").trim(),
+    sections: sections.map(({ heading, bodyLines }) => {
+      const body = bodyLines.join("\n").trim();
+      const placeholder = PLACEHOLDER_LEAD_RE.test(body);
+      const filled = body !== "" && !placeholder;
+      return {
+        heading,
+        body,
+        filled,
+        guidance: placeholder ? body.replace(PLACEHOLDER_LEAD_RE, "").trim() || null : null
+      };
+    })
+  };
+}
+function getIntentData(root) {
+  const file2 = path18.join(root, "specs", "intent.md");
+  let raw;
+  try {
+    raw = fs17.readFileSync(file2, "utf8");
+  } catch {
+    return { available: false, reason: `${INTENT_REL_PATH} not found` };
+  }
+  return { available: true, ...parseIntentMarkdown(raw) };
+}
+
+// src/lib/preview-service.mjs
+var execFileAsync = promisify(execFile);
+var LOADED_BUILD = loadedBuildId();
+var EX_RENEW = 75;
+var RENEW_DEBOUNCE_MS = 1500;
+var RENEW_QUIESCE_POLL_MS = 2e3;
+var ACTIVITY_BROADCAST_MS = 2e3;
+var RENEW_REJOIN_MS = 15e3;
+var RENEW_REJOIN_TRIES = 8;
+var RENEW_REJOIN_POLL_MS = 250;
+function renewalDecision({ diskId, loadedId, armed, blockedBy }) {
+  if (diskId === null || loadedId === null || diskId === loadedId) return armed ? "stand-down" : "none";
+  return blockedBy ? "defer" : "renew";
+}
+var DEFAULT_PORT2 = 9600;
+var DEFAULT_DAEMON_PORT = 9601;
+var PORT_ATTEMPTS = 10;
+var DEBOUNCE_MS = 400;
+var CLASSES_DEBOUNCE_MS = 1500;
+var POLL_FALLBACK_MS = 2e3;
+var GOVERNANCE_DEBOUNCE_MS = 200;
+var SELF_WRITE_ECHO_MS = 1500;
+var DAEMON_BOOT_TIMEOUT_MS = 24e4;
+var DAEMON_RENDER_TIMEOUT_MS = 12e4;
+var COMPILE_WATCHDOG_MS = 2e4;
+var STALE_RETRY_MS = 2500;
+var MAX_STALE_RETRIES = 3;
+var LANE_MARKER_REL = ["qa", ".lane-in-progress"];
+var LANE_MARKER_STALE_MS = 30 * 60 * 1e3;
+var LANE_POLL_MS = 5e3;
+var KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
+var TRANSIENT_RENDER_RE = /Could not find or load main class|java\.lang\.(?:ClassNotFoundException|NoClassDefFoundError)|Timeout waiting to lock|Could not create service of type/;
+var TRANSIENT_RETRY_MS = 4e3;
+var MAX_TRANSIENT_RETRIES = 12;
+var STUCK_RETRY_MS = 3e4;
+var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
+function consoleRegistryPath(projectDir) {
+  const key = crypto.createHash("sha1").update(path19.resolve(projectDir)).digest("hex").slice(0, 12);
+  return path19.join(os3.tmpdir(), `cmp-console-${key}.json`);
+}
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err && err.code === "EPERM";
+  }
+}
+async function findLiveConsole(projectDir, { probe } = {}) {
+  let rec;
+  try {
+    rec = JSON.parse(fs18.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+  } catch {
+    return null;
+  }
+  if (!rec || typeof rec.pid !== "number" || typeof rec.port !== "number") return null;
+  if (!processAlive(rec.pid)) return null;
+  const ask = () => probe ? probe(rec) : fetch(`http://127.0.0.1:${rec.port}/status`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
+  if (await ask()) return rec;
+  if (rec.renewing === true && Date.now() - Date.parse(rec.renewingAt ?? "") < RENEW_REJOIN_MS) {
+    for (let i = 0; i < RENEW_REJOIN_TRIES; i += 1) {
+      await new Promise((r) => setTimeout(r, RENEW_REJOIN_POLL_MS));
+      let fresh;
+      try {
+        fresh = JSON.parse(fs18.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+      } catch {
+        continue;
+      }
+      if (fresh && typeof fresh.port === "number" && fresh.renewing !== true) {
+        const back = probe ? await probe(fresh) : await fetch(`http://127.0.0.1:${fresh.port}/status`, { signal: AbortSignal.timeout(2e3) }).then((r) => r.ok).catch(() => false);
+        if (back) return fresh;
+      }
+    }
+  }
+  return null;
+}
+function consoleLauncherPath() {
+  const here = path19.dirname(fileURLToPath2(import.meta.url));
+  const candidates = [
+    path19.join(here, "..", "..", "bin", "console.mjs"),
+    // src/lib/ → package root
+    path19.join(here, "..", "bin", "console.mjs"),
+    // dist/ → package root
+    path19.join(here, "console.mjs")
+    // bin/ (defensive)
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs18.existsSync(c)) return c;
+    } catch {
+    }
+  }
+  return null;
+}
+async function ensureConsole(projectDir, opts = {}) {
+  const { port, hot, spawnImpl = spawn, probe, waitMs = 9e4, pollMs = 500, log = () => {
+  } } = opts;
+  try {
+    const live = await findLiveConsole(projectDir, { probe });
+    if (live) return { ...live, started: false };
+    const launcher = opts.launcher ?? consoleLauncherPath();
+    if (launcher === null) {
+      log("ensureConsole: no standalone launcher found beside this build \u2014 skipping");
+      return null;
+    }
+    const args = [launcher, path19.resolve(projectDir)];
+    if (typeof port === "number") args.push(String(port));
+    if (hot === true) args.push("--hot");
+    const child = spawnImpl(process.execPath, args, { detached: true, stdio: "ignore" });
+    if (child && typeof child.unref === "function") child.unref();
+    log(`ensureConsole: spawned detached console (pid ${child?.pid ?? "?"}) for ${projectDir}`);
+    const deadline = Date.now() + waitMs;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, pollMs));
+      const now = await findLiveConsole(projectDir, { probe });
+      if (now) return { ...now, started: true };
+    }
+    log("ensureConsole: spawned console did not answer within the boot window");
+    return null;
+  } catch (err) {
+    log(`ensureConsole: ${err && err.message ? err.message : err}`);
+    return null;
+  }
+}
+function writeConsoleRegistry(projectDir, port, extra = {}) {
+  try {
+    fs18.writeFileSync(
+      consoleRegistryPath(projectDir),
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path19.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
+`
+    );
+  } catch {
+  }
+}
+function updateConsoleRegistry(projectDir, patch) {
+  try {
+    const p = consoleRegistryPath(projectDir);
+    const rec = JSON.parse(fs18.readFileSync(p, "utf8"));
+    if (!rec || rec.pid !== process.pid) return;
+    fs18.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
+`);
+  } catch {
+  }
+}
+function clearConsoleRegistry(projectDir) {
+  try {
+    const p = consoleRegistryPath(projectDir);
+    const rec = JSON.parse(fs18.readFileSync(p, "utf8"));
+    if (rec && rec.pid === process.pid) fs18.rmSync(p, { force: true });
+  } catch {
+  }
+}
+function stampRenderMarker(projectDir) {
+  try {
+    const p = path19.join(projectDir, ...RENDER_MARKER_REL);
+    fs18.mkdirSync(path19.dirname(p), { recursive: true });
+    fs18.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+`);
+  } catch {
+  }
+}
+function touchRenderMarker(projectDir) {
+  try {
+    const now = /* @__PURE__ */ new Date();
+    fs18.utimesSync(path19.join(projectDir, ...RENDER_MARKER_REL), now, now);
+  } catch {
+  }
+}
+function clearRenderMarker(projectDir) {
+  try {
+    fs18.rmSync(path19.join(projectDir, ...RENDER_MARKER_REL), { force: true });
+  } catch {
+  }
+}
+function resolveAppName(projectDir) {
+  for (const f of ["settings.gradle.kts", "settings.gradle"]) {
+    try {
+      const text = fs18.readFileSync(path19.join(projectDir, f), "utf8");
+      const m = text.match(/rootProject\.name\s*=\s*["']([^"']+)["']/);
+      if (m) return m[1];
+    } catch {
+    }
+  }
+  return path19.basename(projectDir);
+}
+function detectCapabilities(projectDir) {
+  const has = (rel) => {
+    try {
+      return fs18.statSync(path19.join(projectDir, rel)).isDirectory();
+    } catch {
+      return false;
+    }
+  };
+  return { governance: has("qa"), screens: has("composeApp") };
+}
+function laneInProgress(projectDir, { now = Date.now } = {}) {
+  try {
+    const st = fs18.statSync(path19.join(projectDir, ...LANE_MARKER_REL));
+    return now() - st.mtimeMs < LANE_MARKER_STALE_MS;
+  } catch {
+    return false;
+  }
+}
+async function withKspSelfHeal(projectDir, log, run) {
+  try {
+    return await run();
+  } catch (err) {
+    const text = `${err && err.message ? err.message : err}${err && err.stdout ? err.stdout : ""}${err && err.stderr ? err.stderr : ""}`;
+    if (!KSP_COLLISION_RE.test(text)) throw err;
+    log("KSP cache collision (concurrent Gradle \u2014 verify lane?) \u2014 clearing kspCaches, retrying once");
+    fs18.rmSync(path19.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
+    return await run();
+  }
+}
+function detectAppPackage(projectDir) {
+  const spec = path19.join(projectDir, "create-cmp.json");
+  if (fs18.existsSync(spec)) {
+    try {
+      const pkg = JSON.parse(fs18.readFileSync(spec, "utf8")).package;
+      if (pkg) return pkg;
+    } catch {
+    }
+  }
+  const gradle = path19.join(projectDir, "composeApp", "build.gradle.kts");
+  if (fs18.existsSync(gradle)) {
+    const m = fs18.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
+    if (m) return m[1];
+  }
+  throw new Error(
+    "cannot detect the app package (no create-cmp.json `package`, no `namespace` in composeApp/build.gradle.kts)"
+  );
+}
+function summarizeTree(tree) {
+  let nodes = 0;
+  let tokenized = 0;
+  let tagged = 0;
+  (function walk2(n) {
+    nodes++;
+    if (n.designToken) tokenized++;
+    if (n.testTag) tagged++;
+    (n.children || []).forEach(walk2);
+  })(tree.root);
+  return { nodes, tokenized, tagged };
+}
+function diffScreenTrees(prev, next) {
+  if (!prev) return [];
+  const changed = [];
+  for (const [id, json2] of next) {
+    if (!prev.has(id) || prev.get(id) !== json2) changed.push(id);
+  }
+  for (const id of prev.keys()) {
+    if (!next.has(id)) changed.push(id);
+  }
+  return changed;
+}
+var STATE_VARIANT_ID_RE = /^(.+)@(loading|empty|error)$/;
+function stateVariantCards(cards) {
+  const out = { loading: [], empty: [], error: [] };
+  for (const { screen } of cards) {
+    const m = STATE_VARIANT_ID_RE.exec(screen.id);
+    if (!m) continue;
+    out[m[2]].push({ id: screen.id, title: screen.title, png: screen.png, baseScreen: m[1] });
+  }
+  return out;
+}
+function extractCompileErrors(text) {
+  return String(text).split(/\r?\n/).map((l) => l.trim()).filter(
+    (l) => /^e: /.test(l) || /Compilation failed/i.test(l) || /^> Task :\S+ FAILED$/.test(l) || /^BUILD FAILED/.test(l)
+  );
 }
 function createPreviewService(opts) {
   const projectDir = path19.resolve(opts.projectDir);
@@ -38837,18 +38860,19 @@ function createPreviewService(opts) {
   }
   async function getDesignSystemData() {
     const catalogPath = path19.join(previewsDir, "design-system.json");
+    const sourcePath = path19.relative(projectDir, catalogPath).split(path19.sep).join("/");
     if (fs18.existsSync(catalogPath)) {
       try {
-        return { available: true, source: "previews", catalog: JSON.parse(fs18.readFileSync(catalogPath, "utf8")) };
+        return { available: true, source: "previews", sourcePath, catalog: JSON.parse(fs18.readFileSync(catalogPath, "utf8")) };
       } catch (err) {
         log(`design-system.json at ${catalogPath} is not valid JSON (${err.message}) \u2014 trying a live session`);
       }
     }
     try {
       const catalog = await fetchLiveCatalog({ timeoutMs: 800 });
-      return { available: true, source: "live", catalog };
+      return { available: true, source: "live", sourcePath, catalog };
     } catch {
-      return { available: false };
+      return { available: false, sourcePath };
     }
   }
   const VARIANT_NAME_RE = /^[a-z0-9-]+$/;

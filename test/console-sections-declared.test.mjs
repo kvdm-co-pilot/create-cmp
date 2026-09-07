@@ -8,7 +8,7 @@
 // being honest about its own defaults rather than about the project.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { galleryHtml } from "../inspector/mcp/src/lib/preview-service.mjs";
+import { galleryHtml } from "../packages/harness/src/console/preview-service.mjs";
 
 const BASE = { appName: "P", viewport: { width: 411, height: 891 }, version: 1, cards: [] };
 const ids = (extra = {}) =>

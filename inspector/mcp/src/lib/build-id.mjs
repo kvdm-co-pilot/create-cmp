@@ -30,6 +30,30 @@ const PKG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 export const BUNDLE_MARKER = "cmp:bundle-inputs";
 
 /**
+ * The harness package's console, which this package's server bundles.
+ *
+ * NORTH-STAR §9 stage 0.5 moved the console out of this package and into
+ * `packages/harness/src/console/`. esbuild follows the relative import and
+ * inlines those files into dist/server.mjs, so they are IN the artifact — and
+ * for a day they would not have been in the artifact's hash. That is precisely
+ * the drift bundle-freshness.test.mjs exists to refuse: edit the console,
+ * forget to rebuild, and every plugin user runs yesterday's console while the
+ * hash still says the bundle is current. A hash that covers less than the
+ * bundle attests less than it appears to.
+ *
+ * Absent (a synthetic root in a unit test) means an empty list, never a throw.
+ * @returns {string|null} the console directory, or null when there is none
+ */
+function consoleDir(root) {
+  const dir = path.resolve(root, "..", "..", "packages", "harness", "src", "console");
+  try {
+    return fs.statSync(dir).isDirectory() ? dir : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Every first-party source the bundle is built from, sorted — the hash inputs.
  * Deterministic order (sorted at every level) because the hash depends on it.
  */
@@ -43,6 +67,8 @@ export function sourceFiles(root = PKG_ROOT) {
     }
   };
   walk(path.join(root, "src"));
+  const console_ = consoleDir(root);
+  if (console_) walk(console_);
   out.push(path.join(root, "bin", "server.mjs"));
   return out.sort();
 }
@@ -54,7 +80,8 @@ export function sourceFiles(root = PKG_ROOT) {
  * @returns {string[]} absolute directory paths, existing ones only
  */
 export function sourceRoots(root = PKG_ROOT) {
-  return [path.join(root, "src"), path.join(root, "bin")].filter((d) => {
+  return [path.join(root, "src"), path.join(root, "bin"), consoleDir(root)].filter((d) => {
+    if (!d) return false;
     try {
       return fs.statSync(d).isDirectory();
     } catch {

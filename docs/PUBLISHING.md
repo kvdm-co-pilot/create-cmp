@@ -132,6 +132,28 @@ exit 0 — a gate that *looks* like verification is worse than none.
 
 ### `@create-cmp/inspector`
 
+> **BLOCKED as of 2026-09-07 — do not publish this package until the edge below
+> is declared.** Stage 0.5 moved the console into `packages/harness/src/console/`
+> (NORTH-STAR §9). Six imports in four files — `src/lib/preview-service.mjs`,
+> `a11y.mjs`, `design-language.mjs`, `components.mjs` — now reach it by relative
+> path, which escapes this package's root and therefore its tarball. Derived, not
+> assumed: `npm pack` here, extract the tarball, `import("./src/lib/a11y.mjs")`
+> → `ERR_MODULE_NOT_FOUND ... /packages/harness/src/console/contrast.mjs`. The
+> cold-`npx` check below would fail the same way.
+>
+> Nothing in the repo or in the shipped plugin is affected: `dist/server.mjs` is
+> not in `files`, the plugin runs the committed bundle, and esbuild inlines the
+> console into it (`packages: "bundle"`) — bundle-freshness now hashes the
+> console directory too, so that bundle cannot go stale silently.
+>
+> The dependency direction is the one PACKAGE-SPLIT.md §3 requires (studio →
+> harness, "nothing depends upward"); what is missing is a way to DECLARE it.
+> Two candidates, neither chosen here because packaging is PACKAGE-SPLIT's to
+> decide: make `inspector/mcp` a workspace that depends on `prooflane-harness`
+> and import by specifier (needs a `./console/*` subpath in the harness's
+> `exports`), which is D7 + §3 arriving on schedule; or publish the bundle by
+> adding `dist` to `files` and pointing `bin` at it.
+
 ```sh
 cd inspector/mcp
 npm view @create-cmp/inspector version  # expect E404

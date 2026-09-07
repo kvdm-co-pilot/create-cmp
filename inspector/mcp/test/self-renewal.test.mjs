@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 
 import { sourceRoots } from "../src/lib/build-id.mjs";
 import { consoleRegistryPath, findLiveConsole, renewalDecision } from "../src/lib/preview-service.mjs";
-import { renderShellPage } from "../src/lib/console-shell.mjs";
+import { renderShellPage } from "../../../packages/harness/src/console/console-shell.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CONSOLE_BIN = path.join(HERE, "..", "bin", "console.mjs");

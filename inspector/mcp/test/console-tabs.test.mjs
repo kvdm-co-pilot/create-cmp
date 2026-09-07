@@ -19,21 +19,35 @@ import {
   driftPanelHtml,
   stepTestCountsHtml,
   digestTabHtml,
-} from "../src/lib/console-tabs.mjs";
+} from "../../../packages/harness/src/console/console-tabs.mjs";
 
 // --- Design language (§3.1: the designer's handoff spec) --------------------
 
 test("designLanguageBodyHtml: unavailable -> honest empty-state explaining how to produce a catalog", () => {
-  const html = designLanguageBodyHtml({ available: false });
+  // `sourcePath` is what the READER looked at and did not find, which is what
+  // getDesignSystemData now reports on both branches. The console used to print
+  // this path from a literal of its own; it moved into packages/harness
+  // (NORTH-STAR §9, stage 0.5) where naming a stack is not allowed, and the
+  // literal was the wrong mechanism anyway — it named a cmp path to every
+  // project, including ones whose previews live elsewhere.
+  const html = designLanguageBodyHtml({ available: false, sourcePath: "composeApp/build/previews/design-system.json" });
   assert.match(html, /No design-system catalog available yet/);
   assert.match(html, /design-system\.json/);
   assert.match(html, /connect_live/);
+});
+
+test("designLanguageBodyHtml: unavailable with no path from the reader -> the how-to stands, the path is not invented", () => {
+  const html = designLanguageBodyHtml({ available: false });
+  assert.match(html, /No design-system catalog available yet/);
+  assert.match(html, /connect_live/);
+  assert.doesNotMatch(html, /<code>[^<]*design-system\.json<\/code>/, "a path the reader did not give is not guessed at");
 });
 
 test("designLanguageBodyHtml: color token table — swatch in the declared color, value, source disclosed", () => {
   const html = designLanguageBodyHtml({
     available: true,
     source: "previews",
+    sourcePath: "composeApp/build/previews/design-system.json",
     catalog: { colors: { Primary: "#0A2540" }, dimens: { PaddingPage: "16dp" } },
   });
   assert.match(html, /<h3>Color tokens<\/h3>/);
@@ -79,7 +93,7 @@ test("designLanguageBodyHtml: usage absence branches — unavailable scan states
   assert.doesNotMatch(unavailable, /<th>Usage<\/th>/, "no fabricated zero column");
 
   const noObject = designLanguageBodyHtml(ds, { usage: { available: true, colors: null, dimens: null } });
-  assert.match(noObject, /Not derivable statically &mdash; no Kotlin object declaring these tokens/);
+  assert.match(noObject, /Not derivable statically &mdash; no source object declaring these tokens/);
 
   const unwired = designLanguageBodyHtml(ds, {});
   assert.doesNotMatch(unwired, /<th>Usage<\/th>/);

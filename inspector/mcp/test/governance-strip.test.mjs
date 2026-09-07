@@ -12,7 +12,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { deriveHumanQueue, governanceStripHtml } from "../src/lib/console-shell.mjs";
+import { deriveHumanQueue, governanceStripHtml } from "../../../packages/harness/src/console/console-shell.mjs";
 
 const status = (id, status, extra = {}) => ({ id, status, resolvable: true, ...extra });
 
