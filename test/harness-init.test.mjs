@@ -214,3 +214,70 @@ test("the generated skeleton reads the SpecModel by its real field names", () =>
   assert.match(src, /r\.status === "unlocked" \? "SKIP"/, "unlocked is not a failure — nothing is proven and nothing is wrong");
   assert.ok(!/r\.ok\b/.test(src), "checkHarnessIntegrity returns status, never ok");
 });
+
+/**
+ * The skeleton at the path it is written to, with its lane siblings stubbed.
+ *
+ * The generated profile imports `../../harness-lock.mjs` and friends, so it can
+ * only be imported from `qa/lib/profiles/<id>/`. Building that shape is the
+ * honest way to test the file as generated rather than a re-parsed excerpt of it.
+ */
+function skeletonTree(lang) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "skeleton-"));
+  const lib = path.join(dir, "qa", "lib");
+  fs.mkdirSync(path.join(lib, "profiles", "probe"), { recursive: true });
+  fs.writeFileSync(path.join(lib, "harness-lock.mjs"), "export const checkHarnessIntegrity = () => ({ status: 'unlocked' });\nexport const describeIntegrity = () => '';\n");
+  fs.writeFileSync(path.join(lib, "spec-model.mjs"), "export const requireSpecModel = () => ({});\n");
+  fs.writeFileSync(path.join(lib, "spec-coverage.mjs"), "export const scanSpecClauses = () => new Map();\nexport const scanCitations = () => [];\nexport const clauseTierCoverage = () => ({});\nexport const citationScanDiagnostic = () => null;\n");
+  fs.writeFileSync(path.join(lib, "profiles", "probe", "index.mjs"), profileSkeleton("probe", { sourceRoots: ["src"], tiers: ["unit"], lang }));
+  return dir;
+}
+
+// A TEST LIVES WHERE THE LANGUAGE PUTS IT.
+//
+// The seeded `forFile` recognised only test DIRECTORIES — one ecosystem's
+// convention. Go writes `foo_test.go` beside the source and has no test
+// directory at all, so a cold Go adoption (2026-09-07, the Stage 0 exit run)
+// put every citation on a null tier: the first clause declaring `[tier: unit]`
+// FAILED while a real unit test sat two lines away citing it. A wrong verdict,
+// on the first day, for exactly the adopter `harness init` exists to serve.
+test("the seeded tier map knows where each language keeps its tests", async () => {
+  const cases = [
+    { lang: ".go", test: "internal/cart/cart_test.go", src: "internal/cart/cart.go" },
+    { lang: ".py", test: "app/test_cart.py", src: "app/cart.py" },
+    { lang: ".rb", test: "lib/cart_spec.rb", src: "lib/cart.rb" },
+    { lang: ".ts", test: "src/cart.test.ts", src: "src/cart.ts" },
+    { lang: ".js", test: "src/cart.spec.js", src: "src/cart.js" },
+    { lang: ".kt", test: "src/CartTest.kt", src: "src/Cart.kt" },
+    { lang: ".java", test: "src/CartTests.java", src: "src/Cart.java" },
+    { lang: ".cs", test: "src/CartTests.cs", src: "src/Cart.cs" },
+    { lang: ".php", test: "src/CartTest.php", src: "src/Cart.php" },
+    { lang: ".rs", test: "src/cart_test.rs", src: "src/cart.rs" },
+  ];
+  for (const c of cases) {
+    const dir = skeletonTree(c.lang);
+    try {
+      const mod = await import(`file://${path.join(dir, "qa/lib/profiles/probe/index.mjs")}?v=${c.lang}`);
+      assert.equal(mod.tiers.forFile(c.test), "unit", `${c.lang}: ${c.test} is a test file in this language`);
+      assert.equal(mod.tiers.forFile(c.src), null, `${c.lang}: ${c.src} is not`);
+      // The directory convention still works for languages that use it.
+      assert.equal(mod.tiers.forFile("tests/whatever.txt"), "unit", `${c.lang}: a test directory is still a test directory`);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("a project with no recognised language still tiers by directory, and never by accident", async () => {
+  const dir = skeletonTree(null);
+  try {
+    const mod = await import(`file://${path.join(dir, "qa/lib/profiles/probe/index.mjs")}?v=none`);
+    assert.equal(mod.tiers.forFile("tests/a.txt"), "unit");
+    // The never-matching pattern must not match everything — the failure mode
+    // of an empty regex.
+    assert.equal(mod.tiers.forFile("src/main.c"), null, "with no language, nothing is a test file by shape");
+    assert.equal(mod.tiers.forFile(""), null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
