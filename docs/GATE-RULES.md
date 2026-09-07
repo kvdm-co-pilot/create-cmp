@@ -234,3 +234,43 @@ at the wrong altitude. Calibrating a gate perfectly tells you nothing about
 whether its consumers still work; running every consumer tells you nothing about
 whether the gate was ever executing. Keep them separate — collapsing them into
 "test more" loses both.
+
+---
+
+## Rule 3 — A loop cannot certify its own termination
+
+Rule 2 says the layer you changed cannot certify itself. The same holds one level up: **the loop
+doing the work cannot be the thing that decides the work is finished.**
+
+An exit condition written as prose is decided by whoever reads it, which in an agentic loop is
+the agent that just did the work. It will read the sentence charitably — not dishonestly, but in
+the direction of its own effort. The measured cost of that, in this repo: Stage 0 outlived three
+exit criteria over weeks, and each iteration produced real defects fixed and left the stopping
+condition exactly as untrue as before.
+
+### What it requires
+
+**The exit is a command, written before the work starts.** `node scripts/stage-gate.mjs`. A stage
+whose exit is not yet a command has not started; writing the predicate is its first task. The
+command exits non-zero, prints what remains, and takes no view on how hard anyone tried.
+
+**A criterion met once by hand is not a criterion.** It decays into a sentence in a commit
+message that nothing re-runs and nothing notices breaking. Stage 0's cold adoption was a manual
+run that found a real wrong verdict; it is `scripts/cold-adoption.mjs` now, and reverting the fix
+makes it fail by name in both ecosystems.
+
+**Four terminators, layered.** A verifier, an iteration cap, a budget, and no-progress detection.
+Any one alone fails: a verifier with no cap runs forever on an impossible goal; a cap with no
+verifier stops at an arbitrary place and calls it done.
+
+**Held-out input.** A gate the agent wrote is a gate the agent can satisfy, and long-horizon
+coding agents measurably drift toward passing the visible checks rather than being correct — the
+gap widening with task length. The counter is adversarial input the fix was not written against:
+a second ecosystem, a kept plant, a squatted port. Eight wrong verdicts were found that way this
+year. None were found by reading.
+
+### Why this is not Rule 0
+
+Rule 0 proves the INSTRUMENT returns before you trust a reading from it. Rule 3 proves the
+CRITERION is evaluable before you point a loop at it. A perfectly calibrated instrument attached
+to a goal nobody can evaluate still never finishes.

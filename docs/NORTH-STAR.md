@@ -247,16 +247,57 @@ the layer you changed cannot certify itself · proof costs what the change costs
 silent · never wait on nothing · a signature binds content, a decision is closed · one record,
 read first.
 
-**The three gate rules** — Rule 0: prove the framework returns, both ways, in seconds, before
+**The four gate rules** — Rule 0: prove the framework returns, both ways, in seconds, before
 pointing work at it. Rule 1: a gate is not wired until a *kept* plant makes it fail by name and
 its measured cost has chosen its stage. Rule 2: the layer you changed cannot certify itself —
 library → full suite; template or harness → a fresh app stamped; environment-sensitive → the
-environment.
+environment. Rule 3: a loop cannot certify its own termination — the exit is a command written
+before the work starts, and a stage whose exit is still prose has not started.
 
 **The orchestration pattern** — *keep reasoning cheap and reversible; gate the irreversible
 work.* Reasoning stays with the orchestrator; execution is delegated to peer-strength agents and
 comes back as a claim the orchestrator gates by running the consumers itself. A weaker model is
 not used for execution: the tiering is about context separation, not cost.
+
+**Termination is a first-class concern — a stage does not start until its exit is a command.**
+Everything else in this section governs how work is DONE; nothing governed when it STOPS, and
+that omission cost more than any defect on the list. Stage 0's exit read "every verdict-bearing
+core function returns the same verdict under two unlike profiles" — a sentence with no
+evaluator. A loop terminates when a condition evaluates true, so a loop pointed at a sentence
+cannot terminate: every iteration did real work and left the stopping condition exactly as
+untrue as before. It outlived three criteria, took a human asking "we can't even complete one
+stage" to unblock, and closed within a day of becoming a predicate (2026-09-07). The industry
+name for this is the most expensive mistake in agentic engineering: a loop with no explicit
+termination logic, stopped by self-assessment rather than a verifier.
+
+So: `node scripts/stage-gate.mjs` evaluates every stage's exit. A stage with no predicate prints
+NO PREDICATE and exits 2 — writing the predicate is the FIRST task of that stage, never the
+last. Four stages are in that state today, and making them evaluable immediately found that
+Stage 1's criterion contradicts ADR-0008.
+
+Four terminators, layered, because any one alone fails: **a verifier** (an objective command,
+never the agent's own judgement); **a cap** on iterations; **a budget** in tokens or wall-clock;
+and **no-progress detection** — if findings open faster than they close for N iterations, the
+loop is diverging and must re-scope rather than continue. A criterion met once by hand is not a
+criterion: it decays into a sentence in a commit message, which is why the cold adoption is now
+`scripts/cold-adoption.mjs` rather than a thing someone did.
+
+**The ratchet — clean it, then fence it, and let the fence only tighten.** The exception lists in
+this repo (`STACK_COUPLED` in the agnostic lint, `NOT_YET_DIFFERENTIAL` in the Stage 0 gate) are
+fitness functions in the evolutionary-architecture sense, and each is checked for EXACTNESS in
+both directions: a file that becomes clean must be REMOVED or the test goes red. That is what
+makes them monotonic. The failure they replaced was an opt-in allowlist, where anything nobody
+thought to add was silently exempt — `determinism.mjs` "passed review for weeks because it was
+not in this list." New code is enforced from creation; old code is migrated in and never back
+out.
+
+**Held-out proof, because a gate the agent wrote is a gate the agent can satisfy.** Rule 2 says
+the layer you changed cannot certify itself; the same applies to the loop's own success
+criteria. Long-horizon coding agents measurably drift toward passing the VISIBLE checks rather
+than being correct, and the gap widens with task length — which is precisely the regime this
+project runs in. The counters here are the kept plants (a gate must be watched failing by name),
+and adversarial input the fix was not written against: eight wrong verdicts this year were found
+by executing in an ecosystem the code had never met, and none by reading it.
 
 **Standing to refuse on cost.** An orchestrator may refuse an instruction whose proof would
 cost more than the change is worth, and must say so with the number. Rigour written as prose
@@ -326,6 +367,16 @@ Every stage has an exit criterion that is a measurement, and a trigger that is a
 is built before its trigger; the runway owns the calendar. Migration is **by subtraction from
 the current tree, never a second harness built beside the first**, with the mobile fleet green
 at every PR.
+
+**Every exit criterion below is a COMMAND, or the stage has not started.** `node
+scripts/stage-gate.mjs` evaluates them and exits 2 on any stage whose criterion is still a
+sentence — see §7, *termination is a first-class concern*. Stage 0 is the worked example: it
+outlived three criteria while its exit was prose and closed within a day of becoming
+`scripts/stage-gate.mjs 0`. Stages 0.5 through 3 are all still prose, and writing each predicate
+is the first task of its stage, not the last. The exercise is not bookkeeping: rendering Stage
+1's criterion evaluable immediately exposed that "a core fix reaches it by version bump"
+contradicts ADR-0008, under which a core fix reaches a repo as a re-lock and never as a
+package-manager bump.
 
 | Stage | What | Exit criterion (measured) | Trigger | State 2026-09-05 |
 |---|---|---|---|---|
