@@ -110,16 +110,16 @@ const NOT_SOURCE = new Set([
  * write `//`.
  */
 export const LANGUAGE_GRAMMARS = Object.freeze({
-  ".py": { marker: "#", test: String.raw`^\s*(?:async\s+)?def\s+test\w*\s*\(|^\s*class\s+Test\w*\s*[(:]`, type: String.raw`^\s*class\s+\w+` },
-  ".go": { marker: "//", test: String.raw`^\s*func\s+(?:Test|Benchmark|Example)\w*\s*\(`, type: String.raw`^\s*type\s+\w+\s+(?:struct|interface)\b` },
-  ".rs": { marker: "//", test: String.raw`^\s*#\[(?:test|tokio::test|rstest)\]|^\s*fn\s+test\w*\s*\(`, type: String.raw`^\s*(?:pub\s+)?(?:struct|enum|trait|impl)\b` },
-  ".rb": { marker: "#", test: String.raw`^\s*(?:def\s+test_\w+|it\s+["']|describe\s+["'])`, type: String.raw`^\s*(?:class|module)\s+\w+` },
-  ".ts": { marker: "//", test: String.raw`\b(?:test|it)\s*\(|^\s*@Test\b`, type: String.raw`^\s*(?:export\s+)?(?:abstract\s+)?(?:class|interface)\b` },
-  ".js": { marker: "//", test: String.raw`\b(?:test|it)\s*\(`, type: String.raw`^\s*(?:export\s+)?class\b` },
-  ".kt": { marker: "//", test: String.raw`@Test\b|\bfun\s+\x60[^\x60]+\x60\s*\(`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\b` },
-  ".java": { marker: "//", test: String.raw`@Test\b`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|abstract\s+)*(?:class|interface|enum)\b` },
-  ".cs": { marker: "//", test: String.raw`\[(?:Test|Fact|Theory)\]`, type: String.raw`^\s*(?:public\s+|internal\s+)?(?:sealed\s+|abstract\s+)?class\b` },
-  ".php": { marker: "//", test: String.raw`function\s+test\w*\s*\(|@test\b`, type: String.raw`^\s*(?:abstract\s+|final\s+)?class\b` },
+  ".py": { marker: "#", test: String.raw`^\s*(?:async\s+)?def\s+test\w*\s*\(|^\s*class\s+Test\w*\s*[(:]`, type: String.raw`^\s*class\s+\w+` , testFile: String.raw`(^|/)test_[^/]*\.py$|_test\.py$`},
+  ".go": { marker: "//", test: String.raw`^\s*func\s+(?:Test|Benchmark|Example)\w*\s*\(`, type: String.raw`^\s*type\s+\w+\s+(?:struct|interface)\b` , testFile: String.raw`_test\.go$`},
+  ".rs": { marker: "//", test: String.raw`^\s*#\[(?:test|tokio::test|rstest)\]|^\s*fn\s+test\w*\s*\(`, type: String.raw`^\s*(?:pub\s+)?(?:struct|enum|trait|impl)\b` , testFile: String.raw`_test\.rs$`},
+  ".rb": { marker: "#", test: String.raw`^\s*(?:def\s+test_\w+|it\s+["']|describe\s+["'])`, type: String.raw`^\s*(?:class|module)\s+\w+` , testFile: String.raw`_(?:spec|test)\.rb$`},
+  ".ts": { marker: "//", test: String.raw`\b(?:test|it)\s*\(|^\s*@Test\b`, type: String.raw`^\s*(?:export\s+)?(?:abstract\s+)?(?:class|interface)\b` , testFile: String.raw`\.(?:test|spec)\.tsx?$`},
+  ".js": { marker: "//", test: String.raw`\b(?:test|it)\s*\(`, type: String.raw`^\s*(?:export\s+)?class\b` , testFile: String.raw`\.(?:test|spec)\.jsx?$`},
+  ".kt": { marker: "//", test: String.raw`@Test\b|\bfun\s+\x60[^\x60]+\x60\s*\(`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\b` , testFile: String.raw`Tests?\.kt$`},
+  ".java": { marker: "//", test: String.raw`@Test\b`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|abstract\s+)*(?:class|interface|enum)\b` , testFile: String.raw`Tests?\.java$`},
+  ".cs": { marker: "//", test: String.raw`\[(?:Test|Fact|Theory)\]`, type: String.raw`^\s*(?:public\s+|internal\s+)?(?:sealed\s+|abstract\s+)?class\b` , testFile: String.raw`Tests?\.cs$`},
+  ".php": { marker: "//", test: String.raw`function\s+test\w*\s*\(|@test\b`, type: String.raw`^\s*(?:abstract\s+|final\s+)?class\b` , testFile: String.raw`Test\.php$`},
 });
 
 /**
@@ -288,6 +288,15 @@ export function profileSkeleton(id, { sourceRoots, tiers, lang = null }) {
     : `\n// No recognised source language was found, so this profile uses the core's\n// FALLBACK grammar, which matches Kotlin/JVM and JavaScript only. If your\n// citations report as "declared but never cited" while the markers are plainly\n// there, that is why — declare a grammar:\n//\n// export const grammar = {\n//   citationMarker: /^(?:\\/\\/|#)\\s*SPEC:/,\n//   testDeclaration: /^\\\\s*def\\\\s+test\\\\w*\\\\s*\\\\(/,   // ← your language's test form\n//   typeDeclaration: /^\\\\s*class\\\\s+\\\\w+/,\n//   bindingWindow: 5,\n// };\n`;
   const tierNames = JSON.stringify(tiers);
   const hostTier = tiers[0];
+  // WHERE this language keeps its tests. Distinct from `g.test`, which is what a
+  // test DECLARATION looks like inside a file: Go writes `foo_test.go` beside
+  // the source and never uses a test directory, so a directory-only rule put
+  // every Go citation on a null tier. With no recognised language the pattern
+  // matches nothing and the directory rule below carries it alone.
+  // A `/` inside the pattern would terminate the regex literal it is embedded
+  // in — `(^|/)test_` from the Python convention did exactly that. Escaped here
+  // rather than in the table, so the table stays readable as plain patterns.
+  const testFilePattern = g && g.testFile ? `/${g.testFile.replace(/\//g, "\\/")}/` : "/(?!)/";
   return `// The "${id}" stack profile — what a stack IS, to this harness.
 //
 // Written by \`create-cmp harness init\`. This file is YOURS: the harness never
@@ -348,6 +357,12 @@ export const tiers = {
   satisfying: { ${tiers.map((t) => `${t}: ["${t}"]`).join(", ")} },
   journey: null,
   forFile: (rel) => {
+    // A test lives WHERE THIS LANGUAGE PUTS IT. Directory-only was one
+    // ecosystem's convention: Go writes foo_test.go beside the source, Rust
+    // _test.rs, Ruby _spec.rb, JS foo.test.ts. A cold Go adoption (2026-09-07)
+    // put every citation on a null tier, so the first clause declaring
+    // [tier: unit] FAILED while a real unit test sat right there citing it.
+    if (${testFilePattern}.test(rel)) return "${hostTier}";
     if (/(^|\\/)(test|tests|__tests__)(\\/|$)/.test(rel)) return "${hostTier}";
     return null;
   },

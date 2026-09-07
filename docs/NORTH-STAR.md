@@ -329,7 +329,7 @@ at every PR.
 
 | Stage | What | Exit criterion (measured) | Trigger | State 2026-09-05 |
 |---|---|---|---|---|
-| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **criterion 1 MET, not yet exited.** 24/24 profile-dependent verdict-bearing core functions proved against two unlike profiles, enforced by `test/stage0-differential-coverage.test.mjs` — the criterion is now a gate, not a sentence. All 7 known-wrong verdicts closed; lint inverted to deny-by-default (§9.1). REMAINING: the cold adoption re-run |
+| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **EXITED 2026-09-07.** 24/24 profile-dependent verdict-bearing core functions proved against two unlike profiles, enforced by `test/stage0-differential-coverage.test.mjs`. Cold adoptions re-run against the fixed tree: Go and Python, nothing → `harness init` → framework-check PASS → lane PASS, citations bound and tiers resolved. Fleet L2 green per PR. All 7 known-wrong verdicts closed; lint inverted to deny-by-default (§9.1) |
 | **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; console + MCP server into the harness; section types formalised; tool listing profile-driven; `cmp` providers extracted; neutral skills moved | The console renders a stamped Compose app exactly as today **and** a manifest-only backend fixture with every section present and honest | Stage 0 exit; before Stage 1 so the package boundary is drawn with the console inside | not started |
 | **1 — distribution** | The package split (PACKAGE-SPLIT Phases C–E): `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`, `prooflane-studio-cmp`; the lock as a stamper-written manifest; resolve local → node_modules → registry → git URL, fetch at init/new only | A backend repo installs the harness without create-cmp; a core fix reaches it by version bump | Stage 0.5 exit **and** ADR-0007 signed (O4) **and** the Stage 1 ADR (O2) | **started early**: names claimed, packages renamed, `prooflane-harness@0.19.0` published, workspaces declared but inert |
 | **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows from the profile | A profile authored by a team **outside this project** passes framework-check and mints a receipt Gatekeeper accepts. Our own agents authoring one no longer counts — two have, and both found defects rather than proving absence of them | a genuinely external adopter, or the pinned port-demand issue | — |
@@ -459,6 +459,20 @@ needs a kept plant and a measured cost (§8). Related and now corrected: `harnes
 header promised that `upgrade --harness` performs a REMOTE authenticity comparison against the
 registry. It does not and never has — it re-locks from a local `package.json`. A module whose
 whole job is precision about which question it answers was imprecise about exactly that.
+
+**The cold adoption found an eighth wrong verdict, which is why it is an exit criterion.** A Go
+project reached a green lane on the first run — and the green was hiding a defect: the tier map
+`harness init` seeds recognised only test DIRECTORIES, so `internal/cart/cart_test.go`, which is
+where Go puts a test, landed on a null tier. The first clause declaring `[tier: unit]` FAILED with
+a real unit test two lines away citing it. Eight of eight found the same way: not by reading, by
+running in an ecosystem the code had never met. Ten languages now declare where they keep their
+tests, and a regression test imports each generated skeleton and checks a real path both ways.
+
+**What the exit does NOT claim.** The adoptions were run by the agent that wrote the harness, which
+cannot un-know the internals; only the printed output was followed, but a genuinely cold operator
+is a stronger test than this project can currently perform on itself. Stage 2's criterion — a
+profile authored by a team OUTSIDE this project — is where that gap closes, and it is deliberately
+not claimed here.
 
 **In parallel, and unchanged in intent:** the mobile studio modules (attach ✓, runtime
 feedback, device-as-structure, profiling, data inspectors, release lane) proceed as
