@@ -237,6 +237,27 @@ function archHeaderStatus(page) {
   return m ? m[1] : "";
 }
 
+/**
+ * Wait for a condition instead of guessing how long it takes.
+ *
+ * A fixed `setTimeout(300)` is a bet that the machine is idle, and it loses
+ * under a parallel suite run — the wait expires, the assertion reads a state
+ * that was about to be correct, and the test fails for a reason that has
+ * nothing to do with the code. Polling costs nothing when the condition is
+ * already true and is what makes the test measure behaviour rather than load.
+ *
+ * @param {() => boolean} cond
+ * @param {{timeoutMs?: number, everyMs?: number, what?: string}} [opts]
+ */
+async function waitFor(cond, { timeoutMs = 5000, everyMs = 10, what = "condition" } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (cond()) return;
+    if (Date.now() > deadline) throw new Error(`waitFor: ${what} did not hold within ${timeoutMs}ms`);
+    await new Promise((r) => setTimeout(r, everyMs));
+  }
+}
+
 test("service: Architecture tab — boots against a real layer tree + the REAL app-base.spec.md/ARCHITECTURE.md/approvals/inputs-hash libraries; doc-shaped structure, a deliberate ARCH-09 violation with file:line, a real receipt's per-clause status + the advisory label, then approve + drift", async () => {
   const { root: projectDir, violatingFile, specFile } = await makeArchitectureFixtureProject();
   const service = createPreviewService({ projectDir, port: 19891, hot: false, runRender: async () => {} });
@@ -1161,8 +1182,10 @@ test("service: daemon fast path renders via HTTP and falls back to gradle when i
 
   try {
     await service.start();
-    // First render races daemon discovery — wait for both to settle.
-    await new Promise((r) => setTimeout(r, 300));
+    // First render races daemon discovery. WAIT FOR IT, do not guess: the fixed
+    // 300ms this replaced was a bet on an idle machine and lost one full-suite
+    // run on 2026-09-06, failing on load rather than on behaviour.
+    await waitFor(() => service.status().mode === "daemon", { what: "daemon discovery" });
 
     let status = service.status();
     assert.equal(status.mode, "daemon", "healthy daemon on the port is adopted");
@@ -1181,6 +1204,12 @@ test("service: daemon fast path renders via HTTP and falls back to gradle when i
     assert.equal(status.lastError, null, "fallback render succeeded");
   } finally {
     service.stop();
+    // The fake daemon is closed above on the happy path only. When an assertion
+    // throws before that line the listening server keeps the event loop alive,
+    // so the runner never exits and the whole SUITE hangs instead of reporting
+    // one red test — which is what happened when this test's timing bet was
+    // pushed over. A failing test must fail, not wedge.
+    if (daemon.listening) await new Promise((r) => daemon.close(r));
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });

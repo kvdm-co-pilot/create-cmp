@@ -21,7 +21,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
-import { observedTreeHash, DEVICE_TIER_TRIGGERS } from "./observed-tree.mjs";
+import { observedTreeHash, DEVICE_TIER_TRIGGERS, DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FLEET_RECORD = path.join(REPO_ROOT, "qa-artifacts", "fleet-latest.json");
@@ -50,8 +50,7 @@ function changedPaths() {
 }
 
 export function deviceTierRequired(paths) {
-  const need = deriveTierNeed(paths, { observedRoots: DEVICE_TIER_TRIGGERS, tierName: "fleet L2" });
-  return { ...need, why: DEVICE_TIER_TRIGGERS.filter((t) => paths.some((p) => p.startsWith(t))) };
+  return deriveTierNeed(paths, { irrelevantRoots: DEVICE_TIER_IRRELEVANT, tierName: "fleet L2" });
 }
 
 /** `ℹ tests 1525 / ℹ pass 1525 / ℹ fail 0` out of the node test runner. */
