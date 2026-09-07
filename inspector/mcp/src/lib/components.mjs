@@ -23,22 +23,19 @@
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * PascalCase/camelCase → kebab-case: AppHeader → app-header, ListItemCard →
- * list-item-card. Mirrors the template's qa/lib/component-stories.mjs (the
- * lane-side parity gate) — keep the two in sync, same contract as navSlug.
- */
-export function kebabCase(name) {
-  return String(name)
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
-    .toLowerCase();
-}
-
-/** The preview-registry story id a component of this name registers (§3.3): `component.<kebab>`. */
-export function componentStoryId(name) {
-  return `component.${kebabCase(name)}`;
-}
+// `kebabCase` and `componentStoryId` MOVED to
+// packages/harness/src/console/console-data.mjs when the console moved into the
+// harness package (NORTH-STAR §9, stage 0.5). console-tabs.mjs was their only
+// production caller here, and a console module may not import back into this
+// package: `prooflane-harness` ships `src/` alone, so the import would be a
+// dangling relative path in the published tarball. The story-id grammar is
+// stack-free — it spells an id from a name — so it crossed cleanly; the `.kt`
+// scan below could not, and stayed.
+//
+// Re-exported unchanged, so test/component-scan-parity.test.mjs still compares
+// THIS definition against the cmp profile's copy. A third copy here would have
+// defeated the gate that exists to catch exactly that divergence.
+export { kebabCase, componentStoryId } from "../../../../packages/harness/src/console/console-data.mjs";
 
 /** Every `.kt` file under `dir` (recursive), as absolute paths. Exported for handrolled-state.mjs's ARCH-11 mirror. */
 export function walkKtFiles(dir) {

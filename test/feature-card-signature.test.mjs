@@ -14,7 +14,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { featuresTabHtml } from "../inspector/mcp/src/lib/console-tabs.mjs";
+import { featuresTabHtml } from "../packages/harness/src/console/console-tabs.mjs";
 
 /** A board of one feature in the given phase — the shape featuresTabHtml renders. */
 function boardWith(phase, overrides = {}) {

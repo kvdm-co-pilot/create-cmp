@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseColor, relativeLuminance, contrastRatio } from "../src/lib/contrast.mjs";
+import { parseColor, relativeLuminance, contrastRatio } from "../../../packages/harness/src/console/contrast.mjs";
 
 test("parseColor: 6-digit hex is opaque RGB", () => {
   assert.deepEqual(parseColor("#FFFFFF"), { r: 255, g: 255, b: 255, a: 255 });

@@ -3,7 +3,7 @@
 // honesty rules: a stale green is never presented as a live PASS.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { artifactStatusHtml, receiptGlyph, railReceiptHtml, rendererDownBannerHtml, renderShellPage } from "../src/lib/console-shell.mjs";
+import { artifactStatusHtml, receiptGlyph, railReceiptHtml, rendererDownBannerHtml, renderShellPage } from "../../../packages/harness/src/console/console-shell.mjs";
 
 // The hash a signed row displays must be the hash the SIGNATURE was bound to —
 // `storedHash` — never the live recompute. They agree for everything signed on

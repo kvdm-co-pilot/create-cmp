@@ -1,3 +1,9 @@
+// MOVED from inspector/mcp/src/lib/console-overview.mjs — NORTH-STAR §9, stage
+// 0.5, "the console into the harness". Unchanged in the move; like
+// console-shell.mjs it had no imports, so it crossed the package boundary
+// without leaving an edge behind. See console-shell.mjs's note for why the
+// destination is `src/console/` rather than `src/lib/`.
+//
 // console-overview.mjs — the front door (STUDIO-REDESIGN.md §3.7).
 //
 // WHY THIS SECTION EXISTS, and what it supersedes. §2 of the redesign made the

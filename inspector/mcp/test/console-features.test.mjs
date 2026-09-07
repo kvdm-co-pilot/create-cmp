@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { featuresTabHtml } from "../src/lib/console-tabs.mjs";
+import { featuresTabHtml } from "../../../packages/harness/src/console/console-tabs.mjs";
 
 const baseFeature = (over = {}) => ({
   name: "meal",

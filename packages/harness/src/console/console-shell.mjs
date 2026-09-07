@@ -1,3 +1,14 @@
+// MOVED from inspector/mcp/src/lib/console-shell.mjs — NORTH-STAR §9, stage 0.5,
+// "the console into the harness". Distribution has to ship the console and could
+// not while it lived in a sibling package; `prooflane-harness`'s `files` list
+// ships `src/`, so it ships from here. Nothing in this file changed in the move
+// — it had no imports at all, which is why it crossed first.
+//
+// Note the directory: `src/console/`, not `src/lib/`. scripts/sync-harness.mjs
+// mirrors `src/lib` into `template/qa/lib`, so a console under lib/ would be
+// vendored into every stamped app. REGION_DIRS is one level deep and REGION_TREES
+// covers only `src/lib/profiles`, so `src/console/` is shipped and not vendored.
+//
 // console-shell.mjs — the ONE frame every console section renders inside
 // (docs/STUDIO-REDESIGN.md §2). The shell is the whole design system: the
 // sidebar ordering/coverage rail, the per-page header grammar, the type ramp,

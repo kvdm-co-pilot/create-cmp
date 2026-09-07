@@ -28,7 +28,7 @@
 // gracefully: nodes without `clickable` are simply skipped, never crashed on.
 
 import { walk } from "./tree.mjs";
-import { contrastRatio } from "./contrast.mjs";
+import { contrastRatio } from "../../../../packages/harness/src/console/contrast.mjs"; // moved with the console — NORTH-STAR §9, stage 0.5
 
 // Resolved-key aliases the codebase's `.designToken(resolved = mapOf(...))` calls use in
 // practice (see HomeScreen.kt's "color" example) plus the common Material naming. First match

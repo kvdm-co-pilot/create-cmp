@@ -25,7 +25,7 @@ import {
   sourceFiles,
   sourcesHash,
 } from "../src/lib/build-id.mjs";
-import { staleConsoleBannerHtml, provenanceHtml } from "../src/lib/console-shell.mjs";
+import { staleConsoleBannerHtml, provenanceHtml } from "../../../packages/harness/src/console/console-shell.mjs";
 
 test("sourcesHash: deterministic over the same tree, and moves when any source byte moves", () => {
   const a = sourcesHash();
