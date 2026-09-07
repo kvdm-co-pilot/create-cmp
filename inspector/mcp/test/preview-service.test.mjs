@@ -808,7 +808,7 @@ test("service: a render marker left stamped from a prior process does not stop t
   });
   try {
     await service.start();
-    await new Promise((r) => setTimeout(r, 150));
+    await waitFor(() => service.status().version === 1, { what: "the first render to land" });
     assert.equal(service.status().version, 1, "render proceeds normally; the render marker never gates renderCycle");
   } finally {
     service.stop();
@@ -1222,8 +1222,15 @@ test("service: a healthy daemon serving ANOTHER project is refused, not adopted"
   // A daemon for a DIFFERENT checkout, answering on the same machine-global port.
   // It is healthy and would render happily — with the other project's screens.
   let daemonRenders = 0;
+  // Counted so the REFUSAL can be proven rather than assumed. Sleeping and then
+  // asserting "mode is still gradle" passes just as happily when discovery has
+  // not run yet — a vacuous green, which is worse than a flake because it is
+  // silent. Waiting for the probe to have HAPPENED is what makes the negative
+  // assertion mean something.
+  let healthProbes = 0;
   const daemon = http.createServer((req, res) => {
     if (req.url === "/health") {
+      healthProbes++;
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
         JSON.stringify({
@@ -1257,7 +1264,9 @@ test("service: a healthy daemon serving ANOTHER project is refused, not adopted"
 
   try {
     await service.start();
-    await new Promise((r) => setTimeout(r, 300));
+    // The foreign daemon must have been ASKED before "it was not adopted" says
+    // anything at all.
+    await waitFor(() => healthProbes >= 1, { what: "the foreign daemon to be probed" });
 
     assert.equal(service.status().mode, "gradle", "a foreign daemon is never adopted");
     await service._renderCycle();
@@ -1321,7 +1330,7 @@ test("service: swap-aware renders — stale render retried until the reload land
 
   try {
     await service.start();
-    await new Promise((r) => setTimeout(r, 300)); // first render + daemon adoption
+    await waitFor(() => service.status().mode === "daemon", { what: "daemon adoption" });
     assert.equal(service.status().mode, "daemon");
 
     // A save whose swap is slow: the first render is stale (same content, no reload).
@@ -1385,7 +1394,7 @@ test("service: failed hot swap (reloadErrors bump) surfaces as lastError(reload)
 
   try {
     await service.start();
-    await new Promise((r) => setTimeout(r, 300));
+    await waitFor(() => service.status().mode === "daemon", { what: "daemon adoption" });
     assert.equal(service.status().mode, "daemon");
 
     // A save whose swap the agent rejects: reloadErrors bumps, content stays pre-swap.
@@ -1448,7 +1457,7 @@ test("service: compile watchdog — silent recompiler failure surfaces via a com
 
   try {
     await service.start();
-    await new Promise((r) => setTimeout(r, 300));
+    await waitFor(() => service.status().mode === "daemon", { what: "daemon adoption" });
     assert.equal(service.status().mode, "daemon");
 
     // Broken save: no classes ever land, no render fires — only the watchdog can tell.
@@ -2862,7 +2871,10 @@ test("service: a service that boots onto previews from a PREVIOUS run dates them
 
   try {
     await service.start().catch(() => {});
-    await new Promise((r) => setTimeout(r, 150));
+    // The real condition: the service has read the on-disk manifest and dated
+    // it. (An earlier version of this line polled `… || true`, which is not a
+    // wait at all — it returns on the first tick and only looked like one.)
+    await waitFor(() => Boolean(service.status().freshness?.lastRenderAt), { what: "the on-disk render to be dated" });
     const f = service.status().freshness;
     assert.ok(f.lastRenderAt, "the on-disk render is dated");
     assert.ok(
