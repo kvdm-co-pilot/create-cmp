@@ -49,6 +49,7 @@ const STAGES = [
   {
     id: "0.5",
     name: "the console into the harness",
+    exited: "2026-09-07",
     criteria: [{ what: "console baseline, honesty floor, declared sections, no Compose furniture off-Compose", cmd: ["scripts/stage05-gate.mjs"] }],
   },
   {

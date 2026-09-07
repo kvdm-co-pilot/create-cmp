@@ -1,6 +1,6 @@
 {
   "name": "prooflane-harness",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "The prooflane verify lane: a stack-agnostic evidence harness that derives done from evidence rather than an agent's word. Profile loader, lane runner, receipts, hash-locked region, Stop hook, spec-to-citation binding and the Rule 0/1/2 instruments. Dependency-free ESM, vendored into each project so a receipt is checkable offline from the repo alone, and content-hashed so a receipt names the exact lane that issued it. NOTE: this release still carries the `cmp` (Compose Multiplatform) stack profile as its source of truth; it moves to prooflane-profile-cmp in the package split.",
   "type": "module",
   "main": "src/verify.mjs",
@@ -8,7 +8,10 @@
     ".": "./src/verify.mjs",
     "./harness-region": "./src/lib/harness-region.mjs",
     "./lib/*.mjs": "./src/lib/*.mjs",
-    "./lib/*": "./src/lib/*.mjs"
+    "./lib/*": "./src/lib/*.mjs",
+    "./console": "./src/console/preview-service.mjs",
+    "./console/*.mjs": "./src/console/*.mjs",
+    "./console/*": "./src/console/*.mjs"
   },
   "files": [
     "src",
