@@ -932,7 +932,7 @@ test("service: render failure keeps previous state and reports lastError", async
 
   try {
     await service.start();
-    await new Promise((r) => setTimeout(r, 100));
+    await waitFor(() => service.status().version === 1, { what: "the first render to land" });
     let status = service.status();
     assert.equal(status.version, 1);
     // FI-9 Change B: the first successful render marks the renderer healthy.
@@ -2712,7 +2712,7 @@ test("service: a concurrent foreign Gradle build DEFERS the render — never an 
 
   try {
     await service.start();
-    await new Promise((r) => setTimeout(r, 100));
+    await waitFor(() => service.status().renderer.lastOutcome === "ok", { what: "the render to report ok" });
     assert.equal(service.status().renderer.lastOutcome, "ok");
     const healthyAt = service.status().renderer.lastSuccessAt;
 
