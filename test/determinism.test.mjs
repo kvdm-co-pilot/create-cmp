@@ -228,8 +228,15 @@ test("the report format is DECLARED: undeclared or unsupported is a refusal by n
   // else — an empty leg that read as "no tests". PATTERN: JUnit XML as the
   // lingua franca, declared by the profile. What this pins is the silent {}:
   // it is now a throw with the missing declaration named.
+  //
+  // The EXAMPLE of an unsupported format moved on 2026-09-09: `tap` used to be
+  // one and is now readable, along with `ctrf`. The property is untouched —
+  // what is pinned is that a format the core cannot read is named, not that any
+  // particular format is missing. `trx` (the .NET runner's) stands in, and will
+  // be replaced the day someone writes that parser.
   assert.match(reportFormatProblem(undefined) ?? "", /declares no `reports`/);
-  assert.match(reportFormatProblem({ format: "tap" }) ?? "", /not one the core can read/);
+  assert.match(reportFormatProblem({ format: "trx" }) ?? "", /not one the core can read/);
   assert.equal(reportFormatProblem({ format: "junit-xml" }), null);
+  for (const readable of ["tap", "ctrf"]) assert.equal(reportFormatProblem({ format: readable }), null);
   assert.throws(() => parseJUnitOutcomes("/nonexistent"), /declares no `reports`|reports\.format/);
 });

@@ -8,6 +8,32 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **TAP and CTRF report parsers — `reports.format` stops being a one-value enum.** Both were named
+  as "next" beside `REPORT_FORMATS` for months, and a profile declaring either got a refusal saying
+  a parser was its own change. This is that change, and the cmp pack now routes through a
+  **dispatcher** rather than naming the JUnit reader directly — a step that picked its own parser
+  would silently ignore its own declaration the day a profile declared `tap`, reading zero tests and
+  calling it green.
+
+  Every parser obeys the one rule the determinism probe rests on: **read only verdict-bearing
+  content.** TAP carries timings in YAML diagnostics and `# time=…` trailers; CTRF carries
+  `duration`, `start` and `stop` on every test. None of it is read. A parser that let a millisecond
+  through would make the second run differ from the first *by construction*, and the probe would
+  report its own noise as the stack's defect — with a genuine timezone flip sitting in the same
+  list, indistinguishable.
+
+  Three judgements worth naming, each pinned by a test:
+
+  - **TAP's number is not part of the identity.** It is positional, so keying on it would make a
+    suite that reorders read as every test having changed.
+  - **A TAP `# TODO` failure is a skip**, because that is TAP's own semantics: it is an *expected*
+    failure, and reading it as a fail breaks a passing suite.
+  - **A CTRF status the schema does not define is `error`, never `pass`** — "I do not know what this
+    means" is not "it passed", which is the stance `ERROR` takes everywhere else in this harness.
+
+  Duplicate test names are disambiguated rather than collapsed, in both — the JUnit parser's
+  original defect (last-write-wins hiding a real flip) not re-made one format over.
+
 - **A rung is comparable only within its pack — the last two places that broke it, both of which
   ran on every device check (§8.9, §9.2).**
 

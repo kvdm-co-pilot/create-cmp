@@ -76,8 +76,19 @@ function attr(attrs, name) {
  *   keyed by `classname.name`; empty object when the directory is absent
  *   (the caller decides what an empty leg means — this parser never guesses)
  */
-/** The report formats the core can read. TAP and CTRF are the next two, each its own parser. */
-export const REPORT_FORMATS = Object.freeze(["junit-xml"]);
+/**
+ * The report formats the core can read. Each is its OWN parser, dispatched by
+ * the profile's declaration — never sniffed from the file, because a wrong
+ * guess here produces `{}`, and an empty leg compared against an empty leg
+ * yields no differences: the probe would pass having read nothing. That exact
+ * failure is why the declaration exists.
+ *
+ * Every parser here obeys one rule, and it is the rule the whole probe rests
+ * on: READ ONLY VERDICT-BEARING CONTENT. No durations, no timestamps, no run
+ * ids. Two runs that differ solely in how long they took must produce byte-
+ * identical outcome maps, or the probe reports its own noise as a defect.
+ */
+export const REPORT_FORMATS = Object.freeze(["junit-xml", "tap", "ctrf"]);
 
 /**
  * Why a profile's `reports` declaration cannot be read — or null when it can.
@@ -219,4 +230,151 @@ export function compareOutcomes(a, b, labelA, labelB, attribute) {
     }
   }
   return diffs;
+}
+
+// ── TAP and CTRF ────────────────────────────────────────────────────────────
+// The second and third formats the core can read. Both were named as "next"
+// beside REPORT_FORMATS for months; a profile declaring either got a refusal
+// telling it a parser was its own change. This is that change.
+//
+// The rule both obey is the one the whole probe rests on: READ ONLY
+// VERDICT-BEARING CONTENT. TAP carries timings in YAML diagnostics and in
+// `# time=…` comments; CTRF carries `duration`, `start` and `stop` on every
+// test and a `summary` block full of them. None of it is read. A parser that
+// let a millisecond through would make every second run "nondeterministic" and
+// the probe would be reporting its own noise.
+
+/**
+ * Parse a TAP stream into per-test outcomes.
+ *
+ * IDENTITY. TAP has no classname — a test is its description, and the number is
+ * positional, so it is NOT part of the key: a suite whose tests reorder between
+ * two runs would otherwise read as every test having changed. Duplicate
+ * descriptions are disambiguated by occurrence, which is the honest answer when
+ * a runner emits two tests with one name.
+ *
+ * DIRECTIVES decide status before the ok/not-ok does: `# SKIP` is a skip
+ * whichever way the line reads, and a `# TODO` failure is an expected one, so
+ * it is a skip rather than a fail — that is TAP's own semantics, and reading it
+ * as a failure would make a passing suite look broken.
+ *
+ * @param {string} text one TAP stream
+ * @returns {Record<string, {status: "pass"|"fail"|"error"|"skip", messages: string[]}>}
+ */
+export function parseTapStream(text) {
+  const outcomes = {};
+  const seen = new Map();
+  const lines = String(text ?? "").split("\n");
+  let pending = null;
+
+  const commit = () => {
+    if (!pending) return;
+    const n = (seen.get(pending.name) ?? 0) + 1;
+    seen.set(pending.name, n);
+    outcomes[n === 1 ? pending.name : `${pending.name} #${n}`] = { status: pending.status, messages: pending.messages };
+    pending = null;
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const m = line.match(/^\s*(not ok|ok)\b[ \t]*(\d+)?[ \t]*-?[ \t]*(.*)$/);
+    if (!m) {
+      // A YAML diagnostic block belongs to the test above it. Its `message` and
+      // `severity` are verdict-bearing; every other key — `duration_ms`, `at`,
+      // stack line numbers — is not, and is deliberately dropped.
+      if (pending && /^\s*---\s*$/.test(line)) {
+        for (i += 1; i < lines.length && !/^\s*\.\.\.\s*$/.test(lines[i]); i += 1) {
+          const kv = lines[i].match(/^\s*(message|severity)\s*:\s*(.+?)\s*$/);
+          if (kv) pending.messages.push(kv[2].replace(/^["']|["']$/g, ""));
+        }
+      }
+      continue;
+    }
+    commit();
+    const rest = m[3] ?? "";
+    // The directive is separated from the description by ` # `. Splitting on it
+    // also strips a runner's `# time=…` trailer, which must never reach a key.
+    const hash = rest.indexOf("#");
+    const description = (hash === -1 ? rest : rest.slice(0, hash)).trim();
+    const directive = hash === -1 ? "" : rest.slice(hash + 1).trim();
+    let status = m[1] === "ok" ? "pass" : "fail";
+    if (/^skip\b/i.test(directive)) status = "skip";
+    else if (/^todo\b/i.test(directive)) status = "skip";
+    pending = { name: description || `test ${m[2] ?? Object.keys(outcomes).length + 1}`, status, messages: [] };
+  }
+  commit();
+  return outcomes;
+}
+
+/**
+ * Parse a CTRF report (JSON) into per-test outcomes.
+ *
+ * CTRF names four statuses this maps onto the probe's four: `passed`,
+ * `failed`, `skipped`, `pending` (a skip — it did not run), and `other`, which
+ * is the honest match for `error`: the runner could not say. A status the
+ * schema does not define is `error` too, because "I do not know what this
+ * means" is not "it passed" — the same stance `ERROR` takes everywhere else in
+ * this harness.
+ *
+ * IDENTITY is `suite.name` when a suite is given, mirroring JUnit's
+ * `classname.name`, so the two formats key the same test the same way.
+ *
+ * @param {string} json one CTRF document
+ * @returns {Record<string, {status: "pass"|"fail"|"error"|"skip", messages: string[]}>}
+ */
+export function parseCtrfReport(json) {
+  const outcomes = {};
+  let doc;
+  try {
+    doc = JSON.parse(json);
+  } catch {
+    // Unparseable is EMPTY, not a throw: the caller's own rule is that an empty
+    // leg is a refusal, never a pass, so this cannot hide a defect — and one
+    // corrupt file must not stop the other leg from being read.
+    return outcomes;
+  }
+  const tests = Array.isArray(doc?.results?.tests) ? doc.results.tests : Array.isArray(doc?.tests) ? doc.tests : [];
+  const STATUS = { passed: "pass", failed: "fail", skipped: "skip", pending: "skip", other: "error" };
+  const seen = new Map();
+  for (const t of tests) {
+    if (!t || typeof t.name !== "string" || !t.name) continue;
+    const base = typeof t.suite === "string" && t.suite ? `${t.suite}.${t.name}` : t.name;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    const messages = [];
+    if (typeof t.message === "string" && t.message) messages.push(t.message);
+    if (!messages.length && typeof t.trace === "string" && t.trace) messages.push(t.trace.split("\n")[0]);
+    outcomes[n === 1 ? base : `${base} #${n}`] = { status: STATUS[t.status] ?? "error", messages };
+  }
+  return outcomes;
+}
+
+/**
+ * The one entry point a step should call: parse a results directory according
+ * to the format the PROFILE declared.
+ *
+ * Dispatching here rather than at each call site is what keeps the refusal in
+ * one place. A step that picked its own parser would be free to disagree with
+ * `reportFormatProblem` about what is supported, and the disagreement would
+ * surface as an empty outcome map — the failure mode this whole file is
+ * arranged to prevent.
+ *
+ * @param {string} dir a test-results directory
+ * @param {{format?: string}} declared the profile's `reports`
+ * @returns {Record<string, {status: string, messages: string[]}>}
+ */
+export function parseReportOutcomes(dir, { format } = {}) {
+  const problem = reportFormatProblem({ format });
+  if (problem) throw new Error(problem);
+  if (format === "junit-xml") return parseJUnitOutcomes(dir, { format });
+
+  const outcomes = {};
+  if (!fs.existsSync(dir)) return outcomes;
+  const wanted = format === "tap" ? /\.(tap|txt)$/i : /\.json$/i;
+  for (const entry of fs.readdirSync(dir).sort()) {
+    if (!wanted.test(entry)) continue;
+    const body = fs.readFileSync(path.join(dir, entry), "utf8");
+    Object.assign(outcomes, format === "tap" ? parseTapStream(body) : parseCtrfReport(body));
+  }
+  return outcomes;
 }
