@@ -118,6 +118,12 @@ rendered as a property of the receipt, because notarisation is not examination
   someone's package manager applies. Stage 1's exit criterion — "a core fix reaches it by version
   bump" (`NORTH-STAR.md:334`) — is met by a command, and that wording should be read that way or
   amended; it is the one place this ADR bends a sentence already written.
+  **AMENDED 2026-09-08.** The sentence now reads that a core fix reaches the adopter by one command
+  and that the proof is the adopter's TREE — vendored bytes and lock digests moving — rather than a
+  manifest number. Worth recording how it was caught: not by anyone re-reading the ADR, but by
+  trying to write the criterion as a command (`scripts/stage1-gate.mjs`). A contradiction between
+  two documents can sit unnoticed indefinitely; a contradiction between a document and a program
+  surfaces the first time the program runs.
 - **One field is added, against the presumption.** §8.8 presumes against new mechanism, and the
   answer is that `source` prevents a specific falsehood already measured: the published core has sat
   versions behind the tree (`PACKAGE-SPLIT.md:52-55`), so receipts today name versions that were not

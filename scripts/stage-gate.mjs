@@ -55,12 +55,7 @@ const STAGES = [
   {
     id: "1",
     name: "distribution",
-    criteria: null,
-    pending:
-      "\"a backend repo installs the harness without create-cmp; a core fix reaches it by version bump\" — " +
-      "the first half is a cold-adoption variant and could reuse scripts/cold-adoption.mjs. The second is " +
-      "contradicted by ADR-0008 (a core fix reaches a repo as a re-lock, never a package-manager bump) and " +
-      "must be reworded before it can be evaluated at all.",
+    criteria: [{ what: "installs without create-cmp; a core fix reaches the tree by one command", cmd: ["scripts/stage1-gate.mjs"] }],
   },
   {
     id: "2",
@@ -80,9 +75,20 @@ const STAGES = [
   },
 ];
 
+/**
+ * Three outcomes, not two. Exit 2 means the criterion could not be EVALUATED —
+ * `scripts/cold-adoption.mjs` refuses to run against a dirty tree, because an
+ * adoption experiment that can edit the engine is measuring itself. Reporting
+ * that as a failure made stage 0, which is exited, read ✗ whenever anyone had
+ * uncommitted work. "I could not check" and "I checked and it is broken" are
+ * different claims, and this file exists to stop exactly that conflation one
+ * level up.
+ */
 function runCmd(argv) {
   const r = spawnSync(process.execPath, argv, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
-  return { ok: r.status === 0, tail: ((r.stdout ?? "") + (r.stderr ?? "")).trim().split("\n").slice(-2).join(" ") };
+  const tail = ((r.stdout ?? "") + (r.stderr ?? "")).trim().split("\n").slice(-2).join(" ");
+  if (r.status === 2) return { ok: false, unevaluable: true, tail };
+  return { ok: r.status === 0, tail };
 }
 
 function checkFleet() {
@@ -95,7 +101,12 @@ function checkFleet() {
 function evaluate(stage) {
   if (!stage.criteria) return { state: "pending" };
   const results = stage.criteria.map((c) => ({ what: c.what, ...(c.fleet ? checkFleet() : runCmd(c.cmd)) }));
-  return { state: results.every((r) => r.ok) ? "pass" : "fail", results };
+  if (results.every((r) => r.ok)) return { state: "pass", results };
+  // Unevaluable is not failing. A stage nobody could check is reported as
+  // unchecked, and the process exits 2 — the same code the criterion used to
+  // say it — rather than asserting a verdict nobody derived.
+  if (results.some((r) => r.unevaluable) && results.every((r) => r.ok || r.unevaluable)) return { state: "unevaluable", results };
+  return { state: "fail", results };
 }
 
 function main() {
@@ -114,11 +125,13 @@ function main() {
       worst = Math.max(worst, 2);
       continue;
     }
-    const mark = r.state === "pass" ? "✓" : "✗";
+    const mark = r.state === "pass" ? "✓" : r.state === "unevaluable" ? "?" : "✗";
     process.stdout.write(`  ${mark} stage ${stage.id} — ${stage.name}${stage.exited ? ` (exited ${stage.exited})` : ""}\n`);
-    for (const c of r.results) process.stdout.write(`      ${c.ok ? "✓" : "✗"} ${c.what}\n        ${c.tail}\n`);
+    for (const c of r.results) process.stdout.write(`      ${c.ok ? "✓" : c.unevaluable ? "?" : "✗"} ${c.what}\n        ${c.tail}\n`);
+    if (r.state === "unevaluable") process.stdout.write("      (not a failure — nothing could be checked; commit and re-run)\n");
     process.stdout.write("\n");
     if (r.state === "fail") worst = Math.max(worst, 1);
+    if (r.state === "unevaluable") worst = Math.max(worst, 2);
   }
   process.exit(worst);
 }
