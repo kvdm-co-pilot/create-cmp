@@ -169,6 +169,22 @@ you re-take the lock:
 npx prooflane relock
 ```
 
+### Upgrading
+
+A core fix reaches your tree by one command — never by a package manager moving a number,
+because the lane is vendored and a lane in `node_modules` is outside the lock that vouches
+for it:
+
+```
+npm i -D prooflane-harness@latest
+npx prooflane upgrade
+```
+
+It re-vendors every machine-owned file, rewrites `qa/harness-source.json` (which artifact you
+now carry, and where it came from), re-takes the lock, and leaves your profile and your two
+declarations untouched. Run `node qa/framework-check.mjs` afterwards — the lane changed, so
+prove it still refuses — then commit the lane, the lock and the provenance record together.
+
 It re-hashes the region and rewrites `qa/harness.lock.json`, **only** when every difference is
 a file you own (`qa/lib/profiles/<id>/**`, `qa/verified-surface.json`, `qa/harness-manifest.json`).
 A machine-owned file among them and it refuses by name: that is a fork, and `create-cmp upgrade

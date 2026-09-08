@@ -42,6 +42,7 @@ import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfile, loadProfileSync } from "./lib/profile-loader.mjs";
 import { laneMarkerPath } from "./lib/lane-markers.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
+import { readHarnessSource } from "./lib/harness-source.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -520,6 +521,13 @@ function harnessForReceipt() {
     status: r.status,
     intact: r.status === "intact",
   };
+  // PROVENANCE (ADR-0008): where these bytes came from, when the tree records
+  // it. Omitted entirely when unrecorded — absent means "not known", and every
+  // receipt minted before the record existed is in that state. Never defaulted
+  // to `local`, which would invent an origin for all of them. It is reported,
+  // never consulted: no verdict, gate or level reads this field.
+  const provenance = readHarnessSource(ROOT);
+  if (provenance?.source) summary.source = provenance.source;
   if (r.status === "modified") {
     summary.modified = r.modified;
     summary.missing = r.missing;
