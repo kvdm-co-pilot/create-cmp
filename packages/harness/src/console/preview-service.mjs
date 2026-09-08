@@ -47,6 +47,9 @@ import {
   governanceStripHtml,
 } from "./console-shell.mjs";
 import { overviewBodyHtml, overviewStatusHtml, overviewGlyph } from "./console-overview.mjs";
+// The Evidence section's own status line shows a rung, so it shows the pack —
+// one spelling for the whole console lives in console-evidence.mjs (§6.5).
+import { rungWithPack, rungPackNote } from "./console-evidence.mjs";
 import {
   designLanguageBodyHtml,
   componentsBodyHtml,
@@ -334,9 +337,14 @@ export function galleryHtml(state) {
   if (effectiveReceipt && effectiveReceipt.available) {
     const age = typeof effectiveReceipt.ageMs === "number" ? formatAgeCoarse(effectiveReceipt.ageMs) : "age unknown";
     // The rung (receipt's own derived evidenceLevel) rides the status line —
-    // "verify PASS · L2 device · 3m ago" — absent on FAIL/pre-ladder receipts.
-    const rung = effectiveReceipt.evidenceLevel
-      ? ` &middot; ${esc(effectiveReceipt.evidenceLevel.rung)} ${esc(effectiveReceipt.evidenceLevel.name)}`
+    // "verify PASS · L2 device · pack cmp · 3m ago" — absent on FAIL/pre-ladder
+    // receipts. The pack is part of the rung and not an extra field: §6.5 says
+    // every surface showing a rung shows it, and this is the Evidence section's
+    // own header line, so a bare grade here would be the console asserting a
+    // claim §8.9 says cannot be compared with anyone else's.
+    const rungLabel = rungWithPack(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack);
+    const rung = rungLabel
+      ? ` &middot; <span title="${escAttr(rungPackNote(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack))}">${esc(rungLabel)}</span>`
       : "";
     evidenceStatus = `verify ${esc(effectiveReceipt.verdict || "?")}${rung} &middot; ${esc(age)}${
       effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""

@@ -40,6 +40,17 @@
 // The page answers the returning owner's three questions, in the order they are
 // actually asked: what needs me (queue) · what changed (digest) · is it still
 // proven (the standing line in the header).
+//
+// The one import, added 2026-09-08, and it does not breach "composition only":
+// two surfaces here show an evidence rung — the standing line and the
+// recent-requests rows — and NORTH-STAR.md §6.5 requires both to show the pack
+// that graded it. console-evidence.mjs is where the console keeps that one
+// spelling, so importing it is the same rule as taking `receiptGlyph` from the
+// caller: this file arranges a derivation it does not own. The module is a
+// sibling inside `src/console/`, so the package boundary this file crossed
+// cleanly is untouched.
+
+import { rungWithPack, rungPackNote } from "./console-evidence.mjs";
 
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -64,10 +75,16 @@ export function overviewStatusHtml({ receipt, statuses = [], receiptGlyph, forma
     receipt && receipt.available && typeof receipt.ageMs === "number" && formatAge
       ? ` &middot; ${esc(formatAge(receipt.ageMs))}`
       : "";
-  const rung =
-    receipt && receipt.available && receipt.evidenceLevel
-      ? ` &middot; <span class="badge evidence-rung">${esc(receipt.evidenceLevel.rung)} ${esc(receipt.evidenceLevel.name)}</span>`
-      : "";
+  // The rung carries the pack that graded it (§6.5), because this is the line a
+  // returning owner reads to answer "is it still proven" and a bare L2 does not
+  // answer it: §8.9 makes one pack's L2 and another's different claims, so the
+  // grade alone tells the reader which of two unlike things they are looking at
+  // only if they already knew. The badge holds both or neither.
+  const label =
+    receipt && receipt.available ? rungWithPack(receipt.evidenceLevel, receipt.packId ?? receipt.pack) : null;
+  const rung = label
+    ? ` &middot; <span class="badge evidence-rung" title="${escAttr(rungPackNote(receipt.evidenceLevel, receipt.packId ?? receipt.pack))}">${esc(label)}</span>`
+    : "";
   // The tally is silent on an ungoverned project rather than printing "0 of 0
   // signed", which reads as a finding when it is an absence.
   const tally = statuses.length
@@ -343,8 +360,15 @@ function chainHistoryHtml(history) {
     .map((h) => {
       const label = h.title || h.request || "(untitled request)";
       const ageMs = h.at ? Date.now() - Date.parse(h.at) : NaN;
+      // The trail's own glance (qa/lib/plan.mjs receiptGlance) stores the rung
+      // AND the pack it was graded under, and this row shows both for a reason
+      // the other rung surfaces do not have: these rows OUTLIVE the run that
+      // made them, so a bare grade here can never be attributed later by
+      // anything. A row reading "PASS · L2" is unreadable the moment a second
+      // pack exists in the repo's history (§8.9).
+      const rung = h.receipt ? rungWithPack(h.receipt.rung, h.receipt.pack) : null;
       const outcome = h.receipt && h.receipt.verdict
-        ? `<span class="ch-hist-outcome ${h.receipt.verdict === "PASS" ? "ok" : "bad"}">${esc(h.receipt.verdict)}${h.receipt.rung ? ` &middot; ${esc(h.receipt.rung)}` : ""}</span>`
+        ? `<span class="ch-hist-outcome ${h.receipt.verdict === "PASS" ? "ok" : "bad"}"${rung ? ` title="${escAttr(rungPackNote(h.receipt.rung, h.receipt.pack))}"` : ""}>${esc(h.receipt.verdict)}${rung ? ` &middot; ${esc(rung)}` : ""}</span>`
         : `<span class="ch-hist-outcome">no receipt at close</span>`;
       const dur = typeof h.durationMs === "number" && h.durationMs > 0 ? ` &middot; ${esc(fmtChainDur(h.durationMs))}` : "";
       const steps = Array.isArray(h.steps) && h.steps.length ? ` &middot; ${h.steps.length} step${h.steps.length === 1 ? "" : "s"}` : "";

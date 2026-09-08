@@ -14,7 +14,7 @@ const short = (s) => String(s ?? "").slice(0, 7);
  * @param {{ execFileAsync: Function, sinceDays?: number, limit?: number }} deps
  * @returns {Promise<{available: boolean, reason?: string, since: string,
  *   commits: Array<{sha, subject, when, files: Array<{status, path}>}>,
- *   laneRuns: Array<{sha, when, verdict, strength?: string, rung?: string}>,
+ *   laneRuns: Array<{sha, when, verdict, strength?: string, rung?: string, packId?: string|null}>,
  *   approvalEvents: Array<{sha, when, subject}>,
  *   openComments: number|null}>}
  */
@@ -89,6 +89,14 @@ export async function getDigestData(projectDir, { execFileAsync, sinceDays = 7, 
           verdict: receipt.verdict ?? "unknown",
           strength: onDevice.length ? `on-device: ${onDevice.join("+")}` : "desktop-only",
           rung: level && typeof level.rung === "string" && typeof level.name === "string" ? `${level.rung} ${level.name}` : undefined,
+          // The pack that graded that rung, carried BESIDE it because a rung
+          // that reaches a surface without one cannot be rendered honestly
+          // there — NORTH-STAR.md §6.5 requires every surface showing a rung to
+          // show the pack, and this row feeds one (the front door's "What
+          // changed" lane-run table). Only the id: `pack.version` on a receipt
+          // is currently the harness lock's number rather than the profile's
+          // (docs/adr/0008), so passing it on would propagate a borrowed fact.
+          packId: typeof receipt.pack?.id === "string" && receipt.pack.id.trim() ? receipt.pack.id.trim() : null,
         });
       } catch {
         laneRuns.push({ sha: short(sha), when, verdict: "unreadable" });

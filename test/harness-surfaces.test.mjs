@@ -18,6 +18,14 @@ import { fileURLToPath } from "node:url";
 import { scaffold } from "../src/scaffold.mjs";
 import { evidenceLevel } from "../template/qa/lib/evidence-level.mjs";
 import { CMP_LADDER } from "../packages/harness/src/lib/profiles/cmp/ladder.mjs";
+// The cmp profile's own plant declaration. Every rung assertion below passes it
+// because a rung now has a PRECONDITION as well as a derivation: a profile that
+// ships no plants the Rule 0 instrument can run earns no rung at all, however
+// green its lane (NORTH-STAR §8.9; qa/lib/plant-calibration.mjs). These tests
+// grade the cmp pack, so they state the cmp pack's plants — the assertions
+// themselves are unchanged, and the badge floor has its own suite in
+// test/badge-floor.test.mjs.
+import { plants as CMP_PLANTS } from "../packages/harness/src/lib/profiles/cmp/plants.mjs";
 import { isHarnessFile } from "../packages/harness/src/lib/harness-region.mjs";
 
 // S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
@@ -341,7 +349,11 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.match(verify, /mode: fast \? "fast" : "full"|const mode = fast \? "fast" : "full"/, "the receipt records mode fast/full distinctly");
       assert.match(verify, /INNER LOOP ONLY, NOT THE DONE-GATE/, "the start banner is loud and unambiguous");
       assert.match(verify, /FAST — INNER LOOP ONLY, NOT DONE/, "the fast verdict line is visually distinct from done-green");
-      assert.match(verify, /evidenceLevel\(steps, profile, \{ mode, ladder: resolvedLadder\.ladder \}\)/, "the rung derivation is told the mode — fast derives no rung");
+      assert.match(
+        verify,
+        /gradeEvidence\(steps, profile, \{ mode, ladder: resolvedLadder\.ladder, plants: loaded\.profile\.plants \}\)/,
+        "the rung derivation is told the mode — fast derives no rung — and the profile's plants, without which it derives no rung either (the badge floor, NORTH-STAR §8.9)",
+      );
       // Docs: CLAUDE.md commands table + TESTING.md both teach the flag honestly.
       const claudeMd = fs.readFileSync(path.join(out, "CLAUDE.md"), "utf8");
       assert.match(claudeMd, /node qa\/verify\.mjs --fast/, "CLAUDE.md commands table lists --fast");
@@ -628,7 +640,7 @@ function desktopPassSteps() {
 }
 
 test("evidence ladder: a green desktop lane (device steps all SKIP) is L1 — SKIPs are visible fine print, not rungs", () => {
-  const level = evidenceLevel(desktopPassSteps(), "local", { ladder: CMP_LADDER });
+  const level = evidenceLevel(desktopPassSteps(), "local", { ladder: CMP_LADDER, plants: CMP_PLANTS });
   assert.equal(level.rung, "L1");
   assert.equal(level.name, "desktop");
   assert.ok(level.satisfiedBy.includes("conformance") && level.satisfiedBy.includes("releaseBuild"));
@@ -637,7 +649,7 @@ test("evidence ladder: a green desktop lane (device steps all SKIP) is L1 — SK
 
 test("evidence ladder: one on-device execution step PASSed lifts to L2 device", () => {
   const steps = desktopPassSteps().map((s) => (s.name === "e2eSmoke" ? { name: "e2eSmoke", verdict: "PASS", durationMs: 60_000 } : s));
-  const level = evidenceLevel(steps, "local", { ladder: CMP_LADDER });
+  const level = evidenceLevel(steps, "local", { ladder: CMP_LADDER, plants: CMP_PLANTS });
   assert.equal(level.rung, "L2");
   assert.equal(level.name, "device");
   assert.ok(level.satisfiedBy.includes("e2eSmoke"));
@@ -646,7 +658,7 @@ test("evidence ladder: one on-device execution step PASSed lifts to L2 device", 
 test("evidence ladder: THE key pin — releaseSmoke SKIP (unsigned keystore) never upgrades L2 to L3", () => {
   const steps = desktopPassSteps().map((s) => (s.name === "e2eSmoke" ? { name: "e2eSmoke", verdict: "PASS", durationMs: 60_000 } : s));
   steps.push({ name: "releaseSmoke", verdict: "SKIP", reason: "release APK is unsigned — no signingConfig", durationMs: 0 });
-  const level = evidenceLevel(steps, "release", { ladder: CMP_LADDER });
+  const level = evidenceLevel(steps, "release", { ladder: CMP_LADDER, plants: CMP_PLANTS });
   assert.equal(level.rung, "L2", "a SKIP can never buy a rung — the label must not overclaim");
   assert.ok(!level.satisfiedBy.includes("releaseSmoke"));
 });
@@ -654,7 +666,7 @@ test("evidence ladder: THE key pin — releaseSmoke SKIP (unsigned keystore) nev
 test("evidence ladder: releaseSmoke PASSed on top of L2 is L3 release", () => {
   const steps = desktopPassSteps().map((s) => (s.name === "e2eSmoke" ? { name: "e2eSmoke", verdict: "PASS", durationMs: 60_000 } : s));
   steps.push({ name: "releaseSmoke", verdict: "PASS", durationMs: 90_000 });
-  const level = evidenceLevel(steps, "release", { ladder: CMP_LADDER });
+  const level = evidenceLevel(steps, "release", { ladder: CMP_LADDER, plants: CMP_PLANTS });
   assert.equal(level.rung, "L3");
   assert.equal(level.name, "release");
   assert.ok(level.satisfiedBy.includes("releaseSmoke"));
@@ -668,25 +680,25 @@ test("evidence ladder: a step that could not run (ERROR) earns no rung either �
     { name: "conformance", verdict: "PASS" }, { name: "goldenTrees", verdict: "PASS" }, { name: "a11y", verdict: "PASS" },
     { name: "releaseBuild", verdict: "ERROR", reason: "DID NOT COMPLETE — deadline" },
   ];
-  assert.equal(evidenceLevel(steps, "local", { ladder: CMP_LADDER }), null);
+  assert.equal(evidenceLevel(steps, "local", { ladder: CMP_LADDER, plants: CMP_PLANTS }), null);
 });
 
 test("evidence ladder: a FAILed lane has no rung — evidenceLevel is null", () => {
   const steps = desktopPassSteps().map((s) => (s.name === "goldenTrees" ? { name: "goldenTrees", verdict: "FAIL", reason: "drift", durationMs: 100 } : s));
-  assert.equal(evidenceLevel(steps, "local", { ladder: CMP_LADDER }), null);
+  assert.equal(evidenceLevel(steps, "local", { ladder: CMP_LADDER, plants: CMP_PLANTS }), null);
   // Even a FAIL in a device step nulls the rung — the lane verdict is FAIL.
   const deviceFail = desktopPassSteps().map((s) => (s.name === "e2eSmoke" ? { name: "e2eSmoke", verdict: "FAIL", reason: "smoke red", durationMs: 100 } : s));
-  assert.equal(evidenceLevel(deviceFail, "local", { ladder: CMP_LADDER }), null);
+  assert.equal(evidenceLevel(deviceFail, "local", { ladder: CMP_LADDER, plants: CMP_PLANTS }), null);
 });
 
 test("evidence ladder: a fast-mode run derives NO rung — the inner loop is a signal, never evidence", () => {
   // Even a fully green step list buys nothing under mode "fast": a fast receipt
   // must never be silently reused as if it were a full-lane result.
-  assert.equal(evidenceLevel(desktopPassSteps(), "local", { mode: "fast", ladder: CMP_LADDER }), null);
+  assert.equal(evidenceLevel(desktopPassSteps(), "local", { mode: "fast", ladder: CMP_LADDER, plants: CMP_PLANTS }), null);
   // The same steps under full mode (or with mode unstated — legacy callers)
   // still derive their honest rung.
-  assert.equal(evidenceLevel(desktopPassSteps(), "local", { mode: "full", ladder: CMP_LADDER }).rung, "L1");
-  assert.equal(evidenceLevel(desktopPassSteps(), "local", { ladder: CMP_LADDER }).rung, "L1");
+  assert.equal(evidenceLevel(desktopPassSteps(), "local", { mode: "full", ladder: CMP_LADDER, plants: CMP_PLANTS }).rung, "L1");
+  assert.equal(evidenceLevel(desktopPassSteps(), "local", { ladder: CMP_LADDER, plants: CMP_PLANTS }).rung, "L1");
 });
 
 test("evidence ladder: a green scaffold-profile lane is L0 — and the profile flag never buys a higher rung", () => {
@@ -703,7 +715,7 @@ test("evidence ladder: a green scaffold-profile lane is L0 — and the profile f
   ];
   // The same steps claim the same rung under any requested profile: derived, never declared.
   for (const profile of ["scaffold", "local", "ci", "release"]) {
-    const level = evidenceLevel(scaffoldSteps, profile, { ladder: CMP_LADDER });
+    const level = evidenceLevel(scaffoldSteps, profile, { ladder: CMP_LADDER, plants: CMP_PLANTS });
     assert.equal(level.rung, "L0", `profile "${profile}" cannot declare a rung the steps did not earn`);
     assert.equal(level.name, "scaffold");
   }

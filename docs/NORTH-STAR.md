@@ -623,10 +623,24 @@ Two things were learned in the closing that neither the predicate nor the audit 
 **Still open, and deliberately.** `pack.version` inheriting the harness lock's number, and a
 plantless profile earning a rung, are both left red on the gate: the first is ADR-0008's to settle
 and the ADR is unsigned, and the second is a new floor, which under §8.8 needs a kept plant and a
-measured cost before it is wired. **Five console surfaces still render a bare rung** —
-`console-shell.mjs:280`, `console-overview.mjs:69`, `console-tabs.mjs` (three), and
-`preview-service.mjs:339` — named here rather than left silent, since §6.5 says *every* surface and
-a list that stops where the last commit stopped is the instance-fix again.
+measured cost before it is wired. **The console surfaces are closed too, and the list in this
+paragraph was wrong three ways** — it said five, named six locations, and a scan found **seven**;
+the miss was `console-overview.mjs`'s recent-requests rows. That is the argument against enumerating
+a class by hand, made against this document: the fix is a deny-by-default scan of the whole console
+directory, so a surface written tomorrow is covered the day it is written.
+
+**And the root cause was not the renderers.** All of them were fed by
+`inspector/mcp/src/lib/receipt-bridge.mjs` and `digest.mjs`, which built a fixed object with `pack`
+simply absent. A renderer-only fix would have printed "pack unnamed" over every real `cmp` receipt —
+a false statement, which is strictly worse than the bare rung it replaced. Worth keeping: the
+surface where a defect is VISIBLE and the layer where it is CAUSED were one hop apart, and fixing
+only the visible one would have made the product lie more confidently.
+
+*Named and still open, both outside the console:* `lib/flight-recorder.mjs:94` stores a rung with no
+pack and `:341` prints one. Sharper, because it runs today under fit-test question 6:
+`scripts/fleet-check.mjs:290` compares a rung against a threshold **without asking which pack graded
+it**, and `:305` prints the result with no pack — a cross-pack comparison of exactly the kind §8.9
+forbids and Stage 3's predicate already refuses.
 
 ---
 

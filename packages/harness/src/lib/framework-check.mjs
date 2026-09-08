@@ -44,6 +44,11 @@
 // the scanner came to disagree about the same file (see `flowCitation`). The
 // import performs no IO; every function below still takes data and returns data.
 import { DEFAULT_GRAMMAR } from "./spec-model.mjs";
+// The badge floor's two halves, imported for the same reason as the grammar
+// above: the plant below calibrates THE grader the lane runs and THE definition
+// of plant material the runner plants from, not a re-statement of either.
+import { evidenceLevel } from "./evidence-level.mjs";
+import { plantCalibration } from "./plant-calibration.mjs";
 
 /**
  * Per-direction bound. Rule 0's whole claim is about SPEED of refusal, so the
@@ -488,6 +493,82 @@ export function assessCoverage(plants) {
     return { ok: false, reason: `the region plants are the floor and ${missingFloor.join(", ")} could not be made` };
   }
   return { ok: true };
+}
+
+/**
+ * THE BADGE FLOOR'S KEPT PLANT — "a profile with no calibrated plants earns no
+ * rung" (NORTH-STAR.md §8.9), watched failing rather than assumed to work.
+ *
+ * WHY IT IS HERE AND NOT ONLY IN THE HARNESS'S OWN SUITE. GATE-RULES Rule 1 is
+ * explicit about where a plant goes — "Add the plant to `qa/framework-check.mjs`
+ * and run that" — and the reason is this gate's own subject: the floor exists to
+ * protect a claim made on EVERY adopter's receipt, so the plant that proves it
+ * still bites has to run in every adopter's tree, forever, not once in ours.
+ * A gate proved only in the repository that wrote it is a gate proved on the one
+ * profile it was written against, which is how every wrong verdict in
+ * NORTH-STAR.md §9.1 survived a green suite.
+ *
+ * THE VIOLATION PLANTED is the twin `scripts/stage2-gate.mjs` built: this
+ * profile's own ladder and a lane whose rows all PASS, graded with the `plants`
+ * declaration REMOVED. Before 2026-09-08 that earned `L1` — measured on two
+ * scratch adopters differing in exactly one export. It must now earn nothing,
+ * and the same rows WITH the declaration must still earn their rung, or the
+ * plant would go green on a grader that had simply stopped grading anyone.
+ * Those two halves are the same pair criteria F and G of the stage-2 gate make,
+ * and they are made here in microseconds instead of two adopted trees.
+ *
+ * NO TREE IS TOUCHED AND NO LANE IS RUN. The rows are synthesised from the
+ * ladder's own step names, so this asserts over the GRADER — which is the only
+ * thing the floor lives in. That is also its limit, and it is stated in the
+ * runner's own output rather than hidden here: it proves the rung a lane WOULD
+ * be given, not that a lane was run.
+ *
+ * @param {{ladder: object|null|undefined, plants: object|null|undefined}} profile
+ *   the profile's resolved ladder (qa/lib/evidence-ladder.mjs) and its `plants`
+ *   declaration — both exactly as the lane runner reads them
+ * @returns {{ok: true, rung: string}
+ *   |{ok: false, reason: string}
+ *   |{available: false, reason: string}} `available: false` is neither a pass
+ *   nor a failure: it is a plant this tree cannot make, reported with its cause
+ *   the same way every unavailable plant is.
+ */
+export function assessBadgeFloor({ ladder, plants } = {}) {
+  const calibrated = plantCalibration(plants);
+  if (!calibrated.ok) {
+    return { available: false, reason: `${calibrated.reason} — there is no declaration to strip, and no rung to lose` };
+  }
+  if (!ladder || typeof ladder !== "object") {
+    return {
+      available: false,
+      reason:
+        "this profile declares no `ladder` a reader can see without starting a lane, so no rung exists either way " +
+        "(a ladder declared only on the object `steps(ctx)` returns is invisible here — qa/lib/evidence-ladder.mjs)",
+    };
+  }
+  const names = [...new Set([...(ladder.l0Required ?? []), ...(ladder.l1Required ?? [])])];
+  const rows = names.map((name) => ({ name, verdict: "PASS" }));
+  const earned = evidenceLevel(rows, null, { mode: "full", ladder, plants });
+  if (!earned) {
+    return {
+      available: false,
+      reason:
+        `this profile's ladder grants no rung even with ${names.length ? names.join(", ") : "every declared step"} PASSing, ` +
+        "so there is no rung for the floor to withhold",
+    };
+  }
+  // THE PLANT: the same rows, the same ladder, and no plant material.
+  const stripped = evidenceLevel(rows, null, { mode: "full", ladder, plants: undefined });
+  if (stripped) {
+    return {
+      ok: false,
+      reason:
+        `PLANTED the profile's own ladder with its \`plants\` declaration removed and the lane still earned ` +
+        `${stripped.rung} · ${stripped.name} — the badge floor is not being applied. NORTH-STAR.md §8.9: "a profile ` +
+        `with no calibrated plants earns no rung"; §6.7: a profile ships plants this instrument can run, or it ships ` +
+        `without a badge. The grader is qa/lib/evidence-level.mjs and the floor it asks is qa/lib/plant-calibration.mjs`,
+    };
+  }
+  return { ok: true, rung: earned.rung };
 }
 
 /**

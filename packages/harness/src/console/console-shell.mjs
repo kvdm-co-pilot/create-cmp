@@ -32,6 +32,15 @@
 //   provenance footer ("derived from the live tree … absence = not derivable").
 // - Light + dark via prefers-color-scheme. Pure server-rendered HTML/CSS,
 //   zero external dependencies.
+//
+// The one import, added 2026-09-08: the rail foot shows an evidence rung, and
+// NORTH-STAR.md §6.5 requires every surface that shows one to show the pack
+// beside it. That spelling belongs to console-evidence.mjs so that the console
+// has one of it rather than seven (see that file's header). The import is a
+// sibling inside `src/console/`, so the reason this file crossed the package
+// boundary cleanly still holds: nothing here points out of the package.
+
+import { rungWithPack, rungPackNote } from "./console-evidence.mjs";
 
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -276,8 +285,15 @@ export function railReceiptHtml(receipt, formatAge = formatAgeCoarse) {
   }
   const unknown = receipt.stale === null ? " &middot; freshness unverified" : "";
   // The evidence-ladder rung, verbatim from the receipt's own derived
-  // evidenceLevel — absent (FAIL / pre-ladder receipt) means no rung shown.
-  const rung = receipt.evidenceLevel ? ` &middot; ${esc(receipt.evidenceLevel.rung)} ${esc(receipt.evidenceLevel.name)}` : "";
+  // evidenceLevel — absent (FAIL / pre-ladder receipt) means no rung shown —
+  // AND THE PACK THAT GRADED IT, which is not decoration on the one line the
+  // console shows on every page. This foot said "verify PASS · L2 device" until
+  // 2026-09-08, and a reader who met that had no way to tell a phone-driven L2
+  // from a database-backed one (§8.9). The pack rides the same string so the
+  // two can never be separated by a later edit to this template literal.
+  const label = rungWithPack(receipt.evidenceLevel, receipt.packId ?? receipt.pack);
+  const note = rungPackNote(receipt.evidenceLevel, receipt.packId ?? receipt.pack);
+  const rung = label ? ` &middot; <span title="${esc(note)}">${esc(label)}</span>` : "";
   return `${glyph} verify ${esc(verdict)}${rung} ${esc(age)}${unknown}`;
 }
 

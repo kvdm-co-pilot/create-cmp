@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs d171983fdc49e3b07e6681e9ddbd6258177ea83800632c84ff452ca1040a4473
+// cmp:bundle-inputs 145264bed9236e321eba049c8e4e07e771195ad65f668e3345335e116ec34779
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -33422,6 +33422,10 @@ function readEvidenceLevel(receipt) {
     satisfiedBy: Array.isArray(level.satisfiedBy) ? level.satisfiedBy.filter((s) => typeof s === "string") : []
   };
 }
+function readPackId(receipt) {
+  const id = receipt && receipt.pack && typeof receipt.pack.id === "string" ? receipt.pack.id.trim() : "";
+  return id || null;
+}
 async function recomputeStaleness(root, receipt) {
   const receiptHash = receiptInputsHash(receipt);
   if (!receiptHash) {
@@ -33480,6 +33484,7 @@ async function getLastReceipt(root) {
   const ageMs = Number.isNaN(parsedAt) ? null : Date.now() - parsedAt;
   const { stale, currentInputsHash, staleReason } = await recomputeStaleness(root, receipt);
   const evidenceLevel = readEvidenceLevel(receipt);
+  const packId = readPackId(receipt);
   return {
     available: true,
     relPath: RECEIPT_REL_PATH,
@@ -33491,6 +33496,7 @@ async function getLastReceipt(root) {
     ageMs,
     steps,
     evidenceLevel,
+    packId,
     conformance,
     inputsHash: receiptInputsHash(receipt),
     inputsFileCount: receiptInputsFileCount(receipt),
@@ -33558,6 +33564,7 @@ function listReceiptHistory(root) {
       verdict: parsed.verdict ?? null,
       profile: typeof parsed.profile === "string" ? parsed.profile : null,
       evidenceLevel: readEvidenceLevel(parsed),
+      packId: readPackId(parsed),
       generatedAt: receiptGeneratedAt(parsed)
     });
   }
@@ -34263,7 +34270,15 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
           when,
           verdict: receipt.verdict ?? "unknown",
           strength: onDevice.length ? `on-device: ${onDevice.join("+")}` : "desktop-only",
-          rung: level && typeof level.rung === "string" && typeof level.name === "string" ? `${level.rung} ${level.name}` : void 0
+          rung: level && typeof level.rung === "string" && typeof level.name === "string" ? `${level.rung} ${level.name}` : void 0,
+          // The pack that graded that rung, carried BESIDE it because a rung
+          // that reaches a surface without one cannot be rendered honestly
+          // there — NORTH-STAR.md §6.5 requires every surface showing a rung to
+          // show the pack, and this row feeds one (the front door's "What
+          // changed" lane-run table). Only the id: `pack.version` on a receipt
+          // is currently the harness lock's number rather than the profile's
+          // (docs/adr/0008), so passing it on would propagate a borrowed fact.
+          packId: typeof receipt.pack?.id === "string" && receipt.pack.id.trim() ? receipt.pack.id.trim() : null
         });
       } catch {
         laneRuns.push({ sha: short(sha), when, verdict: "unreadable" });
@@ -34377,6 +34392,26 @@ async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: 
     available: false,
     reason: `no commit in the last ${SEARCH_DEPTH} touching this artifact matches the approved hash \u2014 the approval was likely recorded against uncommitted files. The chip is still correct; only the anchored diff is unavailable.`
   };
+}
+
+// ../../packages/harness/src/console/console-evidence.mjs
+function packIdOf(pack) {
+  if (typeof pack === "string") return pack.trim() || null;
+  if (pack && typeof pack === "object" && typeof pack.id === "string") return pack.id.trim() || null;
+  return null;
+}
+function rungWithPack(level, pack) {
+  const grade = typeof level === "string" ? level.trim() : level && typeof level === "object" && typeof level.rung === "string" ? level.rung.trim() : "";
+  if (!grade) return null;
+  const name = level && typeof level === "object" && typeof level.name === "string" && level.name.trim() ? level.name.trim() : "";
+  const id = packIdOf(pack);
+  return `${grade}${name ? ` ${name}` : ""} \xB7 ${id ? `pack ${id}` : "pack unnamed"}`;
+}
+function rungPackNote(level, pack) {
+  if (!rungWithPack(level, pack)) return null;
+  const grade = typeof level === "string" ? level.trim() : String(level.rung).trim();
+  const id = packIdOf(pack);
+  return id ? `this rung is pack ${id}'s: a ${id} ${grade} and another pack's ${grade} are different claims` : "the receipt names no pack, so this rung is comparable to nothing";
 }
 
 // ../../packages/harness/src/console/console-shell.mjs
@@ -34501,7 +34536,9 @@ function railReceiptHtml(receipt, formatAge = formatAgeCoarse) {
     return `${glyph} verify ${esc3(verdict)} ${esc3(age)} &mdash; stale (tree changed since)`;
   }
   const unknown2 = receipt.stale === null ? " &middot; freshness unverified" : "";
-  const rung = receipt.evidenceLevel ? ` &middot; ${esc3(receipt.evidenceLevel.rung)} ${esc3(receipt.evidenceLevel.name)}` : "";
+  const label = rungWithPack(receipt.evidenceLevel, receipt.packId ?? receipt.pack);
+  const note = rungPackNote(receipt.evidenceLevel, receipt.packId ?? receipt.pack);
+  const rung = label ? ` &middot; <span title="${esc3(note)}">${esc3(label)}</span>` : "";
   return `${glyph} verify ${esc3(verdict)}${rung} ${esc3(age)}${unknown2}`;
 }
 function railItemHtml(item) {
@@ -35244,7 +35281,8 @@ function overviewStatusHtml({ receipt, statuses = [], receiptGlyph: receiptGlyph
   const g = receiptGlyph2 ? receiptGlyph2(receipt) : null;
   const lane = g ? `<span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span> ${esc4(g.label)}` : "";
   const age = receipt && receipt.available && typeof receipt.ageMs === "number" && formatAge ? ` &middot; ${esc4(formatAge(receipt.ageMs))}` : "";
-  const rung = receipt && receipt.available && receipt.evidenceLevel ? ` &middot; <span class="badge evidence-rung">${esc4(receipt.evidenceLevel.rung)} ${esc4(receipt.evidenceLevel.name)}</span>` : "";
+  const label = receipt && receipt.available ? rungWithPack(receipt.evidenceLevel, receipt.packId ?? receipt.pack) : null;
+  const rung = label ? ` &middot; <span class="badge evidence-rung" title="${escAttr(rungPackNote(receipt.evidenceLevel, receipt.packId ?? receipt.pack))}">${esc4(label)}</span>` : "";
   const tally = statuses.length ? ` &middot; ${statuses.filter((s) => s.status === "approved").length} of ${statuses.length} signed` : "";
   return `${lane}${age}${rung}${tally}`;
 }
@@ -35384,7 +35422,8 @@ function chainHistoryHtml(history) {
   const rows = history.map((h) => {
     const label = h.title || h.request || "(untitled request)";
     const ageMs = h.at ? Date.now() - Date.parse(h.at) : NaN;
-    const outcome = h.receipt && h.receipt.verdict ? `<span class="ch-hist-outcome ${h.receipt.verdict === "PASS" ? "ok" : "bad"}">${esc4(h.receipt.verdict)}${h.receipt.rung ? ` &middot; ${esc4(h.receipt.rung)}` : ""}</span>` : `<span class="ch-hist-outcome">no receipt at close</span>`;
+    const rung = h.receipt ? rungWithPack(h.receipt.rung, h.receipt.pack) : null;
+    const outcome = h.receipt && h.receipt.verdict ? `<span class="ch-hist-outcome ${h.receipt.verdict === "PASS" ? "ok" : "bad"}"${rung ? ` title="${escAttr(rungPackNote(h.receipt.rung, h.receipt.pack))}"` : ""}>${esc4(h.receipt.verdict)}${rung ? ` &middot; ${esc4(rung)}` : ""}</span>` : `<span class="ch-hist-outcome">no receipt at close</span>`;
     const dur = typeof h.durationMs === "number" && h.durationMs > 0 ? ` &middot; ${esc4(fmtChainDur(h.durationMs))}` : "";
     const steps = Array.isArray(h.steps) && h.steps.length ? ` &middot; ${h.steps.length} step${h.steps.length === 1 ? "" : "s"}` : "";
     return `    <p class="ch-hist-row" title="${escAttr(Array.isArray(h.steps) ? h.steps.join(" \u2192 ") : "")}">${esc4(label)}${steps}${dur} &middot; ${outcome}${Number.isNaN(ageMs) ? "" : ` &middot; ${esc4(fmtChainAge(ageMs))}`}</p>`;
@@ -36594,7 +36633,8 @@ function timelineRowHtml(r) {
   const commit = r.commitSha ? `<span class="meta">commit <code>${esc5(String(r.commitSha).slice(0, 7))}</code></span>` : "";
   const author = r.author ? `<span class="meta">by ${esc5(r.author)}</span>` : "";
   const when = r.committedAt ? esc5(r.committedAt) : "commit date unknown";
-  const rung = r.evidenceLevel ? `<span class="badge evidence-rung">${esc5(r.evidenceLevel.rung)} &middot; ${esc5(r.evidenceLevel.name)}</span>` : "";
+  const rungLabel = rungWithPack(r.evidenceLevel, r.packId ?? r.pack);
+  const rung = rungLabel ? `<span class="badge evidence-rung" title="${escAttr2(rungPackNote(r.evidenceLevel, r.packId ?? r.pack))}">${esc5(rungLabel)}</span>` : "";
   return `    <li>
       <span class="${cls}">${esc5(r.verdict || "?")}</span>
       ${rung}
@@ -36628,7 +36668,8 @@ function evidenceBodyHtml(lastReceipt, history) {
   const stale = r.stale === true;
   const verdictCls = stale ? "verdict-muted" : r.verdict === "PASS" ? "verdict-pass" : r.verdict === "FAIL" ? "verdict-fail" : "verdict-muted";
   const staleChip = stale ? ` <span class="badge badge-changed">STALE &mdash; the tree changed since this run</span>` : r.stale === null ? ` <span class="badge badge-unreviewed">freshness unknown</span>` : "";
-  const rungChip = r.evidenceLevel ? ` <span class="badge evidence-rung" title="${escAttr2(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"}`)}">Evidence: ${esc5(r.evidenceLevel.rung)} &middot; ${esc5(r.evidenceLevel.name)}</span>` : "";
+  const rungLabelText = rungWithPack(r.evidenceLevel, r.packId ?? r.pack);
+  const rungChip = rungLabelText ? ` <span class="badge evidence-rung" title="${escAttr2(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"} \u2014 ${rungPackNote(r.evidenceLevel, r.packId ?? r.pack)}`)}">Evidence: ${esc5(rungLabelText)}</span>` : "";
   const age = formatReceiptAge(r.ageMs);
   const dirty = r.commitDirty && r.commitDirty.length ? ` &middot; ${r.commitDirty.length} uncommitted file${r.commitDirty.length === 1 ? "" : "s"} at run time` : "";
   const facts = [
@@ -37009,6 +37050,12 @@ ${chainHtml}`;
 ${chainHtml}
   <div id="live-error" class="banner" hidden></div>`;
 }
+function laneRunEvidenceHtml(r) {
+  const label = rungWithPack(r.rung, r.packId ?? r.pack);
+  const strength = esc5(r.strength ?? "\u2014");
+  if (!label) return strength;
+  return `<span title="${escAttr2(rungPackNote(r.rung, r.packId ?? r.pack))}">${esc5(label)}</span> &mdash; ${strength}`;
+}
 function digestTabHtml(digest) {
   if (!digest || !digest.available) {
     return `<div class="empty"><p>No digest \u2014 ${esc5(digest ? digest.reason : "unavailable")}</p></div>`;
@@ -37016,7 +37063,7 @@ function digestTabHtml(digest) {
   const lane = digest.laneRuns.length ? `  <h3>Lane runs</h3>
   <table class="params-table"><thead><tr><th>when</th><th>commit</th><th>verdict</th><th>evidence</th></tr></thead><tbody>
 ${digest.laneRuns.map(
-    (r) => `    <tr><td>${esc5(r.when)}</td><td><code>${esc5(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc5(r.verdict)}</span></td><td>${r.rung ? `${esc5(r.rung)} &mdash; ` : ""}${esc5(r.strength ?? "\u2014")}</td></tr>`
+    (r) => `    <tr><td>${esc5(r.when)}</td><td><code>${esc5(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc5(r.verdict)}</span></td><td>${laneRunEvidenceHtml(r)}</td></tr>`
   ).join("\n")}
   </tbody></table>` : `  <h3>Lane runs</h3>
   <p class="empty-inline">no committed receipts in the window \u2014 the lane has not run (or its receipt was not committed)</p>`;
@@ -37294,7 +37341,8 @@ function galleryHtml(state) {
   let evidenceStatus = "no verify receipt yet";
   if (effectiveReceipt && effectiveReceipt.available) {
     const age = typeof effectiveReceipt.ageMs === "number" ? formatAgeCoarse(effectiveReceipt.ageMs) : "age unknown";
-    const rung = effectiveReceipt.evidenceLevel ? ` &middot; ${esc6(effectiveReceipt.evidenceLevel.rung)} ${esc6(effectiveReceipt.evidenceLevel.name)}` : "";
+    const rungLabel = rungWithPack(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack);
+    const rung = rungLabel ? ` &middot; <span title="${escAttr3(rungPackNote(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack))}">${esc6(rungLabel)}</span>` : "";
     evidenceStatus = `verify ${esc6(effectiveReceipt.verdict || "?")}${rung} &middot; ${esc6(age)}${effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""}`;
   }
   let approvalsStatus = "approvals not available in this project";

@@ -32,7 +32,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { computeInputsHash, undeclaredTopLevel } from "./lib/inputs-hash.mjs";
-import { evidenceLevel } from "./lib/evidence-level.mjs";
+import { gradeEvidence } from "./lib/evidence-level.mjs";
 import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
 import { updateReadmeBadge, README_REL_PATH } from "./lib/evidence-badge.mjs";
 import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
@@ -476,7 +476,16 @@ const strengthLabel = typeof pack.strengthLabel === "function" ? pack.strengthLa
 // declare it (resolved above, qa/lib/evidence-ladder.mjs): a profile that
 // declares none in either earns no rung (a backend graded by another stack's
 // step names was L0 by construction — wrong, not conservative).
-const level = evidenceLevel(steps, profile, { mode, ladder: resolvedLadder.ladder });
+//
+// AND THE BADGE FLOOR: the profile's `plants` declaration goes to the grader
+// too, because a ladder is a vocabulary and plants are what prove the steps
+// under it still bite. A profile shipping none earns NO rung however green its
+// lane (NORTH-STAR §8.9, §6.7, §3's third *never*) — measured on two adopters
+// differing in exactly one export, both of which earned L1 until 2026-09-08.
+// `.why` is the sentence for a rung that is absent: derived by the same call,
+// so the grade and its explanation can never disagree.
+const grade = gradeEvidence(steps, profile, { mode, ladder: resolvedLadder.ladder, plants: loaded.profile.plants });
+const level = grade.level;
 
 // Artifacts: hash whatever the run left under qa-artifacts/ (never committed).
 const artifacts = [];
@@ -664,6 +673,12 @@ if (asJson) {
   // pack its own (ADR-0008), so printing it would name a version of the wrong
   // thing.
   console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name} · pack ${pack.id}` : ""}${strengthLabel ? ` (${strengthLabel})` : ""} — receipt written to qa/evidence/latest.json${badge.changed ? ` and ${README_REL_PATH}'s evidence badge refreshed` : ""} (commit ${badge.changed ? "them" : "it"} with your change)`);
+  // A GREEN LANE THAT EARNED NO RUNG SAYS WHY, on the line a human is already
+  // reading. Silence here is the exact shape of the defect that cost a foreign
+  // author their grade — a lane that passed, a rung that never appeared, and
+  // nothing anywhere connecting the two (NORTH-STAR §9.2). On a FAILed lane the
+  // absence explains itself, so this stays quiet and lets the red row speak.
+  if (verdict === "PASS" && !level && grade.why) console.log(`  ⓘ ${grade.why}`);
 }
 
 // A TIER THAT HAS NEVER RUN HERE. A SKIP is non-fatal by design — absence of a
