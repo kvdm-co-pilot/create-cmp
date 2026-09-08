@@ -29,6 +29,7 @@
 // status surface never breaks the work it reports on.
 
 import fs from "node:fs";
+import { gitignoredDirs, declaredIgnore } from "./inputs-hash.mjs";
 import path from "node:path";
 
 import { laneMarkerPath, renderMarkerPath } from "./lane-markers.mjs";
@@ -289,7 +290,12 @@ function activityRoots(root) {
   if (!model.ok) return ["qa", "docs"];
   return [...new Set([...model.model.sourceRoots, model.model.specsDir, "qa", "docs"])];
 }
-const ACTIVITY_SKIP_DIRS = new Set(["build", ".gradle", ".kotlin", ".git", ".idea", "node_modules", "evidence"]);
+// Machinery and the repo's own ignored directories — never one stack's build
+// dirs by name (the 2026-09-08 language audit found .gradle and .kotlin here).
+const ACTIVITY_SKIP_FLOOR = new Set([".git", "node_modules", "evidence"]);
+function activitySkipDirs(root) {
+  return new Set([...ACTIVITY_SKIP_FLOOR, ...gitignoredDirs(root), ...declaredIgnore(root)]);
+}
 // Machinery, not work: the chain's own files and the lane's outputs must not
 // count as "the agent wrote something", or the pulse would corroborate itself.
 const ACTIVITY_SKIP_FILES = new Set([".plan.json", ".request.json", ".plan-history.jsonl", "flight-recorder.jsonl", "approvals.log.jsonl", ".DS_Store"]);
@@ -308,6 +314,7 @@ export const ACTIVITY_STALL_MS = 10 * 60 * 1000;
  *   null when there is no request to measure from
  */
 export function observeActivity(root, sinceIso, { now = Date.now() } = {}) {
+  const skipDirs = activitySkipDirs(root);
   const since = Date.parse(sinceIso ?? "");
   if (Number.isNaN(since)) return null;
   let filesChanged = 0;
@@ -321,7 +328,7 @@ export function observeActivity(root, sinceIso, { now = Date.now() } = {}) {
     }
     for (const e of entries) {
       if (e.isDirectory()) {
-        if (!ACTIVITY_SKIP_DIRS.has(e.name)) walk(path.join(dir, e.name));
+        if (!skipDirs.has(e.name)) walk(path.join(dir, e.name));
         continue;
       }
       if (!e.isFile() || ACTIVITY_SKIP_FILES.has(e.name)) continue;

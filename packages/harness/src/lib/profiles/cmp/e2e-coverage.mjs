@@ -21,10 +21,10 @@ import path from "node:path";
 import { evaluateReachability } from "./reachability.mjs";
 import { scanCitations, scanSpecClauses } from "../../spec-coverage.mjs";
 import { specModelFrom } from "../../spec-model.mjs";
-import { layout as cmpLayout, tiers as cmpTiers } from "./declarations.mjs";
+import { layout as cmpLayout, tiers as cmpTiers, grammar as cmpGrammar } from "./declarations.mjs";
 
 const SPEC_MODEL = (() => {
-  const r = specModelFrom({ id: "cmp", layout: cmpLayout, tiers: cmpTiers });
+  const r = specModelFrom({ id: "cmp", layout: cmpLayout, tiers: cmpTiers, grammar: cmpGrammar });
   if (!r.ok) throw new Error(r.reason);
   return r.model;
 })();

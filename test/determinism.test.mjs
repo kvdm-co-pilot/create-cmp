@@ -36,6 +36,7 @@ import {
   compareOutcomes,
   laneStepForTestClass,
   parseJUnitOutcomes,
+  reportFormatProblem,
 } from "../template/qa/lib/determinism.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -92,7 +93,7 @@ test("parse: verdicts and failure text come out; time attributes are never part 
       skipCase("com.acme.HomeViewModelTest", "ignored one", "0.001"),
     ]),
   });
-  const outcomes = parseJUnitOutcomes(dir);
+  const outcomes = parseJUnitOutcomes(dir, { format: "junit-xml" });
   assert.equal(outcomes["com.acme.HomeViewModelTest.loads items"].status, "pass");
   const failed = outcomes["com.acme.HomeViewModelTest.formats the date"];
   assert.equal(failed.status, "fail");
@@ -113,7 +114,7 @@ test("duration-only differences are NOT differences: identical suites with diffe
   });
   writeResults(a, mk("0.100", "0.900"));
   writeResults(b, mk("7.777", "0.001")); // wildly different timings, same verdicts, same failure text
-  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B", CMP_ATTRIBUTION);
+  const diffs = compareOutcomes(parseJUnitOutcomes(a, { format: "junit-xml" }), parseJUnitOutcomes(b, { format: "junit-xml" }), "TZ=A", "TZ=B", CMP_ATTRIBUTION);
   assert.deepEqual(diffs, [], "a timing wobble must not register as nondeterminism");
 });
 
@@ -128,7 +129,7 @@ test("a verdict flip names the test, the owning lane step, both legs, and the fa
       failCase("com.acme.HomeGoldenTreeTest", "home renders today header", "0.1", "expected 'Aug 20' but was 'Aug 21'"),
     ]),
   });
-  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=Etc/GMT+12 (UTC-12)", "TZ=Etc/GMT-14 (UTC+14)", CMP_ATTRIBUTION);
+  const diffs = compareOutcomes(parseJUnitOutcomes(a, { format: "junit-xml" }), parseJUnitOutcomes(b, { format: "junit-xml" }), "TZ=Etc/GMT+12 (UTC-12)", "TZ=Etc/GMT-14 (UTC+14)", CMP_ATTRIBUTION);
   assert.equal(diffs.length, 1);
   const d = diffs[0];
   assert.equal(d.kind, "verdict-flip");
@@ -147,7 +148,7 @@ test("identical failures under both legs are deterministic — no difference rep
   });
   writeResults(a, mk());
   writeResults(b, mk());
-  assert.deepEqual(compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B", CMP_ATTRIBUTION), []);
+  assert.deepEqual(compareOutcomes(parseJUnitOutcomes(a, { format: "junit-xml" }), parseJUnitOutcomes(b, { format: "junit-xml" }), "TZ=A", "TZ=B", CMP_ATTRIBUTION), []);
 });
 
 test("failing in both legs with DIFFERENT output is a difference (a date in the message is still a leak)", () => {
@@ -155,7 +156,7 @@ test("failing in both legs with DIFFERENT output is a difference (a date in the 
   const b = tmp();
   writeResults(a, { "TEST-com.acme.FooTest.xml": suiteXml([failCase("com.acme.FooTest", "boundary", "0.5", "expected day 2026-08-19")]) });
   writeResults(b, { "TEST-com.acme.FooTest.xml": suiteXml([failCase("com.acme.FooTest", "boundary", "0.5", "expected day 2026-08-21")]) });
-  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B", CMP_ATTRIBUTION);
+  const diffs = compareOutcomes(parseJUnitOutcomes(a, { format: "junit-xml" }), parseJUnitOutcomes(b, { format: "junit-xml" }), "TZ=A", "TZ=B", CMP_ATTRIBUTION);
   assert.equal(diffs.length, 1);
   assert.equal(diffs[0].kind, "failure-text-changed");
   assert.match(diffs[0].detail, /2026-08-19/);
@@ -172,7 +173,7 @@ test("a test that executed in only one leg is a difference, attributed to its st
     ]),
   });
   writeResults(b, { "TEST-com.acme.BarTest.xml": suiteXml([passCase("com.acme.BarTest", "stable one", "0.1")]) });
-  const diffs = compareOutcomes(parseJUnitOutcomes(a), parseJUnitOutcomes(b), "TZ=A", "TZ=B", CMP_ATTRIBUTION);
+  const diffs = compareOutcomes(parseJUnitOutcomes(a, { format: "junit-xml" }), parseJUnitOutcomes(b, { format: "junit-xml" }), "TZ=A", "TZ=B", CMP_ATTRIBUTION);
   assert.equal(diffs.length, 1);
   assert.equal(diffs[0].kind, "only-in-one-leg");
   assert.equal(diffs[0].step, "unitTests");
@@ -220,4 +221,15 @@ test("verify.mjs wiring: opt-in in ci, refused combinations, --rerun on both leg
   // A bare probe run must never mint a receipt.
   assert.match(verify, /determinism && !profileExplicit/, "bare --determinism has its own branch");
   assert.match(verify, /NO receipt/, "the probe-only branch states the no-receipt rule");
+});
+
+test("the report format is DECLARED: undeclared or unsupported is a refusal by name, never an empty outcome map", () => {
+  // Until 2026-09-08 the parser assumed JUnit XML and returned {} for anything
+  // else — an empty leg that read as "no tests". PATTERN: JUnit XML as the
+  // lingua franca, declared by the profile. What this pins is the silent {}:
+  // it is now a throw with the missing declaration named.
+  assert.match(reportFormatProblem(undefined) ?? "", /declares no `reports`/);
+  assert.match(reportFormatProblem({ format: "tap" }) ?? "", /not one the core can read/);
+  assert.equal(reportFormatProblem({ format: "junit-xml" }), null);
+  assert.throws(() => parseJUnitOutcomes("/nonexistent"), /declares no `reports`|reports\.format/);
 });

@@ -81,6 +81,8 @@ import { getApprovalAnchoredDiff } from "./approval-diff.mjs";
 // status endpoint cannot disagree) and componentStoryCards.
 import { deriveHumanQueue } from "prooflane-harness/console/console-shell.mjs";
 import { componentStoryCards, galleryHtml } from "prooflane-harness/console/preview-service.mjs";
+import { setConsoleCopy } from "prooflane-harness/console/console-tabs.mjs";
+import { loadProfileSync } from "prooflane-harness/lib/profile-loader.mjs";
 
 // Re-exported at their historical import site so every existing caller — the
 // MCP server, bin/console.mjs, scripts/stage05-gate.mjs, and the console tests
@@ -627,6 +629,22 @@ export function extractCompileErrors(text) {
 // --- the service --------------------------------------------------------------------
 
 /**
+ * The console renders the PROFILE's words, not the shell's. The shell's tab
+ * helpers carry neutral copy; the profile a project declares may export
+ * `console` (a copy object) and this host — the one place that knows the
+ * project root — sets it once. Best effort: a project with no loadable profile
+ * renders the neutral words, which is correct for it.
+ */
+function applyConsoleCopy(projectDir) {
+  try {
+    const loaded = loadProfileSync(projectDir);
+    setConsoleCopy(loaded && loaded.ok ? loaded.profile?.console ?? null : null);
+  } catch {
+    setConsoleCopy(null);
+  }
+}
+
+/**
  * Create (not yet start) a preview service for one project.
  *
  * @param {object} opts
@@ -638,6 +656,7 @@ export function extractCompileErrors(text) {
  */
 export function createPreviewService(opts) {
   const projectDir = path.resolve(opts.projectDir);
+  applyConsoleCopy(projectDir);
   const appName = opts.appName || resolveAppName(projectDir);
   const previewsDir = path.join(projectDir, "composeApp", "build", "previews");
   const srcDir = path.join(projectDir, "composeApp", "src");

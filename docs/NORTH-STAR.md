@@ -196,13 +196,17 @@ core reads through one protocol.
    `upgrade --harness`, a foreign repo is told to run `attach`, which interviews. A harness that
    guessed would be a harness that lied quietly on the second stack it met.
 2. **The profile is one vendored directory** — `qa/lib/profiles/<id>/` — exporting `id`,
-   `protocol`, `steps(ctx)`, and growing the nine declarations one PR at a time: **layout**
+   `protocol`, `steps(ctx)`, and growing the declarations one PR at a time: **layout**
    (where specs, sources, tests, receipt, arch doc are), **artifacts** (what a human signs, in
    what order, hashed how), **architecture** (layers, allowed dependencies, rules as tests),
    **tiers** (names, ordering, which observes which, `forFile`), **steps**, **ladder** (rungs,
    names, what earns them — no ladder means no rung, the honest grade), **review** (what Design
    and Audit are here; the router's stack rows), **plants** (Rule 0/1 violations the instrument
-   runs forever), **providers** (the eyes, if the stack has any).
+   runs forever), **providers** (the eyes, if the stack has any), and — since 2026-09-08 —
+   **grammar** (what a citation and a test declaration look like; REQUIRED, the core has no
+   fallback), **reports** (the format the test runner emits), **detect** (the marker files that
+   make a tree this stack's), **layout.ignore** (what to skip when no `.gitignore` can say) and
+   **console** copy (the words the shell's sections show).
 3. **The core loads *the* profile the manifest declares** through the loader and never by name.
    A lint fails the suite on any core import of a profile module.
 4. **Architecture rules are tests the lane runs**, and the architecture document's derived
@@ -217,6 +221,22 @@ core reads through one protocol.
 7. **Rules 0, 1 and 2 apply to profiles.** A profile ships with plants, run by
    `qa/framework-check.mjs` through the real runner in seconds and restored byte-for-byte, or it
    ships without a badge.
+
+**The 2026-09-08 declarations each borrow an industry pattern, and each says how it fails.**
+The language audit found the core still spoke Kotlin in five places a stack fact had no
+declaration to live in. Every fix is a declaration plus a pattern with a known failure mode
+and a mitigation built beside it; the full argument is in each declaration's header
+(`lib/profiles/cmp/declarations.mjs`, `lib/spec-model.mjs`, `lib/determinism.mjs`,
+`receipts/src/inputs-hash.mjs`, `console/console-tabs.mjs`, `test/agnostic-lint.test.mjs`).
+
+| gap | pattern | why it works | how it fails | what we do |
+|---|---|---|---|---|
+| test-declaration grammar was a Kotlin/JS fallback | declaration over inference (tree-sitter's one-query-per-language shape) | a required field cannot be silently wrong for the author who forgot it | a copied regex binds nothing, or the wrong lines | Rule 0 plants an unbound citation in THIS language and watches the grammar fail it by name; the diagnostic prints "N seen, 0 bound" |
+| a ten-language table decided what a tree was | buildpack `detect` per profile; Linguist's table for the seed | the profile author knows the markers; a maintained table is not a hand-picked ten | an eager `detect` claims a Gradle repo that is not a Compose app; a mixed tree's dominant extension is the wrong language | evidence is returned and printed, two claims refuse, and the snapshot carries its fetch time and sha256 |
+| ignore sets named `.gradle`, `.kotlin`, `.idea` for every tree | the repo's `.gitignore` is the truth (git, ripgrep, watchman); `layout.ignore` beneath it | the people who know the stack maintain the list they already maintain | a tree with no git, no `.gitignore` and no declaration hashes its build output | the hash moves too often — the safe direction — and the walk prints its rules; git-mode hashing is untouched (Q5) |
+| the report parser assumed JUnit XML | JUnit XML as the lingua franca, declared as `reports.format` | one parser, every ecosystem's runner emits it | a dialect parses to `{}` and looks like "no tests" | undeclared or unsupported refuses by name; an empty leg is a refusal, never a pass |
+| the console shell named `Tokens.kt` and `@Composable` | contribution points (VS Code `viewsWelcome`, Backstage, Grafana) — the shell renders types, the provider supplies words | a Python profile's console never tells its user to edit a Kotlin file | a provider forgets a key; a new string bypasses `copy` | every key has a neutral default; the lint scans `console/` for language-shaped strings |
+| the lint knew eight literal words | a derived vocabulary (Linguist extensions, names, syntax tokens, build files), enforced like ArchUnit's layer rules | an extension nobody here typed cannot be forgotten here | false positives — `.go(` is a call, `.ch` a CSS unit, `.com` a TLD | filename context, the harness's own language excluded, a short NAMED ambiguity list; every hit fixed or excused with an exit, and the excuse list may never grow |
 
 The console follows the same shape: **section types are the core's, providers are the
 profile's, and there are no profile-owned tabs.** The test for a section type is whether a

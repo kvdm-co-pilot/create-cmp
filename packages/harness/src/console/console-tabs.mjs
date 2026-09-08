@@ -29,6 +29,50 @@
 // ("Not derivable statically — <reason>").
 
 import { classifyDimens, deriveContrastPairs, componentStoryId } from "./console-data.mjs";
+
+/**
+ * THE SHELL'S OWN WORDS — neutral, and overridden by the profile's console copy.
+ * PATTERN: contribution points (VS Code `contributes.viewsWelcome`, Backstage
+ * plugins, Grafana panels): the shell renders section TYPES; the provider
+ * supplies rows and the words around them. WHY IT WORKS: the shell stops naming
+ * Tokens.kt or @Composable, so a Python profile's console never tells its user
+ * to edit a Kotlin file. HOW IT FAILS: a provider forgets a key and the adopter
+ * sees a neutral placeholder where they expected help; or a new string is added
+ * here without going through `copy`. WHAT WE DO: every key has a neutral
+ * default, `resolveCopy` merges the profile's over it, and the widened agnostic
+ * lint scans console/ for language-shaped strings so the second failure is
+ * caught the day it is written.
+ */
+export const NEUTRAL_COPY = Object.freeze({
+  usesIn: "the shared sources",
+  tokensEditHint: "Edit the design tokens, let the preview re-render, then stash the result with the",
+  componentsEmpty: "no components found in the registry directory",
+  versionSetFile: "the version catalogue",
+  versionSetUnreadable: "the version catalogue is not readable",
+  kspPairLabel: "the code-generator version matches the language version",
+  kspPrefixWarning: "is not prefixed by the language version",
+  previewRegistryFile: "the preview registry",
+  noRenderableApp: "no renderable app",
+  kspCarriesNote: "",
+  kspName: "the code generator",
+  kspCarriesLabel: "carries the language version",
+  depGraphGatesNote: "The conformance gates (and the receipt they write, below) are authoritative.",
+});
+/**
+ * The words in force. Module state, set ONCE by the console host that loaded
+ * the profile (`setConsoleCopy(profile.console)`) — the tab helpers take no
+ * meta and the gallery has no root, so threading a parameter through eight
+ * call sites would have been the same global by a longer road. A host that
+ * never sets it renders the neutral words, which is the honest default.
+ */
+let COPY = NEUTRAL_COPY;
+export function setConsoleCopy(copy) {
+  COPY = Object.freeze({ ...NEUTRAL_COPY, ...(copy && typeof copy === "object" ? copy : {}) });
+  return COPY;
+}
+export function consoleCopy() {
+  return COPY;
+}
 // Three surfaces in this file show an evidence rung — the Evidence headline,
 // the committed-receipt timeline, and the digest's lane-run table — and
 // NORTH-STAR.md §6.5 requires each of them to show the pack that graded it.
@@ -317,7 +361,7 @@ const SPACING_BAR_PX_PER_DP = 4;
 
 /** "N uses in commonMain" — 0 is stated plainly, never hidden. */
 function usageText(n) {
-  return `${n} use${n === 1 ? "" : "s"} in commonMain`;
+  return `${n} use${n === 1 ? "" : "s"} in ${COPY.usesIn}`;
 }
 
 /**
@@ -556,7 +600,7 @@ function candidatesStripHtml(variants) {
   if (!variants || !variants.available || !variants.variants || variants.variants.length === 0) {
     return `<div class="empty">
       <p>No design-language candidates stashed yet.</p>
-      <p>Edit <code>Tokens.kt</code>, let the preview re-render, then stash the result with the
+      <p>${COPY.tokensEditHint}
       <code>snapshot_variant</code> tool (e.g. <code>{name: "warmer"}</code>) — repeat per idea, then
       compare them here and Pick one.</p>
     </div>`;
@@ -840,7 +884,7 @@ export function componentsBodyHtml(components, meta = {}) {
     </div>`;
   }
   if (!components.components || components.components.length === 0) {
-    return `<div class="empty-inline">no @Composable components found in presentation/components/*.kt</div>`;
+    return `<div class="empty-inline">${esc(COPY.componentsEmpty)}</div>`;
   }
   const violationsByFile = new Map(
     meta.violations && meta.violations.available ? meta.violations.violations.map((v) => [v.file, v]) : [],
@@ -1391,7 +1435,7 @@ function systemContextHtml(sc) {
  */
 function versionSetHtml(versionSet) {
   if (!versionSet || !versionSet.available) {
-    return `<p class="empty-inline">${esc((versionSet && versionSet.reason) || "gradle/libs.versions.toml not readable")}</p>`;
+    return `<p class="empty-inline">${esc((versionSet && versionSet.reason) || COPY.versionSetUnreadable)}</p>`;
   }
   const badge = (status) => {
     if (status === "match") return `<span class="glyph glyph-signed">&#10003;</span> pinned as documented`;
@@ -1412,12 +1456,12 @@ function versionSetHtml(versionSet) {
   const inv = versionSet.kspInvariant;
   const invLine = inv.available
     ? inv.ok
-      ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> KSP is <code>&lt;kotlin&gt;-&lt;ksp&gt;</code> — <code>${esc(inv.ksp)}</code> carries Kotlin <code>${esc(inv.kotlin)}</code>.</p>`
-      : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> KSP <code>${esc(inv.ksp)}</code> is not prefixed by Kotlin <code>${esc(inv.kotlin)}</code> — Room's KMP native compilation breaks on this.</p>`
+      ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> ${COPY.kspPairLabel} — <code>${esc(inv.ksp)}</code> ${COPY.kspCarriesLabel} <code>${esc(inv.kotlin)}</code>.</p>`
+      : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> ${COPY.kspName} <code>${esc(inv.ksp)}</code> ${COPY.kspPrefixWarning} <code>${esc(inv.kotlin)}</code>${COPY.kspCarriesNote}</p>`
     : `<p class="empty-inline">${esc(inv.reason)}</p>`;
   return `  <h4>The frozen set, as pinned</h4>
   <table class="doc-table">
-    <thead><tr><th>Library</th><th>${esc("gradle/libs.versions.toml")}</th><th>§2 says</th><th>Verdict</th></tr></thead>
+    <thead><tr><th>Library</th><th>${esc(COPY.versionSetFile)}</th><th>§2 says</th><th>Verdict</th></tr></thead>
     <tbody>
 ${rows}
     </tbody>
@@ -1451,7 +1495,8 @@ function platformViewHtml(pv) {
 // every rendered graph carries this line in the section's own vocabulary,
 // right under the graph itself (never a top-of-tab banner — that visual
 // weight is reserved for the artifact's own approval status).
-const DEP_GRAPH_ADVISORY_HTML = `<p class="dep-advisory">Advisory preview; the lane is the law &mdash; this is a live scan of real imports between <code>node qa/verify.mjs</code> runs, not a verdict. The Kotlin conformance gates (and the receipt they write, below) are authoritative.</p>`;
+// A function, not a constant: the copy in force is set by the host after this module loads.
+const depGraphAdvisoryHtml = () => `<p class="dep-advisory">Advisory preview; the lane is the law &mdash; this is a live scan of real imports between <code>node qa/verify.mjs</code> runs, not a verdict. ${COPY.depGraphGatesNote}</p>`;
 
 function dependencyGraphHtml(graph) {
   if (!graph || !graph.available) {
@@ -1462,7 +1507,7 @@ function dependencyGraphHtml(graph) {
   }
   if (graph.edges.length === 0) {
     return `<p class="empty-inline">no cross-layer imports observed under <code>${esc(graph.appPackage)}</code></p>
-${DEP_GRAPH_ADVISORY_HTML}`;
+${depGraphAdvisoryHtml()}`;
   }
   const rows = graph.edges
     .map((e) => {
@@ -1497,7 +1542,7 @@ ${graph.violations
 ${rows}
   </ul>
 ${violationsHtml}
-${DEP_GRAPH_ADVISORY_HTML}`;
+${depGraphAdvisoryHtml()}`;
 }
 
 function layerMapHtml(layerMap) {
@@ -2206,7 +2251,7 @@ export function screensBodyHtml(data) {
     return `<div class="empty">
       <p>No screens rendered yet.</p>
       <p>The preview loop fills this page on its first render &mdash; every entry in
-      <code>inspector/PreviewRegistry.kt</code> becomes a row.</p>
+      <code>${esc(COPY.previewRegistryFile)}</code> becomes a row.</p>
     </div>`;
   }
   const changedSet = new Set(changed);
@@ -2273,7 +2318,7 @@ export function screensBodyHtml(data) {
 ${rows}
 </div>
 <p class="meta matrix-note">An empty cell means the screen registers no entry for that state. States come from
-<code>@state</code> preview-registry entries in <code>inspector/PreviewRegistry.kt</code> (e.g. <code>"home@empty"</code>).</p>`;
+<code>@state</code> preview-registry entries in <code>${esc(COPY.previewRegistryFile)}</code> (e.g. <code>"home@empty"</code>).</p>`;
 }
 
 // --- Intent (§3.0) — the product strategist's brief --------------------------

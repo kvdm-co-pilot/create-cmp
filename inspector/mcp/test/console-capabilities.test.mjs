@@ -50,7 +50,8 @@ test("a governance-only project (qa/, no composeApp/) gets its window: Drive and
     assert.match(page, /id="tab-comments"/, "Comments is served");
     assert.doesNotMatch(page, /id="tab-screens"/, "Screens is absent — not empty, absent");
     assert.doesNotMatch(page, /id="tab-live-device"/, "Live device is absent");
-    assert.match(page, /governance only &middot; no Compose app/, "and the rail says so, once, quietly");
+    // The words are the profile's (console copy); a project with no loadable profile gets the shell's neutral ones.
+    assert.match(page, /governance only &middot; no (?:Compose|renderable) app/, "and the rail says so, once, quietly");
   } finally {
     service.stop();
   }

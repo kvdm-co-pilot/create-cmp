@@ -57,7 +57,8 @@ import { fileURLToPath } from "node:url";
 
 import * as cmp from "../packages/harness/src/lib/profiles/cmp/index.mjs";
 import * as alien from "./fixtures/profiles/py-alien/index.mjs";
-import { DEFAULT_GRAMMAR, specModelFrom } from "../packages/harness/src/lib/spec-model.mjs";
+import { specModelFrom } from "../packages/harness/src/lib/spec-model.mjs";
+import { grammar as cmpGrammar } from "../packages/harness/src/lib/profiles/cmp/declarations.mjs";
 import { evaluateReceipt } from "../packages/harness/src/lib/receipt-validate.mjs";
 import {
   DEFAULT_BOUND_MS,
@@ -127,15 +128,18 @@ test("the plant selector and the coverage scanner must agree on what a citation 
   // the gate and invisible to the instrument that proves the gate reads. The
   // two must be one answer, or the plant that "could not be made" is a plant
   // whose target the lane is happily scanning.
-  for (const line of ["// SPEC: HOME-02", "# SPEC: HOME-02"]) {
-    assert.ok(DEFAULT_GRAMMAR.citationMarker.test(line), `the scanner's fallback marker reads ${line}`);
-    assert.equal(flowCitation(`${line} — the items render\n`), "HOME-02", `so must the plant selector: ${line}`);
+  // Each grammar reads ITS marker, and the selector agrees with the scanner under that grammar.
+  for (const [line, g] of [["// SPEC: HOME-02", cmpGrammar], ["# SPEC: HOME-02", grammarOf(alien)]]) {
+    assert.ok(g.citationMarker.test(line), `the scanner's marker reads ${line}`);
+    assert.equal(flowCitation(`${line} — the items render\n`, g), "HOME-02", `so must the plant selector: ${line}`);
   }
+  // And with no grammar at all, nothing is a citation — the lane refuses such a profile first.
+  assert.equal(flowCitation("// SPEC: HOME-02\n"), null);
 });
 
 test("a journey cites in ITS language's comment — four grammars, one answer", () => {
   const cases = [
-    { name: "cmp (declares no grammar — the core's fallback)", grammar: grammarOf(cmp), flow: "# E2E smoke\n\n# SPEC: HOME-02 — the items render\n- launchApp\n" },
+    { name: "cmp (declares both dialects: `//` in Kotlin, `#` in Maestro YAML)", grammar: grammarOf(cmp), flow: "# E2E smoke\n\n# SPEC: HOME-02 — the items render\n- launchApp\n" },
     { name: "py-alien (declares its own)", grammar: grammarOf(alien), flow: '"""home journey"""\n\n# SPEC: HOME-02\ndef test_home():\n    pass\n' },
     { name: "ts-journeys (a C-family journey)", grammar: grammarOf(TS_JOURNEYS), flow: 'import { test } from "@playwright/test";\n\n// SPEC: HOME-02 — the items render\ntest("home lists items", async () => {});\n' },
     { name: "lua-journeys (a marker in neither fallback)", grammar: grammarOf(LUA_JOURNEYS), flow: "-- home journey\n\n-- SPEC: HOME-02 — the items render\nfunction test_home() end\n" },
@@ -157,7 +161,7 @@ test("a marker the profile does NOT declare is not a citation — this reads the
   // And prose ABOUT a flow is not a citation in any grammar — the marker opens
   // the line or it is not a marker. (The stamped smoke flow's own header reads
   // "# E2E smoke — Maestro flow. SPEC: SHELL-01, HOME-02.")
-  for (const g of [DEFAULT_GRAMMAR, grammarOf(alien), grammarOf(TS_JOURNEYS), lua]) {
+  for (const g of [cmpGrammar, grammarOf(alien), grammarOf(TS_JOURNEYS), lua]) {
     assert.equal(flowCitation("# E2E smoke — Maestro flow. SPEC: SHELL-01, HOME-02.\n", g), null);
     assert.equal(flowCitation("", g), null);
     assert.equal(flowCitation(undefined, g), null);

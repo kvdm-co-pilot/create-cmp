@@ -243,16 +243,16 @@ function skeletonTree(lang) {
 // on the first day, for exactly the adopter `harness init` exists to serve.
 test("the seeded tier map knows where each language keeps its tests", async () => {
   const cases = [
-    { lang: ".go", test: "internal/cart/cart_test.go", src: "internal/cart/cart.go" },
-    { lang: ".py", test: "app/test_cart.py", src: "app/cart.py" },
-    { lang: ".rb", test: "lib/cart_spec.rb", src: "lib/cart.rb" },
-    { lang: ".ts", test: "src/cart.test.ts", src: "src/cart.ts" },
-    { lang: ".js", test: "src/cart.spec.js", src: "src/cart.js" },
-    { lang: ".kt", test: "src/CartTest.kt", src: "src/Cart.kt" },
-    { lang: ".java", test: "src/CartTests.java", src: "src/Cart.java" },
-    { lang: ".cs", test: "src/CartTests.cs", src: "src/Cart.cs" },
-    { lang: ".php", test: "src/CartTest.php", src: "src/Cart.php" },
-    { lang: ".rs", test: "src/cart_test.rs", src: "src/cart.rs" },
+    { lang: "Go", test: "internal/cart/cart_test.go", src: "internal/cart/cart.go" },
+    { lang: "Python", test: "app/test_cart.py", src: "app/cart.py" },
+    { lang: "Ruby", test: "lib/cart_spec.rb", src: "lib/cart.rb" },
+    { lang: "TypeScript", test: "src/cart.test.ts", src: "src/cart.ts" },
+    { lang: "JavaScript", test: "src/cart.spec.js", src: "src/cart.js" },
+    { lang: "Kotlin", test: "src/CartTest.kt", src: "src/Cart.kt" },
+    { lang: "Java", test: "src/CartTests.java", src: "src/Cart.java" },
+    { lang: "C#", test: "src/CartTests.cs", src: "src/Cart.cs" },
+    { lang: "PHP", test: "src/CartTest.php", src: "src/Cart.php" },
+    { lang: "Rust", test: "src/cart_test.rs", src: "src/cart.rs" },
   ];
   for (const c of cases) {
     const dir = skeletonTree(c.lang);

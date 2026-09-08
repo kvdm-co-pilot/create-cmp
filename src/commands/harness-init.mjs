@@ -45,6 +45,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { detect as cmpDetect } from "../../packages/harness/src/lib/profiles/cmp/declarations.mjs";
+
+const LINGUIST = JSON.parse(fs.readFileSync(new URL("../data/linguist-languages.json", import.meta.url), "utf8"));
+/** Extension → Linguist language name; the first language claiming an extension keeps it. */
+const EXT_TO_LANGUAGE = new Map();
+for (const [name, exts] of Object.entries(LINGUIST.languages)) for (const e of exts) if (!EXT_TO_LANGUAGE.has(e)) EXT_TO_LANGUAGE.set(e, name);
+/** The profiles whose `detect` this CLI can ask. */
+const KNOWN_DETECTORS = new Map([["cmp", cmpDetect]]);
 
 import { colors, ok, warn, fail } from "../lib/log.mjs";
 import {
@@ -109,17 +117,31 @@ const NOT_SOURCE = new Set([
  * language uses, so the printed next-steps do not tell a Python project to
  * write `//`.
  */
+/**
+ * DETECTION IS DERIVED; ONLY THE GRAMMAR SEEDS ARE OURS. PATTERN: GitHub
+ * Linguist's languages.yml (src/data/linguist-languages.json, with provenance)
+ * maps an extension to a language for every tree GitHub classifies; the seed
+ * grammars below are keyed by Linguist's language NAME, so an extension nobody
+ * here typed cannot be wrong here. Before a profile exists this is the only
+ * language knowledge the CLI holds; once one exists, its `detect(root)` claims
+ * the tree (buildpack-style) and this table is never consulted.
+ * WHY IT WORKS: a maintained table, not a hand-picked ten. HOW IT FAILS: a
+ * mixed tree's dominant extension is the wrong language (generated JS in a
+ * Python service), or the snapshot ages. WHAT WE DO: count only under the
+ * detected source roots, skip what .gitignore skips, PRINT what was counted so
+ * the guess is arguable, and carry the snapshot's fetch time and sha256.
+ */
 export const LANGUAGE_GRAMMARS = Object.freeze({
-  ".py": { marker: "#", test: String.raw`^\s*(?:async\s+)?def\s+test\w*\s*\(|^\s*class\s+Test\w*\s*[(:]`, type: String.raw`^\s*class\s+\w+` , testFile: String.raw`(^|/)test_[^/]*\.py$|_test\.py$`},
-  ".go": { marker: "//", test: String.raw`^\s*func\s+(?:Test|Benchmark|Example)\w*\s*\(`, type: String.raw`^\s*type\s+\w+\s+(?:struct|interface)\b` , testFile: String.raw`_test\.go$`},
-  ".rs": { marker: "//", test: String.raw`^\s*#\[(?:test|tokio::test|rstest)\]|^\s*fn\s+test\w*\s*\(`, type: String.raw`^\s*(?:pub\s+)?(?:struct|enum|trait|impl)\b` , testFile: String.raw`_test\.rs$`},
-  ".rb": { marker: "#", test: String.raw`^\s*(?:def\s+test_\w+|it\s+["']|describe\s+["'])`, type: String.raw`^\s*(?:class|module)\s+\w+` , testFile: String.raw`_(?:spec|test)\.rb$`},
-  ".ts": { marker: "//", test: String.raw`\b(?:test|it)\s*\(|^\s*@Test\b`, type: String.raw`^\s*(?:export\s+)?(?:abstract\s+)?(?:class|interface)\b` , testFile: String.raw`\.(?:test|spec)\.tsx?$`},
-  ".js": { marker: "//", test: String.raw`\b(?:test|it)\s*\(`, type: String.raw`^\s*(?:export\s+)?class\b` , testFile: String.raw`\.(?:test|spec)\.jsx?$`},
-  ".kt": { marker: "//", test: String.raw`@Test\b|\bfun\s+\x60[^\x60]+\x60\s*\(`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\b` , testFile: String.raw`Tests?\.kt$`},
-  ".java": { marker: "//", test: String.raw`@Test\b`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|abstract\s+)*(?:class|interface|enum)\b` , testFile: String.raw`Tests?\.java$`},
-  ".cs": { marker: "//", test: String.raw`\[(?:Test|Fact|Theory)\]`, type: String.raw`^\s*(?:public\s+|internal\s+)?(?:sealed\s+|abstract\s+)?class\b` , testFile: String.raw`Tests?\.cs$`},
-  ".php": { marker: "//", test: String.raw`function\s+test\w*\s*\(|@test\b`, type: String.raw`^\s*(?:abstract\s+|final\s+)?class\b` , testFile: String.raw`Test\.php$`},
+  "Python": { marker: "#", test: String.raw`^\s*(?:async\s+)?def\s+test\w*\s*\(|^\s*class\s+Test\w*\s*[(:]`, type: String.raw`^\s*class\s+\w+` , testFile: String.raw`(^|/)test_[^/]*\.py$|_test\.py$`},
+  "Go": { marker: "//", test: String.raw`^\s*func\s+(?:Test|Benchmark|Example)\w*\s*\(`, type: String.raw`^\s*type\s+\w+\s+(?:struct|interface)\b` , testFile: String.raw`_test\.go$`},
+  "Rust": { marker: "//", test: String.raw`^\s*#\[(?:test|tokio::test|rstest)\]|^\s*fn\s+test\w*\s*\(`, type: String.raw`^\s*(?:pub\s+)?(?:struct|enum|trait|impl)\b` , testFile: String.raw`_test\.rs$`},
+  "Ruby": { marker: "#", test: String.raw`^\s*(?:def\s+test_\w+|it\s+["']|describe\s+["'])`, type: String.raw`^\s*(?:class|module)\s+\w+` , testFile: String.raw`_(?:spec|test)\.rb$`},
+  "TypeScript": { marker: "//", test: String.raw`\b(?:test|it)\s*\(|^\s*@Test\b`, type: String.raw`^\s*(?:export\s+)?(?:abstract\s+)?(?:class|interface)\b` , testFile: String.raw`\.(?:test|spec)\.tsx?$`},
+  "JavaScript": { marker: "//", test: String.raw`\b(?:test|it)\s*\(`, type: String.raw`^\s*(?:export\s+)?class\b` , testFile: String.raw`\.(?:test|spec)\.jsx?$`},
+  "Kotlin": { marker: "//", test: String.raw`@Test\b|\bfun\s+\x60[^\x60]+\x60\s*\(`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\b` , testFile: String.raw`Tests?\.kt$`},
+  "Java": { marker: "//", test: String.raw`@Test\b`, type: String.raw`^(?:@\w+\s+)*(?:public\s+|abstract\s+)*(?:class|interface|enum)\b` , testFile: String.raw`Tests?\.java$`},
+  "C#": { marker: "//", test: String.raw`\[(?:Test|Fact|Theory)\]`, type: String.raw`^\s*(?:public\s+|internal\s+)?(?:sealed\s+|abstract\s+)?class\b` , testFile: String.raw`Tests?\.cs$`},
+  "PHP": { marker: "//", test: String.raw`function\s+test\w*\s*\(|@test\b`, type: String.raw`^\s*(?:abstract\s+|final\s+)?class\b` , testFile: String.raw`Test\.php$`},
 });
 
 /**
@@ -140,19 +162,57 @@ export function detectLanguage(root, roots) {
       return;
     }
     for (const e of entries) {
-      if (e.name.startsWith(".") || e.name === "node_modules" || e.name === "build") continue;
+      if (e.name.startsWith(".") || e.name === "node_modules") continue;
       const abs = path.join(dir, e.name);
       if (e.isDirectory()) walk(abs);
       else {
-        const ext = path.extname(e.name);
-        if (Object.hasOwn(LANGUAGE_GRAMMARS, ext)) counts.set(ext, (counts.get(ext) ?? 0) + 1);
+        const lang = EXT_TO_LANGUAGE.get(path.extname(e.name));
+        if (lang) counts.set(lang, (counts.get(lang) ?? 0) + 1);
       }
     }
   };
   for (const rel of roots) walk(path.join(root, ...rel.split("/")));
   let best = null;
-  for (const [ext, n] of counts) if (!best || n > counts.get(best)) best = ext;
+  for (const [lang, n] of counts) if (!best || n > counts.get(best)) best = lang;
   return best;
+}
+
+/** What detectLanguage counted, for the line that makes the guess arguable. */
+export function languageCounts(root, roots) {
+  const counts = new Map();
+  const walk = (dir) => {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name.startsWith(".") || e.name === "node_modules") continue;
+      if (e.isDirectory()) walk(path.join(dir, e.name));
+      else { const l = EXT_TO_LANGUAGE.get(path.extname(e.name)); if (l) counts.set(l, (counts.get(l) ?? 0) + 1); }
+    }
+  };
+  for (const rel of roots) walk(path.join(root, ...rel.split("/")));
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+/**
+ * Ask every profile this CLI knows whether the tree is ITS — buildpack-style
+ * `detect`. Today that is the `cmp` profile shipped in this repo; a registry of
+ * profiles is Stage 2's. Evidence is returned, never a bare boolean, so the
+ * claim can be argued with and two claims can be refused rather than resolved
+ * by list order.
+ * @param {string} root
+ * @returns {{id: string, evidence: string[], reason: string}[]}
+ */
+export function profileClaims(root) {
+  const claims = [];
+  for (const [id, detect] of KNOWN_DETECTORS) {
+    try {
+      const r = detect(root, fs);
+      if (r && r.claims) claims.push({ id, evidence: r.evidence ?? [], reason: r.reason ?? "" });
+    } catch {
+      /* a detector that throws claims nothing */
+    }
+  }
+  return claims;
 }
 
 /**
@@ -281,11 +341,11 @@ export function manifestFor(id, sourceRoots) {
  */
 export function profileSkeleton(id, { sourceRoots, tiers, lang = null }) {
   const roots = JSON.stringify(sourceRoots.length ? sourceRoots : ["src"]);
-  const g = lang ? LANGUAGE_GRAMMARS[lang] : null;
-  const exts = lang ? JSON.stringify([lang]) : '[".kt", ".kts", ".java", ".ts", ".js", ".py", ".go", ".rs"]';
+  const g = lang ? LANGUAGE_GRAMMARS[lang] ?? null : null;
+  const exts = lang && LINGUIST.languages[lang] ? JSON.stringify(LINGUIST.languages[lang]) : '[".<your source extension>"]';
   const grammarBlock = g
-    ? `\n/**\n * THE GRAMMAR — what a citation and a test declaration look like HERE.\n *\n * A \`SPEC:\` citation counts only when a test declaration follows it within\n * \`bindingWindow\` non-blank lines. That rule decides whether ANY promise is\n * proved, and the pattern is language-specific, so it is yours rather than the\n * harness's. Seeded from the ${lang} sources found in this tree — correct it if\n * your tests look different, and the lane will say so if nothing binds.\n */\nexport const grammar = {\n  citationMarker: /^(?:\\/\\/|#)\\s*SPEC:/,\n  testDeclaration: /${g.test}/,\n  typeDeclaration: /${g.type}/,\n  bindingWindow: 5,\n};\n`
-    : `\n// No recognised source language was found, so this profile uses the core's\n// FALLBACK grammar, which matches Kotlin/JVM and JavaScript only. If your\n// citations report as "declared but never cited" while the markers are plainly\n// there, that is why — declare a grammar:\n//\n// export const grammar = {\n//   citationMarker: /^(?:\\/\\/|#)\\s*SPEC:/,\n//   testDeclaration: /^\\\\s*def\\\\s+test\\\\w*\\\\s*\\\\(/,   // ← your language's test form\n//   typeDeclaration: /^\\\\s*class\\\\s+\\\\w+/,\n//   bindingWindow: 5,\n// };\n`;
+    ? `\n/**\n * THE GRAMMAR — what a citation and a test declaration look like HERE.\n *\n * A \`SPEC:\` citation counts only when a test declaration follows it within\n * \`bindingWindow\` non-blank lines. That rule decides whether ANY promise is\n * proved, and the pattern is language-specific, so it is yours rather than the\n * harness's. Seeded from the ${lang} sources found in this tree — correct it if\n * your tests look different, and the lane will say so if nothing binds.\n */\nexport const grammar = {\n  citationMarker: /^${g.marker === "#" ? "#" : "\\/\\/"}\\s*SPEC:/,   // this language's comment, before SPEC:\n  lineComment: /^${g.marker === "#" ? "#" : "(?:\\/\\/|\\*)"}/,\n  blockComment: ${g.marker === "#" ? "null" : '{ open: "/*", close: "*/" }'},\n  testDeclaration: /${g.test}/,\n  typeDeclaration: /${g.type}/,\n  bindingWindow: 5,\n};\n`
+    : `\n// No recognised source language was found. \`grammar\` is REQUIRED — the core has no\n// fallback since 2026-09-08 — so the lane will refuse until you fill this in. What a\n// citation and a test declaration look like in THIS language:\nexport const grammar = {\n  citationMarker: /^\\/\\/\\s*SPEC:/,   // the comment syntax your language uses before SPEC:\n  lineComment: /^\\/\\//,\n  blockComment: null,\n  testDeclaration: null,   // REQUIRED — what a test declaration looks like; the lane refuses until this is a pattern\n  bindingWindow: 5,\n};\n`;
   const tierNames = JSON.stringify(tiers);
   const hostTier = tiers[0];
   // The extension a planted test file needs, in the language THIS tree is
@@ -297,7 +357,7 @@ export function profileSkeleton(id, { sourceRoots, tiers, lang = null }) {
   // (qa/lib/plant-calibration.mjs), so a wrong seed here is a wrong grade later.
   // With no recognised language there is no honest guess, and a placeholder that
   // is visibly a placeholder is better than a confident one that is wrong.
-  const plantFileSuffix = lang ?? ".<your test file extension>";
+  const plantFileSuffix = lang && LINGUIST.languages[lang] ? LINGUIST.languages[lang][0] : ".<your test file extension>";
   // WHERE this language keeps its tests. Distinct from `g.test`, which is what a
   // test DECLARATION looks like inside a file: Go writes `foo_test.go` beside
   // the source and never uses a test directory, so a directory-only rule put
@@ -341,6 +401,7 @@ export const protocol = ${PROFILE_PROTOCOL};
  *   flows          journey files ({dir, exts}) — null when this stack has none
  *   sourceRoots    what the watcher watches (defaults to citationRoots)
  *   buildDir       build output, so the lane can ignore it (optional)
+ *   ignore         directories skipped when no git/.gitignore can say (optional)
  */
 ${grammarBlock}
 export const layout = {
@@ -348,8 +409,29 @@ export const layout = {
   citationRoots: ${roots},
   citationExts: ${exts},
   flows: null,
+  // Directories the inputs hash and the activity scan skip when there is no git and no
+  // .gitignore to ask — build output, caches. The repo's .gitignore is the truth; this is the floor.
+  ignore: [],
   sourceRoots: ${roots},
 };
+
+/**
+ * THE REPORT FORMAT your test runner emits — the core parses what is declared and
+ * refuses what is not. JUnit XML is what pytest --junitxml, go-junit-report,
+ * cargo2junit, jest-junit and swift test --xunit-output all produce.
+ */
+export const reports = { format: "junit-xml", dir: "<where your runner writes its XML>" };
+
+/**
+ * Does a tree belong to THIS profile? Buildpack-style: name the marker files that
+ * identify your stack (a build file AND the module you scaffold, not either).
+ * \`harness init\` asks every known profile before seeding a generic one.
+ */
+export function detect(root, fs) {
+  const evidence = [];
+  // if (fs.existsSync(\`\${root}/pyproject.toml\`)) evidence.push("pyproject.toml");
+  return { claims: false, evidence, reason: "declare the marker files that identify this stack" };
+}
 
 /**
  * WHICH TEST TIERS exist, and which can observe which promise. This is what
@@ -566,15 +648,18 @@ export function planInit(root, { id }) {
   const sourceRoots = detectSourceRoots(root);
   const tiers = ["unit"];
   const lang = detectLanguage(root, sourceRoots);
+  const claimedBy = profileClaims(root);
   return {
     id,
     sourceRoots,
     lang,
+    languageCounts: languageCounts(root, sourceRoots),
+    claimedBy,
     vendor: vendorPlan(),
     write: [
       { rel: MANIFEST_REL_PATH, content: JSON.stringify(manifestFor(id, sourceRoots), null, 2) + "\n" },
       { rel: profileEntryRel(id), content: profileSkeleton(id, { sourceRoots, tiers, lang }) },
-      { rel: SURFACE_CONFIG_REL, content: JSON.stringify({ surface: seedSurface(root) }, null, 2) + "\n" },
+      { rel: SURFACE_CONFIG_REL, content: JSON.stringify({ surface: seedSurface(root), ignore: [] }, null, 2) + "\n" },
     ],
   };
 }
@@ -630,6 +715,17 @@ export async function runHarnessInit(flags, positional) {
   }
 
   const plan = planInit(root, { id });
+  if (plan.claimedBy.length > 0 && !flags["new-profile"]) {
+    const c = plan.claimedBy;
+    fail(
+      c.length === 1
+        ? `this tree is claimed by the \`${c[0].id}\` profile — ${c[0].reason} (evidence: ${c[0].evidence.join(", ")}).\n` +
+            `  It already has a profile; \`harness init\` would seed a second, generic one over it.\n` +
+            `  To do that anyway: create-cmp harness init --new-profile`
+        : `${c.length} profiles claim this tree (${c.map((x) => x.id).join(", ")}) — refusing to pick one by list order. Pass --profile <id> and --new-profile.`
+    );
+    return 2;
+  }
   const written = [];
   const kept = [];
 

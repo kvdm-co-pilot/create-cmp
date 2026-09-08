@@ -236,7 +236,7 @@ export function markerDecision({ laneMtimeMs = null, renderMtimeMs = null, nowMs
     return { launch: false, reason: `a verify lane is in progress (${LANE_MARKER_REL} is fresh) — deferring; changes coalesce into one run when it finishes` };
   }
   if (renderMtimeMs != null && nowMs - renderMtimeMs < RENDER_MARKER_FRESH_MS) {
-    return { launch: false, reason: "the preview daemon has a Gradle build in flight (.cmp-render-in-progress is fresh) — deferring; changes coalesce into one run when it finishes" };
+    return { launch: false, reason: "the preview daemon has a build in flight (.cmp-render-in-progress is fresh) — deferring; changes coalesce into one run when it finishes" };
   }
   return { launch: true };
 }

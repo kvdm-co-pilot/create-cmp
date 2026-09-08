@@ -28,7 +28,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { specModelFrom, DEFAULT_GRAMMAR } from "../packages/harness/src/lib/spec-model.mjs";
+import { specModelFrom } from "../packages/harness/src/lib/spec-model.mjs";
 import { scanSpecClauses, scanCitations, citationIsBound, citationScanDiagnostic } from "../packages/harness/src/lib/spec-coverage.mjs";
 
 /** A profile for one language: sources under src/, tests under tests/. */
@@ -77,31 +77,36 @@ func TestAdds(t *testing.T) {
 }
 `;
 
-const PYTHON_GRAMMar = { testDeclaration: /^\s*(?:async\s+)?def\s+test\w*\s*\(|^\s*class\s+Test\w*\s*[(:]/ };
-const GO_GRAMMAR = { testDeclaration: /^\s*func\s+(?:Test|Benchmark|Example)\w*\s*\(/ };
+// Full grammars: since 2026-09-08 a grammar is REQUIRED and there is no fallback to
+// fill in what a fixture leaves out — a partial one is refused by name.
+const PYTHON_GRAMMar = { citationMarker: /^#\s*SPEC:/, lineComment: /^#/, blockComment: { open: '"""', close: '"""' }, testDeclaration: /^\s*(?:async\s+)?def\s+test\w*\s*\(|^\s*class\s+Test\w*\s*[(:]/ };
+const GO_GRAMMAR = { citationMarker: /^\/\/\s*SPEC:/, lineComment: /^\/\//, blockComment: { open: "/*", close: "*/" }, testDeclaration: /^\s*func\s+(?:Test|Benchmark|Example)\w*\s*\(/ };
+const JS_GRAMMAR = { citationMarker: /^\/\/\s*SPEC:/, lineComment: /^\/\//, blockComment: { open: "/*", close: "*/" }, testDeclaration: /\b(?:test|it)\s*\(/ };
+import { grammar as KOTLIN_GRAMMAR } from "../packages/harness/src/lib/profiles/cmp/declarations.mjs";
 
-test("THE DEFECT, still reproducible: the fallback grammar binds nothing in Python or Go", () => {
-  // Kept as a live demonstration rather than a comment. If someone widens the
-  // fallback to cover these, this test tells them — and that is the moment to
-  // ask whether the fallback should exist at all, not to quietly re-hardcode.
-  assert.equal(citationIsBound(["# SPEC: APP-01", "def test_adds():"], 0), false, "python def test_");
-  assert.equal(citationIsBound(["# SPEC: APP-01", "async def test_adds():"], 0), false, "python async def");
-  assert.equal(citationIsBound(["// SPEC: APP-01", "func TestAdds(t *testing.T) {"], 0), false, "go func Test");
-  assert.equal(citationIsBound(["// SPEC: APP-01", "#[test]"], 0), false, "rust #[test]");
-  // And the two it does know, which is why nobody noticed.
-  assert.equal(citationIsBound(["// SPEC: APP-01", "@Test fun adds() {}"], 0), true, "kotlin");
-  assert.equal(citationIsBound(["// SPEC: APP-01", 'test("adds", () => {})'], 0), true, "javascript");
+test("THE FALLBACK IS GONE: binding with no grammar refuses, and one language's grammar binds nothing in another", () => {
+  // Until 2026-09-08 the core carried Kotlin's and JavaScript's regexes as a
+  // fallback, and `cmp` itself relied on it — so a profile that forgot `grammar`
+  // was graded with Kotlin's, silently. Now: no grammar is a refusal, and the
+  // cross-language silence is demonstrated with a DECLARED grammar, which is the
+  // only way it can happen any more.
+  assert.throws(() => citationIsBound(["# SPEC: APP-01", "def test_adds():"], 0), /no fallback grammar/);
+  assert.equal(citationIsBound(["# SPEC: APP-01", "def test_adds():"], 0, KOTLIN_GRAMMAR), false, "kotlin's grammar cannot see python");
+  assert.equal(citationIsBound(["// SPEC: APP-01", "func TestAdds(t *testing.T) {"], 0, KOTLIN_GRAMMAR), false, "nor go");
+  assert.equal(citationIsBound(["// SPEC: APP-01", "#[test]"], 0, KOTLIN_GRAMMAR), false, "nor rust");
+  // Each language binds under ITS grammar, and only there.
+  assert.equal(citationIsBound(["// SPEC: APP-01", "@Test fun adds() {}"], 0, KOTLIN_GRAMMAR), true, "kotlin");
+  assert.equal(citationIsBound(["// SPEC: APP-01", 'test("adds", () => {})'], 0, JS_GRAMMAR), true, "javascript");
+  assert.equal(citationIsBound(["# SPEC: APP-01", "def test_adds():"], 0, PYTHON_GRAMMar), true, "python");
 });
 
 test("PYTHON: a profile that declares its grammar gets its citations counted, end to end", () => {
   const root = treeWith(".py", PYTHON_TEST);
   try {
-    // Without a declared grammar: the marker is found and thrown away.
+    // Without a declared grammar: REFUSED, by name — never graded with another language's.
     const bare = specModelFrom(profileFor("py-bare", ".py"), {});
-    assert.equal(bare.ok, true);
-    const none = scanCitations(root, bare.model);
-    assert.equal(none.length, 0, "the fallback grammar cannot bind a Python test");
-    assert.equal(none.markersSeen, 1, "…and it SAW the marker, which is what makes the silence a lie");
+    assert.equal(bare.ok, false, "a profile with no grammar is refused, not graded with Kotlin's");
+    assert.match(bare.reason, /grammar is required/);
 
     // With one: the same tree, the same scanner, a real citation.
     const declared = specModelFrom(profileFor("py", ".py", PYTHON_GRAMMar), {});
@@ -123,9 +128,8 @@ test("PYTHON: a profile that declares its grammar gets its citations counted, en
 test("GO: a second non-JVM language, same seam, no core change", () => {
   const root = treeWith(".go", GO_TEST);
   try {
-    const bare = scanCitations(root, specModelFrom(profileFor("go-bare", ".go"), {}).model);
-    assert.equal(bare.length, 0);
-    assert.equal(bare.markersSeen, 1);
+    const bare = specModelFrom(profileFor("go-bare", ".go"), {});
+    assert.equal(bare.ok, false, "no grammar, no grade");
 
     const tags = scanCitations(root, specModelFrom(profileFor("go", ".go", GO_GRAMMAR), {}).model);
     assert.equal(tags.length, 1, "Go binds once its profile says what a Go test looks like");
@@ -138,14 +142,16 @@ test("GO: a second non-JVM language, same seam, no core change", () => {
 test("the scan SAYS SO when it found markers and bound none — the sentence that was missing", () => {
   const root = treeWith(".py", PYTHON_TEST);
   try {
-    const model = specModelFrom(profileFor("py-bare", ".py"), {}).model;
+    // A DECLARED but wrong grammar — Kotlin's test declaration on a Python tree —
+    // is the only way to see a marker and bind nothing now.
+    const model = specModelFrom(profileFor("py-wrong", ".py", { ...PYTHON_GRAMMar, testDeclaration: KOTLIN_GRAMMAR.testDeclaration }), {}).model;
     const tags = scanCitations(root, model);
     const said = citationScanDiagnostic(tags, model);
     assert.ok(said, "a scan that saw markers and kept none must explain itself");
     assert.match(said, /1 SPEC marker found and none bound/);
-    assert.match(said, /Kotlin\/JVM \+ JavaScript fallback/, "it must name WHY, not just that");
+    assert.match(said, /matched no line after a citation/, "it must name WHY, not just that");
     assert.match(said, /grammar\.testDeclaration/, "and the field that fixes it");
-    assert.match(said, /Python `def test_`/, "with a pattern the reader can copy");
+    assert.match(said, /harness init/, "and where a seed comes from");
 
     // Silent in the two cases where it would be noise: nothing written at all,
     // and everything binding correctly.
@@ -162,20 +168,25 @@ test("a profile may declare its grammar as a source STRING, not only a RegExp", 
   // A profile is data as much as code, and a manifest-driven or generated
   // profile will hand over strings. Refusing them would push every adopter into
   // regex-literal syntax for no reason.
-  const model = specModelFrom(profileFor("py-str", ".py", { testDeclaration: "^\\s*def\\s+test\\w*\\s*\\(" }), {}).model;
+  const model = specModelFrom(profileFor("py-str", ".py", { citationMarker: "^#\\s*SPEC:", lineComment: "^#", testDeclaration: "^\\s*def\\s+test\\w*\\s*\\(" }), {}).model;
   assert.ok(model.grammar.testDeclaration instanceof RegExp);
   assert.equal(citationIsBound(["# SPEC: APP-01", "def test_adds():"], 0, model.grammar), true);
-  // An UNPARSEABLE pattern falls back rather than throwing mid-lane: a broken
-  // profile must not take the whole run down with a SyntaxError from a scanner.
-  const broken = specModelFrom(profileFor("py-bad", ".py", { testDeclaration: "([unclosed" }), {}).model;
-  assert.deepEqual(broken.grammar.testDeclaration, DEFAULT_GRAMMAR.testDeclaration);
+  // An UNPARSEABLE pattern is a declaration PROBLEM named before the lane runs —
+  // not a SyntaxError mid-scan, and no longer a silent fall-back to Kotlin's.
+  const broken = specModelFrom(profileFor("py-bad", ".py", { citationMarker: "^#\\s*SPEC:", lineComment: "^#", testDeclaration: "([unclosed" }), {});
+  assert.equal(broken.ok, false);
+  assert.match(broken.reason, /grammar\.testDeclaration is not a valid pattern/);
 });
 
-test("field-by-field override: declaring one pattern keeps the rest, and cmp is untouched", async () => {
-  const model = specModelFrom(profileFor("partial", ".py", { bindingWindow: 2 }), {}).model;
-  assert.equal(model.grammar.bindingWindow, 2);
-  assert.deepEqual(model.grammar.testDeclaration, DEFAULT_GRAMMAR.testDeclaration, "undeclared fields keep the fallback");
-  assert.equal(model.grammar.isDefault, false, "…but the profile no longer counts as undeclared");
+test("a partial grammar is refused by name — there is no fallback to keep — and cmp declares its own", async () => {
+  const partial = specModelFrom(profileFor("partial", ".py", { bindingWindow: 2 }), {});
+  assert.equal(partial.ok, false, "bindingWindow alone is not a grammar");
+  assert.match(partial.reason, /grammar\.citationMarker is required/);
+  assert.match(partial.reason, /grammar\.testDeclaration is required/);
+  // The optional fields DO default: a full grammar without bindingWindow gets 5.
+  const full = specModelFrom(profileFor("full", ".py", PYTHON_GRAMMar), {}).model;
+  assert.equal(full.grammar.bindingWindow, 5);
+  assert.equal(full.grammar.isDefault, false);
 
   // The whole point of a fallback is that the first stack does not move. If
   // this fails, a Compose app's coverage changed and the fleet gate will say so.
@@ -205,11 +216,11 @@ test("a comment line is SKIPPED, not counted — the window measures distance fr
   // idiomatic, so this silently punished the projects documenting themselves best.
   const five = ["# a", "# b", "# c", "# d", "# e"];
   assert.equal(citationIsBound(["# SPEC: APP-01", ...five, "def test_add():"], 0, PY_FULL), true);
-  // Kotlin, unchanged — the fallback still skips `//` and `*`.
-  assert.equal(citationIsBound(["// SPEC: APP-01", "// a", "// b", "// c", "// d", "// e", "@Test fun a() {}"], 0), true);
+  // Kotlin, under ITS grammar — `//` and `*` lines are skipped the same way.
+  assert.equal(citationIsBound(["// SPEC: APP-01", "// a", "// b", "// c", "// d", "// e", "@Test fun a() {}"], 0, KOTLIN_GRAMMAR), true);
   // And the window still BITES: real code between tag and test is still distance.
   const code = ["val a = 1", "val b = 2", "val c = 3", "val d = 4", "val e = 5"];
-  assert.equal(citationIsBound(["// SPEC: APP-01", ...code, "@Test fun a() {}"], 0), false, "the window must still close on real code");
+  assert.equal(citationIsBound(["// SPEC: APP-01", ...code, "@Test fun a() {}"], 0, KOTLIN_GRAMMAR), false, "the window must still close on real code");
 });
 
 test("a citation inside a BLOCK comment never binds — the laundering hole, in every language", () => {

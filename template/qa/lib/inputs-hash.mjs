@@ -55,7 +55,10 @@ import path from "node:path";
  * @returns {string[]}
  */
 export function defaultSurface(root) {
-  const skip = new Set(["node_modules", "build", "dist", "out", "target", ".gradle", "qa-artifacts"]);
+  // The same construction as the walk — the universal floor plus what this
+  // repo's own .gitignore says — so the two agree by construction. qa-artifacts
+  // is the lane's own output and stays named.
+  const skip = new Set([...WALK_FLOOR, "qa-artifacts", ...gitignoredDirs(root), ...declaredIgnore(root)]);
   let entries;
   try {
     entries = fs.readdirSync(root, { withFileTypes: true });
@@ -179,7 +182,39 @@ function tryGitLsFiles(root) {
 // since the receipt" the instant a user ran `git init` — with no source change.
 // That is the exact invariant the constant was written to hold, broken for
 // every ecosystem but the first.
-const WALK_EXCLUDED_DIRS = new Set([".git", "node_modules", "build", ".gradle", ".kotlin", ".idea"]);
+// THE FLOOR IS UNIVERSAL; EVERYTHING ELSE IS DECLARED. `.git` is git's, and
+// `node_modules` is this lane's own runtime. Until 2026-09-08 this set also
+// carried `build`, `.gradle`, `.kotlin`, `.idea` — one ecosystem's build output,
+// applied to every tree. PATTERN: the repo's own ignore file is the truth
+// (ripgrep, watchman and git itself all read .gitignore rather than a table);
+// beneath it, the profile declares `layout.ignore` and `layout.buildDir`,
+// written into qa/verified-surface.json as `ignore` so THIS package — the
+// notary's, which must know no profile — reads a project fact, not a stack.
+// WHY IT WORKS: the people who know the stack maintain the list, in the file
+// they already maintain. HOW IT FAILS: a tree with no git, no .gitignore and no
+// declaration hashes its build output — a hash that moves too often, which is
+// the safe direction. WHAT WE DO: that case is the walk, and the walk prints
+// its rules. Q5 (NORTH-STAR §10): git-mode hashing is untouched, and a cmp
+// tree's .gitignore already lists these directories, so no receipt moves.
+const WALK_FLOOR = new Set([".git", "node_modules"]);
+const WALK_EXCLUDED_DIRS = WALK_FLOOR;
+
+/**
+ * Directories the project DECLARED unhashable — qa/verified-surface.json's
+ * optional `ignore` list, written by `harness init` from `layout.ignore` and
+ * `layout.buildDir`, so the notary reads a project fact rather than a profile.
+ * @param {string} root
+ * @returns {Set<string>}
+ */
+export function declaredIgnore(root) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path.join(root, SURFACE_CONFIG_REL), "utf8"));
+    const list = Array.isArray(parsed?.ignore) ? parsed.ignore : [];
+    return new Set(list.filter((x) => typeof x === "string" && x.trim() && !x.includes("..")).map((x) => x.replace(/^\.\//, "").replace(/\/$/, "")));
+  } catch {
+    return new Set();
+  }
+}
 
 /**
  * The directories THIS repo ignores, read from its own `.gitignore`.
@@ -199,7 +234,7 @@ const WALK_EXCLUDED_DIRS = new Set([".git", "node_modules", "build", ".gradle", 
  * @param {string} root
  * @returns {Set<string>}
  */
-function gitignoredDirs(root) {
+export function gitignoredDirs(root) {
   let text;
   try {
     text = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
@@ -330,7 +365,7 @@ function resolveSurfaceFiles(root, surfaceEntries) {
   // PLUS this repo's own .gitignore, which is what `git ls-files
   // --exclude-standard` will honour the moment the tree becomes a repo. Reading
   // the same file is what makes the two modes agree by construction.
-  const ignored = new Set([...WALK_EXCLUDED_DIRS, ...gitignoredDirs(root)]);
+  const ignored = new Set([...WALK_FLOOR, ...gitignoredDirs(root), ...declaredIgnore(root)]);
   const collected = [];
   for (const surface of surfaceEntries) {
     const abs = path.join(root, surface);

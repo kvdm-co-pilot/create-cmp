@@ -22,7 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { TIER_NAME_RE, requireSpecModel, DEFAULT_GRAMMAR } from "./spec-model.mjs";
+import { TIER_NAME_RE, requireSpecModel, GRAMMAR_DEFAULTS } from "./spec-model.mjs";
 
 /** `- **HOME-01** — …` (live) or `- ~~**HOME-01**~~ — …` (withdrawn). */
 export const CLAUSE_LINE_RE = /^-\s+(~~)?\*\*([A-Z][A-Z0-9]*-\d{2,})\*\*/;
@@ -39,7 +39,6 @@ export const CLAUSE_LINE_RE = /^-\s+(~~)?\*\*([A-Z][A-Z0-9]*-\d{2,})\*\*/;
 const CLAUSE_TIER_RE = /\[tier:\s*([a-z][a-z0-9-]*)\]/i;
 
 // Kept as the module-local fallback; the live values come from the SpecModel.
-const TAG_LINE_RE = DEFAULT_GRAMMAR.citationMarker;
 
 // A citation is a claim that a TEST covers a clause, so it has to sit on one.
 // Counting the tag wherever it appears makes a red specCoverage curable with a
@@ -51,12 +50,11 @@ const TAG_LINE_RE = DEFAULT_GRAMMAR.citationMarker;
 // BINDING_WINDOW non-blank lines. The window is small enough that the tag must
 // be attached to the test, and loose enough for the @DisplayName / annotation
 // stack that idiomatically sits between them.
-export const BINDING_WINDOW = DEFAULT_GRAMMAR.bindingWindow;
+export const BINDING_WINDOW = GRAMMAR_DEFAULTS.bindingWindow;
 
 // Kotlin @Test, a backticked test function, and the node:test / Maestro-adjacent
 // `test(` / `it(` call forms. Deliberately syntactic: a citation's binding must
 // be readable without compiling anything.
-const TEST_DECL_RE = DEFAULT_GRAMMAR.testDeclaration;
 
 // A tag whose first meaningful line declares a TYPE is documenting that type,
 // not claiming a test — and it must be refused structurally rather than by
@@ -64,7 +62,6 @@ const TEST_DECL_RE = DEFAULT_GRAMMAR.testDeclaration;
 // would otherwise launder the citation. This is exactly payment-blueprint's
 // drift: `// SPEC: PP-07` sat on `class PaymentWorkerTest`, three properties
 // above a genuine @Test, and vouched for the whole file.
-const TYPE_DECL_RE = DEFAULT_GRAMMAR.typeDeclaration;
 
 /**
  * The flow-shaped citation files the lane executes: top-level files in the
@@ -97,7 +94,12 @@ export function listFlowFiles(root, model = requireSpecModel(root)) {
  * @param {number} index line the tag sits on
  * @returns {boolean}
  */
-export function citationIsBound(lines, index, grammar = DEFAULT_GRAMMAR) {
+export function citationIsBound(lines, index, grammar) {
+  // The grammar is the PROFILE's. There is no fallback to reach for: a caller
+  // without one is a caller about to grade a language it cannot read.
+  if (!grammar || !(grammar.testDeclaration instanceof RegExp) || !(grammar.lineComment instanceof RegExp)) {
+    throw new Error("citationIsBound needs the profile's grammar (testDeclaration, lineComment) — the core has no fallback grammar");
+  }
   // THE GRAMMAR IS THE PROFILE'S. These three patterns decide whether a
   // citation counts at all, and they are the most language-specific thing in
   // the lane — far more so than a directory name. Held in the spine they
@@ -105,21 +107,22 @@ export function citationIsBound(lines, index, grammar = DEFAULT_GRAMMAR) {
   // Rust citation, which reported as "declared but never cited" and pointed the
   // reader at the spec file. Passing them in is what makes that a declaration
   // the adopter can see and fix rather than a rule they must reverse-engineer.
-  const TEST_DECL = grammar.testDeclaration ?? DEFAULT_GRAMMAR.testDeclaration;
-  const TYPE_DECL = grammar.typeDeclaration ?? DEFAULT_GRAMMAR.typeDeclaration;
-  const WINDOW = grammar.bindingWindow ?? DEFAULT_GRAMMAR.bindingWindow;
-  const LINE_COMMENT = grammar.lineComment ?? DEFAULT_GRAMMAR.lineComment;
-  const BLOCK = grammar.blockComment ?? DEFAULT_GRAMMAR.blockComment;
+  const TEST_DECL = grammar.testDeclaration;
+  // No type declaration declared: no citation is ever judged "on a type" — never-match, not Kotlin's.
+  const TYPE_DECL = grammar.typeDeclaration instanceof RegExp ? grammar.typeDeclaration : /(?!)/;
+  const WINDOW = grammar.bindingWindow ?? GRAMMAR_DEFAULTS.bindingWindow;
+  const LINE_COMMENT = grammar.lineComment;
+  const BLOCK = grammar.blockComment ?? GRAMMAR_DEFAULTS.blockComment;
   let seen = 0;
   let inBlockComment = false;
   for (let i = index + 1; i < lines.length && seen < WINDOW; i += 1) {
     const line = lines[i].trim();
     if (line === "") continue;
     if (inBlockComment) {
-      if (line.includes(BLOCK.close)) inBlockComment = false;
+      if (BLOCK && line.includes(BLOCK.close)) inBlockComment = false;
       continue;
     }
-    if (line.startsWith(BLOCK.open)) {
+    if (BLOCK && line.startsWith(BLOCK.open)) {
       // A same-delimiter block (Python's """) opens and closes with the same
       // token, so a single line carrying it twice is a complete block.
       const closes = BLOCK.open === BLOCK.close ? line.split(BLOCK.close).length - 1 >= 2 : line.includes(BLOCK.close);
@@ -140,13 +143,15 @@ export function citationIsBound(lines, index, grammar = DEFAULT_GRAMMAR) {
 }
 
 /** Is this tag inside a block comment that began earlier in the file? */
-function insideBlockComment(lines, index, grammar = DEFAULT_GRAMMAR) {
+function insideBlockComment(lines, index, grammar) {
+  // A language with no block comments (declared null) has nothing to be inside of.
+  if (!grammar || !grammar.blockComment) return false;
   // A citation inside a block comment is documentation, not a claim, and must
   // never bind. This scanned for `/*` and `*/` only, so a `# SPEC:` sitting in
   // a Python docstring — or a Ruby =begin block — counted as a real citation
   // over whatever test happened to follow. That is the laundering hole the
   // whole binder exists to close, open for every language outside the C family.
-  const { open: OPEN, close: CLOSE } = grammar.blockComment ?? DEFAULT_GRAMMAR.blockComment;
+  const { open: OPEN, close: CLOSE } = grammar.blockComment;
   // Same-delimiter blocks (Python's triple quote) have no open/close pair to
   // match, so parity is the only honest reading: an odd count before this line
   // means we are inside one.
@@ -222,7 +227,7 @@ export function scanSpecClauses(root, model = requireSpecModel(root)) {
  */
 export function scanCitations(root, model = requireSpecModel(root)) {
   const tags = [];
-  const MARKER = model.grammar?.citationMarker ?? DEFAULT_GRAMMAR.citationMarker;
+  const MARKER = model.grammar.citationMarker; // present — specDeclarationProblems refused the profile otherwise
   // How many markers were SEEN, before binding threw any away. The gap between
   // this and tags.length is the single most useful diagnostic the scan has: all
   // markers found and none bound means the grammar does not match this
@@ -335,13 +340,11 @@ export function citationScanDiagnostic(tags, model) {
   const seen = Number(tags?.markersSeen ?? 0);
   const kept = tags?.length ?? 0;
   if (seen === 0 || kept > 0) return null;
-  const how = model?.grammar?.isDefault
-    ? "this profile declares no `grammar`, so the lane is using its Kotlin/JVM + JavaScript fallback"
-    : "this profile's `grammar.testDeclaration` did not match";
+  const how = "this profile's `grammar.testDeclaration` matched no line after a citation";
   return (
     `${seen} SPEC marker${seen === 1 ? "" : "s"} found and none bound to a test — ${how}. ` +
     "A citation counts only when a test declaration follows it within " +
     `${model?.grammar?.bindingWindow ?? 5} non-blank lines. Declare \`grammar.testDeclaration\` ` +
-    "in your profile with the pattern your language uses (Python `def test_`, Go `func Test`, Rust `#[test]`)."
+    "in your profile with the pattern this language uses for a test declaration — `create-cmp harness init` seeds one per language."
   );
 }

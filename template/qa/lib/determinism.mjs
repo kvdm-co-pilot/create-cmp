@@ -76,7 +76,29 @@ function attr(attrs, name) {
  *   keyed by `classname.name`; empty object when the directory is absent
  *   (the caller decides what an empty leg means — this parser never guesses)
  */
-export function parseJUnitOutcomes(dir) {
+/** The report formats the core can read. TAP and CTRF are the next two, each its own parser. */
+export const REPORT_FORMATS = Object.freeze(["junit-xml"]);
+
+/**
+ * Why a profile's `reports` declaration cannot be read — or null when it can.
+ * PATTERN: JUnit XML as the lingua franca (pytest --junitxml, go-junit-report,
+ * cargo2junit, jest-junit, swift test --xunit-output); the profile DECLARES it.
+ * WHY IT WORKS: the parser stops assuming what a runner emitted. HOW IT FAILS:
+ * a dialect parses to {} and looks like "no tests". WHAT WE DO: undeclared or
+ * unsupported is a refusal by name here, and the probe treats an empty leg as a
+ * refusal, never a pass.
+ * @param {{format?: string}|null|undefined} reports
+ * @returns {string|null}
+ */
+export function reportFormatProblem(reports) {
+  if (!reports || typeof reports !== "object") return "the profile declares no `reports` — declare { format: \"junit-xml\" } (the format this stack's test runner emits) so the probe parses what was declared rather than assuming it";
+  if (!REPORT_FORMATS.includes(reports.format)) return `reports.format ${JSON.stringify(reports.format)} is not one the core can read (${REPORT_FORMATS.join(", ")}) — a parser for it is its own change`;
+  return null;
+}
+
+export function parseJUnitOutcomes(dir, { format } = {}) {
+  const problem = reportFormatProblem({ format });
+  if (problem) throw new Error(problem);
   const outcomes = {};
   if (!fs.existsSync(dir)) return outcomes;
   for (const entry of fs.readdirSync(dir)) {

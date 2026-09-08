@@ -26,6 +26,8 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const BACKEND = {
   id: "ktor-backend",
   layout: { specs: "docs/specs", citationRoots: ["services", "qa/test"], citationExts: [".kt", ".mjs"], flows: null },
+  // Required since 2026-09-08: Kotlin and node tests, both citing with `//`.
+  grammar: { citationMarker: /^\/\/\s*SPEC:/, lineComment: /^(?:\/\/|\*)/, blockComment: { open: "/*", close: "*/" }, testDeclaration: /@Test\b|\b(?:test|it)\s*\(/ },
   tiers: {
     names: ["unit", "integration"],
     hostOnly: ["unit"],

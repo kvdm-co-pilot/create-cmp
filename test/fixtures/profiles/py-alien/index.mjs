@@ -57,6 +57,8 @@ export const layout = {
  * shares nothing with the core's fallback. `blockComment` opens and closes with
  * the same token, which is the case a matched-pair scanner cannot read.
  */
+export const reports = { format: "junit-xml", dir: "reports" };
+
 export const grammar = {
   citationMarker: /^(?:\/\/|#)\s*SPEC:/,
   lineComment: /^#/,

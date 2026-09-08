@@ -62,6 +62,19 @@ export const layout = {
  * The reverse is not true: an integration test may also prove a plain unit
  * clause, so `unit` is satisfied by either tier.
  */
+/** What a citation and a test look like in this Kotlin service — required, never defaulted. */
+export const grammar = {
+  citationMarker: /^\/\/\s*SPEC:/,
+  lineComment: /^(?:\/\/|\*)/,
+  blockComment: { open: "/*", close: "*/" },
+  testDeclaration: /@Test\b|\bfun\s+`[^`]+`\s*\(/,
+  typeDeclaration: /^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\s+\w+/,
+  bindingWindow: 5,
+};
+
+/** Gradle's test task writes JUnit XML. */
+export const reports = { format: "junit-xml", dir: "build/test-results" };
+
 export const tiers = {
   names: ["unit", "integration"],
   hostOnly: ["unit"],
