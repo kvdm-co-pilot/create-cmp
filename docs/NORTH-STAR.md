@@ -503,7 +503,25 @@ whole reason a second profile had to run.
   plants watched failing — is not derivable from a lane run, so claiming it would have been the fake.
   An absent rung now says why; a floor that refuses silently is the same defect wearing the other hat.
 - **`evaluateReceipt` never read `pack`** — the field the comparability rule rests on, checked by
-  nothing; an editor can remove it and no reader notices. **Open**; Stage 2's row.
+  nothing; an editor can remove it and no reader notices. **Open, and BLOCKED BY A CONTRADICTION
+  found 2026-09-09 on the first attempt to close it.** Two programs disagree about what a receipt
+  missing `pack` means, and both are deliberate:
+
+  - `scripts/stage2-gate.mjs` criterion H requires the vendored `evaluateReceipt` to **REFUSE** a
+    receipt that names no pack — "a field that no predicate reads is a field an editor can delete".
+  - `test/receipt-pack.test.mjs` requires that a receipt predating `pack` **validates exactly as
+    before**, reason unchanged, and asserts the reason does not mention pack — "the validator does
+    not know pack exists yet — *by design*". That is what `pack` being ADDITIVE meant when it
+    landed.
+
+  Both cannot hold. The blank-id half is not contested — a present-but-empty `pack.id` is malformed
+  (the schema already says `minLength: 1`) and refusing it breaks nothing. The contested half is the
+  ABSENT one, and the predicate cannot tell "never had one" from "had one, and it was removed".
+  Resolving it is a decision about what a receipt must carry, not an implementation: either the
+  additive contract is retired and old receipts are refused with "re-run the lane" (the remedy the
+  binding check beside it already offers), or criterion H is amended to refuse only a malformed pack
+  and report an absent one as not-comparable. **Karel's call.** Recorded here rather than settled by
+  whichever program was edited last.
 - **No surface that showed a rung showed the pack** (against §6.5 and §3's promise for Gatekeeper).
   **Closed 2026-09-08** on every evidence surface. The cause was one hop from the symptom: the
   console's `receipt-bridge.mjs` and `digest.mjs` built the object with `pack` absent, so a
