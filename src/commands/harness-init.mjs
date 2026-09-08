@@ -496,10 +496,37 @@ export function steps({ ROOT }) {
 // }
 //
 // export const ladder = {
-//   // The evidence rungs THIS pack means. A pack with no ladder earns no rung,
-//   // which is the honest grade for a ladder nobody has calibrated.
+//   // The evidence rungs THIS pack means, and which of ITS steps earn them. A
+//   // profile with no ladder earns no rung, which is the honest grade for a
+//   // ladder nobody has calibrated — but a rung is also the vocabulary your
+//   // evidence gets quoted in, so an uncalibrated ladder is worth ten minutes.
+//   //
+//   // A rung is DERIVED from steps that actually PASSed. A SKIP never earns
+//   // one, a FAILed lane earns none, and \`verify --fast\` earns none either.
+//   //
+//   //   names            rung id → the word YOUR stack means by it. The letters
+//   //                    are the core's shape; the words are yours, and nobody
+//   //                    else's stack is graded by them.
+//   //   l0Required       step names that must all PASS for the floor rung
+//   //   l1Required       and for L1, on top of L0
+//   //   deviceExecution  step names that need a resource the host may not have
+//   //                    (a phone, a container, a broker). ONE of them PASSing
+//   //                    lifts L1 to L2; a SKIP never does
+//   //   release          ONE step name (a string, not a list) whose PASS lifts
+//   //                    L2 to L3, or null. A list here silently never matches,
+//   //                    so L3 becomes unreachable without saying so
+//   //
+//   // WHERE TO DECLARE IT — there are two places and this is the one to use.
+//   // A pack may also return \`evidenceLadder\` from steps() above, and the lane
+//   // reads either; but the object steps() returns exists only once a lane has
+//   // started, and a reader that must NOT start one — the Stop hook asking
+//   // whether a tier that could have run did — can only see this top-level
+//   // export. Declare it here and every reader agrees. Declare it in BOTH and
+//   // they must be the same ladder: the lane refuses to grade from two
+//   // declarations that disagree rather than pick whichever one it can see
+//   // (qa/lib/evidence-ladder.mjs carries the argument).
 //   names: { L0: "…", L1: "…", L2: "…", L3: "…" },
-//   l0Required: [], l1Required: [], deviceExecution: [], release: [],
+//   l0Required: [], l1Required: [], deviceExecution: [], release: null,
 // };
 //
 // export const plants = {

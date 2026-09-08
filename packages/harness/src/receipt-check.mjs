@@ -25,6 +25,7 @@ import { readHold, assessHold, describeHold, holdExplains } from "./lib/agent-ho
 import { LANE_MARKER_STALE_MS, laneMarkerPath } from "./lib/lane-markers.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfileSync } from "./lib/profile-loader.mjs";
+import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -128,13 +129,28 @@ function evaluate() {
   // reason text, and THAT list is the profile's — read from the ladder's
   // execution tier when the profile is loadable, and simply not applied when
   // it is not. A legacy fallback that guessed would be worse than none.
+  //
+  // THE LADDER IS RESOLVED, NOT SPELLED. This used to read `profile.ladder`
+  // directly, which is one of the two places a profile may declare its rungs;
+  // qa/verify.mjs read the other, and nothing reconciled them. It goes
+  // through qa/lib/evidence-ladder.mjs now, so this reader and the lane can
+  // never be looking at different declarations of the same thing.
+  //
+  // NO PACK IS PASSED, AND THAT IS THE POINT. Getting the pack's spelling means
+  // calling `steps(ctx)`, and this file is the Stop hook: a done-gate that
+  // starts a lane to answer a legacy-compat question is not a gate, it is a
+  // second lane. So a profile that declares its ladder ONLY on the pack gives
+  // this reader nothing and gets no legacy fallback — the same honest silence
+  // as a profile with no ladder at all, and the reason the top-level spelling
+  // is the one `harness init` seeds and the one the resolver prefers.
   const legacyPatterns = /no Android device|maestro CLI not installed|is held by|devices attached|CMP_DEVICE=none/;
   let legacyNames = null;
   try {
     const manifest = resolveHarnessManifest(ROOT);
     if (manifest.ok) {
       const loaded = loadProfileSync(ROOT, manifest.manifest.profile);
-      const ladder = loaded.ok && loaded.profile.ladder ? loaded.profile.ladder : null;
+      const resolved = evidenceLadderFor(loaded.ok ? loaded.profile : null);
+      const ladder = resolved.ok ? resolved.ladder : null;
       if (ladder && Array.isArray(ladder.deviceExecution)) legacyNames = ladder.deviceExecution;
     }
   } catch {
@@ -172,9 +188,21 @@ function evaluate() {
   // Surface the receipt's evidence rung (the ladder — qa/lib/evidence-level.mjs)
   // alongside the verdict: the rung is the receipt's own derived field, read
   // verbatim, never recomputed here. Older receipts without it stay valid.
+  //
+  // AND THE PACK WITH IT, ALWAYS — the two are set in the same breath because
+  // NORTH-STAR.md §6.5 requires that every surface showing a rung shows the
+  // pack, and §8.9 is why: one pack's L2 and another pack's L2 are different
+  // claims. This CLI printed the rung alone, which left every reader of the
+  // done-gate exactly where that rule says they must not be. Only the pack's
+  // ID is carried: it is the part that carries the meaning, and `pack.version`
+  // on a receipt is today the harness lock's number rather than the profile's
+  // (docs/adr/0008), so a surface that leaned on it would be repeating a
+  // borrowed fact.
   const level = receipt.evidenceLevel;
   if (level && typeof level === "object" && typeof level.rung === "string") {
     result.evidenceLevel = level;
+    const id = receipt.pack && typeof receipt.pack.id === "string" ? receipt.pack.id.trim() : "";
+    result.packId = id || null;
   }
   return result;
 }
@@ -222,7 +250,15 @@ if (asHook) {
   process.exit(0);
 }
 
-const rungSuffix = result.evidenceLevel ? ` — evidence ${result.evidenceLevel.rung} · ${result.evidenceLevel.name}` : "";
+// The rung NEVER travels alone (see evaluate() above): a rung is a claim in one
+// pack's vocabulary, so the pack is named beside it, and a receipt that names no
+// pack is SAID to name none rather than being rendered as if the omission did
+// not matter. A rung whose pack is unknown is comparable to nothing, and that is
+// a fact about the evidence, not a formatting detail to be tidied away.
+const rungSuffix = result.evidenceLevel
+  ? ` — evidence ${result.evidenceLevel.rung} · ${result.evidenceLevel.name}` +
+    (result.packId ? ` · pack ${result.packId}` : " · pack UNNAMED (this rung is comparable to nothing)")
+  : "";
 
 if (asJson) {
   console.log(JSON.stringify(result, null, 2));

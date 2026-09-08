@@ -31,6 +31,7 @@ import { specModelFrom } from "../packages/harness/src/lib/spec-model.mjs";
 import { scanSpecClauses, scanCitations, clauseTierCoverage } from "../packages/harness/src/lib/spec-coverage.mjs";
 import { checkLaneVouching } from "../packages/harness/src/lib/receipt-validate.mjs";
 import { computeInputsHash } from "../packages/harness/src/lib/inputs-hash.mjs";
+import { setPlan, markStep, readPlanHistory, PLAN_HISTORY_REL } from "../packages/harness/src/lib/plan.mjs";
 
 function tmp(p) {
   return fs.mkdtempSync(path.join(os.tmpdir(), p));
@@ -167,4 +168,57 @@ test("the inputs hash is the SAME before and after `git init` — in both ecosys
       fs.rmSync(root, { recursive: true, force: true });
     }
   }
+});
+
+test("the plan trail records EACH pack's own rung, and never one borrowed from the other", () => {
+  // markStep became profile-dependent on 2026-09-08, when the trail it writes
+  // started carrying the pack beside the rung. That was not cosmetic: the trail
+  // is WRITTEN and outlives the run, so a bare rung in it can never be
+  // attributed afterwards and §8.9's rule — one pack's L2 and another's are
+  // different claims — becomes unenforceable for every later reader.
+  //
+  // Profile-dependent means it must answer the same way for two unlike packs,
+  // and "the same way" here is precisely: each records ITS OWN pack, at its own
+  // rung, with neither borrowing the other's vocabulary. A core that had learned
+  // one stack would write one pack's name into both trails, or drop the field
+  // for the ecosystem it did not recognise — and either is invisible from
+  // inside a single profile, which is why this is asserted across two.
+  const cases = [
+    { pack: "cmp", rung: "L2", name: "device" },
+    { pack: "alien-py", rung: "L1", name: "fast tests" },
+  ];
+  const seen = [];
+  for (const c of cases) {
+    const root = tmp("diff-plan-");
+    try {
+      fs.mkdirSync(path.join(root, "qa", "evidence"), { recursive: true });
+      fs.writeFileSync(
+        path.join(root, "qa", "evidence", "latest.json"),
+        JSON.stringify({ verdict: "PASS", pack: { id: c.pack, version: null }, evidenceLevel: { rung: c.rung, name: c.name, satisfiedBy: [] } }),
+      );
+
+      assert.equal(setPlan(root, { title: "a change", steps: ["build", "prove"] }).ok, true, `${c.pack}: the chain is declared`);
+      // Step N+1 CLOSES the chain, and closing is what writes the trail — the
+      // glance is only recorded where it will outlive the run, which is exactly
+      // why a missing pack there could never be recovered.
+      const marked = markStep(root, 3);
+      assert.equal(marked.ok, true, `${c.pack}: closing the chain succeeds identically in both ecosystems`);
+
+      const trail = fs.readFileSync(path.join(root, PLAN_HISTORY_REL), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+      const glances = trail.map((e) => e.receipt).filter(Boolean);
+      assert.ok(glances.length > 0, `${c.pack}: the trail records a receipt glance at all`);
+      for (const g of glances) {
+        assert.equal(g.rung, c.rung, `${c.pack}: the trail records this pack's rung`);
+        assert.equal(g.pack, c.pack, `${c.pack}: and names the pack that defines it — a stored rung with no pack is unattributable forever`);
+      }
+      seen.push(glances[0]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }
+  // The differential claim itself: two unlike packs produced two DIFFERENT
+  // attributions from the same logical action. Identical output here would mean
+  // the core answered from something other than the profile in front of it.
+  assert.notDeepEqual(seen[0], seen[1], "two unlike packs must not produce one attribution");
+  assert.deepEqual(Object.keys(seen[0]).sort(), Object.keys(seen[1]).sort(), "and the SHAPE must be identical — same fields, different values");
 });
