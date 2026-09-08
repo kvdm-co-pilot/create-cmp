@@ -43,7 +43,7 @@ import { changedWorkingTreePaths, deriveAffectedFilter } from "../../affected-te
 import { affected as cmpAffected } from "./affected.mjs";
 import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./device-lease.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "../../arch-doc.mjs";
-import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes, reportFormatProblem } from "../../determinism.mjs";
+import { DETERMINISM_TIMEZONES, compareOutcomes, parseReportOutcomes, reportFormatProblem } from "../../determinism.mjs";
 import { evaluateAuditCadence } from "../../audit-cadence.mjs";
 import { androidChecksOutcome } from "./android-checks.mjs";
 import { deviceLogIncidents, maestroOutcome, parseMaestroJunit } from "./maestro.mjs";
@@ -850,7 +850,10 @@ function stepDeterminism() {
   for (const { tz, label } of DETERMINISM_TIMEZONES) {
     const res = shGradle(`${GRADLEW} :composeApp:desktopTest${RERUN} --console=plain`, { env: { ...process.env, TZ: tz } });
     // Parsed NOW, before the next leg overwrites the same results directory.
-    const outcomes = parseJUnitOutcomes(resultsDir, { format: reports.format });
+    // The DISPATCHER, not one format's parser. A pack that named the JUnit
+    // reader directly would silently ignore its own `reports.format` the day a
+    // profile declared tap or ctrf — reading zero tests and calling it green.
+    const outcomes = parseReportOutcomes(resultsDir, { format: reports.format });
     legs.push({ tz, label, ok: res.ok, outcomes, tail: res.out.split("\n").slice(-8).join("\n") });
   }
   const [a, b] = legs;
