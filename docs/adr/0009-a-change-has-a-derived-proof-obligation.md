@@ -1,6 +1,7 @@
 # ADR-0009: A change has a derived proof obligation — and a deferral is evidence, not a skip
 
-- **Status:** proposed
+- **Status:** accepted — 2026-09-08, Karel van der Merwe (signed by his instruction in session — "sign the adrs"; drafted by the architect)
+- **Implementation:** pending — Stage 2 work in the adopter lane; the harness-side half (WHEN a tier is due) is GATE-RULES Rule 4, live.
 - **Date:** 2026-09-06
 - **Related:** GATE-RULES Rule 4 (landed 2026-09-08) is the harness-side half of this idea — WHEN
   a tier is due (`scripts/proof-plan.mjs`, enforced by `scripts/hooks/proof-gate.mjs`). This ADR

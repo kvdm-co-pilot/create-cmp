@@ -145,6 +145,31 @@ export function decide(kind, o, tiers, ctx) {
   return SILENT;
 }
 
+/**
+ * The session's memory files, scanned for the device cadence the lint hunts in
+ * tracked docs — memory is the one surface git cannot see. Non-fatal: a hit is
+ * a line in the session's context, never a refusal. `PROOFLANE_MEMORY_DIR`
+ * overrides the location so a test can plant one.
+ */
+export async function memoryRestatements(dir = process.env.PROOFLANE_MEMORY_DIR) {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const { restatements } = await import("../lib/cadence.mjs");
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+  const where = dir ?? path.join(os.homedir(), ".claude", "projects", root.replace(/\//g, "-"), "memory");
+  let files = [];
+  try {
+    files = fs.readdirSync(where).filter((f) => f.endsWith(".md"));
+  } catch {
+    return "";
+  }
+  const hits = [];
+  for (const f of files) {
+    for (const h of restatements(fs.readFileSync(path.join(where, f), "utf8"))) hits.push(`${f}:${h.line} (${h.what})`);
+  }
+  return hits.length ? `\n\nmemory restates the device cadence — the program is the rule, edit the memory: ${hits.join("; ")}` : "";
+}
+
 /** A verify lane in flight on this machine, by its command line — or null. */
 function runningLane() {
   try {
@@ -231,7 +256,8 @@ async function main() {
           hookEventName: "SessionStart",
           additionalContext:
             "Proof schedule for this tree — GATE-RULES Rule 4, enforced by scripts/hooks/proof-gate.mjs on fleet-check and gh pr merge, not by any document:\n" +
-            render(obligation()),
+            render(obligation()) +
+            (await memoryRestatements()),
         },
       });
     } catch (e) {

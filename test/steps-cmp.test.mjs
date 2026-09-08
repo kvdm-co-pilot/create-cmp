@@ -97,6 +97,11 @@ function e2eProject() {
   fs.mkdirSync(path.join(root, "qa", "e2e"), { recursive: true });
   fs.writeFileSync(path.join(root, "qa", "e2e", "smoke.yaml"), "appId: x\n---\n- launchApp\n");
   fs.writeFileSync(path.join(root, "qa", "e2e", "week.yaml"), "appId: x\n---\n- launchApp\n");
+  // The inspector ships in this fixture: tokenDrift SKIPs structurally without it (2026-09-08)
+  // and would never reach the device provisioning these tests are about.
+  const inspector = path.join(root, "composeApp", "src", "androidDebug", "kotlin", "x", "inspector");
+  fs.mkdirSync(inspector, { recursive: true });
+  fs.writeFileSync(path.join(inspector, "InspectorHttpServer.kt"), "// fixture\n");
   return root;
 }
 

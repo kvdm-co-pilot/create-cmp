@@ -591,7 +591,11 @@ const receipt = {
   // `pack` because `profile` is taken by the RUN profile (scaffold/local/ci/…);
   // the collision is resolved at schema/2, not here. The pack declares its id;
   // its version is the lock's until the profile loader gives it its own.
-  pack: { id: pack.id, version: harnessSummary.version },
+  // ADR-0008 (accepted 2026-09-08): the pack's version is the PROFILE'S OWN —
+  // `export const version` — or null. Never the harness lock's number, which is
+  // a version of the wrong thing: a profile declaring 0.3.1 was minting receipts
+  // that said 0.20.0 (NORTH-STAR §9.2).
+  pack: { id: pack.id, version: typeof loaded.profile?.version === "string" ? loaded.profile.version : null },
   strength: { onDeviceSteps },
   evidenceLevel: level,
   artifacts,
@@ -603,7 +607,13 @@ const receipt = {
 };
 
 fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
-fs.writeFileSync(path.join(EVIDENCE_DIR, "latest.json"), `${JSON.stringify(receipt, null, 2)}\n`);
+// A fast run writes its own file. Before 2026-09-08 it wrote latest.json, so a
+// resident watcher's next pass overwrote the checkpoint's receipt with a fast
+// one the Stop hook refuses — the agent had done everything right and was told
+// it had not. latest-fast.json is never committed (template gitignore) and is
+// read by nothing that grades; latest.json stays the single receipt-of-record.
+const RECEIPT_FILE = fast ? "latest-fast.json" : "latest.json";
+fs.writeFileSync(path.join(EVIDENCE_DIR, RECEIPT_FILE), `${JSON.stringify(receipt, null, 2)}\n`);
 // latest.json is the single receipt-of-record. Commit it with your change: the
 // studio console's Evidence audit trail reconstructs the full history from the
 // git log of this file — every commit is one verified, attributed state.
@@ -669,9 +679,7 @@ if (asJson) {
   // pack's L2 and another's different claims that must be "shown as such", and
   // this is the line an agent reads on every single run — the surface where a
   // bare rung would do the most quiet damage. Only the pack's ID: `pack.version`
-  // is the harness lock's borrowed number until the profile loader gives the
-  // pack its own (ADR-0008), so printing it would name a version of the wrong
-  // thing.
+  // is the profile's own or null (ADR-0008), and a null is not worth a column.
   console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name} · pack ${pack.id}` : ""}${strengthLabel ? ` (${strengthLabel})` : ""} — receipt written to qa/evidence/latest.json${badge.changed ? ` and ${README_REL_PATH}'s evidence badge refreshed` : ""} (commit ${badge.changed ? "them" : "it"} with your change)`);
   // A GREEN LANE THAT EARNED NO RUNG SAYS WHY, on the line a human is already
   // reading. Silence here is the exact shape of the defect that cost a foreign

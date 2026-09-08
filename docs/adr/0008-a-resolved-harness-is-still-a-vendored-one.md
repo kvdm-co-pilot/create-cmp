@@ -1,6 +1,7 @@
 # ADR-0008: A resolved harness is still a vendored one — pinning is how the bytes arrive, not how they are trusted
 
-- **Status:** proposed
+- **Status:** accepted — 2026-09-08, Karel van der Merwe (signed by his instruction in session — "sign the adrs"; drafted by the architect)
+- **Implementation:** `pack.version` is the profile's own or null since 2026-09-08 (`packages/harness/src/verify.mjs::pack`, pinned by `test/audit-fixes.test.mjs`); `harness.source` provenance and the empty-region floor are pending.
 - **Date:** 2026-09-05
 
 ## Context

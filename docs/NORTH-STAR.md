@@ -429,90 +429,20 @@ found by reading, only by running.** Adoption proves the seam accepts a profile.
 prove the core computes the same answer for both. Only differential execution does, and that is
 why it is the third and final exit criterion.
 
-**The residue Stage 0 must clear**, from an adversarial audit that verified each by execution.
-Each line is a wrong VERDICT, not a refusal, which is why none was found by reading.
-
-*Closed 2026-09-06, each with a differential test that was watched failing on the alien profile
-and passing on `cmp` before the fix landed:*
-
-- **The walk-mode ignore set disagreed with itself**, so a `git init` invalidated a valid receipt
-  on any ecosystem but the first. Walk mode now reads the repo's own `.gitignore` — the file
-  `git ls-files --exclude-standard` honours — so the two modes agree by construction rather than
-  by list maintenance. `.gitignore` is consequently attested as a RESOLUTION INPUT, outside the
-  declared surface, because a file that decides what is attested and is not itself attested is
-  the narrowing failure arriving through the side door.
-- **`harnessIntegrity` was required as a literal step name by the receipt validator** — a name
-  the `cmp` pack chose, that the profile protocol never mentions, so a pack spelling it
-  `harness_integrity` minted receipts invalid FOREVER, in every reader. The vouching row is now
-  found by the `harness` object it carries: the data, not the name — in the validator AND in the
-  two Rule 0 floor plants, whose Stop-hook assertion no longer names the step either. It matches
-  the core's own refusal wording instead, so the plant is calibrated against what the gate
-  actually says.
-
-- **A 5-second plausibility floor called a fast stack's honest lane fabricated.** A Go, Rust,
-  Python or TypeScript lane finishes in hundreds of milliseconds and was told its evidence could
-  not attest a real run — the one accusation this product cannot afford to make wrongly. The
-  number was not the defect: ONE receipt carries no start time, no total duration and no
-  baseline, so nothing on it can justify any floor. A floor is a fact about the STACK, and the
-  validator does not know the stack — so it is now the notary's policy (`minExecutedMs: null` by
-  default), set from a history the receipt does not carry. Every stack-independent fabrication
-  check is untouched: no steps, all-SKIP, all-ERROR, and durations that are not real numbers.
-  Nothing in this repo enforced the floor — `qa/receipt-check.mjs` calls `evaluateReceipt`, not
-  `validateReceiptForTree` — so no adopter's lane changes; what changes is what a hosted notary
-  built on `prooflane-receipts` would have refused.
-- **The agnostic lint was an opt-in allowlist, and is now deny-by-default.** Twenty files were
-  listed; every core module outside the list could name `composeApp` or `gradlew` freely, and
-  seven did. The list's own comment admitted the mechanism — `determinism.mjs` "passed review for
-  weeks because it was not in this list". Now every `.mjs` under `packages/harness/src` is
-  required to be stack-free unless explicitly excused with a reason and an exit, a **new file is
-  covered the day it is written**, and the exception list is checked for EXACTNESS: a file that
-  becomes clean must be removed or the test goes red. An allowlist rots silently; a denylist that
-  cannot hold a stale entry shrinks or breaks. Seven entries remain — four are `cmp` profile
-  TOOLS at the wrong path that `harness init` already refuses to vendor, and three are core
-  library modules (`step-cache`, `arch-doc`, `audit-cadence`) whose facts degrade rather than
-  lie.
-
-- **The journey-citation grammar was `#`, in three places that had to agree and did not.** The
-  plant selector read `^#\s*SPEC:`, so a project citing with `//`, `--`, `;` or `%` had both
-  flow plants silently SKIPPED — a gate nobody was calibrating, which is the same as no gate.
-  The selector now reads the profile's declared `citationMarker`. That alone would have made
-  things worse rather than better: the runner's `stripCitations` also matched `^#\s*SPEC:` and
-  wrote a `#` comment in its place, so a newly-selected plant would have failed to bite and the
-  instrument would have reported a framework defect that was its own. The two failures had been
-  cancelling. `stripCitations` now REMOVES the citation line rather than rewriting it, which is
-  what makes it language-free — deleting a comment is safe in every syntax; composing one is
-  not — and the runner passes the profile's grammar down so all three agree.
-- **The watcher identified build output by the single directory name `build`.** Wrong in both
-  directions off-Gradle: it re-triggered the lane on a Rust or Python tree's real output (a
-  feedback loop) and refused to watch any real source directory named `build/`. It now reads
-  `layout.buildDir`, and prints the glob it actually settled on instead of a hardcoded string
-  that could disagree with its own behaviour. Proven at process level, not just unit level: the
-  resident loop was run against both ecosystems, before and after, touching files and counting
-  lane runs.
-- **The lane's compile short-circuit was keyed to a step literally named `build`** — Gradle's
-  word for the task and for the directory, and nobody else's. A pack compiling in `py_build`
-  never short-circuited, so its whole slow tier ran against a tree that does not compile; a pack
-  with any *other* step named `build` — a packaging step, a container image — had its lane
-  truncated there and real verdicts dropped. The pack now declares `compileStepName`, and the
-  distinction is the KEY's presence, not its value: a caller that predates the declaration keeps
-  today's behaviour, and a pack that declares none short-circuits on NOTHING rather than
-  inheriting another stack's step name.
-
-- **A 30-minute deadline ceiling had no profile channel.** "Never under five minutes, never over
-  thirty" is a judgement about how long a build can honestly take before it is wedged, made once
-  for one toolchain: a cold `xcodebuild`, a cold `cargo test` against an empty target dir, or a
-  Gradle daemon starting on a cold CI runner can each exceed it honestly, and the lane killed the
-  step and wrote an ERROR row — a wrong verdict about a healthy build. `stepDeadlineMs` had
-  always accepted overrides; nothing supplied them, so the numbers were unreachable from the only
-  place that knows the stack. **That was the defect, not the constants**, which survive as the
-  fallback rather than being replaced by a different guess. The pack declares `stepDeadlines`,
-  and the other half of the fix is that a killed step now NAMES the knob when the bound was
-  inherited — before, an adopter had no way to learn the bound existed, let alone that it was
-  another stack's number. `cmp` declares today's values to the millisecond, so the shipped lane
-  does not move; what changed is that the numbers have an owner.
-
-**All seven are closed.** What remains is not audit residue but the two things found while
-closing them, both recorded below.
+**The residue Stage 0 had to clear** — an adversarial audit that verified each item by execution —
+was seven wrong VERDICTS, none a refusal, which is why none was found by reading: the walk-mode
+ignore set disagreeing with itself; a validator requiring a step NAME (`harnessIntegrity`) that one
+pack chose; a 5-second plausibility floor accusing every fast stack of fabrication; an opt-in
+agnostic lint; a `#` citation grammar in three places that had to agree; a watcher keyed to a
+directory named `build`; a compile short-circuit and a deadline ceiling keyed to one toolchain.
+**All seven closed 2026-09-06**, each with a differential test watched failing on the alien profile
+before the fix landed — `test/citation-grammar.test.mjs`, `test/agnostic-lint.test.mjs`,
+`test/core-ecosystem-assumptions.test.mjs`, `test/build-is-one-stacks-word.test.mjs` and
+`test/stage0-differential-coverage.test.mjs` hold them. Every fix had the same shape: the profile
+declares the fact (`citationMarker`, `layout.buildDir`, `compileStepName`, `stepDeadlines`,
+`minExecutedMs` as the notary's policy) and the core stops guessing it; the lint went from an
+allowlist that rots silently to a denylist checked for exactness. What remains is not audit
+residue but the two things found while closing them, both recorded below.
 
 *Found while closing the above, and not smuggled into that fix:* **an empty region reads
 `intact`.** A tree holding two declaration files and no engine code at all locks, passes
@@ -537,137 +467,68 @@ is a stronger test than this project can currently perform on itself. Stage 2's 
 profile authored by a team OUTSIDE this project — is where that gap closes, and it is deliberately
 not claimed here.
 
-**In parallel, and unchanged in intent:** the mobile studio modules (attach ✓, runtime
-feedback, device-as-structure, profiling, data inspectors, release lane) proceed as
-*providers* of the `cmp` profile behind the harness's interfaces, each terminating in a receipt.
-Gatekeeper's hosted deployment stays deferred until real user traction; its code is complete.
-Discovery work (getting found by a cold agent through at least two independent surfaces) runs on
-its own plan of record.
-
-**Does this hold at 100 repos?** Only through Stages 1–3: a versioned harness, versioned
-profiles with a handshake, a manifest that says exactly what shipped, one command that upgrades
-a pinned fleet, and receipts comparable within a pack. Stage 0 alone gives one repo a clean
-seam; it does not give a fleet a spine. That is why the stages are ordered as they are and why
-none is skipped.
-
 ### 9.2 What Stage 2's predicate found before Stage 2 started
 
 Writing `scripts/stage2-gate.mjs` was Stage 2's first task, not its last, and it was red on the
-first run: seven of ten rows. **Two of those are honest absences** — no external profile is
-attested, and the criterion that depends on one is not reached. **One is the feature the stage
-exists to build** — the loader has no `extends`, so an heir declaring only what it changes is
-refused (`profile-loader.mjs:51` requires every declaration from every profile). **Four are live
-defects**, and two more were found beside them. None was visible from inside `cmp`, which is the
+first run: seven of ten rows. Two were honest absences — no external profile attested, and the
+criterion that depends on one not reached. One was the feature the stage exists to build — `extends`
+(`profile-loader.mjs::REQUIRED_EXPORTS` requires every declaration from every profile). Four were
+live defects, and two more were found beside them. None was visible from inside `cmp`, which is the
 whole reason a second profile had to run.
 
-*Against guarantee §8.9 — "a profile with no calibrated plants earns no rung", "a `cmp` L2 and any
-other pack's L2 are different claims and are shown as such":*
+- **A profile with no plants earned a rung** (against §8.9, and one of a Stack Profile's four
+  *nevers*, §3). Two adopters differing in exactly one export both earned L1. **Closed 2026-09-08** —
+  `lib/plant-calibration.mjs`, `test/badge-floor.test.mjs`. Of "calibrated"'s three readings the
+  floor implements USABLE: DECLARED is defeated by `export const plants = {}`, and OBSERVED — the
+  plants watched failing — is not derivable from a lane run, so claiming it would have been the fake.
+  An absent rung now says why; a floor that refuses silently is the same defect wearing the other hat.
+- **`evaluateReceipt` never read `pack`** — the field the comparability rule rests on, checked by
+  nothing; an editor can remove it and no reader notices. **Open**; Stage 2's row.
+- **No surface that showed a rung showed the pack** (against §6.5 and §3's promise for Gatekeeper).
+  **Closed 2026-09-08** on every evidence surface. The cause was one hop from the symptom: the
+  console's `receipt-bridge.mjs` and `digest.mjs` built the object with `pack` absent, so a
+  renderer-only fix would have printed "pack unnamed" over every real `cmp` receipt — a false
+  statement, strictly worse than the bare rung. The class was found by a deny-by-default scan of the
+  console directory, after a hand-enumerated list said five, named six and missed the seventh.
+  **Still open outside the console:** `lib/flight-recorder.mjs` stores and prints a rung with no
+  pack, and `scripts/fleet-check.mjs` compares a rung to `--min-level` without asking which pack
+  graded it — a cross-pack comparison §8.9 forbids, in a script that runs today.
+- **`pack.version` inherited the harness lock's number** (against ADR-0008): a profile declaring
+  0.3.1 minted receipts saying 0.20.0. **Closed 2026-09-08** with the ADR's acceptance —
+  `verify.mjs::pack` records the profile's own `export const version`, or null, never a version of
+  the wrong thing.
+- **The evidence ladder had two spellings, each with a different reader.** `harness init` seeded
+  `export const ladder`; the lane runner read `pack.evidenceLadder`; `receipt-check` read the
+  top-level. `cmp` exported both, so the split was invisible from inside the only real profile, and a
+  foreign author who did exactly what the seed said got no rung and no explanation. **Closed
+  2026-09-08** — `lib/evidence-ladder.mjs` resolves once and refuses when two declarations disagree;
+  `test/evidence-ladder.test.mjs`.
+- **The spec plants hardcoded a step name** (`step: "specCoverage"`) — the `harnessIntegrity` defect
+  §9.1 records as closed, in the same file, with the same fix not applied: a fix applied to instances
+  rather than the class comes back. **Closed** — the pack declares `plants.observedBy`; a pack that
+  declares nothing falls back to the lane, never to `cmp`'s names (the `compileStepName` distinction:
+  the key's presence, not its value).
 
-- **A profile with no plants earned a rung** — the ladder alone decided the grade and nothing asked
-  whether the profile had plants. Measured: two adopters differing in exactly one export both earned
-  L1. §3 makes "earns a rung without plants" one of a Stack Profile's four *nevers*, and nothing
-  anywhere connected the two facts. **Closed 2026-09-08** by `lib/plant-calibration.mjs`, which
-  implements the middle of "calibrated"'s three readings: DECLARED is defeated by
-  `export const plants = {}`, and OBSERVED — the plants have been watched failing — is the truest
-  reading and is **not derivable from a lane run**, because the lane does not run the instrument;
-  claiming it would have been the fake. What ships is USABLE, and it is the INSTRUMENT'S OWN
-  judgement rather than a second opinion — one question with two implementations is how
-  `flowCitation` and `scanCitations` came to disagree about the same file in the same tree. A rung
-  that is absent now says WHY, because a floor that refuses silently is the same defect wearing the
-  other hat.
-- **`evaluateReceipt` never reads `pack`.** A receipt with the field deleted is accepted as valid
-  (`packages/harness/src/lib/receipt-validate.mjs`). The field the whole comparability rule rests
-  on is checked by nothing and an editor can remove it without any reader noticing.
-- **No surface that shows a rung shows the pack.** `renderEvidenceBadge`
-  (`packages/harness/src/lib/evidence-badge.mjs`) and `receipt-check.mjs:225` each print the rung
-  alone, against §6.5 and against §3's promise that Gatekeeper shows the pack beside the rung.
+Three things the closing taught, kept as patterns rather than lines. **Refuse rather than
+reinterpret.** `release` is the one ladder field the grader reads as a single step NAME; every
+sibling is a list; the seeded skeleton showed `release: []`; and the `ktor-backend` author declared a
+list — L3 unreachable, nothing said. Accepting the list is the obvious repair and would move an
+existing pack's rung from L2 to L3, which changes what a receipt claims and is fit-test question 5's
+business — so it is refused by name, and the mistake is kept as a plant, because a plant is watched
+failing forever and a corrected fixture proves nothing after the day it changes. **A fix that never
+executed on a foreign tree is a claim.** A plant failure aborts the run and the spec plants go first,
+so §9.1's floor-plant fix had never once run off-`cmp` — the cost of fixing instances, paid twice in
+one file. **Dead code in a declaration is inert until something reads it.** The seeded `plants`
+skeleton wrote a ternary with two identical branches (`.kt` either way), harmless while nothing read
+`plants`; the day the badge floor read it, every Go, Python, Rust and TypeScript adopter was told to
+name their planted test `.kt`. The suffix derives from the detected language now, and the reading is
+usually added by someone who never looks at the seed.
 
-*Against ADR-0008:*
-
-- **`pack.version` inherits the harness lock's version** (`packages/harness/src/verify.mjs:568`).
-  Measured: a profile declaring `0.3.1` minted a receipt recording `0.20.0`. The ADR decided the
-  number "must become null, not inherited"; the code's own comment admits the borrowing — "its
-  version is the lock's until the profile loader gives it its own".
-
-*Found beside them, and the sharper pair:*
-
-- **The evidence ladder has two spellings, and each has a different reader.** `harness init` seeds
-  a commented `export const ladder` as the way to declare rungs
-  (`src/commands/harness-init.mjs:498`); the lane runner reads `pack.evidenceLadder` off the object
-  `steps(ctx)` returns (`packages/harness/src/verify.mjs:462`); `receipt-check.mjs:137` reads the
-  top-level `profile.ladder`. `cmp` exports **both** (`profiles/cmp/index.mjs:34`,
-  `steps-cmp.mjs:1513`) for a stated reason — a reader that must not start a lane needs one it can
-  ask without instantiating anything — so the split is invisible from inside the only real profile.
-  A foreign author who does exactly what the seeded skeleton says gets **no rung and no
-  explanation**. That is a silently wrong verdict, the class §9.1 catalogues eight of, and it was
-  found the same way all eight were: by running in an ecosystem the code had never met.
-- **The three spec plants hardcode a step name.** `framework-check.mjs:243, :270, :289` assert
-  `step: "specCoverage"` — a name the `cmp` pack chose, asserted against every profile, so a pack
-  spelling it otherwise fails its own Rule 0 instrument. This is the `harnessIntegrity` defect
-  closed in §9.1 with the same shape, in the same file: `VOUCHING_STEP` already solved the class
-  for the floor plants by finding the row that carries the DATA rather than the name, and the spec
-  plants did not get the treatment. A fix applied to the instances rather than to the class comes
-  back.
-
-**Closed 2026-09-08**, each watched failing by name before the fix landed — the ladder's two
-spellings (one resolver, `lib/evidence-ladder.mjs`, and a refusal when two declarations disagree),
-every rung surface on the evidence path now naming its pack, and the spec and flow plants no longer
-asserting another pack's step name (the pack declares `plants.observedBy`; a pack that declares
-nothing falls back to the lane, never to `cmp`'s names — the `compileStepName` distinction, the
-KEY's presence rather than its value).
-
-Two things were learned in the closing that neither the predicate nor the audit had seen.
-
-- **A seventh wrong verdict, and a real author had already hit it.** `release` is the one ladder
-  field the grader reads as a single step NAME; every sibling — `scaffoldCore`, `l0Required`,
-  `l1Required`, `deviceExecution` — is a list, and the seeded skeleton showed `release: []`. The
-  second-stack author who wrote the `ktor-backend` profile from the contract alone declared
-  `release: ["distribution"]`, and their L3 was unreachable with nothing said about it. `cmp`
-  declares a bare string, so it is invisible from inside the only real profile. Executed rather
-  than read: the same PASSing rows grade **L2 as a list and L3 as a string**. It is **refused, not
-  reinterpreted** — accepting the list is the obvious repair and would move an existing pack's rung
-  from L2 to L3, which changes what a receipt claims and is fit-test question 5's business. Whether
-  the ladder should be uniformly list-shaped is the ADR that question raises; the refusal moves no
-  grade anywhere and does not pre-empt it. The mistake is kept as a **plant** rather than corrected
-  away, because a plant is watched failing forever and a corrected fixture proves nothing after the
-  day it changes.
-- **§9.1's own plant fix had never once executed on a foreign tree.** A plant failure ABORTS the
-  run and the spec plants go first — so on a pack spelling its steps differently, the two floor
-  plants whose literal-name defect §9.1 records as closed never ran at all. The fix was real; the
-  proof that it worked off-`cmp` did not exist, because the instrument stopped before reaching it.
-  That is the cost of fixing instances rather than the class, paid twice in one file.
-
-*And an eighth, found only because the badge floor made it matter.* The seeded `plants` skeleton
-wrote `testFileBasename: "FrameworkCheckPlanted.${hostTier === "unit" ? "kt" : "kt"}"` — **both
-branches identical** — so every Go, Python, Rust and TypeScript adopter was told to name their
-planted test file `.kt`. It had been harmless for as long as `plants` was optional decoration
-nothing read. The moment a rung depends on the declaration, a ternary that cannot branch decides
-whether an adopter can earn a badge. The suffix is derived from the detected language now. Worth
-keeping as a pattern rather than a line: **dead code in a declaration is inert until something
-starts reading the declaration**, and the reading is usually added by someone who never looks at
-the seed.
-
-**Still open, and deliberately.** `pack.version` inheriting the harness lock's number, and a
-plantless profile earning a rung, are both left red on the gate: the first is ADR-0008's to settle
-and the ADR is unsigned, and the second is a new floor, which under §8.8 needs a kept plant and a
-measured cost before it is wired. **The console surfaces are closed too, and the list in this
-paragraph was wrong three ways** — it said five, named six locations, and a scan found **seven**;
-the miss was `console-overview.mjs`'s recent-requests rows. That is the argument against enumerating
-a class by hand, made against this document: the fix is a deny-by-default scan of the whole console
-directory, so a surface written tomorrow is covered the day it is written.
-
-**And the root cause was not the renderers.** All of them were fed by
-`inspector/mcp/src/lib/receipt-bridge.mjs` and `digest.mjs`, which built a fixed object with `pack`
-simply absent. A renderer-only fix would have printed "pack unnamed" over every real `cmp` receipt —
-a false statement, which is strictly worse than the bare rung it replaced. Worth keeping: the
-surface where a defect is VISIBLE and the layer where it is CAUSED were one hop apart, and fixing
-only the visible one would have made the product lie more confidently.
-
-*Named and still open, both outside the console:* `lib/flight-recorder.mjs:94` stores a rung with no
-pack and `:341` prints one. Sharper, because it runs today under fit-test question 6:
-`scripts/fleet-check.mjs:290` compares a rung against a threshold **without asking which pack graded
-it**, and `:305` prints the result with no pack — a cross-pack comparison of exactly the kind §8.9
-forbids and Stage 3's predicate already refuses.
+**Open, and why:** `evaluateReceipt` reading `pack`, and the two rung-without-pack surfaces above.
+**Closed since this section was first written, and it said otherwise:** the badge floor (a paragraph
+here once said it still needed a kept plant and a measured cost — it has both) and `pack.version`
+(it said ADR-0008 was unsigned; it is signed). A section that records what is open must be re-read
+when things close, or it becomes the eighteen documents.
 
 ---
 
@@ -755,9 +616,9 @@ loop: −1 lane per signing round · residue: <named, or none>
 | # | Decision | Blocks | Owner |
 |---|---|---|---|
 | ~~O1~~ | ~~Name the harness and its console.~~ **CLOSED — the name is `prooflane`, and the packages are UNSCOPED `prooflane-*`.** Seven names claimed and verified live on 2026-09-05: `prooflane`, `create-ktor`, `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`, `prooflane-studio-cmp`, `prooflane-receipts`. No scope: npm requires an organisation for one and `prooflane` was unavailable. The cost is accepted and recorded — anyone may publish `prooflane-anything` — because renaming the product a second time on day two costs more than the namespace guarantee is worth (PACKAGE-SPLIT §5, D8). `create-cmp` on npm belongs to someone else and is permanently lost. | — | — |
-| O2 | **The Stage 1 ADR** — what a pinned (fetched) receipt means versus a vendored one; whether Gatekeeper accepts both and how it shows the difference. | Stage 1 | architect drafts, Karel signs |
+| ~~O2~~ | **The Stage 1 ADR — CLOSED 2026-09-08, ADR-0008 accepted by Karel** (a resolved harness is still a vendored one; one kind of receipt; `pack.version` is the profile's own). — what a pinned (fetched) receipt means versus a vendored one; whether Gatekeeper accepts both and how it shows the difference. | Stage 1 | architect drafts, Karel signs |
 | ~~O3~~ | ~~The `ktor-backend` profile.~~ **CLOSED 2026-09-04** by the fuelled-api adoption report: a backend profile is ~230 lines and needs no core change. It comes into this repo as the suite's second profile (PACKAGE-SPLIT A4). | — | — |
-| O4 | **The receipt-format ADR** — `cmp-evidence/1` is renamed to the `prooflane` name with the reader accepting both (PACKAGE-SPLIT D3). What a receipt in the old format means once the new one exists, and what Gatekeeper does with each. | the rename, in Phase C | architect drafts, Karel signs |
+| ~~O4~~ | **The receipt-format ADR — CLOSED 2026-09-08, ADR-0007 accepted by Karel** (`prooflane-evidence/1` is routing metadata; the rename PR is its own slice). — `cmp-evidence/1` is renamed to the `prooflane` name with the reader accepting both (PACKAGE-SPLIT D3). What a receipt in the old format means once the new one exists, and what Gatekeeper does with each. | the rename, in Phase C | architect drafts, Karel signs |
 
 ---
 
@@ -794,3 +655,5 @@ must move fast and never be stuck, or the product has failed.** **The stack is d
 front, in a profile, and the core never learns a stack fact.** **A receipt is checkable
 offline and names what produced it.** **Mobile is the reference and never regresses.**
 **Everything is free and lives in the repo; accountable attestation is the service.**
+
+What to *run* is not in these six sentences on purpose: `CLAUDE.md` at the repo root carries the four programs — what a slice owes, the lane returning both ways, a stage's exit, the counts — and nothing else.

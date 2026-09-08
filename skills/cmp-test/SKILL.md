@@ -1,28 +1,21 @@
 ---
 name: cmp-test
 description: >-
-  Generate a regression test suite for a Compose Multiplatform app by OBSERVING it — read the
-  running app's semantics tree as structured JSON via the cmp-inspector MCP (testTags, text,
-  clickables, bounds, nav state), derive a test plan from what actually rendered, and write
-  tests into the app's shipped harness. Use this when the user says "write tests for my
-  app", "generate appium tests", "create a regression suite", "test this screen", "BDD tests for
-  my CMP app", "cover this flow with tests", "add UI tests to my CMP app", or "generate tests
-  from the running app". Tests are derived from the rendered structure — never guessed from
-  source, never from screenshots — and land in the shipped harness: current scaffolds carry
-  Maestro flows (qa/e2e/*.yaml, testTag selectors); legacy pre-Maestro scaffolds carry the
-  qa/appium AppiumClient runner or tests/appium pytest suite. Both are complemented by the verify
-  lane's golden-tree baseline (qa/golden/, the goldenTrees step) as the device-free CI regression
-  layer.
+  Generate a regression test suite for a Compose Multiplatform app by OBSERVING it — read the running
+  app's semantics tree as JSON via the cmp-inspector MCP (testTags, text, clickables, bounds, nav
+  state), derive a test plan from what actually rendered, and write the tests into the app's shipped
+  harness (Maestro flows in qa/e2e/*.yaml with testTag selectors, plus spec-cited Compose UI tests).
+  Use this when the user says "write tests for my app", "create a regression suite", "test this
+  screen", "cover this flow with tests", "add UI tests to my CMP app", or "generate tests from the
+  running app". Tests are derived from the rendered structure — never guessed from source, never from
+  screenshots.
 ---
 
 # cmp-test — generate the regression suite from the rendered tree
 
-> **Which harness? Look before you write.** Current scaffolds ship **Maestro** flows
-> (`qa/e2e/*.yaml` — `# SPEC:`-cited, testTag `id:` selectors; see `smoke.yaml` for the shape)
-> and NO Appium directories. The Appium mechanics below apply only to **legacy pre-Maestro
-> projects** that actually contain `qa/appium/` or `tests/appium/` — check which exists in the
-> target repo first and emit tests for THAT harness. Durable screen behavior belongs in Compose
-> UI Tests (spec-cited) either way; E2E stays a thin smoke layer.
+> Current scaffolds ship **Maestro** flows (`qa/e2e/*.yaml` — `# SPEC:`-cited, testTag `id:` selectors;
+> see `smoke.yaml` for the shape). Durable screen behavior belongs in Compose UI Tests (spec-cited);
+> E2E stays a thin smoke layer. Legacy pre-Maestro scaffolds (`qa/appium/`) are not covered here.
 
 ## Before anything: confirm the capability (fail loud)
 
@@ -93,8 +86,8 @@ Rules that make the plan durable:
 
 - Assert on **testTags and semantics**, never on pixels and never on coordinates.
 - Geometry claims (a 48dp touch target, a 12dp card gap) belong to the **inspector/lane layer**
-  (the lane's `a11y` step, `inspect_tree { includeLayoutGaps: true }`, golden trees), not to
-  Appium — don't bend the Appium client into measuring rects.
+  (the lane's `a11y` step, `inspect_tree { includeLayoutGaps: true }`, golden trees), not to an
+  E2E flow — don't bend a flow runner into measuring rects.
 - Prefer a screen's **tagged marker node** (e.g. `home_title`) as its "I am here" assertion;
   fall back to a distinctive text only when no tag exists (then see §4).
 

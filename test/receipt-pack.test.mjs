@@ -59,14 +59,16 @@ test("the pack declares its own id — the spine never assumes a name", () => {
   assert.equal(pack.version, undefined, "no version until the profile loader — the spine pairs id with the lock's version");
 });
 
-test("a fresh receipt carries pack {id, version}, and version is the harness lock's", () => {
+test("a fresh receipt carries pack {id, version}, and version is the profile's own or null — never the harness lock's (ADR-0008)", () => {
   const dir = stampedApp();
   const receipt = smokeReceipt(dir);
   const lock = JSON.parse(fs.readFileSync(path.join(dir, "qa", "harness.lock.json"), "utf8"));
 
-  assert.deepEqual(receipt.pack, { id: "cmp", version: lock.version });
-  // Both producer halves agree until profiles are versioned on their own.
-  assert.equal(receipt.pack.version, receipt.harness.version);
+  // ADR-0008 (accepted 2026-09-08): the version is the PROFILE'S OWN or null —
+  // never the harness lock's number. `cmp` declares none, so null; a profile
+  // that exports `version` puts that on the wire (stage2-gate row I).
+  assert.deepEqual(receipt.pack, { id: "cmp", version: null });
+  assert.notEqual(receipt.pack.version, receipt.harness.version, "the borrowed number is gone");
   assert.match(String(lock.version), /^\d+\.\d+\.\d+$/);
 });
 

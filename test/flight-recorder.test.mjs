@@ -244,7 +244,7 @@ test("appending to the journal never moves the receipt's inputs hash", () => {
 
 test("lane wiring: the entry is appended AFTER the receipt is written, and a failed append is noted, not fatal", () => {
   const verify = laneSrc(path.join(REPO_ROOT, "template"));
-  const receiptWrite = verify.indexOf('fs.writeFileSync(path.join(EVIDENCE_DIR, "latest.json")');
+  const receiptWrite = verify.indexOf('fs.writeFileSync(path.join(EVIDENCE_DIR, RECEIPT_FILE)');
   const flightAppend = verify.indexOf("appendFlightRecord(");
   assert.ok(receiptWrite > 0 && flightAppend > receiptWrite, "the journal entry records the final verdict — appended after the receipt");
   assert.match(verify, /flight recorder: journal append failed/, "a failed append surfaces in the lane's own output");

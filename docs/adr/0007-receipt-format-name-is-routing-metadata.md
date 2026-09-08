@@ -1,6 +1,7 @@
 # ADR-0007: The receipt format name is routing metadata, not part of the claim — rename it, read both
 
-- **Status:** proposed
+- **Status:** accepted — 2026-09-08, Karel van der Merwe (signed by his instruction in session — "sign the adrs"; drafted by the architect)
+- **Implementation:** pending — the rename PR (`prooflane-evidence/1` in `$id`, both writers, the reader's enum) is its own slice; nothing in the tree carries the new name yet.
 - **Date:** 2026-09-05
 
 ## Context

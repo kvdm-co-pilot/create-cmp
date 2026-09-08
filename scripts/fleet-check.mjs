@@ -38,7 +38,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { observedTreeHash, DEVICE_TIER_TRIGGERS } from "./observed-tree.mjs";
@@ -182,11 +182,39 @@ function fmtDuration(ms) {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-function run(cmd, argv, opts) {
-  const res = spawnSync(cmd, argv, { stdio: "inherit", ...opts });
-  if (res.error) throw new Error(`${cmd} failed to start: ${res.error.message}`);
-  return res.status ?? 1;
+/**
+ * Run a child and take it down with us. This was `spawnSync`, which blocks the
+ * event loop, so a SIGTERM to this process could not be handled — the parent
+ * died and the scratch app's `qa/verify.mjs` lane it had started lived on
+ * under PID 1, holding the device. On 2026-09-08 the proof gate then refused
+ * the next device run because that orphan was still "a lane already running"
+ * — correctly. So: async, with the live child tracked, and a signal handler
+ * that forwards the signal before exiting.
+ */
+const live = new Set();
+export function runCommand(cmd, argv, opts) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, argv, { stdio: "inherit", ...opts });
+    live.add(child);
+    child.once("error", (e) => { live.delete(child); reject(new Error(`${cmd} failed to start: ${e.message}`)); });
+    child.once("exit", (code, signal) => { live.delete(child); resolve(code ?? (signal ? 1 : 1)); });
+  });
 }
+/** Forward a signal to every live child. Exported so a test can watch it happen. */
+export function terminateChildren(signal = "SIGTERM") {
+  for (const c of live) {
+    try { c.kill(signal); } catch { /* already gone */ }
+  }
+  return live.size;
+}
+for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"]) {
+  process.on(sig, () => {
+    const n = terminateChildren(sig);
+    if (n) process.stderr.write(`fleet-check: ${sig} — forwarded to ${n} child process(es)\n`);
+    process.exit(sig === "SIGINT" ? 130 : 143);
+  });
+}
+const run = runCommand;
 
 async function main() {
   let args;
@@ -238,7 +266,7 @@ async function main() {
   const scratchRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-fleet-check-"));
   const appDir = path.join(scratchRoot, APP_NAME);
   process.stdout.write(`\n── stamping scratch app → ${appDir}\n`);
-  const stampStatus = run(
+  const stampStatus = await run(
     process.execPath,
     [
       path.join(REPO_ROOT, "bin", "create-cmp.mjs"),
@@ -263,7 +291,7 @@ async function main() {
   // 2. Run the app's OWN lane inside the scratch app. Env is inherited whole —
   //    JAVA_HOME/ANDROID_HOME come from the caller, never from this script.
   process.stdout.write(`\n── running verify lane (--profile ${args.profile}) in the scratch app\n`);
-  run(process.execPath, [path.join(appDir, "qa", "verify.mjs"), "--profile", args.profile], {
+  await run(process.execPath, [path.join(appDir, "qa", "verify.mjs"), "--profile", args.profile], {
     cwd: appDir,
     env: { ...process.env },
   });

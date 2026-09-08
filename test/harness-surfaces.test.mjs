@@ -283,7 +283,8 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       // The Evidence audit trail is the git history of this one file, so it must stay tracked.
       const gitignore = fs.readFileSync(path.join(out, ".gitignore"), "utf8");
       const ignoreRules = gitignore.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#"));
-      assert.ok(!ignoreRules.some((l) => l.includes("qa/evidence")), "nothing under qa/evidence is gitignored");
+      const evidenceRules = ignoreRules.filter((l) => l.includes("qa/evidence"));
+      assert.deepEqual(evidenceRules, ["qa/evidence/latest-fast.json"], "the fast receipt is ignored — inner-loop feedback, never evidence — and ONLY it; latest.json is never gitignored");
     });
 
     await t.test("qa/e2e/smoke.yaml cites SHELL-01 and uses extendedWaitUntil", () => {

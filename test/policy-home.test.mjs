@@ -27,27 +27,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // not. The homes quote the episode inside backticks — a quotation, not a rule —
 // and the phrases below are written to pass a backtick-quoted line.
 
-export const CADENCE_PHRASES = Object.freeze([
-  [/(?:fleet L2|min-level L2)`?[^.;\n]{0,12}\b(?:green\s+)?(?:\*\*)?(?:once\s+)?per (?:PR|commit)/i, "the per-PR / per-commit fleet cadence"],
-  [/\b(?:device|emulator|fleet L2)[^.;\n]{0,40}\b(?:per|every|each) (?:commit|PR|step)\b/i, "a device run keyed to commits, PRs or steps"],
-  [/\b(?:per|every|each) (?:commit|PR|step)\b[^.;\n]{0,40}\b(?:device (?:run|tier|proof)|fleet L2)/i, "a device run keyed to commits, PRs or steps"],
-  [/(?<!`)fleet L2\s+REQUIRED/, "the line an agent acted on three times"],
-]);
-
-export function restatements(text) {
-  const out = [];
-  const lines = text.split("\n");
-  lines.forEach((line, i) => {
-    // One hit per line: a line is a restatement or it is not, however many phrasings it trips.
-    for (const [re, what] of CADENCE_PHRASES) {
-      if (re.test(line)) {
-        out.push({ line: i + 1, what, text: line.trim() });
-        break;
-      }
-    }
-  });
-  return out;
-}
+import { CADENCE_PHRASES, restatements } from "../scripts/lib/cadence.mjs";
+export { CADENCE_PHRASES, restatements };
 
 /** Tracked markdown only — a gitignored ledger is not a document anyone is pointed at. */
 function trackedDocs() {
