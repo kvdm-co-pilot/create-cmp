@@ -247,12 +247,14 @@ the layer you changed cannot certify itself · proof costs what the change costs
 silent · never wait on nothing · a signature binds content, a decision is closed · one record,
 read first.
 
-**The four gate rules** — Rule 0: prove the framework returns, both ways, in seconds, before
+**The five gate rules** — Rule 0: prove the framework returns, both ways, in seconds, before
 pointing work at it. Rule 1: a gate is not wired until a *kept* plant makes it fail by name and
 its measured cost has chosen its stage. Rule 2: the layer you changed cannot certify itself —
 library → full suite; template or harness → a fresh app stamped; environment-sensitive → the
 environment. Rule 3: a loop cannot certify its own termination — the exit is a command written
-before the work starts, and a stage whose exit is still prose has not started.
+before the work starts, and a stage whose exit is still prose has not started. Rule 4: proof is
+SCHEDULED, not triggered — an expensive tier runs once, at the end of the slice that changed it,
+and what a slice will owe is declared before the first line is written.
 
 **The orchestration pattern** — *keep reasoning cheap and reversible; gate the irreversible
 work.* Reasoning stays with the orchestrator; execution is delegated to peer-strength agents and
@@ -320,10 +322,30 @@ reopen walks back only what it amends.
 rebase, delete the branch, pull — and only then is the next piece branched. Stacks on GitHub are
 long-lived branches by another name and auto-close when their base is deleted.
 
-**Release gating.** A release is gated at the device rung (L2) on a real headless emulator on the
-debug build; device rows SKIPped is never reported as fleet PASS. The machine is checked for
-another lane before a device tier runs. Publishing is unattended through ambient auth; the agent
-never handles a token.
+**Device gating — this is the policy's home, and every other document cites it rather than
+restating it.** A slice declares what it will owe before the work starts, and the device tier runs
+**once, at the end of that slice** — never per commit:
+
+```bash
+node scripts/proof-plan.mjs --open "<what you are building>"   # before the work
+node scripts/proof-plan.mjs                                     # what is owed, and WHEN
+node scripts/proof-plan.mjs --close                             # refuses if anything is owed
+```
+
+The run itself is L2 on a real headless emulator against the debug build; device rows SKIPped is
+never reported as fleet PASS; the machine is checked for another lane first. A discharge is read
+from the run's own record, never asserted. The device tier is the **last** gate, so a trigger path
+edited afterwards reopens the slice and is told so.
+
+**Why this paragraph says "the policy's home" out loud.** On 2026-09-08 the same rule was stated in
+eighteen documents, none of them a program, and they disagreed — the project memory said "gate a
+RELEASE at L2" while `fit-test.mjs` printed `fleet L2 REQUIRED` on any commit touching the harness
+source. A device suite ran three times in one session, once for a comment. Prose is read at the
+start of a session; a program speaks at the moment of the decision, and it wins. `deriveTierNeed`
+had always answered WHETHER a tier could be skipped and nothing had ever answered WHEN, which is
+the whole defect: a tier with no schedule runs now. GATE-RULES Rule 4 carries the full episode.
+
+**Publishing** is unattended through ambient auth; the agent never handles a token.
 
 ---
 
