@@ -121,8 +121,10 @@ export function gradeEvidence(stepResults, profile, { mode, ladder, plants } = {
   if (!calibrated.ok) {
     const alsoNoLadder = !ladder || typeof ladder !== "object";
     return none(
+      // The §6.7 citation is already inside `calibrated.reason`; repeating it
+      // here made the most-read line in the lane cite the same section twice.
       `no evidence rung: ${calibrated.reason}. A profile ships plants its Rule 0 instrument can run — ` +
-        "`node qa/framework-check.mjs` — or it ships without a badge (NORTH-STAR.md §6.7, §8.9)" +
+        "`node qa/framework-check.mjs` — or it ships without a badge (§8.9)" +
         (alsoNoLadder ? ", and this profile declares no `ladder` either, which alone earns no rung" : ""),
     );
   }

@@ -147,7 +147,7 @@
 //
 // G — THE BADGE FLOOR: ITS PLANTLESS TWIN EARNS NO RUNG (§8.9, §3's third
 //     never). The twin differs from F's profile in exactly one export. Today
-//     `evidenceLevel` (packages/harness/src/lib/evidence-level.mjs:61) derives
+//     the grader derived
 //     the rung from the ladder alone and never asks whether the profile ships
 //     plants, so this is expected red and is the sharpest thing on the list.
 //
@@ -794,7 +794,7 @@ export const tiers = { names: ["heir-tier"], hostOnly: ["heir-tier"], satisfying
           ? `the twin's lane did not pass, so its rung says nothing: ${tail(lanePlantless, 3)}`
           : plantlessRung === null
             ? "a lane green over a profile that ships no plants records no rung"
-            : `the twin ships NO plants and still earned ${plantlessRung} · ${receiptPlantless.evidenceLevel.name} — §8.9 says a profile with no calibrated plants earns no rung, and §3 makes "earns a rung without plants" one of a Stack Profile's four nevers. evidenceLevel (packages/harness/src/lib/evidence-level.mjs:61) derives the rung from the ladder alone and never asks whether the profile has plants`,
+            : `the twin ships NO plants and still earned ${plantlessRung} · ${receiptPlantless.evidenceLevel.name} — §8.9 says a profile with no calibrated plants earns no rung, and §3 makes "earns a rung without plants" one of a Stack Profile's four nevers. the grader is deriving the rung from the ladder alone again — lib/plant-calibration.mjs is the floor it must ask, and lib/evidence-level.mjs is what asks it`,
     });
 
     // ── H and I — the pack on the receipt ───────────────────────────────────

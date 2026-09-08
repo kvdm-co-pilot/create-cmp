@@ -146,7 +146,7 @@
         "object",
         "null"
       ],
-      "description": "The evidence ladder rung (qa/lib/evidence-level.mjs), DERIVED from which steps actually ran and PASSed \u2014 never declared. A SKIPped step never upgrades a rung; null when the lane FAILed (a failed lane has no rung); absent when the pack declares no ladder, which is the honest grade for a ladder nobody has calibrated. THE RUNG IS THE PACK'S: L2 under one pack and L2 under another are different claims that happen to share a letter, which is why `pack` travels on every receipt. Compare rungs only within a pack.",
+      "description": "The evidence ladder rung (qa/lib/evidence-level.mjs), DERIVED from which steps actually ran and PASSed \u2014 never declared. A SKIPped step never upgrades a rung; null when the lane FAILed (a failed lane has no rung); absent when the pack declares no ladder, which is the honest grade for a ladder nobody has calibrated; and null when the profile ships no plants its Rule 0 instrument can run, because a rung is a claim about gates that have been calibrated and a profile that cannot be calibrated has earned none (\u00a78.9, \u00a76.7). THE RUNG IS THE PACK'S: L2 under one pack and L2 under another are different claims that happen to share a letter, which is why `pack` travels on every receipt. Compare rungs only within a pack.",
       "required": [
         "rung",
         "name",
