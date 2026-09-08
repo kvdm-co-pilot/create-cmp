@@ -181,4 +181,6 @@ rather than quietly kept.
 - `packages/harness/src/lib/harness-lock.mjs` (the lock and its `status`),
   `harness-region.mjs` (what the region is), `packages/harness/src/verify.mjs` (the writer of
   `harness` and `pack`), `template/qa/evidence/schema.json` (the fields this constrains),
-  `src/commands/harness-init.mjs` (where resolution will land).
+  `packages/harness/install/init.mjs` (where resolution will land — the installer moved into the
+  harness package on 2026-09-08 so it could be reached without create-cmp; the paths cited in
+  Context above are as they stood when this was decided).

@@ -91,7 +91,7 @@ const STACK_FACTS = ["composeApp", "androidInstrumentedTest", "desktopTest", "co
  * 2026-09-08 language audit found had walked past them (NORTH-STAR §10 Q4: "a
  * stack assumption that names no stack cannot be found by reading"). PATTERN:
  * the vocabulary is DERIVED — file extensions from GitHub Linguist's table
- * (src/data/linguist-languages.json, with provenance), the way ArchUnit and
+ * (packages/harness/install/linguist-languages.json, with provenance), the way ArchUnit and
  * dependency-cruiser enforce "this layer may not name that one" from a rule
  * rather than a list. WHY IT WORKS: an extension nobody here typed cannot be
  * forgotten here. HOW IT FAILS: false positives — `.go(` is a method call,
@@ -104,7 +104,7 @@ const STACK_FACTS = ["composeApp", "androidInstrumentedTest", "desktopTest", "co
  * `inv.kotlin` — a property access — reads as a build directory. Every hit is
  * either fixed or excused with a named exit.
  */
-const LINGUIST = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "src", "data", "linguist-languages.json"), "utf8"));
+const LINGUIST = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "packages", "harness", "install", "linguist-languages.json"), "utf8"));
 const OWN_LANGUAGES = new Set(["JavaScript", "TypeScript", "JSON", "JSON5", "Shell", "Dockerfile", "Makefile", "HTML", "CSS", "SVG"]);
 const EXTENSIONS = [...new Set(Object.entries(LINGUIST.languages).filter(([name]) => !OWN_LANGUAGES.has(name)).flatMap(([, exts]) => exts))]
   .filter((e) => e.length > 2 && !/^\.(mjs|cjs|jsx?|tsx?|mts|cts|json|md|yml|yaml|xml|html|css|svg|sh|txt|toml)$/.test(e))
@@ -129,11 +129,13 @@ const STACK_SHAPES = [
  * named exit, not a permanent exemption.
  */
 const STACK_COUPLED = new Map([
-  // The four `cmp` profile TOOLS. `harness init` already knows these are not
-  // portable — PROFILE_TOOLS in src/commands/harness-init.mjs deliberately
-  // omits all four when seeding a foreign repo, so no adopter runs them. They
-  // are the cmp profile's tools living at the wrong path. Exit: they move into
-  // lib/profiles/cmp/ and these entries are deleted.
+  // The four `cmp` profile TOOLS, which the installer already withholds from a
+  // foreign repo. That used to be a second hand-written list in another
+  // package; since 2026-09-08 both sides read ONE declaration — `tools` in
+  // profiles/cmp/declarations.mjs — and the test below pins that these four
+  // entries and the derived set stay the same four. They are the cmp profile's
+  // tools living at the wrong path. Exit: they move into lib/profiles/cmp/,
+  // and both the declaration and these entries are deleted together.
   ["preview-gallery.mjs", "a cmp profile tool (PROFILE_TOOLS); not vendored into a foreign repo"],
   ["refusal-demo.mjs", "a cmp profile tool (PROFILE_TOOLS); not vendored into a foreign repo"],
   ["scaffold-feature.mjs", "a cmp profile tool (PROFILE_TOOLS); the Kotlin stamper"],
@@ -211,6 +213,42 @@ test("the exception list is EXACT — a file that is now clean must be removed f
   );
 });
 
+test("the excused TOOLS and the withheld ones are one fact, not two lists", async () => {
+  // THE DRIFT THIS CLOSES. Two hand-maintained lists described the same four
+  // files — this one, excusing them from the lint, and PROFILE_TOOLS in the
+  // installer, withholding them from a foreign repo — each naming the other in
+  // a comment. Add a fifth tool and exactly one gets updated; the silent half
+  // is the installer, which hands an adopter a module that names a stack they
+  // are not. Neither list is authoritative now: the profile declares `tools`
+  // and install/portability.mjs derives the set, and this asserts the lint's
+  // excuses have not drifted from what the installer actually withholds.
+  const { loadShippedDeclarations, notPortable, undeclaredProfileTools } = await import(
+    "../packages/harness/install/portability.mjs"
+  );
+  const declarations = await loadShippedDeclarations(CORE);
+  const derived = notPortable(CORE, declarations);
+
+  const excusedTools = [...STACK_COUPLED.keys()].filter((rel) => !rel.includes("/")).sort();
+  assert.deepEqual(
+    derived.tools,
+    excusedTools,
+    "every top-level tool excused from the lint must be one the installer withholds, and vice versa",
+  );
+
+  // The check that keeps the declaration honest: a tool whose own imports reach
+  // a profile and that no profile declares would be vendored into a repo that
+  // cannot load it.
+  assert.deepEqual(
+    await Promise.resolve(undeclaredProfileTools(CORE, declarations)),
+    [],
+    "a tool imports a profile but no profile declares it — add it to that profile's `tools`",
+  );
+
+  // And the library half, which is derived from imports alone: a11y.mjs cannot
+  // load without profiles/cmp/tree.mjs, so a foreign repo is not given it.
+  assert.deepEqual(derived.lib, ["a11y.mjs"]);
+});
+
 test("the rule covers every core module, so a NEW file is stack-free by default", () => {
   // The inversion, asserted directly: coverage is derived from the tree, not
   // from a list someone maintains. A file created tomorrow is subject to the
@@ -234,7 +272,7 @@ const NOT_YET_MOVED = ["lib/a11y.mjs", "lib/component-stories.mjs", "scaffold-fe
 
 test("the cmp profile declares layout and tiers, and the core reads them only through the loader", () => {
   const entry = fs.readFileSync(path.join(PROFILES, "cmp", "index.mjs"), "utf8");
-  assert.match(entry, /export \{ layout, tiers, grammar, reports, detect \} from "\.\/declarations\.mjs"/);
+  assert.match(entry, /export \{ layout, tiers, grammar, reports, detect, tools \} from "\.\/declarations\.mjs"/);
   for (const abs of mjsUnder(CORE)) {
     if (abs.startsWith(PROFILES + path.sep)) continue;
     if (NOT_YET_MOVED.includes(path.relative(CORE, abs).split(path.sep).join("/"))) continue;

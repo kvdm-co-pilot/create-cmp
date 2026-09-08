@@ -125,11 +125,18 @@ The lane is two things (evidence-economics S8): a **spine** and a **step pack**.
   `createCmpSteps(ctx)` returns `{ stepsForProfile, DEVICE_STEPS, FAST_EXCLUDED_NAMES,
   STEP_FN_BY_NAME, stepDeterminism, releaseLease }`. **It reads no argv and writes no receipt.**
 
-To verify a Kotlin backend, a web service, anything: **one command.**
+To verify a Kotlin backend, a web service, anything — **from this package alone**:
 
 ```
-npx create-cmp-cli harness init [--profile <id>]
+npm i -D prooflane-harness
+npx prooflane init [--profile <id>]
 ```
+
+No scaffolder, no Compose, nothing else installed — that independence is the point, and
+`node scripts/stage1-gate.mjs` in the create-cmp repo proves it by installing this tarball
+into a Go repo that has never heard of us and running the lane. (If you already have the
+Compose scaffolder, `npx create-cmp-cli harness init` delegates to exactly this code; the two
+differ only in which command names they print back at you.)
 
 It vendors the spine, writes `qa/harness-manifest.json`, generates a working profile at
 `qa/lib/profiles/<id>/index.mjs`, seeds `qa/verified-surface.json` from your own tree, takes
@@ -159,7 +166,7 @@ same hole as an edited spine — so the first edit you make to it FAILs `harness
 you re-take the lock:
 
 ```
-npx create-cmp-cli harness relock
+npx prooflane relock
 ```
 
 It re-hashes the region and rewrites `qa/harness.lock.json`, **only** when every difference is

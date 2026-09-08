@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // THE LANGUAGE TABLE IS DERIVED, NEVER HAND-WRITTEN.
 //
-//   node scripts/derive-linguist.mjs          # refresh src/data/linguist-languages.json
+//   node scripts/derive-linguist.mjs          # refresh packages/harness/install/linguist-languages.json
 //
 // PATTERN: GitHub Linguist's languages.yml is the canonical map from file
 // extension to language, maintained by the people who classify every public
@@ -24,7 +24,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const SOURCE = "https://raw.githubusercontent.com/github-linguist/linguist/HEAD/lib/linguist/languages.yml";
-const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "data", "linguist-languages.json");
+const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "packages", "harness", "install", "linguist-languages.json");
 
 export function extractProgrammingLanguages(yaml) {
   const langs = {};

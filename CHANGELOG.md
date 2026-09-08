@@ -8,6 +8,57 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **`prooflane` — the harness's own command, and the reason Stage 1 could not start.**
+  `prooflane-harness` shipped a verify lane and no way to install one. The command that writes
+  a lane, `harness init`, lived in `src/commands/` of `create-cmp`, so a Go or Python repo that
+  wanted the lane had to install the Kotlin/Compose scaffolder to get it — the exact dependency
+  NORTH-STAR §9's Stage 1 exists to remove. `scripts/stage1-gate.mjs` said so as a command: its
+  criterion A reported "installed, but the package declares no `bin`", and B, C and D reported
+  "not reached" rather than passing vacuously.
+
+  The package now declares `bin: { prooflane }` and carries `prooflane init` and
+  `prooflane relock`. **Two front doors, one behaviour:** `create-cmp harness init` now
+  delegates to the same module rather than owning it, and the only difference is an
+  `invocation` that decides which command names get printed back — a `prooflane` user is never
+  told to run a `create-cmp` command, which would send them back to the package this stage
+  removes. Criteria A and B are met: a Go repo with no create-cmp installs the tarball, runs
+  `prooflane init`, and reaches `verify lane: PASS`. C and D remain — no `upgrade` exists yet,
+  so a core fix cannot yet reach an installed lane by one command, and the bin says that rather
+  than shipping a command that does nothing.
+
+  **Three couplings the move had to pay off, each replaced by a derivation rather than a list:**
+
+  - *The detectors.* `harness init` asked `KNOWN_DETECTORS = new Map([["cmp", cmpDetect]])` —
+    an installer that names a stack, one layer above the coupling Stage 0 removed. It now
+    imports the `detect` of every profile the package **ships**, discovered from the profiles
+    directory, and is correct on the day a second profile lands.
+  - *The withheld tools.* Which lane files a foreign repo must not be given was written down
+    **twice, by hand, in two packages** — `PROFILE_TOOLS` in the installer, and `STACK_COUPLED`
+    in `test/agnostic-lint.test.mjs` — each naming the other in a comment. Add a fifth tool and
+    exactly one gets updated, and the silent half hands an adopter a module that cannot load.
+    Now `install/portability.mjs` derives it from two signals that already exist: a file whose
+    import closure reaches `lib/profiles/` cannot load without it (this catches
+    `preview-gallery.mjs`'s deferred `import(new URL(…))` too), and a profile declares its own
+    `tools` for the case closure cannot see — `refusal-demo.mjs` drives a Compose tree through
+    strings alone and would import cleanly into a Go repo, then lie to it. The declaration is
+    checked by the closure (`undeclaredProfileTools`), and the lint now asserts its excused
+    tools ARE the withheld ones instead of mirroring them.
+  - *The receipt schema.* `harness init` vendored `qa/evidence/schema.json` out of the repo's
+    `template/`, which a registry install does not have — so every adopter who installed the
+    package rather than the scaffolder got a lane with no schema beside its receipts, silently,
+    because the copy was guarded by `existsSync`. The contract now ships **in** the package
+    (`packages/harness/evidence/schema.json`) and `sync-harness.mjs` keeps the template's copy
+    byte-identical.
+
+  **The installer is not the lane, and the boundary is now a test rather than a habit.**
+  `install/` and `bin/` ship in the tarball but are never vendored, never inside the lock, and
+  never inside a receipt's `inputs.hash` — which is what lets the installer hold Linguist's
+  language table and per-language test patterns while `src/` stays stack-free under the
+  agnostic lint. `test/install-boundary.test.mjs` pins all of it: nothing under `install/` or
+  `bin/` is synced, the region's shape cannot reach them, a stamped app's lock holds no
+  installer file, the package ships what it installs, and the installer takes no dependency —
+  the lane must run offline, and the thing that installs it inherits that rule.
+
 - **`create-cmp harness relock` — the command whose absence bricked an adopter's first edit.**
   `qa/lib/profiles/<id>/**` is inside the hash-locked region and is also the one directory the
   harness tells you to edit. So the first legitimate profile change failed `harnessIntegrity`

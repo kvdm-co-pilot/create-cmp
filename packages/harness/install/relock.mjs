@@ -51,16 +51,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { colors, ok, warn, fail } from "../lib/log.mjs";
+import { colors, ok, warn, fail } from "./log.mjs";
+import { frontDoor } from "./init.mjs";
 import {
   HARNESS_DECLARATIONS,
   HARNESS_PROFILES_DIR,
   isAdopterOwned,
-} from "../../packages/harness/src/lib/harness-region.mjs";
+} from "../src/lib/harness-region.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** Where the harness package keeps the profiles this engine vendors. */
-const SHIPPED_PROFILES_DIR = path.resolve(HERE, "../../packages/harness/src/lib/profiles");
+const SHIPPED_PROFILES_DIR = path.resolve(HERE, "../src/lib/profiles");
 
 /** The lane module a project carries — the one that will CHECK what we write. */
 const PROJECT_LOCK_MODULE = "qa/lib/harness-lock.mjs";
@@ -153,13 +154,14 @@ function renderRows(rows) {
  * @param {string|undefined} positional
  * @returns {Promise<number>} exit code
  */
-export async function runHarnessRelock(flags, positional) {
+export async function runHarnessRelock(flags, positional, opts = {}) {
+  const cmd = frontDoor(opts.invocation);
   const targetDir = (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
   const root = path.resolve(targetDir);
   const dryRun = Boolean(flags["dry-run"]);
 
   process.stdout.write(
-    `\n${colors.bold("create-cmp harness relock")} — re-take the lock over the files you own\n` +
+    `\n${colors.bold(cmd.relock)} — re-take the lock over the files you own\n` +
       `  project: ${colors.cyan(root)}\n\n`
   );
 
@@ -177,7 +179,7 @@ export async function runHarnessRelock(flags, positional) {
   const lockModulePath = path.join(root, ...PROJECT_LOCK_MODULE.split("/"));
   if (!fs.existsSync(lockModulePath)) {
     fail(`no ${PROJECT_LOCK_MODULE} under ${root} — this project carries no verify lane.`);
-    process.stdout.write(`  Install one: ${colors.cyan("create-cmp harness init")}\n\n`);
+    process.stdout.write(`  Install one: ${colors.cyan(cmd.init)}\n\n`);
     return 2;
   }
   const { checkHarnessIntegrity, describeIntegrity, writeHarnessLock, LOCK_PATH } = await import(
@@ -192,8 +194,8 @@ export async function runHarnessRelock(flags, positional) {
       `  A relock re-takes a lock you already have; it decides what it may cover by\n` +
         `  comparing the tree against the recorded one. With no baseline, every file in\n` +
         `  the region would be adopted sight unseen — including a forked lane.\n\n` +
-        `  Install the lane (and its first lock): ${colors.cyan("create-cmp harness init")}\n` +
-        `  Restore a stamped app's lane:          ${colors.cyan("create-cmp upgrade --harness")}\n\n`
+        `  Install the lane (and its first lock): ${colors.cyan(cmd.init)}\n` +
+        `  Restore a stamped app's lane:          ${colors.cyan(cmd.restore)}\n\n`
     );
     return 2;
   }
@@ -210,7 +212,7 @@ export async function runHarnessRelock(flags, positional) {
       `  A relock re-hashes the lane already installed and preserves the identity the\n` +
         `  lock names. It will not invent one — a lock claiming a version this tree was\n` +
         `  never proven against is worse than no lock.\n\n` +
-        `  Reinstall the lane: ${colors.cyan("create-cmp upgrade --harness")}\n\n`
+        `  Reinstall the lane: ${colors.cyan(cmd.restore)}\n\n`
     );
     return 2;
   }
@@ -227,7 +229,7 @@ export async function runHarnessRelock(flags, positional) {
         `  Editing the lane's own code is a ${colors.bold("fork")}, not a re-lock. Re-taking the lock\n` +
         `  over it would make every receipt this project issues vouch for a lane the\n` +
         `  harness has never seen — the one thing the lock exists to prevent.\n\n` +
-        `  Restore them:  ${colors.cyan("create-cmp upgrade --harness")}\n` +
+        `  Restore them:  ${colors.cyan(cmd.restore)}\n` +
         `  If the change belongs in the harness, it belongs upstream: a local patch is a\n` +
         `  lane no upgrade preserves and no fix ever reaches.\n\n`
     );

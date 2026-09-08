@@ -16,15 +16,15 @@ import { detect, grammar, reports, layout } from "../packages/harness/src/lib/pr
 import { copy as cmpCopy } from "../packages/harness/src/lib/profiles/cmp/console-copy.mjs";
 import { NEUTRAL_COPY, setConsoleCopy, consoleCopy } from "../packages/harness/src/console/console-tabs.mjs";
 import { declaredIgnore, gitignoredDirs } from "../packages/receipts/src/inputs-hash.mjs";
-import { LANGUAGE_GRAMMARS, detectLanguage, profileClaims } from "../src/commands/harness-init.mjs";
+import { LANGUAGE_GRAMMARS, detectLanguage, profileClaims } from "../packages/harness/install/init.mjs";
 import { extractProgrammingLanguages } from "../scripts/derive-linguist.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const LINGUIST = JSON.parse(fs.readFileSync(path.join(ROOT, "src/data/linguist-languages.json"), "utf8"));
+const LINGUIST = JSON.parse(fs.readFileSync(path.join(ROOT, "packages/harness/install/linguist-languages.json"), "utf8"));
 const tmp = (n) => fs.mkdtempSync(path.join(os.tmpdir(), `${n}-`));
 const touch = (root, rel) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), ""); };
 
-test("detect (buildpack-style): cmp claims a tree only with BOTH markers, and returns its evidence", () => {
+test("detect (buildpack-style): cmp claims a tree only with BOTH markers, and returns its evidence", async () => {
   const empty = tmp("detect");
   assert.equal(detect(empty, fs).claims, false, "nothing there");
   touch(empty, "settings.gradle.kts");
@@ -35,8 +35,11 @@ test("detect (buildpack-style): cmp claims a tree only with BOTH markers, and re
   const both = detect(empty, fs);
   assert.equal(both.claims, true);
   assert.equal(both.evidence.length, 2, "evidence, never a bare boolean");
-  assert.deepEqual(profileClaims(empty).map((c) => c.id), ["cmp"], "harness init asks the profiles first");
-  assert.deepEqual(profileClaims(tmp("none")), [], "and an unclaimed tree gets the seed path");
+  // profileClaims went async on 2026-09-08: the installer moved into the harness
+  // package and derives its detectors from the profiles the package SHIPS —
+  // imported, not listed — so it can no longer name `cmp` in a static import.
+  assert.deepEqual((await profileClaims(empty)).map((c) => c.id), ["cmp"], "harness init asks the profiles first");
+  assert.deepEqual(await profileClaims(tmp("none")), [], "and an unclaimed tree gets the seed path");
 });
 
 test("the language table is DERIVED: Linguist with provenance, the seed grammars keyed by its names, and the extractor is honest about collapse", () => {

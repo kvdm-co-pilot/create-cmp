@@ -19,7 +19,7 @@ export const id = "cmp";
 export const protocol = 1;
 
 /** Where specs, sources, tests and flows live; which tiers observe what. */
-export { layout, tiers, grammar, reports, detect } from "./declarations.mjs";
+export { layout, tiers, grammar, reports, detect, tools } from "./declarations.mjs";
 export { copy as console } from "./console-copy.mjs";
 
 /** What a human signs, in definition order; and whether this tree may record signatures at all. */
