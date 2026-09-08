@@ -5,6 +5,7 @@
 // which is the same discipline the module exists to enforce.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { grammar as cmpGrammar } from "../packages/harness/src/lib/profiles/cmp/declarations.mjs";
 
 import {
   DEFAULT_BOUND_MS,
@@ -25,6 +26,8 @@ const SPEC = `# Home\n\n- **HOME-01** — Given the app opens, Then the shell re
 const FLOW = `# E2E smoke\n\n# SPEC: HOME-02 — the items render\n- launchApp\n`;
 
 const fullTree = () => ({
+  // A stamped Compose tree carries the cmp profile's grammar — required since 2026-09-08.
+  grammar: cmpGrammar,
   specs: [{ rel: "specs/home.spec.md", text: SPEC }],
   flows: [{ rel: "qa/e2e/smoke.yaml", text: FLOW }],
   harnessLib: ["qa/lib/spec-coverage.mjs", "qa/lib/verify.mjs"],
@@ -50,11 +53,11 @@ test("firstClauseId takes the first clause id, and only from a spec list item", 
 });
 
 test("flowCitation reads a `# SPEC:` tag and ignores a mention mid-line", () => {
-  assert.equal(flowCitation(FLOW), "HOME-02");
+  assert.equal(flowCitation(FLOW, cmpGrammar), "HOME-02");
   // The stamped smoke flow opens with "# E2E smoke — Maestro flow. SPEC: A, B."
   // That is prose ABOUT the flow, not a citation the coverage scan binds to.
-  assert.equal(flowCitation("# E2E smoke — Maestro flow. SPEC: SHELL-01, HOME-02.\n"), null);
-  assert.equal(flowCitation(""), null);
+  assert.equal(flowCitation("# E2E smoke — Maestro flow. SPEC: SHELL-01, HOME-02.\n", cmpGrammar), null);
+  assert.equal(flowCitation("", cmpGrammar), null);
 });
 
 test("clauseFamily takes the prefix, and falls back rather than throwing", () => {
@@ -279,7 +282,7 @@ test("the cmp profile's planted sources actually produce the violations they cla
   const unbound = cmpPlants.unboundCitationSource("HOME-99").split("\n");
   const tagLine = unbound.findIndex((l) => l.includes("SPEC: HOME-99"));
   assert.ok(tagLine >= 0, "the unbound plant carries the citation");
-  assert.equal(citationIsBound(unbound, tagLine), false, "…and the core's binder must refuse it — that IS the plant");
+  assert.equal(citationIsBound(unbound, tagLine, cmpGrammar), false, "…and the core's binder must refuse it — that IS the plant");
   // Longer than the window, so a real test cannot wander into range and launder
   // it: this is payment-blueprint's drift, where a tag on a class three
   // properties above a genuine @Test vouched for the whole file.
@@ -289,7 +292,7 @@ test("the cmp profile's planted sources actually produce the violations they cla
   const tier = cmpPlants.tierUnmetCitationSource("HOME-98").split("\n");
   const tierTag = tier.findIndex((l) => l.includes("SPEC: HOME-98"));
   assert.ok(tierTag >= 0);
-  assert.equal(citationIsBound(tier, tierTag), true, "the tier plant's citation IS bound — a real, running test that simply cannot observe the claim");
+  assert.equal(citationIsBound(tier, tierTag, cmpGrammar), true, "the tier plant's citation IS bound — a real, running test that simply cannot observe the claim");
   assert.equal(cmpPlants.unmeetableTier, "e2e");
   assert.match(cmpPlants.testFileBasename, /\.kt$/, "and it lands somewhere this stack compiles");
 });

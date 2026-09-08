@@ -45,7 +45,74 @@ export const layout = Object.freeze({
   // render marker (qa/lib/lane-markers.mjs) and where KSP's single-owner
   // incremental storage lives (steps-cmp.mjs's coexistence self-heal).
   buildDir: "composeApp/build",
+  // Directories the inputs hash and the activity scan skip when there is no
+  // git and no .gitignore to ask. The repo's own .gitignore is the truth
+  // (git ls-files --exclude-standard, or the walk that reads the same file);
+  // this is the floor beneath it, and it is THIS stack's to declare — the core
+  // used to hardcode .gradle and .kotlin for every ecosystem.
+  ignore: Object.freeze([".gradle", ".kotlin", ".idea"]),
 });
+
+/**
+ * THE GRAMMAR — what a citation and a test declaration look like in Kotlin.
+ *
+ * PATTERN: declaration over fallback (the shape tree-sitter uses — one query
+ * file per language, named captures, nothing inferred). WHY IT WORKS: a
+ * required declaration cannot be silently wrong for the profile that forgot
+ * it; until 2026-09-08 this regex lived in the core as a FALLBACK and `cmp`
+ * itself never declared one, so any profile that omitted `grammar` was graded
+ * with Kotlin's — and nothing said so. HOW IT FAILS: an author copies another
+ * language's regex and it binds nothing, or binds the wrong lines. WHAT WE DO:
+ * the Rule 0 instrument plants `unboundCitationSource` in THIS language and
+ * watches the grammar fail to bind it by name, so a grammar that cannot see
+ * its own language is caught before it grades anything; and the coverage
+ * diagnostic prints "N markers seen, 0 bound" rather than a quiet PASS.
+ */
+export const grammar = Object.freeze({
+  // TWO citation dialects, both this profile's: Kotlin sources cite with `//`, and
+  // the Maestro YAML journeys under qa/e2e cite with `#`. Declared here — the
+  // old core fallback happened to accept both, which is how nobody noticed.
+  citationMarker: /^(?:\/\/|#)\s*SPEC:/,
+  lineComment: /^(?:\/\/|\*)/,
+  blockComment: Object.freeze({ open: "/*", close: "*/" }),
+  testDeclaration: /@Test\b|\bfun\s+`[^`]+`\s*\(/,
+  typeDeclaration: /^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\s+\w+/,
+  bindingWindow: 5,
+});
+
+/**
+ * THE REPORT FORMAT the lane's runners emit, so the core parses what was
+ * declared and never assumes. PATTERN: JUnit XML as the lingua franca (pytest
+ * --junitxml, go-junit-report, cargo2junit, jest-junit, swift test
+ * --xunit-output all emit it). WHY IT WORKS: one parser, every ecosystem, and
+ * the declaration is a fact the profile author knows. HOW IT FAILS: a runner
+ * emits a dialect (no classname, nested suites) and the parser reads {} — an
+ * empty leg that looks like "no tests". WHAT WE DO: the parser refuses an
+ * undeclared or unsupported format by name instead of returning {}, and the
+ * determinism probe treats an empty outcome map as a refusal, never a pass.
+ */
+export const reports = Object.freeze({ format: "junit-xml", dir: "composeApp/build/test-results" });
+
+/**
+ * Does this tree belong to THIS profile? PATTERN: Cloud Native Buildpacks'
+ * `bin/detect` — each stack recognises itself from marker files and the
+ * platform holds no table. WHY IT WORKS: the profile author knows the markers;
+ * `harness init` asks every known profile and keeps no language list of its
+ * own. HOW IT FAILS: an eager detect claims a tree that is not its (any Gradle
+ * repo is not a Compose app), or two profiles claim one tree. WHAT WE DO:
+ * evidence is returned and printed, never a bare boolean; two claims refuse
+ * and ask; and the claim needs BOTH the build file and the module the stamper
+ * writes, not either.
+ */
+export function detect(root, fs) {
+  const has = (rel) => fs.existsSync(`${root}/${rel}`);
+  const evidence = [];
+  if (has("composeApp/build.gradle.kts")) evidence.push("composeApp/build.gradle.kts");
+  if (has("settings.gradle.kts") || has("settings.gradle")) evidence.push("settings.gradle(.kts)");
+  const claims = evidence.length === 2;
+  return { claims, evidence, reason: claims ? "a Compose Multiplatform app: the composeApp module and a Gradle settings file" : `not a Compose Multiplatform app (found: ${evidence.join(", ") || "neither marker"})` };
+}
+
 
 /**
  * Evidence tiers — the source-set / harness boundaries that decide what a

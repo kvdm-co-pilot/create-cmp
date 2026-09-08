@@ -86,6 +86,45 @@ test("the cmp profile exists where the loader looks, and is the only place the p
 const STACK_FACTS = ["composeApp", "androidInstrumentedTest", "desktopTest", "commonTest", "qa/e2e", "steps-cmp", "gradlew", "kspCaches"];
 
 /**
+ * THE GRAMMAR HALF. Eight literal words could not see `.kt`, `Kotlin`,
+ * `@Composable`, `@Test`, `fun `, or `libs.versions.toml` — every core hit the
+ * 2026-09-08 language audit found had walked past them (NORTH-STAR §10 Q4: "a
+ * stack assumption that names no stack cannot be found by reading"). PATTERN:
+ * the vocabulary is DERIVED — file extensions from GitHub Linguist's table
+ * (src/data/linguist-languages.json, with provenance), the way ArchUnit and
+ * dependency-cruiser enforce "this layer may not name that one" from a rule
+ * rather than a list. WHY IT WORKS: an extension nobody here typed cannot be
+ * forgotten here. HOW IT FAILS: false positives — `.go(` is a method call,
+ * `.d` and `.m` are one letter, `Java` appears in "JavaScript" — and a lint
+ * that cries wolf gets excused wholesale. WHAT WE DO: single-letter extensions
+ * are dropped, the harness's own language (JavaScript/TypeScript family) is
+ * excluded because the core IS JavaScript, an extension must be followed by
+ * something that is not an identifier or a call paren, and names are matched
+ * whole-word; a dot-directory like `.kotlin` must not follow an identifier, or
+ * `inv.kotlin` — a property access — reads as a build directory. Every hit is
+ * either fixed or excused with a named exit.
+ */
+const LINGUIST = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "src", "data", "linguist-languages.json"), "utf8"));
+const OWN_LANGUAGES = new Set(["JavaScript", "TypeScript", "JSON", "JSON5", "Shell", "Dockerfile", "Makefile", "HTML", "CSS", "SVG"]);
+const EXTENSIONS = [...new Set(Object.entries(LINGUIST.languages).filter(([name]) => !OWN_LANGUAGES.has(name)).flatMap(([, exts]) => exts))]
+  .filter((e) => e.length > 2 && !/^\.(mjs|cjs|jsx?|tsx?|mts|cts|json|md|yml|yaml|xml|html|css|svg|sh|txt|toml)$/.test(e))
+  .map((e) => e.slice(1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+const AMBIGUOUS = new Set(["com", "net", "org", "io", "spec", "feature", "cmd", "ms", "ch", "cls", "trigger", "gov", "inc", "e", "t", "d", "m", "r", "s", "n", "b", "f", "p"]);
+const STACK_SHAPES = [
+  // FILENAME CONTEXT, not any dot: preceded by a word character or a glob star,
+  // followed by a delimiter — never `-` (a CSS selector), `.` (a chained
+  // extension like .spec.md), `(` (a method call) or a word. And a short list of
+  // extensions that are also ordinary tokens, each with its reason: .com/.net/
+  // .org are TLDs in URLs; .spec and .feature are this harness's own file
+  // conventions (specs/*.spec.md, docs/features); .cmd/.ms/.cls/.trigger/.gov
+  // are words the shell and console print. Named here, not silently dropped.
+  [new RegExp(`(?<=[\\w*\\]])\\.(?:${EXTENSIONS.filter((e) => !AMBIGUOUS.has(e)).join("|")})(?=["'\\x60\\s/)\\]},;:]|$)`), "a source-file extension (Linguist-derived)"],
+  [/\b(?:Kotlin|Swift|Java|Python|Golang|Rust|Ruby|Dart|Scala|Groovy|Compose|Gradle|Maven|Xcode|CocoaPods|Maestro|JUnit|pytest|Jest|KSP|Detekt|Konsist)\b/, "a language, framework or tool name"],
+  [/@Test\b|@Composable\b|\bfun\s+[`\w]|\bdef\s+test|\bfunc\s+Test|#\[test\]|\bsuspend\s+fun\b/, "a syntax token of one language"],
+  [/\b(?:build\.gradle(?:\.kts)?|settings\.gradle(?:\.kts)?|libs\.versions\.toml|gradlew|Cargo\.toml|go\.mod|pyproject\.toml|Package\.swift|Podfile|pom\.xml)\b|(?<![\w)\]])\.(?:gradle|kotlin)\b/, "a build-tool file or directory"],
+];
+
+/**
  * Core modules that still name a stack, and why. Each entry is a debt with a
  * named exit, not a permanent exemption.
  */
@@ -118,10 +157,15 @@ const STACK_COUPLED = new Map([
   ["lib/audit-cadence.mjs", "derives the app package from composeApp/build.gradle.kts — refuses off-cmp"],
 ]);
 
-/** Stack facts in a module's CODE, comments stripped. */
+/** Stack facts in a module's CODE, comments stripped — the literal words and the grammar-shaped ones. */
 function stackFactsIn(abs) {
   const code = fs.readFileSync(abs, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
-  return STACK_FACTS.filter((f) => code.includes(f));
+  const literal = STACK_FACTS.filter((f) => code.includes(f));
+  const shaped = STACK_SHAPES.flatMap(([re, what]) => {
+    const m = code.match(re);
+    return m ? [`${JSON.stringify(m[0])} — ${what}`] : [];
+  });
+  return [...literal, ...shaped];
 }
 
 /** Every core module the rule applies to — a profile is exempt by definition. */
@@ -190,7 +234,7 @@ const NOT_YET_MOVED = ["lib/a11y.mjs", "lib/component-stories.mjs", "scaffold-fe
 
 test("the cmp profile declares layout and tiers, and the core reads them only through the loader", () => {
   const entry = fs.readFileSync(path.join(PROFILES, "cmp", "index.mjs"), "utf8");
-  assert.match(entry, /export \{ layout, tiers \} from "\.\/declarations\.mjs"/);
+  assert.match(entry, /export \{ layout, tiers, grammar, reports, detect \} from "\.\/declarations\.mjs"/);
   for (const abs of mjsUnder(CORE)) {
     if (abs.startsWith(PROFILES + path.sep)) continue;
     if (NOT_YET_MOVED.includes(path.relative(CORE, abs).split(path.sep).join("/"))) continue;

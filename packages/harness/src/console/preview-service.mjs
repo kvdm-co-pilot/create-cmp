@@ -66,6 +66,7 @@ import {
   featuresTabHtml,
   driftPanelHtml,
   signatureBarHtml,
+  consoleCopy,
 } from "./console-tabs.mjs";
 
 // Component-story registry entries (§3.3): `component.<kebab-name>` ids from
@@ -1311,7 +1312,7 @@ export function galleryHtml(state) {
   const visibleSections = capabilities.screens ? declaredSections : declaredSections.filter((s) => !NEEDS_SCREENS.has(s.id));
   const capabilityNote = capabilities.screens
     ? ""
-    : `<p class="rail-sub rail-capability" title="This project declares no screen-rendering capability. The governance window is complete; screens, preview and the live device all need one.">governance only &middot; no Compose app</p>`;
+    : `<p class="rail-sub rail-capability" title="This project declares no screen-rendering capability. The governance window is complete; screens, preview and the live device all need one.">governance only &middot; ${consoleCopy().noRenderableApp}</p>`;
   // The layout line: which manifest (if any) the console is reading this
   // project through. A refused manifest is said out loud on the rail — every
   // section it feeds already carries the reason, but the rail is where a

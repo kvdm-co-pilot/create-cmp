@@ -19,7 +19,16 @@ import {
   driftPanelHtml,
   stepTestCountsHtml,
   digestTabHtml,
+  setConsoleCopy,
+  NEUTRAL_COPY,
 } from "../../../packages/harness/src/console/console-tabs.mjs";
+import { copy as cmpCopy } from "../../../packages/harness/src/lib/profiles/cmp/console-copy.mjs";
+
+// These tests render the CMP console, so they set the profile's copy the way the
+// host does (setConsoleCopy at service start). Without it the shell renders its
+// neutral words — asserted once below — and never a Compose word (2026-09-08).
+setConsoleCopy(cmpCopy);
+
 
 // --- Design language (§3.1: the designer's handoff spec) --------------------
 
@@ -2060,4 +2069,16 @@ test("evidenceBodyHtml: steps tagged with a layer group under one header row per
   const missing = evidenceBodyHtml({ available: false, relPath: "qa/evidence/receipt.json", reason: "no receipt at qa/evidence/receipt.json — run node qa/verify.mjs" }, null);
   assert.match(missing, /the lane writes <code>qa\/evidence\/receipt\.json<\/code>/);
   assert.doesNotMatch(missing, /latest\.json/);
+});
+
+test("the shell's own words are neutral: with no profile copy set, no Compose word renders", () => {
+  setConsoleCopy(null);
+  try {
+    const html = componentsBodyHtml({ available: true, components: [] });
+    assert.match(html, /no components found in the registry directory/);
+    assert.doesNotMatch(html, /@Composable|\.kt\b/);
+    assert.equal(NEUTRAL_COPY.usesIn, "the shared sources");
+  } finally {
+    setConsoleCopy(cmpCopy);
+  }
 });

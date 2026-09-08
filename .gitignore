@@ -39,6 +39,8 @@ docs/CONTRACT.md
 docs/GROWTH-STRATEGY.md
 docs/research/
 docs/SESSION-STATE.md
+# The per-session handover a fresh session is pointed at — the ledger's sibling, never tracked.
+docs/HANDOVER.md
 docs/HARNESS-ROADMAP.md
 
 # Inspector — generated headless-render output (the committed fixtures are

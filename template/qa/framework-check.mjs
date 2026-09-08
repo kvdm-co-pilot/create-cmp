@@ -58,7 +58,7 @@ import { plantCalibration } from "./lib/plant-calibration.mjs";
 import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
 import { listHarnessFiles } from "./lib/harness-region.mjs";
 import { listFlowFiles, scanCitations, walkFiles } from "./lib/spec-coverage.mjs";
-import { resolveSpecModel, DEFAULT_GRAMMAR } from "./lib/spec-model.mjs";
+import { resolveSpecModel } from "./lib/spec-model.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfileSync } from "./lib/profile-loader.mjs";
 
@@ -451,7 +451,7 @@ function read(rel) {
  * syntax. The marker is matched on the TRIMMED line, agreeing with
  * `scanCitations` and with the selector about indented citations.
  */
-function stripCitations(text, marker = SPEC_MODEL?.grammar?.citationMarker ?? DEFAULT_GRAMMAR.citationMarker) {
+function stripCitations(text, marker = SPEC_MODEL?.grammar?.citationMarker ?? /\bSPEC:/) {
   // A profile could declare its marker with /g, which makes `.test()` stateful
   // across calls. Rebuild without flags rather than trust the declaration.
   const probe = new RegExp(marker.source);

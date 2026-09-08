@@ -43,7 +43,6 @@
 // point — a second copy of "what a citation looks like" is how the selector and
 // the scanner came to disagree about the same file (see `flowCitation`). The
 // import performs no IO; every function below still takes data and returns data.
-import { DEFAULT_GRAMMAR } from "./spec-model.mjs";
 // The badge floor's two halves, imported for the same reason as the grammar
 // above: the plant below calibrates THE grader the lane runs and THE definition
 // of plant material the runner plants from, not a re-statement of either.
@@ -237,9 +236,11 @@ export function firstClauseId(text) {
  * @param {{citationMarker?: RegExp}} [grammar] the SpecModel's grammar
  * @returns {string|null}
  */
-export function flowCitation(text, grammar = DEFAULT_GRAMMAR) {
+export function flowCitation(text, grammar) {
   if (typeof text !== "string") return null;
-  const MARKER = grammar?.citationMarker ?? DEFAULT_GRAMMAR.citationMarker;
+  // The marker is the profile's; with none declared nothing can be a citation — and the lane refuses that profile before this runs.
+  const MARKER = grammar?.citationMarker;
+  if (!(MARKER instanceof RegExp)) return null;
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
     if (!MARKER.test(trimmed)) continue;
@@ -393,11 +394,13 @@ export function selectPlants(tree) {
   // see `flowCitation`. The skip below prints the marker it used, because "no
   // citation in 3 flow files" over three flows that all carry one is a sentence
   // that sends the reader to the flows instead of to the grammar.
-  const grammar = tree?.grammar ?? DEFAULT_GRAMMAR;
-  const marker = grammar?.citationMarker ?? DEFAULT_GRAMMAR.citationMarker;
-  const citingFlows = flows.filter((f) => flowCitation(f?.text, grammar));
+  const grammar = tree?.grammar ?? null;
+  const marker = grammar?.citationMarker instanceof RegExp ? grammar.citationMarker : null;
+  const citingFlows = marker ? flows.filter((f) => flowCitation(f?.text, grammar)) : [];
   if (!citingFlows.length) {
-    const why = flows.length
+    const why = !marker
+      ? "the profile declares no grammar.citationMarker — the plant selector cannot read a citation (the lane refuses this profile for the same reason)"
+      : flows.length
       ? `no citation matching /${marker.source}/ in ${flows.length} flow file(s) — the journey-coverage gate has nothing to lose`
       : `no flows${flowsDir ? ` under ${flowsDir}` : ""} — this project declares no journeys`;
     skip(PLANT_KINDS.FEATURE_WITHOUT_FLOW, why);

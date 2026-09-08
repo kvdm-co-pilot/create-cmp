@@ -23,13 +23,13 @@ import { compareTokenDrift } from "./token-drift.mjs";
 import { evaluateApprovalsGate } from "../../approvals.mjs";
 import { clauseTierCoverage, listFlowFiles, scanCitations, scanSpecClauses, walkFiles } from "../../spec-coverage.mjs";
 import { specModelFrom } from "../../spec-model.mjs";
-import { layout as cmpLayout, tiers as cmpTiers } from "./declarations.mjs";
+import { layout as cmpLayout, tiers as cmpTiers, reports, grammar as cmpGrammar } from "./declarations.mjs";
 import { RENDER_MARKER_FRESH_MS, RENDER_MARKER_NAME } from "../../lane-markers.mjs";
 
 // The scanner's model, built from this profile's own declarations — the pack
 // hands its facts to the core rather than round-tripping through the manifest.
 const SPEC_MODEL = (() => {
-  const r = specModelFrom({ id: "cmp", layout: cmpLayout, tiers: cmpTiers });
+  const r = specModelFrom({ id: "cmp", layout: cmpLayout, tiers: cmpTiers, grammar: cmpGrammar });
   if (!r.ok) throw new Error(r.reason);
   return r.model;
 })();
@@ -43,7 +43,7 @@ import { changedWorkingTreePaths, deriveAffectedFilter } from "../../affected-te
 import { affected as cmpAffected } from "./affected.mjs";
 import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./device-lease.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "../../arch-doc.mjs";
-import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes } from "../../determinism.mjs";
+import { DETERMINISM_TIMEZONES, compareOutcomes, parseJUnitOutcomes, reportFormatProblem } from "../../determinism.mjs";
 import { evaluateAuditCadence } from "../../audit-cadence.mjs";
 import { androidChecksOutcome } from "./android-checks.mjs";
 import { deviceLogIncidents, maestroOutcome, parseMaestroJunit } from "./maestro.mjs";
@@ -843,12 +843,14 @@ function stepDeterminism() {
     };
   }
 
-  const resultsDir = path.join(ROOT, "composeApp/build/test-results/desktopTest");
+  const reportProblem = reportFormatProblem(reports);
+  if (reportProblem) return { name: "determinism", verdict: "ERROR", reason: reportProblem, durationMs: elapsed() };
+  const resultsDir = path.join(ROOT, reports.dir, "desktopTest");
   const legs = [];
   for (const { tz, label } of DETERMINISM_TIMEZONES) {
     const res = shGradle(`${GRADLEW} :composeApp:desktopTest${RERUN} --console=plain`, { env: { ...process.env, TZ: tz } });
     // Parsed NOW, before the next leg overwrites the same results directory.
-    const outcomes = parseJUnitOutcomes(resultsDir);
+    const outcomes = parseJUnitOutcomes(resultsDir, { format: reports.format });
     legs.push({ tz, label, ok: res.ok, outcomes, tail: res.out.split("\n").slice(-8).join("\n") });
   }
   const [a, b] = legs;

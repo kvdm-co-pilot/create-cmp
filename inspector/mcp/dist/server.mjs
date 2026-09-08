@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 145264bed9236e321eba049c8e4e07e771195ad65f668e3345335e116ec34779
+// cmp:bundle-inputs 6e6f72f6dd02fdd5bdbbb430dbdcafb52cbbdad773e6e7664119eb092b658dd3
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -3235,8 +3235,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path20) {
-      let input = path20;
+    function removeDotSegments(path21) {
+      let input = path21;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3488,8 +3488,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path20, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path20 && path20 !== "/" ? path20 : void 0;
+        const [path21, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path21 && path21 !== "/" ? path21 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6882,12 +6882,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs19, exportName) {
+    function addFormats(ajv, list, fs20, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs19[f]);
+        ajv.addFormat(f, fs20[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7254,8 +7254,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path20, errorMaps, issueData } = params;
-  const fullPath = [...path20, ...issueData.path || []];
+  const { data, path: path21, errorMaps, issueData } = params;
+  const fullPath = [...path21, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7370,11 +7370,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path20, key) {
+  constructor(parent, value, path21, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path20;
+    this._path = path21;
     this._key = key;
   }
   get path() {
@@ -11294,10 +11294,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path20) {
-  if (!path20)
+function getElementAtPath(obj, path21) {
+  if (!path21)
     return obj;
-  return path20.reduce((acc, key) => acc?.[key], obj);
+  return path21.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11706,11 +11706,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path20, issues) {
+function prefixIssues(path21, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path20);
+    iss.path.unshift(path21);
     return iss;
   });
 }
@@ -11857,16 +11857,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path20 = []) => {
+  const processError = (error52, path21 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path20, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else {
-        const fullpath = [...path20, ...issue2.path];
+        const fullpath = [...path21, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -11893,17 +11893,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path20 = []) => {
+  const processError = (error52, path21 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path20, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else {
-        const fullpath = [...path20, ...issue2.path];
+        const fullpath = [...path21, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -11935,8 +11935,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path20 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path20) {
+  const path21 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path21) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -25061,13 +25061,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path20 = ref.slice(1).split("/").filter(Boolean);
-  if (path20.length === 0) {
+  const path21 = ref.slice(1).split("/").filter(Boolean);
+  if (path21.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path20[0] === defsKey) {
-    const key = path20[1];
+  if (path21[0] === defsKey) {
+    const key = path21[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -31014,11 +31014,11 @@ function* walk(tree) {
   if (!root || typeof root !== "object") return;
   yield* walkNode(root, "root");
 }
-function* walkNode(node, path20) {
-  yield { node, path: path20 };
+function* walkNode(node, path21) {
+  yield { node, path: path21 };
   const children = Array.isArray(node.children) ? node.children : [];
   for (let i = 0; i < children.length; i++) {
-    yield* walkNode(children[i], `${path20}.children[${i}]`);
+    yield* walkNode(children[i], `${path21}.children[${i}]`);
   }
 }
 function findByTestTag(tree, tag) {
@@ -31057,18 +31057,18 @@ function layoutGaps(a, b) {
 }
 function siblingLayoutGaps(tree) {
   const out = [];
-  const visit = (node, path20) => {
+  const visit = (node, path21) => {
     const children = Array.isArray(node.children) ? node.children : [];
     const tagged = children.filter((c) => c && c.testTag != null && c.bounds);
     for (let i = 0; i + 1 < tagged.length; i++) {
       out.push({
-        parentPath: path20,
+        parentPath: path21,
         a: tagged[i].testTag,
         b: tagged[i + 1].testTag,
         gaps: layoutGaps(tagged[i], tagged[i + 1])
       });
     }
-    children.forEach((c, i) => c && visit(c, `${path20}.children[${i}]`));
+    children.forEach((c, i) => c && visit(c, `${path21}.children[${i}]`));
   };
   if (tree && tree.root) visit(tree.root, "root");
   return out;
@@ -31142,9 +31142,9 @@ function auditA11y(tree, opts = {}) {
   const violations = [];
   const warnings = [];
   let passCount = 0;
-  for (const { node, path: path20 } of walk(tree)) {
+  for (const { node, path: path21 } of walk(tree)) {
     const entryBase = {
-      path: path20,
+      path: path21,
       testTag: node.testTag ?? null,
       bounds: node.bounds ?? null
     };
@@ -31556,16 +31556,16 @@ function diffTrees(currentTree, goldenTree, tolerancePx = 1) {
   diffNode(cur, gold, "root", tol, diffs);
   return diffs;
 }
-function diffNode(cur, gold, path20, tol, out) {
+function diffNode(cur, gold, path21, tol, out) {
   if (cur.testTag !== gold.testTag) {
-    out.push({ path: path20, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
+    out.push({ path: path21, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
   }
   if (cur.text !== gold.text) {
-    out.push({ path: path20, kind: "text-changed", before: gold.text, after: cur.text });
+    out.push({ path: path21, kind: "text-changed", before: gold.text, after: cur.text });
   }
   if (cur.contentDescription !== gold.contentDescription) {
     out.push({
-      path: path20,
+      path: path21,
       kind: "contentDescription-changed",
       before: gold.contentDescription,
       after: cur.contentDescription
@@ -31573,29 +31573,29 @@ function diffNode(cur, gold, path20, tol, out) {
   }
   const roleB = gold.role ?? null;
   const roleA = cur.role ?? null;
-  if (roleA !== roleB) out.push({ path: path20, kind: "role-changed", before: roleB, after: roleA });
+  if (roleA !== roleB) out.push({ path: path21, kind: "role-changed", before: roleB, after: roleA });
   const clickB = gold.clickable ?? false;
   const clickA = cur.clickable ?? false;
-  if (clickA !== clickB) out.push({ path: path20, kind: "clickable-changed", before: clickB, after: clickA });
+  if (clickA !== clickB) out.push({ path: path21, kind: "clickable-changed", before: clickB, after: clickA });
   const disB = gold.disabled ?? false;
   const disA = cur.disabled ?? false;
-  if (disA !== disB) out.push({ path: path20, kind: "disabled-changed", before: disB, after: disA });
+  if (disA !== disB) out.push({ path: path21, kind: "disabled-changed", before: disB, after: disA });
   if (JSON.stringify(cur.designToken) !== JSON.stringify(gold.designToken)) {
-    out.push({ path: path20, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
+    out.push({ path: path21, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
   }
   const moved = boundsMovedBeyond(cur.bounds, gold.bounds, tol);
   if (moved) {
-    out.push({ path: path20, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
+    out.push({ path: path21, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
   }
   const curKids = cur.children || [];
   const goldKids = gold.children || [];
   const shared = Math.min(curKids.length, goldKids.length);
   for (let i = 0; i < shared; i++) {
-    diffNode(curKids[i], goldKids[i], `${path20}.children[${i}]`, tol, out);
+    diffNode(curKids[i], goldKids[i], `${path21}.children[${i}]`, tol, out);
   }
   for (let i = shared; i < curKids.length; i++) {
     out.push({
-      path: `${path20}.children[${i}]`,
+      path: `${path21}.children[${i}]`,
       kind: "node-added",
       before: null,
       after: summarize(curKids[i])
@@ -31603,7 +31603,7 @@ function diffNode(cur, gold, path20, tol, out) {
   }
   for (let i = shared; i < goldKids.length; i++) {
     out.push({
-      path: `${path20}.children[${i}]`,
+      path: `${path21}.children[${i}]`,
       kind: "node-removed",
       before: summarize(goldKids[i]),
       after: null
@@ -31649,8 +31649,8 @@ function parsePngHeader(buf) {
   }
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
-function readPngMeta(path20) {
-  const abs = resolve(path20);
+function readPngMeta(path21) {
+  const abs = resolve(path21);
   let buf;
   try {
     buf = readFileSync3(abs);
@@ -32110,9 +32110,9 @@ function renderTreeSvg(tree, opts = {}) {
   const originY = LEGEND_H + MARGIN / 2;
   let nodeCount = 0;
   const body = [];
-  for (const { node, path: path20 } of walk(root)) {
+  for (const { node, path: path21 } of walk(root)) {
     nodeCount++;
-    if (depthOf(path20) > maxDepth) continue;
+    if (depthOf(path21) > maxDepth) continue;
     const b = node.bounds;
     const w = boundsDim(b, "width");
     const h = boundsDim(b, "height");
@@ -32123,10 +32123,10 @@ function renderTreeSvg(tree, opts = {}) {
     const sh = h * scale;
     const tokenized = node.designToken != null;
     const clickable = node.clickable === true;
-    const rules = violationsByPath.get(path20);
+    const rules = violationsByPath.get(path21);
     const base = tokenized ? STYLE.tokenized : STYLE.plain;
     body.push(
-      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path20)}"/>`
+      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path21)}"/>`
     );
     if (clickable) {
       body.push(
@@ -32217,8 +32217,8 @@ var ABBREV = {
 function abbrev(key) {
   return ABBREV[key] ?? key;
 }
-function depthOf(path20) {
-  return (path20.match(/\.children\[/g) || []).length;
+function depthOf(path21) {
+  return (path21.match(/\.children\[/g) || []).length;
 }
 function boundsDim(b, key) {
   return b && typeof b[key] === "number" ? b[key] : 0;
@@ -32238,9 +32238,9 @@ function countRenderable(tree, opts = {}) {
   const maxDepth = typeof opts.maxDepth === "number" && opts.maxDepth >= 0 ? opts.maxDepth : Infinity;
   let total = 0;
   let drawn = 0;
-  for (const { node, path: path20 } of walk(root)) {
+  for (const { node, path: path21 } of walk(root)) {
     total++;
-    if (depthOf(path20) > maxDepth) continue;
+    if (depthOf(path21) > maxDepth) continue;
     if (boundsDim(node.bounds, "width") > 0 && boundsDim(node.bounds, "height") > 0) drawn++;
   }
   return { total, drawn };
@@ -32318,10 +32318,10 @@ function parseLogcat(raw, opts = {}) {
 
 // src/lib/preview-service.mjs
 import crypto from "node:crypto";
-import fs18 from "node:fs";
+import fs19 from "node:fs";
 import http from "node:http";
 import os3 from "node:os";
-import path19 from "node:path";
+import path20 from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 import { promisify } from "node:util";
@@ -32421,7 +32421,7 @@ function diffAgainstDesignSystem(tree, catalog) {
   const colors = catalog && catalog.colors || {};
   const dimens = catalog && catalog.dimens || {};
   const out = [];
-  for (const { node, path: path20 } of walk(tree)) {
+  for (const { node, path: path21 } of walk(tree)) {
     const dt = node.designToken;
     if (!dt || !Array.isArray(dt.tokens) || dt.tokens.length === 0) continue;
     const resolved = dt.resolved && typeof dt.resolved === "object" ? dt.resolved : {};
@@ -32435,7 +32435,7 @@ function diffAgainstDesignSystem(tree, catalog) {
       const matches = resolvedValues.includes(declaredNorm);
       if (!matches) {
         out.push({
-          path: path20,
+          path: path21,
           token,
           declared,
           // report the node's resolved value most likely intended for this token:
@@ -34186,11 +34186,11 @@ function createLiveSession({
     });
   }
   async function resolveAppId2() {
-    const fs19 = await import("node:fs");
+    const fs20 = await import("node:fs");
     for (const f of ["composeApp/build.gradle.kts", "composeApp/build.gradle"]) {
       const p = path15.join(projectDir, f);
-      if (!fs19.existsSync(p)) continue;
-      const m = fs19.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
+      if (!fs20.existsSync(p)) continue;
+      const m = fs20.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
       if (m) return m[1];
     }
     throw new Error("could not resolve applicationId from composeApp/build.gradle(.kts)");
@@ -34297,11 +34297,11 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
   }
   let openComments = null;
   try {
-    const fs19 = await import("node:fs");
-    const path20 = await import("node:path");
-    const ledger = path20.join(projectDir, "qa", "comments.json");
-    if (fs19.existsSync(ledger)) {
-      const data = JSON.parse(fs19.readFileSync(ledger, "utf8"));
+    const fs20 = await import("node:fs");
+    const path21 = await import("node:path");
+    const ledger = path21.join(projectDir, "qa", "comments.json");
+    if (fs20.existsSync(ledger)) {
+      const data = JSON.parse(fs20.readFileSync(ledger, "utf8"));
       openComments = (data.comments ?? []).filter((c) => c.status === "open").length;
     }
   } catch {
@@ -35273,6 +35273,7 @@ var LAYOUT_PATH_FIELDS = ["receipt", "architectureDoc", "specs", "approvals"];
 var LAYOUT_LIST_FIELDS = ["citationRoots", "packs"];
 var META_FIELDS2 = ["schema", "profile"];
 var KNOWN_FIELDS2 = /* @__PURE__ */ new Set([...META_FIELDS2, ...LAYOUT_PATH_FIELDS, ...LAYOUT_LIST_FIELDS]);
+var PROFILE_ID_RE2 = /^[a-z][a-z0-9-]*$/;
 
 // ../../packages/harness/src/console/console-overview.mjs
 var esc4 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -35595,6 +35596,29 @@ function overviewGlyph(queue = [], statuses = []) {
 }
 
 // ../../packages/harness/src/console/console-tabs.mjs
+var NEUTRAL_COPY = Object.freeze({
+  usesIn: "the shared sources",
+  tokensEditHint: "Edit the design tokens, let the preview re-render, then stash the result with the",
+  componentsEmpty: "no components found in the registry directory",
+  versionSetFile: "the version catalogue",
+  versionSetUnreadable: "the version catalogue is not readable",
+  kspPairLabel: "the code-generator version matches the language version",
+  kspPrefixWarning: "is not prefixed by the language version",
+  previewRegistryFile: "the preview registry",
+  noRenderableApp: "no renderable app",
+  kspCarriesNote: "",
+  kspName: "the code generator",
+  kspCarriesLabel: "carries the language version",
+  depGraphGatesNote: "The conformance gates (and the receipt they write, below) are authoritative."
+});
+var COPY = NEUTRAL_COPY;
+function setConsoleCopy(copy) {
+  COPY = Object.freeze({ ...NEUTRAL_COPY, ...copy && typeof copy === "object" ? copy : {} });
+  return COPY;
+}
+function consoleCopy() {
+  return COPY;
+}
 var esc5 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 var escAttr2 = (s) => esc5(s).replace(/"/g, "&quot;");
 function commentControlHtml(target, opts = {}) {
@@ -35726,7 +35750,7 @@ function artifactBannerHtml(s) {
 var px = (n) => `${Math.round(n * 100) / 100}px`;
 var SPACING_BAR_PX_PER_DP = 4;
 function usageText(n) {
-  return `${n} use${n === 1 ? "" : "s"} in commonMain`;
+  return `${n} use${n === 1 ? "" : "s"} in ${COPY.usesIn}`;
 }
 function colorTokenTableHtml(colors, usage) {
   const entries = Object.entries(colors);
@@ -35888,7 +35912,7 @@ function candidatesStripHtml(variants) {
   if (!variants || !variants.available || !variants.variants || variants.variants.length === 0) {
     return `<div class="empty">
       <p>No design-language candidates stashed yet.</p>
-      <p>Edit <code>Tokens.kt</code>, let the preview re-render, then stash the result with the
+      <p>${COPY.tokensEditHint}
       <code>snapshot_variant</code> tool (e.g. <code>{name: "warmer"}</code>) \u2014 repeat per idea, then
       compare them here and Pick one.</p>
     </div>`;
@@ -36044,7 +36068,7 @@ function componentsBodyHtml(components, meta3 = {}) {
     </div>`;
   }
   if (!components.components || components.components.length === 0) {
-    return `<div class="empty-inline">no @Composable components found in presentation/components/*.kt</div>`;
+    return `<div class="empty-inline">${esc5(COPY.componentsEmpty)}</div>`;
   }
   const violationsByFile = new Map(
     meta3.violations && meta3.violations.available ? meta3.violations.violations.map((v) => [v.file, v]) : []
@@ -36377,7 +36401,7 @@ function systemContextHtml(sc) {
 }
 function versionSetHtml(versionSet) {
   if (!versionSet || !versionSet.available) {
-    return `<p class="empty-inline">${esc5(versionSet && versionSet.reason || "gradle/libs.versions.toml not readable")}</p>`;
+    return `<p class="empty-inline">${esc5(versionSet && versionSet.reason || COPY.versionSetUnreadable)}</p>`;
   }
   const badge = (status) => {
     if (status === "match") return `<span class="glyph glyph-signed">&#10003;</span> pinned as documented`;
@@ -36394,10 +36418,10 @@ function versionSetHtml(versionSet) {
       </tr>`
   ).join("\n");
   const inv = versionSet.kspInvariant;
-  const invLine = inv.available ? inv.ok ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> KSP is <code>&lt;kotlin&gt;-&lt;ksp&gt;</code> \u2014 <code>${esc5(inv.ksp)}</code> carries Kotlin <code>${esc5(inv.kotlin)}</code>.</p>` : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> KSP <code>${esc5(inv.ksp)}</code> is not prefixed by Kotlin <code>${esc5(inv.kotlin)}</code> \u2014 Room's KMP native compilation breaks on this.</p>` : `<p class="empty-inline">${esc5(inv.reason)}</p>`;
+  const invLine = inv.available ? inv.ok ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> ${COPY.kspPairLabel} \u2014 <code>${esc5(inv.ksp)}</code> ${COPY.kspCarriesLabel} <code>${esc5(inv.kotlin)}</code>.</p>` : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> ${COPY.kspName} <code>${esc5(inv.ksp)}</code> ${COPY.kspPrefixWarning} <code>${esc5(inv.kotlin)}</code>${COPY.kspCarriesNote}</p>` : `<p class="empty-inline">${esc5(inv.reason)}</p>`;
   return `  <h4>The frozen set, as pinned</h4>
   <table class="doc-table">
-    <thead><tr><th>Library</th><th>${esc5("gradle/libs.versions.toml")}</th><th>\xA72 says</th><th>Verdict</th></tr></thead>
+    <thead><tr><th>Library</th><th>${esc5(COPY.versionSetFile)}</th><th>\xA72 says</th><th>Verdict</th></tr></thead>
     <tbody>
 ${rows}
     </tbody>
@@ -36412,7 +36436,7 @@ function platformViewHtml(pv) {
   const expectActual = pv.expectActual ? `<h4>Expect/actual boundary</h4>${mdTableHtml({ available: true, headers: pv.expectActual.headers, rows: pv.expectActual.rows })}` : "";
   return `${main2}${expectActual}`;
 }
-var DEP_GRAPH_ADVISORY_HTML = `<p class="dep-advisory">Advisory preview; the lane is the law &mdash; this is a live scan of real imports between <code>node qa/verify.mjs</code> runs, not a verdict. The Kotlin conformance gates (and the receipt they write, below) are authoritative.</p>`;
+var depGraphAdvisoryHtml = () => `<p class="dep-advisory">Advisory preview; the lane is the law &mdash; this is a live scan of real imports between <code>node qa/verify.mjs</code> runs, not a verdict. ${COPY.depGraphGatesNote}</p>`;
 function dependencyGraphHtml(graph) {
   if (!graph || !graph.available) {
     return `<div class="empty">
@@ -36422,7 +36446,7 @@ function dependencyGraphHtml(graph) {
   }
   if (graph.edges.length === 0) {
     return `<p class="empty-inline">no cross-layer imports observed under <code>${esc5(graph.appPackage)}</code></p>
-${DEP_GRAPH_ADVISORY_HTML}`;
+${depGraphAdvisoryHtml()}`;
   }
   const rows = graph.edges.map((e) => {
     const chip = e.violation ? `<span class="badge badge-changed violation-chip">violates ${esc5(e.clauseId)}</span>` : "";
@@ -36447,7 +36471,7 @@ ${graph.violations.map(
 ${rows}
   </ul>
 ${violationsHtml}
-${DEP_GRAPH_ADVISORY_HTML}`;
+${depGraphAdvisoryHtml()}`;
 }
 function layerMapHtml(layerMap) {
   if (!layerMap || !layerMap.available) {
@@ -36867,7 +36891,7 @@ function screensBodyHtml(data) {
     return `<div class="empty">
       <p>No screens rendered yet.</p>
       <p>The preview loop fills this page on its first render &mdash; every entry in
-      <code>inspector/PreviewRegistry.kt</code> becomes a row.</p>
+      <code>${esc5(COPY.previewRegistryFile)}</code> becomes a row.</p>
     </div>`;
   }
   const changedSet = new Set(changed);
@@ -36920,7 +36944,7 @@ function screensBodyHtml(data) {
 ${rows}
 </div>
 <p class="meta matrix-note">An empty cell means the screen registers no entry for that state. States come from
-<code>@state</code> preview-registry entries in <code>inspector/PreviewRegistry.kt</code> (e.g. <code>"home@empty"</code>).</p>`;
+<code>@state</code> preview-registry entries in <code>${esc5(COPY.previewRegistryFile)}</code> (e.g. <code>"home@empty"</code>).</p>`;
 }
 var GLOSSARY_ITEM_RE = /^[-*]\s+\*\*(.+?)\*\*\s*[—–-]\s*(.+)$/;
 function parseGlossaryRows(body) {
@@ -38184,7 +38208,7 @@ ${section.bodyHtml}`;
   const declaredSections = pick2(sections);
   const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
   const visibleSections = capabilities.screens ? declaredSections : declaredSections.filter((s) => !NEEDS_SCREENS.has(s.id));
-  const capabilityNote = capabilities.screens ? "" : `<p class="rail-sub rail-capability" title="This project declares no screen-rendering capability. The governance window is complete; screens, preview and the live device all need one.">governance only &middot; no Compose app</p>`;
+  const capabilityNote = capabilities.screens ? "" : `<p class="rail-sub rail-capability" title="This project declares no screen-rendering capability. The governance window is complete; screens, preview and the live device all need one.">governance only &middot; ${consoleCopy().noRenderableApp}</p>`;
   const layoutNote = !layout ? "" : !layout.ok ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr3(layout.reason || "")}">${esc6(layout.relPath || MANIFEST_REL_PATH2)} refused &mdash; see Evidence</p>` : layout.source === "manifest" ? `<p class="rail-sub rail-capability" title="${escAttr3(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc6(layout.relPath)} &middot; packs ${esc6((layout.layout.packs || []).join(", "))}</p>` : "";
   return renderShellPage({
     appName,
@@ -38244,9 +38268,77 @@ ${section.bodyHtml}`;
   });
 }
 
-// src/lib/design-language.mjs
+// ../../packages/harness/src/lib/profile-loader.mjs
 import fs16 from "node:fs";
+import { createRequire } from "node:module";
 import path17 from "node:path";
+var PROFILE_PROTOCOL = 1;
+var PROFILES_DIR_REL = "qa/lib/profiles";
+var REQUIRED_EXPORTS = Object.freeze(["id", "protocol", "layout", "tiers", "steps"]);
+function profileEntryRel(id) {
+  return `${PROFILES_DIR_REL}/${id}/index.mjs`;
+}
+function validateProfileModule(mod, id) {
+  if (!mod || typeof mod !== "object") return { ok: false, reason: `profile "${id}" did not load as a module` };
+  const missing = REQUIRED_EXPORTS.filter((name) => !(name in mod));
+  if (missing.length) {
+    return { ok: false, reason: `profile "${id}" is missing required export(s): ${missing.join(", ")} (a profile must export ${REQUIRED_EXPORTS.join(", ")})` };
+  }
+  if (mod.id !== id) {
+    return { ok: false, reason: `profile "${id}" exports id ${JSON.stringify(mod.id)} \u2014 the manifest and the profile disagree about what this project is; fix one of them` };
+  }
+  if (mod.protocol !== PROFILE_PROTOCOL) {
+    return {
+      ok: false,
+      reason: `profile "${id}" implements profile protocol ${JSON.stringify(mod.protocol)}; this lane speaks ${PROFILE_PROTOCOL} \u2014 upgrade the harness or the profile so they match (\`create-cmp upgrade --harness\`)`
+    };
+  }
+  if (typeof mod.steps !== "function") return { ok: false, reason: `profile "${id}" must export steps(ctx) as a function` };
+  if (!mod.layout || typeof mod.layout !== "object") return { ok: false, reason: `profile "${id}" must export layout as an object (where specs, sources, tests and flows live)` };
+  if (!mod.tiers || typeof mod.tiers !== "object") return { ok: false, reason: `profile "${id}" must export tiers as an object (which test tiers exist and which can observe which promise)` };
+  for (const name of ["artifacts", "governable"]) {
+    if (name in mod && typeof mod[name] !== "function") return { ok: false, reason: `profile "${id}" exports ${name} but it is not a function (${name}(root))` };
+  }
+  return { ok: true };
+}
+function locateProfile(root, id) {
+  if (typeof id !== "string" || !PROFILE_ID_RE2.test(id)) {
+    return { ok: false, reason: `profile id ${JSON.stringify(id)} is not a valid profile name (${PROFILE_ID_RE2}) \u2014 it names a directory under ${PROFILES_DIR_REL}/` };
+  }
+  const entryRel = profileEntryRel(id);
+  const entryAbs = path17.join(root, ...entryRel.split("/"));
+  if (!fs16.existsSync(entryAbs)) {
+    let present = [];
+    try {
+      present = fs16.readdirSync(path17.join(root, ...PROFILES_DIR_REL.split("/")), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+    } catch {
+    }
+    const have = present.length ? `profiles present: ${present.join(", ")}` : `no profiles are installed under ${PROFILES_DIR_REL}/`;
+    return { ok: false, reason: `the manifest names profile "${id}" but ${entryRel} does not exist (${have}) \u2014 install the profile or fix ${"qa/harness-manifest.json"}` };
+  }
+  return { ok: true, entryRel, entryAbs };
+}
+function loadProfileSync(root, { id } = {}) {
+  const where = locateProfile(root, id);
+  if (!where.ok) return where;
+  let mod;
+  try {
+    mod = createRequire(import.meta.url)(where.entryAbs);
+  } catch (err) {
+    const code = err && err.code;
+    if (code === "ERR_REQUIRE_ESM" || code === "ERR_REQUIRE_ASYNC_MODULE") {
+      return { ok: false, reason: `profile "${id}" cannot be loaded synchronously on Node ${process.version} \u2014 the harness needs Node 20.19 or 22.12 or newer (require() of ES modules); upgrade Node` };
+    }
+    return { ok: false, reason: `profile "${id}" failed to load from ${where.entryRel}: ${err && err.message ? err.message : String(err)}` };
+  }
+  const verdict = validateProfileModule(mod, id);
+  if (!verdict.ok) return verdict;
+  return { ok: true, profile: mod, entryRel: where.entryRel };
+}
+
+// src/lib/design-language.mjs
+import fs17 from "node:fs";
+import path18 from "node:path";
 function findDeclaringObject(fileTexts, tokenNames) {
   if (tokenNames.length === 0) return null;
   let best = null;
@@ -38289,7 +38381,7 @@ function countReferences(fileTexts, objectName, tokenNames) {
   return counts;
 }
 function getTokenUsage(root, catalog = {}) {
-  const kotlinRoot = path17.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path18.join(root, "composeApp", "src", "commonMain", "kotlin");
   const files = walkKtFiles(kotlinRoot);
   if (files.length === 0) {
     return { available: false, reason: "no .kt files found under composeApp/src/commonMain/kotlin" };
@@ -38297,11 +38389,11 @@ function getTokenUsage(root, catalog = {}) {
   const fileTexts = /* @__PURE__ */ new Map();
   for (const f of files) {
     try {
-      fileTexts.set(f, fs16.readFileSync(f, "utf8"));
+      fileTexts.set(f, fs17.readFileSync(f, "utf8"));
     } catch {
     }
   }
-  const rel = (abs) => path17.relative(root, abs).split(path17.sep).join("/");
+  const rel = (abs) => path18.relative(root, abs).split(path18.sep).join("/");
   const group = (tokens) => {
     const names = Object.keys(tokens || {});
     const decl = findDeclaringObject(fileTexts, names);
@@ -38317,8 +38409,8 @@ function getTokenUsage(root, catalog = {}) {
 }
 
 // src/lib/intent.mjs
-import fs17 from "node:fs";
-import path18 from "node:path";
+import fs18 from "node:fs";
+import path19 from "node:path";
 var INTENT_REL_PATH = "specs/intent.md";
 var PLACEHOLDER_LEAD_RE = /^_not yet captured[^_]*_\s*/i;
 function parseIntentMarkdown(md) {
@@ -38360,10 +38452,10 @@ function parseIntentMarkdown(md) {
   };
 }
 function getIntentData(root) {
-  const file2 = path18.join(root, "specs", "intent.md");
+  const file2 = path19.join(root, "specs", "intent.md");
   let raw;
   try {
-    raw = fs17.readFileSync(file2, "utf8");
+    raw = fs18.readFileSync(file2, "utf8");
   } catch {
     return { available: false, reason: `${INTENT_REL_PATH} not found` };
   }
@@ -38407,8 +38499,8 @@ var MAX_TRANSIENT_RETRIES = 12;
 var STUCK_RETRY_MS = 3e4;
 var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
 function consoleRegistryPath(projectDir) {
-  const key = crypto.createHash("sha1").update(path19.resolve(projectDir)).digest("hex").slice(0, 12);
-  return path19.join(os3.tmpdir(), `cmp-console-${key}.json`);
+  const key = crypto.createHash("sha1").update(path20.resolve(projectDir)).digest("hex").slice(0, 12);
+  return path20.join(os3.tmpdir(), `cmp-console-${key}.json`);
 }
 function processAlive(pid) {
   try {
@@ -38421,7 +38513,7 @@ function processAlive(pid) {
 async function findLiveConsole(projectDir, { probe } = {}) {
   let rec;
   try {
-    rec = JSON.parse(fs18.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+    rec = JSON.parse(fs19.readFileSync(consoleRegistryPath(projectDir), "utf8"));
   } catch {
     return null;
   }
@@ -38434,7 +38526,7 @@ async function findLiveConsole(projectDir, { probe } = {}) {
       await new Promise((r) => setTimeout(r, RENEW_REJOIN_POLL_MS));
       let fresh;
       try {
-        fresh = JSON.parse(fs18.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+        fresh = JSON.parse(fs19.readFileSync(consoleRegistryPath(projectDir), "utf8"));
       } catch {
         continue;
       }
@@ -38447,18 +38539,18 @@ async function findLiveConsole(projectDir, { probe } = {}) {
   return null;
 }
 function consoleLauncherPath() {
-  const here = path19.dirname(fileURLToPath2(import.meta.url));
+  const here = path20.dirname(fileURLToPath2(import.meta.url));
   const candidates = [
-    path19.join(here, "..", "..", "bin", "console.mjs"),
+    path20.join(here, "..", "..", "bin", "console.mjs"),
     // src/lib/ → package root
-    path19.join(here, "..", "bin", "console.mjs"),
+    path20.join(here, "..", "bin", "console.mjs"),
     // dist/ → package root
-    path19.join(here, "console.mjs")
+    path20.join(here, "console.mjs")
     // bin/ (defensive)
   ];
   for (const c of candidates) {
     try {
-      if (fs18.existsSync(c)) return c;
+      if (fs19.existsSync(c)) return c;
     } catch {
     }
   }
@@ -38475,7 +38567,7 @@ async function ensureConsole(projectDir, opts = {}) {
       log("ensureConsole: no standalone launcher found beside this build \u2014 skipping");
       return null;
     }
-    const args = [launcher, path19.resolve(projectDir)];
+    const args = [launcher, path20.resolve(projectDir)];
     if (typeof port === "number") args.push(String(port));
     if (hot === true) args.push("--hot");
     const child = spawnImpl(process.execPath, args, { detached: true, stdio: "ignore" });
@@ -38496,9 +38588,9 @@ async function ensureConsole(projectDir, opts = {}) {
 }
 function writeConsoleRegistry(projectDir, port, extra = {}) {
   try {
-    fs18.writeFileSync(
+    fs19.writeFileSync(
       consoleRegistryPath(projectDir),
-      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path19.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path20.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
 `
     );
   } catch {
@@ -38507,9 +38599,9 @@ function writeConsoleRegistry(projectDir, port, extra = {}) {
 function updateConsoleRegistry(projectDir, patch) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs18.readFileSync(p, "utf8"));
+    const rec = JSON.parse(fs19.readFileSync(p, "utf8"));
     if (!rec || rec.pid !== process.pid) return;
-    fs18.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
+    fs19.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
 `);
   } catch {
   }
@@ -38517,16 +38609,16 @@ function updateConsoleRegistry(projectDir, patch) {
 function clearConsoleRegistry(projectDir) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs18.readFileSync(p, "utf8"));
-    if (rec && rec.pid === process.pid) fs18.rmSync(p, { force: true });
+    const rec = JSON.parse(fs19.readFileSync(p, "utf8"));
+    if (rec && rec.pid === process.pid) fs19.rmSync(p, { force: true });
   } catch {
   }
 }
 function stampRenderMarker(projectDir) {
   try {
-    const p = path19.join(projectDir, ...RENDER_MARKER_REL);
-    fs18.mkdirSync(path19.dirname(p), { recursive: true });
-    fs18.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+    const p = path20.join(projectDir, ...RENDER_MARKER_REL);
+    fs19.mkdirSync(path20.dirname(p), { recursive: true });
+    fs19.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
 `);
   } catch {
   }
@@ -38534,31 +38626,31 @@ function stampRenderMarker(projectDir) {
 function touchRenderMarker(projectDir) {
   try {
     const now = /* @__PURE__ */ new Date();
-    fs18.utimesSync(path19.join(projectDir, ...RENDER_MARKER_REL), now, now);
+    fs19.utimesSync(path20.join(projectDir, ...RENDER_MARKER_REL), now, now);
   } catch {
   }
 }
 function clearRenderMarker(projectDir) {
   try {
-    fs18.rmSync(path19.join(projectDir, ...RENDER_MARKER_REL), { force: true });
+    fs19.rmSync(path20.join(projectDir, ...RENDER_MARKER_REL), { force: true });
   } catch {
   }
 }
 function resolveAppName(projectDir) {
   for (const f of ["settings.gradle.kts", "settings.gradle"]) {
     try {
-      const text = fs18.readFileSync(path19.join(projectDir, f), "utf8");
+      const text = fs19.readFileSync(path20.join(projectDir, f), "utf8");
       const m = text.match(/rootProject\.name\s*=\s*["']([^"']+)["']/);
       if (m) return m[1];
     } catch {
     }
   }
-  return path19.basename(projectDir);
+  return path20.basename(projectDir);
 }
 function detectCapabilities(projectDir) {
   const has = (rel) => {
     try {
-      return fs18.statSync(path19.join(projectDir, rel)).isDirectory();
+      return fs19.statSync(path20.join(projectDir, rel)).isDirectory();
     } catch {
       return false;
     }
@@ -38567,7 +38659,7 @@ function detectCapabilities(projectDir) {
 }
 function laneInProgress(projectDir, { now = Date.now } = {}) {
   try {
-    const st = fs18.statSync(path19.join(projectDir, ...LANE_MARKER_REL));
+    const st = fs19.statSync(path20.join(projectDir, ...LANE_MARKER_REL));
     return now() - st.mtimeMs < LANE_MARKER_STALE_MS;
   } catch {
     return false;
@@ -38580,22 +38672,22 @@ async function withKspSelfHeal(projectDir, log, run) {
     const text = `${err && err.message ? err.message : err}${err && err.stdout ? err.stdout : ""}${err && err.stderr ? err.stderr : ""}`;
     if (!KSP_COLLISION_RE.test(text)) throw err;
     log("KSP cache collision (concurrent Gradle \u2014 verify lane?) \u2014 clearing kspCaches, retrying once");
-    fs18.rmSync(path19.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
+    fs19.rmSync(path20.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
     return await run();
   }
 }
 function detectAppPackage(projectDir) {
-  const spec = path19.join(projectDir, "create-cmp.json");
-  if (fs18.existsSync(spec)) {
+  const spec = path20.join(projectDir, "create-cmp.json");
+  if (fs19.existsSync(spec)) {
     try {
-      const pkg = JSON.parse(fs18.readFileSync(spec, "utf8")).package;
+      const pkg = JSON.parse(fs19.readFileSync(spec, "utf8")).package;
       if (pkg) return pkg;
     } catch {
     }
   }
-  const gradle = path19.join(projectDir, "composeApp", "build.gradle.kts");
-  if (fs18.existsSync(gradle)) {
-    const m = fs18.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
+  const gradle = path20.join(projectDir, "composeApp", "build.gradle.kts");
+  if (fs19.existsSync(gradle)) {
+    const m = fs19.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
     if (m) return m[1];
   }
   throw new Error(
@@ -38640,11 +38732,20 @@ function extractCompileErrors(text) {
     (l) => /^e: /.test(l) || /Compilation failed/i.test(l) || /^> Task :\S+ FAILED$/.test(l) || /^BUILD FAILED/.test(l)
   );
 }
+function applyConsoleCopy(projectDir) {
+  try {
+    const loaded = loadProfileSync(projectDir);
+    setConsoleCopy(loaded && loaded.ok ? loaded.profile?.console ?? null : null);
+  } catch {
+    setConsoleCopy(null);
+  }
+}
 function createPreviewService(opts) {
-  const projectDir = path19.resolve(opts.projectDir);
+  const projectDir = path20.resolve(opts.projectDir);
+  applyConsoleCopy(projectDir);
   const appName = opts.appName || resolveAppName(projectDir);
-  const previewsDir = path19.join(projectDir, "composeApp", "build", "previews");
-  const srcDir = path19.join(projectDir, "composeApp", "src");
+  const previewsDir = path20.join(projectDir, "composeApp", "build", "previews");
+  const srcDir = path20.join(projectDir, "composeApp", "src");
   const log = opts.log || (() => {
   });
   const hot = opts.hot !== false;
@@ -38907,11 +39008,11 @@ function createPreviewService(opts) {
     return result;
   }
   async function getDesignSystemData() {
-    const catalogPath = path19.join(previewsDir, "design-system.json");
-    const sourcePath = path19.relative(projectDir, catalogPath).split(path19.sep).join("/");
-    if (fs18.existsSync(catalogPath)) {
+    const catalogPath = path20.join(previewsDir, "design-system.json");
+    const sourcePath = path20.relative(projectDir, catalogPath).split(path20.sep).join("/");
+    if (fs19.existsSync(catalogPath)) {
       try {
-        return { available: true, source: "previews", sourcePath, catalog: JSON.parse(fs18.readFileSync(catalogPath, "utf8")) };
+        return { available: true, source: "previews", sourcePath, catalog: JSON.parse(fs19.readFileSync(catalogPath, "utf8")) };
       } catch (err) {
         log(`design-system.json at ${catalogPath} is not valid JSON (${err.message}) \u2014 trying a live session`);
       }
@@ -38937,26 +39038,26 @@ function createPreviewService(opts) {
         reason: "no current render to stash \u2014 call preview {projectDir} and wait for a render to complete first"
       };
     }
-    const variantDir = path19.join(previewsDir, "variants", name);
+    const variantDir = path20.join(previewsDir, "variants", name);
     try {
-      fs18.rmSync(variantDir, { recursive: true, force: true });
-      fs18.mkdirSync(variantDir, { recursive: true });
+      fs19.rmSync(variantDir, { recursive: true, force: true });
+      fs19.mkdirSync(variantDir, { recursive: true });
     } catch (err) {
       return { ok: false, reason: `could not prepare ${variantDir}: ${err && err.message ? err.message : err}` };
     }
     const screens = [];
     for (const { screen } of cards) {
-      const src = path19.join(previewsDir, screen.png);
-      if (!fs18.existsSync(src)) continue;
-      const dst = path19.join(variantDir, screen.png);
-      fs18.mkdirSync(path19.dirname(dst), { recursive: true });
-      fs18.copyFileSync(src, dst);
+      const src = path20.join(previewsDir, screen.png);
+      if (!fs19.existsSync(src)) continue;
+      const dst = path20.join(variantDir, screen.png);
+      fs19.mkdirSync(path20.dirname(dst), { recursive: true });
+      fs19.copyFileSync(src, dst);
       screens.push(screen.id);
     }
     let designSystemStashed = false;
-    const dsSrc = path19.join(previewsDir, "design-system.json");
-    if (fs18.existsSync(dsSrc)) {
-      fs18.copyFileSync(dsSrc, path19.join(variantDir, "design-system.json"));
+    const dsSrc = path20.join(previewsDir, "design-system.json");
+    if (fs19.existsSync(dsSrc)) {
+      fs19.copyFileSync(dsSrc, path20.join(variantDir, "design-system.json"));
       designSystemStashed = true;
     }
     touch("variant-snapshot");
@@ -39018,17 +39119,17 @@ function createPreviewService(opts) {
     }
   }
   function loadPreviews() {
-    const manifestPath = path19.join(previewsDir, "manifest.json");
-    const manifest = JSON.parse(fs18.readFileSync(manifestPath, "utf8"));
+    const manifestPath = path20.join(previewsDir, "manifest.json");
+    const manifest = JSON.parse(fs19.readFileSync(manifestPath, "utf8"));
     try {
-      lastRenderAt = fs18.statSync(manifestPath).mtimeMs;
+      lastRenderAt = fs19.statSync(manifestPath).mtimeMs;
     } catch {
       lastRenderAt = Date.now();
     }
     viewport = manifest.viewport;
     const trees = /* @__PURE__ */ new Map();
     cards = manifest.screens.map((screen) => {
-      const treeJson = fs18.readFileSync(path19.join(previewsDir, screen.tree), "utf8");
+      const treeJson = fs19.readFileSync(path20.join(previewsDir, screen.tree), "utf8");
       trees.set(screen.id, treeJson);
       const tree = JSON.parse(treeJson);
       const a11y = auditA11y(tree);
@@ -39065,8 +39166,8 @@ function createPreviewService(opts) {
       };
     }
     let catalog;
-    const catalogPath = path19.join(previewsDir, "design-system.json");
-    if (fs18.existsSync(catalogPath)) catalog = JSON.parse(fs18.readFileSync(catalogPath, "utf8"));
+    const catalogPath = path20.join(previewsDir, "design-system.json");
+    if (fs19.existsSync(catalogPath)) catalog = JSON.parse(fs19.readFileSync(catalogPath, "utf8"));
     return {
       ok: true,
       screen,
@@ -39083,10 +39184,10 @@ function createPreviewService(opts) {
   }
   function snapshotPngs() {
     for (const { screen } of cards) {
-      const src = path19.join(previewsDir, screen.png);
-      const dst = path19.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
+      const src = path20.join(previewsDir, screen.png);
+      const dst = path20.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
       try {
-        if (fs18.existsSync(src)) fs18.copyFileSync(src, dst);
+        if (fs19.existsSync(src)) fs19.copyFileSync(src, dst);
       } catch {
       }
     }
@@ -39117,8 +39218,8 @@ function createPreviewService(opts) {
     } catch {
       return false;
     }
-    const theirs = health && typeof health.previewsDir === "string" ? path19.resolve(health.previewsDir) : null;
-    if (theirs && theirs !== path19.resolve(previewsDir)) {
+    const theirs = health && typeof health.previewsDir === "string" ? path20.resolve(health.previewsDir) : null;
+    if (theirs && theirs !== path20.resolve(previewsDir)) {
       log(`a daemon is running on ${daemonUrl} but serves ${theirs} \u2014 not this project; staying on the gradle path`);
       return false;
     }
@@ -39221,9 +39322,9 @@ function createPreviewService(opts) {
   }
   function watchClasses() {
     if (classesWatcher) return;
-    const classesDir = path19.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
+    const classesDir = path20.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
     try {
-      classesWatcher = fs18.watch(classesDir, { recursive: true }, () => {
+      classesWatcher = fs19.watch(classesDir, { recursive: true }, () => {
         touch("classes-change");
         scheduleRender(CLASSES_DEBOUNCE_MS);
       });
@@ -39419,13 +39520,13 @@ function createPreviewService(opts) {
     } catch {
     }
     try {
-      fs18.writeFileSync(
+      fs19.writeFileSync(
         consoleRegistryPath(projectDir),
         `${JSON.stringify({
           pid: process.ppid,
           port: handoffPort,
           url: `http://127.0.0.1:${handoffPort}/`,
-          projectDir: path19.resolve(projectDir),
+          projectDir: path20.resolve(projectDir),
           startedAt: (/* @__PURE__ */ new Date()).toISOString(),
           renewing: true,
           renewingAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -39452,7 +39553,7 @@ function createPreviewService(opts) {
     for (const dir of sourceRoots()) {
       try {
         selfWatchers.push(
-          fs18.watch(dir, { recursive: true }, (_event, filename) => {
+          fs19.watch(dir, { recursive: true }, (_event, filename) => {
             if (filename && !String(filename).endsWith(".mjs")) return;
             onSelfSourceChange();
           })
@@ -39465,7 +39566,7 @@ function createPreviewService(opts) {
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
   function startWatching() {
     try {
-      watcher = fs18.watch(srcDir, { recursive: true }, (_event, filename) => {
+      watcher = fs19.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
         clearTimeout(activityBroadcastTimer);
@@ -39550,18 +39651,18 @@ function createPreviewService(opts) {
   }
   function watchGovernance() {
     for (const w of GOVERNANCE_WATCHES) {
-      const abs = path19.join(projectDir, w.rel);
-      if (!fs18.existsSync(abs)) {
+      const abs = path20.join(projectDir, w.rel);
+      if (!fs19.existsSync(abs)) {
         if (!w.mkdir || !capabilities.screens) continue;
         try {
-          fs18.mkdirSync(abs, { recursive: true });
+          fs19.mkdirSync(abs, { recursive: true });
         } catch {
           continue;
         }
       }
       try {
-        const watcher2 = fs18.watch(abs, (_event, filename) => {
-          const base = filename ? path19.basename(filename) : "";
+        const watcher2 = fs19.watch(abs, (_event, filename) => {
+          const base = filename ? path20.basename(filename) : "";
           if (w.only && !w.only.has(base)) return;
           pendingGovernance.add(w.kind === "ledger" ? base === "comments.json" ? "comment" : "approval" : "governance");
           clearTimeout(governanceTimer);
@@ -39578,17 +39679,17 @@ function createPreviewService(opts) {
     (function walk2(dir) {
       let entries;
       try {
-        entries = fs18.readdirSync(dir, { withFileTypes: true });
+        entries = fs19.readdirSync(dir, { withFileTypes: true });
       } catch {
         return;
       }
       for (const e of entries) {
-        const p = path19.join(dir, e.name);
+        const p = path20.join(dir, e.name);
         if (IGNORE.test(p)) continue;
         if (e.isDirectory()) walk2(p);
         else {
           try {
-            stamp = Math.max(stamp, fs18.statSync(p).mtimeMs);
+            stamp = Math.max(stamp, fs19.statSync(p).mtimeMs);
           } catch {
           }
         }
@@ -39969,30 +40070,30 @@ function createPreviewService(opts) {
         return;
       }
       if (url2.pathname.startsWith("/walkthrough/")) {
-        const wtRoot = path19.join(projectDir, WALKTHROUGH_REL_DIR);
+        const wtRoot = path20.join(projectDir, WALKTHROUGH_REL_DIR);
         const rel = decodeURIComponent(url2.pathname.slice("/walkthrough/".length));
-        const file2 = path19.normalize(path19.join(wtRoot, rel));
-        if (!file2.startsWith(wtRoot) || !fs18.existsSync(file2) || !fs18.statSync(file2).isFile()) {
+        const file2 = path20.normalize(path20.join(wtRoot, rel));
+        if (!file2.startsWith(wtRoot) || !fs19.existsSync(file2) || !fs19.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".html") ? "text/html; charset=utf-8" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs18.createReadStream(file2).pipe(res);
+        fs19.createReadStream(file2).pipe(res);
         return;
       }
       if (url2.pathname.startsWith("/previews/")) {
         const rel = decodeURIComponent(url2.pathname.slice("/previews/".length));
-        const file2 = path19.normalize(path19.join(previewsDir, rel));
-        if (!file2.startsWith(previewsDir) || !fs18.existsSync(file2) || !fs18.statSync(file2).isFile()) {
+        const file2 = path20.normalize(path20.join(previewsDir, rel));
+        if (!file2.startsWith(previewsDir) || !fs19.existsSync(file2) || !fs19.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".svg") ? "image/svg+xml" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs18.createReadStream(file2).pipe(res);
+        fs19.createReadStream(file2).pipe(res);
         return;
       }
       res.writeHead(404);
@@ -40085,8 +40186,8 @@ function createPreviewService(opts) {
         a11yPass: a11y.pass,
         a11yViolations: a11y.violations.length,
         lastChangedVersion: changedAt.get(screen.id) ?? null,
-        tree: path19.join(previewsDir, screen.tree),
-        png: path19.join(previewsDir, screen.png)
+        tree: path20.join(previewsDir, screen.tree),
+        png: path20.join(previewsDir, screen.png)
       }))
     };
   }
@@ -40113,7 +40214,7 @@ function createPreviewService(opts) {
           throw err;
         }
       }
-      if (capabilities.screens && fs18.existsSync(path19.join(previewsDir, "manifest.json"))) {
+      if (capabilities.screens && fs19.existsSync(path20.join(previewsDir, "manifest.json"))) {
         loadPreviews();
       }
       await listen(opts.port || DEFAULT_PORT2);

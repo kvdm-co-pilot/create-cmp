@@ -65,23 +65,21 @@ function relPathProblem(field, value) {
  * own `grammar` export; `create-cmp harness init` seeds one from the language
  * it detects.
  */
-export const DEFAULT_GRAMMAR = Object.freeze({
-  citationMarker: /^(?:\/\/|#)\s*SPEC:/,
-  // COMMENT SYNTAX, which the first version of this declaration forgot and an
-  // audit caught the same day. It matters twice over. A line comment is SKIPPED
-  // rather than counted, so a language whose comments the core does not
-  // recognise burns its binding window on prose and silently loses the citation
-  // — measured: five `#` lines between a Python citation and its test discards
-  // it, while five `//` lines in Kotlin do not. And a citation inside a BLOCK
-  // comment must not bind at all, which is the laundering hole the binder
-  // exists to close; with only `/* */` known, a `# SPEC:` inside a Python
-  // docstring counted as a real citation over an unrelated test.
-  lineComment: /^(?:\/\/|\*)/,
-  blockComment: Object.freeze({ open: "/*", close: "*/" }),
-  testDeclaration: /@Test\b|\bfun\s+`[^`]+`\s*\(|\b(?:test|it)\s*\(/,
-  typeDeclaration: /^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\b/,
-  bindingWindow: 5,
-});
+/**
+ * THE GRAMMAR IS DECLARED, NEVER DEFAULTED. Until 2026-09-08 this constant held
+ * Kotlin's and JavaScript's test-declaration regexes as the core's FALLBACK, and
+ * `cmp` itself never declared a grammar — so every profile that forgot the
+ * export was graded with Kotlin's, silently. PATTERN: declaration over
+ * inference, the shape tree-sitter uses (one query per language, named
+ * captures). WHY IT WORKS: a required field cannot be silently wrong for the
+ * author who forgot it — the lane refuses by name. HOW IT FAILS: a copied regex
+ * from another language binds nothing or the wrong lines. WHAT WE DO: the Rule
+ * 0 instrument plants an unbound citation in THIS language and watches the
+ * grammar fail it by name; the coverage diagnostic prints "N markers seen, 0
+ * bound". The two fields below are language-neutral and may default.
+ */
+export const GRAMMAR_REQUIRED = Object.freeze(["citationMarker", "testDeclaration", "lineComment"]);
+export const GRAMMAR_DEFAULTS = Object.freeze({ blockComment: null, bindingWindow: 5 });
 
 /** A profile may declare a pattern as a RegExp or as a source string. */
 function regexOr(value, fallback) {
@@ -139,6 +137,20 @@ export function specDeclarationProblems(profile) {
     if (tiers.journey != null && !names.has(tiers.journey)) out.push("tiers.journey must be one of tiers.names (or null when this stack has no journey tier)");
     if (typeof tiers.forFile !== "function") out.push("tiers.forFile(rel) must be a function returning the citing file's tier");
   }
+  const grammar = profile?.grammar;
+  if (!grammar || typeof grammar !== "object") {
+    out.push("grammar is required — declare citationMarker, testDeclaration and lineComment for this stack's language; the core has no fallback grammar (`create-cmp harness init` seeds one per language)");
+  } else {
+    for (const f of GRAMMAR_REQUIRED) {
+      const v = grammar[f];
+      if (!(v instanceof RegExp) && !(typeof v === "string" && v.trim())) out.push(`grammar.${f} is required — a RegExp or a pattern string for this language`);
+      else if (typeof v === "string") {
+        // A pattern that does not compile used to fall back to Kotlin's. It is a
+        // declaration problem, named here, so the lane refuses before it grades.
+        try { new RegExp(v); } catch (err) { out.push(`grammar.${f} is not a valid pattern: ${err.message}`); }
+      }
+    }
+  }
   return out;
 }
 
@@ -181,23 +193,22 @@ export function specModelFrom(profile, overrides = {}) {
       // a real Python adoption, 2026-09-05. Field-by-field override: a profile
       // that declares only `testDeclaration` keeps the rest.
       grammar: Object.freeze({
-        citationMarker: regexOr(profile.grammar?.citationMarker, DEFAULT_GRAMMAR.citationMarker),
-        testDeclaration: regexOr(profile.grammar?.testDeclaration, DEFAULT_GRAMMAR.testDeclaration),
-        typeDeclaration: regexOr(profile.grammar?.typeDeclaration, DEFAULT_GRAMMAR.typeDeclaration),
-        lineComment: regexOr(profile.grammar?.lineComment, DEFAULT_GRAMMAR.lineComment),
+        citationMarker: regexOr(profile.grammar?.citationMarker, null),
+        testDeclaration: regexOr(profile.grammar?.testDeclaration, null),
+        typeDeclaration: regexOr(profile.grammar?.typeDeclaration, null),
+        lineComment: regexOr(profile.grammar?.lineComment, null),
         blockComment: Object.freeze(
           profile.grammar?.blockComment && typeof profile.grammar.blockComment.open === "string" && typeof profile.grammar.blockComment.close === "string"
             ? { open: profile.grammar.blockComment.open, close: profile.grammar.blockComment.close }
-            : DEFAULT_GRAMMAR.blockComment,
+            : GRAMMAR_DEFAULTS.blockComment,
         ),
         bindingWindow:
           Number.isInteger(profile.grammar?.bindingWindow) && profile.grammar.bindingWindow > 0
             ? profile.grammar.bindingWindow
-            : DEFAULT_GRAMMAR.bindingWindow,
-        // TRUE when this profile declared none of it and is running on the
-        // core's JVM/JS fallbacks. The scan reports it when nothing binds, so a
-        // language mismatch names itself instead of looking like an empty spec.
-        isDefault: !profile.grammar,
+            : GRAMMAR_DEFAULTS.bindingWindow,
+        // Always false since 2026-09-08: there is no fallback to be running on.
+        // Kept as a field because two readers print it.
+        isDefault: false,
       }),
       tiers: Object.freeze({
         names: Object.freeze([...tiers.names]),

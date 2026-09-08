@@ -50,12 +50,12 @@ test("JUnit: `name` is not read out of `classname` — the attribute ORDER is th
   <testcase classname="tests.test_cart" name="test_add"/>
 </testsuite>`,
     );
-    const out = parseJUnitOutcomes(dir);
+    const out = parseJUnitOutcomes(dir, { format: "junit-xml" });
     assert.deepEqual(Object.keys(out).sort(), ["tests.test_cart.test_add", "tests.test_cart.test_today_bucket"]);
     assert.equal(out["tests.test_cart.test_today_bucket"].status, "fail", "the red test must survive as itself");
 
     // And the probe now sees the flip it was blind to.
-    const green = parseJUnitOutcomes(tmpWith(`<testsuite><testcase classname="tests.test_cart" name="test_today_bucket"/><testcase classname="tests.test_cart" name="test_add"/></testsuite>`));
+    const green = parseJUnitOutcomes(tmpWith(`<testsuite><testcase classname="tests.test_cart" name="test_today_bucket"/><testcase classname="tests.test_cart" name="test_add"/></testsuite>`), { format: "junit-xml" });
     const diffs = compareOutcomes(out, green, "TZ=UTC-12", "TZ=UTC+14");
     assert.ok(
       diffs.some((d) => d.test === "tests.test_cart.test_today_bucket" && d.kind === "verdict-flip"),
@@ -82,7 +82,7 @@ test("JUnit: the report FILENAME is not one build tool's prefix", () => {
     const dir = tmp("junit-name-");
     try {
       fs.writeFileSync(path.join(dir, name), `<testsuite><testcase classname="c" name="t"/></testsuite>`);
-      assert.equal(Object.keys(parseJUnitOutcomes(dir)).length, 1, `${name} must be read`);
+      assert.equal(Object.keys(parseJUnitOutcomes(dir, { format: "junit-xml" })).length, 1, `${name} must be read`);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -93,7 +93,7 @@ test("JUnit: the report FILENAME is not one build tool's prefix", () => {
   try {
     fs.writeFileSync(path.join(dir, "notes.txt"), "not xml");
     fs.writeFileSync(path.join(dir, "coverage.xml"), "<coverage line-rate=\"0.9\"/>");
-    assert.deepEqual(parseJUnitOutcomes(dir), {});
+    assert.deepEqual(parseJUnitOutcomes(dir, { format: "junit-xml" }), {});
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -116,6 +116,8 @@ function projectWithSpecsAt(specsDir, { journey = null } = {}) {
     id: "svc",
     protocol: 1,
     layout: { specs: specsDir, citationRoots: ["src"], citationExts: [".py"], flows: null },
+    // Required since 2026-09-08: a Python service's grammar.
+    grammar: { citationMarker: /^#\s*SPEC:/, lineComment: /^#/, blockComment: { open: '"""', close: '"""' }, testDeclaration: /^\s*(?:async\s+)?def\s+test\w*\s*\(/ },
     // A journey tier must be one of `names` — the model validator refuses
     // otherwise, correctly, and this fixture must not smuggle an invalid profile
     // past it and then blame the code under test.

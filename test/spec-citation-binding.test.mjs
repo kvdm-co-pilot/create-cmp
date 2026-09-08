@@ -21,6 +21,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+// The binder needs the PROFILE's grammar since 2026-09-08 — there is no fallback. These
+// tests exercise the binder's mechanics on Kotlin and JavaScript sources, so this is the
+// grammar the old core fallback used to be, declared where a test can see it.
+const G = { citationMarker: /^(?:\/\/|#)\s*SPEC:/, lineComment: /^(?:\/\/|\*)/, blockComment: { open: "/*", close: "*/" }, testDeclaration: /@Test\b|\bfun\s+`[^`]+`\s*\(|\b(?:test|it)\s*\(/, typeDeclaration: /^(?:@\w+\s+)*(?:public\s+|internal\s+|private\s+|abstract\s+|open\s+|sealed\s+|data\s+|enum\s+)*(?:class|object|interface)\s+\w+/, bindingWindow: 5 };
+
 import { citationIsBound, BINDING_WINDOW } from "../packages/harness/src/lib/spec-coverage.mjs";
 
 const at = (src) => {
@@ -34,7 +39,7 @@ test("a citation directly above @Test is bound", () => {
     @Test
     fun \`the home screen lists today's items\`() {}
   `);
-  assert.equal(citationIsBound(lines, index), true);
+  assert.equal(citationIsBound(lines, index, G), true);
 });
 
 test("a citation above an annotation stack still reaches its test", () => {
@@ -45,7 +50,7 @@ test("a citation above an annotation stack still reaches its test", () => {
     @Tag("slow")
     fun \`listing\`() {}
   `);
-  assert.equal(citationIsBound(lines, index), true);
+  assert.equal(citationIsBound(lines, index, G), true);
 });
 
 test("THE REAL DRIFT: a citation on a class declaration is NOT bound", () => {
@@ -60,7 +65,7 @@ test("THE REAL DRIFT: a citation on a class declaration is NOT bound", () => {
       fun \`processes a pending payment\`() {}
     }
   `);
-  assert.equal(citationIsBound(lines, index), false, "a class is not a test");
+  assert.equal(citationIsBound(lines, index, G), false, "a class is not a test");
 });
 
 test("a citation in a helper with no test is not bound", () => {
@@ -68,12 +73,12 @@ test("a citation in a helper with no test is not bound", () => {
     // SPEC: HM-03
     private fun buildWallet() = Wallet(id = "w1")
   `);
-  assert.equal(citationIsBound(lines, index), false);
+  assert.equal(citationIsBound(lines, index, G), false);
 });
 
 test("a lone citation with nothing after it is not bound", () => {
   const { lines, index } = at(`// SPEC: HM-04\n`);
-  assert.equal(citationIsBound(lines, index), false);
+  assert.equal(citationIsBound(lines, index, G), false);
 });
 
 test("a test further than the window away is not bound", () => {
@@ -84,7 +89,7 @@ ${filler}
     @Test
     fun \`too far\`() {}
   `);
-  assert.equal(citationIsBound(lines, index), false, `a test beyond ${BINDING_WINDOW} lines is not what the tag claims`);
+  assert.equal(citationIsBound(lines, index, G), false, `a test beyond ${BINDING_WINDOW} lines is not what the tag claims`);
 });
 
 test("blank lines and comments between tag and test do not consume the window", () => {
@@ -96,12 +101,12 @@ test("blank lines and comments between tag and test do not consume the window", 
     @Test
     fun \`still bound\`() {}
   `);
-  assert.equal(citationIsBound(lines, index), true);
+  assert.equal(citationIsBound(lines, index, G), true);
 });
 
 test("node:test and it() forms bind too", () => {
   for (const decl of ['test("x", () => {});', 'it("x", () => {});']) {
     const { lines, index } = at(`// SPEC: BP-01\n${decl}\n`);
-    assert.equal(citationIsBound(lines, index), true, decl);
+    assert.equal(citationIsBound(lines, index, G), true, decl);
   }
 });
