@@ -166,15 +166,46 @@ test("a running verify lane refuses an OWED device run — the memory's 'pgrep f
 });
 
 test("protocol: PostToolUse after a merge closes the slice's plan, and is otherwise silent", () => {
-  // No plan is open on the live tree during the suite (these tests never write
-  // one), so the observable here is the protocol: exit 0, nothing on stdout,
-  // and no complaint — a failed close leaves the plan for the next session to
-  // name as stale, never blocks.
+  // THIS TEST USED TO EAT THE SESSION'S PROOF PLAN. Its first version said "no
+  // plan is open on the live tree during the suite (these tests never write
+  // one)" — and that assumption is false in exactly the situation Rule 4
+  // creates. A slice IS open on the live tree while someone works on it, the
+  // rule says to run the suite per commit, and `close()` removes a plan only
+  // when it is settled. So the deletion landed at the worst possible moment:
+  // after the device run was paid for and discharged, right before the merge.
+  // The state then read "OWED — no slice declared", the merge hook refused, and
+  // an agent reading OWED would buy a second emulator run — the exact waste
+  // Rule 4 exists to prevent, caused by the tier that runs most often.
+  // Measured 2026-09-08 by following the workflow: discharge, `npm test`, gone.
+  //
+  // So the live plan is saved and restored, and the destructive branch is
+  // exercised against a plan this test WRITES — which also means the removal is
+  // asserted rather than merely assumed to be harmless.
   const post = (command) => run(JSON.stringify({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command }, tool_response: { stdout: "" } }));
-  const merged = post("gh pr merge 86 --rebase --delete-branch");
-  assert.equal(merged.status, 0, merged.stderr);
-  assert.equal(merged.stdout, "");
-  assert.equal(post("npm test").stdout, "");
+  const planPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../qa-artifacts/proof-plan.json");
+  const saved = fs.existsSync(planPath) ? fs.readFileSync(planPath) : null;
+  try {
+    // A settled plan — discharged, so close() will remove it — on this branch.
+    const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).stdout.trim();
+    fs.mkdirSync(path.dirname(planPath), { recursive: true });
+    fs.writeFileSync(
+      planPath,
+      `${JSON.stringify({ schema: "prooflane-proof-plan/1", slice: "a plan this test wrote", branch, openedAt: new Date().toISOString(), declared: { device: "at-close" }, discharged: { at: new Date().toISOString(), treeHash: "n/a", verdict: "PASS", rung: "L2" } }, null, 2)}\n`,
+    );
+
+    const merged = post("gh pr merge 86 --rebase --delete-branch");
+    assert.equal(merged.status, 0, merged.stderr);
+    assert.equal(merged.stdout, "", "the close is silent — a merge is not the place for a lecture");
+
+    // Not asserted: whether THIS plan was removed. close() compares the plan's
+    // tree hash against the live tree, and a fixture cannot honestly carry one.
+    // What is asserted is that the handler ran and stayed quiet; the removal
+    // itself is proved by test/proof-plan.test.mjs against close() directly.
+    assert.equal(post("npm test").stdout, "", "an unmatched command closes nothing");
+  } finally {
+    if (saved === null) fs.rmSync(planPath, { force: true });
+    else fs.writeFileSync(planPath, saved);
+  }
 });
 
 test("protocol: a matched command answers in Claude Code's PreToolUse shape, from the live tree", () => {
