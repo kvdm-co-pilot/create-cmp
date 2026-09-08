@@ -592,9 +592,41 @@ other pack's L2 are different claims and are shown as such":*
   plants did not get the treatment. A fix applied to the instances rather than to the class comes
   back.
 
-**None of these is fixed here**, deliberately: the predicate is the stage's first task and fixing
-what it finds is the stage's work. What has changed is that the work has a red command to close
-rather than a paragraph to interpret.
+**Closed 2026-09-08**, each watched failing by name before the fix landed — the ladder's two
+spellings (one resolver, `lib/evidence-ladder.mjs`, and a refusal when two declarations disagree),
+every rung surface on the evidence path now naming its pack, and the spec and flow plants no longer
+asserting another pack's step name (the pack declares `plants.observedBy`; a pack that declares
+nothing falls back to the lane, never to `cmp`'s names — the `compileStepName` distinction, the
+KEY's presence rather than its value).
+
+Two things were learned in the closing that neither the predicate nor the audit had seen.
+
+- **A seventh wrong verdict, and a real author had already hit it.** `release` is the one ladder
+  field the grader reads as a single step NAME; every sibling — `scaffoldCore`, `l0Required`,
+  `l1Required`, `deviceExecution` — is a list, and the seeded skeleton showed `release: []`. The
+  second-stack author who wrote the `ktor-backend` profile from the contract alone declared
+  `release: ["distribution"]`, and their L3 was unreachable with nothing said about it. `cmp`
+  declares a bare string, so it is invisible from inside the only real profile. Executed rather
+  than read: the same PASSing rows grade **L2 as a list and L3 as a string**. It is **refused, not
+  reinterpreted** — accepting the list is the obvious repair and would move an existing pack's rung
+  from L2 to L3, which changes what a receipt claims and is fit-test question 5's business. Whether
+  the ladder should be uniformly list-shaped is the ADR that question raises; the refusal moves no
+  grade anywhere and does not pre-empt it. The mistake is kept as a **plant** rather than corrected
+  away, because a plant is watched failing forever and a corrected fixture proves nothing after the
+  day it changes.
+- **§9.1's own plant fix had never once executed on a foreign tree.** A plant failure ABORTS the
+  run and the spec plants go first — so on a pack spelling its steps differently, the two floor
+  plants whose literal-name defect §9.1 records as closed never ran at all. The fix was real; the
+  proof that it worked off-`cmp` did not exist, because the instrument stopped before reaching it.
+  That is the cost of fixing instances rather than the class, paid twice in one file.
+
+**Still open, and deliberately.** `pack.version` inheriting the harness lock's number, and a
+plantless profile earning a rung, are both left red on the gate: the first is ADR-0008's to settle
+and the ADR is unsigned, and the second is a new floor, which under §8.8 needs a kept plant and a
+measured cost before it is wired. **Five console surfaces still render a bare rung** —
+`console-shell.mjs:280`, `console-overview.mjs:69`, `console-tabs.mjs` (three), and
+`preview-service.mjs:339` — named here rather than left silent, since §6.5 says *every* surface and
+a list that stops where the last commit stopped is the instance-fix again.
 
 ---
 
