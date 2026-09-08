@@ -6,7 +6,7 @@ description: >-
   repo already answers (signed briefs and specs are closed — cited, never re-asked), then
   asks the unsettled decisions whose prerequisites are settled, in numbered rounds of at most
   five, each question carrying WHY it matters and a RECOMMENDED answer, and waits. Stops when
-  no remaining question would change the work. Fires automatically at genesis (before the
+  no remaining question would change the work. Invoke it at genesis (before the
   intent interview) and on every brief-lane request (before the brief is drafted); the human
   can invoke it anytime with "grill me", "interrogate this plan", "poke holes in this", "what
   am I missing", "ask me the hard questions", "settle the open questions before we start".

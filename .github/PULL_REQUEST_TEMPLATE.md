@@ -14,9 +14,11 @@
 <!-- docs/NORTH-STAR.md §10 — the fit test. One block; a change that cannot name its goal is not built. -->
 
 ```
-North star: G_ · mechanism ±_ · core learns no stack fact · receipt unchanged ·
-proof: suite _/_, framework-check _ s, fleet L2 _ · de-fork _→_ · loop: _
+North star: G_ · mechanism ±_ · core learns no stack fact · receipt unchanged · loop: _
+proof: <paste the block `node scripts/fit-test.mjs` prints — suite, framework-check, device schedule>
 ```
+
+<!-- Questions 1-5 and 8 are yours to write; 6 and 7 are DERIVED by scripts/fit-test.mjs (§10). -->
 
 ## Verification
 

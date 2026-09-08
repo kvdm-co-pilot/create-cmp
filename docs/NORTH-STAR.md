@@ -242,19 +242,7 @@ The product enforces a way of working on its users, and we build it the same way
 the rules that came out of measured episodes, each of which cost hours; the full form with
 its episode is `docs/PRINCIPLES.md` and `docs/GATE-RULES.md`.
 
-**The seven principles** — derived, never claimed · prove the instrument before you read it ·
-the layer you changed cannot certify itself · proof costs what the change costs and never runs
-silent · never wait on nothing · a signature binds content, a decision is closed · one record,
-read first.
-
-**The five gate rules** — Rule 0: prove the framework returns, both ways, in seconds, before
-pointing work at it. Rule 1: a gate is not wired until a *kept* plant makes it fail by name and
-its measured cost has chosen its stage. Rule 2: the layer you changed cannot certify itself —
-library → full suite; template or harness → a fresh app stamped; environment-sensitive → the
-environment. Rule 3: a loop cannot certify its own termination — the exit is a command written
-before the work starts, and a stage whose exit is still prose has not started. Rule 4: proof is
-SCHEDULED, not triggered — an expensive tier runs once, at the end of the slice that changed it,
-and what a slice will owe is declared before the first line is written.
+**The seven principles and the five gate rules are cited here by number, never restated** — `docs/PRINCIPLES.md` and `docs/GATE-RULES.md` are their homes, and the one time this section carried a copy (until 2026-09-08) the copy drifted from Rule 4 twice in a day.
 
 **The orchestration pattern** — *keep reasoning cheap and reversible; gate the irreversible
 work.* Reasoning stays with the orchestrator; execution is delegated to peer-strength agents and
@@ -329,22 +317,15 @@ restating it.** A slice declares what it will owe before the work starts, and th
 ```bash
 node scripts/proof-plan.mjs --open "<what you are building>"   # before the work
 node scripts/proof-plan.mjs                                     # what is owed, and WHEN
+node scripts/proof-plan.mjs --discharge                         # after the run — read from its record
 node scripts/proof-plan.mjs --close                             # refuses if anything is owed
 ```
 
-**Enforced by a hook, not by this paragraph.** `.claude/settings.json` runs
-`scripts/hooks/proof-gate.mjs`: an invocation of `fleet-check.mjs` is refused when nothing is owed
-or the tier is already discharged for this exact tree, and `gh pr merge` is refused while it is
-owed — the slice closes at merge, so that is where the run is collected. The audit of 2026-09-08
-found the program existed and nothing invoked it (GATE-RULES Rule 4 carries it).
-
-The run itself is L2 on a real headless emulator against the debug build; device rows SKIPped is
-never reported as fleet PASS; the machine is checked for another lane first. A discharge is read
-from the run's own record, never asserted. The device tier is the **last** gate, so a trigger path
-edited afterwards reopens the slice and is told so.
+GATE-RULES Rule 4 is the full form — what `scripts/hooks/proof-gate.mjs` refuses and when, why the
+device tier is the last gate, why a discharge is read and never asserted. None of it is restated here.
 
 **Why this paragraph says "the policy's home" out loud.** On 2026-09-08 the same rule was stated in
-eighteen documents, none of them a program, and they disagreed — the project memory said "gate a
+twenty-eight documents (eighteen by the first count), none of them a program, and they disagreed — the project memory said "gate a
 RELEASE at L2" while `fit-test.mjs` printed `fleet L2 REQUIRED` on any commit touching the harness
 source. A device suite ran three times in one session, once for a comment. Prose is read at the
 start of a session; a program speaks at the moment of the decision, and it wins. `deriveTierNeed`
@@ -409,13 +390,13 @@ core fix reaches it by version bump" contradicts ADR-0008, under which a core fi
 as a re-lock and never as a package-manager bump — and rendering Stage 2's exposed six live
 defects, three of them against guarantee §8.9 alone (§9.2).
 
-| Stage | What | Exit criterion (measured) | Trigger | State 2026-09-05 |
+| Stage | What | Exit criterion (measured) | Trigger | State (`node scripts/stage-gate.mjs`) |
 |---|---|---|---|---|
-| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **EXITED 2026-09-07.** 24/24 profile-dependent verdict-bearing core functions proved against two unlike profiles, enforced by `test/stage0-differential-coverage.test.mjs`. Cold adoptions re-run against the fixed tree: Go and Python, nothing → `harness init` → framework-check PASS → lane PASS, citations bound and tiers resolved. Fleet L2 green per PR. All 7 known-wrong verdicts closed; lint inverted to deny-by-default (§9.1) |
+| **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Device tier run at the close of each slice (a PR). | taken — a dependency-direction fix | **EXITED 2026-09-07.** every profile-dependent verdict-bearing core function (the count is `test/stage0-differential-coverage.test.mjs`'s, not this row's — it was 24 on 2026-09-07 and 28 a day later) proved against two unlike profiles, enforced by `test/stage0-differential-coverage.test.mjs`. Cold adoptions re-run against the fixed tree: Go and Python, nothing → `harness init` → framework-check PASS → lane PASS, citations bound and tiers resolved. Device tier run at the close of each slice (a PR). All 7 known-wrong verdicts closed; lint inverted to deny-by-default (§9.1) |
 | **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; console + MCP server into the harness; section types formalised; tool listing profile-driven; `cmp` providers extracted; neutral skills moved | `node scripts/stage05-gate.mjs` — a recorded baseline for "exactly as today", an honesty floor a section can FAIL, sections declared rather than assumed, no Compose furniture off-Compose, the console inside the harness package (proved by RENDERING from it, not by `existsSync`), and the package it left still standing alone | Stage 0 exit; before Stage 1 so the package boundary is drawn with the console inside | **6/6. EXITED 2026-09-07.** The console is in `packages/harness/src/console/` and ships in the `prooflane-harness` tarball. No `STACK_COUPLED` entry was needed (still 7) — the moved files were made stack-free instead, which found a real wrong verdict on the way. The move briefly BROKE `@create-cmp/inspector`'s tarball (imports climbing out of the package root); closed by declaring the edge, not reverting it: `inspector/mcp` is a workspace member depending on `prooflane-harness@^0.20.0`, and the harness publishes a `./console/*` surface so the import names a public API rather than reaching into `src/`. Proved by packing the inspector, installing the tarball in an empty directory so the dependency resolves from the registry, and importing it. Permanent ordering: the harness publishes first |
 | **1 — distribution** | The package split (PACKAGE-SPLIT Phases C–E): `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`, `prooflane-studio-cmp`; the lock as a stamper-written manifest; resolve local → node_modules → registry → git URL, fetch at init/new only | `node scripts/stage1-gate.mjs` — a foreign backend installs the harness with NO create-cmp present and gets a command; that command installs a lane reaching a green verify; a core fix published at a higher version reaches the adopter by ONE command; and **the fix arrives IN THE TREE** — the vendored bytes and the lock's per-file digests move, not merely a number in a manifest | Stage 0.5 exit **and** ADR-0007 signed (O4) **and** the Stage 1 ADR (O2) | **0/4, not started.** The predicate exists and is honest about why: the harness package installs into a foreign repo cleanly but declares no `bin`, so an adopter has nothing to run — `harness init` lives in `src/commands/` of create-cmp, which is the very thing this stage says a backend should not need. Criteria B–D report "not reached" rather than passing vacuously. **Criterion amended 2026-09-08:** it read "a core fix reaches it by version bump", which ADR-0008 contradicts — under it the harness is always vendored, so a fix arrives as RESOLVE → VENDOR → RE-LOCK by one command, never as a package manager moving a number. The ADR flagged the contradiction itself and asked for the wording to be read that way or amended; amending it is what made the criterion evaluable |
 | **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows from the profile | `node scripts/stage2-gate.mjs` — the criterion names an AUTHOR this project does not control, so it splits in two. **Provenance is human-attested** (`docs/attestations/stage2-external-profile.json`), reported NOT MET while none exists and never derived. **Acceptance is executed**: a foreign profile loads through a real protocol handshake, framework-check runs the profile's OWN plants and each fails by name, the receipt names its pack and the vendored predicate refuses one that does not, `pack.version` is the profile's own, and every surface showing a rung shows the pack | a genuinely external adopter, or the pinned port-demand issue | **5/10, not started.** The predicate exists, and its red rows were findings rather than absences: four defects against guarantees already binding are closed (§9.2), and what remains red is one honest absence, one blocked on an unsigned ADR, and `extends` — the feature the stage exists to build |
-| **3 — fleet** | `fleet-check` / `upgrade --harness` across a pinned fleet; the console as a fleet view | `node scripts/stage3-gate.mjs` — a fleet is DECLARED in `fleet.json`, never discovered, and an absent manifest is refused rather than counted as a fleet of none; §9's count of 10 is read out of this document rather than kept as a constant, so lowering the bar means editing the road; ten DISTINCT repos (clones and copies are one repo); ONE command; and the proof is each tree — per-repo lock digests moving, a version that moves while bytes do not being the falsehood ADR-0008 forbids; rungs compared only WITHIN a pack, never across | first evidence prospect with more than 10 repos | **0/7, and honestly so.** No fleet is declared and no fleet command exists; the gate says which, and refuses to call zero a fleet |
+| **3 — fleet** | `fleet-check` / `upgrade --harness` across a pinned fleet; the console as a fleet view | `node scripts/stage3-gate.mjs` — a fleet is DECLARED in `fleet.json`, never discovered, and an absent manifest is refused rather than counted as a fleet of none; §9's count — **10 repos upgraded by one command** — is read out of this document rather than kept as a constant (`test/stage3-fleet-size.test.mjs` pins that this sentence stays parseable), so lowering the bar means editing the road; ten DISTINCT repos (clones and copies are one repo); ONE command; and the proof is each tree — per-repo lock digests moving, a version that moves while bytes do not being the falsehood ADR-0008 forbids; rungs compared only WITHIN a pack, never across | first evidence prospect with more than 10 repos | **0/7, and honestly so.** No fleet is declared and no fleet command exists; the gate says which, and refuses to call zero a fleet |
 
 ### 9.1 Why Stage 0 has outlived two exit criteria
 
@@ -728,9 +709,8 @@ A "no" to 4, 5 or 7 stops the PR. A change that cannot answer 1 is not built.
 5. **Receipt meaning.** Does this change what a receipt claims, its schema, or its
    comparability? If yes, an ADR first.
 6. **Proof at altitude.** *(DERIVED — `scripts/fit-test.mjs`.)* Suite and
-   `scripts/framework-check.mjs` on every commit. Fleet L2 (`scripts/fleet-check.mjs
-   --min-level L2`) when the locked region or the template moved — which paths those are is
-   derived, not remembered, and the answer names which trigger fired. `fleet-check` records
+   `scripts/framework-check.mjs` on every commit. The device tier as `scripts/proof-plan.mjs` schedules it — owed, not yet due, discharged, or
+   reopened — never a trigger that fired. `fleet-check` records
    every run (PASS *and* FAIL) to `qa-artifacts/fleet-latest.json` with the commit it ran
    against, because until 2026-09-06 the scratch app was deleted and "fleet L2 PASS" was a
    sentence a human typed with nothing behind it.
@@ -764,11 +744,11 @@ loop: −1 lane per signing round · residue: <named, or none>
 | 2026-09-02 | Evidence economics: the loop is made cheap, visible, honest — `ERROR` verdict, per-step deadlines, stages, reopen scoped to what moved, spine/pack split |
 | 2026-09-03 | PRINCIPLES and GATE-RULES adopted; the lock region covers the lane's own tests and the declarations it reads; the evidence ladder is the profile's |
 | 2026-09-04 | Rule 0 ships to adopters as an instrument; agent liveness; the orchestrator has standing to refuse on cost; signatures batch |
-| 2026-09-04 | **The harness becomes stack-agnostic by inverting one dependency.** (1) Governance is mechanic-in-core, model-in-profile. (2) The `cmp` profile is isolated completely, studio included; the console lives in the harness as neutral section types; no profile-owned tabs. (3) No default profile — absent manifest refused; derived for stamped apps, interviewed for foreign repos. (4) Stage 0 starts, gated: fleet L2 per PR, suite + framework-check per commit, de-fork count in every PR. |
+| 2026-09-04 | **The harness becomes stack-agnostic by inverting one dependency.** (1) Governance is mechanic-in-core, model-in-profile. (2) The `cmp` profile is isolated completely, studio included; the console lives in the harness as neutral section types; no profile-owned tabs. (3) No default profile — absent manifest refused; derived for stamped apps, interviewed for foreign repos. (4) Stage 0 starts, gated: the device tier once at slice close (§7 — amended 2026-09-08; at the time, once per PR), suite + framework-check per commit, de-fork count in every PR. |
 | 2026-09-04 | **The cross-stack rule is amended.** The earlier rule (no cross-stack port without a pinned-issue trigger) is kept for the *eyes*: no renderer or inspector for another stack is written without countable demand. It no longer applies to the *harness*, whose agnosticism is a dependency-direction fix triggered by the in-house second stack. This document is where that amendment is recorded. |
 | 2026-09-04 | Trunk-based development: merge each PR the moment its gate is green, before the next is branched |
 | 2026-09-05 | **Stage 0 moved declarations; it never moved GRAMMAR — and grammar is what decides verdicts.** Names, paths, tier names and step names went to the profile while the rules deciding whether a citation *counts* stayed in the spine, matching Kotlin and JavaScript alone. A wrong directory name produces a refusal; a wrong grammar produces a **silently wrong verdict**: on Python, Go or Rust every citation was discarded, every clause read as uncited, and the message pointed at the spec file. The profile now declares `grammar` (marker, test declaration, type declaration, binding window); the core's patterns become an explicitly-named fallback; and the scan REPORTS when it saw markers and bound none, because the defect was never the wrong default but the *silent* one. Measured by the first Python adoption, 2026-09-05. |
-| 2026-09-04 | **The profile is the unit of distribution; a scaffolder is a consumer of one.** Falsified by the first foreign stack (a Ktor backend, adopted with **zero core edits**), which also showed the packaging — not the seam — is now the bottleneck. Twelve decisions in `docs/proposals/PACKAGE-SPLIT.md`: one repo with workspaces; the harness, the CLI, each profile and each studio split into packages under independent semver with `protocol` carrying compatibility; every profile carries its golden tree, which must reach L1 under its own lane or it does not ship; `harness init` becomes the on-ramp for every stack; the harness is named **`prooflane`**; Phase A ships as 0.25.0 before the rename. |
+| 2026-09-04 | **The profile is the unit of distribution; a scaffolder is a consumer of one.** Falsified by the first foreign stack (a Ktor backend, adopted with **zero core edits**), which also showed the packaging — not the seam — is now the bottleneck. Twelve decisions in `docs/proposals/PACKAGE-SPLIT.md`: one repo with workspaces; the harness, the CLI, each profile and each studio split into packages under independent semver with `protocol` carrying compatibility; every profile carries its golden tree, which must reach L1 under its own lane or it does not ship; `harness init` becomes the on-ramp for every stack; the harness is named **`prooflane`**; Phase A was to ship as 0.25.0 before the rename; the rename landed at 0.24.0 (2026-09-05) and no 0.25.0 exists. |
 
 **Open (each named with what it blocks):**
 

@@ -12,6 +12,7 @@
 // tests cover the protocol: silent and cheap when unmatched, JSON when not.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -142,6 +143,26 @@ test("protocol: unmatched and malformed input are silent, exit 0, and cheap — 
 
   const other = run(JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: FC } }));
   assert.equal(other.stdout, "", "only Bash is watched");
+});
+
+test("the wiring: .claude/settings.json registers all three events on this hook — a handler nobody calls is prose", () => {
+  // The audit of 2026-09-08 found the PostToolUse handler below written, tested
+  // with a synthetic payload, and registered nowhere — the same defect as the
+  // rule it exists to enforce, one layer up. So the wiring is pinned here.
+  const settings = JSON.parse(fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.claude/settings.json"), "utf8"));
+  for (const event of ["SessionStart", "PreToolUse", "PostToolUse"]) {
+    const entries = settings.hooks?.[event] ?? [];
+    const cmds = entries.flatMap((e) => e.hooks.map((h) => h.command));
+    assert.ok(cmds.some((c) => c.includes("scripts/hooks/proof-gate.mjs")), `${event} must run the proof gate; found ${JSON.stringify(cmds)}`);
+    if (event !== "SessionStart") assert.ok(entries.every((e) => e.matcher === "Bash"), `${event} watches Bash`);
+  }
+});
+
+test("a running verify lane refuses an OWED device run — the memory's 'pgrep first' is now checked", () => {
+  const d = decide("device", o("owed"), TIERS, { runningLane: "12345 node qa/verify.mjs" });
+  assert.equal(d.action, "deny");
+  assert.match(d.reason, /already running/);
+  assert.equal(decide("device", o("owed"), TIERS, { runningLane: null }).action, "allow");
 });
 
 test("protocol: PostToolUse after a merge closes the slice's plan, and is otherwise silent", () => {

@@ -30,7 +30,8 @@ Why scoped rather than a `cmp-*` prefix, in order of weight:
    future `@create-cmp/*` name. Unscoped, each new `cmp-<thing>` is a fresh
    land-grab race.
 3. **It ended a three-prefix scatter.** These packages were headed to the
-   registry as `cmp-receipts` + `create-cmp-harness` + `cmp-inspector-mcp`.
+   registry as `prooflane-receipts` + `prooflane-harness` + `@create-cmp/inspector` (names as of the
+   `prooflane-*` rename, 2026-09-05 — `node scripts/ground-truth.mjs` is the current list).
 
 ## Prerequisites (both are one-time, both are yours)
 

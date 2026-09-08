@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The approvals CLI — thin shell over qa/lib/approvals.mjs.
 //
-//   node qa/approve.mjs <artifact> [<artifact> …]
+//   node qa/approve.mjs <artifact> [<artifact> …] --as "Name <email>"
 //                                            records approval (recomputes each artifact's
 //                                            hash now, stamps the time, writes qa/approvals.json).
 //                                            Sign every pending artifact in ONE command: each
@@ -246,7 +246,7 @@ if (acceptFlagIdx !== -1) {
 if (args.length === 0) {
   const ids = listGovernedArtifacts(ROOT).map((a) => a.id);
   console.error(
-    'usage: node qa/approve.mjs <artifact> | --status | --log | --accept-defaults | --reopen <artifact> --reason "…" | --reopen-feature <name> --reason "…" | --accept <name>\n' +
+    'usage: node qa/approve.mjs <artifact> --as "Name <email>" | --status | --log | --accept-defaults | --reopen <artifact> --reason "…" | --reopen-feature <name> --reason "…" | --accept <name>\n' +
       `  valid artifacts: ${ids.length > 0 ? ids.join(", ") : "(none resolved in this project)"}`,
   );
   process.exit(1);

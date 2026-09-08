@@ -300,7 +300,7 @@ that needed no tree — and one data point is not many. Revisit at profile four.
 
 ## 10. Decisions
 
-All eleven decisions below were settled in one grill (`skills/grill-me`) on 2026-09-04, on the
+All twelve decisions below were settled in one grill (`skills/grill-me`) on 2026-09-04, on the
 evidence of the fuelled-api adoption report. They are closed: a change of mind is a **named
 reopening**, never a fresh question.
 

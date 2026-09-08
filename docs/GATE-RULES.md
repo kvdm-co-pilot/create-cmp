@@ -1,3 +1,6 @@
+> Governed by [`NORTH-STAR.md`](./NORTH-STAR.md) (§12); this document is the home of the five gate rules and is
+> cited by NORTH-STAR §7 rather than restated there.
+
 # Three rules for building gates
 
 > Proposed by Karel, 2026-09-03, out of the payment-blueprint adoption. Each comes
@@ -60,7 +63,8 @@ node qa/framework-check.mjs             # in YOUR app — bound 10 s per directi
 node scripts/framework-check.mjs        # in the create-cmp repo — proves the engine and the shipped twin
 ```
 
-**Which one you want is almost always the first.** `qa/framework-check.mjs`
+**Which one you want depends on where you are standing** — in an adopter's app, the first; in this
+repo, the second (`qa/` does not exist here). `qa/framework-check.mjs`
 ships in every scaffold and runs against the tree you are standing in: it
 derives which plants your project can support, reports each one it *cannot*
 make and why, and restores every file it touched — including the receipt and
