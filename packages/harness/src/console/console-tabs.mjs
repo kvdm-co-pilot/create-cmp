@@ -29,6 +29,13 @@
 // ("Not derivable statically — <reason>").
 
 import { classifyDimens, deriveContrastPairs, componentStoryId } from "./console-data.mjs";
+// Three surfaces in this file show an evidence rung — the Evidence headline,
+// the committed-receipt timeline, and the digest's lane-run table — and
+// NORTH-STAR.md §6.5 requires each of them to show the pack that graded it.
+// console-evidence.mjs holds the console's one spelling of that pair; see its
+// header for why the class is fixed in one place rather than at three call
+// sites.
+import { rungWithPack, rungPackNote } from "./console-evidence.mjs";
 
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -1793,8 +1800,16 @@ function timelineRowHtml(r) {
   const when = r.committedAt ? esc(r.committedAt) : "commit date unknown";
   // The rung as attested AT that commit (receipt.evidenceLevel, derived by the
   // lane) — absent on FAIL receipts and pre-ladder receipts, and then omitted
-  // rather than guessed.
-  const rung = r.evidenceLevel ? `<span class="badge evidence-rung">${esc(r.evidenceLevel.rung)} &middot; ${esc(r.evidenceLevel.name)}</span>` : "";
+  // rather than guessed — WITH THE PACK THAT GRADED IT (§6.5). The audit trail
+  // is where the pack matters most and is hardest to recover: these rows are
+  // reconstructed from old commits, and the tree that could tell a reader which
+  // pack was loaded at that sha is exactly the tree they no longer have in
+  // front of them. `profile` on the row beside this is the RUN profile
+  // (scaffold/local/ci) and never the pack, so it cannot stand in for one.
+  const rungLabel = rungWithPack(r.evidenceLevel, r.packId ?? r.pack);
+  const rung = rungLabel
+    ? `<span class="badge evidence-rung" title="${escAttr(rungPackNote(r.evidenceLevel, r.packId ?? r.pack))}">${esc(rungLabel)}</span>`
+    : "";
   return `    <li>
       <span class="${cls}">${esc(r.verdict || "?")}</span>
       ${rung}
@@ -1875,8 +1890,14 @@ export function evidenceBodyHtml(lastReceipt, history) {
   // scaffold / L1 desktop / L2 device / L3 release), rendered verbatim. A FAIL
   // or pre-ladder receipt has none, and none is shown — never fabricated. The
   // per-step table below stays the fine print.
-  const rungChip = r.evidenceLevel
-    ? ` <span class="badge evidence-rung" title="${escAttr(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"}`)}">Evidence: ${esc(r.evidenceLevel.rung)} &middot; ${esc(r.evidenceLevel.name)}</span>`
+  //
+  // The pack that graded it is in the chip itself and not only in the tooltip:
+  // §6.5 asks for the pack BESIDE the rung, and a fact a reader has to hover to
+  // find is not beside anything. The tooltip keeps what it always carried (the
+  // steps that earned the grade) and adds why the pack is there.
+  const rungLabelText = rungWithPack(r.evidenceLevel, r.packId ?? r.pack);
+  const rungChip = rungLabelText
+    ? ` <span class="badge evidence-rung" title="${escAttr(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"} — ${rungPackNote(r.evidenceLevel, r.packId ?? r.pack)}`)}">Evidence: ${esc(rungLabelText)}</span>`
     : "";
   const age = formatReceiptAge(r.ageMs);
   const dirty =
@@ -2473,6 +2494,19 @@ ${chainHtml}
 // digest can never disagree with the audit trail because it IS the audit
 // trail, grouped.
 
+/**
+ * The evidence cell of one lane-run row: the rung as attested at that commit,
+ * the pack that graded it (§6.5 — this table is a rung surface like any other,
+ * and it is the one a returning owner reads FIRST), then the strength phrase.
+ * A row with no rung keeps the strength phrase alone rather than inventing one.
+ */
+function laneRunEvidenceHtml(r) {
+  const label = rungWithPack(r.rung, r.packId ?? r.pack);
+  const strength = esc(r.strength ?? "—");
+  if (!label) return strength;
+  return `<span title="${escAttr(rungPackNote(r.rung, r.packId ?? r.pack))}">${esc(label)}</span> &mdash; ${strength}`;
+}
+
 export function digestTabHtml(digest) {
   if (!digest || !digest.available) {
     return `<div class="empty"><p>No digest — ${esc(digest ? digest.reason : "unavailable")}</p></div>`;
@@ -2483,7 +2517,7 @@ export function digestTabHtml(digest) {
 ${digest.laneRuns
   .map(
     (r) =>
-      `    <tr><td>${esc(r.when)}</td><td><code>${esc(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc(r.verdict)}</span></td><td>${r.rung ? `${esc(r.rung)} &mdash; ` : ""}${esc(r.strength ?? "—")}</td></tr>`
+      `    <tr><td>${esc(r.when)}</td><td><code>${esc(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc(r.verdict)}</span></td><td>${laneRunEvidenceHtml(r)}</td></tr>`
   )
   .join("\n")}
   </tbody></table>`

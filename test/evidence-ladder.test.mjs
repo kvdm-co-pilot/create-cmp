@@ -46,6 +46,22 @@ import { createCmpSteps } from "../packages/harness/src/lib/profiles/cmp/steps-c
 import * as alienProfile from "./fixtures/profiles/py-alien/index.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Plant material, stated where a fixture profile ships none.
+ *
+ * A rung has had a PRECONDITION as well as a derivation since 2026-09-08: a
+ * profile whose `plants` the Rule 0 instrument cannot plant from earns no rung
+ * at all (NORTH-STAR §8.9; qa/lib/plant-calibration.mjs). Cases below that are
+ * about the LADDER state it, so that a null rung in a ladder test can only ever
+ * mean the ladder.
+ */
+const STATED_PLANTS = {
+  testFileBasename: "planted_citation.txt",
+  unboundCitationSource: (clause) => `# SPEC: ${clause}\nclass Planted:\n    pass\n`,
+  tierUnmetCitationSource: (clause) => `# SPEC: ${clause}\ndef test_planted():\n    assert True\n`,
+  unmeetableTier: "integration",
+};
 const CLI = path.join(REPO_ROOT, "bin", "create-cmp.mjs");
 
 /** A cmp pack, built the way test/receipt-pack.test.mjs builds one: no Gradle runs. */
@@ -93,9 +109,17 @@ test("DIFFERENTIAL: the resolver answers for cmp and for the alien pack, and the
   // Neither profile's rung moves because of the resolution — the same ladder
   // reaches the grader either way.
   const cmpSteps = [{ name: "build", verdict: "PASS" }, { name: "unitTests", verdict: "PASS" }];
-  assert.equal(evidenceLevel(cmpSteps, "local", { ladder: withPack.ladder })?.rung, "L0");
+  assert.equal(evidenceLevel(cmpSteps, "local", { ladder: withPack.ladder, plants: cmpProfile.plants })?.rung, "L0");
   const alienSteps = [{ name: "harness_integrity", verdict: "PASS" }];
-  assert.equal(evidenceLevel(alienSteps, "local", { ladder: alienWith.ladder })?.rung, "L0");
+  // py-alien ships NO `plants` — its own header says so, deliberately — so the
+  // badge floor gives it no rung at all, whichever spelling the ladder was
+  // resolved from (NORTH-STAR §8.9; the floor itself is proved in
+  // test/badge-floor.test.mjs). The claim THIS test makes is about resolution,
+  // so it is made twice: once as the profile really is, and once with plant
+  // material stated, where the resolved ladder grades the rung its author
+  // declared. Anything else and the two facts would be entangled.
+  assert.equal(evidenceLevel(alienSteps, "local", { ladder: alienWith.ladder, plants: alienProfile.plants }), null);
+  assert.equal(evidenceLevel(alienSteps, "local", { ladder: alienWith.ladder, plants: STATED_PLANTS })?.rung, "L0");
 });
 
 test("THE REGRESSION, at unit level: a profile declaring ONLY the seeded top-level spelling is graded", () => {
@@ -110,7 +134,7 @@ test("THE REGRESSION, at unit level: a profile declaring ONLY the seeded top-lev
   const resolved = evidenceLadderFor(profile, pack);
   assert.equal(resolved.ok, true);
   assert.equal(resolved.source, "profile");
-  const level = evidenceLevel([{ name: "a", verdict: "PASS" }, { name: "b", verdict: "PASS" }], "local", { ladder: resolved.ladder });
+  const level = evidenceLevel([{ name: "a", verdict: "PASS" }, { name: "b", verdict: "PASS" }], "local", { ladder: resolved.ladder, plants: STATED_PLANTS });
   assert.deepEqual({ rung: level.rung, name: level.name }, { rung: "L1", name: "proven" });
 });
 
@@ -179,8 +203,8 @@ test("THE KEPT PLANT: `release` as a LIST is refused by name — the shape a rea
   // First: the wrong verdict itself, executed rather than described. The SAME
   // green lane grades L2 as a list and L3 as a string — that gap is the defect.
   const rows = ["harnessIntegrity", "specCoverage", "unitTests", "integrationTests", "distribution"].map((name) => ({ name, verdict: "PASS" }));
-  assert.equal(evidenceLevel(rows, "local", { mode: "full", ladder }).rung, "L2", "as a list, the release step earns nothing");
-  assert.equal(evidenceLevel(rows, "local", { mode: "full", ladder: { ...ladder, release: "distribution" } }).rung, "L3", "as a string, the same rows earn L3");
+  assert.equal(evidenceLevel(rows, "local", { mode: "full", ladder, plants: STATED_PLANTS }).rung, "L2", "as a list, the release step earns nothing");
+  assert.equal(evidenceLevel(rows, "local", { mode: "full", ladder: { ...ladder, release: "distribution" }, plants: STATED_PLANTS }).rung, "L3", "as a string, the same rows earn L3");
 
   // Then: the refusal that closes it, and it must NAME the field and the fix
   // rather than merely failing — an author who cannot see what to write is
@@ -267,6 +291,26 @@ function uncommentTheLadder(src) {
   return [...lines.slice(0, start), ...block, ...lines.slice(end + 1)].join("\n");
 }
 
+/**
+ * Do the OTHER thing the seeded skeleton tells an author to do, because since
+ * 2026-09-08 a rung needs both: declare plant material, or the badge floor
+ * refuses the rung however well the ladder is declared (NORTH-STAR §8.9;
+ * qa/lib/plant-calibration.mjs). Written out rather than uncommented, because
+ * the skeleton's placeholders are prose — an author who leaves them would have
+ * a structurally valid declaration whose plants bite nothing, and this file
+ * should model what a real adopter writes, not the shortcut the floor cannot
+ * see. Python, because that is what `foreignRepo` above is written in.
+ */
+function alsoDeclarePlants(src) {
+  return `${src}
+export const plants = {
+  testFileBasename: "test_framework_check_planted.py",
+  unboundCitationSource: (clause) => "# SPEC: " + clause + "\\nclass PlantedType:\\n    pass\\n",
+  tierUnmetCitationSource: (clause) => "# SPEC: " + clause + "\\ndef test_planted():\\n    assert True\\n",
+};
+`;
+}
+
 /** Add a SECOND declaration, on the object steps() returns. */
 function alsoOnThePack(src, ladderLiteral) {
   assert.match(src, /releaseLease: \(\) => \{\},/, "the seeded pack must still carry releaseLease");
@@ -288,7 +332,11 @@ test("THE GATE: an adopter who declares the ladder the way `harness init` seeds 
     const seeded = fs.readFileSync(entry, "utf8");
 
     // ── The gate: ONE declaration, the seeded spelling ────────────────────
-    fs.writeFileSync(entry, uncommentTheLadder(seeded));
+    // The ladder AND the plants: the skeleton seeds both, and a rung needs both
+    // (the badge floor — NORTH-STAR §8.9). The subject of this test is still the
+    // ladder's spelling; the plants are the precondition it is asserted under,
+    // exactly as a real adopter would have to write them.
+    fs.writeFileSync(entry, alsoDeclarePlants(uncommentTheLadder(seeded)));
     relockAndCommit();
     const lane = node(dir, [path.join(dir, "qa", "verify.mjs")]);
     assert.equal(lane.status, 0, `the lane must be green:\n${lane.stdout}${lane.stderr}`);
@@ -312,7 +360,7 @@ test("THE GATE: an adopter who declares the ladder the way `harness init` seeds 
     const before = fs.readFileSync(receiptPath, "utf8");
     fs.writeFileSync(
       entry,
-      alsoOnThePack(uncommentTheLadder(seeded), '{ names: { L0: "locked", L1: "every promise bound" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage", "aStepThisLaneDoesNotHave"], deviceExecution: [], release: null }'),
+      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage", "aStepThisLaneDoesNotHave"], deviceExecution: [], release: null }'),
     );
     relockAndCommit();
     const planted = node(dir, [path.join(dir, "qa", "verify.mjs")]);
@@ -325,7 +373,7 @@ test("THE GATE: an adopter who declares the ladder the way `harness init` seeds 
     // ── Reverted: the same two declarations, made to agree ────────────────
     fs.writeFileSync(
       entry,
-      alsoOnThePack(uncommentTheLadder(seeded), '{ names: { L0: "locked", L1: "every promise bound", L2: "unreachable here", L3: "unreachable here" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage"], deviceExecution: [], release: null }'),
+      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound", L2: "unreachable here", L3: "unreachable here" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage"], deviceExecution: [], release: null }'),
     );
     relockAndCommit();
     const recovered = node(dir, [path.join(dir, "qa", "verify.mjs")]);
@@ -366,4 +414,263 @@ test("a receipt that names no pack SAYS so — a rung comparable to nothing is n
   for (const blank of [{}, { id: "" }, { id: "   " }, { id: 7 }]) {
     assert.match(renderEvidenceBadge(receipt({ pack: blank })).toLowerCase(), /pack unnamed|names no pack/, JSON.stringify(blank));
   }
+});
+
+// ── 6. …AND THE CONSOLE IS A SURFACE. ───────────────────────────────────────
+//
+// NORTH-STAR.md §9.2 closed the evidence path on 2026-09-08 and left the
+// console open in writing: "Five console surfaces still render a bare rung —
+// console-shell.mjs:280, console-overview.mjs:69, console-tabs.mjs (three), and
+// preview-service.mjs:339 — named here rather than left silent, since §6.5 says
+// *every* surface and a list that stops where the last commit stopped is the
+// instance-fix again."
+//
+// The prose says five, the list holds six, and the scan finds SEVEN. The miss
+// is the plan trail's recent-requests rows (console-overview.mjs
+// chainHistoryHtml), where the rung OUTLIVES the run that earned it and so is
+// the one place nothing later can attribute it. And none of the six could have
+// been fixed as listed: every one is fed by inspector/mcp's receipt bridge or
+// its digest, and neither carried `pack` off the receipt — so the pack was
+// never in the console's hands to render, and a renderer-only fix would have
+// printed "pack unnamed" over a receipt that names one. That producer is the
+// eighth site and the reason the listed fix would have been cosmetic.
+//
+// So the assertions below run in two layers, because either alone is a lie:
+//   - the PRODUCER, end to end from a receipt on disk (the console renders what
+//     the bridge gives it; a renderer proved on a hand-built object proves
+//     nothing about the page a human opens);
+//   - the RENDERERS, each surface, both ways — a pack named, and no pack named.
+// Then the CLASS: a console module may not spell a rung any other way, so a
+// surface written tomorrow is covered the day it is written rather than the day
+// someone remembers this file.
+
+import {
+  railReceiptHtml,
+  receiptGlyph as shellReceiptGlyph,
+} from "../packages/harness/src/console/console-shell.mjs";
+import { driveChainHtml, overviewStatusHtml } from "../packages/harness/src/console/console-overview.mjs";
+import { digestTabHtml, evidenceBodyHtml } from "../packages/harness/src/console/console-tabs.mjs";
+import { galleryHtml } from "../packages/harness/src/console/preview-service.mjs";
+import { getLastReceipt } from "../inspector/mcp/src/lib/receipt-bridge.mjs";
+
+const CONSOLE_DIR = path.join(REPO_ROOT, "packages", "harness", "src", "console");
+
+/** A bridge-shaped receipt, as getLastReceipt() returns one. */
+const bridged = (over = {}) => ({
+  available: true,
+  relPath: "qa/evidence/latest.json",
+  verdict: "PASS",
+  profile: "local",
+  commitSha: "2ac67a8deadbeef",
+  generatedAt: "2026-09-08T10:00:00.000Z",
+  ageMs: 60_000,
+  stale: false,
+  steps: [{ name: "unitTests", verdict: "PASS" }],
+  evidenceLevel: { rung: "L2", name: "proven against a real database", satisfiedBy: ["unitTests"] },
+  packId: "py-alien",
+  ...over,
+});
+
+/**
+ * Every console surface that shows a rung, as a callable that returns HTML.
+ * Keyed by the file:line the defect was recorded at, so a red row names the
+ * place rather than the test.
+ */
+function consoleSurfaces(r) {
+  const history = {
+    available: true,
+    receipts: [
+      {
+        file: "qa/evidence/latest.json@2ac67a8",
+        commitSha: "2ac67a8deadbeef",
+        author: "K",
+        committedAt: "2026-09-08T09:00:00.000Z",
+        ageMs: 3_600_000,
+        verdict: r.verdict,
+        profile: r.profile,
+        evidenceLevel: r.evidenceLevel,
+        packId: r.packId,
+        generatedAt: r.generatedAt,
+      },
+    ],
+  };
+  const digest = {
+    available: true,
+    since: "2026-09-01",
+    commits: [],
+    approvalEvents: [],
+    openComments: null,
+    laneRuns: [
+      {
+        sha: "2ac67a8",
+        when: "2026-09-08",
+        verdict: r.verdict,
+        strength: "on-device: e2eSmoke",
+        rung: `${r.evidenceLevel.rung} ${r.evidenceLevel.name}`,
+        packId: r.packId,
+      },
+    ],
+  };
+  const chain = {
+    request: { text: "add login" },
+    plan: { title: "add login", steps: [] },
+    history: [
+      {
+        at: "2026-09-08T09:00:00.000Z",
+        title: "add login",
+        steps: ["build"],
+        durationMs: 1000,
+        receipt: { verdict: r.verdict, rung: r.evidenceLevel.rung, pack: r.packId },
+      },
+    ],
+  };
+  return {
+    "console-shell.mjs railReceiptHtml (the rail foot, on every page)": () => railReceiptHtml(r),
+    "console-overview.mjs overviewStatusHtml (the front door's standing line)": () =>
+      overviewStatusHtml({ receipt: r, statuses: [], receiptGlyph: shellReceiptGlyph, formatAge: () => "1m ago" }),
+    "console-overview.mjs chainHistoryHtml (recent requests — the rows that outlive the run)": () =>
+      driveChainHtml(chain),
+    "console-tabs.mjs evidenceBodyHtml headline chip": () => evidenceBodyHtml(r, { available: false }),
+    "console-tabs.mjs timelineRowHtml (the committed-receipt audit trail)": () =>
+      evidenceBodyHtml(r, history),
+    "console-tabs.mjs digestTabHtml (the front door's lane-run table)": () => digestTabHtml(digest),
+    "preview-service.mjs galleryHtml (the Evidence section's status line)": () =>
+      galleryHtml({ appName: "A", viewport: { width: 411, height: 891 }, version: 1, cards: [], lastReceipt: r }),
+  };
+}
+
+test("THE PRODUCER: the console's receipt bridge carries the pack off the receipt, so a rung reaches the page attributable", async () => {
+  // Proved from a receipt ON DISK rather than a hand-built object, because the
+  // defect was not in any renderer: getLastReceipt built a fixed shape and
+  // `pack` was not in it, so every surface downstream was structurally unable
+  // to obey §6.5 no matter how it was written.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "console-pack-"));
+  try {
+    fs.mkdirSync(path.join(root, "qa", "evidence"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "qa", "evidence", "latest.json"),
+      JSON.stringify({
+        schema: "cmp-evidence/1",
+        profile: "local",
+        verdict: "PASS",
+        commit: { sha: "abc123", dirty: [] },
+        inputs: { hash: "deadbeef", fileCount: 3 },
+        steps: [{ name: "unitTests", verdict: "PASS" }],
+        evidenceLevel: { rung: "L2", name: "proven against a real database", satisfiedBy: ["unitTests"] },
+        pack: { id: "py-alien", version: null },
+        generatedAt: new Date().toISOString(),
+      }),
+    );
+    const got = await getLastReceipt(root);
+    assert.equal(got.available, true, JSON.stringify(got));
+    assert.equal(got.packId, "py-alien", "the bridge must carry the pack beside the rung it already carries");
+    // End to end: the bridge's own output, rendered by the surface a human sees.
+    assert.match(railReceiptHtml(got), /py-alien/, "and the rail foot renders what the bridge gave it");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/**
+ * What a HUMAN sees: tags stripped, which takes every attribute with them.
+ *
+ * The distinction is the whole assertion. `scripts/stage2-gate.mjs` names its
+ * own weakness in criterion J — "this asks for a MENTION, not a placement — a
+ * pack id in a footnote under a rung in a headline would pass" — and a test
+ * that grepped raw HTML would be weaker still: a `title=` tooltip nobody hovers
+ * would satisfy it. §6.5 says BESIDE the rung, so the pack is looked for in the
+ * rendered words, within reach of the grade.
+ */
+const visible = (html) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+
+test("every console surface that shows a rung shows the pack (NORTH-STAR §6.5)", () => {
+  const r = bridged();
+  for (const [where, render] of Object.entries(consoleSurfaces(r))) {
+    const html = render();
+    const text = visible(html);
+    assert.match(text, /L2/, `${where}: rendered no rung at all — the fixture is wrong, not the code`);
+    // BESIDE, not merely present: the pack must follow the grade within one
+    // clause. A pack id elsewhere on the page is a mention, and §6.5 asks for a
+    // placement — the reader meeting the rung must meet the pack in the same
+    // glance, without hovering and without scrolling.
+    assert.match(
+      text,
+      /L2[^·]{0,60}· pack py-alien/,
+      `${where}: the rung is not beside its pack in the rendered TEXT — a tooltip or a footnote is a mention, not a placement (§6.5). Rendered: ${text.slice(0, 300)}`,
+    );
+    assert.match(
+      html,
+      /different claims/,
+      `${where}: names the pack but never says why it is there — §8.9 is the reason a reader needs it`,
+    );
+  }
+});
+
+test("a console rung with NO pack SAYS so — never a bare rung the reader could compare with anything", () => {
+  // The other half, and the one that makes the first half honest: a surface
+  // that only appends a pack when it happens to have one degrades to exactly
+  // the bare rung this rule forbids. The wording matches the README badge and
+  // the done-gate CLI on purpose — one vocabulary across the surfaces.
+  for (const missing of [null, undefined, "", "   "]) {
+    const r = bridged({ packId: missing });
+    for (const [where, render] of Object.entries(consoleSurfaces(r))) {
+      const html = render();
+      const text = visible(html);
+      assert.match(text, /L2/, `${where}: the rung is still shown — the receipt earned it`);
+      assert.match(
+        text,
+        /L2[^·]{0,60}· pack unnamed/,
+        `${where}: pack ${JSON.stringify(missing)} rendered as a bare rung. Rendered: ${text.slice(0, 300)}`,
+      );
+      assert.match(
+        html,
+        /comparable to nothing/,
+        `${where}: an unattributed rung must say what it is worth, in the words the other surfaces use`,
+      );
+    }
+  }
+});
+
+test("THE CLASS: no console module spells a rung any way but the shared one", () => {
+  // §9.2's own lesson, applied to itself: "a fix applied to the instances
+  // rather than to the class comes back", a cost that section records this
+  // repository paying twice in one file. The seven surfaces above are instances.
+  // THIS is the class — deny-by-default over the whole console directory, the
+  // same inversion test/agnostic-lint.test.mjs uses, so the seventh surface is
+  // covered the day it is written and by nobody remembering to come here.
+  //
+  // The rule, stated as the DEFECT rather than as a naming convention: reading
+  // a `rung` FIELD — `x.rung`, `x["rung"]`, `const {rung} = x` — is what every
+  // one of the six sites did before interpolating the grade into its own
+  // markup, so outside console-evidence.mjs that read is legal only where the
+  // value is being handed to the shared derivation. A local variable may still
+  // be called `rung`; what it may not be is a grade this file pulled off a
+  // receipt itself. The narrower spelling matters: a rule about the word would
+  // be satisfied by renaming, and a rule satisfied by renaming is not a rule.
+  const files = fs
+    .readdirSync(CONSOLE_DIR)
+    .filter((f) => f.endsWith(".mjs") && f !== "console-evidence.mjs")
+    .sort();
+  assert.ok(files.length >= 5, `expected the whole console to be scanned, saw ${files.length} modules`);
+  const offenders = [];
+  for (const f of files) {
+    // LINE comments before block comments — the other order lets a `/*` inside
+    // a `//` line swallow everything to the next `*/` (the bug scripts/
+    // stage05-gate.mjs records hitting while writing its own scanner).
+    const src = fs
+      .readFileSync(path.join(CONSOLE_DIR, f), "utf8")
+      .replace(/^[ \t]*\/\/.*$/gm, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    src.split("\n").forEach((line, i) => {
+      const readsRungField = /\.\s*rung\b/.test(line) || /\[\s*["']rung["']\s*\]/.test(line) || /\{[^}]*\brung\b[^}]*\}\s*=/.test(line);
+      if (!readsRungField) return;
+      if (line.includes("rungWithPack(") || line.includes("rungPackNote(")) return;
+      offenders.push(`${f}:${i + 1}: ${line.trim()}`);
+    });
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `a console module reads a rung outside console-evidence.mjs — route it through rungWithPack so it cannot be rendered without its pack (§6.5):\n  ${offenders.join("\n  ")}`,
+  );
 });

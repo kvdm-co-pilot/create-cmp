@@ -288,6 +288,16 @@ export function profileSkeleton(id, { sourceRoots, tiers, lang = null }) {
     : `\n// No recognised source language was found, so this profile uses the core's\n// FALLBACK grammar, which matches Kotlin/JVM and JavaScript only. If your\n// citations report as "declared but never cited" while the markers are plainly\n// there, that is why — declare a grammar:\n//\n// export const grammar = {\n//   citationMarker: /^(?:\\/\\/|#)\\s*SPEC:/,\n//   testDeclaration: /^\\\\s*def\\\\s+test\\\\w*\\\\s*\\\\(/,   // ← your language's test form\n//   typeDeclaration: /^\\\\s*class\\\\s+\\\\w+/,\n//   bindingWindow: 5,\n// };\n`;
   const tierNames = JSON.stringify(tiers);
   const hostTier = tiers[0];
+  // The extension a planted test file needs, in the language THIS tree is
+  // written in. It read `${hostTier === "unit" ? "kt" : "kt"}` — a ternary whose
+  // two branches are the same JVM extension — so the commented `plants` block
+  // told a Python or Go adopter to name their planted test file `.kt`, in the
+  // one declaration whose whole job is to supply what the core cannot know. It
+  // never bit while `plants` was optional decoration; it decides a RUNG now
+  // (qa/lib/plant-calibration.mjs), so a wrong seed here is a wrong grade later.
+  // With no recognised language there is no honest guess, and a placeholder that
+  // is visibly a placeholder is better than a confident one that is wrong.
+  const plantFileSuffix = lang ?? ".<your test file extension>";
   // WHERE this language keeps its tests. Distinct from `g.test`, which is what a
   // test DECLARATION looks like inside a file: Go writes `foo_test.go` beside
   // the source and never uses a test directory, so a directory-only rule put
@@ -532,8 +542,12 @@ export function steps({ ROOT }) {
 // export const plants = {
 //   // The source Rule 0's instrument plants to prove the gates still bite.
 //   // WITHOUT THIS, qa/framework-check.mjs cannot plant the unbound-citation
-//   // and tier-unmet cases and says so per plant. No plants, no badge.
-//   testFileBasename: "FrameworkCheckPlanted.${hostTier === "unit" ? "kt" : "kt"}",
+//   // and tier-unmet cases and says so per plant. No plants, no badge —
+//   // literally: the grader asks for these three fields before it will hand
+//   // this profile ANY rung, however green the lane (qa/lib/plant-calibration
+//   // .mjs; NORTH-STAR §8.9). A ladder without them is a vocabulary for a
+//   // claim nobody calibrated, so declare both or expect neither.
+//   testFileBasename: "FrameworkCheckPlanted${plantFileSuffix}",
 //   unboundCitationSource: (clause) => "…a citation on a type with no test under it…",
 //   tierUnmetCitationSource: (clause) => "…a host-tier test citing a clause it cannot observe…",
 //   unmeetableTier: "…a tier in \`tiers.satisfying\` a host test cannot satisfy…",

@@ -51,8 +51,11 @@ import {
   assessPlantRun,
   assessGreenRun,
   assessCalibrationCost,
+  assessBadgeFloor,
   plantRow,
 } from "./lib/framework-check.mjs";
+import { plantCalibration } from "./lib/plant-calibration.mjs";
+import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
 import { listHarnessFiles } from "./lib/harness-region.mjs";
 import { listFlowFiles, scanCitations, walkFiles } from "./lib/spec-coverage.mjs";
 import { resolveSpecModel, DEFAULT_GRAMMAR } from "./lib/spec-model.mjs";
@@ -227,13 +230,13 @@ const SPEC_MODEL = SPEC_MODEL_RESULT.model;
 // are the core scanner's, and which plants a tree can support is derived from
 // the tree. A profile that declares none simply ships without those two, said
 // out loud per plant (§5.2: no plants, no badge).
-const PLANT_DECL = (() => {
+const PROFILE_MODULE = (() => {
   const manifest = resolveHarnessManifest(ROOT);
   if (!manifest.ok) return null;
   const loaded = loadProfileSync(ROOT, manifest.manifest.profile);
-  if (!loaded.ok) return null;
-  return loaded.profile.plants ?? null;
+  return loaded.ok ? loaded.profile : null;
 })();
+const PLANT_DECL = PROFILE_MODULE?.plants ?? null;
 
 // The SOURCE half of that declaration, which the two citation plants cannot do
 // without. Kept separate from the declaration itself because the other half —
@@ -242,11 +245,14 @@ const PLANT_DECL = (() => {
 // not written yet. Requiring all of it or none of it would mean a pack that
 // names its steps but ships no plant source still had cmp's spellings asserted
 // against it, which is the defect this reads the declaration to avoid.
-const PROFILE_PLANTS = (() => {
-  const p = PLANT_DECL;
-  if (!p || typeof p.unboundCitationSource !== "function" || typeof p.tierUnmetCitationSource !== "function" || typeof p.testFileBasename !== "string") return null;
-  return p;
-})();
+//
+// THE TEST FOR "ENOUGH TO PLANT WITH" USED TO BE THREE `typeof`s WRITTEN HERE.
+// It moved to qa/lib/plant-calibration.mjs the day the RUNG came to depend on
+// the same answer (NORTH-STAR §8.9 — a profile with no calibrated plants earns
+// no rung): the grader and the instrument asking that question separately is
+// how the same word ends up meaning two things in one tree, which is the
+// `flowCitation`/`scanCitations` episode this file already carries.
+const PROFILE_PLANTS = plantCalibration(PLANT_DECL).ok ? PLANT_DECL : null;
 const PLANTED_TEST_REL = (testDir) => `${testDir}/${PROFILE_PLANTS.testFileBasename}`;
 
 function readFlows() {
@@ -336,6 +342,32 @@ for (const p of plants) {
       `for it; naming one narrows the assertion to that row`,
   );
 }
+
+// ── The badge floor, planted (NORTH-STAR §8.9, §6.7; GATE-RULES Rule 1) ─────
+// "A profile with no calibrated plants earns no rung" is a guarantee, and until
+// 2026-09-08 nothing checked it: two scratch adopters differing in exactly one
+// export — one shipping `plants`, one shipping none — both earned L1. The floor
+// now lives in the grader (qa/lib/evidence-level.mjs), and a floor nobody
+// watches fail is a floor that quietly stops being there, so this plants the
+// violation it exists to catch and asserts the refusal.
+//
+// It runs BEFORE the dirty-tree check because it touches nothing: no file, no
+// lane, no receipt. That is also its limit and the line below says so — it
+// proves what the grader WOULD give this ladder, not that a lane ran.
+const badgeFloor = (() => {
+  const started = t();
+  const resolved = evidenceLadderFor(PROFILE_MODULE);
+  const assessed = resolved.ok
+    ? assessBadgeFloor({ ladder: resolved.ladder, plants: PLANT_DECL })
+    : { available: false, reason: resolved.reason };
+  return { ...assessed, ms: t() - started };
+})();
+if (badgeFloor.ok === false) die(badgeFloor.reason);
+out(
+  badgeFloor.available === false
+    ? `  ⓘ  ${"badge floor".padEnd(24)} not planted — ${badgeFloor.reason}`
+    : `  badge floor          ${String(badgeFloor.ms).padStart(5)}ms   ✓ this profile's ladder grades ${badgeFloor.rung} with its plants and NOTHING without them (grader only — no lane run)`,
+);
 
 // ── Refuse to start on a dirty tree ─────────────────────────────────────────
 // Everything this may write, named up front. A file with uncommitted changes is
@@ -643,6 +675,10 @@ if (asJson) {
         verdict: "PASS",
         plants: plants.map((p) => ({ kind: p.kind, label: p.label, step: p.step })),
         unavailable,
+        // Reported beside the tree plants, never counted as one: it plants into
+        // the GRADER rather than into the tree, and a reader comparing plant
+        // counts across runs must not see this one move the number.
+        badgeFloor,
         cycles,
         totalMs: cost.totalMs,
         budgetMs: BUDGET_MS,

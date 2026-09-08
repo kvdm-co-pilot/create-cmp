@@ -7,7 +7,10 @@
 // qa/verify.mjs — see that file's `receipt` object (schema "cmp-evidence/1"):
 // { schema, profile, verdict, commit, inputs: {hash, fileCount}, steps: [{name,
 // verdict, reason?, durationMs, details?}], strength, evidenceLevel: {rung,
-// name, satisfiedBy}|null, artifacts, toolVersions, generatedAt }.
+// name, satisfiedBy}|null, pack: {id, version}, artifacts, toolVersions,
+// generatedAt }. `pack` is named here because it is not optional colour: it is
+// WHICH step pack graded the rung, and NORTH-STAR.md §6.5 makes it travel with
+// the rung to every surface the console draws.
 // This bridge reads that JSON directly (never re-derives its shape) and, to
 // answer "is it still bound to the CURRENT tree", dynamically imports the
 // project's OWN qa/lib/inputs-hash.mjs and calls its computeInputsHash — the
@@ -115,6 +118,30 @@ function readEvidenceLevel(receipt) {
 }
 
 /**
+ * The pack that produced the receipt's rows — its ID, and never its version.
+ *
+ * This bridge is what the console SEES of a receipt, and it dropped `pack`
+ * entirely until 2026-09-08. Every console surface downstream therefore showed
+ * a rung it could not attribute, which is what NORTH-STAR.md §6.5 forbids
+ * ("every surface that shows a rung shows the pack") and §8.9 explains: a `cmp`
+ * L2 and any other pack's L2 are different claims. So the pack is read here,
+ * beside the rung, in the same breath — the two travel together or the reader
+ * downstream is left comparing things that do not compare.
+ *
+ * `null` for a receipt that names no pack, which the console renders as saying
+ * so. Only the id, because `pack.version` on a receipt is today the harness
+ * LOCK's version rather than the profile's — docs/adr/0008-a-resolved-harness-
+ * is-still-a-vendored-one.md decided that number "must become null, not
+ * inherited" — and a surface printing it would name a version of the wrong
+ * thing.
+ * @returns {string|null}
+ */
+function readPackId(receipt) {
+  const id = receipt && receipt.pack && typeof receipt.pack.id === "string" ? receipt.pack.id.trim() : "";
+  return id || null;
+}
+
+/**
  * Recompute the CURRENT tree's inputs hash via the project's own algorithm,
  * and compare it to the receipt's `inputs.hash`. `stale: null` means
  * "unknown" (no inputs.hash to compare, or the algorithm couldn't be
@@ -178,6 +205,7 @@ async function recomputeStaleness(root, receipt) {
  *   ageMs?: number|null,
  *   steps?: Array<{name: string, verdict: string, reason?: string, note?: string, durationMs?: number, details?: object}>,
  *   evidenceLevel?: {rung: string, name: string, satisfiedBy: string[]}|null,
+ *   packId?: string|null,
  *   conformance?: {verdict: string, reason?: string, durationMs?: number}|null,
  *   inputsHash?: string|null,
  *   inputsFileCount?: number|null,
@@ -239,6 +267,8 @@ export async function getLastReceipt(root) {
   const { stale, currentInputsHash, staleReason } = await recomputeStaleness(root, receipt);
 
   const evidenceLevel = readEvidenceLevel(receipt);
+  // Read together with the rung and never separately: see readPackId.
+  const packId = readPackId(receipt);
 
   return {
     available: true,
@@ -251,6 +281,7 @@ export async function getLastReceipt(root) {
     ageMs,
     steps,
     evidenceLevel,
+    packId,
     conformance,
     inputsHash: receiptInputsHash(receipt),
     inputsFileCount: receiptInputsFileCount(receipt),
@@ -290,7 +321,7 @@ function git(root, args) {
  * `available: false` with the reason stated — the console renders the
  * standardized absence line, never a fabricated trail.
  * @param {string} root project root
- * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, commitSha: string, author: string|null, committedAt: string|null, ageMs: number|null, verdict: string|null, profile: string|null, evidenceLevel: {rung: string, name: string, satisfiedBy: string[]}|null, generatedAt: string|null}>}}
+ * @returns {{available: boolean, reason?: string, receipts?: Array<{file: string, commitSha: string, author: string|null, committedAt: string|null, ageMs: number|null, verdict: string|null, profile: string|null, evidenceLevel: {rung: string, name: string, satisfiedBy: string[]}|null, packId: string|null, generatedAt: string|null}>}}
  */
 export function listReceiptHistory(root) {
   const resolved = resolveReceiptRelPath(root);
@@ -341,6 +372,7 @@ export function listReceiptHistory(root) {
       verdict: parsed.verdict ?? null,
       profile: typeof parsed.profile === "string" ? parsed.profile : null,
       evidenceLevel: readEvidenceLevel(parsed),
+      packId: readPackId(parsed),
       generatedAt: receiptGeneratedAt(parsed),
     });
   }
