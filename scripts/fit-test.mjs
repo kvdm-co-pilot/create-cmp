@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
 import { observedTreeHash, DEVICE_TIER_TRIGGERS, DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
-import { obligation } from "./proof-plan.mjs";
+import { obligation, changedPaths } from "./proof-plan.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FLEET_RECORD = path.join(REPO_ROOT, "qa-artifacts", "fleet-latest.json");
@@ -30,24 +30,6 @@ const FLEET_RECORD = path.join(REPO_ROOT, "qa-artifacts", "fleet-latest.json");
 
 function sh(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...opts });
-}
-
-/**
- * Every path this branch changes: committed since the merge base with the
- * trunk, plus anything still uncommitted. Both halves matter — a device tier
- * that "was not required" because the trigger is only in the working tree is
- * the wrong answer.
- */
-function changedPaths() {
-  const base = sh("git", ["merge-base", "HEAD", "origin/main"]);
-  const out = new Set();
-  if (base.status === 0) {
-    const diff = sh("git", ["diff", "--name-only", `${base.stdout.trim()}...HEAD`]);
-    if (diff.status === 0) for (const l of diff.stdout.split("\n")) if (l.trim()) out.add(l.trim());
-  }
-  const dirty = sh("git", ["status", "--porcelain"]);
-  if (dirty.status === 0) for (const l of dirty.stdout.split("\n")) if (l.trim()) out.add(l.slice(3).trim());
-  return [...out];
 }
 
 export function deviceTierRequired(paths) {
@@ -106,7 +88,7 @@ function collect({ run }) {
   const fc = run ? parseFrameworkCheck(sh("node", ["scripts/framework-check.mjs"]).stdout ?? "") : null;
   const paths = changedPaths();
   const device = deviceTierRequired(paths);
-  return { suite, frameworkCheck: fc, device, owed: obligation(undefined, paths), fleet: readFleetRecord(), changed: paths.length };
+  return { suite, frameworkCheck: fc, device, owed: obligation(undefined, paths), fleet: readFleetRecord(), changed: paths?.length ?? null };
 }
 
 function render(d) {

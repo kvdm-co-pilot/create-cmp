@@ -298,7 +298,8 @@ twenty minutes after the same agent had written down, in the same session, that 
 suite for a comment is ceremony. Naming it did not stop it.
 
 The reason it did not stop it is the rule worth keeping. **Eighteen documents in this repository
-stated the device-tier policy and not one of them was a program.** They also disagreed: the
+stated the device-tier policy and not one of them was a program** (a wider grep the next day counted
+twenty-eight, the harness's own plugin agent and project memory among them). They also disagreed: the
 project memory said *"gate a RELEASE at L2"* — a slice boundary — while `scripts/fit-test.mjs`
 printed **`fleet L2 REQUIRED`** on any commit touching the harness source. Prose and program
 contradicted each other, and **the program won, as it always will**: prose is read once at the
@@ -325,6 +326,23 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
 - **A discharge is READ, never asserted.** It comes from the run's own recorded verdict and tree
   hash — a discharge that trusted its caller would be exactly the shape of claim this product
   exists to refuse.
+- **Enforced at the decision point, never by reading.** `.claude/settings.json` runs
+  `scripts/hooks/proof-gate.mjs` on every Bash call. An invocation of `fleet-check.mjs` is
+  refused when nothing is owed, when the tier is already discharged for this exact tree, or when
+  no slice is declared (the run could discharge nothing); it is allowed while owed, with the
+  schedule as the reason. `gh pr merge` is refused while the tier is owed — the slice closes at
+  merge, so that is where "once, at slice close" is collected. SessionStart puts the schedule in
+  front of the session. The audit the day after this rule landed found the program above existed
+  and **nothing invoked it**: no settings file in this repo, no git hooks, every `--open` in prose.
+  A rule made executable and left for the reader to remember to run is the same defect one layer
+  up — while the template this repo stamps had carried the equivalent PreToolUse hooks for
+  adopters all along. The harness enforced on adopters what it did not enforce on itself.
+- **A tree that is trunk owes nothing, and a plan belongs to its branch.** The same audit found a
+  clean `main` reporting OWED: `deriveTierNeed` fails open on an empty list because the lane
+  cannot see its diff — right there, wrong here, where git answered "nothing". And the previous
+  slice's plan file was still on disk, applying itself to whatever came next. A plan now records
+  the branch it was opened on, `--open` refuses on trunk, and a leftover is named as stale rather
+  than reused.
 
 ### Why this is not Rule 2
 

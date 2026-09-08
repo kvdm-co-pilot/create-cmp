@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs\"" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs\"", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

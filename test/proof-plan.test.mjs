@@ -18,13 +18,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { obligation, TIERS } from "../scripts/proof-plan.mjs";
+import { obligation, TIERS, isTrunk } from "../scripts/proof-plan.mjs";
 import { render } from "../scripts/fit-test.mjs";
+
+/** A slice is a branch — a plan is bound to the one it was opened on. */
+const BRANCH = "feat/a-slice-under-test";
 
 /** A declared slice, in memory. The real one lives in qa-artifacts and is not touched. */
 const slice = (over = {}) => ({
   schema: "prooflane-proof-plan/1",
   slice: "a slice under test",
+  branch: BRANCH,
   openedAt: "2026-09-08T10:00:00.000Z",
   base: "0".repeat(40),
   declared: { suite: "per-commit", frameworkCheck: "per-commit", device: "at-close" },
@@ -48,13 +52,13 @@ test("a docs-only change owes NOTHING — the derivation that was already right 
   // This half was never broken: deriveTierNeed correctly declared docs, tests
   // and scripts unable to affect a device. Asserted so that adding the WHEN
   // dimension cannot regress the WHETHER one.
-  const o = obligation(slice(), DOCS_ONLY);
+  const o = obligation(slice(), DOCS_ONLY, BRANCH);
   assert.equal(o.state, "none");
   assert.equal(o.need.required, false);
 });
 
 test("THE REGRESSION: a harness-source change mid-slice is OWED and NOT DUE, and never says REQUIRED", () => {
-  const o = obligation(slice(), TRIGGER);
+  const o = obligation(slice(), TRIGGER, BRANCH);
   assert.equal(o.need.required, true, "the derivation still says the tier cannot be skipped");
   assert.equal(o.state, "owed", "but it is owed at slice close, not now");
 
@@ -72,7 +76,7 @@ test("an undeclared slice is told to declare one — the point is knowing BEFORE
   // knows up front it will need an emulator can be scoped differently; one that
   // knows it will not never pays for one. So an obligation with no declared
   // slice is not silently treated as owed-now — it asks for the declaration.
-  const o = obligation(null, TRIGGER);
+  const o = obligation(null, TRIGGER, BRANCH);
   assert.equal(o.state, "undeclared");
 });
 
@@ -83,7 +87,7 @@ test("a discharge is READ from the run's record, never asserted — and a stale 
   const hash = "a".repeat(64);
   const discharged = slice({ discharged: { at: "2026-09-08T10:30:00.000Z", treeHash: hash, verdict: "PASS", rung: "L2" } });
 
-  const o = obligation(discharged, TRIGGER);
+  const o = obligation(discharged, TRIGGER, BRANCH);
   // The live tree hash will not equal a fabricated one, so this is the reopened
   // branch — which is the assertion: a discharge keyed to different bytes does
   // not carry over.
@@ -95,7 +99,7 @@ test("REOPENED: discharged, then a trigger path moves — the slice reopens inst
   // This is the exact 2026-09-08 sequence, encoded. The device tier is the LAST
   // gate; the mistake was editing a trigger file after discharging, which is a
   // sequencing error and is reported as one rather than as a second bill.
-  const o = obligation(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", treeHash: "b".repeat(64), verdict: "PASS", rung: "L2" } }), TRIGGER);
+  const o = obligation(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", treeHash: "b".repeat(64), verdict: "PASS", rung: "L2" } }), TRIGGER, BRANCH);
   assert.equal(o.state, "reopened");
   assert.ok(o.plan.discharged, "and it still remembers the run it had, so a reader can see what moved");
 });
@@ -105,8 +109,8 @@ test("a discharged slice over an UNCHANGED tree stays discharged — the tier is
   // discharged and nothing device-relevant has moved, further commits in the
   // slice cost nothing. Keyed to the live tree hash so the assertion is about
   // this repository rather than about a fixture.
-  const live = obligation(slice(), TRIGGER).now;
-  const o = obligation(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", treeHash: live, verdict: "PASS", rung: "L2" } }), TRIGGER);
+  const live = obligation(slice(), TRIGGER, BRANCH).now;
+  const o = obligation(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", treeHash: live, verdict: "PASS", rung: "L2" } }), TRIGGER, BRANCH);
   assert.equal(o.state, "discharged");
 });
 
@@ -132,4 +136,40 @@ test("the LINE an agent reads: quiet mid-slice, loud at close — loudness follo
   // A discharged slice says so rather than going quiet, so a reader can tell
   // "already bought" from "not needed".
   assert.match(render({ ...base, owed: { state: "discharged" } }), /DISCHARGED/);
+});
+
+test("a tree that IS trunk owes nothing — the 2026-09-08 audit found a clean main saying OWED", () => {
+  // `deriveTierNeed([])` fails open ("no change to reason about") because the
+  // lane cannot see its diff. Here git answered, and the answer was "nothing":
+  // this tree is origin/main, and whatever it owed was collected when its slice
+  // merged. The day after Rule 4 landed, a clean main printed OWED and told the
+  // reader to run an emulator over a tree that had changed by zero bytes.
+  const o = obligation(null, [], "main");
+  assert.equal(o.state, "none");
+  assert.equal(o.need.required, false);
+  assert.match(o.need.reason, /trunk/);
+});
+
+test("but a diff git could NOT determine still fails open — 'could not tell' is not 'nothing changed'", () => {
+  const o = obligation(slice(), null, BRANCH);
+  assert.equal(o.state, "owed");
+  assert.match(o.need.reason, /cannot tell/);
+});
+
+test("a plan is bound to its branch: the last slice's plan does not carry over, and is named as stale", () => {
+  // The same audit found PR #84's plan still on disk after the merge, applying
+  // itself to whatever came next. A leftover is reported, never reused.
+  const o = obligation(slice({ branch: "feat/the-previous-slice" }), TRIGGER, BRANCH);
+  assert.equal(o.state, "undeclared", "a stale plan is no plan");
+  assert.equal(o.stale.slice, "a slice under test", "and the reader is told which one is lying around");
+  assert.equal(o.plan, null);
+  // A plan written before branches were recorded has no branch at all — stale too.
+  assert.equal(obligation(slice({ branch: undefined }), TRIGGER, BRANCH).state, "undeclared");
+});
+
+test("trunk is not a slice — --open refuses on main and on a detached HEAD", () => {
+  assert.equal(isTrunk("main"), true);
+  assert.equal(isTrunk(""), true, "detached");
+  assert.equal(isTrunk(null), true, "git could not say");
+  assert.equal(isTrunk("feat/anything"), false);
 });

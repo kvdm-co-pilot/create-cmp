@@ -42,6 +42,10 @@ export const DEVICE_TIER_IRRELEVANT = Object.freeze([
   // a too-narrow entry is one device run and the cost of a too-wide one is a
   // missed regression.
   "inspector/mcp/test/",
+  // This repo's own Claude Code hooks and agent definitions. What SHIPS is
+  // `template/.claude/`, which is under a trigger; this one configures the
+  // agent that develops the harness and never reaches a stamped app.
+  ".claude/",
 ]);
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "build", "dist", "out"]);
