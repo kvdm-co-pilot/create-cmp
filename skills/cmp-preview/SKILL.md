@@ -2,7 +2,7 @@
 name: cmp-preview
 description: >-
   THE default UI feedback loop while building or editing ANY Compose Multiplatform
-  screen — use it DURING development, not only when asked: it renders the app's REAL
+  screen — in a stamped app, use it DURING development, not only when asked: it renders the app's REAL
   screens headlessly in seconds (no device, no emulator, no manual Gradle) and tells you
   exactly what each edit changed, so you catch your own mistakes as you build. Use this
   whenever you are about to write or change CMP/KMP UI code, need quick build/visual

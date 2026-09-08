@@ -36,8 +36,9 @@ npm whoami
 **One-time token setup (Karel does this himself, not the agent):**
 
 1. npmjs.com → avatar → **Access Tokens** → **Generate New Token** → **Granular Access Token**
-2. Permissions: **Read and write**. Packages: only ours — `create-cmp-cli`, `create-mobile`,
-   `create-compose-multiplatform`, `create-kmp` — never "all packages".
+2. Permissions: **Read and write**. Packages: only ours — every name under `packages/*/package.json`
+   and `packages/aliases/*/package.json` (`node scripts/ground-truth.mjs` lists them; ten as of
+   2026-09-08, `prooflane-harness` and `prooflane-receipts` among them) — never "all packages".
 3. Enable **Bypass two-factor authentication** (this is what makes publish non-interactive).
 4. Pick an expiration; when it lapses, `npm whoami` starts failing and publish PUTs return E404 —
    that's the signal to regenerate.
@@ -199,6 +200,15 @@ release body instead.
 - Do not skip the registry verification step — "the command exited 0" is not the same as "the
   package is live and correct."
 - Do not touch the token: never read/echo/move it, never put auth config anywhere inside the repo.
+
+## The harness packages (`prooflane-harness`, `prooflane-receipts`) — publish these FIRST
+
+NORTH-STAR §9 Stage 0.5 records a **permanent ordering: the harness publishes first**, because the
+CLI depends on it and a stamped app's lock names its version. The same gate applies — `npm whoami`,
+clean `main`, suite green, the fleet record PASS at L2 on this tree (`scripts/hooks/proof-gate.mjs`
+refuses `npm publish` otherwise) — then `cd packages/harness && npm publish`, then `packages/receipts`,
+then the CLI, then the aliases below. A version on a receipt must be fetchable before any receipt
+names it.
 
 ## Alias packages (create-compose-multiplatform, create-kmp, create-mobile)
 

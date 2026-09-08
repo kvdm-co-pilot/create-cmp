@@ -11,10 +11,11 @@
 
 ## 1. What it is (the mental model)
 
-create-cmp is the **AI delivery harness for Kotlin/Compose Multiplatform**: it makes an
+create-cmp is the **`cmp` Stack Profile and its scaffolder** — one adopter of the stack-agnostic
+`prooflane-harness` (identity: `docs/NORTH-STAR.md` §3). For a Kotlin/Compose Multiplatform app it makes an
 (Android + iOS) app **that builds green**, encodes industry best practices at every layer as
 executable patterns and gates, binds Claude Code to them, and stays useful for the whole life of
-the project (product definition: [`HARNESS-PLAN.md`](./HARNESS-PLAN.md)). Four ideas explain
+the project (product definition: [`NORTH-STAR.md`](./NORTH-STAR.md) §3; `HARNESS-PLAN.md` is the 2026-07 historical one). Four ideas explain
 everything:
 
 1. **Determinism over generation.** The 90% of a CMP project that's identical every time is a

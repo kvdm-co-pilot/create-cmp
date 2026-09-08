@@ -170,7 +170,8 @@ current instance; `docs/SESSION-STATE.md` points at it.
 
 ## The one-line form
 
-Carried into every session. Do not expand it there; expand it here.
+Carried by `agents/cmp-orchestrator.md` and `.claude/agents/deep-worker.md` into the sessions they define; a
+plain session reaches it through `CLAUDE.md` → NORTH-STAR §12. Do not expand it there; expand it here.
 
 ```
 Principles (docs/PRINCIPLES.md): derived, never claimed · prove the instrument before you

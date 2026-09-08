@@ -125,7 +125,7 @@ function main() {
   for (const stage of wanted) {
     const r = evaluate(stage);
     if (r.state === "pending") {
-      process.stdout.write(`  ⧗ stage ${stage.id} — ${stage.name}\n      NO PREDICATE. This stage may not start until its exit is a command.\n      ${stage.pending}\n\n`);
+      process.stdout.write(`  ⧗ stage ${stage.id} — ${stage.name}\n      NO PREDICATE (${stage.pending ?? "no criteria declared"}). This stage may not start until its exit is a command.\n      ${stage.pending}\n\n`);
       worst = Math.max(worst, 2);
       continue;
     }

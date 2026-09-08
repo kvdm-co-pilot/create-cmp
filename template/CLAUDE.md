@@ -14,9 +14,11 @@ principle wins and the rule is the bug.
 ## Definition of done
 
 Done means `node qa/verify.mjs` reports PASS and the receipt it writes
-(`qa/evidence/latest.json`) is in your commit. Claiming completion without a PASS receipt is
-a failure. SKIPped steps are recorded in the receipt; never present green-with-gaps as fully
-verified.
+(`qa/evidence/latest.json`) attests this tree — the hook checks the working tree by hash; commit
+it with your change so CI and reviewers hold the same proof. Claiming completion without a PASS receipt is
+a failure. SKIPped steps are recorded in the receipt, and a step that SKIPped for an environmental reason (no
+device, no bootable AVD) makes the receipt unusable as done-evidence — `qa/receipt-check.mjs` refuses
+it. Never present green-with-gaps as fully verified.
 
 **Verify in two tiers — the full lane is a checkpoint, not an inner loop.** It builds,
 tests, and gates the whole tree to produce the receipt, so it is slow by design; running it
@@ -29,15 +31,16 @@ once — when you believe the change is done.
   did-I-break-anything signal is free the way an IDE's errors-on-save are free; and
   `./gradlew :composeApp:desktopTest` for the unit tests your change touches. This is where
   you catch your own mistakes.
-- **Checkpoint — run once, at done:** `node qa/verify.mjs`. It writes the receipt; commit
+- **Checkpoint — run once, at done:** stop `qa/watch.mjs` first — its next fast pass would overwrite
+  `qa/evidence/latest.json` with a fast receipt the Stop hook refuses — then `node qa/verify.mjs`. It writes the receipt; commit
   the receipt with your change. The Stop hook (`qa/receipt-check.mjs`) then confirms — with a
-  cheap hash check, not another lane run — that a valid receipt attests your commit, and CI
+  cheap hash check, not another lane run — that a valid receipt attests this tree, and CI
   re-runs the full lane on push. After a green checkpoint, do not re-run the lane unless you
   change the tree again.
 
 Humans get the same gate at push time: run `node qa/setup-hooks.mjs` once (after `git init`)
-to enable the shipped pre-push hook. It blocks a push whose committed receipt doesn't attest
-HEAD — the same cheap check, before code leaves the machine (`git push --no-verify` bypasses
+to enable the shipped pre-push hook. It blocks a push whose receipt doesn't attest
+the tree — the same cheap check, before code leaves the machine (`git push --no-verify` bypasses
 it; CI still enforces it).
 
 ## Specifications — behavior starts here
@@ -50,7 +53,7 @@ then implement. Durable tests cite their clause (`// SPEC: HOME-02`).
 prove that test could ever *observe* the promise. Add `[tier: device]` (or `[tier: e2e]`)
 after the id when the claim is about OS facts a host JVM cannot see — lifecycle, alarms,
 notifications, permissions, real navigation. `specCoverage` then requires a citation from
-`androidInstrumentedTest` or `qa/e2e` and FAILS without one, rather than accepting a
+`androidInstrumentedTest` or `qa/e2e` for `device`, from `qa/e2e` alone for `e2e`, and FAILS without one, rather than accepting a
 desktop test that is structurally blind to the claim.
 [`specs/app-base.spec.md`](./specs/app-base.spec.md) states the architecture and shell
 invariants the conformance gates enforce.
@@ -120,8 +123,9 @@ timezone), `DozeControl` (forced idle), `PermissionControl`, `ProcessControl`,
 the exemplar proves an `allowWhileIdle` alarm delivers from inside forced deep idle by
 nesting a clock warp in a Doze bracket. Exemplars: `PlatformBehaviorSeamTest`,
 `RuntimeStateSeamTest`. Each organ's header states what it does NOT reproduce; read it
-before claiming more than it proves. The lane's `androidChecks` step runs them when a
-device is attached; see `docs/TESTING.md`.
+before claiming more than it proves. The lane's `androidChecks` step runs them — the lane provisions its own device: an attached one, or a
+headless AVD it boots itself. `CMP_DEVICE=none` opts out, and that SKIP is environmental, so the receipt is
+then not done-evidence. See `docs/TESTING.md`.
 
 ## Evidence
 
@@ -141,7 +145,7 @@ Every `.mjs` file directly under `qa/` and `qa/lib/`, every `.mjs` under
 glue), and the declarations the lane reads (`qa/harness-manifest.json`,
 `qa/verified-surface.json`) are **machine-owned**: harness code that is byte-identical in
 every create-cmp app and carries no app content at all. It
-belongs to `create-cmp-harness`, versioned independently of the engine that stamped this
+belongs to `prooflane-harness` (the name in your `qa/harness.lock.json`), versioned independently of the engine that stamped this
 app's shape, and `qa/harness.lock.json` records a sha256 of every one of those files.
 
 `node qa/verify.mjs` checks that lock first, on every run. Editing lane code fails the
@@ -150,8 +154,9 @@ honestly vouch for itself. Without that check the receipt was unfalsifiable in o
 specific way: force every step to PASS in `qa/verify.mjs` and the receipt still validated,
 since the edited file was simply part of the hashed input surface.
 
-**So: do not edit `qa/*.mjs`, `qa/lib/*.mjs`, `qa/lib/profiles/**`, or
-`qa/harness-manifest.json`.** If the lane is wrong, the fix is
+**So: do not edit `qa/*.mjs`, `qa/lib/*.mjs`, `qa/lib/profiles/cmp/**`, `qa/verified-surface.json`, or
+`qa/harness-manifest.json`.** (A profile you wrote yourself under `qa/lib/profiles/<id>/` is yours; after
+editing it, `npx create-cmp-cli harness relock` re-takes the lock.) If the lane is wrong, the fix is
 upstream in the engine, not here. If you genuinely must fork it, know that
 `npx create-cmp-cli upgrade --harness` will replace the region and preserve your edits as
 `qa/harness-local.patch` for you to re-apply or upstream — nothing is lost, but the fork
@@ -165,7 +170,7 @@ Upgrading the lane is safe to do unattended — it touches no app content and no
 artifact:
 
 ```bash
-npx create-cmp-cli upgrade --harness
+npx create-cmp-cli upgrade --harness --yes   # without --yes it dry-runs and exits 0 — a silent no-op from a tool
 ```
 
 ## Approvals — governed artifacts need a human's sign-off
@@ -174,7 +179,7 @@ Some artifacts are **governed**: a human approves them, and the approval is boun
 artifact's content by hash (`qa/approvals.json`) — the evidence-receipt idea, applied to a
 human decision. The ordered walk is a **definition order**, not just an approval order:
 each artifact is the vocabulary the next is written in, so on a fresh app each step is a
-conversation that ends in an approval — the genesis walk, six conversations:
+conversation that ends in an approval — the genesis walk:
 
 The order encodes two disciplines: **behavior is spec-first** (the exemplar's clauses are
 confirmed before the slice is built) and **visuals are UI-first** (the design system and
@@ -243,7 +248,7 @@ re-declare when the answers reshape the steps).
 
 | Step | What |
 |---|---|
-| 1 | **Feature brief** — `docs/features/<name>.md`: the decisions with their why, research, rejected options, an **Open decisions** section until the human closes each. Signed BEFORE code. |
+| 1 | **Feature brief** — `docs/features/<name>.md`: the decisions with their why, research, rejected options, an **Edge cases** section (at least three — the walk's audit step will not advance without them), an **Open decisions** section until the human closes each. Signed BEFORE code. |
 | 2 | **Design** — iff the feature has a UI surface (`"screens": true`, or screen files exist): draft the screens on STUB data, register them in the PreviewRegistry, render, and STOP. The human judges the rendered screens and signs `feature-design:<name>`. Never ask a human to approve a described UI. |
 | 3 | **Contract** — reopen any signed spec the brief amends (`--reopen feature-spec:<surface> --reason "…"`); write the clauses where the behavior lives — about the form that now exists; the human signs |
 | 4 | Build the slice (`add-feature` / preview loop). Declared blast lands "as declared"; re-approve touched visual artifacts on rendered output (wiring the signed screens from stub to real state drifts `feature-design:<name>` — its re-approval is that pass) |
@@ -283,7 +288,7 @@ signed bytes must not move when the human accepts).
 
 | Command | What |
 |---|---|
-| `node qa/approve.mjs feature-brief:<name>` | the human signs the brief (before code) |
+| `node qa/approve.mjs feature-brief:<name> --as "<signer>"` | the human signs the brief (before code) |
 | `node qa/approve.mjs --accept <name>` | the human's bookend; refused until provenDone |
 
 Editing a feature is the same brief **reopened** — `--reopen-feature <name> --reason "…"`
@@ -296,8 +301,8 @@ strip's History) is how "what happened while I was away" stays answerable.
 | Command | What |
 |---|---|
 | `node qa/approve.mjs --status` | Every governed artifact with live state (`unreviewed` / `approved` / `changed-since-approval` / `reopened`), short hash, mode badge |
-| `node qa/approve.mjs <artifact>` | Record approval — hashes the artifact's files now, stamps the time; also clears a `defaults-accepted` mode |
-| `node qa/approve.mjs --accept-defaults` | **Express lane**: approve every currently-resolvable artifact in one visible act, each stamped `"mode": "defaults-accepted"` — build now, walk the definition later. Unresolvable artifacts are skipped with the standard refusal printed. The ledger never pretends the defaults were designed. |
+| `node qa/approve.mjs <artifact> --as "Name <email>"` | Record approval — hashes the artifact's files now, stamps the time; also clears a `defaults-accepted` mode |
+| `node qa/approve.mjs --accept-defaults --as "Name <email>"` | **Express lane**: approve every currently-resolvable artifact in one visible act, each stamped `"mode": "defaults-accepted"` — build now, walk the definition later. Unresolvable artifacts are skipped with the standard refusal printed. The ledger never pretends the defaults were designed. |
 | `node qa/approve.mjs --reopen <artifact> --reason "…"` | Move an *approved* artifact (shaped or defaults-accepted) back to `reopened` for deliberate redesign. `--reason` is REQUIRED and recorded (`reopenedAt`, `via`, `reason` — on the row and in the journal). Refuses unknown ids and anything not currently approved. |
 | `node qa/approve.mjs --reopen-feature <name> --reason "…"` | ONE recorded change: reopens the brief + `feature-spec:<name>` + `feature-design:<name>` + every declared `touches` artifact (each only if currently approved), all under one reason. |
 | `node qa/approve.mjs --log` | The governance journal — every approve/reopen/accept with when, which surface (`via`), and why. |
@@ -385,15 +390,15 @@ which is worse than no chain. While the full check runs, the chain's observed li
 narrates the lane's own position (step, elapsed, usual cost) — quote THAT, never an
 estimate. The chain gates nothing; the walk stays the truth for doneness.
 
-**The studio is a standing check:** every injected context opens with a `[studio: …]`
+**The studio is a standing check:** while a walk is open, every injected context opens with a `[studio: …]`
 line. If it says DOWN or not running, restore it before proceeding — call the
 cmp-inspector `preview { projectDir }` tool (it starts a detached resident console
 that survives the session) — or, if the tools are absent, tell the human once. A
 missing window is a fault to heal, never something to work silently past.
 
-**While working — the header, then quiet:** open EVERY reply with the walk's one-line
-header — the exact `[chat header]` line the per-prompt inject delivers. Paste it
-verbatim, never compose it: it is the derivation's own string, so it cannot drift, and
+**While working — the header, then quiet:** when the per-prompt inject delivers a `[chat header]` line,
+open EVERY reply with it — with no walk open (a fresh app, direct-lane work) it delivers nothing and you
+write no header. Paste it verbatim, never compose it: it is the derivation's own string, so it cannot drift, and
 it persists in the transcript, which the statusline beneath the input box never does.
 After the header: one line per stage transition, nothing per-file. Stages carry their
 plain-words gloss on first mention ("Contract — agreeing what it promises"); quote the
@@ -527,14 +532,17 @@ conventions) · [`CONTRIBUTING.md`](./CONTRIBUTING.md) (workflow, Conventional C
 | `node qa/setup-hooks.mjs` | Enable the pre-push receipt gate (one-time, after `git init`) |
 | `./gradlew :composeApp:assembleDebug` | Android debug build |
 | `./gradlew :composeApp:assembleRelease` | Android release build — R8 + `lintVital`, the variant the lane's `releaseBuild` step proves. Produces an **unsigned** APK; signing needs a keystore, which is yours to create and keep out of the repo. |
-| `./gradlew :composeApp:hotRunDesktop --auto` | Desktop dev-client with hot reload |
 | `./gradlew :composeApp:connectedDebugAndroidTest` | Instrumented behavior tests on the attached device (the lane's `androidChecks` step) |
+| `node qa/framework-check.mjs` | GATE-RULES Rule 0: proves the lane returns both ways — PASS on the clean tree, FAIL by name on planted violations — in seconds, restoring every byte. Run it first in a repo whose harness is new or freshly upgraded. |
 | `node qa/verify.mjs --profile smoke` | The smallest end-to-end lane: every pure-Node gate, no Gradle, no device — seconds. Proves the framework *returns*, never the change (its receipt is refused as done-evidence). Run it first in any repo whose harness is new or freshly upgraded |
 | `node qa/verify.mjs --profile nightly` | Scheduled stage: everything `ci` proves with the determinism probe forced on. Proves the harness, never a change — its receipt (`stage: "nightly"`) is refused as done-evidence, exactly like `--fast`. Schedule it; never wait on it |
 | `node qa/verify.mjs --profile release` | Ship-time lane: everything `ci` proves plus the audit-cadence report (`auditCadence` — which androidMain subsystems changed since their last recorded `cmp-audit`; a nudge, never a gate) and the release-APK Maestro smoke (`releaseSmoke`) |
 | `node qa/verify.mjs --determinism` | Timezone determinism probe, alone: runs the JVM test tier twice under UTC-12 and UTC+14 and FAILs naming any test whose outcome differs — the dynamic net behind ARCH-13's static one. Opt-in inside a lane via `--profile ci --determinism`; never with `--fast`; writes no receipt on its own |
 | `node qa/record-audit.mjs <subsystem>` | Record that a `cmp-audit` of an androidMain subsystem happened (appends subsystem + HEAD sha + timestamp to `qa/audits.jsonl`; refuses dirty/unknown targets). `--list` shows every derived subsystem and its audit status |
 | `node qa/retrospective.mjs` | How this project actually uses its harness, from `qa/flight-recorder.jsonl` (appended by every lane run): fast vs full ratio, verbatim SKIP reasons grouped, whether the device tier is ever reached, longest stretch with no full lane. States only what the journal recorded |
+<!-- >>> cmp:feature dev-client -->
+| `./gradlew :composeApp:hotRunDesktop --auto` | Desktop dev-client with hot reload |
+<!-- <<< cmp:feature dev-client -->
 <!-- <<< cmp:feature harness -->
 <!-- >>> cmp:feature !harness -->
 # __APP_NAME__ — working guide

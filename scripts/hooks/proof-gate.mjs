@@ -40,6 +40,7 @@
 // "I could not check" is not "I checked". An unmatched command never reaches code
 // that can throw — a gate that blocked every Bash call because stdin was odd would
 // be removed within the hour, and rightly.
+import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -101,6 +102,10 @@ export function decide(kind, o, tiers, ctx) {
         return deny(`no slice is declared, so this run could discharge nothing — ${o.need.reason}. Declare first: ${DECLARE}. Then run the tier once, at close.`);
       case "owed":
       case "reopened":
+        // A lane already driving the one device makes a second run worse than
+        // wasted: it has wedged Maestro before its first flow. This was a line in
+        // a memory file ("check pgrep first") — now it is checked.
+        if (ctx?.runningLane) return deny(`a verify lane is already running (${ctx.runningLane}) — a concurrent device run collides with it (wedged adbd, false reds). Wait for it, then run the tier once.`);
         return allow(`the device tier is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — a trigger path edited afterwards reopens the slice. Then: node scripts/proof-plan.mjs --discharge`);
       default:
         return deny(`the proof plan is in an unknown state (${o.state}) — refusing rather than guessing`);
@@ -138,6 +143,17 @@ export function decide(kind, o, tiers, ctx) {
       : SILENT;
   }
   return SILENT;
+}
+
+/** A verify lane in flight on this machine, by its command line — or null. */
+function runningLane() {
+  try {
+    const { execSync } = createRequire(import.meta.url)("node:child_process");
+    const out = execSync("pgrep -fl 'qa/verify.mjs'", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return out ? out.split("\n")[0].slice(0, 80) : null;
+  } catch {
+    return null; // pgrep exits 1 when nothing matches
+  }
 }
 
 /** The fleet record and the hash of the tree it would have to describe. */
@@ -183,7 +199,8 @@ async function main() {
     // Matched. From here on, a failure is a refusal.
     try {
       const { obligation, TIERS } = await import("../proof-plan.mjs");
-      const d = decide(kind, obligation(), TIERS, kind === "publish" ? await releaseContext() : undefined);
+      const ctx = kind === "publish" ? await releaseContext() : kind === "device" ? { runningLane: runningLane() } : undefined;
+      const d = decide(kind, obligation(), TIERS, ctx);
       if (d.action === "silent") return;
       emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: d.action, permissionDecisionReason: d.reason } });
     } catch (e) {

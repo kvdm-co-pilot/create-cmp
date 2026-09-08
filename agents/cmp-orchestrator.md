@@ -55,8 +55,10 @@ enforces the link.
 
 ## Gate everything — the subagent's output is a claim, the gate is the proof
 Nothing is "done" until it passes the project's own gates, run by YOU:
-- `node qa/verify.mjs` reports **PASS** and the evidence receipt is committed (the generated
+- In a stamped app: `node qa/verify.mjs` reports **PASS** and the evidence receipt is committed (the generated
   `CLAUDE.md` definition of done).
+- In the create-cmp repo itself (no `qa/` here): `npm test` + `node scripts/framework-check.mjs`, the device
+  tier as `node scripts/proof-plan.mjs` schedules it, and `node scripts/stage-gate.mjs` for a stage's exit.
 - The engine suite (`npm test`) stays green.
 - For risky changes, run the **negative proof** too — inject the violation, watch the right
   gate fail by name, revert. A gate you haven't seen fail is a gate you don't trust.
