@@ -68,6 +68,30 @@ import { CMP_LADDER } from "./ladder.mjs";
  *   FAST_EXCLUDED_NAMES: string[], STEP_FN_BY_NAME: Record<string, Function>,
  *   stepDeterminism: Function, releaseLease: () => void}}
  */
+/**
+ * Is the inspector server in this app at all? `--no-inspector` deletes the
+ * androidDebug inspector sources (the feature manifest's paths), so the file
+ * that answers `/inspect/health` is simply not there. Asked BEFORE the lane
+ * touches a device: the 2026-09-08 context audit found this step booting a
+ * headless emulator first and only then discovering the endpoint it wanted to
+ * read was never shipped — a device paid for by every `--no-inspector` app,
+ * for a step that then SKIPped. Structural, so the receipt stays done-evidence.
+ */
+export function inspectorShipped(root) {
+  const base = path.join(root, "composeApp", "src", "androidDebug");
+  if (!fs.existsSync(base)) return false;
+  const stack = [base];
+  while (stack.length) {
+    const dir = stack.pop();
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) stack.push(path.join(dir, e.name));
+      else if (e.name === "InspectorHttpServer.kt") return true;
+    }
+  }
+  return false;
+}
+
+
 export function createCmpSteps(ctx) {
   const { ROOT, HERE, fast, determinism, profile, mode, sh, tryGit, tryGitLines, DEGRADED_PATHS } = ctx;
 
@@ -938,6 +962,10 @@ function pollHealth(port, attempts, delaySec) {
 function stepTokenDrift() {
   const started = Date.now();
   const elapsed = () => Date.now() - started;
+
+  if (!inspectorShipped(ROOT)) {
+    return { name: "tokenDrift", verdict: "SKIP", skipKind: "structure", reason: "inspector not shipped in this project (--no-inspector) — no endpoint to read, no device needed", durationMs: elapsed() };
+  }
 
   const device = ensureLaneDevice("tokenDrift");
   if (device) return { ...device, durationMs: elapsed() };

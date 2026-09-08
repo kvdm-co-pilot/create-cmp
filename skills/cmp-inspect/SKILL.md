@@ -1,23 +1,15 @@
 ---
 name: cmp-inspect
 description: >-
-  Inspect a running Kotlin/Compose Multiplatform UI as structured design data — hierarchy, geometry,
-  and resolved design tokens delivered as JSON, never screenshots. Use this when the user wants to
-  "inspect the Compose UI", "read the design tokens", asks "why is this padding wrong", "check for
-  token drift", "is this screen matching the design system", "debug this Compose layout without
-  screenshots", "what colour/radius/spacing did this actually render", "assert the resolved tokens",
-  "did this UI change / regress", or "audit this screen for accessibility (touch targets, missing
-  labels)", "inspect the RUNNING app", "what's on the screen right now", "check the real
-  navigation state", "show me the screen / a preview / a wireframe of the UI", or "prove this UI
-  change did what it should". Drives the create-cmp inspector: either render a screen headlessly
-  with the harness (tier 0) or connect to the RUNNING debug app's live endpoint (tier 1:
-  connect_live + source {kind:"live"} — real data, real nav state), then query with the
-  cmp-inspector MCP tools (inspect_tree — whole tree, one testTag subtree, wireframe SVG, or
-  layout-gap report; navigate_and_inspect; render_screen; db_query; runtime_crashes;
-  runtime_logs). Also covers "drive the running app", "tap the app and check the screen",
-  "let me watch/click the app from my browser" (connect_live's remoteUrl live device view).
-  Asserts on the rendered STRUCTURE, not pixels — layout faults, UI regressions, and navigation
-  state are read mechanically from the tree; token drift and a11y are gated by the verify lane.
+  Inspect a running Kotlin/Compose Multiplatform UI as structured design data — hierarchy, geometry
+  and resolved design tokens as JSON, never screenshots — via the cmp-inspector MCP tools. Use this
+  when the user wants to "inspect the Compose UI", "read the design tokens", asks "why is this
+  padding wrong", "check for token drift", "debug this layout without screenshots", "what
+  colour/radius/spacing actually rendered", "did this UI change / regress", "audit this screen for
+  accessibility", "what's on the screen right now", "check the real navigation state", "drive the
+  running app", "tap the app and check", or "prove this UI change did what it should". Tier 0 renders
+  headlessly; tier 1 connects to the RUNNING debug app (real data, real nav state). Asserts on
+  STRUCTURE, not pixels. For a live gallery of every screen, use cmp-preview instead.
 ---
 
 # cmp-inspect — read a live Compose UI as structured design data

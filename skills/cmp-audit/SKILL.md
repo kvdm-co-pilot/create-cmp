@@ -1,19 +1,14 @@
 ---
 name: cmp-audit
 description: >-
-  Adversarial audit of one subsystem of a Kotlin/Compose Multiplatform app against its spec
-  AND against platform semantics — the class of defect desktop-tier tests cannot see
-  (alarms, notifications, PendingIntents, channels, reboot, process death, DST). Use this
-  when the user says "audit the notifications", "double check X for bugs", "adversarial
-  review of <subsystem>", "platform audit", "are there latent bugs in the alarms/reminders",
-  "review the scheduling code for edge cases", "would this survive a reboot", or names a
-  subsystem they want interrogated rather than extended. Reads the spec clauses, the
-  implementation across ALL source sets (commonMain AND androidMain/iosMain — platform code
-  is where JVM tests are blind), and the tests; interrogates them with a platform-semantics
-  question bank (identity, lifecycle, cancellation, delivery, state re-ask, permissions,
-  coverage arithmetic); kills its own findings before reporting; and lands each survivor in
-  the project's change flow as a spec amendment + failing-test-first fix proposal or a named
-  human decision — never a direct unreviewed fix to a signed artifact.
+  Adversarial audit of one subsystem of a Kotlin/Compose Multiplatform app against its spec AND
+  against platform semantics — the class of defect desktop-tier tests cannot see (alarms,
+  notifications, PendingIntents, reboot, process death, DST). Use this when the user says "audit the
+  notifications", "double check X for bugs", "adversarial review of <subsystem>", "platform audit",
+  "would this survive a reboot", or names a subsystem they want interrogated rather than extended.
+  Reads spec, implementation across ALL source sets and tests; kills its own findings before
+  reporting; lands each survivor in the change flow as a spec amendment + failing-test-first fix or a
+  named human decision — never a direct unreviewed fix to a signed artifact.
 ---
 
 # cmp-audit — interrogate one subsystem until it confesses

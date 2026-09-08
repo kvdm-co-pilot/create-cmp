@@ -17,9 +17,10 @@
 //   node scripts/stage-gate.mjs          every stage
 //   node scripts/stage-gate.mjs 0        one stage
 //
-// Exit 0 when the named stage passes (or, with no argument, when the first
-// unexited stage's criteria all pass). Exit 1 when a criterion fails. Exit 2
-// when a stage has no predicate — the state this exists to make visible.
+// Exit 0 when the named stage passes — or, with no argument, when EVERY stage
+// passes (all are evaluated and the worst outcome wins). Exit 1 when a
+// criterion fails. Exit 2 when a stage has no predicate — the state this exists
+// to make visible.
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";

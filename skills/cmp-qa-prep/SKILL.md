@@ -1,60 +1,37 @@
 ---
 name: cmp-qa-prep
 description: >-
-  Bring up the E2E test harness for a Kotlin/Compose Multiplatform (CMP/KMP) app — start the
-  Android emulator, install the debug build, and run the bottom-nav smoke (Maestro flows on
-  current scaffolds; a legacy Appium session on pre-Maestro projects). Use this when the user
-  wants to run E2E/device tests on their CMP/KMP app, prepare or set up the
-  KMP test environment, smoke-test a Compose Multiplatform app on an emulator, or asks "run Appium
-  tests on my CMP app", "run maestro on my CMP app", "prep my KMP test environment", "smoke test
-  my Compose Multiplatform app", or "verify my CMP app runs on a device".
-  Assumes the toolchain is already installed (see cmp-doctor) and an app already exists (see
-  cmp-new).
+  Bring up the E2E harness for a Kotlin/Compose Multiplatform app — boot the Android emulator,
+  install the debug build, run the Maestro smoke — or, simpler, run the verify lane, which does all
+  three itself. Use this when the user wants to run E2E/device tests on their CMP/KMP app, "prep my
+  KMP test environment", "smoke test my Compose Multiplatform app", "run maestro on my CMP app", or
+  "verify my CMP app runs on a device". Assumes the toolchain is installed (cmp-doctor) and an app
+  exists (cmp-new).
 ---
 
 # cmp-qa-prep — E2E harness bring-up for a CMP app
 
-> **Which harness? Check the repo first.** Current scaffolds ship **Maestro** (`qa/e2e/*.yaml`) —
-> bring-up is: emulator + `installDebug` + `maestro test qa/e2e/smoke.yaml` (CLI:
-> `curl -fsSL https://get.maestro.mobile.dev | bash`), or simply `node qa/verify.mjs` which runs
-> the whole lane including e2eSmoke. The Appium mechanics below apply only to **legacy
-> pre-Maestro projects** that actually contain `qa/appium/` / `tests/appium/`.
+Current scaffolds ship **Maestro** flows (`qa/e2e/*.yaml`). Two ways to bring the harness up; the
+first is almost always the one you want:
 
-Your job: take an already-scaffolded CMP/KMP project to a running, smoke-passing app on an Android
-emulator. On legacy projects this wraps the template's old `qa/appium/` client + smoke runner and
-`tests/appium/cmp/` config.
+1. **Let the lane do it:** `node qa/verify.mjs`. With nothing attached it boots the project's AVD
+   headless (`CMP_AVD` overrides), installs the debug build, runs every flow in `qa/e2e/`, writes
+   the receipt, and shuts the emulator down. This is the done-gate; a green run here IS the proof.
+2. **By hand, for an interactive session:** check disk first (`df -h ~`, ≥ 3 GB free — Gradle
+   fails with "No space left on device"); `emulator -avd <name>` + `adb wait-for-device` (the AVD
+   `cmp-doctor` created; one AVD per app); `./gradlew :composeApp:installDebug`;
+   `maestro test qa/e2e/smoke.yaml` (CLI: `curl -fsSL https://get.maestro.mobile.dev | bash`).
+   Device proof is a checkpoint, never an inner loop — the project's PreToolUse hook reminds you.
 
-## Preconditions
+Preconditions: toolchain present (JDK, Android SDK + AVD — **cmp-doctor** heals it); a project
+scaffolded with the `e2e` toggle on (otherwise say so — there is no harness to bring up).
 
-- Toolchain present (JDK, Android SDK + AVD, Appium 3.x + `uiautomator2` driver). If not, run
-  **cmp-doctor** first.
-- A scaffolded project with the E2E harness enabled (the `e2e` toggle in **cmp-new** — renamed
-  from `appium` in 0.3.0). If the project was scaffolded with the harness off, say so — there is
-  no harness to bring up.
-
-## Bring-up sequence (legacy Appium path)
-
-1. **Disk check first** (builds fail with "No space left on device"): `df -h ~` — want ≥ 3 GB free.
-2. **Boot an emulator** from the AVD that `cmp-doctor` created (`emulator -avd <name>` /
-   `adb wait-for-device`). Note: the verify lane no longer needs this — with nothing
-   attached it boots that AVD headless itself (`CMP_AVD` overrides), runs every flow in
-   `qa/e2e/`, and shuts the emulator down after. Boot by hand only for an interactive session.
-3. **Build + install** the debug app: `./gradlew :composeApp:installDebug` (exit 0 = success).
-4. **Reverse-port** any local services the harness needs (`adb reverse`), if applicable.
-5. **Start Appium + create a session.** Prefer the Appium MCP tools (`appium_session_management`
-   with `action=create`, UiAutomator2 caps) over raw CLI when an MCP session is available; otherwise
-   start `appium` and connect the harness client in `qa/appium/`.
-6. **Run the smoke** — the sample smoke that asserts the bottom nav renders
-   (`tests/appium/cmp/`). This is the same north-star proof the engine's `--verify` uses.
-
-## Locator hygiene (Appium)
-
-Prefer accessibility id / id over long XPath. Use `scroll_to_element` for off-screen targets rather
-than re-querying. Use gestures for taps/drags. Don't assert on screenshots/pixels — assert on the
-element tree.
+Legacy pre-Maestro scaffolds (`qa/appium/`, `tests/appium/`; the toggle was renamed from `appium`
+in 0.3.0) are not covered here — migrate with **cmp-upgrade**, or see the skill's history.
 
 ## Report
 
-Report: disk headroom, emulator/AVD used, install exit code, Appium session status, and the smoke
-**PASS/FAIL** with the asserted element. On failure, give the concrete next step (e.g. low disk →
-clean Gradle caches; no AVD → run **cmp-doctor**; build error → surface the Gradle failure).
+Disk headroom, emulator/AVD used, install exit code, and the smoke **PASS/FAIL** with the asserted
+element. On failure, the concrete next step: low disk → clean Gradle caches; no AVD → **cmp-doctor**;
+build error → surface the Gradle failure; `device offline` while `adb devices` is fine →
+`adb kill-server && adb start-server`.
