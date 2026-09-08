@@ -62,6 +62,7 @@ import {
 import { PROFILE_PROTOCOL, profileEntryRel } from "../src/lib/profile-loader.mjs";
 import { LOCK_PATH } from "../src/lib/harness-lock.mjs";
 import { SURFACE_CONFIG_REL } from "../src/lib/inputs-hash.mjs";
+import { SOURCE_PATH, resolvedSourceKind } from "../src/lib/harness-source.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** The harness package source — the single source of truth for the vendored bytes. */
@@ -324,13 +325,13 @@ export function seedSurface(root) {
  * tree — the test pins that no profile tool and no profile-coupled lib is in it.
  * @returns {{rel: string, src: string}[]}
  */
-export function vendorPlan() {
+export function vendorPlan(srcRoot = HARNESS_SRC) {
   const out = [];
-  for (const f of fs.readdirSync(HARNESS_SRC).filter((f) => f.endsWith(".mjs")).sort()) {
+  for (const f of fs.readdirSync(srcRoot).filter((f) => f.endsWith(".mjs")).sort()) {
     if (PROFILE_TOOLS.includes(f)) continue;
-    out.push({ rel: `qa/${f}`, src: path.join(HARNESS_SRC, f) });
+    out.push({ rel: `qa/${f}`, src: path.join(srcRoot, f) });
   }
-  const libDir = path.join(HARNESS_SRC, "lib");
+  const libDir = path.join(srcRoot, "lib");
   for (const f of fs.readdirSync(libDir).filter((f) => f.endsWith(".mjs")).sort()) {
     if (PROFILE_LIB.includes(f)) continue;
     out.push({ rel: `qa/lib/${f}`, src: path.join(libDir, f) });
@@ -339,7 +340,7 @@ export function vendorPlan() {
   // in the repo's template: a registry install has no template to read, and an
   // adopter whose qa/evidence/ has no schema beside its receipts got a quieter
   // lane than every stamped app for exactly that reason until 2026-09-08.
-  const schema = path.join(HARNESS_SRC, "..", "evidence", "schema.json");
+  const schema = path.join(srcRoot, "..", "evidence", "schema.json");
   if (fs.existsSync(schema)) out.push({ rel: "qa/evidence/schema.json", src: schema });
   return out;
 }
@@ -803,8 +804,16 @@ export async function runHarnessInit(flags, positional, opts = {}) {
   // place before it is taken. Written through the vendored copy so the lock
   // records what this project actually has, not what this repo has.
   if (!dryRun && !fs.existsSync(path.join(root, LOCK_PATH))) {
-    const { writeHarnessLock } = await import(path.join(root, "qa", "lib", "harness-lock.mjs"));
     const pkg = JSON.parse(fs.readFileSync(path.join(HARNESS_SRC, "..", "package.json"), "utf8"));
+    // PROVENANCE BEFORE THE LOCK. The record is inside the region, so it has to
+    // exist before the region is hashed — otherwise the first `upgrade` reports
+    // it as a new file rather than a changed one, and the lock this install
+    // takes describes a tree the project does not have (ADR-0008).
+    const { writeHarnessSource } = await import(path.join(root, "qa", "lib", "harness-source.mjs"));
+    writeHarnessSource(root, { name: pkg.name, version: pkg.version, source: resolvedSourceKind(root, pkg.name) ?? "local" });
+    written.push(SOURCE_PATH);
+
+    const { writeHarnessLock } = await import(path.join(root, "qa", "lib", "harness-lock.mjs"));
     writeHarnessLock(root, { version: pkg.version });
     written.push(LOCK_PATH);
   }

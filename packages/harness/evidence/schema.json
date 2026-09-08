@@ -266,6 +266,19 @@
         },
         "intact": {
           "type": "boolean"
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "local",
+            "registry",
+            "git",
+            null
+          ],
+          "description": "PROVENANCE (ADR-0008): where this lane's bytes came from \u2014 recorded because the resolver knows it, and never counted as a check by anything. ABSENT means unrecorded, which is what every receipt minted before the field existed is; it must never be read as `local`. With `name` and `version` it is the fetch coordinate a checker needs to know WHICH artifact to compare against `lock.files` \u2014 and whether fetching one is meaningful at all. It is exactly as forgeable as the `version` beside it; a notary that performs the comparison reports that as ITS finding, dated and named, never as a property of this receipt."
         }
       }
     },

@@ -8,6 +8,44 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **`prooflane upgrade` — a core fix reaches an installed lane by ONE command, and the proof is
+  the adopter's tree. Stage 1 EXITS, 4/4.**
+
+  Under ADR-0008 the harness is always vendored, so a fix cannot arrive the way a runtime
+  dependency does: `npm install` moves bytes into `node_modules`; this moves them into the
+  tree. RESOLVE (the newer package, `node_modules` first) → VENDOR (every machine-owned file,
+  replaced wholesale — never the adopter's profile or declarations) → RE-LOCK. Idempotent: the
+  same version rewrites nothing and says so, because an upgrade that rewrites on every run
+  makes its own diff meaningless. A forked spine is restored **loudly** — the files it
+  overwrote are named, since a silent restore hides that someone's local patch is gone.
+
+  **ADR-0008's provenance, landed — and it is what makes criterion D honest rather than
+  clever.** `qa/harness-source.json` records the artifact that was vendored and where it came
+  from (`local` / `registry` / `git`), so a version bump moves that file's bytes and the lock's
+  per-file digests move with it. The tree records, truthfully, which harness it now carries —
+  which is exactly the failure D forbids: a number moving in a manifest while nothing in the
+  tree changes, and every later receipt naming a lane version the tree does not have.
+
+  Three decisions inside that record, each with a failure it prevents:
+
+  - *It lives in the locked region, not in the lock.* The lock cannot hash itself, so a
+    `source` written there sits outside every digest — the one place an editor's change
+    leaves no trace. Inside the region it is inside `lock.files` and `inputs.hash`, so a
+    hand-edited origin FAILs `harnessIntegrity` by name.
+  - *It is machine-owned, NOT adopter-owned.* `HARNESS_DECLARATIONS` is what `relock` may
+    re-baseline; provenance is deliberately in a new `HARNESS_GENERATED` list instead, because
+    an adopter re-locking their own edited origin is the one outcome this must never allow.
+  - *The kind is DERIVED from the adopter's lockfile `resolved` URL, never assumed.* The
+    tempting shortcut — "it is in `node_modules`, so it came from the registry" — is false for
+    a local-tarball install, which is how this repo's own Stage 1 gate installs the harness. A
+    wrong provenance is worse than none: it tells a checker to fetch an artifact that was never
+    published and to conclude something from failing. Unknowable reads as `null`.
+
+  On the receipt, `harness.source` is **omitted when unrecorded** — never defaulted to `local`,
+  which would invent an origin for every receipt minted before the field existed. Nothing gates
+  on it; no verdict, level or ladder reads it (ADR-0008: "recorded because the resolver knows
+  it, and never counted as a check by anything").
+
 - **`prooflane` — the harness's own command, and the reason Stage 1 could not start.**
   `prooflane-harness` shipped a verify lane and no way to install one. The command that writes
   a lane, `harness init`, lived in `src/commands/` of `create-cmp`, so a Go or Python repo that

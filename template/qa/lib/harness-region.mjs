@@ -90,6 +90,27 @@ export const HARNESS_PROFILES_DIR = "qa/lib/profiles";
 export const HARNESS_DECLARATIONS = ["qa/verified-surface.json", "qa/harness-manifest.json"];
 
 /**
+ * MACHINE-OWNED files that are not .mjs and not declarations. Today: the
+ * provenance record (lib/harness-source.mjs) — which artifact was vendored and
+ * where it came from, written by init and rewritten by upgrade.
+ *
+ * It is in the region for one reason: inside it, the record is inside
+ * `lock.files` and inside `inputs.hash`, so a hand-edited origin FAILs
+ * harnessIntegrity by name. Provenance is offered as no kind of check
+ * (ADR-0008), and that is precisely why it must not also be silently editable —
+ * a field nothing verifies and anyone can rewrite is worse than an absent one.
+ *
+ * It is deliberately NOT in HARNESS_DECLARATIONS, though it sits beside them:
+ * that list is what `harness relock` may re-baseline, and an adopter re-locking
+ * their own edited provenance is the one outcome this must never allow.
+ *
+ * Absent is fine everywhere — `listHarnessFiles` lists what exists, so a lane
+ * installed before this file existed has an unchanged region and an unchanged
+ * lock.
+ */
+export const HARNESS_GENERATED = ["qa/harness-source.json"];
+
+/**
  * Of the locked region, WHICH files does the adopter author?
  *
  * The region is one lock but two kinds of file, and conflating them is what
@@ -134,6 +155,7 @@ export function isAdopterOwned(relPath) {
 export function isHarnessFile(relPath) {
   if (typeof relPath !== "string") return false;
   if (HARNESS_DECLARATIONS.includes(relPath)) return true;
+  if (HARNESS_GENERATED.includes(relPath)) return true;
   if (!relPath.endsWith(".mjs")) return false;
   if (relPath.startsWith(`${HARNESS_TEST_DIR}/`)) return true;
   if (relPath.startsWith(`${HARNESS_PROFILES_DIR}/`)) return true;
@@ -181,7 +203,7 @@ export function listHarnessFiles(root) {
   // A declaration directly under qa/ is already seen by the scan above (it is
   // a harness file by name); the explicit loop covers one that lives deeper.
   // Deduplicated so no path is hashed twice.
-  for (const rel of HARNESS_DECLARATIONS) {
+  for (const rel of [...HARNESS_DECLARATIONS, ...HARNESS_GENERATED]) {
     if (fs.existsSync(path.join(root, ...rel.split("/")))) found.push(rel);
   }
   return [...new Set(found)].sort();

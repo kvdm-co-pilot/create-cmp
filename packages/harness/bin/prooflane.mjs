@@ -19,13 +19,8 @@
 //
 //   prooflane init [dir]      install the verify lane into a repo of any stack
 //   prooflane relock [dir]    re-take the lock after editing YOUR profile
+//   prooflane upgrade [dir]   re-vendor the lane from the resolved harness
 //   prooflane --version       the harness version this command installs
-//
-// `upgrade` is deliberately absent rather than stubbed: re-vendoring an
-// installed lane is Stage 1's criteria C and D, and a command that exists but
-// does nothing is worse than one that is honestly missing (an adopter reads a
-// silent success as an upgrade that happened). The unknown-subcommand refusal
-// below names it as not-yet-shipped for exactly that reason.
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -68,7 +63,8 @@ function usage() {
     `\n${colors.bold("prooflane")} — the verify lane, for a repo of any stack\n\n` +
     `  ${colors.bold("Commands")}\n` +
     `    prooflane init [dir]      install the lane, then prove it refuses\n` +
-    `    prooflane relock [dir]    re-take the lock after editing YOUR profile or declarations\n\n` +
+    `    prooflane relock [dir]    re-take the lock after editing YOUR profile or declarations\n` +
+    `    prooflane upgrade [dir]   re-vendor the lane from the installed harness, then re-lock\n\n` +
     `  ${colors.bold("Flags")}\n` +
     `    --profile <id>            the profile id to write (default: the directory name)\n` +
     `    --target-dir <dir>        the project to install into (default: .)\n` +
@@ -107,16 +103,16 @@ async function main() {
     const { runHarnessRelock } = await import("../install/relock.mjs");
     return await runHarnessRelock(flags, positionals[1], { invocation: "prooflane" });
   }
+  if (command === "upgrade") {
+    const { runHarnessUpgrade } = await import("../install/upgrade.mjs");
+    return await runHarnessUpgrade(flags, positionals[1], { invocation: "prooflane" });
+  }
 
-  // Name what exists and what does not. `upgrade` is the one an adopter will
-  // reach for next and the one that is not here yet; saying so is cheaper than
-  // letting them discover it as "unknown subcommand".
   fail(`prooflane: unknown command ${JSON.stringify(command)}`);
   process.stdout.write(
-    `  usage: prooflane init [dir] [--profile <id>] [--dry-run]\n` +
-      `         prooflane relock [dir] [--dry-run]\n\n` +
-      `  ${colors.dim("upgrade is not shipped yet — re-vendoring an installed lane is the next slice.")}\n` +
-      `  ${colors.dim("Until then a stamped app refreshes its lane with `create-cmp upgrade --harness`.")}\n\n`
+    `  usage: prooflane init    [dir] [--profile <id>] [--dry-run]\n` +
+      `         prooflane relock  [dir] [--dry-run]\n` +
+      `         prooflane upgrade [dir] [--dry-run]\n\n`
   );
   return 2;
 }

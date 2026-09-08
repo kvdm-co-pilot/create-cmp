@@ -61,12 +61,75 @@ test("--help lists the commands; a bare invocation is not a success", () => {
   assert.match(bare.stdout, /prooflane init/);
 });
 
-test("an unknown command names what exists AND what does not yet", () => {
-  const r = run(["upgrade"]);
+test("an unknown command is refused by name, and lists the three that exist", () => {
+  // `upgrade` was the honestly-missing one here until it shipped (Stage 1 C/D).
+  // The property that outlives it: a refusal names what you typed and what you
+  // could have typed, rather than leaving you to guess the vocabulary.
+  const r = run(["frobnicate"]);
   assert.equal(r.status, 2);
   const out = r.stdout + r.stderr;
-  assert.match(out, /unknown command "upgrade"/);
-  assert.match(out, /not shipped yet/, "a missing command must be named as missing, never silently unknown");
+  assert.match(out, /unknown command "frobnicate"/);
+  for (const known of ["init", "relock", "upgrade"]) {
+    assert.match(out, new RegExp(`prooflane ${known}`), `the refusal must name ${known}`);
+  }
+});
+
+test("upgrade refuses a project with no lane, and names the command that installs one", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "prooflane-upgrade-"));
+  try {
+    const r = run(["upgrade", "--target-dir", root]);
+    assert.equal(r.status, 2, "upgrading nothing is a refusal, never a silent success");
+    const out = r.stdout + r.stderr;
+    assert.match(out, /no qa\/harness-manifest\.json/);
+    assert.match(out, /prooflane init/);
+    assert.doesNotMatch(out, /create-cmp/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("upgrade is idempotent: same version, nothing rewritten, exit 0", () => {
+  const root = goRepo();
+  try {
+    assert.equal(run(["init", "--target-dir", root]).status, 0);
+    const before = fs.readFileSync(path.join(root, "qa", "harness.lock.json"), "utf8");
+
+    const r = run(["upgrade", "--target-dir", root]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /already at prooflane-harness/, "an upgrade that changes nothing must say so");
+
+    const after = fs.readFileSync(path.join(root, "qa", "harness.lock.json"), "utf8");
+    assert.equal(after, before, "an idempotent upgrade must not rewrite the lock — its diff is the evidence");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("init writes the provenance record, inside the lock and not adopter-owned", async () => {
+  // ADR-0008's `harness.source`: recorded because the resolver knows it, never
+  // counted as a check — and inside the region so a hand-edited origin cannot
+  // pass unnoticed.
+  const root = goRepo();
+  try {
+    assert.equal(run(["init", "--target-dir", root]).status, 0);
+    const rec = JSON.parse(fs.readFileSync(path.join(root, "qa", "harness-source.json"), "utf8"));
+    assert.equal(rec.schema, "prooflane-harness-source/1");
+    assert.equal(rec.name, "prooflane-harness");
+    assert.equal(rec.version, PKG.version, "the record names the artifact actually vendored");
+    assert.ok(["local", "registry", "git", null].includes(rec.source));
+
+    const lock = JSON.parse(fs.readFileSync(path.join(root, "qa", "harness.lock.json"), "utf8"));
+    assert.ok(lock.files["qa/harness-source.json"], "provenance must be inside the lock, or editing it leaves no trace");
+
+    const { isAdopterOwned } = await import("../packages/harness/src/lib/harness-region.mjs");
+    assert.equal(
+      isAdopterOwned("qa/harness-source.json"),
+      false,
+      "relock re-baselines what the adopter owns; a forged origin must never be re-lockable",
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("init writes a working lane into a foreign repo and never names create-cmp", () => {
