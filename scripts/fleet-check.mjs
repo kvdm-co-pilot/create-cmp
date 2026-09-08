@@ -308,6 +308,13 @@ async function main() {
   }
   const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
   const rung = levelFromReceipt(receipt);
+  // WHICH PACK GRADED IT. A rung is comparable only within its pack (§8.9): a
+  // `cmp` L2 and a backend pack's L2 are different claims, so `rung >= L2` is
+  // an incomplete sentence until the grader is named. This check compares one
+  // receipt against a threshold the caller chose FOR that pack, which is
+  // legitimate — but only while the pack is visible in the comparison, the
+  // output and the record. It was in none of the three.
+  const packId = typeof receipt.pack?.id === "string" ? receipt.pack.id : null;
   const failures = [];
   if (receipt.verdict !== "PASS") failures.push(`lane verdict is ${receipt.verdict}, not PASS`);
   if (rung === null) {
@@ -316,7 +323,17 @@ async function main() {
     // no evidence.
     failures.push(`receipt earned no evidence rung (mode ${receipt.mode ?? "full"}) — required >=${minLevel}`);
   } else if (compareLevels(rung, minLevel) < 0) {
-    failures.push(`evidence rung ${rung} is below the required minimum ${minLevel}`);
+    failures.push(`evidence rung ${rung} (pack ${packId ?? "unnamed"}) is below the required minimum ${minLevel}`);
+  } else if (!packId) {
+    // A rung that passes a threshold while naming no grader is the overclaim
+    // this whole ladder exists to prevent: it reads as "L2" and means "L2 by
+    // some pack". Not a FAIL — the lane really did run and really did earn the
+    // rung — but it must never be quoted as a comparable result, so it is said
+    // out loud rather than passing silently.
+    process.stdout.write(
+      `\n  ${"note:"} the receipt names no pack, so this rung is not comparable to any other repo's.\n` +
+      `        The lane earned it; nothing can say it earned the SAME thing (NORTH-STAR §8.9).\n`,
+    );
   }
 
   // 4. Report: compact step table + rung + summary.
@@ -331,10 +348,11 @@ async function main() {
   const rungName = carried && receipt.evidenceLevel?.name ? ` ${receipt.evidenceLevel.name}` : "";
   process.stdout.write(
     `\n  rung: ${rungLabel}${rungName}${provenance}` +
+    ` | pack: ${packId ?? "unnamed"}` +
     ` | required: >=${minLevel} | verdict: ${receipt.verdict}\n`
   );
 
-  writeFleetRecord({ receipt, rung, minLevel, failures, avd: process.env.CMP_AVD ?? null });
+  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null });
 
   if (failures.length) {
     process.stderr.write(`\nfleet check: FAIL\n`);
@@ -366,7 +384,7 @@ async function main() {
  * Lives under qa/evidence/, which inputs-hash excludes as lane output, so
  * recording a run never invalidates a receipt.
  */
-export function writeFleetRecord({ receipt, rung, minLevel, failures, avd, root = REPO_ROOT }) {
+export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failures, avd, root = REPO_ROOT }) {
   const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
   const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
   const record = {
@@ -374,6 +392,10 @@ export function writeFleetRecord({ receipt, rung, minLevel, failures, avd, root 
     ranAt: new Date().toISOString(),
     verdict: failures.length ? "FAIL" : "PASS",
     rung,
+    // Recorded beside the rung so a later reader — proof-plan's discharge, the
+    // fit test, a fleet view — never has to compare two rungs without knowing
+    // whether they are comparable at all.
+    pack,
     requiredLevel: minLevel,
     failures,
     avd,

@@ -510,9 +510,15 @@ whole reason a second profile had to run.
   renderer-only fix would have printed "pack unnamed" over every real `cmp` receipt — a false
   statement, strictly worse than the bare rung. The class was found by a deny-by-default scan of the
   console directory, after a hand-enumerated list said five, named six and missed the seventh.
-  **Still open outside the console:** `lib/flight-recorder.mjs` stores and prints a rung with no
-  pack, and `scripts/fleet-check.mjs` compares a rung to `--min-level` without asking which pack
-  graded it — a cross-pack comparison §8.9 forbids, in a script that runs today.
+  **Closed outside the console 2026-09-09.** `lib/flight-recorder.mjs` records the pack beside the
+  rung, and its `highestRung` is computed PER PACK — that one was not a missing label but a wrong
+  answer: the maximum was taken over every journal entry, so a journal holding a `cmp` L2 beside a
+  backend pack's L1 reported "L2" as though one number described both. Two packs now have no single
+  highest, and each is printed on its own; an entry predating pack recording is `unattributed`,
+  never credited to whichever pack is present. `scripts/fleet-check.mjs` names the grader in the
+  comparison, the output and the record, and says out loud when a receipt names no pack — the lane
+  earned the rung, and nothing can say it earned the SAME thing. Pinned by
+  `test/rung-comparability.test.mjs`.
 - **`pack.version` inherited the harness lock's number** (against ADR-0008): a profile declaring
   0.3.1 minted receipts saying 0.20.0. **Closed 2026-09-08** with the ADR's acceptance —
   `verify.mjs::pack` records the profile's own `export const version`, or null, never a version of
