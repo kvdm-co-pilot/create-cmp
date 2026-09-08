@@ -664,6 +664,9 @@ const flight = noJournal
         mode,
         verdict,
         evidenceLevel: level,
+        // The grader travels with the grade — §8.9's comparability rule is
+        // unenforceable in a journal that records rungs without packs.
+        pack: { id: pack.id },
         steps,
         sha: receipt.commit.sha,
         durationMs: Date.now() - laneStartedAt,

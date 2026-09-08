@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **A rung is comparable only within its pack — the last two places that broke it, both of which
+  ran on every device check (§8.9, §9.2).**
+
+  `scripts/fleet-check.mjs` compared a rung to `--min-level` without asking which pack graded it.
+  It now names the grader in the comparison, the output and the record — and when a receipt names
+  no pack it says so out loud: the lane earned the rung, and nothing can say it earned the *same*
+  thing.
+
+  **The flight recorder's was the sharper one, because it was not a missing label but a wrong
+  answer.** `highestRung` took the maximum over every journal entry, so a journal holding a `cmp`
+  L2 beside a backend pack's L1 reported **"L2"** as though one number described both. The fix is
+  not a smarter sort — it is refusing to put two incomparable claims in one ordering: the highest
+  is computed per pack, two packs have no single highest, and each is printed on its own. An entry
+  written before packs were recorded is `unattributed`, never quietly credited to whichever pack
+  happens to be present.
+
 - **A stamped app records its provenance too — the other front door had the defect Stage 1 D
   forbids.** `prooflane upgrade` moved an adopter's per-file lock digests on a version bump;
   `create-cmp upgrade --harness` moved a stamped app's lock `version` and not one digest, which is
