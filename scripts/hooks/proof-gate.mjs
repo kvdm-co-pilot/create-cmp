@@ -22,8 +22,19 @@
 //     gh pr merge       REFUSED while the tier is owed. The slice closes at merge, so
 //                       this is where "once, at slice close" is collected.
 //     gh pr create      allowed, reminded.
+//     npm publish       REFUSED unless on a clean trunk with a fleet record that is PASS at
+//                       L2 on THIS tree — the npm-publish skill's steps 1 and 2, which were
+//                       prose, and 0.11.0 shipped a release build nobody had run.
 //     anything else     silent, and cheap: nothing is imported before a match, so an
 //                       ordinary Bash call pays node's startup and no more.
+//   PostToolUse (Bash)  after `gh pr merge`, the finished slice's plan is closed, so it is
+//                       never found lying around by the next one.
+//
+// ONE EXCEPTION, and why it is not a hole: a device run on a clean TRUNK is allowed.
+// Trunk owes nothing per slice, so by the rule above the run would be refused as
+// waste — but a release proof over trunk is exactly what publishing needs, and it
+// is the release manager's explicit act, not an inner loop. `proof-plan` marks
+// that state `trunk`; a docs-only branch is not trunk and is still refused.
 //
 // A matched command the gate cannot answer is REFUSED (exit 2, reason on stderr):
 // "I could not check" is not "I checked". An unmatched command never reaches code
@@ -56,6 +67,7 @@ export const WATCHED = Object.freeze({
   device: invocation("node\\s+(?:\\S*/)?fleet-check\\.mjs"),
   merge: invocation("gh\\s+pr\\s+merge"),
   create: invocation("gh\\s+pr\\s+create"),
+  publish: invocation("npm\\s+publish"),
 });
 
 export function classify(command) {
@@ -76,11 +88,12 @@ const DECLARE = 'node scripts/proof-plan.mjs --open "<what you are building>" (o
  * of them contains the word REQUIRED — that is the word an agent acted on three
  * times in one session, and a test pins its absence.
  */
-export function decide(kind, o, tiers) {
+export function decide(kind, o, tiers, ctx) {
   const cmd = tiers?.device?.cmd ?? "the fleet check";
   if (kind === "device") {
     switch (o.state) {
       case "none":
+        if (o.trunk) return allow(`nothing is owed per slice — this is trunk — so this can only be a RELEASE proof (npm-publish skill step 2): allowed. Then npm publish reads its record.`);
         return deny(`nothing is owed — ${o.need.reason}. A device run over this tree proves nothing this slice needs (GATE-RULES Rule 4: the tier runs once, at the close of a slice that changed something it can see).`);
       case "discharged":
         return deny(`already discharged for this exact tree at ${o.plan.discharged.at} (verdict ${o.plan.discharged.verdict}, rung ${o.plan.discharged.rung ?? "none"}). A second run over the same bytes is the 2026-09-08 defect; had a trigger path moved, the state would read REOPENED.`);
@@ -104,12 +117,41 @@ export function decide(kind, o, tiers) {
         return SILENT;
     }
   }
+  if (kind === "publish") {
+    // The npm-publish skill's first two steps, as a program: clean trunk, and a
+    // fleet record that is PASS at L2 on these exact bytes. Read, never asserted.
+    if (!o.trunk) {
+      const where = o.branch === "main" ? "main, but with commits or edits not yet on origin/main — publish only what is merged" : `${o.branch || "a detached HEAD"}, not main`;
+      return deny(`publish only from a clean main — this is ${where}${o.state === "none" ? "" : `; the device tier is ${o.state.toUpperCase()} here`} (npm-publish skill step 1).`);
+    }
+    const r = ctx?.record;
+    if (!r) return deny(`no fleet record — run ${cmd} first; a release proof is read from its record, never asserted (npm-publish skill step 2).`);
+    if (r.observedHash !== ctx.now) return deny(`the fleet record describes another tree (${String(r.observedHash).slice(0, 7)} → ${String(ctx.now).slice(0, 7)}) — run ${cmd} on this one.`);
+    if (r.verdict !== "PASS") return deny(`the fleet record on this tree is ${r.verdict}, not PASS — the scratch app is the crime scene; do not bump the version.`);
+    const rung = Number(String(r.rung ?? "").replace(/^L/, ""));
+    if (!(rung >= 2)) return deny(`the fleet record on this tree is rung ${r.rung ?? "none"} — a release requires L2: attach an emulator and run ${cmd}.`);
+    return allow(`release proof on this tree: ${r.verdict} at ${r.rung}, ran ${r.ranAt}.`);
+  }
   if (kind === "create") {
     return o.state === "owed" || o.state === "reopened" || o.state === "undeclared"
       ? allow(`reminder: the device tier is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${cmd}, then node scripts/proof-plan.mjs --discharge). Open the PR, finish everything else, run the tier last.`)
       : SILENT;
   }
   return SILENT;
+}
+
+/** The fleet record and the hash of the tree it would have to describe. */
+async function releaseContext() {
+  const fs = await import("node:fs");
+  const { observedTreeHash, DEVICE_TIER_TRIGGERS } = await import("../observed-tree.mjs");
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+  let record = null;
+  try {
+    record = JSON.parse(fs.readFileSync(path.join(root, "qa-artifacts", "fleet-latest.json"), "utf8"));
+  } catch {
+    record = null;
+  }
+  return { record, now: observedTreeHash(root, DEVICE_TIER_TRIGGERS) };
 }
 
 function readStdin() {
@@ -141,12 +183,25 @@ async function main() {
     // Matched. From here on, a failure is a refusal.
     try {
       const { obligation, TIERS } = await import("../proof-plan.mjs");
-      const d = decide(kind, obligation(), TIERS);
+      const d = decide(kind, obligation(), TIERS, kind === "publish" ? await releaseContext() : undefined);
       if (d.action === "silent") return;
       emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: d.action, permissionDecisionReason: d.reason } });
     } catch (e) {
       process.stderr.write(`proof gate could not answer for "${kind}": ${e?.message ?? e} — refusing rather than allowing\n`);
       process.exit(2);
+    }
+    return;
+  }
+
+  if (event === "PostToolUse") {
+    if (input.tool_name !== "Bash" || classify(String(input.tool_input?.command ?? "")) !== "merge") return;
+    // Best effort and read-only in effect: close() removes the plan only when
+    // nothing is owed, which after a merge the gate allowed is always true.
+    try {
+      const { close } = await import("../proof-plan.mjs");
+      close();
+    } catch {
+      /* a failed close leaves the plan, which the next session names as stale */
     }
     return;
   }

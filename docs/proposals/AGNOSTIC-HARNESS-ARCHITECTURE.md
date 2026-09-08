@@ -808,15 +808,16 @@ copy now match upstream, or is the difference entirely inside their profile?" is
 diff, not an opinion.
 
 **Invariant:** the mobile offering never regresses. Gated as decision 4 says —
-`scripts/fleet-check.mjs --min-level L2` green **once per PR**; the full suite and
-`scripts/framework-check.mjs` green **on every commit**. De-fork count in every PR
+the device tier discharged **once, at each slice's close** (GATE-RULES Rule 4 —
+`node scripts/proof-plan.mjs` says what a slice owes and when, and the hook enforces it); the
+full suite and `scripts/framework-check.mjs` green **on every commit**. De-fork count in every PR
 description. Any single step past two days: stop and re-slice.
 
 ### 11.2 Stages and triggers
 
 | Stage | Work | Exit criterion | Trigger |
 |---|---|---|---|
-| **0 — the lane seam** ✅ *implemented 2026-09-04; not yet EXITED* | All seven numbered steps landed (§11.3), one PR each, fleet L2 green per PR. `pack` in receipts; manifest v2 + loader with absent-manifest refusal; the Compose glue, ladder, Maestro helpers, component-stories, androidChecksOutcome and the plant source in `profiles/cmp/`; `spec-coverage`, `approvals`, `affected-tests`, `feature-brief`, `receipt-check`, the lane marker, the watcher, the chain view and `--help` all reading the profile. Fifteen core modules held to the no-stack-facts lint. | **MEASURED 2026-09-04 — the seam holds.** A Ktor backend (`fuelled-api`) authored a profile and ran a green lane with **zero edits to this repo**, verified by `git status --porcelain` at both ends. Rule 0 went green on the second stack in 1.2 s; the tier gate and the Stop hook fired correctly on a stack they had never seen. ~~De-fork ≤ 3 against the blueprint~~ is **retired**: that repo is a separate track and is not re-vendoring until this work is done. **Stage 0 still does not exit**, because the report also showed the only documented entrance for a non-Compose repo is a closed loop. New exit: a profile authored from `harness init` output and the README *without opening core source* (`PACKAGE-SPLIT.md` A5). | **taken** — a dependency-direction fix, not a port |
+| **0 — the lane seam** ✅ *implemented 2026-09-04; not yet EXITED* | All seven numbered steps landed (§11.3), one PR each, the device tier discharged at each slice's close. `pack` in receipts; manifest v2 + loader with absent-manifest refusal; the Compose glue, ladder, Maestro helpers, component-stories, androidChecksOutcome and the plant source in `profiles/cmp/`; `spec-coverage`, `approvals`, `affected-tests`, `feature-brief`, `receipt-check`, the lane marker, the watcher, the chain view and `--help` all reading the profile. Fifteen core modules held to the no-stack-facts lint. | **MEASURED 2026-09-04 — the seam holds.** A Ktor backend (`fuelled-api`) authored a profile and ran a green lane with **zero edits to this repo**, verified by `git status --porcelain` at both ends. Rule 0 went green on the second stack in 1.2 s; the tier gate and the Stop hook fired correctly on a stack they had never seen. ~~De-fork ≤ 3 against the blueprint~~ is **retired**: that repo is a separate track and is not re-vendoring until this work is done. **Stage 0 still does not exit**, because the report also showed the only documented entrance for a non-Compose repo is a closed loop. New exit: a profile authored from `harness init` output and the README *without opening core source* (`PACKAGE-SPLIT.md` A5). | **taken** — a dependency-direction fix, not a port |
 | **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; **backend provider sketched on paper as the interface test**; console + MCP server move into the harness; section types formalised behind `console-tabs.mjs`; tool listing profile-driven; `cmp` providers extracted; neutral skills moved. | The console renders a stamped Compose app exactly as today, and renders a manifest-only backend fixture with every section present and honest. | Stage 0 exit — and **before** Stage 1, so the package boundary is drawn with the console inside |
 | **1 — distribution** | Harness as its own package (console included); `create-cmp-cli` depends on it. Lock = stamper-written manifest (§10.2). Pin + fetch + cache as an *option*; vendored stays default. | A backend repo installs the harness without create-cmp. A core fix reaches it by version bump. | Stage 0.5 exit; **ADR signed** on what a pinned receipt means (§14) |
 | **2 — profiles as artifacts** | Profile versioning + protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`. Governance rows in the router from the profile. | A second profile authored by someone who is not Karel passes framework-check and mints a receipt Gatekeeper accepts. | a second external profile, **or** the §6 pinned issue |
@@ -972,7 +973,7 @@ second profile exists.
    No profile-owned tabs.
 3. **No default profile.** An absent manifest is refused and the user is told how to
    make one — derived for stamped apps, interviewed for foreign repos (§4.1).
-4. **Stage 0 starts**, gated as §11.1: fleet L2 per PR, suite + framework-check per
+4. **Stage 0 starts**, gated as §11.1: the device tier at slice close (Rule 4), suite + framework-check per
    commit, de-fork count in every description.
 
 **Open:**

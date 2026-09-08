@@ -90,6 +90,11 @@ fresh app and runs its Gradle lane — expect several minutes, more on a cold Gr
 **STOP on failure.** The scratch dir is kept and its path printed — that is the crime scene. Do
 not proceed to the version bump until the fleet check passes.
 
+**Enforced, not remembered.** `scripts/hooks/proof-gate.mjs` allows this run on a clean `main`
+— trunk owes nothing per slice, so a release proof is the one legitimate device run without a
+slice (GATE-RULES Rule 4) — and **refuses `npm publish`** unless the record this run writes is
+PASS at L2 on this exact tree. Steps 1 and 2 are checked by the program; this text explains them.
+
 ### 3. Auth check
 
 ```bash
