@@ -1,7 +1,8 @@
 | **grill-me** | Settle the load-bearing questions **before** the first line of work — the decide step's opening act. Fires at genesis (before the intent interview) and on every brief-lane request (before the brief is drafted); `/grill-me` on demand. | Reads what the repo already answers (signed briefs and specs are closed — cited, never re-asked) → asks the *frontier* of unsettled decisions in numbered rounds of ≤5, each with why it matters and a recommended answer → waits → stops when no answer would change the work. No new artifact: settled answers become the brief's Decisions with their why, the human's own calls its Open decisions; the signature closes them. Never grills the direct lane, a bug fix, or a spike. |
 # create-cmp — the complete usage guide
 
-> **Read this first.** It is the single entry point to the whole product: setup, the engine CLI,
+> **Read this first to USE the product** (contributors: `docs/NORTH-STAR.md` governs — §12). It is
+> the single entry point to the whole product: setup, the engine CLI,
 > the 11 skills, the `cmp-inspector` MCP (15 tools), and the workflows that tie them together. An
 > agent that reads this knows how to drive create-cmp end to end. Concise by section, exhaustive in
 > total. Companion deep-dives are cross-linked; you rarely need them.

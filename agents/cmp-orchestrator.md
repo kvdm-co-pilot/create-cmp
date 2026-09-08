@@ -70,10 +70,9 @@ Nothing is "done" until it passes the project's own gates, run by YOU:
 Re-run the gate independently after a delegate reports success — do not take its word for green.
 
 ## Device and Gradle-heavy proof — batch it, once, last
-The device (emulator/real hardware) and the full Gradle lane are the scarcest, slowest,
-most fragile resources this harness touches — one device per machine, minutes per full
-run. They are a **checkpoint**, never an inner-loop gate, at the orchestrator level exactly
-as much as at the agent level:
+The stamped app's `CLAUDE.md` (*Definition of done*) and its hooks own this rule — the full
+lane is a checkpoint, never an inner loop — and it is not restated here. What changes when
+the loop has an orchestrator is only this:
 - **Never brief a subagent to run the full device/release lane** (`node qa/verify.mjs`
   with no `--fast`, `connectedDebugAndroidTest`, a Maestro flow) **as its own per-task
   proof**, and never dispatch two subagents whose briefs both touch the device or Gradle

@@ -18,7 +18,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { obligation, TIERS, isTrunk } from "../scripts/proof-plan.mjs";
+import { obligation, TIERS, isTrunk, close } from "../scripts/proof-plan.mjs";
 import { render } from "../scripts/fit-test.mjs";
 
 /** A slice is a branch — a plan is bound to the one it was opened on. */
@@ -148,6 +148,18 @@ test("a tree that IS trunk owes nothing — the 2026-09-08 audit found a clean m
   assert.equal(o.state, "none");
   assert.equal(o.need.required, false);
   assert.match(o.need.reason, /trunk/);
+  assert.equal(o.trunk, true, "and says so as data, because the hook treats trunk-none differently from docs-only-none");
+  assert.equal(obligation(null, DOCS_ONLY, BRANCH).trunk, undefined, "a docs-only branch is not trunk");
+});
+
+test("close(): refuses while anything is owed, and only removes a plan when there is one to remove", () => {
+  // Never exercised against the live plan file — the removing branch needs a
+  // plan or a stale plan in the obligation, and neither is handed in here.
+  assert.equal(close({ state: "owed", plan: slice(), stale: null }).closed, false);
+  assert.equal(close({ state: "reopened", plan: slice(), stale: null }).closed, false);
+  const r = close({ state: "none", plan: null, stale: null });
+  assert.equal(r.closed, true);
+  assert.equal(r.removed, false, "nothing to remove");
 });
 
 test("but a diff git could NOT determine still fails open — 'could not tell' is not 'nothing changed'", () => {

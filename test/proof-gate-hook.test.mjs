@@ -32,12 +32,15 @@ test("classify: an INVOCATION matches; a mention never does", () => {
     [`echo $(node ${FC})`, "device"],
     ["gh pr merge 85 --rebase --delete-branch", "merge"],
     ["git push -u origin HEAD && gh pr create --title x --body y", "create"],
+    ["npm publish --access public", "publish"],
+    ["cd packages/harness && npm publish", "publish"],
     // Mentions. The first two are how this file's own author got refused.
     [`echo '{"command":"node ${FC}"}'`, null],
     [`python3 - <<'EOF'\nold = "node ${FC}"\nEOF`, null],
     [`cat ${FC}`, null],
     [`grep -n "node ${FC}" docs/X.md`, null],
     ['git commit -m "then gh pr merge"', null],
+    ['echo "npm publish is step 4"', null],
     ["npm test", null],
     ["", null],
   ];
@@ -68,6 +71,32 @@ test("device run: refused when nothing is owed, already discharged, or undeclare
     assert.match(d.reason, /LAST gate/, "and says it is the last one");
   }
   assert.equal(decide("device", o("something-new"), TIERS).action, "deny", "an unknown state refuses rather than guesses");
+
+  // The one exception: nothing owed because this IS trunk. A docs-only branch
+  // owes nothing and is refused as waste; a clean main owes nothing per slice
+  // and the only reason to run there is a release proof, which is allowed.
+  const trunk = decide("device", o("none", { trunk: true }), TIERS);
+  assert.equal(trunk.action, "allow");
+  assert.match(trunk.reason, /RELEASE/);
+});
+
+test("npm publish: the publish skill's first two steps as a program — clean trunk, and a PASS L2 record on THIS tree", () => {
+  const now = "c".repeat(40);
+  const rec = (over = {}) => ({ observedHash: now, verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", ...over });
+  const onTrunk = o("none", { trunk: true, branch: "main" });
+
+  assert.match(decide("publish", o("none", { branch: "feat/x" }), TIERS, { record: rec(), now }).reason, /clean main/, "not trunk");
+  assert.match(decide("publish", o("owed", { branch: "feat/x" }), TIERS, { record: rec(), now }).reason, /OWED/, "and says what the branch still owes");
+  assert.equal(decide("publish", onTrunk, TIERS, { record: null, now }).action, "deny", "no record");
+  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ observedHash: "d".repeat(40) }), now }).reason, /another tree/);
+  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ verdict: "FAIL" }), now }).reason, /FAIL, not PASS/);
+  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ rung: "L1" }), now }).reason, /requires L2/);
+  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ rung: null }), now }).reason, /rung none/);
+
+  const ok = decide("publish", onTrunk, TIERS, { record: rec(), now });
+  assert.equal(ok.action, "allow");
+  assert.match(ok.reason, /PASS at L2/);
+  assert.equal(decide("publish", onTrunk, TIERS, { record: rec({ rung: "L3" }), now }).action, "allow", "a higher rung is not a lower one");
 });
 
 test("gh pr merge: refused while the tier is owed — the slice closes here, so this is where it is collected", () => {
@@ -89,9 +118,9 @@ test("gh pr create: reminded, never blocked — the PR is the review surface, th
 });
 
 test("no decision ever says REQUIRED — that is the word an agent acted on three times", () => {
-  for (const kind of ["device", "merge", "create"]) {
+  for (const kind of ["device", "merge", "create", "publish"]) {
     for (const s of ["none", "undeclared", "owed", "discharged", "reopened"]) {
-      const d = decide(kind, o(s), TIERS);
+      const d = decide(kind, o(s), TIERS, { record: null, now: "x" });
       assert.ok(!/REQUIRED/.test(d.reason ?? ""), `${kind}/${s}: ${d.reason}`);
     }
   }
@@ -113,6 +142,18 @@ test("protocol: unmatched and malformed input are silent, exit 0, and cheap — 
 
   const other = run(JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: FC } }));
   assert.equal(other.stdout, "", "only Bash is watched");
+});
+
+test("protocol: PostToolUse after a merge closes the slice's plan, and is otherwise silent", () => {
+  // No plan is open on the live tree during the suite (these tests never write
+  // one), so the observable here is the protocol: exit 0, nothing on stdout,
+  // and no complaint — a failed close leaves the plan for the next session to
+  // name as stale, never blocks.
+  const post = (command) => run(JSON.stringify({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command }, tool_response: { stdout: "" } }));
+  const merged = post("gh pr merge 86 --rebase --delete-branch");
+  assert.equal(merged.status, 0, merged.stderr);
+  assert.equal(merged.stdout, "");
+  assert.equal(post("npm test").stdout, "");
 });
 
 test("protocol: a matched command answers in Claude Code's PreToolUse shape, from the live tree", () => {

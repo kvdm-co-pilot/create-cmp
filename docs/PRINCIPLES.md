@@ -5,9 +5,10 @@
 > the episode that produced it and its enforcement. Seven rules, each with the
 > episode that produced it, what it requires, and how it is enforced. Written 2026-09-03 from
 > two days in which every one of these was violated at least once and each violation cost
-> hours. **Read this first in any session touching the harness, the console, or a project's
-> `qa/`.** The one-line form is carried into every session by `CLAUDE.md` and re-told every
-> prompt by the inject, because a principle that lives only in a document is a principle that
+> hours. **Read this after `docs/NORTH-STAR.md`, which governs (§12), in any session touching the
+> harness, the console, or a project's `qa/`.** A stamped app's `CLAUDE.md` carries the one-line
+> forms into its sessions; this repo's own `CLAUDE.md` carries only the document map and the
+> programs that enforce, because a principle that lives only in a document is a principle that
 > gets performed.
 
 The essence these serve: **a spec-driven workflow with automated proof, in which agents move

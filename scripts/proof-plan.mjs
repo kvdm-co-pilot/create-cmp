@@ -151,8 +151,12 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
 
   if (Array.isArray(paths) && paths.length === 0) {
     const where = branch ? ` (${branch})` : "";
+    // `trunk` is read by the hook: "none because the diff is docs-only" makes a
+    // device run pure waste, while "none because this IS trunk" is the one
+    // place a device run is legitimate without a slice — a release proof.
     return {
       state: "none",
+      trunk: true,
       ...base,
       need: { required: false, obliging: [], reason: `nothing has changed since origin/main and the working tree is clean — this tree is trunk${where}, and whatever it owed was collected when its slice merged` },
     };
@@ -169,6 +173,18 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
   // is the point: an agent that edits after the last gate should be told it has
   // reopened the slice, not silently charged for another emulator.
   return { state: "reopened", need, ...base, now };
+}
+
+/**
+ * Close the slice: remove the plan when nothing is owed. The merge hook calls
+ * this after `gh pr merge` so a finished slice's plan never lies around to be
+ * named stale by the next one — the 2026-09-08 audit found PR #84's still there.
+ */
+export function close(o = obligation()) {
+  const settled = o.state === "none" || o.state === "discharged";
+  const had = Boolean(o.plan || o.stale);
+  if (settled && had) fs.rmSync(PLAN_PATH, { force: true });
+  return { closed: settled, removed: settled && had, state: o.state };
 }
 
 export function render(o) {
@@ -280,8 +296,7 @@ function main() {
   const o = obligation();
   if (flag("--close") !== -1) {
     process.stdout.write(`${render(o)}\n`);
-    if (o.state === "none" || o.state === "discharged") {
-      if (o.plan) fs.rmSync(PLAN_PATH, { force: true });
+    if (close(o).closed) {
       process.stdout.write("\nslice closed — nothing owed.\n");
       process.exit(0);
     }

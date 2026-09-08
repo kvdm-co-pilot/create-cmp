@@ -2,6 +2,9 @@
 
 - **Status:** proposed
 - **Date:** 2026-09-06
+- **Related:** GATE-RULES Rule 4 (landed 2026-09-08) is the harness-side half of this idea — WHEN
+  a tier is due (`scripts/proof-plan.mjs`, enforced by `scripts/hooks/proof-gate.mjs`). This ADR
+  is the adopter-lane half: WHETHER, and what a deferral is allowed to claim.
 
 ## Context
 

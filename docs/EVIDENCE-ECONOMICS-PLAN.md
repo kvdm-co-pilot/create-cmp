@@ -5,7 +5,8 @@
 being done, in what order, by which session, with what proof — so every session working on or
 with the harness (create-cmp, create-cmp-showcase, payment-blueprint) reads the same state.
 
-**Any session touching the lane, the console, approvals, or spec coverage reads this first.**
+**Any session touching the lane, the console, approvals, or spec coverage reads this — after
+`docs/NORTH-STAR.md`, which governs and is the one document read first (§12).**
 Update the status column when a slice lands. One slice per commit. A slice is not "landed"
 until its planted-failure proof is in the suite.
 
