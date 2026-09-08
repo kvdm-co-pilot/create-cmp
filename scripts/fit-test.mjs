@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
 import { observedTreeHash, DEVICE_TIER_TRIGGERS, DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
+import { obligation } from "./proof-plan.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FLEET_RECORD = path.join(REPO_ROOT, "qa-artifacts", "fleet-latest.json");
@@ -104,7 +105,8 @@ function collect({ run }) {
   const suite = run ? parseSuite(sh("npm", ["test"]).stdout ?? "") : null;
   const fc = run ? parseFrameworkCheck(sh("node", ["scripts/framework-check.mjs"]).stdout ?? "") : null;
   const paths = changedPaths();
-  return { suite, frameworkCheck: fc, device: deviceTierRequired(paths), fleet: readFleetRecord(), changed: paths.length };
+  const device = deviceTierRequired(paths);
+  return { suite, frameworkCheck: fc, device, owed: obligation(undefined, paths), fleet: readFleetRecord(), changed: paths.length };
 }
 
 function render(d) {
@@ -118,14 +120,35 @@ function render(d) {
   // first version rebuilt it from a path list and produced "REQUIRED —  moved"
   // whenever the honest answer was a fail-open one, throwing away the only
   // sentence a reader could argue with.
-  L.push(`   fleet L2          ${d.device.required ? "REQUIRED" : "not required"} — ${d.device.reason}`);
+  // WHETHER and WHEN are two questions, and printing only the first is what
+  // made this line cost three emulator runs in one session on 2026-09-08. It
+  // said REQUIRED the moment any commit touched the harness source; an agent
+  // reading that at the moment of decision ran the device suite, and one of
+  // those runs was triggered by a comment. The word REQUIRED is gone on
+  // purpose: this now routes through scripts/proof-plan.mjs, which says WHEN,
+  // and whose whole answer to a mid-slice commit is "not now".
+  // A caller that hands over no schedule is not silently given the old
+  // behaviour: an obligation whose timing nobody declared is UNDECLARED, which
+  // reads as "declare the slice", never as "run it now".
+  const state = d.owed ? d.owed.state : d.device.required ? "undeclared" : "none";
+  const owed = { none: "not required", undeclared: "OWED — no slice declared", owed: "OWED — at slice close, NOT NOW", discharged: "DISCHARGED", reopened: "REOPENED — a trigger moved after the run" }[state];
+  L.push(`   fleet L2          ${owed} — ${d.device.reason}`);
   if (d.fleet.present) {
     const r = d.fleet.record;
     const dev = r.steps.filter((s) => ["e2eSmoke", "androidChecks"].includes(s.name));
     L.push(`                     ${r.verdict} · rung ${r.rung ?? "none"} (required >=${r.requiredLevel})${dev.length ? ` · ${dev.map((s) => `${s.name} ${(s.durationMs / 1000).toFixed(1)}s`).join(", ")}` : ""}`);
     L.push(`                     ${d.fleet.current ? "ran against this exact code ✓" : `STALE — ${d.fleet.staleReason}`}${r.treeWasDirty ? " · tree was dirty when it ran" : ""}`);
   } else if (d.device.required) {
-    L.push("                     NO RECORD — a device run is required and none is recorded for this tree");
+    // HOW LOUD depends on WHEN, and that is the whole fix. Mid-slice an absent
+    // record is the expected state and saying NO RECORD there is what made an
+    // agent go and buy one. At close — or with no slice declared — an absent
+    // record is the failure mode this line has always existed to break, so it
+    // keeps shouting.
+    L.push(
+      state === "owed"
+        ? "                     no record yet — expected mid-slice; it is due at close"
+        : "                     NO RECORD — a device run is due and none is recorded for this tree",
+    );
   }
 
   L.push("\n7. Mobile");

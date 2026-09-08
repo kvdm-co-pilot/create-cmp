@@ -274,3 +274,61 @@ year. None were found by reading.
 Rule 0 proves the INSTRUMENT returns before you trust a reading from it. Rule 3 proves the
 CRITERION is evaluable before you point a loop at it. A perfectly calibrated instrument attached
 to a goal nobody can evaluate still never finishes.
+
+---
+
+## Rule 4 — Proof is SCHEDULED, not triggered: declare what a slice will owe before starting it
+
+An expensive tier does not run when something changes. It runs **once, at the end of the slice
+that changed it.** What a slice will owe is declared before the first line is written, and the
+obligation accrues until the slice closes.
+
+```bash
+node scripts/proof-plan.mjs --open "<what you are building>"   # before the work
+node scripts/proof-plan.mjs                                    # what is owed, and WHEN
+node scripts/proof-plan.mjs --discharge                        # after the run, read from its record
+node scripts/proof-plan.mjs --close                            # refuses if anything is owed
+```
+
+### Why: the rule was stated in eighteen documents and lost every time
+
+On 2026-09-08 a device suite costing three and a half minutes and an emulator ran **three times in
+one session**. The third was triggered by a comment and a message string changing in one file —
+twenty minutes after the same agent had written down, in the same session, that re-running a device
+suite for a comment is ceremony. Naming it did not stop it.
+
+The reason it did not stop it is the rule worth keeping. **Eighteen documents in this repository
+stated the device-tier policy and not one of them was a program.** They also disagreed: the
+project memory said *"gate a RELEASE at L2"* — a slice boundary — while `scripts/fit-test.mjs`
+printed **`fleet L2 REQUIRED`** on any commit touching the harness source. Prose and program
+contradicted each other, and **the program won, as it always will**: prose is read once at the
+start of a session, and a program speaks at the moment of the decision.
+
+So the fix for a rule that keeps getting lost is never a nineteenth restatement. It is to change
+the sentence the program prints. That line now reads `OWED — at slice close, NOT NOW`, and the word
+`REQUIRED` is gone from it on purpose, pinned by a test.
+
+### What it requires
+
+- **`deriveTierNeed` answers WHETHER. Something must answer WHEN.** That was the entire defect:
+  the repo had a careful, fail-open derivation of whether a device run could be skipped, and no
+  concept at all of *not yet*. A tier with no schedule is a tier that runs now.
+- **Declared before the work, not derived after it.** A slice that knows up front it will need an
+  emulator can be scoped differently; a slice that knows it will not never pays for one. This is
+  the same move as Rule 3 — the predicate is the FIRST task — applied to cost instead of to
+  termination.
+- **The expensive tier is the LAST gate, and after it the slice is frozen.** A trigger path edited
+  after a discharge REOPENS the slice and is told so by name. This is deliberately not solved by a
+  cleverer hash that tries to tell a comment from a statement: doing that correctly needs a parser
+  for every ecosystem the harness might meet, and doing it by exception list is wrong the first
+  time someone edits a string a test asserts on. The ordering rule is cheaper and it is honest.
+- **A discharge is READ, never asserted.** It comes from the run's own recorded verdict and tree
+  hash — a discharge that trusted its caller would be exactly the shape of claim this product
+  exists to refuse.
+
+### Why this is not Rule 2
+
+Rule 2 says the layer you changed cannot certify itself, and it is about WHICH proof is valid.
+Rule 4 is about WHEN a valid proof is bought. They pull in opposite directions on purpose: Rule 2
+argues for more expensive proof, Rule 4 argues for buying it once. A product that resolves G1
+against G2 has to hold both, and the place they meet is the slice boundary.
