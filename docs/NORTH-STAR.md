@@ -332,6 +332,12 @@ node scripts/proof-plan.mjs                                     # what is owed, 
 node scripts/proof-plan.mjs --close                             # refuses if anything is owed
 ```
 
+**Enforced by a hook, not by this paragraph.** `.claude/settings.json` runs
+`scripts/hooks/proof-gate.mjs`: an invocation of `fleet-check.mjs` is refused when nothing is owed
+or the tier is already discharged for this exact tree, and `gh pr merge` is refused while it is
+owed — the slice closes at merge, so that is where the run is collected. The audit of 2026-09-08
+found the program existed and nothing invoked it (GATE-RULES Rule 4 carries it).
+
 The run itself is L2 on a real headless emulator against the debug build; device rows SKIPped is
 never reported as fleet PASS; the machine is checked for another lane first. A discharge is read
 from the run's own record, never asserted. The device tier is the **last** gate, so a trigger path
