@@ -111,6 +111,81 @@ const VOUCHING_STEP = Object.freeze({
   hookPattern: "vouch|the row is the more specific truth",
 });
 
+/**
+ * Which of THIS pack's steps observes the violation a plant makes.
+ *
+ * THE SECOND HALF OF THE SAME LESSON, and the reason a fix applied to instances
+ * comes back. `VOUCHING_STEP` above took the literal `harnessIntegrity` out of
+ * the two floor plants because it is a name the cmp pack chose (NORTH-STAR
+ * §9.1). The other five plants kept theirs — `specCoverage` on the three spec
+ * plants, `e2eCoverage` on the two flow ones — and those are the same string in
+ * the same position, doing the same damage: a name the profile protocol never
+ * mentions, that REQUIRED_EXPORTS does not ask for and a profile author has no
+ * way to discover, asserted by the core against every profile there will ever
+ * be.
+ *
+ * Measured rather than reasoned about, because §9.1's lesson is that a stack
+ * assumption naming no stack is found only by running. A `harness init`
+ * skeleton with its two steps renamed to snake_case and NOTHING else changed:
+ * the lane FAILs, `spec_coverage` names the orphaned citation exactly as it
+ * should, and this instrument stops at the first plant with
+ *
+ *   planted "orphaned citation" and the lane said FAIL (specCoverage: no row)
+ *   — the guard did not FAIL BY NAME
+ *
+ * That is worse than the floor-plant case rather than equal to it, because the
+ * spec plants run FIRST and a plant failure aborts the run: on such a tree the
+ * two plants that were already fixed never execute at all, and the adopter's
+ * Rule 0 check accuses their working lane while pointing at the harness.
+ *
+ * Three ways to fix it; only one is honest here.
+ *
+ * THE DATA SELECTOR `vouching` USES IS NOT AVAILABLE. It works because the CORE
+ * computes the integrity findings and the row carries them — `harness`, the one
+ * part of that row the receipt schema documents — so every pack that performs
+ * the check answers to it whether it declares anything or not. There is no
+ * equivalent for spec or journey coverage. What cmp's coverage row carries is
+ * `details` ({clauses, withdrawn, tags, files}), written by cmp's own step
+ * function; the generated skeleton writes a different shape ({clauses,
+ * citations}) from the same core scanner; and nothing documents either as a
+ * contract. Inventing a field now would put an undocumented requirement on
+ * every future pack, silently unmet by any pack that omits it — the same
+ * undiscoverable literal wearing different clothes.
+ *
+ * WIDENING TO "ANY ROW THAT WENT RED" IS NOT IT EITHER. The kept plant in
+ * test/framework-check-agnostic.test.mjs builds the receipt that refutes it: the
+ * integrity row FAILs quoting the planted clause id while the coverage gate sits
+ * PASS beside it. A lookup that accepts that reads a broken lock as a working
+ * spec gate, which is the mix-up this whole instrument exists to catch.
+ *
+ * SO THE PACK SAYS — through the declaration that already exists for this
+ * instrument. `plants` is NORTH-STAR §6's eighth declaration, "the Rule 0/1
+ * violations the instrument runs forever", and its endpoint in
+ * AGNOSTIC-HARNESS-ARCHITECTURE.md §5.1 is a `plants(tree)` that returns the
+ * plants themselves. Which step asserts a plant is part of that plant, so it
+ * belongs there and no tenth declaration is invented to hold it. The KEY is a
+ * plant kind — PLANT_KINDS, the core's vocabulary — and the VALUE is the pack's
+ * spelling, so neither side has to learn the other's words.
+ *
+ * AND THE DEFAULT IS NOT cmp's SPELLING. That is the distinction §9.1 drew for
+ * `compileStepName`: "the distinction is the KEY's presence, not its value — a
+ * pack that declares none short-circuits on NOTHING rather than inheriting
+ * another stack's step name." Here a pack that declares no step for a kind gets
+ * null, and `plantRow` then holds the LANE instead of a row nobody named: the
+ * assertion widens honestly, still refuses a lane that stayed green or went red
+ * without naming what was planted, and reports the row it actually read.
+ * Declaring narrows it back to exactly one row; declaring nothing never inherits
+ * the wrong one.
+ *
+ * @param {{observedBy?: Record<string, string>}} tree
+ * @param {string} kind one of PLANT_KINDS
+ * @returns {string|null} this pack's name for the step, or null if it named none
+ */
+function observingStep(tree, kind) {
+  const declared = tree?.observedBy?.[kind];
+  return typeof declared === "string" && declared.length > 0 ? declared : null;
+}
+
 /** A clause id at the head of a spec list item: `- **HOME-02** — …`. */
 const CLAUSE_RE = /^-\s+\*\*([A-Z][A-Z0-9]*-\d{2,})\*\*/m;
 
@@ -196,14 +271,20 @@ export function clauseFamily(clause) {
  * like — and getting it from the profile is what stops this instrument from
  * disagreeing with the gate it is calibrating (see `flowCitation`).
  *
+ * `observedBy` is the profile's `plants.observedBy` — plant kind → the name
+ * THIS pack gives the step that catches that kind of violation. A kind it does
+ * not name gets a null `step`, which is an assertion over the lane rather than
+ * over one row, never cmp's spelling by default (see `observingStep`).
+ *
  * @param {{specs?: Array<{rel: string, text: string}>,
  *          flows?: Array<{rel: string, text: string}>,
  *          harnessLib?: string[],
  *          testDir?: string|null,
  *          plantsDeclared?: boolean,
  *          unmeetableTier?: string,
+ *          observedBy?: Record<string, string>,
  *          grammar?: {citationMarker?: RegExp}}} tree
- * @returns {{plants: Array<{kind: string, label: string, step: string,
+ * @returns {{plants: Array<{kind: string, label: string, step: string|null,
  *            names: string[], target: object}>,
  *           unavailable: Array<{kind: string, reason: string}>}}
  */
@@ -235,12 +316,13 @@ export function selectPlants(tree) {
       : "no spec files — nothing declares behavior to plant against";
     for (const kind of [PLANT_KINDS.ORPHANED_CITATION, PLANT_KINDS.UNBOUND_CITATION, PLANT_KINDS.TIER_UNMET]) skip(kind, why);
   } else {
-    // Renaming a live clause orphans every citation of it: specCoverage must
-    // name the id it can no longer find.
+    // Renaming a live clause orphans every citation of it: whichever step reads
+    // clause↔test citations must name the id it can no longer find. WHICH step
+    // that is is the pack's to spell and never this file's — see observingStep.
     plants.push({
       kind: PLANT_KINDS.ORPHANED_CITATION,
       label: "orphaned citation",
-      step: "specCoverage",
+      step: observingStep(tree, PLANT_KINDS.ORPHANED_CITATION),
       names: [clause],
       target: { spec: spec.rel, clause },
     });
@@ -267,7 +349,7 @@ export function selectPlants(tree) {
       plants.push({
         kind: PLANT_KINDS.UNBOUND_CITATION,
         label: "unbound citation",
-        step: "specCoverage",
+        step: observingStep(tree, PLANT_KINDS.UNBOUND_CITATION),
         names: [`${family}-99`],
         target: { spec: spec.rel, clause: `${family}-99`, testDir },
       });
@@ -286,7 +368,7 @@ export function selectPlants(tree) {
         plants.push({
           kind: PLANT_KINDS.TIER_UNMET,
           label: "tier unmet",
-          step: "specCoverage",
+          step: observingStep(tree, PLANT_KINDS.TIER_UNMET),
           names: [`${family}-98`],
           target: { spec: spec.rel, clause: `${family}-98`, testDir, unmeetableTier: tree.unmeetableTier },
         });
@@ -311,7 +393,7 @@ export function selectPlants(tree) {
   const citingFlows = flows.filter((f) => flowCitation(f?.text, grammar));
   if (!citingFlows.length) {
     const why = flows.length
-      ? `no citation matching /${marker.source}/ in ${flows.length} flow file(s) — e2eCoverage has nothing to lose`
+      ? `no citation matching /${marker.source}/ in ${flows.length} flow file(s) — the journey-coverage gate has nothing to lose`
       : `no flows${flowsDir ? ` under ${flowsDir}` : ""} — this project declares no journeys`;
     skip(PLANT_KINDS.FEATURE_WITHOUT_FLOW, why);
     skip(PLANT_KINDS.NESTED_FLOW, why);
@@ -321,7 +403,7 @@ export function selectPlants(tree) {
     plants.push({
       kind: PLANT_KINDS.FEATURE_WITHOUT_FLOW,
       label: "feature without a flow",
-      step: "e2eCoverage",
+      step: observingStep(tree, PLANT_KINDS.FEATURE_WITHOUT_FLOW),
       names: [],
       // FAIL BY NAME, without knowing this project's feature names: the gate
       // must name the feature it caught, in the [brackets] its reason uses.
@@ -335,7 +417,7 @@ export function selectPlants(tree) {
     plants.push({
       kind: PLANT_KINDS.NESTED_FLOW,
       label: "flow the lane never runs",
-      step: "e2eCoverage",
+      step: observingStep(tree, PLANT_KINDS.NESTED_FLOW),
       names: [],
       reasonPattern: String.raw`\[[^\]\s]+\]`,
       target: { flows: rels, nestInto: `${flowsDir}/wip` },
@@ -409,25 +491,69 @@ export function assessCoverage(plants) {
 }
 
 /**
- * The receipt row a plant's assertion is about.
+ * What "FAIL BY NAME" means for one plant, in ONE place.
  *
- * Most plants aim at a specific gate and find it by name: the plant says
- * `specCoverage` because that is the gate whose reading is being proven, and a
- * different row failing instead is exactly the mix-up this instrument exists to
- * catch. The two floor plants are different in kind — their assertion is about
- * the step that VOUCHES FOR THE LANE, whatever the pack calls it — so they find
- * it by the data it carries (`harness`), with the name as the pre-`harness`
- * fallback. See VOUCHING_STEP for what that literal name cost.
+ * Two callers need this answer — `plantRow`, to pick the row a plant with no
+ * declared step is about, and `assessPlantRun`, to say which part of the
+ * naming is missing — and a second copy of "what counts as naming" is exactly
+ * how `flowCitation` and `scanCitations` came to disagree about the same file
+ * in the same tree. So there is one, and the caller that needs a sentence gets
+ * the offending part back rather than re-deriving it.
+ *
+ * @param {{reason?: string}} row
+ * @param {{names?: string[], reasonPattern?: string}} plant
+ * @returns {{kind: "name"|"pattern", want: string, reason: string}|null} null when the row names everything asked of it
+ */
+function missingName(row, plant) {
+  const reason = String(row?.reason ?? "");
+  for (const name of plant?.names ?? []) {
+    if (!reason.includes(name)) return { kind: "name", want: name, reason };
+  }
+  if (plant?.reasonPattern && !new RegExp(plant.reasonPattern).test(reason)) {
+    return { kind: "pattern", want: plant.reasonPattern, reason };
+  }
+  return null;
+}
+
+/**
+ * The receipt row a plant's assertion is about — found three ways, in the order
+ * of how much each one can be trusted about a pack nobody here has met.
+ *
+ * BY ITS DATA, for the two floor plants. Their assertion is about the step that
+ * VOUCHES FOR THE LANE, whatever the pack calls it, and the core computes the
+ * findings that row carries — so `harness` identifies it on every pack, with
+ * the name only as the pre-`harness` fallback. See VOUCHING_STEP.
+ *
+ * BY THE NAME THE PACK GAVE IT, when the pack declared one for this plant kind
+ * (`plants.observedBy`). This is the sharp case and the one to prefer: a
+ * different row failing instead is the mix-up the instrument exists to catch,
+ * and only a named row can catch it.
+ *
+ * BY THE LANE, when the pack declared nothing. There is no honest third source
+ * for another pack's step name (see `observingStep`), so the assertion becomes
+ * "some row went red naming what was planted" — the row carrying the plant's own
+ * fingerprint. Only FAIL rows can satisfy it: an ERROR is a step that fell over,
+ * not a gate that read something and refused, and treating the two alike is how
+ * a crash comes to read as a calibrated gate. When no FAIL row names the plant,
+ * a red row is returned anyway rather than null, because `assessPlantRun` then
+ * prints that row's reason — "this is what your lane actually said" is a far
+ * better sentence to hand an adopter than "no row" — and the FAIL rows are
+ * offered ahead of the ERROR ones, or a step that blew up alongside a gate that
+ * fired correctly would be reported as the finding. This branch is weaker than
+ * a declared name and is meant to be: it is what a pack gets for not saying,
+ * and it still bites.
  *
  * @param {Array<object>} steps
- * @param {{step?: string, vouching?: boolean}} plant
+ * @param {{step?: string|null, vouching?: boolean, names?: string[], reasonPattern?: string}} plant
  * @returns {object|null}
  */
 export function plantRow(steps, plant) {
   const rows = Array.isArray(steps) ? steps : [];
-  const byName = rows.find((s) => s && s.name === plant?.step) ?? null;
-  if (!plant?.vouching) return byName;
-  return rows.find((s) => s && s.harness && typeof s.harness === "object") ?? byName;
+  const byName = plant?.step ? (rows.find((s) => s && s.name === plant.step) ?? null) : null;
+  if (plant?.vouching) return rows.find((s) => s && s.harness && typeof s.harness === "object") ?? byName;
+  if (plant?.step) return byName;
+  const failed = rows.filter((s) => s && s.verdict === "FAIL");
+  return failed.find((s) => !missingName(s, plant)) ?? failed[0] ?? rows.find((s) => s && s.verdict === "ERROR") ?? null;
 }
 
 /**
@@ -448,7 +574,7 @@ export function plantRow(steps, plant) {
  * @param {{hung?: boolean, ms?: number, exit?: number|null,
  *          receipt?: {verdict?: string, steps?: Array<object>}|null,
  *          stderr?: string}} run
- * @param {{label: string, step: string, names?: string[], vouching?: boolean}} plant
+ * @param {{label: string, kind?: string, step?: string|null, names?: string[], vouching?: boolean}} plant
  * @param {number} boundMs
  * @returns {{ok: true}|{ok: false, reason: string}}
  */
@@ -463,32 +589,35 @@ export function assessPlantRun(run, plant, boundMs) {
     return { ok: false, reason: `"${label}" returned no receipt (exit ${run?.exit ?? "?"})${tail ? `:\n${tail}` : ""}` };
   }
   const row = plantRow(receipt.steps, plant);
-  const rowName = row?.name ?? plant.step;
+  const rowName = row?.name ?? plant.step ?? "the lane";
   if (receipt.verdict !== "FAIL" || !row || row.verdict !== "FAIL") {
     // A missing row says what was looked for. "harnessIntegrity: no row" over a
     // receipt whose vouching row is called something else is a true sentence
-    // that points at the wrong thing.
+    // that points at the wrong thing. The third branch is the pack that named
+    // no step for this kind: "no row" would be the same wrong sentence again,
+    // so it says what the lookup actually was AND names the declaration that
+    // would make it sharp — an adopter cannot fix a requirement nobody states.
     const found = row
       ? `${rowName}: ${row.verdict}`
       : plant.vouching
         ? `no row carries a \`harness\` object and none is named ${plant.step}`
-        : `${plant.step}: no row`;
+        : plant.step
+          ? `${plant.step}: no row`
+          : `no row on this receipt went red at all, and this profile's \`plants.observedBy\` names no step for ${plant.kind ?? "this plant"}`;
     return {
       ok: false,
       reason: `planted "${label}" and the lane said ${receipt.verdict} (${found}) — the guard did not FAIL BY NAME`,
     };
   }
-  const reason = String(row.reason ?? "");
-  for (const name of plant.names ?? []) {
-    if (!reason.includes(name)) {
-      return { ok: false, reason: `${rowName} FAILed on "${label}" but did not NAME ${name}:\n${reason}` };
-    }
-  }
   // Some gates name something the selector cannot know in advance — a feature
-  // this project happens to have. The pattern is how those still assert FAIL BY
-  // NAME instead of settling for "it went red".
-  if (plant.reasonPattern && !new RegExp(plant.reasonPattern).test(reason)) {
-    return { ok: false, reason: `${rowName} FAILed on "${label}" but named nothing matching /${plant.reasonPattern}/:\n${reason}` };
+  // this project happens to have. `reasonPattern` is how those still assert
+  // FAIL BY NAME instead of settling for "it went red"; `missingName` holds
+  // both halves so the row lookup above cannot drift from the judgement here.
+  const missing = missingName(row, plant);
+  if (missing) {
+    return missing.kind === "name"
+      ? { ok: false, reason: `${rowName} FAILed on "${label}" but did not NAME ${missing.want}:\n${missing.reason}` }
+      : { ok: false, reason: `${rowName} FAILed on "${label}" but named nothing matching /${missing.want}/:\n${missing.reason}` };
   }
   return { ok: true };
 }

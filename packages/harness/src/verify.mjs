@@ -33,6 +33,7 @@ import { fileURLToPath } from "node:url";
 
 import { computeInputsHash, undeclaredTopLevel } from "./lib/inputs-hash.mjs";
 import { evidenceLevel } from "./lib/evidence-level.mjs";
+import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
 import { updateReadmeBadge, README_REL_PATH } from "./lib/evidence-badge.mjs";
 import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
 import { StepTimeout, spawnTimedOut } from "./lib/step-outcomes.mjs";
@@ -310,6 +311,21 @@ if (!loaded.ok) {
 const pack = loaded.profile.steps({ ROOT, HERE, fast, determinism, profile, mode, sh, tryGit, tryGitLines, DEGRADED_PATHS });
 const { stepsForProfile, DEVICE_STEPS, FAST_EXCLUDED_NAMES, STEP_FN_BY_NAME } = pack;
 
+// ── The evidence ladder, resolved once, before a step runs ──────────────────
+// The ladder has TWO spellings — the profile's top-level `ladder` and the
+// pack's `evidenceLadder` — and this line used to read only the second one,
+// while the Stop hook read only the first. Both spellings are legitimate and
+// qa/lib/evidence-ladder.mjs carries the argument for the precedence; what was
+// not legitimate is that a profile declaring only the spelling `harness init`
+// SEEDS was graded at no rung with nothing said about it. Resolved here rather
+// than at the grading call so the refusal — two declarations that disagree —
+// lands before any work is done, and so the rung the receipt records and the
+// rung a no-lane reader would compute come from the same bytes.
+const resolvedLadder = evidenceLadderFor(loaded.profile, pack);
+if (!resolvedLadder.ok) {
+  console.error(resolvedLadder.reason);
+  process.exit(2);
+}
 
 if (!stepsForProfile[profile]) {
   console.error(`Unknown profile "${profile}" — use smoke | scaffold | local | ci | nightly | release.`);
@@ -456,10 +472,11 @@ const strengthLabel = typeof pack.strengthLabel === "function" ? pack.strengthLa
 // fine print; the rung is added alongside, never in place of it. null on FAIL —
 // a failed lane has no rung. null on a --fast run too: the inner loop is a
 // signal, never evidence, so a fast receipt derives NO rung at all.
-// The ladder is the PACK's: a pack that declares none earns no rung (a
-// backend graded by Compose step names was L0 by construction — wrong, not
-// conservative).
-const level = evidenceLevel(steps, profile, { mode, ladder: pack.evidenceLadder ?? null });
+// The ladder is the PROFILE's, in either of the two places a profile may
+// declare it (resolved above, qa/lib/evidence-ladder.mjs): a profile that
+// declares none in either earns no rung (a backend graded by another stack's
+// step names was L0 by construction — wrong, not conservative).
+const level = evidenceLevel(steps, profile, { mode, ladder: resolvedLadder.ladder });
 
 // Artifacts: hash whatever the run left under qa-artifacts/ (never committed).
 const artifacts = [];
@@ -639,7 +656,14 @@ if (asJson) {
     `\n${verdict === "PASS" ? "⚡⚡" : "❌"} verify lane [FAST — INNER LOOP ONLY, NOT DONE]: ${verdict} (skipped device/release tier: ${fastExcluded.join(", ") || "none"}) — this fast receipt satisfies no done-gate; run the full lane (node qa/verify.mjs) once before you finish`,
   );
 } else {
-  console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name}` : ""}${strengthLabel ? ` (${strengthLabel})` : ""} — receipt written to qa/evidence/latest.json${badge.changed ? ` and ${README_REL_PATH}'s evidence badge refreshed` : ""} (commit ${badge.changed ? "them" : "it"} with your change)`);
+  // The rung NEVER appears without the pack that defines it. §8.9 makes one
+  // pack's L2 and another's different claims that must be "shown as such", and
+  // this is the line an agent reads on every single run — the surface where a
+  // bare rung would do the most quiet damage. Only the pack's ID: `pack.version`
+  // is the harness lock's borrowed number until the profile loader gives the
+  // pack its own (ADR-0008), so printing it would name a version of the wrong
+  // thing.
+  console.log(`\n${verdict === "PASS" ? "✅" : "❌"} verify lane: ${verdict}${level ? ` · ${level.rung} ${level.name} · pack ${pack.id}` : ""}${strengthLabel ? ` (${strengthLabel})` : ""} — receipt written to qa/evidence/latest.json${badge.changed ? ` and ${README_REL_PATH}'s evidence badge refreshed` : ""} (commit ${badge.changed ? "them" : "it"} with your change)`);
 }
 
 // A TIER THAT HAS NEVER RUN HERE. A SKIP is non-fatal by design — absence of a

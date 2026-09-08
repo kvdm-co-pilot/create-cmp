@@ -146,7 +146,15 @@ export function steps() {
       l0Required: ["harnessIntegrity"],
       l1Required: ["harnessIntegrity", "specCoverage", "unitTests"],
       deviceExecution: ["integrationTests"],
-      release: ["distribution"],
+      // AS AUTHORED this read `release: ["distribution"]` — a list, like every
+      // other field on this ladder. The grader reads `release` as a single step
+      // NAME, so the list matched nothing and this profile's L3 was unreachable
+      // with nothing said about it. That is not a fixture bug: it is what a real
+      // second-stack author wrote from the contract alone, and it is why
+      // evidence-ladder.mjs now refuses the shape by name. The mistake is kept
+      // as a PLANT (test/evidence-ladder.test.mjs) rather than as a passive
+      // fixture, because a plant is watched failing and a fixture is not.
+      release: "distribution",
     },
     // Nothing to lease: no device, and the container is owned by Testcontainers
     // for the life of the Gradle JVM.

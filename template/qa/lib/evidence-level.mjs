@@ -36,11 +36,19 @@
 //     the desktop rungs, and only executed PASSes gate the device rungs.
 
 // The Compose ladder that used to live here is qa/lib/profiles/cmp/ladder.mjs
-// (Stage 0 PR 3). This module derives a rung from WHATEVER ladder the profile's
-// step pack hands the runner (`evidenceLadder`); it carries no step names of
-// its own and defaults to none — a profile that declares no ladder earns no
-// rung. The rung vocabulary above is one profile's example, kept because it is
-// the clearest statement of what a rung is for.
+// (Stage 0 PR 3). This module derives a rung from WHATEVER ladder it is handed;
+// it carries no step names of its own and defaults to none — a profile that
+// declares no ladder earns no rung. The rung vocabulary above is one profile's
+// example, kept because it is the clearest statement of what a rung is for.
+//
+// WHERE THAT LADDER COMES FROM IS NOT THIS MODULE'S QUESTION, and saying it was
+// is how a defect hid: this comment used to name one of the two spellings a
+// profile may use (`evidenceLadder`, on the pack), which is the one the runner
+// happened to read while the Stop hook read the other. Resolving between them
+// is qa/lib/evidence-ladder.mjs's single job, and every caller goes through it.
+// The fields read below are the fields that resolution compares — the pairing
+// is derived from this source by test/evidence-ladder.test.mjs so the two
+// cannot drift.
 
 /**
  * Derive the receipt's evidence rung from the lane's step results.

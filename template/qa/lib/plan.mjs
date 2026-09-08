@@ -149,11 +149,20 @@ export function markStep(root, n) {
   return { ok: true, plan };
 }
 
-/** The receipt's verdict + rung right now, for the trail — fail-soft glance. */
+/**
+ * The receipt's verdict + rung right now, for the trail — fail-soft glance.
+ *
+ * The pack rides along with the rung and is not optional decoration. This
+ * record is WRITTEN to the plan history and outlives the run that made it, so a
+ * bare rung here is worse than a bare rung printed to a terminal: nothing later
+ * can attribute it, and §8.9's rule that one pack's L2 and another's are
+ * different claims becomes unenforceable for every reader of the trail. `null`
+ * when the receipt names no pack, which is itself the honest answer.
+ */
 function receiptGlance(root) {
   try {
     const r = JSON.parse(fs.readFileSync(path.join(root, "qa/evidence/latest.json"), "utf8"));
-    return { verdict: r?.verdict ?? null, rung: r?.evidenceLevel?.rung ?? null };
+    return { verdict: r?.verdict ?? null, rung: r?.evidenceLevel?.rung ?? null, pack: r?.pack?.id ?? null };
   } catch {
     return null;
   }

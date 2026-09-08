@@ -51,6 +51,7 @@ import {
   assessPlantRun,
   assessGreenRun,
   assessCalibrationCost,
+  plantRow,
 } from "./lib/framework-check.mjs";
 import { listHarnessFiles } from "./lib/harness-region.mjs";
 import { listFlowFiles, scanCitations, walkFiles } from "./lib/spec-coverage.mjs";
@@ -226,12 +227,23 @@ const SPEC_MODEL = SPEC_MODEL_RESULT.model;
 // are the core scanner's, and which plants a tree can support is derived from
 // the tree. A profile that declares none simply ships without those two, said
 // out loud per plant (§5.2: no plants, no badge).
-const PROFILE_PLANTS = (() => {
+const PLANT_DECL = (() => {
   const manifest = resolveHarnessManifest(ROOT);
   if (!manifest.ok) return null;
   const loaded = loadProfileSync(ROOT, manifest.manifest.profile);
   if (!loaded.ok) return null;
-  const p = loaded.profile.plants;
+  return loaded.profile.plants ?? null;
+})();
+
+// The SOURCE half of that declaration, which the two citation plants cannot do
+// without. Kept separate from the declaration itself because the other half —
+// which step observes which plant (`observedBy`) — costs a pack nothing to give
+// and must not be withheld by the absence of a Kotlin/Python/Go snippet it has
+// not written yet. Requiring all of it or none of it would mean a pack that
+// names its steps but ships no plant source still had cmp's spellings asserted
+// against it, which is the defect this reads the declaration to avoid.
+const PROFILE_PLANTS = (() => {
+  const p = PLANT_DECL;
   if (!p || typeof p.unboundCitationSource !== "function" || typeof p.tierUnmetCitationSource !== "function" || typeof p.testFileBasename !== "string") return null;
   return p;
 })();
@@ -286,6 +298,12 @@ const tree = {
   plantsDeclared: Boolean(PROFILE_PLANTS),
   // No `?? "e2e"` anywhere: the tier a plant declares is the profile's or absent.
   unmeetableTier: PROFILE_PLANTS?.unmeetableTier ?? null,
+  // WHICH STEP CATCHES WHICH PLANT is the pack's word, exactly as the tier
+  // above is. There is no `?? "specCoverage"` here for the same reason there is
+  // no `?? "e2e"` there: a default is another stack's name asserted against
+  // this one, and lib/framework-check.mjs `observingStep` records what that
+  // cost. A pack that names none gets an assertion over the lane.
+  observedBy: PLANT_DECL?.observedBy ?? null,
   flowsDir: SPEC_MODEL && SPEC_MODEL.flows ? SPEC_MODEL.flows.dir : null,
   // What a citation LOOKS like is the profile's, never `#`. Without this the
   // selector falls back to DEFAULT_GRAMMAR, which accepts `//` and `#` and so
@@ -300,6 +318,24 @@ const coverage = assessCoverage(plants);
 if (!coverage.ok) die(coverage.reason);
 
 for (const u of unavailable) out(`  ⓘ  ${u.kind.padEnd(24)} not planted — ${u.reason}`);
+
+// A plant whose step this pack has not named is neither unavailable nor broken:
+// it asserts over the LANE instead of over one row, which is a real gate and a
+// blunter one (qa/lib/framework-check.mjs `observingStep`). It is said out loud
+// for the same reason every unavailable plant says why — and for one more. The
+// whole episode behind `observedBy` is that a requirement nobody can discover is
+// a requirement nobody meets: `harnessIntegrity` was undiscoverable and cost an
+// adopter a lane that could never mint a valid receipt (NORTH-STAR §9.1). A
+// declaration that only appears in a refusal repeats that, one level quieter. So
+// the instrument names it while everything is GREEN, which is the only moment
+// the reader is not already debugging something else.
+for (const p of plants) {
+  if (p.step || p.vouching) continue;
+  out(
+    `  ⓘ  ${p.kind.padEnd(24)} asserted over the whole lane — this profile's \`plants.observedBy\` names no step ` +
+      `for it; naming one narrows the assertion to that row`,
+  );
+}
 
 // ── Refuse to start on a dirty tree ─────────────────────────────────────────
 // Everything this may write, named up front. A file with uncommitted changes is
@@ -511,8 +547,15 @@ try {
       }
     }
 
+    // NAME THE ROW THAT ACTUALLY WENT RED, not the one the plant asked for.
+    // For a plant whose step this pack did not declare those are different
+    // strings — the plant asked for nothing — and "undefined FAIL naming
+    // CART-01" is a line that makes a working run look broken. It is also the
+    // more useful line in every case: on a pack the reader does not know, this
+    // is where they learn which of their own gates is calibrated.
     const named = plant.names.length ? ` naming ${plant.names.join(", ")}` : "";
-    out(`  FAIL: ${plant.label.padEnd(28)} ${String(run.ms).padStart(5)}ms   ✓ ${plant.step} FAIL${named}`);
+    const observed = plantRow(run.receipt.steps, plant)?.name ?? plant.step ?? "the lane";
+    out(`  FAIL: ${plant.label.padEnd(28)} ${String(run.ms).padStart(5)}ms   ✓ ${observed} FAIL${named}`);
     revertPlant(plant);
   }
 

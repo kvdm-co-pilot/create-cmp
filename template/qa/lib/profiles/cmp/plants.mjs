@@ -26,6 +26,8 @@
 // instrument says so per plant rather than reporting a quieter green — the
 // §5.2 rule: no plants, no badge.
 
+import { PLANT_KINDS } from "../../framework-check.mjs";
+
 /** The file a planted citation lives in, relative to the test directory the instrument found. */
 export const testFileBasename = "CmpFrameworkCheckPlanted.kt";
 
@@ -56,10 +58,38 @@ export function tierUnmetCitationSource(clause) {
  */
 export const unmeetableTier = "e2e";
 
+/**
+ * WHICH OF THIS PACK'S STEPS CATCHES EACH KIND OF PLANTED VIOLATION.
+ *
+ * `specCoverage` and `e2eCoverage` are OUR words. They used to be written into
+ * the core's plant selector as literals and asserted against every profile
+ * there will ever be — the same defect NORTH-STAR §9.1 records for
+ * `harnessIntegrity`, in the same file, one fix later. A pack spelling its
+ * coverage step `spec_coverage` had this instrument stop at the first plant
+ * with "specCoverage: no row — the guard did not FAIL BY NAME", about a gate
+ * that had just failed by name on the row beside it, and the two floor plants
+ * behind it never ran at all.
+ *
+ * So the names live here, where they are true, keyed by the CORE's plant kinds
+ * so neither side has to learn the other's vocabulary. A pack that omits this
+ * loses nothing it had: its plants assert over the lane instead of over one row
+ * (lib/framework-check.mjs `observingStep`). Declaring is how a pack asks for
+ * the sharper assertion — that THIS gate, not merely some gate, is the one that
+ * caught it.
+ */
+export const observedBy = Object.freeze({
+  [PLANT_KINDS.ORPHANED_CITATION]: "specCoverage",
+  [PLANT_KINDS.UNBOUND_CITATION]: "specCoverage",
+  [PLANT_KINDS.TIER_UNMET]: "specCoverage",
+  [PLANT_KINDS.FEATURE_WITHOUT_FLOW]: "e2eCoverage",
+  [PLANT_KINDS.NESTED_FLOW]: "e2eCoverage",
+});
+
 /** What the instrument reads off the profile. */
 export const plants = Object.freeze({
   testFileBasename,
   unboundCitationSource,
   tierUnmetCitationSource,
   unmeetableTier,
+  observedBy,
 });
