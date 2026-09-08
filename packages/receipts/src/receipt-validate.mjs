@@ -288,7 +288,7 @@ export function validateReceiptForTree({ root, now = Date.now(), policy = {} } =
   if (receipt === null) {
     return {
       status: "missing",
-      reason: `no receipt at ${RECEIPT_REL_PATH} — this repo does not carry the create-cmp evidence harness (that is not a failure)`,
+      reason: `no receipt at ${RECEIPT_REL_PATH} — this repo does not carry the prooflane evidence harness (that is not a failure)`,
       checks: [{ id: "receipt-present", ok: false, detail: `no parsable receipt at ${RECEIPT_REL_PATH}` }],
       skips: [],
     };

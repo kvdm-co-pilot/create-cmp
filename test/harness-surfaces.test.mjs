@@ -303,11 +303,22 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.ok(!/tapOn:\s*"/.test(smoke), "no tapOn by bare display text remains");
     });
 
-    await t.test("qa/evidence/schema.json parses and identifies as cmp-evidence", () => {
+    await t.test("qa/evidence/schema.json identifies as prooflane-evidence, and still accepts the old name", () => {
+      // ADR-0007: the format name is routing metadata, not part of the claim,
+      // so the rename asserts nothing new and expires nothing old. BOTH halves
+      // are the decision — a schema that took the new name and dropped the old
+      // would silently invalidate every receipt ever written, which is the one
+      // thing a rename must not do.
       const raw = fs.readFileSync(path.join(out, "qa/evidence/schema.json"), "utf8");
       const schema = JSON.parse(raw);
       const id = schema.$id ?? schema.id ?? "";
-      assert.match(String(id), /cmp-evidence/);
+      assert.equal(String(id), "prooflane-evidence/1", "the format is no longer named after one stack");
+      assert.deepEqual(
+        schema.properties.schema.enum,
+        ["cmp-evidence/1", "prooflane-evidence/1"],
+        "both names are valid for the life of /1 — the old one stops being WRITTEN, never READ",
+      );
+      assert.equal(schema.properties.schema.const, undefined, "a const here would refuse every receipt already minted");
     });
 
     await t.test("qa/evidence/schema.json declares the evidence ladder (nullable evidenceLevel) and accepts the release profile", () => {

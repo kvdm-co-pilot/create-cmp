@@ -8,6 +8,32 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The receipt format is `prooflane-evidence/1` (ADR-0007) — and `cmp-evidence/1` never stops
+  being read.** The artefact we invite people to audit was named after one stack, while a Kotlin
+  backend and a Python service were already writing it. Both halves of this are the decision:
+
+  - *The name moves.* `$id` and the one writer emit `prooflane-evidence/1`.
+  - *The old name stays valid for the life of `/1`.* `properties.schema` becomes an `enum` of
+    both, not a `const` of the new one — a const would have silently invalidated every receipt
+    ever minted, which is the one thing a rename must not do.
+
+  **Why a rename and not `cmp-evidence/2`:** the `schema` field is ROUTING METADATA — it names
+  the document that defines the rest of the file. The claim is `verdict` + `inputs.hash` +
+  `steps[]` + `harness` + `pack`. A version bump asserts the shape changed, and no field moved;
+  it would make every existing receipt re-earn the right to say the same thing.
+
+  **The equivalence is now pinned, not assumed.** That old receipts stay valid rested on an
+  absence — no module reads the field — and an absence is exactly what a later edit removes
+  unnoticed. `packages/receipts/test/receipt-validate.test.mjs` now asserts it directly: same
+  tree, same facts, two labels, one verdict; and an *unknown* label validates too, because the
+  predicate routes on fields and the format name is not a trust signal in either direction.
+
+  **What deliberately did NOT move**, per the ADR: `LOCK_SCHEMA` (`cmp-harness-lock/1`) is a
+  different file with a different writer and finishes its journey with the package work; the
+  architecture doc's `cmp:generated` markers sit inside a signed artifact's hash basis, so
+  renaming them would re-ask a signature in every adopting repo for a change containing no
+  decision.
+
 - **`prooflane upgrade` — a core fix reaches an installed lane by ONE command, and the proof is
   the adopter's tree. Stage 1 EXITS, 4/4.**
 

@@ -82,6 +82,30 @@ test("evaluateReceipt: PASS receipt whose hash matches the tree is valid", () =>
   });
 });
 
+test("evaluateReceipt: BOTH format names validate identically — the rename expires no receipt", () => {
+  // ADR-0007's central promise, made checkable. The rename is safe only because
+  // `schema` is ROUTING METADATA: it names the document that defines the rest of
+  // the file, while the claim is verdict + inputs.hash + steps[]. So a receipt
+  // minted before the rename must assert exactly what it asserted the day it was
+  // written, forever.
+  //
+  // That rested on an ABSENCE — no module reads the field — and an absence is
+  // the kind of fact a later edit removes without anyone noticing. Asserted here
+  // as an equivalence instead: same tree, same facts, two labels, one verdict.
+  withTree((root) => {
+    const hash = () => computeInputsHash(root);
+    const old = evaluateReceipt(makeReceipt(root, { schema: "cmp-evidence/1" }), hash);
+    const now = evaluateReceipt(makeReceipt(root, { schema: "prooflane-evidence/1" }), hash);
+    assert.equal(old.valid, true, "a receipt written before the rename is still valid");
+    assert.deepEqual({ valid: old.valid, reason: old.reason }, { valid: now.valid, reason: now.reason });
+
+    // And the field is not a trust signal in either direction: an unknown label
+    // on the envelope changes no verdict about the tree inside it.
+    const strange = evaluateReceipt(makeReceipt(root, { schema: "someone-elses-format/9" }), hash);
+    assert.equal(strange.valid, true, "the predicate routes on FIELDS, never on the format name");
+  });
+});
+
 test("evaluateReceipt: source change since the receipt invalidates it", () => {
   withTree((root) => {
     const receipt = makeReceipt(root);
@@ -206,7 +230,7 @@ test("validateReceiptForTree: no receipt → status missing (not invalid — non
   withTree((root) => {
     const res = validateReceiptForTree({ root });
     assert.equal(res.status, "missing");
-    assert.match(res.reason, /does not carry the create-cmp evidence harness/);
+    assert.match(res.reason, /does not carry the prooflane evidence harness/);
     assert.match(res.reason, /not a failure/);
   });
 });

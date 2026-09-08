@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "cmp-evidence/1",
+  "$id": "prooflane-evidence/1",
   "title": "create-cmp verify-lane evidence receipt",
   "type": "object",
   "required": [
@@ -15,7 +15,11 @@
   ],
   "properties": {
     "schema": {
-      "const": "cmp-evidence/1"
+      "enum": [
+        "cmp-evidence/1",
+        "prooflane-evidence/1"
+      ],
+      "description": "ROUTING METADATA, not part of the claim (ADR-0007): it names the document that defines the rest of this file. The claim is verdict + inputs.hash + steps[] + harness + pack. Renaming the label changed no assertion any receipt has ever made, which is why this is a rename and not a version bump \u2014 a bump would assert the shape changed, and no field moved. BOTH names are valid for the life of /1: a repo that never upgrades keeps writing `cmp-evidence/1` and every reader keeps accepting it. Nothing routes on this field \u2014 readers dispatch on field SHAPE \u2014 so the enum documents behaviour that already existed rather than enabling new behaviour. It would stop being accepted only at /2: a different decision, about a changed shape, needing its own ADR."
     },
     "profile": {
       "enum": [
