@@ -25,6 +25,7 @@
 // additive, idempotent, never clobbering. See src/commands/harden.mjs.
 
 import fs from "node:fs";
+import { HARNESS_DECLARATIONS, HARNESS_GENERATED } from "../../packages/harness/src/lib/harness-region.mjs";
 import path from "node:path";
 
 import { listHarnessFiles } from "../../packages/harness/src/lib/harness-region.mjs";
@@ -59,12 +60,33 @@ const IMPORT_SPECIFIER_RE = /(?:from\s+|new URL\(\s*)["'](\.\.?\/[^"']+\.mjs)["'
 
 /**
  * The machine-owned files a minimal scaffold keeps: the entry points plus
- * their transitive ./-relative imports, resolved against the tree as stamped.
+ * their transitive ./-relative imports, resolved against the tree as stamped —
+ * PLUS the region members that are not modules and therefore cannot be reached
+ * by any import closure.
+ *
+ * That last clause is not a special case, it is the shape of the region: it
+ * holds code AND the files the lane reads about itself (the two declarations)
+ * and the record of which harness it carries (`qa/harness-source.json`,
+ * ADR-0008). A closure walk can only ever see the code half, so deriving the
+ * keep-set from imports alone quietly proposes deleting the other half — and
+ * the file it would delete is the one that says what this lane IS.
+ *
  * @param {string} projectDir
  * @returns {Set<string>} project-relative posix paths
  */
 export function laneKeepSet(projectDir) {
   const keep = new Set();
+  // The declarations are gated on presence; the generated record is NOT, and
+  // the asymmetry is the point. `qa/harness-source.json` is written at STAMP
+  // time, so it is absent from the template this set is usually derived against
+  // and present in every stamped tree — gating it on presence would produce a
+  // keep-set that is right about the template and wrong about the app, which is
+  // the only tree the answer is ever used on. A name kept but absent costs
+  // nothing: the set decides what NOT to delete.
+  for (const rel of HARNESS_DECLARATIONS) {
+    if (fs.existsSync(path.join(projectDir, ...rel.split("/")))) keep.add(rel);
+  }
+  for (const rel of HARNESS_GENERATED) keep.add(rel);
   const queue = MINIMAL_LANE_ENTRY_POINTS.filter((rel) =>
     fs.existsSync(path.join(projectDir, rel))
   );

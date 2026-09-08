@@ -43,6 +43,7 @@ import { consent } from "../bootstrap/exec.mjs";
 import { loadRegistry, latestSet, getSet } from "../lib/registry.mjs";
 import { planUpgrade, BACKUP_SUFFIX, sidecarDroppedLines, staleBackupPaths } from "../lib/upgrade.mjs";
 import { writeHarnessLock, checkHarnessIntegrity, describeIntegrity } from "../../packages/harness/src/lib/harness-lock.mjs";
+import { writeHarnessSource, HARNESS_PKG_NAME } from "../../packages/harness/src/lib/harness-source.mjs";
 import { LOCAL_PATCH_PATH, stampBaseWith } from "../lib/harness-upgrade.mjs";
 import { buildTokenMap } from "../lib/tokens.mjs";
 import {
@@ -409,6 +410,12 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
   // version numbers buy. So the lock is rewritten on its own schedule.
   const harnessVersion = shippedHarnessVersion();
   if (harnessVersion) {
+    // The provenance record first: it is inside the region the lock hashes, and
+    // rewriting it is what makes a version-only upgrade visible in the TREE
+    // rather than only in a number (ADR-0008 / Stage 1 criterion D). Without
+    // this a stamped app upgraded here moved its lock's `version` and not one
+    // digest — the shape the criterion forbids.
+    writeHarnessSource(projectDir, { name: HARNESS_PKG_NAME, version: harnessVersion, source: "local" });
     writeHarnessLock(projectDir, { version: harnessVersion });
     ok(`lane locked at ${colors.bold(harnessVersion)} — ${describeIntegrity(checkHarnessIntegrity(projectDir))}`);
   }

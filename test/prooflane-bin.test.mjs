@@ -186,6 +186,39 @@ test("re-running init names no command this door does not have", () => {
   }
 });
 
+test("a stamped app records provenance too — and its upgrade moves lock digests", async () => {
+  // The gap this closes: `prooflane upgrade` moved an adopter's digests on a
+  // version bump (Stage 1 criterion D), while `create-cmp upgrade --harness`
+  // moved a stamped app's lock `version` and not one digest — the shape the
+  // criterion forbids, one front door over.
+  const { writeHarnessSource, readHarnessSource, HARNESS_PKG_NAME } = await import(
+    "../packages/harness/src/lib/harness-source.mjs"
+  );
+  const { hashHarnessRegion } = await import("../packages/harness/src/lib/harness-region.mjs");
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "stamped-provenance-"));
+  try {
+    fs.mkdirSync(path.join(root, "qa", "lib"), { recursive: true });
+    fs.writeFileSync(path.join(root, "qa", "verify.mjs"), "// engine\n");
+
+    writeHarnessSource(root, { name: HARNESS_PKG_NAME, version: "0.20.0", source: "local" });
+    const before = hashHarnessRegion(root);
+
+    writeHarnessSource(root, { name: HARNESS_PKG_NAME, version: "0.21.0", source: "local" });
+    const after = hashHarnessRegion(root);
+
+    assert.notEqual(
+      before.files["qa/harness-source.json"],
+      after.files["qa/harness-source.json"],
+      "a version-only upgrade must move a digest in the TREE, not only a number in the lock",
+    );
+    assert.equal(before.files["qa/verify.mjs"], after.files["qa/verify.mjs"], "engine bytes that did not change must not move");
+    assert.equal(readHarnessSource(root).version, "0.21.0");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("relock through this door refuses with prooflane's vocabulary, not create-cmp's", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "prooflane-relock-"));
   try {

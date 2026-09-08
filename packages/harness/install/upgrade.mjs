@@ -48,10 +48,10 @@ import { frontDoor, HARNESS_SRC, vendorPlan } from "./init.mjs";
 import { MANIFEST_REL_PATH } from "../src/lib/harness-manifest.mjs";
 import { LOCK_PATH } from "../src/lib/harness-lock.mjs";
 import { isAdopterOwned } from "../src/lib/harness-region.mjs";
-import { SOURCE_PATH, resolvedSourceKind } from "../src/lib/harness-source.mjs";
+import { SOURCE_PATH, resolvedSourceKind, HARNESS_PKG_NAME } from "../src/lib/harness-source.mjs";
 
-/** The package whose bytes this command vendors. */
-const PKG_NAME = "prooflane-harness";
+/** The package whose bytes this command vendors — named once, in the core. */
+const PKG_NAME = HARNESS_PKG_NAME;
 
 /**
  * WHERE THE NEW BYTES COME FROM, in the order an adopter would expect.

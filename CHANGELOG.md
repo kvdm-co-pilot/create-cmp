@@ -8,6 +8,27 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **A stamped app records its provenance too — the other front door had the defect Stage 1 D
+  forbids.** `prooflane upgrade` moved an adopter's per-file lock digests on a version bump;
+  `create-cmp upgrade --harness` moved a stamped app's lock `version` and not one digest, which is
+  precisely the shape the criterion calls a lie. All three create-cmp writers — the stamp,
+  `upgrade --harness` and `harden` — now write `qa/harness-source.json` BEFORE taking the lock,
+  because the record is inside the region the lock hashes.
+
+  A stamped app's `source` is **`local`**, and that is exact rather than convenient: its lane
+  bytes were copied from a path on this machine (the template inside whichever create-cmp is
+  installed here), which is what the enum's `local` means, and it stays true however create-cmp
+  itself arrived. Calling it `registry` because the scaffolder came from `npx` would name the
+  provenance of the wrong artifact.
+
+  **One derivation this exposed.** `laneKeepSet` — which decides what a `--minimal` scaffold keeps
+  — walked the import closure from the lane's entry points, and a closure walk can only ever see
+  the code half of the region. The other half is the files the lane reads *about itself*: the two
+  declarations and now the provenance record. Deriving the keep-set from imports alone quietly
+  proposed deleting the file that says what the lane IS. The declarations stay gated on presence;
+  the generated record is kept by RULE, because it is written at stamp time and so is absent from
+  the template the set is derived against and present in every stamped tree.
+
 - **The receipt format is `prooflane-evidence/1` (ADR-0007) — and `cmp-evidence/1` never stops
   being read.** The artefact we invite people to audit was named after one stack, while a Kotlin
   backend and a Python service were already writing it. Both halves of this are the decision:
