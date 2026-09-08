@@ -13,8 +13,14 @@
     "./console/*.mjs": "./src/console/*.mjs",
     "./console/*": "./src/console/*.mjs"
   },
+  "bin": {
+    "prooflane": "bin/prooflane.mjs"
+  },
   "files": [
     "src",
+    "install",
+    "bin",
+    "evidence",
     "README.md"
   ],
   "scripts": {

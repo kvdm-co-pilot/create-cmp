@@ -30,6 +30,20 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+/**
+ * The receipt contract, which the harness owns and every project carries.
+ *
+ * It moved into the package on 2026-09-08, when the harness got its own
+ * entrance: `harness init` vendored this file out of `template/`, so a repo
+ * that installed `prooflane-harness` from the registry — where no template
+ * exists — silently got a lane with no schema beside its receipts, while every
+ * stamped app had one. A package that installs itself must carry everything it
+ * installs.
+ */
+const SCHEMA_FILES = [
+  { from: "packages/harness/evidence/schema.json", to: "template/qa/evidence/schema.json" },
+];
+
 /** Stage 1 — receipts package → its home inside the harness package. */
 const RECEIPTS_FILES = [
   { from: "packages/receipts/src/inputs-hash.mjs", to: "packages/harness/src/lib/inputs-hash.mjs" },
@@ -120,7 +134,7 @@ export function orphanFiles() {
 }
 
 /** Every pair this script maintains, in application order. */
-export const SYNCED_FILES = [...RECEIPTS_FILES, ...harnessFiles()];
+export const SYNCED_FILES = [...RECEIPTS_FILES, ...SCHEMA_FILES, ...harnessFiles()];
 
 function syncPairs(pairs, checkOnly) {
   let drifted = 0;
@@ -154,7 +168,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   // Re-derive AFTER stage 1, so a file stage 1 just created is carried down.
   console.log("stage 2  prooflane-harness → template/qa");
-  problems += syncPairs(harnessFiles(), checkOnly);
+  problems += syncPairs([...SCHEMA_FILES, ...harnessFiles()], checkOnly);
 
   for (const orphan of orphanFiles()) {
     if (checkOnly) {

@@ -1,4 +1,5 @@
-// `create-cmp harness init` — the entrance for a repo of ANY stack.
+// `prooflane init` (and `create-cmp harness init`, which delegates here) — the
+// entrance for a repo of ANY stack.
 //
 // WHY THIS EXISTS. Until now the only documented way for a non-Compose repo to
 // declare its stack was a closed loop, and it was measured: the absent-manifest
@@ -45,52 +46,85 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { detect as cmpDetect } from "../../packages/harness/src/lib/profiles/cmp/declarations.mjs";
 
-const LINGUIST = JSON.parse(fs.readFileSync(new URL("../data/linguist-languages.json", import.meta.url), "utf8"));
+const LINGUIST = JSON.parse(fs.readFileSync(new URL("./linguist-languages.json", import.meta.url), "utf8"));
 /** Extension → Linguist language name; the first language claiming an extension keeps it. */
 const EXT_TO_LANGUAGE = new Map();
 for (const [name, exts] of Object.entries(LINGUIST.languages)) for (const e of exts) if (!EXT_TO_LANGUAGE.has(e)) EXT_TO_LANGUAGE.set(e, name);
-/** The profiles whose `detect` this CLI can ask. */
-const KNOWN_DETECTORS = new Map([["cmp", cmpDetect]]);
 
-import { colors, ok, warn, fail } from "../lib/log.mjs";
+import { colors, ok, warn, fail } from "./log.mjs";
+import { loadShippedDeclarations, notPortable } from "./portability.mjs";
 import {
   MANIFEST_REL_PATH,
   MANIFEST_SCHEMA,
   PROFILE_ID_RE,
-} from "../../packages/harness/src/lib/harness-manifest.mjs";
-import { PROFILE_PROTOCOL, profileEntryRel } from "../../packages/harness/src/lib/profile-loader.mjs";
-import { LOCK_PATH } from "../../packages/harness/src/lib/harness-lock.mjs";
-import { SURFACE_CONFIG_REL } from "../../packages/harness/src/lib/inputs-hash.mjs";
+} from "../src/lib/harness-manifest.mjs";
+import { PROFILE_PROTOCOL, profileEntryRel } from "../src/lib/profile-loader.mjs";
+import { LOCK_PATH } from "../src/lib/harness-lock.mjs";
+import { SURFACE_CONFIG_REL } from "../src/lib/inputs-hash.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** The harness package source — the single source of truth for the vendored bytes. */
-export const HARNESS_SRC = path.resolve(HERE, "../../packages/harness/src");
+export const HARNESS_SRC = path.resolve(HERE, "..", "src");
 
 /**
- * Top-level `qa/*.mjs` tools that are the CMP profile's, not the spine's, and
- * are therefore never vendored into a foreign repo. Each would either fail to
- * import or lie about a stack the project is not:
- *   preview-gallery, walkthrough  import the Compose renderer and a11y auditor
- *   scaffold-feature              stamps Compose sources (its own header says so)
- *   refusal-demo                  demonstrates refusals against a Compose tree
- * A profile that wants them ships them; the core does not hand them out.
+ * Which lane files a foreign repo must NOT be given — DERIVED, never listed
+ * here (install/portability.mjs carries the argument). Two signals: a file
+ * whose imports reach a profile cannot load without it, and a file the profile
+ * itself declares as its own tool would lie to a stack it is not.
+ *
+ * Until 2026-09-08 this was two frozen arrays, and their twin lived in
+ * test/agnostic-lint.test.mjs naming this file in a comment — one fact written
+ * down twice, by hand, in two packages.
+ *
+ * Awaited once at module scope: the answer depends only on what the package
+ * ships, so it is the same for every init in the process.
  */
-export const PROFILE_TOOLS = Object.freeze([
-  "preview-gallery.mjs",
-  "walkthrough.mjs",
-  "scaffold-feature.mjs",
-  "refusal-demo.mjs",
-]);
+const PORTABILITY = notPortable(HARNESS_SRC, await loadShippedDeclarations(HARNESS_SRC));
+
+/** `qa/*.mjs` tools that belong to a profile, not the spine. */
+export const PROFILE_TOOLS = Object.freeze(PORTABILITY.tools);
+
+/** `qa/lib/*.mjs` modules that cannot load without their profile. */
+export const PROFILE_LIB = Object.freeze(PORTABILITY.lib);
+
+/** Why each is withheld — for the refusal that has to explain itself. */
+export const PORTABILITY_REASONS = PORTABILITY.why;
 
 /**
- * `qa/lib/*.mjs` that are not stack-free. `a11y.mjs` imports
- * `./profiles/cmp/tree.mjs`, so vendoring it into a repo with no `cmp` profile
- * produces a module that cannot load — the one genuine import edge from the
- * spine into a profile, and the reason this list is not empty.
+ * HOW THE USER GOT HERE, so the commands printed back are ones they can run.
+ *
+ * The same implementation now has two front doors — `prooflane init` (the
+ * harness's own bin, which is the whole point of Stage 1) and `create-cmp
+ * harness init` (the scaffolder, which delegates here so there is one
+ * behaviour rather than two). Printing "create-cmp harness relock" to someone
+ * who installed only the harness would send them back to the very package
+ * Stage 1 says they must not need; printing "prooflane relock" to a create-cmp
+ * user names a binary they may not have. So the caller says which it is, and
+ * the default is the harness's own — a library used without being told assumes
+ * the adopter, not the scaffolder.
  */
-export const PROFILE_LIB = Object.freeze(["a11y.mjs"]);
+const FRONT_DOORS = Object.freeze({
+  prooflane: Object.freeze({
+    init: "prooflane init",
+    relock: "prooflane relock",
+    // NOT `prooflane upgrade`: it does not exist yet (Stage 1's criteria C and
+    // D). Naming a command an adopter cannot run is the same lie this
+    // vocabulary exists to prevent, so the honest answer for a repo that has
+    // only the harness is the one every repo has.
+    restore: "git restore qa/    (re-vendoring by command is not shipped yet)",
+  }),
+  "create-cmp": Object.freeze({
+    init: "create-cmp harness init",
+    relock: "create-cmp harness relock",
+    restore: "create-cmp upgrade --harness  (merges rather than overwrites)",
+  }),
+});
+
+/** @param {string|undefined} name @returns {{init: string, relock: string, upgrade: string}} */
+export function frontDoor(name) {
+  return FRONT_DOORS[name ?? "prooflane"] ?? FRONT_DOORS.prooflane;
+}
 
 /** Directories that are never a project's source root. */
 const NOT_SOURCE = new Set([
@@ -119,7 +153,7 @@ const NOT_SOURCE = new Set([
  */
 /**
  * DETECTION IS DERIVED; ONLY THE GRAMMAR SEEDS ARE OURS. PATTERN: GitHub
- * Linguist's languages.yml (src/data/linguist-languages.json, with provenance)
+ * Linguist's languages.yml (install/linguist-languages.json, with provenance)
  * maps an extension to a language for every tree GitHub classifies; the seed
  * grammars below are keyed by Linguist's language NAME, so an extension nobody
  * here typed cannot be wrong here. Before a profile exists this is the only
@@ -194,19 +228,23 @@ export function languageCounts(root, roots) {
 }
 
 /**
- * Ask every profile this CLI knows whether the tree is ITS — buildpack-style
- * `detect`. Today that is the `cmp` profile shipped in this repo; a registry of
- * profiles is Stage 2's. Evidence is returned, never a bare boolean, so the
- * claim can be argued with and two claims can be refused rather than resolved
- * by list order.
+ * Ask every profile the harness SHIPS whether the tree is ITS — buildpack-style
+ * `detect`. The set is derived from the profiles directory, never a list here:
+ * an installer that named `cmp` would be the coupling Stage 0 removed, one
+ * layer up, and it would be wrong the day a second profile ships. A registry of
+ * profiles beyond the package is Stage 2's.
+ *
+ * Evidence is returned, never a bare boolean, so the claim can be argued with
+ * and two claims can be refused rather than resolved by list order.
  * @param {string} root
- * @returns {{id: string, evidence: string[], reason: string}[]}
+ * @returns {Promise<{id: string, evidence: string[], reason: string}[]>}
  */
-export function profileClaims(root) {
+export async function profileClaims(root) {
   const claims = [];
-  for (const [id, detect] of KNOWN_DETECTORS) {
+  for (const [id, mod] of await loadShippedDeclarations(HARNESS_SRC)) {
+    if (typeof mod.detect !== "function") continue;
     try {
-      const r = detect(root, fs);
+      const r = mod.detect(root, fs);
       if (r && r.claims) claims.push({ id, evidence: r.evidence ?? [], reason: r.reason ?? "" });
     } catch {
       /* a detector that throws claims nothing */
@@ -297,7 +335,11 @@ export function vendorPlan() {
     if (PROFILE_LIB.includes(f)) continue;
     out.push({ rel: `qa/lib/${f}`, src: path.join(libDir, f) });
   }
-  const schema = path.join(HARNESS_SRC, "..", "..", "..", "template", "qa", "evidence", "schema.json");
+  // The receipt contract ships IN the package (packages/harness/evidence/), not
+  // in the repo's template: a registry install has no template to read, and an
+  // adopter whose qa/evidence/ has no schema beside its receipts got a quieter
+  // lane than every stamped app for exactly that reason until 2026-09-08.
+  const schema = path.join(HARNESS_SRC, "..", "evidence", "schema.json");
   if (fs.existsSync(schema)) out.push({ rel: "qa/evidence/schema.json", src: schema });
   return out;
 }
@@ -339,7 +381,7 @@ export function manifestFor(id, sourceRoots) {
  * @param {{sourceRoots: string[], tiers: string[]}} opts
  * @returns {string}
  */
-export function profileSkeleton(id, { sourceRoots, tiers, lang = null }) {
+export function profileSkeleton(id, { sourceRoots, tiers, lang = null, invocation = undefined }) {
   const roots = JSON.stringify(sourceRoots.length ? sourceRoots : ["src"]);
   const g = lang ? LANGUAGE_GRAMMARS[lang] ?? null : null;
   const exts = lang && LINGUIST.languages[lang] ? JSON.stringify(LINGUIST.languages[lang]) : '[".<your source extension>"]';
@@ -369,7 +411,7 @@ export function profileSkeleton(id, { sourceRoots, tiers, lang = null }) {
   const testFilePattern = g && g.testFile ? `/${g.testFile.replace(/\//g, "\\/")}/` : "/(?!)/";
   return `// The "${id}" stack profile — what a stack IS, to this harness.
 //
-// Written by \`create-cmp harness init\`. This file is YOURS: the harness never
+// Written by \`${frontDoor(invocation).init}\`. This file is YOURS: the harness never
 // rewrites it. Everything under qa/lib/ except this directory is machine-owned
 // and must not be edited — if you find yourself needing to, that is a defect in
 // the harness and worth reporting rather than patching locally.
@@ -644,11 +686,11 @@ export function steps({ ROOT }) {
  * @param {{id: string}} opts
  * @returns {{vendor: {rel: string, src: string}[], write: {rel: string, content: string}[], id: string, sourceRoots: string[]}}
  */
-export function planInit(root, { id }) {
+export async function planInit(root, { id, invocation = undefined }) {
   const sourceRoots = detectSourceRoots(root);
   const tiers = ["unit"];
   const lang = detectLanguage(root, sourceRoots);
-  const claimedBy = profileClaims(root);
+  const claimedBy = await profileClaims(root);
   return {
     id,
     sourceRoots,
@@ -658,25 +700,28 @@ export function planInit(root, { id }) {
     vendor: vendorPlan(),
     write: [
       { rel: MANIFEST_REL_PATH, content: JSON.stringify(manifestFor(id, sourceRoots), null, 2) + "\n" },
-      { rel: profileEntryRel(id), content: profileSkeleton(id, { sourceRoots, tiers, lang }) },
+      { rel: profileEntryRel(id), content: profileSkeleton(id, { sourceRoots, tiers, lang, invocation }) },
       { rel: SURFACE_CONFIG_REL, content: JSON.stringify({ surface: seedSurface(root), ignore: [] }, null, 2) + "\n" },
     ],
   };
 }
 
 /**
- * `create-cmp harness init` — writes the entrance, then proves it.
+ * `prooflane init` (and `create-cmp harness init`, which delegates here) —
+ * writes the entrance, then proves it.
  * @param {Record<string, string|boolean>} flags
  * @param {string|undefined} positional
+ * @param {{invocation?: string}} [opts] which front door the user came through
  * @returns {Promise<number>} exit code
  */
-export async function runHarnessInit(flags, positional) {
+export async function runHarnessInit(flags, positional, opts = {}) {
+  const cmd = frontDoor(opts.invocation);
   const targetDir = (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
   const root = path.resolve(targetDir);
   const dryRun = Boolean(flags["dry-run"]);
 
   process.stdout.write(
-    `\n${colors.bold("create-cmp harness init")} — the verify lane, for any stack\n` +
+    `\n${colors.bold(cmd.init)} — the verify lane, for any stack\n` +
       `  project: ${colors.cyan(root)}\n\n`
   );
 
@@ -690,7 +735,7 @@ export async function runHarnessInit(flags, positional) {
     fail(
       `could not derive a profile id from "${path.basename(root)}".\n` +
         `  A profile id is lowercase, dash-separated, and starts with a letter.\n` +
-        `  Pass one: create-cmp harness init --profile <id>`
+        `  Pass one: ${cmd.init} --profile <id>`
     );
     return 2;
   }
@@ -707,21 +752,21 @@ export async function runHarnessInit(flags, positional) {
     process.stdout.write(
       `  Nothing was changed.\n\n` +
         `  Edited your profile or a declaration, and the lane now FAILs harnessIntegrity?\n` +
-        `    ${colors.cyan("create-cmp harness relock")}     re-takes the lock over the files you own\n` +
+        `    ${colors.cyan(cmd.relock)}     re-takes the lock over the files you own\n` +
         `  Re-vendoring the spine after a harness upgrade?\n` +
-        `    ${colors.cyan("create-cmp upgrade --harness")}  merges rather than overwrites\n\n`
+        `    ${colors.cyan(cmd.restore)}\n\n`
     );
     return 0;
   }
 
-  const plan = planInit(root, { id });
+  const plan = await planInit(root, { id, invocation: opts.invocation });
   if (plan.claimedBy.length > 0 && !flags["new-profile"]) {
     const c = plan.claimedBy;
     fail(
       c.length === 1
         ? `this tree is claimed by the \`${c[0].id}\` profile — ${c[0].reason} (evidence: ${c[0].evidence.join(", ")}).\n` +
             `  It already has a profile; \`harness init\` would seed a second, generic one over it.\n` +
-            `  To do that anyway: create-cmp harness init --new-profile`
+            `  To do that anyway: ${cmd.init} --new-profile`
         : `${c.length} profiles claim this tree (${c.map((x) => x.id).join(", ")}) — refusing to pick one by list order. Pass --profile <id> and --new-profile.`
     );
     return 2;

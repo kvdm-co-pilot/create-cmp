@@ -32,7 +32,7 @@ import {
   seedSurface,
   manifestFor,
   profileSkeleton,
-} from "../src/commands/harness-init.mjs";
+} from "../packages/harness/install/init.mjs";
 import { validateProfileModule, profileEntryRel } from "../packages/harness/src/lib/profile-loader.mjs";
 import { absentManifestReason } from "../packages/harness/src/lib/harness-manifest.mjs";
 

@@ -94,6 +94,32 @@ export const grammar = Object.freeze({
 export const reports = Object.freeze({ format: "junit-xml", dir: "composeApp/build/test-results" });
 
 /**
+ * The top-level `qa/*.mjs` tools that are THIS profile's, not the spine's, and
+ * are therefore never vendored into a repo that does not run this profile.
+ *
+ * PATTERN: the contribution point — the core holds no list of stacks, and the
+ * only thing that knows a tool belongs to Compose is the Compose profile.
+ * WHY IT WORKS: the fact is declared once, where it is known, and the installer
+ * derives the set (install/portability.mjs) instead of mirroring it by hand in
+ * two packages, which is what it did until 2026-09-08. HOW IT FAILS: this
+ * profile grows a fifth tool and nobody adds it here, so a foreign repo is
+ * vendored a module that names a stack it is not. WHAT WE DO: the import
+ * closure is the check — `undeclaredProfileTools` refuses a tool whose own
+ * imports reach this profile and that is missing from this list, so the only
+ * gap this can leave is a tool that lies in strings alone.
+ *
+ * These four live at the spine's path for historical reasons; the debt is
+ * recorded in test/agnostic-lint.test.mjs, and the exit is that they move into
+ * this directory, at which point this declaration becomes redundant and goes.
+ */
+export const tools = Object.freeze([
+  "preview-gallery.mjs",
+  "refusal-demo.mjs",
+  "scaffold-feature.mjs",
+  "walkthrough.mjs",
+]);
+
+/**
  * Does this tree belong to THIS profile? PATTERN: Cloud Native Buildpacks'
  * `bin/detect` — each stack recognises itself from marker files and the
  * platform holds no table. WHY IT WORKS: the profile author knows the markers;

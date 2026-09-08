@@ -65,17 +65,20 @@ async function main() {
     }
     // `harness` takes a subcommand because it is stack-neutral and will grow
     // siblings (`upgrade`, `doctor`) that must not collide with the Compose
-    // verbs above. It is also the form that survives the rename: when the
-    // binary is named after the harness, `harness init` becomes `<name> init`.
+    // verbs above. It is also the form that survived the rename it predicted:
+    // since 2026-09-08 the implementation lives in the harness package and its
+    // own binary spells these `prooflane init` / `prooflane relock`. This
+    // dispatch DELEGATES rather than duplicating — `invocation` is the only
+    // difference, and it decides which command names the output prints back.
     case "harness": {
       const sub = rest[0];
       if (sub === "init") {
-        const { runHarnessInit } = await import("../src/commands/harness-init.mjs");
-        process.exit((await runHarnessInit(flags, rest[1])) ?? 0);
+        const { runHarnessInit } = await import("../packages/harness/install/init.mjs");
+        process.exit((await runHarnessInit(flags, rest[1], { invocation: "create-cmp" })) ?? 0);
       }
       if (sub === "relock") {
-        const { runHarnessRelock } = await import("../src/commands/harness-relock.mjs");
-        process.exit((await runHarnessRelock(flags, rest[1])) ?? 0);
+        const { runHarnessRelock } = await import("../packages/harness/install/relock.mjs");
+        process.exit((await runHarnessRelock(flags, rest[1], { invocation: "create-cmp" })) ?? 0);
       }
       process.stderr.write(
         `create-cmp harness: unknown subcommand ${JSON.stringify(sub ?? "")}\n` +

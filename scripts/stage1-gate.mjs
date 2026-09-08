@@ -107,7 +107,7 @@ function criteria() {
         ? `install failed: ${installErr}`
         : bin
           ? `${path.basename(bin)}`
-          : "installed, but the package declares no `bin` — an adopter has nothing to run. `harness init` lives in create-cmp (src/commands/harness-init.mjs), so today a backend needs the very thing Stage 1 says it should not",
+          : "installed, but the package declares no `bin` — an adopter has nothing to run. The installer lives in packages/harness/install/ and is reached through packages/harness/bin/prooflane.mjs; if that is gone, a backend needs create-cmp again, which is the very thing Stage 1 says it should not",
     });
 
     // Everything below needs A. Say so rather than reporting a pass.

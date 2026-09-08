@@ -30,7 +30,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { planRelock, profileIdOf, shippedProfileIds } from "../src/commands/harness-relock.mjs";
+import { planRelock, profileIdOf, shippedProfileIds } from "../packages/harness/install/relock.mjs";
 import { isAdopterOwned } from "../packages/harness/src/lib/harness-region.mjs";
 import { describeIntegrity } from "../packages/harness/src/lib/harness-lock.mjs";
 
@@ -306,7 +306,7 @@ test("the core's name rule stays stack-free — it must not learn a profile id",
   // isAdopterOwned ships inside every vendored lane. It answers "is this the
   // shape of a file an adopter authors", and nothing else: the id of the
   // profile the ENGINE vendors is the engine's knowledge, layered on in
-  // src/commands/harness-relock.mjs. Stage 0's whole direction is that no core
+  // packages/harness/install/relock.mjs. Stage 0's whole direction is that no core
   // module names a profile (test/agnostic-lint.test.mjs).
   assert.equal(isAdopterOwned("qa/lib/profiles/cmp/steps-cmp.mjs"), true, "the NAME rule alone cannot tell — which is why the command layers on the shipped list");
   assert.equal(isAdopterOwned("qa/lib/spec-coverage.mjs"), false);

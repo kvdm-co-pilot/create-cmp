@@ -5,7 +5,7 @@
 //
 //   `export const ladder`         the top-level declaration. `harness init`
 //                                 seeds it as THE way to declare rungs
-//                                 (src/commands/harness-init.mjs), and
+//                                 (install/init.mjs), and
 //                                 qa/receipt-check.mjs read it.
 //   `evidenceLadder` on the pack  a key on the object `steps(ctx)` returns.
 //                                 The lane runner read only this one

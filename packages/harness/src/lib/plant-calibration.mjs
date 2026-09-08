@@ -75,7 +75,7 @@
  *
  * These are the same three the runner tested inline before this file existed,
  * and the same three `harness init` seeds in the commented `export const plants`
- * skeleton (src/commands/harness-init.mjs). That agreement is deliberate and is
+ * skeleton (install/init.mjs). That agreement is deliberate and is
  * the answer to the discoverability objection this repository has already paid
  * for once: `harnessIntegrity` was a requirement no profile author could find,
  * and it cost an adopter a lane that could never mint a valid receipt
