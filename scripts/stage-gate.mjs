@@ -60,18 +60,22 @@ const STAGES = [
   {
     id: "2",
     name: "profiles as artifacts",
-    criteria: null,
-    pending:
-      "\"a profile authored by a team OUTSIDE this project passes framework-check and mints a receipt " +
-      "Gatekeeper accepts\" — deliberately not automatable: its whole point is an author this project does " +
-      "not control. What CAN be a command is the acceptance half (given a foreign profile, does it pass), " +
-      "leaving only provenance to a human.",
+    // The criterion names an AUTHOR this project does not control, so half of it
+    // is not automatable and pretending otherwise would be the vacuous green.
+    // The gate splits it: provenance is read from a human-written attestation
+    // and reported NOT MET while none exists; acceptance — does the machinery
+    // take a foreign profile end to end, and refuse what §8 says it must — is
+    // executed. It is red today, and seven of its ten rows are findings.
+    criteria: [{ what: "a foreign profile is accepted end to end, and the badge floor refuses what it must", cmd: ["scripts/stage2-gate.mjs"] }],
   },
   {
     id: "3",
     name: "fleet",
-    criteria: null,
-    pending: "\"10 repos upgraded by one command; receipts comparable within pack\" — countable, so a predicate is cheap. Nothing to count yet.",
+    // "Nothing to count yet" is the honest state and it is not the same as zero:
+    // an absent fleet manifest is REFUSED (§8.7 one layer up), never counted as
+    // a fleet of none and called done. The count itself is read out of §9 rather
+    // than kept as a constant here, so lowering the bar means editing the road.
+    criteria: [{ what: "a declared fleet, upgraded by one command, with the proof in each tree", cmd: ["scripts/stage3-gate.mjs"] }],
   },
 ];
 
