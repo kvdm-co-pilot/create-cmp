@@ -22,6 +22,7 @@ import { validatePackageName } from "./lib/package-name.mjs";
 import { buildTokenMap, replaceTokens, replacePathTokens, isBinaryPath, slugifyAppName } from "./lib/tokens.mjs";
 import { isHarnessFile, listHarnessFiles } from "../packages/harness/src/lib/harness-region.mjs";
 import { writeHarnessLock } from "../packages/harness/src/lib/harness-lock.mjs";
+import { writeHarnessSource, HARNESS_PKG_NAME } from "../packages/harness/src/lib/harness-source.mjs";
 import { renamePackageDirs } from "./lib/rename.mjs";
 import {
   stripFeatureBlocks,
@@ -305,6 +306,13 @@ function writeLaneLock(projectDir) {
   // it would attest nothing while creating the very qa/ directory the strip
   // just removed.
   if (listHarnessFiles(projectDir).length === 0) return;
+  // PROVENANCE BEFORE THE LOCK (ADR-0008). The record is inside the region, so
+  // it must exist before the region is hashed. A stamped app's lane bytes were
+  // COPIED FROM A PATH ON THIS MACHINE — the template inside whichever
+  // create-cmp is installed here — which is `local` exactly as the enum defines
+  // it, and is true however create-cmp itself arrived. Calling it `registry`
+  // because the scaffolder came from npx would name the wrong artifact.
+  writeHarnessSource(projectDir, { name: HARNESS_PKG_NAME, version, source: "local" });
   writeHarnessLock(projectDir, { version });
 }
 

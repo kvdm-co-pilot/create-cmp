@@ -52,6 +52,7 @@ import {
   checkHarnessIntegrity,
   describeIntegrity,
 } from "../../packages/harness/src/lib/harness-lock.mjs";
+import { writeHarnessSource, HARNESS_PKG_NAME } from "../../packages/harness/src/lib/harness-source.mjs";
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -152,7 +153,12 @@ export async function hardenProject({ projectDir, templateDir, apply = false, lo
     }
 
     const harnessVersion = shippedHarnessVersion();
-    if (harnessVersion) writeHarnessLock(projectDir, { version: harnessVersion });
+    if (harnessVersion) {
+      // Same ordering as the stamp: the record is inside the region the lock
+      // hashes, so it exists first (ADR-0008).
+      writeHarnessSource(projectDir, { name: HARNESS_PKG_NAME, version: harnessVersion, source: "local" });
+      writeHarnessLock(projectDir, { version: harnessVersion });
+    }
 
     const updated = { ...record, harness: true, engineVersion: currentEngineVersion() };
     fs.writeFileSync(specPath, JSON.stringify(updated, null, 2) + "\n");

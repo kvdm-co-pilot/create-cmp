@@ -39,6 +39,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
+/**
+ * The package whose bytes a lane is made of. Named here because four writers
+ * record it — `prooflane init`, `prooflane upgrade`, the stamp and
+ * `upgrade --harness` — and a provenance record naming the wrong package is
+ * exactly the falsehood this file exists to prevent.
+ */
+export const HARNESS_PKG_NAME = "prooflane-harness";
+
 /** Project-relative path of the provenance record. */
 export const SOURCE_PATH = "qa/harness-source.json";
 
