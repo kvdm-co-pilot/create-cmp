@@ -190,7 +190,7 @@ Receipt schema (abridged):
 
 ```json
 {
-  "schema": "cmp-evidence/1",
+  "schema": "prooflane-evidence/1",
   "commit": { "sha": "…", "dirty": ["…"] },
   "profile": "local|ci",
   "verdict": "PASS|FAIL",

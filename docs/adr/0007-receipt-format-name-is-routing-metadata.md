@@ -1,7 +1,7 @@
 # ADR-0007: The receipt format name is routing metadata, not part of the claim — rename it, read both
 
 - **Status:** accepted — 2026-09-08, Karel van der Merwe (signed by his instruction in session — "sign the adrs"; drafted by the architect)
-- **Implementation:** pending — the rename PR (`prooflane-evidence/1` in `$id`, both writers, the reader's enum) is its own slice; nothing in the tree carries the new name yet.
+- **Implementation:** landed 2026-09-08. `$id` and the writer are `prooflane-evidence/1` (`packages/harness/evidence/schema.json`, `packages/harness/src/verify.mjs` and its vendored twin); `properties.schema` is an enum of both names; the equivalence the decision rests on — a receipt in either name validates identically — is pinned by `packages/receipts/test/receipt-validate.test.mjs` rather than left resting on the absence of a reader. `LOCK_SCHEMA` and the arch-doc markers deliberately did NOT move, as this ADR specifies.
 - **Date:** 2026-09-05
 
 ## Context

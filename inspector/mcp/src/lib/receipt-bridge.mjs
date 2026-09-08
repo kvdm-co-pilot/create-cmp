@@ -4,7 +4,8 @@
 //
 // File ownership: this package owns inspector/mcp/**, not template/qa/**. The
 // receipt itself (qa/evidence/latest.json) is written by the project's own
-// qa/verify.mjs — see that file's `receipt` object (schema "cmp-evidence/1"):
+// qa/verify.mjs — see that file's `receipt` object (schema "prooflane-evidence/1",
+// and "cmp-evidence/1" on anything written before ADR-0007's rename):
 // { schema, profile, verdict, commit, inputs: {hash, fileCount}, steps: [{name,
 // verdict, reason?, durationMs, details?}], strength, evidenceLevel: {rung,
 // name, satisfiedBy}|null, pack: {id, version}, artifacts, toolVersions,
@@ -49,7 +50,9 @@ export function resolveReceiptRelPath(root) {
   return layoutPath(root, "receipt");
 }
 
-// Two receipt schemas name the same facts differently: cmp-evidence/1 nests
+// Two receipt SHAPES name the same facts differently (the format NAME is not
+// what is dispatched on — ADR-0007 — which is why the rename to
+// prooflane-evidence/1 changed nothing here): the harness receipt nests
 // them (inputs.hash, commit.sha, generatedAt) while a spine adopter's own
 // writer may keep them flat (inputsHash, gitSha, timestamp — payment-blueprint's
 // pb-evidence/1). Both are READ here, never re-derived; a field absent in

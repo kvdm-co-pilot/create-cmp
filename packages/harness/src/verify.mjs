@@ -560,7 +560,11 @@ const STAGE_OF_PROFILE = { smoke: "smoke", scaffold: "scaffold", local: "change"
 // hashes the whole region.
 const harnessSummary = harnessForReceipt();
 const receipt = {
-  schema: "cmp-evidence/1",
+  // ADR-0007: the format name is ROUTING METADATA, not part of the claim, so
+  // this rename asserts nothing new and expires nothing old. Readers accept
+  // both names for the life of /1; `cmp-evidence/1` stopped being WRITTEN here
+  // and never stops being READ.
+  schema: "prooflane-evidence/1",
   profile,
   stage: STAGE_OF_PROFILE[profile] ?? profile,
   // "full" is the done-gate; "fast" (--fast) excluded the device/release tier
