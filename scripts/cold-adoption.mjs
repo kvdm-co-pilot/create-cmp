@@ -45,7 +45,7 @@ const ECOSYSTEMS = [
         'package cart\n\nimport "testing"\n\n// SPEC: CART-01\nfunc TestTotal(t *testing.T) {\n\tif (&Cart{Items: []int{1, 2}}).Total() != 3 {\n\t\tt.Fatal("bad")\n\t}\n}\n\n// SPEC: CART-02\nfunc TestEmpty(t *testing.T) {\n\tif (&Cart{}).Total() != 0 {\n\t\tt.Fatal("bad")\n\t}\n}\n',
       "specs/cart.spec.md": "# Cart\n\n- **CART-01** the cart totals its line items\n- **CART-02** [tier: unit] an empty cart totals zero\n",
     },
-    expect: { language: ".go", citations: 2 },
+    expect: { language: "Go", citations: 2 }, // init names the language, Linguist-style, since 2026-09-08
   },
   {
     id: "py",
@@ -55,7 +55,7 @@ const ECOSYSTEMS = [
         "from app.cart import Cart\n\n\n# SPEC: CART-01\ndef test_total():\n    assert Cart([1, 2]).total() == 3\n\n\n# SPEC: CART-02\ndef test_empty():\n    assert Cart().total() == 0\n",
       "specs/cart.spec.md": "# Cart\n\n- **CART-01** the cart totals its line items\n- **CART-02** [tier: unit] an empty cart totals zero\n",
     },
-    expect: { language: ".py", citations: 2 },
+    expect: { language: "Python", citations: 2 },
   },
 ];
 
