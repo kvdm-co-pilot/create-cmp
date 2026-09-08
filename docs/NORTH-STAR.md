@@ -272,8 +272,11 @@ termination logic, stopped by self-assessment rather than a verifier.
 
 So: `node scripts/stage-gate.mjs` evaluates every stage's exit. A stage with no predicate prints
 NO PREDICATE and exits 2 — writing the predicate is the FIRST task of that stage, never the
-last. Four stages are in that state today, and making them evaluable immediately found that
-Stage 1's criterion contradicts ADR-0008.
+last. **As of 2026-09-08 every stage on the road has one**, and writing them is what found the
+defects: Stage 1's criterion contradicted ADR-0008, and Stage 2's opened six live ones — three
+against guarantee §8.9 alone (§9.2). Neither was found by re-reading the documents that held them.
+That is the case for the predicate in one line — it is not bookkeeping about work, it is the
+cheapest adversary the work has.
 
 Four terminators, layered, because any one alone fails: **a verifier** (an objective command,
 never the agent's own judgement); **a cap** on iterations; **a budget** in tokens or wall-clock;
@@ -372,19 +375,19 @@ at every PR.
 scripts/stage-gate.mjs` evaluates them and exits 2 on any stage whose criterion is still a
 sentence — see §7, *termination is a first-class concern*. Stage 0 is the worked example: it
 outlived three criteria while its exit was prose and closed within a day of becoming
-`scripts/stage-gate.mjs 0`. Stages 0.5 through 3 are all still prose, and writing each predicate
-is the first task of its stage, not the last. The exercise is not bookkeeping: rendering Stage
-1's criterion evaluable immediately exposed that "a core fix reaches it by version bump"
-contradicts ADR-0008, under which a core fix reaches a repo as a re-lock and never as a
-package-manager bump.
+`scripts/stage-gate.mjs 0`. **Every stage has a predicate as of 2026-09-08**; none is prose. The
+exercise is not bookkeeping: rendering Stage 1's criterion evaluable immediately exposed that "a
+core fix reaches it by version bump" contradicts ADR-0008, under which a core fix reaches a repo
+as a re-lock and never as a package-manager bump — and rendering Stage 2's exposed six live
+defects, three of them against guarantee §8.9 alone (§9.2).
 
 | Stage | What | Exit criterion (measured) | Trigger | State 2026-09-05 |
 |---|---|---|---|---|
 | **0 — the lane seam** | The dependency inversion; the grammar; `harness init` and `harness relock`; every rule that decides a verdict declared by the profile rather than assumed by the spine | **Differential conformance: every verdict-bearing core function returns the same verdict for the same logical input under two unlike profiles, proved by EXECUTION.** Plus a cold adoption authored from `harness init` output and the README alone, re-run against the fixed tree. Fleet L2 green per PR. | taken — a dependency-direction fix | **EXITED 2026-09-07.** 24/24 profile-dependent verdict-bearing core functions proved against two unlike profiles, enforced by `test/stage0-differential-coverage.test.mjs`. Cold adoptions re-run against the fixed tree: Go and Python, nothing → `harness init` → framework-check PASS → lane PASS, citations bound and tiers resolved. Fleet L2 green per PR. All 7 known-wrong verdicts closed; lint inverted to deny-by-default (§9.1) |
 | **0.5 — the console into the harness** | Provider interface named from the existing tool contracts; console + MCP server into the harness; section types formalised; tool listing profile-driven; `cmp` providers extracted; neutral skills moved | `node scripts/stage05-gate.mjs` — a recorded baseline for "exactly as today", an honesty floor a section can FAIL, sections declared rather than assumed, no Compose furniture off-Compose, the console inside the harness package (proved by RENDERING from it, not by `existsSync`), and the package it left still standing alone | Stage 0 exit; before Stage 1 so the package boundary is drawn with the console inside | **6/6. EXITED 2026-09-07.** The console is in `packages/harness/src/console/` and ships in the `prooflane-harness` tarball. No `STACK_COUPLED` entry was needed (still 7) — the moved files were made stack-free instead, which found a real wrong verdict on the way. The move briefly BROKE `@create-cmp/inspector`'s tarball (imports climbing out of the package root); closed by declaring the edge, not reverting it: `inspector/mcp` is a workspace member depending on `prooflane-harness@^0.20.0`, and the harness publishes a `./console/*` surface so the import names a public API rather than reaching into `src/`. Proved by packing the inspector, installing the tarball in an empty directory so the dependency resolves from the registry, and importing it. Permanent ordering: the harness publishes first |
 | **1 — distribution** | The package split (PACKAGE-SPLIT Phases C–E): `prooflane-harness`, `prooflane-cli`, `prooflane-profile-cmp`, `prooflane-studio-cmp`; the lock as a stamper-written manifest; resolve local → node_modules → registry → git URL, fetch at init/new only | `node scripts/stage1-gate.mjs` — a foreign backend installs the harness with NO create-cmp present and gets a command; that command installs a lane reaching a green verify; a core fix published at a higher version reaches the adopter by ONE command; and **the fix arrives IN THE TREE** — the vendored bytes and the lock's per-file digests move, not merely a number in a manifest | Stage 0.5 exit **and** ADR-0007 signed (O4) **and** the Stage 1 ADR (O2) | **0/4, not started.** The predicate exists and is honest about why: the harness package installs into a foreign repo cleanly but declares no `bin`, so an adopter has nothing to run — `harness init` lives in `src/commands/` of create-cmp, which is the very thing this stage says a backend should not need. Criteria B–D report "not reached" rather than passing vacuously. **Criterion amended 2026-09-08:** it read "a core fix reaches it by version bump", which ADR-0008 contradicts — under it the harness is always vendored, so a fix arrives as RESOLVE → VENDOR → RE-LOCK by one command, never as a package manager moving a number. The ADR flagged the contradiction itself and asked for the wording to be read that way or amended; amending it is what made the criterion evaluable |
-| **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows from the profile | A profile authored by a team **outside this project** passes framework-check and mints a receipt Gatekeeper accepts. Our own agents authoring one no longer counts — two have, and both found defects rather than proving absence of them | a genuinely external adopter, or the pinned port-demand issue | — |
-| **3 — fleet** | `fleet-check` / `upgrade --harness` across a pinned fleet; the console as a fleet view | 10 repos upgraded by one command; receipts comparable within pack | first evidence prospect with more than 10 repos | — |
+| **2 — profiles as artifacts** | Profile versioning and protocol handshake; `extends`; per-profile framework-check as the badge floor; Gatekeeper reads `pack`; governance rows from the profile | `node scripts/stage2-gate.mjs` — the criterion names an AUTHOR this project does not control, so it splits in two. **Provenance is human-attested** (`docs/attestations/stage2-external-profile.json`), reported NOT MET while none exists and never derived. **Acceptance is executed**: a foreign profile loads through a real protocol handshake, framework-check runs the profile's OWN plants and each fails by name, the receipt names its pack and the vendored predicate refuses one that does not, `pack.version` is the profile's own, and every surface showing a rung shows the pack | a genuinely external adopter, or the pinned port-demand issue | **3/10, not started.** The predicate exists and the seven red rows are findings, not absences — four against guarantees already binding (§9.2) |
+| **3 — fleet** | `fleet-check` / `upgrade --harness` across a pinned fleet; the console as a fleet view | `node scripts/stage3-gate.mjs` — a fleet is DECLARED in `fleet.json`, never discovered, and an absent manifest is refused rather than counted as a fleet of none; §9's count of 10 is read out of this document rather than kept as a constant, so lowering the bar means editing the road; ten DISTINCT repos (clones and copies are one repo); ONE command; and the proof is each tree — per-repo lock digests moving, a version that moves while bytes do not being the falsehood ADR-0008 forbids; rungs compared only WITHIN a pack, never across | first evidence prospect with more than 10 repos | **0/7, and honestly so.** No fleet is declared and no fleet command exists; the gate says which, and refuses to call zero a fleet |
 
 ### 9.1 Why Stage 0 has outlived two exit criteria
 
@@ -537,6 +540,61 @@ profiles with a handshake, a manifest that says exactly what shipped, one comman
 a pinned fleet, and receipts comparable within a pack. Stage 0 alone gives one repo a clean
 seam; it does not give a fleet a spine. That is why the stages are ordered as they are and why
 none is skipped.
+
+### 9.2 What Stage 2's predicate found before Stage 2 started
+
+Writing `scripts/stage2-gate.mjs` was Stage 2's first task, not its last, and it was red on the
+first run: seven of ten rows. **Two of those are honest absences** — no external profile is
+attested, and the criterion that depends on one is not reached. **One is the feature the stage
+exists to build** — the loader has no `extends`, so an heir declaring only what it changes is
+refused (`profile-loader.mjs:51` requires every declaration from every profile). **Four are live
+defects**, and two more were found beside them. None was visible from inside `cmp`, which is the
+whole reason a second profile had to run.
+
+*Against guarantee §8.9 — "a profile with no calibrated plants earns no rung", "a `cmp` L2 and any
+other pack's L2 are different claims and are shown as such":*
+
+- **A profile with no plants earns a rung.** `evidenceLevel` (`packages/harness/src/lib/evidence-level.mjs:61`)
+  derives the rung from the ladder alone and never asks whether the profile has plants. Measured:
+  a fixture shipping zero plants earned L1. §3 makes "earns a rung without plants" one of a Stack
+  Profile's four *nevers*, and nothing anywhere connects the two facts.
+- **`evaluateReceipt` never reads `pack`.** A receipt with the field deleted is accepted as valid
+  (`packages/harness/src/lib/receipt-validate.mjs`). The field the whole comparability rule rests
+  on is checked by nothing and an editor can remove it without any reader noticing.
+- **No surface that shows a rung shows the pack.** `renderEvidenceBadge`
+  (`packages/harness/src/lib/evidence-badge.mjs`) and `receipt-check.mjs:225` each print the rung
+  alone, against §6.5 and against §3's promise that Gatekeeper shows the pack beside the rung.
+
+*Against ADR-0008:*
+
+- **`pack.version` inherits the harness lock's version** (`packages/harness/src/verify.mjs:568`).
+  Measured: a profile declaring `0.3.1` minted a receipt recording `0.20.0`. The ADR decided the
+  number "must become null, not inherited"; the code's own comment admits the borrowing — "its
+  version is the lock's until the profile loader gives it its own".
+
+*Found beside them, and the sharper pair:*
+
+- **The evidence ladder has two spellings, and each has a different reader.** `harness init` seeds
+  a commented `export const ladder` as the way to declare rungs
+  (`src/commands/harness-init.mjs:498`); the lane runner reads `pack.evidenceLadder` off the object
+  `steps(ctx)` returns (`packages/harness/src/verify.mjs:462`); `receipt-check.mjs:137` reads the
+  top-level `profile.ladder`. `cmp` exports **both** (`profiles/cmp/index.mjs:34`,
+  `steps-cmp.mjs:1513`) for a stated reason — a reader that must not start a lane needs one it can
+  ask without instantiating anything — so the split is invisible from inside the only real profile.
+  A foreign author who does exactly what the seeded skeleton says gets **no rung and no
+  explanation**. That is a silently wrong verdict, the class §9.1 catalogues eight of, and it was
+  found the same way all eight were: by running in an ecosystem the code had never met.
+- **The three spec plants hardcode a step name.** `framework-check.mjs:243, :270, :289` assert
+  `step: "specCoverage"` — a name the `cmp` pack chose, asserted against every profile, so a pack
+  spelling it otherwise fails its own Rule 0 instrument. This is the `harnessIntegrity` defect
+  closed in §9.1 with the same shape, in the same file: `VOUCHING_STEP` already solved the class
+  for the floor plants by finding the row that carries the DATA rather than the name, and the spec
+  plants did not get the treatment. A fix applied to the instances rather than to the class comes
+  back.
+
+**None of these is fixed here**, deliberately: the predicate is the stage's first task and fixing
+what it finds is the stage's work. What has changed is that the work has a red command to close
+rather than a paragraph to interpret.
 
 ---
 
