@@ -27,8 +27,18 @@ test("the device tier runs unless every changed path is declared unable to affec
 });
 
 test("the gate outputs are read, not retyped", () => {
-  assert.deepEqual(parseSuite("ℹ tests 1525\nℹ suites 0\nℹ pass 1525\nℹ fail 0\n"), { tests: 1525, pass: 1525, fail: 0 });
-  assert.deepEqual(parseSuite("no summary here"), { tests: null, pass: null, fail: null });
+  assert.deepEqual(parseSuite("ℹ tests 1525\nℹ suites 0\nℹ pass 1525\nℹ fail 0\n"), { tests: 1525, pass: 1525, fail: 0, failing: [] });
+  assert.deepEqual(parseSuite("no summary here"), { tests: null, pass: null, fail: null, failing: [] });
+
+  // A failure has to arrive with a NAME. The counts alone are unactionable by
+  // the time anyone reads the block — measured on 2026-09-08, when this line
+  // said "1647/1648 — 1 FAILING" once and was green on the next two runs, with
+  // nothing left to say which test it had been.
+  assert.deepEqual(
+    parseSuite("✖ a step that broke (12.3ms)\n✖ a step that broke (12.3ms)\nℹ tests 3\nℹ pass 2\nℹ fail 1\n"),
+    { tests: 3, pass: 2, fail: 1, failing: ["a step that broke"] },
+    "named once, however many times the runner echoes it",
+  );
   const fc = parseFrameworkCheck("framework check: PASS — the lane returns, both ways: 7 plants, 2883ms total (bound 10000ms)");
   assert.deepEqual(fc, { verdict: "PASS", plants: 7, ms: 2883 });
   assert.equal(parseFrameworkCheck("framework check: FAIL — planted x").verdict, "FAIL");

@@ -42,7 +42,15 @@ export function parseSuite(stdout) {
     const m = stdout.match(new RegExp(`^\\u2139 ${k} (\\d+)$`, "m"));
     return m ? Number(m[1]) : null;
   };
-  return { tests: n("tests"), pass: n("pass"), fail: n("fail") };
+  // WHICH tests failed, not just how many. A bare "1 FAILING" is unactionable
+  // by the time anyone reads it — and this is not hypothetical: on 2026-09-08
+  // this line reported 1647/1648 once, immediately after a device run, and was
+  // green on the next two invocations. Six FEWER tests were even registered,
+  // which says a file aborted rather than an assertion failing — and none of
+  // that was recoverable from the count, because the output had been thrown
+  // away. A transient nobody can name is a transient nobody can fix.
+  const failing = [...stdout.matchAll(/^\u2716 (.+?) \(\d/gm)].map((m) => m[1].trim());
+  return { tests: n("tests"), pass: n("pass"), fail: n("fail"), failing: [...new Set(failing)] };
 }
 
 /** `framework check: PASS — … 7 plants, 2883ms total`. */
@@ -96,6 +104,7 @@ function render(d) {
   L.push("fit test — the derived half (docs/NORTH-STAR.md §10)\n");
   L.push("6. Proof at altitude");
   L.push(`   suite             ${d.suite ? `${d.suite.pass}/${d.suite.tests}${d.suite.fail ? ` — ${d.suite.fail} FAILING` : ""}` : "not run (--no-run)"}`);
+  for (const name of d.suite?.failing ?? []) L.push(`                     ✖ ${name}`);
   L.push(`   framework-check   ${d.frameworkCheck ? `${d.frameworkCheck.verdict} · ${d.frameworkCheck.plants} plants · ${d.frameworkCheck.ms} ms` : "not run (--no-run)"}`);
 
   // The reason comes from deriveTierNeed and is PRINTED, not reconstructed. The
