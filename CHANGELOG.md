@@ -8,6 +8,32 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **An intact region must contain engine code (ADR-0010) — and building the plant corrected the
+  diagnosis.** ADR-0008 measured the hole and left it: a tree holding two declarations and nothing
+  else locks, and `checkHarnessIntegrity` calls it `intact`.
+
+  The first draft said the floor would fire when a lane ran *from outside the region*. **That mode
+  cannot occur** — `verify.mjs` and `receipt-check.mjs` derive their root from their own file
+  location, so a lane always attests the tree it lives in and its own module is always in that
+  tree's region. Trying to build the kept plant is what showed it.
+
+  So the reachable defect was never a missing gate deep in the lane; it was a **false sentence in the
+  shared voice**. `describeIntegrity` — what `create-cmp upgrade --harness`, `harden`,
+  `prooflane upgrade` and any hosted checker render — said `"prooflane-harness 0.20.0 — 3 files
+  verified"` over a lane containing no lane. It now says it is not a lane.
+
+  `status` is deliberately untouched: a region of declarations really *is* unmodified since it was
+  locked. `vacuous` and `engineFiles` answer the separate question, exactly as ADR-0008 refused a
+  fourth `status` value for provenance. The vouching step FAILs on the same flag — correct, and
+  honestly unreachable through today's entry points, kept because it costs ten lines and becomes
+  reachable the moment any caller passes a foreign root.
+
+  **The kept plant is out-of-tree, and the exception is bounded by its reason:** this gate's violation
+  is the *absence* of the engine, so planting it in the tree deletes the instrument mid-run — the lane
+  would fail to start rather than fail by name. `framework-check` builds the region in a scratch
+  directory and watches `describeIntegrity` refuse, because a flag nobody prints is a gate nobody
+  sees. Any future gate wanting this exception must show the same property, not cite this one.
+
 - **TAP and CTRF report parsers — `reports.format` stops being a one-value enum.** Both were named
   as "next" beside `REPORT_FORMATS` for months, and a profile declaring either got a refusal saying
   a parser was its own change. This is that change, and the cmp pack now routes through a

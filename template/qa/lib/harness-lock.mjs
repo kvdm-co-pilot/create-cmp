@@ -117,6 +117,8 @@ export function checkHarnessIntegrity(root) {
       missing: [],
       extra: [],
       fileCount: region.fileCount,
+      engineFiles: region.engineFiles,
+      vacuous: region.engineFiles === 0,
     };
   }
 
@@ -131,6 +133,12 @@ export function checkHarnessIntegrity(root) {
     missing: cmp.missing,
     extra: cmp.extra,
     fileCount: region.fileCount,
+    // ADR-0010: how much of this region is the LANE, and whether it is a lane
+    // at all. `status` is deliberately untouched — a region of three
+    // declarations genuinely IS unmodified since it was locked; it is simply
+    // not a lane, and that is a different question from the one status answers.
+    engineFiles: region.engineFiles,
+    vacuous: region.engineFiles === 0,
   };
 }
 
@@ -141,6 +149,19 @@ export function checkHarnessIntegrity(root) {
  * @returns {string}
  */
 export function describeIntegrity(r) {
+  // ADR-0010, AND THIS IS THE REACHABLE HALF OF IT. `status` is honest — a
+  // region of declarations really is unmodified since it was locked — so a
+  // caller rendering that status alone says "N files verified" over a lane that
+  // holds no lane. Every caller that checks a tree it does not LIVE in reaches
+  // this: `create-cmp upgrade --harness` and `harden` print it over an
+  // arbitrary project directory, `prooflane upgrade` over the adopter's root,
+  // and a hosted checker over a repo it fetched. The shipped lane cannot (it
+  // derives its root from its own location, so its own module is always in the
+  // region) — which is exactly why the fix belongs in the shared voice rather
+  // than in one step.
+  if (r.vacuous) {
+    return `${r.name ?? "harness"} ${r.version ?? "?"} — ${r.fileCount} file(s) locked and NONE of them engine code: this is not a lane, and nothing here can vouch for one`;
+  }
   if (r.status === "intact") {
     // The region digest rides beside the version: two lanes can carry the same
     // package version with different content (create-cmp-showcase, 2026-09-03 —

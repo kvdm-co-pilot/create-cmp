@@ -368,6 +368,29 @@ function stepHarnessIntegrity() {
   const r = checkHarnessIntegrity(ROOT);
   const base = { name: "harnessIntegrity", durationMs: Date.now() - started, harness: r };
 
+  // ADR-0010 — THE FLOOR, BEFORE THE STATUS. A region with no engine module
+  // reads `intact` and is telling the truth: it is unmodified since it was
+  // locked. It is simply not a lane, and a lane that is not there cannot vouch
+  // for anything.
+  //
+  // On an ordinary tree this cannot fire — a region with no qa/verify.mjs has
+  // nothing to run this check. It fires in the one mode ADR-0008 rejects: a
+  // lane running from OUTSIDE the region, over a project whose qa/ holds only
+  // declarations. There the lane runs, this step executes, and until now it
+  // returned PASS over a project carrying none of the code that produced the
+  // verdict — the residue that ADR predicted, in the row that exists to
+  // prevent exactly it.
+  if (r.vacuous) {
+    return {
+      ...base,
+      verdict: "FAIL",
+      reason:
+        `the harness region holds ${r.fileCount} file(s) and NONE of them is engine code — this is not a lane, so it cannot vouch for one. ` +
+        `A lane running from outside the region (node_modules) over a project whose qa/ carries only declarations produces exactly this: ` +
+        `install the lane into the tree (\`prooflane init\`, or \`prooflane upgrade\` to re-vendor it) so the code that issues the verdict is the code the receipt binds`,
+    };
+  }
+
   if (r.status === "intact") {
     return { ...base, verdict: "PASS", note: describeIntegrity(r) };
   }

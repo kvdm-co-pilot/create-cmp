@@ -39,6 +39,7 @@
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,6 +58,7 @@ import {
 import { plantCalibration } from "./lib/plant-calibration.mjs";
 import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
 import { listHarnessFiles } from "./lib/harness-region.mjs";
+import { checkHarnessIntegrity, describeIntegrity, writeHarnessLock } from "./lib/harness-lock.mjs";
 import { listFlowFiles, scanCitations, walkFiles } from "./lib/spec-coverage.mjs";
 import { resolveSpecModel } from "./lib/spec-model.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
@@ -648,6 +650,51 @@ try {
       die(`the Stop hook did not refuse a receipt whose tier was skipped for an environmental reason:\n${hook.stderr.slice(-400)}`);
     }
     out(`  Stop hook            refuses a skipped tier ✓`);
+  }
+
+  // 4b. THE VACUITY FLOOR (ADR-0010) — the one plant that cannot be made in
+  // this tree.
+  //
+  // Its violation is the ABSENCE of the engine, so planting it here would
+  // delete the files this instrument is running from: the lane would fail to
+  // START rather than fail by name, and a plant that proves the tree is broken
+  // proves nothing about the gate. So the region is built in a scratch
+  // directory, locked, and the refusal is watched there.
+  //
+  // The exception is granted for one reason and holds only while that reason
+  // does: this is the only gate whose violation removes the instrument that
+  // would observe it. A future gate wanting an out-of-tree plant must show the
+  // same property, not cite this one.
+  {
+    const started = Date.now();
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "vacuity-floor-"));
+    try {
+      fs.mkdirSync(path.join(scratch, "qa"), { recursive: true });
+      // A region of declarations and nothing else — ADR-0008's probe, exactly.
+      fs.writeFileSync(path.join(scratch, "qa", "verified-surface.json"), '{"surface":["src"]}\n');
+      fs.writeFileSync(path.join(scratch, "qa", "harness-manifest.json"), '{"schema":"harness-manifest/1"}\n');
+      writeHarnessLock(scratch, { version: "0.0.0-plant" });
+      const seen = checkHarnessIntegrity(scratch);
+      if (!seen.vacuous || seen.engineFiles !== 0) {
+        die(`the vacuity floor did not see an engine-free region: engineFiles=${seen.engineFiles}, vacuous=${seen.vacuous}`);
+      }
+      if (seen.status !== "intact") {
+        die(`the plant is only meaningful while the region reads intact — it read "${seen.status}", so the floor is being proved against the wrong state`);
+      }
+      // FAILING BY NAME is the requirement (§8.8), and the name has to reach a
+      // human. `describeIntegrity` is the shared voice every caller renders, so
+      // the plant watches THAT refuse — a flag nobody prints would be a gate
+      // nobody sees.
+      const said = describeIntegrity(seen);
+      if (!/not a lane/.test(said) || /files verified/.test(said)) {
+        die(`the vacuity floor is invisible to every caller that renders an integrity result: describeIntegrity said "${said}"`);
+      }
+      const ms = Date.now() - started;
+      cycles.push({ label: "vacuity floor", ms });
+      out(`  FAIL: region holds no engine     ${String(ms).padStart(5)}ms   ✓ intact but vacuous, and it SAYS so — ${seen.fileCount} file(s), 0 engine`);
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
   }
 
   // 5. Everything reverted, and it passes again — the plants were the only cause.
