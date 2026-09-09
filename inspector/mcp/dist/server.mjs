@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 31597c6353f4118f2a86ccbec6b6d05dc5425d351c15e8f12db868087fb3c12d
+// cmp:bundle-inputs d8ce1df979e8a8624c2a86da1b83d154651e720fa087902407b21656e54f212e
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36279,7 +36279,13 @@ function flowRail(sections = []) {
     const evidence = step.sections.map((id) => byId.get(id)).filter(Boolean);
     if (evidence.length === 0) continue;
     const open = evidence.find((s) => !settled(s));
-    present2.push({ id: step.id, label: step.label, done: !open, openSection: open ? open.id : null });
+    present2.push({
+      id: step.id,
+      label: step.label,
+      done: !open,
+      openSection: open ? open.id : null,
+      openHasSubject: open ? Boolean(open.glyph) : false
+    });
   }
   if (present2.length === 0) return { steps: [], here: null };
   const firstOpen = present2.findIndex((s) => !s.done);
@@ -36310,7 +36316,7 @@ function flowRailHtml(sections = [], commandFor = () => null) {
   const { steps } = flowRail(sections);
   if (steps.length === 0) return "";
   const marked = steps.find((s) => s.here);
-  const cmd = marked ? commandFor(marked.openSection) : null;
+  const cmd = marked ? commandFor(marked.openSection, marked.openHasSubject) : null;
   const body = steps.map((s) => `<span class="flow-step${s.here ? " flow-here" : ""}${s.done ? " flow-done" : ""}">${esc5(s.label)}</span>`).join('<span class="flow-arrow">&rarr;</span>');
   return `<nav class="flow" aria-label="The working flow">${body}${cmd ? `<code class="flow-cmd">${esc5(cmd)}</code>` : ""}</nav>`;
 }
@@ -38597,11 +38603,15 @@ function galleryHtml(state) {
   const humanQueue = deriveHumanQueue({ statuses: overviewStatuses, features: overviewFeatures });
   const SIGNED_BY_APPROVAL = ["intent", "features", "architecture", "specs", "design-system", "components", "approvals"];
   const FLOW_COMMANDS = Object.freeze({
-    ...Object.fromEntries(SIGNED_BY_APPROVAL.map((id) => [id, "node qa/approve.mjs"])),
-    evidence: "node qa/verify.mjs",
-    walkthrough: "node qa/walkthrough.mjs"
+    ...Object.fromEntries(SIGNED_BY_APPROVAL.map((id) => [id, { cmd: "node qa/approve.mjs", needsSubject: true }])),
+    evidence: { cmd: "node qa/verify.mjs", needsSubject: false },
+    walkthrough: { cmd: "node qa/walkthrough.mjs", needsSubject: false }
   });
-  const flowCommandFor = (id) => FLOW_COMMANDS[id] ?? null;
+  const flowCommandFor = (id, hasSubject) => {
+    const entry = FLOW_COMMANDS[id];
+    if (!entry) return null;
+    return entry.needsSubject && !hasSubject ? null : entry.cmd;
+  };
   const railItems = [
     // §3.7 (front door): the returning owner's entry point — what needs you,
     // what changed, is it still proven. It owns no facts; it arranges the

@@ -300,6 +300,85 @@ test("the rail names `node qa/arch-doc.mjs` beside an `architecture` section tha
   );
 });
 
+/** The one command the rail offers, or null when it offers none. */
+function railCommand(html) {
+  const m = /<code class="flow-cmd">([^<]*)<\/code>/.exec(html);
+  return m ? m[1] : null;
+}
+
+test("the rail names `node qa/approve.mjs` beside a section that has NOTHING TO SIGN", () => {
+  // THE MAP IS DERIVED NOW AND THE KEY IS STILL AN IDENTITY. `SIGNED_BY_APPROVAL`
+  // (preview-service.mjs, 2026-09-10) states one true fact — "a section settled
+  // by a signature is advanced by the signing command" — and that fact is true
+  // of a section that HAS an artifact waiting for a signature. `commandFor` is
+  // handed a section ID, so it cannot tell that section apart from one whose
+  // glyph is null because NOTHING EXISTS TO SIGN, and it answers `approve.mjs`
+  // for both. That is this rail's one recurring defect, unmoved by deriving the
+  // table: a lookup asked a question its key cannot express. Deriving the values
+  // fixed the entry that was wrong; it could not widen the key.
+  //
+  // Both fixtures below are states the console has WORDS for, one line under the
+  // rail, and in both the page and the rail contradict each other on one screen.
+  //
+  // MINE, NOT PRE-EXISTING: on main FLOW_COMMANDS held four entries — architecture,
+  // evidence, walkthrough, approvals — and neither `intent` nor `features` was
+  // among them, so both of these trees drew a rail with NO command at all
+  // (verified by rendering the same fixtures against origin/main). This branch
+  // added the entries and made a section the thing the command is keyed on.
+  //
+  // Fix-agnostic, deliberately: keying the command on the section's STATE rather
+  // than its id, or reporting no `openSection` for a section that is open only
+  // because it is empty, or naming the command that actually drafts the missing
+  // thing, all satisfy this. What it refuses is the one this branch has refused
+  // seven times — the rail naming a command that cannot advance the thing it
+  // marks.
+
+  // 1. THE UNGOVERNED FIRST LOAD. No ledger, so no artifact of any kind can be
+  //    signed — and the page SAYS so, in its own words, in the waiting row
+  //    directly beneath the rail.
+  const bare = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+  assert.match(
+    bare,
+    /nothing here is governed yet, so no signature can be waiting/,
+    "the fixture no longer represents an ungoverned project",
+  );
+  assert.notEqual(
+    railCommand(bare),
+    "node qa/approve.mjs",
+    "the page says no signature can be waiting, and the rail's one instruction is the signing command",
+  );
+
+  // 2. GOVERNED, EVERYTHING SIGNED, AND NO FEATURE BRIEFS — which is every
+  //    project the day genesis closes: template/ ships no docs/features, so the
+  //    board is empty and `featuresGlyph` is null (it is only ever assigned
+  //    inside `features.board.features.length > 0`). No approval of anything
+  //    moves that glyph — only writing a brief does — so `approve.mjs` provably
+  //    cannot advance the section the rail is marking, while the same page reads
+  //    "nothing waits on you".
+  const governed = ["intent", "architecture", "exemplar-spec", "design-system", "components"];
+  const noBriefs = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 3,
+    cards: [{ screen: { id: "Home", name: "Home" }, summary: { nodes: 12, tokenized: 12, tagged: 12 }, a11y: { pass: true, violations: [] } }],
+    // The shipped shape for a project with no docs/features: available, empty.
+    features: { available: true, board: { features: [], undeclared: [] } },
+    approvals: { available: true, statuses: governed.map((id) => ({ id, status: "approved", resolvable: true })) },
+    lastReceipt: { available: true, verdict: "PASS", stale: false, ageMs: 1000, evidenceLevel: { rung: "L2", name: "device", satisfiedBy: [] }, packId: "cmp", steps: [] },
+    liveDevice: { reachable: true },
+    walkthrough: { available: true, runs: [{ generatedAt: "2026-09-10T00:00:00Z", manifest: { screens: [] } }] },
+  });
+  // The console KNOWS both halves — asserted first, so a failure below is the
+  // command and never a fixture that stopped representing the state.
+  assert.match(noBriefs, /no feature briefs yet/, "the fixture no longer represents a project with no feature briefs");
+  assert.match(noBriefs, /nothing waits on you/, "the fixture no longer represents a project with an empty queue");
+  assert.notEqual(
+    railCommand(noBriefs),
+    "node qa/approve.mjs",
+    "there is nothing to sign on this tree and no signature can create a feature brief, yet the rail says to sign",
+  );
+});
+
 test("a step evidenced by an UNGOVERNABLE section is never done — the marker cannot leave `preview`", () => {
   // `flowRail`'s own docblock, one screen up: "`here` is the first present step
   // still wanting attention — the next thing to do... When everything is

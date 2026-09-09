@@ -175,7 +175,32 @@ export function flowRail(sections = []) {
     // up, applied to the command instead of the verdict: fix the evidence,
     // never the predicate.
     const open = evidence.find((s) => !settled(s));
-    present.push({ id: step.id, label: step.label, done: !open, openSection: open ? open.id : null });
+    // `openSection` is only reported for a section with SOMETHING TO ACT ON,
+    // and that qualifier is the whole of finding 9. A section can be open for
+    // two unlike reasons — a signature is waiting, or nothing exists there at
+    // all — and a bare id cannot tell them apart, so both resolved to
+    // `approve.mjs`. The rail then told a brand-new adopter to approve, one
+    // line above the page's own "no approvals ledger — nothing here is governed
+    // yet", and told a freshly-genesised project to approve a feature board
+    // that no approval can move (`featuresGlyph` is assigned only when briefs
+    // exist; only writing one advances it).
+    //
+    // A null glyph means the section holds nothing. It still leaves the step
+    // open — you have not done it — but there is no command that advances a
+    // thing that does not exist, so the rail says nothing beside it. That is
+    // evidence-or-silence, and it is the third and last altitude of one defect:
+    // the key had to become state-aware, not merely the values underivable.
+    // `openHasSubject` is the fact the command lookup needs and a bare id
+    // cannot carry: whether the open section HOLDS anything. A section can be
+    // open because a signature is waiting, or because nothing exists there at
+    // all, and the two want different commands — or none.
+    present.push({
+      id: step.id,
+      label: step.label,
+      done: !open,
+      openSection: open ? open.id : null,
+      openHasSubject: open ? Boolean(open.glyph) : false,
+    });
   }
   if (present.length === 0) return { steps: [], here: null };
 
