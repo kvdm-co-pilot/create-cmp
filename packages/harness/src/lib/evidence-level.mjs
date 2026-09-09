@@ -234,3 +234,87 @@ function rungFor(stepResults, ladder) {
 
   return { rung, name: RUNG_NAMES[rung], satisfiedBy: inLaneOrder(counted) };
 }
+
+/**
+ * WHAT WOULD EARN THE NEXT RUNG — the ladder read forward instead of backward.
+ *
+ * docs/proposals/LIVE-CONSOLE.md's fifth question ("what would earn the next
+ * rung?") and §4's second gap: "the profile's unmet requirement is derived and
+ * NAMED, not summarised". The names returned are the ladder's own step names,
+ * verbatim — this function writes no prose about what a rung means, because a
+ * sentence about `releaseSmoke` written here is a sentence that stops being
+ * true in the first pack that spells its steps differently.
+ *
+ * THIS DOES NOT GRADE, AND THAT IS THE WHOLE POINT. The rung a tree has earned
+ * arrives as `earned` — read from the receipt the lane wrote, whose grade came
+ * from `gradeEvidence` above. A second derivation of the same rung, on a
+ * console page, is exactly the defect NORTH-STAR.md §9.2 catalogues: two
+ * readers, one question, only one of them right. So this lives in the grader's
+ * own file, beside `rungFor`, reading the same fields off the same ladder — and
+ * it takes the verdict rather than reaching for it.
+ *
+ * WHICH RUNGS EXIST is derived from the declaration too, never assumed to be
+ * four. `rungFor` can only reach L2 when `deviceExecution` names a step, and
+ * only reach L3 when `release` does — so a ladder that names neither has two
+ * rungs, and drawing four with two forever dark would be the console promising
+ * an adopter a rung their profile cannot mint.
+ *
+ * @param {object|null} ladder the profile's resolved ladder (evidence-ladder.mjs)
+ * @param {{earned?: string|null, passed?: string[]}} [opts] `earned` is the
+ *   receipt's own `evidenceLevel` rung, read verbatim; `passed` the step names
+ *   that PASSed in that same run, used only to say which of a rung's named
+ *   requirements are still outstanding.
+ * @returns {{available: false, reason: string}
+ *   |{available: true, earned: string|null, atTop: boolean, orphanRung: boolean,
+ *     rungs: Array<{id: string, name: string, earned: boolean, requires: string[], mode: "all"|"any"}>,
+ *     next: {id: string, name: string, requires: string[], unmet: string[], mode: "all"|"any"}|null}}
+ */
+export function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
+  if (!ladder || typeof ladder !== "object") {
+    return {
+      available: false,
+      reason: "this profile declares no `ladder`, so there are no rungs to earn — which is the honest grade, not a failure",
+    };
+  }
+  const L = ladder;
+  const RUNG_NAMES = L.names ?? {};
+  const DEVICE_EXECUTION = Array.isArray(L.deviceExecution) ? L.deviceExecution : [];
+  const RELEASE_EXECUTION = typeof L.release === "string" && L.release.trim() ? L.release.trim() : null;
+  const L0_REQUIRED = Array.isArray(L.l0Required) ? [...L.l0Required] : [];
+  const L1_REQUIRED = Array.isArray(L.l1Required) ? [...L.l1Required] : [];
+  // `all` and `any` are `rungFor`'s own two shapes and not a vocabulary of this
+  // function's own: every name must have PASSed (l0Required, l1Required), or at
+  // least one must have (an on-device EXECUTION step). `release` is one name,
+  // which is `all` of one.
+  const declared = [
+    { id: "L0", requires: L0_REQUIRED, mode: "all" },
+    { id: "L1", requires: L1_REQUIRED, mode: "all" },
+    ...(DEVICE_EXECUTION.length ? [{ id: "L2", requires: [...DEVICE_EXECUTION], mode: "any" }] : []),
+    ...(DEVICE_EXECUTION.length && RELEASE_EXECUTION ? [{ id: "L3", requires: [RELEASE_EXECUTION], mode: "all" }] : []),
+  ].map((r) => ({ ...r, name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id }));
+
+  const earnedId = typeof earned === "string" && earned.trim() ? earned.trim() : null;
+  const earnedIdx = earnedId ? declared.findIndex((r) => r.id === earnedId) : -1;
+  const passedSet = new Set((Array.isArray(passed) ? passed : []).filter((s) => typeof s === "string"));
+  const rungs = declared.map((r, i) => ({ ...r, earned: earnedIdx >= 0 && i <= earnedIdx }));
+  // A rung the receipt NAMES and this ladder does not declare is reported as
+  // exactly that. Nothing is marked earned (there is no rung here to mark), and
+  // `orphanRung` says why — a receipt graded under a ladder that has since
+  // changed is a real state, and quietly drawing every rung dark would make a
+  // console that had lost track of a rung look like a tree that never earned
+  // one. Which of the two is wrong is not a console's question; reporting the
+  // pair is.
+  const nextIdx = earnedIdx + 1;
+  const next =
+    nextIdx < declared.length
+      ? { ...declared[nextIdx], unmet: declared[nextIdx].requires.filter((n) => !passedSet.has(n)) }
+      : null;
+  return {
+    available: true,
+    earned: earnedId,
+    orphanRung: Boolean(earnedId) && earnedIdx === -1,
+    atTop: next === null && earnedIdx >= 0,
+    rungs,
+    next,
+  };
+}

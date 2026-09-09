@@ -63,6 +63,12 @@ import { getLastReceipt, listReceiptHistory } from "./receipt-bridge.mjs";
 // tailed for the SSE. The bridge supplies bytes and a clock; console-now.mjs
 // owns every question about what they mean.
 import { readStepStream, watchStepStream } from "./steps-bridge.mjs";
+// Rule 0's last result and the profile's own ladder (LIVE-CONSOLE.md Phase C).
+// Both are READS: the record the instrument left behind, and the ladder the
+// profile declares — neither runs anything, because a page load that plants
+// into the tree is what D4b was rejected for.
+import { readTrustRecord } from "./trust-bridge.mjs";
+import { readLadderStanding } from "./ladder-bridge.mjs";
 import { getComponentsData } from "./components.mjs";
 import { getVariantsData } from "./variants.mjs";
 import { getComponentDriftInfo } from "./component-drift.mjs";
@@ -2194,6 +2200,13 @@ export function createPreviewService(opts) {
             // — which is what makes a run that happened while the console was
             // down still visible when it comes back up.
             now: readStepStream(projectDir),
+            // The *trust* and *ladder* rows (LIVE-CONSOLE Phase C), read on the
+            // page load like everything else here. Both are file reads and a
+            // profile import — no lane is started, no instrument is run, and
+            // nothing is planted: D4b's rejection is kept at the call site as
+            // well as in the bridges.
+            trust: readTrustRecord(projectDir),
+            ladder: readLadderStanding(projectDir, lastReceipt),
             tokenUsage,
             intent,
             features: featureBoard,

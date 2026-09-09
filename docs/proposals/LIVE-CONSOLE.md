@@ -3,14 +3,19 @@
 - **Status:** **accepted — 2026-09-09, Karel van der Merwe** (signed by his instruction in session:
   *"Accept, and write §3.7 in Phase A"*; drafted by the architect as product owner and UX, on his ask
   *"present the harness (working) flows and work to the user live … easy to follow, concise,
-  uncluttered, understandable"*). Accepted as the design for **Phases A and B**; C and D are not
-  signed and are not to be started without a further decision.
+  uncluttered, understandable"*). Accepted as the design for **Phases A and B**; **C and D accepted
+  2026-09-09** on his instruction in session — *"Live Console - start on this NOW"* — as the proposal
+  scopes them (§5's D3a and D4a, §6's C and D rows) and no wider.
 - **Implementation:** Phase A landed with this acceptance — `console-standing.mjs`, the strip's
   standing clause, the derived flow rail, and `STUDIO-REDESIGN.md` §3.7's *Standing* amendment.
   **Phase B landed 2026-09-09** under the architecture signed the same day (see D2's amendment):
   `verify --events` also writes `qa/.lane-steps.ndjson`, `console-now.mjs` decides what it
   means and renders every row, `steps-bridge.mjs` reads and tails it, and the existing `/events`
-  stream carries the rendered rows. **C and D remain unsigned and unstarted.**
+  stream carries the rendered rows. **Phases C and D landed 2026-09-09**: `framework-record.mjs`
+  (the record, and what it means), `console-trust.mjs` and `console-ladder.mjs` (the two rows),
+  `ladderStanding` in `evidence-level.mjs` (the ladder read forward, beside the grader that reads it
+  backward), `trust-bridge.mjs`/`ladder-bridge.mjs`, and `evidence-html.mjs` behind
+  `qa/verify.mjs --html`. **D4a is amended by one word at implementation — see its note below.**
 - **Scope:** the front door of the existing console (`packages/harness/src/console/`). No new
   product, no new section type, no infrastructure stood up. Extends `STUDIO-REDESIGN.md` §2/§4.
 
@@ -120,8 +125,8 @@ Added, because a live page can lie in ways a document cannot:
 | the human queue ("waiting on me") | **yes** — `deriveHumanQueue` | none |
 | the rung with its pack, one spelling | **yes** — `rungWithPack` | none |
 | per-step progress **while** the lane runs | **CLOSED 2026-09-09** — `verify --events` writes `qa/.lane-steps.ndjson` and the console tails it | none |
-| Rule 0's last result for the *trust* row | **no** — framework-check persists nothing in an adopter tree | it writes `qa/evidence/framework-check.json` (plants, each name, duration, tree-identical) |
-| "what would earn the next rung" | **partly** — the ladder is declared in the profile | the profile's unmet requirement is derived and named, not summarised |
+| Rule 0's last result for the *trust* row | **CLOSED 2026-09-09** — `qa/framework-check.mjs --record` writes `qa/evidence/framework-check.json` and the console reads it | none |
+| "what would earn the next rung" | **CLOSED 2026-09-09** — `ladderStanding` reads the declaration forward and is told the receipt's rung | none |
 
 Both gaps are small, and each is a *record*, not a gate — §8.8's rule (no new gate without a kept
 plant) is not triggered. Each derived fact does need the derivation gated: the console's
@@ -159,10 +164,35 @@ second event format.
 - *b. Commit it every run.* Rejected: churn on every lane run.
 - *c. Gatekeeper hosts it.* Deferred by standing decision (`gatekeeper-host-deferred`).
 
+**D3a as built — 2026-09-09.** Two details the decision did not settle, settled here. **It is not
+gitignored**, and that is deliberate rather than an oversight: `test/harness-surfaces.test.mjs`
+pins the ignored set under `qa/evidence/` to exactly `qa/evidence/latest-fast.json`, because that
+directory holds the committed receipt-of-record. So "not committed by default" is literal — the
+file is untracked, it appears in `git status`, and whether it is committed or deleted is the
+adopter's call, not a rule this harness writes into their `.gitignore`. And a `--fast` run writes
+`latest-fast.html`, for the reason it writes `latest-fast.json`: a fast result must never overwrite
+the checkpoint's.
+
 **D4 — Rule 0 persistence.**
 - *a. framework-check writes a small record* (**recommended**) — it already computes every field.
 - *b. Re-run framework-check when the console asks.* Rejected: seconds of latency and a mutation
   of the tree on a page load.
+
+**D4a as built — AMENDED 2026-09-09** (at implementation, by three gates rather than by a
+preference). The record is written **only under `--record`**. D4a did not say "on every run", and
+every-run is not available: the Rule 0 instrument plants into your real tree and its promise is
+that it puts the tree back, and that promise is kept by three separate gates written before this
+record existed — `scripts/framework-check.mjs`'s before/after tree hash around the shipped twin,
+`scripts/stage2-gate.mjs` criterion E (a signed stage exit), and
+`test/framework-check-agnostic.test.mjs`'s `git status --porcelain` comparison on a foreign tree.
+A record written unconditionally makes all three red, and the only way to ship it that way is to
+edit three gates into agreement with a change. Behind a flag, the default invocation is
+byte-for-byte what it always was, all three gates keep asserting exactly what they asserted, and
+the record is an OUTPUT someone asked for rather than residue nobody expected — the same shape D3a
+chose one decision above. The cost is real and is stated rather than hidden: **the trust row is
+absent until somebody runs the flag**, and it renders that absence with the command that ends it.
+`test/console-trust.test.mjs` pins both halves — the plain run leaves the tree untouched, and the
+flagged run adds exactly one file.
 
 ## 6. Phasing
 
@@ -170,8 +200,8 @@ second event format.
 |---|---|---|---|
 | **A** | the strip (verdict · rung+pack · age · commit · stale check), *waiting*, the flow rail | nothing new — receipt + human queue + git | small; the page most people will ever see |
 | **B** ✅ | *now* — per-step rows appended live | D2 as amended: the step stream as an artifact, tailed | small; one emitter, one tail, one renderer |
-| **C** | *trust* and *ladder* rows | D4a record; the profile's ladder read for its unmet requirement | small–medium |
-| **D** | `--html` snapshot (D3a) | A–C | small |
+| **C** ✅ | *trust* and *ladder* rows | D4a record (as amended: `--record`); the profile's ladder read for its unmet requirement | small–medium |
+| **D** ✅ | `--html` snapshot (D3a) | A–C | small |
 | — | fleet view (many trees, one strip each) | Stage 3's trigger | not now; the strip is designed to tile |
 
 A is worth shipping alone. It answers questions 1 and 3 with no new plumbing.

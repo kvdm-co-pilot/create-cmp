@@ -8,6 +8,49 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The front door answers the last two of its five questions — Live Console Phases C and D**
+  (`docs/proposals/LIVE-CONSOLE.md`, C and D signed 2026-09-09). The page could say what is
+  happening, what needs you, and whether the proof still describes this tree. It could not say
+  **whether the lane saying so is calibrated**, or **what would earn the next rung** — the two
+  questions a reader cannot answer for themselves from anything else on the page.
+
+  ***trust* reads a record; it never runs the instrument.** `qa/framework-check.mjs --record` leaves
+  `qa/evidence/framework-check.json` behind — each plant, the gate it made refuse and what that gate
+  NAMED, per-plant durations, which plants this tree cannot make and why, and whether the instrument
+  left every file it touched byte-identical (measured against the bytes it read, not asserted). The
+  row says it in one line: *"Rule 0 — 7 plants failed by name · tree byte-identical · 2h ago"*, and
+  expands in place to name each plant. Re-running framework-check behind a page load was rejected at
+  signing (D4b) and the rejection is kept at every layer: nothing in the console spawns anything.
+
+  **The record is opt-in, and the reason is a gate — three of them.** The instrument plants into
+  your real tree and its promise is that it puts the tree back; `scripts/framework-check.mjs`,
+  `scripts/stage2-gate.mjs` criterion E and `test/framework-check-agnostic.test.mjs` each hold it to
+  that with a before/after comparison. A record written on every run makes all three red, and the
+  only way to ship it that way is to edit three gates into agreement with a change. So the default
+  run is byte-for-byte what it always was, and **an absent record renders as absence** — with the
+  command that ends it, never as reassurance.
+
+  ***ladder* names the next rung's requirement, and is not a second opinion about the current one.**
+  `ladderStanding` lives in the grader's own file beside `rungFor`, reads the ladder FORWARD, and is
+  TOLD the rung the receipt recorded rather than deriving one — so the row and the strip cannot
+  disagree. `L0 ● L1 ● L2 ● L3 ○ · L3 needs releaseSmoke`: the step name is the profile's own, read
+  from the declaration, never prose about what a rung means. Which rungs exist is derived too — a
+  ladder that names no device step has no L2 to draw — and the pack rides on the row, because the
+  same four marks under another pack are four other claims (§6.5, §8.9).
+
+  **`node qa/verify.mjs --html` writes the run as one file you can send someone** (D3a):
+  `qa/evidence/latest.html`, opt-in, no server, no script, no image, no stylesheet link, no external
+  fetch of any kind — it opens from a `file://` URL on a machine with no network, which is where a
+  snapshot attached to a PR is most likely to be read. It shows the strip, the steps with the
+  failing one's own reason verbatim, and the same trust and ladder rows from the same derivations
+  the console uses. Written by the lane rather than the console because a vendored `qa/` may import
+  only from `./lib/`, and that is what makes `node qa/verify.mjs` work offline.
+
+  Gated by `test/console-trust.test.mjs` (7), `test/console-ladder.test.mjs` (7) and
+  `test/evidence-html.test.mjs` (7), including two inversions that deny by default over the whole
+  console directory — no second module may read the Rule 0 record, and none may read the ladder
+  declaration itself.
+
 - **The lane reports each step as it finishes — `verify --events`.** A console could only learn what
   a run did from the receipt written after it ended. Now `runLane` takes an `onStep` callback beside
   its human `print`, and `--events` emits one NDJSON object per finished step: name, verdict,

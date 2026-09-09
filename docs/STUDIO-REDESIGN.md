@@ -236,6 +236,33 @@ drops, the block **says** it is not live rather than presenting a frozen list as
 a live one. `test/console-now.test.mjs` refuses any console module that reads the
 stream or decides a run's phase a second way.
 
+*Trust and Ladder — the instrument, and the future, added 2026-09-09*
+(LIVE-CONSOLE.md Phase C, signed the same day: *"Live Console - start on this
+NOW"*). Two more of the five questions, and the two that were not on the page at
+all: **can I trust the lane that says so**, and **what would earn the next
+rung**. They sit last, under the queue, because the five run in time order and
+these are about the instrument and about the future.
+
+*Trust* reads the record `node qa/framework-check.mjs --record` leaves behind —
+`qa/evidence/framework-check.json` — and says what Rule 0 last found: how many of
+this profile's own plants made the responsible gate refuse **by name**, whether
+the instrument left the tree byte-identical, and how long ago. The console never
+RUNS the instrument to answer (D4b was rejected: seconds of latency and a
+mutation of the tree behind a page load — it plants into real files). The record
+is opt-in for a reason worth keeping visible: the instrument's promise is that it
+puts your tree back, three separate gates hold it to that, and a file written on
+every run would have made all three red. **An absent record renders as absence**,
+with the command that ends it — never as reassurance.
+
+*Ladder* draws the rungs the profile's own ladder declares — `L0 ● L1 ● L2 ● L3
+○` — and names what the next one wants **in the profile's own step names**, read
+from the declaration rather than described in prose. Which rungs exist is derived
+too: a ladder that names no device step has no L2 to draw. The row is **not a
+second opinion about a rung**: the mark comes from the rung the receipt records,
+and `ladderStanding` (in the grader's own file, beside `rungFor`) is TOLD the
+rung rather than deriving one. The pack rides on the row, because the same four
+marks under another pack are four other claims (§6.5, §8.9).
+
 *Signing, amended 2026-08-24* (Karel: "in the overview give the option to
 approve as well"). The page originally named each act and jumped you to the
 section that owned the signature. Each row now carries the control itself.
