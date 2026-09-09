@@ -8,6 +8,33 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **`npm ci` was broken for a fresh clone, and CI could not see it.** 0.25.0 moved
+  `prooflane-harness` 0.20.0 → 0.21.1 and the `prooflane` alias 0.0.1 → 0.1.0. Two things did not
+  move with them: `inspector/mcp` still declared `prooflane-harness: ^0.20.0`, and
+  `package-lock.json` still recorded the pre-release versions.
+
+  **A caret on a `0.x` version pins the MINOR** — `^0.20.0` means `>=0.20.0 <0.21.0` — so the
+  workspace at 0.21.1 no longer satisfied it. npm stopped linking the sibling and went looking for
+  `prooflane-harness@0.20.0` on the registry, which the lock does not contain. `npm ci` refuses an
+  out-of-sync lock, so anyone cloning fresh could not install.
+
+  **Nothing caught it because CI runs `npm install`, which is permissive**: it quietly repairs what
+  `npm ci` treats as fatal. The green build was real; the broken one was the one nobody ran. Found
+  while rebuilding the Claude Code plugin cache, which installs the same way a fresh clone does.
+
+  The inspector's range is now `>=0.21.0` — the floor form the alias packages already use, so a
+  harness minor no longer silently unlinks the workspace — and the lock is refreshed.
+  `inspector/mcp/dist/server.mjs` is rebuilt: the committed bundle attests a hash of its sources
+  **and its declared deps**, so changing the range correctly failed the freshness guard until it was
+  rebuilt.
+
+  Gated by `test/workspace-lock-sync.test.mjs`: every dependency on a sibling workspace must be
+  satisfiable by that sibling's current version, and the lock must record every workspace at its
+  manifest's version. Its `satisfies()` understands only the range forms this repo uses and
+  **throws on anything else** rather than guessing — a hand-rolled semver that silently mis-parses
+  is worse than no check. Both halves were verified by re-introducing the defect and watching them
+  fail by name.
+
 - **The ground-truth deriver hand-wrote the one claim it could not derive, and 0.25.0 made it
   false.** `scripts/ground-truth.mjs` exists because prose cannot be trusted to count — and it
   carried a literal two-name `unpublished` list in its own source. Publishing `prooflane-harness`

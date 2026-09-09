@@ -36,7 +36,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.25 || ^4.0",
-    "prooflane-harness": "^0.20.0"
+    "prooflane-harness": ">=0.21.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.1"

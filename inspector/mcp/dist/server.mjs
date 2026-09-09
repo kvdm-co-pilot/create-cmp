@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs edf55796a0fd91a9dbc03016cad7bd29caa5f42493124ab9cdbf924607d4d25f
+// cmp:bundle-inputs 615b2c95bcc0d2e7b8a07d4f7cc796b3134b9c4b2156e67f07aa424fd47449f4
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -38272,7 +38272,8 @@ ${section.bodyHtml}`;
 import fs16 from "node:fs";
 import { createRequire } from "node:module";
 import path17 from "node:path";
-var PROFILE_PROTOCOL = 1;
+var SUPPORTED_PROFILE_PROTOCOLS = Object.freeze([1, 2]);
+var EXTENDS_PROTOCOL = 2;
 var PROFILES_DIR_REL = "qa/lib/profiles";
 var REQUIRED_EXPORTS = Object.freeze(["id", "protocol", "layout", "tiers", "steps"]);
 function profileEntryRel(id) {
@@ -38287,10 +38288,10 @@ function validateProfileModule(mod, id) {
   if (mod.id !== id) {
     return { ok: false, reason: `profile "${id}" exports id ${JSON.stringify(mod.id)} \u2014 the manifest and the profile disagree about what this project is; fix one of them` };
   }
-  if (mod.protocol !== PROFILE_PROTOCOL) {
+  if (!SUPPORTED_PROFILE_PROTOCOLS.includes(mod.protocol)) {
     return {
       ok: false,
-      reason: `profile "${id}" implements profile protocol ${JSON.stringify(mod.protocol)}; this lane speaks ${PROFILE_PROTOCOL} \u2014 upgrade the harness or the profile so they match (\`create-cmp upgrade --harness\`)`
+      reason: `profile "${id}" implements profile protocol ${JSON.stringify(mod.protocol)}; this lane speaks ${SUPPORTED_PROFILE_PROTOCOLS.join(" and ")} \u2014 upgrade the harness or the profile so they match (\`prooflane upgrade\`)`
     };
   }
   if (typeof mod.steps !== "function") return { ok: false, reason: `profile "${id}" must export steps(ctx) as a function` };
@@ -38318,6 +38319,66 @@ function locateProfile(root, id) {
   }
   return { ok: true, entryRel, entryAbs };
 }
+var BASE_KEYS = Object.freeze(["extends", "extendsProfile"]);
+function declaredBase(mod) {
+  for (const key of BASE_KEYS) {
+    const value = mod?.[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return null;
+}
+var INHERITABLE = Object.freeze([
+  "layout",
+  "tiers",
+  "steps",
+  "artifacts",
+  "governable",
+  "grammar",
+  "reports",
+  "detect",
+  "tools",
+  "ladder",
+  "plants",
+  "console",
+  "version"
+]);
+function resolveInheritance(mod, id, load) {
+  const chain = [id];
+  const merged = {};
+  let current = mod;
+  const ownBase = declaredBase(mod);
+  if (ownBase && mod.protocol < EXTENDS_PROTOCOL) {
+    return {
+      ok: false,
+      reason: `profile "${id}" declares a base ("${ownBase}") but implements profile protocol ${JSON.stringify(mod.protocol)} \u2014 \`extends\` arrived in protocol ${EXTENDS_PROTOCOL}. Declare \`protocol = ${EXTENDS_PROTOCOL}\` so an older lane refuses it by naming the protocol rather than by naming a declaration you deliberately left out`
+    };
+  }
+  for (; ; ) {
+    const base = declaredBase(current);
+    if (!base) break;
+    if (chain.includes(base)) {
+      return {
+        ok: false,
+        reason: `profile "${id}" has a circular \`extends\` chain: ${[...chain, base].join(" \u2192 ")} \u2014 a profile cannot inherit from itself, however many steps around`
+      };
+    }
+    const loaded = load(base);
+    if (!loaded.ok) {
+      return { ok: false, reason: `profile "${chain[chain.length - 1]}" extends "${base}", which did not load: ${loaded.reason}` };
+    }
+    chain.push(base);
+    for (const key of INHERITABLE) {
+      if (!(key in merged) && key in loaded.profile) merged[key] = loaded.profile[key];
+    }
+    current = loaded.profile;
+  }
+  if (chain.length === 1) return { ok: true, profile: mod, chain };
+  const profile = { ...merged };
+  for (const key of Object.keys(mod)) profile[key] = mod[key];
+  profile.id = mod.id;
+  profile.protocol = mod.protocol;
+  return { ok: true, profile, chain };
+}
 function loadProfileSync(root, { id } = {}) {
   const where = locateProfile(root, id);
   if (!where.ok) return where;
@@ -38331,9 +38392,11 @@ function loadProfileSync(root, { id } = {}) {
     }
     return { ok: false, reason: `profile "${id}" failed to load from ${where.entryRel}: ${err && err.message ? err.message : String(err)}` };
   }
-  const verdict = validateProfileModule(mod, id);
+  const resolved = resolveInheritance(mod, id, (baseId) => loadProfileSync(root, { id: baseId }));
+  if (!resolved.ok) return resolved;
+  const verdict = validateProfileModule(resolved.profile, id);
   if (!verdict.ok) return verdict;
-  return { ok: true, profile: mod, entryRel: where.entryRel };
+  return { ok: true, profile: resolved.profile, entryRel: where.entryRel, chain: resolved.chain };
 }
 
 // src/lib/design-language.mjs
