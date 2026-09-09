@@ -45,7 +45,10 @@ test("parseAdbDevices / chooseAvd / emulatorBinary: the small pure parts", () =>
 test("an attached device is used as-is — nothing is booted, nothing is shut down", () => {
   const f = fakes({ devicesSeq: [ADB_ONE] });
   const d = ensureDevice({ sh: f.sh, env: {}, spawnImpl: f.spawnImpl, now: f.now, sleep: f.sleep });
-  assert.deepEqual(d, { ok: true, serial: "emulator-5554", booted: false });
+  // `headless` records HOW the device it used was started — null here because
+  // this fake's process table says nothing, which is the honest answer to an
+  // unanswerable question rather than a default of true (2026-09-09).
+  assert.deepEqual(d, { ok: true, serial: "emulator-5554", booted: false, headless: null });
   assert.equal(f.spawned.length, 0);
   assert.deepEqual(releaseDevice(d, { sh: f.sh, env: {} }), { shutdown: false });
   assert.ok(!f.calls.some((c) => c.includes("emu kill")), "an attached device is never killed");
