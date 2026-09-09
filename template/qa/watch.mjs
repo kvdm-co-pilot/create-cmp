@@ -447,7 +447,7 @@ function main() {
       const startedAtIso = new Date().toISOString();
       const started = Date.now();
       say(`── watch run #${n} starting (node qa/verify.mjs --fast --no-journal) …`);
-      const child = spawn(process.execPath, [path.join(ROOT, "qa", "verify.mjs"), "--fast", "--json", "--no-journal"], {
+      const child = spawn(process.execPath, [path.join(ROOT, "qa", "verify.mjs"), "--fast", "--json", "--no-journal", "--events"], {
         cwd: ROOT,
         stdio: ["ignore", "pipe", "pipe"],
         // Its own process GROUP: verify spawns Gradle through a shell, and a
@@ -460,7 +460,31 @@ function main() {
       let stdout = "";
       let stderr = "";
       child.stdout.on("data", (d) => (stdout += d));
-      child.stderr.on("data", (d) => (stderr += d));
+      // stderr carries two things now: verify's own diagnostics, and one NDJSON
+      // line per finished step (--events). The step lines are RELAYED as they
+      // arrive — that is the whole point, a console appending a row while the
+      // lane runs rather than learning the story from a receipt after it ends.
+      // Everything else is kept verbatim for the failure report, because a
+      // watcher that swallowed a stack trace to look tidy would be hiding the
+      // one thing a red run is for.
+      let stderrPartial = "";
+      child.stderr.on("data", (d) => {
+        stderr += d;
+        stderrPartial += d;
+        const lines = stderrPartial.split("\n");
+        stderrPartial = lines.pop() ?? "";
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t.startsWith("{")) continue;
+          let obj;
+          try {
+            obj = JSON.parse(t);
+          } catch {
+            continue; // not ours — a diagnostic that merely starts with a brace
+          }
+          if (obj && obj.event === "step") emit({ ...obj, n });
+        }
+      });
       child.on("error", (err) => {
         currentChild = null;
         say(`── watch run #${n}: could not spawn verify — ${err.message}`);

@@ -98,6 +98,9 @@ Flags:
                                   output
   --json                         print the receipt as JSON instead of the
                                   human-readable step-by-step log
+  --events                       one NDJSON object per finished step, on STDERR.
+                                 stdout keeps its contract (one receipt with --json);
+                                 stderr carries progress. Combine them freely.
   --help, -h                     print this usage and exit 0 without
                                   running anything
 
@@ -170,7 +173,7 @@ if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
 // save without ever running the lane. test/verify-flags.test.mjs now pins
 // consumed ⊆ recognized and watch's spawn ⊆ recognized so the class cannot
 // recur.
-const RECOGNIZED_FLAGS = new Set(["--profile", "--json", "--fast", "--determinism", "--no-journal"]);
+const RECOGNIZED_FLAGS = new Set(["--profile", "--json", "--fast", "--determinism", "--no-journal", "--events"]);
 for (let i = 0; i < rawArgs.length; i += 1) {
   const arg = rawArgs[i];
   if (arg === "--profile") {
@@ -185,6 +188,21 @@ for (let i = 0; i < rawArgs.length; i += 1) {
 const args = rawArgs;
 const profile = args.includes("--profile") ? args[args.indexOf("--profile") + 1] : "local";
 const asJson = args.includes("--json");
+// Step events go to STDERR, deliberately. `--json` prints ONE object on stdout
+// and both qa/watch.mjs and qa/refusal-demo.mjs parse it that way; interleaving
+// step lines there would break every existing reader for the benefit of a new
+// one. stdout stays the result, stderr becomes the progress — the oldest
+// convention there is, and it lets a caller consume both at once.
+const asEvents = args.includes("--events");
+const emitStepEvent = asEvents
+  ? (obj) => {
+      try {
+        process.stderr.write(`${JSON.stringify(obj)}\n`);
+      } catch {
+        /* a blocked or closed stderr must never fail the lane */
+      }
+    }
+  : null;
 const fast = args.includes("--fast");
 // --no-journal suppresses the flight-recorder append (qa/watch.mjs passes it).
 // See the append site below for why the inner loop must not write here.
@@ -425,6 +443,26 @@ const lane = runLane({
   // Human runs print a row per step and get the pulse; --json gets neither
   // (a narrator during a machine run is a lane doing something unasked).
   print: asJson ? null : (line) => console.log(line),
+  // One NDJSON line per finished step, on stderr, only when asked. A console
+  // can append a row while the lane runs instead of learning the whole story
+  // from the receipt after it ends.
+  onStep: emitStepEvent
+    ? (result, { index, total }) =>
+        emitStepEvent({
+          event: "step",
+          index,
+          total,
+          name: result.name,
+          verdict: result.verdict,
+          durationMs: result.durationMs ?? null,
+          layer: result.layer ?? null,
+          // The step's own words, never this file's: a note explains a SKIP and
+          // a reason explains a FAIL, and rewording either is how a console
+          // starts telling a story the lane did not.
+          note: result.note ?? null,
+          reason: result.reason ? String(result.reason).split("\n")[0] : null,
+        })
+    : null,
   narrator: { entry: path.join(HERE, "lib", "lane-narrator.mjs"), root: ROOT },
   // The device lease (if a device step took it) is held to the very end of the
   // run — see the scope decision at leaseDeviceForStep. Release is idempotent
