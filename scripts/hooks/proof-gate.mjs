@@ -251,12 +251,25 @@ async function main() {
   if (event === "SessionStart") {
     try {
       const { obligation, render } = await import("../proof-plan.mjs");
+      // The installed plugin's staleness, one line. It is here and not in a
+      // document because the two days it went unnoticed were exactly the days
+      // nobody thought to look — and a session reads this before anything else.
+      // `summary` never refreshes and never throws; a null is silence, not a gap.
+      let pluginLine = "";
+      try {
+        const { summary } = await import("../plugin-refresh.mjs");
+        const line = summary({ repoRoot: path.resolve(fileURLToPath(import.meta.url), "../../.."), timeoutMs: 3000 });
+        if (line) pluginLine = `\n\n${line}`;
+      } catch {
+        /* the plugin is not this tree's concern when it cannot be read */
+      }
       emit({
         hookSpecificOutput: {
           hookEventName: "SessionStart",
           additionalContext:
             "Proof schedule for this tree — GATE-RULES Rule 4, enforced by scripts/hooks/proof-gate.mjs on fleet-check and gh pr merge, not by any document:\n" +
             render(obligation()) +
+            pluginLine +
             (await memoryRestatements()),
         },
       });

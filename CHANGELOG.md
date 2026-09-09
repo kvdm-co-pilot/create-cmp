@@ -6,6 +6,49 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`plugin-refresh` — the plugin refresh becomes a program, and a skill that points at it.**
+  Refreshing an installed marketplace plugin looks like four commands and is four traps, every one
+  of which reports success while serving stale bytes: `/reload-plugins` re-reads disk and never
+  refetches; the cache is keyed by **version**, so a stale snapshot already declaring the new number
+  gets *reused*; `installed_plugins.json` holds one entry **per scope** and updating one leaves the
+  other behind; and the version number, the plugin count and the reload's own "N skills" line are
+  blind to all three. Two days were lost to exactly this.
+
+  `node scripts/plugin-refresh.mjs` performs the refresh and then **refuses to call it done unless
+  the installed tree is byte-identical to the clone it claims to come from**. `--check` answers "is
+  it stale?" without touching anything, and now runs at SessionStart as one line — read-only, with a
+  bounded `git fetch` so a dead network degrades to a disk-only comparison instead of hanging a
+  session start. It never refreshes on its own.
+
+  It also answers the question no version number can: **which running sessions have loaded which
+  bytes**. `<cache>/<version>/.in_use/` is a **directory of per-pid leases**, not a marker file —
+  `[ -f ]` reports it absent, which produced two confident wrong conclusions in one day. Each pid
+  resolves through `~/.claude/sessions/<pid>.json`, so the program names the sessions still needing
+  `/reload-plugins`, and says plainly that it will never reload one itself. This is the only signal
+  that discriminates when two versions ship identical skills — it does not care what the bytes are,
+  only who loaded them.
+
+  Gated by `test/plugin-refresh.test.mjs` (7 tests), one per failure: a reused cache directory with
+  matching versions must not compare equal; every scope must come back from `installEntries`; leases
+  must be read as a directory; a session holding both generations has reloaded while one holding
+  only the old has not; and `summary()` must never throw and never act. All fixtures, no network.
+
+### Changed
+
+- **CI installs the way a stranger does — `npm ci`, one step, not `npm install`, two.** The previous
+  release found `npm ci` broken for every fresh clone while CI stayed green, because CI ran the one
+  install that cannot fail: `npm install` quietly repairs a lock that `npm ci` refuses. CI is now the
+  strict install, so a lock desync fails the build rather than only the local test.
+
+  The second install step (`--prefix inspector/mcp`) is cut with it. Its comment claimed
+  inspector/mcp was *"a SEPARATE package, not a workspace"* — true once, and it outlived the change
+  that made it a workspace. The root lock places its dependencies nested at
+  `inspector/mcp/node_modules/@modelcontextprotocol/sdk`, so one root `npm ci` resolves them.
+  Verified before cutting the step, by running a clean root `npm ci` and resolving the sdk from
+  `inspector/mcp` — not by reading the lock and assuming.
+
 ### Fixed
 
 - **`npm ci` was broken for a fresh clone, and CI could not see it.** 0.25.0 moved

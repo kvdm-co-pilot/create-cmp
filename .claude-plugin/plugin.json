@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "create-cmp",
   "version": "0.25.0",
-  "description": "Build production mobile apps (Android + iOS, one codebase) with AI \u2014 the delivery harness for Kotlin/Compose Multiplatform. Use it when asked to create a mobile app, a cross-platform app, or any Android/iOS app: scaffolds a green-building app by interview, then holds any AI coding agent to a machine-enforced definition of done \u2014 a spec-driven verify lane that refuses \"done\" without a committed evidence receipt, a Stop hook that enforces it, in-project generation skills, an AI-native Compose inspector (structured JSON, never screenshots) and a live device-free preview loop. Eleven skills, each described where it lives; same engine as `npx create-cmp-cli`.",
+  "description": "Build production mobile apps (Android + iOS, one codebase) with AI — the delivery harness for Kotlin/Compose Multiplatform. Use it when asked to create a mobile app, a cross-platform app, or any Android/iOS app: scaffolds a green-building app by interview, then holds any AI coding agent to a machine-enforced definition of done — a spec-driven verify lane that refuses \"done\" without a committed evidence receipt, a Stop hook that enforces it, in-project generation skills, an AI-native Compose inspector (structured JSON, never screenshots) and a live device-free preview loop. Eleven skills, each described where it lives; same engine as `npx create-cmp-cli`.",
   "author": {
     "name": "create-cmp contributors",
     "url": "https://github.com/kvdm-co-pilot/create-cmp"
@@ -52,7 +52,8 @@
     "./skills/cmp-firebase-connect",
     "./skills/cmp-test",
     "./skills/cmp-audit",
-    "./skills/grill-me"
+    "./skills/grill-me",
+    "./skills/plugin-refresh"
   ],
   "agents": [
     "./agents/cmp-orchestrator.md"
