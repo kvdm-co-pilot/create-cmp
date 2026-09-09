@@ -139,7 +139,7 @@ export function flowRailHtml(sections = [], commandFor = () => null) {
   // nothing there — which is this rail's own recurring defect: asking a lookup
   // a question its key cannot express.
   const marked = steps.find((s) => s.here);
-  const cmd = marked ? commandFor(marked.openSection) : null;
+  const cmd = marked ? commandFor(marked.openSection, marked.openHasSubject) : null;
   const body = steps
     .map((s) => `<span class="flow-step${s.here ? " flow-here" : ""}${s.done ? " flow-done" : ""}">${esc(s.label)}</span>`)
     .join('<span class="flow-arrow">&rarr;</span>');
@@ -161,8 +161,12 @@ export function flowRailHtml(sections = [], commandFor = () => null) {
  * ported it. It is refused on two grounds, and the second is why the prototype
  * is not the last word here: LIVE-CONSOLE.md §3.4 — "one question per row, no
  * row may grow a second fact" — and the flow rail is drawn on this same page
- * DIRECTLY ABOVE these rows, already naming the current step AND the command
- * that advances it. Repeating it is the second spelling of one fact, which is
+ * DIRECTLY ABOVE these rows, already naming the current step. (This comment
+ * also claimed the rail names "the command that advances it" — it does, but
+ * only when one exists and something is actually waiting; on a first load it
+ * is silent. The decision rests on the STEP being duplicated, which it always
+ * is, not on the command.) Repeating it is the second spelling of one fact,
+ * which is
  * the defect this console refuses everywhere else. Karel's call on this slice,
  * 2026-09-09; `inspector/mcp/test/console-overview.test.mjs` keeps it gone.
  */

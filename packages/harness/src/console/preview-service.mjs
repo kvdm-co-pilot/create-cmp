@@ -556,13 +556,27 @@ export function galleryHtml(state) {
   // driving a device is a session, not a command an adopter types — a section
   // with no unambiguous command answers null and the rail says nothing beside
   // it, which is evidence-or-silence applied to a command.
+  // A SIGNING COMMAND CANNOT CREATE THE THING TO SIGN, and that is the
+  // distinction three fixes missed. `approve.mjs` needs a subject: on a tree
+  // with no approvals ledger, or a freshly-genesised one with no feature
+  // briefs, it advances nothing, and the rail named it anyway — one line above
+  // the page's own "nothing here is governed yet". A PRODUCING command has no
+  // such precondition: `verify.mjs` on a tree with no receipt is exactly how a
+  // receipt comes to exist, and `walkthrough.mjs` likewise. So the map declares
+  // which kind each is, and a signing command is withheld when the open section
+  // holds no subject. Withheld, not replaced — the rail says nothing rather
+  // than inventing an act.
   const SIGNED_BY_APPROVAL = ["intent", "features", "architecture", "specs", "design-system", "components", "approvals"];
   const FLOW_COMMANDS = Object.freeze({
-    ...Object.fromEntries(SIGNED_BY_APPROVAL.map((id) => [id, "node qa/approve.mjs"])),
-    evidence: "node qa/verify.mjs",
-    walkthrough: "node qa/walkthrough.mjs",
+    ...Object.fromEntries(SIGNED_BY_APPROVAL.map((id) => [id, { cmd: "node qa/approve.mjs", needsSubject: true }])),
+    evidence: { cmd: "node qa/verify.mjs", needsSubject: false },
+    walkthrough: { cmd: "node qa/walkthrough.mjs", needsSubject: false },
   });
-  const flowCommandFor = (id) => FLOW_COMMANDS[id] ?? null;
+  const flowCommandFor = (id, hasSubject) => {
+    const entry = FLOW_COMMANDS[id];
+    if (!entry) return null;
+    return entry.needsSubject && !hasSubject ? null : entry.cmd;
+  };
 
   const railItems = [
     // §3.7 (front door): the returning owner's entry point — what needs you,
