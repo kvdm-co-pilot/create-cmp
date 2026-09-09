@@ -146,57 +146,28 @@ export function flowRail(sections = []) {
   // another is a bug waiting for its caller.
   const settled = (s) => Boolean(s.glyph && s.glyph.cls === "glyph-signed");
 
-  // A SECTION WITH NO GLYPH CASTS NO VOTE, and this is the same calibration
-  // error as the `includes` one above, one layer up: `settled` cannot tell NOT
-  // YET SIGNED from CANNOT BE SIGNED, so a section that can never carry a
-  // signature blocked its step forever. Two of the six were built that way and
-  // preview-service.mjs says so in its own words — `screens` is "UNGOVERNED —
-  // no signature exists, so it can never be green", and `walkthrough` is a
-  // literal `glyph: null`. So `preview` and `report` rendered unfinished on
-  // every project for all time, and because `here` is the FIRST unfinished
-  // step it pinned at `preview` and could never reach verify, report or drive:
-  // a finished project's rail told its owner to go and preview, and named no
-  // command, because preview is one of the two steps that deliberately has
-  // none. `features` did the same to `define` whenever a project had no
-  // feature briefs.
+  // NO ABSTENTION, AND NO `UNGOVERNED` SET. There was one, briefly, holding
+  // `screens` and `walkthrough` — the two sections whose glyph was a literal
+  // that never varied. It was the wrong diagnosis of the right symptom: both
+  // sections HAD state (a screen count, a walkthrough run) and the rail's input
+  // was throwing it away, so a predicate that can only read a glyph was asked a
+  // question the glyph could not express. Deriving both glyphs from the state
+  // that always existed emptied the set, and an empty special case is one that
+  // should not exist. Every section votes; a section with no glyph has nothing
+  // settled and says so.
   //
-  // IT IS DECLARED, NOT INFERRED FROM A NULL GLYPH, and the difference is the
-  // whole fix. "Has no glyph right now" and "can never have one" are different
-  // facts, and reading the first as the second breaks the other direction:
-  // `live-device` is null when nothing is attached, but it DOES reach
-  // glyph-signed when a device is reachable, so an absent device is a real
-  // "not yet" that must still block `drive`. Only sections that can never be
-  // signed abstain, and there are exactly two — preview-service.mjs says so in
-  // its own words for one ("Screens is UNGOVERNED — no signature exists, so it
-  // can never be green") and declares the other as a literal `glyph: null`.
-  //
-  // `features` deliberately still votes. A null features glyph means no briefs
-  // exist yet, and "you have not defined anything" is a true and useful thing
-  // for `define` to say — unlike screens, features CAN be signed.
-  // TWO INDEPENDENT FACTS, and a section abstains only when BOTH hold: it can
-  // never be signed, AND it has nothing to say right now. `screens` errored
-  // carries glyph-drift — "last render failed, the gallery may be stale" — which
-  // is a real problem that should make `preview` the thing to attend to, even
-  // though no signature will ever settle it. Abstaining on the id alone would
-  // make the rail blind to that; abstaining on the null glyph alone would stop
-  // an absent device blocking `drive`. So: both, or it votes.
-  // ONLY `screens`. `walkthrough` was in this set until 2026-09-10 and did not
-  // belong: it was never ungovernable, it was merely never GIVEN a glyph — the
-  // rail's input handed it a literal `glyph: null` while the section beside it
-  // rendered "no runs yet" from state it already had. Putting it here made
-  // `report` abstain, and abstaining is not finished: a brand-new tree painted
-  // `report` DONE. The glyph is derived now, so walkthrough votes like anything
-  // else, and `report` is done when a walkthrough exists and not before.
-  const UNGOVERNED = new Set(["screens"]);
-  const votes = (s) => !UNGOVERNED.has(s.id) || Boolean(s.glyph);
+  // This was the same bug three times at three altitudes — `settled()` calling
+  // unsigned "signed", then `done` calling never-signed "done", then `done`
+  // calling never-run "done" — and each patch moved it rather than killing it.
+  // The rule that ends it: a step is settled only by evidence that can actually
+  // report being settled, so fix the evidence, never the predicate.
   const byId = new Map(usable.map((s) => [s.id, s]));
 
   const present = [];
   for (const step of FLOW_STEPS) {
     const evidence = step.sections.map((id) => byId.get(id)).filter(Boolean);
     if (evidence.length === 0) continue; // the profile declared none of it
-    const voting = evidence.filter(votes);
-    present.push({ id: step.id, label: step.label, done: voting.length === 0 ? true : voting.every(settled) });
+    present.push({ id: step.id, label: step.label, done: evidence.every(settled) });
   }
   if (present.length === 0) return { steps: [], here: null };
 

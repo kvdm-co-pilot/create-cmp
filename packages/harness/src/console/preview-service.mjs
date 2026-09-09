@@ -569,8 +569,20 @@ export function galleryHtml(state) {
     {
       id: "screens",
       label: "Screens",
+      // DERIVED IN BOTH DIRECTIONS as of 2026-09-10, and the third instance of
+      // one bug: this was `error ? glyph-drift : null`, so the glyph was null
+      // when twelve screens had rendered cleanly AND when none had — while
+      // `screensStatus`, computed a few hundred lines up, already says
+      // "render #N · M screens". `settled()` could not tell PREVIEWED from
+      // NOTHING TO PREVIEW, and the rail resolved that the one way that is a
+      // claim about the project. Screens carries no SIGNATURE — nobody signs a
+      // screen — but glyph-signed is this console's role for "settled", not a
+      // claim of signature (live-device already wears it for "device
+      // connected"), and a rendered gallery is what `preview` wants.
       glyph: error
         ? { ch: "✗", cls: "glyph-drift", label: `last ${errorSource || "render"} failed — the gallery may be stale` }
+        : baseScreenCount > 0
+        ? { ch: "●", cls: "glyph-signed", label: `${baseScreenCount} screen${baseScreenCount === 1 ? "" : "s"} rendered` }
         : null,
     },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
