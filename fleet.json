@@ -1,0 +1,7 @@
+{
+  "schema": "prooflane-fleet/1",
+  "repos": [
+    { "id": "fuelled-api", "path": "../fuelled-api" },
+    { "id": "pantry-api", "path": "../pantry-api" }
+  ]
+}

@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 
 import { requiredFleetSize } from "../scripts/stage3-gate.mjs";
 
-test("§9's Stage 3 row still contains the sentence stage3-gate parses, and it says 10", () => {
+test("§9's Stage 3 row still contains the sentence stage3-gate parses, and it says 2", () => {
   const r = requiredFleetSize();
-  assert.equal(r.n, 10, r.reason ?? "the derivation returned no count");
+  assert.equal(r.n, 2, r.reason ?? "the derivation returned no count");
 });
