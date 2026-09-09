@@ -1,9 +1,10 @@
 | **grill-me** | Settle the load-bearing questions **before** the first line of work — the decide step's opening act. Fires at genesis (before the intent interview) and on every brief-lane request (before the brief is drafted); `/grill-me` on demand. | Reads what the repo already answers (signed briefs and specs are closed — cited, never re-asked) → asks the *frontier* of unsettled decisions in numbered rounds of ≤5, each with why it matters and a recommended answer → waits → stops when no answer would change the work. No new artifact: settled answers become the brief's Decisions with their why, the human's own calls its Open decisions; the signature closes them. Never grills the direct lane, a bug fix, or a spike. |
+| **plugin-refresh** | Refresh the installed plugin from its marketplace and prove the result by content — and see which running sessions have actually loaded which bytes. | `node scripts/plugin-refresh.mjs` (`--check` also runs at SessionStart). Pulls the marketplace, rebuilds the version-keyed cache dir, `npm ci --omit=dev`, repoints **every** scope, then refuses to call it done unless the tree is byte-identical to the clone. Reads `.in_use` leases to name the sessions that still need `/reload-plugins`; never reloads one itself. |
 # create-cmp — the complete usage guide
 
 > **Read this first to USE the product** (contributors: `docs/NORTH-STAR.md` governs — §12). It is
 > the single entry point to the whole product: setup, the engine CLI,
-> the 11 skills, the `cmp-inspector` MCP (15 tools), and the workflows that tie them together. An
+> the 12 skills, the `cmp-inspector` MCP (15 tools), and the workflows that tie them together. An
 > agent that reads this knows how to drive create-cmp end to end. Concise by section, exhaustive in
 > total. Companion deep-dives are cross-linked; you rarely need them.
 
@@ -32,7 +33,7 @@ everything:
    *(The harness layers are being built out — see [`HARNESS-PLAN.md`](./HARNESS-PLAN.md) for what
    ships today vs next.)*
 
-**Two front doors, one engine:** the `create-cmp` CLI (`npx`) and the Claude Code plugin (11 skills +
+**Two front doors, one engine:** the `create-cmp` CLI (`npx`) and the Claude Code plugin (12 skills +
 the MCP). Same deterministic Node engine behind both.
 
 **The frozen version set** (moved as one unit by `upgrade`; never bump a piece in isolation):
@@ -80,7 +81,7 @@ npx create-cmp-cli@latest --help                  # the engine directly (install
 
 Working from a checkout of this repo instead: `node bin/create-cmp.mjs --help`.
 
-**Claude Code plugin** (adds the 11 skills + the `cmp-inspector` MCP):
+**Claude Code plugin** (adds the 12 skills + the `cmp-inspector` MCP):
 
 ```text
 /plugin marketplace add kvdm-co-pilot/create-cmp
@@ -185,7 +186,7 @@ the lane in the agent's edit loop.
 
 ---
 
-## 4. The 11 skills
+## 4. The 12 skills
 
 Skills are the plugin's conversational front door; each shells the same engine or the MCP. Invoke by
 intent — the descriptions carry rich triggers.

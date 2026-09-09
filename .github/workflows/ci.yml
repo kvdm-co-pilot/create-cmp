@@ -25,17 +25,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+      # `npm ci`, not `npm install`. The difference is the whole point: `npm ci`
+      # installs strictly from the lock and REFUSES one that disagrees with the
+      # manifests, where `npm install` quietly repairs it. That permissiveness
+      # hid a lock desync for a whole release — `npm ci` was broken for every
+      # fresh clone while CI stayed green, because CI was the one install that
+      # could not fail (2026-09-09). CI now installs the way a stranger does.
+      #
+      # ONE install, not two. inspector/mcp IS a workspace (see the root
+      # manifest), and the root lock records its deps at
+      # inspector/mcp/node_modules/@modelcontextprotocol/sdk — nested, resolved
+      # by the same `npm ci`. The second `--prefix inspector/mcp` step this
+      # replaces carried a comment claiming the opposite ("a SEPARATE package,
+      # not a workspace"); that was true once and outlived the change that made
+      # it a workspace. Verified by running a clean root `npm ci` and resolving
+      # the sdk from inspector/mcp before this was cut.
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      # inspector/mcp is a SEPARATE package, not a workspace — a root install
-      # does not reach it. `node --test` from the root discovers its test files
-      # regardless, so without this step server-tools.test.mjs dies on
-      # ERR_MODULE_NOT_FOUND for @modelcontextprotocol/sdk and the whole run is
-      # red. It also means a local suite that passes (because those deps are
-      # installed on the dev machine) is NOT the gate CI runs — the exact
-      # false-green this project exists to prevent.
-      - name: Install MCP server dependencies
-        run: npm install --no-audit --no-fund --prefix inspector/mcp
+        run: npm ci --no-audit --no-fund
       - name: Run tests
         run: node --test
 
