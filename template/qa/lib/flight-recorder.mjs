@@ -52,7 +52,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 export const FLIGHT_JOURNAL_REL_PATH = "qa/flight-recorder.jsonl";
-export const FLIGHT_SCHEMA = "cmp-flight/1";
+// ADR-0007's principle, applied to the journal. The receipt's rename left this
+// behind, and the reason that ADR gave for deferring LOCK_SCHEMA — "it finishes
+// that journey with the package work" — does NOT carry over: a journal is
+// APPEND-ONLY and is never rewritten, so deferring it is deciding never. It is
+// committed in every stamped app, so a Go project's repo carried `cmp` on every
+// line of it. Nothing reads this field (readFlightJournal accepts any object),
+// so old entries and new ones coexist in one file and both stay readable.
+export const FLIGHT_SCHEMA = "prooflane-flight/1";
 
 // Below this many entries the report carries an explicit shortness note —
 // two entries are two facts, not a trend, and the report must say so rather

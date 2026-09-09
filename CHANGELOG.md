@@ -8,6 +8,36 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **No internal artifact is named after one stack any more** — ADR-0007's principle applied to the
+  six the receipt's rename left behind: the journal, the lock, the audit record, the approvals
+  ledger, the step cache and the comments ledger. All six are files a stamped app **commits**, so a
+  Go or Python project's repository carried `cmp` on every line of them.
+
+  **What made this more than a find-and-replace is that their readers differ, and the difference
+  decides what a rename costs:**
+
+  | reader | cost |
+  |---|---|
+  | never inspects it (journal, lock, audit record) | free |
+  | tolerant — `parsed.schema ?? DEFAULT` (approvals) | free |
+  | silently resets (step cache) | one needless cold rebuild |
+  | **refuses, by throwing** (comments) | an adopter's existing ledger becomes unreadable |
+
+  So the two that validate now accept **both** names for the life of `/1` and write only the new one
+  — ADR-0007's enum, applied where it is load-bearing rather than cosmetic. The comments ledger is
+  the one where getting this wrong destroys user data: those comments are the adopter's, not ours.
+  An *unknown* schema is still refused, because accepting the old name is not accepting anything.
+
+  Two arguments worth keeping. **`LOCK_SCHEMA` moved because its deferral condition was met** —
+  ADR-0007 said it "finishes that journey with the package work", and the lock has written
+  `name: "prooflane-harness"` since the package rename, which is the very split that ADR pointed at
+  as observable in the tree. **The journal needed a different argument**: it is append-only and
+  therefore never rewritten, so deferring it to "a change that already rewrites that file's
+  contract" would have been deciding never.
+
+  The step cache's file NAME stays `.cmp-step-cache.json` — a path inside a Compose app's build
+  directory, chosen by that profile, gitignored, read by nothing else. Only the schema moved.
+
 - **`pack` is load-bearing; the additive contract is retired (ADR-0011).** Two programs contradicted
   each other, both deliberately, and neither had ever been run against the other's claim:
   `stage2-gate.mjs` criterion H required the predicate to REFUSE a receipt naming no pack, while

@@ -177,7 +177,10 @@ test("the cache lives in the gitignored build dir, keyed per step", () => {
 
   assert.equal(STEP_CACHE_REL_PATH, "composeApp/build/.cmp-step-cache.json");
   const parsed = JSON.parse(fs.readFileSync(path.join(root, STEP_CACHE_REL_PATH), "utf8"));
-  assert.equal(parsed.schema, "cmp-step-cache/1");
+  // The file NAME stays `.cmp-step-cache.json` — it is a path inside a Compose
+  // app's build dir, chosen by that profile, and it is gitignored and never
+  // read by anything but this cache. Only the SCHEMA moved.
+  assert.equal(parsed.schema, "prooflane-step-cache/1");
   assert.ok(parsed.steps.specCoverage);
   assert.equal(parsed.steps.specCoverage.verdict, "PASS");
 });
