@@ -37,6 +37,53 @@ export const BOOT_BOUND_MS = 240_000;
 export const PREFERRED_AVD = "cmp_pixel";
 /** Headless, deterministic, no snapshot: every lane boots the same cold device. */
 export const HEADLESS_ARGS = Object.freeze(["-no-window", "-no-audio", "-no-boot-anim", "-no-snapshot", "-gpu", "swiftshader_indirect"]);
+
+/**
+ * Was an already-attached emulator started headless?
+ *
+ * The lane boots headless itself — but only when NOTHING is attached. Attach a
+ * windowed emulator first and the lane uses it as-is, which is how a windowed
+ * device quietly becomes the thing a proof ran on. That happened three times in
+ * one session on 2026-09-09, by an agent hand-booting a window in front of a
+ * lane that would have booted its own, and nothing said a word.
+ *
+ * So the lane says so. It does NOT refuse: a human debugging a flow legitimately
+ * wants to watch it, and a gate that blocks that would be traded away rather
+ * than obeyed. What it must not do is let the difference go unrecorded — a
+ * windowed run competes for the GPU and RAM the build wants, depends on a
+ * desktop session, and is not what CI does.
+ *
+ * Returns null when the question cannot be answered (not an emulator, no
+ * readable process table) — absence, never a guess in either direction.
+ *
+ * @returns {{headless: boolean, pid: number}|null}
+ */
+export function attachedEmulatorHeadless(serial, { sh } = {}) {
+  if (!sh || typeof serial !== "string" || !serial.startsWith("emulator-")) return null;
+  // The emulator's console port is encoded in its serial; its process carries
+  // the flags it was started with, which is the only honest record of how.
+  let out = "";
+  try {
+    out = String(sh("ps -eo pid=,args= 2>/dev/null | grep -i '[e]mulator' || true") ?? "");
+  } catch {
+    return null;
+  }
+  const port = serial.slice("emulator-".length);
+  for (const line of out.split("\n").map((l) => l.trim()).filter(Boolean)) {
+    const m = line.match(/^(\d+)\s+(.*)$/);
+    if (!m) continue;
+    const [, pid, args] = m;
+    // Match the emulator that owns this serial when the port is on its command
+    // line; otherwise fall back to the sole emulator process, and give up if
+    // several are running rather than blaming an arbitrary one.
+    const owns = args.includes(`-port ${port}`) || args.includes(`-ports ${port}`);
+    if (owns) return { headless: args.includes("-no-window"), pid: Number(pid) };
+  }
+  const emulators = out.split("\n").map((l) => l.trim()).filter((l) => /\/emulator\b|\bemulator\b/.test(l) && /-avd\b/.test(l));
+  if (emulators.length !== 1) return null;
+  const m = emulators[0].match(/^(\d+)\s+(.*)$/);
+  return m ? { headless: m[2].includes("-no-window"), pid: Number(m[1]) } : null;
+}
 const POLL_MS = 3000;
 
 function sleepSync(ms) {
@@ -100,7 +147,17 @@ export function ensureDevice({ sh, env = process.env, spawnImpl = spawn, sleep =
     return { ok: false, optOut: true, reason: "device tier disabled by CMP_DEVICE=none (the one explicit opt-out; a receipt carrying it is never done-evidence)" };
   }
   const attached = parseAdbDevices(sh("adb devices", { timeout: 10_000 }).out);
-  if (attached.length > 0) return { ok: true, serial: attached[0], booted: false };
+  if (attached.length > 0) {
+    // The lane boots headless — but only when nothing is attached. A windowed
+    // emulator attached first is used as-is, and that is how one quietly becomes
+    // the device a proof ran on. Say it; do not refuse it (a human debugging a
+    // flow wants the window, and a gate blocking that gets traded away).
+    const how = attachedEmulatorHeadless(attached[0], { sh: (c) => sh(c, { timeout: 10_000 }).out });
+    if (how && how.headless === false) {
+      log(`using the attached emulator ${attached[0]}, which was started WITH A WINDOW — device runs are headless (${HEADLESS_ARGS.join(" ")}); a windowed device competes for the GPU and RAM the build wants and is not what CI runs`);
+    }
+    return { ok: true, serial: attached[0], booted: false, headless: how ? how.headless : null };
+  }
 
   const bin = emulatorBinary({ env, exists });
   const listing = sh(`"${bin}" -list-avds`, { timeout: 30_000 });

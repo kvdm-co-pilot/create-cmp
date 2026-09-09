@@ -18,10 +18,25 @@ first is almost always the one you want:
    headless (`CMP_AVD` overrides), installs the debug build, runs every flow in `qa/e2e/`, writes
    the receipt, and shuts the emulator down. This is the done-gate; a green run here IS the proof.
 2. **By hand, for an interactive session:** check disk first (`df -h ~`, ≥ 3 GB free — Gradle
-   fails with "No space left on device"); `emulator -avd <name>` + `adb wait-for-device` (the AVD
-   `cmp-doctor` created; one AVD per app); `./gradlew :composeApp:installDebug`;
-   `maestro test qa/e2e/smoke.yaml` (CLI: `curl -fsSL https://get.maestro.mobile.dev | bash`).
+   fails with "No space left on device"); boot **headless** —
+
+   ```
+   emulator -avd <name> -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
+   ```
+
+   — then `adb wait-for-device` (the AVD `cmp-doctor` created; one AVD per app);
+   `./gradlew :composeApp:installDebug`; `maestro test qa/e2e/smoke.yaml`
+   (CLI: `curl -fsSL https://get.maestro.mobile.dev | bash`).
    Device proof is a checkpoint, never an inner loop — the project's PreToolUse hook reminds you.
+
+**Headless is the rule, not a preference** (Karel, 2026-09-09: *"always run device tests in headless
+mode"*). Those flags are `HEADLESS_ARGS` in the cmp profile's `device-provider.mjs`, and they are
+what path 1 already uses — so **do not hand-boot a windowed emulator in front of a lane that would
+have booted its own**. A window costs GPU and RAM the build wants, makes the run depend on a
+desktop session, and differs from what CI does; `-no-snapshot` is there so every lane boots the same
+cold device rather than inheriting yesterday's state. If a device is already attached the lane uses
+it as-is, which is exactly how a windowed emulator quietly becomes the thing your proof ran on —
+`node scripts/fleet-check.mjs` now says so when it finds one.
 
 Preconditions: toolchain present (JDK, Android SDK + AVD — **cmp-doctor** heals it); a project
 scaffolded with the `e2e` toggle on (otherwise say so — there is no harness to bring up).

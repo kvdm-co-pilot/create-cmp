@@ -8,6 +8,25 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **Device runs are headless, and the lane says so when they are not.** The lane already booted
+  headless — with nothing attached, `ensureDevice` starts the AVD with `HEADLESS_ARGS`
+  (`-no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect`). The gap was the
+  other branch: attach a windowed emulator **first** and the lane uses it as-is, silently, and that
+  windowed device becomes the thing the proof ran on. It happened three times in one session — an
+  agent hand-booting a window in front of a lane that would have booted its own — and nothing said a
+  word.
+
+  `attachedEmulatorHeadless()` reads the flags the attached emulator was actually started with (by
+  the console port encoded in its serial), and `ensureDevice` reports a windowed one by name. It
+  **does not refuse**: a human debugging a flow legitimately wants the window, and a gate that blocks
+  that gets traded away rather than obeyed. What it may never do is let the difference go unrecorded.
+  An unanswerable question — a real phone, an unreadable process table, two emulators and no port
+  match — returns `null`, never a guess in either direction.
+
+  `skills/cmp-qa-prep` now states the rule where the hand-boot instructions are, with the flags spelled
+  out, and says plainly not to hand-boot in front of a lane that would have done it correctly. Gated
+  by `test/headless-device.test.mjs` (7 tests).
+
 - **The front door says whether the proof still describes THIS tree — "stale is not PASS".** The
   header answered *is it still proven* with the lane's verdict and rung. Those say how **strong** the
   last proof was; they do not say whether it is about the code in front of you, and one green badge
