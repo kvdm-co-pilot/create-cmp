@@ -98,7 +98,15 @@ test("the flow rail is SIX steps, DERIVED — a stack that declares no device ge
 
   const full = flowRail([signed("specs"), open("screens"), open("live-device")]);
   assert.deepEqual(full.steps.map((s) => s.id), ["define", "preview", "drive"], "one step per PHASE, not per section");
-  assert.equal(full.here, "preview", "here is the first step still wanting attention");
+  // `here` was "preview" until 2026-09-10, and that expectation encoded the
+  // defect the test below now refuses: `open("screens")` is a null glyph, and
+  // screens can NEVER be signed, so reading it as "wants attention" pinned the
+  // marker on preview for the life of every project. It abstains now. The
+  // assertion itself is unchanged in meaning — here is still the first step
+  // still wanting attention — and `drive` is that step, because `live-device`
+  // CAN be signed and simply is not yet.
+  assert.equal(full.here, "drive", "here is the first step still wanting attention");
+  assert.equal(full.steps[1].done, true, "preview's only evidence can never be signed, so it does not block the arc");
   assert.equal(full.steps[0].done, true, "define's only present evidence is signed, so define is done");
 
   const noDevice = flowRail([signed("specs"), open("screens")]);
@@ -131,6 +139,82 @@ test("the rail names one command for the STEP it marks, and nothing to click", (
   assert.match(html, /flow-here/);
   assert.match(html, /node qa\/verify\.mjs/);
   assert.ok(!/<button|<a /.test(html), "the rail is descriptive — it has no controls");
+});
+
+test("a step evidenced by an UNGOVERNABLE section is never done — the marker cannot leave `preview`", () => {
+  // `flowRail`'s own docblock, one screen up: "`here` is the first present step
+  // still wanting attention — the next thing to do... When everything is
+  // settled the arc is complete and the marker rests on the last present step."
+  //
+  // THIS CONSOLE CANNOT REACH THAT STATE. `done` is `evidence.every(settled)`
+  // and `settled` is `glyph.cls === "glyph-signed"`, so a step is done only if
+  // EVERY section that evidences it can carry a signature. Two of the six are
+  // evidenced by sections that can never carry one, and preview-service.mjs
+  // says so itself:
+  //
+  //   preview <- screens      "Screens is UNGOVERNED — no signature exists, so
+  //                            it can never be green."  glyph: null | glyph-drift
+  //   report  <- walkthrough  `{ id: "walkthrough", label: "Walkthrough",
+  //                             glyph: null }` — the literal, unconditionally
+  //
+  // `settled()` cannot tell NOT YET SIGNED from CANNOT BE SIGNED, which is the
+  // same calibration error the `cls.includes("signed")` fix corrected one level
+  // down: a predicate answering a question its vocabulary cannot express. So
+  // `preview` and `report` render grey on every project forever, and because
+  // `here` is the FIRST not-done step it is pinned at `preview` — it can never
+  // reach `verify`, `report` or `drive`, and `preview` is one of the two steps
+  // FLOW_COMMANDS deliberately gives no command, so the rail also stops naming
+  // one. A finished project's rail tells its owner to go and preview.
+  //
+  // MINE, NOT PRE-EXISTING: FLOW_STEPS and the step-to-section mapping are new
+  // on this branch, and `flowRailHtml` had no caller before it. Before, a
+  // section was its own step and "Screens, ungoverned" read as exactly that;
+  // now an ungovernable section gates a PHASE of the working flow.
+  //
+  // Not caught by the test above it, because its fixture hands `screens` a
+  // `glyph-signed` — a glyph preview-service.mjs cannot produce for it.
+  //
+  // A SETTLED PROJECT, built only from inputs the console really takes: every
+  // governed artifact signed, a fresh PASS receipt, a device attached. The
+  // sections are declared rather than defaulted so the failure is attributable
+  // to one cause: `features` is left out because an EMPTY feature board also
+  // yields a null glyph, which is the same defect wearing different clothes and
+  // would blur which step this test is about.
+  const governed = ["intent", "architecture", "specs", "design-system", "components", "exemplar-spec"];
+  const html = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 1,
+    cards: [],
+    sections: ["overview", "intent", "architecture", "specs", "screens", "design-system", "components", "evidence", "walkthrough", "approvals", "live-device"],
+    approvals: { available: true, statuses: governed.map((id) => ({ id, status: "approved", resolvable: true })) },
+    lastReceipt: { available: true, verdict: "PASS", stale: false, ageMs: 1000, evidenceLevel: { rung: "L2", name: "device", satisfiedBy: [] }, packId: "cmp", steps: [] },
+    liveDevice: { reachable: true },
+  });
+  const at = html.indexOf('<nav class="flow"');
+  assert.ok(at > 0, "the front door renders no flow rail");
+  const rail = html.slice(at, html.indexOf("</nav>", at));
+  const steps = [...rail.matchAll(/<span class="flow-step([^"]*)">([^<]+)<\/span>/g)].map((m) => ({
+    id: m[2],
+    done: /flow-done/.test(m[1]),
+    here: /flow-here/.test(m[1]),
+  }));
+  assert.ok(steps.length > 0, `the rail drew no steps: ${rail}`);
+
+  // The fixture is a SETTLED project — checked first, so a failure below is the
+  // defect and never a fixture that stopped representing one.
+  for (const id of ["define", "approve", "verify", "drive"]) {
+    const step = steps.find((s) => s.id === id);
+    assert.ok(step && step.done, `the fixture no longer represents a settled project: ${id} is not done — ${rail}`);
+  }
+
+  // Fix-agnostic, deliberately: dropping a step whose evidence cannot be
+  // signed, or not letting such a section block its step, or giving those
+  // sections a real settled state all satisfy this. What it refuses is a rail
+  // that can never finish.
+  const open = steps.filter((s) => !s.done).map((s) => s.id);
+  assert.deepEqual(open, [], `nothing is left to sign, yet the rail paints these steps unfinished forever: ${open.join(", ")}`);
+  assert.equal(steps.at(-1).here, true, "with the arc complete the marker rests on the LAST step, not on one it can never leave");
 });
 
 test("the six steps are the proposal's, in the proposal's order", () => {
