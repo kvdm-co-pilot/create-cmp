@@ -68,9 +68,17 @@ you. Work fast enough to be run every time — a review that costs more than the
 skipped, and a skipped reviewer finds nothing.
 
 **Leave a record.** A qualifying slice owes one, and `gh pr merge` is refused until it exists —
-Karel, 2026-09-09: *"gating its existence, never its content"*. Write
-`qa-artifacts/review-latest.json`: the commit, the tree hash it describes, when you ran, the test
-names you added, the decisions you handed up. **Nothing reads its content, and nothing scores you.**
+Karel, 2026-09-09: *"gating its existence, never its content"*. Do not hand-write it:
+
+```
+node scripts/proof-plan.mjs --record-review --tests "<names you added>" --decisions "<handed up>"
+node scripts/proof-plan.mjs --record-review --nothing-found        # the common case
+```
+
+**The tree hash is computed, never accepted from you.** A record whose hash came from its author
+is a claim, and this product refuses that shape — so a hand-written record is refused, and the
+same recomputation runs again at discharge. A trigger path edited after you record REOPENS the
+obligation, because a review is of BYTES, not of a branch name. **Nothing reads its content, and nothing scores you.**
 The gate asks only whether a review of THIS tree happened, because a gate that judged your findings
 would be the uncalibrated instrument in the refusal path this whole design avoids.
 
