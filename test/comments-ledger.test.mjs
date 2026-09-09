@@ -78,7 +78,7 @@ test("scaffold ships the empty comments seed + the lib + the CLI", async () => {
     const seedPath = path.join(out, "qa/comments.json");
     assert.ok(fs.existsSync(seedPath), "qa/comments.json shipped");
     const seed = JSON.parse(fs.readFileSync(seedPath, "utf8"));
-    assert.deepEqual(seed, { schema: "cmp-comments/1", comments: [] });
+    assert.deepEqual(seed, { schema: "prooflane-comments/1", comments: [] });
 
     assert.ok(fs.existsSync(path.join(out, "qa/lib/comments.mjs")), "qa/lib/comments.mjs shipped");
     assert.ok(fs.existsSync(path.join(out, "qa/comment.mjs")), "qa/comment.mjs shipped");
@@ -93,7 +93,7 @@ test("listComments on the fresh seed returns an empty ledger", async () => {
   const out = await makeProject("cmp-comments-list-empty-");
   try {
     const { listComments } = await loadLib(out);
-    assert.deepEqual(listComments(out), { schema: "cmp-comments/1", comments: [] });
+    assert.deepEqual(listComments(out), { schema: "prooflane-comments/1", comments: [] });
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }
@@ -104,7 +104,7 @@ test("listComments tolerates a missing file as the empty seed, and a write then 
   try {
     fs.rmSync(path.join(out, "qa/comments.json"));
     const { listComments, addComment } = await loadLib(out);
-    assert.deepEqual(listComments(out), { schema: "cmp-comments/1", comments: [] }, "missing file reads as empty, not an error");
+    assert.deepEqual(listComments(out), { schema: "prooflane-comments/1", comments: [] }, "missing file reads as empty, not an error");
     assert.ok(!fs.existsSync(path.join(out, "qa/comments.json")), "a read never creates the file");
 
     const res = addComment(out, { target: GENERAL_TARGET, text: "hello" });

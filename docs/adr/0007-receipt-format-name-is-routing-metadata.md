@@ -65,6 +65,8 @@ accepts both names, and must never treat the format name as a trust signal — a
 more or less attestable for the name on its envelope. `pack` is what makes two rungs
 incomparable; `schema` is not.
 
+**EXTENDED 2026-09-09.** This ADR's principle was applied to the six internal artifacts the receipt's rename left behind — the journal, lock, audit record, approvals ledger, step cache and comments ledger, all of them files a stamped app commits. The condition this ADR set for `LOCK_SCHEMA` below ("it finishes that journey with the package work") has been met: the lock has written `name: "prooflane-harness"` since the package rename, which is the split named here as observable. The journal needed a different argument — it is APPEND-ONLY and never rewritten, so deferring it to "a change that already rewrites that file's contract" would have been deciding never. The two artifacts whose readers VALIDATE their schema (comments, step cache) accept both names for the life of /1, exactly as this ADR decided for the receipt.
+
 **The lock and the doc markers do not move with it.** `LOCK_SCHEMA = "cmp-harness-lock/1"`
 (`harness-lock.mjs:36`) is the same defect at the same low cost — `checkHarnessIntegrity`
 (`harness-lock.mjs:97-127`) never reads it either — but the lock is a different file with a

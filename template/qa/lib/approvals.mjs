@@ -59,7 +59,10 @@ import { resolveHarnessManifest } from "./harness-manifest.mjs";
 import { loadProfileSync } from "./profile-loader.mjs";
 
 export const APPROVALS_REL_PATH = "qa/approvals.json";
-export const APPROVALS_SCHEMA = "cmp-approvals/1";
+// Free to move: the reader is tolerant by construction — `parsed.schema ??
+// APPROVALS_SCHEMA` — so a ledger written under the old name reads back
+// unchanged and is rewritten under the new one at the next signature.
+export const APPROVALS_SCHEMA = "prooflane-approvals/1";
 // The JOURNAL (2026-07-28 flow audit, fix 1): qa/approvals.json is a mutable
 // snapshot — every transition overwrites the row, so the ledger cannot answer
 // "what happened while I was away?". The journal is the append-only memory

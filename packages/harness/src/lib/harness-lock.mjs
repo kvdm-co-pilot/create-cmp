@@ -41,7 +41,13 @@ import path from "node:path";
 import { hashHarnessRegion, compareHarnessRegion, isAdopterOwned } from "./harness-region.mjs";
 
 export const LOCK_PATH = "qa/harness.lock.json";
-export const LOCK_SCHEMA = "cmp-harness-lock/1";
+// ADR-0007 deferred this one with a condition: the lock's schema string
+// "finishes that journey with the package work, not in this PR". That work has
+// landed — the lock has written `name: "prooflane-harness"` since the package
+// rename, which is the split ADR-0007 itself pointed at as observable in the
+// tree. The condition is met, so the journey finishes here. Nothing reads the
+// field; `readHarnessLock` parses the file and never inspects it.
+export const LOCK_SCHEMA = "prooflane-harness-lock/1";
 
 /**
  * Read the lock, or null when it is absent or unparsable. An unreadable lock
