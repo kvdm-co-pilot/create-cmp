@@ -256,6 +256,7 @@ export function overviewBodyHtml({
   // stream, does not decide a run's phase, and does not format a step.
   // "" is an older caller, and renders no row rather than an empty one.
   nowHtml = "",
+  railHtml = "",
 } = {}) {
   const byArtifact = new Map(statuses.map((s) => [s.id, s]));
   const byFeature = new Map(features.map((f) => [f.name, f]));
@@ -340,11 +341,17 @@ ${digestHtml}
   // *now* leads the page, ahead of *waiting*: LIVE-CONSOLE.md's five questions
   // are in TIME order — the run that is happening comes before the signature
   // that is waiting on you — and it is the row people arrive to watch.
+  // The flow rail sits directly under the strip and above everything else —
+  // LIVE-CONSOLE.md §2 ("a thin rail under the strip"). It is the FIRST thing
+  // in the body because it answers "where is this tree in the arc", which is
+  // context for every row beneath it. Empty string when the caller passes no
+  // rail, so a console with no sections renders no rail rather than a stub.
+  const railBlock = railHtml ? `${railHtml}\n` : "";
   const nowBlock = nowHtml ? `  <h3 class="fd-h">Now</h3>\n${nowHtml}\n` : "";
 
   return `${driveChainHtml(walks && walks.chain ? walks.chain : null)}  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
-${nowBlock}  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
+${railBlock}${nowBlock}  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
 ${walksHtml(features, statuses, walks)}
 ${fold("What changed", changedBlock)}

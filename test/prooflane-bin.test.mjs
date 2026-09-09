@@ -166,11 +166,24 @@ test("init writes a working lane into a foreign repo and never names create-cmp"
   }
 });
 
-test("re-running init names no command this door does not have", () => {
+test("re-running init names the command that converges an occupied tree — and that command RUNS", () => {
   // The branch most likely to lie. Its whole job is to hand the adopter the
-  // NEXT command, and until `prooflane upgrade` exists there is no harness-side
-  // re-vendor to send them to — so it must not invent one, and must not fall
-  // back to naming the scaffolder either.
+  // NEXT command, so it must never invent one, and must not fall back to
+  // naming the scaffolder either.
+  //
+  // THE PREMISE CHANGED, THE RULE DID NOT. This test used to assert the
+  // ABSENCE of `prooflane upgrade`, because when it was written that command
+  // did not exist and naming it would have been the lie. It ships now — and
+  // the absence assertion silently became the lie it was built to prevent:
+  // two independent adoptions (fuelled-api, pantry-api, 2026-09-09) hit this
+  // exact refusal, were sent to `git restore qa/` under the words "not
+  // shipped yet", and got no provenance because init returns before writing
+  // it. ADR-0013's amendment records the correction: init converges a tree
+  // with no manifest, `upgrade` converges an occupied one.
+  //
+  // So the assertion is INVERTED and STRENGTHENED. Naming the command is not
+  // enough — a name is what lied last time. The command it names is executed
+  // here, through the same front door, and must actually converge this tree.
   const root = goRepo();
   try {
     assert.equal(run(["init", "--target-dir", root]).status, 0);
@@ -180,7 +193,16 @@ test("re-running init names no command this door does not have", () => {
     assert.match(out, /already exists/);
     assert.match(out, /prooflane relock/, "the common case — an edited profile — is named first");
     assert.doesNotMatch(out, /create-cmp/, `named the scaffolder:\n${out}`);
-    assert.doesNotMatch(out, /prooflane upgrade/, `named a command that does not exist:\n${out}`);
+    assert.match(out, /prooflane upgrade/, `the occupied-tree path is not named at all:\n${out}`);
+    assert.doesNotMatch(out, /not shipped yet/, `still tells the adopter a shipped command is unavailable:\n${out}`);
+
+    // THE PLANT: run what the refusal just told them to run. A door that names
+    // a command it cannot dispatch is the same defect wearing a truer name.
+    const upgraded = run(["upgrade", "--target-dir", root]);
+    assert.equal(upgraded.status, 0, `the named command failed:\n${upgraded.stdout}${upgraded.stderr}`);
+    const upOut = upgraded.stdout + upgraded.stderr;
+    assert.doesNotMatch(upOut, /undefined/, `the command announced itself as "undefined":\n${upOut}`);
+    assert.match(upOut, /prooflane upgrade/, "it names itself, from the same FRONT_DOORS table");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
