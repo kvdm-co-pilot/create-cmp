@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 615b2c95bcc0d2e7b8a07d4f7cc796b3134b9c4b2156e67f07aa424fd47449f4
+// cmp:bundle-inputs 88c3ec13e3f9706098652cc426cfbc3332e75dea3c3d6ccbac206cb7082d9f7c
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -34924,6 +34924,22 @@ var SHELL_CSS = `
   .badge-open { background: var(--accent-bg); color: var(--accent); }
   .badge-resolved { background: var(--signed-bg); color: var(--signed); }
   .evidence-rung { background: var(--accent-bg); color: var(--accent); }
+  /* Standing \u2014 whether the proof still describes THIS tree. A moved or dirty
+     tree takes the REOPENED role, never the drift one: it is an unanswered
+     question, not a violation, and the three semantic colours keep their three
+     meanings. */
+  .standing-ok { color: var(--signed); }
+  .standing-open { color: var(--reopen); }
+  /* The working flow, derived from the declared section arc. Descriptive only \u2014
+     no controls, nothing to click, and it never blocks a step. */
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0;
+          font-size: var(--fs-meta); color: var(--muted); margin: 8px 0 4px; }
+  .flow-step { padding: 2px 0; }
+  .flow-done { color: var(--ink-2); }
+  .flow-here { color: var(--ink); font-weight: 600; }
+  .flow-arrow { padding: 0 8px; color: var(--line); }
+  .flow-cmd { margin-left: 10px; font-family: var(--mono); font-size: var(--fs-meta);
+              color: var(--ink-2); background: var(--surface); padding: 1px 6px; border-radius: 4px; }
 
   /* --- screens (\xA73.4: the screen \xD7 state matrix) --- */
   .screens-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
@@ -35275,17 +35291,60 @@ var META_FIELDS2 = ["schema", "profile"];
 var KNOWN_FIELDS2 = /* @__PURE__ */ new Set([...META_FIELDS2, ...LAYOUT_PATH_FIELDS, ...LAYOUT_LIST_FIELDS]);
 var PROFILE_ID_RE2 = /^[a-z][a-z0-9-]*$/;
 
+// ../../packages/harness/src/console/console-standing.mjs
+var STANDING = Object.freeze({
+  UNKNOWN: "unknown",
+  MOVED: "moved",
+  DIRTY: "dirty",
+  CURRENT: "current"
+});
+function standing(receipt, { head = null, dirtyCount = 0 } = {}) {
+  const sha = typeof receipt?.commit?.sha === "string" ? receipt.commit.sha : null;
+  if (!receipt || receipt.available === false || !sha || !head) {
+    return {
+      state: STANDING.UNKNOWN,
+      label: "standing not derivable",
+      note: !sha ? "the receipt records no commit \u2014 re-run the lane" : "this tree's HEAD could not be read",
+      ok: false
+    };
+  }
+  if (sha !== head) {
+    return {
+      state: STANDING.MOVED,
+      label: "tree has MOVED since",
+      note: `the receipt proves ${sha.slice(0, 7)}; this tree is ${head.slice(0, 7)}. The verdict is true about a tree you are not looking at.`,
+      ok: false
+    };
+  }
+  if (dirtyCount > 0) {
+    return {
+      state: STANDING.DIRTY,
+      label: `${dirtyCount} file${dirtyCount === 1 ? "" : "s"} changed since`,
+      note: "the receipt proves this commit, but the working tree has moved past it. Nothing here covers the uncommitted edits.",
+      ok: false
+    };
+  }
+  return {
+    state: STANDING.CURRENT,
+    label: "tree unchanged since",
+    note: `the receipt proves ${sha.slice(0, 7)}, which is this tree.`,
+    ok: true
+  };
+}
+
 // ../../packages/harness/src/console/console-overview.mjs
 var esc4 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 var escAttr = (s) => esc4(s).replace(/"/g, "&quot;");
-function overviewStatusHtml({ receipt, statuses = [], receiptGlyph: receiptGlyph2, formatAge } = {}) {
+function overviewStatusHtml({ receipt, statuses = [], receiptGlyph: receiptGlyph2, formatAge, tree = null } = {}) {
   const g = receiptGlyph2 ? receiptGlyph2(receipt) : null;
   const lane = g ? `<span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span> ${esc4(g.label)}` : "";
   const age = receipt && receipt.available && typeof receipt.ageMs === "number" && formatAge ? ` &middot; ${esc4(formatAge(receipt.ageMs))}` : "";
   const label = receipt && receipt.available ? rungWithPack(receipt.evidenceLevel, receipt.packId ?? receipt.pack) : null;
   const rung = label ? ` &middot; <span class="badge evidence-rung" title="${escAttr(rungPackNote(receipt.evidenceLevel, receipt.packId ?? receipt.pack))}">${esc4(label)}</span>` : "";
   const tally = statuses.length ? ` &middot; ${statuses.filter((s) => s.status === "approved").length} of ${statuses.length} signed` : "";
-  return `${lane}${age}${rung}${tally}`;
+  const st = tree ? standing(receipt, tree) : null;
+  const stand = st ? ` &middot; <span class="${st.ok ? "standing-ok" : "standing-open"}" title="${escAttr(st.note)}">${esc4(st.label)}</span>` : "";
+  return `${lane}${age}${rung}${tally}${stand}`;
 }
 function itemActionHtml(item, { byArtifact, byFeature }) {
   const record2 = byArtifact.get(item.artifact) || null;
@@ -37246,6 +37305,11 @@ function galleryHtml(state) {
     lastReceipt = null,
     receiptHistory = { available: false },
     treeHash = null,
+    // { head, dirtyCount } — this tree, now. Supplied by the server that
+    // already reads the receipt; console-standing.mjs decides what it means.
+    // Absent (an older caller, or git unreadable) renders no standing clause
+    // rather than a guess.
+    tree = null,
     tokenUsage = null,
     intent = { available: false },
     features = { available: false },
@@ -37506,7 +37570,8 @@ function galleryHtml(state) {
         receipt: effectiveReceipt,
         statuses: overviewStatuses,
         receiptGlyph,
-        formatAge: formatAgeCoarse
+        formatAge: formatAgeCoarse,
+        tree
       }),
       bodyHtml: overviewBodyHtml({
         queue: humanQueue,
@@ -38564,6 +38629,16 @@ var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
 function consoleRegistryPath(projectDir) {
   const key = crypto.createHash("sha1").update(path20.resolve(projectDir)).digest("hex").slice(0, 12);
   return path20.join(os3.tmpdir(), `cmp-console-${key}.json`);
+}
+async function treeState(projectDir) {
+  try {
+    const head = (await execFileAsync("git", ["-C", projectDir, "rev-parse", "HEAD"])).stdout.trim();
+    if (!head) return null;
+    const status = (await execFileAsync("git", ["-C", projectDir, "status", "--porcelain"])).stdout;
+    return { head, dirtyCount: status.split("\n").filter((l) => l.trim()).length };
+  } catch {
+    return null;
+  }
 }
 function processAlive(pid) {
   try {
@@ -39869,6 +39944,7 @@ function createPreviewService(opts) {
             lastReceipt,
             receiptHistory,
             treeHash,
+            tree: await treeState(projectDir),
             tokenUsage,
             intent,
             features: featureBoard,

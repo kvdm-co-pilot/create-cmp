@@ -231,6 +231,29 @@ export function consoleRegistryPath(projectDir) {
   return path.join(os.tmpdir(), `cmp-console-${key}.json`);
 }
 
+
+/**
+ * This tree, now — the two facts console-standing.mjs needs to say whether the
+ * receipt still describes it. Impure by necessity and therefore HERE, in the
+ * server that already reads the project directory, rather than in the pure
+ * module that decides what the answer means.
+ *
+ * Every failure is the same answer: null. A directory that is not a git
+ * repository, a git that is not installed, a detached state — none of them make
+ * a proof stale, they make its standing unknown, and the strip says so in the
+ * standard absence form instead of guessing.
+ */
+async function treeState(projectDir) {
+  try {
+    const head = (await execFileAsync("git", ["-C", projectDir, "rev-parse", "HEAD"])).stdout.trim();
+    if (!head) return null;
+    const status = (await execFileAsync("git", ["-C", projectDir, "status", "--porcelain"])).stdout;
+    return { head, dirtyCount: status.split("\n").filter((l) => l.trim()).length };
+  } catch {
+    return null;
+  }
+}
+
 function processAlive(pid) {
   try {
     process.kill(pid, 0); // signal 0 tests existence without touching the process
@@ -2133,6 +2156,7 @@ export function createPreviewService(opts) {
             lastReceipt,
             receiptHistory,
             treeHash,
+            tree: await treeState(projectDir),
             tokenUsage,
             intent,
             features: featureBoard,

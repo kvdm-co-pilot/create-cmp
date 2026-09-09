@@ -8,6 +8,37 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The front door says whether the proof still describes THIS tree — "stale is not PASS".** The
+  header answered *is it still proven* with the lane's verdict and rung. Those say how **strong** the
+  last proof was; they do not say whether it is about the code in front of you, and one green badge
+  silently merged the two. A receipt earned three commits ago is a true statement about a tree that
+  no longer exists — rendered as PASS with nothing beside it, the most confident lie the console can
+  tell.
+
+  The strip now ends with a derived clause: the receipt's own commit against this tree's HEAD, and
+  its dirty set against the working tree now. Four answers, never three — *tree unchanged since* ·
+  *tree has MOVED since* · *N files changed since* · *standing not derivable*. A moved or edited tree
+  takes the **reopened** role, never drift: it is an unanswered question, not a violation, and the
+  three semantic colours keep their three meanings.
+
+  `console-standing.mjs` holds the one spelling, for the reason `console-evidence.mjs` holds one for
+  the rung — the strip reads it today, a fleet row reads it when Stage 3 arrives, and a fix applied
+  to instances rather than to the class comes back. It is **pure**: the server that already reads the
+  receipt supplies `{ head, dirtyCount }`, so the case that matters — a tree that moved — is testable
+  without building a repository to move.
+
+- **The working flow renders as a rail, derived from the sections the console declares.** Current
+  step marked, its one command beside it, descriptive only: no controls, and it blocks nothing. It
+  reads the declared section arc rather than restating a list of steps, so a stack that declares no
+  device section simply has no *drive* step — a hard-coded rail would promise every adopter a step
+  their profile may not have.
+
+  Design of record: `STUDIO-REDESIGN.md` §3.7, *Standing, amended 2026-09-09*, and
+  `docs/proposals/LIVE-CONSOLE.md`, accepted for Phases A–B. Gated by
+  `test/console-standing.test.mjs` (8 tests) — including one that refuses any console module deciding
+  standing a second way — plus differential coverage proving standing does not vary by pack, because
+  whether a tree moved is a fact about git and not about a stack.
+
 - **`plugin-refresh` — the plugin refresh becomes a program, and a skill that points at it.**
   Refreshing an installed marketplace plugin looks like four commands and is four traps, every one
   of which reports success while serving stale bytes: `/reload-plugins` re-reads disk and never

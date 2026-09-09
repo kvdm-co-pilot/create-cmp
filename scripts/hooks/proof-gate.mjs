@@ -170,12 +170,47 @@ export async function memoryRestatements(dir = process.env.PROOFLANE_MEMORY_DIR)
   return hits.length ? `\n\nmemory restates the device cadence — the program is the rule, edit the memory: ${hits.join("; ")}` : "";
 }
 
-/** A verify lane in flight on this machine, by its command line — or null. */
+/**
+ * A verify lane in flight on this machine — or null.
+ *
+ * `pgrep -f` matches the WHOLE command line, so the obvious spelling
+ * (`pgrep -fl 'qa/verify.mjs'`) matches any process that merely MENTIONS the
+ * path. It refused a legitimate device run on 2026-09-09 because another
+ * project's session was holding a shell whose commit-message heredoc contained
+ * those characters — a gate refusing real work for a reason that was not true,
+ * which is the one failure this project cannot tolerate in its own gates.
+ *
+ * So a candidate must actually BE node: `pgrep` proposes, and the process's own
+ * executable name disposes. A shell quoting the path reports `zsh`, an editor
+ * reports its own name, and only a running lane reports `node`. Cheap, and it
+ * fails toward permitting — an unreadable process table returns null and the
+ * device run proceeds, because a false BLOCK is worse here than a false allow:
+ * the collision it prevents is noisy and obvious, while the block is silent and
+ * looks like the tree's fault.
+ */
 function runningLane() {
   try {
     const { execSync } = createRequire(import.meta.url)("node:child_process");
-    const out = execSync("pgrep -fl 'qa/verify.mjs'", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-    return out ? out.split("\n")[0].slice(0, 80) : null;
+    const run = (cmd) => execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const pids = run("pgrep -f 'qa/verify\\.mjs'").split("\n").filter(Boolean);
+    for (const pid of pids) {
+      if (String(pid) === String(process.pid)) continue;
+      let comm = "";
+      try {
+        comm = run(`ps -o comm= -p ${Number(pid)}`);
+      } catch {
+        continue; // exited between pgrep and ps — not a lane in flight
+      }
+      if (!/(^|\/)node(js)?$/.test(comm.trim())) continue;
+      let args = "";
+      try {
+        args = run(`ps -o args= -p ${Number(pid)}`);
+      } catch {
+        args = comm;
+      }
+      return `${pid} ${args}`.slice(0, 80);
+    }
+    return null;
   } catch {
     return null; // pgrep exits 1 when nothing matches
   }

@@ -795,6 +795,22 @@ export const SHELL_CSS = `
   .badge-open { background: var(--accent-bg); color: var(--accent); }
   .badge-resolved { background: var(--signed-bg); color: var(--signed); }
   .evidence-rung { background: var(--accent-bg); color: var(--accent); }
+  /* Standing — whether the proof still describes THIS tree. A moved or dirty
+     tree takes the REOPENED role, never the drift one: it is an unanswered
+     question, not a violation, and the three semantic colours keep their three
+     meanings. */
+  .standing-ok { color: var(--signed); }
+  .standing-open { color: var(--reopen); }
+  /* The working flow, derived from the declared section arc. Descriptive only —
+     no controls, nothing to click, and it never blocks a step. */
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0;
+          font-size: var(--fs-meta); color: var(--muted); margin: 8px 0 4px; }
+  .flow-step { padding: 2px 0; }
+  .flow-done { color: var(--ink-2); }
+  .flow-here { color: var(--ink); font-weight: 600; }
+  .flow-arrow { padding: 0 8px; color: var(--line); }
+  .flow-cmd { margin-left: 10px; font-family: var(--mono); font-size: var(--fs-meta);
+              color: var(--ink-2); background: var(--surface); padding: 1px 6px; border-radius: 4px; }
 
   /* --- screens (§3.4: the screen × state matrix) --- */
   .screens-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
