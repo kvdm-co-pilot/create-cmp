@@ -69,7 +69,11 @@ ships in every scaffold and runs against the tree you are standing in: it
 derives which plants your project can support, reports each one it *cannot*
 make and why, and restores every file it touched — including the receipt and
 the README badge, so a smoke run cannot overwrite a real L1/L2 receipt with one
-that proves nothing. It refuses to start if a file it plants into has
+that proves nothing. `--record` adds the one file it does **not** put back:
+`qa/evidence/framework-check.json`, the result the console's *trust* row reads
+(`docs/proposals/LIVE-CONSOLE.md` D4a). It is a flag and not a default because
+the restore promise above is what makes this safe to run mid-change, and three
+gates hold the instrument to it. It refuses to start if a file it plants into has
 uncommitted changes. Measured on a fresh scaffold: **7 plants, 1.9 s.**
 
 The engine script stamps a scratch app, runs `--profile smoke` (every pure-Node

@@ -841,6 +841,30 @@ export const SHELL_CSS = `
      verdict — an observation beside one (evidence-must-attest-execution). */
   .now-flag { color: var(--reopen); text-decoration: underline dotted; }
 
+  /* --- trust and ladder (LIVE-CONSOLE.md Phase C) ---
+     Two rows, two questions: what Rule 0 last said about this lane, and what
+     would earn the next rung. No badge, no score, no bar — the trust row is a
+     sentence and the ladder row is four marks. Red appears on the trust line
+     for the two states that mean something went wrong (Rule 0 FAILED, or the
+     instrument did not put the tree back); nothing else here takes a colour. */
+  .trust, .ladder { margin: 4px 0 16px; }
+  .trust-line, .ladder-line { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+  .trust-bad { color: var(--drift); font-weight: 650; }
+  .trust-absent, .ladder-absent { color: var(--muted); }
+  .trust-note, .trust-link { margin: 2px 0 0; font-size: var(--fs-meta); color: var(--muted); }
+  .trust-plants { margin: 4px 0 0; font-size: var(--fs-meta); }
+  .trust-plants > summary { cursor: pointer; color: var(--muted); }
+  .trust-list { list-style: none; margin: 4px 0 0; padding: 0; }
+  .trust-plant { padding: 1px 0; line-height: 1.5; }
+  .trust-name { display: inline-block; min-width: 24ch; color: var(--ink); }
+  .trust-dur { color: var(--muted); }
+  /* A rung is earned or it is not. The unearned mark stays muted rather than
+     red: not-yet is not a failure (LIVE-CONSOLE §3.2's rule, one row up). */
+  .ladder-rung { font-family: var(--mono); color: var(--muted); margin-right: 6px; }
+  .ladder-earned { color: var(--ink); }
+  .ladder-pack { color: var(--muted); }
+  .ladder-needs { color: var(--ink-2); }
+
   /* --- screens (§3.4: the screen × state matrix) --- */
   .screens-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
   #filter { font: inherit; font-size: var(--fs-body); padding: 5px 12px; width: 240px;

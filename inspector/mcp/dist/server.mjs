@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 5f7a7cf41c45aa55244a731595484faadd114ba7dfab4d5da7215498445edddd
+// cmp:bundle-inputs 2f92d904168d3c13e2a075478a7def06ad1a227b0a19e974acb45d02ca044de4
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -39,9 +39,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/ajv/dist/compile/codegen/code.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/code.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/codegen/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.regexpCode = exports.getEsmExportName = exports.getProperty = exports.safeStringify = exports.stringify = exports.strConcat = exports.addCodeArg = exports.str = exports._ = exports.nil = exports._Code = exports.Name = exports.IDENTIFIER = exports._CodeOrName = void 0;
@@ -193,9 +193,9 @@ var require_code = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/codegen/scope.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/codegen/scope.js
 var require_scope = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ValueScope = exports.ValueScopeName = exports.Scope = exports.varKinds = exports.UsedValueState = void 0;
@@ -338,9 +338,9 @@ var require_scope = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/codegen/index.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/codegen/index.js
 var require_codegen = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/index.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/codegen/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.or = exports.and = exports.not = exports.CodeGen = exports.operators = exports.varKinds = exports.ValueScopeName = exports.ValueScope = exports.Scope = exports.Name = exports.regexpCode = exports.stringify = exports.getProperty = exports.nil = exports.strConcat = exports.str = exports._ = void 0;
@@ -1058,9 +1058,9 @@ var require_codegen = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/util.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/util.js
 var require_util = __commonJS({
-  "node_modules/ajv/dist/compile/util.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/util.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.checkStrictMode = exports.getErrorPath = exports.Type = exports.useFunc = exports.setEvaluated = exports.evaluatedPropsToName = exports.mergeEvaluated = exports.eachItem = exports.unescapeJsonPointer = exports.escapeJsonPointer = exports.escapeFragment = exports.unescapeFragment = exports.schemaRefOrVal = exports.schemaHasRulesButRef = exports.schemaHasRules = exports.checkUnknownRules = exports.alwaysValidSchema = exports.toHash = void 0;
@@ -1225,9 +1225,9 @@ var require_util = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/names.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/names.js
 var require_names = __commonJS({
-  "node_modules/ajv/dist/compile/names.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/names.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -1264,9 +1264,9 @@ var require_names = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/errors.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/errors.js
 var require_errors = __commonJS({
-  "node_modules/ajv/dist/compile/errors.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/errors.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendErrors = exports.resetErrorsCount = exports.reportExtraError = exports.reportError = exports.keyword$DataError = exports.keywordError = void 0;
@@ -1386,9 +1386,9 @@ var require_errors = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/boolSchema.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/boolSchema.js
 var require_boolSchema = __commonJS({
-  "node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.boolOrEmptySchema = exports.topBoolOrEmptySchema = void 0;
@@ -1437,9 +1437,9 @@ var require_boolSchema = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/rules.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/rules.js
 var require_rules = __commonJS({
-  "node_modules/ajv/dist/compile/rules.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/rules.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getRules = exports.isJSONType = void 0;
@@ -1468,9 +1468,9 @@ var require_rules = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/applicability.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/applicability.js
 var require_applicability = __commonJS({
-  "node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.shouldUseRule = exports.shouldUseGroup = exports.schemaHasRulesForType = void 0;
@@ -1491,9 +1491,9 @@ var require_applicability = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/dataType.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/dataType.js
 var require_dataType = __commonJS({
-  "node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.reportTypeError = exports.checkDataTypes = exports.checkDataType = exports.coerceAndCheckDataType = exports.getJSONTypes = exports.getSchemaTypes = exports.DataType = void 0;
@@ -1675,9 +1675,9 @@ var require_dataType = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/defaults.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/defaults.js
 var require_defaults = __commonJS({
-  "node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.assignDefaults = void 0;
@@ -1712,9 +1712,9 @@ var require_defaults = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/code.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/code.js
 var require_code2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/code.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateUnion = exports.validateArray = exports.usePattern = exports.callValidateCode = exports.schemaProperties = exports.allSchemaProperties = exports.noPropertyInData = exports.propertyInData = exports.isOwnProperty = exports.hasPropFunc = exports.reportMissingProp = exports.checkMissingProp = exports.checkReportMissingProp = void 0;
@@ -1845,9 +1845,9 @@ var require_code2 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/keyword.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/keyword.js
 var require_keyword = __commonJS({
-  "node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateKeywordUsage = exports.validSchemaType = exports.funcKeywordCode = exports.macroKeywordCode = void 0;
@@ -1963,9 +1963,9 @@ var require_keyword = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/subschema.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/subschema.js
 var require_subschema = __commonJS({
-  "node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendSubschemaMode = exports.extendSubschemaData = exports.getSubschema = void 0;
@@ -2046,9 +2046,9 @@ var require_subschema = __commonJS({
   }
 });
 
-// node_modules/fast-deep-equal/index.js
+// ../../../../../inspector/mcp/node_modules/fast-deep-equal/index.js
 var require_fast_deep_equal = __commonJS({
-  "node_modules/fast-deep-equal/index.js"(exports, module) {
+  "../../../../../inspector/mcp/node_modules/fast-deep-equal/index.js"(exports, module) {
     "use strict";
     module.exports = function equal(a, b) {
       if (a === b) return true;
@@ -2081,9 +2081,9 @@ var require_fast_deep_equal = __commonJS({
   }
 });
 
-// node_modules/json-schema-traverse/index.js
+// ../../../../../inspector/mcp/node_modules/json-schema-traverse/index.js
 var require_json_schema_traverse = __commonJS({
-  "node_modules/json-schema-traverse/index.js"(exports, module) {
+  "../../../../../inspector/mcp/node_modules/json-schema-traverse/index.js"(exports, module) {
     "use strict";
     var traverse = module.exports = function(schema, opts, cb) {
       if (typeof opts == "function") {
@@ -2169,9 +2169,9 @@ var require_json_schema_traverse = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/resolve.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/resolve.js
 var require_resolve = __commonJS({
-  "node_modules/ajv/dist/compile/resolve.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/resolve.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getSchemaRefs = exports.resolveUrl = exports.normalizeId = exports._getFullPath = exports.getFullPath = exports.inlineRef = void 0;
@@ -2325,9 +2325,9 @@ var require_resolve = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/index.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/index.js
 var require_validate = __commonJS({
-  "node_modules/ajv/dist/compile/validate/index.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/validate/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getData = exports.KeywordCxt = exports.validateFunctionCode = void 0;
@@ -2833,9 +2833,9 @@ var require_validate = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/validation_error.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/runtime/validation_error.js
 var require_validation_error = __commonJS({
-  "node_modules/ajv/dist/runtime/validation_error.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/runtime/validation_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var ValidationError = class extends Error {
@@ -2849,9 +2849,9 @@ var require_validation_error = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/ref_error.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/ref_error.js
 var require_ref_error = __commonJS({
-  "node_modules/ajv/dist/compile/ref_error.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/ref_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var resolve_1 = require_resolve();
@@ -2866,9 +2866,9 @@ var require_ref_error = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/index.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/compile/index.js
 var require_compile = __commonJS({
-  "node_modules/ajv/dist/compile/index.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/compile/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.resolveSchema = exports.getCompilingSchema = exports.resolveRef = exports.compileSchema = exports.SchemaEnv = void 0;
@@ -3090,9 +3090,9 @@ var require_compile = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/refs/data.json
+// ../../../../../inspector/mcp/node_modules/ajv/dist/refs/data.json
 var require_data = __commonJS({
-  "node_modules/ajv/dist/refs/data.json"(exports, module) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/refs/data.json"(exports, module) {
     module.exports = {
       $id: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#",
       description: "Meta-schema for $data reference (JSON AnySchema extension proposal)",
@@ -3109,9 +3109,9 @@ var require_data = __commonJS({
   }
 });
 
-// node_modules/fast-uri/lib/utils.js
+// ../../../../../inspector/mcp/node_modules/fast-uri/lib/utils.js
 var require_utils = __commonJS({
-  "node_modules/fast-uri/lib/utils.js"(exports, module) {
+  "../../../../../inspector/mcp/node_modules/fast-uri/lib/utils.js"(exports, module) {
     "use strict";
     var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
     var isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
@@ -3235,8 +3235,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path23) {
-      let input = path23;
+    function removeDotSegments(path25) {
+      let input = path25;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3422,9 +3422,9 @@ var require_utils = __commonJS({
   }
 });
 
-// node_modules/fast-uri/lib/schemes.js
+// ../../../../../inspector/mcp/node_modules/fast-uri/lib/schemes.js
 var require_schemes = __commonJS({
-  "node_modules/fast-uri/lib/schemes.js"(exports, module) {
+  "../../../../../inspector/mcp/node_modules/fast-uri/lib/schemes.js"(exports, module) {
     "use strict";
     var { isUUID } = require_utils();
     var URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
@@ -3488,8 +3488,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path23, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path23 && path23 !== "/" ? path23 : void 0;
+        const [path25, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path25 && path25 !== "/" ? path25 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -3632,9 +3632,9 @@ var require_schemes = __commonJS({
   }
 });
 
-// node_modules/fast-uri/index.js
+// ../../../../../inspector/mcp/node_modules/fast-uri/index.js
 var require_fast_uri = __commonJS({
-  "node_modules/fast-uri/index.js"(exports, module) {
+  "../../../../../inspector/mcp/node_modules/fast-uri/index.js"(exports, module) {
     "use strict";
     var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, escapePreservingEscapes, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils();
     var { SCHEMES, getSchemeHandler } = require_schemes();
@@ -3918,9 +3918,9 @@ var require_fast_uri = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/uri.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/runtime/uri.js
 var require_uri = __commonJS({
-  "node_modules/ajv/dist/runtime/uri.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/runtime/uri.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var uri = require_fast_uri();
@@ -3929,9 +3929,9 @@ var require_uri = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/core.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/core.js
 var require_core = __commonJS({
-  "node_modules/ajv/dist/core.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/core.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = void 0;
@@ -4540,9 +4540,9 @@ var require_core = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/core/id.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/core/id.js
 var require_id = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var def = {
@@ -4555,9 +4555,9 @@ var require_id = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/core/ref.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/core/ref.js
 var require_ref = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.callRef = exports.getValidate = void 0;
@@ -4677,9 +4677,9 @@ var require_ref = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/core/index.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/core/index.js
 var require_core2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var id_1 = require_id();
@@ -4698,9 +4698,9 @@ var require_core2 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitNumber.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/limitNumber.js
 var require_limitNumber = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4730,9 +4730,9 @@ var require_limitNumber = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/multipleOf.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/multipleOf.js
 var require_multipleOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4758,9 +4758,9 @@ var require_multipleOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/ucs2length.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/runtime/ucs2length.js
 var require_ucs2length = __commonJS({
-  "node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     function ucs2length(str) {
@@ -4784,9 +4784,9 @@ var require_ucs2length = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitLength.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/limitLength.js
 var require_limitLength = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4816,9 +4816,9 @@ var require_limitLength = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/pattern.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/pattern.js
 var require_pattern = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4853,9 +4853,9 @@ var require_pattern = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitProperties.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/limitProperties.js
 var require_limitProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4882,9 +4882,9 @@ var require_limitProperties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/required.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/required.js
 var require_required = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4964,9 +4964,9 @@ var require_required = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitItems.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/limitItems.js
 var require_limitItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4993,9 +4993,9 @@ var require_limitItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/equal.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/runtime/equal.js
 var require_equal = __commonJS({
-  "node_modules/ajv/dist/runtime/equal.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/runtime/equal.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var equal = require_fast_deep_equal();
@@ -5004,9 +5004,9 @@ var require_equal = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
 var require_uniqueItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var dataType_1 = require_dataType();
@@ -5071,9 +5071,9 @@ var require_uniqueItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/const.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/const.js
 var require_const = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5100,9 +5100,9 @@ var require_const = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/enum.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/enum.js
 var require_enum = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5149,9 +5149,9 @@ var require_enum = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/index.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/index.js
 var require_validation = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var limitNumber_1 = require_limitNumber();
@@ -5187,9 +5187,9 @@ var require_validation = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
 var require_additionalItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateAdditionalItems = void 0;
@@ -5240,9 +5240,9 @@ var require_additionalItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/items.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/items.js
 var require_items = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateTuple = void 0;
@@ -5297,9 +5297,9 @@ var require_items = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
 var require_prefixItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var items_1 = require_items();
@@ -5314,9 +5314,9 @@ var require_prefixItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/items2020.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/items2020.js
 var require_items2020 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5349,9 +5349,9 @@ var require_items2020 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/contains.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/contains.js
 var require_contains = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5443,9 +5443,9 @@ var require_contains = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/dependencies.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/dependencies.js
 var require_dependencies = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateSchemaDeps = exports.validatePropertyDeps = exports.error = void 0;
@@ -5537,9 +5537,9 @@ var require_dependencies = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
 var require_propertyNames = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5580,9 +5580,9 @@ var require_propertyNames = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
 var require_additionalProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5686,9 +5686,9 @@ var require_additionalProperties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/properties.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/properties.js
 var require_properties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var validate_1 = require_validate();
@@ -5744,9 +5744,9 @@ var require_properties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
 var require_patternProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5818,9 +5818,9 @@ var require_patternProperties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/not.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/not.js
 var require_not = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5849,9 +5849,9 @@ var require_not = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/anyOf.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/anyOf.js
 var require_anyOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5866,9 +5866,9 @@ var require_anyOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/oneOf.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/oneOf.js
 var require_oneOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5924,9 +5924,9 @@ var require_oneOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/allOf.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/allOf.js
 var require_allOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5951,9 +5951,9 @@ var require_allOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/if.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/if.js
 var require_if = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6020,9 +6020,9 @@ var require_if = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/thenElse.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/thenElse.js
 var require_thenElse = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -6038,9 +6038,9 @@ var require_thenElse = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/index.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/index.js
 var require_applicator = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var additionalItems_1 = require_additionalItems();
@@ -6086,9 +6086,9 @@ var require_applicator = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/format/format.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/format/format.js
 var require_format = __commonJS({
-  "node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6176,9 +6176,9 @@ var require_format = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/format/index.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/format/index.js
 var require_format2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var format_1 = require_format();
@@ -6187,9 +6187,9 @@ var require_format2 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/metadata.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/metadata.js
 var require_metadata = __commonJS({
-  "node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.contentVocabulary = exports.metadataVocabulary = void 0;
@@ -6210,9 +6210,9 @@ var require_metadata = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/draft7.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/draft7.js
 var require_draft7 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var core_1 = require_core2();
@@ -6232,9 +6232,9 @@ var require_draft7 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/discriminator/types.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/discriminator/types.js
 var require_types = __commonJS({
-  "node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.DiscrError = void 0;
@@ -6246,9 +6246,9 @@ var require_types = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/discriminator/index.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/discriminator/index.js
 var require_discriminator = __commonJS({
-  "node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6351,9 +6351,9 @@ var require_discriminator = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/refs/json-schema-draft-07.json
+// ../../../../../inspector/mcp/node_modules/ajv/dist/refs/json-schema-draft-07.json
 var require_json_schema_draft_07 = __commonJS({
-  "node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
     module.exports = {
       $schema: "http://json-schema.org/draft-07/schema#",
       $id: "http://json-schema.org/draft-07/schema#",
@@ -6508,9 +6508,9 @@ var require_json_schema_draft_07 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/ajv.js
+// ../../../../../inspector/mcp/node_modules/ajv/dist/ajv.js
 var require_ajv = __commonJS({
-  "node_modules/ajv/dist/ajv.js"(exports, module) {
+  "../../../../../inspector/mcp/node_modules/ajv/dist/ajv.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.MissingRefError = exports.ValidationError = exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = exports.Ajv = void 0;
@@ -6578,9 +6578,9 @@ var require_ajv = __commonJS({
   }
 });
 
-// node_modules/ajv-formats/dist/formats.js
+// ../../../../../inspector/mcp/node_modules/ajv-formats/dist/formats.js
 var require_formats = __commonJS({
-  "node_modules/ajv-formats/dist/formats.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv-formats/dist/formats.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
@@ -6781,9 +6781,9 @@ var require_formats = __commonJS({
   }
 });
 
-// node_modules/ajv-formats/dist/limit.js
+// ../../../../../inspector/mcp/node_modules/ajv-formats/dist/limit.js
 var require_limit = __commonJS({
-  "node_modules/ajv-formats/dist/limit.js"(exports) {
+  "../../../../../inspector/mcp/node_modules/ajv-formats/dist/limit.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatLimitDefinition = void 0;
@@ -6853,9 +6853,9 @@ var require_limit = __commonJS({
   }
 });
 
-// node_modules/ajv-formats/dist/index.js
+// ../../../../../inspector/mcp/node_modules/ajv-formats/dist/index.js
 var require_dist = __commonJS({
-  "node_modules/ajv-formats/dist/index.js"(exports, module) {
+  "../../../../../inspector/mcp/node_modules/ajv-formats/dist/index.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var formats_1 = require_formats();
@@ -6882,12 +6882,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs21, exportName) {
+    function addFormats(ajv, list, fs23, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs21[f]);
+        ajv.addFormat(f, fs23[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -6895,7 +6895,7 @@ var require_dist = __commonJS({
   }
 });
 
-// node_modules/zod/v3/helpers/util.js
+// ../../../../../inspector/mcp/node_modules/zod/v3/helpers/util.js
 var util;
 (function(util2) {
   util2.assertEqual = (_) => {
@@ -7029,7 +7029,7 @@ var getParsedType = (data) => {
   }
 };
 
-// node_modules/zod/v3/ZodError.js
+// ../../../../../inspector/mcp/node_modules/zod/v3/ZodError.js
 var ZodIssueCode = util.arrayToEnum([
   "invalid_type",
   "invalid_literal",
@@ -7143,7 +7143,7 @@ ZodError.create = (issues) => {
   return error51;
 };
 
-// node_modules/zod/v3/locales/en.js
+// ../../../../../inspector/mcp/node_modules/zod/v3/locales/en.js
 var errorMap = (issue2, _ctx) => {
   let message;
   switch (issue2.code) {
@@ -7246,16 +7246,16 @@ var errorMap = (issue2, _ctx) => {
 };
 var en_default = errorMap;
 
-// node_modules/zod/v3/errors.js
+// ../../../../../inspector/mcp/node_modules/zod/v3/errors.js
 var overrideErrorMap = en_default;
 function getErrorMap() {
   return overrideErrorMap;
 }
 
-// node_modules/zod/v3/helpers/parseUtil.js
+// ../../../../../inspector/mcp/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path23, errorMaps, issueData } = params;
-  const fullPath = [...path23, ...issueData.path || []];
+  const { data, path: path25, errorMaps, issueData } = params;
+  const fullPath = [...path25, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7361,20 +7361,20 @@ var isDirty = (x) => x.status === "dirty";
 var isValid = (x) => x.status === "valid";
 var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
 
-// node_modules/zod/v3/helpers/errorUtil.js
+// ../../../../../inspector/mcp/node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 
-// node_modules/zod/v3/types.js
+// ../../../../../inspector/mcp/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path23, key) {
+  constructor(parent, value, path25, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path23;
+    this._path = path25;
     this._key = key;
   }
   get path() {
@@ -10771,7 +10771,7 @@ var nullableType = ZodNullable.create;
 var preprocessType = ZodEffects.createWithPreprocess;
 var pipelineType = ZodPipeline.create;
 
-// node_modules/zod/v4/core/index.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -11050,7 +11050,7 @@ __export(core_exports2, {
   version: () => version
 });
 
-// node_modules/zod/v4/core/core.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -11127,7 +11127,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// node_modules/zod/v4/core/util.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -11294,10 +11294,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path23) {
-  if (!path23)
+function getElementAtPath(obj, path25) {
+  if (!path25)
     return obj;
-  return path23.reduce((acc, key) => acc?.[key], obj);
+  return path25.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11706,11 +11706,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path23, issues) {
+function prefixIssues(path25, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path23);
+    iss.path.unshift(path25);
     return iss;
   });
 }
@@ -11823,7 +11823,7 @@ var Class = class {
   }
 };
 
-// node_modules/zod/v4/core/errors.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -11857,16 +11857,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path23 = []) => {
+  const processError = (error52, path25 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path23, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path25, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path23, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path25, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path23, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path25, ...issue2.path]);
       } else {
-        const fullpath = [...path23, ...issue2.path];
+        const fullpath = [...path25, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -11893,17 +11893,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path23 = []) => {
+  const processError = (error52, path25 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path23, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path25, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path23, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path25, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path23, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path25, ...issue2.path]);
       } else {
-        const fullpath = [...path23, ...issue2.path];
+        const fullpath = [...path25, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -11935,8 +11935,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path23 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path23) {
+  const path25 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path25) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -11962,7 +11962,7 @@ function prettifyError(error51) {
   return lines.join("\n");
 }
 
-// node_modules/zod/v4/core/parse.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -12050,7 +12050,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
 
-// node_modules/zod/v4/core/regexes.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   base64: () => base64,
@@ -12209,7 +12209,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// node_modules/zod/v4/core/checks.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a3;
   inst._zod ?? (inst._zod = {});
@@ -12757,7 +12757,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// node_modules/zod/v4/core/doc.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = []) {
     this.content = [];
@@ -12793,14 +12793,14 @@ var Doc = class {
   }
 };
 
-// node_modules/zod/v4/core/versions.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 4,
   patch: 3
 };
 
-// node_modules/zod/v4/core/schemas.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a3;
   inst ?? (inst = {});
@@ -14893,7 +14893,7 @@ function handleRefineResult(result, payload, input, inst) {
   }
 }
 
-// node_modules/zod/v4/locales/index.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -14950,7 +14950,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 
-// node_modules/zod/v4/locales/ar.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -15057,7 +15057,7 @@ function ar_default() {
   };
 }
 
-// node_modules/zod/v4/locales/az.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -15163,7 +15163,7 @@ function az_default() {
   };
 }
 
-// node_modules/zod/v4/locales/be.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -15320,7 +15320,7 @@ function be_default() {
   };
 }
 
-// node_modules/zod/v4/locales/bg.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -15441,7 +15441,7 @@ function bg_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ca.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ca.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -15550,7 +15550,7 @@ function ca_default() {
   };
 }
 
-// node_modules/zod/v4/locales/cs.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/cs.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -15662,7 +15662,7 @@ function cs_default() {
   };
 }
 
-// node_modules/zod/v4/locales/da.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/da.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -15778,7 +15778,7 @@ function da_default() {
   };
 }
 
-// node_modules/zod/v4/locales/de.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/de.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -15887,7 +15887,7 @@ function de_default() {
   };
 }
 
-// node_modules/zod/v4/locales/el.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/el.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -15997,7 +15997,7 @@ function el_default() {
   };
 }
 
-// node_modules/zod/v4/locales/en.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/en.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -16110,7 +16110,7 @@ function en_default2() {
   };
 }
 
-// node_modules/zod/v4/locales/eo.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/eo.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -16220,7 +16220,7 @@ function eo_default() {
   };
 }
 
-// node_modules/zod/v4/locales/es.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/es.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -16353,7 +16353,7 @@ function es_default() {
   };
 }
 
-// node_modules/zod/v4/locales/fa.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/fa.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -16468,7 +16468,7 @@ function fa_default() {
   };
 }
 
-// node_modules/zod/v4/locales/fi.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/fi.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -16581,7 +16581,7 @@ function fi_default() {
   };
 }
 
-// node_modules/zod/v4/locales/fr.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/fr.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -16707,7 +16707,7 @@ function fr_default() {
   };
 }
 
-// node_modules/zod/v4/locales/fr-CA.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/fr-CA.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -16815,7 +16815,7 @@ function fr_CA_default() {
   };
 }
 
-// node_modules/zod/v4/locales/he.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/he.js
 var error17 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -17010,7 +17010,7 @@ function he_default() {
   };
 }
 
-// node_modules/zod/v4/locales/hr.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/hr.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -17133,7 +17133,7 @@ function hr_default() {
   };
 }
 
-// node_modules/zod/v4/locales/hu.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/hu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -17242,7 +17242,7 @@ function hu_default() {
   };
 }
 
-// node_modules/zod/v4/locales/hy.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -17390,7 +17390,7 @@ function hy_default() {
   };
 }
 
-// node_modules/zod/v4/locales/id.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/id.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -17497,7 +17497,7 @@ function id_default() {
   };
 }
 
-// node_modules/zod/v4/locales/is.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/is.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -17607,7 +17607,7 @@ function is_default() {
   };
 }
 
-// node_modules/zod/v4/locales/it.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/it.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -17716,7 +17716,7 @@ function it_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ja.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ja.js
 var error24 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -17824,7 +17824,7 @@ function ja_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ka.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ka.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -17937,7 +17937,7 @@ function ka_default() {
   };
 }
 
-// node_modules/zod/v4/locales/km.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/km.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -18048,12 +18048,12 @@ function km_default() {
   };
 }
 
-// node_modules/zod/v4/locales/kh.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 
-// node_modules/zod/v4/locales/ko.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ko.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -18165,7 +18165,7 @@ function ko_default() {
   };
 }
 
-// node_modules/zod/v4/locales/lt.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -18369,7 +18369,7 @@ function lt_default() {
   };
 }
 
-// node_modules/zod/v4/locales/mk.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/mk.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -18479,7 +18479,7 @@ function mk_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ms.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ms.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -18587,7 +18587,7 @@ function ms_default() {
   };
 }
 
-// node_modules/zod/v4/locales/nl.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/nl.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -18698,7 +18698,7 @@ function nl_default() {
   };
 }
 
-// node_modules/zod/v4/locales/no.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/no.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -18807,7 +18807,7 @@ function no_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ota.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ota.js
 var error33 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -18917,7 +18917,7 @@ function ota_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ps.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ps.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -19032,7 +19032,7 @@ function ps_default() {
   };
 }
 
-// node_modules/zod/v4/locales/pl.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/pl.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -19142,7 +19142,7 @@ function pl_default() {
   };
 }
 
-// node_modules/zod/v4/locales/pt.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/pt.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "ter" },
@@ -19251,7 +19251,7 @@ function pt_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ro.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ro.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -19371,7 +19371,7 @@ function ro_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ru.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -19528,7 +19528,7 @@ function ru_default() {
   };
 }
 
-// node_modules/zod/v4/locales/sl.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/sl.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -19638,7 +19638,7 @@ function sl_default() {
   };
 }
 
-// node_modules/zod/v4/locales/sv.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/sv.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -19749,7 +19749,7 @@ function sv_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ta.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ta.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -19860,7 +19860,7 @@ function ta_default() {
   };
 }
 
-// node_modules/zod/v4/locales/th.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/th.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -19971,7 +19971,7 @@ function th_default() {
   };
 }
 
-// node_modules/zod/v4/locales/tr.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/tr.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -20077,7 +20077,7 @@ function tr_default() {
   };
 }
 
-// node_modules/zod/v4/locales/uk.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/uk.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -20186,12 +20186,12 @@ function uk_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ua.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 
-// node_modules/zod/v4/locales/ur.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/ur.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -20302,7 +20302,7 @@ function ur_default() {
   };
 }
 
-// node_modules/zod/v4/locales/uz.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/uz.js
 var error46 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -20413,7 +20413,7 @@ function uz_default() {
   };
 }
 
-// node_modules/zod/v4/locales/vi.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/vi.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -20522,7 +20522,7 @@ function vi_default() {
   };
 }
 
-// node_modules/zod/v4/locales/zh-CN.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/zh-CN.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -20632,7 +20632,7 @@ function zh_CN_default() {
   };
 }
 
-// node_modules/zod/v4/locales/zh-TW.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/zh-TW.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -20740,7 +20740,7 @@ function zh_TW_default() {
   };
 }
 
-// node_modules/zod/v4/locales/yo.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/locales/yo.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -20848,7 +20848,7 @@ function yo_default() {
   };
 }
 
-// node_modules/zod/v4/core/registries.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -20898,7 +20898,7 @@ function registry() {
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
 
-// node_modules/zod/v4/core/api.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/api.js
 // @__NO_SIDE_EFFECTS__
 function _string(Class2, params) {
   return new Class2({
@@ -21937,7 +21937,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   return inst;
 }
 
-// node_modules/zod/v4/core/to-json-schema.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -22296,7 +22296,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   return finalize(ctx, schema);
 };
 
-// node_modules/zod/v4/core/json-schema-processors.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/json-schema-processors.js
 var formatMap = {
   guid: "uuid",
   url: "uri",
@@ -22840,7 +22840,7 @@ function toJSONSchema(input, params) {
   return finalize(ctx, input);
 }
 
-// node_modules/zod/v4/core/json-schema-generator.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -22915,10 +22915,10 @@ var JSONSchemaGenerator = class {
   }
 };
 
-// node_modules/zod/v4/core/json-schema.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 
-// node_modules/zod/v4/mini/schemas.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/mini/schemas.js
 var ZodMiniType = /* @__PURE__ */ $constructor("ZodMiniType", (inst, def) => {
   if (!inst._zod)
     throw new Error("Uninitialized schema in ZodMiniType.");
@@ -22964,7 +22964,7 @@ function object(shape, params) {
   return new ZodMiniObject(def);
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
 function isZ4Schema(s) {
   const schema = s;
   return !!schema._zod;
@@ -23108,7 +23108,7 @@ function getLiteralValue(schema) {
   return void 0;
 }
 
-// node_modules/zod/v4/classic/external.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -23351,7 +23351,7 @@ __export(external_exports, {
   xor: () => xor
 });
 
-// node_modules/zod/v4/classic/schemas.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny2,
@@ -23522,7 +23522,7 @@ __export(schemas_exports2, {
   xor: () => xor
 });
 
-// node_modules/zod/v4/classic/checks.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -23556,7 +23556,7 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 
-// node_modules/zod/v4/classic/iso.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/iso.js
 var iso_exports2 = {};
 __export(iso_exports2, {
   ZodISODate: () => ZodISODate,
@@ -23597,7 +23597,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// node_modules/zod/v4/classic/errors.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -23637,7 +23637,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// node_modules/zod/v4/classic/parse.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse3 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -23651,7 +23651,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// node_modules/zod/v4/classic/schemas.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/schemas.js
 var _installedGroups = /* @__PURE__ */ new WeakMap();
 function _installLazyMethods(inst, group, methods) {
   const proto = Object.getPrototypeOf(inst);
@@ -24941,7 +24941,7 @@ function preprocess(fn, schema) {
   });
 }
 
-// node_modules/zod/v4/classic/compat.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode2 = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -24967,7 +24967,7 @@ var ZodFirstPartyTypeKind2;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind3) {
 })(ZodFirstPartyTypeKind2 || (ZodFirstPartyTypeKind2 = {}));
 
-// node_modules/zod/v4/classic/from-json-schema.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...schemas_exports2,
   ...checks_exports2,
@@ -25061,13 +25061,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path23 = ref.slice(1).split("/").filter(Boolean);
-  if (path23.length === 0) {
+  const path25 = ref.slice(1).split("/").filter(Boolean);
+  if (path25.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path23[0] === defsKey) {
-    const key = path23[1];
+  if (path25[0] === defsKey) {
+    const key = path25[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -25447,7 +25447,7 @@ function fromJSONSchema(schema, params) {
   return convertSchema(normalized, ctx);
 }
 
-// node_modules/zod/v4/classic/coerce.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/coerce.js
 var coerce_exports2 = {};
 __export(coerce_exports2, {
   bigint: () => bigint3,
@@ -25472,10 +25472,10 @@ function date4(params) {
   return _coercedDate(ZodDate2, params);
 }
 
-// node_modules/zod/v4/classic/external.js
+// ../../../../../inspector/mcp/node_modules/zod/v4/classic/external.js
 config(en_default2());
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
 var LATEST_PROTOCOL_VERSION = "2025-11-25";
 var SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"];
 var RELATED_TASK_META_KEY = "io.modelcontextprotocol/related-task";
@@ -27006,12 +27006,12 @@ var UrlElicitationRequiredError = class extends McpError {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
 function isTerminal(status) {
   return status === "completed" || status === "failed" || status === "cancelled";
 }
 
-// node_modules/zod-to-json-schema/dist/esm/Options.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/Options.js
 var ignoreOverride = /* @__PURE__ */ Symbol("Let zodToJsonSchema decide on which parser to use");
 var defaultOptions = {
   name: void 0,
@@ -27045,7 +27045,7 @@ var getDefaultOptions = (options) => typeof options === "string" ? {
   ...options
 };
 
-// node_modules/zod-to-json-schema/dist/esm/Refs.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/Refs.js
 var getRefs = (options) => {
   const _options = getDefaultOptions(options);
   const currentPath = _options.name !== void 0 ? [..._options.basePath, _options.definitionPath, _options.name] : _options.basePath;
@@ -27066,7 +27066,7 @@ var getRefs = (options) => {
   };
 };
 
-// node_modules/zod-to-json-schema/dist/esm/errorMessages.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/errorMessages.js
 function addErrorMessage(res, key, errorMessage, refs) {
   if (!refs?.errorMessages)
     return;
@@ -27082,7 +27082,7 @@ function setResponseValueAndErrors(res, key, value, errorMessage, refs) {
   addErrorMessage(res, key, errorMessage, refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/getRelativePath.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/getRelativePath.js
 var getRelativePath = (pathA, pathB) => {
   let i = 0;
   for (; i < pathA.length && i < pathB.length; i++) {
@@ -27092,7 +27092,7 @@ var getRelativePath = (pathA, pathB) => {
   return [(pathA.length - i).toString(), ...pathB.slice(i)].join("/");
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/any.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/any.js
 function parseAnyDef(refs) {
   if (refs.target !== "openAi") {
     return {};
@@ -27108,7 +27108,7 @@ function parseAnyDef(refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/array.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/array.js
 function parseArrayDef(def, refs) {
   const res = {
     type: "array"
@@ -27132,7 +27132,7 @@ function parseArrayDef(def, refs) {
   return res;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
 function parseBigintDef(def, refs) {
   const res = {
     type: "integer",
@@ -27178,24 +27178,24 @@ function parseBigintDef(def, refs) {
   return res;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
 function parseBooleanDef() {
   return {
     type: "boolean"
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
 function parseBrandedDef(_def, refs) {
   return parseDef(_def.type._def, refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
 var parseCatchDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/date.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/date.js
 function parseDateDef(def, refs, overrideDateStrategy) {
   const strategy = overrideDateStrategy ?? refs.dateStrategy;
   if (Array.isArray(strategy)) {
@@ -27254,7 +27254,7 @@ var integerDateParser = (def, refs) => {
   return res;
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/default.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/default.js
 function parseDefaultDef(_def, refs) {
   return {
     ...parseDef(_def.innerType._def, refs),
@@ -27262,12 +27262,12 @@ function parseDefaultDef(_def, refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
 function parseEffectsDef(_def, refs) {
   return refs.effectStrategy === "input" ? parseDef(_def.schema._def, refs) : parseAnyDef(refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
 function parseEnumDef(def) {
   return {
     type: "string",
@@ -27275,7 +27275,7 @@ function parseEnumDef(def) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
 var isJsonSchema7AllOfType = (type) => {
   if ("type" in type && type.type === "string")
     return false;
@@ -27317,7 +27317,7 @@ function parseIntersectionDef(def, refs) {
   } : void 0;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
 function parseLiteralDef(def, refs) {
   const parsedType2 = typeof def.value;
   if (parsedType2 !== "bigint" && parsedType2 !== "number" && parsedType2 !== "boolean" && parsedType2 !== "string") {
@@ -27337,7 +27337,7 @@ function parseLiteralDef(def, refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/string.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/string.js
 var emojiRegex2 = void 0;
 var zodPatterns = {
   /**
@@ -27662,7 +27662,7 @@ function stringifyRegExpWithFlags(regex, refs) {
   return pattern;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/record.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/record.js
 function parseRecordDef(def, refs) {
   if (refs.target === "openAi") {
     console.warn("Warning: OpenAI may not support records in schemas! Try an array of key-value pairs instead.");
@@ -27714,7 +27714,7 @@ function parseRecordDef(def, refs) {
   return schema;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/map.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/map.js
 function parseMapDef(def, refs) {
   if (refs.mapStrategy === "record") {
     return parseRecordDef(def, refs);
@@ -27739,7 +27739,7 @@ function parseMapDef(def, refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
 function parseNativeEnumDef(def) {
   const object3 = def.values;
   const actualKeys = Object.keys(def.values).filter((key) => {
@@ -27753,7 +27753,7 @@ function parseNativeEnumDef(def) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/never.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/never.js
 function parseNeverDef(refs) {
   return refs.target === "openAi" ? void 0 : {
     not: parseAnyDef({
@@ -27763,7 +27763,7 @@ function parseNeverDef(refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/null.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/null.js
 function parseNullDef(refs) {
   return refs.target === "openApi3" ? {
     enum: ["null"],
@@ -27773,7 +27773,7 @@ function parseNullDef(refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/union.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/union.js
 var primitiveMappings = {
   ZodString: "string",
   ZodNumber: "number",
@@ -27841,7 +27841,7 @@ var asAnyOf = (def, refs) => {
   return anyOf.length ? { anyOf } : void 0;
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
 function parseNullableDef(def, refs) {
   if (["ZodString", "ZodNumber", "ZodBigInt", "ZodBoolean", "ZodNull"].includes(def.innerType._def.typeName) && (!def.innerType._def.checks || !def.innerType._def.checks.length)) {
     if (refs.target === "openApi3") {
@@ -27873,7 +27873,7 @@ function parseNullableDef(def, refs) {
   return base && { anyOf: [base, { type: "null" }] };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/number.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/number.js
 function parseNumberDef(def, refs) {
   const res = {
     type: "number"
@@ -27922,7 +27922,7 @@ function parseNumberDef(def, refs) {
   return res;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/object.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/object.js
 function parseObjectDef(def, refs) {
   const forceOptionalIntoNullable = refs.target === "openAi";
   const result = {
@@ -27992,7 +27992,7 @@ function safeIsOptional(schema) {
   }
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
 var parseOptionalDef = (def, refs) => {
   if (refs.currentPath.toString() === refs.propertyPath?.toString()) {
     return parseDef(def.innerType._def, refs);
@@ -28011,7 +28011,7 @@ var parseOptionalDef = (def, refs) => {
   } : parseAnyDef(refs);
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
 var parsePipelineDef = (def, refs) => {
   if (refs.pipeStrategy === "input") {
     return parseDef(def.in._def, refs);
@@ -28031,12 +28031,12 @@ var parsePipelineDef = (def, refs) => {
   };
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
 function parsePromiseDef(def, refs) {
   return parseDef(def.type._def, refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/set.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/set.js
 function parseSetDef(def, refs) {
   const items = parseDef(def.valueType._def, {
     ...refs,
@@ -28056,7 +28056,7 @@ function parseSetDef(def, refs) {
   return schema;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
 function parseTupleDef(def, refs) {
   if (def.rest) {
     return {
@@ -28084,24 +28084,24 @@ function parseTupleDef(def, refs) {
   }
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
 function parseUndefinedDef(refs) {
   return {
     not: parseAnyDef(refs)
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
 function parseUnknownDef(refs) {
   return parseAnyDef(refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
 var parseReadonlyDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
 
-// node_modules/zod-to-json-schema/dist/esm/selectParser.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/selectParser.js
 var selectParser = (def, typeName, refs) => {
   switch (typeName) {
     case ZodFirstPartyTypeKind.ZodString:
@@ -28177,7 +28177,7 @@ var selectParser = (def, typeName, refs) => {
   }
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parseDef.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/parseDef.js
 function parseDef(def, refs, forceResolution = false) {
   const seenItem = refs.seen.get(def);
   if (refs.override) {
@@ -28233,7 +28233,7 @@ var addMeta = (def, refs, jsonSchema) => {
   return jsonSchema;
 };
 
-// node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
+// ../../../../../inspector/mcp/node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
 var zodToJsonSchema = (schema, options) => {
   const refs = getRefs(options);
   let definitions = typeof options === "object" && options.definitions ? Object.entries(options.definitions).reduce((acc, [name2, schema2]) => ({
@@ -28295,7 +28295,7 @@ var zodToJsonSchema = (schema, options) => {
   return combined;
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
 function mapMiniTarget(t) {
   if (!t)
     return "draft-7";
@@ -28337,7 +28337,7 @@ function parseWithCompat(schema, data) {
   return result.data;
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
 var DEFAULT_REQUEST_TIMEOUT_MSEC = 6e4;
 var Protocol = class {
   constructor(_options) {
@@ -29291,7 +29291,7 @@ function mergeCapabilities(base, additional) {
   return result;
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
 var import_ajv = __toESM(require_ajv(), 1);
 var import_ajv_formats = __toESM(require_dist(), 1);
 function createDefaultAjvInstance() {
@@ -29359,7 +29359,7 @@ var AjvJsonSchemaValidator = class {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
 var ExperimentalServerTasks = class {
   constructor(_server) {
     this._server = _server;
@@ -29572,7 +29572,7 @@ var ExperimentalServerTasks = class {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
 function assertToolsCallTaskCapability(requests, method, entityName) {
   if (!requests) {
     throw new Error(`${entityName} does not support task creation (required for ${method})`);
@@ -29607,7 +29607,7 @@ function assertClientRequestTaskCapability(requests, method, entityName) {
   }
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
 var Server = class extends Protocol {
   /**
    * Initializes this server with the given name and version information.
@@ -29987,7 +29987,7 @@ var Server = class extends Protocol {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/completable.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/server/completable.js
 var COMPLETABLE_SYMBOL = /* @__PURE__ */ Symbol.for("mcp.completable");
 function isCompletable(schema) {
   return !!schema && typeof schema === "object" && COMPLETABLE_SYMBOL in schema;
@@ -30001,7 +30001,7 @@ var McpZodTypeKind;
   McpZodTypeKind2["Completable"] = "McpCompletable";
 })(McpZodTypeKind || (McpZodTypeKind = {}));
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/shared/toolNameValidation.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/toolNameValidation.js
 var TOOL_NAME_REGEX = /^[A-Za-z0-9._-]{1,128}$/;
 function validateToolName(name) {
   const warnings = [];
@@ -30059,7 +30059,7 @@ function validateAndWarnToolName(name) {
   return result.isValid;
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/mcp-server.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/mcp-server.js
 var ExperimentalMcpServerTasks = class {
   constructor(_mcpServer) {
     this._mcpServer = _mcpServer;
@@ -30074,7 +30074,7 @@ var ExperimentalMcpServerTasks = class {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
 var McpServer = class {
   constructor(serverInfo, options) {
     this._registeredResources = {};
@@ -30866,10 +30866,10 @@ var EMPTY_COMPLETION_RESULT = {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process3 from "node:process";
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
 var ReadBuffer = class {
   append(chunk) {
     this._buffer = this._buffer ? Buffer.concat([this._buffer, chunk]) : chunk;
@@ -30897,7 +30897,7 @@ function serializeMessage(message) {
   return JSON.stringify(message) + "\n";
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../../../../../inspector/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 var StdioServerTransport = class {
   constructor(_stdin = process3.stdin, _stdout = process3.stdout) {
     this._stdin = _stdin;
@@ -31014,11 +31014,11 @@ function* walk(tree) {
   if (!root || typeof root !== "object") return;
   yield* walkNode(root, "root");
 }
-function* walkNode(node, path23) {
-  yield { node, path: path23 };
+function* walkNode(node, path25) {
+  yield { node, path: path25 };
   const children = Array.isArray(node.children) ? node.children : [];
   for (let i = 0; i < children.length; i++) {
-    yield* walkNode(children[i], `${path23}.children[${i}]`);
+    yield* walkNode(children[i], `${path25}.children[${i}]`);
   }
 }
 function findByTestTag(tree, tag) {
@@ -31057,18 +31057,18 @@ function layoutGaps(a, b) {
 }
 function siblingLayoutGaps(tree) {
   const out = [];
-  const visit = (node, path23) => {
+  const visit = (node, path25) => {
     const children = Array.isArray(node.children) ? node.children : [];
     const tagged = children.filter((c) => c && c.testTag != null && c.bounds);
     for (let i = 0; i + 1 < tagged.length; i++) {
       out.push({
-        parentPath: path23,
+        parentPath: path25,
         a: tagged[i].testTag,
         b: tagged[i + 1].testTag,
         gaps: layoutGaps(tagged[i], tagged[i + 1])
       });
     }
-    children.forEach((c, i) => c && visit(c, `${path23}.children[${i}]`));
+    children.forEach((c, i) => c && visit(c, `${path25}.children[${i}]`));
   };
   if (tree && tree.root) visit(tree.root, "root");
   return out;
@@ -31142,9 +31142,9 @@ function auditA11y(tree, opts = {}) {
   const violations = [];
   const warnings = [];
   let passCount = 0;
-  for (const { node, path: path23 } of walk(tree)) {
+  for (const { node, path: path25 } of walk(tree)) {
     const entryBase = {
-      path: path23,
+      path: path25,
       testTag: node.testTag ?? null,
       bounds: node.bounds ?? null
     };
@@ -31556,16 +31556,16 @@ function diffTrees(currentTree, goldenTree, tolerancePx = 1) {
   diffNode(cur, gold, "root", tol, diffs);
   return diffs;
 }
-function diffNode(cur, gold, path23, tol, out) {
+function diffNode(cur, gold, path25, tol, out) {
   if (cur.testTag !== gold.testTag) {
-    out.push({ path: path23, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
+    out.push({ path: path25, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
   }
   if (cur.text !== gold.text) {
-    out.push({ path: path23, kind: "text-changed", before: gold.text, after: cur.text });
+    out.push({ path: path25, kind: "text-changed", before: gold.text, after: cur.text });
   }
   if (cur.contentDescription !== gold.contentDescription) {
     out.push({
-      path: path23,
+      path: path25,
       kind: "contentDescription-changed",
       before: gold.contentDescription,
       after: cur.contentDescription
@@ -31573,29 +31573,29 @@ function diffNode(cur, gold, path23, tol, out) {
   }
   const roleB = gold.role ?? null;
   const roleA = cur.role ?? null;
-  if (roleA !== roleB) out.push({ path: path23, kind: "role-changed", before: roleB, after: roleA });
+  if (roleA !== roleB) out.push({ path: path25, kind: "role-changed", before: roleB, after: roleA });
   const clickB = gold.clickable ?? false;
   const clickA = cur.clickable ?? false;
-  if (clickA !== clickB) out.push({ path: path23, kind: "clickable-changed", before: clickB, after: clickA });
+  if (clickA !== clickB) out.push({ path: path25, kind: "clickable-changed", before: clickB, after: clickA });
   const disB = gold.disabled ?? false;
   const disA = cur.disabled ?? false;
-  if (disA !== disB) out.push({ path: path23, kind: "disabled-changed", before: disB, after: disA });
+  if (disA !== disB) out.push({ path: path25, kind: "disabled-changed", before: disB, after: disA });
   if (JSON.stringify(cur.designToken) !== JSON.stringify(gold.designToken)) {
-    out.push({ path: path23, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
+    out.push({ path: path25, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
   }
   const moved = boundsMovedBeyond(cur.bounds, gold.bounds, tol);
   if (moved) {
-    out.push({ path: path23, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
+    out.push({ path: path25, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
   }
   const curKids = cur.children || [];
   const goldKids = gold.children || [];
   const shared = Math.min(curKids.length, goldKids.length);
   for (let i = 0; i < shared; i++) {
-    diffNode(curKids[i], goldKids[i], `${path23}.children[${i}]`, tol, out);
+    diffNode(curKids[i], goldKids[i], `${path25}.children[${i}]`, tol, out);
   }
   for (let i = shared; i < curKids.length; i++) {
     out.push({
-      path: `${path23}.children[${i}]`,
+      path: `${path25}.children[${i}]`,
       kind: "node-added",
       before: null,
       after: summarize(curKids[i])
@@ -31603,7 +31603,7 @@ function diffNode(cur, gold, path23, tol, out) {
   }
   for (let i = shared; i < goldKids.length; i++) {
     out.push({
-      path: `${path23}.children[${i}]`,
+      path: `${path25}.children[${i}]`,
       kind: "node-removed",
       before: summarize(goldKids[i]),
       after: null
@@ -31649,8 +31649,8 @@ function parsePngHeader(buf) {
   }
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
-function readPngMeta(path23) {
-  const abs = resolve(path23);
+function readPngMeta(path25) {
+  const abs = resolve(path25);
   let buf;
   try {
     buf = readFileSync3(abs);
@@ -32110,9 +32110,9 @@ function renderTreeSvg(tree, opts = {}) {
   const originY = LEGEND_H + MARGIN / 2;
   let nodeCount = 0;
   const body = [];
-  for (const { node, path: path23 } of walk(root)) {
+  for (const { node, path: path25 } of walk(root)) {
     nodeCount++;
-    if (depthOf(path23) > maxDepth) continue;
+    if (depthOf(path25) > maxDepth) continue;
     const b = node.bounds;
     const w = boundsDim(b, "width");
     const h = boundsDim(b, "height");
@@ -32123,10 +32123,10 @@ function renderTreeSvg(tree, opts = {}) {
     const sh = h * scale;
     const tokenized = node.designToken != null;
     const clickable = node.clickable === true;
-    const rules = violationsByPath.get(path23);
+    const rules = violationsByPath.get(path25);
     const base = tokenized ? STYLE.tokenized : STYLE.plain;
     body.push(
-      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path23)}"/>`
+      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path25)}"/>`
     );
     if (clickable) {
       body.push(
@@ -32217,8 +32217,8 @@ var ABBREV = {
 function abbrev(key) {
   return ABBREV[key] ?? key;
 }
-function depthOf(path23) {
-  return (path23.match(/\.children\[/g) || []).length;
+function depthOf(path25) {
+  return (path25.match(/\.children\[/g) || []).length;
 }
 function boundsDim(b, key) {
   return b && typeof b[key] === "number" ? b[key] : 0;
@@ -32238,9 +32238,9 @@ function countRenderable(tree, opts = {}) {
   const maxDepth = typeof opts.maxDepth === "number" && opts.maxDepth >= 0 ? opts.maxDepth : Infinity;
   let total = 0;
   let drawn = 0;
-  for (const { node, path: path23 } of walk(root)) {
+  for (const { node, path: path25 } of walk(root)) {
     total++;
-    if (depthOf(path23) > maxDepth) continue;
+    if (depthOf(path25) > maxDepth) continue;
     if (boundsDim(node.bounds, "width") > 0 && boundsDim(node.bounds, "height") > 0) drawn++;
   }
   return { total, drawn };
@@ -32318,10 +32318,10 @@ function parseLogcat(raw, opts = {}) {
 
 // src/lib/preview-service.mjs
 import crypto from "node:crypto";
-import fs20 from "node:fs";
+import fs22 from "node:fs";
 import http from "node:http";
 import os3 from "node:os";
-import path22 from "node:path";
+import path24 from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 import { promisify } from "node:util";
@@ -32421,7 +32421,7 @@ function diffAgainstDesignSystem(tree, catalog) {
   const colors = catalog && catalog.colors || {};
   const dimens = catalog && catalog.dimens || {};
   const out = [];
-  for (const { node, path: path23 } of walk(tree)) {
+  for (const { node, path: path25 } of walk(tree)) {
     const dt = node.designToken;
     if (!dt || !Array.isArray(dt.tokens) || dt.tokens.length === 0) continue;
     const resolved = dt.resolved && typeof dt.resolved === "object" ? dt.resolved : {};
@@ -32435,7 +32435,7 @@ function diffAgainstDesignSystem(tree, catalog) {
       const matches = resolvedValues.includes(declaredNorm);
       if (!matches) {
         out.push({
-          path: path23,
+          path: path25,
           token,
           declared,
           // report the node's resolved value most likely intended for this token:
@@ -33075,8 +33075,8 @@ function getLayerMap(root) {
   const knownIds = new Set(KNOWN_LAYERS.map((l) => l.id));
   const layers = KNOWN_LAYERS.map(({ id, label }) => {
     const dir = path8.join(packageDir, id);
-    const present = fs8.existsSync(dir);
-    return { id, label, present, files: present ? walkKotlinFiles(dir) : [] };
+    const present2 = fs8.existsSync(dir);
+    return { id, label, present: present2, files: present2 ? walkKotlinFiles(dir) : [] };
   });
   const otherPackages = topLevel.filter((name) => !knownIds.has(name)).sort((a, b) => a.localeCompare(b)).map((name) => ({ name, files: walkKotlinFiles(path8.join(packageDir, name)) }));
   return { available: true, appPackage, kotlinRoot: toPosix(path8.relative(root, kotlinRoot)), layers, otherPackages };
@@ -33575,8 +33575,8 @@ function listReceiptHistory(root) {
 }
 
 // src/lib/steps-bridge.mjs
-import fs11 from "node:fs";
-import path12 from "node:path";
+import fs12 from "node:fs";
+import path13 from "node:path";
 
 // ../../packages/harness/src/console/console-data.mjs
 function kebabCase(name) {
@@ -33658,6 +33658,10 @@ function rungPackNote(level, pack) {
   const grade = typeof level === "string" ? level.trim() : String(level.rung).trim();
   const id = packIdOf(pack);
   return id ? `this rung is pack ${id}'s: a ${id} ${grade} and another pack's ${grade} are different claims` : "the receipt names no pack, so this rung is comparable to nothing";
+}
+function packClause(pack) {
+  const id = packIdOf(pack);
+  return id ? `pack ${id}` : "pack unnamed";
 }
 
 // ../../packages/harness/src/console/console-shell.mjs
@@ -34215,6 +34219,30 @@ var SHELL_CSS = `
   /* A duration an order of magnitude under the step's own history. Not a
      verdict \u2014 an observation beside one (evidence-must-attest-execution). */
   .now-flag { color: var(--reopen); text-decoration: underline dotted; }
+
+  /* --- trust and ladder (LIVE-CONSOLE.md Phase C) ---
+     Two rows, two questions: what Rule 0 last said about this lane, and what
+     would earn the next rung. No badge, no score, no bar \u2014 the trust row is a
+     sentence and the ladder row is four marks. Red appears on the trust line
+     for the two states that mean something went wrong (Rule 0 FAILED, or the
+     instrument did not put the tree back); nothing else here takes a colour. */
+  .trust, .ladder { margin: 4px 0 16px; }
+  .trust-line, .ladder-line { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+  .trust-bad { color: var(--drift); font-weight: 650; }
+  .trust-absent, .ladder-absent { color: var(--muted); }
+  .trust-note, .trust-link { margin: 2px 0 0; font-size: var(--fs-meta); color: var(--muted); }
+  .trust-plants { margin: 4px 0 0; font-size: var(--fs-meta); }
+  .trust-plants > summary { cursor: pointer; color: var(--muted); }
+  .trust-list { list-style: none; margin: 4px 0 0; padding: 0; }
+  .trust-plant { padding: 1px 0; line-height: 1.5; }
+  .trust-name { display: inline-block; min-width: 24ch; color: var(--ink); }
+  .trust-dur { color: var(--muted); }
+  /* A rung is earned or it is not. The unearned mark stays muted rather than
+     red: not-yet is not a failure (LIVE-CONSOLE \xA73.2's rule, one row up). */
+  .ladder-rung { font-family: var(--mono); color: var(--muted); margin-right: 6px; }
+  .ladder-earned { color: var(--ink); }
+  .ladder-pack { color: var(--muted); }
+  .ladder-needs { color: var(--ink-2); }
 
   /* --- screens (\xA73.4: the screen \xD7 state matrix) --- */
   .screens-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
@@ -34785,20 +34813,104 @@ function nowSectionHtml(state) {
 }
 
 // ../../packages/harness/src/lib/lane-markers.mjs
-import path11 from "node:path";
+import path12 from "node:path";
 
 // ../../packages/harness/src/lib/harness-manifest.mjs
+import fs10 from "node:fs";
+import path10 from "node:path";
 var MANIFEST_REL_PATH2 = "qa/harness-manifest.json";
 var LAYOUT_PATH_FIELDS = ["receipt", "architectureDoc", "specs", "approvals"];
 var LAYOUT_LIST_FIELDS = ["citationRoots", "packs"];
 var META_FIELDS2 = ["schema", "profile"];
 var KNOWN_FIELDS2 = /* @__PURE__ */ new Set([...META_FIELDS2, ...LAYOUT_PATH_FIELDS, ...LAYOUT_LIST_FIELDS]);
 var PROFILE_ID_RE2 = /^[a-z][a-z0-9-]*$/;
+function pathProblem2(field, value) {
+  if (typeof value !== "string" || value.trim() === "") return `${field} must be a non-empty string`;
+  if (value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value)) return `${field} must be relative to the project root (got "${value}")`;
+  if (value.includes("\\")) return `${field} must use "/" separators (got "${value}")`;
+  if (value.split("/").some((seg) => seg === "..")) return `${field} may not escape the project root (got "${value}")`;
+  return null;
+}
+function manifestProblems2(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return ["the manifest must be a JSON object"];
+  const problems = [];
+  for (const key of Object.keys(parsed)) {
+    if (!KNOWN_FIELDS2.has(key)) problems.push(`unknown field "${key}" (known: ${[...KNOWN_FIELDS2].join(", ")})`);
+  }
+  if ("schema" in parsed && (typeof parsed.schema !== "string" || !parsed.schema.startsWith("harness-manifest/"))) {
+    problems.push(`schema must be a string of the form "harness-manifest/<n>" (got ${JSON.stringify(parsed.schema)})`);
+  }
+  if (!("profile" in parsed)) {
+    problems.push(`profile is required \u2014 add "profile": { "id": "<profile>" } naming the stack profile under qa/lib/profiles/`);
+  } else {
+    const p = parsed.profile;
+    if (!p || typeof p !== "object" || Array.isArray(p)) problems.push("profile must be an object { id, version? }");
+    else {
+      if (typeof p.id !== "string" || !PROFILE_ID_RE2.test(p.id)) {
+        problems.push(`profile.id must match ${PROFILE_ID_RE2} \u2014 it names a directory under qa/lib/profiles/ (got ${JSON.stringify(p.id)})`);
+      }
+      if ("version" in p && typeof p.version !== "string") problems.push("profile.version must be a string when present");
+      for (const key of Object.keys(p)) {
+        if (key !== "id" && key !== "version") problems.push(`profile has an unknown field "${key}" (known: id, version)`);
+      }
+    }
+  }
+  for (const field of LAYOUT_PATH_FIELDS) {
+    if (!(field in parsed)) continue;
+    const p = pathProblem2(field, parsed[field]);
+    if (p) problems.push(p);
+  }
+  for (const field of LAYOUT_LIST_FIELDS) {
+    if (!(field in parsed)) continue;
+    const list = parsed[field];
+    if (!Array.isArray(list) || list.length === 0) {
+      problems.push(`${field} must be a non-empty array of strings`);
+      continue;
+    }
+    list.forEach((entry, i) => {
+      const p = field === "citationRoots" ? pathProblem2(`${field}[${i}]`, entry) : typeof entry === "string" && entry.trim() ? null : `${field}[${i}] must be a non-empty string`;
+      if (p) problems.push(p);
+    });
+  }
+  return problems;
+}
+function absentManifestReason(root) {
+  const stamped = fs10.existsSync(path10.join(root, "create-cmp.json"));
+  const how = stamped ? "This is a create-cmp app: run `create-cmp upgrade --harness` and it will write the manifest from what it already knows." : "Run `create-cmp harness init` \u2014 it writes the manifest, a working profile for this project, the verified surface and the lock, then proves the lane returns.";
+  return `${MANIFEST_REL_PATH2} is missing \u2014 the lane cannot run without knowing which stack profile this project uses, and there is no default. ${how}`;
+}
+function resolveHarnessManifest(root) {
+  const file2 = path10.join(root, ...MANIFEST_REL_PATH2.split("/"));
+  if (!fs10.existsSync(file2)) {
+    return { ok: false, absent: true, relPath: MANIFEST_REL_PATH2, reason: absentManifestReason(root) };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(fs10.readFileSync(file2, "utf8"));
+  } catch (err) {
+    return {
+      ok: false,
+      absent: false,
+      relPath: MANIFEST_REL_PATH2,
+      reason: `${MANIFEST_REL_PATH2} is not valid JSON (${err && err.message ? err.message : String(err)}) \u2014 fix it; no layout is assumed while a manifest is present`
+    };
+  }
+  const problems = manifestProblems2(parsed);
+  if (problems.length) {
+    return {
+      ok: false,
+      absent: false,
+      relPath: MANIFEST_REL_PATH2,
+      reason: `${MANIFEST_REL_PATH2} is malformed: ${problems.join("; ")} \u2014 fix it; no layout is assumed while a manifest is present`
+    };
+  }
+  return { ok: true, manifest: parsed, relPath: MANIFEST_REL_PATH2 };
+}
 
 // ../../packages/harness/src/lib/profile-loader.mjs
-import fs10 from "node:fs";
+import fs11 from "node:fs";
 import { createRequire } from "node:module";
-import path10 from "node:path";
+import path11 from "node:path";
 var SUPPORTED_PROFILE_PROTOCOLS = Object.freeze([1, 2]);
 var EXTENDS_PROTOCOL = 2;
 var PROFILES_DIR_REL = "qa/lib/profiles";
@@ -34834,14 +34946,14 @@ function locateProfile(root, id) {
     return { ok: false, reason: `profile id ${JSON.stringify(id)} is not a valid profile name (${PROFILE_ID_RE2}) \u2014 it names a directory under ${PROFILES_DIR_REL}/` };
   }
   const entryRel = profileEntryRel(id);
-  const entryAbs = path10.join(root, ...entryRel.split("/"));
-  if (!fs10.existsSync(entryAbs)) {
-    let present = [];
+  const entryAbs = path11.join(root, ...entryRel.split("/"));
+  if (!fs11.existsSync(entryAbs)) {
+    let present2 = [];
     try {
-      present = fs10.readdirSync(path10.join(root, ...PROFILES_DIR_REL.split("/")), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+      present2 = fs11.readdirSync(path11.join(root, ...PROFILES_DIR_REL.split("/")), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
     } catch {
     }
-    const have = present.length ? `profiles present: ${present.join(", ")}` : `no profiles are installed under ${PROFILES_DIR_REL}/`;
+    const have = present2.length ? `profiles present: ${present2.join(", ")}` : `no profiles are installed under ${PROFILES_DIR_REL}/`;
     return { ok: false, reason: `the manifest names profile "${id}" but ${entryRel} does not exist (${have}) \u2014 install the profile or fix ${"qa/harness-manifest.json"}` };
   }
   return { ok: true, entryRel, entryAbs };
@@ -34931,7 +35043,7 @@ var LANE_STEPS_REL = "qa/.lane-steps.ndjson";
 var LANE_MARKER_STALE_MS = 30 * 60 * 1e3;
 var RENDER_MARKER_FRESH_MS = 5 * 60 * 1e3;
 function laneStepsPath(root) {
-  return path11.join(root, ...LANE_STEPS_REL.split("/"));
+  return path12.join(root, ...LANE_STEPS_REL.split("/"));
 }
 
 // src/lib/steps-bridge.mjs
@@ -34944,7 +35056,7 @@ function readStepStream(root, { now = Date.now() } = {}) {
   const resolved = resolveStepsPath(root);
   let text;
   try {
-    text = fs11.readFileSync(resolved.abs, "utf8");
+    text = fs12.readFileSync(resolved.abs, "utf8");
   } catch (err) {
     const missing = err && err.code === "ENOENT";
     return {
@@ -34965,19 +35077,19 @@ function watchStepStream(root, onEvent) {
   if (!resolved.ok) return { close: () => {
   }, path: null };
   const abs = resolved.abs;
-  const dir = path12.dirname(abs);
+  const dir = path13.dirname(abs);
   let offset = 0;
   let partial2 = "";
   let watcher = null;
   try {
-    offset = fs11.statSync(abs).size;
+    offset = fs12.statSync(abs).size;
   } catch {
     offset = 0;
   }
   const drain = () => {
     let size;
     try {
-      size = fs11.statSync(abs).size;
+      size = fs12.statSync(abs).size;
     } catch {
       offset = 0;
       partial2 = "";
@@ -34990,14 +35102,14 @@ function watchStepStream(root, onEvent) {
     if (size === offset) return;
     let chunk = "";
     try {
-      const fd = fs11.openSync(abs, "r");
+      const fd = fs12.openSync(abs, "r");
       try {
         const buf = Buffer.alloc(size - offset);
-        const read = fs11.readSync(fd, buf, 0, buf.length, offset);
+        const read = fs12.readSync(fd, buf, 0, buf.length, offset);
         chunk = buf.subarray(0, read).toString("utf8");
         offset += read;
       } finally {
-        fs11.closeSync(fd);
+        fs12.closeSync(fd);
       }
     } catch {
       return;
@@ -35021,8 +35133,8 @@ function watchStepStream(root, onEvent) {
     }
   };
   try {
-    watcher = fs11.watch(dir, (_event, filename) => {
-      if (filename && path12.basename(String(filename)) !== STEPS_FILE_NAME) return;
+    watcher = fs12.watch(dir, (_event, filename) => {
+      if (filename && path13.basename(String(filename)) !== STEPS_FILE_NAME) return;
       drain();
     });
   } catch {
@@ -35041,19 +35153,240 @@ function watchStepStream(root, onEvent) {
   };
 }
 
+// ../../packages/harness/src/lib/framework-record.mjs
+import fs13 from "node:fs";
+import path14 from "node:path";
+var FRAMEWORK_RECORD_REL = "qa/evidence/framework-check.json";
+var FRAMEWORK_RECORD_COMMAND = "node qa/framework-check.mjs --record";
+function frameworkRecordPath(root) {
+  return path14.join(root, ...FRAMEWORK_RECORD_REL.split("/"));
+}
+function readFrameworkRecord(root) {
+  const abs = frameworkRecordPath(root);
+  let text;
+  try {
+    text = fs13.readFileSync(abs, "utf8");
+  } catch (err) {
+    return {
+      ok: false,
+      relPath: FRAMEWORK_RECORD_REL,
+      reason: err && err.code === "ENOENT" ? `no Rule 0 record at ${FRAMEWORK_RECORD_REL}` : `${FRAMEWORK_RECORD_REL} could not be read (${err && err.message ? err.message : String(err)})`
+    };
+  }
+  let record2;
+  try {
+    record2 = JSON.parse(text);
+  } catch (err) {
+    return { ok: false, relPath: FRAMEWORK_RECORD_REL, reason: `${FRAMEWORK_RECORD_REL} is not parseable JSON (${err.message})` };
+  }
+  if (!record2 || typeof record2 !== "object" || !Array.isArray(record2.plants)) {
+    return { ok: false, relPath: FRAMEWORK_RECORD_REL, reason: `${FRAMEWORK_RECORD_REL} is not a Rule 0 record (no plants[])` };
+  }
+  return { ok: true, record: record2, relPath: FRAMEWORK_RECORD_REL };
+}
+function trustState(read, { now = Date.now() } = {}) {
+  if (!read || read.ok !== true) {
+    return {
+      available: false,
+      relPath: read && read.relPath || FRAMEWORK_RECORD_REL,
+      reason: read && read.reason || `no Rule 0 record at ${FRAMEWORK_RECORD_REL}`
+    };
+  }
+  const r = read.record;
+  const plants = Array.isArray(r.plants) ? r.plants : [];
+  const stamp = typeof r.generatedAt === "string" ? Date.parse(r.generatedAt) : NaN;
+  return {
+    available: true,
+    relPath: read.relPath || FRAMEWORK_RECORD_REL,
+    verdict: typeof r.verdict === "string" ? r.verdict : "?",
+    reason: typeof r.reason === "string" && r.reason ? r.reason : void 0,
+    plants: plants.length,
+    failedByName: plants.filter((p) => p && p.failedByName === true).length,
+    unavailable: Array.isArray(r.unavailable) ? r.unavailable.length : 0,
+    // Tri-state on purpose: true, false, and "the record does not say" are
+    // three different readings and only one of them is reassuring.
+    treeIdentical: typeof r.treeIdentical === "boolean" ? r.treeIdentical : null,
+    changed: Array.isArray(r.changed) ? r.changed : [],
+    generatedAt: typeof r.generatedAt === "string" ? r.generatedAt : null,
+    commit: typeof r.commit === "string" ? r.commit : null,
+    ageMs: Number.isNaN(stamp) ? null : Math.max(0, now - stamp),
+    rows: plants.map((p) => ({
+      label: typeof p.label === "string" ? p.label : String(p.kind ?? "plant"),
+      observed: typeof p.observed === "string" ? p.observed : null,
+      names: Array.isArray(p.names) ? p.names : [],
+      failedByName: p.failedByName === true,
+      durationMs: typeof p.durationMs === "number" ? p.durationMs : null
+    }))
+  };
+}
+function trustLine(state, age = null) {
+  const tail = age ? ` \xB7 ${age}` : "";
+  if (!state || !state.available) {
+    return state && state.reason || `no Rule 0 record at ${FRAMEWORK_RECORD_REL}`;
+  }
+  if (state.verdict !== "PASS") {
+    const why = state.reason ? `: ${String(state.reason).split("\n")[0]}` : "";
+    return `Rule 0 \u2014 FAILED${why}${tail}`;
+  }
+  const n = state.plants;
+  const byName = n === 0 ? "no plants this tree could make" : state.failedByName === n ? `${n} plant${n === 1 ? "" : "s"} failed by name` : `${state.failedByName} of ${n} plants failed by name`;
+  const tree = state.treeIdentical === true ? "tree byte-identical" : state.treeIdentical === false ? `tree NOT restored \u2014 ${state.changed.length} file${state.changed.length === 1 ? "" : "s"} left changed` : "the record does not say whether the tree was restored";
+  return `Rule 0 \u2014 ${byName} \xB7 ${tree}${tail}`;
+}
+
+// src/lib/trust-bridge.mjs
+function readTrustRecord(root, { now = Date.now() } = {}) {
+  return trustState(readFrameworkRecord(root), { now });
+}
+
+// ../../packages/harness/src/lib/evidence-ladder.mjs
+var GRADED_FIELDS = Object.freeze(["scaffoldCore", "l0Required", "l1Required", "deviceExecution", "release", "names"]);
+var DECLARED_SPELLING = "`export const ladder` (the profile's top-level declaration)";
+var PACK_SPELLING = "`evidenceLadder` (a key on the object `steps(ctx)` returns)";
+function present(v) {
+  return v !== void 0 && v !== null;
+}
+function same(a, b) {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((x, i) => same(x, b[i]));
+  }
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    const ka = Object.keys(a).sort();
+    const kb = Object.keys(b).sort();
+    if (ka.length !== kb.length || ka.some((k, i) => k !== kb[i])) return false;
+    return ka.every((k) => same(a[k], b[k]));
+  }
+  return false;
+}
+function brief(v) {
+  if (v === void 0) return "absent";
+  if (Array.isArray(v)) return JSON.stringify(v);
+  if (v && typeof v === "object") return `{${Object.keys(v).sort().join(", ")}}`;
+  return JSON.stringify(v) ?? String(v);
+}
+function evidenceLadderFor(profile, pack) {
+  const id = profile && typeof profile.id === "string" ? profile.id : "(unnamed)";
+  const declared = profile && typeof profile === "object" ? profile.ladder : void 0;
+  const packed = pack && typeof pack === "object" ? pack.evidenceLadder : void 0;
+  for (const [value, spelling, source] of [
+    [declared, DECLARED_SPELLING, "profile"],
+    [packed, PACK_SPELLING, "pack"]
+  ]) {
+    if (present(value) && (typeof value !== "object" || Array.isArray(value))) {
+      return {
+        ok: false,
+        source,
+        reason: `profile "${id}" declares ${spelling} as ${brief(value)}, which is not an evidence ladder \u2014 a ladder is an object of step names ({ names, l0Required, l1Required, deviceExecution, release }). Fix it or remove it; a profile that declares no ladder earns no rung, which is honest, and this is not that.`
+      };
+    }
+  }
+  for (const [value, spelling, source] of [
+    [declared, DECLARED_SPELLING, "profile"],
+    [packed, PACK_SPELLING, "pack"]
+  ]) {
+    const release = present(value) ? value.release : void 0;
+    if (present(release) && typeof release !== "string") {
+      return {
+        ok: false,
+        source,
+        reason: `profile "${id}" declares ${spelling} with release = ${brief(release)}, which names no step. \`release\` takes ONE step name as a string \u2014 it is the only ladder field that is not a list, and a list here matches nothing, so L3 is unreachable and nothing says so. Write \`release: "${Array.isArray(release) && typeof release[0] === "string" ? release[0] : "yourReleaseStep"}"\`, or remove the field: a profile that declares no release step earns no L3, which is honest.`
+      };
+    }
+  }
+  if (present(declared) && present(packed)) {
+    const differing = GRADED_FIELDS.filter((f) => !same(declared[f], packed[f]));
+    if (differing.length) {
+      return {
+        ok: false,
+        source: "both",
+        reason: `profile "${id}" declares its evidence ladder TWICE and the two disagree, at ${differing.map((f) => `${f} (${brief(declared[f])} vs ${brief(packed[f])})`).join("; ")}. ${DECLARED_SPELLING} and ${PACK_SPELLING} must be the same ladder \u2014 the top-level one is what a reader that cannot start a lane asks, and a rung graded from whichever declaration a given reader happened to see would be a claim nobody made. Delete one, or export the same object from both.`
+      };
+    }
+    return { ok: true, ladder: declared, source: "both" };
+  }
+  if (present(declared)) return { ok: true, ladder: declared, source: "profile" };
+  if (present(packed)) return { ok: true, ladder: packed, source: "pack" };
+  return { ok: true, ladder: null, source: "none" };
+}
+
+// ../../packages/harness/src/lib/plant-calibration.mjs
+var PLANT_MATERIAL = Object.freeze([
+  ["testFileBasename", "string", "the file a planted citation lives in"],
+  ["unboundCitationSource", "function", "a citation on a type declaration with no test under it"],
+  ["tierUnmetCitationSource", "function", "a host-tier test citing a clause only another tier can observe"]
+]);
+
+// ../../packages/harness/src/lib/evidence-level.mjs
+function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
+  if (!ladder || typeof ladder !== "object") {
+    return {
+      available: false,
+      reason: "this profile declares no `ladder`, so there are no rungs to earn \u2014 which is the honest grade, not a failure"
+    };
+  }
+  const L = ladder;
+  const RUNG_NAMES = L.names ?? {};
+  const DEVICE_EXECUTION = Array.isArray(L.deviceExecution) ? L.deviceExecution : [];
+  const RELEASE_EXECUTION = typeof L.release === "string" && L.release.trim() ? L.release.trim() : null;
+  const L0_REQUIRED = Array.isArray(L.l0Required) ? [...L.l0Required] : [];
+  const L1_REQUIRED = Array.isArray(L.l1Required) ? [...L.l1Required] : [];
+  const declared = [
+    { id: "L0", requires: L0_REQUIRED, mode: "all" },
+    { id: "L1", requires: L1_REQUIRED, mode: "all" },
+    ...DEVICE_EXECUTION.length ? [{ id: "L2", requires: [...DEVICE_EXECUTION], mode: "any" }] : [],
+    ...DEVICE_EXECUTION.length && RELEASE_EXECUTION ? [{ id: "L3", requires: [RELEASE_EXECUTION], mode: "all" }] : []
+  ].map((r) => ({ ...r, name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id }));
+  const earnedId = typeof earned === "string" && earned.trim() ? earned.trim() : null;
+  const earnedIdx = earnedId ? declared.findIndex((r) => r.id === earnedId) : -1;
+  const passedSet = new Set((Array.isArray(passed) ? passed : []).filter((s) => typeof s === "string"));
+  const rungs = declared.map((r, i) => ({ ...r, earned: earnedIdx >= 0 && i <= earnedIdx }));
+  const nextIdx = earnedIdx + 1;
+  const next = nextIdx < declared.length ? { ...declared[nextIdx], unmet: declared[nextIdx].requires.filter((n) => !passedSet.has(n)) } : null;
+  return {
+    available: true,
+    earned: earnedId,
+    orphanRung: Boolean(earnedId) && earnedIdx === -1,
+    atTop: next === null && earnedIdx >= 0,
+    rungs,
+    next
+  };
+}
+
+// src/lib/ladder-bridge.mjs
+function readLadderStanding(root, receipt = null) {
+  let loaded;
+  try {
+    const manifest = resolveHarnessManifest(root);
+    loaded = manifest.ok ? loadProfileSync(root, manifest.manifest.profile) : { ok: false, reason: manifest.reason };
+  } catch (err) {
+    loaded = { ok: false, reason: `the profile could not be loaded (${err && err.message ? err.message : String(err)})` };
+  }
+  if (!loaded || !loaded.ok) {
+    return { available: false, reason: loaded && loaded.reason ? loaded.reason : "this project declares no loadable profile, so it declares no ladder" };
+  }
+  const resolved = evidenceLadderFor(loaded.profile);
+  if (!resolved.ok) return { available: false, reason: resolved.reason };
+  const level = receipt && receipt.available !== false ? receipt.evidenceLevel : null;
+  const earned = level && typeof level.rung === "string" ? level.rung : null;
+  const passed = (receipt && Array.isArray(receipt.steps) ? receipt.steps : []).filter((s) => s && s.verdict === "PASS" && typeof s.name === "string").map((s) => s.name);
+  return ladderStanding(resolved.ladder, { earned, passed });
+}
+
 // src/lib/components.mjs
-import fs12 from "node:fs";
-import path13 from "node:path";
+import fs14 from "node:fs";
+import path15 from "node:path";
 function walkKtFiles(dir) {
   const out = [];
   let entries;
   try {
-    entries = fs12.readdirSync(dir, { withFileTypes: true });
+    entries = fs14.readdirSync(dir, { withFileTypes: true });
   } catch {
     return out;
   }
   for (const e of entries) {
-    const p = path13.join(dir, e.name);
+    const p = path15.join(dir, e.name);
     if (e.isDirectory()) out.push(...walkKtFiles(p));
     else if (e.name.endsWith(".kt")) out.push(p);
   }
@@ -35064,13 +35397,13 @@ function findPresentationDirs(kotlinRoot) {
   (function walk2(dir) {
     let entries;
     try {
-      entries = fs12.readdirSync(dir, { withFileTypes: true });
+      entries = fs14.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of entries) {
       if (!e.isDirectory()) continue;
-      const p = path13.join(dir, e.name);
+      const p = path15.join(dir, e.name);
       if (e.name === "presentation") out.push(p);
       else walk2(p);
     }
@@ -35245,36 +35578,36 @@ function scanComposables(text) {
 }
 var SCREEN_FILE_RE = /Screen\.kt$/;
 function getComponentsData(root) {
-  const kotlinRoot = path13.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path15.join(root, "composeApp", "src", "commonMain", "kotlin");
   const presentationDirs = findPresentationDirs(kotlinRoot);
   if (presentationDirs.length === 0) {
     return {
       available: false,
-      reason: `no 'presentation' directory found under ${path13.relative(root, kotlinRoot).split(path13.sep).join("/")}`
+      reason: `no 'presentation' directory found under ${path15.relative(root, kotlinRoot).split(path15.sep).join("/")}`
     };
   }
-  const componentsDirs = presentationDirs.map((p) => path13.join(p, "components")).filter((p) => fs12.existsSync(p));
+  const componentsDirs = presentationDirs.map((p) => path15.join(p, "components")).filter((p) => fs14.existsSync(p));
   if (componentsDirs.length === 0) {
     return { available: false, reason: "no presentation/components directory found" };
   }
   const componentFiles = componentsDirs.flatMap(
-    (dir) => fs12.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(".kt")).map((e) => path13.join(dir, e.name))
+    (dir) => fs14.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(".kt")).map((e) => path15.join(dir, e.name))
   );
   if (componentFiles.length === 0) {
     return { available: true, components: [] };
   }
   const allPresentationFiles = presentationDirs.flatMap(walkKtFiles);
-  const fileTexts = new Map(allPresentationFiles.map((f) => [f, fs12.readFileSync(f, "utf8")]));
+  const fileTexts = new Map(allPresentationFiles.map((f) => [f, fs14.readFileSync(f, "utf8")]));
   const components = [];
   for (const file2 of componentFiles) {
-    const text = fileTexts.get(file2) ?? fs12.readFileSync(file2, "utf8");
-    const relFile = path13.relative(root, file2).split(path13.sep).join("/");
+    const text = fileTexts.get(file2) ?? fs14.readFileSync(file2, "utf8");
+    const relFile = path15.relative(root, file2).split(path15.sep).join("/");
     for (const sig of scanComposables(text)) {
       const callRe = new RegExp(`\\b${sig.name}\\s*\\(`);
       const usedIn = [];
       for (const [otherFile, otherText] of fileTexts) {
         if (otherFile === file2) continue;
-        if (callRe.test(otherText)) usedIn.push(path13.relative(root, otherFile).split(path13.sep).join("/"));
+        if (callRe.test(otherText)) usedIn.push(path15.relative(root, otherFile).split(path15.sep).join("/"));
       }
       usedIn.sort((a, b) => a.localeCompare(b));
       components.push({
@@ -35298,11 +35631,11 @@ function getComponentsData(root) {
 var SEAM_NAME_RE = /(Screen|Route|Preview)$/;
 function scanUngoverned(root, presentationDirs, registryComponents) {
   const registryNames = new Set(registryComponents.map((c) => c.name));
-  const featureFiles = presentationDirs.flatMap(walkKtFiles).filter((f) => !f.split(path13.sep).includes("components"));
-  const fileTexts = new Map(featureFiles.map((f) => [f, fs12.readFileSync(f, "utf8")]));
+  const featureFiles = presentationDirs.flatMap(walkKtFiles).filter((f) => !f.split(path15.sep).includes("components"));
+  const fileTexts = new Map(featureFiles.map((f) => [f, fs14.readFileSync(f, "utf8")]));
   const out = [];
   for (const [file2, text] of fileTexts) {
-    const relFile = path13.relative(root, file2).split(path13.sep).join("/");
+    const relFile = path15.relative(root, file2).split(path15.sep).join("/");
     const featureOf = (rel) => {
       const after = rel.split("/presentation/")[1] ?? "";
       return after.includes("/") ? after.split("/")[0] : "(root)";
@@ -35314,7 +35647,7 @@ function scanUngoverned(root, presentationDirs, registryComponents) {
       const usedIn = [];
       for (const [otherFile, otherText] of fileTexts) {
         if (otherFile === file2) continue;
-        if (callRe.test(otherText)) usedIn.push(path13.relative(root, otherFile).split(path13.sep).join("/"));
+        if (callRe.test(otherText)) usedIn.push(path15.relative(root, otherFile).split(path15.sep).join("/"));
       }
       const features = /* @__PURE__ */ new Set([featureOf(relFile), ...usedIn.map(featureOf)]);
       out.push({
@@ -35333,35 +35666,35 @@ function scanUngoverned(root, presentationDirs, registryComponents) {
 }
 
 // src/lib/variants.mjs
-import fs13 from "node:fs";
-import path14 from "node:path";
+import fs15 from "node:fs";
+import path16 from "node:path";
 function getVariantsData(root) {
-  const variantsDir = path14.join(root, "composeApp", "build", "previews", "variants");
+  const variantsDir = path16.join(root, "composeApp", "build", "previews", "variants");
   let entries;
   try {
-    entries = fs13.readdirSync(variantsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+    entries = fs15.readdirSync(variantsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
   } catch {
     return { available: false };
   }
   if (entries.length === 0) return { available: false };
   const variants = entries.map((e) => e.name).sort().map((name) => {
-    const dir = path14.join(variantsDir, name);
+    const dir = path16.join(variantsDir, name);
     let screenDirs = [];
     try {
-      screenDirs = fs13.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
+      screenDirs = fs15.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
     } catch {
       screenDirs = [];
     }
-    const screens = screenDirs.map((e) => e.name).filter((id) => fs13.existsSync(path14.join(dir, id, "screen.png"))).sort().map((id) => ({ id, png: `variants/${name}/${id}/screen.png` }));
-    const hasDesignSystem = fs13.existsSync(path14.join(dir, "design-system.json"));
+    const screens = screenDirs.map((e) => e.name).filter((id) => fs15.existsSync(path16.join(dir, id, "screen.png"))).sort().map((id) => ({ id, png: `variants/${name}/${id}/screen.png` }));
+    const hasDesignSystem = fs15.existsSync(path16.join(dir, "design-system.json"));
     return { name, screens, hasDesignSystem };
   });
   return { available: true, variants };
 }
 
 // src/lib/component-drift.mjs
-import fs14 from "node:fs";
-import path15 from "node:path";
+import fs16 from "node:fs";
+import path17 from "node:path";
 function getComponentDriftInfo(root, files, approvalRecord) {
   if (!approvalRecord) {
     return { available: false, reason: "no approvals record for the components artifact" };
@@ -35382,7 +35715,7 @@ function getComponentDriftInfo(root, files, approvalRecord) {
   const byFile = {};
   for (const relFile of files) {
     try {
-      const stat = fs14.statSync(path15.join(root, relFile));
+      const stat = fs16.statSync(path17.join(root, relFile));
       byFile[relFile] = { modifiedSinceApproval: stat.mtimeMs > approvedAtMs, mtime: stat.mtime.toISOString() };
     } catch {
       byFile[relFile] = { modifiedSinceApproval: null, mtime: null };
@@ -35392,19 +35725,19 @@ function getComponentDriftInfo(root, files, approvalRecord) {
 }
 
 // src/lib/handrolled-state.mjs
-import fs15 from "node:fs";
-import path16 from "node:path";
+import fs17 from "node:fs";
+import path18 from "node:path";
 var INDICATORS = ["CircularProgressIndicator", "LinearProgressIndicator"];
 function isUnderComponentsDir(absFile) {
-  return absFile.split(path16.sep).includes("components");
+  return absFile.split(path18.sep).includes("components");
 }
 function getHandRolledStateViolations(root) {
-  const kotlinRoot = path16.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path18.join(root, "composeApp", "src", "commonMain", "kotlin");
   const presentationDirs = findPresentationDirs(kotlinRoot);
   if (presentationDirs.length === 0) {
     return {
       available: false,
-      reason: `no 'presentation' directory found under ${path16.relative(root, kotlinRoot).split(path16.sep).join("/")}`
+      reason: `no 'presentation' directory found under ${path18.relative(root, kotlinRoot).split(path18.sep).join("/")}`
     };
   }
   const files = presentationDirs.flatMap(walkKtFiles).filter((f) => !isUnderComponentsDir(f));
@@ -35412,7 +35745,7 @@ function getHandRolledStateViolations(root) {
   for (const file2 of files) {
     let text;
     try {
-      text = fs15.readFileSync(file2, "utf8");
+      text = fs17.readFileSync(file2, "utf8");
     } catch {
       continue;
     }
@@ -35427,7 +35760,7 @@ function getHandRolledStateViolations(root) {
       if (lines.length) indicators.push({ name, lines });
     }
     if (indicators.length) {
-      violations.push({ file: path16.relative(root, file2).split(path16.sep).join("/"), indicators });
+      violations.push({ file: path18.relative(root, file2).split(path18.sep).join("/"), indicators });
     }
   }
   violations.sort((a, b) => a.file.localeCompare(b.file));
@@ -35435,29 +35768,29 @@ function getHandRolledStateViolations(root) {
 }
 
 // src/lib/walkthrough-data.mjs
-import fs16 from "node:fs";
-import path17 from "node:path";
-var WALKTHROUGH_REL_DIR = path17.join("qa", "evidence", "walkthrough");
+import fs18 from "node:fs";
+import path19 from "node:path";
+var WALKTHROUGH_REL_DIR = path19.join("qa", "evidence", "walkthrough");
 function getWalkthroughData(projectDir, { limit = 8 } = {}) {
-  const root = path17.join(projectDir, WALKTHROUGH_REL_DIR);
-  if (!fs16.existsSync(root)) {
+  const root = path19.join(projectDir, WALKTHROUGH_REL_DIR);
+  if (!fs18.existsSync(root)) {
     return { available: false, reason: "no walkthrough runs yet \u2014 node qa/walkthrough.mjs against the live app", runs: [] };
   }
   const runs = [];
-  for (const entry of fs16.readdirSync(root)) {
-    const dir = path17.join(root, entry);
-    const manifestPath = path17.join(dir, "manifest.json");
-    if (!fs16.existsSync(manifestPath)) continue;
+  for (const entry of fs18.readdirSync(root)) {
+    const dir = path19.join(root, entry);
+    const manifestPath = path19.join(dir, "manifest.json");
+    if (!fs18.existsSync(manifestPath)) continue;
     let manifest;
     try {
-      manifest = JSON.parse(fs16.readFileSync(manifestPath, "utf8"));
+      manifest = JSON.parse(fs18.readFileSync(manifestPath, "utf8"));
     } catch (err) {
-      runs.push({ dir, relDir: path17.join(WALKTHROUGH_REL_DIR, entry), error: `manifest unreadable: ${err.message}` });
+      runs.push({ dir, relDir: path19.join(WALKTHROUGH_REL_DIR, entry), error: `manifest unreadable: ${err.message}` });
       continue;
     }
     runs.push({
       dir,
-      relDir: path17.join(WALKTHROUGH_REL_DIR, entry),
+      relDir: path19.join(WALKTHROUGH_REL_DIR, entry),
       relDirBase: entry,
       // the console's /walkthrough/<base>/… static route key
       generatedAt: manifest.generatedAt ?? entry,
@@ -35466,7 +35799,7 @@ function getWalkthroughData(projectDir, { limit = 8 } = {}) {
       a11yViolations: (manifest.screens ?? []).reduce((a, s) => a + (s.a11y?.violations ?? []).length, 0),
       unsettled: (manifest.screens ?? []).filter((s) => s.settled === false).length,
       notWalked: (manifest.notWalked ?? []).length,
-      hasReport: fs16.existsSync(path17.join(dir, "report.html")),
+      hasReport: fs18.existsSync(path19.join(dir, "report.html")),
       manifest
     });
   }
@@ -35476,7 +35809,7 @@ function getWalkthroughData(projectDir, { limit = 8 } = {}) {
 }
 
 // src/lib/live-session.mjs
-import path18 from "node:path";
+import path20 from "node:path";
 var HEALTH_TIMEOUT_MS = 900;
 async function getLiveDeviceStatus({ port = 9500, fetchImpl = fetch } = {}) {
   const url2 = `http://127.0.0.1:${port}/inspect/health`;
@@ -35596,11 +35929,11 @@ function createLiveSession({
     });
   }
   async function resolveAppId2() {
-    const fs21 = await import("node:fs");
+    const fs23 = await import("node:fs");
     for (const f of ["composeApp/build.gradle.kts", "composeApp/build.gradle"]) {
-      const p = path18.join(projectDir, f);
-      if (!fs21.existsSync(p)) continue;
-      const m = fs21.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
+      const p = path20.join(projectDir, f);
+      if (!fs23.existsSync(p)) continue;
+      const m = fs23.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
       if (m) return m[1];
     }
     throw new Error("could not resolve applicationId from composeApp/build.gradle(.kts)");
@@ -35707,11 +36040,11 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
   }
   let openComments = null;
   try {
-    const fs21 = await import("node:fs");
-    const path23 = await import("node:path");
-    const ledger = path23.join(projectDir, "qa", "comments.json");
-    if (fs21.existsSync(ledger)) {
-      const data = JSON.parse(fs21.readFileSync(ledger, "utf8"));
+    const fs23 = await import("node:fs");
+    const path25 = await import("node:path");
+    const ledger = path25.join(projectDir, "qa", "comments.json");
+    if (fs23.existsSync(ledger)) {
+      const data = JSON.parse(fs23.readFileSync(ledger, "utf8"));
       openComments = (data.comments ?? []).filter((c) => c.status === "open").length;
     }
   } catch {
@@ -35721,15 +36054,15 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
 }
 
 // src/lib/approval-diff.mjs
-import fs17 from "node:fs";
+import fs19 from "node:fs";
 import os2 from "node:os";
-import path19 from "node:path";
+import path21 from "node:path";
 import { pathToFileURL as pathToFileURL5 } from "node:url";
 var SEARCH_DEPTH = 120;
 var MAX_DIFF_LINES = 400;
 async function importProjectApprovals(projectDir) {
-  const lib = path19.join(projectDir, "qa", "lib", "approvals.mjs");
-  if (!fs17.existsSync(lib)) return null;
+  const lib = path21.join(projectDir, "qa", "lib", "approvals.mjs");
+  if (!fs19.existsSync(lib)) return null;
   try {
     return await import(pathToFileURL5(lib).href);
   } catch {
@@ -35737,13 +36070,13 @@ async function importProjectApprovals(projectDir) {
   }
 }
 async function materialize(git2, sha, relFiles, alsoNeeded) {
-  const tmp = fs17.mkdtempSync(path19.join(os2.tmpdir(), "cmp-approval-anchor-"));
+  const tmp = fs19.mkdtempSync(path21.join(os2.tmpdir(), "cmp-approval-anchor-"));
   for (const rel of [...relFiles, ...alsoNeeded]) {
     try {
       const { stdout } = await git2(["show", `${sha}:${rel}`]);
-      const dest = path19.join(tmp, rel);
-      fs17.mkdirSync(path19.dirname(dest), { recursive: true });
-      fs17.writeFileSync(dest, stdout);
+      const dest = path21.join(tmp, rel);
+      fs19.mkdirSync(path21.dirname(dest), { recursive: true });
+      fs19.writeFileSync(dest, stdout);
     } catch {
     }
   }
@@ -35795,7 +36128,7 @@ async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: 
       }
     } catch {
     } finally {
-      if (tmp) fs17.rmSync(tmp, { recursive: true, force: true });
+      if (tmp) fs19.rmSync(tmp, { recursive: true, force: true });
     }
   }
   return {
@@ -35942,7 +36275,17 @@ function overviewBodyHtml({
   // stream, does not decide a run's phase, and does not format a step.
   // "" is an older caller, and renders no row rather than an empty one.
   nowHtml = "",
-  railHtml = ""
+  railHtml = "",
+  // LIVE-CONSOLE.md's fourth and fifth questions ("can I trust the lane that
+  // says so?", "what would earn the next rung?"), rendered by console-trust.mjs
+  // and console-ladder.mjs and passed in as strings — exactly like nowHtml and
+  // digestHtml. Composition only: this file does not read the Rule 0 record,
+  // does not resolve a ladder, and does not decide a rung. "" is an older
+  // caller and renders no row rather than an empty one, because an empty trust
+  // row would read as "nothing is wrong", which is the one thing a row about an
+  // unrun instrument must never say.
+  trustHtml = "",
+  ladderHtml = ""
 } = {}) {
   const byArtifact = new Map(statuses.map((s) => [s.id, s]));
   const byFeature = new Map(features.map((f) => [f.name, f]));
@@ -35990,11 +36333,17 @@ ${inner}
   const nowBlock = nowHtml ? `  <h3 class="fd-h">Now</h3>
 ${nowHtml}
 ` : "";
+  const trustBlock = trustHtml ? `  <h3 class="fd-h">Trust</h3>
+${trustHtml}
+` : "";
+  const ladderBlock = ladderHtml ? `  <h3 class="fd-h">Ladder</h3>
+${ladderHtml}
+` : "";
   return `${driveChainHtml(walks && walks.chain ? walks.chain : null)}  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
 ${railBlock}${nowBlock}  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
-${walksHtml(features, statuses, walks)}
+${trustBlock}${ladderBlock}${walksHtml(features, statuses, walks)}
 ${fold("What changed", changedBlock)}
 ${fold("History", historyHtml)}`;
 }
@@ -36197,6 +36546,82 @@ function overviewGlyph(queue = [], statuses = []) {
   return drifted ? { ch: "\u26A0", cls: "glyph-drift", label: `${queue.length} act(s) waiting \u2014 drift among them` } : { ch: "\u25CB", cls: "glyph-unsigned", label: `${queue.length} act(s) waiting on you` };
 }
 
+// ../../packages/harness/src/console/console-trust.mjs
+var esc6 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr3 = (s) => esc6(s).replace(/"/g, "&quot;");
+function trustRowHtml(state, { age = null } = {}) {
+  if (!state || !state.available) {
+    return `  <div class="trust" id="trust">
+  <p class="trust-line trust-absent">${esc6(trustLine(state))} &mdash; run <code>${esc6(FRAMEWORK_RECORD_COMMAND)}</code></p>
+  </div>`;
+  }
+  const failed = state.verdict !== "PASS";
+  const bad = failed || state.treeIdentical === false;
+  const cls = bad ? "trust-line trust-bad" : "trust-line";
+  const line = `<p class="${cls}">${esc6(trustLine(state, age))}</p>`;
+  const rows = (state.rows ?? []).map((p) => {
+    const dur = formatDurationMs(p.durationMs);
+    const named = p.names.length ? ` naming ${esc6(p.names.join(", "))}` : "";
+    const verdict = p.failedByName ? `<span class="step-verdict-pass">refused</span>` : `<span class="step-verdict-fail">did NOT refuse by name</span>`;
+    return `    <li class="trust-plant"><code class="trust-name">${esc6(p.label)}</code> ${verdict} &middot; ${esc6(p.observed || "the lane")}${named}${dur ? ` <span class="trust-dur">${esc6(dur)}</span>` : ""}</li>`;
+  }).join("\n");
+  const detail = rows ? `
+  <details class="trust-plants"><summary>${state.plants} plant${state.plants === 1 ? "" : "s"}, each with the gate it made refuse</summary>
+  <ul class="trust-list">
+${rows}
+  </ul>
+  </details>` : "";
+  const unavailable = state.unavailable > 0 ? `
+  <p class="trust-note">${state.unavailable} plant${state.unavailable === 1 ? "" : "s"} this tree cannot make &mdash; the record names each one and why</p>` : "";
+  const source = `
+  <p class="trust-link">reading <code>${esc6(state.relPath)}</code>${state.commit ? ` &middot; at ${esc6(String(state.commit).slice(0, 7))}` : ""}</p>`;
+  return `  <div class="trust" id="trust" title="${escAttr3(
+    "GATE-RULES Rule 0: each plant makes the responsible gate FAIL BY NAME, and the instrument leaves the tree as it found it"
+  )}">
+  ${line}${detail}${unavailable}${source}
+  </div>`;
+}
+
+// ../../packages/harness/src/console/console-ladder.mjs
+var esc7 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr4 = (s) => esc7(s).replace(/"/g, "&quot;");
+var MARK = { earned: "&#9679;", open: "&#9675;" };
+function ladderRowHtml(state, { pack = null } = {}) {
+  if (!state || !state.available) {
+    return `  <div class="ladder" id="ladder">
+  <p class="ladder-line ladder-absent">${esc7(state && state.reason || "no ladder is derivable for this project")}</p>
+  </div>`;
+  }
+  const marks = state.rungs.map(
+    (r) => `<span class="ladder-rung${r.earned ? " ladder-earned" : ""}" title="${escAttr4(
+      `${r.id} ${r.name} \u2014 ${r.mode === "any" ? "any one of" : "every one of"}: ${r.requires.join(", ") || "(nothing declared)"}`
+    )}">${esc7(r.id)} ${r.earned ? MARK.earned : MARK.open}</span>`
+  ).join(" ");
+  let needs;
+  if (state.orphanRung) {
+    needs = `<span class="ladder-needs">the receipt records ${esc7(state.earned)}, which this profile's ladder does not declare</span>`;
+  } else if (state.atTop) {
+    needs = `<span class="ladder-needs">${esc7(state.earned)} is the top rung this pack declares</span>`;
+  } else if (state.next) {
+    const n = state.next;
+    const named = (list) => list.map((s) => `<code>${esc7(s)}</code>`).join(n.mode === "any" ? " or " : " &middot; ");
+    needs = n.unmet.length ? `<span class="ladder-needs">${esc7(n.id)} needs ${named(n.unmet)}</span>` : (
+      // Every step the next rung names PASSed in the run the receipt
+      // describes, and the receipt still records no such rung. That is a real
+      // state (the badge floor refuses to grade a profile whose plants cannot
+      // be planted, whatever its steps did), and inventing a requirement to
+      // fill the sentence would be worse than saying it.
+      `<span class="ladder-needs">${esc7(n.id)} needs ${named(n.requires)} &mdash; the last run records ${n.requires.length === 1 ? "it" : "them"} PASSed and the receipt still names no ${esc7(n.id)}</span>`
+    );
+  } else {
+    needs = `<span class="ladder-needs">this ladder declares no rungs</span>`;
+  }
+  const note = state.earned ? rungPackNote(state.earned, pack) : null;
+  return `  <div class="ladder" id="ladder">
+  <p class="ladder-line"><span class="ladder-pack"${note ? ` title="${escAttr4(note)}"` : ""}>${esc7(packClause(pack))}</span> &middot; ${marks} &middot; ${needs}</p>
+  </div>`;
+}
+
 // ../../packages/harness/src/console/console-tabs.mjs
 var NEUTRAL_COPY = Object.freeze({
   usesIn: "the shared sources",
@@ -36221,10 +36646,10 @@ function setConsoleCopy(copy) {
 function consoleCopy() {
   return COPY;
 }
-var esc6 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-var escAttr3 = (s) => esc6(s).replace(/"/g, "&quot;");
+var esc8 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr5 = (s) => esc8(s).replace(/"/g, "&quot;");
 function commentControlHtml(target, opts = {}) {
-  const targetJson = escAttr3(JSON.stringify(target));
+  const targetJson = escAttr5(JSON.stringify(target));
   const testTagField = opts.testTagInput ? `<input type="text" class="comment-testtag" placeholder="testTag (optional \u2014 element-level)">` : "";
   return `<span class="comment-ctl" data-target="${targetJson}">
       <button type="button" class="comment-btn" title="Add comment">&#128172;</button>
@@ -36269,23 +36694,23 @@ function signatureBarHtml(status, opts = {}) {
   if (!status) return "";
   const what = opts.what || status.id;
   const cls = status.status === "approved" ? "badge-approved" : status.status === "changed-since-approval" ? "badge-drift" : status.status === "reopened" ? "badge-reopened" : "badge-unreviewed";
-  const line = status.status === "approved" ? `signed${status.approvedAt ? ` ${esc6(status.approvedAt)}` : ""}${status.mode ? ` \xB7 ${esc6(status.mode)}` : ""}` : status.status === "changed-since-approval" ? "changed since signature \u2014 review the diff below, then re-approve" : status.status === "reopened" ? (
+  const line = status.status === "approved" ? `signed${status.approvedAt ? ` ${esc8(status.approvedAt)}` : ""}${status.mode ? ` \xB7 ${esc8(status.mode)}` : ""}` : status.status === "changed-since-approval" ? "changed since signature \u2014 review the diff below, then re-approve" : status.status === "reopened" ? (
     // The WHY, read straight off the ledger row (07-28 audit: "reopened"
     // with no reason was the state Karel came back to and could not
     // decode). Pre-audit rows carry no reason — the line then says only
     // what it knows.
-    `reopened for redesign${status.reopenedAt ? ` ${esc6(status.reopenedAt)}` : ""}${status.via ? ` via ${esc6(status.via)}` : ""}${status.reason ? ` \u2014 <em>${esc6(status.reason)}</em>` : ""} \u2014 re-approve when the redesign lands`
+    `reopened for redesign${status.reopenedAt ? ` ${esc8(status.reopenedAt)}` : ""}${status.via ? ` via ${esc8(status.via)}` : ""}${status.reason ? ` \u2014 <em>${esc8(status.reason)}</em>` : ""} \u2014 re-approve when the redesign lands`
   ) : "not signed yet \u2014 nothing here is binding until you sign it";
   const canApprove = status.resolvable !== false;
   const approveLabel = status.status === "approved" ? `Re-approve ${what}` : status.status === "unreviewed" ? `Approve ${what}` : `Re-approve ${what}`;
   const buttons = [
-    canApprove ? `<button type="button" class="approve-btn" data-artifact="${escAttr3(status.id)}">${esc6(approveLabel)}</button>` : `<span class="meta">not approvable yet \u2014 ${status.fileCount} of its expected files resolved</span>`,
-    status.status === "approved" ? `<button type="button" class="reopen-btn" data-artifact="${escAttr3(status.id)}">Reopen for redesign</button>` : ""
+    canApprove ? `<button type="button" class="approve-btn" data-artifact="${escAttr5(status.id)}">${esc8(approveLabel)}</button>` : `<span class="meta">not approvable yet \u2014 ${status.fileCount} of its expected files resolved</span>`,
+    status.status === "approved" ? `<button type="button" class="reopen-btn" data-artifact="${escAttr5(status.id)}">Reopen for redesign</button>` : ""
   ].filter(Boolean).join(" ");
   return `  <div class="signature-bar">
-    <span class="badge ${cls}">${esc6(status.status)}</span>
+    <span class="badge ${cls}">${esc8(status.status)}</span>
     <span class="signature-line">${line}</span>
-    <code class="signature-id">${esc6(status.id)}</code>
+    <code class="signature-id">${esc8(status.id)}</code>
     <span class="signature-actions">${buttons}</span>
   </div>`;
 }
@@ -36294,38 +36719,38 @@ function driftPanelHtml(status, anchored, opts = {}) {
   const reopened = status.status === "reopened";
   if (status.status !== "changed-since-approval" && !reopened) return "";
   const withApprove = opts.withApprove !== false;
-  const signedLine = status.approvedAt ? ` It was signed ${esc6(status.approvedAt)}.` : "";
+  const signedLine = status.approvedAt ? ` It was signed ${esc8(status.approvedAt)}.` : "";
   let filesHtml = "";
   let diffHtml = "";
   if (anchored && anchored.available) {
     const { changed = [], unchanged = [] } = anchored.files ?? {};
     const total = changed.length + unchanged.length;
     const verb = { M: "changed", A: "added since signing", D: "deleted" };
-    const changedItems = changed.map((c) => `<li><span class="status-drift">${esc6(verb[c.status] ?? c.status)}</span> <code>${esc6(c.path)}</code></li>`).join("\n");
+    const changedItems = changed.map((c) => `<li><span class="status-drift">${esc8(verb[c.status] ?? c.status)}</span> <code>${esc8(c.path)}</code></li>`).join("\n");
     const stillSigned = unchanged.length > 0 ? `      <details class="drift-still-signed"><summary>${unchanged.length} file(s) still exactly as signed</summary>
-        <ul>${unchanged.map((f) => `<li><span class="ok-inline">\u2713</span> <code>${esc6(f)}</code></li>`).join("\n")}</ul>
+        <ul>${unchanged.map((f) => `<li><span class="ok-inline">\u2713</span> <code>${esc8(f)}</code></li>`).join("\n")}</ul>
       </details>` : "";
     filesHtml = `    <p class="drift-summary">${total > 1 ? `<strong>${unchanged.length} of ${total}</strong> file(s) still exactly as signed &middot; <strong>${changed.length}</strong> changed:` : "what changed:"}</p>
     <ul class="drift-files">
 ${changedItems}
     </ul>
 ${stillSigned}`;
-    diffHtml = `    <details class="drift-diff"><summary>diff against the signed bytes (anchor ${esc6(anchored.anchorSha)} &middot; ${esc6(
+    diffHtml = `    <details class="drift-diff"><summary>diff against the signed bytes (anchor ${esc8(anchored.anchorSha)} &middot; ${esc8(
       anchored.anchorWhen || ""
     )}${anchored.truncated ? " &middot; truncated" : ""})</summary>
-      <pre class="approval-diff">${esc6(anchored.diff)}</pre>
+      <pre class="approval-diff">${esc8(anchored.diff)}</pre>
     </details>`;
   } else if (anchored) {
-    diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc6(anchored.reason)}</p>`;
+    diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc8(anchored.reason)}</p>`;
   }
-  const who = status.via ? ` via ${esc6(status.via)}` : "";
-  const why = status.reason ? ` Reason given: <em>${esc6(status.reason)}</em>.` : " No reason was recorded \u2014 this reopen predates the reason-required rule.";
-  const head = reopened ? `<p class="drift-head"><strong>Reopened for redesign</strong> &mdash; the signature on <code>${esc6(status.id)}</code> was deliberately walked back${status.reopenedAt ? ` ${esc6(status.reopenedAt)}` : ""}${who}.${why} This is sanctioned, not drift: the verify lane skips it rather than failing. Below is what has moved since the bytes you signed. Approve when the rendered result is what you want.</p>` : `<p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc6(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve \u2014 or revert the change.</p>`;
-  return `  <div class="drift-panel${reopened ? " drift-panel-reopened" : ""}" data-artifact="${escAttr3(status.id)}">
+  const who = status.via ? ` via ${esc8(status.via)}` : "";
+  const why = status.reason ? ` Reason given: <em>${esc8(status.reason)}</em>.` : " No reason was recorded \u2014 this reopen predates the reason-required rule.";
+  const head = reopened ? `<p class="drift-head"><strong>Reopened for redesign</strong> &mdash; the signature on <code>${esc8(status.id)}</code> was deliberately walked back${status.reopenedAt ? ` ${esc8(status.reopenedAt)}` : ""}${who}.${why} This is sanctioned, not drift: the verify lane skips it rather than failing. Below is what has moved since the bytes you signed. Approve when the rendered result is what you want.</p>` : `<p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc8(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve \u2014 or revert the change.</p>`;
+  return `  <div class="drift-panel${reopened ? " drift-panel-reopened" : ""}" data-artifact="${escAttr5(status.id)}">
     ${head}
 ${filesHtml}
 ${diffHtml}
-    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr3(status.id)}">${reopened ? "Approve" : "Re-approve"} ${esc6(status.id)}</button></div>` : ""}
+    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr5(status.id)}">${reopened ? "Approve" : "Re-approve"} ${esc8(status.id)}</button></div>` : ""}
   </div>`;
 }
 function genesisGuide(id) {
@@ -36341,7 +36766,7 @@ function genesisGuide(id) {
 }
 function artifactBannerHtml(s) {
   if (s.status === "unreviewed" || s.status === "reopened") {
-    return `<div class="artifact-banner banner-genesis"><span class="banner-mode">genesis</span> ${esc6(genesisGuide(s.id))}</div>`;
+    return `<div class="artifact-banner banner-genesis"><span class="banner-mode">genesis</span> ${esc8(genesisGuide(s.id))}</div>`;
   }
   if (s.status === "approved") {
     const unshaped = s.mode === "defaults-accepted";
@@ -36359,11 +36784,11 @@ function colorTokenTableHtml(colors, usage) {
   if (entries.length === 0) return `  <p class="empty-inline">no color tokens declared</p>`;
   const counts = usage && usage.available && usage.colors ? usage.colors.counts : null;
   const rows = entries.map(([name, hex3]) => {
-    const usageCell = counts ? `<td class="tok-usage">${esc6(usageText(counts[name] ?? 0))}</td>` : "";
+    const usageCell = counts ? `<td class="tok-usage">${esc8(usageText(counts[name] ?? 0))}</td>` : "";
     return `    <tr>
-      <td class="tok-swatch-cell"><span class="tok-swatch" style="background:${esc6(hex3)}"></span></td>
-      <td>${esc6(name)}${commentControlHtml({ type: "design-system", token: name })}</td>
-      <td><code>${esc6(hex3)}</code></td>
+      <td class="tok-swatch-cell"><span class="tok-swatch" style="background:${esc8(hex3)}"></span></td>
+      <td>${esc8(name)}${commentControlHtml({ type: "design-system", token: name })}</td>
+      <td><code>${esc8(hex3)}</code></td>
       ${usageCell}
     </tr>`;
   }).join("\n");
@@ -36371,7 +36796,7 @@ function colorTokenTableHtml(colors, usage) {
   if (usage && !counts) {
     const reason = usage.available === false && usage.reason || "no source object declaring these tokens was found";
     absence = `
-  <p class="empty-inline">usage counts: Not derivable statically &mdash; ${esc6(reason)}</p>`;
+  <p class="empty-inline">usage counts: Not derivable statically &mdash; ${esc8(reason)}</p>`;
   }
   return `  <table class="tok-table">
     <thead><tr><th></th><th>Token</th><th>Value</th>${counts ? "<th>Usage</th>" : ""}</tr></thead>
@@ -36391,10 +36816,10 @@ function contrastMatrixHtml(colors) {
     const aa = p.aa ? `<span class="wcag-pass">pass</span>` : `<span class="wcag-fail">fail</span>`;
     const aaa = p.aaa ? `<span class="wcag-pass">pass</span>` : `<span class="wcag-fail">fail</span>`;
     return `    <tr>
-      <td><span class="contrast-sample" style="background:${esc6(p.bgHex)};color:${esc6(p.fgHex)}">Aa</span>
-          <code>${esc6(p.fg)}</code> on <code>${esc6(p.bg)}</code></td>
-      <td class="tok-usage">${esc6(p.role)}</td>
-      <td class="contrast-ratio">${esc6(ratio)}</td>
+      <td><span class="contrast-sample" style="background:${esc8(p.bgHex)};color:${esc8(p.fgHex)}">Aa</span>
+          <code>${esc8(p.fg)}</code> on <code>${esc8(p.bg)}</code></td>
+      <td class="tok-usage">${esc8(p.role)}</td>
+      <td class="contrast-ratio">${esc8(ratio)}</td>
       <td>${aa}</td>
       <td>${aaa}</td>
     </tr>`;
@@ -36409,7 +36834,7 @@ ${rows}
 }
 function dimenSubTableHtml(entries) {
   const rows = entries.map(
-    (d) => `    <tr><td>${esc6(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</td><td><code>${esc6(d.value)}</code></td></tr>`
+    (d) => `    <tr><td>${esc8(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</td><td><code>${esc8(d.value)}</code></td></tr>`
   ).join("\n");
   return `  <table class="tok-table"><tbody>
 ${rows}
@@ -36418,9 +36843,9 @@ ${rows}
 function spacingScaleHtml(spacing) {
   const rows = spacing.map(
     (d) => `    <div class="scale-row">
-      <span class="scale-name">${esc6(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</span>
+      <span class="scale-name">${esc8(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</span>
       <span class="scale-bar" style="width:${px(d.dp * SPACING_BAR_PX_PER_DP)}"></span>
-      <span class="scale-value">${esc6(d.value)}</span>
+      <span class="scale-value">${esc8(d.value)}</span>
     </div>`
   ).join("\n");
   return `  <div class="scale-list">
@@ -36457,7 +36882,7 @@ function typeRampHtml(typography) {
       spec.tracking == null ? "tracking unset" : `tracking ${spec.tracking}`
     ].filter(Boolean).join(" &middot; ");
     return `      <tr>
-        <td class="ramp-name"><code>${esc6(spec.name ?? "\u2014")}</code></td>
+        <td class="ramp-name"><code>${esc8(spec.name ?? "\u2014")}</code></td>
         <td class="ramp-specimen"><span style="${style}">Ag</span></td>
         <td class="ramp-numbers">${numbers}</td>
       </tr>`;
@@ -36476,7 +36901,7 @@ ${candidatesStripHtml(meta3.variants)}` : "";
   if (!ds || !ds.available) {
     return `<div class="empty">
       <p>No design-system catalog available yet.</p>
-      <p>Produce one by letting the preview gallery render at least once${ds && ds.sourcePath ? ` (writes <code>${esc6(ds.sourcePath)}</code>)` : ""}, or connect a running
+      <p>Produce one by letting the preview gallery render at least once${ds && ds.sourcePath ? ` (writes <code>${esc8(ds.sourcePath)}</code>)` : ""}, or connect a running
       DEBUG build (<code>connect_live</code>) so it can be read live from
       <code>/inspect/design-system</code>.</p>
     </div>${candidatesSection}`;
@@ -36501,7 +36926,7 @@ ${dimenSubTableHtml(elevation)}`);
 ${dimenSubTableHtml(other)}`);
   }
   const typeRamp = typeRampHtml(typography);
-  return `  <p class="meta">source: ${esc6(sourceLabel)}</p>
+  return `  <p class="meta">source: ${esc8(sourceLabel)}</p>
   <h3>Color tokens</h3>
 ${colorTokenTableHtml(colors, meta3.usage)}
   <h3>Contrast &mdash; WCAG 2.2</h3>
@@ -36522,16 +36947,16 @@ function candidatesStripHtml(variants) {
   const cards = variants.variants.map((v) => {
     const shots = v.screens.map(
       (s) => `        <div class="candidate-shot">
-          <img alt="${escAttr3(v.name)} \u2014 ${escAttr3(s.id)}" src="/previews/${escAttr3(s.png)}">
-          <p class="lbl">${esc6(s.id)}</p>
+          <img alt="${escAttr5(v.name)} \u2014 ${escAttr5(s.id)}" src="/previews/${escAttr5(s.png)}">
+          <p class="lbl">${esc8(s.id)}</p>
         </div>`
     ).join("\n");
     return `    <div class="candidate-card">
-      <h4>${esc6(v.name)}</h4>
+      <h4>${esc8(v.name)}</h4>
       <div class="candidate-shots">
 ${shots || '        <p class="empty-inline">no screens stashed for this candidate</p>'}
       </div>
-      <button type="button" class="pick-btn" data-variant="${escAttr3(v.name)}">Pick &ldquo;${esc6(v.name)}&rdquo;</button>
+      <button type="button" class="pick-btn" data-variant="${escAttr5(v.name)}">Pick &ldquo;${esc8(v.name)}&rdquo;</button>
     </div>`;
   }).join("\n");
   return `  <div class="candidates-strip">
@@ -36540,7 +36965,7 @@ ${cards}
   <div id="pick-error" class="banner" hidden></div>`;
 }
 function shortDate(iso) {
-  return iso ? esc6(String(iso)) : "";
+  return iso ? esc8(String(iso)) : "";
 }
 function componentApprovalBadgeHtml(approval, drift, file2) {
   if (!approval) return "";
@@ -36564,10 +36989,10 @@ function paramsTableHtml(paramsParsed, paramDocs = {}) {
     return `<p class="meta">takes no parameters</p>`;
   }
   const rows = paramsParsed.map((p) => {
-    const type = p.type ? `<code>${esc6(p.type)}</code>` : `<span class="empty-inline">not parsed</span>`;
-    const def = p.default ? `<code>${esc6(p.default)}</code>` : `<span class="param-required">required</span>`;
-    const note = paramDocs[p.name] ? esc6(paramDocs[p.name]) : "";
-    return `    <tr><td><code>${esc6(p.name)}</code></td><td>${type}</td><td>${def}</td><td class="param-note">${note}</td></tr>`;
+    const type = p.type ? `<code>${esc8(p.type)}</code>` : `<span class="empty-inline">not parsed</span>`;
+    const def = p.default ? `<code>${esc8(p.default)}</code>` : `<span class="param-required">required</span>`;
+    const note = paramDocs[p.name] ? esc8(paramDocs[p.name]) : "";
+    return `    <tr><td><code>${esc8(p.name)}</code></td><td>${type}</td><td>${def}</td><td class="param-note">${note}</td></tr>`;
   }).join("\n");
   return `<table class="params-table">
     <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Notes</th></tr></thead>
@@ -36580,20 +37005,20 @@ function stateContractHtml(facts, hasScreenTagParam) {
   const items = [];
   if (hasScreenTagParam) {
     items.push(
-      facts.derivedTags && facts.derivedTags.length ? `owns testTags derived from <code>screenTag</code>: ${facts.derivedTags.map((t) => `<code>&lt;screenTag&gt;_${esc6(t)}</code>`).join(", ")}` : `takes a required <code>screenTag</code> parameter (tag suffixes not found in this scan)`
+      facts.derivedTags && facts.derivedTags.length ? `owns testTags derived from <code>screenTag</code>: ${facts.derivedTags.map((t) => `<code>&lt;screenTag&gt;_${esc8(t)}</code>`).join(", ")}` : `takes a required <code>screenTag</code> parameter (tag suffixes not found in this scan)`
     );
   }
   if (facts.contentUiStateArms && facts.contentUiStateArms.length) {
-    items.push(`renders <code>ContentUiState</code> arms: ${facts.contentUiStateArms.map((a) => `<code>${esc6(a)}</code>`).join(", ")}`);
+    items.push(`renders <code>ContentUiState</code> arms: ${facts.contentUiStateArms.map((a) => `<code>${esc8(a)}</code>`).join(", ")}`);
   }
   if (facts.a11yFloorEvidence && facts.a11yFloorEvidence.length) {
-    items.push(`enforces the 48dp a11y touch-target floor (evidence: ${facts.a11yFloorEvidence.map((e) => `<code>${esc6(e)}</code>`).join(", ")})`);
+    items.push(`enforces the 48dp a11y touch-target floor (evidence: ${facts.a11yFloorEvidence.map((e) => `<code>${esc8(e)}</code>`).join(", ")})`);
   }
   if (facts.insetsApis && facts.insetsApis.length) {
-    items.push(`owns insets: ${facts.insetsApis.map((a) => `<code>${esc6(a)}</code>`).join(", ")}`);
+    items.push(`owns insets: ${facts.insetsApis.map((a) => `<code>${esc8(a)}</code>`).join(", ")}`);
   }
   if (facts.tokensReferenced && facts.tokensReferenced.length) {
-    items.push(`tokens: ${facts.tokensReferenced.map((t) => `<code>${esc6(t)}</code>`).join(", ")}`);
+    items.push(`tokens: ${facts.tokensReferenced.map((t) => `<code>${esc8(t)}</code>`).join(", ")}`);
   }
   if (facts.selfReportsDesignToken) {
     items.push(`self-reports resolved values to the inspector (<code>designToken(...)</code>)`);
@@ -36607,16 +37032,16 @@ function componentStoryHtml(name, componentStories, version2, changedVersions) {
   const card = componentStories ? componentStories[kebab] : void 0;
   if (!card) {
     return `  <div class="component-story">
-    <p class="lbl">story render &mdash; <code>${esc6(id)}</code></p>
-    <p class="empty-inline">no story render yet &mdash; run the preview render to produce <code>${esc6(id)}</code></p>
+    <p class="lbl">story render &mdash; <code>${esc8(id)}</code></p>
+    <p class="empty-inline">no story render yet &mdash; run the preview render to produce <code>${esc8(id)}</code></p>
   </div>`;
   }
   const changedIn = changedVersions ? changedVersions[card.id] : void 0;
   const chip = changedIn ? ` <span class="chg">changed #${Number(changedIn)}</span>` : "";
   const buster = version2 ? `?v=${Number(version2)}` : "";
   return `  <div class="component-story">
-    <p class="lbl">story render &mdash; <code>${esc6(card.id)}</code>${chip}</p>
-    <img alt="${escAttr3(card.id)} story render" src="/previews/${escAttr3(card.png)}${buster}">
+    <p class="lbl">story render &mdash; <code>${esc8(card.id)}</code>${chip}</p>
+    <img alt="${escAttr5(card.id)} story render" src="/previews/${escAttr5(card.png)}${buster}">
   </div>`;
 }
 var STATE_TAG_TO_VARIANT = { loading: "loading", empty: "empty", error: "error", retry: "error" };
@@ -36628,15 +37053,15 @@ function liveVariantsHtml(derivedTags, stateVariants) {
     const entries = sv[state] || [];
     if (entries.length === 0) {
       return `    <div class="state-variant-block">
-      <p class="lbl">live &#64;${esc6(state)} render</p>
-      <p class="empty-inline">Not derivable statically &mdash; no <code>@${esc6(state)}</code> preview-registry entry has rendered yet</p>
+      <p class="lbl">live &#64;${esc8(state)} render</p>
+      <p class="empty-inline">Not derivable statically &mdash; no <code>@${esc8(state)}</code> preview-registry entry has rendered yet</p>
     </div>`;
     }
     const thumbs = entries.map(
-      (v) => `<div class="state-variant-thumb"><img alt="${escAttr3(v.id)}" src="/previews/${escAttr3(v.png)}"><p class="lbl">${esc6(v.id)}</p></div>`
+      (v) => `<div class="state-variant-thumb"><img alt="${escAttr5(v.id)}" src="/previews/${escAttr5(v.png)}"><p class="lbl">${esc8(v.id)}</p></div>`
     ).join("");
     return `    <div class="state-variant-block">
-      <p class="lbl">live &#64;${esc6(state)} render</p>
+      <p class="lbl">live &#64;${esc8(state)} render</p>
       <div class="state-variant-thumbs">${thumbs}</div>
     </div>`;
   });
@@ -36654,9 +37079,9 @@ function usedInHtml(usedIn, usedInScreens, violationsByFile) {
   );
   const items = ordered.map((f) => {
     const v = violationsByFile.get(f);
-    const chip = v ? `<span class="badge badge-changed violation-chip" title="hand-rolls ${esc6(v.indicators.map((i) => i.name).join(", "))} directly instead of via the components registry">&#9888; hand-rolled state</span>` : "";
+    const chip = v ? `<span class="badge badge-changed violation-chip" title="hand-rolls ${esc8(v.indicators.map((i) => i.name).join(", "))} directly instead of via the components registry">&#9888; hand-rolled state</span>` : "";
     const kind = screenSet.has(f) ? `<span class="badge badge-open">screen</span>` : "";
-    return `<li><code>${esc6(f)}</code> ${kind}${chip}</li>`;
+    return `<li><code>${esc8(f)}</code> ${kind}${chip}</li>`;
   }).join("");
   return `<ul class="component-used-in">${items}</ul>`;
 }
@@ -36664,23 +37089,23 @@ function componentsBodyHtml(components, meta3 = {}) {
   if (!components || !components.available) {
     return `<div class="empty">
       <p>No components scan available yet.</p>
-      <p>${esc6(
+      <p>${esc8(
       components && components.reason || "No presentation/components directory found in this project."
     )}</p>
     </div>`;
   }
   if (!components.components || components.components.length === 0) {
-    return `<div class="empty-inline">${esc6(COPY.componentsEmpty)}</div>`;
+    return `<div class="empty-inline">${esc8(COPY.componentsEmpty)}</div>`;
   }
   const violationsByFile = new Map(
     meta3.violations && meta3.violations.available ? meta3.violations.violations.map((v) => [v.file, v]) : []
   );
   const entries = components.components.map((c) => {
     const head = `<header class="component-head">
-      <h3>${esc6(c.name)}${commentControlHtml({ type: "design-system", token: `component:${c.name}` })}</h3>
+      <h3>${esc8(c.name)}${commentControlHtml({ type: "design-system", token: `component:${c.name}` })}</h3>
       ${componentApprovalBadgeHtml(meta3.approval, meta3.drift, c.file)}
     </header>
-    <p class="meta component-file"><code>${esc6(c.file)}</code></p>`;
+    <p class="meta component-file"><code>${esc8(c.file)}</code></p>`;
     const storyHtml = componentStoryHtml(c.name, meta3.componentStories, meta3.version, meta3.changedVersions);
     if (c.parseError) {
       return `  <article class="component-entry">
@@ -36693,7 +37118,7 @@ function componentsBodyHtml(components, meta3 = {}) {
     const facts = c.facts || {};
     const hasScreenTagParam = paramsParsed.some((p) => p.name === "screenTag");
     const doc = c.kdocDescription ?? c.kdoc;
-    const kdocHtml = doc ? `<p class="lbl">usage notes &mdash; from the component's own doc comment</p><blockquote class="component-kdoc">${esc6(doc)}</blockquote>` : "";
+    const kdocHtml = doc ? `<p class="lbl">usage notes &mdash; from the component's own doc comment</p><blockquote class="component-kdoc">${esc8(doc)}</blockquote>` : "";
     return `  <article class="component-entry">
     ${head}
     ${storyHtml}
@@ -36720,9 +37145,9 @@ function promotionQueueHtml(ungoverned) {
   }
   const rows = ungoverned.map(
     (u) => `    <tr>
-      <td><code>${esc6(u.name)}</code></td>
-      <td><code>${esc6(u.file)}</code></td>
-      <td>${esc6(u.feature)}</td>
+      <td><code>${esc8(u.name)}</code></td>
+      <td><code>${esc8(u.file)}</code></td>
+      <td>${esc8(u.feature)}</td>
       <td>${u.crossFeatureUseCount > 0 ? `<strong>${u.crossFeatureUseCount}</strong>` : "0"}</td>
       <td>${u.composesRegistry ? "composes registry components" : "self-contained"}</td>
     </tr>`
@@ -36743,7 +37168,7 @@ ${rows}
 }
 function approvalsTabHtml(approvals, meta3 = {}) {
   if (!approvals || !approvals.available) {
-    const detail = approvals && approvals.error ? esc6(approvals.error) : "This looks like an older scaffold that predates the approvals wave (no qa/lib/approvals.mjs).";
+    const detail = approvals && approvals.error ? esc8(approvals.error) : "This looks like an older scaffold that predates the approvals wave (no qa/lib/approvals.mjs).";
     return `<div class="empty">
       <p>Approvals are not available in this project.</p>
       <p>${detail}</p>
@@ -36767,21 +37192,21 @@ function approvalsTabHtml(approvals, meta3 = {}) {
       `${shortHash2(s.storedHash ?? s.hash)}${s.hashBasis === "raw-bytes" ? " \xB7 signed pre-strip, bytes unchanged" : ""}`
     ) : unresolvable ? "unresolvable" : `would approve at ${shortHash2(s.hash)}`;
     const unresolvableNote = s.resolvable === false ? `<p class="unresolvable-note">unresolvable (${s.fileCount} of expected files resolved) \u2014 not approvable</p>` : "";
-    const missingNote = s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc6(s.missing.join(", "))}</p>` : "";
-    const reopenNote = s.status === "reopened" ? `<p class="reopen-note">reopened${s.reopenedAt ? ` ${esc6(s.reopenedAt)}` : ""}${s.via ? ` via ${esc6(s.via)}` : ""}${s.reason ? ` \u2014 ${esc6(s.reason)}` : ""}</p>` : "";
+    const missingNote = s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc8(s.missing.join(", "))}</p>` : "";
+    const reopenNote = s.status === "reopened" ? `<p class="reopen-note">reopened${s.reopenedAt ? ` ${esc8(s.reopenedAt)}` : ""}${s.via ? ` via ${esc8(s.via)}` : ""}${s.reason ? ` \u2014 ${esc8(s.reason)}` : ""}</p>` : "";
     const btnLabel = s.status === "approved" ? "Re-approve" : "Approve";
-    const reopenBtn = s.status === "approved" ? `<button class="reopen-btn" data-artifact="${esc6(s.id)}">Reopen</button>` : "";
+    const reopenBtn = s.status === "approved" ? `<button class="reopen-btn" data-artifact="${esc8(s.id)}">Reopen</button>` : "";
     const anchored = meta3.anchoredDiffs ? meta3.anchoredDiffs[s.id] : null;
     const diffRow = s.status === "changed-since-approval" || s.status === "reopened" ? `    <tr class="approval-diff-row"><td colspan="6">
 ${driftPanelHtml(s, anchored, { withApprove: false })}
     </td></tr>` : "";
-    return `    <tr class="approval-row" data-artifact="${esc6(s.id)}">
+    return `    <tr class="approval-row" data-artifact="${esc8(s.id)}">
       <td class="order-num">${orderNumber(s.id)}</td>
-      <td>${esc6(s.label)}<div class="artifact-id">${esc6(s.id)}</div>${artifactBannerHtml(s)}</td>
-      <td><span class="badge ${badgeClass}">${esc6(statusLabel)}</span></td>
+      <td>${esc8(s.label)}<div class="artifact-id">${esc8(s.id)}</div>${artifactBannerHtml(s)}</td>
+      <td><span class="badge ${badgeClass}">${esc8(statusLabel)}</span></td>
       <td>${s.fileCount}</td>
-      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc6(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}${reopenNote}</td>
-      <td><button class="approve-btn" data-artifact="${esc6(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
+      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc8(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}${reopenNote}</td>
+      <td><button class="approve-btn" data-artifact="${esc8(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
     </tr>
 ${diffRow}`;
   }).join("\n");
@@ -36802,7 +37227,7 @@ function gateForClause(c) {
 function citingTestsCellHtml(c) {
   if (c.withdrawn) return `<span class="empty-inline">withdrawn &mdash; citation-exempt</span>`;
   if (c.citedBy && c.citedBy.length) {
-    const items = c.citedBy.map((s) => `<li><code>${esc6(s.file)}:${s.line}</code></li>`).join("");
+    const items = c.citedBy.map((s) => `<li><code>${esc8(s.file)}:${s.line}</code></li>`).join("");
     return `<ul class="rtm-tests">${items}</ul>`;
   }
   if (c.cited) {
@@ -36813,8 +37238,8 @@ function citingTestsCellHtml(c) {
 function specsTabHtml(specs, meta3 = {}) {
   if (!specs || !specs.available) {
     const where = specs && specs.specsDir || "specs/";
-    const why = specs && specs.reason ? ` ${esc6(specs.reason)}` : "";
-    return `<div class="empty"><p>No ${esc6(where)} directory found in this project.${why}</p></div>`;
+    const why = specs && specs.reason ? ` ${esc8(specs.reason)}` : "";
+    return `<div class="empty"><p>No ${esc8(where)} directory found in this project.${why}</p></div>`;
   }
   const matrices = specs.files.map((f) => {
     const live = f.clauses.filter((c) => !c.withdrawn);
@@ -36828,20 +37253,20 @@ function specsTabHtml(specs, meta3 = {}) {
       uncovered ? `<span class="rtm-defect">${uncovered} uncovered</span>` : null
     ].filter(Boolean).join(" &middot; ");
     const rows = f.clauses.map((c) => {
-      const prose = esc6(c.prose);
+      const prose = esc8(c.prose);
       const gate = gateForClause(c);
       return `    <tr class="rtm-row${c.withdrawn ? " rtm-withdrawn" : ""}">
-      <td><span class="clause-id"><code>${esc6(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: f.relPath || `specs/${f.file}`, clauseId: c.id })}</td>
+      <td><span class="clause-id"><code>${esc8(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: f.relPath || `specs/${f.file}`, clauseId: c.id })}</td>
       <td class="rtm-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</td>
       <td>${citingTestsCellHtml(c)}</td>
-      <td class="rtm-gate">${gate ? `<code>${esc6(gate)}</code>` : `<span class="empty-inline">&mdash;</span>`}</td>
+      <td class="rtm-gate">${gate ? `<code>${esc8(gate)}</code>` : `<span class="empty-inline">&mdash;</span>`}</td>
       <td>${gate ? stepReceiptCellHtml(meta3.lastReceipt, gate) : `<span class="empty-inline">&mdash;</span>`}</td>
     </tr>`;
     }).join("\n");
     const specRel = f.relPath || `specs/${f.file}`;
     const specStatus = meta3.artifactByFile ? meta3.artifactByFile[specRel] : null;
     return `  <div class="spec-file">
-    <h3>${esc6(specRel)}</h3>
+    <h3>${esc8(specRel)}</h3>
 ${signatureBarHtml(specStatus, { what: "this contract" })}
     <p class="rtm-counts">${counts}</p>
     ${rows ? `<table class="doc-table rtm-table">
@@ -36859,8 +37284,8 @@ ${rows}
     <ul class="rtm-defect-list">
 ${specs.orphanCitations.map(
       (o) => `      <li class="rtm-defect-item">
-        <code>${esc6(o.file)}:${o.line}</code> cites <code>${esc6(o.id)}</code>
-        <span class="badge badge-changed">${esc6(o.reason)}</span>
+        <code>${esc8(o.file)}:${o.line}</code> cites <code>${esc8(o.id)}</code>
+        <span class="badge badge-changed">${esc8(o.reason)}</span>
       </li>`
     ).join("\n")}
     </ul>
@@ -36870,7 +37295,7 @@ ${specs.orphanCitations.map(
 ${orphansHtml}`;
 }
 function inlineMdHtml(text) {
-  let s = esc6(String(text));
+  let s = esc8(String(text));
   s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
@@ -36878,7 +37303,7 @@ function inlineMdHtml(text) {
 }
 function mdTableHtml(table) {
   if (!table || !table.available) {
-    return `<p class="empty-inline">${esc6(table && table.reason || "not available")}</p>`;
+    return `<p class="empty-inline">${esc8(table && table.reason || "not available")}</p>`;
   }
   const head = `<tr>${table.headers.map((h) => `<th>${inlineMdHtml(h)}</th>`).join("")}</tr>`;
   const body = table.rows.map((r) => `<tr>${r.map((c) => `<td>${inlineMdHtml(c)}</td>`).join("")}</tr>`).join("\n");
@@ -36932,7 +37357,7 @@ function mdProseHtml(md) {
         i++;
       }
       i++;
-      out.push(`<pre class="doc-code">${esc6(code.join("\n"))}</pre>`);
+      out.push(`<pre class="doc-code">${esc8(code.join("\n"))}</pre>`);
       continue;
     }
     if (/^####?\s+/.test(t)) {
@@ -36972,7 +37397,7 @@ function mdProseHtml(md) {
 }
 function docSectionProseHtml(section) {
   if (!section || !section.available) {
-    return `<p class="empty-inline">${esc6(section && section.reason || "docs/ARCHITECTURE.md not found")}</p>`;
+    return `<p class="empty-inline">${esc8(section && section.reason || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   return `<div class="doc-prose">${mdProseHtml(section.body)}</div>`;
 }
@@ -36994,16 +37419,16 @@ ${nodes}
 }
 function systemContextHtml(sc) {
   if (!sc || !sc.available) {
-    return `<p class="empty-inline">${esc6(sc && sc.reason || "docs/ARCHITECTURE.md not found")}</p>`;
+    return `<p class="empty-inline">${esc8(sc && sc.reason || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   const intro = sc.intro ? `<p>${inlineMdHtml(sc.intro)}</p>` : "";
   const diagram = sc.table ? contextDiagramHtml(sc.table) : "";
-  const table = sc.table ? mdTableHtml({ available: true, headers: sc.table.headers, rows: sc.table.rows }) : `<p class="empty-inline">no integration table found under "${esc6(sc.heading)}"</p>`;
+  const table = sc.table ? mdTableHtml({ available: true, headers: sc.table.headers, rows: sc.table.rows }) : `<p class="empty-inline">no integration table found under "${esc8(sc.heading)}"</p>`;
   return `${intro}${diagram}${table}`;
 }
 function versionSetHtml(versionSet) {
   if (!versionSet || !versionSet.available) {
-    return `<p class="empty-inline">${esc6(versionSet && versionSet.reason || COPY.versionSetUnreadable)}</p>`;
+    return `<p class="empty-inline">${esc8(versionSet && versionSet.reason || COPY.versionSetUnreadable)}</p>`;
   }
   const badge = (status) => {
     if (status === "match") return `<span class="glyph glyph-signed">&#10003;</span> pinned as documented`;
@@ -37013,17 +37438,17 @@ function versionSetHtml(versionSet) {
   };
   const rows = versionSet.rows.map(
     (r) => `      <tr>
-        <td>${esc6(r.library)}</td>
-        <td><code>${esc6(r.catalogVersion ?? "\u2014")}</code></td>
-        <td><code>${esc6(r.docVersion ?? "\u2014")}</code></td>
+        <td>${esc8(r.library)}</td>
+        <td><code>${esc8(r.catalogVersion ?? "\u2014")}</code></td>
+        <td><code>${esc8(r.docVersion ?? "\u2014")}</code></td>
         <td>${badge(r.status)}</td>
       </tr>`
   ).join("\n");
   const inv = versionSet.kspInvariant;
-  const invLine = inv.available ? inv.ok ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> ${COPY.kspPairLabel} \u2014 <code>${esc6(inv.ksp)}</code> ${COPY.kspCarriesLabel} <code>${esc6(inv.kotlin)}</code>.</p>` : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> ${COPY.kspName} <code>${esc6(inv.ksp)}</code> ${COPY.kspPrefixWarning} <code>${esc6(inv.kotlin)}</code>${COPY.kspCarriesNote}</p>` : `<p class="empty-inline">${esc6(inv.reason)}</p>`;
+  const invLine = inv.available ? inv.ok ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> ${COPY.kspPairLabel} \u2014 <code>${esc8(inv.ksp)}</code> ${COPY.kspCarriesLabel} <code>${esc8(inv.kotlin)}</code>.</p>` : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> ${COPY.kspName} <code>${esc8(inv.ksp)}</code> ${COPY.kspPrefixWarning} <code>${esc8(inv.kotlin)}</code>${COPY.kspCarriesNote}</p>` : `<p class="empty-inline">${esc8(inv.reason)}</p>`;
   return `  <h4>The frozen set, as pinned</h4>
   <table class="doc-table">
-    <thead><tr><th>Library</th><th>${esc6(COPY.versionSetFile)}</th><th>\xA72 says</th><th>Verdict</th></tr></thead>
+    <thead><tr><th>Library</th><th>${esc8(COPY.versionSetFile)}</th><th>\xA72 says</th><th>Verdict</th></tr></thead>
     <tbody>
 ${rows}
     </tbody>
@@ -37032,7 +37457,7 @@ ${invLine}`;
 }
 function platformViewHtml(pv) {
   if (!pv || !pv.available) {
-    return `<p class="empty-inline">${esc6(pv && pv.reason || "docs/ARCHITECTURE.md not found")}</p>`;
+    return `<p class="empty-inline">${esc8(pv && pv.reason || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   const main2 = mdTableHtml({ available: true, headers: pv.headers, rows: pv.rows });
   const expectActual = pv.expectActual ? `<h4>Expect/actual boundary</h4>${mdTableHtml({ available: true, headers: pv.expectActual.headers, rows: pv.expectActual.rows })}` : "";
@@ -37043,17 +37468,17 @@ function dependencyGraphHtml(graph) {
   if (!graph || !graph.available) {
     return `<div class="empty">
       <p>No dependency graph available.</p>
-      <p>${esc6(graph && graph.reason || "the scan reported no graph and gave no reason.")}</p>
+      <p>${esc8(graph && graph.reason || "the scan reported no graph and gave no reason.")}</p>
     </div>`;
   }
   if (graph.edges.length === 0) {
-    return `<p class="empty-inline">no cross-layer imports observed under <code>${esc6(graph.appPackage)}</code></p>
+    return `<p class="empty-inline">no cross-layer imports observed under <code>${esc8(graph.appPackage)}</code></p>
 ${depGraphAdvisoryHtml()}`;
   }
   const rows = graph.edges.map((e) => {
-    const chip = e.violation ? `<span class="badge badge-changed violation-chip">violates ${esc6(e.clauseId)}</span>` : "";
+    const chip = e.violation ? `<span class="badge badge-changed violation-chip">violates ${esc8(e.clauseId)}</span>` : "";
     return `    <li class="dep-edge${e.violation ? " dep-violation" : ""}">
-      <code>${esc6(e.from)}</code> &rarr; <code>${esc6(e.to)}</code>
+      <code>${esc8(e.from)}</code> &rarr; <code>${esc8(e.to)}</code>
       <span class="dep-count">${e.count} import${e.count === 1 ? "" : "s"}</span>
       ${chip}
     </li>`;
@@ -37063,8 +37488,8 @@ ${depGraphAdvisoryHtml()}`;
     <ul class="dep-violation-list">
 ${graph.violations.map(
     (v) => `      <li class="dep-violation-item">
-        <code>${esc6(v.file)}:${v.line}</code> imports <code>${esc6(v.imported)}</code>
-        <span class="badge badge-changed">${esc6(v.from)} &rarr; ${esc6(v.to)} violates ${esc6(v.clauseId)}</span>
+        <code>${esc8(v.file)}:${v.line}</code> imports <code>${esc8(v.imported)}</code>
+        <span class="badge badge-changed">${esc8(v.from)} &rarr; ${esc8(v.to)} violates ${esc8(v.clauseId)}</span>
       </li>`
   ).join("\n")}
     </ul>
@@ -37079,21 +37504,21 @@ function layerMapHtml(layerMap) {
   if (!layerMap || !layerMap.available) {
     return `<div class="empty">
       <p>No layer map available.</p>
-      <p>${esc6(layerMap && layerMap.reason || "the scan reported no layer map and gave no reason.")}</p>
+      <p>${esc8(layerMap && layerMap.reason || "the scan reported no layer map and gave no reason.")}</p>
     </div>`;
   }
   const boxes = layerMap.layers.map(
     (l) => `    <div class="layer-box${l.present ? "" : " layer-empty"}">
-      <h4>${esc6(l.id)}${commentControlHtml({ type: "architecture", path: l.id })}</h4>
-      <p class="layer-desc">${esc6(l.label)}</p>
-      ${l.present ? l.files.length ? `<ul class="layer-files">${l.files.map((f) => `<li><code>${esc6(f)}</code></li>`).join("")}</ul>` : `<p class="empty-inline">no files</p>` : `<p class="empty-inline">directory not present</p>`}
+      <h4>${esc8(l.id)}${commentControlHtml({ type: "architecture", path: l.id })}</h4>
+      <p class="layer-desc">${esc8(l.label)}</p>
+      ${l.present ? l.files.length ? `<ul class="layer-files">${l.files.map((f) => `<li><code>${esc8(f)}</code></li>`).join("")}</ul>` : `<p class="empty-inline">no files</p>` : `<p class="empty-inline">directory not present</p>`}
     </div>`
   ).join("\n");
   const others = layerMap.otherPackages && layerMap.otherPackages.length ? `  <div class="layer-others">
     <p class="lbl">other top-level packages</p>
-    <ul class="layer-files">${layerMap.otherPackages.map((p) => `<li><code>${esc6(p.name)}</code> (${p.files.length} file${p.files.length === 1 ? "" : "s"})</li>`).join("")}</ul>
+    <ul class="layer-files">${layerMap.otherPackages.map((p) => `<li><code>${esc8(p.name)}</code> (${p.files.length} file${p.files.length === 1 ? "" : "s"})</li>`).join("")}</ul>
   </div>` : "";
-  return `  <p class="meta">package <code>${esc6(layerMap.appPackage)}</code> &middot; navigation lives under <code>presentation/navigation</code> (shown as part of presentation, below)</p>
+  return `  <p class="meta">package <code>${esc8(layerMap.appPackage)}</code> &middot; navigation lives under <code>presentation/navigation</code> (shown as part of presentation, below)</p>
   <div class="layer-map">
 ${boxes}
   </div>
@@ -37111,57 +37536,57 @@ function formatReceiptAge(ageMs) {
 function clauseReceiptStatusHtml(lastReceipt) {
   if (!lastReceipt || !lastReceipt.available) {
     const reason = lastReceipt && lastReceipt.reason || `no receipt at ${lastReceipt && lastReceipt.relPath || "qa/evidence/latest.json"} \u2014 run node qa/verify.mjs`;
-    return `<span class="receipt-badge receipt-none" title="${escAttr3(reason)}">no receipt yet &mdash; run node qa/verify.mjs</span>`;
+    return `<span class="receipt-badge receipt-none" title="${escAttr5(reason)}">no receipt yet &mdash; run node qa/verify.mjs</span>`;
   }
   if (!lastReceipt.conformance) {
     return `<span class="receipt-badge receipt-none">last receipt has no conformance step &mdash; run node qa/verify.mjs</span>`;
   }
   const age = formatReceiptAge(lastReceipt.ageMs);
-  const generatedTitle = lastReceipt.generatedAt ? ` title="generated ${escAttr3(lastReceipt.generatedAt)}"` : "";
+  const generatedTitle = lastReceipt.generatedAt ? ` title="generated ${escAttr5(lastReceipt.generatedAt)}"` : "";
   if (lastReceipt.stale) {
-    return `<span class="receipt-badge receipt-stale"${generatedTitle}>stale receipt</span><span class="receipt-age">conformance was ${esc6(lastReceipt.conformance.verdict)} ${age} &mdash; source changed since</span>`;
+    return `<span class="receipt-badge receipt-stale"${generatedTitle}>stale receipt</span><span class="receipt-age">conformance was ${esc8(lastReceipt.conformance.verdict)} ${age} &mdash; source changed since</span>`;
   }
   const verdictClass2 = lastReceipt.conformance.verdict === "PASS" ? "receipt-pass" : lastReceipt.conformance.verdict === "FAIL" ? "receipt-fail" : "receipt-none";
   const freshnessNote = lastReceipt.stale === null ? " &middot; freshness unverified" : "";
-  return `<span class="receipt-badge ${verdictClass2}"${generatedTitle}>conformance: ${esc6(lastReceipt.conformance.verdict)}</span><span class="receipt-age">${age}${freshnessNote}</span>`;
+  return `<span class="receipt-badge ${verdictClass2}"${generatedTitle}>conformance: ${esc8(lastReceipt.conformance.verdict)}</span><span class="receipt-age">${age}${freshnessNote}</span>`;
 }
 function stepReceiptCellHtml(lastReceipt, stepName) {
   if (!lastReceipt || !lastReceipt.available) {
     const reason = lastReceipt && lastReceipt.reason || `no receipt at ${lastReceipt && lastReceipt.relPath || "qa/evidence/latest.json"} \u2014 run node qa/verify.mjs`;
-    return `<span class="receipt-badge receipt-none" title="${escAttr3(reason)}">no receipt yet</span>`;
+    return `<span class="receipt-badge receipt-none" title="${escAttr5(reason)}">no receipt yet</span>`;
   }
   const step = (lastReceipt.steps || []).find((s) => s && s.name === stepName);
   if (!step) {
-    const profile = lastReceipt.profile ? ` (profile ${esc6(lastReceipt.profile)})` : "";
+    const profile = lastReceipt.profile ? ` (profile ${esc8(lastReceipt.profile)})` : "";
     return `<span class="receipt-badge receipt-none">not in last receipt${profile}</span>`;
   }
   const age = formatReceiptAge(lastReceipt.ageMs);
   if (lastReceipt.stale) {
-    return `<span class="receipt-badge receipt-stale">stale &mdash; was ${esc6(step.verdict)} ${age}</span>`;
+    return `<span class="receipt-badge receipt-stale">stale &mdash; was ${esc8(step.verdict)} ${age}</span>`;
   }
   const cls = step.verdict === "PASS" ? "receipt-pass" : step.verdict === "FAIL" ? "receipt-fail" : "receipt-none";
   const freshness = lastReceipt.stale === null ? " &middot; freshness unverified" : "";
-  const title = step.reason ? ` title="${escAttr3(step.reason)}"` : "";
-  return `<span class="receipt-badge ${cls}"${title}>${esc6(step.verdict)}</span><span class="receipt-age">${age}${freshness}</span>`;
+  const title = step.reason ? ` title="${escAttr5(step.reason)}"` : "";
+  return `<span class="receipt-badge ${cls}"${title}>${esc8(step.verdict)}</span><span class="receipt-age">${age}${freshness}</span>`;
 }
 function governedContractHtml(gc, lastReceipt) {
   if (!gc || !gc.available) {
     return `<div class="empty">
       <p>No governed contract available.</p>
-      <p>${esc6(gc && gc.reason || "specs/app-base.spec.md not found.")}</p>
+      <p>${esc8(gc && gc.reason || "specs/app-base.spec.md not found.")}</p>
     </div>`;
   }
   const items = gc.clauses.map((c) => {
-    const prose = esc6(c.prose);
+    const prose = esc8(c.prose);
     const receiptStatus = /^ARCH-/i.test(c.id) ? clauseReceiptStatusHtml(lastReceipt) : "";
     return `      <li class="clause${c.withdrawn ? " withdrawn" : ""}">
-        <span class="clause-id"><code>${esc6(c.id)}</code></span>
+        <span class="clause-id"><code>${esc8(c.id)}</code></span>
         <span class="clause-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</span>
         ${receiptStatus}
         ${commentControlHtml({ type: "spec-line", file: `specs/${gc.file}`, clauseId: c.id })}
       </li>`;
   }).join("\n");
-  return `  <p class="meta">specs/${esc6(gc.file)}</p>
+  return `  <p class="meta">specs/${esc8(gc.file)}</p>
   <ul class="clause-list">
 ${items || '    <li class="empty-inline">no clauses parsed</li>'}
   </ul>`;
@@ -37170,10 +37595,10 @@ function featureShapeHtml(shape) {
   if (!shape || !shape.available) {
     return `<div class="empty">
       <p>No feature shape available.</p>
-      <p>${esc6(shape && shape.reason || "presentation/home not found.")}</p>
+      <p>${esc8(shape && shape.reason || "presentation/home not found.")}</p>
     </div>`;
   }
-  const items = shape.files.map((f) => `    <li><code>${esc6(f)}</code>${commentControlHtml({ type: "architecture", path: f })}</li>`).join("\n");
+  const items = shape.files.map((f) => `    <li><code>${esc8(f)}</code>${commentControlHtml({ type: "architecture", path: f })}</li>`).join("\n");
   return `  <p class="meta">${shape.files.length} file(s) &mdash; the shape <code>qa/scaffold-feature.mjs</code> clones for a new feature</p>
   <ul class="feature-tree">
 ${items}
@@ -37237,30 +37662,30 @@ var STEP_GOVERNS = {
 };
 function inputsBindingHtml(r) {
   if (r.stale === true) {
-    const move = r.inputsHash && r.currentInputsHash ? ` (<code>${esc6(shortHash2(r.inputsHash))}</code> &rarr; <code>${esc6(shortHash2(r.currentInputsHash))}</code>)` : "";
+    const move = r.inputsHash && r.currentInputsHash ? ` (<code>${esc8(shortHash2(r.inputsHash))}</code> &rarr; <code>${esc8(shortHash2(r.currentInputsHash))}</code>)` : "";
     return `<span class="evidence-binding-stale">inputs no longer match the current tree${move} &mdash; re-run <code>node qa/verify.mjs</code></span>`;
   }
   if (r.stale === false) {
     const files = typeof r.inputsFileCount === "number" ? ` over ${r.inputsFileCount} files` : "";
-    return `inputs bound to the current tree &mdash; hash <code>${esc6(shortHash2(r.inputsHash))}</code> still matches${files}`;
+    return `inputs bound to the current tree &mdash; hash <code>${esc8(shortHash2(r.inputsHash))}</code> still matches${files}`;
   }
-  return `inputs binding unknown &mdash; ${esc6(r.staleReason || "freshness could not be recomputed")}`;
+  return `inputs binding unknown &mdash; ${esc8(r.staleReason || "freshness could not be recomputed")}`;
 }
 function timelineRowHtml(r) {
   const cls = r.verdict === "PASS" ? "step-verdict-pass" : r.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
   const age = typeof r.ageMs === "number" ? formatReceiptAge(r.ageMs) : "age unknown";
-  const commit = r.commitSha ? `<span class="meta">commit <code>${esc6(String(r.commitSha).slice(0, 7))}</code></span>` : "";
-  const author = r.author ? `<span class="meta">by ${esc6(r.author)}</span>` : "";
-  const when = r.committedAt ? esc6(r.committedAt) : "commit date unknown";
+  const commit = r.commitSha ? `<span class="meta">commit <code>${esc8(String(r.commitSha).slice(0, 7))}</code></span>` : "";
+  const author = r.author ? `<span class="meta">by ${esc8(r.author)}</span>` : "";
+  const when = r.committedAt ? esc8(r.committedAt) : "commit date unknown";
   const rungLabel = rungWithPack(r.evidenceLevel, r.packId ?? r.pack);
-  const rung = rungLabel ? `<span class="badge evidence-rung" title="${escAttr3(rungPackNote(r.evidenceLevel, r.packId ?? r.pack))}">${esc6(rungLabel)}</span>` : "";
+  const rung = rungLabel ? `<span class="badge evidence-rung" title="${escAttr5(rungPackNote(r.evidenceLevel, r.packId ?? r.pack))}">${esc8(rungLabel)}</span>` : "";
   return `    <li>
-      <span class="${cls}">${esc6(r.verdict || "?")}</span>
+      <span class="${cls}">${esc8(r.verdict || "?")}</span>
       ${rung}
-      ${r.profile ? `<span class="meta">profile <code>${esc6(r.profile)}</code></span>` : ""}
+      ${r.profile ? `<span class="meta">profile <code>${esc8(r.profile)}</code></span>` : ""}
       ${commit}
       ${author}
-      <span class="meta">committed ${when} &middot; ${esc6(age)}</span>
+      <span class="meta">committed ${when} &middot; ${esc8(age)}</span>
     </li>`;
 }
 function stepTestCountsHtml(step) {
@@ -37278,8 +37703,8 @@ function evidenceBodyHtml(lastReceipt, history) {
     const reason = lastReceipt && lastReceipt.reason || `no receipt at ${relPath}`;
     return `<div class="empty">
       <p>No verify receipt yet.</p>
-      <p>${esc6(reason)}</p>
-      <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>${esc6(relPath)}</code>,
+      <p>${esc8(reason)}</p>
+      <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>${esc8(relPath)}</code>,
       and this page renders exactly what that receipt attests. Nothing here is derived any other way.</p>
     </div>`;
   }
@@ -37288,26 +37713,26 @@ function evidenceBodyHtml(lastReceipt, history) {
   const verdictCls = stale ? "verdict-muted" : r.verdict === "PASS" ? "verdict-pass" : r.verdict === "FAIL" ? "verdict-fail" : "verdict-muted";
   const staleChip = stale ? ` <span class="badge badge-changed">STALE &mdash; the tree changed since this run</span>` : r.stale === null ? ` <span class="badge badge-unreviewed">freshness unknown</span>` : "";
   const rungLabelText = rungWithPack(r.evidenceLevel, r.packId ?? r.pack);
-  const rungChip = rungLabelText ? ` <span class="badge evidence-rung" title="${escAttr3(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"} \u2014 ${rungPackNote(r.evidenceLevel, r.packId ?? r.pack)}`)}">Evidence: ${esc6(rungLabelText)}</span>` : "";
+  const rungChip = rungLabelText ? ` <span class="badge evidence-rung" title="${escAttr5(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"} \u2014 ${rungPackNote(r.evidenceLevel, r.packId ?? r.pack)}`)}">Evidence: ${esc8(rungLabelText)}</span>` : "";
   const age = formatReceiptAge(r.ageMs);
   const dirty = r.commitDirty && r.commitDirty.length ? ` &middot; ${r.commitDirty.length} uncommitted file${r.commitDirty.length === 1 ? "" : "s"} at run time` : "";
   const facts = [
-    r.profile ? `<li>profile <code>${esc6(r.profile)}</code></li>` : "",
-    r.commitSha ? `<li>commit <code>${esc6(shortHash2(r.commitSha))}</code>${dirty}</li>` : "",
-    `<li>generated ${r.generatedAt ? esc6(r.generatedAt) : "at an unknown time"} &middot; ${esc6(age)}</li>`,
+    r.profile ? `<li>profile <code>${esc8(r.profile)}</code></li>` : "",
+    r.commitSha ? `<li>commit <code>${esc8(shortHash2(r.commitSha))}</code>${dirty}</li>` : "",
+    `<li>generated ${r.generatedAt ? esc8(r.generatedAt) : "at an unknown time"} &middot; ${esc8(age)}</li>`,
     `<li>${inputsBindingHtml(r)}</li>`
   ].filter(Boolean).join("\n      ");
   const stepRowHtml2 = (s) => {
     const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
     const governs = STEP_GOVERNS[s.name];
-    const governsCell = governs ? `<a class="step-link" href="#${esc6(governs.section)}">${esc6(governs.label)}</a>` : "";
+    const governsCell = governs ? `<a class="step-link" href="#${esc8(governs.section)}">${esc8(governs.label)}</a>` : "";
     const counts = stepTestCountsHtml(s);
-    const note = s.note ? `<span class="step-note">${esc6(s.note)}</span>` : "";
-    const reason = s.reason ? `<span class="step-reason">${esc6(s.reason)}</span>` : "";
+    const note = s.note ? `<span class="step-note">${esc8(s.note)}</span>` : "";
+    const reason = s.reason ? `<span class="step-reason">${esc8(s.reason)}</span>` : "";
     return `    <tr>
-      <td><code>${esc6(s.name)}</code></td>
-      <td><span class="${cls}">${esc6(s.verdict)}</span></td>
-      <td>${esc6(formatDurationMs(s.durationMs))}</td>
+      <td><code>${esc8(s.name)}</code></td>
+      <td><span class="${cls}">${esc8(s.verdict)}</span></td>
+      <td>${esc8(formatDurationMs(s.durationMs))}</td>
       <td>${governsCell}</td>
       <td>${counts}${note}${reason}</td>
     </tr>`;
@@ -37326,7 +37751,7 @@ function evidenceBodyHtml(lastReceipt, history) {
     }
     stepRows = [...groups.entries()].map(([layer, steps]) => {
       const tally = ["PASS", "FAIL", "ERROR", "SKIP"].map((v) => [v, steps.filter((s) => s.verdict === v).length]).filter(([, n]) => n > 0).map(([v, n]) => `${n} ${v}`).join(" &middot; ");
-      return `    <tr class="step-layer" data-layer="${escAttr3(layer)}"><th colspan="5">${esc6(layer)} <span class="step-layer-tally">${tally}</span></th></tr>
+      return `    <tr class="step-layer" data-layer="${escAttr5(layer)}"><th colspan="5">${esc8(layer)} <span class="step-layer-tally">${tally}</span></th></tr>
 ${steps.map(stepRowHtml2).join("\n")}`;
     }).join("\n");
   }
@@ -37338,12 +37763,12 @@ ${stepRows}
   </table>` : `  <p class="empty-inline">the receipt carries no steps</p>`;
   const timelineHtml = history && history.available && history.receipts && history.receipts.length ? `  <ul class="evidence-timeline">
 ${history.receipts.map(timelineRowHtml).join("\n")}
-  </ul>` : `  <p class="empty-inline">${esc6(history && history.reason || "no committed receipt history yet")} &mdash; each commit of <code>${esc6(relPath)}</code> becomes one entry in the audit trail</p>`;
-  return `  <p class="meta">Rendered from <code>${esc6(relPath)}</code> &mdash; the verify lane's own attestation.
+  </ul>` : `  <p class="empty-inline">${esc8(history && history.reason || "no committed receipt history yet")} &mdash; each commit of <code>${esc8(relPath)}</code> becomes one entry in the audit trail</p>`;
+  return `  <p class="meta">Rendered from <code>${esc8(relPath)}</code> &mdash; the verify lane's own attestation.
   The lane is the law: nothing on this page is re-derived live.</p>
   <div class="evidence-headline${stale ? " evidence-stale" : ""}">
     <p class="lbl">latest receipt</p>
-    <span class="evidence-verdict ${verdictCls}">${esc6(r.verdict || "?")}</span>${rungChip}${staleChip}
+    <span class="evidence-verdict ${verdictCls}">${esc8(r.verdict || "?")}</span>${rungChip}${staleChip}
     <ul class="evidence-facts">
       ${facts}
     </ul>
@@ -37351,31 +37776,31 @@ ${history.receipts.map(timelineRowHtml).join("\n")}
   <h3>Steps</h3>
 ${stepsHtml}
   <h3>Audit trail &mdash; committed receipts</h3>
-  <p class="meta">Every commit of <code>${esc6(relPath)}</code> is one verified state of record, attributed from git. Newest first.</p>
+  <p class="meta">Every commit of <code>${esc8(relPath)}</code> is one verified state of record, attributed from git. Newest first.</p>
 ${timelineHtml}`;
 }
 function describeTarget(t) {
   if (!t || typeof t !== "object") return '<span class="empty-inline">unknown target</span>';
   switch (t.type) {
     case "screen":
-      return `screen <code>${esc6(t.screen)}</code>`;
+      return `screen <code>${esc8(t.screen)}</code>`;
     case "element":
-      return `screen <code>${esc6(t.screen)}</code>${t.testTag ? ` &middot; element <code>${esc6(t.testTag)}</code>` : ""}`;
+      return `screen <code>${esc8(t.screen)}</code>${t.testTag ? ` &middot; element <code>${esc8(t.testTag)}</code>` : ""}`;
     case "spec-line":
-      return `spec <code>${esc6(t.file)}</code>${t.clauseId ? ` &middot; clause <code>${esc6(t.clauseId)}</code>` : ""}`;
+      return `spec <code>${esc8(t.file)}</code>${t.clauseId ? ` &middot; clause <code>${esc8(t.clauseId)}</code>` : ""}`;
     case "design-system":
-      return `design system <code>${esc6(t.token)}</code>`;
+      return `design system <code>${esc8(t.token)}</code>`;
     case "architecture":
-      return `architecture <code>${esc6(t.path)}</code>`;
+      return `architecture <code>${esc8(t.path)}</code>`;
     case "general":
       return "general";
     default:
-      return `<span class="empty-inline">${esc6(t.type || "unknown target")}</span>`;
+      return `<span class="empty-inline">${esc8(t.type || "unknown target")}</span>`;
   }
 }
 function commentsTabHtml(comments) {
   if (!comments || !comments.available) {
-    const detail = comments && comments.error ? esc6(comments.error) : "This looks like an older scaffold that predates the comments wave (no qa/lib/comments.mjs).";
+    const detail = comments && comments.error ? esc8(comments.error) : "This looks like an older scaffold that predates the comments wave (no qa/lib/comments.mjs).";
     return `<div class="empty">
       <p>Comments are not available in this project.</p>
       <p>${detail}</p>
@@ -37386,14 +37811,14 @@ function commentsTabHtml(comments) {
   }
   const rows = [...comments.comments].sort((a, b) => a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0).map((c) => {
     const badgeClass = c.status === "resolved" ? "badge-resolved" : "badge-open";
-    const resolution = c.status === "resolved" ? `<div class="comment-resolution"><span class="lbl">resolved by ${esc6(c.resolvedBy || "?")}${c.resolvedAt ? ` at ${esc6(c.resolvedAt)}` : ""}</span>${c.resolutionNote ? `<p class="comment-resolution-note">${esc6(c.resolutionNote)}</p>` : ""}</div>` : "";
-    return `    <tr class="comment-row" data-id="${esc6(c.id)}">
-      <td><code>${esc6(c.id)}</code></td>
+    const resolution = c.status === "resolved" ? `<div class="comment-resolution"><span class="lbl">resolved by ${esc8(c.resolvedBy || "?")}${c.resolvedAt ? ` at ${esc8(c.resolvedAt)}` : ""}</span>${c.resolutionNote ? `<p class="comment-resolution-note">${esc8(c.resolutionNote)}</p>` : ""}</div>` : "";
+    return `    <tr class="comment-row" data-id="${esc8(c.id)}">
+      <td><code>${esc8(c.id)}</code></td>
       <td>${describeTarget(c.target)}</td>
-      <td class="comment-text-cell">${esc6(c.text)}</td>
-      <td>${esc6(c.author)}</td>
-      <td>${esc6(c.createdAt)}</td>
-      <td><span class="badge ${badgeClass}">${esc6(c.status)}</span>${resolution}</td>
+      <td class="comment-text-cell">${esc8(c.text)}</td>
+      <td>${esc8(c.author)}</td>
+      <td>${esc8(c.createdAt)}</td>
+      <td><span class="badge ${badgeClass}">${esc8(c.status)}</span>${resolution}</td>
     </tr>`;
   }).join("\n");
   return `  <table class="comments-table">
@@ -37421,19 +37846,19 @@ function clausesForScreen(specs, screenId) {
 }
 function matrixCellHtml(card, state, changedSet, version2) {
   if (!card) {
-    const what = state === "default" ? "no default entry registered" : `no @${escAttr3(state)} entry registered`;
+    const what = state === "default" ? "no default entry registered" : `no @${escAttr5(state)} entry registered`;
     return `<div class="matrix-cell matrix-none" title="${what} for this screen">&mdash;</div>`;
   }
   const id = card.screen.id;
   const isChanged = changedSet.has(id);
   const compare = isChanged && version2 > 1;
   const buster = `?v=${Number(version2)}`;
-  const cur = `<img class="cur" alt="${escAttr3(id)} render" src="/previews/${escAttr3(card.screen.png)}${buster}">`;
+  const cur = `<img class="cur" alt="${escAttr5(id)} render" src="/previews/${escAttr5(card.screen.png)}${buster}">`;
   let inner = cur;
   let label = "";
   if (compare) {
     const prevPng = String(card.screen.png).replace(/screen\.png$/, "screen.prev.png");
-    inner = `<div class="cmp">${cur}<img class="prev" alt="${escAttr3(id)} before" src="/previews/${escAttr3(prevPng)}${buster}"></div>`;
+    inner = `<div class="cmp">${cur}<img class="prev" alt="${escAttr5(id)} before" src="/previews/${escAttr5(prevPng)}${buster}"></div>`;
     label = `<p class="lbl">hover = before</p>`;
   }
   return `<div class="matrix-cell${isChanged ? " changed" : ""}">${inner}${label}</div>`;
@@ -37446,7 +37871,7 @@ function matrixRowEndHtml(baseId, baseCard, changedVersions) {
     return `<p class="meta">Not derivable statically &mdash; no default render for this screen${chgChip}</p>${comment}`;
   }
   const { summary, a11y } = baseCard;
-  const a11yChip = a11y.pass ? `<span class="pass">PASS</span>` : `<span class="fail">${esc6(`${a11y.violations.length} violation${a11y.violations.length === 1 ? "" : "s"}`)}</span>`;
+  const a11yChip = a11y.pass ? `<span class="pass">PASS</span>` : `<span class="fail">${esc8(`${a11y.violations.length} violation${a11y.violations.length === 1 ? "" : "s"}`)}</span>`;
   return `<p class="meta">${summary.nodes} nodes &middot; ${summary.tokenized} tokenized &middot; ${summary.tagged} tagged</p>
       <p class="meta">a11y ${a11yChip}${chgChip}</p>
       ${comment}`;
@@ -37457,18 +37882,18 @@ function rowClausesHtml(specs, baseId, lastReceipt) {
     return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no specs/ directory found</p>`;
   }
   if (governing.length === 0) {
-    return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no spec clause's citing tests carry a <code>${esc6(baseId)}</code> path segment</p>`;
+    return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no spec clause's citing tests carry a <code>${esc8(baseId)}</code> path segment</p>`;
   }
   const items = governing.map(({ file: file2, clause }) => {
     const gate = gateForClause(clause);
     return `      <li class="clause">
-        <span class="clause-id"><code>${esc6(clause.id)}</code></span>
-        <span class="clause-prose">${esc6(clause.prose)}</span>
+        <span class="clause-id"><code>${esc8(clause.id)}</code></span>
+        <span class="clause-prose">${esc8(clause.prose)}</span>
         ${gate ? stepReceiptCellHtml(lastReceipt, gate) : ""}
         ${commentControlHtml({ type: "spec-line", file: `specs/${file2}`, clauseId: clause.id })}
       </li>`;
   }).join("\n");
-  return `<p class="lbl">governing clauses &mdash; clauses whose citing tests live under <code>${esc6(baseId)}</code></p>
+  return `<p class="lbl">governing clauses &mdash; clauses whose citing tests live under <code>${esc8(baseId)}</code></p>
     <ul class="clause-list">
 ${items}
     </ul>`;
@@ -37486,7 +37911,7 @@ function screensBodyHtml(data) {
     return `<div class="empty">
       <p>No screens rendered yet.</p>
       <p>The preview loop fills this page on its first render &mdash; every entry in
-      <code>${esc6(COPY.previewRegistryFile)}</code> becomes a row.</p>
+      <code>${esc8(COPY.previewRegistryFile)}</code> becomes a row.</p>
     </div>`;
   }
   const changedSet = new Set(changed);
@@ -37501,7 +37926,7 @@ function screensBodyHtml(data) {
   const stateCols = SCREEN_STATE_ORDER.filter(
     (s) => [...byBase.values()].some((row) => row.variants.has(s))
   );
-  const headCols = ["default", ...stateCols].map((c) => `<span class="matrix-col">${esc6(c)}</span>`).join("");
+  const headCols = ["default", ...stateCols].map((c) => `<span class="matrix-col">${esc8(c)}</span>`).join("");
   const rows = [...byBase.entries()].map(([baseId, row]) => {
     const title = row.base ? row.base.screen.title : baseId;
     const rowChanged = changedSet.has(baseId) || [...row.variants.values()].some((c) => changedSet.has(c.screen.id));
@@ -37510,11 +37935,11 @@ function screensBodyHtml(data) {
       ...stateCols.map((s) => matrixCellHtml(row.variants.get(s) || null, s, changedSet, version2))
     ].join("\n        ");
     const wire = row.base ? `<div class="wire">${row.base.svg}</div>` : `<p class="empty-inline">wireframe: Not derivable statically &mdash; no default render for this screen</p>`;
-    return `  <section class="matrix-row${rowChanged ? " changed" : ""}" id="card-${esc6(baseId)}">
+    return `  <section class="matrix-row${rowChanged ? " changed" : ""}" id="card-${esc8(baseId)}">
     <div class="matrix-line">
       <div class="matrix-rowhead">
-        <h3>${esc6(title)}${rowChanged ? '<span class="flag">CHANGED</span>' : ""}</h3>
-        <p class="meta">id <code>${esc6(baseId)}</code></p>
+        <h3>${esc8(title)}${rowChanged ? '<span class="flag">CHANGED</span>' : ""}</h3>
+        <p class="meta">id <code>${esc8(baseId)}</code></p>
       </div>
       <div class="matrix-cells">
         ${cells}
@@ -37539,7 +37964,7 @@ function screensBodyHtml(data) {
 ${rows}
 </div>
 <p class="meta matrix-note">An empty cell means the screen registers no entry for that state. States come from
-<code>@state</code> preview-registry entries in <code>${esc6(COPY.previewRegistryFile)}</code> (e.g. <code>"home@empty"</code>).</p>`;
+<code>@state</code> preview-registry entries in <code>${esc8(COPY.previewRegistryFile)}</code> (e.g. <code>"home@empty"</code>).</p>`;
 }
 var GLOSSARY_ITEM_RE = /^[-*]\s+\*\*(.+?)\*\*\s*[—–-]\s*(.+)$/;
 function parseGlossaryRows(body) {
@@ -37598,7 +38023,7 @@ function intentBodyHtml(intent) {
       body = `<p class="brief-pending-inline">Not yet captured &mdash; conversation 0 pending.</p>${guidance}`;
     }
     return `  <section class="brief-section${sec.filled ? "" : " brief-unfilled"}">
-    <h3>${esc6(sec.heading)}${comment}</h3>
+    <h3>${esc8(sec.heading)}${comment}</h3>
     ${body}
   </section>`;
   }).join("\n");
@@ -37621,27 +38046,27 @@ function walkthroughTabHtml(wt) {
   const cards = (m.screens ?? []).map((s) => {
     const a11yLine = (s.a11y?.violations ?? []).length === 0 ? `<span class="ok-inline">a11y 0 violations</span>` : `<span class="bad-inline">a11y ${s.a11y.violations.length} violations</span>`;
     const settled = s.settled === false ? ` <span class="bad-inline">captured mid-load</span>` : "";
-    const spec = s.spec ? ` \xB7 spec ${esc6(s.spec.file)} (${s.spec.clauses.length} clauses)` : "";
+    const spec = s.spec ? ` \xB7 spec ${esc8(s.spec.file)} (${s.spec.clauses.length} clauses)` : "";
     const variants = (s.variants ?? []).length ? ` \xB7 ${s.variants.length} tier-0 variants` : "";
     return `    <div class="wt-card">
-      <img src="/walkthrough/${esc6(latest.relDirBase || "")}/${esc6(s.png)}" loading="lazy">
-      <div class="wt-meta"><strong>${esc6(s.id)}</strong> <span class="chip">${esc6(s.kind)}</span>${settled}<br>
-      route <code>${esc6(s.route ?? "\u2014")}</code> \xB7 ${s.nodes} nodes \xB7 ${a11yLine}${spec}${variants}</div>
+      <img src="/walkthrough/${esc8(latest.relDirBase || "")}/${esc8(s.png)}" loading="lazy">
+      <div class="wt-meta"><strong>${esc8(s.id)}</strong> <span class="chip">${esc8(s.kind)}</span>${settled}<br>
+      route <code>${esc8(s.route ?? "\u2014")}</code> \xB7 ${s.nodes} nodes \xB7 ${a11yLine}${spec}${variants}</div>
     </div>`;
   }).join("\n");
   const notWalked = (m.notWalked ?? []).length ? `  <h3>Not walked</h3>
-  <ul class="wt-notwalked">${m.notWalked.map((n) => `<li><code>${esc6(n.target)}</code> \u2014 ${esc6(n.reason)}</li>`).join("")}</ul>` : "";
+  <ul class="wt-notwalked">${m.notWalked.map((n) => `<li><code>${esc8(n.target)}</code> \u2014 ${esc8(n.reason)}</li>`).join("")}</ul>` : "";
   const db = m.db ? `  <h3>DB at capture time</h3>
   <table class="params-table"><thead><tr><th>table</th><th>rows</th></tr></thead><tbody>
-${m.db.tables.map((t) => `    <tr><td><code>${esc6(t.name)}</code></td><td>${t.error ? esc6(t.error) : t.rowCount ?? "?"}</td></tr>`).join("\n")}
+${m.db.tables.map((t) => `    <tr><td><code>${esc8(t.name)}</code></td><td>${t.error ? esc8(t.error) : t.rowCount ?? "?"}</td></tr>`).join("\n")}
   </tbody></table>` : `  <p class="empty-inline">no DB appendix \u2014 Room off or the app predates /inspect/db</p>`;
   const history = wt.runs.length > 1 ? `  <h3>Previous runs</h3>
   <ul class="wt-history">${wt.runs.slice(1).map(
-    (r) => r.error ? `<li>${esc6(r.relDir)} \u2014 <span class="bad-inline">${esc6(r.error)}</span></li>` : `<li>${esc6(r.generatedAt)} \u2014 ${r.screenCount} screens, ${r.a11yViolations} a11y violations
-          <span class="empty-inline">(diff: <code>node qa/walkthrough.mjs --compare ${esc6(r.relDir)} ${esc6(wt.runs[0].relDir)}</code>)</span></li>`
+    (r) => r.error ? `<li>${esc8(r.relDir)} \u2014 <span class="bad-inline">${esc8(r.error)}</span></li>` : `<li>${esc8(r.generatedAt)} \u2014 ${r.screenCount} screens, ${r.a11yViolations} a11y violations
+          <span class="empty-inline">(diff: <code>node qa/walkthrough.mjs --compare ${esc8(r.relDir)} ${esc8(wt.runs[0].relDir)}</code>)</span></li>`
   ).join("")}</ul>` : "";
-  return `  <p class="meta">latest: ${esc6(latest.generatedAt)} \xB7 ${latest.screenCount} screens \xB7 ${latest.a11yViolations} a11y violations \xB7 ${latest.notWalked} not walked${latest.unsettled ? ` \xB7 <strong>${latest.unsettled} captured mid-load</strong>` : ""} \u2014
-  <a href="/walkthrough/${esc6(latest.relDirBase || "")}/report.html" target="_blank">open full report</a></p>
+  return `  <p class="meta">latest: ${esc8(latest.generatedAt)} \xB7 ${latest.screenCount} screens \xB7 ${latest.a11yViolations} a11y violations \xB7 ${latest.notWalked} not walked${latest.unsettled ? ` \xB7 <strong>${latest.unsettled} captured mid-load</strong>` : ""} \u2014
+  <a href="/walkthrough/${esc8(latest.relDirBase || "")}/report.html" target="_blank">open full report</a></p>
   <div class="wt-grid">
 ${cards}
   </div>
@@ -37652,17 +38077,17 @@ ${history}`;
 function liveDeviceTabHtml(live, session) {
   const chainHtml = session && session.steps && session.steps.length ? `  <ol class="live-steps">
 ${session.steps.map(
-    (s) => `    <li class="live-step-${esc6(s.status)}"><code>${esc6(s.name)}</code> \u2014 ${esc6(s.status)}${s.detail ? `: ${esc6(s.detail)}` : ""}${s.ms != null ? ` <span class="empty-inline">(${Math.round(s.ms / 100) / 10}s)</span>` : ""}</li>`
+    (s) => `    <li class="live-step-${esc8(s.status)}"><code>${esc8(s.name)}</code> \u2014 ${esc8(s.status)}${s.detail ? `: ${esc8(s.detail)}` : ""}${s.ms != null ? ` <span class="empty-inline">(${Math.round(s.ms / 100) / 10}s)</span>` : ""}</li>`
   ).join("\n")}
   </ol>` : "";
   if (live && live.reachable) {
-    return `  <p class="meta"><span class="ok-inline">\u25CF</span> ${esc6(live.appId)} \xB7 ${esc6(live.buildType)} \xB7 process started ${esc6(
+    return `  <p class="meta"><span class="ok-inline">\u25CF</span> ${esc8(live.appId)} \xB7 ${esc8(live.buildType)} \xB7 process started ${esc8(
       live.processStartedAtMs ? new Date(live.processStartedAtMs).toISOString() : "unknown"
-    )} \u2014 <a href="${esc6(live.remoteUrl)}" target="_blank">open in its own tab</a></p>
-  <iframe class="live-remote" src="${esc6(live.remoteUrl)}" title="live device"></iframe>
+    )} \u2014 <a href="${esc8(live.remoteUrl)}" target="_blank">open in its own tab</a></p>
+  <iframe class="live-remote" src="${esc8(live.remoteUrl)}" title="live device"></iframe>
 ${chainHtml}`;
   }
-  return `  <p class="meta"><span class="bad-inline">\u25CB</span> ${esc6(live ? live.reason : "status unknown")}</p>
+  return `  <p class="meta"><span class="bad-inline">\u25CB</span> ${esc8(live ? live.reason : "status unknown")}</p>
   <p>Start the whole chain from here \u2014 boot a headless AVD if no device is attached, install the
   debug build, launch it, forward the inspector port, and wait for health:</p>
   <p><button id="live-start-btn"${session && session.running ? " disabled" : ""}>${session && session.running ? "Starting\u2026" : "Start live session"}</button></p>
@@ -37671,33 +38096,33 @@ ${chainHtml}
 }
 function laneRunEvidenceHtml(r) {
   const label = rungWithPack(r.rung, r.packId ?? r.pack);
-  const strength = esc6(r.strength ?? "\u2014");
+  const strength = esc8(r.strength ?? "\u2014");
   if (!label) return strength;
-  return `<span title="${escAttr3(rungPackNote(r.rung, r.packId ?? r.pack))}">${esc6(label)}</span> &mdash; ${strength}`;
+  return `<span title="${escAttr5(rungPackNote(r.rung, r.packId ?? r.pack))}">${esc8(label)}</span> &mdash; ${strength}`;
 }
 function digestTabHtml(digest) {
   if (!digest || !digest.available) {
-    return `<div class="empty"><p>No digest \u2014 ${esc6(digest ? digest.reason : "unavailable")}</p></div>`;
+    return `<div class="empty"><p>No digest \u2014 ${esc8(digest ? digest.reason : "unavailable")}</p></div>`;
   }
   const lane = digest.laneRuns.length ? `  <h3>Lane runs</h3>
   <table class="params-table"><thead><tr><th>when</th><th>commit</th><th>verdict</th><th>evidence</th></tr></thead><tbody>
 ${digest.laneRuns.map(
-    (r) => `    <tr><td>${esc6(r.when)}</td><td><code>${esc6(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc6(r.verdict)}</span></td><td>${laneRunEvidenceHtml(r)}</td></tr>`
+    (r) => `    <tr><td>${esc8(r.when)}</td><td><code>${esc8(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc8(r.verdict)}</span></td><td>${laneRunEvidenceHtml(r)}</td></tr>`
   ).join("\n")}
   </tbody></table>` : `  <h3>Lane runs</h3>
   <p class="empty-inline">no committed receipts in the window \u2014 the lane has not run (or its receipt was not committed)</p>`;
   const approvals = digest.approvalEvents.length ? `  <h3>Approval events</h3>
-  <ul class="digest-list">${digest.approvalEvents.map((e) => `<li>${esc6(e.when)} \xB7 <code>${esc6(e.sha)}</code> \u2014 ${esc6(e.subject)}</li>`).join("")}</ul>` : "";
+  <ul class="digest-list">${digest.approvalEvents.map((e) => `<li>${esc8(e.when)} \xB7 <code>${esc8(e.sha)}</code> \u2014 ${esc8(e.subject)}</li>`).join("")}</ul>` : "";
   const commitFilesHtml = (files) => {
     if (!Array.isArray(files) || files.length === 0) return "";
     const shown = files.slice(0, 12);
     const more = files.length > shown.length ? `<li class="fd-more">\u2026 and ${files.length - shown.length} more</li>` : "";
     return `<details class="digest-files"><summary>${files.length} file${files.length === 1 ? "" : "s"}</summary>
-      <ul class="digest-filelist">${shown.map((f) => `<li><span class="fd-status">${esc6(f.status)}</span> <code>${esc6(f.path)}</code></li>`).join("")}${more}</ul></details>`;
+      <ul class="digest-filelist">${shown.map((f) => `<li><span class="fd-status">${esc8(f.status)}</span> <code>${esc8(f.path)}</code></li>`).join("")}${more}</ul></details>`;
   };
   const commits = digest.commits.length ? `  <h3>Commits</h3>
   <ul class="digest-list">${digest.commits.map(
-    (c) => `<li>${esc6(c.when)} \xB7 <code>${esc6(c.sha)}</code> \u2014 ${esc6(c.subject)}${commitFilesHtml(c.files)}</li>`
+    (c) => `<li>${esc8(c.when)} \xB7 <code>${esc8(c.sha)}</code> \u2014 ${esc8(c.subject)}${commitFilesHtml(c.files)}</li>`
   ).join("")}</ul>` : `  <p class="empty-inline">no commits in the window</p>`;
   const comments = digest.openComments == null ? "" : `  <p class="meta">${digest.openComments} open comment${digest.openComments === 1 ? "" : "s"} awaiting action</p>`;
   return `${comments}
@@ -37713,71 +38138,71 @@ function featuresTabHtml(features, meta3 = {}) {
   if (!board || board.features.length === 0) {
     return `  <p class="empty-inline">no feature briefs yet. A brief is born by writing <code>docs/features/&lt;name&gt;.md</code> \u2014 the decisions and their why, signed BEFORE the feature is built. Its location is the governance opt-in; it appears here as a governed <code>feature-brief:&lt;name&gt;</code> artifact the moment the file exists.</p>`;
   }
-  const undeclared = board.undeclared.length > 0 ? `  <div class="feature-undeclared"><strong>Undeclared blast:</strong> ${board.undeclared.map((u) => `<code>${esc6(u.id)}</code>`).join(", ")} changed since approval, and no open brief declared touching ${board.undeclared.length === 1 ? "it" : "them"} \u2014 either a brief's <code>touches</code> is incomplete, or this drift belongs to no feature. The approvals gate is already failing on it; the plan should say why.</div>` : "";
+  const undeclared = board.undeclared.length > 0 ? `  <div class="feature-undeclared"><strong>Undeclared blast:</strong> ${board.undeclared.map((u) => `<code>${esc8(u.id)}</code>`).join(", ")} changed since approval, and no open brief declared touching ${board.undeclared.length === 1 ? "it" : "them"} \u2014 either a brief's <code>touches</code> is incomplete, or this drift belongs to no feature. The approvals gate is already failing on it; the plan should say why.</div>` : "";
   const phaseChip = (phase) => {
     const cls = phase === "accepted" ? "phase-accepted" : phase === "proven" ? "phase-proven" : phase === "approved" ? "phase-approved" : phase === "changed-since-approval" ? "phase-drift" : phase === "reopened" ? "phase-reopened" : "phase-proposed";
-    return `<span class="feature-phase ${cls}">${esc6(phase)}</span>`;
+    return `<span class="feature-phase ${cls}">${esc8(phase)}</span>`;
   };
   const cards = board.features.map((f) => {
     const clauseRows = f.clauses.map((c) => {
       const mark = c.withdrawn ? `<span class="pending-inline">\u2014</span>` : c.cited ? `<span class="ok-inline">\u2713</span>` : `<span class="pending-inline">\u25CB</span>`;
-      const id = c.withdrawn ? `<s><code>${esc6(c.id)}</code></s>` : `<code>${esc6(c.id)}</code>`;
+      const id = c.withdrawn ? `<s><code>${esc8(c.id)}</code></s>` : `<code>${esc8(c.id)}</code>`;
       const state = c.withdrawn ? "withdrawn" : c.cited ? "cited by a test" : "no citing test yet";
       return `      <tr><td>${mark}</td><td>${id}</td><td class="feature-check-detail">${state}</td></tr>`;
     }).join("\n");
-    const clauseTable = f.specExists ? f.clauses.length > 0 ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>clause</th><th><code>${esc6(f.specRel)}</code></th></tr></thead><tbody>
+    const clauseTable = f.specExists ? f.clauses.length > 0 ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>clause</th><th><code>${esc8(f.specRel)}</code></th></tr></thead><tbody>
 ${clauseRows}
-    </tbody></table>` : `    <p class="empty-inline"><code>${esc6(f.specRel)}</code> exists but has no clauses yet \u2014 behavior starts as clauses there.</p>` : `    <p class="empty-inline">no spec yet (<code>${esc6(f.specRel)}</code>) \u2014 the contract step: behavior starts as clauses there, signed before the build.</p>`;
-    const receiptNote = f.receipt.present ? `receipt ${esc6(f.receipt.verdict ?? "?")}${f.receipt.verdict === "PASS" ? f.receipt.attestsTree ? " \xB7 attests this tree" : " \xB7 attests an OLDER tree" : ""}` : "no receipt yet";
-    const doneLine = `    <p class="feature-done ${f.provenDone ? "feature-done-yes" : "meta"}">${f.provenDone ? "\u2713 proven done" : "not yet proven done"} \u2014 ${esc6(f.doneReason)}</p>`;
+    </tbody></table>` : `    <p class="empty-inline"><code>${esc8(f.specRel)}</code> exists but has no clauses yet \u2014 behavior starts as clauses there.</p>` : `    <p class="empty-inline">no spec yet (<code>${esc8(f.specRel)}</code>) \u2014 the contract step: behavior starts as clauses there, signed before the build.</p>`;
+    const receiptNote = f.receipt.present ? `receipt ${esc8(f.receipt.verdict ?? "?")}${f.receipt.verdict === "PASS" ? f.receipt.attestsTree ? " \xB7 attests this tree" : " \xB7 attests an OLDER tree" : ""}` : "no receipt yet";
+    const doneLine = `    <p class="feature-done ${f.provenDone ? "feature-done-yes" : "meta"}">${f.provenDone ? "\u2713 proven done" : "not yet proven done"} \u2014 ${esc8(f.doneReason)}</p>`;
     const touches = f.touches.length > 0 ? `    <p class="feature-touches">declares touching: ${f.touches.map((t) => {
       const drifted = t.status === "changed-since-approval";
       const isSpec = t.id.startsWith("feature-spec:");
       const note = drifted ? ` <span class="feature-as-declared">(as declared \u2014 re-approve when shaped)</span>` : isSpec && t.status === "approved" && f.phase !== "accepted" ? ` <span class="feature-as-declared">(this contract will be reopened &amp; amended)</span>` : !isSpec && t.status === "approved" && f.phase !== "accepted" ? ` <span class="feature-as-declared">(re-approval expected when the work lands)</span>` : "";
-      return `<code>${esc6(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc6(t.status)}</span>${note}`;
+      return `<code>${esc8(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc8(t.status)}</span>${note}`;
     }).join(" \xB7 ")}</p>` : `    <p class="feature-touches meta">declares touching nothing beyond its own spec</p>`;
     const sections = Array.isArray(f.sections) ? f.sections : [];
     const decisionSections = sections.filter((s) => /decision/i.test(s.heading));
     const decisionsHtml = decisionSections.map(
       (s) => `    <div class="feature-decisions">
-      <h4>${esc6(s.heading)}</h4>
+      <h4>${esc8(s.heading)}</h4>
       <div class="doc-prose">${mdProseHtml(s.body)}</div>
     </div>`
     ).join("\n");
     const fullBriefHtml = sections.length > 0 ? `    <details class="feature-brief-full"><summary>the full brief (${sections.length} sections \u2014 the signed document)</summary>
-${sections.map((s) => `      <h4>${esc6(s.heading)}</h4>
+${sections.map((s) => `      <h4>${esc8(s.heading)}</h4>
       <div class="doc-prose">${mdProseHtml(s.body)}</div>`).join("\n")}
     </details>` : "";
     const designHtml = f.design ? f.design.status === "approved" ? `    <p class="feature-design meta">design signed \u2014 ${f.design.fileCount} screen file(s) under governance</p>` : f.design.status === "reopened" ? `    <p class="feature-design"><span class="status-reopened">design reopened</span> \u2014 redesign in progress; re-approve when it lands</p>` : !f.design.resolvable ? `    <p class="feature-design meta">design not drafted yet \u2014 the agent drafts the screens on stub data; you sign what renders, in the Screens gallery</p>` : `    <p class="feature-design"><span class="${f.design.status === "changed-since-approval" ? "status-drift" : "pending-inline"}">${f.design.status === "changed-since-approval" ? "design changed since signature" : "design awaits your signature"}</span> \u2014 judge it on the rendered screens, then
-      <button type="button" class="approve-btn" data-artifact="${escAttr3(f.design.id)}">${f.design.status === "changed-since-approval" ? "Re-approve design" : "Approve design"}</button></p>` : "";
-    const nextHtml = f.nextStep ? `    <p class="feature-next">next &rarr; ${esc6(f.nextStep.label)}${f.nextStep.owner ? ` <span class="meta">&middot; ${esc6(f.nextStep.owner)}</span>` : ""}</p>` : "";
+      <button type="button" class="approve-btn" data-artifact="${escAttr5(f.design.id)}">${f.design.status === "changed-since-approval" ? "Re-approve design" : "Approve design"}</button></p>` : "";
+    const nextHtml = f.nextStep ? `    <p class="feature-next">next &rarr; ${esc8(f.nextStep.label)}${f.nextStep.owner ? ` <span class="meta">&middot; ${esc8(f.nextStep.owner)}</span>` : ""}</p>` : "";
     const stamps = [];
-    if (f.record && f.record.approvedAt) stamps.push(`signed ${esc6(f.record.approvedAt)}${f.record.via ? ` via ${esc6(f.record.via)}` : ""}`);
-    if (f.record && f.record.accepted) stamps.push(`accepted ${esc6(f.record.acceptedAt ?? "?")}`);
+    if (f.record && f.record.approvedAt) stamps.push(`signed ${esc8(f.record.approvedAt)}${f.record.via ? ` via ${esc8(f.record.via)}` : ""}`);
+    if (f.record && f.record.accepted) stamps.push(`accepted ${esc8(f.record.acceptedAt ?? "?")}`);
     if (f.record && f.record.status === "reopened" && f.record.reopenedAt)
       stamps.push(
-        `reopened ${esc6(f.record.reopenedAt)}${f.record.via ? ` via ${esc6(f.record.via)}` : ""}${f.record.reason ? ` \u2014 ${esc6(f.record.reason)}` : ""}`
+        `reopened ${esc8(f.record.reopenedAt)}${f.record.via ? ` via ${esc8(f.record.via)}` : ""}${f.record.reason ? ` \u2014 ${esc8(f.record.reason)}` : ""}`
       );
     const briefAwaitsSignature = f.phase === "proposed" || f.phase === "changed-since-approval" || f.phase === "reopened";
     const actions = [];
     if (briefAwaitsSignature) {
-      actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr3(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
+      actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr5(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
     }
     if (f.phase === "proven") {
-      actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr3(f.name)}">Accept</button>`);
+      actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr5(f.name)}">Accept</button>`);
     }
     if (f.phase === "approved") {
       actions.push(`<span class="meta">building \u2014 Accept enables when doneness derives (${f.covered}/${f.total} clauses cited, ${receiptNote})</span>`);
     }
     if (f.blockError) {
-      actions.push(`<span class="status-drift">cmp:feature block: ${esc6(f.blockError)}</span>`);
+      actions.push(`<span class="status-drift">cmp:feature block: ${esc8(f.blockError)}</span>`);
     }
     return `  <article class="feature-card${f.phase === "accepted" ? " feature-card-closed" : ""}">
     <header class="feature-card-head">
-      <h3>${esc6(f.name)}</h3>
+      <h3>${esc8(f.name)}</h3>
       ${phaseChip(f.phase)}
       <span class="feature-tally">${f.covered}/${f.total} clauses cited</span>
-      <a class="feature-doc-link" href="#" title="${escAttr3(f.rel)}">${esc6(f.rel)}</a>
+      <a class="feature-doc-link" href="#" title="${escAttr5(f.rel)}">${esc8(f.rel)}</a>
     </header>
     ${stamps.length > 0 ? `<p class="meta">${stamps.join(" \xB7 ")}</p>` : ""}
 ${nextHtml}
@@ -37811,8 +38236,8 @@ function componentStoryCards(cards) {
   }
   return out;
 }
-var esc7 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-var escAttr4 = (s) => esc7(s).replace(/"/g, "&quot;");
+var esc9 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr6 = (s) => esc9(s).replace(/"/g, "&quot;");
 function galleryHtml(state) {
   const {
     appName,
@@ -37851,6 +38276,16 @@ function galleryHtml(state) {
     // qa/.lane-steps.ndjson. Absent (an older caller) renders no *now* row
     // at all rather than an empty one that reads as "nothing is running".
     now = null,
+    // Rule 0's last result, as the record left it (qa/lib/framework-record.mjs
+    // trustState) — LIVE-CONSOLE Phase C. Absent means an older caller and
+    // renders NO row; a caller that read the tree and found no record passes
+    // the unavailable state, which renders as absence WITH the command that
+    // ends it. The two are deliberately different: nothing to say, versus
+    // nobody has asked.
+    trust = null,
+    // The profile's ladder read forward (qa/lib/evidence-level.mjs
+    // ladderStanding), against the rung the RECEIPT records.
+    ladder = null,
     tokenUsage = null,
     intent = { available: false },
     features = { available: false },
@@ -37971,8 +38406,8 @@ function galleryHtml(state) {
   if (effectiveReceipt && effectiveReceipt.available) {
     const age = typeof effectiveReceipt.ageMs === "number" ? formatAgeCoarse(effectiveReceipt.ageMs) : "age unknown";
     const rungLabel = rungWithPack(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack);
-    const rung = rungLabel ? ` &middot; <span title="${escAttr4(rungPackNote(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack))}">${esc7(rungLabel)}</span>` : "";
-    evidenceStatus = `verify ${esc7(effectiveReceipt.verdict || "?")}${rung} &middot; ${esc7(age)}${effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""}`;
+    const rung = rungLabel ? ` &middot; <span title="${escAttr6(rungPackNote(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack))}">${esc9(rungLabel)}</span>` : "";
+    evidenceStatus = `verify ${esc9(effectiveReceipt.verdict || "?")}${rung} &middot; ${esc9(age)}${effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""}`;
   }
   let approvalsStatus = "approvals not available in this project";
   if (approvals.available && approvals.statuses) {
@@ -38133,6 +38568,13 @@ function galleryHtml(state) {
         journal: journal.available ? journal.events : [],
         formatAge: formatAgeCoarse,
         nowHtml: now ? nowSectionHtml(now) : "",
+        // The age is the shell's word, handed to the row rather than formatted
+        // inside it — one age vocabulary for the whole page.
+        trustHtml: trust ? trustRowHtml(trust, { age: typeof trust.ageMs === "number" ? formatAgeCoarse(trust.ageMs) : null }) : "",
+        // The pack comes from the RECEIPT, beside the rung it graded, because a
+        // ladder drawn without the pack that owns it is four marks a reader
+        // cannot compare to anything (§8.9).
+        ladderHtml: ladder ? ladderRowHtml(ladder, { pack: effectiveReceipt && effectiveReceipt.available ? effectiveReceipt.packId ?? effectiveReceipt.pack : null }) : "",
         // Phase A shipped the rail's deriver, its renderer and its CSS, and
         // never called it: `flowRailHtml` had no reference outside its own
         // definition and its tests, so the "derived flow rail" the proposal
@@ -38893,7 +39335,7 @@ ${section.bodyHtml}`;
   const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
   const visibleSections = capabilities.screens ? declaredSections : declaredSections.filter((s) => !NEEDS_SCREENS.has(s.id));
   const capabilityNote = capabilities.screens ? "" : `<p class="rail-sub rail-capability" title="This project declares no screen-rendering capability. The governance window is complete; screens, preview and the live device all need one.">governance only &middot; ${consoleCopy().noRenderableApp}</p>`;
-  const layoutNote = !layout ? "" : !layout.ok ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr4(layout.reason || "")}">${esc7(layout.relPath || MANIFEST_REL_PATH2)} refused &mdash; see Evidence</p>` : layout.source === "manifest" ? `<p class="rail-sub rail-capability" title="${escAttr4(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc7(layout.relPath)} &middot; packs ${esc7((layout.layout.packs || []).join(", "))}</p>` : "";
+  const layoutNote = !layout ? "" : !layout.ok ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr6(layout.reason || "")}">${esc9(layout.relPath || MANIFEST_REL_PATH2)} refused &mdash; see Evidence</p>` : layout.source === "manifest" ? `<p class="rail-sub rail-capability" title="${escAttr6(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc9(layout.relPath)} &middot; packs ${esc9((layout.layout.packs || []).join(", "))}</p>` : "";
   return renderShellPage({
     appName,
     railItems: visibleRail,
@@ -38953,8 +39395,8 @@ ${section.bodyHtml}`;
 }
 
 // src/lib/design-language.mjs
-import fs18 from "node:fs";
-import path20 from "node:path";
+import fs20 from "node:fs";
+import path22 from "node:path";
 function findDeclaringObject(fileTexts, tokenNames) {
   if (tokenNames.length === 0) return null;
   let best = null;
@@ -38997,7 +39439,7 @@ function countReferences(fileTexts, objectName, tokenNames) {
   return counts;
 }
 function getTokenUsage(root, catalog = {}) {
-  const kotlinRoot = path20.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path22.join(root, "composeApp", "src", "commonMain", "kotlin");
   const files = walkKtFiles(kotlinRoot);
   if (files.length === 0) {
     return { available: false, reason: "no .kt files found under composeApp/src/commonMain/kotlin" };
@@ -39005,11 +39447,11 @@ function getTokenUsage(root, catalog = {}) {
   const fileTexts = /* @__PURE__ */ new Map();
   for (const f of files) {
     try {
-      fileTexts.set(f, fs18.readFileSync(f, "utf8"));
+      fileTexts.set(f, fs20.readFileSync(f, "utf8"));
     } catch {
     }
   }
-  const rel = (abs) => path20.relative(root, abs).split(path20.sep).join("/");
+  const rel = (abs) => path22.relative(root, abs).split(path22.sep).join("/");
   const group = (tokens) => {
     const names = Object.keys(tokens || {});
     const decl = findDeclaringObject(fileTexts, names);
@@ -39025,8 +39467,8 @@ function getTokenUsage(root, catalog = {}) {
 }
 
 // src/lib/intent.mjs
-import fs19 from "node:fs";
-import path21 from "node:path";
+import fs21 from "node:fs";
+import path23 from "node:path";
 var INTENT_REL_PATH = "specs/intent.md";
 var PLACEHOLDER_LEAD_RE = /^_not yet captured[^_]*_\s*/i;
 function parseIntentMarkdown(md) {
@@ -39068,10 +39510,10 @@ function parseIntentMarkdown(md) {
   };
 }
 function getIntentData(root) {
-  const file2 = path21.join(root, "specs", "intent.md");
+  const file2 = path23.join(root, "specs", "intent.md");
   let raw;
   try {
-    raw = fs19.readFileSync(file2, "utf8");
+    raw = fs21.readFileSync(file2, "utf8");
   } catch {
     return { available: false, reason: `${INTENT_REL_PATH} not found` };
   }
@@ -39115,8 +39557,8 @@ var MAX_TRANSIENT_RETRIES = 12;
 var STUCK_RETRY_MS = 3e4;
 var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
 function consoleRegistryPath(projectDir) {
-  const key = crypto.createHash("sha1").update(path22.resolve(projectDir)).digest("hex").slice(0, 12);
-  return path22.join(os3.tmpdir(), `cmp-console-${key}.json`);
+  const key = crypto.createHash("sha1").update(path24.resolve(projectDir)).digest("hex").slice(0, 12);
+  return path24.join(os3.tmpdir(), `cmp-console-${key}.json`);
 }
 async function treeState(projectDir) {
   try {
@@ -39139,7 +39581,7 @@ function processAlive(pid) {
 async function findLiveConsole(projectDir, { probe } = {}) {
   let rec;
   try {
-    rec = JSON.parse(fs20.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+    rec = JSON.parse(fs22.readFileSync(consoleRegistryPath(projectDir), "utf8"));
   } catch {
     return null;
   }
@@ -39152,7 +39594,7 @@ async function findLiveConsole(projectDir, { probe } = {}) {
       await new Promise((r) => setTimeout(r, RENEW_REJOIN_POLL_MS));
       let fresh;
       try {
-        fresh = JSON.parse(fs20.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+        fresh = JSON.parse(fs22.readFileSync(consoleRegistryPath(projectDir), "utf8"));
       } catch {
         continue;
       }
@@ -39165,18 +39607,18 @@ async function findLiveConsole(projectDir, { probe } = {}) {
   return null;
 }
 function consoleLauncherPath() {
-  const here = path22.dirname(fileURLToPath2(import.meta.url));
+  const here = path24.dirname(fileURLToPath2(import.meta.url));
   const candidates = [
-    path22.join(here, "..", "..", "bin", "console.mjs"),
+    path24.join(here, "..", "..", "bin", "console.mjs"),
     // src/lib/ → package root
-    path22.join(here, "..", "bin", "console.mjs"),
+    path24.join(here, "..", "bin", "console.mjs"),
     // dist/ → package root
-    path22.join(here, "console.mjs")
+    path24.join(here, "console.mjs")
     // bin/ (defensive)
   ];
   for (const c of candidates) {
     try {
-      if (fs20.existsSync(c)) return c;
+      if (fs22.existsSync(c)) return c;
     } catch {
     }
   }
@@ -39193,7 +39635,7 @@ async function ensureConsole(projectDir, opts = {}) {
       log("ensureConsole: no standalone launcher found beside this build \u2014 skipping");
       return null;
     }
-    const args = [launcher, path22.resolve(projectDir)];
+    const args = [launcher, path24.resolve(projectDir)];
     if (typeof port === "number") args.push(String(port));
     if (hot === true) args.push("--hot");
     const child = spawnImpl(process.execPath, args, { detached: true, stdio: "ignore" });
@@ -39214,9 +39656,9 @@ async function ensureConsole(projectDir, opts = {}) {
 }
 function writeConsoleRegistry(projectDir, port, extra = {}) {
   try {
-    fs20.writeFileSync(
+    fs22.writeFileSync(
       consoleRegistryPath(projectDir),
-      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path22.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path24.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
 `
     );
   } catch {
@@ -39225,9 +39667,9 @@ function writeConsoleRegistry(projectDir, port, extra = {}) {
 function updateConsoleRegistry(projectDir, patch) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs20.readFileSync(p, "utf8"));
+    const rec = JSON.parse(fs22.readFileSync(p, "utf8"));
     if (!rec || rec.pid !== process.pid) return;
-    fs20.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
+    fs22.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
 `);
   } catch {
   }
@@ -39235,16 +39677,16 @@ function updateConsoleRegistry(projectDir, patch) {
 function clearConsoleRegistry(projectDir) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs20.readFileSync(p, "utf8"));
-    if (rec && rec.pid === process.pid) fs20.rmSync(p, { force: true });
+    const rec = JSON.parse(fs22.readFileSync(p, "utf8"));
+    if (rec && rec.pid === process.pid) fs22.rmSync(p, { force: true });
   } catch {
   }
 }
 function stampRenderMarker(projectDir) {
   try {
-    const p = path22.join(projectDir, ...RENDER_MARKER_REL);
-    fs20.mkdirSync(path22.dirname(p), { recursive: true });
-    fs20.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+    const p = path24.join(projectDir, ...RENDER_MARKER_REL);
+    fs22.mkdirSync(path24.dirname(p), { recursive: true });
+    fs22.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
 `);
   } catch {
   }
@@ -39252,31 +39694,31 @@ function stampRenderMarker(projectDir) {
 function touchRenderMarker(projectDir) {
   try {
     const now = /* @__PURE__ */ new Date();
-    fs20.utimesSync(path22.join(projectDir, ...RENDER_MARKER_REL), now, now);
+    fs22.utimesSync(path24.join(projectDir, ...RENDER_MARKER_REL), now, now);
   } catch {
   }
 }
 function clearRenderMarker(projectDir) {
   try {
-    fs20.rmSync(path22.join(projectDir, ...RENDER_MARKER_REL), { force: true });
+    fs22.rmSync(path24.join(projectDir, ...RENDER_MARKER_REL), { force: true });
   } catch {
   }
 }
 function resolveAppName(projectDir) {
   for (const f of ["settings.gradle.kts", "settings.gradle"]) {
     try {
-      const text = fs20.readFileSync(path22.join(projectDir, f), "utf8");
+      const text = fs22.readFileSync(path24.join(projectDir, f), "utf8");
       const m = text.match(/rootProject\.name\s*=\s*["']([^"']+)["']/);
       if (m) return m[1];
     } catch {
     }
   }
-  return path22.basename(projectDir);
+  return path24.basename(projectDir);
 }
 function detectCapabilities(projectDir) {
   const has = (rel) => {
     try {
-      return fs20.statSync(path22.join(projectDir, rel)).isDirectory();
+      return fs22.statSync(path24.join(projectDir, rel)).isDirectory();
     } catch {
       return false;
     }
@@ -39285,7 +39727,7 @@ function detectCapabilities(projectDir) {
 }
 function laneInProgress(projectDir, { now = Date.now } = {}) {
   try {
-    const st = fs20.statSync(path22.join(projectDir, ...LANE_MARKER_REL));
+    const st = fs22.statSync(path24.join(projectDir, ...LANE_MARKER_REL));
     return now() - st.mtimeMs < LANE_MARKER_STALE_MS2;
   } catch {
     return false;
@@ -39298,22 +39740,22 @@ async function withKspSelfHeal(projectDir, log, run) {
     const text = `${err && err.message ? err.message : err}${err && err.stdout ? err.stdout : ""}${err && err.stderr ? err.stderr : ""}`;
     if (!KSP_COLLISION_RE.test(text)) throw err;
     log("KSP cache collision (concurrent Gradle \u2014 verify lane?) \u2014 clearing kspCaches, retrying once");
-    fs20.rmSync(path22.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
+    fs22.rmSync(path24.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
     return await run();
   }
 }
 function detectAppPackage(projectDir) {
-  const spec = path22.join(projectDir, "create-cmp.json");
-  if (fs20.existsSync(spec)) {
+  const spec = path24.join(projectDir, "create-cmp.json");
+  if (fs22.existsSync(spec)) {
     try {
-      const pkg = JSON.parse(fs20.readFileSync(spec, "utf8")).package;
+      const pkg = JSON.parse(fs22.readFileSync(spec, "utf8")).package;
       if (pkg) return pkg;
     } catch {
     }
   }
-  const gradle = path22.join(projectDir, "composeApp", "build.gradle.kts");
-  if (fs20.existsSync(gradle)) {
-    const m = fs20.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
+  const gradle = path24.join(projectDir, "composeApp", "build.gradle.kts");
+  if (fs22.existsSync(gradle)) {
+    const m = fs22.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
     if (m) return m[1];
   }
   throw new Error(
@@ -39367,11 +39809,11 @@ function applyConsoleCopy(projectDir) {
   }
 }
 function createPreviewService(opts) {
-  const projectDir = path22.resolve(opts.projectDir);
+  const projectDir = path24.resolve(opts.projectDir);
   applyConsoleCopy(projectDir);
   const appName = opts.appName || resolveAppName(projectDir);
-  const previewsDir = path22.join(projectDir, "composeApp", "build", "previews");
-  const srcDir = path22.join(projectDir, "composeApp", "src");
+  const previewsDir = path24.join(projectDir, "composeApp", "build", "previews");
+  const srcDir = path24.join(projectDir, "composeApp", "src");
   const log = opts.log || (() => {
   });
   const hot = opts.hot !== false;
@@ -39634,11 +40076,11 @@ function createPreviewService(opts) {
     return result;
   }
   async function getDesignSystemData() {
-    const catalogPath = path22.join(previewsDir, "design-system.json");
-    const sourcePath = path22.relative(projectDir, catalogPath).split(path22.sep).join("/");
-    if (fs20.existsSync(catalogPath)) {
+    const catalogPath = path24.join(previewsDir, "design-system.json");
+    const sourcePath = path24.relative(projectDir, catalogPath).split(path24.sep).join("/");
+    if (fs22.existsSync(catalogPath)) {
       try {
-        return { available: true, source: "previews", sourcePath, catalog: JSON.parse(fs20.readFileSync(catalogPath, "utf8")) };
+        return { available: true, source: "previews", sourcePath, catalog: JSON.parse(fs22.readFileSync(catalogPath, "utf8")) };
       } catch (err) {
         log(`design-system.json at ${catalogPath} is not valid JSON (${err.message}) \u2014 trying a live session`);
       }
@@ -39664,26 +40106,26 @@ function createPreviewService(opts) {
         reason: "no current render to stash \u2014 call preview {projectDir} and wait for a render to complete first"
       };
     }
-    const variantDir = path22.join(previewsDir, "variants", name);
+    const variantDir = path24.join(previewsDir, "variants", name);
     try {
-      fs20.rmSync(variantDir, { recursive: true, force: true });
-      fs20.mkdirSync(variantDir, { recursive: true });
+      fs22.rmSync(variantDir, { recursive: true, force: true });
+      fs22.mkdirSync(variantDir, { recursive: true });
     } catch (err) {
       return { ok: false, reason: `could not prepare ${variantDir}: ${err && err.message ? err.message : err}` };
     }
     const screens = [];
     for (const { screen } of cards) {
-      const src = path22.join(previewsDir, screen.png);
-      if (!fs20.existsSync(src)) continue;
-      const dst = path22.join(variantDir, screen.png);
-      fs20.mkdirSync(path22.dirname(dst), { recursive: true });
-      fs20.copyFileSync(src, dst);
+      const src = path24.join(previewsDir, screen.png);
+      if (!fs22.existsSync(src)) continue;
+      const dst = path24.join(variantDir, screen.png);
+      fs22.mkdirSync(path24.dirname(dst), { recursive: true });
+      fs22.copyFileSync(src, dst);
       screens.push(screen.id);
     }
     let designSystemStashed = false;
-    const dsSrc = path22.join(previewsDir, "design-system.json");
-    if (fs20.existsSync(dsSrc)) {
-      fs20.copyFileSync(dsSrc, path22.join(variantDir, "design-system.json"));
+    const dsSrc = path24.join(previewsDir, "design-system.json");
+    if (fs22.existsSync(dsSrc)) {
+      fs22.copyFileSync(dsSrc, path24.join(variantDir, "design-system.json"));
       designSystemStashed = true;
     }
     touch("variant-snapshot");
@@ -39745,17 +40187,17 @@ function createPreviewService(opts) {
     }
   }
   function loadPreviews() {
-    const manifestPath = path22.join(previewsDir, "manifest.json");
-    const manifest = JSON.parse(fs20.readFileSync(manifestPath, "utf8"));
+    const manifestPath = path24.join(previewsDir, "manifest.json");
+    const manifest = JSON.parse(fs22.readFileSync(manifestPath, "utf8"));
     try {
-      lastRenderAt = fs20.statSync(manifestPath).mtimeMs;
+      lastRenderAt = fs22.statSync(manifestPath).mtimeMs;
     } catch {
       lastRenderAt = Date.now();
     }
     viewport = manifest.viewport;
     const trees = /* @__PURE__ */ new Map();
     cards = manifest.screens.map((screen) => {
-      const treeJson = fs20.readFileSync(path22.join(previewsDir, screen.tree), "utf8");
+      const treeJson = fs22.readFileSync(path24.join(previewsDir, screen.tree), "utf8");
       trees.set(screen.id, treeJson);
       const tree = JSON.parse(treeJson);
       const a11y = auditA11y(tree);
@@ -39792,8 +40234,8 @@ function createPreviewService(opts) {
       };
     }
     let catalog;
-    const catalogPath = path22.join(previewsDir, "design-system.json");
-    if (fs20.existsSync(catalogPath)) catalog = JSON.parse(fs20.readFileSync(catalogPath, "utf8"));
+    const catalogPath = path24.join(previewsDir, "design-system.json");
+    if (fs22.existsSync(catalogPath)) catalog = JSON.parse(fs22.readFileSync(catalogPath, "utf8"));
     return {
       ok: true,
       screen,
@@ -39810,10 +40252,10 @@ function createPreviewService(opts) {
   }
   function snapshotPngs() {
     for (const { screen } of cards) {
-      const src = path22.join(previewsDir, screen.png);
-      const dst = path22.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
+      const src = path24.join(previewsDir, screen.png);
+      const dst = path24.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
       try {
-        if (fs20.existsSync(src)) fs20.copyFileSync(src, dst);
+        if (fs22.existsSync(src)) fs22.copyFileSync(src, dst);
       } catch {
       }
     }
@@ -39844,8 +40286,8 @@ function createPreviewService(opts) {
     } catch {
       return false;
     }
-    const theirs = health && typeof health.previewsDir === "string" ? path22.resolve(health.previewsDir) : null;
-    if (theirs && theirs !== path22.resolve(previewsDir)) {
+    const theirs = health && typeof health.previewsDir === "string" ? path24.resolve(health.previewsDir) : null;
+    if (theirs && theirs !== path24.resolve(previewsDir)) {
       log(`a daemon is running on ${daemonUrl} but serves ${theirs} \u2014 not this project; staying on the gradle path`);
       return false;
     }
@@ -39948,9 +40390,9 @@ function createPreviewService(opts) {
   }
   function watchClasses() {
     if (classesWatcher) return;
-    const classesDir = path22.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
+    const classesDir = path24.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
     try {
-      classesWatcher = fs20.watch(classesDir, { recursive: true }, () => {
+      classesWatcher = fs22.watch(classesDir, { recursive: true }, () => {
         touch("classes-change");
         scheduleRender(CLASSES_DEBOUNCE_MS);
       });
@@ -40146,13 +40588,13 @@ function createPreviewService(opts) {
     } catch {
     }
     try {
-      fs20.writeFileSync(
+      fs22.writeFileSync(
         consoleRegistryPath(projectDir),
         `${JSON.stringify({
           pid: process.ppid,
           port: handoffPort,
           url: `http://127.0.0.1:${handoffPort}/`,
-          projectDir: path22.resolve(projectDir),
+          projectDir: path24.resolve(projectDir),
           startedAt: (/* @__PURE__ */ new Date()).toISOString(),
           renewing: true,
           renewingAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -40179,7 +40621,7 @@ function createPreviewService(opts) {
     for (const dir of sourceRoots()) {
       try {
         selfWatchers.push(
-          fs20.watch(dir, { recursive: true }, (_event, filename) => {
+          fs22.watch(dir, { recursive: true }, (_event, filename) => {
             if (filename && !String(filename).endsWith(".mjs")) return;
             onSelfSourceChange();
           })
@@ -40192,7 +40634,7 @@ function createPreviewService(opts) {
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
   function startWatching() {
     try {
-      watcher = fs20.watch(srcDir, { recursive: true }, (_event, filename) => {
+      watcher = fs22.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
         clearTimeout(activityBroadcastTimer);
@@ -40278,18 +40720,18 @@ function createPreviewService(opts) {
   }
   function watchGovernance() {
     for (const w of GOVERNANCE_WATCHES) {
-      const abs = path22.join(projectDir, w.rel);
-      if (!fs20.existsSync(abs)) {
+      const abs = path24.join(projectDir, w.rel);
+      if (!fs22.existsSync(abs)) {
         if (!w.mkdir || !capabilities.screens) continue;
         try {
-          fs20.mkdirSync(abs, { recursive: true });
+          fs22.mkdirSync(abs, { recursive: true });
         } catch {
           continue;
         }
       }
       try {
-        const watcher2 = fs20.watch(abs, (_event, filename) => {
-          const base = filename ? path22.basename(filename) : "";
+        const watcher2 = fs22.watch(abs, (_event, filename) => {
+          const base = filename ? path24.basename(filename) : "";
           if (w.only && !w.only.has(base)) return;
           pendingGovernance.add(w.kind === "ledger" ? base === "comments.json" ? "comment" : "approval" : "governance");
           clearTimeout(governanceTimer);
@@ -40306,24 +40748,24 @@ function createPreviewService(opts) {
       if (sseClients.size === 0) return;
       broadcast(nowFrame(readStepStream(projectDir), event));
     });
-    if (stepTail.path) log(`watching the lane's step stream (${path22.relative(projectDir, stepTail.path)})`);
+    if (stepTail.path) log(`watching the lane's step stream (${path24.relative(projectDir, stepTail.path)})`);
   }
   function scanStamp() {
     let stamp = 0;
     (function walk2(dir) {
       let entries;
       try {
-        entries = fs20.readdirSync(dir, { withFileTypes: true });
+        entries = fs22.readdirSync(dir, { withFileTypes: true });
       } catch {
         return;
       }
       for (const e of entries) {
-        const p = path22.join(dir, e.name);
+        const p = path24.join(dir, e.name);
         if (IGNORE.test(p)) continue;
         if (e.isDirectory()) walk2(p);
         else {
           try {
-            stamp = Math.max(stamp, fs20.statSync(p).mtimeMs);
+            stamp = Math.max(stamp, fs22.statSync(p).mtimeMs);
           } catch {
           }
         }
@@ -40445,6 +40887,13 @@ function createPreviewService(opts) {
             // — which is what makes a run that happened while the console was
             // down still visible when it comes back up.
             now: readStepStream(projectDir),
+            // The *trust* and *ladder* rows (LIVE-CONSOLE Phase C), read on the
+            // page load like everything else here. Both are file reads and a
+            // profile import — no lane is started, no instrument is run, and
+            // nothing is planted: D4b's rejection is kept at the call site as
+            // well as in the bridges.
+            trust: readTrustRecord(projectDir),
+            ladder: readLadderStanding(projectDir, lastReceipt),
             tokenUsage,
             intent,
             features: featureBoard,
@@ -40713,30 +41162,30 @@ function createPreviewService(opts) {
         return;
       }
       if (url2.pathname.startsWith("/walkthrough/")) {
-        const wtRoot = path22.join(projectDir, WALKTHROUGH_REL_DIR);
+        const wtRoot = path24.join(projectDir, WALKTHROUGH_REL_DIR);
         const rel = decodeURIComponent(url2.pathname.slice("/walkthrough/".length));
-        const file2 = path22.normalize(path22.join(wtRoot, rel));
-        if (!file2.startsWith(wtRoot) || !fs20.existsSync(file2) || !fs20.statSync(file2).isFile()) {
+        const file2 = path24.normalize(path24.join(wtRoot, rel));
+        if (!file2.startsWith(wtRoot) || !fs22.existsSync(file2) || !fs22.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".html") ? "text/html; charset=utf-8" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs20.createReadStream(file2).pipe(res);
+        fs22.createReadStream(file2).pipe(res);
         return;
       }
       if (url2.pathname.startsWith("/previews/")) {
         const rel = decodeURIComponent(url2.pathname.slice("/previews/".length));
-        const file2 = path22.normalize(path22.join(previewsDir, rel));
-        if (!file2.startsWith(previewsDir) || !fs20.existsSync(file2) || !fs20.statSync(file2).isFile()) {
+        const file2 = path24.normalize(path24.join(previewsDir, rel));
+        if (!file2.startsWith(previewsDir) || !fs22.existsSync(file2) || !fs22.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".svg") ? "image/svg+xml" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs20.createReadStream(file2).pipe(res);
+        fs22.createReadStream(file2).pipe(res);
         return;
       }
       res.writeHead(404);
@@ -40829,8 +41278,8 @@ function createPreviewService(opts) {
         a11yPass: a11y.pass,
         a11yViolations: a11y.violations.length,
         lastChangedVersion: changedAt.get(screen.id) ?? null,
-        tree: path22.join(previewsDir, screen.tree),
-        png: path22.join(previewsDir, screen.png)
+        tree: path24.join(previewsDir, screen.tree),
+        png: path24.join(previewsDir, screen.png)
       }))
     };
   }
@@ -40857,7 +41306,7 @@ function createPreviewService(opts) {
           throw err;
         }
       }
-      if (capabilities.screens && fs20.existsSync(path22.join(previewsDir, "manifest.json"))) {
+      if (capabilities.screens && fs22.existsSync(path24.join(previewsDir, "manifest.json"))) {
         loadPreviews();
       }
       await listen(opts.port || DEFAULT_PORT2);

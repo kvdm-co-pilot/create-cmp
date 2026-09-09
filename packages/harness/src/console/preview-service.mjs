@@ -52,6 +52,13 @@ import { overviewBodyHtml, overviewStatusHtml, overviewGlyph, flowRailHtml } fro
 // a row looks — including the rows the SSE appends mid-run, so a live row and
 // a reloaded row are rendered by the same function.
 import { nowSectionHtml } from "./console-now.mjs";
+// The *trust* and *ladder* rows (LIVE-CONSOLE.md Phase C). Same shape as *now*:
+// the server reads the artifact (the Rule 0 record; the profile's ladder plus
+// the receipt's own rung) and these modules decide how the answer looks. The
+// derivations live in qa/lib — framework-record.mjs and evidence-level.mjs — so
+// the `--html` snapshot reads the same facts the same way.
+import { trustRowHtml } from "./console-trust.mjs";
+import { ladderRowHtml } from "./console-ladder.mjs";
 // The Evidence section's own status line shows a rung, so it shows the pack —
 // one spelling for the whole console lives in console-evidence.mjs (§6.5).
 import { rungWithPack, rungPackNote } from "./console-evidence.mjs";
@@ -161,6 +168,16 @@ export function galleryHtml(state) {
     // qa/.lane-steps.ndjson. Absent (an older caller) renders no *now* row
     // at all rather than an empty one that reads as "nothing is running".
     now = null,
+    // Rule 0's last result, as the record left it (qa/lib/framework-record.mjs
+    // trustState) — LIVE-CONSOLE Phase C. Absent means an older caller and
+    // renders NO row; a caller that read the tree and found no record passes
+    // the unavailable state, which renders as absence WITH the command that
+    // ends it. The two are deliberately different: nothing to say, versus
+    // nobody has asked.
+    trust = null,
+    // The profile's ladder read forward (qa/lib/evidence-level.mjs
+    // ladderStanding), against the rung the RECEIPT records.
+    ladder = null,
     tokenUsage = null,
     intent = { available: false },
     features = { available: false },
@@ -609,6 +626,15 @@ export function galleryHtml(state) {
         journal: journal.available ? journal.events : [],
         formatAge: formatAgeCoarse,
         nowHtml: now ? nowSectionHtml(now) : "",
+        // The age is the shell's word, handed to the row rather than formatted
+        // inside it — one age vocabulary for the whole page.
+        trustHtml: trust ? trustRowHtml(trust, { age: typeof trust.ageMs === "number" ? formatAgeCoarse(trust.ageMs) : null }) : "",
+        // The pack comes from the RECEIPT, beside the rung it graded, because a
+        // ladder drawn without the pack that owns it is four marks a reader
+        // cannot compare to anything (§8.9).
+        ladderHtml: ladder
+          ? ladderRowHtml(ladder, { pack: effectiveReceipt && effectiveReceipt.available ? (effectiveReceipt.packId ?? effectiveReceipt.pack) : null })
+          : "",
         // Phase A shipped the rail's deriver, its renderer and its CSS, and
         // never called it: `flowRailHtml` had no reference outside its own
         // definition and its tests, so the "derived flow rail" the proposal

@@ -120,3 +120,28 @@ export function rungPackNote(level, pack) {
     ? `this rung is pack ${id}'s: a ${id} ${grade} and another pack's ${grade} are different claims`
     : "the receipt names no pack, so this rung is comparable to nothing";
 }
+
+/**
+ * The pack, named on its own — for the one surface that shows RUNGS without
+ * showing a grade: the *ladder* row (LIVE-CONSOLE.md Phase C), which draws
+ * `L0 ● L1 ● L2 ● L3 ○` and says what the next rung wants.
+ *
+ * That row shows rungs, so §6.5 binds it — "every surface that shows a rung
+ * shows the pack" — and §8.9 is the reason it matters more here than anywhere:
+ * the row is a picture of ONE PACK'S ladder, and the same four boxes drawn for
+ * another pack mean four other things. But the row deliberately does not print
+ * the earned grade in words (the strip above it already does, through
+ * `rungWithPack`), so it needs the pack clause without the grade in front of
+ * it, and this is that clause rather than a second spelling of a rung: the
+ * vocabulary — "pack cmp", "pack unnamed" — is the same one, out of the same
+ * `packIdOf`, and a caller that wants the grade too still calls `rungWithPack`.
+ *
+ * @param {{id?: string}|string|null|undefined} pack
+ * @returns {string} "pack cmp" or "pack unnamed" — never an empty string, for
+ *   the reason `rungWithPack` never renders a bare grade: an unattributed
+ *   ladder is comparable to nothing and saying so is the point.
+ */
+export function packClause(pack) {
+  const id = packIdOf(pack);
+  return id ? `pack ${id}` : "pack unnamed";
+}

@@ -257,6 +257,16 @@ export function overviewBodyHtml({
   // "" is an older caller, and renders no row rather than an empty one.
   nowHtml = "",
   railHtml = "",
+  // LIVE-CONSOLE.md's fourth and fifth questions ("can I trust the lane that
+  // says so?", "what would earn the next rung?"), rendered by console-trust.mjs
+  // and console-ladder.mjs and passed in as strings — exactly like nowHtml and
+  // digestHtml. Composition only: this file does not read the Rule 0 record,
+  // does not resolve a ladder, and does not decide a rung. "" is an older
+  // caller and renders no row rather than an empty one, because an empty trust
+  // row would read as "nothing is wrong", which is the one thing a row about an
+  // unrun instrument must never say.
+  trustHtml = "",
+  ladderHtml = "",
 } = {}) {
   const byArtifact = new Map(statuses.map((s) => [s.id, s]));
   const byFeature = new Map(features.map((f) => [f.name, f]));
@@ -348,12 +358,19 @@ ${digestHtml}
   // rail, so a console with no sections renders no rail rather than a stub.
   const railBlock = railHtml ? `${railHtml}\n` : "";
   const nowBlock = nowHtml ? `  <h3 class="fd-h">Now</h3>\n${nowHtml}\n` : "";
+  // *trust* and *ladder* sit AFTER what-needs-you, and that order is the
+  // proposal's: the five questions run in time order — the past run, the
+  // present run, my next action, the instrument's integrity, the future — so
+  // the two rows about the instrument and the future come last, under the one
+  // thing a person can act on right now.
+  const trustBlock = trustHtml ? `  <h3 class="fd-h">Trust</h3>\n${trustHtml}\n` : "";
+  const ladderBlock = ladderHtml ? `  <h3 class="fd-h">Ladder</h3>\n${ladderHtml}\n` : "";
 
   return `${driveChainHtml(walks && walks.chain ? walks.chain : null)}  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
 ${railBlock}${nowBlock}  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
-${walksHtml(features, statuses, walks)}
+${trustBlock}${ladderBlock}${walksHtml(features, statuses, walks)}
 ${fold("What changed", changedBlock)}
 ${fold("History", historyHtml)}`;
 }

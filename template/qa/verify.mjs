@@ -35,6 +35,11 @@ import { computeInputsHash, undeclaredTopLevel } from "./lib/inputs-hash.mjs";
 import { gradeEvidence } from "./lib/evidence-level.mjs";
 import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
 import { updateReadmeBadge, README_REL_PATH } from "./lib/evidence-badge.mjs";
+// The `--html` snapshot (LIVE-CONSOLE.md D3a) and the Rule 0 record it reports
+// beside the run. Both are OUTPUTS derived from artifacts — neither can change
+// a verdict, and the second is only ever read.
+import { SNAPSHOT_REL, snapshotHtml } from "./lib/evidence-html.mjs";
+import { readFrameworkRecord } from "./lib/framework-record.mjs";
 import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
 import { StepTimeout, spawnTimedOut } from "./lib/step-outcomes.mjs";
 import { expectedDurations, runLane, stepDisplayName } from "./lib/lane-runner.mjs";
@@ -55,7 +60,7 @@ const ARTIFACTS_DIR = path.join(ROOT, "qa-artifacts");
 // killed). Same refusal-over-fabrication stance as qa/approve.mjs, which
 // refuses an unknown artifact by name rather than guessing: an unknown
 // argument here is refused by name, not swallowed into "run everything".
-const USAGE = `node qa/verify.mjs [--profile smoke|scaffold|local|ci|nightly|release] [--fast] [--json] [--help]
+const USAGE = `node qa/verify.mjs [--profile smoke|scaffold|local|ci|nightly|release] [--fast] [--json] [--html] [--help]
 
 The verify lane — this project's single verification gate. Runs every
 verification step this project carries, aggregates a typed PASS/FAIL
@@ -105,6 +110,12 @@ Flags:
                                  qa/.lane-steps.ndjson (truncated per run,
                                  gitignored) so a console that was not running
                                  can still render the run afterwards.
+  --html                         also write qa/evidence/latest.html — this run
+                                 as ONE self-contained page: no server, no
+                                 script, no external fetch, so it opens from a
+                                 file:// URL and attaches to a PR. Opt-in on
+                                 purpose (docs/proposals/LIVE-CONSOLE.md D3a);
+                                 writing it every run was rejected as churn
   --help, -h                     print this usage and exit 0 without
                                   running anything
 
@@ -177,7 +188,7 @@ if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
 // save without ever running the lane. test/verify-flags.test.mjs now pins
 // consumed ⊆ recognized and watch's spawn ⊆ recognized so the class cannot
 // recur.
-const RECOGNIZED_FLAGS = new Set(["--profile", "--json", "--fast", "--determinism", "--no-journal", "--events"]);
+const RECOGNIZED_FLAGS = new Set(["--profile", "--json", "--fast", "--determinism", "--no-journal", "--events", "--html"]);
 for (let i = 0; i < rawArgs.length; i += 1) {
   const arg = rawArgs[i];
   if (arg === "--profile") {
@@ -198,6 +209,12 @@ const asJson = args.includes("--json");
 // one. stdout stays the result, stderr becomes the progress — the oldest
 // convention there is, and it lets a caller consume both at once.
 const asEvents = args.includes("--events");
+// The shareable snapshot (docs/proposals/LIVE-CONSOLE.md D3a, 2026-09-09): this
+// run as one self-contained file beside the receipt. OPT-IN — D3b, writing it
+// on every run, was rejected as churn, and this flag is the whole of that
+// decision. It is an OUTPUT derived from the receipt, exactly like the README
+// badge: written after the verdict, unable to change one.
+const asHtml = args.includes("--html");
 // The same events, ALSO left behind as an artifact (docs/proposals/LIVE-CONSOLE.md
 // Phase B, decided 2026-09-09). stderr reaches whoever is holding the pipe;
 // qa/.lane-steps.ndjson reaches whoever arrives afterwards — a console that
@@ -772,6 +789,31 @@ fs.writeFileSync(path.join(EVIDENCE_DIR, RECEIPT_FILE), `${JSON.stringify(receip
 // sentence stays true as the tree moves on (qa/lib/evidence-badge.mjs).
 const badge = updateReadmeBadge(ROOT);
 
+// ── The shareable snapshot (LIVE-CONSOLE.md D3a) ────────────────────────────
+// One file, no server, opens from a file:// URL. Derived from the receipt just
+// written plus the two artifacts the console's own rows read — the profile's
+// ladder (already resolved above, before a step ran) and Rule 0's record, if
+// this tree has one. A failed write is a note, never a verdict: this is an
+// output like the badge, and a renderer that could fail a lane would be the
+// recorder breaking the thing it observes.
+const snapshot = (() => {
+  if (!asHtml) return null;
+  try {
+    const html = snapshotHtml({
+      receipt,
+      ladder: resolvedLadder.ladder,
+      frameworkRecord: readFrameworkRecord(ROOT),
+      appName: path.basename(ROOT),
+    });
+    const rel = fast ? SNAPSHOT_REL.replace("latest.html", "latest-fast.html") : SNAPSHOT_REL;
+    fs.writeFileSync(path.join(ROOT, ...rel.split("/")), html);
+    return { ok: true, rel };
+  } catch (err) {
+    return { ok: false, reason: err && err.message ? err.message : String(err) };
+  }
+})();
+if (snapshot && !snapshot.ok) console.error(`  ⓘ --html: could not write the snapshot — ${snapshot.reason}`);
+
 // ── Flight recorder (roadmap §10 item 5) — the lane journals its own run ────
 // One JSON line per run into qa/flight-recorder.jsonl (committed, and
 // excluded from the receipt's hashed surface — qa/lib/flight-recorder.mjs
@@ -838,6 +880,14 @@ if (asJson) {
   // nothing anywhere connecting the two (NORTH-STAR §9.2). On a FAILed lane the
   // absence explains itself, so this stays quiet and lets the red row speak.
   if (verdict === "PASS" && !level && grade.why) console.log(`  ⓘ ${grade.why}`);
+}
+
+// The snapshot is NAMED when it was asked for — a file written silently is a
+// file nobody attaches to anything. Outside the verdict branches, so a --fast
+// run that asked for one is told where its own file went (latest-fast.html) as
+// plainly as a full run is; `--json` stays one object on stdout.
+if (!asJson && snapshot && snapshot.ok) {
+  console.log(`  ⓘ snapshot written to ${snapshot.rel} — one self-contained page, no server`);
 }
 
 // A TIER THAT HAS NEVER RUN HERE. A SKIP is non-fatal by design — absence of a

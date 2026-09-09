@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // framework-check.mjs — GATE-RULES Rule 0, in THIS app's own tree.
 //
-//   node qa/framework-check.mjs [--bound-ms 10000] [--budget-ms 5000] [--json]
+//   node qa/framework-check.mjs [--bound-ms 10000] [--budget-ms 5000] [--json] [--record]
 //
 // Before you point real work at this harness, prove the FRAMEWORK returns: a
 // deterministic PASS and a deterministic FAIL, fast, through the real lane
@@ -31,6 +31,12 @@
 // read into memory first and restored in a `finally`, and on SIGINT/SIGTERM
 // too. It refuses to start if any of those files already has uncommitted
 // changes, because a crash mid-plant must never be able to lose your work.
+//
+// `--record` is the ONE exception, and it is opt-in for exactly that reason:
+// it leaves qa/evidence/framework-check.json behind — the answer the console's
+// trust row reads (LIVE-CONSOLE.md D4a). Every other file, on every run, is
+// still put back, and the record itself carries whether that restore actually
+// worked, measured against the bytes this run read before it touched anything.
 //
 // Which plants are possible is DERIVED from the tree (qa/lib/framework-check.mjs).
 // A project with no specs, no flows, or no test sources still gets the region
@@ -63,6 +69,7 @@ import { listFlowFiles, scanCitations, walkFiles } from "./lib/spec-coverage.mjs
 import { resolveSpecModel } from "./lib/spec-model.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfileSync } from "./lib/profile-loader.mjs";
+import { FRAMEWORK_RECORD_REL, buildFrameworkRecord, frameworkRecordPath } from "./lib/framework-record.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RECEIPT_REL = "qa/evidence/latest.json";
@@ -75,11 +82,13 @@ const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
 
 if (flag("--help") || flag("-h")) {
   console.log(
-    `node qa/framework-check.mjs [--bound-ms <ms>] [--budget-ms <ms>] [--json]\n` +
+    `node qa/framework-check.mjs [--bound-ms <ms>] [--budget-ms <ms>] [--json] [--record]\n` +
       `  Proves this app's lane returns a fast deterministic PASS and FAIL through the smoke profile.\n` +
       `  --bound-ms   per-direction hang bound (default ${DEFAULT_BOUND_MS})\n` +
       `  --budget-ms  per-cycle calibration budget; a slower cycle is reported (default ${CALIBRATION_BUDGET_MS})\n` +
-      `  --json       print the report as JSON`,
+      `  --json       print the report as JSON\n` +
+      `  --record     leave the result behind at ${FRAMEWORK_RECORD_REL} — the ONLY file this\n` +
+      `               run does not put back, and what the console's trust row reads`,
   );
   process.exit(0);
 }
@@ -87,6 +96,20 @@ if (flag("--help") || flag("-h")) {
 const BOUND_MS = Number.parseInt(opt("--bound-ms", String(DEFAULT_BOUND_MS)), 10);
 const BUDGET_MS = Number.parseInt(opt("--budget-ms", String(CALIBRATION_BUDGET_MS)), 10);
 const asJson = flag("--json");
+// LIVE-CONSOLE.md D4a — the console cannot ask this instrument a question (D4b
+// was rejected: seconds of latency and a mutation of the tree behind a page
+// load), so the instrument leaves its answer behind and the console reads it.
+//
+// ASKED FOR, NOT AUTOMATIC. Everything else this script writes it puts back,
+// and three separate gates hold it to that — scripts/framework-check.mjs's
+// before/after tree hash, scripts/stage2-gate.mjs criterion E, and
+// test/framework-check-agnostic.test.mjs's porcelain comparison. A record
+// written on every run would make all three red, and the only way to ship it
+// that way is to edit three gates (one of them a signed stage exit) into
+// agreement with a change. Behind a flag, the default run is byte-for-byte what
+// it always was and this file's promise is unbroken; qa/lib/framework-record.mjs
+// carries the full argument.
+const asRecord = flag("--record");
 
 const t = () => Date.now();
 const out = (s) => {
@@ -94,11 +117,90 @@ const out = (s) => {
 };
 const abs = (rel) => path.join(ROOT, ...rel.split("/"));
 
+/**
+ * What this run will have to say for itself, filled in as it goes.
+ *
+ * Accumulated rather than assembled at the end, because the run that most needs
+ * a record is the one that DIES: a Rule 0 that failed is the most important
+ * thing the console's trust row can report, and it is exactly the run with no
+ * tidy report section to write from. Everything here is a fact the instrument
+ * already printed on its own output.
+ */
+const RECORD = { plants: [], unavailable: [], totalMs: null };
+
 function die(msg) {
   restoreAll();
+  writeRecordIfAsked("FAIL", msg);
   if (asJson) process.stdout.write(`${JSON.stringify({ verdict: "FAIL", reason: msg }, null, 2)}\n`);
   else process.stderr.write(`\nframework check: FAIL — ${msg}\n`);
   process.exit(1);
+}
+
+/**
+ * Did the restore actually restore? Answered from the ledger this script
+ * already keeps — every file it read before touching, compared to the bytes on
+ * disk now — so the record's `treeIdentical` is a MEASUREMENT and not the
+ * instrument vouching for itself in prose. A file that was absent before must
+ * be absent again; one that existed must hold exactly the bytes it held.
+ *
+ * The record itself is not in the ledger and is not compared: it is this run's
+ * declared output, not a file it planted into, and the sentence stays precise —
+ * every file this check TOUCHED is byte-identical to what it found.
+ */
+function restoredExactly() {
+  const changed = [];
+  for (const [rel, text] of original) {
+    const p = abs(rel);
+    let now = null;
+    try {
+      now = fs.readFileSync(p, "utf8");
+    } catch {
+      now = null;
+    }
+    if (now !== text) changed.push(rel);
+  }
+  return { identical: changed.length === 0, changed };
+}
+
+/** The commit this ran against, when git answers — provenance, never a gate. */
+function headSha() {
+  const res = spawnSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8", timeout: 5000 });
+  const sha = res.status === 0 ? (res.stdout ?? "").trim() : "";
+  return sha || null;
+}
+
+/**
+ * Leave the answer behind — the one file this run does not put back, and only
+ * when asked (see `asRecord` above for why it is a flag).
+ *
+ * Written AFTER `restoreAll`, with `fs` directly rather than through the
+ * ledger's `write`, so nothing can restore the record away again.
+ */
+function writeRecordIfAsked(verdict, reason = null) {
+  if (!asRecord) return;
+  const restored = restoredExactly();
+  const record = buildFrameworkRecord({
+    verdict,
+    reason,
+    plants: RECORD.plants,
+    unavailable: RECORD.unavailable,
+    treeIdentical: restored.identical,
+    changed: restored.changed,
+    totalMs: RECORD.totalMs,
+    boundMs: BOUND_MS,
+    generatedAt: new Date().toISOString(),
+    commit: headSha(),
+  });
+  const p = frameworkRecordPath(ROOT);
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, `${JSON.stringify(record, null, 2)}\n`);
+    out(`  record               ${FRAMEWORK_RECORD_REL} — the console's trust row reads this`);
+  } catch (err) {
+    // A record that could not be written is reported and changes no verdict:
+    // this is a note left for a reader, never a gate (LIVE-CONSOLE §8.8).
+    process.stderr.write(`framework check: could not write ${FRAMEWORK_RECORD_REL} — ${err.message}\n`);
+  }
 }
 
 // ── Restore ledger ──────────────────────────────────────────────────────────
@@ -322,6 +424,10 @@ const tree = {
 };
 
 const { plants, unavailable } = selectPlants(tree);
+// Which plants this tree CANNOT make, and why, travels into the record for the
+// same reason it is printed: a run that reports "2 plants, all green" over a
+// tree where five were impossible has said something much weaker than it looks.
+RECORD.unavailable = unavailable.map((u) => ({ kind: u.kind, reason: u.reason }));
 const coverage = assessCoverage(plants);
 if (!coverage.ok) die(coverage.reason);
 
@@ -590,6 +696,19 @@ try {
     const named = plant.names.length ? ` naming ${plant.names.join(", ")}` : "";
     const observed = plantRow(run.receipt.steps, plant)?.name ?? plant.step ?? "the lane";
     out(`  FAIL: ${plant.label.padEnd(28)} ${String(run.ms).padStart(5)}ms   ✓ ${observed} FAIL${named}`);
+    // Recorded only HERE, past `assessPlantRun`'s refusal — so `failedByName`
+    // on the record means the assessor accepted this plant's refusal, not that
+    // the writer believed it. A plant that did not refuse by name never reaches
+    // this line; it dies above, and the FAIL record says so instead.
+    RECORD.plants.push({
+      kind: plant.kind,
+      label: plant.label,
+      step: plant.step ?? null,
+      observed,
+      names: plant.names,
+      failedByName: true,
+      durationMs: run.ms,
+    });
     revertPlant(plant);
   }
 
@@ -714,6 +833,11 @@ try {
 // wrong instrument, and that is worth saying while the choice is cheap.
 
 const cost = assessCalibrationCost(cycles, BUDGET_MS);
+RECORD.totalMs = cost.totalMs;
+// The record is written from the same numbers this report prints, at the one
+// moment both are true: every plant reverted, the tree checked against the
+// bytes this run found, and the lane green again.
+writeRecordIfAsked("PASS");
 
 if (asJson) {
   process.stdout.write(
