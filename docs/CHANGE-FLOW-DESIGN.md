@@ -21,7 +21,13 @@ lost and the mistake never rebuilt.
 
 Everything that ever happens to a create-cmp app is the same loop:
 
-> **Decide → Design → Audit → Contract → Build → Prove → Sign**
+> **Decide → Design → Contract → Build → Prove → Sign-off**
+>
+> *(six stages, and this diagram used to name seven. `Audit` is not a peer stage: the program
+> maps it INTO Design — `packages/harness/src/lib/walk.mjs:66`, `audit: "design"` — and the
+> stage list at `walk.mjs:26` has six entries. The reasoning below about WHY audit happens
+> before any signature is unaffected and still governs; only this arrow was wrong, and it
+> disagreed with the program and with four other documents. Corrected 2026-09-09.)*
 
 | Stage | What it is | Where it lives |
 |---|---|---|
