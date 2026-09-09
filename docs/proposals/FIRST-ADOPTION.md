@@ -189,7 +189,28 @@ Nothing executable. This is a plan, and the road's own count is unmoved: Stage 2
 a real profile and a real signature exist. Recording the plan is not progress against the gate, and
 the gate will keep saying so.
 
-## 9. `fleet.json` — why it is NOT written here
+## 9. `fleet.json` — WRITTEN 2026-09-09, and what changed
+
+> **This section's verdict reversed on 2026-09-09, and the reason it reversed is the point.** It
+> argued that a manifest naming repos which carry no lane would turn criterion A green by declaring
+> something C then refuses — buying a green criterion with a declaration that is not yet true. That
+> reasoning was correct and it still is. What changed is the fact under it: `fuelled-api` and
+> `pantry-api` now carry real lanes with `"source": "registry"` provenance, so a manifest naming
+> them is **true**. The manifest was written, and the gate moved from 7/7 unmet to 3/7 — with A, B,
+> C and F green **because the declaration is accurate**, not because the bar moved to meet it.
+>
+> The bar did also move, separately and deliberately: Karel lowered §9's count from ten repos to two
+> (*"2 is enought for this phase"*, 2026-09-09). That is recorded in `docs/NORTH-STAR.md` because
+> the count is read out of the road rather than kept as a constant — lowering it means editing the
+> road, in public, which is the design working as intended.
+>
+> **What stays red is worth reading**: D and E want ONE command that upgrades the whole fleet, and
+> `upgrade --fleet` exits 2 — it does not exist. G wants rungs compared within a pack, and a
+> two-repo fleet holding two different packs has nothing to compare; the gate calls that *"a red,
+> not a vacuous green"*, which is the correct refusal. Converging `create-cmp-showcase` and
+> `brat-o-meter` — both `cmp` — is what would give G something real to say.
+
+### The original reasoning, kept because it was right
 
 Karel asked (2026-09-09) for the fleet manifest to be declared as plumbing, explicitly accepting it
 would not exit Stage 3. Checked against the gate and against the tree, **there is nothing true to
