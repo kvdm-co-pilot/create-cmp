@@ -51,6 +51,12 @@
 // cleanly is untouched.
 
 import { rungWithPack, rungPackNote } from "./console-evidence.mjs";
+// The second import, 2026-09-09, for the same reason as the first: the strip
+// now answers "does this proof still describe THIS tree", console-standing.mjs
+// is where the console keeps that one spelling, and arranging a derivation this
+// file does not own is exactly what composition-only means. Sibling module,
+// package boundary untouched.
+import { flowRail, standing } from "./console-standing.mjs";
 
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -66,7 +72,7 @@ const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
  *   that derivation — importing it here would fork nothing, but passing it
  *   keeps the ONE-derivation rule visible at the call site).
  */
-export function overviewStatusHtml({ receipt, statuses = [], receiptGlyph, formatAge } = {}) {
+export function overviewStatusHtml({ receipt, statuses = [], receiptGlyph, formatAge, tree = null } = {}) {
   const g = receiptGlyph ? receiptGlyph(receipt) : null;
   const lane = g
     ? `<span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span> ${esc(g.label)}`
@@ -90,7 +96,33 @@ export function overviewStatusHtml({ receipt, statuses = [], receiptGlyph, forma
   const tally = statuses.length
     ? ` &middot; ${statuses.filter((s) => s.status === "approved").length} of ${statuses.length} signed`
     : "";
-  return `${lane}${age}${rung}${tally}`;
+  // Whether the proof still describes THIS tree — the strip's last clause, and
+  // a derived check rather than decoration (LIVE-CONSOLE.md, "stale is not
+  // PASS"). A verdict earned three commits ago is true about a tree that no
+  // longer exists, and a green badge with nothing beside it merges the two
+  // questions the reader most needs kept apart. Rendered in the reopened role,
+  // not the drift one: a moved tree is not a failure, it is an unanswered
+  // question, and the three semantic colours mean what they mean.
+  const st = tree ? standing(receipt, tree) : null;
+  const stand = st
+    ? ` &middot; <span class="${st.ok ? "standing-ok" : "standing-open"}" title="${escAttr(st.note)}">${esc(st.label)}</span>`
+    : "";
+  return `${lane}${age}${rung}${tally}${stand}`;
+}
+
+/**
+ * The working flow as a rail — where the tree is in the arc the console
+ * declares. Descriptive: it blocks nothing, has no controls, and names one
+ * command for the step it marks.
+ */
+export function flowRailHtml(sections = [], commandFor = () => null) {
+  const { steps } = flowRail(sections);
+  if (steps.length === 0) return "";
+  const cmd = steps.find((s) => s.here) ? commandFor(steps.find((s) => s.here).id) : null;
+  const body = steps
+    .map((s) => `<span class="flow-step${s.here ? " flow-here" : ""}${s.done ? " flow-done" : ""}">${esc(s.label)}</span>`)
+    .join('<span class="flow-arrow">&rarr;</span>');
+  return `<nav class="flow" aria-label="The working flow">${body}${cmd ? `<code class="flow-cmd">${esc(cmd)}</code>` : ""}</nav>`;
 }
 
 /**

@@ -1,8 +1,12 @@
 # The console tells the work as it happens — a live front door
 
-- **Status:** proposal — unsigned. Drafted 2026-09-09 as product owner and UX, on Karel's ask:
+- **Status:** **accepted — 2026-09-09, Karel van der Merwe** (signed by his instruction in session:
+  *"Accept, and write §3.7 in Phase A"*; drafted by the architect as product owner and UX, on his ask
   *"present the harness (working) flows and work to the user live … easy to follow, concise,
-  uncluttered, understandable."*
+  uncluttered, understandable"*). Accepted as the design for **Phases A and B**; C and D are not
+  signed and are not to be started without a further decision.
+- **Implementation:** Phase A landed with this acceptance — `console-standing.mjs`, the strip's
+  standing clause, the derived flow rail, and `STUDIO-REDESIGN.md` §3.7's *Standing* amendment.
 - **Scope:** the front door of the existing console (`packages/harness/src/console/`). No new
   product, no new section type, no infrastructure stood up. Extends `STUDIO-REDESIGN.md` §2/§4.
 
@@ -172,8 +176,9 @@ happening all over the place"* does not arrive.
 
 ## 9. Residue
 
-- `console-overview.mjs` cites *"STUDIO-REDESIGN.md §3.7"*; no §3.7 exists in that document. The
-  front door was added in code and never written into the design of record. Phase A should land
-  the section it cites.
+- ~~`console-overview.mjs` cites a §3.7 that does not exist.~~ **Wrong when drafted, and corrected
+  here.** §3 numbers its sections in bold (`**7 · Overview — the front door**`), not as `### 3.7`
+  headings; the section was there all along and the draft's grep missed it. Phase A amended it
+  rather than adding it.
 - The flow rail's six steps are named in `preview-service.mjs`, not declared anywhere a profile
   could vary. If a stack has no *drive*, the rail must derive that, not assume it.

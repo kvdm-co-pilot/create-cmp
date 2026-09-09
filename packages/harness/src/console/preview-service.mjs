@@ -146,6 +146,11 @@ export function galleryHtml(state) {
     lastReceipt = null,
     receiptHistory = { available: false },
     treeHash = null,
+    // { head, dirtyCount } — this tree, now. Supplied by the server that
+    // already reads the receipt; console-standing.mjs decides what it means.
+    // Absent (an older caller, or git unreadable) renders no standing clause
+    // rather than a guess.
+    tree = null,
     tokenUsage = null,
     intent = { available: false },
     features = { available: false },
@@ -567,6 +572,7 @@ export function galleryHtml(state) {
         statuses: overviewStatuses,
         receiptGlyph,
         formatAge: formatAgeCoarse,
+        tree,
       }),
       bodyHtml: overviewBodyHtml({
         queue: humanQueue,

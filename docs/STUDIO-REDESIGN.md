@@ -166,6 +166,42 @@ proven** (the standing line in the header: the lane's own glyph, verdict,
 rung, and the signing tally). It **owns no facts**: every line is arranged
 from the module that derived it.
 
+*Standing, amended 2026-09-09* (Karel: "easy to follow, concise, uncluttered,
+understandable" — the THIRD report of the same failure, after the 07-28 audit
+and 2026-08-22). The header line answered "is it still proven" with the lane's
+verdict and rung. Those say how **strong** the last proof was; they do not say
+whether it is about the code in front of you, and a single green badge silently
+merges the two. A receipt earned three commits ago is a true statement about a
+tree that no longer exists — rendered as PASS with nothing beside it, the most
+confident lie the console can tell.
+
+So the line ends with a derived clause, and the rule is **stale is not PASS**:
+the receipt's own commit against this tree's HEAD, and its dirty set against the
+working tree now. Four answers, never three — *unchanged since* · *tree has
+MOVED since* · *N files changed since* · *standing not derivable*. A moved or
+edited tree takes the **reopened** role, never drift: it is an unanswered
+question, not a violation, and §2's three semantic colours keep their three
+meanings. An unanswerable question uses §4's standard absence form rather than
+defaulting to either verdict.
+
+The decision lives in **one** module (`console-standing.mjs`) for the reason the
+rung does (§6.5, `console-evidence.mjs`): the strip reads it today, a fleet row
+reads it when Stage 3 arrives, and a fix applied to instances rather than to the
+class comes back. It is **pure** — the server that already reads the receipt
+supplies `{ head, dirtyCount }`; the module decides what they mean — so the case
+that matters, a tree that moved, is testable without building a repository to
+move. `test/console-standing.test.mjs` refuses any console module that decides
+standing a second way.
+
+*The working flow rail, same amendment.* Under the strip, the console's own
+section arc renders as a rail with the current step marked and its one command
+beside it — descriptive, never a wizard: it blocks nothing and carries no
+controls. It is **derived from the declared sections**, not written out as a
+list of steps, so a stack that declares no device section simply has no *drive*
+step. A hard-coded rail would promise every adopter a step their profile may not
+have. "Here" is the first section still wanting attention — the glyph's own
+meaning, not a second opinion about it.
+
 *Signing, amended 2026-08-24* (Karel: "in the overview give the option to
 approve as well"). The page originally named each act and jumped you to the
 section that owned the signature. Each row now carries the control itself.

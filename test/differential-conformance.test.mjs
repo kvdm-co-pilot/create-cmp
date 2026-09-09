@@ -28,6 +28,7 @@ import path from "node:path";
 import * as alien from "./fixtures/profiles/py-alien/index.mjs";
 import * as cmp from "../packages/harness/src/lib/profiles/cmp/index.mjs";
 import { declaredBase, resolveInheritance, EXTENDS_PROTOCOL } from "../packages/harness/src/lib/profile-loader.mjs";
+import { STANDING, standing } from "../packages/harness/src/console/console-standing.mjs";
 import { specModelFrom } from "../packages/harness/src/lib/spec-model.mjs";
 import { scanSpecClauses, scanCitations, clauseTierCoverage } from "../packages/harness/src/lib/spec-coverage.mjs";
 import { checkLaneVouching } from "../packages/harness/src/lib/receipt-validate.mjs";
@@ -241,6 +242,35 @@ test("`extends` is derived from a DECLARATION, and both spellings mean the same 
     assert.equal(declaredBase({ [spelling]: "" }), null, `${label}: an empty base names nothing`);
     assert.equal(declaredBase({ [spelling]: { id: "some-base" } }), null, `${label}: a base is DATA — an object is not an id`);
   }
+});
+
+test("standing answers the same way for either pack — it is about the TREE, not the stack", () => {
+  // Stage 0's gate calls this profile-dependent because the console renders it
+  // per pack. It must not BE profile-dependent: whether a receipt still
+  // describes this tree is a fact about git, and a Kotlin pack's moved tree and
+  // a Python pack's moved tree are the same statement. If this ever diverges,
+  // something has taught a tree-level fact to care which stack produced it.
+  const HEAD = "a".repeat(40);
+  const OTHER = "b".repeat(40);
+
+  for (const pack of ["cmp", "py-alien"]) {
+    const receipt = (sha) => ({ available: true, verdict: "PASS", evidenceLevel: "L2", pack, commit: { sha } });
+
+    assert.equal(standing(receipt(HEAD), { head: HEAD, dirtyCount: 0 }).state, STANDING.CURRENT, `${pack}: same commit, clean tree`);
+    assert.equal(standing(receipt(HEAD), { head: OTHER, dirtyCount: 0 }).state, STANDING.MOVED, `${pack}: a moved tree is moved`);
+    assert.equal(standing(receipt(HEAD), { head: HEAD, dirtyCount: 2 }).state, STANDING.DIRTY, `${pack}: edits since the proof`);
+    assert.equal(standing(receipt(HEAD), { head: null }).state, STANDING.UNKNOWN, `${pack}: no HEAD is unknown, not a pass`);
+
+    // The one that matters: a PASS at the highest rung must still not read as
+    // ok once the tree has moved. Strength and currency are different claims.
+    assert.equal(standing({ ...receipt(HEAD), evidenceLevel: "L3" }, { head: OTHER }).ok, false, `${pack}: L3 does not survive a moved tree`);
+  }
+
+  // And the two packs agree literally, not merely in spirit.
+  const forPack = (pack) => standing(
+    { available: true, pack, commit: { sha: HEAD } }, { head: OTHER, dirtyCount: 0 },
+  );
+  assert.deepEqual(forPack("cmp"), forPack("py-alien"), "standing must not vary by pack at all");
 });
 
 test("an heir inherits its base and overrides one declaration — the same way for either pack", () => {
