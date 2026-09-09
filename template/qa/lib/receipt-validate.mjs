@@ -112,6 +112,33 @@ export function evaluateReceipt(receipt, recompute) {
     };
   }
 
+  // WHICH PACK GRADED THIS — ADR-0011. §8.9's comparability rule rests entirely
+  // on this field ("a `cmp` L2 and any other pack's L2 are different claims"),
+  // and until now no predicate read it: remove `pack` and a receipt kept its
+  // rung while losing the only thing that says what the rung is a rung OF.
+  //
+  // REFUSED, not flagged, and the cost is known. A receipt written before the
+  // field existed (2026-09-04) is refused too, because nothing in a receipt can
+  // tell "never had one" from "had one, and it was removed" — and of those two
+  // errors, accepting tampering is the one a predicate exists to prevent. The
+  // remedy is the one the binding check above already offers for the same class
+  // of staleness, and costs the same: re-run the lane.
+  //
+  // This is deliberately NOT the ADR-0007 case. There a label moved and no
+  // assertion changed, so invalidating old receipts would have been pure loss.
+  // Here the receipt is genuinely missing the field that makes its rung mean
+  // something — it is not being punished for a name, it is being asked for a
+  // claim it never made.
+  if (!receipt.pack || typeof receipt.pack.id !== "string" || receipt.pack.id.length === 0) {
+    return {
+      valid: false,
+      reason:
+        `receipt names no step pack — re-run the lane (attesting profile: ${profile ?? "unknown"}). ` +
+        `A rung is comparable only within its pack, so a receipt that does not name one cannot be compared to any other`,
+      profile,
+    };
+  }
+
   if (receipt.verdict === "FAIL") {
     return {
       valid: false,

@@ -119,6 +119,7 @@ test("a receipt VOUCHES for its lane whatever the pack calls its integrity step"
   // and the refusal accused the lane of not vouching for itself.
   const receiptWith = (stepName) => ({
     schema: "cmp-evidence/1",
+    pack: { id: "cmp", version: null },
     profile: "ci",
     verdict: "PASS",
     steps: [

@@ -109,6 +109,7 @@ test("package predicate and template predicate agree on a real receipt", async (
 
   const receipt = {
     schema: "cmp-evidence/1",
+    pack: { id: "cmp", version: null },
     profile: "local",
     verdict: "PASS",
     inputs: { hash: "a".repeat(64), fileCount: 3 },

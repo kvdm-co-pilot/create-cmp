@@ -31,6 +31,10 @@ const receipt = (steps, verdict = "PASS") => ({
   verdict,
   profile: "local",
   inputs: { hash: "abc" },
+  // ADR-0011: the pack that graded the rows. `checkLaneVouching` itself does
+  // not read it — these fixtures carry one because `evaluateReceipt`, which the
+  // end-to-end tests below go through, refuses a receipt that names none.
+  pack: { id: "cmp", version: null },
   steps,
 });
 const ok = (name) => ({ name, verdict: "PASS", durationMs: 1000 });

@@ -382,6 +382,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       const receiptPath = path.join(out, "qa/evidence/latest.json");
       const baseReceipt = {
         schema: "cmp-evidence/1",
+        pack: { id: "cmp", version: null },
         profile: "local",
         verdict: "PASS",
         commit: { sha: null, dirty: [] },
@@ -434,7 +435,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       const receiptPath = path.join(out, "qa/evidence/latest.json");
       const surfacePath = path.join(out, "qa/verified-surface.json");
       try {
-        fs.writeFileSync(receiptPath, JSON.stringify({ schema: "cmp-evidence/1", profile: "local", mode: "full", verdict: "PASS", inputs: { hash: "a".repeat(64), fileCount: 1 }, steps: [{ name: "build", verdict: "PASS", durationMs: 60_000 }] }));
+        fs.writeFileSync(receiptPath, JSON.stringify({ schema: "cmp-evidence/1", profile: "local", mode: "full", verdict: "PASS", pack: { id: "cmp", version: null }, inputs: { hash: "a".repeat(64), fileCount: 1 }, steps: [{ name: "build", verdict: "PASS", durationMs: 60_000 }] }));
         fs.writeFileSync(surfacePath, '{ "surface": [] }');
         try {
           execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });

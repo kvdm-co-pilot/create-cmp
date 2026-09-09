@@ -178,6 +178,7 @@ test("the hosted predicate returns the same verdict for the same logical receipt
         path.join(root, RECEIPT_REL),
         JSON.stringify({
           schema: "cmp-evidence/1", profile: "local", verdict: "PASS",
+          pack: { id: "cmp", version: null },
           commit: { sha: null, dirty: [] }, inputs: { hash, fileCount },
           steps: s.steps, artifacts: [], toolVersions: { node: process.version },
           generatedAt: new Date().toISOString(),

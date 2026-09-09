@@ -8,6 +8,33 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **`pack` is load-bearing; the additive contract is retired (ADR-0011).** Two programs contradicted
+  each other, both deliberately, and neither had ever been run against the other's claim:
+  `stage2-gate.mjs` criterion H required the predicate to REFUSE a receipt naming no pack, while
+  `test/receipt-pack.test.mjs` required such a receipt to validate exactly as before — *"the
+  validator does not know pack exists yet — by design"*.
+
+  Both were right when written. What changed is that §8.9's comparability rule now rests on `pack`
+  entirely, and **a field the whole rule rests on that no predicate reads is a field an editor
+  deletes with no reader noticing.** `evaluateReceipt` now refuses a receipt with no `pack.id` and
+  names the remedy — *re-run the lane* — the same remedy the binding check directly above it already
+  offers for the same class of staleness. `pack` joins the schema's `required` list, so the schema,
+  the gate and the predicate stop holding three different views of one field.
+
+  **The cost is bounded and understood.** Such a receipt was written before 2026-09-04 *and* must be
+  over a tree that has not moved since, because a receipt stops attesting the moment a verified byte
+  changes. The predicate cannot tell "never had one" from "had one, and it was removed" — and of
+  those two errors, accepting tampering is the one a predicate exists to prevent.
+
+  **This is deliberately not the ADR-0007 case.** There a label moved and no assertion changed, so
+  invalidating old receipts would have been pure loss. Here an old receipt is genuinely missing the
+  field that makes its rung mean something: asked for a claim it never made, not punished for a name.
+
+  `test/receipt-pack.test.mjs` **records** the retired contract instead of deleting it — a contract
+  that is deleted looks like one that never existed. Stage 2's criterion H goes green, the first of
+  that gate's rows to close by implementing what it asked for rather than by exposing a defect in
+  what it measured (7/10).
+
 - **An intact region must contain engine code (ADR-0010) — and building the plant corrected the
   diagnosis.** ADR-0008 measured the hole and left it: a tree holding two declarations and nothing
   else locks, and `checkHarnessIntegrity` calls it `intact`.
