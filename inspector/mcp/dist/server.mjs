@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 673060018bfe464506fa172e01da1328ccea7b363c848c007f01bb80735ba5c3
+// cmp:bundle-inputs 5cf1bded7e4c92e6b3dfa6abcfdb0dbafe3e1884752969d95e320c3e0ddfce25
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36273,7 +36273,7 @@ function flowRail(sections = []) {
   const usable = sections.filter((s) => s && typeof s.id === "string");
   if (usable.length === 0) return { steps: [], here: null };
   const settled = (s) => Boolean(s.glyph && s.glyph.cls === "glyph-signed");
-  const UNGOVERNED = /* @__PURE__ */ new Set(["screens", "walkthrough"]);
+  const UNGOVERNED = /* @__PURE__ */ new Set(["screens"]);
   const votes = (s) => !UNGOVERNED.has(s.id) || Boolean(s.glyph);
   const byId = new Map(usable.map((s) => [s.id, s]));
   const present2 = [];
@@ -38644,7 +38644,18 @@ function galleryHtml(state) {
     { id: "evidence", label: "Evidence", glyph: receiptGlyph(effectiveReceipt) },
     // A2: the walkthrough report is evidence-adjacent — derived from committed
     // manifests, so it sits right after Evidence in the arc.
-    { id: "walkthrough", label: "Walkthrough", glyph: null },
+    // DERIVED, not the literal `glyph: null` this carried until 2026-09-10.
+    // The section directly below renders "latest run …" or "no runs yet" from
+    // `walkthrough.available`, so the state existed all along and the rail's
+    // input threw it away — which made `report` the one step no project could
+    // ever settle, and then (once abstention landed) the one step every project
+    // painted DONE while the same page said no walkthrough had ever run.
+    // A recorded walkthrough is what `report` wants; nothing else settles it.
+    {
+      id: "walkthrough",
+      label: "Walkthrough",
+      glyph: walkthrough.available ? { ch: "\u25CF", cls: "glyph-signed", label: "a walkthrough has been recorded" } : null
+    },
     // The work queue itself: colour whenever any decision waits on the human.
     { id: "approvals", label: "Approvals", glyph: approvalsGlyph },
     {

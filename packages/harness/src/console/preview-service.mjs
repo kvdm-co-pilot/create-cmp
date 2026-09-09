@@ -581,7 +581,20 @@ export function galleryHtml(state) {
     { id: "evidence", label: "Evidence", glyph: receiptGlyph(effectiveReceipt) },
     // A2: the walkthrough report is evidence-adjacent — derived from committed
     // manifests, so it sits right after Evidence in the arc.
-    { id: "walkthrough", label: "Walkthrough", glyph: null },
+    // DERIVED, not the literal `glyph: null` this carried until 2026-09-10.
+    // The section directly below renders "latest run …" or "no runs yet" from
+    // `walkthrough.available`, so the state existed all along and the rail's
+    // input threw it away — which made `report` the one step no project could
+    // ever settle, and then (once abstention landed) the one step every project
+    // painted DONE while the same page said no walkthrough had ever run.
+    // A recorded walkthrough is what `report` wants; nothing else settles it.
+    {
+      id: "walkthrough",
+      label: "Walkthrough",
+      glyph: walkthrough.available
+        ? { ch: "●", cls: "glyph-signed", label: "a walkthrough has been recorded" }
+        : null,
+    },
     // The work queue itself: colour whenever any decision waits on the human.
     { id: "approvals", label: "Approvals", glyph: approvalsGlyph },
     {
