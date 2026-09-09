@@ -1,8 +1,11 @@
 # Attach mode (M0) — the harness without the scaffold
 
-Status: **v1 (M0a) built 2026-08-21** on Karel's direct instruction to execute LADDER
-R1–R5; this brief records the design decisions and the staging so the remaining scope
-(M0b) has a contract to build against. Companion: `docs/research/LADDER-PLAN.md` §R5,
+Status: **M0a built 2026-08-21** on Karel's direct instruction to execute LADDER
+R1–R5. **M0b is RETIRED — superseded by ADR-0013 (2026-09-09), not deferred.** `prooflane
+init` ships a lane into a foreign repo of any language, which is M0b's job for a wider set
+of stacks than M0b scoped; keeping both would be two convergence paths that drift in one.
+M0a's surfaces stay — they remain true of any Compose/KMP repo. Read the M0b sections below
+as the historical contract they were, not as work outstanding. Companion: `docs/research/LADDER-PLAN.md` §R5,
 `docs/research/AGENTIC-MOBILE-STUDIO.md` §M0.
 
 ```json cmp:feature
@@ -45,8 +48,7 @@ made TRUE mechanically:
   reported current. Idempotent by construction.
 - **Reports** wired / sidecar / skipped-with-reason, and names the staged remainder.
 
-**M0b — the eyes (staged, trigger-gated per the studio plan: first post-launch adoption
-signal or first "can I use this on my existing app?" inbound).** Wiring
+**M0b — the eyes (RETIRED 2026-09-09 by ADR-0013; recorded as designed, not as planned).** Wiring
 PreviewRegistry + the `renderScreens` task + the preview `qa/` subset into a foreign
 Gradle build requires detecting/adding a desktop JVM target and a registry seeded from
 the repo's own composables — real per-repo variance that deserves its own design pass,

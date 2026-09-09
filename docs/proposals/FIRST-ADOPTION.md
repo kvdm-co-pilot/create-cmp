@@ -2,6 +2,12 @@
 
 - **Status:** preparation only — nothing in `payment-blueprint` has been touched, by decision
   (Karel, 2026-09-09: *"just prep payment blueprint it will be a few more days in dev"*).
+  **SUPERSEDED IN ORDER, 2026-09-09:** `fuelled-api` goes first (Karel, in session:
+  *"fuelled-api first yes"*). It already carries a hand-written profile with real plants for a
+  stack this project never shaped, and it needs no product decision about a foreign `qa/` before
+  work can start. payment-blueprint remains the runbook's subject and becomes the **second**
+  adoption; everything below still applies to it, and §3's occupied-`qa/` unknown is now first
+  answered in `fuelled-api`.
 - **What this is:** the runbook for adopting `prooflane` in a repo this project does not own the
   code of, and the honest account of which parts an agent may do and which are Karel's alone.
 - **What this is not:** an attestation. `docs/attestations/stage2-external-profile.json` is not
@@ -155,6 +161,16 @@ declare yet**, so it is not written:
 |---|---|
 | `create-cmp` | **no** — it *ships* `template/qa`; it has no `qa/` of its own |
 | `payment-blueprint` | **no** — its `qa/` is a different system (§3) |
+| `fuelled-api` | **a copy, not an adoption** — real profile + plants, but vendored from a local `template/qa` at 0.19.0; no `qa/harness-source.json` |
+| `pantry-api` | **a copy** — own Python profile, harness 0.19.0, same missing provenance |
+| `create-cmp-showcase` | **a copy** — lane at 0.21.0, no profile of its own |
+| `brat-o-meter` | **a copy, and RED** — harness 0.14.1, last receipt FAIL |
+
+**Corrected 2026-09-09.** The first version of this table listed two repos and concluded no repo
+carries a lane. Four more do, and the conclusion survives for a sharper reason than the one first
+given: by ADR-0008's provenance test, a tree with no `qa/harness-source.json` was **copied**, not
+adopted. Four copies at four harness versions are not a fleet — they are the convergence corpus
+ADR-0013 names. The manifest becomes writable when one of them carries `"source": "registry"`.
 
 `scripts/stage3-gate.mjs` criterion A wants *"a manifest the human wrote names each repo"*, and C
 wants *"every repo carries a lane its own lock describes"*. A manifest naming these two would turn A
