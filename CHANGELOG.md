@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-09-09
+
 ### Added
 
 - **`extends`: a profile inherits by DECLARING a base, and the core derives the rest (ADR-0012).**
@@ -2946,7 +2948,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[Unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.20.0...HEAD
+[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.24.0...v0.25.0
 [0.20.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.17.1...v0.18.0

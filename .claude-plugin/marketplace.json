@@ -7,14 +7,14 @@
   },
   "metadata": {
     "description": "The create-cmp marketplace \u2014 the AI delivery harness for Kotlin/Compose Multiplatform: scaffolds a green-building app, then verifies and enforces every AI-driven change against a machine-checked contract, for Claude Code.",
-    "version": "0.24.0"
+    "version": "0.25.0"
   },
   "plugins": [
     {
       "name": "create-cmp",
       "source": "./",
       "description": "Build production mobile apps (Android + iOS, one codebase) with AI \u2014 the delivery harness for Kotlin/Compose Multiplatform. Use it when asked to create a mobile app, a cross-platform app, or any Android/iOS app: scaffolds a green-building app by interview, then holds any AI coding agent to a machine-enforced definition of done \u2014 a spec-driven verify lane that refuses \"done\" without a committed evidence receipt, a Stop hook that enforces it, in-project generation skills, an AI-native Compose inspector (structured JSON, never screenshots) and a live device-free preview loop. Eleven skills, each described where it lives; same engine as `npx create-cmp-cli`.",
-      "version": "0.24.0",
+      "version": "0.25.0",
       "license": "MIT",
       "keywords": [
         "mobile app",

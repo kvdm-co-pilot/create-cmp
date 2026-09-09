@@ -1,7 +1,7 @@
 {
   "name": "prooflane",
-  "version": "0.0.1",
-  "description": "The verify lane: a stack-agnostic evidence harness. Name reserved; the working tool ships today as create-cmp-cli.",
+  "version": "0.1.0",
+  "description": "The verify lane, for a repo of any stack: installs the prooflane harness and its evidence receipts. Thin front door for prooflane-harness.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -29,5 +29,8 @@
   },
   "bin": {
     "prooflane": "bin/cli.mjs"
+  },
+  "dependencies": {
+    "prooflane-harness": ">=0.21.0"
   }
 }
