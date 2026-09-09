@@ -132,7 +132,14 @@ export function overviewStatusHtml({ receipt, statuses = [], receiptGlyph, forma
 export function flowRailHtml(sections = [], commandFor = () => null) {
   const { steps } = flowRail(sections);
   if (steps.length === 0) return "";
-  const cmd = steps.find((s) => s.here) ? commandFor(steps.find((s) => s.here).id) : null;
+  // The command is looked up on the SECTION holding the marked step open, not
+  // on the step. A step is a phase and has no unambiguous command; the section
+  // that is actually open does. Looking it up by step id named `arch-doc.mjs`
+  // for a `define` held open by an unsigned intent — a command that advances
+  // nothing there — which is this rail's own recurring defect: asking a lookup
+  // a question its key cannot express.
+  const marked = steps.find((s) => s.here);
+  const cmd = marked ? commandFor(marked.openSection) : null;
   const body = steps
     .map((s) => `<span class="flow-step${s.here ? " flow-here" : ""}${s.done ? " flow-done" : ""}">${esc(s.label)}</span>`)
     .join('<span class="flow-arrow">&rarr;</span>');

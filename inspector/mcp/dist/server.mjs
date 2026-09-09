@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 8eedecfd5a122aea5f7d084b16be089a87568a69a53ef52674c9b2fd8b48a464
+// cmp:bundle-inputs 959f1763e7bb9e2c7525a2d1adfefe1ff6d81945f018e5acc988c32b52c8ff1b
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36278,7 +36278,8 @@ function flowRail(sections = []) {
   for (const step of FLOW_STEPS) {
     const evidence = step.sections.map((id) => byId.get(id)).filter(Boolean);
     if (evidence.length === 0) continue;
-    present2.push({ id: step.id, label: step.label, done: evidence.every(settled) });
+    const open = evidence.find((s) => !settled(s));
+    present2.push({ id: step.id, label: step.label, done: !open, openSection: open ? open.id : null });
   }
   if (present2.length === 0) return { steps: [], here: null };
   const firstOpen = present2.findIndex((s) => !s.done);
@@ -36308,7 +36309,8 @@ function overviewStatusHtml({ receipt, statuses = [], receiptGlyph: receiptGlyph
 function flowRailHtml(sections = [], commandFor = () => null) {
   const { steps } = flowRail(sections);
   if (steps.length === 0) return "";
-  const cmd = steps.find((s) => s.here) ? commandFor(steps.find((s) => s.here).id) : null;
+  const marked = steps.find((s) => s.here);
+  const cmd = marked ? commandFor(marked.openSection) : null;
   const body = steps.map((s) => `<span class="flow-step${s.here ? " flow-here" : ""}${s.done ? " flow-done" : ""}">${esc5(s.label)}</span>`).join('<span class="flow-arrow">&rarr;</span>');
   return `<nav class="flow" aria-label="The working flow">${body}${cmd ? `<code class="flow-cmd">${esc5(cmd)}</code>` : ""}</nav>`;
 }
@@ -38594,10 +38596,15 @@ function galleryHtml(state) {
   const overviewFeatures = features.available && features.board ? features.board.features : [];
   const humanQueue = deriveHumanQueue({ statuses: overviewStatuses, features: overviewFeatures });
   const FLOW_COMMANDS = Object.freeze({
-    define: "node qa/arch-doc.mjs",
-    approve: "node qa/approve.mjs",
-    verify: "node qa/verify.mjs",
-    report: "node qa/walkthrough.mjs"
+    intent: "node qa/approve.mjs",
+    features: "node qa/approve.mjs",
+    architecture: "node qa/arch-doc.mjs",
+    specs: "node qa/approve.mjs",
+    "design-system": "node qa/approve.mjs",
+    components: "node qa/approve.mjs",
+    approvals: "node qa/approve.mjs",
+    evidence: "node qa/verify.mjs",
+    walkthrough: "node qa/walkthrough.mjs"
   });
   const flowCommandFor = (id) => FLOW_COMMANDS[id] ?? null;
   const railItems = [
@@ -38625,9 +38632,15 @@ function galleryHtml(state) {
     { id: "features", label: "Features", glyph: featuresGlyph },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
     { id: "specs", label: "Specs", glyph: specsGlyph },
-    // Screens is UNGOVERNED — no signature exists, so it can never be green.
-    // Its one honest colour is red: the last render or compile FAILED, so the
-    // gallery may be showing stale pixels. Otherwise neutral.
+    // Screens carries no SIGNATURE — nobody approves a screen — and for a day
+    // this comment concluded from that that it "can never be green", which the
+    // sixteen lines below now contradict. `glyph-signed` is this console's role
+    // for SETTLED, not a claim of approval: live-device wears it for "device
+    // connected" and approvals for "nothing waiting on you". A rendered gallery
+    // is what `preview` wants, so it is green when screens rendered, red when
+    // the last render or compile FAILED (the gallery may be showing stale
+    // pixels — that branch still wins), and neutral only when nothing has been
+    // rendered at all, which is a real not-yet rather than an unanswerable.
     {
       id: "screens",
       label: "Screens",
@@ -39024,8 +39037,10 @@ ${section.bodyHtml}`;
   setInterval(tickNowElapsed, 1000);
   tickNowElapsed();
   // LIVE-CONSOLE \xA73.3: disconnected is SAID, not hidden. A frozen list must
-  // never present itself as live, so the block carries its own clause beside
-  // the file it is reading.
+  // never present itself as live \u2014 and the clause lives in the STRIP, which is
+  // what \xA73.3 names. It sat beside the file it reads until 2026-09-10, inside
+  // the block that became a collapsed row: a disconnection a reader has to
+  // expand a row to discover is hidden, which is the thing \xA73.3 forbids.
   function setNowLive(text) {
     var el = document.getElementById("now-live");
     if (el) el.textContent = text;
