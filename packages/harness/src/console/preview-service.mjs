@@ -47,10 +47,6 @@ import {
   governanceStripHtml,
 } from "./console-shell.mjs";
 import { overviewBodyHtml, overviewStatusHtml, overviewGlyph, flowRailHtml } from "./console-overview.mjs";
-// The flow's six steps, derived from the sections this project declares. The
-// rail draws them and the *waiting* row names the one that is `here`, so the
-// derivation is called ONCE here and both surfaces are handed its result.
-import { flowRail } from "./console-standing.mjs";
 // The *now* row (LIVE-CONSOLE.md Phase B). The server that reads the step
 // stream hands the parsed state in; console-now.mjs owns what it means and how
 // a row looks — including the rows the SSE appends mid-run, so a live row and
@@ -636,11 +632,6 @@ export function galleryHtml(state) {
   const pick = (items) => (declared ? declared.map((id) => items.find((x) => x.id === id)).filter(Boolean) : items);
   const declaredRail = pick(railItems);
   const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
-  // ONE derivation of the flow, read twice: the rail draws it and the *waiting*
-  // row ends with its `here`. Calling flowRail() in two places over two lists is
-  // how the two would come to disagree, so the list is computed once here.
-  const flow = flowRail(visibleRail);
-
   const sections = [
     // §3.7 — the front door. Composition only: it arranges the queue, the
     // anchored-diff file splits and the digest that other modules derived. It
@@ -686,7 +677,6 @@ export function galleryHtml(state) {
         // the call — over `visibleRail`, the list this project actually has,
         // not the raw thirteen.
         railHtml: flowRailHtml(visibleRail, flowCommandFor),
-        flowHere: flow.here,
       }),
       active: true,
     },

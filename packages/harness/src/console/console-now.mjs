@@ -277,11 +277,21 @@ const stepFailed = (row) => row.verdict === "FAIL" || row.verdict === "ERROR";
  * the same row.
  *
  * It is a `<tr>`, and it lives inside a `<tbody>` — the design of record's
- * `table.steps`, four columns, nothing scrolling. The tbody is not decoration:
- * the client appends a finished step with `insertAdjacentHTML("beforeend", …)`,
- * and the HTML fragment parser DROPS a bare `<tr>` inserted into a `<table>`
- * (foster parenting) while accepting it into a `<tbody>`. Without the tbody the
- * live rows would silently vanish and only a reload would show them.
+ * `table.steps`, four columns, nothing scrolling.
+ *
+ * WHY THE TBODY, AND WHY NOT THE REASON THIS COMMENT USED TO GIVE. It claimed
+ * the parser DROPS a bare `<tr>` inserted into a `<table>` (foster parenting).
+ * That is false, and it was checked in a real browser rather than argued from
+ * the spec: `table.insertAdjacentHTML("beforeend", "<tr><td>x</td></tr>")`
+ * yields `<tbody><tr><td>x</td></tr></tbody>` — one row, auto-wrapped, not
+ * dropped. WHATWG HTML 13.2.6.4.9 "in table" acts as if a `tbody` start tag had
+ * been seen and reprocesses the token.
+ *
+ * The tbody is still required, for the duller and truer reason: the live append
+ * addresses `#now-steps`, and that id must sit on an element that EXISTS in the
+ * server-rendered markup and survives a panel swap. An auto-wrapped tbody is
+ * created by the parser and carries no id, so there would be nothing to append
+ * to. The design of record has one, and `#now-steps` is on it.
  *
  * @param {object} row a nowState() row
  * @returns {string}

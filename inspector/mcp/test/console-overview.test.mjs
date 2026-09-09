@@ -33,6 +33,39 @@ test("a genuinely empty queue says so, and only when there IS a ledger", () => {
   assert.match(html, /Nothing waits on you/);
 });
 
+// The *waiting* row's ONE LINE, sliced out of the body so an assertion about
+// what the ROW says cannot be satisfied by prose inside its expanded body.
+function waitingSummary(html) {
+  const at = html.indexOf('<span class="k">waiting</span>');
+  assert.ok(at > 0, "the front door renders no waiting row at all");
+  return html.slice(at, html.indexOf("</summary>", at));
+}
+
+test("the *waiting* row answers ONE question — it never repeats the flow rail's step", () => {
+  // LIVE-CONSOLE.md §3.4: "One question per row, one row per question. No row
+  // may grow a second fact." The waiting row's question is "what is waiting on
+  // me?". WHERE THE TREE IS IN THE ARC is the flow rail's question, and the
+  // rail is rendered on the same page, directly above these four rows, naming
+  // that same step AND the command that advances it. A `next: <step>` clause on
+  // this row is that fact told twice, one line apart — the two-spellings shape
+  // this console refuses everywhere else.
+  //
+  // The prototype (docs/reference/live-console-prototype.html:225) draws
+  // `· next: verify` on this row; the architect's decision on this slice is
+  // that the clause is NOT ported, for exactly the reason above. That decision
+  // is what this pins, because nothing else in the tree does.
+  const statuses = [unsigned, drifted];
+  const queue = deriveHumanQueue({ statuses, features: [] });
+  const summary = waitingSummary(overviewBodyHtml({ queue, statuses, statusGlyph, flowHere: "verify" }));
+
+  assert.doesNotMatch(summary, /next:/, `the waiting row grew the rail's clause: ${summary}`);
+  assert.doesNotMatch(summary, /verify/, "…and it names the rail's step, one line under the rail that already named it");
+  // …while still answering its own question, so the row is fixed rather than
+  // emptied: this must not be satisfiable by deleting the line.
+  assert.match(summary, /2 waiting on you/, "the row still says what waits");
+  assert.match(summary, /drift among them/, "and that some of it is drift");
+});
+
 test("a drifted item shows the file split from approval-diff — the counts, not the diff", () => {
   const statuses = [drifted];
   const queue = deriveHumanQueue({ statuses, features: [] });
