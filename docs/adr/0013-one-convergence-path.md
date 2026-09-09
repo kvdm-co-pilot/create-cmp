@@ -2,6 +2,7 @@
 
 - **Status:** accepted — 2026-09-09, Karel van der Merwe (signed by his instruction in session — *"yes with the floor as precondition, write the ADR"*; drafted by the architect)
 - **Implementation:** none, and that is the point — this decision is mostly about what will **not** be built. Its one executable consequence is a retirement: `attach`'s M0b scope is closed as superseded (`docs/features/attach-mode.md`). The precondition named at signing was found already met before this file was written — see *Consequences*.
+- **Amended 2026-09-09**, the same day, by two real adoptions (`fuelled-api`, `pantry-api`). The decision stands; **one sentence in it was false of the shipped 0.21.1**, corrected below under *The front door is `init` OR `upgrade`*. The floor the decision rests on was also falsification-tested rather than argued — *The floor was attacked, and held*.
 - **Date:** 2026-09-09
 
 ## Context
@@ -44,6 +45,56 @@ is an instrument.
 
 Stage 3's *"one command upgrades the whole fleet"* is therefore a loop over this path, not
 machinery of its own.
+
+### The front door is `init` OR `upgrade` — corrected 2026-09-09
+
+The paragraph above originally named **`prooflane init`** as the single path *"for every tree,
+greenfield and foreign, lane-less and stale alike."* **That is false of the shipped 0.21.1, and two
+independent adoptions hit it within an hour of this ADR merging.** `install/init.mjs:745` tests
+`fs.existsSync(qa/harness-manifest.json)` before `planInit` and returns 0 — it does not merge, does
+not overwrite, and never reaches the block that writes `qa/harness-source.json`, so **an occupied
+tree gets no provenance from `init` at all**. No flag routes around it: `--new-profile`,
+`--target-dir` and `--dry-run` all hit the same early return.
+
+The corrected statement, and the one this ADR now decides:
+
+> **One convergence path, two front doors, chosen by whether a lane is already there.**
+> `prooflane init` converges a tree with no manifest. **`prooflane upgrade` converges an occupied
+> one** — resolve, vendor, re-lock, with no version pairs anywhere.
+
+What the decision claimed survives intact, and that is why this is an amendment rather than a
+reversal: the ADR's own *"what would make this wrong"* predicted that an occupied `qa/` might *"need
+per-version knowledge after all,"* which would have made the migration matrix real. **It does not.**
+`upgrade` converged a Kotlin/Ktor tree and a Python tree through the same code path with no
+knowledge of what version either came from — `0.19.0 → 0.21.1`, 32 files rewritten, 32 lock digests
+moved, profile and declarations kept. The single path is real; only its name was wrong.
+
+The naming defect was not confined to prose. `FRONT_DOORS` carried no `upgrade` key while
+`install/upgrade.mjs` printed `cmd.upgrade` in its own header, so the command announced itself as
+`undefined — re-vendor this project's lane`; and `restore` sent adopters to `git restore qa/` under
+the words *"re-vendoring by command is not shipped yet"*, which was untrue and the wrong operation.
+Both are fixed in the same commit as this amendment. That an adopter met a literal `undefined` as
+the product's first sentence to them is the strongest argument this ADR can make for its own
+correction.
+
+### The floor was attacked, and held — 2026-09-09
+
+*Consequences* below records that the vacuous-plant floor is structural and already present. It has
+since been **tested rather than reasoned about**. The agent that authored `pantry-api`'s profile
+reported that a plausible misdeclaration — `hostOnly: ["unit","integration"]` — would land the
+tier-unmet plant where it satisfies its own clause, and that *"the plant would have been reported as
+made, and it would have proved nothing."* If that were true, a vacuous plant clears the round trip
+and this ADR's safety argument is an illusion.
+
+Planted deliberately in a real foreign tree, it is refused:
+
+```
+framework check: FAIL — planted "tier unmet" and the lane said PASS
+                 (specCoverage: PASS) — the guard did not FAIL BY NAME
+```
+
+The claim was overstated and the floor holds — now demonstrated on a stack this project never
+shaped, which is stronger ground than the source reading this ADR was originally written from.
 
 ## Consequences
 

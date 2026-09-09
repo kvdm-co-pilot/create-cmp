@@ -109,15 +109,26 @@ const FRONT_DOORS = Object.freeze({
   prooflane: Object.freeze({
     init: "prooflane init",
     relock: "prooflane relock",
-    // NOT `prooflane upgrade`: it does not exist yet (Stage 1's criteria C and
-    // D). Naming a command an adopter cannot run is the same lie this
-    // vocabulary exists to prevent, so the honest answer for a repo that has
-    // only the harness is the one every repo has.
-    restore: "git restore qa/    (re-vendoring by command is not shipped yet)",
+    // `prooflane upgrade` SHIPS (bin dispatches it; install/upgrade.mjs runs
+    // it). The comment that used to sit here said it did not exist yet, and
+    // both halves of that were costly: `upgrade.mjs` prints `cmd.upgrade` in
+    // its own header, so with no key here the command announced itself as
+    // "undefined — re-vendor this project's lane"; and `restore` sent an
+    // adopter to `git restore qa/` under the words "not shipped yet", which
+    // is the wrong operation AND untrue. Naming a command an adopter cannot
+    // run is the lie this vocabulary exists to prevent — withholding one they
+    // CAN run is the same lie wearing the other face. Found 2026-09-09 by two
+    // independent adoptions (fuelled-api, pantry-api), both of which hit this
+    // as the first thing the product said to them.
+    upgrade: "prooflane upgrade",
+    restore: "prooflane upgrade    re-vendors the spine from the installed harness",
   }),
   "create-cmp": Object.freeze({
     init: "create-cmp harness init",
     relock: "create-cmp harness relock",
+    // Same hole as the prooflane entry above, same consequence: the JSDoc
+    // below promises `upgrade` and `upgrade.mjs` prints it.
+    upgrade: "create-cmp upgrade --harness",
     restore: "create-cmp upgrade --harness  (merges rather than overwrites)",
   }),
 });

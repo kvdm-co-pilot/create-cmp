@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs eb4831f0b760166a5a76e94d99214942923476a4e34d62d4840bb1bf9c232930
+// cmp:bundle-inputs 5f7a7cf41c45aa55244a731595484faadd114ba7dfab4d5da7215498445edddd
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35844,6 +35844,17 @@ function standing(receipt, { head = null, dirtyCount = 0 } = {}) {
     ok: true
   };
 }
+function flowRail(sections = []) {
+  const usable = sections.filter((s) => s && typeof s.id === "string" && typeof s.label === "string");
+  if (usable.length === 0) return { steps: [], here: null };
+  const settled = (s) => Boolean(s.glyph && typeof s.glyph.cls === "string" && s.glyph.cls.includes("signed"));
+  const firstOpen = usable.findIndex((s) => !settled(s));
+  const hereIdx = firstOpen === -1 ? usable.length - 1 : firstOpen;
+  return {
+    here: usable[hereIdx].id,
+    steps: usable.map((s, i) => ({ id: s.id, label: s.label, here: i === hereIdx, done: settled(s) }))
+  };
+}
 
 // ../../packages/harness/src/console/console-overview.mjs
 var esc5 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -35858,6 +35869,13 @@ function overviewStatusHtml({ receipt, statuses = [], receiptGlyph: receiptGlyph
   const st = tree ? standing(receipt, tree) : null;
   const stand = st ? ` &middot; <span class="${st.ok ? "standing-ok" : "standing-open"}" title="${escAttr2(st.note)}">${esc5(st.label)}</span>` : "";
   return `${lane}${age}${rung}${tally}${stand}`;
+}
+function flowRailHtml(sections = [], commandFor = () => null) {
+  const { steps } = flowRail(sections);
+  if (steps.length === 0) return "";
+  const cmd = steps.find((s) => s.here) ? commandFor(steps.find((s) => s.here).id) : null;
+  const body = steps.map((s) => `<span class="flow-step${s.here ? " flow-here" : ""}${s.done ? " flow-done" : ""}">${esc5(s.label)}</span>`).join('<span class="flow-arrow">&rarr;</span>');
+  return `<nav class="flow" aria-label="The working flow">${body}${cmd ? `<code class="flow-cmd">${esc5(cmd)}</code>` : ""}</nav>`;
 }
 function itemActionHtml(item, { byArtifact, byFeature }) {
   const record2 = byArtifact.get(item.artifact) || null;
@@ -35923,7 +35941,8 @@ function overviewBodyHtml({
   // — exactly like digestHtml. Composition only: this file does not read the
   // stream, does not decide a run's phase, and does not format a step.
   // "" is an older caller, and renders no row rather than an empty one.
-  nowHtml = ""
+  nowHtml = "",
+  railHtml = ""
 } = {}) {
   const byArtifact = new Map(statuses.map((s) => [s.id, s]));
   const byFeature = new Map(features.map((f) => [f.name, f]));
@@ -35966,12 +35985,14 @@ ${digestHtml}
   const fold = (label, inner) => inner ? `  <details class="fd-fold"><summary>${label}</summary>
 ${inner}
   </details>` : "";
+  const railBlock = railHtml ? `${railHtml}
+` : "";
   const nowBlock = nowHtml ? `  <h3 class="fd-h">Now</h3>
 ${nowHtml}
 ` : "";
   return `${driveChainHtml(walks && walks.chain ? walks.chain : null)}  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
-${nowBlock}  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
+${railBlock}${nowBlock}  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
 ${walksHtml(features, statuses, walks)}
 ${fold("What changed", changedBlock)}
@@ -38016,6 +38037,13 @@ function galleryHtml(state) {
   const overviewStatuses = approvals.available && approvals.statuses ? approvals.statuses : [];
   const overviewFeatures = features.available && features.board ? features.board.features : [];
   const humanQueue = deriveHumanQueue({ statuses: overviewStatuses, features: overviewFeatures });
+  const FLOW_COMMANDS = Object.freeze({
+    architecture: "node qa/arch-doc.mjs",
+    evidence: "node qa/verify.mjs",
+    walkthrough: "node qa/walkthrough.mjs",
+    approvals: "node qa/approve.mjs"
+  });
+  const flowCommandFor = (id) => FLOW_COMMANDS[id] ?? null;
   const railItems = [
     // §3.7 (front door): the returning owner's entry point — what needs you,
     // what changed, is it still proven. It owns no facts; it arranges the
@@ -38104,7 +38132,14 @@ function galleryHtml(state) {
         statusGlyph,
         journal: journal.available ? journal.events : [],
         formatAge: formatAgeCoarse,
-        nowHtml: now ? nowSectionHtml(now) : ""
+        nowHtml: now ? nowSectionHtml(now) : "",
+        // Phase A shipped the rail's deriver, its renderer and its CSS, and
+        // never called it: `flowRailHtml` had no reference outside its own
+        // definition and its tests, so the "derived flow rail" the proposal
+        // and PR #108 both record as landed was never on the page. This is
+        // the call. `railItems` is already the {id,label,glyph} shape the
+        // deriver reads, ordered define -> ... -> drive.
+        railHtml: flowRailHtml(railItems, flowCommandFor)
       }),
       active: true
     },

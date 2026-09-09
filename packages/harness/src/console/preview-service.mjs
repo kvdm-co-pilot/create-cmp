@@ -46,7 +46,7 @@ import {
   deriveHumanQueue,
   governanceStripHtml,
 } from "./console-shell.mjs";
-import { overviewBodyHtml, overviewStatusHtml, overviewGlyph } from "./console-overview.mjs";
+import { overviewBodyHtml, overviewStatusHtml, overviewGlyph, flowRailHtml } from "./console-overview.mjs";
 // The *now* row (LIVE-CONSOLE.md Phase B). The server that reads the step
 // stream hands the parsed state in; console-now.mjs owns what it means and how
 // a row looks — including the rows the SSE appends mid-run, so a live row and
@@ -504,6 +504,19 @@ export function galleryHtml(state) {
   // hot-reload loop: the tab is sticky (hash + sessionStorage), so an SSE
   // reload during UI work never bounces the reader off the gallery; only a
   // genuinely fresh session lands on the front door.
+  // ONE command per rail step, and only where a real one exists. Every entry
+  // here is a file in template/qa; a step with no unambiguous command returns
+  // null and the rail says nothing beside it, which is evidence-or-silence
+  // applied to a command. Naming a command an adopter cannot run is the exact
+  // defect this slice fixes in the CLI's own FRONT_DOORS table.
+  const FLOW_COMMANDS = Object.freeze({
+    architecture: "node qa/arch-doc.mjs",
+    evidence: "node qa/verify.mjs",
+    walkthrough: "node qa/walkthrough.mjs",
+    approvals: "node qa/approve.mjs",
+  });
+  const flowCommandFor = (id) => FLOW_COMMANDS[id] ?? null;
+
   const railItems = [
     // §3.7 (front door): the returning owner's entry point — what needs you,
     // what changed, is it still proven. It owns no facts; it arranges the
@@ -596,6 +609,13 @@ export function galleryHtml(state) {
         journal: journal.available ? journal.events : [],
         formatAge: formatAgeCoarse,
         nowHtml: now ? nowSectionHtml(now) : "",
+        // Phase A shipped the rail's deriver, its renderer and its CSS, and
+        // never called it: `flowRailHtml` had no reference outside its own
+        // definition and its tests, so the "derived flow rail" the proposal
+        // and PR #108 both record as landed was never on the page. This is
+        // the call. `railItems` is already the {id,label,glyph} shape the
+        // deriver reads, ordered define -> ... -> drive.
+        railHtml: flowRailHtml(railItems, flowCommandFor),
       }),
       active: true,
     },
