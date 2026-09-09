@@ -223,6 +223,83 @@ test("the rail names `node qa/arch-doc.mjs` beside a `define` step that is open 
   );
 });
 
+test("the rail names `node qa/arch-doc.mjs` beside an `architecture` section that is waiting for a SIGNATURE", () => {
+  // THE COMMAND IS NOW KEYED ON THE SECTION, AND ONE SECTION'S ENTRY STILL
+  // CANNOT ADVANCE IT. The map was rekeyed from steps to sections on 2026-09-10
+  // ("a step has no unambiguous command; the open SECTION does"), and eight of
+  // its nine entries are the command that changes the state the rail reads. The
+  // ninth is not:
+  //
+  //   architecture: "node qa/arch-doc.mjs"        preview-service.mjs
+  //   { id: "architecture", glyph: statusGlyph(archRecord) }   ← same module
+  //
+  // The glyph that decides whether `architecture` is open is the APPROVAL
+  // status and nothing else. The command named beside it regenerates
+  // docs/ARCHITECTURE.md's `cmp:generated` bodies — and those bodies are
+  // explicitly stripped out of the artifact's hash basis, in the approvals
+  // library's own words (qa/lib/approvals.mjs, hashArchitectureArtifact:
+  // "Regenerating a marker section (`node qa/arch-doc.mjs`) changes only the
+  // stripped-away body, so this hash does not move"). So the one command the
+  // rail offers provably cannot move the one state the rail is reading: a
+  // reader who runs it gets no change, and the rail says the same thing again.
+  //
+  // It is the same shape the map was rekeyed to kill, one altitude lower. The
+  // key `architecture` cannot express WHY that section is open — unsigned,
+  // drifted, reopened — and the console has no input describing doc staleness
+  // at all, so the map answers a question this page never asks while the page's
+  // own queue names the act it does ask: "Approve architecture".
+  //
+  // MINE, NOT PRE-EXISTING: on main `flowRailHtml` had no caller, so no command
+  // reached the page; this branch wired the call and kept this entry.
+  //
+  // Fix-agnostic, deliberately: naming the command that signs, or dropping
+  // `architecture` from the map so the rail says nothing beside it (silence is
+  // what that map promises for a section with no unambiguous command), both
+  // satisfy this. What it refuses is the rail naming a command that cannot
+  // advance the thing it marks.
+  const feature = {
+    name: "meal", rel: "docs/features/meal.md", phase: "accepted", record: { status: "approved" },
+    touches: [], blockError: null, specRel: "specs/meal.spec.md", specExists: true, clauses: [],
+    covered: 0, total: 0, receipt: { present: true, verdict: "PASS", attestsTree: true }, provenDone: false,
+  };
+  // Everything settled but the architecture SIGNATURE. Nothing here is stale —
+  // staleness is not an input to this page — so the only thing standing between
+  // this tree and a finished `define` is a human's approval.
+  const statuses = [
+    { id: "intent", status: "approved", resolvable: true },
+    { id: "architecture", status: "unreviewed", resolvable: true },
+    { id: "design-system", status: "approved", resolvable: true },
+    { id: "components", status: "approved", resolvable: true },
+    { id: "feature-brief:meal", status: "approved", resolvable: true },
+    { id: "feature-spec:meal", status: "approved", resolvable: true },
+    { id: "exemplar-spec", status: "approved", resolvable: true },
+  ];
+  const html = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 1,
+    cards: [{ screen: { id: "Home", name: "Home" }, summary: { nodes: 12, tokenized: 12, tagged: 12 }, a11y: { pass: true, violations: [] } }],
+    features: { available: true, board: { features: [feature], undeclared: [] } },
+    approvals: { available: true, statuses },
+    lastReceipt: { available: true, verdict: "PASS", stale: false, ageMs: 1000, evidenceLevel: { rung: "L2", name: "device", satisfiedBy: [] }, packId: "cmp", steps: [] },
+    liveDevice: { reachable: true },
+    walkthrough: { available: true, runs: [{ generatedAt: "2026-09-10T00:00:00Z", manifest: { screens: [] } }] },
+  });
+  // The console KNOWS the act — asserted first, so a failure below is the
+  // command and never a fixture that stopped representing the state.
+  assert.match(html, /Approve architecture/, "the fixture no longer represents a tree waiting on the architecture signature");
+
+  const at = html.indexOf('<nav class="flow"');
+  assert.ok(at > 0, "the front door renders no flow rail");
+  const rail = html.slice(at, html.indexOf("</nav>", at));
+  assert.match(rail, /class="flow-step flow-here">define</, "the fixture no longer marks `define` as the step in hand");
+  assert.doesNotMatch(
+    rail,
+    /arch-doc/,
+    `\`architecture\` is waiting for a signature, and the rail's one instruction regenerates a doc it does not hash: ${rail}`,
+  );
+});
+
 test("a step evidenced by an UNGOVERNABLE section is never done — the marker cannot leave `preview`", () => {
   // `flowRail`'s own docblock, one screen up: "`here` is the first present step
   // still wanting attention — the next thing to do... When everything is

@@ -537,14 +537,28 @@ export function galleryHtml(state) {
   // sections are advanced by a signature and `approve.mjs` is that command;
   // screens and live-device have none, because previewing is the console itself
   // and driving a device is a session, not a command an adopter types.
+  // DERIVED, NOT TYPED, and that is the class closure rather than another
+  // patch. Hand-writing nine entries put `architecture: "node qa/arch-doc.mjs"`
+  // among eight correct ones, and it was the only entry that was not
+  // `approve.mjs` — which is exactly how it hid. `architecture`'s open-ness is
+  // decided by `statusGlyph(archRecord)`, an approval status, and
+  // template/qa/lib/approvals.mjs says in its own words that regenerating a
+  // marker section "changes only the stripped-away body, so this hash does not
+  // move". The one command the rail offered could not move the one state the
+  // rail reads, and it said so one line under a queue row reading "Approve
+  // architecture".
+  //
+  // A SECTION SETTLED BY A SIGNATURE IS ADVANCED BY THE SIGNING COMMAND. That
+  // is one true fact, so it is stated once and applied, not repeated six times
+  // where the seventh can quietly differ. Only two sections are settled by
+  // something other than a signature, and they are the only two named apart.
+  // `screens` and `live-device` appear nowhere: previewing is this console and
+  // driving a device is a session, not a command an adopter types — a section
+  // with no unambiguous command answers null and the rail says nothing beside
+  // it, which is evidence-or-silence applied to a command.
+  const SIGNED_BY_APPROVAL = ["intent", "features", "architecture", "specs", "design-system", "components", "approvals"];
   const FLOW_COMMANDS = Object.freeze({
-    intent: "node qa/approve.mjs",
-    features: "node qa/approve.mjs",
-    architecture: "node qa/arch-doc.mjs",
-    specs: "node qa/approve.mjs",
-    "design-system": "node qa/approve.mjs",
-    components: "node qa/approve.mjs",
-    approvals: "node qa/approve.mjs",
+    ...Object.fromEntries(SIGNED_BY_APPROVAL.map((id) => [id, "node qa/approve.mjs"])),
     evidence: "node qa/verify.mjs",
     walkthrough: "node qa/walkthrough.mjs",
   });
