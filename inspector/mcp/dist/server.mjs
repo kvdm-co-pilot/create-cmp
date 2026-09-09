@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 8ad320dba88a15524d8d393ac01dfb392e4d44c9a79ddad0befd63ecb8b883f2
+// cmp:bundle-inputs 673060018bfe464506fa172e01da1328ccea7b363c848c007f01bb80735ba5c3
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36273,12 +36273,15 @@ function flowRail(sections = []) {
   const usable = sections.filter((s) => s && typeof s.id === "string");
   if (usable.length === 0) return { steps: [], here: null };
   const settled = (s) => Boolean(s.glyph && s.glyph.cls === "glyph-signed");
+  const UNGOVERNED = /* @__PURE__ */ new Set(["screens", "walkthrough"]);
+  const votes = (s) => !UNGOVERNED.has(s.id) || Boolean(s.glyph);
   const byId = new Map(usable.map((s) => [s.id, s]));
   const present2 = [];
   for (const step of FLOW_STEPS) {
     const evidence = step.sections.map((id) => byId.get(id)).filter(Boolean);
     if (evidence.length === 0) continue;
-    present2.push({ id: step.id, label: step.label, done: evidence.every(settled) });
+    const voting = evidence.filter(votes);
+    present2.push({ id: step.id, label: step.label, done: voting.length === 0 ? true : voting.every(settled) });
   }
   if (present2.length === 0) return { steps: [], here: null };
   const firstOpen = present2.findIndex((s) => !s.done);

@@ -145,13 +145,51 @@ export function flowRail(sections = []) {
   // done, and a substring test over a vocabulary where one term contains
   // another is a bug waiting for its caller.
   const settled = (s) => Boolean(s.glyph && s.glyph.cls === "glyph-signed");
+
+  // A SECTION WITH NO GLYPH CASTS NO VOTE, and this is the same calibration
+  // error as the `includes` one above, one layer up: `settled` cannot tell NOT
+  // YET SIGNED from CANNOT BE SIGNED, so a section that can never carry a
+  // signature blocked its step forever. Two of the six were built that way and
+  // preview-service.mjs says so in its own words — `screens` is "UNGOVERNED —
+  // no signature exists, so it can never be green", and `walkthrough` is a
+  // literal `glyph: null`. So `preview` and `report` rendered unfinished on
+  // every project for all time, and because `here` is the FIRST unfinished
+  // step it pinned at `preview` and could never reach verify, report or drive:
+  // a finished project's rail told its owner to go and preview, and named no
+  // command, because preview is one of the two steps that deliberately has
+  // none. `features` did the same to `define` whenever a project had no
+  // feature briefs.
+  //
+  // IT IS DECLARED, NOT INFERRED FROM A NULL GLYPH, and the difference is the
+  // whole fix. "Has no glyph right now" and "can never have one" are different
+  // facts, and reading the first as the second breaks the other direction:
+  // `live-device` is null when nothing is attached, but it DOES reach
+  // glyph-signed when a device is reachable, so an absent device is a real
+  // "not yet" that must still block `drive`. Only sections that can never be
+  // signed abstain, and there are exactly two — preview-service.mjs says so in
+  // its own words for one ("Screens is UNGOVERNED — no signature exists, so it
+  // can never be green") and declares the other as a literal `glyph: null`.
+  //
+  // `features` deliberately still votes. A null features glyph means no briefs
+  // exist yet, and "you have not defined anything" is a true and useful thing
+  // for `define` to say — unlike screens, features CAN be signed.
+  // TWO INDEPENDENT FACTS, and a section abstains only when BOTH hold: it can
+  // never be signed, AND it has nothing to say right now. `screens` errored
+  // carries glyph-drift — "last render failed, the gallery may be stale" — which
+  // is a real problem that should make `preview` the thing to attend to, even
+  // though no signature will ever settle it. Abstaining on the id alone would
+  // make the rail blind to that; abstaining on the null glyph alone would stop
+  // an absent device blocking `drive`. So: both, or it votes.
+  const UNGOVERNED = new Set(["screens", "walkthrough"]);
+  const votes = (s) => !UNGOVERNED.has(s.id) || Boolean(s.glyph);
   const byId = new Map(usable.map((s) => [s.id, s]));
 
   const present = [];
   for (const step of FLOW_STEPS) {
     const evidence = step.sections.map((id) => byId.get(id)).filter(Boolean);
     if (evidence.length === 0) continue; // the profile declared none of it
-    present.push({ id: step.id, label: step.label, done: evidence.every(settled) });
+    const voting = evidence.filter(votes);
+    present.push({ id: step.id, label: step.label, done: voting.length === 0 ? true : voting.every(settled) });
   }
   if (present.length === 0) return { steps: [], here: null };
 
