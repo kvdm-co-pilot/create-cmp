@@ -155,10 +155,11 @@ test("the step table is the prototype's four columns, and it has a TBODY", () =>
   }
   const panel = frontDoor();
   assert.match(panel, /<table class="steps"><tbody/, "table.steps opens a tbody");
-  // THE TBODY IS LOAD-BEARING, not tidiness: the client appends a finished step
-  // with insertAdjacentHTML("beforeend", <tr>…), and the HTML fragment parser
-  // FOSTER-PARENTS a bare <tr> out of a <table> while accepting it into a
-  // <tbody>. Without it every live row would silently vanish until a reload.
+  // THE TBODY IS LOAD-BEARING, not tidiness — and console-now.mjs owns the
+  // reason, in one place. Do not restate it here: this comment used to carry a
+  // second copy claiming the parser foster-parents a bare <tr> out of a
+  // <table>, which is false (a browser auto-wraps it), and when the claim was
+  // corrected in console-now.mjs this copy survived the same commit.
   assert.match(panel, /<tbody id="now-steps">/, "and the rows the SSE appends to are addressed on the tbody");
   for (const col of STEP_COLUMNS) {
     assert.ok(panel.includes(`<td class="${col}">`), `no rendered row carries a td.${col}`);
