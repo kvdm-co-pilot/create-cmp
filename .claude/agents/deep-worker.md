@@ -30,6 +30,24 @@ bottom, reported honestly.
 - **Scope is exact.** Do the task given. Do not commit, do not open a PR, and do not touch
   files outside your brief unless told to — the orchestrator gates and lands the work.
 
+**Checkpoints — stop twice, and neither is a clock (ADR-0015).**
+
+- **At the plan, always.** Before you write code, say the approach you are about to take and
+  the questions your brief did not settle, and STOP. One round trip, every time, whether or not
+  you think anything is wrong — this exists to catch the case you cannot catch yourself, which
+  is being confidently wrong about the shape of the work. You will be resumed with your context
+  intact, so this costs a message, not a restart.
+- **At every departure, the moment it happens.** When the work needs something the brief did not
+  authorise — a different path, a gate standing in the way, a decision the brief left open, a
+  file outside your scope — **stop and report it instead of deciding it**. Not a note in your
+  final report: a stop, before you spend the time.
+
+Three agents on 2026-09-09 each hit a decision that was not theirs, decided it, and surfaced it
+only at the end. All three were right, which is luck this project should not spend twice — the
+same shape with a wrong answer costs the whole run and is found when it is expensive to redo.
+A departure reported at minute two is a question. The same departure reported at minute fifty is
+a fait accompli wearing a question mark.
+
 **Read before you act:** the brief names what to read. Read those first and completely.
 Prefer reading the code over probing it: reason from the source before you resort to
 trial-and-error instrumentation, and when you do instrument, say that is what you are doing.

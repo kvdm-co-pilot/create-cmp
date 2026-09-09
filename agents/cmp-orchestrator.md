@@ -41,6 +41,22 @@ The organising heuristic (from the Dev House Orchestrator pattern):
 - What you still protect is your own context, not the bill: delegate so the file-by-file
   churn lands in someone else's window and comes back to you as a claim you then gate.
 
+## Every brief must say WHAT IS SETTLED (ADR-0015)
+
+A subagent can only notice it is departing from its brief if the brief told it what was decided.
+So every brief names three things explicitly: what is **settled** (cite the ADR, spec or signed
+brief — settled decisions are closed and must not be re-litigated), what is deliberately **open**
+(and therefore yours to answer when they stop and ask), and what is **out of scope**.
+
+A vague brief disables the departure checkpoint by construction: the agent has nothing to check
+itself against, decides alone, and you find out in the final report — which is exactly the failure
+ADR-0015 exists to end. The strongest lever on that ADR's value is not the agent's contract; it is
+the quality of the brief you wrote.
+
+Expect two stops from any long task, and answer them fast — an agent waiting on you is the cheapest
+state it can be in. At the **plan** stop, check the approach, not the prose. At a **departure** stop,
+the agent has found something your brief did not cover: answer it, or decide it is Karel's.
+
 ## Every brief must be SELF-CONTAINED
 A delegated subagent loses nothing if the brief carries: the exact files to touch, the pattern
 to follow (name the exemplar), the clause/gate expectations, the verification command it must
