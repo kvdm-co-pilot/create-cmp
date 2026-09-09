@@ -148,6 +148,30 @@ export function isAdopterOwned(relPath) {
 }
 
 /**
+ * Is this region member ENGINE CODE — the lane itself, as opposed to what the
+ * lane reads about itself or the profile the adopter wrote?
+ *
+ * The three exclusions are the region's non-engine halves: the declarations
+ * (`qa/verified-surface.json`, `qa/harness-manifest.json`), the generated
+ * provenance record, and `qa/lib/profiles/<id>/**` — an adopter's own pack is
+ * theirs, and a region holding a profile and no spine is still a lane with no
+ * engine in it.
+ *
+ * ADR-0010: a region with zero of these is VACUOUS. It reads `intact` because
+ * it genuinely is unmodified since it was locked — it is simply not a lane.
+ *
+ * @param {string} relPath project-relative path, "/"-separated
+ * @returns {boolean}
+ */
+export function isEngineModule(relPath) {
+  if (!isHarnessFile(relPath)) return false;
+  if (HARNESS_DECLARATIONS.includes(relPath)) return false;
+  if (HARNESS_GENERATED.includes(relPath)) return false;
+  if (relPath.startsWith(`${HARNESS_PROFILES_DIR}/`)) return false;
+  return relPath.endsWith(".mjs");
+}
+
+/**
  * Is this project-relative path part of the machine-owned harness region?
  * @param {string} relPath project-relative path, "/"-separated
  * @returns {boolean}
@@ -234,7 +258,14 @@ export function hashHarnessRegion(root) {
     files[rel] = h;
     digest.update(rel, "utf8").update("\0").update(h, "utf8").update("\n");
   }
-  return { sha256: digest.digest("hex"), fileCount: rels.length, files };
+  return {
+    sha256: digest.digest("hex"),
+    fileCount: rels.length,
+    // ADR-0010: how many of those files are the LANE. `fileCount` counts the
+    // region; this counts the engine in it, and zero is the vacuous self-vouch.
+    engineFiles: rels.filter(isEngineModule).length,
+    files,
+  };
 }
 
 /**

@@ -1,7 +1,7 @@
 # ADR-0008: A resolved harness is still a vendored one — pinning is how the bytes arrive, not how they are trusted
 
 - **Status:** accepted — 2026-09-08, Karel van der Merwe (signed by his instruction in session — "sign the adrs"; drafted by the architect)
-- **Implementation:** `pack.version` is the profile's own or null since 2026-09-08 (`packages/harness/src/verify.mjs::pack`, pinned by `test/audit-fixes.test.mjs`). `harness.source` provenance landed 2026-09-08: `qa/harness-source.json` (`packages/harness/src/lib/harness-source.mjs`), written by `prooflane init`/`upgrade`, inside the locked region and NOT adopter-owned, reported on the receipt and read by no verdict. The empty-region self-vouch floor is still pending — it is a gate, so it needs a kept plant and a measured cost (§8.8).
+- **Implementation:** `pack.version` is the profile's own or null since 2026-09-08 (`packages/harness/src/verify.mjs::pack`, pinned by `test/audit-fixes.test.mjs`). `harness.source` provenance landed 2026-09-08: `qa/harness-source.json` (`packages/harness/src/lib/harness-source.mjs`), written by `prooflane init`/`upgrade`, inside the locked region and NOT adopter-owned, reported on the receipt and read by no verdict. The empty-region self-vouch floor is CLOSED by ADR-0010 (2026-09-09), which corrected this ADR's own framing on the way: a running lane can never observe a vacuous region (it derives its root from its own location), so the reachable defect was a false sentence in `describeIntegrity`, not a missing gate in the lane.
 - **Date:** 2026-09-05
 
 ## Context
