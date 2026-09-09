@@ -3,6 +3,7 @@
 //
 //   node scripts/ground-truth.mjs            # human-readable table
 //   node scripts/ground-truth.mjs --json     # machine-readable, for tests and briefs
+//   node scripts/ground-truth.mjs --registry # what the REGISTRY serves, fetched
 //
 // WHY THIS EXISTS. create-cmp's thesis is that a claim about a tree must be
 // derived from that tree, and that the delta between claim and tree IS the
@@ -15,7 +16,11 @@
 // re-run — which test/doc-counts.test.mjs then fails on.
 //
 // Offline and dependency-free BY DESIGN: it is consumed by the test suite,
-// which must pass on an air-gapped machine and in CI with no registry.
+// which must pass on an air-gapped machine and in CI with no registry. That is
+// why `--registry` is a FLAG and not the default, and why `groundTruth()` never
+// reaches the network — the one question that needs the registry is asked only
+// when a human asks it. A tree fact and a registry fact are different kinds of
+// fact, and this file states only the first (see `npmNames`).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -108,23 +113,72 @@ function verifyProfiles() {
   };
 }
 
-/** npm names this repo owns, and where each is defined. */
+/**
+ * npm names this repo owns, and where each is defined.
+ *
+ * WHAT THIS MAY AND MAY NOT SAY. Ownership and version are facts about the
+ * TREE, so they are derived here. Whether a name is live on the registry is a
+ * fact about the REGISTRY, and this file cannot see it — so it does not claim
+ * it. It used to: two names were listed under a hand-written `unpublished`
+ * key, which stayed correct only until they were published (0.25.0, and both
+ * had in fact been live for minutes when the deriver was next run). A
+ * hand-written claim inside the file whose entire purpose is that claims are
+ * derived is the drift this project exists to remove, one layer in.
+ *
+ * `independent` is the tree fact that key was reaching for: these packages
+ * carry their own manifest under `packages/` and version apart from the
+ * CLI/plugin/marketplace lockstep. For the registry's answer, ask the
+ * registry: `--registry`.
+ */
 function npmNames() {
-  const aliases = fs
-    .readdirSync(path.join(ROOT, "packages/aliases"), { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => {
-      const p = json(`packages/aliases/${e.name}/package.json`);
-      return { name: p.name, version: p.version };
-    });
-  return {
-    primary: { name: json("package.json").name, version: json("package.json").version },
-    aliases,
-    unpublished: [
-      { name: json("packages/harness/package.json").name, version: json("packages/harness/package.json").version },
-      { name: json("packages/receipts/package.json").name, version: json("packages/receipts/package.json").version },
-    ],
+  const dirs = (rel) =>
+    fs
+      .readdirSync(path.join(ROOT, rel), { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => `${rel}/${e.name}`)
+      .filter((d) => fs.existsSync(path.join(ROOT, d, "package.json")));
+  const manifest = (d) => {
+    const p = json(`${d}/package.json`);
+    return { name: p.name, version: p.version, dir: d };
   };
+  return {
+    primary: { name: json("package.json").name, version: json("package.json").version, dir: "." },
+    aliases: dirs("packages/aliases").map(manifest),
+    independent: dirs("packages")
+      .map(manifest)
+      .filter((p) => !json(`${p.dir}/package.json`).private),
+  };
+}
+
+/** Every name this repo owns, in one list — what `--registry` asks about. */
+function ownedNames(gt) {
+  return [gt.npm.primary, ...gt.npm.independent, ...gt.npm.aliases];
+}
+
+/**
+ * The registry's answer, fetched — never assumed. Opt-in via `--registry`,
+ * because `groundTruth()` itself is consumed by the suite and must stay
+ * offline (see the header). Reports the delta a release manager actually
+ * asks for: is what this tree holds the thing the registry serves?
+ */
+export async function registryStatus(gt, fetchImpl = fetch) {
+  return Promise.all(
+    ownedNames(gt).map(async (p) => {
+      try {
+        const res = await fetchImpl(`https://registry.npmjs.org/${p.name}`, {
+          headers: { accept: "application/vnd.npm.install-v1+json" },
+        });
+        if (res.status === 404) return { ...p, state: "absent", latest: null };
+        if (!res.ok) return { ...p, state: "unknown", latest: null, why: `HTTP ${res.status}` };
+        const latest = (await res.json())["dist-tags"]?.latest ?? null;
+        if (latest === null) return { ...p, state: "unknown", latest, why: "no dist-tags.latest" };
+        if (latest === p.version) return { ...p, state: "published", latest };
+        return { ...p, state: "differs", latest };
+      } catch (err) {
+        return { ...p, state: "unknown", latest: null, why: err.message };
+      }
+    }),
+  );
 }
 
 export function groundTruth() {
@@ -175,18 +229,19 @@ function renderMarkdown(gt) {
 | \`create-cmp-cli\` (repo) | **${v.cli}** |
 | Claude Code plugin | **${v.plugin}** |
 | marketplace entry | **${v.marketplace}** |
-| \`${gt.npm.unpublished[0].name}\` | ${v.harness} — independent, unpublished |
-| \`${gt.npm.unpublished[1].name}\` | ${v.receipts} — independent, unpublished |
-| \`@create-cmp/inspector\` | ${v.inspectorMcp} — independent, published separately |
+${gt.npm.independent.map((p) => `| \`${p.name}\` | ${p.version} — independent |`).join("\n")}
+| \`@create-cmp/inspector\` | ${v.inspectorMcp} — independent |
 
 CLI, plugin, and marketplace are **one release** and are pinned in lockstep.
-The other three are **deliberately independent** — the lane is versioned apart
+The other ${gt.npm.independent.length + 1} are **deliberately independent** — the lane is versioned apart
 from the engine that stamped it, so a project can upgrade its lane without
 upgrading its generator. Do not "fix" them to match.
 
 > **⚠ Repo version ≠ published version.** The table above is what is in the
-> tree. What a reader can actually \`npx\` may lag it. Check with
-> \`npm view create-cmp-cli version\` before citing any version in copy.
+> tree; what a reader can actually \`npx\` may lag it. That is a fact about the
+> registry, not about this tree, so nothing above asserts it. Ask for it:
+> \`node scripts/ground-truth.mjs --registry\` fetches every name this repo owns
+> and reports which the registry serves at the version held here.
 >
 > **Best practice for all launch copy: don't pin a version at all.** Write
 > \`npm create kmp@latest my-app\`. A pinned number in prose is a promise to
@@ -226,9 +281,11 @@ ${p.local.steps.filter((x) => !["specCoverage", "build", "unitTests", "conforman
 
 ## npm names
 
-Live: ${[gt.npm.primary, ...gt.npm.aliases].map((n) => `\`${n.name}\``).join(" · ")}.
+Owned by this repo: ${ownedNames(gt).map((n) => `\`${n.name}\``).join(" · ")}.
 Lead all copy with **\`npm create kmp@latest my-app\`** — the most memorable invocation.
-Not yet published: ${gt.npm.unpublished.map((n) => `\`${n.name}\``).join(", ")}.
+
+Whether each is live on the registry is not a fact about this tree, so it is not
+asserted here. Ask the registry: \`node scripts/ground-truth.mjs --registry\`.
 
 ## Stable, non-numeric facts (safe to cite directly)
 
@@ -251,7 +308,7 @@ Not yet published: ${gt.npm.unpublished.map((n) => `\`${n.name}\``).join(", ")}.
 `;
 }
 
-function main() {
+async function main() {
   const gt = groundTruth();
   if (process.argv.includes("--json")) {
     console.log(JSON.stringify(gt, null, 2));
@@ -265,6 +322,30 @@ function main() {
     return;
   }
   const row = (k, v) => console.log(`  ${k.padEnd(26)}${v}`);
+  if (process.argv.includes("--registry")) {
+    const status = await registryStatus(gt);
+    const MARK = { published: "✓", differs: "→", absent: "·", unknown: "?" };
+    const SAY = {
+      published: "registry serves this exact version",
+      differs: "registry serves",
+      absent: "no such name on the registry",
+      unknown: "could not ask",
+    };
+    console.log("\ncreate-cmp — the registry's answer, fetched just now\n");
+    const label = (p) => `${MARK[p.state]} ${p.name}@${p.version}`;
+    const width = Math.max(...status.map((p) => label(p).length)) + 2;
+    for (const p of status) {
+      const detail = p.state === "differs" ? `${SAY.differs} ${p.latest}` : p.state === "unknown" ? `${SAY.unknown} — ${p.why}` : SAY[p.state];
+      console.log(`  ${label(p).padEnd(width)}${detail}`);
+    }
+    const behind = status.filter((p) => p.state === "differs" || p.state === "absent");
+    console.log(
+      behind.length === 0
+        ? "\n  every name this repo owns is live at the version this tree holds.\n"
+        : `\n  ${behind.length} name(s) the registry does not serve at this tree's version: ${behind.map((p) => p.name).join(", ")}.\n`,
+    );
+    return;
+  }
   console.log("\ncreate-cmp — derived ground truth\n");
   console.log("versions");
   for (const [k, v] of Object.entries(gt.versions)) row(k, v);
@@ -276,9 +357,9 @@ function main() {
   for (const [k, v] of Object.entries(gt.verifyProfiles)) row(k, v.count);
   console.log("\nnpm");
   row("primary", `${gt.npm.primary.name}@${gt.npm.primary.version}`);
+  for (const p of gt.npm.independent) row("independent", `${p.name}@${p.version}`);
   for (const a of gt.npm.aliases) row("alias", `${a.name}@${a.version}`);
-  for (const u of gt.npm.unpublished) row("unpublished", `${u.name}@${u.version}`);
-  console.log("");
+  console.log("\n  registry state is not a fact about this tree — ask for it with --registry\n");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main();
