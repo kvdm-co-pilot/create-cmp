@@ -115,3 +115,26 @@ export function deriveContrastPairs(colors = {}) {
   add("OnSurface", "Background", "body text on Background");
   return pairs;
 }
+
+// --- step durations -----------------------------------------------------------
+
+/**
+ * A step duration in human units — "" (silence) when there is none to show.
+ *
+ * MOVED HERE 2026-09-09 from console-tabs.mjs, where it was module-private.
+ * The Evidence table renders a step's duration from the receipt and the front
+ * door's *now* rows render one from the live step stream; those are the same
+ * fact read at two moments, and two private copies would have been two
+ * spellings of it — the class NORTH-STAR §9.2 says comes back when it is fixed
+ * per instance. One definition, two import sites.
+ *
+ * @param {number|null|undefined} ms
+ * @returns {string}
+ */
+export function formatDurationMs(ms) {
+  if (typeof ms !== "number" || Number.isNaN(ms) || ms < 0) return "";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const secs = ms / 1000;
+  if (secs < 60) return `${Math.round(secs * 10) / 10}s`;
+  return `${Math.floor(secs / 60)}m ${String(Math.round(secs % 60)).padStart(2, "0")}s`;
+}

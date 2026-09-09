@@ -202,6 +202,40 @@ step. A hard-coded rail would promise every adopter a step their profile may not
 have. "Here" is the first section still wanting attention — the glyph's own
 meaning, not a second opinion about it.
 
+*Now — the lane as it happens, added 2026-09-09* (LIVE-CONSOLE.md Phase B;
+architecture signed the same day, Karel: "recommended approach"). The page's
+questions were **what needs me · what changed · is it still proven**, all three
+about the past. The one people actually arrive to watch — *what is happening* —
+had no answer, because the only thing the lane left behind was a receipt written
+after it ended. It leads the page now, ahead of the queue: the five questions are
+in **time order**, and the run in flight comes before the signature waiting on
+you.
+
+The transport is **an artifact, not a push endpoint**. `verify --events` appends
+each finished step to `qa/.lane-steps.ndjson` (truncated per run, gitignored,
+outside the receipt's hashed inputs); the console **tails** that file and
+rebroadcasts on the SSE it already holds open. Three consequences, and they are
+the reason for the shape: the console never becomes the thing that RUNS the lane
+— no spawn, no verdict-producing work behind a page load; a run that happened
+while nobody was watching still renders on the next open, because the file is
+still there; and every value on the row is read from an artifact, so **absence =
+not derivable** stays literally true.
+
+What the wire carries is the **rendered row**, not data the page would have to
+interpret: `console-now.mjs` renders the row the server puts on the page AND the
+row the stream appends, so a live row and a reloaded row are the same bytes from
+the same function, and the page derives nothing. The one exception is the running
+step's elapsed time, which is a reading of the reader's own clock; the artifact
+supplies the instant it started. Rows **append** — a step frame carries only the
+step that finished and the one now running — and the Drive panel's own refresh is
+made to leave the block alone, because the lane rewrites its marker at every step
+start and that is a governed-file event. A step is **not yet · running · done**,
+never *pending*; a step an order of magnitude faster than its own history is
+flagged beside its verdict (a build cache can replay a PASS); and when the stream
+drops, the block **says** it is not live rather than presenting a frozen list as
+a live one. `test/console-now.test.mjs` refuses any console module that reads the
+stream or decides a run's phase a second way.
+
 *Signing, amended 2026-08-24* (Karel: "in the overview give the option to
 approve as well"). The page originally named each act and jumped you to the
 section that owned the signature. Each row now carries the control itself.

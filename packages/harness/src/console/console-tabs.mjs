@@ -28,7 +28,7 @@
 // values, and every absence uses the one standardized form
 // ("Not derivable statically — <reason>").
 
-import { classifyDimens, deriveContrastPairs, componentStoryId } from "./console-data.mjs";
+import { classifyDimens, deriveContrastPairs, componentStoryId, formatDurationMs } from "./console-data.mjs";
 
 /**
  * THE SHELL'S OWN WORDS — neutral, and overridden by the profile's console copy.
@@ -1802,14 +1802,9 @@ const STEP_GOVERNS = {
   approvals: { section: "approvals", label: "Approvals" },
 };
 
-/** A step duration in human units — "" (silence) when the receipt carries none. */
-function formatDurationMs(ms) {
-  if (typeof ms !== "number" || Number.isNaN(ms) || ms < 0) return "";
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  const secs = ms / 1000;
-  if (secs < 60) return `${Math.round(secs * 10) / 10}s`;
-  return `${Math.floor(secs / 60)}m ${String(Math.round(secs % 60)).padStart(2, "0")}s`;
-}
+// formatDurationMs moved to console-data.mjs on 2026-09-09 — the front door's
+// *now* rows render the same fact from the live step stream, and two private
+// copies would have been two spellings of one duration. Imported above.
 
 /**
  * The inputs-binding line — three-valued, per receipt-bridge.mjs's staleness

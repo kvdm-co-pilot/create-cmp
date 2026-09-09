@@ -812,6 +812,35 @@ export const SHELL_CSS = `
   .flow-cmd { margin-left: 10px; font-family: var(--mono); font-size: var(--fs-meta);
               color: var(--ink-2); background: var(--surface); padding: 1px 6px; border-radius: 4px; }
 
+  /* --- now: the lane as it happens (LIVE-CONSOLE.md Phase B) ---
+     One row per step, appended as each finishes. No spinner, no progress bar,
+     no percentage, no auto-scroll: the verdicts wear the SAME classes the
+     Evidence table's rows wear (.step-verdict-*), so a step means the same
+     colour wherever it is read, and SKIP is muted rather than green. */
+  .now { margin: 4px 0 16px; }
+  .now-head { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+  .now-live { color: var(--ink); font-weight: 650; letter-spacing: 0.02em; }
+  .now-absent { color: var(--muted); }
+  .now-link { margin: 2px 0 8px; font-size: var(--fs-meta); color: var(--muted); }
+  .now-steps { list-style: none; margin: 0; padding: 0; font-size: var(--fs-meta); }
+  .now-step { padding: 2px 0; line-height: 1.5; border-bottom: 1px solid transparent; }
+  .now-name { display: inline-block; min-width: 15ch; color: var(--ink); }
+  .now-dur { color: var(--muted); }
+  .now-note { color: var(--ink-2); }
+  .now-state { color: var(--muted); font-style: italic; }
+  .now-running .now-name { font-weight: 650; }
+  .now-running .now-state { color: var(--ink); font-style: normal; }
+  .now-elapsed { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .now-waiting .now-name { color: var(--muted); }
+  /* The tool's own words, wrapped but never reflowed or reworded. */
+  .now-reason { margin: 4px 0 4px 2ch; padding: 6px 8px; white-space: pre-wrap; overflow-x: auto;
+                font-family: var(--mono); font-size: var(--fs-meta); color: var(--drift);
+                background: var(--drift-bg); border-radius: 6px; }
+  .now-nofix { margin: 0 0 6px 2ch; font-size: var(--fs-meta); color: var(--muted); }
+  /* A duration an order of magnitude under the step's own history. Not a
+     verdict — an observation beside one (evidence-must-attest-execution). */
+  .now-flag { color: var(--reopen); text-decoration: underline dotted; }
+
   /* --- screens (§3.4: the screen × state matrix) --- */
   .screens-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
   #filter { font: inherit; font-size: var(--fs-body); padding: 5px 12px; width: 240px;

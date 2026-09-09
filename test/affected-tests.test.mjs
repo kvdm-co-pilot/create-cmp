@@ -85,7 +85,19 @@ test("package→filter mapping: parent-dir segment becomes *seg*, unioned, dedup
 });
 
 test("lane outputs never count as changes: a dirty receipt neither forces the full suite nor drives the filter", () => {
-  assert.deepEqual(LANE_OUTPUT_PREFIXES, ["qa/evidence", "qa-artifacts", "qa/flight-recorder.jsonl", "qa/.lane-in-progress"]);
+  assert.deepEqual(LANE_OUTPUT_PREFIXES, [
+    "qa/evidence",
+    "qa-artifacts",
+    "qa/flight-recorder.jsonl",
+    "qa/.lane-in-progress",
+    // Added 2026-09-09 (LIVE-CONSOLE.md Phase B): the running lane's step
+    // stream, appended to WHILE the lane runs so the console can render a row
+    // as each step lands. Same class as the marker below, and it must be
+    // enumerated here for the same reason the marker is — an adopter's
+    // .gitignore never learns new entries, so in an upgraded repo this file
+    // shows up in the change set as an untracked file under qa/.
+    "qa/.lane-steps.ndjson",
+  ]);
 
   // The lane's own in-flight marker (Stage 0 PR 6a moved it under qa/, out of a
   // Compose build directory) is present for exactly the duration of the run
@@ -94,6 +106,14 @@ test("lane outputs never count as changes: a dirty receipt neither forces the fu
   const markerOnly = deriveAffectedFilter(["qa/.lane-in-progress", `${SRC}/presentation/home/HomeViewModel.kt`], cmpAffected);
   assert.equal(markerOnly.mode, "filtered", markerOnly.reason);
   assert.deepEqual(markerOnly.patterns, ["*home*"]);
+
+  // PLANTED: the step stream is written by the very run whose filter this is —
+  // `qa/watch.mjs` spawns `--fast --events` on every save. Counted as a change
+  // it matches the qa/** hatch, and the inner loop falls open to the full suite
+  // from the second save onward: the marker's bug, one file over again.
+  const streamOnly = deriveAffectedFilter(["qa/.lane-steps.ndjson", `${SRC}/presentation/home/HomeViewModel.kt`], cmpAffected);
+  assert.equal(streamOnly.mode, "filtered", streamOnly.reason);
+  assert.deepEqual(streamOnly.patterns, ["*home*"]);
 
   // PLANTED: the flight journal is appended by every run and committed. Counted
   // as a change it matches the qa/** hatch, and --fast falls open to the full

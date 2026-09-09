@@ -109,6 +109,12 @@ const EXCLUDED_PREFIXES = [
   // run's duration, rewritten at every step. Hashing it would make the lane
   // invalidate its own receipt mid-run.
   "qa/.lane-in-progress",
+  // The lane's own step stream (qa/lib/lane-markers.mjs): one NDJSON line per
+  // finished step, appended WHILE the lane runs so the console can render it
+  // (docs/proposals/LIVE-CONSOLE.md Phase B). Same reason as the marker above —
+  // a lane that hashed its own progress would invalidate its own receipt
+  // between two of its own steps.
+  "qa/.lane-steps.ndjson",
   "qa/evidence",
   "qa-artifacts",
   "qa/comments.json",

@@ -7,6 +7,10 @@
   signed and are not to be started without a further decision.
 - **Implementation:** Phase A landed with this acceptance — `console-standing.mjs`, the strip's
   standing clause, the derived flow rail, and `STUDIO-REDESIGN.md` §3.7's *Standing* amendment.
+  **Phase B landed 2026-09-09** under the architecture signed the same day (see D2's amendment):
+  `verify --events` also writes `qa/.lane-steps.ndjson`, `console-now.mjs` decides what it
+  means and renders every row, `steps-bridge.mjs` reads and tails it, and the existing `/events`
+  stream carries the rendered rows. **C and D remain unsigned and unstarted.**
 - **Scope:** the front door of the existing console (`packages/harness/src/console/`). No new
   product, no new section type, no infrastructure stood up. Extends `STUDIO-REDESIGN.md` §2/§4.
 
@@ -115,7 +119,7 @@ Added, because a live page can lie in ways a document cannot:
 | receipt with verdict, rung, pack, commit, inputs, steps, durations | **yes** — `qa/evidence/latest.json` | none |
 | the human queue ("waiting on me") | **yes** — `deriveHumanQueue` | none |
 | the rung with its pack, one spelling | **yes** — `rungWithPack` | none |
-| per-step progress **while** the lane runs | **no** — `verify --json` prints one object at the end | verify emits one NDJSON line per step in `--json` mode; the watcher relays it |
+| per-step progress **while** the lane runs | **CLOSED 2026-09-09** — `verify --events` writes `qa/.lane-steps.ndjson` and the console tails it | none |
 | Rule 0's last result for the *trust* row | **no** — framework-check persists nothing in an adopter tree | it writes `qa/evidence/framework-check.json` (plants, each name, duration, tree-identical) |
 | "what would earn the next rung" | **partly** — the ladder is declared in the profile | the profile's unmet requirement is derived and named, not summarised |
 
@@ -137,6 +141,18 @@ plant) is not triggered. Each derived fact does need the derivation gated: the c
 - *b. WebSocket.* Rejected: a dependency for a one-way stream.
 - *c. Run-level only (no per-step).* Acceptable Phase B fallback; loses the moment people come for.
 
+**D2 as built — AMENDED 2026-09-09** (Karel, at implementation: *"recommended approach"* — the
+architect's **artifact-and-tail**). D2a made the *watcher* the relay, which ties the rows to a
+process that happened to be holding the pipe. As built, `verify --events` **also appends each
+finished-step object to `qa/.lane-steps.ndjson`**, and the console **tails that file** and
+rebroadcasts on the same `/events` stream. Same zero dependencies, and three properties D2a did
+not have: the console never becomes the thing that RUNS the lane (no spawn, no verdict-producing
+work behind a page load); a run that happened while the console was down still renders on the
+next open, because the file outlived both processes; and every value on the page is read from an
+artifact, so *absence = not derivable* stays literally true. The stderr channel D2a describes is
+unchanged and still relayed by `watch.mjs` — the file is a second sink for the same object, not a
+second event format.
+
 **D3 — A shareable snapshot.**
 - *a. `node qa/verify.mjs --html` writes `qa/evidence/latest.html` alongside the receipt, opt-in,
   not committed by default* (**recommended**). One file, no server, attaches to a PR.
@@ -153,7 +169,7 @@ plant) is not triggered. Each derived fact does need the derivation gated: the c
 | phase | delivers | needs | cost |
 |---|---|---|---|
 | **A** | the strip (verdict · rung+pack · age · commit · stale check), *waiting*, the flow rail | nothing new — receipt + human queue + git | small; the page most people will ever see |
-| **B** | *now* — per-step rows appended live | D2a: step events from verify, relayed | small; one emitter, one relay, one renderer |
+| **B** ✅ | *now* — per-step rows appended live | D2 as amended: the step stream as an artifact, tailed | small; one emitter, one tail, one renderer |
 | **C** | *trust* and *ladder* rows | D4a record; the profile's ladder read for its unmet requirement | small–medium |
 | **D** | `--html` snapshot (D3a) | A–C | small |
 | — | fleet view (many trees, one strip each) | Stage 3's trigger | not now; the strip is designed to tile |

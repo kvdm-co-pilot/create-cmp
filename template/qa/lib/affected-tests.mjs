@@ -52,7 +52,10 @@ import path from "node:path";
 // line also landed in their locked region.
 // qa/.lane-in-progress is the lane's own marker (qa/lib/lane-markers.mjs) —
 // present, untracked, for exactly the duration of the run that would read it.
-export const LANE_OUTPUT_PREFIXES = ["qa/evidence", "qa-artifacts", "qa/flight-recorder.jsonl", "qa/.lane-in-progress"];
+// qa/.lane-steps.ndjson is that marker's sibling: the run's own step stream,
+// appended to WHILE the lane runs so the console can render it. Same reason —
+// a lane's own progress is not a change to the tree it is checking.
+export const LANE_OUTPUT_PREFIXES = ["qa/evidence", "qa-artifacts", "qa/flight-recorder.jsonl", "qa/.lane-in-progress", "qa/.lane-steps.ndjson"];
 
 function isLaneOutput(p) {
   return LANE_OUTPUT_PREFIXES.some((prefix) => p === prefix || p.startsWith(`${prefix}/`));

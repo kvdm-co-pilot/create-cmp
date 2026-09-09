@@ -40,7 +40,7 @@ import { StepTimeout, spawnTimedOut } from "./lib/step-outcomes.mjs";
 import { expectedDurations, runLane, stepDisplayName } from "./lib/lane-runner.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfile, loadProfileSync } from "./lib/profile-loader.mjs";
-import { laneMarkerPath } from "./lib/lane-markers.mjs";
+import { laneMarkerPath, laneStepsPath } from "./lib/lane-markers.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
 import { readHarnessSource } from "./lib/harness-source.mjs";
 
@@ -101,6 +101,10 @@ Flags:
   --events                       one NDJSON object per finished step, on STDERR.
                                  stdout keeps its contract (one receipt with --json);
                                  stderr carries progress. Combine them freely.
+                                 The same objects are ALSO appended to
+                                 qa/.lane-steps.ndjson (truncated per run,
+                                 gitignored) so a console that was not running
+                                 can still render the run afterwards.
   --help, -h                     print this usage and exit 0 without
                                   running anything
 
@@ -194,6 +198,36 @@ const asJson = args.includes("--json");
 // one. stdout stays the result, stderr becomes the progress — the oldest
 // convention there is, and it lets a caller consume both at once.
 const asEvents = args.includes("--events");
+// The same events, ALSO left behind as an artifact (docs/proposals/LIVE-CONSOLE.md
+// Phase B, decided 2026-09-09). stderr reaches whoever is holding the pipe;
+// qa/.lane-steps.ndjson reaches whoever arrives afterwards — a console that
+// was not running when the lane ran still renders the run, because the file is
+// still on disk. That is the whole reason the console TAILS a file instead of
+// the lane PUSHING to a console: the console never becomes the thing that runs
+// the lane, and every value on its page is read from an artifact.
+//
+// TRUNCATED at the start of each run, so the file is exactly one run: bounded
+// on a watcher that runs the fast lane on every save, and unambiguous for the
+// reader (the last `run/start` line wins).
+//
+// WHERE it goes is qa/lib/lane-markers.mjs's to say, beside the in-flight
+// marker and for the same reasons — it is transient lane state, not evidence,
+// so it is gitignored, excluded from the receipt's hashed input surface, and a
+// lane OUTPUT for the fast filter. One spelling of the path: the lane writes
+// it, the console reads it, and neither may guess where the other put it.
+const STEPS_STREAM_PATH = laneStepsPath(ROOT);
+const appendStepStream = asEvents
+  ? (obj, { truncate = false } = {}) => {
+      try {
+        fs.mkdirSync(path.dirname(STEPS_STREAM_PATH), { recursive: true });
+        const line = `${JSON.stringify(obj)}\n`;
+        if (truncate) fs.writeFileSync(STEPS_STREAM_PATH, line);
+        else fs.appendFileSync(STEPS_STREAM_PATH, line);
+      } catch {
+        /* an unwritable qa/ must never fail the lane it narrates */
+      }
+    }
+  : null;
 const emitStepEvent = asEvents
   ? (obj) => {
       try {
@@ -201,6 +235,7 @@ const emitStepEvent = asEvents
       } catch {
         /* a blocked or closed stderr must never fail the lane */
       }
+      appendStepStream(obj);
     }
   : null;
 const fast = args.includes("--fast");
@@ -431,6 +466,29 @@ const expectedByStep = (() => {
     return { byName: new Map(), laneMs: null }; // narration is optional; the lane never depends on its own journal
   }
 })();
+// The stream's opening line, written BEFORE the first step runs. It is what
+// makes the file readable rather than merely appendable: a reader learns the
+// run's identity (so an arriving row can be told from the previous run's), how
+// many steps there are, and their NAMES — which is the only way a console can
+// say "unitTests — not yet" instead of inventing a placeholder for a step it
+// cannot name. Nothing here is a claim about the run's outcome.
+const RUN_ID = `${laneStartedAt}-${process.pid}`;
+const RUN_STARTED_AT = new Date(laneStartedAt).toISOString();
+if (appendStepStream) {
+  appendStepStream(
+    {
+      event: "run",
+      phase: "start",
+      runId: RUN_ID,
+      startedAt: RUN_STARTED_AT,
+      profile,
+      mode,
+      total: laneSteps.length,
+      steps: laneSteps.map((fn) => stepDisplayName(fn)).filter(Boolean),
+    },
+    { truncate: true },
+  );
+}
 const lane = runLane({
   steps: laneSteps,
   markerPath: LANE_MARKER,
@@ -450,17 +508,38 @@ const lane = runLane({
     ? (result, { index, total }) =>
         emitStepEvent({
           event: "step",
+          // Which run this row belongs to, and when it landed. Both exist for
+          // the reader that arrives LATER (the artifact's whole point): the id
+          // tells an appended row from the previous run's, and the instant is
+          // how the next step's elapsed time is counted without the console
+          // keeping a clock of its own.
+          runId: RUN_ID,
+          at: new Date().toISOString(),
           index,
           total,
           name: result.name,
           verdict: result.verdict,
           durationMs: result.durationMs ?? null,
+          // What this step USUALLY costs, from this project's own flight
+          // journal. It rides along because "impossibly fast" is meaningless
+          // without it: a 6ms gate and a 52-second build are both suspicious
+          // at 10x under their own history and at no fixed number
+          // (evidence-must-attest-execution — a build cache can replay a PASS).
+          expectedMs: expectedByStep.byName.get(result.name) ?? null,
           layer: result.layer ?? null,
           // The step's own words, never this file's: a note explains a SKIP and
           // a reason explains a FAIL, and rewording either is how a console
           // starts telling a story the lane did not.
           note: result.note ?? null,
-          reason: result.reason ? String(result.reason).split("\n")[0] : null,
+          // VERBATIM, newlines and all. This used to be the first line only,
+          // which was right while stderr's only reader was a terminal and
+          // wrong the moment the events became the console's FAIL row:
+          // LIVE-CONSOLE.md requires that row to show "the tool's own reason
+          // and its own fix, verbatim", and a reason truncated at the emitter
+          // cannot be shown verbatim anywhere downstream. The human one-line
+          // row is still one line — that truncation belongs to `print` above,
+          // not to the machine event.
+          reason: result.reason ? String(result.reason) : null,
         })
     : null,
   narrator: { entry: path.join(HERE, "lib", "lane-narrator.mjs"), root: ROOT },
@@ -483,6 +562,25 @@ const lane = runLane({
   stepDeadlines: pack.stepDeadlines,
 });
 const steps = lane.steps;
+// The stream's closing line. It is what lets a reader tell a lane that is
+// still running from a lane that DIED: an open stream that has gone silent
+// past the harness's own lane-marker bound is reported as stopped, never as
+// forever-running, and a step is never called "pending" (LIVE-CONSOLE §3.2).
+// `completed` is written from the rows the lane actually produced, so a
+// short-circuited run (a compile FAIL that made the rest meaningless) says so
+// instead of leaving the remainder looking like work still to come.
+if (appendStepStream) {
+  appendStepStream({
+    event: "run",
+    phase: "end",
+    runId: RUN_ID,
+    endedAt: new Date().toISOString(),
+    verdict: lane.verdict,
+    durationMs: lane.durationMs ?? null,
+    completed: steps.length,
+    total: laneSteps.length,
+  });
+}
 // CACHED counts as PASS for the lane verdict (it IS a prior PASS, reused only
 // in fast mode on an unchanged input set) — but it stays CACHED on the
 // receipt, visibly distinct. ERROR fails the lane: "I could not check this" is
