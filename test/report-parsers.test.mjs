@@ -118,3 +118,106 @@ test("the dispatcher reads the DECLARED format, and refuses one it cannot", () =
     for (const d of [tap, ctrf]) fs.rmSync(d, { recursive: true, force: true });
   }
 });
+
+// ── MEETING A REAL RUNNER ───────────────────────────────────────────────────
+//
+// Everything above was written from the format specs. §8.8 counts "adversarial
+// input the fix was not written against" among its terminators, and names the
+// score: eight wrong verdicts this year found by executing in an ecosystem the
+// code had never met, and NONE by reading it.
+//
+// So the parser was pointed at Node's own `--test-reporter=tap` — a real
+// producer, already installed, emitting a stream nobody here authored. It found
+// two defects in minutes, and neither was visible in the spec:
+//
+//   1. EVERY FAILURE MESSAGE WAS LOST. The parser read `message:`, which is what
+//      the TAP spec's examples show. Node writes the failure text under
+//      `error:` as a BLOCK SCALAR. So every failing test parsed with no
+//      messages, and `compareOutcomes`'s "failed under both, with different
+//      output" — a whole determinism-leak class — could never fire for the most
+//      widely available TAP producer there is.
+//   2. NESTED SUBTESTS TOOK THE WRONG PARENT. TAP emits a parent's `ok` AFTER
+//      its children, so a stack built from result lines makes the previous
+//      SIBLING the parent. Children came out under the test before them.
+test("a real runner's TAP: failure text survives, because that is what a determinism leak IS", () => {
+  // Node's shape, verbatim — block scalar and all.
+  const real = [
+    "TAP version 13",
+    "# Subtest: a real failure",
+    "not ok 1 - a real failure",
+    "  ---",
+    "  duration_ms: 1.23",
+    "  location: '/abs/path/that/must/not/be/read.mjs:10:11'",
+    "  failureType: 'testCodeFailure'",
+    "  error: |-",
+    "    Expected values to be strictly equal:",
+    "",
+    "    'a' !== 'b'",
+    "  code: 'ERR_ASSERTION'",
+    "  ...",
+    "1..1",
+  ].join("\n");
+  const o = parseTapStream(real);
+  const entry = o["a real failure"];
+  assert.equal(entry.status, "fail");
+  assert.ok(entry.messages.length > 0, "a failure with no message makes 'failed differently' unobservable");
+  assert.ok(
+    entry.messages.some((msg) => /Expected values to be strictly equal/.test(msg)),
+    `the block scalar's text must reach the outcome: ${JSON.stringify(entry.messages)}`,
+  );
+  assert.ok(!entry.messages.some((msg) => /duration_ms|1\.23/.test(msg)), "time is never verdict-bearing");
+  assert.ok(!entry.messages.some((msg) => /\/abs\/path/.test(msg)), "an absolute path would differ per machine");
+});
+
+test("a real runner's TAP: two runs that fail DIFFERENTLY are caught — the class the lost messages hid", () => {
+  const withError = (text) =>
+    parseTapStream(["# Subtest: t", "not ok 1 - t", "  ---", "  error: |-", `    ${text}`, "  ...", "1..1"].join("\n"));
+  const diffs = compareOutcomes(withError("'a' !== 'b'"), withError("'a' !== 'c'"), "TZ=A", "TZ=B", () => "unit");
+  assert.equal(diffs.length, 1, "the same test failing with different output is a finding, not a match");
+  assert.equal(diffs[0].kind, "failure-text-changed");
+});
+
+test("a real runner's TAP: a nested subtest is keyed by its REAL parent, not the test before it", () => {
+  const real = [
+    "TAP version 13",
+    "# Subtest: alpha",
+    "ok 1 - alpha",
+    "# Subtest: parent",
+    "    # Subtest: child",
+    "    ok 1 - child",
+    "    1..1",
+    "ok 2 - parent",
+    "1..2",
+  ].join("\n");
+  const keys = Object.keys(parseTapStream(real));
+  assert.ok(keys.includes("parent > child"), `child must carry its real parent: ${JSON.stringify(keys)}`);
+  assert.ok(!keys.includes("alpha > child"), "the previous SIBLING is not the parent — TAP emits a parent's result AFTER its children");
+  assert.ok(keys.includes("alpha") && keys.includes("parent"));
+});
+
+test("a real runner's TAP: same-named children under different parents do not collide", () => {
+  // Why the path matters rather than the bare name: a positional `#2` suffix
+  // would move if the parents ran in a different order, reintroducing exactly
+  // the ordering sensitivity the bare test number was excluded to avoid.
+  const stream = (first, second) =>
+    parseTapStream(
+      [
+        `# Subtest: ${first}`,
+        "    # Subtest: works",
+        "    ok 1 - works",
+        `ok 1 - ${first}`,
+        `# Subtest: ${second}`,
+        "    # Subtest: works",
+        "    ok 1 - works",
+        `ok 2 - ${second}`,
+      ].join("\n"),
+    );
+  const ab = stream("alpha", "beta");
+  assert.deepEqual(
+    Object.keys(ab).filter((k) => k.includes("works")).sort(),
+    ["alpha > works", "beta > works"],
+  );
+  // Run the parents the other way round: the same two tests, same two keys.
+  const ba = stream("beta", "alpha");
+  assert.deepEqual(compareOutcomes(ab, ba, "TZ=A", "TZ=B", () => "unit"), [], "reordering parents is not a change");
+});
