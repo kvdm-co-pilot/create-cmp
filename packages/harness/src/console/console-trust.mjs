@@ -48,10 +48,17 @@ const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
  * @returns {string} HTML
  */
 export function trustRowHtml(state, { age = null } = {}) {
+  // THE ROW *IS* THE DISCLOSURE. It used to be a block with a nested <details>
+  // inside it, which put the plants two clicks and two indents from the line
+  // they belong to. §2's shape is one line that expands in place, so the
+  // expansion is the row's own body and there is exactly one summary.
   if (!state || !state.available) {
-    return `  <div class="trust" id="trust">
-  <p class="trust-line trust-absent">${esc(trustLine(state))} &mdash; run <code>${esc(FRAMEWORK_RECORD_COMMAND)}</code></p>
-  </div>`;
+    return `  <details class="row" id="trust">
+  <summary><span class="k">trust</span><span class="v trust-absent">${esc(trustLine(state))} &mdash; run <code>${esc(FRAMEWORK_RECORD_COMMAND)}</code></span><span class="chev">&rsaquo;</span></summary>
+  <div class="body">
+  <p>Rule 0 is the instrument that checks the instrument: it plants one violation per guard and watches each guard refuse BY NAME. Nothing on this page has been checked that way until it is run, and it is not run behind a page load &mdash; it plants into your real tree and puts it back.</p>
+  </div>
+  </details>`;
   }
   const failed = state.verdict !== "PASS";
   // Red is the console's three-colour vocabulary and means "something went
@@ -59,8 +66,6 @@ export function trustRowHtml(state, { age = null } = {}) {
   // instrument did not put back is that too, and it is the finding a reader
   // would least expect to have to look for.
   const bad = failed || state.treeIdentical === false;
-  const cls = bad ? "trust-line trust-bad" : "trust-line";
-  const line = `<p class="${cls}">${esc(trustLine(state, age))}</p>`;
   const rows = (state.rows ?? [])
     .map((p) => {
       // The plant's own label and the row that ACTUALLY went red — the
@@ -68,27 +73,29 @@ export function trustRowHtml(state, { age = null } = {}) {
       // for, because on a pack that named none those are different strings.
       const dur = formatDurationMs(p.durationMs);
       const named = p.names.length ? ` naming ${esc(p.names.join(", "))}` : "";
+      // "FAIL ✓" is the design of record's own spelling and it is exact: the
+      // gate FAILED, which is what the plant asked it to do. A plant that made
+      // nothing go red is the one that reads as a failure here.
       const verdict = p.failedByName
-        ? `<span class="step-verdict-pass">refused</span>`
-        : `<span class="step-verdict-fail">did NOT refuse by name</span>`;
-      return `    <li class="trust-plant"><code class="trust-name">${esc(p.label)}</code> ${verdict} &middot; ${esc(p.observed || "the lane")}${named}${dur ? ` <span class="trust-dur">${esc(dur)}</span>` : ""}</li>`;
+        ? `<span class="step-verdict-pass">FAIL &#10003;</span>`
+        : `<span class="step-verdict-fail">no refusal</span>`;
+      const why = p.failedByName ? `${esc(p.observed || "the lane")}${named}` : "did NOT refuse by name";
+      return `    <tr class="trust-plant"><td class="step">${esc(p.label)}</td><td class="verd">${verdict}</td><td class="dur">${esc(dur || "")}</td><td class="why">${why}</td></tr>`;
     })
     .join("\n");
-  const detail = rows
-    ? `\n  <details class="trust-plants"><summary>${state.plants} plant${state.plants === 1 ? "" : "s"}, each with the gate it made refuse</summary>
-  <ul class="trust-list">
-${rows}
-  </ul>
-  </details>`
-    : "";
+  const table = rows ? `  <table class="steps"><tbody>\n${rows}\n  </tbody></table>\n` : "";
   const unavailable =
     state.unavailable > 0
-      ? `\n  <p class="trust-note">${state.unavailable} plant${state.unavailable === 1 ? "" : "s"} this tree cannot make &mdash; the record names each one and why</p>`
+      ? `  <p class="trust-note">${state.unavailable} plant${state.unavailable === 1 ? "" : "s"} this tree cannot make &mdash; the record names each one and why</p>\n`
       : "";
-  const source = `\n  <p class="trust-link">reading <code>${esc(state.relPath)}</code>${state.commit ? ` &middot; at ${esc(String(state.commit).slice(0, 7))}` : ""}</p>`;
-  return `  <div class="trust" id="trust" title="${escAttr(
+  const source = `  <p class="trust-link">reading <code>${esc(state.relPath)}</code>${state.commit ? ` &middot; at ${esc(String(state.commit).slice(0, 7))}` : ""}</p>`;
+  return `  <details class="row" id="trust" title="${escAttr(
     "GATE-RULES Rule 0: each plant makes the responsible gate FAIL BY NAME, and the instrument leaves the tree as it found it",
   )}">
-  ${line}${detail}${unavailable}${source}
-  </div>`;
+  <summary><span class="k">trust</span><span class="v${bad ? " trust-bad" : ""}">${esc(trustLine(state, age))}</span><span class="chev">&rsaquo;</span></summary>
+  <div class="body">
+${table}${unavailable}  <p>A lane you have not seen refuse is a lane you have not seen. This is the last time it refused, and what it refused by name.</p>
+${source}
+  </div>
+  </details>`;
 }

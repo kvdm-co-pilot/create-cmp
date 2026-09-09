@@ -33,8 +33,10 @@ import {
   nowSectionHtml,
   nowState,
   parseStepStream,
+  stepReasonHtml,
   stepRowHtml,
 } from "../packages/harness/src/console/console-now.mjs";
+import { overviewStatusHtml } from "../packages/harness/src/console/console-overview.mjs";
 import { LANE_MARKER_STALE_MS } from "../packages/harness/src/lib/lane-markers.mjs";
 import { galleryHtml } from "../packages/harness/src/console/preview-service.mjs";
 
@@ -108,20 +110,26 @@ test("the staleness bound is the harness's own — the console's copy may not dr
   );
 });
 
+// The reason moved BELOW the table on 2026-09-09 (the design of record's
+// `.reason` block), so it is asserted where it is now rendered: the same rule,
+// checked at the composition that actually draws it, which is a stronger place
+// than the row — it also pins that the block reaches the page at all.
 test("a FAIL row shows the tool's own reason VERBATIM, newlines and all", () => {
   const reason = "error: unresolved reference `Foo` (src/main.kt:12)\nfix: define Foo or drop the reference";
   const s = nowState(parseStepStream(stream({ steps: [{ verdict: "FAIL", durationMs: 41_000, reason }], end: { verdict: "FAIL", completed: 1 } })), { now: T0 + 10_000 });
-  const html = stepRowHtml(at(s, 0));
+  const html = nowSectionHtml(s);
   assert.match(html, /unresolved reference/);
   assert.match(html, /src\/main\.kt:12/, "the tool's own coordinates survive");
   assert.match(html, /fix: define Foo or drop the reference/, "the tool's own FIX survives — the console never rewrites it");
-  assert.ok(html.includes("\n"), "a multi-line reason stays multi-line — that is what verbatim means");
+  assert.ok(stepReasonHtml(at(s, 0)).includes("\n"), "a multi-line reason stays multi-line — that is what verbatim means");
   assert.ok(!/the harness printed none/.test(html), "a tool that printed a fix must not be told it printed none");
+  // And it travels on the SSE too, so a FAIL mid-run does not wait for a reload.
+  assert.match(nowFrame(s, { event: "run", phase: "end" }).reasonsHtml, /unresolved reference/);
 });
 
 test("a FAIL with no fix STATES the absence rather than inventing one", () => {
   const s = nowState(parseStepStream(stream({ steps: [{ verdict: "FAIL", durationMs: 12, reason: "3 tests failed" }], end: { verdict: "FAIL", completed: 1 } })), { now: T0 + 10_000 });
-  const html = stepRowHtml(at(s, 0));
+  const html = nowSectionHtml(s);
   assert.match(html, /3 tests failed/);
   assert.match(html, /fix: the harness printed none/);
 });
@@ -134,7 +142,8 @@ test("§7: SKIP is muted and never green, and a skip's reason is never dressed a
   const html = stepRowHtml(at(s, 0));
   assert.match(html, /step-verdict-skip/);
   assert.ok(!/step-verdict-pass/.test(html), "a SKIP must never wear the PASS role");
-  assert.ok(!/now-reason/.test(html), "a skip's explanation is not a failure block");
+  assert.equal(stepReasonHtml(at(s, 0)), "", "a skip's explanation is not a failure block");
+  assert.ok(!/class="reason"/.test(nowSectionHtml(s)), "…and no verbatim block is drawn for it at all");
   assert.ok(!/printed none/.test(html), "and a skip is never asked what its fix was");
   assert.match(html, /no device attached/, "but the step's own words are still shown");
 });
@@ -241,10 +250,20 @@ test("§7: the block carries no score, no percentage, no spinner, and no second 
   assert.ok(!/style="/.test(html), "no inline colour — the shell owns the palette");
 });
 
-test("§3.3: the block says whether it is live, in its own words, beside the file it reads", () => {
+test("§3.3: the STRIP says whether it is live, and the block says what it is reading", () => {
   const s = nowState(parseStepStream(stream({ steps: [] })), { now: T0 + 1000 });
   const html = nowSectionHtml(s);
-  assert.match(html, /id="now-live"/, "there is a place for the liveness clause to be written");
+  // The liveness clause lives in the STRIP, which is where §3.3 puts it ("the
+  // strip says 'disconnected — showing last known, 40s ago'"). It was inside
+  // this block until 2026-09-09, which stopped being survivable the moment the
+  // block became a collapsed row: a clause inside a closed disclosure is a
+  // clause that is HIDDEN, and §3.3's whole subject is not hiding it.
+  assert.match(
+    overviewStatusHtml({ receipt: { available: false }, receiptGlyph: () => null }),
+    /id="now-live"/,
+    "there is a place for the liveness clause to be written, and it is never behind a click",
+  );
+  assert.ok(!/id="now-live"/.test(html), "and it is not ALSO in the row — one clause, one place");
   assert.match(html, /reading the lane's step stream/, "and the page says what it is reading");
 
   // The PATH comes from the reader that opened the file — the console keeps no
@@ -262,7 +281,7 @@ test("the front door renders the rows, and a caller that supplies no stream rend
     { now: T0 + 2000 },
   );
   const withNow = galleryHtml({ ...base, now: s });
-  assert.match(withNow, /<h3 class="fd-h">Now<\/h3>/);
+  assert.match(withNow, /<span class="k">now<\/span>/, "the row states its own question — no heading above it");
   assert.match(withNow, /id="now-steps"/);
   assert.match(withNow, /harnessIntegrity/);
   assert.match(withNow, /now-running/);

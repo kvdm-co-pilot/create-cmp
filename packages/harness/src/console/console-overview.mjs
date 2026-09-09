@@ -74,8 +74,14 @@ const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
  */
 export function overviewStatusHtml({ receipt, statuses = [], receiptGlyph, formatAge, tree = null } = {}) {
   const g = receiptGlyph ? receiptGlyph(receipt) : null;
+  // The verdict badge is the first thing anyone reads, so it is a BADGE — the
+  // design of record's `.verdict`, not a run of prose. Its role comes from
+  // receiptGlyph's own class and from nowhere else: a stale PASS is demoted by
+  // that one derivation (glyph-drift), and if this file re-decided the role it
+  // could hand a stale receipt the green the shared derivation just took away.
+  const ROLE = { "glyph-signed": "pass", "glyph-drift": "fail" };
   const lane = g
-    ? `<span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span> ${esc(g.label)}`
+    ? `<span class="${`verdict ${ROLE[g.cls] || ""}`.trim()}"><span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span> ${esc(g.label)}</span>`
     : "";
   const age =
     receipt && receipt.available && typeof receipt.ageMs === "number" && formatAge
@@ -107,7 +113,15 @@ export function overviewStatusHtml({ receipt, statuses = [], receiptGlyph, forma
   const stand = st
     ? ` &middot; <span class="${st.ok ? "standing-ok" : "standing-open"}" title="${escAttr(st.note)}">${esc(st.label)}</span>`
     : "";
-  return `${lane}${age}${rung}${tally}${stand}`;
+  // LIVE-CONSOLE §3.3 — "disconnected is SAID, not hidden" — and §3.3 names the
+  // STRIP as where it is said. It lived in the *now* block until 2026-09-09,
+  // which was survivable while that block was always expanded and became wrong
+  // the moment it became a collapsed row: a liveness clause inside a closed
+  // disclosure is a liveness clause that is hidden, which is the exact thing the
+  // rule forbids. The client's setNowLive() writes here; the server's word is
+  // "live", because the page it just rendered is.
+  const live = ` &middot; <span id="now-live">live</span>`;
+  return `<span class="strip">${lane}${age}${rung}${tally}${stand}${live}</span>`;
 }
 
 /**
@@ -123,6 +137,30 @@ export function flowRailHtml(sections = [], commandFor = () => null) {
     .map((s) => `<span class="flow-step${s.here ? " flow-here" : ""}${s.done ? " flow-done" : ""}">${esc(s.label)}</span>`)
     .join('<span class="flow-arrow">&rarr;</span>');
   return `<nav class="flow" aria-label="The working flow">${body}${cmd ? `<code class="flow-cmd">${esc(cmd)}</code>` : ""}</nav>`;
+}
+
+/**
+ * The *waiting* row's ONE LINE — LIVE-CONSOLE's third question ("what is
+ * waiting on me?"), derived from the queue and the ledger and nothing else.
+ *
+ * The drift clause reads `overviewGlyph`'s predicate rather than a second one.
+ * That is the same rule the glyph itself keeps and for the same reason: a
+ * colour or a clause that depends on matching prose stops being true the day
+ * someone rewords deriveHumanQueue, and nobody finds out. One predicate, two
+ * surfaces.
+ *
+ * `next` is the flow rail's own `here`, passed in — the row states where the
+ * arc is, it does not work it out a second time.
+ */
+function waitingLineHtml(queue, statuses, next) {
+  if (statuses.length === 0) {
+    return `no approvals ledger &mdash; nothing here is governed yet`;
+  }
+  const g = overviewGlyph(queue, statuses);
+  if (queue.length === 0) return `nothing waits on you`;
+  const drift = g && g.cls === "glyph-drift" ? ` &middot; <span class="status-drift">drift among them</span>` : "";
+  const step = next ? ` &middot; next: ${esc(next)}` : "";
+  return `${queue.length} waiting on you${drift}${step}`;
 }
 
 /**
@@ -257,6 +295,10 @@ export function overviewBodyHtml({
   // "" is an older caller, and renders no row rather than an empty one.
   nowHtml = "",
   railHtml = "",
+  // The flow rail's own `here`, passed in beside its markup: the *waiting* row
+  // ends with "next: <step>", and deriving that a second time here is exactly
+  // the thing that lets two lines on one page disagree.
+  flowHere = null,
   // LIVE-CONSOLE.md's fourth and fifth questions ("can I trust the lane that
   // says so?", "what would earn the next rung?"), rendered by console-trust.mjs
   // and console-ladder.mjs and passed in as strings — exactly like nowHtml and
@@ -342,35 +384,46 @@ ${digestHtml}
 </div>`
     : "";
 
-  // Page anatomy (studio-drive-mode): Drive leads with the live chain, then
-  // what-needs-you, then the walks; the digest and history are the page's own
-  // MIRROR tail — complete, derived, and collapsed by default.
+  // Page anatomy (studio-drive-mode): Drive leads with the rows, then the live
+  // chain, then the walks; the digest and history are the page's own MIRROR
+  // tail — complete, derived, and collapsed by default.
   const fold = (label, inner) =>
     inner ? `  <details class="fd-fold"><summary>${label}</summary>\n${inner}\n  </details>` : "";
 
-  // *now* leads the page, ahead of *waiting*: LIVE-CONSOLE.md's five questions
-  // are in TIME order — the run that is happening comes before the signature
-  // that is waiting on you — and it is the row people arrive to watch.
-  // The flow rail sits directly under the strip and above everything else —
-  // LIVE-CONSOLE.md §2 ("a thin rail under the strip"). It is the FIRST thing
-  // in the body because it answers "where is this tree in the arc", which is
-  // context for every row beneath it. Empty string when the caller passes no
-  // rail, so a console with no sections renders no rail rather than a stub.
+  // THE FOUR ROWS, and why there is no heading between the strip and them.
+  //
+  // Phases A–D shipped these as four <h3> sections with prose under each, and
+  // the page stopped fitting above the fold — thirteen screenfuls where the
+  // design of record (docs/reference/live-console-prototype.html) has four
+  // lines. §2's shape is literal: "One page. Five rows. Each row is one line
+  // when idle and expands in place." A heading over a one-line row doubles its
+  // height and says nothing the row's own `.k` does not.
+  //
+  // The order is the proposal's five questions in TIME order — the run that is
+  // happening, the signature waiting on you, the instrument's integrity, the
+  // future. (The first question, "is this tree proven right now", is the strip
+  // above; it is not a row because it must be legible without a click.)
+  //
+  // Empty string is an older caller: the row is absent rather than empty,
+  // because an empty *trust* row reads as "nothing is wrong" — the one thing a
+  // row about an unrun instrument must never say.
+  //
+  // The flow rail sits directly under the strip and above the rows —
+  // LIVE-CONSOLE.md §2 ("a thin rail under the strip"). It answers "where is
+  // this tree in the arc", which is context for every row beneath it.
   const railBlock = railHtml ? `${railHtml}\n` : "";
-  const nowBlock = nowHtml ? `  <h3 class="fd-h">Now</h3>\n${nowHtml}\n` : "";
-  // *trust* and *ladder* sit AFTER what-needs-you, and that order is the
-  // proposal's: the five questions run in time order — the past run, the
-  // present run, my next action, the instrument's integrity, the future — so
-  // the two rows about the instrument and the future come last, under the one
-  // thing a person can act on right now.
-  const trustBlock = trustHtml ? `  <h3 class="fd-h">Trust</h3>\n${trustHtml}\n` : "";
-  const ladderBlock = ladderHtml ? `  <h3 class="fd-h">Ladder</h3>\n${ladderHtml}\n` : "";
-
-  return `${driveChainHtml(walks && walks.chain ? walks.chain : null)}  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
-  from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
-${railBlock}${nowBlock}  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
+  const waitingRow = `  <details class="row" id="waiting">
+  <summary><span class="k">waiting</span><span class="v">${waitingLineHtml(queue, statuses, flowHere)}</span><span class="chev">&rsaquo;</span></summary>
+  <div class="body">
 ${queueHtml}
-${trustBlock}${ladderBlock}${walksHtml(features, statuses, walks)}
+  </div>
+  </details>`;
+  const rows = [nowHtml, waitingRow, trustHtml, ladderHtml].filter(Boolean).join("\n");
+
+  return `${railBlock}  <div class="rows">
+${rows}
+  </div>
+${driveChainHtml(walks && walks.chain ? walks.chain : null)}${walksHtml(features, statuses, walks)}
 ${fold("What changed", changedBlock)}
 ${fold("History", historyHtml)}`;
 }

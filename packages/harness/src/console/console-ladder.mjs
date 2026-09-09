@@ -47,16 +47,17 @@ export function ladderRowHtml(state, { pack = null } = {}) {
   if (!state || !state.available) {
     // A profile with no ladder earns no rung, which is the honest grade and not
     // a failure — the grader's own words, not a rewriting of them.
-    return `  <div class="ladder" id="ladder">
-  <p class="ladder-line ladder-absent">${esc((state && state.reason) || "no ladder is derivable for this project")}</p>
-  </div>`;
+    return `  <details class="row" id="ladder">
+  <summary><span class="k">ladder</span><span class="v ladder-absent">${esc((state && state.reason) || "no ladder is derivable for this project")}</span><span class="chev">&rsaquo;</span></summary>
+  <div class="body">
+  <p>A rung is a pack's own claim about how strong a proof is. Without a declared ladder there is nothing to grade against, so no rung is minted &mdash; which is the honest grade, not a low one.</p>
+  </div>
+  </details>`;
   }
   const marks = state.rungs
     .map(
       (r) =>
-        `<span class="ladder-rung${r.earned ? " ladder-earned" : ""}" title="${escAttr(
-          `${r.id} ${r.name} — ${r.mode === "any" ? "any one of" : "every one of"}: ${r.requires.join(", ") || "(nothing declared)"}`,
-        )}">${esc(r.id)} ${r.earned ? MARK.earned : MARK.open}</span>`,
+        `<span class="ladder-rung${r.earned ? " ladder-earned" : ""}">${esc(r.id)} ${r.earned ? MARK.earned : MARK.open}</span>`,
     )
     .join(" ");
 
@@ -82,10 +83,32 @@ export function ladderRowHtml(state, { pack = null } = {}) {
     needs = `<span class="ladder-needs">this ladder declares no rungs</span>`;
   }
 
+  // WHAT EACH RUNG ACTUALLY REQUIRES, on the page rather than in a `title=`.
+  // It was a tooltip until 2026-09-09, which meant the one fact this row exists
+  // to carry — what would earn the next rung — was invisible on a phone, where
+  // there is no hover, and invisible to anyone reading rather than pointing.
+  // The words are the declaration's own: rung id, the pack's label for it, and
+  // the step names verbatim.
+  const rows = state.rungs
+    .map(
+      (r) =>
+        `    <tr class="ladder-req"><td class="step">${esc(r.id)} ${esc(r.name || "")}</td><td class="verd">${
+          r.earned ? MARK.earned : MARK.open
+        }</td><td class="dur"></td><td class="why">${esc(r.mode === "any" ? "any one of" : "every one of")}: ${r.requires
+          .map((s) => `<code>${esc(s)}</code>`)
+          .join(", ") || "(nothing declared)"}</td></tr>`,
+    )
+    .join("\n");
   // The pack clause is a TITLE away from its full sentence, the same one every
   // other rung surface carries.
   const note = state.earned ? rungPackNote(state.earned, pack) : null;
-  return `  <div class="ladder" id="ladder">
-  <p class="ladder-line"><span class="ladder-pack"${note ? ` title="${escAttr(note)}"` : ""}>${esc(packClause(pack))}</span> &middot; ${marks} &middot; ${needs}</p>
-  </div>`;
+  return `  <details class="row" id="ladder">
+  <summary><span class="k">ladder</span><span class="v"><span class="ladder-pack"${note ? ` title="${escAttr(note)}"` : ""}>${esc(packClause(pack))}</span> &middot; ${marks} &middot; ${needs}</span><span class="chev">&rsaquo;</span></summary>
+  <div class="body">
+  <table class="steps"><tbody>
+${rows}
+  </tbody></table>
+  <p>The ladder is the profile's declaration, read &mdash; not a summary someone wrote. Rungs compare only within a pack.</p>
+  </div>
+  </details>`;
 }
