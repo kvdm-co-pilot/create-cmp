@@ -8,6 +8,28 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **The ground-truth deriver hand-wrote the one claim it could not derive, and 0.25.0 made it
+  false.** `scripts/ground-truth.mjs` exists because prose cannot be trusted to count — and it
+  carried a literal two-name `unpublished` list in its own source. Publishing `prooflane-harness`
+  and `prooflane-receipts` falsified it, and the very next run reported two live packages as
+  unpublished. The deriver was the last place in this repo where a claim about the world was
+  maintained by hand, which is the drift it exists to remove, one layer in.
+
+  The fix separates two kinds of fact that the old key ran together. **Ownership and version are
+  facts about the TREE** — now derived by scanning `packages/*` for manifests, so adding a package
+  makes it appear with nobody editing a list. **What the registry serves is a fact about the
+  REGISTRY**, which this tree cannot see, so it is no longer asserted at all: the default output
+  says so in one line and points at `--registry`, which fetches every owned name and reports which
+  the registry serves at the version held here. `groundTruth()` itself stays offline and
+  synchronous — it is consumed by the suite, which must pass air-gapped, so the network path is a
+  flag and never the default.
+
+  A release manager's "what is unreleased?" is now a command rather than a memory. Gated by
+  `test/ground-truth-derivation.test.mjs`: ownership must equal what is on disk, no owned package
+  name may appear as a literal in the deriver's source, `gt.npm.unpublished` may not return, the
+  default path may not fetch, and an unreachable registry must report **unknown** rather than
+  telling an offline machine its packages are missing.
+
 - **The harness's `exports` map hid its own `package.json`, so nothing could introspect it.** An
   exports map is a **denylist by default**: every subpath not listed is unreachable, including ones
   nobody thinks of as API. `./package.json` is the one that matters, because reading a dependency's
