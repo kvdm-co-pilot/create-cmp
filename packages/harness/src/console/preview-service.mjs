@@ -47,6 +47,11 @@ import {
   governanceStripHtml,
 } from "./console-shell.mjs";
 import { overviewBodyHtml, overviewStatusHtml, overviewGlyph } from "./console-overview.mjs";
+// The *now* row (LIVE-CONSOLE.md Phase B). The server that reads the step
+// stream hands the parsed state in; console-now.mjs owns what it means and how
+// a row looks — including the rows the SSE appends mid-run, so a live row and
+// a reloaded row are rendered by the same function.
+import { nowSectionHtml } from "./console-now.mjs";
 // The Evidence section's own status line shows a rung, so it shows the pack —
 // one spelling for the whole console lives in console-evidence.mjs (§6.5).
 import { rungWithPack, rungPackNote } from "./console-evidence.mjs";
@@ -151,6 +156,11 @@ export function galleryHtml(state) {
     // Absent (an older caller, or git unreadable) renders no standing clause
     // rather than a guess.
     tree = null,
+    // The lane's step stream as console-now.mjs read it (nowState) — what is
+    // happening, or what last happened. Supplied by the server that tails
+    // qa/.lane-steps.ndjson. Absent (an older caller) renders no *now* row
+    // at all rather than an empty one that reads as "nothing is running".
+    now = null,
     tokenUsage = null,
     intent = { available: false },
     features = { available: false },
@@ -585,6 +595,7 @@ export function galleryHtml(state) {
         statusGlyph,
         journal: journal.available ? journal.events : [],
         formatAge: formatAgeCoarse,
+        nowHtml: now ? nowSectionHtml(now) : "",
       }),
       active: true,
     },
@@ -786,6 +797,15 @@ export function galleryHtml(state) {
   function refreshGovernedPanels() {
     fetch("/").then((r) => r.text()).then((html) => {
       const doc = new DOMParser().parseFromString(html, "text/html");
+      // The *now* block is NOT the panel's to redraw. The lane rewrites
+      // qa/.lane-in-progress at every step start, which is a governed-file
+      // event, so a running lane would otherwise re-render this panel — and
+      // the step rows with it — several times a minute. That is the blink
+      // LIVE-CONSOLE §8 measures ("rows append, the page does not blink").
+      // The block is fed by the step stream instead: every appended line, plus
+      // a full frame on every SSE connect and reconnect, so keeping the live
+      // node can never leave it behind the file.
+      const keptNow = document.getElementById("now");
       const swapped = [];
       for (const id of GOVERNED_PANELS) {
         const fresh = doc.querySelector("#" + id);
@@ -797,6 +817,10 @@ export function galleryHtml(state) {
         swapped.push(cur);
       }
       if (swapped.length === 0) { location.reload(); return; } // unexpected markup — old behavior
+      const freshNow = document.getElementById("now");
+      if (keptNow && freshNow && freshNow !== keptNow && freshNow.parentNode) {
+        freshNow.parentNode.replaceChild(keptNow, freshNow);
+      }
       for (const el of swapped) {
         wireApproveButtons(el);
         wireReopenButtons(el);
@@ -841,6 +865,52 @@ export function galleryHtml(state) {
       target.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   });
+  // ── the *now* rows (LIVE-CONSOLE.md Phase B) ────────────────────────────
+  // THIS CODE DERIVES NOTHING. The server read qa/.lane-steps.ndjson,
+  // console-now.mjs decided what it meant and rendered each row, and this
+  // puts the bytes where their data-index says. Rows APPEND: a step frame
+  // carries only the step that finished and the one now running, so nothing
+  // else in the list is touched and the page never reloads (LIVE-CONSOLE §7).
+  function applyNowFrame(msg) {
+    const box = document.getElementById("now");
+    const list = document.getElementById("now-steps");
+    if (!box || !list) return; // a project with no step stream renders no block
+    if (msg.clear || (msg.runId && box.dataset.run !== msg.runId)) {
+      // A different run. The rows on screen belong to the previous one, and
+      // two runs interleaved in one list is a lie about both.
+      box.dataset.run = msg.runId || "";
+      list.innerHTML = "";
+    }
+    var rows = msg.rows || [];
+    for (var i = 0; i < rows.length; i += 1) {
+      var cur = list.querySelector('[data-index="' + rows[i].index + '"]');
+      if (cur) cur.outerHTML = rows[i].html;
+      else list.insertAdjacentHTML("beforeend", rows[i].html);
+    }
+    var head = document.getElementById("now-head");
+    if (head && msg.headHtml) head.innerHTML = msg.headHtml;
+    tickNowElapsed();
+  }
+  // The ONE number on this page the server cannot know: how long the running
+  // step has been running is a reading of THIS clock. The artifact supplies
+  // the instant it started (data-since); nothing else here is computed.
+  function tickNowElapsed() {
+    document.querySelectorAll(".now-elapsed[data-since]").forEach(function (el) {
+      var t = Date.parse(el.getAttribute("data-since") || "");
+      if (isNaN(t)) { el.textContent = ""; return; }
+      var s = Math.max(0, Math.round((Date.now() - t) / 1000));
+      el.textContent = s < 90 ? s + "s" : Math.round(s / 60) + " min";
+    });
+  }
+  setInterval(tickNowElapsed, 1000);
+  tickNowElapsed();
+  // LIVE-CONSOLE §3.3: disconnected is SAID, not hidden. A frozen list must
+  // never present itself as live, so the block carries its own clause beside
+  // the file it is reading.
+  function setNowLive(text) {
+    var el = document.getElementById("now-live");
+    if (el) el.textContent = text;
+  }
   const es = new EventSource("/events");
   // EventSource reconnects on its own, but nothing ever wrote the pill back to
   // "live" — so a one-second blip read as permanently disconnected, which is a
@@ -848,7 +918,7 @@ export function galleryHtml(state) {
   // fires on the initial connect AND on every automatic reconnect — the honest
   // signal. (No backticks in this comment: it lives inside the page's template
   // literal, and a stray one closes the string.)
-  es.onopen = () => { pill.textContent = "live"; pill.className = ""; };
+  es.onopen = () => { pill.textContent = "live"; pill.className = ""; setNowLive("live"); };
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     // studio-self-renewal R6: this page was drawn by CMP_CONSOLE_BUILD; the hello
@@ -872,6 +942,9 @@ export function galleryHtml(state) {
     if (msg.type === "approval" || msg.type === "comment" || msg.type === "governance") {
       refreshGovernedPanels();
     }
+    // One line landed in the lane's step stream. Rows append in place — this
+    // is the only path that touches them, and it never reloads.
+    if (msg.type === "step") applyNowFrame(msg);
     if (msg.type === "error") {
       pill.textContent = msg.source === "compile" ? "compile failed" : "render failed";
       pill.className = "error";
@@ -885,6 +958,7 @@ export function galleryHtml(state) {
     const gone = es.readyState === 2; // CLOSED
     pill.textContent = gone ? "server gone" : "reconnecting…";
     pill.className = gone ? "error" : "rendering";
+    setNowLive(gone ? "NOT live — the console is gone; these rows are the last read of the file" : "NOT live — reconnecting; these rows are the last read of the file");
   };
   // Screen filter — survives the SSE-triggered reloads via sessionStorage.
   // §3.4: it filters matrix ROWS (one row per screen, states stay together).

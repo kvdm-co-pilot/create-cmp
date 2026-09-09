@@ -48,6 +48,12 @@ qa/.plan.json
 qa/.plan-history.jsonl
 qa/.agent-hold.json
 qa/.lane-in-progress
+# The running lane's step stream (`verify --events`, LIVE-CONSOLE.md Phase B):
+# one NDJSON line per finished step, so the console can render a row as each one
+# lands and can still render the run afterwards. Progress, never evidence — the
+# receipt-of-record stays qa/evidence/latest.json — and rewritten on every save
+# in the watch loop, which is why committing it would be pure churn.
+qa/.lane-steps.ndjson
 
 # Android signing. The keystore IS the app's identity on Android — it cannot be reissued —
 # and keystore.properties holds its passwords. Never committed, never in a sidecar diff.

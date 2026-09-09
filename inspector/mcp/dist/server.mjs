@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 88c3ec13e3f9706098652cc426cfbc3332e75dea3c3d6ccbac206cb7082d9f7c
+// cmp:bundle-inputs eb4831f0b760166a5a76e94d99214942923476a4e34d62d4840bb1bf9c232930
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -3235,8 +3235,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path21) {
-      let input = path21;
+    function removeDotSegments(path23) {
+      let input = path23;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3488,8 +3488,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path21, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path21 && path21 !== "/" ? path21 : void 0;
+        const [path23, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path23 && path23 !== "/" ? path23 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6882,12 +6882,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs20, exportName) {
+    function addFormats(ajv, list, fs21, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs20[f]);
+        ajv.addFormat(f, fs21[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7254,8 +7254,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path21, errorMaps, issueData } = params;
-  const fullPath = [...path21, ...issueData.path || []];
+  const { data, path: path23, errorMaps, issueData } = params;
+  const fullPath = [...path23, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7370,11 +7370,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path21, key) {
+  constructor(parent, value, path23, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path21;
+    this._path = path23;
     this._key = key;
   }
   get path() {
@@ -11294,10 +11294,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path21) {
-  if (!path21)
+function getElementAtPath(obj, path23) {
+  if (!path23)
     return obj;
-  return path21.reduce((acc, key) => acc?.[key], obj);
+  return path23.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11706,11 +11706,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path21, issues) {
+function prefixIssues(path23, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path21);
+    iss.path.unshift(path23);
     return iss;
   });
 }
@@ -11857,16 +11857,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path21 = []) => {
+  const processError = (error52, path23 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path23, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path23, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path23, ...issue2.path]);
       } else {
-        const fullpath = [...path21, ...issue2.path];
+        const fullpath = [...path23, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -11893,17 +11893,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path21 = []) => {
+  const processError = (error52, path23 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path23, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path23, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path23, ...issue2.path]);
       } else {
-        const fullpath = [...path21, ...issue2.path];
+        const fullpath = [...path23, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -11935,8 +11935,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path21 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path21) {
+  const path23 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path23) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -25061,13 +25061,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path21 = ref.slice(1).split("/").filter(Boolean);
-  if (path21.length === 0) {
+  const path23 = ref.slice(1).split("/").filter(Boolean);
+  if (path23.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path21[0] === defsKey) {
-    const key = path21[1];
+  if (path23[0] === defsKey) {
+    const key = path23[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -31014,11 +31014,11 @@ function* walk(tree) {
   if (!root || typeof root !== "object") return;
   yield* walkNode(root, "root");
 }
-function* walkNode(node, path21) {
-  yield { node, path: path21 };
+function* walkNode(node, path23) {
+  yield { node, path: path23 };
   const children = Array.isArray(node.children) ? node.children : [];
   for (let i = 0; i < children.length; i++) {
-    yield* walkNode(children[i], `${path21}.children[${i}]`);
+    yield* walkNode(children[i], `${path23}.children[${i}]`);
   }
 }
 function findByTestTag(tree, tag) {
@@ -31057,18 +31057,18 @@ function layoutGaps(a, b) {
 }
 function siblingLayoutGaps(tree) {
   const out = [];
-  const visit = (node, path21) => {
+  const visit = (node, path23) => {
     const children = Array.isArray(node.children) ? node.children : [];
     const tagged = children.filter((c) => c && c.testTag != null && c.bounds);
     for (let i = 0; i + 1 < tagged.length; i++) {
       out.push({
-        parentPath: path21,
+        parentPath: path23,
         a: tagged[i].testTag,
         b: tagged[i + 1].testTag,
         gaps: layoutGaps(tagged[i], tagged[i + 1])
       });
     }
-    children.forEach((c, i) => c && visit(c, `${path21}.children[${i}]`));
+    children.forEach((c, i) => c && visit(c, `${path23}.children[${i}]`));
   };
   if (tree && tree.root) visit(tree.root, "root");
   return out;
@@ -31142,9 +31142,9 @@ function auditA11y(tree, opts = {}) {
   const violations = [];
   const warnings = [];
   let passCount = 0;
-  for (const { node, path: path21 } of walk(tree)) {
+  for (const { node, path: path23 } of walk(tree)) {
     const entryBase = {
-      path: path21,
+      path: path23,
       testTag: node.testTag ?? null,
       bounds: node.bounds ?? null
     };
@@ -31556,16 +31556,16 @@ function diffTrees(currentTree, goldenTree, tolerancePx = 1) {
   diffNode(cur, gold, "root", tol, diffs);
   return diffs;
 }
-function diffNode(cur, gold, path21, tol, out) {
+function diffNode(cur, gold, path23, tol, out) {
   if (cur.testTag !== gold.testTag) {
-    out.push({ path: path21, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
+    out.push({ path: path23, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
   }
   if (cur.text !== gold.text) {
-    out.push({ path: path21, kind: "text-changed", before: gold.text, after: cur.text });
+    out.push({ path: path23, kind: "text-changed", before: gold.text, after: cur.text });
   }
   if (cur.contentDescription !== gold.contentDescription) {
     out.push({
-      path: path21,
+      path: path23,
       kind: "contentDescription-changed",
       before: gold.contentDescription,
       after: cur.contentDescription
@@ -31573,29 +31573,29 @@ function diffNode(cur, gold, path21, tol, out) {
   }
   const roleB = gold.role ?? null;
   const roleA = cur.role ?? null;
-  if (roleA !== roleB) out.push({ path: path21, kind: "role-changed", before: roleB, after: roleA });
+  if (roleA !== roleB) out.push({ path: path23, kind: "role-changed", before: roleB, after: roleA });
   const clickB = gold.clickable ?? false;
   const clickA = cur.clickable ?? false;
-  if (clickA !== clickB) out.push({ path: path21, kind: "clickable-changed", before: clickB, after: clickA });
+  if (clickA !== clickB) out.push({ path: path23, kind: "clickable-changed", before: clickB, after: clickA });
   const disB = gold.disabled ?? false;
   const disA = cur.disabled ?? false;
-  if (disA !== disB) out.push({ path: path21, kind: "disabled-changed", before: disB, after: disA });
+  if (disA !== disB) out.push({ path: path23, kind: "disabled-changed", before: disB, after: disA });
   if (JSON.stringify(cur.designToken) !== JSON.stringify(gold.designToken)) {
-    out.push({ path: path21, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
+    out.push({ path: path23, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
   }
   const moved = boundsMovedBeyond(cur.bounds, gold.bounds, tol);
   if (moved) {
-    out.push({ path: path21, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
+    out.push({ path: path23, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
   }
   const curKids = cur.children || [];
   const goldKids = gold.children || [];
   const shared = Math.min(curKids.length, goldKids.length);
   for (let i = 0; i < shared; i++) {
-    diffNode(curKids[i], goldKids[i], `${path21}.children[${i}]`, tol, out);
+    diffNode(curKids[i], goldKids[i], `${path23}.children[${i}]`, tol, out);
   }
   for (let i = shared; i < curKids.length; i++) {
     out.push({
-      path: `${path21}.children[${i}]`,
+      path: `${path23}.children[${i}]`,
       kind: "node-added",
       before: null,
       after: summarize(curKids[i])
@@ -31603,7 +31603,7 @@ function diffNode(cur, gold, path21, tol, out) {
   }
   for (let i = shared; i < goldKids.length; i++) {
     out.push({
-      path: `${path21}.children[${i}]`,
+      path: `${path23}.children[${i}]`,
       kind: "node-removed",
       before: summarize(goldKids[i]),
       after: null
@@ -31649,8 +31649,8 @@ function parsePngHeader(buf) {
   }
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
-function readPngMeta(path21) {
-  const abs = resolve(path21);
+function readPngMeta(path23) {
+  const abs = resolve(path23);
   let buf;
   try {
     buf = readFileSync3(abs);
@@ -32110,9 +32110,9 @@ function renderTreeSvg(tree, opts = {}) {
   const originY = LEGEND_H + MARGIN / 2;
   let nodeCount = 0;
   const body = [];
-  for (const { node, path: path21 } of walk(root)) {
+  for (const { node, path: path23 } of walk(root)) {
     nodeCount++;
-    if (depthOf(path21) > maxDepth) continue;
+    if (depthOf(path23) > maxDepth) continue;
     const b = node.bounds;
     const w = boundsDim(b, "width");
     const h = boundsDim(b, "height");
@@ -32123,10 +32123,10 @@ function renderTreeSvg(tree, opts = {}) {
     const sh = h * scale;
     const tokenized = node.designToken != null;
     const clickable = node.clickable === true;
-    const rules = violationsByPath.get(path21);
+    const rules = violationsByPath.get(path23);
     const base = tokenized ? STYLE.tokenized : STYLE.plain;
     body.push(
-      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path21)}"/>`
+      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path23)}"/>`
     );
     if (clickable) {
       body.push(
@@ -32217,8 +32217,8 @@ var ABBREV = {
 function abbrev(key) {
   return ABBREV[key] ?? key;
 }
-function depthOf(path21) {
-  return (path21.match(/\.children\[/g) || []).length;
+function depthOf(path23) {
+  return (path23.match(/\.children\[/g) || []).length;
 }
 function boundsDim(b, key) {
   return b && typeof b[key] === "number" ? b[key] : 0;
@@ -32238,9 +32238,9 @@ function countRenderable(tree, opts = {}) {
   const maxDepth = typeof opts.maxDepth === "number" && opts.maxDepth >= 0 ? opts.maxDepth : Infinity;
   let total = 0;
   let drawn = 0;
-  for (const { node, path: path21 } of walk(root)) {
+  for (const { node, path: path23 } of walk(root)) {
     total++;
-    if (depthOf(path21) > maxDepth) continue;
+    if (depthOf(path23) > maxDepth) continue;
     if (boundsDim(node.bounds, "width") > 0 && boundsDim(node.bounds, "height") > 0) drawn++;
   }
   return { total, drawn };
@@ -32318,10 +32318,10 @@ function parseLogcat(raw, opts = {}) {
 
 // src/lib/preview-service.mjs
 import crypto from "node:crypto";
-import fs19 from "node:fs";
+import fs20 from "node:fs";
 import http from "node:http";
 import os3 from "node:os";
-import path20 from "node:path";
+import path22 from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 import { promisify } from "node:util";
@@ -32421,7 +32421,7 @@ function diffAgainstDesignSystem(tree, catalog) {
   const colors = catalog && catalog.colors || {};
   const dimens = catalog && catalog.dimens || {};
   const out = [];
-  for (const { node, path: path21 } of walk(tree)) {
+  for (const { node, path: path23 } of walk(tree)) {
     const dt = node.designToken;
     if (!dt || !Array.isArray(dt.tokens) || dt.tokens.length === 0) continue;
     const resolved = dt.resolved && typeof dt.resolved === "object" ? dt.resolved : {};
@@ -32435,7 +32435,7 @@ function diffAgainstDesignSystem(tree, catalog) {
       const matches = resolvedValues.includes(declaredNorm);
       if (!matches) {
         out.push({
-          path: path21,
+          path: path23,
           token,
           declared,
           // report the node's resolved value most likely intended for this token:
@@ -33574,9 +33574,9 @@ function listReceiptHistory(root) {
   return { available: true, receipts };
 }
 
-// src/lib/components.mjs
-import fs10 from "node:fs";
-import path10 from "node:path";
+// src/lib/steps-bridge.mjs
+import fs11 from "node:fs";
+import path12 from "node:path";
 
 // ../../packages/harness/src/console/console-data.mjs
 function kebabCase(name) {
@@ -33632,766 +33632,12 @@ function deriveContrastPairs(colors = {}) {
   add("OnSurface", "Background", "body text on Background");
   return pairs;
 }
-
-// src/lib/components.mjs
-function walkKtFiles(dir) {
-  const out = [];
-  let entries;
-  try {
-    entries = fs10.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const e of entries) {
-    const p = path10.join(dir, e.name);
-    if (e.isDirectory()) out.push(...walkKtFiles(p));
-    else if (e.name.endsWith(".kt")) out.push(p);
-  }
-  return out;
-}
-function findPresentationDirs(kotlinRoot) {
-  const out = [];
-  (function walk2(dir) {
-    let entries;
-    try {
-      entries = fs10.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      if (!e.isDirectory()) continue;
-      const p = path10.join(dir, e.name);
-      if (e.name === "presentation") out.push(p);
-      else walk2(p);
-    }
-  })(kotlinRoot);
-  return out;
-}
-function splitTopLevel(paramsText) {
-  const parts = [];
-  let depth = 0;
-  let current = "";
-  for (const ch of paramsText) {
-    if (ch === "(" || ch === "[" || ch === "{") depth++;
-    else if (ch === ")" || ch === "]" || ch === "}") depth--;
-    if (ch === "," && depth === 0) {
-      parts.push(current.trim());
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  if (current.trim()) parts.push(current.trim());
-  return parts;
-}
-function parseParam(raw) {
-  let depth = 0;
-  let colonIdx = -1;
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (ch === "(" || ch === "[" || ch === "{") depth++;
-    else if (ch === ")" || ch === "]" || ch === "}") depth--;
-    else if (ch === ":" && depth === 0 && colonIdx === -1) colonIdx = i;
-  }
-  if (colonIdx === -1) return { raw, name: raw.trim(), type: null, default: null };
-  const name = raw.slice(0, colonIdx).trim();
-  const rest = raw.slice(colonIdx + 1);
-  depth = 0;
-  let eqIdx = -1;
-  for (let i = 0; i < rest.length; i++) {
-    const ch = rest[i];
-    if (ch === "(" || ch === "[" || ch === "{") depth++;
-    else if (ch === ")" || ch === "]" || ch === "}") depth--;
-    else if (ch === "=" && depth === 0 && eqIdx === -1) eqIdx = i;
-  }
-  if (eqIdx === -1) return { raw, name, type: rest.trim(), default: null };
-  return { raw, name, type: rest.slice(0, eqIdx).trim(), default: rest.slice(eqIdx + 1).trim() };
-}
-function extractKdocBefore(text, idx) {
-  const before = text.slice(0, idx).replace(/\s+$/, "");
-  if (!before.endsWith("*/")) return null;
-  const start = before.lastIndexOf("/**");
-  if (start === -1) return null;
-  const raw = before.slice(start);
-  const body = raw.replace(/^\/\*\*/, "").replace(/\*\/$/, "");
-  const lines = body.split("\n").map((l) => l.replace(/^\s*\*\s?/, "").trimEnd());
-  while (lines.length && lines[0].trim() === "") lines.shift();
-  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
-  const joined = lines.join("\n").trim();
-  return joined || null;
-}
-function parseKdocSections(kdoc) {
-  if (!kdoc) return { description: null, paramDocs: {} };
-  const descLines = [];
-  const paramDocs = {};
-  let currentParam = null;
-  let pastFirstTag = false;
-  for (const line of kdoc.split("\n")) {
-    const tag = line.match(/^@(\w+)(?:\s+(.*))?$/);
-    if (tag) {
-      pastFirstTag = true;
-      currentParam = null;
-      if (tag[1] === "param") {
-        const m = (tag[2] || "").match(/^\[?([A-Za-z_][A-Za-z0-9_]*)\]?\s*(.*)$/);
-        if (m) {
-          currentParam = m[1];
-          paramDocs[currentParam] = m[2] || "";
-        }
-      }
-      continue;
-    }
-    if (currentParam !== null) {
-      paramDocs[currentParam] = `${paramDocs[currentParam]} ${line.trim()}`.trim();
-    } else if (!pastFirstTag) {
-      descLines.push(line);
-    }
-  }
-  const description = descLines.join("\n").trim() || null;
-  return { description, paramDocs };
-}
-var FUN_SEARCH_WINDOW = 500;
-var BODY_SEARCH_WINDOW = 300;
-function findFunctionBody(text, afterIdx) {
-  const searchEnd = Math.min(text.length, afterIdx + BODY_SEARCH_WINDOW);
-  let i = afterIdx;
-  while (i < searchEnd && text[i] !== "{") i++;
-  if (i >= searchEnd || text[i] !== "{") return null;
-  let depth = 0;
-  const start = i;
-  for (; i < text.length; i++) {
-    if (text[i] === "{") depth++;
-    else if (text[i] === "}") {
-      depth--;
-      if (depth === 0) return text.slice(start, i + 1);
-    }
-  }
-  return null;
-}
-var TOKEN_REF_RE = /\b(\w*(?:Tokens|Colors))\.(\w+)/g;
-function deriveFacts(bodyText) {
-  const derivedTags = [...new Set([...bodyText.matchAll(/\$\{screenTag\}_([A-Za-z0-9]+)/g)].map((m) => m[1]))].sort();
-  const a11yFloorEvidence = [];
-  if (/\b48\.dp\b/.test(bodyText)) a11yFloorEvidence.push("48.dp");
-  if (/\bMinTouchTarget\b/.test(bodyText)) a11yFloorEvidence.push("MinTouchTarget");
-  const contentUiStateArms = [...new Set([...bodyText.matchAll(/\bis ContentUiState\.(\w+)\b/g)].map((m) => m[1]))];
-  const insetsApis = ["statusBarsPadding", "navigationBarsPadding", "consumeWindowInsets", "WindowInsets"].filter(
-    (api) => new RegExp(`\\b${api}\\b`).test(bodyText)
-  );
-  const tokensReferenced = [...new Set([...bodyText.matchAll(TOKEN_REF_RE)].map((m) => `${m[1]}.${m[2]}`))].sort();
-  const selfReportsDesignToken = /\.designToken\(/.test(bodyText);
-  return { derivedTags, a11yFloorEvidence, contentUiStateArms, insetsApis, tokensReferenced, selfReportsDesignToken };
-}
-function scanComposables(text) {
-  const out = [];
-  const composableRe = /@Composable\b/g;
-  let m;
-  while (m = composableRe.exec(text)) {
-    const window = text.slice(m.index, m.index + FUN_SEARCH_WINDOW);
-    const funMatch = window.match(/fun\s+(?:<[^>]*>\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^>]*>)?\s*\(/);
-    if (!funMatch) continue;
-    const name = funMatch[1];
-    const kdoc = extractKdocBefore(text, m.index);
-    const openIdx = m.index + funMatch.index + funMatch[0].length - 1;
-    let depth = 0;
-    let closeIdx = -1;
-    for (let i = openIdx; i < text.length; i++) {
-      if (text[i] === "(") depth++;
-      else if (text[i] === ")") {
-        depth--;
-        if (depth === 0) {
-          closeIdx = i;
-          break;
-        }
-      }
-    }
-    const { description: kdocDescription, paramDocs } = parseKdocSections(kdoc);
-    if (closeIdx === -1) {
-      out.push({
-        name,
-        params: [],
-        paramsParsed: [],
-        parseError: true,
-        kdoc,
-        kdocDescription,
-        paramDocs,
-        facts: deriveFacts("")
-      });
-      continue;
-    }
-    const rawParams = splitTopLevel(text.slice(openIdx + 1, closeIdx));
-    const body = findFunctionBody(text, closeIdx + 1);
-    out.push({
-      name,
-      params: rawParams,
-      paramsParsed: rawParams.map(parseParam),
-      kdoc,
-      kdocDescription,
-      paramDocs,
-      facts: deriveFacts(body ?? ""),
-      body: body ?? ""
-    });
-  }
-  return out;
-}
-var SCREEN_FILE_RE = /Screen\.kt$/;
-function getComponentsData(root) {
-  const kotlinRoot = path10.join(root, "composeApp", "src", "commonMain", "kotlin");
-  const presentationDirs = findPresentationDirs(kotlinRoot);
-  if (presentationDirs.length === 0) {
-    return {
-      available: false,
-      reason: `no 'presentation' directory found under ${path10.relative(root, kotlinRoot).split(path10.sep).join("/")}`
-    };
-  }
-  const componentsDirs = presentationDirs.map((p) => path10.join(p, "components")).filter((p) => fs10.existsSync(p));
-  if (componentsDirs.length === 0) {
-    return { available: false, reason: "no presentation/components directory found" };
-  }
-  const componentFiles = componentsDirs.flatMap(
-    (dir) => fs10.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(".kt")).map((e) => path10.join(dir, e.name))
-  );
-  if (componentFiles.length === 0) {
-    return { available: true, components: [] };
-  }
-  const allPresentationFiles = presentationDirs.flatMap(walkKtFiles);
-  const fileTexts = new Map(allPresentationFiles.map((f) => [f, fs10.readFileSync(f, "utf8")]));
-  const components = [];
-  for (const file2 of componentFiles) {
-    const text = fileTexts.get(file2) ?? fs10.readFileSync(file2, "utf8");
-    const relFile = path10.relative(root, file2).split(path10.sep).join("/");
-    for (const sig of scanComposables(text)) {
-      const callRe = new RegExp(`\\b${sig.name}\\s*\\(`);
-      const usedIn = [];
-      for (const [otherFile, otherText] of fileTexts) {
-        if (otherFile === file2) continue;
-        if (callRe.test(otherText)) usedIn.push(path10.relative(root, otherFile).split(path10.sep).join("/"));
-      }
-      usedIn.sort((a, b) => a.localeCompare(b));
-      components.push({
-        name: sig.name,
-        file: relFile,
-        params: sig.params,
-        paramsParsed: sig.paramsParsed,
-        parseError: sig.parseError === true,
-        kdoc: sig.kdoc,
-        kdocDescription: sig.kdocDescription,
-        paramDocs: sig.paramDocs,
-        facts: sig.facts,
-        usedIn,
-        usedInScreens: usedIn.filter((f) => SCREEN_FILE_RE.test(f))
-      });
-    }
-  }
-  components.sort((a, b) => a.name.localeCompare(b.name) || a.file.localeCompare(b.file));
-  return { available: true, components, ungoverned: scanUngoverned(root, presentationDirs, components) };
-}
-var SEAM_NAME_RE = /(Screen|Route|Preview)$/;
-function scanUngoverned(root, presentationDirs, registryComponents) {
-  const registryNames = new Set(registryComponents.map((c) => c.name));
-  const featureFiles = presentationDirs.flatMap(walkKtFiles).filter((f) => !f.split(path10.sep).includes("components"));
-  const fileTexts = new Map(featureFiles.map((f) => [f, fs10.readFileSync(f, "utf8")]));
-  const out = [];
-  for (const [file2, text] of fileTexts) {
-    const relFile = path10.relative(root, file2).split(path10.sep).join("/");
-    const featureOf = (rel) => {
-      const after = rel.split("/presentation/")[1] ?? "";
-      return after.includes("/") ? after.split("/")[0] : "(root)";
-    };
-    for (const sig of scanComposables(text)) {
-      if (SEAM_NAME_RE.test(sig.name)) continue;
-      if (registryNames.has(sig.name)) continue;
-      const callRe = new RegExp(`\\b${sig.name}\\s*\\(`);
-      const usedIn = [];
-      for (const [otherFile, otherText] of fileTexts) {
-        if (otherFile === file2) continue;
-        if (callRe.test(otherText)) usedIn.push(path10.relative(root, otherFile).split(path10.sep).join("/"));
-      }
-      const features = /* @__PURE__ */ new Set([featureOf(relFile), ...usedIn.map(featureOf)]);
-      out.push({
-        name: sig.name,
-        file: relFile,
-        feature: featureOf(relFile),
-        params: sig.params.length,
-        usedIn: usedIn.sort((a, b) => a.localeCompare(b)),
-        crossFeatureUseCount: features.size - 1,
-        composesRegistry: registryComponents.some((c) => new RegExp(`\\b${c.name}\\s*\\(`).test(sig.body))
-      });
-    }
-  }
-  out.sort((a, b) => b.crossFeatureUseCount - a.crossFeatureUseCount || a.name.localeCompare(b.name));
-  return out;
-}
-
-// src/lib/variants.mjs
-import fs11 from "node:fs";
-import path11 from "node:path";
-function getVariantsData(root) {
-  const variantsDir = path11.join(root, "composeApp", "build", "previews", "variants");
-  let entries;
-  try {
-    entries = fs11.readdirSync(variantsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
-  } catch {
-    return { available: false };
-  }
-  if (entries.length === 0) return { available: false };
-  const variants = entries.map((e) => e.name).sort().map((name) => {
-    const dir = path11.join(variantsDir, name);
-    let screenDirs = [];
-    try {
-      screenDirs = fs11.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
-    } catch {
-      screenDirs = [];
-    }
-    const screens = screenDirs.map((e) => e.name).filter((id) => fs11.existsSync(path11.join(dir, id, "screen.png"))).sort().map((id) => ({ id, png: `variants/${name}/${id}/screen.png` }));
-    const hasDesignSystem = fs11.existsSync(path11.join(dir, "design-system.json"));
-    return { name, screens, hasDesignSystem };
-  });
-  return { available: true, variants };
-}
-
-// src/lib/component-drift.mjs
-import fs12 from "node:fs";
-import path12 from "node:path";
-function getComponentDriftInfo(root, files, approvalRecord) {
-  if (!approvalRecord) {
-    return { available: false, reason: "no approvals record for the components artifact" };
-  }
-  if (approvalRecord.status !== "changed-since-approval") {
-    return {
-      available: false,
-      reason: `components artifact status is "${approvalRecord.status}" \u2014 nothing to attribute per-file`
-    };
-  }
-  if (!approvalRecord.approvedAt) {
-    return { available: false, reason: "no approvedAt timestamp on the stored record \u2014 cannot compare file mtimes" };
-  }
-  const approvedAtMs = Date.parse(approvalRecord.approvedAt);
-  if (Number.isNaN(approvedAtMs)) {
-    return { available: false, reason: `approvedAt "${approvalRecord.approvedAt}" is not a parseable timestamp` };
-  }
-  const byFile = {};
-  for (const relFile of files) {
-    try {
-      const stat = fs12.statSync(path12.join(root, relFile));
-      byFile[relFile] = { modifiedSinceApproval: stat.mtimeMs > approvedAtMs, mtime: stat.mtime.toISOString() };
-    } catch {
-      byFile[relFile] = { modifiedSinceApproval: null, mtime: null };
-    }
-  }
-  return { available: true, byFile };
-}
-
-// src/lib/handrolled-state.mjs
-import fs13 from "node:fs";
-import path13 from "node:path";
-var INDICATORS = ["CircularProgressIndicator", "LinearProgressIndicator"];
-function isUnderComponentsDir(absFile) {
-  return absFile.split(path13.sep).includes("components");
-}
-function getHandRolledStateViolations(root) {
-  const kotlinRoot = path13.join(root, "composeApp", "src", "commonMain", "kotlin");
-  const presentationDirs = findPresentationDirs(kotlinRoot);
-  if (presentationDirs.length === 0) {
-    return {
-      available: false,
-      reason: `no 'presentation' directory found under ${path13.relative(root, kotlinRoot).split(path13.sep).join("/")}`
-    };
-  }
-  const files = presentationDirs.flatMap(walkKtFiles).filter((f) => !isUnderComponentsDir(f));
-  const violations = [];
-  for (const file2 of files) {
-    let text;
-    try {
-      text = fs13.readFileSync(file2, "utf8");
-    } catch {
-      continue;
-    }
-    const indicators = [];
-    for (const name of INDICATORS) {
-      const re = new RegExp(`\\b${name}\\b`, "g");
-      const lines = [];
-      let m;
-      while (m = re.exec(text)) {
-        lines.push(text.slice(0, m.index).split("\n").length);
-      }
-      if (lines.length) indicators.push({ name, lines });
-    }
-    if (indicators.length) {
-      violations.push({ file: path13.relative(root, file2).split(path13.sep).join("/"), indicators });
-    }
-  }
-  violations.sort((a, b) => a.file.localeCompare(b.file));
-  return { available: true, violations };
-}
-
-// src/lib/walkthrough-data.mjs
-import fs14 from "node:fs";
-import path14 from "node:path";
-var WALKTHROUGH_REL_DIR = path14.join("qa", "evidence", "walkthrough");
-function getWalkthroughData(projectDir, { limit = 8 } = {}) {
-  const root = path14.join(projectDir, WALKTHROUGH_REL_DIR);
-  if (!fs14.existsSync(root)) {
-    return { available: false, reason: "no walkthrough runs yet \u2014 node qa/walkthrough.mjs against the live app", runs: [] };
-  }
-  const runs = [];
-  for (const entry of fs14.readdirSync(root)) {
-    const dir = path14.join(root, entry);
-    const manifestPath = path14.join(dir, "manifest.json");
-    if (!fs14.existsSync(manifestPath)) continue;
-    let manifest;
-    try {
-      manifest = JSON.parse(fs14.readFileSync(manifestPath, "utf8"));
-    } catch (err) {
-      runs.push({ dir, relDir: path14.join(WALKTHROUGH_REL_DIR, entry), error: `manifest unreadable: ${err.message}` });
-      continue;
-    }
-    runs.push({
-      dir,
-      relDir: path14.join(WALKTHROUGH_REL_DIR, entry),
-      relDirBase: entry,
-      // the console's /walkthrough/<base>/… static route key
-      generatedAt: manifest.generatedAt ?? entry,
-      appId: manifest.appId ?? "unknown",
-      screenCount: (manifest.screens ?? []).length,
-      a11yViolations: (manifest.screens ?? []).reduce((a, s) => a + (s.a11y?.violations ?? []).length, 0),
-      unsettled: (manifest.screens ?? []).filter((s) => s.settled === false).length,
-      notWalked: (manifest.notWalked ?? []).length,
-      hasReport: fs14.existsSync(path14.join(dir, "report.html")),
-      manifest
-    });
-  }
-  runs.sort((a, b) => String(b.generatedAt).localeCompare(String(a.generatedAt)));
-  const trimmed = runs.slice(0, limit).map((r, i) => i === 0 ? r : { ...r, manifest: void 0 });
-  return trimmed.length ? { available: true, runs: trimmed } : { available: false, reason: "walkthrough directory exists but holds no runs", runs: [] };
-}
-
-// src/lib/live-session.mjs
-import path15 from "node:path";
-var HEALTH_TIMEOUT_MS = 900;
-async function getLiveDeviceStatus({ port = 9500, fetchImpl = fetch } = {}) {
-  const url2 = `http://127.0.0.1:${port}/inspect/health`;
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), HEALTH_TIMEOUT_MS);
-      const res = await fetchImpl(url2, { signal: ctrl.signal, headers: { connection: "close" } });
-      clearTimeout(timer);
-      if (!res.ok) return { reachable: false, reason: `health -> HTTP ${res.status}` };
-      const health = await res.json();
-      return {
-        reachable: true,
-        appId: health.appId ?? "unknown",
-        buildType: health.buildType ?? "debug",
-        processStartedAtMs: health.processStartedAtMs ?? null,
-        remoteUrl: `http://127.0.0.1:${port}/inspect/remote`
-      };
-    } catch {
-      if (attempt === 2) return { reachable: false, reason: "inspector not reachable (app not running, or no adb forward)" };
-    }
-  }
-  return { reachable: false, reason: "unreachable" };
-}
-function createLiveSession({
-  projectDir,
-  port = 9500,
-  exec,
-  gradleEnv: gradleEnv2,
-  log = () => {
-  },
-  // Injectable so the health step is testable. Without it the step reached the
-  // REAL loopback inspector on the machine-global port — a test would silently
-  // assert against whatever app happened to be running, exactly the isolation
-  // trap that let a foreign preview daemon get adopted.
-  fetchImpl = fetch
-} = {}) {
-  const state = {
-    running: false,
-    startedAt: null,
-    finishedAt: null,
-    ok: null,
-    steps: []
-    // {name, status: running|ok|fail, detail?, ms}
-  };
-  const describeDetail = (value) => {
-    if (value == null) return "";
-    if (typeof value === "string") return value.trim();
-    if (typeof value === "object") {
-      const out = [value.stdout, value.stderr].filter((s) => typeof s === "string" && s.trim());
-      return out.length ? out.join(" ").trim() : "";
-    }
-    return String(value);
-  };
-  const step = async (name, fn) => {
-    const entry = { name, status: "running", startedAt: Date.now() };
-    state.steps.push(entry);
-    log(`live-session: ${name}\u2026`);
-    try {
-      const detail = describeDetail(await fn());
-      entry.status = "ok";
-      if (detail) entry.detail = detail.slice(0, 300);
-    } catch (err) {
-      entry.status = "fail";
-      entry.detail = String(err && err.message ? err.message : err).slice(0, 500);
-      throw err;
-    } finally {
-      entry.ms = Date.now() - entry.startedAt;
-      delete entry.startedAt;
-    }
-  };
-  async function run() {
-    await step("device", async () => {
-      const { stdout } = await exec("adb", ["devices"]);
-      const attached = stdout.split("\n").slice(1).filter((l) => l.trim().endsWith("device"));
-      if (attached.length > 0) return `already attached: ${attached[0].split("	")[0]}`;
-      const { stdout: avds } = await exec("emulator", ["-list-avds"]);
-      const avd = avds.split("\n").map((s) => s.trim()).filter(Boolean)[0];
-      if (!avd) throw new Error("no device attached and no AVDs exist \u2014 create one in Android Studio first");
-      exec("emulator", ["-avd", avd, "-no-window", "-no-audio"], { detach: true });
-      await exec("adb", ["wait-for-device"], { timeoutMs: 12e4 });
-      const deadline = Date.now() + 12e4;
-      while (Date.now() < deadline) {
-        const { stdout: boot } = await exec("adb", ["shell", "getprop", "sys.boot_completed"]).catch(() => ({ stdout: "" }));
-        if (boot.trim() === "1") return `booted ${avd}`;
-        await new Promise((r) => setTimeout(r, 2e3));
-      }
-      throw new Error(`AVD ${avd} did not finish booting within 120s`);
-    });
-    await step("installDebug", async () => {
-      const gradlew = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
-      await exec(gradlew, [":composeApp:installDebug", "--console=plain"], {
-        cwd: projectDir,
-        env: gradleEnv2 ? gradleEnv2() : void 0,
-        timeoutMs: 9e5
-      });
-    });
-    await step("launch", async () => {
-      const appId = await resolveAppId2();
-      await exec("adb", ["shell", "monkey", "-p", appId, "-c", "android.intent.category.LAUNCHER", "1"]);
-      return appId;
-    });
-    await step("forward", async () => {
-      await exec("adb", ["forward", `tcp:${port}`, `tcp:${port}`]);
-      return `tcp:${port} \u2192 tcp:${port}`;
-    });
-    await step("health", async () => {
-      const deadline = Date.now() + 3e4;
-      let lastReason = "";
-      while (Date.now() < deadline) {
-        const status = await getLiveDeviceStatus({ port, fetchImpl });
-        if (status.reachable) return `${status.appId} (${status.buildType})`;
-        lastReason = status.reason;
-        await new Promise((r) => setTimeout(r, 1e3));
-      }
-      throw new Error(`inspector never became healthy: ${lastReason}`);
-    });
-  }
-  async function resolveAppId2() {
-    const fs20 = await import("node:fs");
-    for (const f of ["composeApp/build.gradle.kts", "composeApp/build.gradle"]) {
-      const p = path15.join(projectDir, f);
-      if (!fs20.existsSync(p)) continue;
-      const m = fs20.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
-      if (m) return m[1];
-    }
-    throw new Error("could not resolve applicationId from composeApp/build.gradle(.kts)");
-  }
-  return {
-    status: () => ({ ...state, steps: state.steps.map((s) => ({ ...s })) }),
-    start() {
-      if (state.running) return { started: false, reason: "a live-session chain is already running" };
-      state.running = true;
-      state.ok = null;
-      state.steps.length = 0;
-      state.startedAt = (/* @__PURE__ */ new Date()).toISOString();
-      state.finishedAt = null;
-      run().then(() => {
-        state.ok = true;
-      }).catch(() => {
-        state.ok = false;
-      }).finally(() => {
-        state.running = false;
-        state.finishedAt = (/* @__PURE__ */ new Date()).toISOString();
-      });
-      return { started: true };
-    }
-  };
-}
-
-// src/lib/digest.mjs
-var short = (s) => String(s ?? "").slice(0, 7);
-async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceDays = 7, limit = 30 } = {}) {
-  const git2 = async (args) => (await execFileAsync3("git", args, { cwd: projectDir, timeout: 8e3, maxBuffer: 4 * 1024 * 1024 })).stdout;
-  const since = `${sinceDays} days ago`;
-  const resolvedLayout = resolveProjectLayout(projectDir);
-  if (!resolvedLayout.ok) {
-    return { available: false, reason: resolvedLayout.reason, since, commits: [], laneRuns: [], approvalEvents: [], openComments: null };
-  }
-  const layout = resolvedLayout.layout ?? DEFAULT_LAYOUT;
-  let commits;
-  try {
-    const raw = await git2([
-      "log",
-      `--since=${since}`,
-      `--max-count=${limit}`,
-      "--name-status",
-      "--no-renames",
-      "--pretty=format:%x01%H%x00%ci%x00%s"
-    ]);
-    commits = [];
-    for (const block of raw.split("")) {
-      if (!block.trim()) continue;
-      const [head, ...fileLines] = block.split("\n");
-      const [sha, when, subject] = head.split("\0");
-      if (!sha) continue;
-      const files = [];
-      for (const line of fileLines) {
-        if (!line.trim()) continue;
-        const [status, ...rest] = line.split("	");
-        if (!rest.length) continue;
-        files.push({ status: status.trim(), path: rest.join("	") });
-      }
-      commits.push({ sha: short(sha), when, subject, files });
-    }
-  } catch (err) {
-    return { available: false, reason: `not a git repo (or git failed): ${err.message}`, since, commits: [], laneRuns: [], approvalEvents: [], openComments: null };
-  }
-  const laneRuns = [];
-  try {
-    const raw = await git2(["log", `--since=${since}`, "--pretty=%H%x00%ci", "--", layout.receipt]);
-    for (const line of raw.split("\n").filter(Boolean).slice(0, 12)) {
-      const [sha, when] = line.split("\0");
-      try {
-        const body = await git2(["show", `${sha}:${layout.receipt}`]);
-        const receipt = JSON.parse(body);
-        const onDevice = receipt.strength?.onDeviceSteps ?? [];
-        const level = receipt.evidenceLevel;
-        laneRuns.push({
-          sha: short(sha),
-          when,
-          verdict: receipt.verdict ?? "unknown",
-          strength: onDevice.length ? `on-device: ${onDevice.join("+")}` : "desktop-only",
-          rung: level && typeof level.rung === "string" && typeof level.name === "string" ? `${level.rung} ${level.name}` : void 0,
-          // The pack that graded that rung, carried BESIDE it because a rung
-          // that reaches a surface without one cannot be rendered honestly
-          // there — NORTH-STAR.md §6.5 requires every surface showing a rung to
-          // show the pack, and this row feeds one (the front door's "What
-          // changed" lane-run table). Only the id: `pack.version` on a receipt
-          // is currently the harness lock's number rather than the profile's
-          // (docs/adr/0008), so passing it on would propagate a borrowed fact.
-          packId: typeof receipt.pack?.id === "string" && receipt.pack.id.trim() ? receipt.pack.id.trim() : null
-        });
-      } catch {
-        laneRuns.push({ sha: short(sha), when, verdict: "unreadable" });
-      }
-    }
-  } catch {
-  }
-  let approvalEvents = [];
-  try {
-    const raw = await git2(["log", `--since=${since}`, "--pretty=%H%x00%ci%x00%s", "--", layout.approvals]);
-    approvalEvents = raw.split("\n").filter(Boolean).slice(0, 12).map((l) => {
-      const [sha, when, subject] = l.split("\0");
-      return { sha: short(sha), when, subject };
-    });
-  } catch {
-  }
-  let openComments = null;
-  try {
-    const fs20 = await import("node:fs");
-    const path21 = await import("node:path");
-    const ledger = path21.join(projectDir, "qa", "comments.json");
-    if (fs20.existsSync(ledger)) {
-      const data = JSON.parse(fs20.readFileSync(ledger, "utf8"));
-      openComments = (data.comments ?? []).filter((c) => c.status === "open").length;
-    }
-  } catch {
-    openComments = null;
-  }
-  return { available: true, since, commits, laneRuns, approvalEvents, openComments };
-}
-
-// src/lib/approval-diff.mjs
-import fs15 from "node:fs";
-import os2 from "node:os";
-import path16 from "node:path";
-import { pathToFileURL as pathToFileURL5 } from "node:url";
-var SEARCH_DEPTH = 120;
-var MAX_DIFF_LINES = 400;
-async function importProjectApprovals(projectDir) {
-  const lib = path16.join(projectDir, "qa", "lib", "approvals.mjs");
-  if (!fs15.existsSync(lib)) return null;
-  try {
-    return await import(pathToFileURL5(lib).href);
-  } catch {
-    return null;
-  }
-}
-async function materialize(git2, sha, relFiles, alsoNeeded) {
-  const tmp = fs15.mkdtempSync(path16.join(os2.tmpdir(), "cmp-approval-anchor-"));
-  for (const rel of [...relFiles, ...alsoNeeded]) {
-    try {
-      const { stdout } = await git2(["show", `${sha}:${rel}`]);
-      const dest = path16.join(tmp, rel);
-      fs15.mkdirSync(path16.dirname(dest), { recursive: true });
-      fs15.writeFileSync(dest, stdout);
-    } catch {
-    }
-  }
-  return tmp;
-}
-async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: execFileAsync3 } = {}) {
-  const git2 = (args) => execFileAsync3("git", args, { cwd: projectDir, timeout: 1e4, maxBuffer: 16 * 1024 * 1024 });
-  const lib = await importProjectApprovals(projectDir);
-  if (!lib) return { available: false, reason: "project approvals library not importable" };
-  const artifacts = lib.listGovernedArtifacts(projectDir);
-  const artifact = artifacts.find((a) => a.id === artifactId);
-  if (!artifact) return { available: false, reason: `unknown artifact ${artifactId}` };
-  const ledger = lib.loadApprovals(projectDir);
-  const record2 = (ledger?.artifacts ?? []).find((r) => r.artifact === artifactId);
-  const stored = record2?.hash;
-  if (!stored) return { available: false, reason: "no stored approval hash to anchor against" };
-  const alsoNeeded = ["qa/lib/arch-doc.mjs"];
-  let log;
-  try {
-    const { stdout } = await git2(["log", `--max-count=${SEARCH_DEPTH}`, "--pretty=%H%x00%ci", "--", ...artifact.files]);
-    log = stdout.split("\n").filter(Boolean).map((l) => l.split("\0"));
-  } catch (err) {
-    return { available: false, reason: `git log failed: ${err.message}` };
-  }
-  for (const [sha, when] of log) {
-    let tmp = null;
-    try {
-      tmp = await materialize(git2, sha, artifact.files, alsoNeeded);
-      const h = typeof artifact.hash === "function" ? artifact.hash(tmp) : lib.hashArtifactFiles(tmp, artifact.files);
-      if (h.hash === stored) {
-        const { stdout: diff } = await git2(["diff", sha, "--", ...artifact.files]);
-        const { stdout: nameStatus } = await git2(["diff", "--name-status", sha, "--", ...artifact.files]);
-        const changed = nameStatus.split("\n").filter(Boolean).map((l) => {
-          const [status, ...rest] = l.split("	");
-          return { status: status[0], path: rest[rest.length - 1] };
-        });
-        const changedPaths = new Set(changed.map((c) => c.path));
-        const unchanged = artifact.files.filter((f) => !changedPaths.has(f));
-        const lines = diff.split("\n");
-        const truncated = lines.length > MAX_DIFF_LINES;
-        return {
-          available: true,
-          anchorSha: sha.slice(0, 7),
-          anchorWhen: when,
-          diff: (truncated ? lines.slice(0, MAX_DIFF_LINES) : lines).join("\n"),
-          truncated,
-          files: { changed, unchanged }
-        };
-      }
-    } catch {
-    } finally {
-      if (tmp) fs15.rmSync(tmp, { recursive: true, force: true });
-    }
-  }
-  return {
-    available: false,
-    reason: `no commit in the last ${SEARCH_DEPTH} touching this artifact matches the approved hash \u2014 the approval was likely recorded against uncommitted files. The chip is still correct; only the anchored diff is unavailable.`
-  };
+function formatDurationMs(ms) {
+  if (typeof ms !== "number" || Number.isNaN(ms) || ms < 0) return "";
+  if (ms < 1e3) return `${Math.round(ms)}ms`;
+  const secs = ms / 1e3;
+  if (secs < 60) return `${Math.round(secs * 10) / 10}s`;
+  return `${Math.floor(secs / 60)}m ${String(Math.round(secs % 60)).padStart(2, "0")}s`;
 }
 
 // ../../packages/harness/src/console/console-evidence.mjs
@@ -34941,6 +34187,35 @@ var SHELL_CSS = `
   .flow-cmd { margin-left: 10px; font-family: var(--mono); font-size: var(--fs-meta);
               color: var(--ink-2); background: var(--surface); padding: 1px 6px; border-radius: 4px; }
 
+  /* --- now: the lane as it happens (LIVE-CONSOLE.md Phase B) ---
+     One row per step, appended as each finishes. No spinner, no progress bar,
+     no percentage, no auto-scroll: the verdicts wear the SAME classes the
+     Evidence table's rows wear (.step-verdict-*), so a step means the same
+     colour wherever it is read, and SKIP is muted rather than green. */
+  .now { margin: 4px 0 16px; }
+  .now-head { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+  .now-live { color: var(--ink); font-weight: 650; letter-spacing: 0.02em; }
+  .now-absent { color: var(--muted); }
+  .now-link { margin: 2px 0 8px; font-size: var(--fs-meta); color: var(--muted); }
+  .now-steps { list-style: none; margin: 0; padding: 0; font-size: var(--fs-meta); }
+  .now-step { padding: 2px 0; line-height: 1.5; border-bottom: 1px solid transparent; }
+  .now-name { display: inline-block; min-width: 15ch; color: var(--ink); }
+  .now-dur { color: var(--muted); }
+  .now-note { color: var(--ink-2); }
+  .now-state { color: var(--muted); font-style: italic; }
+  .now-running .now-name { font-weight: 650; }
+  .now-running .now-state { color: var(--ink); font-style: normal; }
+  .now-elapsed { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .now-waiting .now-name { color: var(--muted); }
+  /* The tool's own words, wrapped but never reflowed or reworded. */
+  .now-reason { margin: 4px 0 4px 2ch; padding: 6px 8px; white-space: pre-wrap; overflow-x: auto;
+                font-family: var(--mono); font-size: var(--fs-meta); color: var(--drift);
+                background: var(--drift-bg); border-radius: 6px; }
+  .now-nofix { margin: 0 0 6px 2ch; font-size: var(--fs-meta); color: var(--muted); }
+  /* A duration an order of magnitude under the step's own history. Not a
+     verdict \u2014 an observation beside one (evidence-must-attest-execution). */
+  .now-flag { color: var(--reopen); text-decoration: underline dotted; }
+
   /* --- screens (\xA73.4: the screen \xD7 state matrix) --- */
   .screens-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
   #filter { font: inherit; font-size: var(--fs-body); padding: 5px 12px; width: 240px;
@@ -35283,6 +34558,235 @@ var SHELL_CSS = `
     font-size: var(--fs-meta); }
 `;
 
+// ../../packages/harness/src/console/console-now.mjs
+var esc4 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr = (s) => esc4(s).replace(/"/g, "&quot;");
+var STALE_RUN_MS = 30 * 60 * 1e3;
+var REPLAY_FACTOR = 10;
+var REPLAY_FLOOR_MS = 2e3;
+var RUN_PHASE = Object.freeze({
+  NONE: "none",
+  RUNNING: "running",
+  DONE: "done",
+  STOPPED: "stopped"
+});
+var STEP_STATE = Object.freeze({
+  DONE: "done",
+  RUNNING: "running",
+  NOT_YET: "not yet",
+  NOT_RUN: "not run"
+});
+function parseStepStream(text) {
+  if (typeof text !== "string" || text.trim() === "") {
+    return { available: false, reason: "no step stream \u2014 the lane has not run with --events in this tree", run: null, steps: [], end: null };
+  }
+  let run = null;
+  let end = null;
+  let steps = [];
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (!t.startsWith("{")) continue;
+    let obj;
+    try {
+      obj = JSON.parse(t);
+    } catch {
+      continue;
+    }
+    if (!obj || typeof obj !== "object") continue;
+    if (obj.event === "run" && obj.phase === "start") {
+      run = obj;
+      end = null;
+      steps = [];
+      continue;
+    }
+    if (obj.event === "run" && obj.phase === "end") {
+      end = obj;
+      continue;
+    }
+    if (obj.event === "step") steps.push(obj);
+  }
+  if (!run && steps.length === 0) {
+    return { available: false, reason: "the step stream carries no run", run: null, steps: [], end: null };
+  }
+  return { available: true, run, steps, end };
+}
+function lastMovedMs(parsed) {
+  const stamps = [];
+  if (parsed.run && parsed.run.startedAt) stamps.push(Date.parse(parsed.run.startedAt));
+  for (const s of parsed.steps) if (s.at) stamps.push(Date.parse(s.at));
+  if (parsed.end && parsed.end.endedAt) stamps.push(Date.parse(parsed.end.endedAt));
+  const usable = stamps.filter((n) => !Number.isNaN(n));
+  return usable.length ? Math.max(...usable) : null;
+}
+function replaySuspect(step) {
+  const expected = typeof step.expectedMs === "number" ? step.expectedMs : null;
+  const actual = typeof step.durationMs === "number" ? step.durationMs : null;
+  if (expected === null || actual === null) return false;
+  if (expected < REPLAY_FLOOR_MS) return false;
+  return actual * REPLAY_FACTOR <= expected;
+}
+function nowState(parsed, { now = Date.now(), staleAfterMs = STALE_RUN_MS } = {}) {
+  if (!parsed || !parsed.available) {
+    return {
+      available: false,
+      reason: parsed && parsed.reason || "no step stream",
+      phase: RUN_PHASE.NONE,
+      rows: []
+    };
+  }
+  const run = parsed.run;
+  const byIndex = /* @__PURE__ */ new Map();
+  for (const s of parsed.steps) if (Number.isInteger(s.index)) byIndex.set(s.index, s);
+  const total = run && Number.isInteger(run.total) && run.total || parsed.steps.reduce((n, s) => Number.isInteger(s.total) ? s.total : n, 0) || parsed.steps.length;
+  const names = run && Array.isArray(run.steps) ? run.steps : [];
+  const completed = byIndex.size;
+  const moved = lastMovedMs(parsed);
+  const silentMs = moved === null ? null : Math.max(0, now - moved);
+  let phase;
+  if (parsed.end) phase = RUN_PHASE.DONE;
+  else if (silentMs !== null && silentMs >= staleAfterMs) phase = RUN_PHASE.STOPPED;
+  else phase = RUN_PHASE.RUNNING;
+  const prev = byIndex.get(completed - 1);
+  const runningSince = phase === RUN_PHASE.RUNNING ? prev && prev.at || run && run.startedAt || null : null;
+  const rows = [];
+  const upper = Math.max(total, completed);
+  for (let i = 0; i < upper; i += 1) {
+    const done = byIndex.get(i);
+    if (done) {
+      rows.push({
+        index: i,
+        name: typeof done.name === "string" ? done.name : `step ${i + 1}`,
+        state: STEP_STATE.DONE,
+        verdict: typeof done.verdict === "string" ? done.verdict : null,
+        durationMs: typeof done.durationMs === "number" ? done.durationMs : null,
+        expectedMs: typeof done.expectedMs === "number" ? done.expectedMs : null,
+        note: typeof done.note === "string" && done.note ? done.note : null,
+        reason: typeof done.reason === "string" && done.reason ? done.reason : null,
+        replaySuspect: replaySuspect(done)
+      });
+      continue;
+    }
+    const name = typeof names[i] === "string" ? names[i] : null;
+    if (phase === RUN_PHASE.RUNNING && i === completed) {
+      rows.push({ index: i, name: name ?? `step ${i + 1}`, state: STEP_STATE.RUNNING, since: runningSince });
+      continue;
+    }
+    rows.push({
+      index: i,
+      name: name ?? `step ${i + 1}`,
+      state: phase === RUN_PHASE.RUNNING ? STEP_STATE.NOT_YET : STEP_STATE.NOT_RUN
+    });
+  }
+  const count = (v) => parsed.steps.filter((s) => s.verdict === v).length;
+  return {
+    available: true,
+    phase,
+    runId: run && run.runId || parsed.steps[0] && parsed.steps[0].runId || null,
+    // "fast" is the inner loop's mode and it is NAMED, never hidden: a fast run
+    // earns no rung (qa/lib/evidence-level.mjs) and a row that let it read as
+    // the full lane would be the console lending it strength it does not have.
+    mode: run && typeof run.mode === "string" && run.mode || null,
+    profile: run && typeof run.profile === "string" && run.profile || null,
+    startedAt: run && run.startedAt || null,
+    ageMs: moved === null ? null : Math.max(0, now - moved),
+    total,
+    completed,
+    runningSince,
+    stoppedEarly: Boolean(parsed.end && Number.isInteger(parsed.end.completed) && parsed.end.completed < total),
+    verdict: parsed.end && typeof parsed.end.verdict === "string" ? parsed.end.verdict : null,
+    durationMs: parsed.end && typeof parsed.end.durationMs === "number" ? parsed.end.durationMs : null,
+    tally: { pass: count("PASS"), fail: count("FAIL"), skip: count("SKIP"), error: count("ERROR"), cached: count("CACHED") },
+    rows
+  };
+}
+function verdictClass(verdict) {
+  if (verdict === "PASS") return "step-verdict-pass";
+  if (verdict === "FAIL") return "step-verdict-fail";
+  if (verdict === "ERROR") return "step-verdict-error";
+  return "step-verdict-skip";
+}
+function stepRowHtml(row) {
+  const name = `<code class="now-name">${esc4(row.name)}</code>`;
+  if (row.state === STEP_STATE.RUNNING) {
+    return `<li class="now-step now-running" data-index="${row.index}">${name} <span class="now-state">running</span> <span class="now-elapsed" data-since="${escAttr(row.since || "")}"></span></li>`;
+  }
+  if (row.state === STEP_STATE.NOT_YET || row.state === STEP_STATE.NOT_RUN) {
+    return `<li class="now-step now-waiting" data-index="${row.index}">${name} <span class="now-state">${esc4(row.state)}</span></li>`;
+  }
+  const verdict = `<span class="${verdictClass(row.verdict)}">${esc4(row.verdict || "")}</span>`;
+  const dur = formatDurationMs(row.durationMs);
+  const durHtml = dur ? ` <span class="now-dur">${esc4(dur)}</span>` : "";
+  const note = row.note ? ` <span class="now-note">${esc4(row.note)}</span>` : "";
+  const failed = row.verdict === "FAIL" || row.verdict === "ERROR";
+  let detail = "";
+  if (row.reason && failed) {
+    const printedFix = /^\s*fix\b/im.test(row.reason);
+    detail = `
+  <pre class="now-reason">${esc4(row.reason)}</pre>` + (printedFix ? "" : `
+  <p class="now-nofix">fix: the harness printed none &mdash; the step's own output is above</p>`);
+  }
+  const said = row.reason && !failed ? ` <span class="now-note">${esc4(row.reason)}</span>` : "";
+  const flag = row.replaySuspect ? ` <span class="now-flag" title="a build cache can replay a PASS from another tree \u2014 qa/verify.mjs forces --rerun where it can">far faster than its own history (${esc4(formatDurationMs(row.expectedMs))})</span>` : "";
+  return `<li class="now-step" data-index="${row.index}">${name} ${verdict}${durHtml}${note}${said}${flag}${detail}</li>`;
+}
+function nowHeadHtml(state) {
+  if (!state || !state.available) {
+    return `<p class="now-head now-absent">${esc4(state && state.reason || "no step stream")} &mdash; run <code>node qa/verify.mjs --events</code></p>`;
+  }
+  const modeClause = state.mode === "fast" ? " &middot; fast lane (inner loop &mdash; earns no rung)" : "";
+  const profile = state.profile ? ` &middot; profile ${esc4(state.profile)}` : "";
+  if (state.phase === RUN_PHASE.RUNNING) {
+    const row = state.rows.find((r) => r.state === STEP_STATE.RUNNING);
+    const which = row ? ` &middot; step ${row.index + 1} of ${state.total} &middot; <code>${esc4(row.name)}</code>` : "";
+    return `<p class="now-head now-live">RUNNING${which}${modeClause}${profile}</p>`;
+  }
+  const parts = [];
+  parts.push(`${state.completed} step${state.completed === 1 ? "" : "s"}`);
+  for (const [label, n] of [["FAIL", state.tally.fail], ["ERROR", state.tally.error], ["SKIP", state.tally.skip], ["CACHED", state.tally.cached]]) {
+    if (n > 0) parts.push(`${n} ${label}`);
+  }
+  const dur = formatDurationMs(state.durationMs);
+  if (dur) parts.push(dur);
+  if (state.ageMs !== null && state.ageMs !== void 0) parts.push(formatAgeCoarse(state.ageMs));
+  const lead = state.phase === RUN_PHASE.STOPPED ? `the lane STOPPED without finishing after step ${state.completed} of ${state.total}` : state.stoppedEarly ? `the lane stopped after step ${state.completed} of ${state.total}` : "idle &mdash; last run";
+  return `<p class="now-head">${lead} &middot; ${parts.map((p) => esc4(p)).join(" &middot; ")}${modeClause}${profile}</p>`;
+}
+function nowFrame(state, event = null) {
+  const rowsById = new Map((state && state.rows ? state.rows : []).map((r) => [r.index, r]));
+  const pick2 = (indices) => [...new Set(indices)].filter((i) => rowsById.has(i)).sort((a, b) => a - b).map((i) => ({ index: i, html: stepRowHtml(rowsById.get(i)) }));
+  const isStart = Boolean(event && event.event === "run" && event.phase === "start");
+  const isEnd = Boolean(event && event.event === "run" && event.phase === "end");
+  const isStep = Boolean(event && event.event === "step" && Number.isInteger(event.index));
+  const full = isStart || !(isEnd || isStep);
+  let rows;
+  if (full) rows = pick2([...rowsById.keys()]);
+  else if (isEnd) rows = pick2([...rowsById.keys()].filter((i) => rowsById.get(i).state !== STEP_STATE.DONE));
+  else rows = pick2([event.index, event.index + 1]);
+  return {
+    type: "step",
+    runId: state && state.runId || null,
+    clear: full,
+    headHtml: nowHeadHtml(state),
+    rows
+  };
+}
+function nowSectionHtml(state) {
+  const runAttr = state && state.available && state.runId ? escAttr(state.runId) : "";
+  const rows = state && state.available ? state.rows.map(stepRowHtml).join("\n    ") : "";
+  const rel = state && typeof state.relPath === "string" && state.relPath ? state.relPath : null;
+  const source = rel ? `reading <code>${esc4(rel)}</code>` : "reading the lane's step stream";
+  return `  <div class="now" id="now" data-run="${runAttr}">
+  <div id="now-head">${nowHeadHtml(state)}</div>
+  <p class="now-link" id="now-link">${source} &middot; <span id="now-live">live</span></p>
+  <ol class="now-steps" id="now-steps">
+    ${rows}
+  </ol>
+  </div>`;
+}
+
+// ../../packages/harness/src/lib/lane-markers.mjs
+import path11 from "node:path";
+
 // ../../packages/harness/src/lib/harness-manifest.mjs
 var MANIFEST_REL_PATH2 = "qa/harness-manifest.json";
 var LAYOUT_PATH_FIELDS = ["receipt", "architectureDoc", "specs", "approvals"];
@@ -35290,6 +34794,1015 @@ var LAYOUT_LIST_FIELDS = ["citationRoots", "packs"];
 var META_FIELDS2 = ["schema", "profile"];
 var KNOWN_FIELDS2 = /* @__PURE__ */ new Set([...META_FIELDS2, ...LAYOUT_PATH_FIELDS, ...LAYOUT_LIST_FIELDS]);
 var PROFILE_ID_RE2 = /^[a-z][a-z0-9-]*$/;
+
+// ../../packages/harness/src/lib/profile-loader.mjs
+import fs10 from "node:fs";
+import { createRequire } from "node:module";
+import path10 from "node:path";
+var SUPPORTED_PROFILE_PROTOCOLS = Object.freeze([1, 2]);
+var EXTENDS_PROTOCOL = 2;
+var PROFILES_DIR_REL = "qa/lib/profiles";
+var REQUIRED_EXPORTS = Object.freeze(["id", "protocol", "layout", "tiers", "steps"]);
+function profileEntryRel(id) {
+  return `${PROFILES_DIR_REL}/${id}/index.mjs`;
+}
+function validateProfileModule(mod, id) {
+  if (!mod || typeof mod !== "object") return { ok: false, reason: `profile "${id}" did not load as a module` };
+  const missing = REQUIRED_EXPORTS.filter((name) => !(name in mod));
+  if (missing.length) {
+    return { ok: false, reason: `profile "${id}" is missing required export(s): ${missing.join(", ")} (a profile must export ${REQUIRED_EXPORTS.join(", ")})` };
+  }
+  if (mod.id !== id) {
+    return { ok: false, reason: `profile "${id}" exports id ${JSON.stringify(mod.id)} \u2014 the manifest and the profile disagree about what this project is; fix one of them` };
+  }
+  if (!SUPPORTED_PROFILE_PROTOCOLS.includes(mod.protocol)) {
+    return {
+      ok: false,
+      reason: `profile "${id}" implements profile protocol ${JSON.stringify(mod.protocol)}; this lane speaks ${SUPPORTED_PROFILE_PROTOCOLS.join(" and ")} \u2014 upgrade the harness or the profile so they match (\`prooflane upgrade\`)`
+    };
+  }
+  if (typeof mod.steps !== "function") return { ok: false, reason: `profile "${id}" must export steps(ctx) as a function` };
+  if (!mod.layout || typeof mod.layout !== "object") return { ok: false, reason: `profile "${id}" must export layout as an object (where specs, sources, tests and flows live)` };
+  if (!mod.tiers || typeof mod.tiers !== "object") return { ok: false, reason: `profile "${id}" must export tiers as an object (which test tiers exist and which can observe which promise)` };
+  for (const name of ["artifacts", "governable"]) {
+    if (name in mod && typeof mod[name] !== "function") return { ok: false, reason: `profile "${id}" exports ${name} but it is not a function (${name}(root))` };
+  }
+  return { ok: true };
+}
+function locateProfile(root, id) {
+  if (typeof id !== "string" || !PROFILE_ID_RE2.test(id)) {
+    return { ok: false, reason: `profile id ${JSON.stringify(id)} is not a valid profile name (${PROFILE_ID_RE2}) \u2014 it names a directory under ${PROFILES_DIR_REL}/` };
+  }
+  const entryRel = profileEntryRel(id);
+  const entryAbs = path10.join(root, ...entryRel.split("/"));
+  if (!fs10.existsSync(entryAbs)) {
+    let present = [];
+    try {
+      present = fs10.readdirSync(path10.join(root, ...PROFILES_DIR_REL.split("/")), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+    } catch {
+    }
+    const have = present.length ? `profiles present: ${present.join(", ")}` : `no profiles are installed under ${PROFILES_DIR_REL}/`;
+    return { ok: false, reason: `the manifest names profile "${id}" but ${entryRel} does not exist (${have}) \u2014 install the profile or fix ${"qa/harness-manifest.json"}` };
+  }
+  return { ok: true, entryRel, entryAbs };
+}
+var BASE_KEYS = Object.freeze(["extends", "extendsProfile"]);
+function declaredBase(mod) {
+  for (const key of BASE_KEYS) {
+    const value = mod?.[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return null;
+}
+var INHERITABLE = Object.freeze([
+  "layout",
+  "tiers",
+  "steps",
+  "artifacts",
+  "governable",
+  "grammar",
+  "reports",
+  "detect",
+  "tools",
+  "ladder",
+  "plants",
+  "console",
+  "version"
+]);
+function resolveInheritance(mod, id, load) {
+  const chain = [id];
+  const merged = {};
+  let current = mod;
+  const ownBase = declaredBase(mod);
+  if (ownBase && mod.protocol < EXTENDS_PROTOCOL) {
+    return {
+      ok: false,
+      reason: `profile "${id}" declares a base ("${ownBase}") but implements profile protocol ${JSON.stringify(mod.protocol)} \u2014 \`extends\` arrived in protocol ${EXTENDS_PROTOCOL}. Declare \`protocol = ${EXTENDS_PROTOCOL}\` so an older lane refuses it by naming the protocol rather than by naming a declaration you deliberately left out`
+    };
+  }
+  for (; ; ) {
+    const base = declaredBase(current);
+    if (!base) break;
+    if (chain.includes(base)) {
+      return {
+        ok: false,
+        reason: `profile "${id}" has a circular \`extends\` chain: ${[...chain, base].join(" \u2192 ")} \u2014 a profile cannot inherit from itself, however many steps around`
+      };
+    }
+    const loaded = load(base);
+    if (!loaded.ok) {
+      return { ok: false, reason: `profile "${chain[chain.length - 1]}" extends "${base}", which did not load: ${loaded.reason}` };
+    }
+    chain.push(base);
+    for (const key of INHERITABLE) {
+      if (!(key in merged) && key in loaded.profile) merged[key] = loaded.profile[key];
+    }
+    current = loaded.profile;
+  }
+  if (chain.length === 1) return { ok: true, profile: mod, chain };
+  const profile = { ...merged };
+  for (const key of Object.keys(mod)) profile[key] = mod[key];
+  profile.id = mod.id;
+  profile.protocol = mod.protocol;
+  return { ok: true, profile, chain };
+}
+function loadProfileSync(root, { id } = {}) {
+  const where = locateProfile(root, id);
+  if (!where.ok) return where;
+  let mod;
+  try {
+    mod = createRequire(import.meta.url)(where.entryAbs);
+  } catch (err) {
+    const code = err && err.code;
+    if (code === "ERR_REQUIRE_ESM" || code === "ERR_REQUIRE_ASYNC_MODULE") {
+      return { ok: false, reason: `profile "${id}" cannot be loaded synchronously on Node ${process.version} \u2014 the harness needs Node 20.19 or 22.12 or newer (require() of ES modules); upgrade Node` };
+    }
+    return { ok: false, reason: `profile "${id}" failed to load from ${where.entryRel}: ${err && err.message ? err.message : String(err)}` };
+  }
+  const resolved = resolveInheritance(mod, id, (baseId) => loadProfileSync(root, { id: baseId }));
+  if (!resolved.ok) return resolved;
+  const verdict = validateProfileModule(resolved.profile, id);
+  if (!verdict.ok) return verdict;
+  return { ok: true, profile: resolved.profile, entryRel: where.entryRel, chain: resolved.chain };
+}
+
+// ../../packages/harness/src/lib/lane-markers.mjs
+var LANE_STEPS_REL = "qa/.lane-steps.ndjson";
+var LANE_MARKER_STALE_MS = 30 * 60 * 1e3;
+var RENDER_MARKER_FRESH_MS = 5 * 60 * 1e3;
+function laneStepsPath(root) {
+  return path11.join(root, ...LANE_STEPS_REL.split("/"));
+}
+
+// src/lib/steps-bridge.mjs
+var STEPS_FILE_NAME = LANE_STEPS_REL.split("/").pop();
+var POLL_MS = 1e3;
+function resolveStepsPath(root) {
+  return { ok: true, rel: LANE_STEPS_REL, abs: laneStepsPath(root) };
+}
+function readStepStream(root, { now = Date.now() } = {}) {
+  const resolved = resolveStepsPath(root);
+  let text;
+  try {
+    text = fs11.readFileSync(resolved.abs, "utf8");
+  } catch (err) {
+    const missing = err && err.code === "ENOENT";
+    return {
+      ...nowState(
+        {
+          available: false,
+          reason: missing ? `no step stream at ${resolved.rel} \u2014 the lane has not run with --events in this tree` : `${resolved.rel} could not be read (${err && err.message ? err.message : String(err)})`
+        },
+        { now }
+      ),
+      relPath: resolved.rel
+    };
+  }
+  return { ...nowState(parseStepStream(text), { now, staleAfterMs: LANE_MARKER_STALE_MS }), relPath: resolved.rel };
+}
+function watchStepStream(root, onEvent) {
+  const resolved = resolveStepsPath(root);
+  if (!resolved.ok) return { close: () => {
+  }, path: null };
+  const abs = resolved.abs;
+  const dir = path12.dirname(abs);
+  let offset = 0;
+  let partial2 = "";
+  let watcher = null;
+  try {
+    offset = fs11.statSync(abs).size;
+  } catch {
+    offset = 0;
+  }
+  const drain = () => {
+    let size;
+    try {
+      size = fs11.statSync(abs).size;
+    } catch {
+      offset = 0;
+      partial2 = "";
+      return;
+    }
+    if (size < offset) {
+      offset = 0;
+      partial2 = "";
+    }
+    if (size === offset) return;
+    let chunk = "";
+    try {
+      const fd = fs11.openSync(abs, "r");
+      try {
+        const buf = Buffer.alloc(size - offset);
+        const read = fs11.readSync(fd, buf, 0, buf.length, offset);
+        chunk = buf.subarray(0, read).toString("utf8");
+        offset += read;
+      } finally {
+        fs11.closeSync(fd);
+      }
+    } catch {
+      return;
+    }
+    partial2 += chunk;
+    const lines = partial2.split("\n");
+    partial2 = lines.pop() ?? "";
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t.startsWith("{")) continue;
+      let obj;
+      try {
+        obj = JSON.parse(t);
+      } catch {
+        continue;
+      }
+      try {
+        onEvent(obj);
+      } catch {
+      }
+    }
+  };
+  try {
+    watcher = fs11.watch(dir, (_event, filename) => {
+      if (filename && path12.basename(String(filename)) !== STEPS_FILE_NAME) return;
+      drain();
+    });
+  } catch {
+  }
+  const timer = setInterval(drain, POLL_MS);
+  if (typeof timer.unref === "function") timer.unref();
+  return {
+    close: () => {
+      clearInterval(timer);
+      try {
+        if (watcher) watcher.close();
+      } catch {
+      }
+    },
+    path: abs
+  };
+}
+
+// src/lib/components.mjs
+import fs12 from "node:fs";
+import path13 from "node:path";
+function walkKtFiles(dir) {
+  const out = [];
+  let entries;
+  try {
+    entries = fs12.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    const p = path13.join(dir, e.name);
+    if (e.isDirectory()) out.push(...walkKtFiles(p));
+    else if (e.name.endsWith(".kt")) out.push(p);
+  }
+  return out;
+}
+function findPresentationDirs(kotlinRoot) {
+  const out = [];
+  (function walk2(dir) {
+    let entries;
+    try {
+      entries = fs12.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const p = path13.join(dir, e.name);
+      if (e.name === "presentation") out.push(p);
+      else walk2(p);
+    }
+  })(kotlinRoot);
+  return out;
+}
+function splitTopLevel(paramsText) {
+  const parts = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of paramsText) {
+    if (ch === "(" || ch === "[" || ch === "{") depth++;
+    else if (ch === ")" || ch === "]" || ch === "}") depth--;
+    if (ch === "," && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+function parseParam(raw) {
+  let depth = 0;
+  let colonIdx = -1;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === "(" || ch === "[" || ch === "{") depth++;
+    else if (ch === ")" || ch === "]" || ch === "}") depth--;
+    else if (ch === ":" && depth === 0 && colonIdx === -1) colonIdx = i;
+  }
+  if (colonIdx === -1) return { raw, name: raw.trim(), type: null, default: null };
+  const name = raw.slice(0, colonIdx).trim();
+  const rest = raw.slice(colonIdx + 1);
+  depth = 0;
+  let eqIdx = -1;
+  for (let i = 0; i < rest.length; i++) {
+    const ch = rest[i];
+    if (ch === "(" || ch === "[" || ch === "{") depth++;
+    else if (ch === ")" || ch === "]" || ch === "}") depth--;
+    else if (ch === "=" && depth === 0 && eqIdx === -1) eqIdx = i;
+  }
+  if (eqIdx === -1) return { raw, name, type: rest.trim(), default: null };
+  return { raw, name, type: rest.slice(0, eqIdx).trim(), default: rest.slice(eqIdx + 1).trim() };
+}
+function extractKdocBefore(text, idx) {
+  const before = text.slice(0, idx).replace(/\s+$/, "");
+  if (!before.endsWith("*/")) return null;
+  const start = before.lastIndexOf("/**");
+  if (start === -1) return null;
+  const raw = before.slice(start);
+  const body = raw.replace(/^\/\*\*/, "").replace(/\*\/$/, "");
+  const lines = body.split("\n").map((l) => l.replace(/^\s*\*\s?/, "").trimEnd());
+  while (lines.length && lines[0].trim() === "") lines.shift();
+  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+  const joined = lines.join("\n").trim();
+  return joined || null;
+}
+function parseKdocSections(kdoc) {
+  if (!kdoc) return { description: null, paramDocs: {} };
+  const descLines = [];
+  const paramDocs = {};
+  let currentParam = null;
+  let pastFirstTag = false;
+  for (const line of kdoc.split("\n")) {
+    const tag = line.match(/^@(\w+)(?:\s+(.*))?$/);
+    if (tag) {
+      pastFirstTag = true;
+      currentParam = null;
+      if (tag[1] === "param") {
+        const m = (tag[2] || "").match(/^\[?([A-Za-z_][A-Za-z0-9_]*)\]?\s*(.*)$/);
+        if (m) {
+          currentParam = m[1];
+          paramDocs[currentParam] = m[2] || "";
+        }
+      }
+      continue;
+    }
+    if (currentParam !== null) {
+      paramDocs[currentParam] = `${paramDocs[currentParam]} ${line.trim()}`.trim();
+    } else if (!pastFirstTag) {
+      descLines.push(line);
+    }
+  }
+  const description = descLines.join("\n").trim() || null;
+  return { description, paramDocs };
+}
+var FUN_SEARCH_WINDOW = 500;
+var BODY_SEARCH_WINDOW = 300;
+function findFunctionBody(text, afterIdx) {
+  const searchEnd = Math.min(text.length, afterIdx + BODY_SEARCH_WINDOW);
+  let i = afterIdx;
+  while (i < searchEnd && text[i] !== "{") i++;
+  if (i >= searchEnd || text[i] !== "{") return null;
+  let depth = 0;
+  const start = i;
+  for (; i < text.length; i++) {
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+var TOKEN_REF_RE = /\b(\w*(?:Tokens|Colors))\.(\w+)/g;
+function deriveFacts(bodyText) {
+  const derivedTags = [...new Set([...bodyText.matchAll(/\$\{screenTag\}_([A-Za-z0-9]+)/g)].map((m) => m[1]))].sort();
+  const a11yFloorEvidence = [];
+  if (/\b48\.dp\b/.test(bodyText)) a11yFloorEvidence.push("48.dp");
+  if (/\bMinTouchTarget\b/.test(bodyText)) a11yFloorEvidence.push("MinTouchTarget");
+  const contentUiStateArms = [...new Set([...bodyText.matchAll(/\bis ContentUiState\.(\w+)\b/g)].map((m) => m[1]))];
+  const insetsApis = ["statusBarsPadding", "navigationBarsPadding", "consumeWindowInsets", "WindowInsets"].filter(
+    (api) => new RegExp(`\\b${api}\\b`).test(bodyText)
+  );
+  const tokensReferenced = [...new Set([...bodyText.matchAll(TOKEN_REF_RE)].map((m) => `${m[1]}.${m[2]}`))].sort();
+  const selfReportsDesignToken = /\.designToken\(/.test(bodyText);
+  return { derivedTags, a11yFloorEvidence, contentUiStateArms, insetsApis, tokensReferenced, selfReportsDesignToken };
+}
+function scanComposables(text) {
+  const out = [];
+  const composableRe = /@Composable\b/g;
+  let m;
+  while (m = composableRe.exec(text)) {
+    const window = text.slice(m.index, m.index + FUN_SEARCH_WINDOW);
+    const funMatch = window.match(/fun\s+(?:<[^>]*>\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^>]*>)?\s*\(/);
+    if (!funMatch) continue;
+    const name = funMatch[1];
+    const kdoc = extractKdocBefore(text, m.index);
+    const openIdx = m.index + funMatch.index + funMatch[0].length - 1;
+    let depth = 0;
+    let closeIdx = -1;
+    for (let i = openIdx; i < text.length; i++) {
+      if (text[i] === "(") depth++;
+      else if (text[i] === ")") {
+        depth--;
+        if (depth === 0) {
+          closeIdx = i;
+          break;
+        }
+      }
+    }
+    const { description: kdocDescription, paramDocs } = parseKdocSections(kdoc);
+    if (closeIdx === -1) {
+      out.push({
+        name,
+        params: [],
+        paramsParsed: [],
+        parseError: true,
+        kdoc,
+        kdocDescription,
+        paramDocs,
+        facts: deriveFacts("")
+      });
+      continue;
+    }
+    const rawParams = splitTopLevel(text.slice(openIdx + 1, closeIdx));
+    const body = findFunctionBody(text, closeIdx + 1);
+    out.push({
+      name,
+      params: rawParams,
+      paramsParsed: rawParams.map(parseParam),
+      kdoc,
+      kdocDescription,
+      paramDocs,
+      facts: deriveFacts(body ?? ""),
+      body: body ?? ""
+    });
+  }
+  return out;
+}
+var SCREEN_FILE_RE = /Screen\.kt$/;
+function getComponentsData(root) {
+  const kotlinRoot = path13.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const presentationDirs = findPresentationDirs(kotlinRoot);
+  if (presentationDirs.length === 0) {
+    return {
+      available: false,
+      reason: `no 'presentation' directory found under ${path13.relative(root, kotlinRoot).split(path13.sep).join("/")}`
+    };
+  }
+  const componentsDirs = presentationDirs.map((p) => path13.join(p, "components")).filter((p) => fs12.existsSync(p));
+  if (componentsDirs.length === 0) {
+    return { available: false, reason: "no presentation/components directory found" };
+  }
+  const componentFiles = componentsDirs.flatMap(
+    (dir) => fs12.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(".kt")).map((e) => path13.join(dir, e.name))
+  );
+  if (componentFiles.length === 0) {
+    return { available: true, components: [] };
+  }
+  const allPresentationFiles = presentationDirs.flatMap(walkKtFiles);
+  const fileTexts = new Map(allPresentationFiles.map((f) => [f, fs12.readFileSync(f, "utf8")]));
+  const components = [];
+  for (const file2 of componentFiles) {
+    const text = fileTexts.get(file2) ?? fs12.readFileSync(file2, "utf8");
+    const relFile = path13.relative(root, file2).split(path13.sep).join("/");
+    for (const sig of scanComposables(text)) {
+      const callRe = new RegExp(`\\b${sig.name}\\s*\\(`);
+      const usedIn = [];
+      for (const [otherFile, otherText] of fileTexts) {
+        if (otherFile === file2) continue;
+        if (callRe.test(otherText)) usedIn.push(path13.relative(root, otherFile).split(path13.sep).join("/"));
+      }
+      usedIn.sort((a, b) => a.localeCompare(b));
+      components.push({
+        name: sig.name,
+        file: relFile,
+        params: sig.params,
+        paramsParsed: sig.paramsParsed,
+        parseError: sig.parseError === true,
+        kdoc: sig.kdoc,
+        kdocDescription: sig.kdocDescription,
+        paramDocs: sig.paramDocs,
+        facts: sig.facts,
+        usedIn,
+        usedInScreens: usedIn.filter((f) => SCREEN_FILE_RE.test(f))
+      });
+    }
+  }
+  components.sort((a, b) => a.name.localeCompare(b.name) || a.file.localeCompare(b.file));
+  return { available: true, components, ungoverned: scanUngoverned(root, presentationDirs, components) };
+}
+var SEAM_NAME_RE = /(Screen|Route|Preview)$/;
+function scanUngoverned(root, presentationDirs, registryComponents) {
+  const registryNames = new Set(registryComponents.map((c) => c.name));
+  const featureFiles = presentationDirs.flatMap(walkKtFiles).filter((f) => !f.split(path13.sep).includes("components"));
+  const fileTexts = new Map(featureFiles.map((f) => [f, fs12.readFileSync(f, "utf8")]));
+  const out = [];
+  for (const [file2, text] of fileTexts) {
+    const relFile = path13.relative(root, file2).split(path13.sep).join("/");
+    const featureOf = (rel) => {
+      const after = rel.split("/presentation/")[1] ?? "";
+      return after.includes("/") ? after.split("/")[0] : "(root)";
+    };
+    for (const sig of scanComposables(text)) {
+      if (SEAM_NAME_RE.test(sig.name)) continue;
+      if (registryNames.has(sig.name)) continue;
+      const callRe = new RegExp(`\\b${sig.name}\\s*\\(`);
+      const usedIn = [];
+      for (const [otherFile, otherText] of fileTexts) {
+        if (otherFile === file2) continue;
+        if (callRe.test(otherText)) usedIn.push(path13.relative(root, otherFile).split(path13.sep).join("/"));
+      }
+      const features = /* @__PURE__ */ new Set([featureOf(relFile), ...usedIn.map(featureOf)]);
+      out.push({
+        name: sig.name,
+        file: relFile,
+        feature: featureOf(relFile),
+        params: sig.params.length,
+        usedIn: usedIn.sort((a, b) => a.localeCompare(b)),
+        crossFeatureUseCount: features.size - 1,
+        composesRegistry: registryComponents.some((c) => new RegExp(`\\b${c.name}\\s*\\(`).test(sig.body))
+      });
+    }
+  }
+  out.sort((a, b) => b.crossFeatureUseCount - a.crossFeatureUseCount || a.name.localeCompare(b.name));
+  return out;
+}
+
+// src/lib/variants.mjs
+import fs13 from "node:fs";
+import path14 from "node:path";
+function getVariantsData(root) {
+  const variantsDir = path14.join(root, "composeApp", "build", "previews", "variants");
+  let entries;
+  try {
+    entries = fs13.readdirSync(variantsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+  } catch {
+    return { available: false };
+  }
+  if (entries.length === 0) return { available: false };
+  const variants = entries.map((e) => e.name).sort().map((name) => {
+    const dir = path14.join(variantsDir, name);
+    let screenDirs = [];
+    try {
+      screenDirs = fs13.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
+    } catch {
+      screenDirs = [];
+    }
+    const screens = screenDirs.map((e) => e.name).filter((id) => fs13.existsSync(path14.join(dir, id, "screen.png"))).sort().map((id) => ({ id, png: `variants/${name}/${id}/screen.png` }));
+    const hasDesignSystem = fs13.existsSync(path14.join(dir, "design-system.json"));
+    return { name, screens, hasDesignSystem };
+  });
+  return { available: true, variants };
+}
+
+// src/lib/component-drift.mjs
+import fs14 from "node:fs";
+import path15 from "node:path";
+function getComponentDriftInfo(root, files, approvalRecord) {
+  if (!approvalRecord) {
+    return { available: false, reason: "no approvals record for the components artifact" };
+  }
+  if (approvalRecord.status !== "changed-since-approval") {
+    return {
+      available: false,
+      reason: `components artifact status is "${approvalRecord.status}" \u2014 nothing to attribute per-file`
+    };
+  }
+  if (!approvalRecord.approvedAt) {
+    return { available: false, reason: "no approvedAt timestamp on the stored record \u2014 cannot compare file mtimes" };
+  }
+  const approvedAtMs = Date.parse(approvalRecord.approvedAt);
+  if (Number.isNaN(approvedAtMs)) {
+    return { available: false, reason: `approvedAt "${approvalRecord.approvedAt}" is not a parseable timestamp` };
+  }
+  const byFile = {};
+  for (const relFile of files) {
+    try {
+      const stat = fs14.statSync(path15.join(root, relFile));
+      byFile[relFile] = { modifiedSinceApproval: stat.mtimeMs > approvedAtMs, mtime: stat.mtime.toISOString() };
+    } catch {
+      byFile[relFile] = { modifiedSinceApproval: null, mtime: null };
+    }
+  }
+  return { available: true, byFile };
+}
+
+// src/lib/handrolled-state.mjs
+import fs15 from "node:fs";
+import path16 from "node:path";
+var INDICATORS = ["CircularProgressIndicator", "LinearProgressIndicator"];
+function isUnderComponentsDir(absFile) {
+  return absFile.split(path16.sep).includes("components");
+}
+function getHandRolledStateViolations(root) {
+  const kotlinRoot = path16.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const presentationDirs = findPresentationDirs(kotlinRoot);
+  if (presentationDirs.length === 0) {
+    return {
+      available: false,
+      reason: `no 'presentation' directory found under ${path16.relative(root, kotlinRoot).split(path16.sep).join("/")}`
+    };
+  }
+  const files = presentationDirs.flatMap(walkKtFiles).filter((f) => !isUnderComponentsDir(f));
+  const violations = [];
+  for (const file2 of files) {
+    let text;
+    try {
+      text = fs15.readFileSync(file2, "utf8");
+    } catch {
+      continue;
+    }
+    const indicators = [];
+    for (const name of INDICATORS) {
+      const re = new RegExp(`\\b${name}\\b`, "g");
+      const lines = [];
+      let m;
+      while (m = re.exec(text)) {
+        lines.push(text.slice(0, m.index).split("\n").length);
+      }
+      if (lines.length) indicators.push({ name, lines });
+    }
+    if (indicators.length) {
+      violations.push({ file: path16.relative(root, file2).split(path16.sep).join("/"), indicators });
+    }
+  }
+  violations.sort((a, b) => a.file.localeCompare(b.file));
+  return { available: true, violations };
+}
+
+// src/lib/walkthrough-data.mjs
+import fs16 from "node:fs";
+import path17 from "node:path";
+var WALKTHROUGH_REL_DIR = path17.join("qa", "evidence", "walkthrough");
+function getWalkthroughData(projectDir, { limit = 8 } = {}) {
+  const root = path17.join(projectDir, WALKTHROUGH_REL_DIR);
+  if (!fs16.existsSync(root)) {
+    return { available: false, reason: "no walkthrough runs yet \u2014 node qa/walkthrough.mjs against the live app", runs: [] };
+  }
+  const runs = [];
+  for (const entry of fs16.readdirSync(root)) {
+    const dir = path17.join(root, entry);
+    const manifestPath = path17.join(dir, "manifest.json");
+    if (!fs16.existsSync(manifestPath)) continue;
+    let manifest;
+    try {
+      manifest = JSON.parse(fs16.readFileSync(manifestPath, "utf8"));
+    } catch (err) {
+      runs.push({ dir, relDir: path17.join(WALKTHROUGH_REL_DIR, entry), error: `manifest unreadable: ${err.message}` });
+      continue;
+    }
+    runs.push({
+      dir,
+      relDir: path17.join(WALKTHROUGH_REL_DIR, entry),
+      relDirBase: entry,
+      // the console's /walkthrough/<base>/… static route key
+      generatedAt: manifest.generatedAt ?? entry,
+      appId: manifest.appId ?? "unknown",
+      screenCount: (manifest.screens ?? []).length,
+      a11yViolations: (manifest.screens ?? []).reduce((a, s) => a + (s.a11y?.violations ?? []).length, 0),
+      unsettled: (manifest.screens ?? []).filter((s) => s.settled === false).length,
+      notWalked: (manifest.notWalked ?? []).length,
+      hasReport: fs16.existsSync(path17.join(dir, "report.html")),
+      manifest
+    });
+  }
+  runs.sort((a, b) => String(b.generatedAt).localeCompare(String(a.generatedAt)));
+  const trimmed = runs.slice(0, limit).map((r, i) => i === 0 ? r : { ...r, manifest: void 0 });
+  return trimmed.length ? { available: true, runs: trimmed } : { available: false, reason: "walkthrough directory exists but holds no runs", runs: [] };
+}
+
+// src/lib/live-session.mjs
+import path18 from "node:path";
+var HEALTH_TIMEOUT_MS = 900;
+async function getLiveDeviceStatus({ port = 9500, fetchImpl = fetch } = {}) {
+  const url2 = `http://127.0.0.1:${port}/inspect/health`;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), HEALTH_TIMEOUT_MS);
+      const res = await fetchImpl(url2, { signal: ctrl.signal, headers: { connection: "close" } });
+      clearTimeout(timer);
+      if (!res.ok) return { reachable: false, reason: `health -> HTTP ${res.status}` };
+      const health = await res.json();
+      return {
+        reachable: true,
+        appId: health.appId ?? "unknown",
+        buildType: health.buildType ?? "debug",
+        processStartedAtMs: health.processStartedAtMs ?? null,
+        remoteUrl: `http://127.0.0.1:${port}/inspect/remote`
+      };
+    } catch {
+      if (attempt === 2) return { reachable: false, reason: "inspector not reachable (app not running, or no adb forward)" };
+    }
+  }
+  return { reachable: false, reason: "unreachable" };
+}
+function createLiveSession({
+  projectDir,
+  port = 9500,
+  exec,
+  gradleEnv: gradleEnv2,
+  log = () => {
+  },
+  // Injectable so the health step is testable. Without it the step reached the
+  // REAL loopback inspector on the machine-global port — a test would silently
+  // assert against whatever app happened to be running, exactly the isolation
+  // trap that let a foreign preview daemon get adopted.
+  fetchImpl = fetch
+} = {}) {
+  const state = {
+    running: false,
+    startedAt: null,
+    finishedAt: null,
+    ok: null,
+    steps: []
+    // {name, status: running|ok|fail, detail?, ms}
+  };
+  const describeDetail = (value) => {
+    if (value == null) return "";
+    if (typeof value === "string") return value.trim();
+    if (typeof value === "object") {
+      const out = [value.stdout, value.stderr].filter((s) => typeof s === "string" && s.trim());
+      return out.length ? out.join(" ").trim() : "";
+    }
+    return String(value);
+  };
+  const step = async (name, fn) => {
+    const entry = { name, status: "running", startedAt: Date.now() };
+    state.steps.push(entry);
+    log(`live-session: ${name}\u2026`);
+    try {
+      const detail = describeDetail(await fn());
+      entry.status = "ok";
+      if (detail) entry.detail = detail.slice(0, 300);
+    } catch (err) {
+      entry.status = "fail";
+      entry.detail = String(err && err.message ? err.message : err).slice(0, 500);
+      throw err;
+    } finally {
+      entry.ms = Date.now() - entry.startedAt;
+      delete entry.startedAt;
+    }
+  };
+  async function run() {
+    await step("device", async () => {
+      const { stdout } = await exec("adb", ["devices"]);
+      const attached = stdout.split("\n").slice(1).filter((l) => l.trim().endsWith("device"));
+      if (attached.length > 0) return `already attached: ${attached[0].split("	")[0]}`;
+      const { stdout: avds } = await exec("emulator", ["-list-avds"]);
+      const avd = avds.split("\n").map((s) => s.trim()).filter(Boolean)[0];
+      if (!avd) throw new Error("no device attached and no AVDs exist \u2014 create one in Android Studio first");
+      exec("emulator", ["-avd", avd, "-no-window", "-no-audio"], { detach: true });
+      await exec("adb", ["wait-for-device"], { timeoutMs: 12e4 });
+      const deadline = Date.now() + 12e4;
+      while (Date.now() < deadline) {
+        const { stdout: boot } = await exec("adb", ["shell", "getprop", "sys.boot_completed"]).catch(() => ({ stdout: "" }));
+        if (boot.trim() === "1") return `booted ${avd}`;
+        await new Promise((r) => setTimeout(r, 2e3));
+      }
+      throw new Error(`AVD ${avd} did not finish booting within 120s`);
+    });
+    await step("installDebug", async () => {
+      const gradlew = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
+      await exec(gradlew, [":composeApp:installDebug", "--console=plain"], {
+        cwd: projectDir,
+        env: gradleEnv2 ? gradleEnv2() : void 0,
+        timeoutMs: 9e5
+      });
+    });
+    await step("launch", async () => {
+      const appId = await resolveAppId2();
+      await exec("adb", ["shell", "monkey", "-p", appId, "-c", "android.intent.category.LAUNCHER", "1"]);
+      return appId;
+    });
+    await step("forward", async () => {
+      await exec("adb", ["forward", `tcp:${port}`, `tcp:${port}`]);
+      return `tcp:${port} \u2192 tcp:${port}`;
+    });
+    await step("health", async () => {
+      const deadline = Date.now() + 3e4;
+      let lastReason = "";
+      while (Date.now() < deadline) {
+        const status = await getLiveDeviceStatus({ port, fetchImpl });
+        if (status.reachable) return `${status.appId} (${status.buildType})`;
+        lastReason = status.reason;
+        await new Promise((r) => setTimeout(r, 1e3));
+      }
+      throw new Error(`inspector never became healthy: ${lastReason}`);
+    });
+  }
+  async function resolveAppId2() {
+    const fs21 = await import("node:fs");
+    for (const f of ["composeApp/build.gradle.kts", "composeApp/build.gradle"]) {
+      const p = path18.join(projectDir, f);
+      if (!fs21.existsSync(p)) continue;
+      const m = fs21.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
+      if (m) return m[1];
+    }
+    throw new Error("could not resolve applicationId from composeApp/build.gradle(.kts)");
+  }
+  return {
+    status: () => ({ ...state, steps: state.steps.map((s) => ({ ...s })) }),
+    start() {
+      if (state.running) return { started: false, reason: "a live-session chain is already running" };
+      state.running = true;
+      state.ok = null;
+      state.steps.length = 0;
+      state.startedAt = (/* @__PURE__ */ new Date()).toISOString();
+      state.finishedAt = null;
+      run().then(() => {
+        state.ok = true;
+      }).catch(() => {
+        state.ok = false;
+      }).finally(() => {
+        state.running = false;
+        state.finishedAt = (/* @__PURE__ */ new Date()).toISOString();
+      });
+      return { started: true };
+    }
+  };
+}
+
+// src/lib/digest.mjs
+var short = (s) => String(s ?? "").slice(0, 7);
+async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceDays = 7, limit = 30 } = {}) {
+  const git2 = async (args) => (await execFileAsync3("git", args, { cwd: projectDir, timeout: 8e3, maxBuffer: 4 * 1024 * 1024 })).stdout;
+  const since = `${sinceDays} days ago`;
+  const resolvedLayout = resolveProjectLayout(projectDir);
+  if (!resolvedLayout.ok) {
+    return { available: false, reason: resolvedLayout.reason, since, commits: [], laneRuns: [], approvalEvents: [], openComments: null };
+  }
+  const layout = resolvedLayout.layout ?? DEFAULT_LAYOUT;
+  let commits;
+  try {
+    const raw = await git2([
+      "log",
+      `--since=${since}`,
+      `--max-count=${limit}`,
+      "--name-status",
+      "--no-renames",
+      "--pretty=format:%x01%H%x00%ci%x00%s"
+    ]);
+    commits = [];
+    for (const block of raw.split("")) {
+      if (!block.trim()) continue;
+      const [head, ...fileLines] = block.split("\n");
+      const [sha, when, subject] = head.split("\0");
+      if (!sha) continue;
+      const files = [];
+      for (const line of fileLines) {
+        if (!line.trim()) continue;
+        const [status, ...rest] = line.split("	");
+        if (!rest.length) continue;
+        files.push({ status: status.trim(), path: rest.join("	") });
+      }
+      commits.push({ sha: short(sha), when, subject, files });
+    }
+  } catch (err) {
+    return { available: false, reason: `not a git repo (or git failed): ${err.message}`, since, commits: [], laneRuns: [], approvalEvents: [], openComments: null };
+  }
+  const laneRuns = [];
+  try {
+    const raw = await git2(["log", `--since=${since}`, "--pretty=%H%x00%ci", "--", layout.receipt]);
+    for (const line of raw.split("\n").filter(Boolean).slice(0, 12)) {
+      const [sha, when] = line.split("\0");
+      try {
+        const body = await git2(["show", `${sha}:${layout.receipt}`]);
+        const receipt = JSON.parse(body);
+        const onDevice = receipt.strength?.onDeviceSteps ?? [];
+        const level = receipt.evidenceLevel;
+        laneRuns.push({
+          sha: short(sha),
+          when,
+          verdict: receipt.verdict ?? "unknown",
+          strength: onDevice.length ? `on-device: ${onDevice.join("+")}` : "desktop-only",
+          rung: level && typeof level.rung === "string" && typeof level.name === "string" ? `${level.rung} ${level.name}` : void 0,
+          // The pack that graded that rung, carried BESIDE it because a rung
+          // that reaches a surface without one cannot be rendered honestly
+          // there — NORTH-STAR.md §6.5 requires every surface showing a rung to
+          // show the pack, and this row feeds one (the front door's "What
+          // changed" lane-run table). Only the id: `pack.version` on a receipt
+          // is currently the harness lock's number rather than the profile's
+          // (docs/adr/0008), so passing it on would propagate a borrowed fact.
+          packId: typeof receipt.pack?.id === "string" && receipt.pack.id.trim() ? receipt.pack.id.trim() : null
+        });
+      } catch {
+        laneRuns.push({ sha: short(sha), when, verdict: "unreadable" });
+      }
+    }
+  } catch {
+  }
+  let approvalEvents = [];
+  try {
+    const raw = await git2(["log", `--since=${since}`, "--pretty=%H%x00%ci%x00%s", "--", layout.approvals]);
+    approvalEvents = raw.split("\n").filter(Boolean).slice(0, 12).map((l) => {
+      const [sha, when, subject] = l.split("\0");
+      return { sha: short(sha), when, subject };
+    });
+  } catch {
+  }
+  let openComments = null;
+  try {
+    const fs21 = await import("node:fs");
+    const path23 = await import("node:path");
+    const ledger = path23.join(projectDir, "qa", "comments.json");
+    if (fs21.existsSync(ledger)) {
+      const data = JSON.parse(fs21.readFileSync(ledger, "utf8"));
+      openComments = (data.comments ?? []).filter((c) => c.status === "open").length;
+    }
+  } catch {
+    openComments = null;
+  }
+  return { available: true, since, commits, laneRuns, approvalEvents, openComments };
+}
+
+// src/lib/approval-diff.mjs
+import fs17 from "node:fs";
+import os2 from "node:os";
+import path19 from "node:path";
+import { pathToFileURL as pathToFileURL5 } from "node:url";
+var SEARCH_DEPTH = 120;
+var MAX_DIFF_LINES = 400;
+async function importProjectApprovals(projectDir) {
+  const lib = path19.join(projectDir, "qa", "lib", "approvals.mjs");
+  if (!fs17.existsSync(lib)) return null;
+  try {
+    return await import(pathToFileURL5(lib).href);
+  } catch {
+    return null;
+  }
+}
+async function materialize(git2, sha, relFiles, alsoNeeded) {
+  const tmp = fs17.mkdtempSync(path19.join(os2.tmpdir(), "cmp-approval-anchor-"));
+  for (const rel of [...relFiles, ...alsoNeeded]) {
+    try {
+      const { stdout } = await git2(["show", `${sha}:${rel}`]);
+      const dest = path19.join(tmp, rel);
+      fs17.mkdirSync(path19.dirname(dest), { recursive: true });
+      fs17.writeFileSync(dest, stdout);
+    } catch {
+    }
+  }
+  return tmp;
+}
+async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: execFileAsync3 } = {}) {
+  const git2 = (args) => execFileAsync3("git", args, { cwd: projectDir, timeout: 1e4, maxBuffer: 16 * 1024 * 1024 });
+  const lib = await importProjectApprovals(projectDir);
+  if (!lib) return { available: false, reason: "project approvals library not importable" };
+  const artifacts = lib.listGovernedArtifacts(projectDir);
+  const artifact = artifacts.find((a) => a.id === artifactId);
+  if (!artifact) return { available: false, reason: `unknown artifact ${artifactId}` };
+  const ledger = lib.loadApprovals(projectDir);
+  const record2 = (ledger?.artifacts ?? []).find((r) => r.artifact === artifactId);
+  const stored = record2?.hash;
+  if (!stored) return { available: false, reason: "no stored approval hash to anchor against" };
+  const alsoNeeded = ["qa/lib/arch-doc.mjs"];
+  let log;
+  try {
+    const { stdout } = await git2(["log", `--max-count=${SEARCH_DEPTH}`, "--pretty=%H%x00%ci", "--", ...artifact.files]);
+    log = stdout.split("\n").filter(Boolean).map((l) => l.split("\0"));
+  } catch (err) {
+    return { available: false, reason: `git log failed: ${err.message}` };
+  }
+  for (const [sha, when] of log) {
+    let tmp = null;
+    try {
+      tmp = await materialize(git2, sha, artifact.files, alsoNeeded);
+      const h = typeof artifact.hash === "function" ? artifact.hash(tmp) : lib.hashArtifactFiles(tmp, artifact.files);
+      if (h.hash === stored) {
+        const { stdout: diff } = await git2(["diff", sha, "--", ...artifact.files]);
+        const { stdout: nameStatus } = await git2(["diff", "--name-status", sha, "--", ...artifact.files]);
+        const changed = nameStatus.split("\n").filter(Boolean).map((l) => {
+          const [status, ...rest] = l.split("	");
+          return { status: status[0], path: rest[rest.length - 1] };
+        });
+        const changedPaths = new Set(changed.map((c) => c.path));
+        const unchanged = artifact.files.filter((f) => !changedPaths.has(f));
+        const lines = diff.split("\n");
+        const truncated = lines.length > MAX_DIFF_LINES;
+        return {
+          available: true,
+          anchorSha: sha.slice(0, 7),
+          anchorWhen: when,
+          diff: (truncated ? lines.slice(0, MAX_DIFF_LINES) : lines).join("\n"),
+          truncated,
+          files: { changed, unchanged }
+        };
+      }
+    } catch {
+    } finally {
+      if (tmp) fs17.rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+  return {
+    available: false,
+    reason: `no commit in the last ${SEARCH_DEPTH} touching this artifact matches the approved hash \u2014 the approval was likely recorded against uncommitted files. The chip is still correct; only the anchored diff is unavailable.`
+  };
+}
 
 // ../../packages/harness/src/console/console-standing.mjs
 var STANDING = Object.freeze({
@@ -35333,17 +35846,17 @@ function standing(receipt, { head = null, dirtyCount = 0 } = {}) {
 }
 
 // ../../packages/harness/src/console/console-overview.mjs
-var esc4 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-var escAttr = (s) => esc4(s).replace(/"/g, "&quot;");
+var esc5 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr2 = (s) => esc5(s).replace(/"/g, "&quot;");
 function overviewStatusHtml({ receipt, statuses = [], receiptGlyph: receiptGlyph2, formatAge, tree = null } = {}) {
   const g = receiptGlyph2 ? receiptGlyph2(receipt) : null;
-  const lane = g ? `<span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span> ${esc4(g.label)}` : "";
-  const age = receipt && receipt.available && typeof receipt.ageMs === "number" && formatAge ? ` &middot; ${esc4(formatAge(receipt.ageMs))}` : "";
+  const lane = g ? `<span class="glyph ${g.cls}" title="${escAttr2(g.label)}">${g.ch}</span> ${esc5(g.label)}` : "";
+  const age = receipt && receipt.available && typeof receipt.ageMs === "number" && formatAge ? ` &middot; ${esc5(formatAge(receipt.ageMs))}` : "";
   const label = receipt && receipt.available ? rungWithPack(receipt.evidenceLevel, receipt.packId ?? receipt.pack) : null;
-  const rung = label ? ` &middot; <span class="badge evidence-rung" title="${escAttr(rungPackNote(receipt.evidenceLevel, receipt.packId ?? receipt.pack))}">${esc4(label)}</span>` : "";
+  const rung = label ? ` &middot; <span class="badge evidence-rung" title="${escAttr2(rungPackNote(receipt.evidenceLevel, receipt.packId ?? receipt.pack))}">${esc5(label)}</span>` : "";
   const tally = statuses.length ? ` &middot; ${statuses.filter((s) => s.status === "approved").length} of ${statuses.length} signed` : "";
   const st = tree ? standing(receipt, tree) : null;
-  const stand = st ? ` &middot; <span class="${st.ok ? "standing-ok" : "standing-open"}" title="${escAttr(st.note)}">${esc4(st.label)}</span>` : "";
+  const stand = st ? ` &middot; <span class="${st.ok ? "standing-ok" : "standing-open"}" title="${escAttr2(st.note)}">${esc5(st.label)}</span>` : "";
   return `${lane}${age}${rung}${tally}${stand}`;
 }
 function itemActionHtml(item, { byArtifact, byFeature }) {
@@ -35351,11 +35864,11 @@ function itemActionHtml(item, { byArtifact, byFeature }) {
   const featureName = item.artifact.startsWith("feature-brief:") ? item.artifact.slice("feature-brief:".length) : null;
   const feature = featureName ? byFeature.get(featureName) : null;
   if (feature && feature.provenDone && record2 && record2.status === "approved") {
-    return `<button type="button" class="feature-accept-btn fd-sign" data-name="${escAttr(featureName)}">Accept</button>`;
+    return `<button type="button" class="feature-accept-btn fd-sign" data-name="${escAttr2(featureName)}">Accept</button>`;
   }
   if (record2 && record2.resolvable === false) return "";
   const label = record2 && record2.status === "unreviewed" ? "Approve" : "Re-approve";
-  return `<button type="button" class="approve-btn fd-sign" data-artifact="${escAttr(item.artifact)}">${label}</button>`;
+  return `<button type="button" class="approve-btn fd-sign" data-artifact="${escAttr2(item.artifact)}">${label}</button>`;
 }
 function itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs }) {
   const record2 = byArtifact.get(item.artifact) || null;
@@ -35363,7 +35876,7 @@ function itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs }) {
   if (record2 && (record2.status === "changed-since-approval" || record2.status === "reopened")) {
     if (!anchored || !anchored.available) {
       const why = anchored && anchored.reason ? anchored.reason : "the signed bytes were not located in recent history";
-      return `      <p class="fd-evidence fd-evidence-absent">what changed vs. the signed bytes is not derivable &mdash; ${esc4(why)}</p>`;
+      return `      <p class="fd-evidence fd-evidence-absent">what changed vs. the signed bytes is not derivable &mdash; ${esc5(why)}</p>`;
     }
     const files = anchored.files || { changed: [], unchanged: [] };
     const changed = files.changed || [];
@@ -35372,7 +35885,7 @@ function itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs }) {
     if (changed.length === 0) {
       return `      <p class="fd-evidence">no file in this artifact differs from the signed bytes &mdash; the hash moved for another reason; open the section for the anchored diff</p>`;
     }
-    const list = changed.slice(0, 8).map((f) => `<li><span class="fd-status">${esc4(f.status)}</span> <code>${esc4(f.path)}</code></li>`).join("");
+    const list = changed.slice(0, 8).map((f) => `<li><span class="fd-status">${esc5(f.status)}</span> <code>${esc5(f.path)}</code></li>`).join("");
     const more = changed.length > 8 ? `<li class="fd-more">&hellip; and ${changed.length - 8} more</li>` : "";
     const still = unchanged.length > 0 ? ` &middot; ${unchanged.length} of ${total} still exactly as signed` : "";
     return `      <details class="fd-evidence">
@@ -35404,7 +35917,13 @@ function overviewBodyHtml({
   statusGlyph: statusGlyph2,
   journal = [],
   formatAge,
-  walks = null
+  walks = null,
+  // LIVE-CONSOLE.md's second question ("what is happening?"), rendered by
+  // console-now.mjs from the lane's own step stream and passed in as a string
+  // — exactly like digestHtml. Composition only: this file does not read the
+  // stream, does not decide a run's phase, and does not format a step.
+  // "" is an older caller, and renders no row rather than an empty one.
+  nowHtml = ""
 } = {}) {
   const byArtifact = new Map(statuses.map((s) => [s.id, s]));
   const byFeature = new Map(features.map((f) => [f.name, f]));
@@ -35419,10 +35938,10 @@ function overviewBodyHtml({
 ${queue.map((item) => {
       const record2 = byArtifact.get(item.artifact) || null;
       const g = record2 && record2.status === "approved" ? { ch: "\u25CF", cls: "glyph-attn", label: "proven \u2014 awaiting your acceptance" } : statusGlyph2 ? statusGlyph2(record2) : null;
-      const glyph = g ? `<span class="glyph ${g.cls}" title="${escAttr(g.label)}">${g.ch}</span>` : `<span class="glyph glyph-unsigned">&#9675;</span>`;
+      const glyph = g ? `<span class="glyph ${g.cls}" title="${escAttr2(g.label)}">${g.ch}</span>` : `<span class="glyph glyph-unsigned">&#9675;</span>`;
       return `    <li class="fd-item">
-      <p class="fd-act">${glyph} <span class="fd-label">${esc4(item.label)}</span>
-        <span class="fd-actions">${itemActionHtml(item, { byArtifact, byFeature })}<button type="button" class="gov-jump fd-go" data-go-tab="${escAttr(item.tab)}" data-go-artifact="${escAttr(item.artifact)}" title="open the artifact and read it in full">read it first</button></span></p>
+      <p class="fd-act">${glyph} <span class="fd-label">${esc5(item.label)}</span>
+        <span class="fd-actions">${itemActionHtml(item, { byArtifact, byFeature })}<button type="button" class="gov-jump fd-go" data-go-tab="${escAttr2(item.tab)}" data-go-artifact="${escAttr2(item.artifact)}" title="open the artifact and read it in full">read it first</button></span></p>
 ${itemEvidenceHtml(item, { byArtifact, byFeature, anchoredDiffs })}
     </li>`;
     }).join("\n")}
@@ -35436,10 +35955,10 @@ ${recent.map((e) => {
     const ageMs = e.at ? Date.now() - Date.parse(e.at) : NaN;
     const age = formatAge && !Number.isNaN(ageMs) ? formatAge(ageMs) : "";
     const who = e.via ? ` via ${e.via}` : "";
-    return `    <p class="gov-event" title="${escAttr(e.at || "")}"><span class="gov-event-glyph">${glyph}</span> ${esc4(e.verb)} ${esc4(e.artifact || "")}${esc4(who)}${age ? ` &middot; ${esc4(age)}` : ""}${e.reason ? `<span class="gov-event-reason">${esc4(e.reason)}</span>` : ""}</p>`;
+    return `    <p class="gov-event" title="${escAttr2(e.at || "")}"><span class="gov-event-glyph">${glyph}</span> ${esc5(e.verb)} ${esc5(e.artifact || "")}${esc5(who)}${age ? ` &middot; ${esc5(age)}` : ""}${e.reason ? `<span class="gov-event-reason">${esc5(e.reason)}</span>` : ""}</p>`;
   }).join("\n")}
   </div>`;
-  const since = digestSince ? ` <span class="fd-since">window: since ${esc4(digestSince)}</span>` : "";
+  const since = digestSince ? ` <span class="fd-since">window: since ${esc5(digestSince)}</span>` : "";
   const changedBlock = digestHtml ? `  <h3 class="fd-h">What changed${since}</h3>
 <div class="fd-digest">
 ${digestHtml}
@@ -35447,9 +35966,12 @@ ${digestHtml}
   const fold = (label, inner) => inner ? `  <details class="fd-fold"><summary>${label}</summary>
 ${inner}
   </details>` : "";
+  const nowBlock = nowHtml ? `  <h3 class="fd-h">Now</h3>
+${nowHtml}
+` : "";
   return `${driveChainHtml(walks && walks.chain ? walks.chain : null)}  <p class="meta">The three questions, in the order they get asked. Every line below is arranged
   from the section that owns it &mdash; this page derives nothing of its own, and signing happens where you read.</p>
-  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
+${nowBlock}  <h3 class="fd-h">What needs you${queue.length ? ` <span class="fd-count">${queue.length}</span>` : ""}</h3>
 ${queueHtml}
 ${walksHtml(features, statuses, walks)}
 ${fold("What changed", changedBlock)}
@@ -35483,10 +36005,10 @@ function chainHistoryHtml(history) {
     const label = h.title || h.request || "(untitled request)";
     const ageMs = h.at ? Date.now() - Date.parse(h.at) : NaN;
     const rung = h.receipt ? rungWithPack(h.receipt.rung, h.receipt.pack) : null;
-    const outcome = h.receipt && h.receipt.verdict ? `<span class="ch-hist-outcome ${h.receipt.verdict === "PASS" ? "ok" : "bad"}"${rung ? ` title="${escAttr(rungPackNote(h.receipt.rung, h.receipt.pack))}"` : ""}>${esc4(h.receipt.verdict)}${rung ? ` &middot; ${esc4(rung)}` : ""}</span>` : `<span class="ch-hist-outcome">no receipt at close</span>`;
-    const dur = typeof h.durationMs === "number" && h.durationMs > 0 ? ` &middot; ${esc4(fmtChainDur(h.durationMs))}` : "";
+    const outcome = h.receipt && h.receipt.verdict ? `<span class="ch-hist-outcome ${h.receipt.verdict === "PASS" ? "ok" : "bad"}"${rung ? ` title="${escAttr2(rungPackNote(h.receipt.rung, h.receipt.pack))}"` : ""}>${esc5(h.receipt.verdict)}${rung ? ` &middot; ${esc5(rung)}` : ""}</span>` : `<span class="ch-hist-outcome">no receipt at close</span>`;
+    const dur = typeof h.durationMs === "number" && h.durationMs > 0 ? ` &middot; ${esc5(fmtChainDur(h.durationMs))}` : "";
     const steps = Array.isArray(h.steps) && h.steps.length ? ` &middot; ${h.steps.length} step${h.steps.length === 1 ? "" : "s"}` : "";
-    return `    <p class="ch-hist-row" title="${escAttr(Array.isArray(h.steps) ? h.steps.join(" \u2192 ") : "")}">${esc4(label)}${steps}${dur} &middot; ${outcome}${Number.isNaN(ageMs) ? "" : ` &middot; ${esc4(fmtChainAge(ageMs))}`}</p>`;
+    return `    <p class="ch-hist-row" title="${escAttr2(Array.isArray(h.steps) ? h.steps.join(" \u2192 ") : "")}">${esc5(label)}${steps}${dur} &middot; ${outcome}${Number.isNaN(ageMs) ? "" : ` &middot; ${esc5(fmtChainAge(ageMs))}`}</p>`;
   }).join("\n");
   return `  <details class="ch-hist"><summary>Recent requests <span class="fd-count">${history.length}</span></summary>
 ${rows}
@@ -35497,7 +36019,7 @@ function driveChainHtml(chain) {
   if (!chain || !chain.plan && !chain.request) return "";
   const title = chain.plan && chain.plan.title ? chain.plan.title : chain.request ? chain.request.text : "";
   const busyPhrase = chainBusyPhrase(chain);
-  const busy = busyPhrase !== "" ? `${CH_PROV.observed} <span class="ch-busy">${esc4(busyPhrase)}</span>` : "";
+  const busy = busyPhrase !== "" ? `${CH_PROV.observed} <span class="ch-busy">${esc5(busyPhrase)}</span>` : "";
   let steps = "";
   let meta3 = "";
   if (chain.plan) {
@@ -35510,20 +36032,20 @@ function driveChainHtml(chain) {
       if (st.done) {
         const a = Date.parse(st.startedAt || "");
         const b = Date.parse(st.doneAt || "");
-        if (!Number.isNaN(a) && !Number.isNaN(b)) time3 = ` <span class="ch-time">(${esc4(fmtChainDur(Math.max(0, b - a)))})</span>`;
+        if (!Number.isNaN(a) && !Number.isNaN(b)) time3 = ` <span class="ch-time">(${esc5(fmtChainDur(Math.max(0, b - a)))})</span>`;
       } else if (st.n === cur) {
         const a = Date.parse(st.startedAt || "");
-        if (!Number.isNaN(a)) time3 = ` <span class="ch-time">${esc4(fmtChainDur(Math.max(0, nowMs - a)))} in</span>`;
+        if (!Number.isNaN(a)) time3 = ` <span class="ch-time">${esc5(fmtChainDur(Math.max(0, nowMs - a)))} in</span>`;
       }
-      return `<span class="ch-step ${cls}"><span class="ch-glyph">${glyph}</span> ${st.n}. ${esc4(st.label)}${time3}</span>`;
+      return `<span class="ch-step ${cls}"><span class="ch-glyph">${glyph}</span> ${st.n}. ${esc5(st.label)}${time3}</span>`;
     }).join('<span class="ch-arrow">\u2192</span>')}</p>`;
     const now = chain.plan.steps.find((st) => st.n === cur) ?? null;
-    meta3 = `  <p class="ch-meta">${now ? `now: step ${now.n} of ${chain.plan.steps.length} \u2014 ${esc4(now.label)}` : "chain complete"}${busy ? ` &middot; ${busy}` : ""} &middot; ${CH_PROV.declared} <span class="ch-age">updated ${esc4(fmtChainAge(chain.planAgeMs))}</span></p>`;
+    meta3 = `  <p class="ch-meta">${now ? `now: step ${now.n} of ${chain.plan.steps.length} \u2014 ${esc5(now.label)}` : "chain complete"}${busy ? ` &middot; ${busy}` : ""} &middot; ${CH_PROV.declared} <span class="ch-age">updated ${esc5(fmtChainAge(chain.planAgeMs))}</span></p>`;
   } else {
     meta3 = `  <p class="ch-meta">no declared step chain for this request yet${busy ? ` &middot; ${busy}` : ""}</p>`;
   }
   return `  <div class="ch-strip">
-  <p class="ch-request"><span class="lbl">Request</span> ${esc4(title)} ${CH_PROV.recorded}</p>
+  <p class="ch-request"><span class="lbl">Request</span> ${esc5(title)} ${CH_PROV.recorded}</p>
 ${steps}${meta3}${chainHistoryHtml(chain.history)}  </div>
 `;
 }
@@ -35566,19 +36088,19 @@ function walksHtml(features = [], statuses = [], walksData = null) {
     const dots = WK_STAGES.map(([key, label], i) => {
       const state = key === "design" && f.design === null ? "skip" : i < idx ? "done" : i === idx ? "cur" : "todo";
       const title = state === "skip" ? `${label} \u2014 no UI surface` : label;
-      return `<span class="wk-stage wk-${state}" title="${escAttr(title)}"><span class="wk-dot"></span>${esc4(label)}</span>`;
+      return `<span class="wk-stage wk-${state}" title="${escAttr2(title)}"><span class="wk-dot"></span>${esc5(label)}</span>`;
     }).join("");
     const promises = typeof f.total === "number" && f.total > 0 ? `<span class="wk-promises">${f.covered} of ${f.total} promises kept</span>` : "";
     const owner = f.nextStep ? f.nextStep.label : "";
-    const you = f.nextStep && f.nextStep.owner === "human" ? `<span class="wk-turn">YOUR TURN</span> ${esc4(owner)}` : `<span class="wk-agent">agent</span> ${esc4(owner)}`;
-    return `  <div class="wk-card" data-walk="${escAttr(f.name)}">
-    <p class="wk-name">${esc4(f.name)}${promises}</p>
+    const you = f.nextStep && f.nextStep.owner === "human" ? `<span class="wk-turn">YOUR TURN</span> ${esc5(owner)}` : `<span class="wk-agent">agent</span> ${esc5(owner)}`;
+    return `  <div class="wk-card" data-walk="${escAttr2(f.name)}">
+    <p class="wk-name">${esc5(f.name)}${promises}</p>
     <p class="wk-stages">${dots}</p>
     <p class="wk-you">${you}</p>
   </div>`;
   });
   const arrived = arrivals.map(
-    (a) => `  <p class="wk-arrival">&#9650; ARRIVED, UNPLANNED &mdash; ${esc4(a.label || a.id)} &middot; reopened outside every open walk &mdash; now, or after the current walk lands?</p>`
+    (a) => `  <p class="wk-arrival">&#9650; ARRIVED, UNPLANNED &mdash; ${esc5(a.label || a.id)} &middot; reopened outside every open walk &mdash; now, or after the current walk lands?</p>`
   );
   return `  <h3 class="fd-h">In flight${open.length ? ` <span class="fd-count">${open.length}</span>` : ""}</h3>
 ${cards.join("\n")}
@@ -35593,47 +36115,47 @@ function walksRichHtml(walksData, statuses = []) {
     const dots = w.stages.map((s) => {
       const cls = stageState[s.state] ?? "todo";
       const title = s.note ? `${s.label} \u2014 ${s.note}` : s.label;
-      const note = s.note && s.key === "prove" ? ` <span class="wk-note">${esc4(s.note)}</span>` : "";
-      return `<span class="wk-stage wk-${cls}" title="${escAttr(title)}"><span class="wk-dot"></span>${esc4(s.label)}${note}</span>`;
+      const note = s.note && s.key === "prove" ? ` <span class="wk-note">${esc5(s.note)}</span>` : "";
+      return `<span class="wk-stage wk-${cls}" title="${escAttr2(title)}"><span class="wk-dot"></span>${esc5(s.label)}${note}</span>`;
     }).join("");
     const g = gloss[w.currentStage];
-    const stageLine = w.currentStage ? `<span class="wk-gloss">${esc4(w.stages.find((s) => s.key === w.currentStage)?.label ?? "")}${g ? ` \u2014 ${esc4(g)}` : ""}</span>` : "";
+    const stageLine = w.currentStage ? `<span class="wk-gloss">${esc5(w.stages.find((s) => s.key === w.currentStage)?.label ?? "")}${g ? ` \u2014 ${esc5(g)}` : ""}</span>` : "";
     const all = w.promises && w.promises.all || [];
     const currentId = w.promises && w.promises.current ? w.promises.current.id : null;
     const promiseList = all.length > 0 ? `    <ul class="wk-plist">
 ${all.map((p) => {
       const cls = p.kept ? "wk-p-kept" : p.id === currentId ? "wk-p-cur" : "wk-p-todo";
       const glyph = p.kept ? "\u2713" : p.id === currentId ? "\u25B8" : "\u25CB";
-      return `      <li class="${cls}"><span class="wk-p-glyph">${glyph}</span> <code>${esc4(p.id)}</code>${p.title ? ` ${esc4(p.title)}` : ""}</li>`;
+      return `      <li class="${cls}"><span class="wk-p-glyph">${glyph}</span> <code>${esc5(p.id)}</code>${p.title ? ` ${esc5(p.title)}` : ""}</li>`;
     }).join("\n")}
     </ul>` : "";
     const buttons = (w.you.signable || []).map((s) => {
       if (s.verb === "accept")
-        return `<button type="button" class="feature-accept-btn fd-sign" data-name="${escAttr(s.artifact)}">Accept</button>`;
+        return `<button type="button" class="feature-accept-btn fd-sign" data-name="${escAttr2(s.artifact)}">Accept</button>`;
       const record2 = byId.get(s.artifact);
       if (record2 && record2.status === "approved") return "";
       if (record2 && record2.resolvable === false) return "";
       const label = record2 && record2.status === "unreviewed" ? "Approve" : "Re-approve";
-      return `<button type="button" class="approve-btn fd-sign" data-artifact="${escAttr(s.artifact)}">${label}</button>`;
+      return `<button type="button" class="approve-btn fd-sign" data-artifact="${escAttr2(s.artifact)}">${label}</button>`;
     }).filter(Boolean).join(" ");
-    const you = w.you.turn === "you" ? `<span class="wk-turn">YOUR TURN</span> ${esc4(w.you.act ?? "")}${buttons ? ` ${buttons}` : ""}` : w.you.turn === "agent" ? `<span class="wk-agent">agent</span> ${esc4(w.you.act ?? "")}${w.stops && w.stops.length ? ` <span class="wk-stops">next stop${w.stops.length > 1 ? "s" : ""} for you: ${esc4(w.stops.join(", "))}</span>` : ""}` : esc4(w.doneReason ?? "closed");
+    const you = w.you.turn === "you" ? `<span class="wk-turn">YOUR TURN</span> ${esc5(w.you.act ?? "")}${buttons ? ` ${buttons}` : ""}` : w.you.turn === "agent" ? `<span class="wk-agent">agent</span> ${esc5(w.you.act ?? "")}${w.stops && w.stops.length ? ` <span class="wk-stops">next stop${w.stops.length > 1 ? "s" : ""} for you: ${esc5(w.stops.join(", "))}</span>` : ""}` : esc5(w.doneReason ?? "closed");
     const tally = w.promises && typeof w.promises.total === "number" && w.promises.total > 0 ? `<span class="wk-promises">${w.promises.kept} of ${w.promises.total} promises kept</span>` : "";
-    return `  <div class="wk-card" data-walk="${escAttr(w.name)}">
-    <p class="wk-name">${esc4(w.name)}${tally} ${stageLine}</p>
+    return `  <div class="wk-card" data-walk="${escAttr2(w.name)}">
+    <p class="wk-name">${esc5(w.name)}${tally} ${stageLine}</p>
     <p class="wk-stages">${dots}</p>
 ${promiseList ? `${promiseList}
 ` : ""}    <p class="wk-you">${you}</p>
   </div>`;
   });
   const arrived = arrivals.map(
-    (a) => `  <p class="wk-arrival">&#9650; ARRIVED, UNPLANNED &mdash; ${esc4(a.label || a.id)}${a.reason ? ` &middot; ${esc4(a.reason)}` : ""} &mdash; when?
-    <button type="button" class="wk-arrival-btn" data-arrival="${escAttr(a.id)}" data-choice="now">Now</button>
-    <button type="button" class="wk-arrival-btn" data-arrival="${escAttr(a.id)}" data-choice="after">After the current walk</button>
+    (a) => `  <p class="wk-arrival">&#9650; ARRIVED, UNPLANNED &mdash; ${esc5(a.label || a.id)}${a.reason ? ` &middot; ${esc5(a.reason)}` : ""} &mdash; when?
+    <button type="button" class="wk-arrival-btn" data-arrival="${escAttr2(a.id)}" data-choice="now">Now</button>
+    <button type="button" class="wk-arrival-btn" data-arrival="${escAttr2(a.id)}" data-choice="after">After the current walk</button>
   </p>`
   );
   const lane = walksData.lane;
-  const laneSpread = lane && lane.runs > 2 && lane.medianMs > 0 ? ` &middot; typically ${esc4(fmtLaneMs(lane.medianMs))}${lane.maxMs > lane.medianMs ? `, worst ${esc4(fmtLaneMs(lane.maxMs))}` : ""}` : "";
-  const laneLine = lane && typeof lane.durationMs === "number" ? `  <p class="wk-lane">full check: ${esc4(fmtLaneMs(lane.durationMs))} last run${laneSpread} (measured)</p>` : "";
+  const laneSpread = lane && lane.runs > 2 && lane.medianMs > 0 ? ` &middot; typically ${esc5(fmtLaneMs(lane.medianMs))}${lane.maxMs > lane.medianMs ? `, worst ${esc5(fmtLaneMs(lane.maxMs))}` : ""}` : "";
+  const laneLine = lane && typeof lane.durationMs === "number" ? `  <p class="wk-lane">full check: ${esc5(fmtLaneMs(lane.durationMs))} last run${laneSpread} (measured)</p>` : "";
   return `  <h3 class="fd-h">In flight${walks.length ? ` <span class="fd-count">${walks.length}</span>` : ""}</h3>
 ${cards.join("\n")}
 ${arrived.join("\n")}
@@ -35678,10 +36200,10 @@ function setConsoleCopy(copy) {
 function consoleCopy() {
   return COPY;
 }
-var esc5 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-var escAttr2 = (s) => esc5(s).replace(/"/g, "&quot;");
+var esc6 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr3 = (s) => esc6(s).replace(/"/g, "&quot;");
 function commentControlHtml(target, opts = {}) {
-  const targetJson = escAttr2(JSON.stringify(target));
+  const targetJson = escAttr3(JSON.stringify(target));
   const testTagField = opts.testTagInput ? `<input type="text" class="comment-testtag" placeholder="testTag (optional \u2014 element-level)">` : "";
   return `<span class="comment-ctl" data-target="${targetJson}">
       <button type="button" class="comment-btn" title="Add comment">&#128172;</button>
@@ -35726,23 +36248,23 @@ function signatureBarHtml(status, opts = {}) {
   if (!status) return "";
   const what = opts.what || status.id;
   const cls = status.status === "approved" ? "badge-approved" : status.status === "changed-since-approval" ? "badge-drift" : status.status === "reopened" ? "badge-reopened" : "badge-unreviewed";
-  const line = status.status === "approved" ? `signed${status.approvedAt ? ` ${esc5(status.approvedAt)}` : ""}${status.mode ? ` \xB7 ${esc5(status.mode)}` : ""}` : status.status === "changed-since-approval" ? "changed since signature \u2014 review the diff below, then re-approve" : status.status === "reopened" ? (
+  const line = status.status === "approved" ? `signed${status.approvedAt ? ` ${esc6(status.approvedAt)}` : ""}${status.mode ? ` \xB7 ${esc6(status.mode)}` : ""}` : status.status === "changed-since-approval" ? "changed since signature \u2014 review the diff below, then re-approve" : status.status === "reopened" ? (
     // The WHY, read straight off the ledger row (07-28 audit: "reopened"
     // with no reason was the state Karel came back to and could not
     // decode). Pre-audit rows carry no reason — the line then says only
     // what it knows.
-    `reopened for redesign${status.reopenedAt ? ` ${esc5(status.reopenedAt)}` : ""}${status.via ? ` via ${esc5(status.via)}` : ""}${status.reason ? ` \u2014 <em>${esc5(status.reason)}</em>` : ""} \u2014 re-approve when the redesign lands`
+    `reopened for redesign${status.reopenedAt ? ` ${esc6(status.reopenedAt)}` : ""}${status.via ? ` via ${esc6(status.via)}` : ""}${status.reason ? ` \u2014 <em>${esc6(status.reason)}</em>` : ""} \u2014 re-approve when the redesign lands`
   ) : "not signed yet \u2014 nothing here is binding until you sign it";
   const canApprove = status.resolvable !== false;
   const approveLabel = status.status === "approved" ? `Re-approve ${what}` : status.status === "unreviewed" ? `Approve ${what}` : `Re-approve ${what}`;
   const buttons = [
-    canApprove ? `<button type="button" class="approve-btn" data-artifact="${escAttr2(status.id)}">${esc5(approveLabel)}</button>` : `<span class="meta">not approvable yet \u2014 ${status.fileCount} of its expected files resolved</span>`,
-    status.status === "approved" ? `<button type="button" class="reopen-btn" data-artifact="${escAttr2(status.id)}">Reopen for redesign</button>` : ""
+    canApprove ? `<button type="button" class="approve-btn" data-artifact="${escAttr3(status.id)}">${esc6(approveLabel)}</button>` : `<span class="meta">not approvable yet \u2014 ${status.fileCount} of its expected files resolved</span>`,
+    status.status === "approved" ? `<button type="button" class="reopen-btn" data-artifact="${escAttr3(status.id)}">Reopen for redesign</button>` : ""
   ].filter(Boolean).join(" ");
   return `  <div class="signature-bar">
-    <span class="badge ${cls}">${esc5(status.status)}</span>
+    <span class="badge ${cls}">${esc6(status.status)}</span>
     <span class="signature-line">${line}</span>
-    <code class="signature-id">${esc5(status.id)}</code>
+    <code class="signature-id">${esc6(status.id)}</code>
     <span class="signature-actions">${buttons}</span>
   </div>`;
 }
@@ -35751,38 +36273,38 @@ function driftPanelHtml(status, anchored, opts = {}) {
   const reopened = status.status === "reopened";
   if (status.status !== "changed-since-approval" && !reopened) return "";
   const withApprove = opts.withApprove !== false;
-  const signedLine = status.approvedAt ? ` It was signed ${esc5(status.approvedAt)}.` : "";
+  const signedLine = status.approvedAt ? ` It was signed ${esc6(status.approvedAt)}.` : "";
   let filesHtml = "";
   let diffHtml = "";
   if (anchored && anchored.available) {
     const { changed = [], unchanged = [] } = anchored.files ?? {};
     const total = changed.length + unchanged.length;
     const verb = { M: "changed", A: "added since signing", D: "deleted" };
-    const changedItems = changed.map((c) => `<li><span class="status-drift">${esc5(verb[c.status] ?? c.status)}</span> <code>${esc5(c.path)}</code></li>`).join("\n");
+    const changedItems = changed.map((c) => `<li><span class="status-drift">${esc6(verb[c.status] ?? c.status)}</span> <code>${esc6(c.path)}</code></li>`).join("\n");
     const stillSigned = unchanged.length > 0 ? `      <details class="drift-still-signed"><summary>${unchanged.length} file(s) still exactly as signed</summary>
-        <ul>${unchanged.map((f) => `<li><span class="ok-inline">\u2713</span> <code>${esc5(f)}</code></li>`).join("\n")}</ul>
+        <ul>${unchanged.map((f) => `<li><span class="ok-inline">\u2713</span> <code>${esc6(f)}</code></li>`).join("\n")}</ul>
       </details>` : "";
     filesHtml = `    <p class="drift-summary">${total > 1 ? `<strong>${unchanged.length} of ${total}</strong> file(s) still exactly as signed &middot; <strong>${changed.length}</strong> changed:` : "what changed:"}</p>
     <ul class="drift-files">
 ${changedItems}
     </ul>
 ${stillSigned}`;
-    diffHtml = `    <details class="drift-diff"><summary>diff against the signed bytes (anchor ${esc5(anchored.anchorSha)} &middot; ${esc5(
+    diffHtml = `    <details class="drift-diff"><summary>diff against the signed bytes (anchor ${esc6(anchored.anchorSha)} &middot; ${esc6(
       anchored.anchorWhen || ""
     )}${anchored.truncated ? " &middot; truncated" : ""})</summary>
-      <pre class="approval-diff">${esc5(anchored.diff)}</pre>
+      <pre class="approval-diff">${esc6(anchored.diff)}</pre>
     </details>`;
   } else if (anchored) {
-    diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc5(anchored.reason)}</p>`;
+    diffHtml = `    <p class="empty-inline">anchored diff unavailable &mdash; ${esc6(anchored.reason)}</p>`;
   }
-  const who = status.via ? ` via ${esc5(status.via)}` : "";
-  const why = status.reason ? ` Reason given: <em>${esc5(status.reason)}</em>.` : " No reason was recorded \u2014 this reopen predates the reason-required rule.";
-  const head = reopened ? `<p class="drift-head"><strong>Reopened for redesign</strong> &mdash; the signature on <code>${esc5(status.id)}</code> was deliberately walked back${status.reopenedAt ? ` ${esc5(status.reopenedAt)}` : ""}${who}.${why} This is sanctioned, not drift: the verify lane skips it rather than failing. Below is what has moved since the bytes you signed. Approve when the rendered result is what you want.</p>` : `<p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc5(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve \u2014 or revert the change.</p>`;
-  return `  <div class="drift-panel${reopened ? " drift-panel-reopened" : ""}" data-artifact="${escAttr2(status.id)}">
+  const who = status.via ? ` via ${esc6(status.via)}` : "";
+  const why = status.reason ? ` Reason given: <em>${esc6(status.reason)}</em>.` : " No reason was recorded \u2014 this reopen predates the reason-required rule.";
+  const head = reopened ? `<p class="drift-head"><strong>Reopened for redesign</strong> &mdash; the signature on <code>${esc6(status.id)}</code> was deliberately walked back${status.reopenedAt ? ` ${esc6(status.reopenedAt)}` : ""}${who}.${why} This is sanctioned, not drift: the verify lane skips it rather than failing. Below is what has moved since the bytes you signed. Approve when the rendered result is what you want.</p>` : `<p class="drift-head"><strong>Changed since signature</strong> &mdash; <code>${esc6(status.id)}</code> no longer matches the bytes the human signed.${signedLine} Review what changed below, then re-approve \u2014 or revert the change.</p>`;
+  return `  <div class="drift-panel${reopened ? " drift-panel-reopened" : ""}" data-artifact="${escAttr3(status.id)}">
     ${head}
 ${filesHtml}
 ${diffHtml}
-    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr2(status.id)}">${reopened ? "Approve" : "Re-approve"} ${esc5(status.id)}</button></div>` : ""}
+    ${withApprove ? `<div class="feature-actions"><button type="button" class="approve-btn" data-artifact="${escAttr3(status.id)}">${reopened ? "Approve" : "Re-approve"} ${esc6(status.id)}</button></div>` : ""}
   </div>`;
 }
 function genesisGuide(id) {
@@ -35798,7 +36320,7 @@ function genesisGuide(id) {
 }
 function artifactBannerHtml(s) {
   if (s.status === "unreviewed" || s.status === "reopened") {
-    return `<div class="artifact-banner banner-genesis"><span class="banner-mode">genesis</span> ${esc5(genesisGuide(s.id))}</div>`;
+    return `<div class="artifact-banner banner-genesis"><span class="banner-mode">genesis</span> ${esc6(genesisGuide(s.id))}</div>`;
   }
   if (s.status === "approved") {
     const unshaped = s.mode === "defaults-accepted";
@@ -35816,11 +36338,11 @@ function colorTokenTableHtml(colors, usage) {
   if (entries.length === 0) return `  <p class="empty-inline">no color tokens declared</p>`;
   const counts = usage && usage.available && usage.colors ? usage.colors.counts : null;
   const rows = entries.map(([name, hex3]) => {
-    const usageCell = counts ? `<td class="tok-usage">${esc5(usageText(counts[name] ?? 0))}</td>` : "";
+    const usageCell = counts ? `<td class="tok-usage">${esc6(usageText(counts[name] ?? 0))}</td>` : "";
     return `    <tr>
-      <td class="tok-swatch-cell"><span class="tok-swatch" style="background:${esc5(hex3)}"></span></td>
-      <td>${esc5(name)}${commentControlHtml({ type: "design-system", token: name })}</td>
-      <td><code>${esc5(hex3)}</code></td>
+      <td class="tok-swatch-cell"><span class="tok-swatch" style="background:${esc6(hex3)}"></span></td>
+      <td>${esc6(name)}${commentControlHtml({ type: "design-system", token: name })}</td>
+      <td><code>${esc6(hex3)}</code></td>
       ${usageCell}
     </tr>`;
   }).join("\n");
@@ -35828,7 +36350,7 @@ function colorTokenTableHtml(colors, usage) {
   if (usage && !counts) {
     const reason = usage.available === false && usage.reason || "no source object declaring these tokens was found";
     absence = `
-  <p class="empty-inline">usage counts: Not derivable statically &mdash; ${esc5(reason)}</p>`;
+  <p class="empty-inline">usage counts: Not derivable statically &mdash; ${esc6(reason)}</p>`;
   }
   return `  <table class="tok-table">
     <thead><tr><th></th><th>Token</th><th>Value</th>${counts ? "<th>Usage</th>" : ""}</tr></thead>
@@ -35848,10 +36370,10 @@ function contrastMatrixHtml(colors) {
     const aa = p.aa ? `<span class="wcag-pass">pass</span>` : `<span class="wcag-fail">fail</span>`;
     const aaa = p.aaa ? `<span class="wcag-pass">pass</span>` : `<span class="wcag-fail">fail</span>`;
     return `    <tr>
-      <td><span class="contrast-sample" style="background:${esc5(p.bgHex)};color:${esc5(p.fgHex)}">Aa</span>
-          <code>${esc5(p.fg)}</code> on <code>${esc5(p.bg)}</code></td>
-      <td class="tok-usage">${esc5(p.role)}</td>
-      <td class="contrast-ratio">${esc5(ratio)}</td>
+      <td><span class="contrast-sample" style="background:${esc6(p.bgHex)};color:${esc6(p.fgHex)}">Aa</span>
+          <code>${esc6(p.fg)}</code> on <code>${esc6(p.bg)}</code></td>
+      <td class="tok-usage">${esc6(p.role)}</td>
+      <td class="contrast-ratio">${esc6(ratio)}</td>
       <td>${aa}</td>
       <td>${aaa}</td>
     </tr>`;
@@ -35866,7 +36388,7 @@ ${rows}
 }
 function dimenSubTableHtml(entries) {
   const rows = entries.map(
-    (d) => `    <tr><td>${esc5(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</td><td><code>${esc5(d.value)}</code></td></tr>`
+    (d) => `    <tr><td>${esc6(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</td><td><code>${esc6(d.value)}</code></td></tr>`
   ).join("\n");
   return `  <table class="tok-table"><tbody>
 ${rows}
@@ -35875,9 +36397,9 @@ ${rows}
 function spacingScaleHtml(spacing) {
   const rows = spacing.map(
     (d) => `    <div class="scale-row">
-      <span class="scale-name">${esc5(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</span>
+      <span class="scale-name">${esc6(d.name)}${commentControlHtml({ type: "design-system", token: d.name })}</span>
       <span class="scale-bar" style="width:${px(d.dp * SPACING_BAR_PX_PER_DP)}"></span>
-      <span class="scale-value">${esc5(d.value)}</span>
+      <span class="scale-value">${esc6(d.value)}</span>
     </div>`
   ).join("\n");
   return `  <div class="scale-list">
@@ -35914,7 +36436,7 @@ function typeRampHtml(typography) {
       spec.tracking == null ? "tracking unset" : `tracking ${spec.tracking}`
     ].filter(Boolean).join(" &middot; ");
     return `      <tr>
-        <td class="ramp-name"><code>${esc5(spec.name ?? "\u2014")}</code></td>
+        <td class="ramp-name"><code>${esc6(spec.name ?? "\u2014")}</code></td>
         <td class="ramp-specimen"><span style="${style}">Ag</span></td>
         <td class="ramp-numbers">${numbers}</td>
       </tr>`;
@@ -35933,7 +36455,7 @@ ${candidatesStripHtml(meta3.variants)}` : "";
   if (!ds || !ds.available) {
     return `<div class="empty">
       <p>No design-system catalog available yet.</p>
-      <p>Produce one by letting the preview gallery render at least once${ds && ds.sourcePath ? ` (writes <code>${esc5(ds.sourcePath)}</code>)` : ""}, or connect a running
+      <p>Produce one by letting the preview gallery render at least once${ds && ds.sourcePath ? ` (writes <code>${esc6(ds.sourcePath)}</code>)` : ""}, or connect a running
       DEBUG build (<code>connect_live</code>) so it can be read live from
       <code>/inspect/design-system</code>.</p>
     </div>${candidatesSection}`;
@@ -35958,7 +36480,7 @@ ${dimenSubTableHtml(elevation)}`);
 ${dimenSubTableHtml(other)}`);
   }
   const typeRamp = typeRampHtml(typography);
-  return `  <p class="meta">source: ${esc5(sourceLabel)}</p>
+  return `  <p class="meta">source: ${esc6(sourceLabel)}</p>
   <h3>Color tokens</h3>
 ${colorTokenTableHtml(colors, meta3.usage)}
   <h3>Contrast &mdash; WCAG 2.2</h3>
@@ -35979,16 +36501,16 @@ function candidatesStripHtml(variants) {
   const cards = variants.variants.map((v) => {
     const shots = v.screens.map(
       (s) => `        <div class="candidate-shot">
-          <img alt="${escAttr2(v.name)} \u2014 ${escAttr2(s.id)}" src="/previews/${escAttr2(s.png)}">
-          <p class="lbl">${esc5(s.id)}</p>
+          <img alt="${escAttr3(v.name)} \u2014 ${escAttr3(s.id)}" src="/previews/${escAttr3(s.png)}">
+          <p class="lbl">${esc6(s.id)}</p>
         </div>`
     ).join("\n");
     return `    <div class="candidate-card">
-      <h4>${esc5(v.name)}</h4>
+      <h4>${esc6(v.name)}</h4>
       <div class="candidate-shots">
 ${shots || '        <p class="empty-inline">no screens stashed for this candidate</p>'}
       </div>
-      <button type="button" class="pick-btn" data-variant="${escAttr2(v.name)}">Pick &ldquo;${esc5(v.name)}&rdquo;</button>
+      <button type="button" class="pick-btn" data-variant="${escAttr3(v.name)}">Pick &ldquo;${esc6(v.name)}&rdquo;</button>
     </div>`;
   }).join("\n");
   return `  <div class="candidates-strip">
@@ -35997,7 +36519,7 @@ ${cards}
   <div id="pick-error" class="banner" hidden></div>`;
 }
 function shortDate(iso) {
-  return iso ? esc5(String(iso)) : "";
+  return iso ? esc6(String(iso)) : "";
 }
 function componentApprovalBadgeHtml(approval, drift, file2) {
   if (!approval) return "";
@@ -36021,10 +36543,10 @@ function paramsTableHtml(paramsParsed, paramDocs = {}) {
     return `<p class="meta">takes no parameters</p>`;
   }
   const rows = paramsParsed.map((p) => {
-    const type = p.type ? `<code>${esc5(p.type)}</code>` : `<span class="empty-inline">not parsed</span>`;
-    const def = p.default ? `<code>${esc5(p.default)}</code>` : `<span class="param-required">required</span>`;
-    const note = paramDocs[p.name] ? esc5(paramDocs[p.name]) : "";
-    return `    <tr><td><code>${esc5(p.name)}</code></td><td>${type}</td><td>${def}</td><td class="param-note">${note}</td></tr>`;
+    const type = p.type ? `<code>${esc6(p.type)}</code>` : `<span class="empty-inline">not parsed</span>`;
+    const def = p.default ? `<code>${esc6(p.default)}</code>` : `<span class="param-required">required</span>`;
+    const note = paramDocs[p.name] ? esc6(paramDocs[p.name]) : "";
+    return `    <tr><td><code>${esc6(p.name)}</code></td><td>${type}</td><td>${def}</td><td class="param-note">${note}</td></tr>`;
   }).join("\n");
   return `<table class="params-table">
     <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Notes</th></tr></thead>
@@ -36037,20 +36559,20 @@ function stateContractHtml(facts, hasScreenTagParam) {
   const items = [];
   if (hasScreenTagParam) {
     items.push(
-      facts.derivedTags && facts.derivedTags.length ? `owns testTags derived from <code>screenTag</code>: ${facts.derivedTags.map((t) => `<code>&lt;screenTag&gt;_${esc5(t)}</code>`).join(", ")}` : `takes a required <code>screenTag</code> parameter (tag suffixes not found in this scan)`
+      facts.derivedTags && facts.derivedTags.length ? `owns testTags derived from <code>screenTag</code>: ${facts.derivedTags.map((t) => `<code>&lt;screenTag&gt;_${esc6(t)}</code>`).join(", ")}` : `takes a required <code>screenTag</code> parameter (tag suffixes not found in this scan)`
     );
   }
   if (facts.contentUiStateArms && facts.contentUiStateArms.length) {
-    items.push(`renders <code>ContentUiState</code> arms: ${facts.contentUiStateArms.map((a) => `<code>${esc5(a)}</code>`).join(", ")}`);
+    items.push(`renders <code>ContentUiState</code> arms: ${facts.contentUiStateArms.map((a) => `<code>${esc6(a)}</code>`).join(", ")}`);
   }
   if (facts.a11yFloorEvidence && facts.a11yFloorEvidence.length) {
-    items.push(`enforces the 48dp a11y touch-target floor (evidence: ${facts.a11yFloorEvidence.map((e) => `<code>${esc5(e)}</code>`).join(", ")})`);
+    items.push(`enforces the 48dp a11y touch-target floor (evidence: ${facts.a11yFloorEvidence.map((e) => `<code>${esc6(e)}</code>`).join(", ")})`);
   }
   if (facts.insetsApis && facts.insetsApis.length) {
-    items.push(`owns insets: ${facts.insetsApis.map((a) => `<code>${esc5(a)}</code>`).join(", ")}`);
+    items.push(`owns insets: ${facts.insetsApis.map((a) => `<code>${esc6(a)}</code>`).join(", ")}`);
   }
   if (facts.tokensReferenced && facts.tokensReferenced.length) {
-    items.push(`tokens: ${facts.tokensReferenced.map((t) => `<code>${esc5(t)}</code>`).join(", ")}`);
+    items.push(`tokens: ${facts.tokensReferenced.map((t) => `<code>${esc6(t)}</code>`).join(", ")}`);
   }
   if (facts.selfReportsDesignToken) {
     items.push(`self-reports resolved values to the inspector (<code>designToken(...)</code>)`);
@@ -36064,16 +36586,16 @@ function componentStoryHtml(name, componentStories, version2, changedVersions) {
   const card = componentStories ? componentStories[kebab] : void 0;
   if (!card) {
     return `  <div class="component-story">
-    <p class="lbl">story render &mdash; <code>${esc5(id)}</code></p>
-    <p class="empty-inline">no story render yet &mdash; run the preview render to produce <code>${esc5(id)}</code></p>
+    <p class="lbl">story render &mdash; <code>${esc6(id)}</code></p>
+    <p class="empty-inline">no story render yet &mdash; run the preview render to produce <code>${esc6(id)}</code></p>
   </div>`;
   }
   const changedIn = changedVersions ? changedVersions[card.id] : void 0;
   const chip = changedIn ? ` <span class="chg">changed #${Number(changedIn)}</span>` : "";
   const buster = version2 ? `?v=${Number(version2)}` : "";
   return `  <div class="component-story">
-    <p class="lbl">story render &mdash; <code>${esc5(card.id)}</code>${chip}</p>
-    <img alt="${escAttr2(card.id)} story render" src="/previews/${escAttr2(card.png)}${buster}">
+    <p class="lbl">story render &mdash; <code>${esc6(card.id)}</code>${chip}</p>
+    <img alt="${escAttr3(card.id)} story render" src="/previews/${escAttr3(card.png)}${buster}">
   </div>`;
 }
 var STATE_TAG_TO_VARIANT = { loading: "loading", empty: "empty", error: "error", retry: "error" };
@@ -36085,15 +36607,15 @@ function liveVariantsHtml(derivedTags, stateVariants) {
     const entries = sv[state] || [];
     if (entries.length === 0) {
       return `    <div class="state-variant-block">
-      <p class="lbl">live &#64;${esc5(state)} render</p>
-      <p class="empty-inline">Not derivable statically &mdash; no <code>@${esc5(state)}</code> preview-registry entry has rendered yet</p>
+      <p class="lbl">live &#64;${esc6(state)} render</p>
+      <p class="empty-inline">Not derivable statically &mdash; no <code>@${esc6(state)}</code> preview-registry entry has rendered yet</p>
     </div>`;
     }
     const thumbs = entries.map(
-      (v) => `<div class="state-variant-thumb"><img alt="${escAttr2(v.id)}" src="/previews/${escAttr2(v.png)}"><p class="lbl">${esc5(v.id)}</p></div>`
+      (v) => `<div class="state-variant-thumb"><img alt="${escAttr3(v.id)}" src="/previews/${escAttr3(v.png)}"><p class="lbl">${esc6(v.id)}</p></div>`
     ).join("");
     return `    <div class="state-variant-block">
-      <p class="lbl">live &#64;${esc5(state)} render</p>
+      <p class="lbl">live &#64;${esc6(state)} render</p>
       <div class="state-variant-thumbs">${thumbs}</div>
     </div>`;
   });
@@ -36111,9 +36633,9 @@ function usedInHtml(usedIn, usedInScreens, violationsByFile) {
   );
   const items = ordered.map((f) => {
     const v = violationsByFile.get(f);
-    const chip = v ? `<span class="badge badge-changed violation-chip" title="hand-rolls ${esc5(v.indicators.map((i) => i.name).join(", "))} directly instead of via the components registry">&#9888; hand-rolled state</span>` : "";
+    const chip = v ? `<span class="badge badge-changed violation-chip" title="hand-rolls ${esc6(v.indicators.map((i) => i.name).join(", "))} directly instead of via the components registry">&#9888; hand-rolled state</span>` : "";
     const kind = screenSet.has(f) ? `<span class="badge badge-open">screen</span>` : "";
-    return `<li><code>${esc5(f)}</code> ${kind}${chip}</li>`;
+    return `<li><code>${esc6(f)}</code> ${kind}${chip}</li>`;
   }).join("");
   return `<ul class="component-used-in">${items}</ul>`;
 }
@@ -36121,23 +36643,23 @@ function componentsBodyHtml(components, meta3 = {}) {
   if (!components || !components.available) {
     return `<div class="empty">
       <p>No components scan available yet.</p>
-      <p>${esc5(
+      <p>${esc6(
       components && components.reason || "No presentation/components directory found in this project."
     )}</p>
     </div>`;
   }
   if (!components.components || components.components.length === 0) {
-    return `<div class="empty-inline">${esc5(COPY.componentsEmpty)}</div>`;
+    return `<div class="empty-inline">${esc6(COPY.componentsEmpty)}</div>`;
   }
   const violationsByFile = new Map(
     meta3.violations && meta3.violations.available ? meta3.violations.violations.map((v) => [v.file, v]) : []
   );
   const entries = components.components.map((c) => {
     const head = `<header class="component-head">
-      <h3>${esc5(c.name)}${commentControlHtml({ type: "design-system", token: `component:${c.name}` })}</h3>
+      <h3>${esc6(c.name)}${commentControlHtml({ type: "design-system", token: `component:${c.name}` })}</h3>
       ${componentApprovalBadgeHtml(meta3.approval, meta3.drift, c.file)}
     </header>
-    <p class="meta component-file"><code>${esc5(c.file)}</code></p>`;
+    <p class="meta component-file"><code>${esc6(c.file)}</code></p>`;
     const storyHtml = componentStoryHtml(c.name, meta3.componentStories, meta3.version, meta3.changedVersions);
     if (c.parseError) {
       return `  <article class="component-entry">
@@ -36150,7 +36672,7 @@ function componentsBodyHtml(components, meta3 = {}) {
     const facts = c.facts || {};
     const hasScreenTagParam = paramsParsed.some((p) => p.name === "screenTag");
     const doc = c.kdocDescription ?? c.kdoc;
-    const kdocHtml = doc ? `<p class="lbl">usage notes &mdash; from the component's own doc comment</p><blockquote class="component-kdoc">${esc5(doc)}</blockquote>` : "";
+    const kdocHtml = doc ? `<p class="lbl">usage notes &mdash; from the component's own doc comment</p><blockquote class="component-kdoc">${esc6(doc)}</blockquote>` : "";
     return `  <article class="component-entry">
     ${head}
     ${storyHtml}
@@ -36177,9 +36699,9 @@ function promotionQueueHtml(ungoverned) {
   }
   const rows = ungoverned.map(
     (u) => `    <tr>
-      <td><code>${esc5(u.name)}</code></td>
-      <td><code>${esc5(u.file)}</code></td>
-      <td>${esc5(u.feature)}</td>
+      <td><code>${esc6(u.name)}</code></td>
+      <td><code>${esc6(u.file)}</code></td>
+      <td>${esc6(u.feature)}</td>
       <td>${u.crossFeatureUseCount > 0 ? `<strong>${u.crossFeatureUseCount}</strong>` : "0"}</td>
       <td>${u.composesRegistry ? "composes registry components" : "self-contained"}</td>
     </tr>`
@@ -36200,7 +36722,7 @@ ${rows}
 }
 function approvalsTabHtml(approvals, meta3 = {}) {
   if (!approvals || !approvals.available) {
-    const detail = approvals && approvals.error ? esc5(approvals.error) : "This looks like an older scaffold that predates the approvals wave (no qa/lib/approvals.mjs).";
+    const detail = approvals && approvals.error ? esc6(approvals.error) : "This looks like an older scaffold that predates the approvals wave (no qa/lib/approvals.mjs).";
     return `<div class="empty">
       <p>Approvals are not available in this project.</p>
       <p>${detail}</p>
@@ -36224,21 +36746,21 @@ function approvalsTabHtml(approvals, meta3 = {}) {
       `${shortHash2(s.storedHash ?? s.hash)}${s.hashBasis === "raw-bytes" ? " \xB7 signed pre-strip, bytes unchanged" : ""}`
     ) : unresolvable ? "unresolvable" : `would approve at ${shortHash2(s.hash)}`;
     const unresolvableNote = s.resolvable === false ? `<p class="unresolvable-note">unresolvable (${s.fileCount} of expected files resolved) \u2014 not approvable</p>` : "";
-    const missingNote = s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc5(s.missing.join(", "))}</p>` : "";
-    const reopenNote = s.status === "reopened" ? `<p class="reopen-note">reopened${s.reopenedAt ? ` ${esc5(s.reopenedAt)}` : ""}${s.via ? ` via ${esc5(s.via)}` : ""}${s.reason ? ` \u2014 ${esc5(s.reason)}` : ""}</p>` : "";
+    const missingNote = s.missing && s.missing.length > 0 ? `<p class="missing-note">missing: ${esc6(s.missing.join(", "))}</p>` : "";
+    const reopenNote = s.status === "reopened" ? `<p class="reopen-note">reopened${s.reopenedAt ? ` ${esc6(s.reopenedAt)}` : ""}${s.via ? ` via ${esc6(s.via)}` : ""}${s.reason ? ` \u2014 ${esc6(s.reason)}` : ""}</p>` : "";
     const btnLabel = s.status === "approved" ? "Re-approve" : "Approve";
-    const reopenBtn = s.status === "approved" ? `<button class="reopen-btn" data-artifact="${esc5(s.id)}">Reopen</button>` : "";
+    const reopenBtn = s.status === "approved" ? `<button class="reopen-btn" data-artifact="${esc6(s.id)}">Reopen</button>` : "";
     const anchored = meta3.anchoredDiffs ? meta3.anchoredDiffs[s.id] : null;
     const diffRow = s.status === "changed-since-approval" || s.status === "reopened" ? `    <tr class="approval-diff-row"><td colspan="6">
 ${driftPanelHtml(s, anchored, { withApprove: false })}
     </td></tr>` : "";
-    return `    <tr class="approval-row" data-artifact="${esc5(s.id)}">
+    return `    <tr class="approval-row" data-artifact="${esc6(s.id)}">
       <td class="order-num">${orderNumber(s.id)}</td>
-      <td>${esc5(s.label)}<div class="artifact-id">${esc5(s.id)}</div>${artifactBannerHtml(s)}</td>
-      <td><span class="badge ${badgeClass}">${esc5(statusLabel)}</span></td>
+      <td>${esc6(s.label)}<div class="artifact-id">${esc6(s.id)}</div>${artifactBannerHtml(s)}</td>
+      <td><span class="badge ${badgeClass}">${esc6(statusLabel)}</span></td>
       <td>${s.fileCount}</td>
-      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc5(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}${reopenNote}</td>
-      <td><button class="approve-btn" data-artifact="${esc5(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
+      <td>${hashInfo}${s.approvedAt ? `<div class="approved-at">${esc6(s.approvedAt)}</div>` : ""}${unresolvableNote}${missingNote}${reopenNote}</td>
+      <td><button class="approve-btn" data-artifact="${esc6(s.id)}"${s.resolvable === false ? " disabled" : ""}>${btnLabel}</button> ${reopenBtn}</td>
     </tr>
 ${diffRow}`;
   }).join("\n");
@@ -36259,7 +36781,7 @@ function gateForClause(c) {
 function citingTestsCellHtml(c) {
   if (c.withdrawn) return `<span class="empty-inline">withdrawn &mdash; citation-exempt</span>`;
   if (c.citedBy && c.citedBy.length) {
-    const items = c.citedBy.map((s) => `<li><code>${esc5(s.file)}:${s.line}</code></li>`).join("");
+    const items = c.citedBy.map((s) => `<li><code>${esc6(s.file)}:${s.line}</code></li>`).join("");
     return `<ul class="rtm-tests">${items}</ul>`;
   }
   if (c.cited) {
@@ -36270,8 +36792,8 @@ function citingTestsCellHtml(c) {
 function specsTabHtml(specs, meta3 = {}) {
   if (!specs || !specs.available) {
     const where = specs && specs.specsDir || "specs/";
-    const why = specs && specs.reason ? ` ${esc5(specs.reason)}` : "";
-    return `<div class="empty"><p>No ${esc5(where)} directory found in this project.${why}</p></div>`;
+    const why = specs && specs.reason ? ` ${esc6(specs.reason)}` : "";
+    return `<div class="empty"><p>No ${esc6(where)} directory found in this project.${why}</p></div>`;
   }
   const matrices = specs.files.map((f) => {
     const live = f.clauses.filter((c) => !c.withdrawn);
@@ -36285,20 +36807,20 @@ function specsTabHtml(specs, meta3 = {}) {
       uncovered ? `<span class="rtm-defect">${uncovered} uncovered</span>` : null
     ].filter(Boolean).join(" &middot; ");
     const rows = f.clauses.map((c) => {
-      const prose = esc5(c.prose);
+      const prose = esc6(c.prose);
       const gate = gateForClause(c);
       return `    <tr class="rtm-row${c.withdrawn ? " rtm-withdrawn" : ""}">
-      <td><span class="clause-id"><code>${esc5(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: f.relPath || `specs/${f.file}`, clauseId: c.id })}</td>
+      <td><span class="clause-id"><code>${esc6(c.id)}</code></span>${commentControlHtml({ type: "spec-line", file: f.relPath || `specs/${f.file}`, clauseId: c.id })}</td>
       <td class="rtm-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</td>
       <td>${citingTestsCellHtml(c)}</td>
-      <td class="rtm-gate">${gate ? `<code>${esc5(gate)}</code>` : `<span class="empty-inline">&mdash;</span>`}</td>
+      <td class="rtm-gate">${gate ? `<code>${esc6(gate)}</code>` : `<span class="empty-inline">&mdash;</span>`}</td>
       <td>${gate ? stepReceiptCellHtml(meta3.lastReceipt, gate) : `<span class="empty-inline">&mdash;</span>`}</td>
     </tr>`;
     }).join("\n");
     const specRel = f.relPath || `specs/${f.file}`;
     const specStatus = meta3.artifactByFile ? meta3.artifactByFile[specRel] : null;
     return `  <div class="spec-file">
-    <h3>${esc5(specRel)}</h3>
+    <h3>${esc6(specRel)}</h3>
 ${signatureBarHtml(specStatus, { what: "this contract" })}
     <p class="rtm-counts">${counts}</p>
     ${rows ? `<table class="doc-table rtm-table">
@@ -36316,8 +36838,8 @@ ${rows}
     <ul class="rtm-defect-list">
 ${specs.orphanCitations.map(
       (o) => `      <li class="rtm-defect-item">
-        <code>${esc5(o.file)}:${o.line}</code> cites <code>${esc5(o.id)}</code>
-        <span class="badge badge-changed">${esc5(o.reason)}</span>
+        <code>${esc6(o.file)}:${o.line}</code> cites <code>${esc6(o.id)}</code>
+        <span class="badge badge-changed">${esc6(o.reason)}</span>
       </li>`
     ).join("\n")}
     </ul>
@@ -36327,7 +36849,7 @@ ${specs.orphanCitations.map(
 ${orphansHtml}`;
 }
 function inlineMdHtml(text) {
-  let s = esc5(String(text));
+  let s = esc6(String(text));
   s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
@@ -36335,7 +36857,7 @@ function inlineMdHtml(text) {
 }
 function mdTableHtml(table) {
   if (!table || !table.available) {
-    return `<p class="empty-inline">${esc5(table && table.reason || "not available")}</p>`;
+    return `<p class="empty-inline">${esc6(table && table.reason || "not available")}</p>`;
   }
   const head = `<tr>${table.headers.map((h) => `<th>${inlineMdHtml(h)}</th>`).join("")}</tr>`;
   const body = table.rows.map((r) => `<tr>${r.map((c) => `<td>${inlineMdHtml(c)}</td>`).join("")}</tr>`).join("\n");
@@ -36389,7 +36911,7 @@ function mdProseHtml(md) {
         i++;
       }
       i++;
-      out.push(`<pre class="doc-code">${esc5(code.join("\n"))}</pre>`);
+      out.push(`<pre class="doc-code">${esc6(code.join("\n"))}</pre>`);
       continue;
     }
     if (/^####?\s+/.test(t)) {
@@ -36429,7 +36951,7 @@ function mdProseHtml(md) {
 }
 function docSectionProseHtml(section) {
   if (!section || !section.available) {
-    return `<p class="empty-inline">${esc5(section && section.reason || "docs/ARCHITECTURE.md not found")}</p>`;
+    return `<p class="empty-inline">${esc6(section && section.reason || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   return `<div class="doc-prose">${mdProseHtml(section.body)}</div>`;
 }
@@ -36451,16 +36973,16 @@ ${nodes}
 }
 function systemContextHtml(sc) {
   if (!sc || !sc.available) {
-    return `<p class="empty-inline">${esc5(sc && sc.reason || "docs/ARCHITECTURE.md not found")}</p>`;
+    return `<p class="empty-inline">${esc6(sc && sc.reason || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   const intro = sc.intro ? `<p>${inlineMdHtml(sc.intro)}</p>` : "";
   const diagram = sc.table ? contextDiagramHtml(sc.table) : "";
-  const table = sc.table ? mdTableHtml({ available: true, headers: sc.table.headers, rows: sc.table.rows }) : `<p class="empty-inline">no integration table found under "${esc5(sc.heading)}"</p>`;
+  const table = sc.table ? mdTableHtml({ available: true, headers: sc.table.headers, rows: sc.table.rows }) : `<p class="empty-inline">no integration table found under "${esc6(sc.heading)}"</p>`;
   return `${intro}${diagram}${table}`;
 }
 function versionSetHtml(versionSet) {
   if (!versionSet || !versionSet.available) {
-    return `<p class="empty-inline">${esc5(versionSet && versionSet.reason || COPY.versionSetUnreadable)}</p>`;
+    return `<p class="empty-inline">${esc6(versionSet && versionSet.reason || COPY.versionSetUnreadable)}</p>`;
   }
   const badge = (status) => {
     if (status === "match") return `<span class="glyph glyph-signed">&#10003;</span> pinned as documented`;
@@ -36470,17 +36992,17 @@ function versionSetHtml(versionSet) {
   };
   const rows = versionSet.rows.map(
     (r) => `      <tr>
-        <td>${esc5(r.library)}</td>
-        <td><code>${esc5(r.catalogVersion ?? "\u2014")}</code></td>
-        <td><code>${esc5(r.docVersion ?? "\u2014")}</code></td>
+        <td>${esc6(r.library)}</td>
+        <td><code>${esc6(r.catalogVersion ?? "\u2014")}</code></td>
+        <td><code>${esc6(r.docVersion ?? "\u2014")}</code></td>
         <td>${badge(r.status)}</td>
       </tr>`
   ).join("\n");
   const inv = versionSet.kspInvariant;
-  const invLine = inv.available ? inv.ok ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> ${COPY.kspPairLabel} \u2014 <code>${esc5(inv.ksp)}</code> ${COPY.kspCarriesLabel} <code>${esc5(inv.kotlin)}</code>.</p>` : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> ${COPY.kspName} <code>${esc5(inv.ksp)}</code> ${COPY.kspPrefixWarning} <code>${esc5(inv.kotlin)}</code>${COPY.kspCarriesNote}</p>` : `<p class="empty-inline">${esc5(inv.reason)}</p>`;
+  const invLine = inv.available ? inv.ok ? `<p class="status-line"><span class="glyph glyph-signed">&#10003;</span> ${COPY.kspPairLabel} \u2014 <code>${esc6(inv.ksp)}</code> ${COPY.kspCarriesLabel} <code>${esc6(inv.kotlin)}</code>.</p>` : `<p class="status-line"><span class="glyph glyph-drift">&#9888;</span> ${COPY.kspName} <code>${esc6(inv.ksp)}</code> ${COPY.kspPrefixWarning} <code>${esc6(inv.kotlin)}</code>${COPY.kspCarriesNote}</p>` : `<p class="empty-inline">${esc6(inv.reason)}</p>`;
   return `  <h4>The frozen set, as pinned</h4>
   <table class="doc-table">
-    <thead><tr><th>Library</th><th>${esc5(COPY.versionSetFile)}</th><th>\xA72 says</th><th>Verdict</th></tr></thead>
+    <thead><tr><th>Library</th><th>${esc6(COPY.versionSetFile)}</th><th>\xA72 says</th><th>Verdict</th></tr></thead>
     <tbody>
 ${rows}
     </tbody>
@@ -36489,7 +37011,7 @@ ${invLine}`;
 }
 function platformViewHtml(pv) {
   if (!pv || !pv.available) {
-    return `<p class="empty-inline">${esc5(pv && pv.reason || "docs/ARCHITECTURE.md not found")}</p>`;
+    return `<p class="empty-inline">${esc6(pv && pv.reason || "docs/ARCHITECTURE.md not found")}</p>`;
   }
   const main2 = mdTableHtml({ available: true, headers: pv.headers, rows: pv.rows });
   const expectActual = pv.expectActual ? `<h4>Expect/actual boundary</h4>${mdTableHtml({ available: true, headers: pv.expectActual.headers, rows: pv.expectActual.rows })}` : "";
@@ -36500,17 +37022,17 @@ function dependencyGraphHtml(graph) {
   if (!graph || !graph.available) {
     return `<div class="empty">
       <p>No dependency graph available.</p>
-      <p>${esc5(graph && graph.reason || "the scan reported no graph and gave no reason.")}</p>
+      <p>${esc6(graph && graph.reason || "the scan reported no graph and gave no reason.")}</p>
     </div>`;
   }
   if (graph.edges.length === 0) {
-    return `<p class="empty-inline">no cross-layer imports observed under <code>${esc5(graph.appPackage)}</code></p>
+    return `<p class="empty-inline">no cross-layer imports observed under <code>${esc6(graph.appPackage)}</code></p>
 ${depGraphAdvisoryHtml()}`;
   }
   const rows = graph.edges.map((e) => {
-    const chip = e.violation ? `<span class="badge badge-changed violation-chip">violates ${esc5(e.clauseId)}</span>` : "";
+    const chip = e.violation ? `<span class="badge badge-changed violation-chip">violates ${esc6(e.clauseId)}</span>` : "";
     return `    <li class="dep-edge${e.violation ? " dep-violation" : ""}">
-      <code>${esc5(e.from)}</code> &rarr; <code>${esc5(e.to)}</code>
+      <code>${esc6(e.from)}</code> &rarr; <code>${esc6(e.to)}</code>
       <span class="dep-count">${e.count} import${e.count === 1 ? "" : "s"}</span>
       ${chip}
     </li>`;
@@ -36520,8 +37042,8 @@ ${depGraphAdvisoryHtml()}`;
     <ul class="dep-violation-list">
 ${graph.violations.map(
     (v) => `      <li class="dep-violation-item">
-        <code>${esc5(v.file)}:${v.line}</code> imports <code>${esc5(v.imported)}</code>
-        <span class="badge badge-changed">${esc5(v.from)} &rarr; ${esc5(v.to)} violates ${esc5(v.clauseId)}</span>
+        <code>${esc6(v.file)}:${v.line}</code> imports <code>${esc6(v.imported)}</code>
+        <span class="badge badge-changed">${esc6(v.from)} &rarr; ${esc6(v.to)} violates ${esc6(v.clauseId)}</span>
       </li>`
   ).join("\n")}
     </ul>
@@ -36536,21 +37058,21 @@ function layerMapHtml(layerMap) {
   if (!layerMap || !layerMap.available) {
     return `<div class="empty">
       <p>No layer map available.</p>
-      <p>${esc5(layerMap && layerMap.reason || "the scan reported no layer map and gave no reason.")}</p>
+      <p>${esc6(layerMap && layerMap.reason || "the scan reported no layer map and gave no reason.")}</p>
     </div>`;
   }
   const boxes = layerMap.layers.map(
     (l) => `    <div class="layer-box${l.present ? "" : " layer-empty"}">
-      <h4>${esc5(l.id)}${commentControlHtml({ type: "architecture", path: l.id })}</h4>
-      <p class="layer-desc">${esc5(l.label)}</p>
-      ${l.present ? l.files.length ? `<ul class="layer-files">${l.files.map((f) => `<li><code>${esc5(f)}</code></li>`).join("")}</ul>` : `<p class="empty-inline">no files</p>` : `<p class="empty-inline">directory not present</p>`}
+      <h4>${esc6(l.id)}${commentControlHtml({ type: "architecture", path: l.id })}</h4>
+      <p class="layer-desc">${esc6(l.label)}</p>
+      ${l.present ? l.files.length ? `<ul class="layer-files">${l.files.map((f) => `<li><code>${esc6(f)}</code></li>`).join("")}</ul>` : `<p class="empty-inline">no files</p>` : `<p class="empty-inline">directory not present</p>`}
     </div>`
   ).join("\n");
   const others = layerMap.otherPackages && layerMap.otherPackages.length ? `  <div class="layer-others">
     <p class="lbl">other top-level packages</p>
-    <ul class="layer-files">${layerMap.otherPackages.map((p) => `<li><code>${esc5(p.name)}</code> (${p.files.length} file${p.files.length === 1 ? "" : "s"})</li>`).join("")}</ul>
+    <ul class="layer-files">${layerMap.otherPackages.map((p) => `<li><code>${esc6(p.name)}</code> (${p.files.length} file${p.files.length === 1 ? "" : "s"})</li>`).join("")}</ul>
   </div>` : "";
-  return `  <p class="meta">package <code>${esc5(layerMap.appPackage)}</code> &middot; navigation lives under <code>presentation/navigation</code> (shown as part of presentation, below)</p>
+  return `  <p class="meta">package <code>${esc6(layerMap.appPackage)}</code> &middot; navigation lives under <code>presentation/navigation</code> (shown as part of presentation, below)</p>
   <div class="layer-map">
 ${boxes}
   </div>
@@ -36568,57 +37090,57 @@ function formatReceiptAge(ageMs) {
 function clauseReceiptStatusHtml(lastReceipt) {
   if (!lastReceipt || !lastReceipt.available) {
     const reason = lastReceipt && lastReceipt.reason || `no receipt at ${lastReceipt && lastReceipt.relPath || "qa/evidence/latest.json"} \u2014 run node qa/verify.mjs`;
-    return `<span class="receipt-badge receipt-none" title="${escAttr2(reason)}">no receipt yet &mdash; run node qa/verify.mjs</span>`;
+    return `<span class="receipt-badge receipt-none" title="${escAttr3(reason)}">no receipt yet &mdash; run node qa/verify.mjs</span>`;
   }
   if (!lastReceipt.conformance) {
     return `<span class="receipt-badge receipt-none">last receipt has no conformance step &mdash; run node qa/verify.mjs</span>`;
   }
   const age = formatReceiptAge(lastReceipt.ageMs);
-  const generatedTitle = lastReceipt.generatedAt ? ` title="generated ${escAttr2(lastReceipt.generatedAt)}"` : "";
+  const generatedTitle = lastReceipt.generatedAt ? ` title="generated ${escAttr3(lastReceipt.generatedAt)}"` : "";
   if (lastReceipt.stale) {
-    return `<span class="receipt-badge receipt-stale"${generatedTitle}>stale receipt</span><span class="receipt-age">conformance was ${esc5(lastReceipt.conformance.verdict)} ${age} &mdash; source changed since</span>`;
+    return `<span class="receipt-badge receipt-stale"${generatedTitle}>stale receipt</span><span class="receipt-age">conformance was ${esc6(lastReceipt.conformance.verdict)} ${age} &mdash; source changed since</span>`;
   }
-  const verdictClass = lastReceipt.conformance.verdict === "PASS" ? "receipt-pass" : lastReceipt.conformance.verdict === "FAIL" ? "receipt-fail" : "receipt-none";
+  const verdictClass2 = lastReceipt.conformance.verdict === "PASS" ? "receipt-pass" : lastReceipt.conformance.verdict === "FAIL" ? "receipt-fail" : "receipt-none";
   const freshnessNote = lastReceipt.stale === null ? " &middot; freshness unverified" : "";
-  return `<span class="receipt-badge ${verdictClass}"${generatedTitle}>conformance: ${esc5(lastReceipt.conformance.verdict)}</span><span class="receipt-age">${age}${freshnessNote}</span>`;
+  return `<span class="receipt-badge ${verdictClass2}"${generatedTitle}>conformance: ${esc6(lastReceipt.conformance.verdict)}</span><span class="receipt-age">${age}${freshnessNote}</span>`;
 }
 function stepReceiptCellHtml(lastReceipt, stepName) {
   if (!lastReceipt || !lastReceipt.available) {
     const reason = lastReceipt && lastReceipt.reason || `no receipt at ${lastReceipt && lastReceipt.relPath || "qa/evidence/latest.json"} \u2014 run node qa/verify.mjs`;
-    return `<span class="receipt-badge receipt-none" title="${escAttr2(reason)}">no receipt yet</span>`;
+    return `<span class="receipt-badge receipt-none" title="${escAttr3(reason)}">no receipt yet</span>`;
   }
   const step = (lastReceipt.steps || []).find((s) => s && s.name === stepName);
   if (!step) {
-    const profile = lastReceipt.profile ? ` (profile ${esc5(lastReceipt.profile)})` : "";
+    const profile = lastReceipt.profile ? ` (profile ${esc6(lastReceipt.profile)})` : "";
     return `<span class="receipt-badge receipt-none">not in last receipt${profile}</span>`;
   }
   const age = formatReceiptAge(lastReceipt.ageMs);
   if (lastReceipt.stale) {
-    return `<span class="receipt-badge receipt-stale">stale &mdash; was ${esc5(step.verdict)} ${age}</span>`;
+    return `<span class="receipt-badge receipt-stale">stale &mdash; was ${esc6(step.verdict)} ${age}</span>`;
   }
   const cls = step.verdict === "PASS" ? "receipt-pass" : step.verdict === "FAIL" ? "receipt-fail" : "receipt-none";
   const freshness = lastReceipt.stale === null ? " &middot; freshness unverified" : "";
-  const title = step.reason ? ` title="${escAttr2(step.reason)}"` : "";
-  return `<span class="receipt-badge ${cls}"${title}>${esc5(step.verdict)}</span><span class="receipt-age">${age}${freshness}</span>`;
+  const title = step.reason ? ` title="${escAttr3(step.reason)}"` : "";
+  return `<span class="receipt-badge ${cls}"${title}>${esc6(step.verdict)}</span><span class="receipt-age">${age}${freshness}</span>`;
 }
 function governedContractHtml(gc, lastReceipt) {
   if (!gc || !gc.available) {
     return `<div class="empty">
       <p>No governed contract available.</p>
-      <p>${esc5(gc && gc.reason || "specs/app-base.spec.md not found.")}</p>
+      <p>${esc6(gc && gc.reason || "specs/app-base.spec.md not found.")}</p>
     </div>`;
   }
   const items = gc.clauses.map((c) => {
-    const prose = esc5(c.prose);
+    const prose = esc6(c.prose);
     const receiptStatus = /^ARCH-/i.test(c.id) ? clauseReceiptStatusHtml(lastReceipt) : "";
     return `      <li class="clause${c.withdrawn ? " withdrawn" : ""}">
-        <span class="clause-id"><code>${esc5(c.id)}</code></span>
+        <span class="clause-id"><code>${esc6(c.id)}</code></span>
         <span class="clause-prose">${c.withdrawn ? `<s>${prose}</s>` : prose}</span>
         ${receiptStatus}
         ${commentControlHtml({ type: "spec-line", file: `specs/${gc.file}`, clauseId: c.id })}
       </li>`;
   }).join("\n");
-  return `  <p class="meta">specs/${esc5(gc.file)}</p>
+  return `  <p class="meta">specs/${esc6(gc.file)}</p>
   <ul class="clause-list">
 ${items || '    <li class="empty-inline">no clauses parsed</li>'}
   </ul>`;
@@ -36627,10 +37149,10 @@ function featureShapeHtml(shape) {
   if (!shape || !shape.available) {
     return `<div class="empty">
       <p>No feature shape available.</p>
-      <p>${esc5(shape && shape.reason || "presentation/home not found.")}</p>
+      <p>${esc6(shape && shape.reason || "presentation/home not found.")}</p>
     </div>`;
   }
-  const items = shape.files.map((f) => `    <li><code>${esc5(f)}</code>${commentControlHtml({ type: "architecture", path: f })}</li>`).join("\n");
+  const items = shape.files.map((f) => `    <li><code>${esc6(f)}</code>${commentControlHtml({ type: "architecture", path: f })}</li>`).join("\n");
   return `  <p class="meta">${shape.files.length} file(s) &mdash; the shape <code>qa/scaffold-feature.mjs</code> clones for a new feature</p>
   <ul class="feature-tree">
 ${items}
@@ -36692,39 +37214,32 @@ var STEP_GOVERNS = {
   tokenDrift: { section: "design-system", label: "Design language" },
   approvals: { section: "approvals", label: "Approvals" }
 };
-function formatDurationMs(ms) {
-  if (typeof ms !== "number" || Number.isNaN(ms) || ms < 0) return "";
-  if (ms < 1e3) return `${Math.round(ms)}ms`;
-  const secs = ms / 1e3;
-  if (secs < 60) return `${Math.round(secs * 10) / 10}s`;
-  return `${Math.floor(secs / 60)}m ${String(Math.round(secs % 60)).padStart(2, "0")}s`;
-}
 function inputsBindingHtml(r) {
   if (r.stale === true) {
-    const move = r.inputsHash && r.currentInputsHash ? ` (<code>${esc5(shortHash2(r.inputsHash))}</code> &rarr; <code>${esc5(shortHash2(r.currentInputsHash))}</code>)` : "";
+    const move = r.inputsHash && r.currentInputsHash ? ` (<code>${esc6(shortHash2(r.inputsHash))}</code> &rarr; <code>${esc6(shortHash2(r.currentInputsHash))}</code>)` : "";
     return `<span class="evidence-binding-stale">inputs no longer match the current tree${move} &mdash; re-run <code>node qa/verify.mjs</code></span>`;
   }
   if (r.stale === false) {
     const files = typeof r.inputsFileCount === "number" ? ` over ${r.inputsFileCount} files` : "";
-    return `inputs bound to the current tree &mdash; hash <code>${esc5(shortHash2(r.inputsHash))}</code> still matches${files}`;
+    return `inputs bound to the current tree &mdash; hash <code>${esc6(shortHash2(r.inputsHash))}</code> still matches${files}`;
   }
-  return `inputs binding unknown &mdash; ${esc5(r.staleReason || "freshness could not be recomputed")}`;
+  return `inputs binding unknown &mdash; ${esc6(r.staleReason || "freshness could not be recomputed")}`;
 }
 function timelineRowHtml(r) {
   const cls = r.verdict === "PASS" ? "step-verdict-pass" : r.verdict === "FAIL" ? "step-verdict-fail" : "step-verdict-skip";
   const age = typeof r.ageMs === "number" ? formatReceiptAge(r.ageMs) : "age unknown";
-  const commit = r.commitSha ? `<span class="meta">commit <code>${esc5(String(r.commitSha).slice(0, 7))}</code></span>` : "";
-  const author = r.author ? `<span class="meta">by ${esc5(r.author)}</span>` : "";
-  const when = r.committedAt ? esc5(r.committedAt) : "commit date unknown";
+  const commit = r.commitSha ? `<span class="meta">commit <code>${esc6(String(r.commitSha).slice(0, 7))}</code></span>` : "";
+  const author = r.author ? `<span class="meta">by ${esc6(r.author)}</span>` : "";
+  const when = r.committedAt ? esc6(r.committedAt) : "commit date unknown";
   const rungLabel = rungWithPack(r.evidenceLevel, r.packId ?? r.pack);
-  const rung = rungLabel ? `<span class="badge evidence-rung" title="${escAttr2(rungPackNote(r.evidenceLevel, r.packId ?? r.pack))}">${esc5(rungLabel)}</span>` : "";
+  const rung = rungLabel ? `<span class="badge evidence-rung" title="${escAttr3(rungPackNote(r.evidenceLevel, r.packId ?? r.pack))}">${esc6(rungLabel)}</span>` : "";
   return `    <li>
-      <span class="${cls}">${esc5(r.verdict || "?")}</span>
+      <span class="${cls}">${esc6(r.verdict || "?")}</span>
       ${rung}
-      ${r.profile ? `<span class="meta">profile <code>${esc5(r.profile)}</code></span>` : ""}
+      ${r.profile ? `<span class="meta">profile <code>${esc6(r.profile)}</code></span>` : ""}
       ${commit}
       ${author}
-      <span class="meta">committed ${when} &middot; ${esc5(age)}</span>
+      <span class="meta">committed ${when} &middot; ${esc6(age)}</span>
     </li>`;
 }
 function stepTestCountsHtml(step) {
@@ -36742,8 +37257,8 @@ function evidenceBodyHtml(lastReceipt, history) {
     const reason = lastReceipt && lastReceipt.reason || `no receipt at ${relPath}`;
     return `<div class="empty">
       <p>No verify receipt yet.</p>
-      <p>${esc5(reason)}</p>
-      <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>${esc5(relPath)}</code>,
+      <p>${esc6(reason)}</p>
+      <p>Run <code>node qa/verify.mjs</code> &mdash; the lane writes <code>${esc6(relPath)}</code>,
       and this page renders exactly what that receipt attests. Nothing here is derived any other way.</p>
     </div>`;
   }
@@ -36752,26 +37267,26 @@ function evidenceBodyHtml(lastReceipt, history) {
   const verdictCls = stale ? "verdict-muted" : r.verdict === "PASS" ? "verdict-pass" : r.verdict === "FAIL" ? "verdict-fail" : "verdict-muted";
   const staleChip = stale ? ` <span class="badge badge-changed">STALE &mdash; the tree changed since this run</span>` : r.stale === null ? ` <span class="badge badge-unreviewed">freshness unknown</span>` : "";
   const rungLabelText = rungWithPack(r.evidenceLevel, r.packId ?? r.pack);
-  const rungChip = rungLabelText ? ` <span class="badge evidence-rung" title="${escAttr2(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"} \u2014 ${rungPackNote(r.evidenceLevel, r.packId ?? r.pack)}`)}">Evidence: ${esc5(rungLabelText)}</span>` : "";
+  const rungChip = rungLabelText ? ` <span class="badge evidence-rung" title="${escAttr3(`satisfied by: ${(r.evidenceLevel.satisfiedBy || []).join(", ") || "(none recorded)"} \u2014 ${rungPackNote(r.evidenceLevel, r.packId ?? r.pack)}`)}">Evidence: ${esc6(rungLabelText)}</span>` : "";
   const age = formatReceiptAge(r.ageMs);
   const dirty = r.commitDirty && r.commitDirty.length ? ` &middot; ${r.commitDirty.length} uncommitted file${r.commitDirty.length === 1 ? "" : "s"} at run time` : "";
   const facts = [
-    r.profile ? `<li>profile <code>${esc5(r.profile)}</code></li>` : "",
-    r.commitSha ? `<li>commit <code>${esc5(shortHash2(r.commitSha))}</code>${dirty}</li>` : "",
-    `<li>generated ${r.generatedAt ? esc5(r.generatedAt) : "at an unknown time"} &middot; ${esc5(age)}</li>`,
+    r.profile ? `<li>profile <code>${esc6(r.profile)}</code></li>` : "",
+    r.commitSha ? `<li>commit <code>${esc6(shortHash2(r.commitSha))}</code>${dirty}</li>` : "",
+    `<li>generated ${r.generatedAt ? esc6(r.generatedAt) : "at an unknown time"} &middot; ${esc6(age)}</li>`,
     `<li>${inputsBindingHtml(r)}</li>`
   ].filter(Boolean).join("\n      ");
-  const stepRowHtml = (s) => {
+  const stepRowHtml2 = (s) => {
     const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
     const governs = STEP_GOVERNS[s.name];
-    const governsCell = governs ? `<a class="step-link" href="#${esc5(governs.section)}">${esc5(governs.label)}</a>` : "";
+    const governsCell = governs ? `<a class="step-link" href="#${esc6(governs.section)}">${esc6(governs.label)}</a>` : "";
     const counts = stepTestCountsHtml(s);
-    const note = s.note ? `<span class="step-note">${esc5(s.note)}</span>` : "";
-    const reason = s.reason ? `<span class="step-reason">${esc5(s.reason)}</span>` : "";
+    const note = s.note ? `<span class="step-note">${esc6(s.note)}</span>` : "";
+    const reason = s.reason ? `<span class="step-reason">${esc6(s.reason)}</span>` : "";
     return `    <tr>
-      <td><code>${esc5(s.name)}</code></td>
-      <td><span class="${cls}">${esc5(s.verdict)}</span></td>
-      <td>${esc5(formatDurationMs(s.durationMs))}</td>
+      <td><code>${esc6(s.name)}</code></td>
+      <td><span class="${cls}">${esc6(s.verdict)}</span></td>
+      <td>${esc6(formatDurationMs(s.durationMs))}</td>
       <td>${governsCell}</td>
       <td>${counts}${note}${reason}</td>
     </tr>`;
@@ -36780,7 +37295,7 @@ function evidenceBodyHtml(lastReceipt, history) {
   const anyLayer = stepsList.some((s) => typeof s.layer === "string" && s.layer);
   let stepRows;
   if (!anyLayer) {
-    stepRows = stepsList.map(stepRowHtml).join("\n");
+    stepRows = stepsList.map(stepRowHtml2).join("\n");
   } else {
     const groups = /* @__PURE__ */ new Map();
     for (const s of stepsList) {
@@ -36790,8 +37305,8 @@ function evidenceBodyHtml(lastReceipt, history) {
     }
     stepRows = [...groups.entries()].map(([layer, steps]) => {
       const tally = ["PASS", "FAIL", "ERROR", "SKIP"].map((v) => [v, steps.filter((s) => s.verdict === v).length]).filter(([, n]) => n > 0).map(([v, n]) => `${n} ${v}`).join(" &middot; ");
-      return `    <tr class="step-layer" data-layer="${escAttr2(layer)}"><th colspan="5">${esc5(layer)} <span class="step-layer-tally">${tally}</span></th></tr>
-${steps.map(stepRowHtml).join("\n")}`;
+      return `    <tr class="step-layer" data-layer="${escAttr3(layer)}"><th colspan="5">${esc6(layer)} <span class="step-layer-tally">${tally}</span></th></tr>
+${steps.map(stepRowHtml2).join("\n")}`;
     }).join("\n");
   }
   const stepsHtml = stepRows ? `  <table class="doc-table step-table">
@@ -36802,12 +37317,12 @@ ${stepRows}
   </table>` : `  <p class="empty-inline">the receipt carries no steps</p>`;
   const timelineHtml = history && history.available && history.receipts && history.receipts.length ? `  <ul class="evidence-timeline">
 ${history.receipts.map(timelineRowHtml).join("\n")}
-  </ul>` : `  <p class="empty-inline">${esc5(history && history.reason || "no committed receipt history yet")} &mdash; each commit of <code>${esc5(relPath)}</code> becomes one entry in the audit trail</p>`;
-  return `  <p class="meta">Rendered from <code>${esc5(relPath)}</code> &mdash; the verify lane's own attestation.
+  </ul>` : `  <p class="empty-inline">${esc6(history && history.reason || "no committed receipt history yet")} &mdash; each commit of <code>${esc6(relPath)}</code> becomes one entry in the audit trail</p>`;
+  return `  <p class="meta">Rendered from <code>${esc6(relPath)}</code> &mdash; the verify lane's own attestation.
   The lane is the law: nothing on this page is re-derived live.</p>
   <div class="evidence-headline${stale ? " evidence-stale" : ""}">
     <p class="lbl">latest receipt</p>
-    <span class="evidence-verdict ${verdictCls}">${esc5(r.verdict || "?")}</span>${rungChip}${staleChip}
+    <span class="evidence-verdict ${verdictCls}">${esc6(r.verdict || "?")}</span>${rungChip}${staleChip}
     <ul class="evidence-facts">
       ${facts}
     </ul>
@@ -36815,31 +37330,31 @@ ${history.receipts.map(timelineRowHtml).join("\n")}
   <h3>Steps</h3>
 ${stepsHtml}
   <h3>Audit trail &mdash; committed receipts</h3>
-  <p class="meta">Every commit of <code>${esc5(relPath)}</code> is one verified state of record, attributed from git. Newest first.</p>
+  <p class="meta">Every commit of <code>${esc6(relPath)}</code> is one verified state of record, attributed from git. Newest first.</p>
 ${timelineHtml}`;
 }
 function describeTarget(t) {
   if (!t || typeof t !== "object") return '<span class="empty-inline">unknown target</span>';
   switch (t.type) {
     case "screen":
-      return `screen <code>${esc5(t.screen)}</code>`;
+      return `screen <code>${esc6(t.screen)}</code>`;
     case "element":
-      return `screen <code>${esc5(t.screen)}</code>${t.testTag ? ` &middot; element <code>${esc5(t.testTag)}</code>` : ""}`;
+      return `screen <code>${esc6(t.screen)}</code>${t.testTag ? ` &middot; element <code>${esc6(t.testTag)}</code>` : ""}`;
     case "spec-line":
-      return `spec <code>${esc5(t.file)}</code>${t.clauseId ? ` &middot; clause <code>${esc5(t.clauseId)}</code>` : ""}`;
+      return `spec <code>${esc6(t.file)}</code>${t.clauseId ? ` &middot; clause <code>${esc6(t.clauseId)}</code>` : ""}`;
     case "design-system":
-      return `design system <code>${esc5(t.token)}</code>`;
+      return `design system <code>${esc6(t.token)}</code>`;
     case "architecture":
-      return `architecture <code>${esc5(t.path)}</code>`;
+      return `architecture <code>${esc6(t.path)}</code>`;
     case "general":
       return "general";
     default:
-      return `<span class="empty-inline">${esc5(t.type || "unknown target")}</span>`;
+      return `<span class="empty-inline">${esc6(t.type || "unknown target")}</span>`;
   }
 }
 function commentsTabHtml(comments) {
   if (!comments || !comments.available) {
-    const detail = comments && comments.error ? esc5(comments.error) : "This looks like an older scaffold that predates the comments wave (no qa/lib/comments.mjs).";
+    const detail = comments && comments.error ? esc6(comments.error) : "This looks like an older scaffold that predates the comments wave (no qa/lib/comments.mjs).";
     return `<div class="empty">
       <p>Comments are not available in this project.</p>
       <p>${detail}</p>
@@ -36850,14 +37365,14 @@ function commentsTabHtml(comments) {
   }
   const rows = [...comments.comments].sort((a, b) => a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0).map((c) => {
     const badgeClass = c.status === "resolved" ? "badge-resolved" : "badge-open";
-    const resolution = c.status === "resolved" ? `<div class="comment-resolution"><span class="lbl">resolved by ${esc5(c.resolvedBy || "?")}${c.resolvedAt ? ` at ${esc5(c.resolvedAt)}` : ""}</span>${c.resolutionNote ? `<p class="comment-resolution-note">${esc5(c.resolutionNote)}</p>` : ""}</div>` : "";
-    return `    <tr class="comment-row" data-id="${esc5(c.id)}">
-      <td><code>${esc5(c.id)}</code></td>
+    const resolution = c.status === "resolved" ? `<div class="comment-resolution"><span class="lbl">resolved by ${esc6(c.resolvedBy || "?")}${c.resolvedAt ? ` at ${esc6(c.resolvedAt)}` : ""}</span>${c.resolutionNote ? `<p class="comment-resolution-note">${esc6(c.resolutionNote)}</p>` : ""}</div>` : "";
+    return `    <tr class="comment-row" data-id="${esc6(c.id)}">
+      <td><code>${esc6(c.id)}</code></td>
       <td>${describeTarget(c.target)}</td>
-      <td class="comment-text-cell">${esc5(c.text)}</td>
-      <td>${esc5(c.author)}</td>
-      <td>${esc5(c.createdAt)}</td>
-      <td><span class="badge ${badgeClass}">${esc5(c.status)}</span>${resolution}</td>
+      <td class="comment-text-cell">${esc6(c.text)}</td>
+      <td>${esc6(c.author)}</td>
+      <td>${esc6(c.createdAt)}</td>
+      <td><span class="badge ${badgeClass}">${esc6(c.status)}</span>${resolution}</td>
     </tr>`;
   }).join("\n");
   return `  <table class="comments-table">
@@ -36885,19 +37400,19 @@ function clausesForScreen(specs, screenId) {
 }
 function matrixCellHtml(card, state, changedSet, version2) {
   if (!card) {
-    const what = state === "default" ? "no default entry registered" : `no @${escAttr2(state)} entry registered`;
+    const what = state === "default" ? "no default entry registered" : `no @${escAttr3(state)} entry registered`;
     return `<div class="matrix-cell matrix-none" title="${what} for this screen">&mdash;</div>`;
   }
   const id = card.screen.id;
   const isChanged = changedSet.has(id);
   const compare = isChanged && version2 > 1;
   const buster = `?v=${Number(version2)}`;
-  const cur = `<img class="cur" alt="${escAttr2(id)} render" src="/previews/${escAttr2(card.screen.png)}${buster}">`;
+  const cur = `<img class="cur" alt="${escAttr3(id)} render" src="/previews/${escAttr3(card.screen.png)}${buster}">`;
   let inner = cur;
   let label = "";
   if (compare) {
     const prevPng = String(card.screen.png).replace(/screen\.png$/, "screen.prev.png");
-    inner = `<div class="cmp">${cur}<img class="prev" alt="${escAttr2(id)} before" src="/previews/${escAttr2(prevPng)}${buster}"></div>`;
+    inner = `<div class="cmp">${cur}<img class="prev" alt="${escAttr3(id)} before" src="/previews/${escAttr3(prevPng)}${buster}"></div>`;
     label = `<p class="lbl">hover = before</p>`;
   }
   return `<div class="matrix-cell${isChanged ? " changed" : ""}">${inner}${label}</div>`;
@@ -36910,7 +37425,7 @@ function matrixRowEndHtml(baseId, baseCard, changedVersions) {
     return `<p class="meta">Not derivable statically &mdash; no default render for this screen${chgChip}</p>${comment}`;
   }
   const { summary, a11y } = baseCard;
-  const a11yChip = a11y.pass ? `<span class="pass">PASS</span>` : `<span class="fail">${esc5(`${a11y.violations.length} violation${a11y.violations.length === 1 ? "" : "s"}`)}</span>`;
+  const a11yChip = a11y.pass ? `<span class="pass">PASS</span>` : `<span class="fail">${esc6(`${a11y.violations.length} violation${a11y.violations.length === 1 ? "" : "s"}`)}</span>`;
   return `<p class="meta">${summary.nodes} nodes &middot; ${summary.tokenized} tokenized &middot; ${summary.tagged} tagged</p>
       <p class="meta">a11y ${a11yChip}${chgChip}</p>
       ${comment}`;
@@ -36921,18 +37436,18 @@ function rowClausesHtml(specs, baseId, lastReceipt) {
     return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no specs/ directory found</p>`;
   }
   if (governing.length === 0) {
-    return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no spec clause's citing tests carry a <code>${esc5(baseId)}</code> path segment</p>`;
+    return `<p class="empty-inline">governing clauses: Not derivable statically &mdash; no spec clause's citing tests carry a <code>${esc6(baseId)}</code> path segment</p>`;
   }
   const items = governing.map(({ file: file2, clause }) => {
     const gate = gateForClause(clause);
     return `      <li class="clause">
-        <span class="clause-id"><code>${esc5(clause.id)}</code></span>
-        <span class="clause-prose">${esc5(clause.prose)}</span>
+        <span class="clause-id"><code>${esc6(clause.id)}</code></span>
+        <span class="clause-prose">${esc6(clause.prose)}</span>
         ${gate ? stepReceiptCellHtml(lastReceipt, gate) : ""}
         ${commentControlHtml({ type: "spec-line", file: `specs/${file2}`, clauseId: clause.id })}
       </li>`;
   }).join("\n");
-  return `<p class="lbl">governing clauses &mdash; clauses whose citing tests live under <code>${esc5(baseId)}</code></p>
+  return `<p class="lbl">governing clauses &mdash; clauses whose citing tests live under <code>${esc6(baseId)}</code></p>
     <ul class="clause-list">
 ${items}
     </ul>`;
@@ -36950,7 +37465,7 @@ function screensBodyHtml(data) {
     return `<div class="empty">
       <p>No screens rendered yet.</p>
       <p>The preview loop fills this page on its first render &mdash; every entry in
-      <code>${esc5(COPY.previewRegistryFile)}</code> becomes a row.</p>
+      <code>${esc6(COPY.previewRegistryFile)}</code> becomes a row.</p>
     </div>`;
   }
   const changedSet = new Set(changed);
@@ -36965,7 +37480,7 @@ function screensBodyHtml(data) {
   const stateCols = SCREEN_STATE_ORDER.filter(
     (s) => [...byBase.values()].some((row) => row.variants.has(s))
   );
-  const headCols = ["default", ...stateCols].map((c) => `<span class="matrix-col">${esc5(c)}</span>`).join("");
+  const headCols = ["default", ...stateCols].map((c) => `<span class="matrix-col">${esc6(c)}</span>`).join("");
   const rows = [...byBase.entries()].map(([baseId, row]) => {
     const title = row.base ? row.base.screen.title : baseId;
     const rowChanged = changedSet.has(baseId) || [...row.variants.values()].some((c) => changedSet.has(c.screen.id));
@@ -36974,11 +37489,11 @@ function screensBodyHtml(data) {
       ...stateCols.map((s) => matrixCellHtml(row.variants.get(s) || null, s, changedSet, version2))
     ].join("\n        ");
     const wire = row.base ? `<div class="wire">${row.base.svg}</div>` : `<p class="empty-inline">wireframe: Not derivable statically &mdash; no default render for this screen</p>`;
-    return `  <section class="matrix-row${rowChanged ? " changed" : ""}" id="card-${esc5(baseId)}">
+    return `  <section class="matrix-row${rowChanged ? " changed" : ""}" id="card-${esc6(baseId)}">
     <div class="matrix-line">
       <div class="matrix-rowhead">
-        <h3>${esc5(title)}${rowChanged ? '<span class="flag">CHANGED</span>' : ""}</h3>
-        <p class="meta">id <code>${esc5(baseId)}</code></p>
+        <h3>${esc6(title)}${rowChanged ? '<span class="flag">CHANGED</span>' : ""}</h3>
+        <p class="meta">id <code>${esc6(baseId)}</code></p>
       </div>
       <div class="matrix-cells">
         ${cells}
@@ -37003,7 +37518,7 @@ function screensBodyHtml(data) {
 ${rows}
 </div>
 <p class="meta matrix-note">An empty cell means the screen registers no entry for that state. States come from
-<code>@state</code> preview-registry entries in <code>${esc5(COPY.previewRegistryFile)}</code> (e.g. <code>"home@empty"</code>).</p>`;
+<code>@state</code> preview-registry entries in <code>${esc6(COPY.previewRegistryFile)}</code> (e.g. <code>"home@empty"</code>).</p>`;
 }
 var GLOSSARY_ITEM_RE = /^[-*]\s+\*\*(.+?)\*\*\s*[—–-]\s*(.+)$/;
 function parseGlossaryRows(body) {
@@ -37062,7 +37577,7 @@ function intentBodyHtml(intent) {
       body = `<p class="brief-pending-inline">Not yet captured &mdash; conversation 0 pending.</p>${guidance}`;
     }
     return `  <section class="brief-section${sec.filled ? "" : " brief-unfilled"}">
-    <h3>${esc5(sec.heading)}${comment}</h3>
+    <h3>${esc6(sec.heading)}${comment}</h3>
     ${body}
   </section>`;
   }).join("\n");
@@ -37085,27 +37600,27 @@ function walkthroughTabHtml(wt) {
   const cards = (m.screens ?? []).map((s) => {
     const a11yLine = (s.a11y?.violations ?? []).length === 0 ? `<span class="ok-inline">a11y 0 violations</span>` : `<span class="bad-inline">a11y ${s.a11y.violations.length} violations</span>`;
     const settled = s.settled === false ? ` <span class="bad-inline">captured mid-load</span>` : "";
-    const spec = s.spec ? ` \xB7 spec ${esc5(s.spec.file)} (${s.spec.clauses.length} clauses)` : "";
+    const spec = s.spec ? ` \xB7 spec ${esc6(s.spec.file)} (${s.spec.clauses.length} clauses)` : "";
     const variants = (s.variants ?? []).length ? ` \xB7 ${s.variants.length} tier-0 variants` : "";
     return `    <div class="wt-card">
-      <img src="/walkthrough/${esc5(latest.relDirBase || "")}/${esc5(s.png)}" loading="lazy">
-      <div class="wt-meta"><strong>${esc5(s.id)}</strong> <span class="chip">${esc5(s.kind)}</span>${settled}<br>
-      route <code>${esc5(s.route ?? "\u2014")}</code> \xB7 ${s.nodes} nodes \xB7 ${a11yLine}${spec}${variants}</div>
+      <img src="/walkthrough/${esc6(latest.relDirBase || "")}/${esc6(s.png)}" loading="lazy">
+      <div class="wt-meta"><strong>${esc6(s.id)}</strong> <span class="chip">${esc6(s.kind)}</span>${settled}<br>
+      route <code>${esc6(s.route ?? "\u2014")}</code> \xB7 ${s.nodes} nodes \xB7 ${a11yLine}${spec}${variants}</div>
     </div>`;
   }).join("\n");
   const notWalked = (m.notWalked ?? []).length ? `  <h3>Not walked</h3>
-  <ul class="wt-notwalked">${m.notWalked.map((n) => `<li><code>${esc5(n.target)}</code> \u2014 ${esc5(n.reason)}</li>`).join("")}</ul>` : "";
+  <ul class="wt-notwalked">${m.notWalked.map((n) => `<li><code>${esc6(n.target)}</code> \u2014 ${esc6(n.reason)}</li>`).join("")}</ul>` : "";
   const db = m.db ? `  <h3>DB at capture time</h3>
   <table class="params-table"><thead><tr><th>table</th><th>rows</th></tr></thead><tbody>
-${m.db.tables.map((t) => `    <tr><td><code>${esc5(t.name)}</code></td><td>${t.error ? esc5(t.error) : t.rowCount ?? "?"}</td></tr>`).join("\n")}
+${m.db.tables.map((t) => `    <tr><td><code>${esc6(t.name)}</code></td><td>${t.error ? esc6(t.error) : t.rowCount ?? "?"}</td></tr>`).join("\n")}
   </tbody></table>` : `  <p class="empty-inline">no DB appendix \u2014 Room off or the app predates /inspect/db</p>`;
   const history = wt.runs.length > 1 ? `  <h3>Previous runs</h3>
   <ul class="wt-history">${wt.runs.slice(1).map(
-    (r) => r.error ? `<li>${esc5(r.relDir)} \u2014 <span class="bad-inline">${esc5(r.error)}</span></li>` : `<li>${esc5(r.generatedAt)} \u2014 ${r.screenCount} screens, ${r.a11yViolations} a11y violations
-          <span class="empty-inline">(diff: <code>node qa/walkthrough.mjs --compare ${esc5(r.relDir)} ${esc5(wt.runs[0].relDir)}</code>)</span></li>`
+    (r) => r.error ? `<li>${esc6(r.relDir)} \u2014 <span class="bad-inline">${esc6(r.error)}</span></li>` : `<li>${esc6(r.generatedAt)} \u2014 ${r.screenCount} screens, ${r.a11yViolations} a11y violations
+          <span class="empty-inline">(diff: <code>node qa/walkthrough.mjs --compare ${esc6(r.relDir)} ${esc6(wt.runs[0].relDir)}</code>)</span></li>`
   ).join("")}</ul>` : "";
-  return `  <p class="meta">latest: ${esc5(latest.generatedAt)} \xB7 ${latest.screenCount} screens \xB7 ${latest.a11yViolations} a11y violations \xB7 ${latest.notWalked} not walked${latest.unsettled ? ` \xB7 <strong>${latest.unsettled} captured mid-load</strong>` : ""} \u2014
-  <a href="/walkthrough/${esc5(latest.relDirBase || "")}/report.html" target="_blank">open full report</a></p>
+  return `  <p class="meta">latest: ${esc6(latest.generatedAt)} \xB7 ${latest.screenCount} screens \xB7 ${latest.a11yViolations} a11y violations \xB7 ${latest.notWalked} not walked${latest.unsettled ? ` \xB7 <strong>${latest.unsettled} captured mid-load</strong>` : ""} \u2014
+  <a href="/walkthrough/${esc6(latest.relDirBase || "")}/report.html" target="_blank">open full report</a></p>
   <div class="wt-grid">
 ${cards}
   </div>
@@ -37116,17 +37631,17 @@ ${history}`;
 function liveDeviceTabHtml(live, session) {
   const chainHtml = session && session.steps && session.steps.length ? `  <ol class="live-steps">
 ${session.steps.map(
-    (s) => `    <li class="live-step-${esc5(s.status)}"><code>${esc5(s.name)}</code> \u2014 ${esc5(s.status)}${s.detail ? `: ${esc5(s.detail)}` : ""}${s.ms != null ? ` <span class="empty-inline">(${Math.round(s.ms / 100) / 10}s)</span>` : ""}</li>`
+    (s) => `    <li class="live-step-${esc6(s.status)}"><code>${esc6(s.name)}</code> \u2014 ${esc6(s.status)}${s.detail ? `: ${esc6(s.detail)}` : ""}${s.ms != null ? ` <span class="empty-inline">(${Math.round(s.ms / 100) / 10}s)</span>` : ""}</li>`
   ).join("\n")}
   </ol>` : "";
   if (live && live.reachable) {
-    return `  <p class="meta"><span class="ok-inline">\u25CF</span> ${esc5(live.appId)} \xB7 ${esc5(live.buildType)} \xB7 process started ${esc5(
+    return `  <p class="meta"><span class="ok-inline">\u25CF</span> ${esc6(live.appId)} \xB7 ${esc6(live.buildType)} \xB7 process started ${esc6(
       live.processStartedAtMs ? new Date(live.processStartedAtMs).toISOString() : "unknown"
-    )} \u2014 <a href="${esc5(live.remoteUrl)}" target="_blank">open in its own tab</a></p>
-  <iframe class="live-remote" src="${esc5(live.remoteUrl)}" title="live device"></iframe>
+    )} \u2014 <a href="${esc6(live.remoteUrl)}" target="_blank">open in its own tab</a></p>
+  <iframe class="live-remote" src="${esc6(live.remoteUrl)}" title="live device"></iframe>
 ${chainHtml}`;
   }
-  return `  <p class="meta"><span class="bad-inline">\u25CB</span> ${esc5(live ? live.reason : "status unknown")}</p>
+  return `  <p class="meta"><span class="bad-inline">\u25CB</span> ${esc6(live ? live.reason : "status unknown")}</p>
   <p>Start the whole chain from here \u2014 boot a headless AVD if no device is attached, install the
   debug build, launch it, forward the inspector port, and wait for health:</p>
   <p><button id="live-start-btn"${session && session.running ? " disabled" : ""}>${session && session.running ? "Starting\u2026" : "Start live session"}</button></p>
@@ -37135,33 +37650,33 @@ ${chainHtml}
 }
 function laneRunEvidenceHtml(r) {
   const label = rungWithPack(r.rung, r.packId ?? r.pack);
-  const strength = esc5(r.strength ?? "\u2014");
+  const strength = esc6(r.strength ?? "\u2014");
   if (!label) return strength;
-  return `<span title="${escAttr2(rungPackNote(r.rung, r.packId ?? r.pack))}">${esc5(label)}</span> &mdash; ${strength}`;
+  return `<span title="${escAttr3(rungPackNote(r.rung, r.packId ?? r.pack))}">${esc6(label)}</span> &mdash; ${strength}`;
 }
 function digestTabHtml(digest) {
   if (!digest || !digest.available) {
-    return `<div class="empty"><p>No digest \u2014 ${esc5(digest ? digest.reason : "unavailable")}</p></div>`;
+    return `<div class="empty"><p>No digest \u2014 ${esc6(digest ? digest.reason : "unavailable")}</p></div>`;
   }
   const lane = digest.laneRuns.length ? `  <h3>Lane runs</h3>
   <table class="params-table"><thead><tr><th>when</th><th>commit</th><th>verdict</th><th>evidence</th></tr></thead><tbody>
 ${digest.laneRuns.map(
-    (r) => `    <tr><td>${esc5(r.when)}</td><td><code>${esc5(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc5(r.verdict)}</span></td><td>${laneRunEvidenceHtml(r)}</td></tr>`
+    (r) => `    <tr><td>${esc6(r.when)}</td><td><code>${esc6(r.sha)}</code></td><td><span class="${r.verdict === "PASS" ? "ok-inline" : "bad-inline"}">${esc6(r.verdict)}</span></td><td>${laneRunEvidenceHtml(r)}</td></tr>`
   ).join("\n")}
   </tbody></table>` : `  <h3>Lane runs</h3>
   <p class="empty-inline">no committed receipts in the window \u2014 the lane has not run (or its receipt was not committed)</p>`;
   const approvals = digest.approvalEvents.length ? `  <h3>Approval events</h3>
-  <ul class="digest-list">${digest.approvalEvents.map((e) => `<li>${esc5(e.when)} \xB7 <code>${esc5(e.sha)}</code> \u2014 ${esc5(e.subject)}</li>`).join("")}</ul>` : "";
+  <ul class="digest-list">${digest.approvalEvents.map((e) => `<li>${esc6(e.when)} \xB7 <code>${esc6(e.sha)}</code> \u2014 ${esc6(e.subject)}</li>`).join("")}</ul>` : "";
   const commitFilesHtml = (files) => {
     if (!Array.isArray(files) || files.length === 0) return "";
     const shown = files.slice(0, 12);
     const more = files.length > shown.length ? `<li class="fd-more">\u2026 and ${files.length - shown.length} more</li>` : "";
     return `<details class="digest-files"><summary>${files.length} file${files.length === 1 ? "" : "s"}</summary>
-      <ul class="digest-filelist">${shown.map((f) => `<li><span class="fd-status">${esc5(f.status)}</span> <code>${esc5(f.path)}</code></li>`).join("")}${more}</ul></details>`;
+      <ul class="digest-filelist">${shown.map((f) => `<li><span class="fd-status">${esc6(f.status)}</span> <code>${esc6(f.path)}</code></li>`).join("")}${more}</ul></details>`;
   };
   const commits = digest.commits.length ? `  <h3>Commits</h3>
   <ul class="digest-list">${digest.commits.map(
-    (c) => `<li>${esc5(c.when)} \xB7 <code>${esc5(c.sha)}</code> \u2014 ${esc5(c.subject)}${commitFilesHtml(c.files)}</li>`
+    (c) => `<li>${esc6(c.when)} \xB7 <code>${esc6(c.sha)}</code> \u2014 ${esc6(c.subject)}${commitFilesHtml(c.files)}</li>`
   ).join("")}</ul>` : `  <p class="empty-inline">no commits in the window</p>`;
   const comments = digest.openComments == null ? "" : `  <p class="meta">${digest.openComments} open comment${digest.openComments === 1 ? "" : "s"} awaiting action</p>`;
   return `${comments}
@@ -37177,71 +37692,71 @@ function featuresTabHtml(features, meta3 = {}) {
   if (!board || board.features.length === 0) {
     return `  <p class="empty-inline">no feature briefs yet. A brief is born by writing <code>docs/features/&lt;name&gt;.md</code> \u2014 the decisions and their why, signed BEFORE the feature is built. Its location is the governance opt-in; it appears here as a governed <code>feature-brief:&lt;name&gt;</code> artifact the moment the file exists.</p>`;
   }
-  const undeclared = board.undeclared.length > 0 ? `  <div class="feature-undeclared"><strong>Undeclared blast:</strong> ${board.undeclared.map((u) => `<code>${esc5(u.id)}</code>`).join(", ")} changed since approval, and no open brief declared touching ${board.undeclared.length === 1 ? "it" : "them"} \u2014 either a brief's <code>touches</code> is incomplete, or this drift belongs to no feature. The approvals gate is already failing on it; the plan should say why.</div>` : "";
+  const undeclared = board.undeclared.length > 0 ? `  <div class="feature-undeclared"><strong>Undeclared blast:</strong> ${board.undeclared.map((u) => `<code>${esc6(u.id)}</code>`).join(", ")} changed since approval, and no open brief declared touching ${board.undeclared.length === 1 ? "it" : "them"} \u2014 either a brief's <code>touches</code> is incomplete, or this drift belongs to no feature. The approvals gate is already failing on it; the plan should say why.</div>` : "";
   const phaseChip = (phase) => {
     const cls = phase === "accepted" ? "phase-accepted" : phase === "proven" ? "phase-proven" : phase === "approved" ? "phase-approved" : phase === "changed-since-approval" ? "phase-drift" : phase === "reopened" ? "phase-reopened" : "phase-proposed";
-    return `<span class="feature-phase ${cls}">${esc5(phase)}</span>`;
+    return `<span class="feature-phase ${cls}">${esc6(phase)}</span>`;
   };
   const cards = board.features.map((f) => {
     const clauseRows = f.clauses.map((c) => {
       const mark = c.withdrawn ? `<span class="pending-inline">\u2014</span>` : c.cited ? `<span class="ok-inline">\u2713</span>` : `<span class="pending-inline">\u25CB</span>`;
-      const id = c.withdrawn ? `<s><code>${esc5(c.id)}</code></s>` : `<code>${esc5(c.id)}</code>`;
+      const id = c.withdrawn ? `<s><code>${esc6(c.id)}</code></s>` : `<code>${esc6(c.id)}</code>`;
       const state = c.withdrawn ? "withdrawn" : c.cited ? "cited by a test" : "no citing test yet";
       return `      <tr><td>${mark}</td><td>${id}</td><td class="feature-check-detail">${state}</td></tr>`;
     }).join("\n");
-    const clauseTable = f.specExists ? f.clauses.length > 0 ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>clause</th><th><code>${esc5(f.specRel)}</code></th></tr></thead><tbody>
+    const clauseTable = f.specExists ? f.clauses.length > 0 ? `    <table class="params-table feature-checks"><thead><tr><th></th><th>clause</th><th><code>${esc6(f.specRel)}</code></th></tr></thead><tbody>
 ${clauseRows}
-    </tbody></table>` : `    <p class="empty-inline"><code>${esc5(f.specRel)}</code> exists but has no clauses yet \u2014 behavior starts as clauses there.</p>` : `    <p class="empty-inline">no spec yet (<code>${esc5(f.specRel)}</code>) \u2014 the contract step: behavior starts as clauses there, signed before the build.</p>`;
-    const receiptNote = f.receipt.present ? `receipt ${esc5(f.receipt.verdict ?? "?")}${f.receipt.verdict === "PASS" ? f.receipt.attestsTree ? " \xB7 attests this tree" : " \xB7 attests an OLDER tree" : ""}` : "no receipt yet";
-    const doneLine = `    <p class="feature-done ${f.provenDone ? "feature-done-yes" : "meta"}">${f.provenDone ? "\u2713 proven done" : "not yet proven done"} \u2014 ${esc5(f.doneReason)}</p>`;
+    </tbody></table>` : `    <p class="empty-inline"><code>${esc6(f.specRel)}</code> exists but has no clauses yet \u2014 behavior starts as clauses there.</p>` : `    <p class="empty-inline">no spec yet (<code>${esc6(f.specRel)}</code>) \u2014 the contract step: behavior starts as clauses there, signed before the build.</p>`;
+    const receiptNote = f.receipt.present ? `receipt ${esc6(f.receipt.verdict ?? "?")}${f.receipt.verdict === "PASS" ? f.receipt.attestsTree ? " \xB7 attests this tree" : " \xB7 attests an OLDER tree" : ""}` : "no receipt yet";
+    const doneLine = `    <p class="feature-done ${f.provenDone ? "feature-done-yes" : "meta"}">${f.provenDone ? "\u2713 proven done" : "not yet proven done"} \u2014 ${esc6(f.doneReason)}</p>`;
     const touches = f.touches.length > 0 ? `    <p class="feature-touches">declares touching: ${f.touches.map((t) => {
       const drifted = t.status === "changed-since-approval";
       const isSpec = t.id.startsWith("feature-spec:");
       const note = drifted ? ` <span class="feature-as-declared">(as declared \u2014 re-approve when shaped)</span>` : isSpec && t.status === "approved" && f.phase !== "accepted" ? ` <span class="feature-as-declared">(this contract will be reopened &amp; amended)</span>` : !isSpec && t.status === "approved" && f.phase !== "accepted" ? ` <span class="feature-as-declared">(re-approval expected when the work lands)</span>` : "";
-      return `<code>${esc5(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc5(t.status)}</span>${note}`;
+      return `<code>${esc6(t.id)}</code>&nbsp;<span class="${drifted ? "status-drift" : "meta"}">${esc6(t.status)}</span>${note}`;
     }).join(" \xB7 ")}</p>` : `    <p class="feature-touches meta">declares touching nothing beyond its own spec</p>`;
     const sections = Array.isArray(f.sections) ? f.sections : [];
     const decisionSections = sections.filter((s) => /decision/i.test(s.heading));
     const decisionsHtml = decisionSections.map(
       (s) => `    <div class="feature-decisions">
-      <h4>${esc5(s.heading)}</h4>
+      <h4>${esc6(s.heading)}</h4>
       <div class="doc-prose">${mdProseHtml(s.body)}</div>
     </div>`
     ).join("\n");
     const fullBriefHtml = sections.length > 0 ? `    <details class="feature-brief-full"><summary>the full brief (${sections.length} sections \u2014 the signed document)</summary>
-${sections.map((s) => `      <h4>${esc5(s.heading)}</h4>
+${sections.map((s) => `      <h4>${esc6(s.heading)}</h4>
       <div class="doc-prose">${mdProseHtml(s.body)}</div>`).join("\n")}
     </details>` : "";
     const designHtml = f.design ? f.design.status === "approved" ? `    <p class="feature-design meta">design signed \u2014 ${f.design.fileCount} screen file(s) under governance</p>` : f.design.status === "reopened" ? `    <p class="feature-design"><span class="status-reopened">design reopened</span> \u2014 redesign in progress; re-approve when it lands</p>` : !f.design.resolvable ? `    <p class="feature-design meta">design not drafted yet \u2014 the agent drafts the screens on stub data; you sign what renders, in the Screens gallery</p>` : `    <p class="feature-design"><span class="${f.design.status === "changed-since-approval" ? "status-drift" : "pending-inline"}">${f.design.status === "changed-since-approval" ? "design changed since signature" : "design awaits your signature"}</span> \u2014 judge it on the rendered screens, then
-      <button type="button" class="approve-btn" data-artifact="${escAttr2(f.design.id)}">${f.design.status === "changed-since-approval" ? "Re-approve design" : "Approve design"}</button></p>` : "";
-    const nextHtml = f.nextStep ? `    <p class="feature-next">next &rarr; ${esc5(f.nextStep.label)}${f.nextStep.owner ? ` <span class="meta">&middot; ${esc5(f.nextStep.owner)}</span>` : ""}</p>` : "";
+      <button type="button" class="approve-btn" data-artifact="${escAttr3(f.design.id)}">${f.design.status === "changed-since-approval" ? "Re-approve design" : "Approve design"}</button></p>` : "";
+    const nextHtml = f.nextStep ? `    <p class="feature-next">next &rarr; ${esc6(f.nextStep.label)}${f.nextStep.owner ? ` <span class="meta">&middot; ${esc6(f.nextStep.owner)}</span>` : ""}</p>` : "";
     const stamps = [];
-    if (f.record && f.record.approvedAt) stamps.push(`signed ${esc5(f.record.approvedAt)}${f.record.via ? ` via ${esc5(f.record.via)}` : ""}`);
-    if (f.record && f.record.accepted) stamps.push(`accepted ${esc5(f.record.acceptedAt ?? "?")}`);
+    if (f.record && f.record.approvedAt) stamps.push(`signed ${esc6(f.record.approvedAt)}${f.record.via ? ` via ${esc6(f.record.via)}` : ""}`);
+    if (f.record && f.record.accepted) stamps.push(`accepted ${esc6(f.record.acceptedAt ?? "?")}`);
     if (f.record && f.record.status === "reopened" && f.record.reopenedAt)
       stamps.push(
-        `reopened ${esc5(f.record.reopenedAt)}${f.record.via ? ` via ${esc5(f.record.via)}` : ""}${f.record.reason ? ` \u2014 ${esc5(f.record.reason)}` : ""}`
+        `reopened ${esc6(f.record.reopenedAt)}${f.record.via ? ` via ${esc6(f.record.via)}` : ""}${f.record.reason ? ` \u2014 ${esc6(f.record.reason)}` : ""}`
       );
     const briefAwaitsSignature = f.phase === "proposed" || f.phase === "changed-since-approval" || f.phase === "reopened";
     const actions = [];
     if (briefAwaitsSignature) {
-      actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr2(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
+      actions.push(`<button type="button" class="approve-btn" data-artifact="feature-brief:${escAttr3(f.name)}">${f.phase === "proposed" ? "Approve brief" : "Re-approve brief"}</button>`);
     }
     if (f.phase === "proven") {
-      actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr2(f.name)}">Accept</button>`);
+      actions.push(`<button type="button" class="feature-accept-btn" data-name="${escAttr3(f.name)}">Accept</button>`);
     }
     if (f.phase === "approved") {
       actions.push(`<span class="meta">building \u2014 Accept enables when doneness derives (${f.covered}/${f.total} clauses cited, ${receiptNote})</span>`);
     }
     if (f.blockError) {
-      actions.push(`<span class="status-drift">cmp:feature block: ${esc5(f.blockError)}</span>`);
+      actions.push(`<span class="status-drift">cmp:feature block: ${esc6(f.blockError)}</span>`);
     }
     return `  <article class="feature-card${f.phase === "accepted" ? " feature-card-closed" : ""}">
     <header class="feature-card-head">
-      <h3>${esc5(f.name)}</h3>
+      <h3>${esc6(f.name)}</h3>
       ${phaseChip(f.phase)}
       <span class="feature-tally">${f.covered}/${f.total} clauses cited</span>
-      <a class="feature-doc-link" href="#" title="${escAttr2(f.rel)}">${esc5(f.rel)}</a>
+      <a class="feature-doc-link" href="#" title="${escAttr3(f.rel)}">${esc6(f.rel)}</a>
     </header>
     ${stamps.length > 0 ? `<p class="meta">${stamps.join(" \xB7 ")}</p>` : ""}
 ${nextHtml}
@@ -37275,8 +37790,8 @@ function componentStoryCards(cards) {
   }
   return out;
 }
-var esc6 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-var escAttr3 = (s) => esc6(s).replace(/"/g, "&quot;");
+var esc7 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escAttr4 = (s) => esc7(s).replace(/"/g, "&quot;");
 function galleryHtml(state) {
   const {
     appName,
@@ -37310,6 +37825,11 @@ function galleryHtml(state) {
     // Absent (an older caller, or git unreadable) renders no standing clause
     // rather than a guess.
     tree = null,
+    // The lane's step stream as console-now.mjs read it (nowState) — what is
+    // happening, or what last happened. Supplied by the server that tails
+    // qa/.lane-steps.ndjson. Absent (an older caller) renders no *now* row
+    // at all rather than an empty one that reads as "nothing is running".
+    now = null,
     tokenUsage = null,
     intent = { available: false },
     features = { available: false },
@@ -37430,8 +37950,8 @@ function galleryHtml(state) {
   if (effectiveReceipt && effectiveReceipt.available) {
     const age = typeof effectiveReceipt.ageMs === "number" ? formatAgeCoarse(effectiveReceipt.ageMs) : "age unknown";
     const rungLabel = rungWithPack(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack);
-    const rung = rungLabel ? ` &middot; <span title="${escAttr3(rungPackNote(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack))}">${esc6(rungLabel)}</span>` : "";
-    evidenceStatus = `verify ${esc6(effectiveReceipt.verdict || "?")}${rung} &middot; ${esc6(age)}${effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""}`;
+    const rung = rungLabel ? ` &middot; <span title="${escAttr4(rungPackNote(effectiveReceipt.evidenceLevel, effectiveReceipt.packId ?? effectiveReceipt.pack))}">${esc7(rungLabel)}</span>` : "";
+    evidenceStatus = `verify ${esc7(effectiveReceipt.verdict || "?")}${rung} &middot; ${esc7(age)}${effectiveReceipt.stale ? ` &middot; <span class="status-drift">stale &mdash; tree changed since</span>` : ""}`;
   }
   let approvalsStatus = "approvals not available in this project";
   if (approvals.available && approvals.statuses) {
@@ -37583,7 +38103,8 @@ function galleryHtml(state) {
         digestSince: digest && digest.available ? digest.since : null,
         statusGlyph,
         journal: journal.available ? journal.events : [],
-        formatAge: formatAgeCoarse
+        formatAge: formatAgeCoarse,
+        nowHtml: now ? nowSectionHtml(now) : ""
       }),
       active: true
     },
@@ -37760,6 +38281,15 @@ ${section.bodyHtml}`;
   function refreshGovernedPanels() {
     fetch("/").then((r) => r.text()).then((html) => {
       const doc = new DOMParser().parseFromString(html, "text/html");
+      // The *now* block is NOT the panel's to redraw. The lane rewrites
+      // qa/.lane-in-progress at every step start, which is a governed-file
+      // event, so a running lane would otherwise re-render this panel \u2014 and
+      // the step rows with it \u2014 several times a minute. That is the blink
+      // LIVE-CONSOLE \xA78 measures ("rows append, the page does not blink").
+      // The block is fed by the step stream instead: every appended line, plus
+      // a full frame on every SSE connect and reconnect, so keeping the live
+      // node can never leave it behind the file.
+      const keptNow = document.getElementById("now");
       const swapped = [];
       for (const id of GOVERNED_PANELS) {
         const fresh = doc.querySelector("#" + id);
@@ -37771,6 +38301,10 @@ ${section.bodyHtml}`;
         swapped.push(cur);
       }
       if (swapped.length === 0) { location.reload(); return; } // unexpected markup \u2014 old behavior
+      const freshNow = document.getElementById("now");
+      if (keptNow && freshNow && freshNow !== keptNow && freshNow.parentNode) {
+        freshNow.parentNode.replaceChild(keptNow, freshNow);
+      }
       for (const el of swapped) {
         wireApproveButtons(el);
         wireReopenButtons(el);
@@ -37815,6 +38349,52 @@ ${section.bodyHtml}`;
       target.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   });
+  // \u2500\u2500 the *now* rows (LIVE-CONSOLE.md Phase B) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // THIS CODE DERIVES NOTHING. The server read qa/.lane-steps.ndjson,
+  // console-now.mjs decided what it meant and rendered each row, and this
+  // puts the bytes where their data-index says. Rows APPEND: a step frame
+  // carries only the step that finished and the one now running, so nothing
+  // else in the list is touched and the page never reloads (LIVE-CONSOLE \xA77).
+  function applyNowFrame(msg) {
+    const box = document.getElementById("now");
+    const list = document.getElementById("now-steps");
+    if (!box || !list) return; // a project with no step stream renders no block
+    if (msg.clear || (msg.runId && box.dataset.run !== msg.runId)) {
+      // A different run. The rows on screen belong to the previous one, and
+      // two runs interleaved in one list is a lie about both.
+      box.dataset.run = msg.runId || "";
+      list.innerHTML = "";
+    }
+    var rows = msg.rows || [];
+    for (var i = 0; i < rows.length; i += 1) {
+      var cur = list.querySelector('[data-index="' + rows[i].index + '"]');
+      if (cur) cur.outerHTML = rows[i].html;
+      else list.insertAdjacentHTML("beforeend", rows[i].html);
+    }
+    var head = document.getElementById("now-head");
+    if (head && msg.headHtml) head.innerHTML = msg.headHtml;
+    tickNowElapsed();
+  }
+  // The ONE number on this page the server cannot know: how long the running
+  // step has been running is a reading of THIS clock. The artifact supplies
+  // the instant it started (data-since); nothing else here is computed.
+  function tickNowElapsed() {
+    document.querySelectorAll(".now-elapsed[data-since]").forEach(function (el) {
+      var t = Date.parse(el.getAttribute("data-since") || "");
+      if (isNaN(t)) { el.textContent = ""; return; }
+      var s = Math.max(0, Math.round((Date.now() - t) / 1000));
+      el.textContent = s < 90 ? s + "s" : Math.round(s / 60) + " min";
+    });
+  }
+  setInterval(tickNowElapsed, 1000);
+  tickNowElapsed();
+  // LIVE-CONSOLE \xA73.3: disconnected is SAID, not hidden. A frozen list must
+  // never present itself as live, so the block carries its own clause beside
+  // the file it is reading.
+  function setNowLive(text) {
+    var el = document.getElementById("now-live");
+    if (el) el.textContent = text;
+  }
   const es = new EventSource("/events");
   // EventSource reconnects on its own, but nothing ever wrote the pill back to
   // "live" \u2014 so a one-second blip read as permanently disconnected, which is a
@@ -37822,7 +38402,7 @@ ${section.bodyHtml}`;
   // fires on the initial connect AND on every automatic reconnect \u2014 the honest
   // signal. (No backticks in this comment: it lives inside the page's template
   // literal, and a stray one closes the string.)
-  es.onopen = () => { pill.textContent = "live"; pill.className = ""; };
+  es.onopen = () => { pill.textContent = "live"; pill.className = ""; setNowLive("live"); };
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     // studio-self-renewal R6: this page was drawn by CMP_CONSOLE_BUILD; the hello
@@ -37846,6 +38426,9 @@ ${section.bodyHtml}`;
     if (msg.type === "approval" || msg.type === "comment" || msg.type === "governance") {
       refreshGovernedPanels();
     }
+    // One line landed in the lane's step stream. Rows append in place \u2014 this
+    // is the only path that touches them, and it never reloads.
+    if (msg.type === "step") applyNowFrame(msg);
     if (msg.type === "error") {
       pill.textContent = msg.source === "compile" ? "compile failed" : "render failed";
       pill.className = "error";
@@ -37859,6 +38442,7 @@ ${section.bodyHtml}`;
     const gone = es.readyState === 2; // CLOSED
     pill.textContent = gone ? "server gone" : "reconnecting\u2026";
     pill.className = gone ? "error" : "rendering";
+    setNowLive(gone ? "NOT live \u2014 the console is gone; these rows are the last read of the file" : "NOT live \u2014 reconnecting; these rows are the last read of the file");
   };
   // Screen filter \u2014 survives the SSE-triggered reloads via sessionStorage.
   // \xA73.4: it filters matrix ROWS (one row per screen, states stay together).
@@ -38274,7 +38858,7 @@ ${section.bodyHtml}`;
   const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
   const visibleSections = capabilities.screens ? declaredSections : declaredSections.filter((s) => !NEEDS_SCREENS.has(s.id));
   const capabilityNote = capabilities.screens ? "" : `<p class="rail-sub rail-capability" title="This project declares no screen-rendering capability. The governance window is complete; screens, preview and the live device all need one.">governance only &middot; ${consoleCopy().noRenderableApp}</p>`;
-  const layoutNote = !layout ? "" : !layout.ok ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr3(layout.reason || "")}">${esc6(layout.relPath || MANIFEST_REL_PATH2)} refused &mdash; see Evidence</p>` : layout.source === "manifest" ? `<p class="rail-sub rail-capability" title="${escAttr3(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc6(layout.relPath)} &middot; packs ${esc6((layout.layout.packs || []).join(", "))}</p>` : "";
+  const layoutNote = !layout ? "" : !layout.ok ? `<p class="rail-sub rail-capability rail-layout-refused" title="${escAttr4(layout.reason || "")}">${esc7(layout.relPath || MANIFEST_REL_PATH2)} refused &mdash; see Evidence</p>` : layout.source === "manifest" ? `<p class="rail-sub rail-capability" title="${escAttr4(`layout from ${layout.relPath}: receipt ${layout.layout.receipt}; specs ${layout.layout.specs}/; doc ${layout.layout.architectureDoc}`)}">layout: ${esc7(layout.relPath)} &middot; packs ${esc7((layout.layout.packs || []).join(", "))}</p>` : "";
   return renderShellPage({
     appName,
     railItems: visibleRail,
@@ -38333,140 +38917,9 @@ ${section.bodyHtml}`;
   });
 }
 
-// ../../packages/harness/src/lib/profile-loader.mjs
-import fs16 from "node:fs";
-import { createRequire } from "node:module";
-import path17 from "node:path";
-var SUPPORTED_PROFILE_PROTOCOLS = Object.freeze([1, 2]);
-var EXTENDS_PROTOCOL = 2;
-var PROFILES_DIR_REL = "qa/lib/profiles";
-var REQUIRED_EXPORTS = Object.freeze(["id", "protocol", "layout", "tiers", "steps"]);
-function profileEntryRel(id) {
-  return `${PROFILES_DIR_REL}/${id}/index.mjs`;
-}
-function validateProfileModule(mod, id) {
-  if (!mod || typeof mod !== "object") return { ok: false, reason: `profile "${id}" did not load as a module` };
-  const missing = REQUIRED_EXPORTS.filter((name) => !(name in mod));
-  if (missing.length) {
-    return { ok: false, reason: `profile "${id}" is missing required export(s): ${missing.join(", ")} (a profile must export ${REQUIRED_EXPORTS.join(", ")})` };
-  }
-  if (mod.id !== id) {
-    return { ok: false, reason: `profile "${id}" exports id ${JSON.stringify(mod.id)} \u2014 the manifest and the profile disagree about what this project is; fix one of them` };
-  }
-  if (!SUPPORTED_PROFILE_PROTOCOLS.includes(mod.protocol)) {
-    return {
-      ok: false,
-      reason: `profile "${id}" implements profile protocol ${JSON.stringify(mod.protocol)}; this lane speaks ${SUPPORTED_PROFILE_PROTOCOLS.join(" and ")} \u2014 upgrade the harness or the profile so they match (\`prooflane upgrade\`)`
-    };
-  }
-  if (typeof mod.steps !== "function") return { ok: false, reason: `profile "${id}" must export steps(ctx) as a function` };
-  if (!mod.layout || typeof mod.layout !== "object") return { ok: false, reason: `profile "${id}" must export layout as an object (where specs, sources, tests and flows live)` };
-  if (!mod.tiers || typeof mod.tiers !== "object") return { ok: false, reason: `profile "${id}" must export tiers as an object (which test tiers exist and which can observe which promise)` };
-  for (const name of ["artifacts", "governable"]) {
-    if (name in mod && typeof mod[name] !== "function") return { ok: false, reason: `profile "${id}" exports ${name} but it is not a function (${name}(root))` };
-  }
-  return { ok: true };
-}
-function locateProfile(root, id) {
-  if (typeof id !== "string" || !PROFILE_ID_RE2.test(id)) {
-    return { ok: false, reason: `profile id ${JSON.stringify(id)} is not a valid profile name (${PROFILE_ID_RE2}) \u2014 it names a directory under ${PROFILES_DIR_REL}/` };
-  }
-  const entryRel = profileEntryRel(id);
-  const entryAbs = path17.join(root, ...entryRel.split("/"));
-  if (!fs16.existsSync(entryAbs)) {
-    let present = [];
-    try {
-      present = fs16.readdirSync(path17.join(root, ...PROFILES_DIR_REL.split("/")), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
-    } catch {
-    }
-    const have = present.length ? `profiles present: ${present.join(", ")}` : `no profiles are installed under ${PROFILES_DIR_REL}/`;
-    return { ok: false, reason: `the manifest names profile "${id}" but ${entryRel} does not exist (${have}) \u2014 install the profile or fix ${"qa/harness-manifest.json"}` };
-  }
-  return { ok: true, entryRel, entryAbs };
-}
-var BASE_KEYS = Object.freeze(["extends", "extendsProfile"]);
-function declaredBase(mod) {
-  for (const key of BASE_KEYS) {
-    const value = mod?.[key];
-    if (typeof value === "string" && value.length > 0) return value;
-  }
-  return null;
-}
-var INHERITABLE = Object.freeze([
-  "layout",
-  "tiers",
-  "steps",
-  "artifacts",
-  "governable",
-  "grammar",
-  "reports",
-  "detect",
-  "tools",
-  "ladder",
-  "plants",
-  "console",
-  "version"
-]);
-function resolveInheritance(mod, id, load) {
-  const chain = [id];
-  const merged = {};
-  let current = mod;
-  const ownBase = declaredBase(mod);
-  if (ownBase && mod.protocol < EXTENDS_PROTOCOL) {
-    return {
-      ok: false,
-      reason: `profile "${id}" declares a base ("${ownBase}") but implements profile protocol ${JSON.stringify(mod.protocol)} \u2014 \`extends\` arrived in protocol ${EXTENDS_PROTOCOL}. Declare \`protocol = ${EXTENDS_PROTOCOL}\` so an older lane refuses it by naming the protocol rather than by naming a declaration you deliberately left out`
-    };
-  }
-  for (; ; ) {
-    const base = declaredBase(current);
-    if (!base) break;
-    if (chain.includes(base)) {
-      return {
-        ok: false,
-        reason: `profile "${id}" has a circular \`extends\` chain: ${[...chain, base].join(" \u2192 ")} \u2014 a profile cannot inherit from itself, however many steps around`
-      };
-    }
-    const loaded = load(base);
-    if (!loaded.ok) {
-      return { ok: false, reason: `profile "${chain[chain.length - 1]}" extends "${base}", which did not load: ${loaded.reason}` };
-    }
-    chain.push(base);
-    for (const key of INHERITABLE) {
-      if (!(key in merged) && key in loaded.profile) merged[key] = loaded.profile[key];
-    }
-    current = loaded.profile;
-  }
-  if (chain.length === 1) return { ok: true, profile: mod, chain };
-  const profile = { ...merged };
-  for (const key of Object.keys(mod)) profile[key] = mod[key];
-  profile.id = mod.id;
-  profile.protocol = mod.protocol;
-  return { ok: true, profile, chain };
-}
-function loadProfileSync(root, { id } = {}) {
-  const where = locateProfile(root, id);
-  if (!where.ok) return where;
-  let mod;
-  try {
-    mod = createRequire(import.meta.url)(where.entryAbs);
-  } catch (err) {
-    const code = err && err.code;
-    if (code === "ERR_REQUIRE_ESM" || code === "ERR_REQUIRE_ASYNC_MODULE") {
-      return { ok: false, reason: `profile "${id}" cannot be loaded synchronously on Node ${process.version} \u2014 the harness needs Node 20.19 or 22.12 or newer (require() of ES modules); upgrade Node` };
-    }
-    return { ok: false, reason: `profile "${id}" failed to load from ${where.entryRel}: ${err && err.message ? err.message : String(err)}` };
-  }
-  const resolved = resolveInheritance(mod, id, (baseId) => loadProfileSync(root, { id: baseId }));
-  if (!resolved.ok) return resolved;
-  const verdict = validateProfileModule(resolved.profile, id);
-  if (!verdict.ok) return verdict;
-  return { ok: true, profile: resolved.profile, entryRel: where.entryRel, chain: resolved.chain };
-}
-
 // src/lib/design-language.mjs
-import fs17 from "node:fs";
-import path18 from "node:path";
+import fs18 from "node:fs";
+import path20 from "node:path";
 function findDeclaringObject(fileTexts, tokenNames) {
   if (tokenNames.length === 0) return null;
   let best = null;
@@ -38509,7 +38962,7 @@ function countReferences(fileTexts, objectName, tokenNames) {
   return counts;
 }
 function getTokenUsage(root, catalog = {}) {
-  const kotlinRoot = path18.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path20.join(root, "composeApp", "src", "commonMain", "kotlin");
   const files = walkKtFiles(kotlinRoot);
   if (files.length === 0) {
     return { available: false, reason: "no .kt files found under composeApp/src/commonMain/kotlin" };
@@ -38517,11 +38970,11 @@ function getTokenUsage(root, catalog = {}) {
   const fileTexts = /* @__PURE__ */ new Map();
   for (const f of files) {
     try {
-      fileTexts.set(f, fs17.readFileSync(f, "utf8"));
+      fileTexts.set(f, fs18.readFileSync(f, "utf8"));
     } catch {
     }
   }
-  const rel = (abs) => path18.relative(root, abs).split(path18.sep).join("/");
+  const rel = (abs) => path20.relative(root, abs).split(path20.sep).join("/");
   const group = (tokens) => {
     const names = Object.keys(tokens || {});
     const decl = findDeclaringObject(fileTexts, names);
@@ -38537,8 +38990,8 @@ function getTokenUsage(root, catalog = {}) {
 }
 
 // src/lib/intent.mjs
-import fs18 from "node:fs";
-import path19 from "node:path";
+import fs19 from "node:fs";
+import path21 from "node:path";
 var INTENT_REL_PATH = "specs/intent.md";
 var PLACEHOLDER_LEAD_RE = /^_not yet captured[^_]*_\s*/i;
 function parseIntentMarkdown(md) {
@@ -38580,10 +39033,10 @@ function parseIntentMarkdown(md) {
   };
 }
 function getIntentData(root) {
-  const file2 = path19.join(root, "specs", "intent.md");
+  const file2 = path21.join(root, "specs", "intent.md");
   let raw;
   try {
-    raw = fs18.readFileSync(file2, "utf8");
+    raw = fs19.readFileSync(file2, "utf8");
   } catch {
     return { available: false, reason: `${INTENT_REL_PATH} not found` };
   }
@@ -38618,7 +39071,7 @@ var COMPILE_WATCHDOG_MS = 2e4;
 var STALE_RETRY_MS = 2500;
 var MAX_STALE_RETRIES = 3;
 var LANE_MARKER_REL = ["qa", ".lane-in-progress"];
-var LANE_MARKER_STALE_MS = 30 * 60 * 1e3;
+var LANE_MARKER_STALE_MS2 = 30 * 60 * 1e3;
 var LANE_POLL_MS = 5e3;
 var KSP_COLLISION_RE = /Storage for \[[^\]]*\] is already registered/;
 var TRANSIENT_RENDER_RE = /Could not find or load main class|java\.lang\.(?:ClassNotFoundException|NoClassDefFoundError)|Timeout waiting to lock|Could not create service of type/;
@@ -38627,8 +39080,8 @@ var MAX_TRANSIENT_RETRIES = 12;
 var STUCK_RETRY_MS = 3e4;
 var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
 function consoleRegistryPath(projectDir) {
-  const key = crypto.createHash("sha1").update(path20.resolve(projectDir)).digest("hex").slice(0, 12);
-  return path20.join(os3.tmpdir(), `cmp-console-${key}.json`);
+  const key = crypto.createHash("sha1").update(path22.resolve(projectDir)).digest("hex").slice(0, 12);
+  return path22.join(os3.tmpdir(), `cmp-console-${key}.json`);
 }
 async function treeState(projectDir) {
   try {
@@ -38651,7 +39104,7 @@ function processAlive(pid) {
 async function findLiveConsole(projectDir, { probe } = {}) {
   let rec;
   try {
-    rec = JSON.parse(fs19.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+    rec = JSON.parse(fs20.readFileSync(consoleRegistryPath(projectDir), "utf8"));
   } catch {
     return null;
   }
@@ -38664,7 +39117,7 @@ async function findLiveConsole(projectDir, { probe } = {}) {
       await new Promise((r) => setTimeout(r, RENEW_REJOIN_POLL_MS));
       let fresh;
       try {
-        fresh = JSON.parse(fs19.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+        fresh = JSON.parse(fs20.readFileSync(consoleRegistryPath(projectDir), "utf8"));
       } catch {
         continue;
       }
@@ -38677,18 +39130,18 @@ async function findLiveConsole(projectDir, { probe } = {}) {
   return null;
 }
 function consoleLauncherPath() {
-  const here = path20.dirname(fileURLToPath2(import.meta.url));
+  const here = path22.dirname(fileURLToPath2(import.meta.url));
   const candidates = [
-    path20.join(here, "..", "..", "bin", "console.mjs"),
+    path22.join(here, "..", "..", "bin", "console.mjs"),
     // src/lib/ → package root
-    path20.join(here, "..", "bin", "console.mjs"),
+    path22.join(here, "..", "bin", "console.mjs"),
     // dist/ → package root
-    path20.join(here, "console.mjs")
+    path22.join(here, "console.mjs")
     // bin/ (defensive)
   ];
   for (const c of candidates) {
     try {
-      if (fs19.existsSync(c)) return c;
+      if (fs20.existsSync(c)) return c;
     } catch {
     }
   }
@@ -38705,7 +39158,7 @@ async function ensureConsole(projectDir, opts = {}) {
       log("ensureConsole: no standalone launcher found beside this build \u2014 skipping");
       return null;
     }
-    const args = [launcher, path20.resolve(projectDir)];
+    const args = [launcher, path22.resolve(projectDir)];
     if (typeof port === "number") args.push(String(port));
     if (hot === true) args.push("--hot");
     const child = spawnImpl(process.execPath, args, { detached: true, stdio: "ignore" });
@@ -38726,9 +39179,9 @@ async function ensureConsole(projectDir, opts = {}) {
 }
 function writeConsoleRegistry(projectDir, port, extra = {}) {
   try {
-    fs19.writeFileSync(
+    fs20.writeFileSync(
       consoleRegistryPath(projectDir),
-      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path20.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path22.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
 `
     );
   } catch {
@@ -38737,9 +39190,9 @@ function writeConsoleRegistry(projectDir, port, extra = {}) {
 function updateConsoleRegistry(projectDir, patch) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs19.readFileSync(p, "utf8"));
+    const rec = JSON.parse(fs20.readFileSync(p, "utf8"));
     if (!rec || rec.pid !== process.pid) return;
-    fs19.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
+    fs20.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
 `);
   } catch {
   }
@@ -38747,16 +39200,16 @@ function updateConsoleRegistry(projectDir, patch) {
 function clearConsoleRegistry(projectDir) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs19.readFileSync(p, "utf8"));
-    if (rec && rec.pid === process.pid) fs19.rmSync(p, { force: true });
+    const rec = JSON.parse(fs20.readFileSync(p, "utf8"));
+    if (rec && rec.pid === process.pid) fs20.rmSync(p, { force: true });
   } catch {
   }
 }
 function stampRenderMarker(projectDir) {
   try {
-    const p = path20.join(projectDir, ...RENDER_MARKER_REL);
-    fs19.mkdirSync(path20.dirname(p), { recursive: true });
-    fs19.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+    const p = path22.join(projectDir, ...RENDER_MARKER_REL);
+    fs20.mkdirSync(path22.dirname(p), { recursive: true });
+    fs20.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
 `);
   } catch {
   }
@@ -38764,31 +39217,31 @@ function stampRenderMarker(projectDir) {
 function touchRenderMarker(projectDir) {
   try {
     const now = /* @__PURE__ */ new Date();
-    fs19.utimesSync(path20.join(projectDir, ...RENDER_MARKER_REL), now, now);
+    fs20.utimesSync(path22.join(projectDir, ...RENDER_MARKER_REL), now, now);
   } catch {
   }
 }
 function clearRenderMarker(projectDir) {
   try {
-    fs19.rmSync(path20.join(projectDir, ...RENDER_MARKER_REL), { force: true });
+    fs20.rmSync(path22.join(projectDir, ...RENDER_MARKER_REL), { force: true });
   } catch {
   }
 }
 function resolveAppName(projectDir) {
   for (const f of ["settings.gradle.kts", "settings.gradle"]) {
     try {
-      const text = fs19.readFileSync(path20.join(projectDir, f), "utf8");
+      const text = fs20.readFileSync(path22.join(projectDir, f), "utf8");
       const m = text.match(/rootProject\.name\s*=\s*["']([^"']+)["']/);
       if (m) return m[1];
     } catch {
     }
   }
-  return path20.basename(projectDir);
+  return path22.basename(projectDir);
 }
 function detectCapabilities(projectDir) {
   const has = (rel) => {
     try {
-      return fs19.statSync(path20.join(projectDir, rel)).isDirectory();
+      return fs20.statSync(path22.join(projectDir, rel)).isDirectory();
     } catch {
       return false;
     }
@@ -38797,8 +39250,8 @@ function detectCapabilities(projectDir) {
 }
 function laneInProgress(projectDir, { now = Date.now } = {}) {
   try {
-    const st = fs19.statSync(path20.join(projectDir, ...LANE_MARKER_REL));
-    return now() - st.mtimeMs < LANE_MARKER_STALE_MS;
+    const st = fs20.statSync(path22.join(projectDir, ...LANE_MARKER_REL));
+    return now() - st.mtimeMs < LANE_MARKER_STALE_MS2;
   } catch {
     return false;
   }
@@ -38810,22 +39263,22 @@ async function withKspSelfHeal(projectDir, log, run) {
     const text = `${err && err.message ? err.message : err}${err && err.stdout ? err.stdout : ""}${err && err.stderr ? err.stderr : ""}`;
     if (!KSP_COLLISION_RE.test(text)) throw err;
     log("KSP cache collision (concurrent Gradle \u2014 verify lane?) \u2014 clearing kspCaches, retrying once");
-    fs19.rmSync(path20.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
+    fs20.rmSync(path22.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
     return await run();
   }
 }
 function detectAppPackage(projectDir) {
-  const spec = path20.join(projectDir, "create-cmp.json");
-  if (fs19.existsSync(spec)) {
+  const spec = path22.join(projectDir, "create-cmp.json");
+  if (fs20.existsSync(spec)) {
     try {
-      const pkg = JSON.parse(fs19.readFileSync(spec, "utf8")).package;
+      const pkg = JSON.parse(fs20.readFileSync(spec, "utf8")).package;
       if (pkg) return pkg;
     } catch {
     }
   }
-  const gradle = path20.join(projectDir, "composeApp", "build.gradle.kts");
-  if (fs19.existsSync(gradle)) {
-    const m = fs19.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
+  const gradle = path22.join(projectDir, "composeApp", "build.gradle.kts");
+  if (fs20.existsSync(gradle)) {
+    const m = fs20.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
     if (m) return m[1];
   }
   throw new Error(
@@ -38879,11 +39332,11 @@ function applyConsoleCopy(projectDir) {
   }
 }
 function createPreviewService(opts) {
-  const projectDir = path20.resolve(opts.projectDir);
+  const projectDir = path22.resolve(opts.projectDir);
   applyConsoleCopy(projectDir);
   const appName = opts.appName || resolveAppName(projectDir);
-  const previewsDir = path20.join(projectDir, "composeApp", "build", "previews");
-  const srcDir = path20.join(projectDir, "composeApp", "src");
+  const previewsDir = path22.join(projectDir, "composeApp", "build", "previews");
+  const srcDir = path22.join(projectDir, "composeApp", "src");
   const log = opts.log || (() => {
   });
   const hot = opts.hot !== false;
@@ -39146,11 +39599,11 @@ function createPreviewService(opts) {
     return result;
   }
   async function getDesignSystemData() {
-    const catalogPath = path20.join(previewsDir, "design-system.json");
-    const sourcePath = path20.relative(projectDir, catalogPath).split(path20.sep).join("/");
-    if (fs19.existsSync(catalogPath)) {
+    const catalogPath = path22.join(previewsDir, "design-system.json");
+    const sourcePath = path22.relative(projectDir, catalogPath).split(path22.sep).join("/");
+    if (fs20.existsSync(catalogPath)) {
       try {
-        return { available: true, source: "previews", sourcePath, catalog: JSON.parse(fs19.readFileSync(catalogPath, "utf8")) };
+        return { available: true, source: "previews", sourcePath, catalog: JSON.parse(fs20.readFileSync(catalogPath, "utf8")) };
       } catch (err) {
         log(`design-system.json at ${catalogPath} is not valid JSON (${err.message}) \u2014 trying a live session`);
       }
@@ -39176,26 +39629,26 @@ function createPreviewService(opts) {
         reason: "no current render to stash \u2014 call preview {projectDir} and wait for a render to complete first"
       };
     }
-    const variantDir = path20.join(previewsDir, "variants", name);
+    const variantDir = path22.join(previewsDir, "variants", name);
     try {
-      fs19.rmSync(variantDir, { recursive: true, force: true });
-      fs19.mkdirSync(variantDir, { recursive: true });
+      fs20.rmSync(variantDir, { recursive: true, force: true });
+      fs20.mkdirSync(variantDir, { recursive: true });
     } catch (err) {
       return { ok: false, reason: `could not prepare ${variantDir}: ${err && err.message ? err.message : err}` };
     }
     const screens = [];
     for (const { screen } of cards) {
-      const src = path20.join(previewsDir, screen.png);
-      if (!fs19.existsSync(src)) continue;
-      const dst = path20.join(variantDir, screen.png);
-      fs19.mkdirSync(path20.dirname(dst), { recursive: true });
-      fs19.copyFileSync(src, dst);
+      const src = path22.join(previewsDir, screen.png);
+      if (!fs20.existsSync(src)) continue;
+      const dst = path22.join(variantDir, screen.png);
+      fs20.mkdirSync(path22.dirname(dst), { recursive: true });
+      fs20.copyFileSync(src, dst);
       screens.push(screen.id);
     }
     let designSystemStashed = false;
-    const dsSrc = path20.join(previewsDir, "design-system.json");
-    if (fs19.existsSync(dsSrc)) {
-      fs19.copyFileSync(dsSrc, path20.join(variantDir, "design-system.json"));
+    const dsSrc = path22.join(previewsDir, "design-system.json");
+    if (fs20.existsSync(dsSrc)) {
+      fs20.copyFileSync(dsSrc, path22.join(variantDir, "design-system.json"));
       designSystemStashed = true;
     }
     touch("variant-snapshot");
@@ -39257,17 +39710,17 @@ function createPreviewService(opts) {
     }
   }
   function loadPreviews() {
-    const manifestPath = path20.join(previewsDir, "manifest.json");
-    const manifest = JSON.parse(fs19.readFileSync(manifestPath, "utf8"));
+    const manifestPath = path22.join(previewsDir, "manifest.json");
+    const manifest = JSON.parse(fs20.readFileSync(manifestPath, "utf8"));
     try {
-      lastRenderAt = fs19.statSync(manifestPath).mtimeMs;
+      lastRenderAt = fs20.statSync(manifestPath).mtimeMs;
     } catch {
       lastRenderAt = Date.now();
     }
     viewport = manifest.viewport;
     const trees = /* @__PURE__ */ new Map();
     cards = manifest.screens.map((screen) => {
-      const treeJson = fs19.readFileSync(path20.join(previewsDir, screen.tree), "utf8");
+      const treeJson = fs20.readFileSync(path22.join(previewsDir, screen.tree), "utf8");
       trees.set(screen.id, treeJson);
       const tree = JSON.parse(treeJson);
       const a11y = auditA11y(tree);
@@ -39304,8 +39757,8 @@ function createPreviewService(opts) {
       };
     }
     let catalog;
-    const catalogPath = path20.join(previewsDir, "design-system.json");
-    if (fs19.existsSync(catalogPath)) catalog = JSON.parse(fs19.readFileSync(catalogPath, "utf8"));
+    const catalogPath = path22.join(previewsDir, "design-system.json");
+    if (fs20.existsSync(catalogPath)) catalog = JSON.parse(fs20.readFileSync(catalogPath, "utf8"));
     return {
       ok: true,
       screen,
@@ -39322,10 +39775,10 @@ function createPreviewService(opts) {
   }
   function snapshotPngs() {
     for (const { screen } of cards) {
-      const src = path20.join(previewsDir, screen.png);
-      const dst = path20.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
+      const src = path22.join(previewsDir, screen.png);
+      const dst = path22.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
       try {
-        if (fs19.existsSync(src)) fs19.copyFileSync(src, dst);
+        if (fs20.existsSync(src)) fs20.copyFileSync(src, dst);
       } catch {
       }
     }
@@ -39356,8 +39809,8 @@ function createPreviewService(opts) {
     } catch {
       return false;
     }
-    const theirs = health && typeof health.previewsDir === "string" ? path20.resolve(health.previewsDir) : null;
-    if (theirs && theirs !== path20.resolve(previewsDir)) {
+    const theirs = health && typeof health.previewsDir === "string" ? path22.resolve(health.previewsDir) : null;
+    if (theirs && theirs !== path22.resolve(previewsDir)) {
       log(`a daemon is running on ${daemonUrl} but serves ${theirs} \u2014 not this project; staying on the gradle path`);
       return false;
     }
@@ -39460,9 +39913,9 @@ function createPreviewService(opts) {
   }
   function watchClasses() {
     if (classesWatcher) return;
-    const classesDir = path20.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
+    const classesDir = path22.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
     try {
-      classesWatcher = fs19.watch(classesDir, { recursive: true }, () => {
+      classesWatcher = fs20.watch(classesDir, { recursive: true }, () => {
         touch("classes-change");
         scheduleRender(CLASSES_DEBOUNCE_MS);
       });
@@ -39658,13 +40111,13 @@ function createPreviewService(opts) {
     } catch {
     }
     try {
-      fs19.writeFileSync(
+      fs20.writeFileSync(
         consoleRegistryPath(projectDir),
         `${JSON.stringify({
           pid: process.ppid,
           port: handoffPort,
           url: `http://127.0.0.1:${handoffPort}/`,
-          projectDir: path20.resolve(projectDir),
+          projectDir: path22.resolve(projectDir),
           startedAt: (/* @__PURE__ */ new Date()).toISOString(),
           renewing: true,
           renewingAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -39691,7 +40144,7 @@ function createPreviewService(opts) {
     for (const dir of sourceRoots()) {
       try {
         selfWatchers.push(
-          fs19.watch(dir, { recursive: true }, (_event, filename) => {
+          fs20.watch(dir, { recursive: true }, (_event, filename) => {
             if (filename && !String(filename).endsWith(".mjs")) return;
             onSelfSourceChange();
           })
@@ -39704,7 +40157,7 @@ function createPreviewService(opts) {
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
   function startWatching() {
     try {
-      watcher = fs19.watch(srcDir, { recursive: true }, (_event, filename) => {
+      watcher = fs20.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
         clearTimeout(activityBroadcastTimer);
@@ -39766,6 +40219,7 @@ function createPreviewService(opts) {
   ];
   const pendingGovernance = /* @__PURE__ */ new Set();
   let governanceWatchers = [];
+  let stepTail = null;
   let governanceTimer = null;
   function flushGovernance() {
     const kinds = [...pendingGovernance];
@@ -39789,18 +40243,18 @@ function createPreviewService(opts) {
   }
   function watchGovernance() {
     for (const w of GOVERNANCE_WATCHES) {
-      const abs = path20.join(projectDir, w.rel);
-      if (!fs19.existsSync(abs)) {
+      const abs = path22.join(projectDir, w.rel);
+      if (!fs20.existsSync(abs)) {
         if (!w.mkdir || !capabilities.screens) continue;
         try {
-          fs19.mkdirSync(abs, { recursive: true });
+          fs20.mkdirSync(abs, { recursive: true });
         } catch {
           continue;
         }
       }
       try {
-        const watcher2 = fs19.watch(abs, (_event, filename) => {
-          const base = filename ? path20.basename(filename) : "";
+        const watcher2 = fs20.watch(abs, (_event, filename) => {
+          const base = filename ? path22.basename(filename) : "";
           if (w.only && !w.only.has(base)) return;
           pendingGovernance.add(w.kind === "ledger" ? base === "comments.json" ? "comment" : "approval" : "governance");
           clearTimeout(governanceTimer);
@@ -39812,22 +40266,29 @@ function createPreviewService(opts) {
     }
     if (governanceWatchers.length > 0) log("watching the governed surface (specs, docs/features, qa ledgers, receipt)");
   }
+  function watchStepTail() {
+    stepTail = watchStepStream(projectDir, (event) => {
+      if (sseClients.size === 0) return;
+      broadcast(nowFrame(readStepStream(projectDir), event));
+    });
+    if (stepTail.path) log(`watching the lane's step stream (${path22.relative(projectDir, stepTail.path)})`);
+  }
   function scanStamp() {
     let stamp = 0;
     (function walk2(dir) {
       let entries;
       try {
-        entries = fs19.readdirSync(dir, { withFileTypes: true });
+        entries = fs20.readdirSync(dir, { withFileTypes: true });
       } catch {
         return;
       }
       for (const e of entries) {
-        const p = path20.join(dir, e.name);
+        const p = path22.join(dir, e.name);
         if (IGNORE.test(p)) continue;
         if (e.isDirectory()) walk2(p);
         else {
           try {
-            stamp = Math.max(stamp, fs19.statSync(p).mtimeMs);
+            stamp = Math.max(stamp, fs20.statSync(p).mtimeMs);
           } catch {
           }
         }
@@ -39945,6 +40406,10 @@ function createPreviewService(opts) {
             receiptHistory,
             treeHash,
             tree: await treeState(projectDir),
+            // The *now* row, SERVER-rendered from the file on every page load
+            // — which is what makes a run that happened while the console was
+            // down still visible when it comes back up.
+            now: readStepStream(projectDir),
             tokenUsage,
             intent,
             features: featureBoard,
@@ -39968,6 +40433,10 @@ function createPreviewService(opts) {
           connection: "keep-alive"
         });
         res.write(`data: ${JSON.stringify({ type: "hello", version: version2, build: LOADED_BUILD.id })}
+
+`);
+        const nowOnConnect = readStepStream(projectDir);
+        if (nowOnConnect.available) res.write(`data: ${JSON.stringify(nowFrame(nowOnConnect, null))}
 
 `);
         sseClients.add(res);
@@ -40209,30 +40678,30 @@ function createPreviewService(opts) {
         return;
       }
       if (url2.pathname.startsWith("/walkthrough/")) {
-        const wtRoot = path20.join(projectDir, WALKTHROUGH_REL_DIR);
+        const wtRoot = path22.join(projectDir, WALKTHROUGH_REL_DIR);
         const rel = decodeURIComponent(url2.pathname.slice("/walkthrough/".length));
-        const file2 = path20.normalize(path20.join(wtRoot, rel));
-        if (!file2.startsWith(wtRoot) || !fs19.existsSync(file2) || !fs19.statSync(file2).isFile()) {
+        const file2 = path22.normalize(path22.join(wtRoot, rel));
+        if (!file2.startsWith(wtRoot) || !fs20.existsSync(file2) || !fs20.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".html") ? "text/html; charset=utf-8" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs19.createReadStream(file2).pipe(res);
+        fs20.createReadStream(file2).pipe(res);
         return;
       }
       if (url2.pathname.startsWith("/previews/")) {
         const rel = decodeURIComponent(url2.pathname.slice("/previews/".length));
-        const file2 = path20.normalize(path20.join(previewsDir, rel));
-        if (!file2.startsWith(previewsDir) || !fs19.existsSync(file2) || !fs19.statSync(file2).isFile()) {
+        const file2 = path22.normalize(path22.join(previewsDir, rel));
+        if (!file2.startsWith(previewsDir) || !fs20.existsSync(file2) || !fs20.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".svg") ? "image/svg+xml" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs19.createReadStream(file2).pipe(res);
+        fs20.createReadStream(file2).pipe(res);
         return;
       }
       res.writeHead(404);
@@ -40325,8 +40794,8 @@ function createPreviewService(opts) {
         a11yPass: a11y.pass,
         a11yViolations: a11y.violations.length,
         lastChangedVersion: changedAt.get(screen.id) ?? null,
-        tree: path20.join(previewsDir, screen.tree),
-        png: path20.join(previewsDir, screen.png)
+        tree: path22.join(previewsDir, screen.tree),
+        png: path22.join(previewsDir, screen.png)
       }))
     };
   }
@@ -40353,12 +40822,13 @@ function createPreviewService(opts) {
           throw err;
         }
       }
-      if (capabilities.screens && fs19.existsSync(path20.join(previewsDir, "manifest.json"))) {
+      if (capabilities.screens && fs20.existsSync(path22.join(previewsDir, "manifest.json"))) {
         loadPreviews();
       }
       await listen(opts.port || DEFAULT_PORT2);
       writeConsoleRegistry(projectDir, port);
       watchGovernance();
+      watchStepTail();
       watchSelfSources();
       if (capabilities.screens) {
         startWatching();
@@ -40379,6 +40849,8 @@ function createPreviewService(opts) {
       clearTimeout(governanceTimer);
       for (const w of governanceWatchers) w.close();
       governanceWatchers = [];
+      if (stepTail) stepTail.close();
+      stepTail = null;
       clearTimeout(renewTimer);
       clearTimeout(renewQuiesceTimer);
       for (const w of selfWatchers) w.close();

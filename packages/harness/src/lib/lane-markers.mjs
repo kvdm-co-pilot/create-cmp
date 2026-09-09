@@ -29,6 +29,23 @@ import { loadProfileSync } from "./profile-loader.mjs";
 
 /** The lane's in-flight marker, project-relative. Stamped by qa/verify.mjs for a run's duration. */
 export const LANE_MARKER_REL = "qa/.lane-in-progress";
+/**
+ * The lane's STEP STREAM, project-relative — one NDJSON line per finished step,
+ * appended while the run is still going (`verify --events`,
+ * docs/proposals/LIVE-CONSOLE.md Phase B). The console tails it to append a row
+ * as each step lands, and reads it on a page load so a run that happened while
+ * nobody was watching still renders.
+ *
+ * IT IS PROGRESS, NOT EVIDENCE, and it lives here rather than under
+ * qa/evidence/ for exactly that reason: qa/evidence/ holds the committed
+ * receipt-of-record, and a file rewritten on every save in the watch loop does
+ * not belong beside it. It is transient lane state like the marker above —
+ * gitignored, excluded from the receipt's hashed input surface
+ * (qa/lib/inputs-hash.mjs), and a lane OUTPUT for the fast filter
+ * (qa/lib/affected-tests.mjs). One spelling of the path, here, because the lane
+ * writes it and the console reads it and neither may guess where the other put it.
+ */
+export const LANE_STEPS_REL = "qa/.lane-steps.ndjson";
 /** The eyes' in-flight marker's file name, under the profile's `layout.buildDir`. */
 export const RENDER_MARKER_NAME = ".cmp-render-in-progress";
 
@@ -43,6 +60,14 @@ export const RENDER_MARKER_FRESH_MS = 5 * 60 * 1000;
  */
 export function laneMarkerPath(root) {
   return path.join(root, ...LANE_MARKER_REL.split("/"));
+}
+
+/**
+ * @param {string} root project root
+ * @returns {string} absolute path of the lane's step stream
+ */
+export function laneStepsPath(root) {
+  return path.join(root, ...LANE_STEPS_REL.split("/"));
 }
 
 /**

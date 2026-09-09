@@ -59,6 +59,10 @@ import { getProjectSpecsData } from "./specs.mjs";
 import { resolveProjectLayout, DEFAULT_LAYOUT, MANIFEST_REL_PATH } from "./project-layout.mjs";
 import { getArchitectureData } from "./architecture.mjs";
 import { getLastReceipt, listReceiptHistory } from "./receipt-bridge.mjs";
+// The lane's live step stream (LIVE-CONSOLE.md Phase B): read for the page,
+// tailed for the SSE. The bridge supplies bytes and a clock; console-now.mjs
+// owns every question about what they mean.
+import { readStepStream, watchStepStream } from "./steps-bridge.mjs";
 import { getComponentsData } from "./components.mjs";
 import { getVariantsData } from "./variants.mjs";
 import { getComponentDriftInfo } from "./component-drift.mjs";
@@ -81,6 +85,10 @@ import { getApprovalAnchoredDiff } from "./approval-diff.mjs";
 // status endpoint cannot disagree) and componentStoryCards.
 import { deriveHumanQueue } from "prooflane-harness/console/console-shell.mjs";
 import { componentStoryCards, galleryHtml } from "prooflane-harness/console/preview-service.mjs";
+// nowFrame turns "one line landed in the stream" into the exact instruction
+// the page acts on. It lives in the console, not here, so a row appended live
+// and a row drawn on a reload come out of the same function.
+import { nowFrame } from "prooflane-harness/console/console-now.mjs";
 import { setConsoleCopy } from "prooflane-harness/console/console-tabs.mjs";
 import { loadProfileSync } from "prooflane-harness/lib/profile-loader.mjs";
 
@@ -1930,6 +1938,8 @@ export function createPreviewService(opts) {
   ];
   const pendingGovernance = new Set();
   let governanceWatchers = [];
+  /** The lane's step-stream tail (LIVE-CONSOLE Phase B) — see watchStepTail. */
+  let stepTail = null;
   let governanceTimer = null;
 
   function flushGovernance() {
@@ -1985,6 +1995,29 @@ export function createPreviewService(opts) {
       }
     }
     if (governanceWatchers.length > 0) log("watching the governed surface (specs, docs/features, qa ledgers, receipt)");
+  }
+
+  // ── the lane's step stream, tailed (LIVE-CONSOLE.md Phase B) ───────────────
+  //
+  // The lane writes qa/.lane-steps.ndjson; this reads the lines it appends
+  // and REBROADCASTS them on the SSE the page is already holding open. That is
+  // the whole transport: no new port, no push endpoint, no dependency, and
+  // nothing here can start a lane or produce a verdict.
+  //
+  // What goes on the wire is not the raw line. `nowFrame` (the console's) turns
+  // the freshly-read file into the exact instruction the page acts on — the
+  // head's markup and the markup of the ROWS THAT CHANGED — so the page derives
+  // nothing and a row appended live is byte-identical to the same row on a
+  // reload. Re-reading the whole file per line is deliberate and cheap: it is
+  // one run's worth of lines, and it means a client that connected halfway
+  // through still gets a consistent frame rather than a diff against a state it
+  // never had.
+  function watchStepTail() {
+    stepTail = watchStepStream(projectDir, (event) => {
+      if (sseClients.size === 0) return; // nobody is watching; the file is still the record
+      broadcast(nowFrame(readStepStream(projectDir), event));
+    });
+    if (stepTail.path) log(`watching the lane's step stream (${path.relative(projectDir, stepTail.path)})`);
   }
 
   function scanStamp() {
@@ -2157,6 +2190,10 @@ export function createPreviewService(opts) {
             receiptHistory,
             treeHash,
             tree: await treeState(projectDir),
+            // The *now* row, SERVER-rendered from the file on every page load
+            // — which is what makes a run that happened while the console was
+            // down still visible when it comes back up.
+            now: readStepStream(projectDir),
             tokenUsage,
             intent,
             features: featureBoard,
@@ -2184,6 +2221,22 @@ export function createPreviewService(opts) {
         // predates a renewal — the client reloads itself once (R6). EventSource
         // reconnects on its own, so this costs the human nothing to trigger.
         res.write(`data: ${JSON.stringify({ type: "hello", version, build: LOADED_BUILD.id })}\n\n`);
+        // The *now* rows, in full, on every connect AND every automatic
+        // reconnect (LIVE-CONSOLE Phase B). A page that was open through a
+        // disconnection cannot know which lines it missed, and a console that
+        // left it guessing would be presenting a frozen list as live — so the
+        // whole frame is sent once, read from the file, and the page replaces
+        // what it has. This is the only place the rows are ever REPLACED
+        // rather than appended, and it is the one moment where replacing them
+        // is the honest act.
+        //
+        // ONLY when there is a run to report. A frame whose content is "there
+        // is nothing" instructs the page to do nothing it is not already
+        // doing — the server-rendered block states that absence already — and
+        // §4's evidence-or-silence rules out broadcasting an empty state on a
+        // stream every other client is also reading.
+        const nowOnConnect = readStepStream(projectDir);
+        if (nowOnConnect.available) res.write(`data: ${JSON.stringify(nowFrame(nowOnConnect, null))}\n\n`);
         sseClients.add(res);
         req.on("close", () => sseClients.delete(res));
         return;
@@ -2678,6 +2731,7 @@ export function createPreviewService(opts) {
       // capability on top of it. Without composeApp/ there is no source tree to
       // watch, no classes to hot-swap, nothing to render and no daemon to boot.
       watchGovernance();
+      watchStepTail();
       watchSelfSources();
       if (capabilities.screens) {
         startWatching();
@@ -2698,6 +2752,8 @@ export function createPreviewService(opts) {
       clearTimeout(governanceTimer);
       for (const w of governanceWatchers) w.close();
       governanceWatchers = [];
+      if (stepTail) stepTail.close();
+      stepTail = null;
       clearTimeout(renewTimer);
       clearTimeout(renewQuiesceTimer);
       for (const w of selfWatchers) w.close();
