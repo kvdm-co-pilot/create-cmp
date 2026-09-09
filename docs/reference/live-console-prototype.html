@@ -1,0 +1,343 @@
+<!--
+  THE FRONT DOOR'S DESIGN OF RECORD — the prototype Karel signed on 2026-09-09.
+
+  WHY THIS FILE EXISTS. LIVE-CONSOLE.md §2 carries an ASCII mock and this
+  prototype carried the real thing, and the prototype lived only as a published
+  artifact. Phases A-D were then implemented against the ASCII mock and the
+  Overview page's document grammar, and drifted: four one-line rows became four
+  <h3> sections with prose under them, a six-step flow rail became thirteen
+  wrapping section names duplicating the sidebar, and the page stopped fitting
+  above the fold. Karel, 2026-09-09, looking at the result: "I have no fucking
+  idea what is going on and it does not match my goals."
+
+  A design that lives outside the repo is a design the repo drifts from. This is
+  the copy the console is measured against. It is NOT shipped and NOT served —
+  it is a reference artifact, and `test/console-front-door-shape.test.mjs` reads
+  it so the drift is caught by a program rather than by a person's eye.
+
+  The mockup's state switcher and its STEPS fixture are plumbing, not design.
+  What is normative: the strip, the six-step flow rail, the four collapsed rows
+  and their grid, table.steps, the footer, and the 720px breakpoint.
+-->
+<title>Prooflane Live Front Door</title>
+<style>
+  :root {
+    --paper: #FFFFFF; --surface: #F5F6F8; --ink: #1D2126; --ink-2: #4A5361;
+    --muted: #8A919C; --line: #E4E7EB;
+    --accent: #3557C0; --accent-ink: #FFFFFF; --accent-bg: #EDF1FB;
+    --signed: #1E7A44; --signed-bg: #E8F4ED;
+    --drift: #C03A2E; --drift-bg: #FBEDEB;
+    --reopen: #96690A; --reopen-bg: #FAF2DF;
+    --fs-title: 18px; --fs-head: 14px; --fs-body: 13px; --fs-meta: 11.5px;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, system-ui, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #17191D; --surface: #1F2329; --ink: #E8EAEE; --ink-2: #B6BDC8;
+      --muted: #7E8794; --line: #2B3038;
+      --accent: #8AA3F0; --accent-ink: #10131A; --accent-bg: #232D45;
+      --signed: #5CB985; --signed-bg: #1B2E23;
+      --drift: #E4766A; --drift-bg: #392019;
+      --reopen: #D9A845; --reopen-bg: #33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #17191D; --surface: #1F2329; --ink: #E8EAEE; --ink-2: #B6BDC8;
+    --muted: #7E8794; --line: #2B3038;
+    --accent: #8AA3F0; --accent-ink: #10131A; --accent-bg: #232D45;
+    --signed: #5CB985; --signed-bg: #1B2E23;
+    --drift: #E4766A; --drift-bg: #392019;
+    --reopen: #D9A845; --reopen-bg: #33290F;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
+         font-size: var(--fs-body); line-height: 1.55; }
+  code, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover, a:focus-visible { text-decoration: underline; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* mockup control (not part of the console) */
+  .mock { border-bottom: 1px dashed var(--line); background: var(--surface); padding: 10px 24px;
+          display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: var(--fs-meta); color: var(--ink-2); }
+  .mock .label { text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { background: var(--paper); color: var(--ink-2); border: 0; padding: 5px 12px; font: inherit; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .mock .play { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 5px 12px; font: inherit; color: var(--ink); cursor: pointer; }
+  .mock .play:disabled { opacity: .5; cursor: default; }
+
+  /* the shell's frame */
+  .frame { display: grid; grid-template-columns: 184px 1fr; min-height: calc(100vh - 44px); }
+  .rail { border-right: 1px solid var(--line); padding: 20px 0; background: var(--surface); }
+  .rail .brand { padding: 0 20px 14px; font-size: var(--fs-meta); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .rail ol { list-style: none; margin: 0; padding: 0; }
+  .rail li { padding: 6px 20px; display: flex; gap: 10px; align-items: baseline; color: var(--ink-2); }
+  .rail li.current { background: var(--paper); color: var(--ink); box-shadow: inset 3px 0 0 var(--accent); }
+  .rail .g { width: 12px; display: inline-block; font-family: var(--mono); color: var(--muted); }
+  .rail .g.signed { color: var(--signed); }
+  .rail .g.drift { color: var(--drift); }
+  .rail .g.reopen { color: var(--reopen); }
+  .rail .foot { margin-top: 24px; padding: 12px 20px 0; border-top: 1px solid var(--line); font-size: var(--fs-meta); color: var(--muted); }
+  .rail .foot code { color: var(--ink-2); }
+
+  .doc { padding: 28px 40px 40px; max-width: 880px; }
+  .head { margin-bottom: 18px; }
+  .head h1 { font-size: var(--fs-title); font-weight: 600; margin: 0 0 6px; letter-spacing: -.01em; text-wrap: balance; }
+
+  /* the strip — the whole product in one sentence */
+  .strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--line);
+           border-radius: 6px; background: var(--surface); font-family: var(--mono); font-size: var(--fs-body); }
+  .verdict { font-weight: 700; letter-spacing: .02em; padding: 2px 8px; border-radius: 4px; }
+  .verdict.pass { color: var(--signed); background: var(--signed-bg); }
+  .verdict.fail { color: var(--drift); background: var(--drift-bg); }
+  .verdict.run { color: var(--accent); background: var(--accent-bg); }
+  .strip .sep { color: var(--line); }
+  .strip .dim { color: var(--muted); }
+  .strip .ok { color: var(--signed); }
+  .strip .stale { color: var(--reopen); }
+
+  /* the flow rail — SIX conceptual steps, never the section list */
+  .flow { display: flex; gap: 0; margin: 10px 0 22px; font-size: var(--fs-meta); color: var(--muted); align-items: center; flex-wrap: wrap; }
+  .flow span { padding: 2px 0; }
+  .flow .arrow { padding: 0 8px; color: var(--line); }
+  .flow .here { color: var(--ink); font-weight: 600; }
+  .flow .cmd { margin-left: 10px; font-family: var(--mono); color: var(--ink-2); background: var(--surface); padding: 1px 6px; border-radius: 4px; }
+
+  /* the rows — ONE LINE each, collapsed, expanding in place */
+  .rows { border-top: 1px solid var(--line); }
+  .row { border-bottom: 1px solid var(--line); }
+  .row > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 84px 1fr 16px; gap: 14px; align-items: baseline; padding: 11px 4px; }
+  .row > summary::-webkit-details-marker { display: none; }
+  .row > summary .k { font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .row > summary .v { font-family: var(--mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row > summary .v .dim { color: var(--muted); }
+  .row > summary .v .warn { color: var(--reopen); }
+  .row > summary .v .bad { color: var(--drift); }
+  .row > summary .chev { color: var(--muted); font-family: var(--mono); transition: transform .15s; }
+  .row[open] > summary .chev { transform: rotate(90deg); }
+  .row .body { padding: 2px 4px 14px 98px; color: var(--ink-2); }
+  .row .body p { margin: 0 0 8px; max-width: 62ch; }
+  .row .body code { color: var(--ink); }
+
+  /* step table — rows append, nothing scrolls */
+  table.steps { border-collapse: collapse; font-family: var(--mono); font-size: var(--fs-meta); width: 100%; max-width: 560px; }
+  table.steps td { padding: 3px 10px 3px 0; vertical-align: top; white-space: nowrap; }
+  table.steps td.step { color: var(--ink); width: 160px; }
+  table.steps td.verd { width: 56px; font-weight: 600; }
+  table.steps td.dur { color: var(--muted); width: 64px; text-align: right; }
+  table.steps td.why { color: var(--muted); white-space: normal; }
+  table.steps tr.pass td.verd { color: var(--signed); }
+  table.steps tr.skip td.verd { color: var(--muted); }
+  table.steps tr.fail td.verd { color: var(--drift); }
+  table.steps tr.running td.verd { color: var(--accent); }
+  table.steps tr.notyet td { color: var(--line); }
+  table.steps tr.notyet td.step { color: var(--muted); }
+  table.steps tr.fail td.step { color: var(--drift); }
+  .reason { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--drift); background: var(--drift-bg);
+            font-family: var(--mono); font-size: var(--fs-meta); color: var(--ink); white-space: pre-wrap; max-width: 560px; }
+  .reason .fix { color: var(--ink-2); }
+  .flag { color: var(--reopen); }
+
+  .ladder { font-family: var(--mono); }
+  .ladder .on { color: var(--signed); }
+  .ladder .off { color: var(--muted); }
+
+  .foot { margin-top: 26px; padding-top: 12px; border-top: 1px solid var(--line); font-size: var(--fs-meta); color: var(--muted); font-family: var(--mono); }
+  .foot .dis { color: var(--reopen); }
+
+  @media (max-width: 720px) {
+    .frame { grid-template-columns: 1fr; }
+    .rail { display: none; }
+    .doc { padding: 18px 16px 32px; }
+    .row > summary { grid-template-columns: 64px 1fr 16px; gap: 10px; }
+    .row .body { padding-left: 4px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .row > summary .chev { transition: none; } }
+</style>
+
+<div class="mock" role="region" aria-label="Mockup controls">
+  <span class="label">Mockup · state</span>
+  <div class="seg" role="group" aria-label="State">
+    <button type="button" data-state="idle" aria-pressed="true">Idle</button>
+    <button type="button" data-state="running" aria-pressed="false">Running</button>
+    <button type="button" data-state="failing" aria-pressed="false">Failing</button>
+  </div>
+  <button type="button" class="play" id="play" disabled>Play the run</button>
+  <span id="playhint" class="label" hidden>rows append as steps finish — nothing scrolls, nothing blinks</span>
+</div>
+
+<div class="frame">
+  <nav class="rail" aria-label="Sections">
+    <div class="brand">prooflane · console</div>
+    <ol>
+      <li class="current"><span class="g">◆</span>Overview</li>
+      <li><span class="g signed">●</span>Specs</li>
+      <li><span class="g signed">●</span>Architecture</li>
+      <li><span class="g">○</span>Components</li>
+      <li><span class="g signed">●</span>Screens</li>
+      <li><span class="g drift">⚠</span>Design language</li>
+      <li><span class="g reopen">◐</span>Approvals</li>
+      <li><span class="g">·</span>Evidence</li>
+    </ol>
+    <div class="foot">rung <code id="railRung">L2 · cmp</code></div>
+  </nav>
+
+  <main class="doc">
+    <header class="head">
+      <h1>Overview</h1>
+      <div class="strip" id="strip" aria-live="polite"></div>
+      <div class="flow" aria-label="The working flow">
+        <span>define</span><span class="arrow">→</span>
+        <span>preview</span><span class="arrow">→</span>
+        <span>approve</span><span class="arrow">→</span>
+        <span class="here" id="flowHere">verify</span><span class="arrow">→</span>
+        <span>report</span><span class="arrow">→</span>
+        <span>drive</span>
+        <span class="cmd" id="flowCmd">node qa/verify.mjs</span>
+      </div>
+    </header>
+
+    <div class="rows">
+      <details class="row" id="rowNow">
+        <summary><span class="k">now</span><span class="v" id="nowLine"></span><span class="chev">›</span></summary>
+        <div class="body" id="nowBody"></div>
+      </details>
+
+      <details class="row">
+        <summary><span class="k">waiting</span><span class="v">2 approvals <span class="dim">·</span> <span class="warn">design language drifted</span> <span class="dim">· next:</span> verify</span><span class="chev">›</span></summary>
+        <div class="body">
+          <p><code>Approvals</code> — <code>spec/APP-04</code> and <code>screen/Settings</code> await a signature. Read them first; sign where you read.</p>
+          <p><code>Design language</code> — 3 tokens in the tree no longer match the signed sheet (<code>spacing.4</code>, <code>radius.card</code>, <code>ink.muted</code>). The delta is the drift.</p>
+          <p class="dim">Derived from the human queue. Nothing here is a reminder someone wrote.</p>
+        </div>
+      </details>
+
+      <details class="row">
+        <summary><span class="k">trust</span><span class="v">Rule 0 <span class="dim">—</span> 7 plants failed by name <span class="dim">·</span> tree byte-identical <span class="dim">·</span> 3.0s <span class="dim">·</span> 2h ago</span><span class="chev">›</span></summary>
+        <div class="body">
+          <table class="steps">
+            <tr class="pass"><td class="step">narrowed surface declaration</td><td class="verd">FAIL ✓</td><td class="dur">156ms</td><td class="why">harnessIntegrity refused, naming qa/verified-surface.json</td></tr>
+            <tr class="pass"><td class="step">edited lane cannot vouch</td><td class="verd">FAIL ✓</td><td class="dur">157ms</td><td class="why">harnessIntegrity refused, naming modified</td></tr>
+            <tr class="pass"><td class="step">orphaned citation</td><td class="verd">FAIL ✓</td><td class="dur">141ms</td><td class="why">specCoverage refused by clause id</td></tr>
+            <tr class="pass"><td class="step">region holds no engine</td><td class="verd">FAIL ✓</td><td class="dur">2ms</td><td class="why">intact but vacuous — and it says so</td></tr>
+            <tr class="pass"><td class="step">revert → PASS</td><td class="verd">PASS</td><td class="dur">159ms</td><td class="why">every plant reverted; tree unchanged</td></tr>
+          </table>
+          <p style="margin-top:8px">A lane you have not seen refuse is a lane you have not seen. This is the last time it refused, and what it refused by name.</p>
+        </div>
+      </details>
+
+      <details class="row">
+        <summary><span class="k">ladder</span><span class="v ladder"><span class="on">L0 ●</span> <span class="on">L1 ●</span> <span class="on" id="l2">L2 ●</span> <span class="off">L3 ○</span> <span class="dim">— L3 needs:</span> a release build driven on device</span><span class="chev">›</span></summary>
+        <div class="body">
+          <p>Under pack <code>cmp</code>: <code>L1</code> is every promise bound and satisfied; <code>L2</code> is a phone driving the app (<code>e2eSmoke</code> + <code>androidChecks</code>); <code>L3</code> adds the release build driven, which the <code>release</code> profile runs.</p>
+          <p class="dim">The ladder is the profile's declaration, read, not a summary someone wrote. Rungs compare only within a pack.</p>
+        </div>
+      </details>
+    </div>
+
+    <footer class="foot" id="foot"></footer>
+  </main>
+</div>
+
+<script>
+  // Everything below is mockup plumbing: three snapshots of what the page would derive.
+  const STEPS = [
+    ["harnessIntegrity","PASS","10ms",""],
+    ["specCoverage","PASS","24ms",""],
+    ["approvals","SKIP","18ms","awaiting human approval (non-blocking)"],
+    ["componentStories","PASS","4ms",""],
+    ["reachability","PASS","4ms",""],
+    ["e2eCoverage","PASS","16ms",""],
+    ["archDoc","PASS","9ms",""],
+    ["schemaHistory","SKIP","0ms","no exported schemas — nothing frozen to guard"],
+    ["build","PASS","6.9s",""],
+    ["unitTests","PASS","4.2s",""],
+    ["conformance","PASS","1.8s",""],
+    ["goldenTrees","PASS","2.8s",""],
+    ["tokenDrift","SKIP","8.3s","inspector not reachable on :9500 — launch the debug build for the live tier"],
+    ["a11y","PASS","3.0s",""],
+    ["releaseBuild","PASS","7.4s",""],
+    ["e2eSmoke","PASS","31.0s",""],
+    ["androidChecks","PASS","41.7s",""],
+  ];
+  const $ = (s) => document.querySelector(s);
+  const strip = $("#strip"), nowLine = $("#nowLine"), nowBody = $("#nowBody"), foot = $("#foot"), play = $("#play"), hint = $("#playhint");
+  let timer = null;
+
+  const tr = (s, cls) => `<tr class="${cls}"><td class="step">${s[0]}</td><td class="verd">${s[1]}</td><td class="dur">${s[2]}</td><td class="why">${s[3]}</td></tr>`;
+  const table = (rows) => `<table class="steps">${rows}</table>`;
+
+  function idle() {
+    strip.innerHTML = `<span class="verdict pass">PASS</span><span class="sep">·</span><span>L2 device</span><span class="sep">·</span><span>pack cmp</span><span class="sep">·</span><span class="dim">4 min ago</span><span class="sep">·</span><span class="dim">commit</span> <span>a1b2c3d</span><span class="sep">·</span><span class="ok">tree unchanged since ✓</span>`;
+    nowLine.innerHTML = `idle <span class="dim">— last run</span> 17 steps <span class="dim">·</span> 0 FAIL <span class="dim">·</span> 3 SKIP <span class="dim">·</span> 2m 14s`;
+    nowBody.innerHTML = table(STEPS.map((s) => tr(s, s[1].toLowerCase())));
+    $("#rowNow").open = false;
+    foot.innerHTML = `derived from the live tree at a1b2c3d · inputs 615b2c9 · receipt qa/evidence/latest.json · absence = not derivable`;
+    $("#flowHere").textContent = "verify"; $("#flowCmd").textContent = "node qa/verify.mjs";
+    play.disabled = true; hint.hidden = true;
+  }
+
+  function running(upTo = 8) {
+    const done = STEPS.slice(0, upTo), cur = STEPS[upTo], rest = STEPS.slice(upTo + 1);
+    strip.innerHTML = `<span class="verdict run">RUNNING</span><span class="sep">·</span><span>step ${upTo + 1} of 17</span><span class="sep">·</span><span>${cur ? cur[0] : "—"}</span><span class="sep">·</span><span class="dim" id="elapsed">${cur ? "0.0s …" : ""}</span><span class="sep">·</span><span class="dim">last: PASS L2 cmp, 4 min ago</span>`;
+    nowLine.innerHTML = `running <span class="dim">— ${cur ? cur[0] : ""}</span>`;
+    nowBody.innerHTML = table(
+      done.map((s) => tr(s, s[1].toLowerCase())) +
+      (cur ? tr([cur[0], "…", "", ""], "running") : "") +
+      rest.map((s) => tr([s[0], "—", "", ""], "notyet"))
+    );
+    $("#rowNow").open = true;
+    foot.innerHTML = `live · events from qa/watch.mjs · run 41 started 11:52:03 · last event 0.4s ago`;
+    play.disabled = false; hint.hidden = false;
+  }
+
+  function failing() {
+    strip.innerHTML = `<span class="verdict fail">FAIL</span><span class="sep">·</span><span>build</span><span class="sep">·</span><span class="dim">2 min ago</span><span class="sep">·</span><span class="dim">commit</span> <span>a1b2c3d</span><span class="sep">·</span><span class="dim">last PASS: L2 cmp, 38 min ago</span>`;
+    nowLine.innerHTML = `<span class="bad">build FAIL</span> <span class="dim">— 8 passed, 1 failed, 8 not run</span>`;
+    const done = STEPS.slice(0, 8).map((s) => tr(s, s[1].toLowerCase()));
+    const failed = tr(["build", "FAIL", "41s", ""], "fail");
+    const rest = STEPS.slice(9).map((s) => tr([s[0], "—", "", "not run"], "notyet"));
+    nowBody.innerHTML = table(done + failed + rest) +
+      `<div class="reason">error: unresolved reference \`Foo\` (src/…/bar:12)\n<span class="fix">fix: the lane printed none — open the step log ↗</span></div>` +
+      `<p style="margin-top:10px">The console shows what the lane said, verbatim. It does not reword a failure.</p>`;
+    $("#rowNow").open = true;
+    foot.innerHTML = `derived from the live tree at a1b2c3d · inputs 615b2c9 · <span class="dis">receipt is FAIL — README badge unchanged, still names the last PASS</span>`;
+    play.disabled = true; hint.hidden = true;
+  }
+
+  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+
+  document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+    stop();
+    document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    ({ idle, running: () => running(8), failing })[b.dataset.state]();
+  }));
+
+  play.addEventListener("click", () => {
+    stop();
+    let i = 8; let t = 0;
+    play.disabled = true;
+    timer = setInterval(() => {
+      t += 0.4;
+      const el = document.getElementById("elapsed");
+      if (el) el.textContent = `${t.toFixed(1)}s …`;
+      if (t >= 1.6) {
+        t = 0; i += 1;
+        if (i >= STEPS.length) {
+          stop();
+          idle();
+          document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.state === "idle")));
+          return;
+        }
+        running(i);
+        play.disabled = true;
+      }
+    }, 400);
+  });
+
+  idle();
+</script>
