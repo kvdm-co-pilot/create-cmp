@@ -14,8 +14,7 @@ import {
   REQUIRED_EXPORTS,
   loadProfile,
   profileEntryRel,
-  validateProfileModule,
-} from "../packages/harness/src/lib/profile-loader.mjs";
+  validateProfileModule, SUPPORTED_PROFILE_PROTOCOLS } from "../packages/harness/src/lib/profile-loader.mjs";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "cmp-profile-"));
 function install(root, id, source) {
@@ -51,8 +50,20 @@ test("the manifest and the profile must agree about what this project is", () =>
 test("a protocol the lane does not speak is refused with the upgrade command", () => {
   const v = validateProfileModule({ id: "cmp", protocol: PROFILE_PROTOCOL + 1, ...DECL, steps: () => ({}) }, "cmp");
   assert.equal(v.ok, false);
-  assert.match(v.reason, new RegExp(`speaks ${PROFILE_PROTOCOL}`));
-  assert.match(v.reason, /upgrade --harness/);
+  // The lane speaks a SET now, not a number: `extends` moved the protocol to 2,
+  // and a profile at 1 is one written before it existed — complete on its own,
+  // nothing about it changed, so refusing it would be a rename dressed as a
+  // version.
+  assert.match(v.reason, new RegExp(`speaks ${SUPPORTED_PROFILE_PROTOCOLS.join(" and ")}`));
+  assert.match(v.reason, /prooflane upgrade/, "the command an adopter with only the harness can actually run");
+});
+
+test("every supported protocol is accepted, and the set is the whole answer", () => {
+  for (const protocol of SUPPORTED_PROFILE_PROTOCOLS) {
+    const v = validateProfileModule({ id: "cmp", protocol, ...DECL, steps: () => ({}) }, "cmp");
+    assert.equal(v.ok, true, `protocol ${protocol} must load: ${v.reason ?? ""}`);
+  }
+  assert.equal(validateProfileModule({ id: "cmp", protocol: 0, ...DECL, steps: () => ({}) }, "cmp").ok, false);
 });
 
 test("steps must be a function", () => {
