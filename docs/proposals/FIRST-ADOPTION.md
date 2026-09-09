@@ -137,13 +137,51 @@ tarball, and we do not have it.
 
 ## 7. Order of work
 
-1. payment-blueprint reaches a state worth verifying (its own call — *"a few more days in dev"*).
-2. Branch there; install from the registry; `framework-check` must refuse and recover.
-3. Author the profile with its plants; run the lane; it earns a rung or it does not.
-4. Karel reads it and writes the attestation, or declines to and says why.
+Re-ordered 2026-09-09. Three repos, in this order, and **the first two are treated differently on
+purpose** — see §7.1, which is the part a reader is most likely to undo by accident.
+
+1. **`fuelled-api` — PORT the existing profile.** Branch; install from the registry so the tree
+   carries `qa/harness-source.json`; port the hand-written profile from protocol 1 to 2; give the
+   pack its **own** version in place of the borrowed `0.19.0`; run the lane until it earns a rung on
+   a fresh receipt. `framework-check` must refuse and recover.
+2. **`pantry-api` — REGENERATE the profile with the agent.** Same install, but the profile is
+   authored by the agent under ADR-0013 rather than ported. This is the first real exercise of that
+   decision's central claim.
+3. **`payment-blueprint`** reaches a state worth verifying (its own call — *"a few more days in
+   dev"*), then §3's replace/merge/beside decision, then install and author.
+4. Karel reads whichever profile he means to stand behind and writes the attestation, or declines to
+   and says why.
 5. `node scripts/stage2-gate.mjs` here — 8/10 becomes 10/10, or names what is still missing.
 
 Step 4 is a gate no amount of engineering removes, and it is the point.
+
+### 7.1 Why `fuelled-api` is ported and `pantry-api` is regenerated
+
+**Decision — Karel, 2026-09-09, in session:** *"split the difference port fuelled-api, regenerate
+pantry-api"*.
+
+ADR-0013 says agents author profiles, and read alone it invites regenerating every profile it meets.
+That would be a mistake here, and the reason is worth stating where the work happens rather than only
+in the ADR:
+
+- **`fuelled-api`'s profile is an asset, not just a file.** A human wrote those 310 lines, in that
+  repo, for a stack this codebase never shaped — which is exactly what Stage 2 criterion A measures.
+  Regenerating it moves authorship to an agent driven from inside `create-cmp`. That would not make
+  an attestation false — `authoredBy.relationship` exists to say such things plainly — but it would
+  spend the strongest independence claim available in order to exercise a code path. So it is ported:
+  protocol and versioning move, authorship does not.
+- **`pantry-api` is where the claim gets tested.** ADR-0013 rests on an agent being able to author a
+  correct profile into an occupied tree, and a decision that is never exercised is a decision that is
+  merely assumed. Its Python profile is spent deliberately, so the claim meets evidence early and in
+  a repo where being wrong is cheap.
+
+The two together give both things: an independence claim with human authorship intact, and a real
+first run of agent authorship. Neither would be had by treating both repos the same way.
+
+**What would make this wrong:** if the ported `fuelled-api` profile turns out to need so much
+rewriting to reach protocol 2 that the human authorship is notional by the end. If that happens, say
+so in the attestation's `relationship` rather than continuing to claim a provenance the file no
+longer has.
 
 ## 8. What this changes in this repo today
 
