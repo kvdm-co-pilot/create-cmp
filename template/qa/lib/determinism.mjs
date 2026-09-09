@@ -265,6 +265,24 @@ export function parseTapStream(text) {
   const outcomes = {};
   const seen = new Map();
   const lines = String(text ?? "").split("\n");
+  // NESTING IS INDENTATION, and identity is the PATH. Found by running Node's
+  // own `--test-reporter=tap` at it: a child keyed by its bare name collides
+  // with a same-named child under another parent, and the collision is then
+  // resolved positionally — which reintroduces exactly the ordering
+  // sensitivity the bare test number was excluded to avoid. `parent > child`
+  // is stable however the parents run, and it mirrors what JUnit keys as
+  // `classname.name` and CTRF as `suite.name`, so all three formats identify
+  // the same test the same way.
+  //
+  // THE PARENT IS NOT KNOWN FROM ITS RESULT LINE. TAP emits a parent's `ok`
+  // AFTER its children — it cannot report a verdict it has not finished
+  // computing — so a stack built from result lines makes the previous SIBLING
+  // the parent, which is what the first attempt did (children came out under
+  // "todo one"). The line that does precede the block is `# Subtest: <name>`,
+  // at the parent's own indentation, and both major TAP producers emit it.
+  // A producer that emits none has a flat stream, where there is nothing to
+  // nest and bare names are already the whole path.
+  const stack = [];
   let pending = null;
 
   const commit = () => {
@@ -277,30 +295,72 @@ export function parseTapStream(text) {
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    const m = line.match(/^\s*(not ok|ok)\b[ \t]*(\d+)?[ \t]*-?[ \t]*(.*)$/);
+    const sub = line.match(/^(\s*)#\s*Subtest:\s*(.+?)\s*$/);
+    if (sub) {
+      commit();
+      const depth = sub[1].length;
+      while (stack.length && stack[stack.length - 1].depth >= depth) stack.pop();
+      stack.push({ depth, name: sub[2] });
+      continue;
+    }
+    const m = line.match(/^(\s*)(not ok|ok)\b[ \t]*(\d+)?[ \t]*-?[ \t]*(.*)$/);
     if (!m) {
-      // A YAML diagnostic block belongs to the test above it. Its `message` and
-      // `severity` are verdict-bearing; every other key — `duration_ms`, `at`,
-      // stack line numbers — is not, and is deliberately dropped.
+      // A YAML diagnostic block belongs to the test above it.
+      //
+      // WHICH KEYS ARE READ decides whether a whole defect class is visible.
+      // The first version read `message` and `severity` — the keys the TAP spec's
+      // own examples show — and Node writes the failure text under `error:` as a
+      // block scalar instead. Every failure therefore parsed with NO messages,
+      // and `compareOutcomes`'s "failed under both, with different output" could
+      // never fire for the most widely available TAP producer there is. That is a
+      // silent wrong verdict, and no amount of reading the spec would have found
+      // it.
+      //
+      // `duration_ms` and `location` stay excluded: one is time, the other is an
+      // absolute path. Neither is verdict-bearing, and both would make two
+      // identical runs look different.
       if (pending && /^\s*---\s*$/.test(line)) {
         for (i += 1; i < lines.length && !/^\s*\.\.\.\s*$/.test(lines[i]); i += 1) {
-          const kv = lines[i].match(/^\s*(message|severity)\s*:\s*(.+?)\s*$/);
-          if (kv) pending.messages.push(kv[2].replace(/^["']|["']$/g, ""));
+          const kv = lines[i].match(/^(\s*)(message|severity|error|code|name|failureType)\s*:\s*(.*)$/);
+          if (!kv) continue;
+          const [, indent, key, rawValue] = kv;
+          const value = rawValue.trim();
+          if (/^[|>]-?\+?$/.test(value)) {
+            // A block scalar: its body is the more-indented lines beneath it.
+            const body = [];
+            for (let j = i + 1; j < lines.length; j += 1) {
+              if (/^\s*\.\.\.\s*$/.test(lines[j])) break;
+              const deeper = lines[j].match(/^(\s*)(.*)$/);
+              if (lines[j].trim() && deeper[1].length <= indent.length) break;
+              body.push(deeper[2]);
+              i = j;
+            }
+            const firstLine = body.find((b) => b.trim());
+            if (firstLine) pending.messages.push(`${key}: ${firstLine.trim()}`);
+            continue;
+          }
+          if (value) pending.messages.push(key === "message" ? value.replace(/^["']|["']$/g, "") : `${key}: ${value.replace(/^["']|["']$/g, "")}`);
         }
       }
       continue;
     }
     commit();
-    const rest = m[3] ?? "";
+    const depth = m[1].length;
+    // A result line CLOSES its own frame: everything at or deeper than it is
+    // finished, and the frame it names is itself (pushed by its `# Subtest:`).
+    while (stack.length && stack[stack.length - 1].depth >= depth) stack.pop();
+    const rest = m[4] ?? "";
     // The directive is separated from the description by ` # `. Splitting on it
     // also strips a runner's `# time=…` trailer, which must never reach a key.
     const hash = rest.indexOf("#");
     const description = (hash === -1 ? rest : rest.slice(0, hash)).trim();
     const directive = hash === -1 ? "" : rest.slice(hash + 1).trim();
-    let status = m[1] === "ok" ? "pass" : "fail";
+    let status = m[2] === "ok" ? "pass" : "fail";
     if (/^skip\b/i.test(directive)) status = "skip";
     else if (/^todo\b/i.test(directive)) status = "skip";
-    pending = { name: description || `test ${m[2] ?? Object.keys(outcomes).length + 1}`, status, messages: [] };
+    const own = description || `test ${m[3] ?? Object.keys(outcomes).length + 1}`;
+    const name = [...stack.map((f) => f.name), own].join(" > ");
+    pending = { name, status, messages: [] };
   }
   commit();
   return outcomes;

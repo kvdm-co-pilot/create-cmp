@@ -8,6 +8,31 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The TAP parser met a real runner, and the real runner found two defects the spec could not.**
+  Everything about TAP and CTRF had been written from the format specs. §8.8 counts *"adversarial
+  input the fix was not written against"* among its terminators and names the score: eight wrong
+  verdicts this year found by executing in an ecosystem the code had never met, and **none by
+  reading it**. So the parser was pointed at Node's own `--test-reporter=tap` — a real producer,
+  already installed, emitting a stream nobody here authored.
+
+  **Every failure message was being lost.** The parser read `message:`, which is what the TAP spec's
+  examples show; Node writes the failure text under `error:` as a **block scalar**. So every failing
+  test parsed with no messages, and `compareOutcomes`'s *"failed under both, with different output"*
+  — an entire determinism-leak class — could never fire for the most widely available TAP producer
+  there is. A silent wrong verdict, and no amount of reading the spec would have surfaced it.
+
+  **Nested subtests took the wrong parent.** TAP emits a parent's `ok` *after* its children — it
+  cannot report a verdict it has not finished computing — so a stack built from result lines makes
+  the previous **sibling** the parent. Children came out keyed under the test before them. The line
+  that genuinely precedes the block is `# Subtest: <name>`, and nesting is now driven by it; a
+  producer that emits none has a flat stream, where there is nothing to nest.
+
+  Identity is now the **path** (`parent > child`), mirroring JUnit's `classname.name` and CTRF's
+  `suite.name`, so all three formats key the same test the same way — and same-named children under
+  different parents stop colliding into a positional `#2` suffix that would move when the parents
+  reordered. `duration_ms` and `location` remain excluded: one is time, the other an absolute path,
+  and neither is verdict-bearing.
+
 - **No internal artifact is named after one stack any more** — ADR-0007's principle applied to the
   six the receipt's rename left behind: the journal, the lock, the audit record, the approvals
   ledger, the step cache and the comments ledger. All six are files a stamped app **commits**, so a
