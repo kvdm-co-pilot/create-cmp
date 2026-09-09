@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 9425733f7019c3bcd836510747e7b46b6669731743b7b93d971b9d80c367eb12
+// cmp:bundle-inputs 8ad320dba88a15524d8d393ac01dfb392e4d44c9a79ddad0befd63ecb8b883f2
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36272,7 +36272,7 @@ var FLOW_STEPS = Object.freeze([
 function flowRail(sections = []) {
   const usable = sections.filter((s) => s && typeof s.id === "string");
   if (usable.length === 0) return { steps: [], here: null };
-  const settled = (s) => Boolean(s.glyph && typeof s.glyph.cls === "string" && s.glyph.cls.includes("signed"));
+  const settled = (s) => Boolean(s.glyph && s.glyph.cls === "glyph-signed");
   const byId = new Map(usable.map((s) => [s.id, s]));
   const present2 = [];
   for (const step of FLOW_STEPS) {

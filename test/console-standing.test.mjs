@@ -19,6 +19,8 @@ import { fileURLToPath } from "node:url";
 
 import { FLOW_STEPS, STANDING, flowRail, standing } from "../packages/harness/src/console/console-standing.mjs";
 import { overviewStatusHtml, flowRailHtml } from "../packages/harness/src/console/console-overview.mjs";
+import { receiptGlyph, statusGlyph } from "../packages/harness/src/console/console-shell.mjs";
+import { galleryHtml } from "../packages/harness/src/console/preview-service.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CONSOLE_DIR = path.join(ROOT, "packages/harness/src/console");
@@ -146,6 +148,49 @@ test("the six steps are the proposal's, in the proposal's order", () => {
       seen.add(id);
     }
   }
+});
+
+test("an UNSIGNED section is marked DONE on the rail — `settled()` matches \"signed\" as a substring", () => {
+  // console-standing.mjs's own comment on the predicate: "signed is done,
+  // everything else (unsigned, reopened, drifted, absent) is not." The
+  // predicate is `s.glyph.cls.includes("signed")`, and the class an unsigned
+  // artifact wears is `glyph-unsigned` — which CONTAINS "signed". So the one
+  // state the comment names first is the one the code answers YES to.
+  //
+  // The glyph vocabulary below is the shell's own derivation, never a class
+  // name typed here: renaming the class must move this test, not satisfy it.
+  //
+  // Why it is this branch's defect and not a pre-existing one: `flowRailHtml`
+  // had no caller until preview-service.mjs added one here ("Phase A shipped
+  // the rail's deriver, its renderer and its CSS, and never called it"). The
+  // wrong answer was unreachable; the call site makes it a line on the page.
+  const noReceipt = receiptGlyph({ available: false });
+  assert.equal(noReceipt.cls, "glyph-unsigned", "the derivation itself: no receipt is UNSIGNED");
+  assert.equal(
+    flowRail([{ id: "evidence", glyph: noReceipt }]).steps[0].done,
+    false,
+    "a tree that has never been verified has not finished `verify`",
+  );
+
+  // The same fact one row up, in the words console-standing.mjs uses for it:
+  // "One unsigned spec leaves `define` open, which is the honest reading."
+  const unsignedSpec = statusGlyph({ status: "unreviewed" });
+  assert.equal(unsignedSpec.cls, "glyph-unsigned", "the derivation itself: an unreviewed artifact is UNSIGNED");
+  assert.equal(flowRail([{ id: "specs", glyph: unsignedSpec }]).steps[0].done, false, "one unsigned spec leaves `define` open");
+
+  // And where a reader actually meets it. A project with no receipt at all is
+  // the state every new adopter opens the console in, and the rail under the
+  // strip paints `verify` in the settled role while the strip beside it says
+  // "no verify receipt yet" — two clauses on one screen that disagree.
+  const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+  const at = html.indexOf('<nav class="flow"');
+  assert.ok(at > 0, "the front door renders no flow rail");
+  const nav = html.slice(at, html.indexOf("</nav>", at));
+  assert.doesNotMatch(
+    nav,
+    /class="flow-step[^"]*flow-done[^"]*">verify</,
+    `the rail called an unverified tree's verify step done: ${nav}`,
+  );
 });
 
 test("the console keeps ONE spelling of standing — no module may decide it a second way", () => {

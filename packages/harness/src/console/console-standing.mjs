@@ -132,7 +132,19 @@ export function flowRail(sections = []) {
 
   // "Wants attention" is the glyph's own meaning, not a second opinion about it:
   // signed is done, everything else (unsigned, reopened, drifted, absent) is not.
-  const settled = (s) => Boolean(s.glyph && typeof s.glyph.cls === "string" && s.glyph.cls.includes("signed"));
+  //
+  // EXACT EQUALITY, NOT `includes`. This read `cls.includes("signed")` until
+  // 2026-09-09, and `"glyph-unsigned".includes("signed")` is TRUE — so the
+  // predicate answered "done" for the very first state its own comment above
+  // names as not-done. It was unreachable while `flowRailHtml` had no caller;
+  // wiring the rail put the wrong answer on the page, where a project with no
+  // receipt at all saw `verify` painted settled one line under a strip reading
+  // "no verify receipt yet", and `here` stepped over every unsigned phase to
+  // name the wrong next command. The glyph vocabulary is five exact strings
+  // (glyph-signed / -unsigned / -drift / -reopen / -attn); only the first is
+  // done, and a substring test over a vocabulary where one term contains
+  // another is a bug waiting for its caller.
+  const settled = (s) => Boolean(s.glyph && s.glyph.cls === "glyph-signed");
   const byId = new Map(usable.map((s) => [s.id, s]));
 
   const present = [];
