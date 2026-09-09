@@ -17,7 +17,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { STANDING, flowRail, standing } from "../packages/harness/src/console/console-standing.mjs";
+import { FLOW_STEPS, STANDING, flowRail, standing } from "../packages/harness/src/console/console-standing.mjs";
 import { overviewStatusHtml, flowRailHtml } from "../packages/harness/src/console/console-overview.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -84,33 +84,68 @@ test("the strip renders standing, and a moved tree never renders in the ok role"
   assert.ok(!/standing-/.test(noTree), "with no tree supplied the strip states nothing about standing");
 });
 
-test("the flow rail is DERIVED from the declared sections — a stack that declares no drive gets none", () => {
-  const signed = (label, id) => ({ id, label, glyph: { ch: "●", cls: "glyph-signed", label: "signed" } });
-  const open = (label, id) => ({ id, label, glyph: null });
+// The rail is SIX conceptual steps (LIVE-CONSOLE.md §2, and the design of
+// record), and what stays derived is WHICH of the six this project has. It was
+// one step per section until 2026-09-09, which drew thirteen wrapping section
+// names under the strip — a second copy of the sidebar, not a flow. The rule
+// this file has always enforced is unchanged and is now MORE true: a rail may
+// not promise a step the profile never declared.
+test("the flow rail is SIX steps, DERIVED — a stack that declares no device gets no drive", () => {
+  const signed = (id) => ({ id, glyph: { ch: "●", cls: "glyph-signed", label: "signed" } });
+  const open = (id) => ({ id, glyph: null });
 
-  const full = flowRail([signed("Specs", "specs"), open("Screens", "screens"), open("Live device", "live-device")]);
-  assert.deepEqual(full.steps.map((s) => s.label), ["Specs", "Screens", "Live device"]);
-  assert.equal(full.here, "screens", "here is the FIRST section still wanting attention");
-  assert.equal(full.steps[0].done, true);
+  const full = flowRail([signed("specs"), open("screens"), open("live-device")]);
+  assert.deepEqual(full.steps.map((s) => s.id), ["define", "preview", "drive"], "one step per PHASE, not per section");
+  assert.equal(full.here, "preview", "here is the first step still wanting attention");
+  assert.equal(full.steps[0].done, true, "define's only present evidence is signed, so define is done");
 
-  const noDevice = flowRail([signed("Specs", "specs"), open("Screens", "screens")]);
-  assert.ok(!noDevice.steps.some((s) => s.id === "live-device"), "a rail may not promise a step the profile never declared");
+  const noDevice = flowRail([signed("specs"), open("screens")]);
+  assert.ok(!noDevice.steps.some((s) => s.id === "drive"), "a rail may not promise a step the profile never declared");
+  assert.ok(!noDevice.steps.some((s) => s.id === "verify"), "…and that is true of every one of the six, not just drive");
 
-  const allDone = flowRail([signed("Specs", "specs"), signed("Screens", "screens")]);
-  assert.equal(allDone.here, "screens", "with nothing open the marker rests on the last step");
+  // A step is done only when EVERY present section that evidences it is
+  // settled. One unsigned spec leaves `define` open, because it is.
+  const partly = flowRail([signed("intent"), open("specs")]);
+  assert.deepEqual(partly.steps.map((s) => [s.id, s.done]), [["define", false]]);
 
+  const allDone = flowRail([signed("specs"), signed("screens")]);
+  assert.equal(allDone.here, "preview", "with nothing open the marker rests on the last present step");
+
+  // The two sections that evidence no phase: the front door is where the rail
+  // is drawn, and the comment ledger is a margin, not a phase of the work.
+  assert.deepEqual(flowRail([open("overview"), open("comments")]).steps, [], "overview and comments are not steps");
   assert.deepEqual(flowRail([]).steps, [], "no sections is an empty rail, not a default one");
   assert.equal(flowRailHtml([]), "", "and renders nothing at all");
 });
 
-test("the rail names one command for the step it marks, and nothing to click", () => {
+test("the rail names one command for the STEP it marks, and nothing to click", () => {
+  // Keyed on the step id, not a section id: `verify` is one step and `evidence`
+  // is the section that evidences it, and a map keyed on sections could only
+  // ever answer for one of the four sections a step may have.
   const html = flowRailHtml(
-    [{ id: "verify", label: "Evidence", glyph: null }],
+    [{ id: "evidence", glyph: null }],
     (id) => (id === "verify" ? "node qa/verify.mjs" : null),
   );
   assert.match(html, /flow-here/);
   assert.match(html, /node qa\/verify\.mjs/);
   assert.ok(!/<button|<a /.test(html), "the rail is descriptive — it has no controls");
+});
+
+test("the six steps are the proposal's, in the proposal's order", () => {
+  // LIVE-CONSOLE.md §2: "define → preview → approve → verify → report → drive
+  // is the harness's working flow today". Pinned so a seventh step, or a
+  // reordering, is a decision somebody makes rather than one that happens.
+  assert.deepEqual(FLOW_STEPS.map((s) => s.id), ["define", "preview", "approve", "verify", "report", "drive"]);
+  // No section evidences two steps: a section in two phases would make one
+  // step's doneness depend on another's, and the marker would stop meaning
+  // "the next thing to do".
+  const seen = new Set();
+  for (const step of FLOW_STEPS) {
+    for (const id of step.sections) {
+      assert.equal(seen.has(id), false, `${id} evidences more than one step`);
+      seen.add(id);
+    }
+  }
 });
 
 test("the console keeps ONE spelling of standing — no module may decide it a second way", () => {

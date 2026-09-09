@@ -127,11 +127,16 @@ test("a line appended to the stream arrives as the RENDERED row — the page int
     assert.equal(frame.type, "step");
     assert.equal(frame.clear, false, "a step frame APPENDS — it never clears the list");
     assert.deepEqual(frame.rows.map((r) => r.index), [0, 1], "only the finished row and the newly running one");
-    // The row is HTML the SERVER rendered, carrying the tool's own words.
+    // The row is HTML the SERVER rendered, and so is the verbatim block that
+    // goes with it. The reason moved BELOW the table on 2026-09-09 (the design
+    // of record's `.reason`), so it rides its own field on the same frame —
+    // which is the property that actually matters here: a FAIL mid-run must not
+    // have to wait for a reload before its words are on screen.
     assert.match(frame.rows[0].html, /step-verdict-fail/);
-    assert.match(frame.rows[0].html, /error: boom \(src\/x:1\)/);
-    assert.match(frame.rows[0].html, /fix: unboom it/, "the tool's own fix, verbatim — never reworded");
     assert.match(frame.rows[0].html, /data-index="0"/, "and the index the page files it under");
+    assert.match(frame.reasonsHtml, /error: boom \(src\/x:1\)/);
+    assert.match(frame.reasonsHtml, /fix: unboom it/, "the tool's own fix, verbatim — never reworded");
+    assert.match(frame.reasonsHtml, /harnessIntegrity/, "and which step it belongs to, now that it sits below the table");
   } finally {
     sse.close(); // this test owns the socket; drop it before the server goes
     service.stop();

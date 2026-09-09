@@ -801,10 +801,29 @@ export const SHELL_CSS = `
      meanings. */
   .standing-ok { color: var(--signed); }
   .standing-open { color: var(--reopen); }
-  /* The working flow, derived from the declared section arc. Descriptive only —
-     no controls, nothing to click, and it never blocks a step. */
+  /* --- THE FRONT DOOR'S SHAPE (docs/reference/live-console-prototype.html) ---
+     The design of record, ported. Everything from here to the breakpoint below
+     draws the four one-line rows and the strip above them; the prototype is
+     read back by test/console-front-door-shape.test.mjs so this cannot drift
+     from it without a program saying so.
+
+     The strip — the whole product in one sentence, and the first thing anyone
+     reads. Its badge is .verdict; the ok/stale roles are NOT ported, because
+     .standing-ok / .standing-open already carry exactly those two meanings and
+     a second spelling of a rule is how the two come to disagree. */
+  #tab-overview .page-status { margin: 8px 0 0; }
+  .strip { flex: 1 1 100%; display: block; padding: 10px 12px; border: 1px solid var(--line);
+           border-radius: 6px; background: var(--surface); font-family: var(--mono);
+           font-size: var(--fs-body); color: var(--ink-2); line-height: 1.9; }
+  .verdict { display: inline-block; font-weight: 700; letter-spacing: .02em;
+             padding: 2px 8px; border-radius: 4px; }
+  .verdict.pass { color: var(--signed); background: var(--signed-bg); }
+  .verdict.fail { color: var(--drift); background: var(--drift-bg); }
+
+  /* The working flow — SIX conceptual steps, never the section list.
+     Descriptive only: no controls, nothing to click, it blocks no step. */
   .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0;
-          font-size: var(--fs-meta); color: var(--muted); margin: 8px 0 4px; }
+          font-size: var(--fs-meta); color: var(--muted); margin: 10px 0 14px; }
   .flow-step { padding: 2px 0; }
   .flow-done { color: var(--ink-2); }
   .flow-here { color: var(--ink); font-weight: 600; }
@@ -812,55 +831,77 @@ export const SHELL_CSS = `
   .flow-cmd { margin-left: 10px; font-family: var(--mono); font-size: var(--fs-meta);
               color: var(--ink-2); background: var(--surface); padding: 1px 6px; border-radius: 4px; }
 
-  /* --- now: the lane as it happens (LIVE-CONSOLE.md Phase B) ---
-     One row per step, appended as each finishes. No spinner, no progress bar,
-     no percentage, no auto-scroll: the verdicts wear the SAME classes the
-     Evidence table's rows wear (.step-verdict-*), so a step means the same
-     colour wherever it is read, and SKIP is muted rather than green. */
-  .now { margin: 4px 0 16px; }
-  .now-head { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+  /* The rows — ONE LINE each, collapsed, expanding in place. The grid IS the
+     legibility argument: a fixed key column so the four keys read down as a
+     column, one elastic value column that ellipses rather than wraps (a row
+     that wraps is no longer one line), and a chevron. */
+  .rows { border-top: 1px solid var(--line); margin: 0 0 18px; }
+  .row { border-bottom: 1px solid var(--line); }
+  .row > summary { list-style: none; cursor: pointer; display: grid;
+                   grid-template-columns: 84px 1fr 16px; gap: 14px;
+                   align-items: baseline; padding: 11px 4px; }
+  .row > summary::-webkit-details-marker { display: none; }
+  .row > summary .k { font-size: var(--fs-meta); text-transform: uppercase;
+                      letter-spacing: .06em; color: var(--muted); }
+  .row > summary .v { font-family: var(--mono); color: var(--ink);
+                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row > summary .chev { color: var(--muted); font-family: var(--mono); transition: transform .15s; }
+  .row[open] > summary .chev { transform: rotate(90deg); }
+  .row .body { padding: 2px 4px 14px 98px; color: var(--ink-2); }
+  .row .body p { margin: 0 0 8px; max-width: 62ch; font-size: var(--fs-meta); }
+  .row .body code { color: var(--ink); }
+
+  /* The step table — rows append, nothing scrolls. Fixed columns so seventeen
+     steps read as a column of verdicts rather than as ragged prose. It carries
+     the *now* rows, the Rule 0 plants and the ladder's requirements: three
+     questions whose answers all have the shape name · verdict · cost · why. */
+  table.steps { border-collapse: collapse; font-family: var(--mono);
+                font-size: var(--fs-meta); width: 100%; max-width: 560px; }
+  table.steps td { padding: 3px 10px 3px 0; vertical-align: top; white-space: nowrap; }
+  table.steps td.step { color: var(--ink); width: 160px; }
+  table.steps td.verd { width: 56px; font-weight: 600; }
+  table.steps td.dur { color: var(--muted); width: 64px; text-align: right; }
+  table.steps td.why { color: var(--muted); white-space: normal; }
+  /* A step that has not run, and the step running now. ONE name per state — the
+     same now-waiting/now-running the row markup carries — rather than a
+     second spelling of the same state in the stylesheet. A finished step's
+     colour stays on the .step-verdict-* span inside its cell, the same class
+     the Evidence table uses, so a step means the same colour wherever it is
+     read and SKIP is muted rather than green. */
+  table.steps tr.now-waiting td { color: var(--line); }
+  table.steps tr.now-waiting td.step { color: var(--muted); }
+  table.steps tr.now-running td.step { font-weight: 650; }
+  table.steps tr.now-running td.verd { color: var(--accent); }
+
+  /* The tool's own words, below the table: wrapped, never reflowed or
+     reworded. Verbatim is the whole point — newlines, coordinates, its own fix
+     line — which is also why this cannot live in a fixed-width table cell. */
+  .reason { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--drift);
+            background: var(--drift-bg); font-family: var(--mono); font-size: var(--fs-meta);
+            color: var(--ink); white-space: pre-wrap; overflow-x: auto; max-width: 560px; }
+  .reason-step { display: block; font-weight: 700; color: var(--drift); }
+  .now-nofix { margin: 4px 0 0; font-size: var(--fs-meta); color: var(--muted); }
   .now-live { color: var(--ink); font-weight: 650; letter-spacing: 0.02em; }
   .now-absent { color: var(--muted); }
-  .now-link { margin: 2px 0 8px; font-size: var(--fs-meta); color: var(--muted); }
-  .now-steps { list-style: none; margin: 0; padding: 0; font-size: var(--fs-meta); }
-  .now-step { padding: 2px 0; line-height: 1.5; border-bottom: 1px solid transparent; }
-  .now-name { display: inline-block; min-width: 15ch; color: var(--ink); }
-  .now-dur { color: var(--muted); }
-  .now-note { color: var(--ink-2); }
-  .now-state { color: var(--muted); font-style: italic; }
-  .now-running .now-name { font-weight: 650; }
-  .now-running .now-state { color: var(--ink); font-style: normal; }
+  .now-link { margin: 8px 0 0; font-size: var(--fs-meta); color: var(--muted); }
+  .now-note { color: var(--muted); }
   .now-elapsed { color: var(--ink-2); font-variant-numeric: tabular-nums; }
-  .now-waiting .now-name { color: var(--muted); }
-  /* The tool's own words, wrapped but never reflowed or reworded. */
-  .now-reason { margin: 4px 0 4px 2ch; padding: 6px 8px; white-space: pre-wrap; overflow-x: auto;
-                font-family: var(--mono); font-size: var(--fs-meta); color: var(--drift);
-                background: var(--drift-bg); border-radius: 6px; }
-  .now-nofix { margin: 0 0 6px 2ch; font-size: var(--fs-meta); color: var(--muted); }
   /* A duration an order of magnitude under the step's own history. Not a
      verdict — an observation beside one (evidence-must-attest-execution). */
   .now-flag { color: var(--reopen); text-decoration: underline dotted; }
 
   /* --- trust and ladder (LIVE-CONSOLE.md Phase C) ---
      Two rows, two questions: what Rule 0 last said about this lane, and what
-     would earn the next rung. No badge, no score, no bar — the trust row is a
-     sentence and the ladder row is four marks. Red appears on the trust line
-     for the two states that mean something went wrong (Rule 0 FAILED, or the
-     instrument did not put the tree back); nothing else here takes a colour. */
-  .trust, .ladder { margin: 4px 0 16px; }
-  .trust-line, .ladder-line { margin: 0; font-size: var(--fs-body); color: var(--ink-2); }
+     would earn the next rung. No badge, no score, no bar. Red appears on the
+     trust line for the two states that mean something went wrong (Rule 0
+     FAILED, or the instrument did not put the tree back); nothing else here
+     takes a colour. */
   .trust-bad { color: var(--drift); font-weight: 650; }
   .trust-absent, .ladder-absent { color: var(--muted); }
-  .trust-note, .trust-link { margin: 2px 0 0; font-size: var(--fs-meta); color: var(--muted); }
-  .trust-plants { margin: 4px 0 0; font-size: var(--fs-meta); }
-  .trust-plants > summary { cursor: pointer; color: var(--muted); }
-  .trust-list { list-style: none; margin: 4px 0 0; padding: 0; }
-  .trust-plant { padding: 1px 0; line-height: 1.5; }
-  .trust-name { display: inline-block; min-width: 24ch; color: var(--ink); }
-  .trust-dur { color: var(--muted); }
+  .trust-note, .trust-link { margin: 8px 0 0; font-size: var(--fs-meta); color: var(--muted); }
   /* A rung is earned or it is not. The unearned mark stays muted rather than
      red: not-yet is not a failure (LIVE-CONSOLE §3.2's rule, one row up). */
-  .ladder-rung { font-family: var(--mono); color: var(--muted); margin-right: 6px; }
+  .ladder-rung { color: var(--muted); margin-right: 6px; }
   .ladder-earned { color: var(--ink); }
   .ladder-pack { color: var(--muted); }
   .ladder-needs { color: var(--ink-2); }
@@ -1205,4 +1246,29 @@ export const SHELL_CSS = `
   .approvals-table .drift-panel { margin-bottom: 0; }
   .feature-undeclared { border: 1px solid var(--drift); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
     font-size: var(--fs-meta); }
+
+  /* The front door's provenance line is set in the mono the rest of the page
+     reads in — it is a line of hashes and paths, not prose. */
+  #tab-overview .page-foot { font-family: var(--mono); }
+
+  /* --- the phone (docs/reference/live-console-prototype.html's breakpoint) ---
+     §8's success test is written for one: "a stranger given the URL answers
+     questions 1–3 in under ten seconds without scrolling, on a phone."
+
+     DELIBERATE DEVIATION from the design of record, and recorded in that file's
+     header so nobody restores the original: the prototype hides its rail here
+     (\`.rail { display: none }\`), because ITS rail is mockup decoration. This
+     console's rail is the only navigation there is, and deleting navigation on
+     a phone is a regression the design never intended. So it REFLOWS instead —
+     the front door first, the rail reachable directly below it. */
+  @media (max-width: 720px) {
+    body { flex-direction: column; }
+    #rail { order: 2; width: 100%; position: static; height: auto; overflow-y: visible;
+            border-right: 0; border-top: 1px solid var(--line); }
+    .tab-panel { padding: 18px 16px 32px; }
+    .banner { margin: 18px 16px 0; }
+    .row > summary { grid-template-columns: 64px 1fr 16px; gap: 10px; }
+    .row .body { padding-left: 4px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .row > summary .chev { transition: none; } }
 `;

@@ -83,35 +83,70 @@ export function standing(receipt, { head = null, dirtyCount = 0 } = {}) {
 }
 
 /**
- * The working flow, DERIVED from the sections the console declares rather than
- * written out as a list of six.
+ * THE WORKING FLOW IS SIX STEPS, and the sections are its EVIDENCE.
  *
- * The arc is already real: the console's sections are ordered define → … →
- * drive, and preview-service.mjs's own comment calls that ordering deliberate.
- * A stack with no device section therefore has no `drive` step in its rail
- * because it declares none — which is the whole reason this reads the
- * declaration instead of restating it. A hard-coded rail would promise every
- * adopter a step their profile may not have.
+ * docs/proposals/LIVE-CONSOLE.md §2 names the flow verbatim — `define →
+ * preview → approve → verify → report → drive` — and the front door's design of
+ * record (docs/reference/live-console-prototype.html) draws exactly those six.
+ * Phase A derived the rail from the section list instead, one step per section,
+ * and the result was thirteen wrapping section names duplicating the sidebar:
+ * not a flow, a second navigation.
  *
- * `here` is the first section still wanting attention — the next thing to do,
- * not a wizard's cursor. When everything is signed the arc is complete and the
- * marker rests on the last step.
+ * So the six are named here, and what stays DERIVED is which of them this
+ * project HAS: a step is on the rail only when at least one of the sections
+ * that evidence it is present. A stack that declares no `live-device` section
+ * has no `drive` step, for the same reason Phase A read the declaration at all
+ * — a rail may not promise a step the profile never declared.
+ *
+ * `overview` and `comments` evidence NO step, deliberately: the front door is
+ * where the rail is drawn (it cannot be a step in its own flow) and the comment
+ * ledger is a cross-cutting margin, not a phase of the work.
+ */
+export const FLOW_STEPS = Object.freeze([
+  Object.freeze({ id: "define", label: "define", sections: Object.freeze(["intent", "features", "architecture", "specs"]) }),
+  Object.freeze({ id: "preview", label: "preview", sections: Object.freeze(["screens", "design-system", "components"]) }),
+  Object.freeze({ id: "approve", label: "approve", sections: Object.freeze(["approvals"]) }),
+  Object.freeze({ id: "verify", label: "verify", sections: Object.freeze(["evidence"]) }),
+  Object.freeze({ id: "report", label: "report", sections: Object.freeze(["walkthrough"]) }),
+  Object.freeze({ id: "drive", label: "drive", sections: Object.freeze(["live-device"]) }),
+]);
+
+/**
+ * The six steps, filtered to the ones this console's declared sections
+ * evidence, each marked done/here.
+ *
+ * `done` is the step's evidence settled — EVERY present section that evidences
+ * it is signed. One unsigned spec leaves `define` open, which is the honest
+ * reading: the step is not finished while any of its own artifacts is not.
+ *
+ * `here` is the first present step still wanting attention — the next thing to
+ * do, not a wizard's cursor. When everything is settled the arc is complete and
+ * the marker rests on the last present step.
  *
  * @param {Array<{id:string,label:string,glyph:object|null}>} sections
  * @returns {{ steps: Array<{id:string,label:string,here:boolean,done:boolean}>, here: string|null }}
  */
 export function flowRail(sections = []) {
-  const usable = sections.filter((s) => s && typeof s.id === "string" && typeof s.label === "string");
+  const usable = sections.filter((s) => s && typeof s.id === "string");
   if (usable.length === 0) return { steps: [], here: null };
 
   // "Wants attention" is the glyph's own meaning, not a second opinion about it:
   // signed is done, everything else (unsigned, reopened, drifted, absent) is not.
   const settled = (s) => Boolean(s.glyph && typeof s.glyph.cls === "string" && s.glyph.cls.includes("signed"));
-  const firstOpen = usable.findIndex((s) => !settled(s));
-  const hereIdx = firstOpen === -1 ? usable.length - 1 : firstOpen;
+  const byId = new Map(usable.map((s) => [s.id, s]));
 
+  const present = [];
+  for (const step of FLOW_STEPS) {
+    const evidence = step.sections.map((id) => byId.get(id)).filter(Boolean);
+    if (evidence.length === 0) continue; // the profile declared none of it
+    present.push({ id: step.id, label: step.label, done: evidence.every(settled) });
+  }
+  if (present.length === 0) return { steps: [], here: null };
+
+  const firstOpen = present.findIndex((s) => !s.done);
+  const hereIdx = firstOpen === -1 ? present.length - 1 : firstOpen;
   return {
-    here: usable[hereIdx].id,
-    steps: usable.map((s, i) => ({ id: s.id, label: s.label, here: i === hereIdx, done: settled(s) })),
+    here: present[hereIdx].id,
+    steps: present.map((s, i) => ({ ...s, here: i === hereIdx })),
   };
 }

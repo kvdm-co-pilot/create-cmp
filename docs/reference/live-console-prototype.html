@@ -18,6 +18,20 @@
   The mockup's state switcher and its STEPS fixture are plumbing, not design.
   What is normative: the strip, the six-step flow rail, the four collapsed rows
   and their grid, table.steps, the footer, and the 720px breakpoint.
+
+  ONE DELIBERATE DEVIATION, recorded here so nobody "restores" it by diffing
+  this file against the console. At <=720px the rule below says
+  `.rail { display: none }`. THE CONSOLE DOES NOT DO THAT, and must not: this
+  file's rail is mockup decoration — eight hard-coded section names that lead
+  nowhere — while the console's rail is the only navigation the page has.
+  Deleting navigation on a phone is a regression the design never intended. The
+  console REFLOWS instead: `body { flex-direction: column }` and
+  `#rail { order: 2; width: 100%; position: static; height: auto;
+  border-right: 0; border-top: 1px solid var(--line) }` — the front door first,
+  the rail reachable directly below it. Everything else in that media query
+  (the narrowed row grid, the reduced body padding) is ported as written.
+  `test/console-front-door-shape.test.mjs` asserts the deviation, so restoring
+  `display: none` fails a gate rather than passing unnoticed.
 -->
 <title>Prooflane Live Front Door</title>
 <style>

@@ -47,6 +47,10 @@ import {
   governanceStripHtml,
 } from "./console-shell.mjs";
 import { overviewBodyHtml, overviewStatusHtml, overviewGlyph, flowRailHtml } from "./console-overview.mjs";
+// The flow's six steps, derived from the sections this project declares. The
+// rail draws them and the *waiting* row names the one that is `here`, so the
+// derivation is called ONCE here and both surfaces are handed its result.
+import { flowRail } from "./console-standing.mjs";
 // The *now* row (LIVE-CONSOLE.md Phase B). The server that reads the step
 // stream hands the parsed state in; console-now.mjs owns what it means and how
 // a row looks — including the rows the SSE appends mid-run, so a live row and
@@ -521,16 +525,20 @@ export function galleryHtml(state) {
   // hot-reload loop: the tab is sticky (hash + sessionStorage), so an SSE
   // reload during UI work never bounces the reader off the gallery; only a
   // genuinely fresh session lands on the front door.
-  // ONE command per rail step, and only where a real one exists. Every entry
-  // here is a file in template/qa; a step with no unambiguous command returns
-  // null and the rail says nothing beside it, which is evidence-or-silence
-  // applied to a command. Naming a command an adopter cannot run is the exact
-  // defect this slice fixes in the CLI's own FRONT_DOORS table.
+  // ONE command per FLOW STEP — keyed by the step ids console-standing.mjs
+  // declares, not by section ids, because the rail draws six steps and a map
+  // keyed on sections could only ever answer for one section of the four a step
+  // may have. Every entry here is a file in template/qa; a step with no
+  // unambiguous command returns null and the rail says nothing beside it, which
+  // is evidence-or-silence applied to a command. `preview` and `drive` have
+  // none: previewing is the console itself, and driving a device is a session,
+  // not a command an adopter types. Naming a command an adopter cannot run is
+  // the exact defect this slice fixes in the CLI's own FRONT_DOORS table.
   const FLOW_COMMANDS = Object.freeze({
-    architecture: "node qa/arch-doc.mjs",
-    evidence: "node qa/verify.mjs",
-    walkthrough: "node qa/walkthrough.mjs",
-    approvals: "node qa/approve.mjs",
+    define: "node qa/arch-doc.mjs",
+    approve: "node qa/approve.mjs",
+    verify: "node qa/verify.mjs",
+    report: "node qa/walkthrough.mjs",
   });
   const flowCommandFor = (id) => FLOW_COMMANDS[id] ?? null;
 
@@ -597,6 +605,42 @@ export function galleryHtml(state) {
     },
   ];
 
+  // WHICH RAIL ITEMS THIS PROJECT ACTUALLY HAS — derived HERE, above the
+  // sections, because the front door's flow rail is built inside `sections` and
+  // must be built from the same filtered list the sidebar gets.
+  //
+  // It was built from the raw `railItems` until 2026-09-09, and the consequence
+  // was the defect the flow rail's own rule names: a project with no Screens,
+  // no Design language, no Components and no device was still promised all four
+  // by the rail under its strip, while its sidebar honestly showed none of them.
+  // A rail may not promise a step the profile never declared — so the promise
+  // and the navigation are now filtered by one derivation, once.
+  //
+  // Nothing below reads `sections`; the section half of the same filtering
+  // stays with the sections, immediately after them.
+  //
+  // Sections that need a Compose app to mean anything. `design-system` joined
+  // screens and live-device on 2026-09-07: a design LANGUAGE is Theme.kt and
+  // Tokens.kt, and a service with no UI was being shown a visual vocabulary it
+  // does not have — the console being honest about its own defaults rather than
+  // about the project. This is the fallback for a project that declares no
+  // sections; a profile that declares them gets exactly what it declared.
+  const NEEDS_SCREENS = new Set(["screens", "live-device", "design-system"]);
+  // The declaration comes first: it says which sections this project HAS.
+  // Capability filtering then removes what it cannot show — a project may
+  // declare Screens and still not have a Compose app to render, and that stays
+  // an absence with a stated reason rather than a contradiction. An id declared
+  // but unknown to this console is dropped rather than invented, because a rail
+  // entry leading to an empty panel is the dishonesty this whole section fights.
+  const declared = Array.isArray(declaredSectionIds) && declaredSectionIds.length ? declaredSectionIds : null;
+  const pick = (items) => (declared ? declared.map((id) => items.find((x) => x.id === id)).filter(Boolean) : items);
+  const declaredRail = pick(railItems);
+  const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
+  // ONE derivation of the flow, read twice: the rail draws it and the *waiting*
+  // row ends with its `here`. Calling flowRail() in two places over two lists is
+  // how the two would come to disagree, so the list is computed once here.
+  const flow = flowRail(visibleRail);
+
   const sections = [
     // §3.7 — the front door. Composition only: it arranges the queue, the
     // anchored-diff file splits and the digest that other modules derived. It
@@ -639,9 +683,10 @@ export function galleryHtml(state) {
         // never called it: `flowRailHtml` had no reference outside its own
         // definition and its tests, so the "derived flow rail" the proposal
         // and PR #108 both record as landed was never on the page. This is
-        // the call. `railItems` is already the {id,label,glyph} shape the
-        // deriver reads, ordered define -> ... -> drive.
-        railHtml: flowRailHtml(railItems, flowCommandFor),
+        // the call — over `visibleRail`, the list this project actually has,
+        // not the raw thirteen.
+        railHtml: flowRailHtml(visibleRail, flowCommandFor),
+        flowHere: flow.here,
       }),
       active: true,
     },
@@ -935,6 +980,17 @@ export function galleryHtml(state) {
     }
     var head = document.getElementById("now-head");
     if (head && msg.headHtml) head.innerHTML = msg.headHtml;
+    // A failed step's own words sit BELOW the table, verbatim. The server sends
+    // the whole tail rather than a patch: it is at most a handful of blocks, and
+    // a full replacement cannot leave a previous run's failure stranded under a
+    // table that no longer contains it.
+    var reasons = document.getElementById("now-reasons");
+    if (reasons && typeof msg.reasonsHtml === "string") reasons.innerHTML = msg.reasonsHtml;
+    // The row opens itself for the two states somebody came to watch: a lane
+    // that is running, and a lane that failed. It is never CLOSED from here —
+    // a reader who opened it keeps it open.
+    var box2 = document.getElementById("now");
+    if (box2 && (/now-running/.test(list.innerHTML) || (reasons && reasons.innerHTML.trim() !== ""))) box2.open = true;
     tickNowElapsed();
   }
   // The ONE number on this page the server cannot know: how long the running
@@ -1417,24 +1473,9 @@ export function galleryHtml(state) {
   // from qa/ and stays. One quiet rail line says what is absent and why, so the
   // reader never wonders whether Screens failed to load.
   const railFootPlain = `<button type="button" class="tab-btn" data-tab="evidence" title="open Evidence">${railReceiptHtml(effectiveReceipt)}</button>`;
-  // Sections that need a Compose app to mean anything. `design-system` joined
-  // screens and live-device on 2026-09-07: a design LANGUAGE is Theme.kt and
-  // Tokens.kt, and a service with no UI was being shown a visual vocabulary it
-  // does not have — the console being honest about its own defaults rather than
-  // about the project. This is the fallback for a project that declares no
-  // sections; a profile that declares them gets exactly what it declared.
-  const NEEDS_SCREENS = new Set(["screens", "live-device", "design-system"]);
-  // The declaration comes first: it says which sections this project HAS.
-  // Capability filtering then removes what it cannot show — a project may
-  // declare Screens and still not have a Compose app to render, and that stays
-  // an absence with a stated reason rather than a contradiction. An id declared
-  // but unknown to this console is dropped rather than invented, because a rail
-  // entry leading to an empty panel is the dishonesty this whole section fights.
-  const declared = Array.isArray(declaredSectionIds) && declaredSectionIds.length ? declaredSectionIds : null;
-  const pick = (items) => (declared ? declared.map((id) => items.find((x) => x.id === id)).filter(Boolean) : items);
-  const declaredRail = pick(railItems);
+  // The section half of the same filtering the rail got above `sections` — one
+  // `declared`, one `pick`, one NEEDS_SCREENS, applied to both lists.
   const declaredSections = pick(sections);
-  const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
   const visibleSections = capabilities.screens ? declaredSections : declaredSections.filter((s) => !NEEDS_SCREENS.has(s.id));
   const capabilityNote = capabilities.screens
     ? ""

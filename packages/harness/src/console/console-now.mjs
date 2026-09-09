@@ -267,72 +267,118 @@ function verdictClass(verdict) {
   return "step-verdict-skip";
 }
 
+/** Did this step's verdict mean something went WRONG? (Never the field's question.) */
+const stepFailed = (row) => row.verdict === "FAIL" || row.verdict === "ERROR";
+
 /**
  * ONE row. This exact function renders the row the server puts on the page AND
  * the row the SSE appends mid-run — the page appends bytes the server derived
  * and derives nothing itself, which is why a live row and a reloaded row are
  * the same row.
  *
+ * It is a `<tr>`, and it lives inside a `<tbody>` — the design of record's
+ * `table.steps`, four columns, nothing scrolling. The tbody is not decoration:
+ * the client appends a finished step with `insertAdjacentHTML("beforeend", …)`,
+ * and the HTML fragment parser DROPS a bare `<tr>` inserted into a `<table>`
+ * (foster parenting) while accepting it into a `<tbody>`. Without the tbody the
+ * live rows would silently vanish and only a reload would show them.
+ *
  * @param {object} row a nowState() row
  * @returns {string}
  */
 export function stepRowHtml(row) {
-  const name = `<code class="now-name">${esc(row.name)}</code>`;
+  const cell = (cls, inner) => `<td class="${cls}">${inner}</td>`;
+  const step = cell("step", esc(row.name));
   if (row.state === STEP_STATE.RUNNING) {
     // Elapsed is the one number on this page the SERVER cannot know: it is a
     // reading of the reader's clock, not a value in the artifact. The artifact
     // supplies the INSTANT it started; the page counts from there.
-    return `<li class="now-step now-running" data-index="${row.index}">${name} <span class="now-state">running</span> <span class="now-elapsed" data-since="${escAttr(row.since || "")}"></span></li>`;
+    return `<tr class="now-step now-running" data-index="${row.index}">${step}${cell("verd", "running")}${cell(
+      "dur",
+      `<span class="now-elapsed" data-since="${escAttr(row.since || "")}"></span>`,
+    )}${cell("why", "")}</tr>`;
   }
   if (row.state === STEP_STATE.NOT_YET || row.state === STEP_STATE.NOT_RUN) {
-    return `<li class="now-step now-waiting" data-index="${row.index}">${name} <span class="now-state">${esc(row.state)}</span></li>`;
+    return `<tr class="now-step now-waiting" data-index="${row.index}">${step}${cell("verd", "&mdash;")}${cell(
+      "dur",
+      "",
+    )}${cell("why", esc(row.state))}</tr>`;
   }
   const verdict = `<span class="${verdictClass(row.verdict)}">${esc(row.verdict || "")}</span>`;
   const dur = formatDurationMs(row.durationMs);
-  const durHtml = dur ? ` <span class="now-dur">${esc(dur)}</span>` : "";
   // The step's own words, never the console's: a note explains a SKIP and a
   // reason explains a FAIL, and rewording either is how a console starts
   // telling a story the lane did not (LIVE-CONSOLE §7).
-  const note = row.note ? ` <span class="now-note">${esc(row.note)}</span>` : "";
+  const note = row.note ? `<span class="now-note">${esc(row.note)}</span>` : "";
   // WHICH BLOCK A REASON GETS IS THE VERDICT'S QUESTION, NEVER THE FIELD'S.
   // A step explains itself in `reason` whether it FAILED or merely SKIPped —
   // the generic profile's specCoverage puts "no specs/ directory" there — and
   // rendering both in the red verbatim block would paint a skip as a failure
   // and then ask what the fix was. Red is reserved for the two verdicts that
   // mean something went wrong (console-shell.mjs's three semantic colours).
-  const failed = row.verdict === "FAIL" || row.verdict === "ERROR";
-  let detail = "";
-  if (row.reason && failed) {
-    // Verbatim, newlines and all — the tool's own reason and its own fix. If
-    // the tool printed no fix, the absence is STATED rather than filled in.
-    const printedFix = /^\s*fix\b/im.test(row.reason);
-    detail =
-      `\n  <pre class="now-reason">${esc(row.reason)}</pre>` +
-      (printedFix ? "" : `\n  <p class="now-nofix">fix: the harness printed none &mdash; the step's own output is above</p>`);
-  }
-  // A passing or skipped step's own words, in its own voice and no louder.
-  const said = row.reason && !failed ? ` <span class="now-note">${esc(row.reason)}</span>` : "";
+  // A passing or skipped step's own words, in its own voice and no louder; a
+  // FAIL's go verbatim into stepReasonHtml, below the table.
+  const said = row.reason && !stepFailed(row) ? `<span class="now-note">${esc(row.reason)}</span>` : "";
   const flag = row.replaySuspect
-    ? ` <span class="now-flag" title="a build cache can replay a PASS from another tree — qa/verify.mjs forces --rerun where it can">far faster than its own history (${esc(formatDurationMs(row.expectedMs))})</span>`
+    ? `<span class="now-flag" title="a build cache can replay a PASS from another tree — qa/verify.mjs forces --rerun where it can">far faster than its own history (${esc(formatDurationMs(row.expectedMs))})</span>`
     : "";
-  return `<li class="now-step" data-index="${row.index}">${name} ${verdict}${durHtml}${note}${said}${flag}${detail}</li>`;
+  const why = [note, said, flag].filter(Boolean).join(" ");
+  return `<tr class="now-step" data-index="${row.index}">${step}${cell("verd", verdict)}${cell("dur", esc(dur || ""))}${cell("why", why)}</tr>`;
+}
+
+/**
+ * A FAILED step's own words, VERBATIM — the block that sits after the table
+ * (docs/reference/live-console-prototype.html: "The console shows what the lane
+ * said, verbatim. It does not reword a failure.").
+ *
+ * It is below the table rather than inside a cell because it is the one piece
+ * of this block that is prose the lane wrote: newlines, coordinates, its own
+ * fix line. A four-column row cannot hold it without either reflowing it — the
+ * one thing "verbatim" forbids — or blowing the column widths that make the
+ * other sixteen rows scannable.
+ *
+ * Returns "" for anything that did not fail, so a SKIP's explanation is never
+ * dressed as a failure.
+ *
+ * @param {object} row a nowState() row
+ * @returns {string}
+ */
+export function stepReasonHtml(row) {
+  if (!row || !row.reason || !stepFailed(row)) return "";
+  // If the tool printed no fix, the absence is STATED rather than filled in.
+  const printedFix = /^\s*fix\b/im.test(row.reason);
+  return (
+    `<div class="reason" data-reason-for="${row.index}"><span class="reason-step">${esc(row.name)}</span>\n${esc(row.reason)}</div>` +
+    (printedFix ? "" : `\n  <p class="now-nofix">fix: the harness printed none &mdash; the step's own output is above</p>`)
+  );
+}
+
+/** Every failed step's verbatim block, in run order — the tail of the *now* body. */
+export function stepReasonsHtml(state) {
+  const rows = state && state.available ? state.rows : [];
+  return rows.map(stepReasonHtml).filter(Boolean).join("\n  ");
 }
 
 /**
  * The row's one line — what the lane is doing, or what it last did. One
  * question, one row (LIVE-CONSOLE §3.4): this line never grows a second fact
  * about anything but the run.
+ *
+ * It returns the line's INNER markup, not a paragraph: the line is the
+ * collapsed row's value cell (`summary > .v`), and the same bytes are written
+ * into that cell by the SSE. A `<p>` inside a `<summary>`'s grid cell would
+ * break the one-line-with-ellipsis geometry the design of record specifies.
  */
 export function nowHeadHtml(state) {
   if (!state || !state.available) {
-    return `<p class="now-head now-absent">${esc((state && state.reason) || "no step stream")} &mdash; run <code>node qa/verify.mjs --events</code></p>`;
+    return `<span class="now-absent">${esc((state && state.reason) || "no step stream")} &mdash; run <code>node qa/verify.mjs --events</code></span>`;
   }
   const modeClause = state.mode === "fast" ? " &middot; fast lane (inner loop &mdash; earns no rung)" : "";
   const profile = state.profile ? ` &middot; profile ${esc(state.profile)}` : "";
   if (state.phase === RUN_PHASE.RUNNING) {
     const row = state.rows.find((r) => r.state === STEP_STATE.RUNNING);
     const which = row ? ` &middot; step ${row.index + 1} of ${state.total} &middot; <code>${esc(row.name)}</code>` : "";
-    return `<p class="now-head now-live">RUNNING${which}${modeClause}${profile}</p>`;
+    return `<span class="now-live">RUNNING</span>${which}${modeClause}${profile}`;
   }
   const parts = [];
   parts.push(`${state.completed} step${state.completed === 1 ? "" : "s"}`);
@@ -348,7 +394,7 @@ export function nowHeadHtml(state) {
       : state.stoppedEarly
         ? `the lane stopped after step ${state.completed} of ${state.total}`
         : "idle &mdash; last run";
-  return `<p class="now-head">${lead} &middot; ${parts.map((p) => esc(p)).join(" &middot; ")}${modeClause}${profile}</p>`;
+  return `${lead} &middot; ${parts.map((p) => esc(p)).join(" &middot; ")}${modeClause}${profile}`;
 }
 
 /**
@@ -370,9 +416,14 @@ export function nowHeadHtml(state) {
  *   run/end   — every row that is not done, because "not yet" became "not run"
  *               the moment the lane stopped.
  *
+ * `reasonsHtml` is the whole verbatim tail, replaced wholesale rather than
+ * patched: it is at most a handful of blocks, a FAIL can be superseded by a
+ * later run's PASS, and a full replacement cannot leave an orphan behind the
+ * way an append could.
+ *
  * @param {object} state nowState()'s result
  * @param {object} event the line that just landed (a run or step event)
- * @returns {{type: "step", runId: string|null, clear: boolean, headHtml: string, rows: Array<{index:number, html:string}>}}
+ * @returns {{type: "step", runId: string|null, clear: boolean, headHtml: string, reasonsHtml: string, rows: Array<{index:number, html:string}>}}
  */
 export function nowFrame(state, event = null) {
   const rowsById = new Map((state && state.rows ? state.rows : []).map((r) => [r.index, r]));
@@ -399,30 +450,49 @@ export function nowFrame(state, event = null) {
     runId: (state && state.runId) || null,
     clear: full,
     headHtml: nowHeadHtml(state),
+    reasonsHtml: stepReasonsHtml(state),
     rows,
   };
 }
 
 /**
- * The whole *now* block: the head, the rows, and the one clause that says
- * whether what you are reading is live (LIVE-CONSOLE §3.3 — "disconnected is
- * SAID, not hidden"). `data-run` is how the page knows an arriving row belongs
- * to the run on screen rather than the one before it.
+ * The *now* ROW — one line when idle, expanding in place (LIVE-CONSOLE §2, and
+ * the design of record's four `<details class="row">`). The summary is the
+ * question's one-line answer; the body is the step table and, after it, every
+ * failed step's verbatim words.
+ *
+ * `data-run` is how the page knows an arriving row belongs to the run on screen
+ * rather than the one before it.
+ *
+ * IT OPENS ITSELF for the two states somebody came to watch — a lane that is
+ * running, and a lane that failed. Everything else is the 95% case and stays
+ * one line, which is the whole point of the shape.
+ *
+ * The liveness clause is NOT here: §3.3 puts "disconnected is said, not hidden"
+ * in the STRIP, and a clause inside a collapsed row is a clause that is hidden.
+ * console-overview.mjs's `overviewStatusHtml` carries `#now-live`.
  */
 export function nowSectionHtml(state) {
-  const runAttr = state && state.available && state.runId ? escAttr(state.runId) : "";
-  const rows = state && state.available ? state.rows.map(stepRowHtml).join("\n    ") : "";
+  const live = state && state.available;
+  const runAttr = live && state.runId ? escAttr(state.runId) : "";
+  const rows = live ? state.rows.map(stepRowHtml).join("\n    ") : "";
+  const reasons = stepReasonsHtml(state);
+  const watching =
+    live && (state.phase === RUN_PHASE.RUNNING || state.tally.fail > 0 || state.tally.error > 0);
   // The file is NAMED, and the name comes from the reader that opened it — the
   // console does not carry a path of its own (qa/lib/lane-markers.mjs owns it,
   // and the lane writes from the same constant). A caller that supplies none
   // gets the phrase without the path rather than a path that might be wrong.
   const rel = state && typeof state.relPath === "string" && state.relPath ? state.relPath : null;
   const source = rel ? `reading <code>${esc(rel)}</code>` : "reading the lane's step stream";
-  return `  <div class="now" id="now" data-run="${runAttr}">
-  <div id="now-head">${nowHeadHtml(state)}</div>
-  <p class="now-link" id="now-link">${source} &middot; <span id="now-live">live</span></p>
-  <ol class="now-steps" id="now-steps">
+  return `  <details class="row" id="now" data-run="${runAttr}"${watching ? " open" : ""}>
+  <summary><span class="k">now</span><span class="v" id="now-head">${nowHeadHtml(state)}</span><span class="chev">&rsaquo;</span></summary>
+  <div class="body">
+  <table class="steps"><tbody id="now-steps">
     ${rows}
-  </ol>
-  </div>`;
+  </tbody></table>
+  <div id="now-reasons">${reasons}</div>
+  <p class="now-link" id="now-link">${source}</p>
+  </div>
+  </details>`;
 }

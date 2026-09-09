@@ -182,7 +182,7 @@ test("the row expands to name each plant and the gate it made refuse — one que
 test("the front door renders the row, and a caller that supplies no state renders no row", () => {
   const base = { appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] };
   const withTrust = galleryHtml({ ...base, trust: trustState(read(record()), { now: T0 }) });
-  assert.match(withTrust, /<h3 class="fd-h">Trust<\/h3>/);
+  assert.match(withTrust, /<span class="k">trust<\/span>/, "the row states its own question — no heading above it");
   assert.match(withTrust, /id="trust"/);
   assert.match(withTrust, /Rule 0 — 2 plants failed by name/);
 

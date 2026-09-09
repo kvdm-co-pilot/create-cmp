@@ -137,7 +137,7 @@ test("the front door renders the row, and a caller that supplies no state render
     ladder: ladderStanding(CMP_LADDER, { earned: "L2", passed: L2_STEPS }),
     lastReceipt: { available: true, verdict: "PASS", evidenceLevel: { rung: "L2", name: "device", satisfiedBy: [] }, packId: "cmp", steps: [] },
   });
-  assert.match(withLadder, /<h3 class="fd-h">Ladder<\/h3>/);
+  assert.match(withLadder, /<span class="k">ladder<\/span>/, "the row states its own question — no heading above it");
   assert.match(withLadder, /id="ladder"/);
   assert.match(withLadder, /L3 needs <code>releaseSmoke<\/code>/);
   assert.match(withLadder, /pack cmp/, "the pack comes from the receipt beside the rung it graded");
