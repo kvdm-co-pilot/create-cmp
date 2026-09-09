@@ -9,6 +9,7 @@
     "verdict",
     "commit",
     "steps",
+    "pack",
     "artifacts",
     "toolVersions",
     "generatedAt"

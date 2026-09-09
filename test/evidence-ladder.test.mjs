@@ -551,6 +551,7 @@ test("THE PRODUCER: the console's receipt bridge carries the pack off the receip
       path.join(root, "qa", "evidence", "latest.json"),
       JSON.stringify({
         schema: "cmp-evidence/1",
+        pack: { id: "cmp", version: null },
         profile: "local",
         verdict: "PASS",
         commit: { sha: "abc123", dirty: [] },

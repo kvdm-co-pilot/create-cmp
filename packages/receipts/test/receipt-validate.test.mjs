@@ -44,6 +44,10 @@ function makeReceipt(root, overrides = {}) {
     verdict: "PASS",
     commit: { sha: null, dirty: [] },
     inputs: { hash, fileCount },
+    // The pack that graded it (ADR-0011). A fixture without one modelled a
+    // receipt no lane produces — the same defect the harnessIntegrity row below
+    // was added to fix, one field over — and the predicate now says so.
+    pack: { id: "cmp", version: null },
     steps: [
       // A real lane's first row: the harness vouching for its own code. Fixtures
       // that omitted it were modelling a receipt no lane produces, and

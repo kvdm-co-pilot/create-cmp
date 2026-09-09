@@ -41,6 +41,7 @@ function writeReceipt(root, receipt) {
 function makeReceipt({ hash = "deadbeef", steps = [{ name: "conformance", verdict: "PASS", durationMs: 4210 }], generatedAt = new Date().toISOString() } = {}) {
   return {
     schema: "cmp-evidence/1",
+    pack: { id: "cmp", version: null },
     profile: "local",
     verdict: "PASS",
     commit: { sha: "abc123", dirty: [] },

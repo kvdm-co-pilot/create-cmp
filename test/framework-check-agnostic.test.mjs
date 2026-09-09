@@ -327,6 +327,7 @@ test("the Stop-hook pattern matches the refusal in both dialects", () => {
   // hook rather than about the name.
   const forged = (stepName) => ({
     schema: "cmp-evidence/1",
+    pack: { id: "cmp", version: null },
     profile: "local",
     stage: "change",
     verdict: "PASS",

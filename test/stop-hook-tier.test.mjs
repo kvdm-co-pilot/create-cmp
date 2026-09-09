@@ -51,6 +51,7 @@ function backendProject(steps) {
   write("services/core/Money.kt", "class Money\n");
   const receipt = {
     schema: "cmp-evidence/1",
+    pack: { id: "cmp", version: null },
     profile: "local",
     stage: "change",
     mode: "full",

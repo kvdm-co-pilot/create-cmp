@@ -495,6 +495,7 @@ test("Stop-hook composition: an approvals FAIL fails the lane verdict, and recei
     // with no separate approvals-aware code in receipt-check.mjs.
     const receipt = {
       schema: "cmp-evidence/1",
+      pack: { id: "cmp", version: null },
       profile: "local",
       verdict: "FAIL",
       commit: { sha: null, dirty: [] },
@@ -539,6 +540,7 @@ test("Stop-hook composition: a genuinely valid receipt (approvals PASS included)
 
     const receipt = {
       schema: "cmp-evidence/1",
+      pack: { id: "cmp", version: null },
       profile: "local",
       verdict: "PASS",
       commit: { sha: null, dirty: [] },

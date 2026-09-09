@@ -306,6 +306,7 @@ function makeFakeProject({ verdict = "PASS", exitCode = 0 } = {}) {
   fs.copyFileSync(WATCH_SRC, path.join(root, "qa", "watch.mjs"));
   const receipt = {
     schema: "cmp-evidence/1",
+    pack: { id: "cmp", version: null },
     profile: "local",
     mode: "fast",
     verdict,
