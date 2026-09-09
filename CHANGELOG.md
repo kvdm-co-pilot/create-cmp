@@ -8,6 +8,35 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **`extends`: a profile inherits by DECLARING a base, and the core derives the rest (ADR-0012).**
+  Stage 2's criterion D, and the gate names the way it may *not* be satisfied: writing the heir as
+  `export * from "../base/index.mjs"` would be "ESM re-export, no core support, criterion green,
+  claim false". The gate writes both fixtures itself and the heir it writes **imports nothing**, so
+  the only route to green is for the loader to resolve the declared base.
+
+  The heir's own declarations always win; everything else comes from the nearest ancestor that has
+  it. Three decisions inside that, each with the failure it prevents:
+
+  - **Inheritance covers a named list, never "every export the base has."** Spreading a namespace
+    would inherit `id` and `protocol`, so an heir would silently *become its base* and its receipts
+    would name the wrong pack — the exact confusion `pack` exists to prevent.
+  - **An override wins even when it is falsy** (`in`, not truthiness). A stack with no flow-shaped
+    journey files declares `flows: null`, and a merge reading null as "absent" would restore the
+    base's flows underneath it. The ktor-backend fixture is that stack, so the case is not
+    hypothetical.
+  - **A circular chain is refused by name**, with the chain that closed it in the message. Hanging on
+    an author error tells them nothing.
+
+  **The protocol moved to 2, and the lane speaks 1 and 2.** Inheritance changes what a profile must
+  export, so only a loader that can derive the rest can load an heir. Without the bump an heir
+  declares 1 and an older lane refuses it with *"profile X must export layout"* — pointing the author
+  at their own file when the fix is to upgrade the harness. `extends` is therefore **refused below
+  protocol 2**: a version signal authors may ignore is advisory, and an advisory signal is one a
+  reader cannot trust. A profile at 1 still loads unchanged — it predates `extends`, it is complete
+  on its own, and refusing it would be a rename dressed as a version.
+
+  Stage 2: 7/10 → **8/10**.
+
 - **The TAP parser met a real runner, and the real runner found two defects the spec could not.**
   Everything about TAP and CTRF had been written from the format specs. §8.8 counts *"adversarial
   input the fix was not written against"* among its terminators and names the score: eight wrong

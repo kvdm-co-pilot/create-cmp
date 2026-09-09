@@ -38,7 +38,29 @@ import { PROFILE_ID_RE } from "./harness-manifest.mjs";
  * profile can be versioned apart from the harness; from then on a new
  * required export is a new protocol number.
  */
-export const PROFILE_PROTOCOL = 1;
+/**
+ * The protocol this lane SPEAKS. Bumped to 2 when `extends` landed, because
+ * inheritance changes what a profile must export: an heir declares only what it
+ * changes, and only a loader that can DERIVE the rest can load it.
+ *
+ * Without the bump an heir would declare 1, and an older loader would refuse it
+ * with "profile X must export layout" — pointing the author at their own file
+ * when the real fix is to upgrade the harness. The protocol refusal below says
+ * exactly that instead, which is why the version has to move for the message to
+ * be worth anything.
+ */
+export const PROFILE_PROTOCOL = 2;
+
+/**
+ * Every protocol this lane can load. A profile at 1 is one written before
+ * `extends` existed; it is complete on its own and nothing about it changed, so
+ * refusing it would be a rename dressed as a version — the failure ADR-0007
+ * refused for the receipt, one layer down.
+ */
+export const SUPPORTED_PROFILE_PROTOCOLS = Object.freeze([1, 2]);
+
+/** The protocol a profile must declare before it may use `extends`. */
+export const EXTENDS_PROTOCOL = 2;
 
 /** Where profiles live, relative to the project root. Inside the lock region. */
 export const PROFILES_DIR_REL = "qa/lib/profiles";
@@ -75,10 +97,10 @@ export function validateProfileModule(mod, id) {
   if (mod.id !== id) {
     return { ok: false, reason: `profile "${id}" exports id ${JSON.stringify(mod.id)} — the manifest and the profile disagree about what this project is; fix one of them` };
   }
-  if (mod.protocol !== PROFILE_PROTOCOL) {
+  if (!SUPPORTED_PROFILE_PROTOCOLS.includes(mod.protocol)) {
     return {
       ok: false,
-      reason: `profile "${id}" implements profile protocol ${JSON.stringify(mod.protocol)}; this lane speaks ${PROFILE_PROTOCOL} — upgrade the harness or the profile so they match (\`create-cmp upgrade --harness\`)`,
+      reason: `profile "${id}" implements profile protocol ${JSON.stringify(mod.protocol)}; this lane speaks ${SUPPORTED_PROFILE_PROTOCOLS.join(" and ")} — upgrade the harness or the profile so they match (\`prooflane upgrade\`)`,
     };
   }
   if (typeof mod.steps !== "function") return { ok: false, reason: `profile "${id}" must export steps(ctx) as a function` };
@@ -122,6 +144,123 @@ function locateProfile(root, id) {
 }
 
 /**
+ * WHICH DECLARATION NAMES A BASE. `extends` is a reserved word — legal as an
+ * export NAME (`export { BASE as extends }`) but not as a binding — so a
+ * profile author may reasonably reach for either spelling. Both are read, and
+ * neither is privileged: an author should not have to guess which one the core
+ * happens to prefer.
+ */
+const BASE_KEYS = Object.freeze(["extends", "extendsProfile"]);
+
+/**
+ * The base a profile declares, or null. A base is DATA — the id of another
+ * installed profile — never an import: an heir that imports its base is an ESM
+ * re-export wearing the word, and the core derived nothing.
+ * @param {object} mod
+ * @returns {string|null}
+ */
+export function declaredBase(mod) {
+  for (const key of BASE_KEYS) {
+    const value = mod?.[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return null;
+}
+
+/**
+ * The declarations an heir inherits when it does not make them itself.
+ *
+ * WHY A NAMED LIST RATHER THAN "every export the base has". Spreading a module
+ * namespace would inherit `id` and `protocol` too — an heir would silently
+ * become its base, and a receipt would name the wrong pack. It would also
+ * inherit anything a base happens to export for its own internal use, which is
+ * not a contract. So inheritance covers exactly the protocol's own surface: the
+ * five REQUIRED_EXPORTS minus identity, plus the optional declarations the
+ * loader and the lane already know by name.
+ */
+const INHERITABLE = Object.freeze([
+  "layout",
+  "tiers",
+  "steps",
+  "artifacts",
+  "governable",
+  "grammar",
+  "reports",
+  "detect",
+  "tools",
+  "ladder",
+  "plants",
+  "console",
+  "version",
+]);
+
+/**
+ * Resolve a profile's inheritance chain into one module-shaped object.
+ *
+ * THE HEIR WINS, ALWAYS, and only for what it actually declares — `in` rather
+ * than a truthiness check, so a profile can override a declaration with `null`
+ * (a stack with no flows does exactly that) instead of having the base's value
+ * silently restored underneath it.
+ *
+ * A CYCLE IS REFUSED BY NAME, not survived. `a extends b extends a` is an
+ * author error, and the useful output is the chain that closed it; hanging or
+ * blowing the stack tells them nothing.
+ *
+ * @param {object} mod the heir, already imported
+ * @param {string} id its own id
+ * @param {(baseId: string) => {ok: true, profile: object} | {ok: false, reason: string}} load
+ *   how to load a base by id — the caller supplies sync or async resolution
+ * @returns {{ok: true, profile: object, chain: string[]} | {ok: false, reason: string}}
+ */
+export function resolveInheritance(mod, id, load) {
+  const chain = [id];
+  const merged = {};
+  let current = mod;
+
+  const ownBase = declaredBase(mod);
+  if (ownBase && mod.protocol < EXTENDS_PROTOCOL) {
+    return {
+      ok: false,
+      reason:
+        `profile "${id}" declares a base ("${ownBase}") but implements profile protocol ${JSON.stringify(mod.protocol)} — ` +
+        `\`extends\` arrived in protocol ${EXTENDS_PROTOCOL}. Declare \`protocol = ${EXTENDS_PROTOCOL}\` so an older lane refuses it by naming the protocol ` +
+        `rather than by naming a declaration you deliberately left out`,
+    };
+  }
+
+  for (;;) {
+    const base = declaredBase(current);
+    if (!base) break;
+    if (chain.includes(base)) {
+      return {
+        ok: false,
+        reason: `profile "${id}" has a circular \`extends\` chain: ${[...chain, base].join(" → ")} — a profile cannot inherit from itself, however many steps around`,
+      };
+    }
+    const loaded = load(base);
+    if (!loaded.ok) {
+      return { ok: false, reason: `profile "${chain[chain.length - 1]}" extends "${base}", which did not load: ${loaded.reason}` };
+    }
+    chain.push(base);
+    // Nearest ancestor wins over a more distant one: only fill what is still
+    // absent as the walk moves away from the heir.
+    for (const key of INHERITABLE) {
+      if (!(key in merged) && key in loaded.profile) merged[key] = loaded.profile[key];
+    }
+    current = loaded.profile;
+  }
+
+  if (chain.length === 1) return { ok: true, profile: mod, chain };
+
+  // The heir's own declarations sit on top, and identity is never inherited.
+  const profile = { ...merged };
+  for (const key of Object.keys(mod)) profile[key] = mod[key];
+  profile.id = mod.id;
+  profile.protocol = mod.protocol;
+  return { ok: true, profile, chain };
+}
+
+/**
  * loadProfile, synchronously — for the readers that only have a project root
  * and sit in a sync chain (the spec scanner via feature-brief and approvals,
  * the console's Specs bridge). A profile is plain ESM without top-level
@@ -146,9 +285,16 @@ export function loadProfileSync(root, { id } = {}) {
     }
     return { ok: false, reason: `profile "${id}" failed to load from ${where.entryRel}: ${err && err.message ? err.message : String(err)}` };
   }
-  const verdict = validateProfileModule(mod, id);
+  // INHERITANCE BEFORE VALIDATION. The protocol's required exports are a
+  // property of the RESOLVED profile, not of the file: an heir that declares
+  // only what it changes is complete once its base is merged in, and
+  // validating the raw module would refuse it for missing a declaration it
+  // legitimately inherits.
+  const resolved = resolveInheritance(mod, id, (baseId) => loadProfileSync(root, { id: baseId }));
+  if (!resolved.ok) return resolved;
+  const verdict = validateProfileModule(resolved.profile, id);
   if (!verdict.ok) return verdict;
-  return { ok: true, profile: mod, entryRel: where.entryRel };
+  return { ok: true, profile: resolved.profile, entryRel: where.entryRel, chain: resolved.chain };
 }
 
 /**
@@ -166,7 +312,12 @@ export async function loadProfile(root, { id } = {}) {
   } catch (err) {
     return { ok: false, reason: `profile "${id}" failed to load from ${where.entryRel}: ${err && err.message ? err.message : String(err)}` };
   }
-  const verdict = validateProfileModule(mod, id);
+  // The async twin resolves the chain the same way; `loadProfileSync` shares
+  // the module cache with `import()`, so both loaders hand back one instance
+  // of every base and cannot disagree about what an heir inherited.
+  const resolved = resolveInheritance(mod, id, (baseId) => loadProfileSync(root, { id: baseId }));
+  if (!resolved.ok) return resolved;
+  const verdict = validateProfileModule(resolved.profile, id);
   if (!verdict.ok) return verdict;
-  return { ok: true, profile: mod, entryRel: where.entryRel };
+  return { ok: true, profile: resolved.profile, entryRel: where.entryRel, chain: resolved.chain };
 }

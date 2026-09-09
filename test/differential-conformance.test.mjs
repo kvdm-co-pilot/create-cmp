@@ -27,6 +27,7 @@ import path from "node:path";
 
 import * as alien from "./fixtures/profiles/py-alien/index.mjs";
 import * as cmp from "../packages/harness/src/lib/profiles/cmp/index.mjs";
+import { declaredBase, resolveInheritance, EXTENDS_PROTOCOL } from "../packages/harness/src/lib/profile-loader.mjs";
 import { specModelFrom } from "../packages/harness/src/lib/spec-model.mjs";
 import { scanSpecClauses, scanCitations, clauseTierCoverage } from "../packages/harness/src/lib/spec-coverage.mjs";
 import { checkLaneVouching } from "../packages/harness/src/lib/receipt-validate.mjs";
@@ -222,4 +223,82 @@ test("the plan trail records EACH pack's own rung, and never one borrowed from t
   // the core answered from something other than the profile in front of it.
   assert.notDeepEqual(seen[0], seen[1], "two unlike packs must not produce one attribution");
   assert.deepEqual(Object.keys(seen[0]).sort(), Object.keys(seen[1]).sort(), "and the SHAPE must be identical — same fields, different values");
+});
+
+test("`extends` is derived from a DECLARATION, and both spellings mean the same in either ecosystem", () => {
+  // Stage 2's criterion D, held differentially. The base-declaring field has two
+  // legal spellings for a reason that is JavaScript's, not ours: `extends` is a
+  // reserved word — legal as an export NAME (`export { BASE as extends }`) but
+  // not as a binding — so a profile author reaches for whichever their tooling
+  // tolerates. Neither may be privileged, and neither may mean something
+  // different to a Kotlin pack than to a Python one.
+  for (const [label, spelling] of [
+    ["cmp (Kotlin)", "extends"],
+    ["py-alien", "extendsProfile"],
+  ]) {
+    assert.equal(declaredBase({ [spelling]: "some-base" }), "some-base", `${label}: a declared base must be read`);
+    assert.equal(declaredBase({}), null, `${label}: no declaration is no base, never a guess`);
+    assert.equal(declaredBase({ [spelling]: "" }), null, `${label}: an empty base names nothing`);
+    assert.equal(declaredBase({ [spelling]: { id: "some-base" } }), null, `${label}: a base is DATA — an object is not an id`);
+  }
+});
+
+test("an heir inherits its base and overrides one declaration — the same way for either pack", () => {
+  // The override must win even when it is FALSY. A stack with no flow-shaped
+  // journey files declares `flows: null`, and a merge that treated null as
+  // "absent" would silently restore the base's flows underneath it — handing
+  // that stack a journey it does not have.
+  for (const [label, tierName, flows] of [
+    ["cmp (Kotlin)", "instrumented", "qa/e2e"],
+    ["py-alien", "integration", null],
+  ]) {
+    const base = {
+      id: "base",
+      protocol: 1,
+      layout: { specs: "specs", flows: "base/flows" },
+      tiers: { names: ["base-tier"] },
+      steps: () => ({ id: "base" }),
+      grammar: { citationMarker: /SPEC:/ },
+    };
+    const heir = { id: "heir", protocol: EXTENDS_PROTOCOL, extends: "base", tiers: { names: [tierName] }, layout: { specs: "specs", flows } };
+    const r = resolveInheritance(heir, "heir", () => ({ ok: true, profile: base }));
+
+    assert.equal(r.ok, true, `${label}: ${r.reason ?? ""}`);
+    assert.equal(r.profile.id, "heir", `${label}: identity is never inherited — an heir that became its base would mint receipts naming the wrong pack`);
+    assert.equal(r.profile.tiers.names[0], tierName, `${label}: the override takes`);
+    assert.equal(r.profile.layout.flows, flows, `${label}: a FALSY override still wins`);
+    assert.equal(typeof r.profile.steps, "function", `${label}: what the heir did not declare is inherited`);
+    assert.deepEqual(r.chain, ["heir", "base"], `${label}: the chain is reported, so a reader can see what it inherited from`);
+  }
+});
+
+test("a circular `extends` is refused BY NAME in either ecosystem, never survived", () => {
+  // An author error whose useful output is the chain that closed it. Hanging,
+  // or blowing the stack, tells them nothing.
+  for (const label of ["cmp (Kotlin)", "py-alien"]) {
+    const modules = {
+      a: { id: "a", protocol: EXTENDS_PROTOCOL, extends: "b" },
+      b: { id: "b", protocol: EXTENDS_PROTOCOL, extends: "a" },
+    };
+    const r = resolveInheritance(modules.a, "a", (id) => ({ ok: true, profile: modules[id] }));
+    assert.equal(r.ok, false, `${label}: a cycle must be refused`);
+    assert.match(r.reason, /circular/i, `${label}: named as what it is`);
+    assert.match(r.reason, /a → b → a/, `${label}: and the chain that closed it is shown`);
+  }
+});
+
+test("`extends` below its protocol is refused with the RIGHT signpost, in either ecosystem", () => {
+  // The reason the protocol had to move. An heir that declares 1 and omits its
+  // layout would be refused by an older lane with "must export layout" —
+  // pointing the author at their own file when the fix is to upgrade the
+  // harness. Requiring the protocol that introduced `extends` makes the version
+  // signal trustworthy instead of advisory.
+  for (const [label, spelling] of [
+    ["cmp (Kotlin)", "extends"],
+    ["py-alien", "extendsProfile"],
+  ]) {
+    const r = resolveInheritance({ id: "heir", protocol: 1, [spelling]: "base" }, "heir", () => ({ ok: true, profile: {} }));
+    assert.equal(r.ok, false, `${label}: extends at protocol 1 must be refused`);
+    assert.match(r.reason, /arrived in protocol 2/, `${label}: and say which protocol introduced it`);
+  }
 });
