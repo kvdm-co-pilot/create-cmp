@@ -167,7 +167,15 @@ export function flowRail(sections = []) {
   for (const step of FLOW_STEPS) {
     const evidence = step.sections.map((id) => byId.get(id)).filter(Boolean);
     if (evidence.length === 0) continue; // the profile declared none of it
-    present.push({ id: step.id, label: step.label, done: evidence.every(settled) });
+    // `openSection` is the evidence a command lookup needs and could not have.
+    // A step is a PHASE — `define` spans intent, features, architecture and
+    // specs — so "what advances this step" has no answer at the step's own
+    // altitude; it has one at the section that is actually holding it open.
+    // Reporting it here is the same rule this file already records one screen
+    // up, applied to the command instead of the verdict: fix the evidence,
+    // never the predicate.
+    const open = evidence.find((s) => !settled(s));
+    present.push({ id: step.id, label: step.label, done: !open, openSection: open ? open.id : null });
   }
   if (present.length === 0) return { steps: [], here: null };
 

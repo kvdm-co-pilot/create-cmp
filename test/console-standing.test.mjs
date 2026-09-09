@@ -129,16 +129,98 @@ test("the flow rail is SIX steps, DERIVED — a stack that declares no device ge
 });
 
 test("the rail names one command for the STEP it marks, and nothing to click", () => {
-  // Keyed on the step id, not a section id: `verify` is one step and `evidence`
-  // is the section that evidences it, and a map keyed on sections could only
-  // ever answer for one of the four sections a step may have.
+  // Keyed on the OPEN SECTION, not the step. This fixture keyed on the step id
+  // for a day, and that was the defect written down: a step is a phase, so
+  // "what advances this?" has no answer at the step's altitude — `define`
+  // spans four sections and named `arch-doc.mjs` whichever of them was open.
+  // The section holding the step open does have an unambiguous answer, and
+  // `flowRail` reports it as `openSection`. Same rule as the verdict fix one
+  // screen up: fix the evidence, never the predicate.
   const html = flowRailHtml(
     [{ id: "evidence", glyph: null }],
-    (id) => (id === "verify" ? "node qa/verify.mjs" : null),
+    (id) => (id === "evidence" ? "node qa/verify.mjs" : null),
   );
   assert.match(html, /flow-here/);
   assert.match(html, /node qa\/verify\.mjs/);
   assert.ok(!/<button|<a /.test(html), "the rail is descriptive — it has no controls");
+});
+
+test("the rail names `node qa/arch-doc.mjs` beside a `define` step that is open for a SIGNATURE", () => {
+  // THE COMMAND IS KEYED ON THE STEP, AND ANSWERS FOR ONE OF ITS FOUR SECTIONS.
+  // preview-service.mjs's FLOW_COMMANDS rejects section keys in its own words —
+  // "a map keyed on sections could only ever answer for one section of the four
+  // a step may have" — and then keys `define` to `node qa/arch-doc.mjs`, which
+  // is the answer for exactly one of its four (architecture). `define` is done
+  // when intent, features, architecture AND specs are signed, so the state that
+  // holds it open is almost always a SIGNATURE, and arch-doc.mjs signs nothing:
+  // it regenerates ARCHITECTURE.md's `cmp:generated` sections. A reader who
+  // runs the one command the rail names gets no change, and the rail says the
+  // same thing again. The command that does advance it — `node qa/approve.mjs`
+  // — is in the same map, one line down, keyed to `approve`.
+  //
+  // It is the rule that map states for itself, broken by the map: "a step with
+  // no unambiguous command returns null and the rail says nothing beside it,
+  // which is evidence-or-silence applied to a command." A four-section step has
+  // no unambiguous command; this one names a command anyway.
+  //
+  // AND IT IS THE CLAIM ANOTHER MODULE IS BUILT ON. console-overview.mjs
+  // refuses the prototype's `next:` clause because "the flow rail is drawn on
+  // this same page DIRECTLY ABOVE these rows, already naming the current step
+  // AND the command that advances it" — the second half of that sentence is
+  // what this test finds untrue.
+  //
+  // MINE, NOT PRE-EXISTING: on main the map was keyed by SECTION
+  // (`architecture: "node qa/arch-doc.mjs"`) and a step WAS a section, so the
+  // command could only appear beside the one section it belonged to — and
+  // `flowRailHtml` had no caller, so it never appeared at all. This branch
+  // rekeyed one section's command to a four-section phase and wired the call.
+  //
+  // Fix-agnostic, deliberately: deriving the command from the section that is
+  // actually open, or dropping `define` from the map so the rail says nothing
+  // beside it, or naming the command that signs, all satisfy this. What it
+  // refuses is the rail naming a command that cannot advance the step it marks.
+  const feature = {
+    name: "meal", rel: "docs/features/meal.md", phase: "accepted", record: { status: "approved" },
+    touches: [], blockError: null, specRel: "specs/meal.spec.md", specExists: true, clauses: [],
+    covered: 0, total: 0, receipt: { present: true, verdict: "PASS", attestsTree: true }, provenDone: false,
+  };
+  // Everything settled but ONE unsigned spec: the architecture doc is signed
+  // and undrifted, so arch-doc.mjs has nothing to do on this tree, and `define`
+  // is open for exactly one reason — a signature nobody has given.
+  const statuses = [
+    { id: "intent", status: "approved", resolvable: true },
+    { id: "architecture", status: "approved", resolvable: true },
+    { id: "design-system", status: "approved", resolvable: true },
+    { id: "components", status: "approved", resolvable: true },
+    { id: "feature-brief:meal", status: "approved", resolvable: true },
+    { id: "feature-spec:meal", status: "approved", resolvable: true },
+    { id: "exemplar-spec", status: "unreviewed", resolvable: true },
+  ];
+  const html = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 1,
+    cards: [{ screen: { id: "Home", name: "Home" }, summary: { nodes: 12, tokenized: 12, tagged: 12 }, a11y: { pass: true, violations: [] } }],
+    features: { available: true, board: { features: [feature], undeclared: [] } },
+    approvals: { available: true, statuses },
+    lastReceipt: { available: true, verdict: "PASS", stale: false, ageMs: 1000, evidenceLevel: { rung: "L2", name: "device", satisfiedBy: [] }, packId: "cmp", steps: [] },
+    liveDevice: { reachable: true },
+    walkthrough: { available: true, runs: [{ generatedAt: "2026-09-10T00:00:00Z", manifest: { screens: [] } }] },
+  });
+  // The console KNOWS what is actually open — asserted first, so a failure
+  // below is the command and never a fixture that stopped representing the
+  // state. The page's own queue names the act: approve, not regenerate.
+  assert.match(html, /Approve exemplar-spec/, "the fixture no longer represents a tree whose only open act is a signature");
+
+  const at = html.indexOf('<nav class="flow"');
+  assert.ok(at > 0, "the front door renders no flow rail");
+  const rail = html.slice(at, html.indexOf("</nav>", at));
+  assert.match(rail, /class="flow-step flow-here">define</, "the fixture no longer marks `define` as the step in hand");
+  assert.doesNotMatch(
+    rail,
+    /arch-doc/,
+    `a signature is what \`define\` is waiting for, and the rail's one instruction regenerates a doc: ${rail}`,
+  );
 });
 
 test("a step evidenced by an UNGOVERNABLE section is never done — the marker cannot leave `preview`", () => {

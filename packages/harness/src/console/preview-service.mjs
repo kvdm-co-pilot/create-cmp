@@ -521,20 +521,32 @@ export function galleryHtml(state) {
   // hot-reload loop: the tab is sticky (hash + sessionStorage), so an SSE
   // reload during UI work never bounces the reader off the gallery; only a
   // genuinely fresh session lands on the front door.
-  // ONE command per FLOW STEP — keyed by the step ids console-standing.mjs
-  // declares, not by section ids, because the rail draws six steps and a map
-  // keyed on sections could only ever answer for one section of the four a step
-  // may have. Every entry here is a file in template/qa; a step with no
-  // unambiguous command returns null and the rail says nothing beside it, which
-  // is evidence-or-silence applied to a command. `preview` and `drive` have
-  // none: previewing is the console itself, and driving a device is a session,
-  // not a command an adopter types. Naming a command an adopter cannot run is
-  // the exact defect this slice fixes in the CLI's own FRONT_DOORS table.
+  // ONE command per SECTION, resolved through the section that is actually
+  // holding the step open. This was keyed on STEP ids for a day and its own
+  // comment said why that could not work — "a key could only ever answer for
+  // one section of the four a step may have" — and then it answered for one of
+  // four: `define` named `arch-doc.mjs` whether it was held open by an unsigned
+  // intent, an unsigned spec or a drifted architecture, and arch-doc signs
+  // nothing. It also falsified console-overview.mjs's stated reason for
+  // dropping the prototype's `next:` clause, which was that the rail already
+  // names "the command that advances it".
+  //
+  // A step has no unambiguous command; the open SECTION does. Every entry is a
+  // file in template/qa, and a section with no command answers null so the rail
+  // says nothing beside it — evidence-or-silence applied to a command. Most
+  // sections are advanced by a signature and `approve.mjs` is that command;
+  // screens and live-device have none, because previewing is the console itself
+  // and driving a device is a session, not a command an adopter types.
   const FLOW_COMMANDS = Object.freeze({
-    define: "node qa/arch-doc.mjs",
-    approve: "node qa/approve.mjs",
-    verify: "node qa/verify.mjs",
-    report: "node qa/walkthrough.mjs",
+    intent: "node qa/approve.mjs",
+    features: "node qa/approve.mjs",
+    architecture: "node qa/arch-doc.mjs",
+    specs: "node qa/approve.mjs",
+    "design-system": "node qa/approve.mjs",
+    components: "node qa/approve.mjs",
+    approvals: "node qa/approve.mjs",
+    evidence: "node qa/verify.mjs",
+    walkthrough: "node qa/walkthrough.mjs",
   });
   const flowCommandFor = (id) => FLOW_COMMANDS[id] ?? null;
 
@@ -563,9 +575,15 @@ export function galleryHtml(state) {
     { id: "features", label: "Features", glyph: featuresGlyph },
     { id: "architecture", label: "Architecture", glyph: statusGlyph(archRecord) },
     { id: "specs", label: "Specs", glyph: specsGlyph },
-    // Screens is UNGOVERNED — no signature exists, so it can never be green.
-    // Its one honest colour is red: the last render or compile FAILED, so the
-    // gallery may be showing stale pixels. Otherwise neutral.
+    // Screens carries no SIGNATURE — nobody approves a screen — and for a day
+    // this comment concluded from that that it "can never be green", which the
+    // sixteen lines below now contradict. `glyph-signed` is this console's role
+    // for SETTLED, not a claim of approval: live-device wears it for "device
+    // connected" and approvals for "nothing waiting on you". A rendered gallery
+    // is what `preview` wants, so it is green when screens rendered, red when
+    // the last render or compile FAILED (the gallery may be showing stale
+    // pixels — that branch still wins), and neutral only when nothing has been
+    // rendered at all, which is a real not-yet rather than an unanswerable.
     {
       id: "screens",
       label: "Screens",
@@ -1022,8 +1040,10 @@ export function galleryHtml(state) {
   setInterval(tickNowElapsed, 1000);
   tickNowElapsed();
   // LIVE-CONSOLE §3.3: disconnected is SAID, not hidden. A frozen list must
-  // never present itself as live, so the block carries its own clause beside
-  // the file it is reading.
+  // never present itself as live — and the clause lives in the STRIP, which is
+  // what §3.3 names. It sat beside the file it reads until 2026-09-10, inside
+  // the block that became a collapsed row: a disconnection a reader has to
+  // expand a row to discover is hidden, which is the thing §3.3 forbids.
   function setNowLive(text) {
     var el = document.getElementById("now-live");
     if (el) el.textContent = text;

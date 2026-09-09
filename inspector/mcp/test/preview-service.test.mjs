@@ -650,12 +650,23 @@ test("galleryHtml (rail-truth semantics): reopen never reads as drift; acceptanc
   assert.match(btn(proven, "approvals"), /1 decision\(s\) waiting \(1 acceptance\)/);
   assert.doesNotMatch(btn(proven, "approvals"), /nothing waiting on you/);
 
-  // Screens is ungoverned — never green; red exactly when the last render or
-  // compile failed (the gallery may be stale), neutral otherwise.
+  // Screens carries no signature, but it IS settled by a rendered gallery as of
+  // 2026-09-10 — this comment said "never green" and passed only because the
+  // fixture renders nothing. Red exactly when the last render or compile failed
+  // (the gallery may be stale); neutral when nothing has rendered, which is
+  // what `base` is; green when screens rendered, asserted below.
   const failed = galleryHtml({ ...base, error: "e: boom", errorSource: "compile" });
   assert.match(btn(failed, "screens"), /glyph-drift/);
   assert.match(btn(failed, "screens"), /last compile failed/);
   assert.match(btn(galleryHtml(base), "screens"), /glyph-none/);
+  // The half the old comment ruled out. A rendered gallery settles `preview`,
+  // and a fixture that never renders cannot see the difference — which is how
+  // "never green" survived a day past the code that falsified it.
+  const rendered = galleryHtml({
+    ...base,
+    cards: [{ screen: { id: "Home", name: "Home" }, summary: { nodes: 4, tokenized: 4, tagged: 4 }, a11y: { pass: true, violations: [] } }],
+  });
+  assert.match(btn(rendered, "screens"), /glyph-signed/);
 });
 
 test("galleryHtml (change surface): a drifted artifact shows WHAT changed and what is still approved, in its own section", () => {
