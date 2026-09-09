@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 5cf1bded7e4c92e6b3dfa6abcfdb0dbafe3e1884752969d95e320c3e0ddfce25
+// cmp:bundle-inputs 8eedecfd5a122aea5f7d084b16be089a87568a69a53ef52674c9b2fd8b48a464
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36273,15 +36273,12 @@ function flowRail(sections = []) {
   const usable = sections.filter((s) => s && typeof s.id === "string");
   if (usable.length === 0) return { steps: [], here: null };
   const settled = (s) => Boolean(s.glyph && s.glyph.cls === "glyph-signed");
-  const UNGOVERNED = /* @__PURE__ */ new Set(["screens"]);
-  const votes = (s) => !UNGOVERNED.has(s.id) || Boolean(s.glyph);
   const byId = new Map(usable.map((s) => [s.id, s]));
   const present2 = [];
   for (const step of FLOW_STEPS) {
     const evidence = step.sections.map((id) => byId.get(id)).filter(Boolean);
     if (evidence.length === 0) continue;
-    const voting = evidence.filter(votes);
-    present2.push({ id: step.id, label: step.label, done: voting.length === 0 ? true : voting.every(settled) });
+    present2.push({ id: step.id, label: step.label, done: evidence.every(settled) });
   }
   if (present2.length === 0) return { steps: [], here: null };
   const firstOpen = present2.findIndex((s) => !s.done);
@@ -38634,7 +38631,17 @@ function galleryHtml(state) {
     {
       id: "screens",
       label: "Screens",
-      glyph: error51 ? { ch: "\u2717", cls: "glyph-drift", label: `last ${errorSource || "render"} failed \u2014 the gallery may be stale` } : null
+      // DERIVED IN BOTH DIRECTIONS as of 2026-09-10, and the third instance of
+      // one bug: this was `error ? glyph-drift : null`, so the glyph was null
+      // when twelve screens had rendered cleanly AND when none had — while
+      // `screensStatus`, computed a few hundred lines up, already says
+      // "render #N · M screens". `settled()` could not tell PREVIEWED from
+      // NOTHING TO PREVIEW, and the rail resolved that the one way that is a
+      // claim about the project. Screens carries no SIGNATURE — nobody signs a
+      // screen — but glyph-signed is this console's role for "settled", not a
+      // claim of signature (live-device already wears it for "device
+      // connected"), and a rendered gallery is what `preview` wants.
+      glyph: error51 ? { ch: "\u2717", cls: "glyph-drift", label: `last ${errorSource || "render"} failed \u2014 the gallery may be stale` } : baseScreenCount > 0 ? { ch: "\u25CF", cls: "glyph-signed", label: `${baseScreenCount} screen${baseScreenCount === 1 ? "" : "s"} rendered` } : null
     },
     { id: "design-system", label: "Design language", glyph: statusGlyph(dsRecord) },
     { id: "components", label: "Components", glyph: statusGlyph(componentsRecord) },

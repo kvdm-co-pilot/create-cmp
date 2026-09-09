@@ -98,15 +98,15 @@ test("the flow rail is SIX steps, DERIVED — a stack that declares no device ge
 
   const full = flowRail([signed("specs"), open("screens"), open("live-device")]);
   assert.deepEqual(full.steps.map((s) => s.id), ["define", "preview", "drive"], "one step per PHASE, not per section");
-  // `here` was "preview" until 2026-09-10, and that expectation encoded the
-  // defect the test below now refuses: `open("screens")` is a null glyph, and
-  // screens can NEVER be signed, so reading it as "wants attention" pinned the
-  // marker on preview for the life of every project. It abstains now. The
-  // assertion itself is unchanged in meaning — here is still the first step
-  // still wanting attention — and `drive` is that step, because `live-device`
-  // CAN be signed and simply is not yet.
-  assert.equal(full.here, "drive", "here is the first step still wanting attention");
-  assert.equal(full.steps[1].done, true, "preview's only evidence can never be signed, so it does not block the arc");
+  // THIS EXPECTATION WAS RIGHT ALL ALONG, and briefly said "drive" instead.
+  // Mid-branch it looked like screens could never be settled, so preview was
+  // made to abstain and this line was changed to match. That diagnosis was
+  // wrong — screens was only ever unasked, and deriving its glyph from the
+  // screen count restored exactly the reading this line started with: an
+  // `open("screens")` project has rendered nothing, preview genuinely wants
+  // attention, and the marker rests there. A test that has to be edited twice
+  // to accommodate a fix is a test that was telling you the fix was wrong.
+  assert.equal(full.here, "preview", "here is the first step still wanting attention");
   assert.equal(full.steps[0].done, true, "define's only present evidence is signed, so define is done");
 
   const noDevice = flowRail([signed("specs"), open("screens")]);
@@ -185,7 +185,13 @@ test("a step evidenced by an UNGOVERNABLE section is never done — the marker c
     appName: "Acme",
     viewport: { width: 411, height: 891 },
     version: 1,
-    cards: [],
+    // `cards: []` until 2026-09-10, and that omission was the LAST instance of
+    // this branch's recurring defect. A fixture calling itself A SETTLED
+    // PROJECT while rendering no screens demanded `preview` be done on a tree
+    // with an empty gallery — the same self-contradiction the missing
+    // walkthrough run carried, and it kept `screens` looking ungovernable when
+    // it was only ever unasked. A settled project has rendered its screens.
+    cards: [{ screen: { id: "Home", name: "Home" }, summary: { nodes: 12, tokenized: 12, tagged: 12 }, a11y: { pass: true, violations: [] } }],
     sections: ["overview", "intent", "architecture", "specs", "screens", "design-system", "components", "evidence", "walkthrough", "approvals", "live-device"],
     approvals: { available: true, statuses: governed.map((id) => ({ id, status: "approved", resolvable: true })) },
     lastReceipt: { available: true, verdict: "PASS", stale: false, ageMs: 1000, evidenceLevel: { rung: "L2", name: "device", satisfiedBy: [] }, packId: "cmp", steps: [] },
@@ -282,6 +288,97 @@ test("the rail paints `report` DONE on a project that has never produced a walkt
     rail,
     /class="flow-step[^"]*flow-done[^"]*">report</,
     `nothing has ever been reported, and the rail says the report step is done: ${rail}`,
+  );
+});
+
+test("the rail paints `preview` DONE on a project that has rendered no screens", () => {
+  // `screens` IS THE SAME STORY AS `walkthrough`, AND ONLY ONE OF THEM WAS
+  // FIXED. `walkthrough` left UNGOVERNED on 2026-09-10 because it was never
+  // ungovernable — it had a state (`walkthrough.available`, rendered beside it
+  // as "no runs yet") that the rail's input threw away. `screens` has exactly
+  // that shape too, and it is still in the set:
+  //
+  //   glyph: error ? {cls: "glyph-drift"} : null      preview-service.mjs
+  //   statusHtml: `render #N · ${baseScreenCount} screens`   ← same module
+  //
+  // The glyph is null when twelve screens rendered cleanly AND when none did.
+  // The console is not missing the fact — the Screens section on this same page
+  // says "0 screens" — the rail's input drops it, exactly as it dropped
+  // "no runs yet". So `settled()` cannot tell PREVIEWED from NOTHING TO
+  // PREVIEW, `votes()` reads the null as "cannot ever be answered", and the
+  // step is resolved the one way that is a claim about the project: DONE.
+  //
+  // MINE, NOT PRE-EXISTING: FLOW_STEPS, the `preview` step, the abstention rule
+  // and the UNGOVERNED set are all new on this branch, and `flowRailHtml` had
+  // no caller before it. "Screens, ungoverned" was a section's own honest
+  // grade; a PHASE of the working flow painted complete is a different claim.
+  //
+  // Not caught by the two tests above: the settled-project fixture hands
+  // `screens` nothing to render either — it still calls itself A SETTLED
+  // PROJECT with `cards: []` — and the walkthrough fixture declares no
+  // approvals, so `preview` is held open there by design-system and components
+  // rather than by anything about screens.
+  //
+  // Fix-agnostic, deliberately: deriving screens' glyph from the render it
+  // already reports (which empties UNGOVERNED and retires the concept), or
+  // dropping a step whose evidence no project can settle, or a third rail state
+  // that is neither `flow-here` nor `flow-done`, all satisfy this. What it
+  // refuses is the rail asserting a phase complete that never happened.
+  //
+  // 1. THE SHIPPED CONFIG. No `sections` declared — which is what the server
+  //    actually passes (inspector/mcp/src/lib/preview-service.mjs names no
+  //    `sections` in its galleryHtml call), so `preview` is evidenced by
+  //    screens + design-system + components. Sign the two that can be signed
+  //    and the step is done, with nothing rendered and nothing to look at.
+  const html = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 1,
+    cards: [], // NOTHING HAS EVER RENDERED
+    approvals: {
+      available: true,
+      statuses: ["design-system", "components"].map((id) => ({ id, status: "approved", resolvable: true })),
+    },
+  });
+  // The console KNOWS — asserted first, so a failure below is the rail and
+  // never a fixture that stopped representing a project with nothing rendered.
+  assert.match(html, /0 screens/, "the fixture no longer represents a project with no rendered screens");
+
+  const at = html.indexOf('<nav class="flow"');
+  assert.ok(at > 0, "the front door renders no flow rail");
+  const rail = html.slice(at, html.indexOf("</nav>", at));
+  assert.match(rail, /class="flow-step/, "the fixture no longer draws any steps");
+  assert.doesNotMatch(
+    rail,
+    /class="flow-step[^"]*flow-done[^"]*">preview</,
+    `nothing has ever been rendered, and the rail says the preview step is done: ${rail}`,
+  );
+
+  // 2. THE SAME DEFECT UNCONDITIONAL, one altitude up — the residue of the
+  //    abstention rule the walkthrough fix left in place. `done: voting.length
+  //    === 0 ? true : ...` still equates ABSTAINING with FINISHED, and a
+  //    profile that declares Screens without Design language or Components
+  //    leaves `preview` with no voting evidence at all. On a bare tree where
+  //    nothing whatever has happened, the rail paints the preview phase
+  //    complete — the `report`-is-DONE shape, moved to the other member of the
+  //    set. (`sections` is a first-class declared input with its own suite,
+  //    test/console-sections-declared.test.mjs, and this branch made the rail
+  //    read it.)
+  const declared = galleryHtml({
+    appName: "Acme",
+    viewport: { width: 411, height: 891 },
+    version: 1,
+    cards: [],
+    sections: ["overview", "specs", "screens", "evidence"],
+  });
+  const dat = declared.indexOf('<nav class="flow"');
+  assert.ok(dat > 0, "the front door renders no flow rail");
+  const declaredRail = declared.slice(dat, declared.indexOf("</nav>", dat));
+  assert.match(declaredRail, /class="flow-step/, "the fixture no longer draws any steps");
+  assert.doesNotMatch(
+    declaredRail,
+    /class="flow-step[^"]*flow-done[^"]*">preview</,
+    `nothing at all has happened on this tree, and the rail says preview is done: ${declaredRail}`,
   );
 });
 
