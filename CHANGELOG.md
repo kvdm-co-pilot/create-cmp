@@ -8,6 +8,29 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **The lane reports each step as it finishes — `verify --events`.** A console could only learn what
+  a run did from the receipt written after it ended. Now `runLane` takes an `onStep` callback beside
+  its human `print`, and `--events` emits one NDJSON object per finished step: name, verdict,
+  duration, layer, index, total, and the step's own note or reason — never reworded, because a
+  console that rewrites what the lane said starts telling a story the lane did not.
+
+  **The events go to STDERR, and that is the whole design.** `verify --json` prints ONE object on
+  stdout, and two readers in this repo parse it that way (`watch.mjs`'s receipt extraction and
+  `refusal-demo.mjs`). Interleaving step lines there would break every existing reader for the
+  benefit of a new one — the change ADR-0007 refused for the receipt format, one layer down. So
+  stdout stays the **result** and stderr becomes the **progress**, and a caller can consume both at
+  once.
+
+  `watch.mjs` relays them: step lines are parsed out of the child's stderr as they arrive and
+  re-emitted on its own NDJSON stream tagged with the run number, while every other stderr line is
+  kept verbatim for the failure report — a watcher that swallowed a stack trace to look tidy would
+  hide the one thing a red run is for.
+
+  A reporter may never fail a lane: `onStep` is called inside a try/catch, because a broken console
+  turning a passing run red is the exact false red this project exists to remove. Gated by
+  `test/step-events.test.mjs` (5 tests), including a real lane proving stdout still parses as exactly
+  one receipt while stderr streams the steps.
+
 - **Device runs are headless, and the lane says so when they are not.** The lane already booted
   headless — with nothing attached, `ensureDevice` starts the AVD with `HEADLESS_ARGS`
   (`-no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect`). The gap was the

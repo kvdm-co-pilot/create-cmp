@@ -147,6 +147,18 @@ export function runLane(ctx) {
     // toolchain was cut short learns the knob exists.
     stepDeadlines = undefined,
     print = null,
+    // A STRUCTURED report of each step as it finishes, beside `print`'s human
+    // row. They are deliberately different channels: `print` writes prose for a
+    // person watching a terminal, and is null on a machine run because a
+    // narrator during one is a lane doing something unasked. `onStep` is the
+    // machine's version of the same instant — the result object, unformatted —
+    // so a console can append a row while the lane is still running instead of
+    // learning the whole story from a receipt after it ends.
+    //
+    // It must never be able to fail the lane: a reporter that throws would turn
+    // a passing run red for a reason that has nothing to do with the code under
+    // test, which is the exact false red this project exists to remove.
+    onStep = null,
     narrator = null,
     stopAfter = compileShortCircuit(ctx),
     onFinally = () => {},
@@ -219,6 +231,13 @@ export function runLane(ctx) {
         result.layer = step.layer;
       }
       results.push(result);
+      if (onStep) {
+        try {
+          onStep(result, { index: results.length - 1, total: stepFns.length });
+        } catch {
+          /* a reporter may not fail the lane — see the option's note */
+        }
+      }
       if (print) {
         print(
           `${verdictMark(result.verdict)} ${result.name}: ${result.verdict}${result.note ? ` (${result.note})` : ""}${result.reason ? ` — ${String(result.reason).split("\n")[0]}` : ""}`,
