@@ -7,8 +7,11 @@
 // writes ONLY surfaces that are true in any Compose/KMP repo — the engine's
 // own doctor/upgrade at the toolchain walls, and an advisory SessionStart
 // context that says plainly what is and is not wired here. Previews, the
-// lane, and enforcement are named as NOT wired (M0b's staged scope), never
-// faked. Files are never clobbered: an existing differing file keeps its
+// lane, and enforcement are named as NOT wired, never faked. They were once
+// staged as "M0b"; ADR-0013 RETIRED that scope on 2026-09-09, because
+// `prooflane init` installs a lane into a foreign repo of any language and two
+// convergence paths would drift in one. So attach names what it does not do
+// and points at the command that does — it never installs a lane itself. Files are never clobbered: an existing differing file keeps its
 // bytes and our content lands beside it as `*.cmp-new` (the same sidecar
 // convention as `upgrade --harness` and `harden`).
 
@@ -206,9 +209,9 @@ export function attachProject({ projectDir, apply = false, manifest = null }) {
   return {
     units,
     notWired: [
-      "headless screen previews (PreviewRegistry + renderScreens) — staged M0b, needs a per-repo Gradle wiring design",
+      "headless screen previews (PreviewRegistry + renderScreens) — not wired here, and not planned: it needs a per-repo Gradle wiring design nobody has done",
       "live on-device inspector — ships with scaffolded apps; not injectable into a foreign build yet",
-      "verify lane / evidence receipts / enforcement — the manifest above tells the lane which profile and where things live; vendoring the lane itself into a foreign repo is the next M0b step",
+      "verify lane / evidence receipts / enforcement — attach does not install these. The manifest above tells the lane which profile and where things live; to actually get one, run `npx prooflane init` in this repo (ADR-0013 — one convergence path). attach will not do it for you.",
     ],
   };
 }
