@@ -228,3 +228,81 @@ test("protocol: SessionStart puts the schedule in front of the session, and name
   assert.match(out.additionalContext, /enforced by scripts\/hooks\/proof-gate\.mjs/, "a reader learns the hook exists, not just the rule");
   assert.ok(!/REQUIRED/.test(out.additionalContext));
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE REVIEW HALF (ADR-0014). `gh pr merge` is where a slice closes, so it is
+// where BOTH at-close obligations are collected. The device half above is
+// unchanged; these pin the second one, and the shape of its refusal.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** An obligation with a review block — the shape obligation() always returns now. */
+const withReview = (deviceState, reviewState) => ({
+  ...o(deviceState),
+  review: { state: reviewState, need: { required: reviewState !== "none", reason: "1 changed path(s) are not declared irrelevant to a review: scripts/proof-plan.mjs", obliging: [] } },
+});
+
+test("gh pr merge: refused while a REVIEW is owed — the device tier can be settled and the merge still refused", () => {
+  // The bootstrap case, and the common one: a change to scripts/ or test/
+  // cannot reach a phone (device NONE) and is exactly what wants a reader.
+  for (const s of ["owed", "reopened"]) {
+    const d = decide("merge", withReview("none", s), TIERS);
+    assert.equal(d.action, "deny", `review ${s} blocks the merge`);
+    assert.match(d.reason, /a review is (OWED|REOPENED)/);
+    assert.match(d.reason, new RegExp(TIERS.review.cmd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "quotes the exact command that fixes it");
+  }
+  assert.equal(decide("merge", withReview("none", "none"), TIERS).action, "silent", "nothing owed, nothing said");
+  assert.equal(decide("merge", withReview("discharged", "discharged"), TIERS).action, "silent");
+  assert.equal(decide("merge", withReview("none", "undeclared"), TIERS).action, "deny");
+  assert.match(decide("merge", withReview("none", "undeclared"), TIERS).reason, /Declare/);
+});
+
+test("the merge refusal says the gate never reads what a review FOUND — existence, never content", () => {
+  // The reader of this string is the agent about to decide what to put in the
+  // record. If the program at that moment implies findings are graded, an
+  // honest "nothing found" starts looking like a failing answer, and the record
+  // stops being honest. ADR-0014's accepted weakness only stays honest if the
+  // refusal says out loud that it is one.
+  const d = decide("merge", withReview("none", "owed"), TIERS);
+  assert.match(d.reason, /never reads what it found/);
+  assert.match(d.reason, /"nothing found" is a valid record/);
+  assert.match(d.reason, /ADR-0014/);
+});
+
+test("both at-close tiers refuse in ONE answer — an agent is not sent round the loop twice", () => {
+  const d = decide("merge", withReview("owed", "owed"), TIERS);
+  assert.equal(d.action, "deny");
+  assert.match(d.reason, /the device tier is OWED/);
+  assert.match(d.reason, /a review is OWED/);
+  // And an undeclared slice is told once, not twice: both tiers are undeclared
+  // for the same reason — there is no plan — so one instruction covers them.
+  const u = decide("merge", withReview("undeclared", "undeclared"), TIERS);
+  assert.equal(u.reason.match(/Declare/g).length, 1);
+});
+
+test("gh pr create: the reminder names the review too — the PR is opened knowing what will refuse it", () => {
+  const d = decide("create", withReview("none", "owed"), TIERS);
+  assert.equal(d.action, "allow", "never blocked");
+  assert.match(d.reason, /a review is OWED/);
+  assert.match(d.reason, /merge will refuse/);
+  assert.equal(decide("create", withReview("none", "none"), TIERS).action, "silent");
+});
+
+test("no review decision says REQUIRED either — the word stays gone from every state", () => {
+  for (const kind of ["merge", "create"]) {
+    for (const dev of ["none", "undeclared", "owed", "discharged", "reopened"]) {
+      for (const rev of ["none", "undeclared", "owed", "discharged", "reopened"]) {
+        const d = decide(kind, withReview(dev, rev), TIERS);
+        assert.ok(!/REQUIRED/.test(d.reason ?? ""), `${kind}/${dev}/${rev}: ${d.reason}`);
+      }
+    }
+  }
+});
+
+test("an obligation with no review block is not a licence to merge — the live one always has it", async () => {
+  // decide() is pure and takes what it is given; the only caller hands it
+  // obligation(), which is asserted in test/proof-plan.test.mjs to always carry
+  // a review block. Pinned here from the hook's side so a future refactor that
+  // drops the field is caught where the refusal lives.
+  const { obligation } = await import("../scripts/proof-plan.mjs");
+  assert.ok(obligation().review, "the live obligation carries a review block");
+});
