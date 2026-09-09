@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs dbd47be992ff8968267ef175e5e0a0400f835284d6c33577930d5727f23cbebb
+// cmp:bundle-inputs 9425733f7019c3bcd836510747e7b46b6669731743b7b93d971b9d80c367eb12
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36312,15 +36312,14 @@ function flowRailHtml(sections = [], commandFor = () => null) {
   const body = steps.map((s) => `<span class="flow-step${s.here ? " flow-here" : ""}${s.done ? " flow-done" : ""}">${esc5(s.label)}</span>`).join('<span class="flow-arrow">&rarr;</span>');
   return `<nav class="flow" aria-label="The working flow">${body}${cmd ? `<code class="flow-cmd">${esc5(cmd)}</code>` : ""}</nav>`;
 }
-function waitingLineHtml(queue, statuses, next) {
+function waitingLineHtml(queue, statuses) {
   if (statuses.length === 0) {
     return `no approvals ledger &mdash; nothing here is governed yet`;
   }
   const g = overviewGlyph(queue, statuses);
   if (queue.length === 0) return `nothing waits on you`;
   const drift = g && g.cls === "glyph-drift" ? ` &middot; <span class="status-drift">drift among them</span>` : "";
-  const step = next ? ` &middot; next: ${esc5(next)}` : "";
-  return `${queue.length} waiting on you${drift}${step}`;
+  return `${queue.length} waiting on you${drift}`;
 }
 function itemActionHtml(item, { byArtifact, byFeature }) {
   const record2 = byArtifact.get(item.artifact) || null;
@@ -36388,10 +36387,6 @@ function overviewBodyHtml({
   // "" is an older caller, and renders no row rather than an empty one.
   nowHtml = "",
   railHtml = "",
-  // The flow rail's own `here`, passed in beside its markup: the *waiting* row
-  // ends with "next: <step>", and deriving that a second time here is exactly
-  // the thing that lets two lines on one page disagree.
-  flowHere = null,
   // LIVE-CONSOLE.md's fourth and fifth questions ("can I trust the lane that
   // says so?", "what would earn the next rung?"), rendered by console-trust.mjs
   // and console-ladder.mjs and passed in as strings — exactly like nowHtml and
@@ -36447,7 +36442,7 @@ ${inner}
   const railBlock = railHtml ? `${railHtml}
 ` : "";
   const waitingRow = `  <details class="row" id="waiting">
-  <summary><span class="k">waiting</span><span class="v">${waitingLineHtml(queue, statuses, flowHere)}</span><span class="chev">&rsaquo;</span></summary>
+  <summary><span class="k">waiting</span><span class="v">${waitingLineHtml(queue, statuses)}</span><span class="chev">&rsaquo;</span></summary>
   <div class="body">
 ${queueHtml}
   </div>
@@ -38670,7 +38665,6 @@ function galleryHtml(state) {
   const pick2 = (items) => declared ? declared.map((id) => items.find((x) => x.id === id)).filter(Boolean) : items;
   const declaredRail = pick2(railItems);
   const visibleRail = capabilities.screens ? declaredRail : declaredRail.filter((r) => !NEEDS_SCREENS.has(r.id));
-  const flow = flowRail(visibleRail);
   const sections = [
     // §3.7 — the front door. Composition only: it arranges the queue, the
     // anchored-diff file splits and the digest that other modules derived. It
@@ -38713,8 +38707,7 @@ function galleryHtml(state) {
         // and PR #108 both record as landed was never on the page. This is
         // the call — over `visibleRail`, the list this project actually has,
         // not the raw thirteen.
-        railHtml: flowRailHtml(visibleRail, flowCommandFor),
-        flowHere: flow.here
+        railHtml: flowRailHtml(visibleRail, flowCommandFor)
       }),
       active: true
     },

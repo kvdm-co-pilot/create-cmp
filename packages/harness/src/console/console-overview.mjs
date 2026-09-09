@@ -149,18 +149,24 @@ export function flowRailHtml(sections = [], commandFor = () => null) {
  * someone rewords deriveHumanQueue, and nobody finds out. One predicate, two
  * surfaces.
  *
- * `next` is the flow rail's own `here`, passed in — the row states where the
- * arc is, it does not work it out a second time.
+ * NO "next: <step>" CLAUSE, deliberately. The prototype's fixture draws one
+ * (docs/reference/live-console-prototype.html), and the first implementation
+ * ported it. It is refused on two grounds, and the second is why the prototype
+ * is not the last word here: LIVE-CONSOLE.md §3.4 — "one question per row, no
+ * row may grow a second fact" — and the flow rail is drawn on this same page
+ * DIRECTLY ABOVE these rows, already naming the current step AND the command
+ * that advances it. Repeating it is the second spelling of one fact, which is
+ * the defect this console refuses everywhere else. Karel's call on this slice,
+ * 2026-09-09; `inspector/mcp/test/console-overview.test.mjs` keeps it gone.
  */
-function waitingLineHtml(queue, statuses, next) {
+function waitingLineHtml(queue, statuses) {
   if (statuses.length === 0) {
     return `no approvals ledger &mdash; nothing here is governed yet`;
   }
   const g = overviewGlyph(queue, statuses);
   if (queue.length === 0) return `nothing waits on you`;
   const drift = g && g.cls === "glyph-drift" ? ` &middot; <span class="status-drift">drift among them</span>` : "";
-  const step = next ? ` &middot; next: ${esc(next)}` : "";
-  return `${queue.length} waiting on you${drift}${step}`;
+  return `${queue.length} waiting on you${drift}`;
 }
 
 /**
@@ -295,10 +301,6 @@ export function overviewBodyHtml({
   // "" is an older caller, and renders no row rather than an empty one.
   nowHtml = "",
   railHtml = "",
-  // The flow rail's own `here`, passed in beside its markup: the *waiting* row
-  // ends with "next: <step>", and deriving that a second time here is exactly
-  // the thing that lets two lines on one page disagree.
-  flowHere = null,
   // LIVE-CONSOLE.md's fourth and fifth questions ("can I trust the lane that
   // says so?", "what would earn the next rung?"), rendered by console-trust.mjs
   // and console-ladder.mjs and passed in as strings — exactly like nowHtml and
@@ -413,7 +415,7 @@ ${digestHtml}
   // this tree in the arc", which is context for every row beneath it.
   const railBlock = railHtml ? `${railHtml}\n` : "";
   const waitingRow = `  <details class="row" id="waiting">
-  <summary><span class="k">waiting</span><span class="v">${waitingLineHtml(queue, statuses, flowHere)}</span><span class="chev">&rsaquo;</span></summary>
+  <summary><span class="k">waiting</span><span class="v">${waitingLineHtml(queue, statuses)}</span><span class="chev">&rsaquo;</span></summary>
   <div class="body">
 ${queueHtml}
   </div>

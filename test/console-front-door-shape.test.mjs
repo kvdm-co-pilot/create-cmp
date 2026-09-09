@@ -155,7 +155,7 @@ test("the step table is the prototype's four columns, and it has a TBODY", () =>
   }
   const panel = frontDoor();
   assert.match(panel, /<table class="steps"><tbody/, "table.steps opens a tbody");
-  // THE TBODY IS LOad-BEARING, not tidiness: the client appends a finished step
+  // THE TBODY IS LOAD-BEARING, not tidiness: the client appends a finished step
   // with insertAdjacentHTML("beforeend", <tr>…), and the HTML fragment parser
   // FOSTER-PARENTS a bare <tr> out of a <table> while accepting it into a
   // <tbody>. Without it every live row would silently vanish until a reload.
