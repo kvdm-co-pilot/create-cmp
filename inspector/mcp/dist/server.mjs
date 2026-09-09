@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 959f1763e7bb9e2c7525a2d1adfefe1ff6d81945f018e5acc988c32b52c8ff1b
+// cmp:bundle-inputs 31597c6353f4118f2a86ccbec6b6d05dc5425d351c15e8f12db868087fb3c12d
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -38595,14 +38595,9 @@ function galleryHtml(state) {
   const overviewStatuses = approvals.available && approvals.statuses ? approvals.statuses : [];
   const overviewFeatures = features.available && features.board ? features.board.features : [];
   const humanQueue = deriveHumanQueue({ statuses: overviewStatuses, features: overviewFeatures });
+  const SIGNED_BY_APPROVAL = ["intent", "features", "architecture", "specs", "design-system", "components", "approvals"];
   const FLOW_COMMANDS = Object.freeze({
-    intent: "node qa/approve.mjs",
-    features: "node qa/approve.mjs",
-    architecture: "node qa/arch-doc.mjs",
-    specs: "node qa/approve.mjs",
-    "design-system": "node qa/approve.mjs",
-    components: "node qa/approve.mjs",
-    approvals: "node qa/approve.mjs",
+    ...Object.fromEntries(SIGNED_BY_APPROVAL.map((id) => [id, "node qa/approve.mjs"])),
     evidence: "node qa/verify.mjs",
     walkthrough: "node qa/walkthrough.mjs"
   });
