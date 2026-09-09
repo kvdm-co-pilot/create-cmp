@@ -46,10 +46,12 @@ All notable changes to this project are documented here. The format is based on
   the console uses. Written by the lane rather than the console because a vendored `qa/` may import
   only from `./lib/`, and that is what makes `node qa/verify.mjs` work offline.
 
-  Gated by `test/console-trust.test.mjs` (7), `test/console-ladder.test.mjs` (7) and
-  `test/evidence-html.test.mjs` (7), including two inversions that deny by default over the whole
-  console directory — no second module may read the Rule 0 record, and none may read the ladder
-  declaration itself.
+  Gated by `test/console-trust.test.mjs` (7), `test/console-ladder.test.mjs` (8),
+  `test/evidence-html.test.mjs` (7) and `inspector/mcp/test/trust-ladder-bridge.test.mjs` (2),
+  including two inversions that deny by default over the whole console directory — no second
+  module may read the Rule 0 record, and none may read the ladder declaration itself — and a
+  differential that answers for `cmp` and for a Kotlin/Ktor pack with no spelling leaking either
+  way.
 
 - **The lane reports each step as it finishes — `verify --events`.** A console could only learn what
   a run did from the receipt written after it ended. Now `runLane` takes an `onStep` callback beside
