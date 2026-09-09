@@ -24,7 +24,21 @@
 //   node scripts/proof-plan.mjs --open "<what this slice is>"
 //   node scripts/proof-plan.mjs                     what is owed right now
 //   node scripts/proof-plan.mjs --discharge         record that the device tier ran
+//   node scripts/proof-plan.mjs --record-review     write the review record (the reviewer's own output)
+//   node scripts/proof-plan.mjs --discharge-review  record that a review of this tree happened
 //   node scripts/proof-plan.mjs --close             refuse if anything is still owed
+//
+// THE SECOND AT-CLOSE TIER: A REVIEW (ADR-0014, Karel 2026-09-09 — "gating its
+// existence, never its content"). A qualifying slice owes a review record, and
+// `gh pr merge` is refused until one exists that describes THIS tree. The gate
+// is DELIBERATELY SHALLOW: it asks whether a review of these exact bytes
+// happened and never reads what it found. A record saying "nothing found"
+// satisfies it. That weakness is not an oversight to be fixed by inspecting
+// findings — a gate that scored a review's quality would put an uncalibrated
+// LLM judgement in the refusal path, which is the one thing PRINCIPLES.md §2
+// forbids and the whole reason ADR-0014's first half exists. What the gate buys
+// is the HABIT, not the judgement: the record is bound to a tree, so it cannot
+// be recycled across changes, and what reviews produce can be counted over time.
 //
 // THE ORDERING RULE, AND WHY IT IS THE HONEST ANSWER. A device run proves a
 // TREE. Any later edit to a trigger path — a comment included, because nothing
@@ -48,11 +62,29 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
-import { observedTreeHash, DEVICE_TIER_TRIGGERS, DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
+import {
+  observedTreeHash,
+  DEVICE_TIER_TRIGGERS,
+  DEVICE_TIER_IRRELEVANT,
+  REVIEW_TIER_TRIGGERS,
+  REVIEW_TIER_IRRELEVANT,
+  REVIEW_SKIP,
+} from "./observed-tree.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PLAN_PATH = path.join(REPO_ROOT, "qa-artifacts", "proof-plan.json");
 const SCHEMA = "prooflane-proof-plan/1";
+
+/**
+ * Where the reviewer leaves its record, and what shape it has to be in.
+ *
+ * `qa-artifacts/` because that is already this repo's home for generated run
+ * output and is already a lane-output prefix
+ * (`packages/harness/src/lib/affected-tests.mjs` LANE_OUTPUT_PREFIXES), so
+ * writing a record can never be mistaken for a change to the tree it describes.
+ */
+const REVIEW_PATH = path.join(REPO_ROOT, "qa-artifacts", "review-latest.json");
+const REVIEW_SCHEMA = "prooflane-review/1";
 
 /**
  * The tiers this repo can run, and WHEN each is due. This is the declaration
@@ -69,6 +101,16 @@ const TIERS = Object.freeze({
   suite: { when: "per-commit", cost: "~50s", cmd: "npm test" },
   frameworkCheck: { when: "per-commit", cost: "~4s", cmd: "node scripts/framework-check.mjs" },
   device: { when: "at-close", cost: "~3.5min + an emulator", cmd: 'CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level L2' },
+  // `cmd` is the runnable half; `how` is the part no shell can express, because
+  // what produces a review is an agent reading a diff, not a program. Both are
+  // printed, so the line an agent reads at the moment of decision says who does
+  // the work AND what records it.
+  review: {
+    when: "at-close",
+    cost: "~one read of the diff",
+    cmd: "node scripts/proof-plan.mjs --discharge-review",
+    how: "invoke the staff-reviewer on this diff (.claude/agents/staff-reviewer.md); it writes qa-artifacts/review-latest.json — or `node scripts/proof-plan.mjs --record-review --nothing-found` if it found nothing",
+  },
 });
 
 function sh(cmd, args) {
@@ -154,25 +196,43 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
     // `trunk` is read by the hook: "none because the diff is docs-only" makes a
     // device run pure waste, while "none because this IS trunk" is the one
     // place a device run is legitimate without a slice — a release proof.
-    return {
-      state: "none",
-      trunk: true,
-      ...base,
-      need: { required: false, obliging: [], reason: `nothing has changed since origin/main and the working tree is clean — this tree is trunk${where}, and whatever it owed was collected when its slice merged` },
-    };
+    const reason = `nothing has changed since origin/main and the working tree is clean — this tree is trunk${where}, and whatever it owed was collected when its slice merged`;
+    const none = { required: false, obliging: [], reason };
+    return { state: "none", trunk: true, ...base, need: none, review: { state: "none", trunk: true, need: none } };
   }
   const need = deriveTierNeed(paths, { irrelevantRoots: DEVICE_TIER_IRRELEVANT, tierName: "fleet L2" });
-  if (!need.required) return { state: "none", need, ...base };
-  if (!plan) return { state: "undeclared", need, ...base };
+  // A review is owed on a broader set than a device run: `scripts/` and `test/`
+  // cannot reach a phone and are declared irrelevant to the device tier, but a
+  // rewritten gate or a test that quietly stops refusing something is exactly
+  // what wants a second reader (see REVIEW_TIER_IRRELEVANT for the whole
+  // reasoning). Derived by the same fail-open function, so an unclassified path
+  // costs a read of the diff rather than an unreviewed change.
+  const reviewNeed = deriveTierNeed(paths, { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" });
 
-  const now = observedTreeHash(REPO_ROOT, DEVICE_TIER_TRIGGERS);
-  const d = plan.discharged;
-  if (!d) return { state: "owed", need, ...base, now };
-  if (d.treeHash === now) return { state: "discharged", need, ...base, now };
-  // Discharged, then a trigger path moved. The slice reopened — and saying so
-  // is the point: an agent that edits after the last gate should be told it has
-  // reopened the slice, not silently charged for another emulator.
-  return { state: "reopened", need, ...base, now };
+  const dev = tierState(need.required, plan, plan?.discharged, () => observedTreeHash(REPO_ROOT, DEVICE_TIER_TRIGGERS));
+  const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }));
+  return { ...dev, need, ...base, review: { ...rev, need: reviewNeed } };
+}
+
+/**
+ * The five states, once, for both at-close tiers.
+ *
+ * Written once rather than twice on purpose: two copies of a state machine
+ * drift in one of them, and the one that drifts is whichever is read less. The
+ * hash is a thunk because it costs hundreds of file reads and is only ever
+ * needed in the two states that compare against it.
+ *
+ * The last branch is the ORDERING RULE both tiers inherit: discharged, then a
+ * trigger path moved, means the record describes a tree that no longer exists.
+ * Saying REOPENED is the point — an agent that edits after the last gate should
+ * be told it has reopened the slice, not silently charged for another run.
+ */
+function tierState(required, plan, discharged, hash) {
+  if (!required) return { state: "none" };
+  if (!plan) return { state: "undeclared" };
+  const now = hash();
+  if (!discharged) return { state: "owed", now };
+  return { state: discharged.treeHash === now ? "discharged" : "reopened", now };
 }
 
 /**
@@ -181,10 +241,22 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
  * named stale by the next one — the 2026-09-08 audit found PR #84's still there.
  */
 export function close(o = obligation()) {
-  const settled = o.state === "none" || o.state === "discharged";
+  const isSettled = (s) => s === "none" || s === "discharged";
+  // BOTH at-close tiers, or the plan stays: a slice that closed with a review
+  // owed would be a slice whose next reader is told nothing is outstanding.
+  const settled = isSettled(o.state) && isSettled(o.review?.state ?? "none");
   const had = Boolean(o.plan || o.stale);
   if (settled && had) fs.rmSync(PLAN_PATH, { force: true });
-  return { closed: settled, removed: settled && had, state: o.state };
+  return { closed: settled, removed: settled && had, state: o.state, reviewState: o.review?.state ?? "none" };
+}
+
+/** What is still outstanding, by tier name — the sentence `--close` refuses with. */
+export function outstanding(o) {
+  const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
+  const out = [];
+  if (open(o.state)) out.push(`device (${o.state.toUpperCase()})`);
+  if (open(o.review?.state)) out.push(`review (${o.review.state.toUpperCase()})`);
+  return out;
 }
 
 export function render(o) {
@@ -196,7 +268,7 @@ export function render(o) {
   if (o.stale) L.push(`  (a plan from slice "${o.stale.slice}" on branch ${o.stale.branch ?? "unknown"} is still on disk and does not apply here — --close removes it)\n`);
 
   for (const [name, tier] of Object.entries(TIERS)) {
-    if (name === "device") continue;
+    if (tier.when === "at-close") continue;
     L.push(`  ${name.padEnd(16)} ${tier.when.padEnd(12)} ${tier.cost.padEnd(22)} ${tier.cmd}`);
   }
 
@@ -227,7 +299,115 @@ export function render(o) {
       );
       break;
   }
+  renderReview(o, L);
   return L.join("\n");
+}
+
+/**
+ * The review's half of the same block. It states, every time it is OWED, that
+ * the gate never reads the findings — because the reader most likely to
+ * over-read this line is an agent deciding what to write in the record, and the
+ * honest answer ("nothing found" is a valid record) has to come from the
+ * program, not from a document it read at session start.
+ */
+function renderReview(o, L) {
+  const r = o.review;
+  if (!r) return;
+  const t = TIERS.review;
+  const d = o.plan?.reviewDischarged;
+  const found = (x) => {
+    const bits = [];
+    if (x?.tests?.length) bits.push(`${x.tests.length} test(s): ${x.tests.join(", ")}`);
+    if (x?.decisions?.length) bits.push(`${x.decisions.length} decision(s) handed up`);
+    if (x?.nothingFound) bits.push("nothing found");
+    return bits.length ? bits.join("; ") : "an empty record";
+  };
+  const line = (verdict, detail) => L.push(`  ${"review".padEnd(16)} ${verdict}\n      ${detail}`);
+  switch (r.state) {
+    case "none":
+      line("NOT OWED", r.need.reason);
+      break;
+    case "undeclared":
+      line(
+        "OWED — but no slice is declared",
+        `${r.need.reason}.\n      ${isTrunk(o.branch) ? "You are on trunk — branch first (git switch -c <name>), then declare the slice" : "Declare the slice first"}: node scripts/proof-plan.mjs --open "<what you are building>".`,
+      );
+      break;
+    case "owed":
+      line(
+        "OWED — at slice close, before the merge",
+        `${r.need.reason}.\n      ${t.how}\n      Then: ${t.cmd}\n      What the gate checks is that a review of THESE bytes happened. It never reads what the\n      review found, and "nothing found" is a valid record (ADR-0014, "gating its existence,\n      never its content").`,
+      );
+      break;
+    case "discharged":
+      line("DISCHARGED", `a review of this exact tree is recorded at ${d?.at ?? "an unstated time"} — ${found(d)}, and no trigger path has moved since`);
+      break;
+    case "reopened":
+      line(
+        "REOPENED — a trigger path moved after the review",
+        `the review at ${d?.at ?? "an unstated time"} describes a tree that no longer exists (${String(d?.treeHash ?? "").slice(0, 7)} → ${String(r.now).slice(0, 7)}).\n      Either revert what moved, or have the new bytes read: ${t.cmd} after a fresh record.`,
+      );
+      break;
+  }
+}
+
+/** The review record on disk, or null. Never throws — an absent record is a state, not a crash. */
+export function readReviewRecord(file = REVIEW_PATH) {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a review record discharges the obligation for THESE bytes — pure, so
+ * the refusal path is testable without a repo in a particular state.
+ *
+ * The same rule the device discharge applies, for the same reason: a discharge
+ * that trusts an argument is a claim, and this whole product exists to refuse
+ * exactly that shape. The record's `observedHash` is compared against the hash
+ * this program computes now; a record that describes a different tree
+ * discharges nothing, however recently it was written.
+ *
+ * WHAT IS DELIBERATELY NOT CHECKED: anything the review FOUND. The device
+ * discharge refuses a record whose verdict is not PASS; a review has no verdict
+ * to refuse — by ADR-0014 the reviewer holds no verb, and a gate that graded
+ * findings would be the uncalibrated instrument in the refusal path that the
+ * whole design avoids. Only shape is checked, and only so that an unrecognised
+ * file is refused rather than read as if its fields meant what we assume.
+ *
+ * @returns {{ok: true, discharged: object} | {ok: false, exit: 1|2, message: string}}
+ */
+export function reviewDischarge(record, now) {
+  if (!record) {
+    return {
+      ok: false,
+      exit: 2,
+      message: `no review is recorded — ${TIERS.review.how}\n  A discharge is read from that record, never asserted.\n`,
+    };
+  }
+  if (record.schema !== REVIEW_SCHEMA) {
+    return { ok: false, exit: 2, message: `the record at qa-artifacts/review-latest.json says schema "${record.schema ?? "none"}", not "${REVIEW_SCHEMA}" — refusing rather than reading fields whose meaning is a guess\n` };
+  }
+  if (record.observedHash !== now) {
+    return {
+      ok: false,
+      exit: 1,
+      message: `the recorded review does not describe this tree (${String(record.observedHash).slice(0, 7)} → ${now.slice(0, 7)}) — it cannot discharge anything. A review is of BYTES, not of a branch name; have the current ones read.\n`,
+    };
+  }
+  return {
+    ok: true,
+    discharged: {
+      at: record.ranAt ?? null,
+      treeHash: now,
+      commit: record.commit ?? null,
+      tests: Array.isArray(record.tests) ? record.tests : [],
+      decisions: Array.isArray(record.decisions) ? record.decisions : [],
+      nothingFound: Boolean(record.nothingFound),
+    },
+  };
 }
 
 function main() {
@@ -254,8 +434,72 @@ function main() {
       base: base.status === 0 ? base.stdout.trim() : null,
       declared: Object.fromEntries(Object.entries(TIERS).map(([k, v]) => [k, v.when])),
       discharged: null,
+      reviewDischarged: null,
     });
     process.stdout.write(`${render(obligation())}\n`);
+    process.exit(0);
+  }
+
+  if (flag("--record-review") !== -1) {
+    // The reviewer's own output, written down. WHAT it found is taken from the
+    // caller, because only the reviewer knows it and ADR-0014 records content
+    // without judging it. WHICH TREE it read is not: that is computed here, so
+    // no caller can assert that a review describes bytes it never saw. The one
+    // thing refused is silence by omission — a record with no findings and no
+    // explicit "nothing found" says nothing at all, so it is not written.
+    const opt = (n) => (flag(n) !== -1 ? argv[flag(n) + 1] : null);
+    const list = (v) => (v && !v.startsWith("--") ? v.split(";").map((s) => s.trim()).filter(Boolean) : []);
+    const tests = list(opt("--tests"));
+    const decisions = list(opt("--decisions"));
+    const nothingFound = flag("--nothing-found") !== -1;
+    if (!tests.length && !decisions.length && !nothingFound) {
+      process.stderr.write(
+        'a review record needs what the review produced: --tests "name; name" and/or --decisions "one line; one line", or --nothing-found if that is the honest result.\n' +
+          "Nothing here judges the answer — an empty record is refused only because it records nothing, not because it found nothing.\n",
+      );
+      process.exit(2);
+    }
+    if (nothingFound && (tests.length || decisions.length)) {
+      process.stderr.write("--nothing-found contradicts the findings passed with it — one record cannot say both\n");
+      process.exit(2);
+    }
+    const head = sh("git", ["rev-parse", "HEAD"]);
+    const record = {
+      schema: REVIEW_SCHEMA,
+      ranAt: new Date().toISOString(),
+      // WHICH TREE was read, as content — the same binding the fleet record
+      // uses and for the same reason: a review predates the commit that carries
+      // it, so a commit-keyed record reads stale the moment it lands. The commit
+      // is kept beside it as provenance a human can read, never as the key.
+      observedHash: observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }),
+      commit: head.status === 0 ? head.stdout.trim() : null,
+      tests,
+      decisions,
+      nothingFound,
+    };
+    fs.mkdirSync(path.dirname(REVIEW_PATH), { recursive: true });
+    fs.writeFileSync(REVIEW_PATH, `${JSON.stringify(record, null, 2)}\n`);
+    process.stdout.write(`review recorded — qa-artifacts/review-latest.json, tree ${record.observedHash.slice(0, 7)}\nNow: ${TIERS.review.cmd}\n`);
+    process.exit(0);
+  }
+
+  if (flag("--discharge-review") !== -1) {
+    const plan = read();
+    const branch = currentBranch();
+    if (!plan || plan.branch !== branch) {
+      process.stderr.write(plan
+        ? `the plan on disk belongs to slice "${plan.slice}" on branch ${plan.branch ?? "unknown"}, not ${branch || "this detached HEAD"} — declare one here first\n`
+        : 'no slice is declared — node scripts/proof-plan.mjs --open "<what you are building>"\n');
+      process.exit(2);
+    }
+    const r = reviewDischarge(readReviewRecord(), observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }));
+    if (!r.ok) {
+      process.stderr.write(r.message);
+      process.exit(r.exit);
+    }
+    plan.reviewDischarged = r.discharged;
+    write(plan);
+    process.stdout.write(`${render(obligation(plan))}\n`);
     process.exit(0);
   }
 
@@ -300,13 +544,13 @@ function main() {
       process.stdout.write("\nslice closed — nothing owed.\n");
       process.exit(0);
     }
-    process.stdout.write("\nslice NOT closed — the device tier is still owed.\n");
+    process.stdout.write(`\nslice NOT closed — still owed: ${outstanding(o).join(", ")}.\n`);
     process.exit(1);
   }
 
   process.stdout.write(`${render(o)}\n`);
-  process.exit(o.state === "owed" || o.state === "reopened" || o.state === "undeclared" ? 1 : 0);
+  process.exit(outstanding(o).length ? 1 : 0);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
-export { TIERS, read, changedPaths, currentBranch, isTrunk };
+export { TIERS, read, changedPaths, currentBranch, isTrunk, REVIEW_SCHEMA, REVIEW_PATH };

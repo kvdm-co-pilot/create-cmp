@@ -295,6 +295,8 @@ obligation accrues until the slice closes.
 node scripts/proof-plan.mjs --open "<what you are building>"   # before the work
 node scripts/proof-plan.mjs                                    # what is owed, and WHEN
 node scripts/proof-plan.mjs --discharge                        # after the run, read from its record
+node scripts/proof-plan.mjs --record-review                    # the reviewer's own output, bound to this tree
+node scripts/proof-plan.mjs --discharge-review                 # after the review, read from its record
 node scripts/proof-plan.mjs --close                            # refuses if anything is owed
 ```
 
@@ -334,6 +336,15 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
 - **A discharge is READ, never asserted.** It comes from the run's own recorded verdict and tree
   hash — a discharge that trusted its caller would be exactly the shape of claim this product
   exists to refuse.
+- **There are two at-close tiers, and the second is a review** (ADR-0014). A slice that changes
+  anything but prose owes a review record bound to these exact bytes, and `gh pr merge` refuses
+  until one exists. The gate checks that the record EXISTS and describes this tree; it never reads
+  what the review found, because a gate that graded findings would be the uncalibrated instrument
+  in the refusal path that ADR-0014 exists to avoid. The trigger sets differ on purpose:
+  `scripts/` and `test/` cannot reach a phone and are irrelevant to the device tier, and they are
+  where this repo's refusals live, so they oblige a reader. Both are declared in
+  `scripts/observed-tree.mjs`, and a test refuses any path that could oblige a review without
+  being able to reopen one.
 - **Enforced at the decision point, never by reading.** `.claude/settings.json` runs
   `scripts/hooks/proof-gate.mjs` on every Bash call. An invocation of `fleet-check.mjs` is
   refused when nothing is owed, when the tier is already discharged for this exact tree, or when

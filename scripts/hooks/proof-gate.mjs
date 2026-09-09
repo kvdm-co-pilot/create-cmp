@@ -19,8 +19,12 @@
 //                       bytes is the 2026-09-08 defect — or when no slice is declared,
 //                       because that run could discharge nothing. ALLOWED while owed,
 //                       with the schedule as the reason.
-//     gh pr merge       REFUSED while the tier is owed. The slice closes at merge, so
-//                       this is where "once, at slice close" is collected.
+//     gh pr merge       REFUSED while EITHER at-close tier is owed — the device tier, and
+//                       (ADR-0014) a review record describing this exact tree. The slice
+//                       closes at merge, so this is where "once, at slice close" is
+//                       collected, and both refusals are reported together rather than
+//                       one round trip each. The review half checks that a record EXISTS
+//                       and is bound to these bytes; it never reads what the review found.
 //     gh pr create      allowed, reminded.
 //     npm publish       REFUSED unless on a clean trunk with a fleet record that is PASS at
 //                       L2 on THIS tree — the npm-publish skill's steps 1 and 2, which were
@@ -112,15 +116,41 @@ export function decide(kind, o, tiers, ctx) {
     }
   }
   if (kind === "merge") {
+    // TWO at-close tiers now collect here, and both are reported at once: an
+    // agent told about the device tier, that pays for it, and is then refused
+    // again for the review has been sent round the loop twice by a gate that
+    // knew both answers the first time.
+    const blocked = [];
     switch (o.state) {
       case "owed":
       case "reopened":
-        return deny(`the device tier is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`);
+        blocked.push(`the device tier is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`);
+        break;
       case "undeclared":
-        return deny(`trigger paths changed with no slice declared — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
+        blocked.push(`trigger paths changed with no slice declared — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
+        break;
       default:
-        return SILENT;
+        break;
     }
+    const r = o.review;
+    switch (r?.state) {
+      case "owed":
+      case "reopened":
+        // Existence, never content: the refusal says so, because the agent
+        // reading it is the one about to decide what to put in the record, and
+        // the honest answer — "nothing found" is a record — must come from the
+        // program at the moment of decision, not from an ADR read hours ago.
+        blocked.push(
+          `a review is ${r.state.toUpperCase()} for this slice and the slice closes at merge — ${r.need.reason}. ${tiers?.review?.how ?? "have the diff read"}, then ${tiers?.review?.cmd ?? "node scripts/proof-plan.mjs --discharge-review"}, then merge. The gate checks only that a review of THESE bytes happened; it never reads what it found, and "nothing found" is a valid record (ADR-0014).`,
+        );
+        break;
+      case "undeclared":
+        if (o.state !== "undeclared") blocked.push(`paths that oblige a review changed with no slice declared — ${r.need.reason}. Declare (${DECLARE}), then have the diff read.`);
+        break;
+      default:
+        break;
+    }
+    return blocked.length ? deny(blocked.join("\n\n")) : SILENT;
   }
   if (kind === "publish") {
     // The npm-publish skill's first two steps, as a program: clean trunk, and a
@@ -138,9 +168,11 @@ export function decide(kind, o, tiers, ctx) {
     return allow(`release proof on this tree: ${r.verdict} at ${r.rung}, ran ${r.ranAt}.`);
   }
   if (kind === "create") {
-    return o.state === "owed" || o.state === "reopened" || o.state === "undeclared"
-      ? allow(`reminder: the device tier is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${cmd}, then node scripts/proof-plan.mjs --discharge). Open the PR, finish everything else, run the tier last.`)
-      : SILENT;
+    const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
+    const notes = [];
+    if (open(o.state)) notes.push(`the device tier is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${cmd}, then node scripts/proof-plan.mjs --discharge)`);
+    if (open(o.review?.state)) notes.push(`a review is ${o.review.state.toUpperCase()}; gh pr merge will refuse until a review of these bytes is recorded (${tiers?.review?.cmd ?? "node scripts/proof-plan.mjs --discharge-review"})`);
+    return notes.length ? allow(`reminder: ${notes.join(" — and ")}. Open the PR, finish everything else, run the at-close tiers last.`) : SILENT;
   }
   return SILENT;
 }
