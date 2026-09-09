@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **The harness's `exports` map hid its own `package.json`, so nothing could introspect it.** An
+  exports map is a **denylist by default**: every subpath not listed is unreachable, including ones
+  nobody thinks of as API. `./package.json` is the one that matters, because reading a dependency's
+  version is what every wrapper, shim and introspecting tool does first.
+
+  Found the way these things are found. The `prooflane` front door was published, installed **from
+  the registry**, and refused to run — *"could not find its dependency prooflane-harness"* — while
+  the dependency sat right there in `node_modules`. `create-kmp` had worked for months against
+  `create-cmp-cli`, which declares **no** exports map, so its subpaths were open and the shim
+  pattern looked sound. The map is what changed the rules, and only an install proved it.
+
+  `prooflane-receipts` had the same hole, and the test written for the rule — *a package with an
+  exports map still exposes its own package.json* — is what found it rather than a second install.
+  `prooflane-harness` 0.21.1, `prooflane-receipts` 0.1.1.
+
 ## [0.25.0] - 2026-09-09
 
 ### Added

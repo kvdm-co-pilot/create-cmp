@@ -1,11 +1,12 @@
 {
   "name": "prooflane-receipts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Validate create-cmp evidence receipts: inputs-hash recompute, receipt-vs-tree binding, freshness, and execution-plausibility. Dependency-free ESM \u2014 the single source of truth vendored into every generated project's qa/lib/ and consumed by the hosted receipt check.",
   "type": "module",
   "main": "src/index.mjs",
   "exports": {
     ".": "./src/index.mjs",
+    "./package.json": "./package.json",
     "./inputs-hash": "./src/inputs-hash.mjs",
     "./receipt-validate": "./src/receipt-validate.mjs"
   },
