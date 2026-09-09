@@ -190,6 +190,16 @@ test("a step evidenced by an UNGOVERNABLE section is never done — the marker c
     approvals: { available: true, statuses: governed.map((id) => ({ id, status: "approved", resolvable: true })) },
     lastReceipt: { available: true, verdict: "PASS", stale: false, ageMs: 1000, evidenceLevel: { rung: "L2", name: "device", satisfiedBy: [] }, packId: "cmp", steps: [] },
     liveDevice: { reachable: true },
+    // ADDED 2026-09-10, and the omission was the point. This fixture called
+    // itself A SETTLED PROJECT while carrying no walkthrough run — so it
+    // entrenched the very behaviour it was written to refuse: it demanded
+    // `report` be done on a tree that had never produced one. The first fix
+    // obliged by making `report` abstain, and abstaining is not finished; a
+    // brand-new tree then painted `report` DONE while the Walkthrough section
+    // beside it read "no runs yet". `walkthrough` is not ungovernable, it was
+    // simply never given a glyph. A settled project HAS a walkthrough, so this
+    // fixture now has one, and the assertions below are unchanged.
+    walkthrough: { available: true, runs: [{ generatedAt: "2026-09-10T00:00:00Z", manifest: { screens: [] } }] },
   });
   const at = html.indexOf('<nav class="flow"');
   assert.ok(at > 0, "the front door renders no flow rail");
@@ -215,6 +225,64 @@ test("a step evidenced by an UNGOVERNABLE section is never done — the marker c
   const open = steps.filter((s) => !s.done).map((s) => s.id);
   assert.deepEqual(open, [], `nothing is left to sign, yet the rail paints these steps unfinished forever: ${open.join(", ")}`);
   assert.equal(steps.at(-1).here, true, "with the arc complete the marker rests on the LAST step, not on one it can never leave");
+});
+
+test("the rail paints `report` DONE on a project that has never produced a walkthrough", () => {
+  // THE ABSTENTION RULE ANSWERS A SECOND QUESTION IT WAS NOT ASKED. It was
+  // added on 2026-09-10 to stop a step whose evidence can never be signed from
+  // blocking the arc forever, and it does that by declaring such a step DONE:
+  //
+  //   const votes = (s) => !UNGOVERNED.has(s.id) || Boolean(s.glyph);
+  //   done: voting.length === 0 ? true : voting.every(settled)
+  //
+  // ABSTAINING AND FINISHED ARE NOT THE SAME FACT. "This step cannot block the
+  // arc" is a statement about the console's vocabulary; "this step is done" is
+  // a claim about the project, and `flow-done` is a distinct visual role
+  // (console-shell.mjs: `.flow-done { color: var(--ink-2) }`, brighter than an
+  // unreached step's `--muted`) that makes it to the reader as one.
+  //
+  // `report` is evidenced by exactly one section, `walkthrough`, and
+  // preview-service.mjs hands it the literal `{ id: "walkthrough", glyph: null }`
+  // — unconditional, reached by no project state. So `voting` is empty for
+  // `report` on EVERY project, and the rail paints the report phase complete on
+  // the first page load of a tree where `node qa/walkthrough.mjs` has never
+  // been run. The console is not missing the fact: the Walkthrough section on
+  // this same page reads "no runs yet", derived from `walkthrough.available`,
+  // which the rail's own input throws away.
+  //
+  // MINE, NOT PRE-EXISTING: `glyph: null` on walkthrough is older, but FLOW_STEPS,
+  // the `report` step and the abstention rule are all new on this branch, and
+  // `flowRailHtml` had no caller before it. The page never made this claim.
+  //
+  // It is also the shape this branch has now fixed twice, moved one layer up:
+  // `settled()` was taught not to call unsigned "signed" (2026-09-09), and then
+  // `done` was taught to call never-signed "done" (2026-09-10).
+  //
+  // Fix-agnostic, deliberately: dropping a step no project can ever settle,
+  // deriving `walkthrough`'s glyph from `walkthrough.available`, or a third rail
+  // state that is neither `flow-here` nor `flow-done` all satisfy this. What it
+  // refuses is the rail asserting a phase complete that never happened. (The
+  // first of those three also satisfies the test above it, which asserts the
+  // same fixture's rail has nothing open; the second changes that test's
+  // fixture, which is the author's call, not a gate being weakened.)
+  const html = galleryHtml({ appName: "Acme", viewport: { width: 411, height: 891 }, version: 1, cards: [] });
+
+  // The console KNOWS — asserted first, so a failure below is the rail and
+  // never a fixture that stopped representing a project with no report.
+  assert.match(html, /no runs yet/, "the fixture no longer represents a project with no walkthrough run");
+
+  const at = html.indexOf('<nav class="flow"');
+  assert.ok(at > 0, "the front door renders no flow rail");
+  const rail = html.slice(at, html.indexOf("</nav>", at));
+  // Not `assert.match(rail, />report</)`: a rail that no longer draws a step no
+  // project can settle is one of the fixes this is agnostic to, and must pass.
+  // What must hold is that a rail was drawn at all.
+  assert.match(rail, /class="flow-step/, "the fixture no longer draws any steps");
+  assert.doesNotMatch(
+    rail,
+    /class="flow-step[^"]*flow-done[^"]*">report</,
+    `nothing has ever been reported, and the rail says the report step is done: ${rail}`,
+  );
 });
 
 test("the six steps are the proposal's, in the proposal's order", () => {

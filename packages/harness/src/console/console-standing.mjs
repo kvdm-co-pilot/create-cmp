@@ -180,7 +180,14 @@ export function flowRail(sections = []) {
   // though no signature will ever settle it. Abstaining on the id alone would
   // make the rail blind to that; abstaining on the null glyph alone would stop
   // an absent device blocking `drive`. So: both, or it votes.
-  const UNGOVERNED = new Set(["screens", "walkthrough"]);
+  // ONLY `screens`. `walkthrough` was in this set until 2026-09-10 and did not
+  // belong: it was never ungovernable, it was merely never GIVEN a glyph — the
+  // rail's input handed it a literal `glyph: null` while the section beside it
+  // rendered "no runs yet" from state it already had. Putting it here made
+  // `report` abstain, and abstaining is not finished: a brand-new tree painted
+  // `report` DONE. The glyph is derived now, so walkthrough votes like anything
+  // else, and `report` is done when a walkthrough exists and not before.
+  const UNGOVERNED = new Set(["screens"]);
   const votes = (s) => !UNGOVERNED.has(s.id) || Boolean(s.glyph);
   const byId = new Map(usable.map((s) => [s.id, s]));
 
