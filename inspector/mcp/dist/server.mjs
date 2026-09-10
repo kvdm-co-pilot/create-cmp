@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 463e5b52a9e699dc5567fc871260ef024da00bb6d3c224d2a8bebf1d28fd2a41
+// cmp:bundle-inputs 97ca4f5e45206400de1a3985168f841d4a256c51cef46915d89baede13ccc814
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35061,6 +35061,11 @@ var INHERITABLE = Object.freeze([
   "detect",
   "tools",
   "ladder",
+  // Read against `ladder` by the Stop hook, so it must inherit WITH it: an heir
+  // that kept the step names and lost the reason texts would leave the gate
+  // that refuses "done" over a tier that never ran silently inert for its own
+  // legacy receipts. The halves are one fact.
+  "legacySkipReasons",
   "plants",
   "console",
   "version"
@@ -37857,7 +37862,7 @@ function evidenceBodyHtml(lastReceipt, history) {
   ].filter(Boolean).join("\n      ");
   const stepRowHtml2 = (s) => {
     const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
-    const governs = COPY.stepGoverns[s.name];
+    const governs = (COPY.stepGoverns ?? {})[s.name];
     const governsCell = governs ? `<a class="step-link" href="#${esc8(governs.section)}">${esc8(governs.label)}</a>` : "";
     const counts = stepTestCountsHtml(s);
     const note = s.note ? `<span class="step-note">${esc8(s.note)}</span>` : "";
@@ -39978,7 +39983,9 @@ function extractCompileErrors(text) {
 }
 function applyConsoleCopy(projectDir) {
   try {
-    const loaded = loadProfileSync(projectDir);
+    const manifest = resolveHarnessManifest(projectDir);
+    if (!manifest.ok) return void setConsoleCopy(null);
+    const loaded = loadProfileSync(projectDir, manifest.manifest.profile);
     setConsoleCopy(loaded && loaded.ok ? loaded.profile?.console ?? null : null);
   } catch {
     setConsoleCopy(null);
