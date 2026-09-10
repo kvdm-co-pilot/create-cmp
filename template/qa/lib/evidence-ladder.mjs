@@ -56,12 +56,27 @@
 // create-cmp repo. Vendored byte-identical into qa/lib/ — edit the package
 // source, then run `node scripts/sync-harness.mjs`.
 
+// The contract is DATA — no imports of its own, no I/O — so reading it here
+// costs a resolver's worth of nothing and buys the thing that makes it real:
+// the refusals an author is shown are the refusals that fire.
+import { CONTRACT, requiredFields } from "./profile-contract.mjs";
+
 /**
  * The ladder fields `evidenceLevel` actually reads (evidence-level.mjs). Two
  * declarations differing anywhere else are not in disagreement about any grade,
  * so they are not refused.
  */
 export const GRADED_FIELDS = Object.freeze(["scaffoldCore", "l0Required", "l1Required", "l2Execution", "l3Execution", "names"]);
+
+/**
+ * The graded fields that hold STEP NAMES, derived rather than typed. `names` is
+ * the rung-label map and holds words, not steps; everything else on the ladder
+ * is a list of step names that must match what the lane PASSed.
+ *
+ * Derived because the field that broke this file was the one nobody added to a
+ * list they were maintaining by hand.
+ */
+export const STEP_NAME_FIELDS = Object.freeze(GRADED_FIELDS.filter((f) => f !== "names"));
 
 /** The two spellings, named the way an author wrote them, for every message below. */
 const DECLARED_SPELLING = "`export const ladder` (the profile's top-level declaration)";
@@ -132,7 +147,11 @@ export function evidenceLadderFor(profile, pack) {
         source,
         reason:
           `profile "${id}" declares ${spelling} as ${brief(value)}, which is not an evidence ladder — ` +
-          `a ladder is an object of step names ({ names, l0Required, l1Required, l2Execution, release }). ` +
+          // The field list is DERIVED. It used to be typed here, and after the
+          // 2026-09-10 rename it still advertised `release` — so an author who
+          // followed this message was refused by the very next check in the
+          // same function. A message that names fields must name the fields.
+          `a ladder is an object of step names ({ ${["names", ...GRADED_FIELDS.filter((f) => f !== "names" && f !== "scaffoldCore")].join(", ")} }). ` +
           `Fix it or remove it; a profile that declares no ladder earns no rung, which is honest, and this is not that.`,
       };
     }
@@ -157,6 +176,43 @@ export function evidenceLadderFor(profile, pack) {
   // function compares two DECLARATIONS for disagreement, and a comparator that
   // also reinterpreted shapes could call two genuinely different declarations
   // the same — which is the one thing it exists to catch.
+  //
+  // WHAT THE DELETED REFUSAL DID STILL HAS TO HAPPEN, one field wider. Dropping
+  // malformed entries during normalisation was the first attempt and it was
+  // worse than the asymmetry it replaced: `l3Execution: ["ship", null]` dropped
+  // the null, saw every SURVIVING entry pass, and awarded L3 with a step the
+  // author declared left unproven. `mode: "all"` means proven-by-some is not
+  // proven, and a dropped entry is skipped by another name. That same
+  // declaration was refused before the reshape.
+  //
+  // So every step-name field is checked for entries that are not step names,
+  // and the field list is DERIVED from GRADED_FIELDS rather than typed — a
+  // field added there is validated the day it is added, which is the failure
+  // mode the `release` asymmetry taught this file.
+  for (const [value, spelling, source] of [
+    [declared, DECLARED_SPELLING, "profile"],
+    [packed, PACK_SPELLING, "pack"],
+  ]) {
+    if (!present(value)) continue;
+    for (const field of STEP_NAME_FIELDS) {
+      const raw = value[field];
+      if (raw === undefined || raw === null) continue;
+      const entries = Array.isArray(raw) ? raw : [raw];
+      const bad = entries.filter((n) => typeof n !== "string" || !n.trim());
+      if (!bad.length) continue;
+      return {
+        ok: false,
+        source,
+        reason:
+          `profile "${id}" declares ${spelling} with ${field} = ${brief(raw)}, ` +
+          `which holds ${bad.length} entr${bad.length === 1 ? "y that is" : "ies that are"} not a step name. ` +
+          `Every entry must be a non-empty step name: a rung is earned by matching these against the steps that PASSed, ` +
+          `so a value that can never match would leave the rung unreachable with nothing said. ` +
+          `Remove it, or name the step it was meant to be.`,
+      };
+    }
+  }
+
   // THE PRE-RENAME SPELLINGS, REFUSED BY NAME. `deviceExecution` and `release`
   // became `l2Execution` and `l3Execution` on 2026-09-10, because the core had
   // no business calling a rung after one stack's runtime — a Python profile
@@ -192,6 +248,44 @@ export function evidenceLadderFor(profile, pack) {
     }
   }
 
+  // THE CONTRACT'S OWN REFUSALS, ENFORCED HERE. qa/lib/profile-contract.mjs
+  // publishes a `refusal` string per field and `node qa/profile.mjs explain`
+  // prints it to an author as "REFUSED WHEN IT …". Until this block, nothing
+  // implemented any of them: a ladder with no l0Required resolved clean and
+  // earned L1 (because `[].every()` is vacuously true), and one declaring an
+  // l3Execution with no l2Execution resolved clean with its L3 permanently
+  // dark. A contract that describes refusals nobody performs is worse than no
+  // contract — it tells an author they are protected.
+  //
+  // The refusal TEXT is the contract's, never a second copy: a message written
+  // here would drift from the one `explain` prints, and an author who read one
+  // and hit the other is exactly who this object exists for.
+  for (const [value, spelling, source] of [
+    [declared, DECLARED_SPELLING, "profile"],
+    [packed, PACK_SPELLING, "pack"],
+  ]) {
+    if (!present(value)) continue;
+    const named = (f) => {
+      const raw = value[f];
+      if (raw === undefined || raw === null) return [];
+      return (Array.isArray(raw) ? raw : [raw]).filter((n) => typeof n === "string" && n.trim());
+    };
+    const refuse = (field) => ({
+      ok: false,
+      source,
+      reason:
+        `profile "${id}" ${CONTRACT.ladder.fields[field].refusal}. ` +
+        `Declared in ${spelling}; \`node qa/profile.mjs explain ladder.${field}\` says what it is for.`,
+    });
+    // Only the refusals that describe an UNEARNABLE rung. A rung whose steps
+    // are simply not declared is not an error — it is not earned, which is what
+    // "no ladder means no rung, the honest grade" has always meant one level up.
+    // Refusing those instead was tried on 2026-09-10 and turned three legitimate
+    // partial ladders into refused profiles; the vacuous-grade half it was
+    // reaching for belongs in the grader and lives there now.
+    for (const field of requiredFields("ladder")) if (!named(field).length) return refuse(field);
+    if (named("l3Execution").length && !named("l2Execution").length) return refuse("l3Execution");
+  }
 
   if (present(declared) && present(packed)) {
     const differing = GRADED_FIELDS.filter((f) => !same(declared[f], packed[f]));

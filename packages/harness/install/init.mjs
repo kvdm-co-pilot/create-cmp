@@ -655,12 +655,15 @@ export function steps({ ROOT }) {
 //   //                    else's stack is graded by them.
 //   //   l0Required       step names that must all PASS for the floor rung
 //   //   l1Required       and for L1, on top of L0
-//   //   l2Execution  step names that need a resource the host may not have
-//   //                    (a phone, a container, a broker). ONE of them PASSing
-//   //                    lifts L1 to L2; a SKIP never does
-//   //   release          ONE step name (a string, not a list) whose PASS lifts
-//   //                    L2 to L3, or null. A list here silently never matches,
-//   //                    so L3 becomes unreachable without saying so
+//   //   l2Execution      step names that prove the artifact ran AS THE PROGRAM
+//   //                    — assembled, started the way it really starts, driven
+//   //                    through its real entry surface, on this machine. NOT
+//   //                    imported. ANY one of them PASSing lifts L1 to L2; a
+//   //                    SKIP never does
+//   //   l3Execution      the same, for the SHIPPABLE variant rather than the
+//   //                    development one. EVERY one must PASS — proven by some
+//   //                    and skipped by the rest is not proven. Declare none
+//   //                    and this profile tops out at L2, which is honest
 //   //
 //   // WHERE TO DECLARE IT — there are two places and this is the one to use.
 //   // A pack may also return \`evidenceLadder\` from steps() above, and the lane
@@ -672,7 +675,15 @@ export function steps({ ROOT }) {
 //   // declarations that disagree rather than pick whichever one it can see
 //   // (qa/lib/evidence-ladder.mjs carries the argument).
 //   names: { L0: "…", L1: "…", L2: "…", L3: "…" },
-//   l0Required: [], l1Required: [], l2Execution: [], l3Execution: null,
+//   // NAMED, not empty. This legend showed four empty lists until 2026-09-10,
+//   // which meant uncommenting it verbatim produced a ladder the lane refuses:
+//   // l0Required and l1Required are required, and an empty one would earn its
+//   // rung vacuously. The two steps below are the two this command actually
+//   // writes into your pack, so this block works as it stands and every later
+//   // step is an addition.
+//   l0Required: ["harnessIntegrity"],
+//   l1Required: ["harnessIntegrity", "specCoverage"],
+//   l2Execution: [], l3Execution: [],
 // };
 //
 // export const plants = {
