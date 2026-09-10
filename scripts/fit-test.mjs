@@ -21,7 +21,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
-import { observedTreeHash, DEVICE_TIER_TRIGGERS, DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
+import { observedTreeHash, DEVICE_TIER_TRIGGERS, DEVICE_TIER_IRRELEVANT, DEVICE_SKIP } from "./observed-tree.mjs";
 import { obligation, changedPaths } from "./proof-plan.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -75,7 +75,7 @@ export function readFleetRecord(recordPath = FLEET_RECORD, currentHash = null) {
   } catch {
     return { present: false };
   }
-  const now = currentHash ?? observedTreeHash(REPO_ROOT, DEVICE_TIER_TRIGGERS);
+  const now = currentHash ?? observedTreeHash(REPO_ROOT, DEVICE_TIER_TRIGGERS, { skip: DEVICE_SKIP });
   // A record written before content-binding has no hash to compare. It is not
   // trusted and not silently discarded: it is named as unverifiable, which is
   // the honest third answer.
