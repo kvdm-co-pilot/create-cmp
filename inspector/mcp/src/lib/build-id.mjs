@@ -67,8 +67,10 @@ function consoleDir(root) {
  * that produces identical bytes; that is the safe direction, and the same
  * choice §6 records for ignore-set hashing. What keeps the over-coverage
  * honest is test/bundle-inputs-cover-the-bundle.test.mjs, which derives the
- * REAL input set from esbuild's metafile and fails if this walk ever misses one
- * again.
+ * REAL input set from the committed artifact itself — esbuild writes `// <path>`
+ * above each module it inlines — and fails if this walk ever misses one again.
+ * It reads the artifact rather than the metafile deliberately: no bundler runs,
+ * and what it checks is the file that actually ships.
  */
 function harnessLibDir(root) {
   return harnessDir(root, "lib");
