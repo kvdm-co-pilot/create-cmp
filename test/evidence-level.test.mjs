@@ -43,8 +43,8 @@ test("a pack's own ladder grades its own steps, with its own rung names", () => 
     scaffoldCore: ["compositeBuild", "unitTests"],
     l0Required: ["compositeBuild", "unitTests"],
     l1Required: ["detekt", "archTests", "gitleaks"],
-    deviceExecution: ["contractTests"],
-    release: "loadTest",
+    l2Execution: ["contractTests"],
+    l3Execution: "loadTest",
     names: { L0: "builds", L1: "static", L2: "integrated", L3: "load-proven" },
   };
   const l1 = evidenceLevel(pass("compositeBuild", "unitTests", "detekt", "archTests", "gitleaks"), "local", { mode: "full", ladder, plants: SOME_PLANTS });

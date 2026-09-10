@@ -761,7 +761,7 @@ try {
     // below was already stack-free (`a tier did not run`, keyed on `skipKind`);
     // only the row was borrowed. A profile that declares no runtime tier still
     // needs its hook asserted, so the fallback is a name no pack can own.
-    const [tierStep = "__plantedTier"] = evidenceLadderFor(PROFILE_MODULE).ladder?.deviceExecution ?? [];
+    const [tierStep = "__plantedTier"] = evidenceLadderFor(PROFILE_MODULE).ladder?.l2Execution ?? [];
     const planted = {
       ...green.receipt,
       profile: "local",

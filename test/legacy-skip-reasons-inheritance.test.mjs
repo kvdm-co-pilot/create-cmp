@@ -7,7 +7,7 @@
 //   const declared = profile?.legacySkipReasons;   // receipt-check.mjs:162
 //   ... legacyNames && legacyPatterns && ...        // receipt-check.mjs:173
 //
-// `legacyNames` is the ladder's `deviceExecution`, and `ladder` IS in
+// `legacyNames` is the ladder's `l2Execution`, and `ladder` IS in
 // profile-loader.mjs's INHERITABLE list. `legacySkipReasons` is not. So an heir
 // of cmp — `export const extendsProfile = "cmp"`, the shape differential-
 // conformance.test.mjs already exercises — inherits the step NAMES that gate
@@ -44,8 +44,8 @@ test("an heir inherits the ladder that gates the legacy skip fallback but not th
 
   // The half that IS inherited — receipt-check's `legacyNames`.
   assert.deepEqual(
-    r.profile.ladder?.deviceExecution,
-    CMP_LADDER.deviceExecution,
+    r.profile.ladder?.l2Execution,
+    CMP_LADDER.l2Execution,
     "the ladder is inheritable, so the heir's Stop hook knows which steps the legacy fallback covers",
   );
 

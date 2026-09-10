@@ -156,7 +156,7 @@ test("two declarations that AGREE by value — not by identity — are accepted,
   // The comparison must be structural: an author who writes the same ladder out
   // twice has not contradicted themselves, and refusing them would be a gate
   // with no wrong verdict behind it.
-  const ladder = { names: { L0: "x" }, l0Required: ["a"], deviceExecution: [], release: null };
+  const ladder = { names: { L0: "x" }, l0Required: ["a"], l2Execution: [], l3Execution: null };
   const resolved = evidenceLadderFor({ id: "svc", ladder }, { evidenceLadder: JSON.parse(JSON.stringify(ladder)) });
   assert.equal(resolved.ok, true);
   assert.equal(resolved.source, "both");
@@ -196,30 +196,30 @@ test("THE KEPT PLANT: `release` as a LIST is refused by name — the shape a rea
     names: { L0: "L0", L1: "L1", L2: "L2", L3: "L3" },
     l0Required: ["harnessIntegrity"],
     l1Required: ["harnessIntegrity", "specCoverage", "unitTests"],
-    deviceExecution: ["integrationTests"],
-    release: ["distribution"],
+    l2Execution: ["integrationTests"],
+    l3Execution: ["distribution"],
   };
 
   // First: the wrong verdict itself, executed rather than described. The SAME
   // green lane grades L2 as a list and L3 as a string — that gap is the defect.
   const rows = ["harnessIntegrity", "specCoverage", "unitTests", "integrationTests", "distribution"].map((name) => ({ name, verdict: "PASS" }));
   assert.equal(evidenceLevel(rows, "local", { mode: "full", ladder, plants: STATED_PLANTS }).rung, "L2", "as a list, the release step earns nothing");
-  assert.equal(evidenceLevel(rows, "local", { mode: "full", ladder: { ...ladder, release: "distribution" }, plants: STATED_PLANTS }).rung, "L3", "as a string, the same rows earn L3");
+  assert.equal(evidenceLevel(rows, "local", { mode: "full", ladder: { ...ladder, l3Execution: "distribution" }, plants: STATED_PLANTS }).rung, "L3", "as a string, the same rows earn L3");
 
   // Then: the refusal that closes it, and it must NAME the field and the fix
   // rather than merely failing — an author who cannot see what to write is
   // being refused by an oracle.
   const refused = evidenceLadderFor({ id: "ktor-backend", ladder }, null);
-  assert.equal(refused.ok, false, "a release that names no step is refused, not graded");
-  assert.match(refused.reason, /release/, "the refusal names the field");
+  assert.equal(refused.ok, false, "an l3Execution that names no step is refused, not graded");
+  assert.match(refused.reason, /l3Execution/, "the refusal names the field");
   assert.match(refused.reason, /ktor-backend/, "and the profile");
-  assert.match(refused.reason, /release: "distribution"/, "and shows the author exactly what to write instead");
+  assert.match(refused.reason, /l3Execution: "distribution"/, "and shows the author exactly what to write instead");
 
   // And the honest neighbours are untouched: a string still grades, an absent
   // one still earns no L3. A refusal that also moved a working grade would be
   // changing what a receipt claims, which is not what this is.
-  assert.equal(evidenceLadderFor({ id: "x", ladder: { ...ladder, release: "distribution" } }, null).ok, true);
-  assert.equal(evidenceLadderFor({ id: "x", ladder: { ...ladder, release: null } }, null).ok, true);
+  assert.equal(evidenceLadderFor({ id: "x", ladder: { ...ladder, l3Execution: "distribution" } }, null).ok, true);
+  assert.equal(evidenceLadderFor({ id: "x", ladder: { ...ladder, l3Execution: null } }, null).ok, true);
 });
 
 test("the fields the resolver compares are DERIVED from the grader's source, so the pair cannot drift", () => {
@@ -360,7 +360,7 @@ test("THE GATE: an adopter who declares the ladder the way `harness init` seeds 
     const before = fs.readFileSync(receiptPath, "utf8");
     fs.writeFileSync(
       entry,
-      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage", "aStepThisLaneDoesNotHave"], deviceExecution: [], release: null }'),
+      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage", "aStepThisLaneDoesNotHave"], l2Execution: [], l3Execution: null }'),
     );
     relockAndCommit();
     const planted = node(dir, [path.join(dir, "qa", "verify.mjs")]);
@@ -373,7 +373,7 @@ test("THE GATE: an adopter who declares the ladder the way `harness init` seeds 
     // ── Reverted: the same two declarations, made to agree ────────────────
     fs.writeFileSync(
       entry,
-      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound", L2: "unreachable here", L3: "unreachable here" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage"], deviceExecution: [], release: null }'),
+      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound", L2: "unreachable here", L3: "unreachable here" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage"], l2Execution: [], l3Execution: null }'),
     );
     relockAndCommit();
     const recovered = node(dir, [path.join(dir, "qa", "verify.mjs")]);

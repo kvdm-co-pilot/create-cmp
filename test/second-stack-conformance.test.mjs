@@ -112,7 +112,7 @@ test("DEVICE_STEPS is 'needs a resource the host may not have' — a container h
   assert.equal(pack.strengthLabel, undefined);
   // Its ladder is its own: L2 means a real database, not a device.
   assert.match(pack.evidenceLadder.names.L2, /database/);
-  assert.deepEqual(pack.evidenceLadder.deviceExecution, ["integrationTests"]);
+  assert.deepEqual(pack.evidenceLadder.l2Execution, ["integrationTests"]);
 });
 
 test("its plants are accepted by the core's plant selection, in its own language", () => {

@@ -134,6 +134,16 @@ const STACK_SHAPES = [
   // mitigation is not a longer list: it is the profile contract (piece 2),
   // after which a runtime instance is a DECLARATION and the lint can ask the
   // profile what its nouns are instead of being told.
+  // `device` is NOT here yet, and the reason is a measurement rather than an
+  // oversight: adding it fails ten core modules today (console-shell,
+  // console-standing, console-tabs, preview-service, framework-check,
+  // affected-tests, evidence-badge, evidence-html, flight-recorder, verify).
+  // The 2026-09-10 rename of `ladder.deviceExecution` → `l2Execution` removed
+  // the reason the core HAD to say it; clearing the other ten is a sweep with
+  // semantic work in it — the console's live-device tab is a capability surface,
+  // not a string — and it gets its own slice. Adding the word here before that
+  // sweep would mean adding ten names to STACK_COUPLED, and an exception list
+  // that grows to admit a rule is the rule not landing.
   [/\b(?:emulator|simulator|adb|avd|AVD|CMP_DEVICE)\b/, "a local runtime instance's name — the profile owns this, not the core"],
   [/@Test\b|@Composable\b|\bfun\s+[`\w]|\bdef\s+test|\bfunc\s+Test|#\[test\]|\bsuspend\s+fun\b/, "a syntax token of one language"],
   [/\b(?:build\.gradle(?:\.kts)?|settings\.gradle(?:\.kts)?|libs\.versions\.toml|gradlew|Cargo\.toml|go\.mod|pyproject\.toml|Package\.swift|Podfile|pom\.xml)\b|(?<![\w)\]])\.(?:gradle|kotlin)\b/, "a build-tool file or directory"],
@@ -319,7 +329,7 @@ test("the cmp profile declares layout and tiers, and the core reads them only th
 // the count of the half that still parsed. A lint that quietly stops banning a
 // word is worse than one that never banned it. Importing the frozen object
 // removes the failure mode rather than guarding it.
-const RUNTIME_TIER_STEPS = [...CMP_LADDER.deviceExecution, ...(CMP_LADDER.release ? [CMP_LADDER.release] : [])];
+const RUNTIME_TIER_STEPS = [...CMP_LADDER.l2Execution, ...(CMP_LADDER.l3Execution ? [CMP_LADDER.l3Execution] : [])];
 
 test("the runtime-tier step names are the profile's, and no core module spells one", () => {
   assert.ok(
