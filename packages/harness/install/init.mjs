@@ -675,14 +675,21 @@ export function steps({ ROOT }) {
 //   // declarations that disagree rather than pick whichever one it can see
 //   // (qa/lib/evidence-ladder.mjs carries the argument).
 //   names: { L0: "…", L1: "…", L2: "…", L3: "…" },
-//   // NAMED, not empty. This legend showed four empty lists until 2026-09-10,
-//   // which meant uncommenting it verbatim declared a ladder that earns no rung
-//   // at all: a rung whose steps you do not name is a rung you have not claimed,
-//   // so an empty l0Required grades nothing rather than granting L0 for free.
-//   // Nothing here is REQUIRED — declaring less earns less, which is honest and
-//   // is never refused. The two steps below are the two this command actually
-//   // writes into your pack, so this block works as it stands and every later
-//   // step is an addition.
+//   // NAMED, not empty. A rung whose steps you do not name is a rung you have
+//   // not claimed, so an empty l0Required grades nothing rather than granting
+//   // L0 for free. The two steps below are the two this command actually writes
+//   // into your pack, so this block works as it stands and every later step is
+//   // an addition.
+//   //
+//   // DECLARE FROM THE BOTTOM UP. No field here is required and declaring
+//   // fewer rungs earns fewer rungs, which is honest — but the rungs are
+//   // climbed in order, so naming steps for one while leaving the rung BENEATH
+//   // it empty is refused rather than graded: those steps could never lift
+//   // anything, and a lane that quietly ignored them would be the one thing
+//   // this ladder exists to prevent. Emptying l0Required below while l1Required
+//   // still names steps is exactly that, and the lane will say so by name.
+//   // Run: node qa/profile.mjs explain ladder.l1Required — it prints the same
+//   // sentence the refusal does.
 //   l0Required: ["harnessIntegrity"],
 //   l1Required: ["harnessIntegrity", "specCoverage"],
 //   l2Execution: [], l3Execution: [],
