@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 4e68c9704cc0820ca5265d1e88aa9598a61cf5fb872e4d2dd05c30f064a65749
+// cmp:bundle-inputs fefe833cbdfecc2867126c9d39074d5567edd855cf115ab5bd09f7f5c464bf67
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35393,19 +35393,6 @@ function evidenceLadderFor(profile, pack) {
       };
     }
   }
-  for (const [value, spelling, source] of [
-    [declared, DECLARED_SPELLING, "profile"],
-    [packed, PACK_SPELLING, "pack"]
-  ]) {
-    const l3 = present(value) ? value.l3Execution : void 0;
-    if (present(l3) && typeof l3 !== "string") {
-      return {
-        ok: false,
-        source,
-        reason: `profile "${id}" declares ${spelling} with l3Execution = ${brief(l3)}, which names no step. \`l3Execution\` takes ONE step name as a string \u2014 it is the only ladder field that is not a list, and a list here matches nothing, so L3 is unreachable and nothing says so. Write \`l3Execution: "${Array.isArray(l3) && typeof l3[0] === "string" ? l3[0] : "yourReleaseStep"}"\`, or remove the field: a profile that declares no release step earns no L3, which is honest.`
-      };
-    }
-  }
   if (present(declared) && present(packed)) {
     const differing = GRADED_FIELDS.filter((f) => !same(declared[f], packed[f]));
     if (differing.length) {
@@ -35430,6 +35417,10 @@ var PLANT_MATERIAL = Object.freeze([
 ]);
 
 // ../../packages/harness/src/lib/evidence-level.mjs
+function asList(value) {
+  const raw = Array.isArray(value) ? value : [value];
+  return raw.filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+}
 function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   if (!ladder || typeof ladder !== "object") {
     return {
@@ -35439,15 +35430,15 @@ function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   }
   const L = ladder;
   const RUNG_NAMES = L.names ?? {};
-  const DEVICE_EXECUTION = Array.isArray(L.l2Execution) ? L.l2Execution : [];
-  const RELEASE_EXECUTION = typeof L.l3Execution === "string" && L.l3Execution.trim() ? L.l3Execution.trim() : null;
+  const L2_EXECUTION = asList(L.l2Execution);
+  const L3_EXECUTION = asList(L.l3Execution);
   const L0_REQUIRED = Array.isArray(L.l0Required) ? [...L.l0Required] : [];
   const L1_REQUIRED = Array.isArray(L.l1Required) ? [...L.l1Required] : [];
   const declared = [
     { id: "L0", requires: L0_REQUIRED, mode: "all" },
     { id: "L1", requires: L1_REQUIRED, mode: "all" },
-    ...DEVICE_EXECUTION.length ? [{ id: "L2", requires: [...DEVICE_EXECUTION], mode: "any" }] : [],
-    ...DEVICE_EXECUTION.length && RELEASE_EXECUTION ? [{ id: "L3", requires: [RELEASE_EXECUTION], mode: "all" }] : []
+    ...L2_EXECUTION.length ? [{ id: "L2", requires: [...L2_EXECUTION], mode: "any" }] : [],
+    ...L2_EXECUTION.length && L3_EXECUTION.length ? [{ id: "L3", requires: [...L3_EXECUTION], mode: "all" }] : []
   ].map((r) => ({ ...r, name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id }));
   const earnedId = typeof earned === "string" && earned.trim() ? earned.trim() : null;
   const earnedIdx = earnedId ? declared.findIndex((r) => r.id === earnedId) : -1;

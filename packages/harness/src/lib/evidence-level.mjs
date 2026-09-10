@@ -83,6 +83,29 @@
 import { plantCalibration } from "./plant-calibration.mjs";
 
 /**
+ * A ladder's step-name field as a list, whichever shape it was declared in.
+ *
+ * `l3Execution` was the one graded field read as a single NAME while every
+ * sibling was a list, and the asymmetry was not theoretical: the author of the
+ * second-stack profile, writing from the contract alone, declared a list — and
+ * their L3 was silently unreachable, because a list matched nothing. ADR-0016
+ * makes the list the shape and keeps a lone string accepted, so no ladder that
+ * graded before grades differently now: one name is a list of one.
+ *
+ * Blank and non-string entries are dropped rather than carried. A value that is
+ * not a step name can never be in the PASSed set, and keeping it in an `all`
+ * list would make the rung permanently unreachable — the exact failure this
+ * change exists to end, re-entering by the back door.
+ *
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function asList(value) {
+  const raw = Array.isArray(value) ? value : [value];
+  return raw.filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+}
+
+/**
  * Derive the receipt's evidence rung AND the sentence explaining an absent one.
  *
  * TWO RETURNS, ONE DECISION. `evidenceLevel` below is this function's `.level`
@@ -196,8 +219,12 @@ function rungFor(stepResults, ladder) {
   const SCAFFOLD_CORE = L.scaffoldCore ?? [];
   const L0_REQUIRED = L.l0Required ?? [];
   const L1_REQUIRED = L.l1Required ?? [];
-  const DEVICE_EXECUTION = L.l2Execution ?? [];
-  const RELEASE_EXECUTION = L.l3Execution ?? null;
+  const L2_EXECUTION = L.l2Execution ?? [];
+  // A LIST, like every sibling (ADR-0016). It was the one graded field read as a
+  // single name, and that asymmetry cost a real second-stack author their L3 in
+  // silence: they wrote a list, because every other field is one, and it matched
+  // nothing. A string is still accepted and means exactly what it meant.
+  const L3_EXECUTION = asList(L.l3Execution);
   // A ladder without labels still grades — the rung id is its own label.
   const RUNG_NAMES = L.names ?? { L0: "L0", L1: "L1", L2: "L2", L3: "L3" };
   const steps = Array.isArray(stepResults) ? stepResults.filter((s) => s && typeof s.name === "string") : [];
@@ -217,17 +244,20 @@ function rungFor(stepResults, ladder) {
     rung = "L1";
     for (const name of L1_REQUIRED) counted.add(name);
 
-    // Only an EXECUTED (PASSed) device step lifts to L2 — a SKIP never does.
-    const deviceRan = DEVICE_EXECUTION.some((name) => passed.has(name));
-    if (deviceRan) {
+    // Only an EXECUTED (PASSed) step lifts to L2 — a SKIP never does. ANY one
+    // of them: the rung asks whether the program ran, not whether every way of
+    // running it was tried.
+    const ranAsProgram = L2_EXECUTION.some((name) => passed.has(name));
+    if (ranAsProgram) {
       rung = "L2";
-      for (const name of DEVICE_EXECUTION) counted.add(name);
+      for (const name of L2_EXECUTION) counted.add(name);
 
-      // Only a PASSed releaseSmoke lifts to L3 — a SKIP (unsigned keystore,
-      // no device) never does.
-      if (RELEASE_EXECUTION && passed.has(RELEASE_EXECUTION)) {
+      // EVERY one of them, unlike L2: a shippable variant proven by some of its
+      // steps and skipped by the rest is not proven. A SKIP — an unsigned
+      // artifact, an unavailable runtime — never lifts.
+      if (L3_EXECUTION.length && L3_EXECUTION.every((name) => passed.has(name))) {
         rung = "L3";
-        counted.add(RELEASE_EXECUTION);
+        for (const name of L3_EXECUTION) counted.add(name);
       }
     }
   }
@@ -278,19 +308,19 @@ export function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   }
   const L = ladder;
   const RUNG_NAMES = L.names ?? {};
-  const DEVICE_EXECUTION = Array.isArray(L.l2Execution) ? L.l2Execution : [];
-  const RELEASE_EXECUTION = typeof L.l3Execution === "string" && L.l3Execution.trim() ? L.l3Execution.trim() : null;
+  const L2_EXECUTION = asList(L.l2Execution);
+  const L3_EXECUTION = asList(L.l3Execution);
   const L0_REQUIRED = Array.isArray(L.l0Required) ? [...L.l0Required] : [];
   const L1_REQUIRED = Array.isArray(L.l1Required) ? [...L.l1Required] : [];
   // `all` and `any` are `rungFor`'s own two shapes and not a vocabulary of this
-  // function's own: every name must have PASSed (l0Required, l1Required), or at
-  // least one must have (an on-device EXECUTION step). `release` is one name,
-  // which is `all` of one.
+  // function's own: every name must have PASSed (l0Required, l1Required, and now
+  // l3Execution), or at least one must have (l2Execution — the rung asks whether
+  // the program ran, not whether every way of running it was tried).
   const declared = [
     { id: "L0", requires: L0_REQUIRED, mode: "all" },
     { id: "L1", requires: L1_REQUIRED, mode: "all" },
-    ...(DEVICE_EXECUTION.length ? [{ id: "L2", requires: [...DEVICE_EXECUTION], mode: "any" }] : []),
-    ...(DEVICE_EXECUTION.length && RELEASE_EXECUTION ? [{ id: "L3", requires: [RELEASE_EXECUTION], mode: "all" }] : []),
+    ...(L2_EXECUTION.length ? [{ id: "L2", requires: [...L2_EXECUTION], mode: "any" }] : []),
+    ...(L2_EXECUTION.length && L3_EXECUTION.length ? [{ id: "L3", requires: [...L3_EXECUTION], mode: "all" }] : []),
   ].map((r) => ({ ...r, name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id }));
 
   const earnedId = typeof earned === "string" && earned.trim() ? earned.trim() : null;

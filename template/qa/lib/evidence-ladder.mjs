@@ -138,32 +138,25 @@ export function evidenceLadderFor(profile, pack) {
     }
   }
 
-  // `l3Execution` is the ONE graded field the grader reads as a single step name
-  // rather than as a list, and that asymmetry produces a silently wrong verdict.
-  // evidence-level.mjs does `passed.has(L.l3Execution)` against a Set of step-name
-  // STRINGS, so an `l3Execution: ["distribution"]` never matches anything and L3
-  // becomes unreachable without one word being said about it. Every sibling
-  // field — scaffoldCore, l0Required, l1Required, l2Execution — IS a list,
-  // and the seeded skeleton showed an empty list, so the shape an author is
-  // most likely to reach for is exactly the one that fails silently. A real
-  // one did: the second-stack author who wrote the ktor-backend profile from
-  // the contract alone declared it as a list, and their L3 was unreachable.
-  // Executed rather than read — the same ladder grades L2 as a list and L3 as
-  // a string.
+  // THE SHAPE REFUSAL THAT USED TO LIVE HERE IS GONE (ADR-0016, accepted
+  // 2026-09-10). `release` was the one graded field the grader read as a single
+  // step NAME while every sibling was a list, and the author of the ktor-backend
+  // profile — writing from the contract alone — reached for a list and had their
+  // L3 silently unreachable. A refusal was the conservative repair at the time:
+  // it changed no grade anywhere, where accepting the list would have.
   //
-  // This REFUSES rather than reinterpreting. Accepting the list would be the
-  // semantically obvious repair, and it is not taken here, because it would
-  // move an existing pack's rung from L2 to L3 — changing what a receipt
-  // claims, which fit-test question 5 (NORTH-STAR.md §10) sends to an ADR
-  // first. A refusal changes no grade anywhere: a string means exactly what it
-  // meant, an absent one earns no L3 exactly as before, and the only tree
-  // whose behaviour moves is one that was already being graded wrongly and
-  // silently.
+  // The rename to `l3Execution` deliberately did not settle it; the ADR did. The
+  // list IS the shape now, a lone string is still read as a list of one, and the
+  // only profiles that can possibly be affected are ones that could not run at
+  // all. Nothing that ever produced a receipt grades differently. What goes with
+  // the refusal is the reason an author had to be refused: a field shaped unlike
+  // its siblings, sitting in the declaration an external author writes first and
+  // unaided.
   //
-  // THE RENAME DID NOT SETTLE THIS. `release` → `l3Execution` (2026-09-10) made
-  // the name uniform and deliberately left the SHAPE alone, for the reason
-  // above: a rename changes no grade, a reshape changes several. The open
-  // question is now ADR-0016, and this block is what it proposes to delete.
+  // Normalisation lives in evidence-level.mjs's `asList`, NOT here. This
+  // function compares two DECLARATIONS for disagreement, and a comparator that
+  // also reinterpreted shapes could call two genuinely different declarations
+  // the same — which is the one thing it exists to catch.
   // THE PRE-RENAME SPELLINGS, REFUSED BY NAME. `deviceExecution` and `release`
   // became `l2Execution` and `l3Execution` on 2026-09-10, because the core had
   // no business calling a rung after one stack's runtime — a Python profile
@@ -199,24 +192,6 @@ export function evidenceLadderFor(profile, pack) {
     }
   }
 
-  for (const [value, spelling, source] of [
-    [declared, DECLARED_SPELLING, "profile"],
-    [packed, PACK_SPELLING, "pack"],
-  ]) {
-    const l3 = present(value) ? value.l3Execution : undefined;
-    if (present(l3) && typeof l3 !== "string") {
-      return {
-        ok: false,
-        source,
-        reason:
-          `profile "${id}" declares ${spelling} with l3Execution = ${brief(l3)}, which names no step. ` +
-          `\`l3Execution\` takes ONE step name as a string — it is the only ladder field that is not a list, ` +
-          `and a list here matches nothing, so L3 is unreachable and nothing says so. ` +
-          `Write \`l3Execution: "${Array.isArray(l3) && typeof l3[0] === "string" ? l3[0] : "yourReleaseStep"}"\`, ` +
-          `or remove the field: a profile that declares no release step earns no L3, which is honest.`,
-      };
-    }
-  }
 
   if (present(declared) && present(packed)) {
     const differing = GRADED_FIELDS.filter((f) => !same(declared[f], packed[f]));

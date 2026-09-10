@@ -182,16 +182,19 @@ test("present-but-not-a-ladder is refused, never silently graded as no ladder at
 
 // ── 2. The compared fields are the graded fields ────────────────────────────
 
-test("THE KEPT PLANT: `release` as a LIST is refused by name — the shape a real second-stack author reached for", () => {
-  // Rule 1 says a gate is not wired until a KEPT plant makes it fail by name.
-  // This is that plant, and the shape planted is not invented: it is verbatim
-  // what the ktor-backend author wrote from the contract alone
-  // (test/fixtures/profiles/ktor-backend/index.mjs, where the prose records it).
-  // Every other ladder field is a list, so a list is the shape an author
-  // reaches for; the grader reads this one as a single step NAME, so the list
-  // matched nothing and L3 was unreachable in silence. The fixture is corrected
-  // and the mistake lives HERE instead, because a plant is watched failing and
-  // a corrected fixture proves nothing forever after.
+test("the shape an author reaches for is the shape that grades: l3Execution as a LIST earns L3", () => {
+  // WHAT THIS REPLACED, and why the replacement is the stronger test. Until
+  // ADR-0016 this was a kept plant: `release` as a list was REFUSED by name,
+  // because the grader read that one field as a single step NAME while every
+  // sibling was a list. The shape is not invented — it is verbatim what the
+  // ktor-backend author wrote from the contract alone, and their L3 was
+  // unreachable in silence.
+  //
+  // A refusal was the right conservative repair then; it changed no grade. The
+  // ADR took the other half: the list IS the shape, so there is nothing left to
+  // refuse. A plant against a deleted gate proves nothing, so what is asserted
+  // now is the property that replaced it — including that a lone string still
+  // grades exactly as it did, which is the whole reason this was safe to change.
   const ladder = {
     names: { L0: "L0", L1: "L1", L2: "L2", L3: "L3" },
     l0Required: ["harnessIntegrity"],
@@ -199,27 +202,24 @@ test("THE KEPT PLANT: `release` as a LIST is refused by name — the shape a rea
     l2Execution: ["integrationTests"],
     l3Execution: ["distribution"],
   };
-
-  // First: the wrong verdict itself, executed rather than described. The SAME
-  // green lane grades L2 as a list and L3 as a string — that gap is the defect.
   const rows = ["harnessIntegrity", "specCoverage", "unitTests", "integrationTests", "distribution"].map((name) => ({ name, verdict: "PASS" }));
-  assert.equal(evidenceLevel(rows, "local", { mode: "full", ladder, plants: STATED_PLANTS }).rung, "L2", "as a list, the release step earns nothing");
-  assert.equal(evidenceLevel(rows, "local", { mode: "full", ladder: { ...ladder, l3Execution: "distribution" }, plants: STATED_PLANTS }).rung, "L3", "as a string, the same rows earn L3");
+  const rung = (l) => evidenceLevel(rows, "local", { mode: "full", ladder: l, plants: STATED_PLANTS })?.rung;
 
-  // Then: the refusal that closes it, and it must NAME the field and the fix
-  // rather than merely failing — an author who cannot see what to write is
-  // being refused by an oracle.
-  const refused = evidenceLadderFor({ id: "ktor-backend", ladder }, null);
-  assert.equal(refused.ok, false, "an l3Execution that names no step is refused, not graded");
-  assert.match(refused.reason, /l3Execution/, "the refusal names the field");
-  assert.match(refused.reason, /ktor-backend/, "and the profile");
-  assert.match(refused.reason, /l3Execution: "distribution"/, "and shows the author exactly what to write instead");
+  assert.equal(rung(ladder), "L3", "the list the author actually wrote now earns the rung it always described");
+  assert.equal(rung({ ...ladder, l3Execution: "distribution" }), "L3", "and a lone string still grades — one name is a list of one, so no existing ladder moved");
+  assert.equal(rung({ ...ladder, l3Execution: null }), "L2", "declaring none still earns no L3, which is the honest grade");
+  assert.equal(rung({ ...ladder, l3Execution: [] }), "L2", "and an empty list is declaring none");
 
-  // And the honest neighbours are untouched: a string still grades, an absent
-  // one still earns no L3. A refusal that also moved a working grade would be
-  // changing what a receipt claims, which is not what this is.
-  assert.equal(evidenceLadderFor({ id: "x", ladder: { ...ladder, l3Execution: "distribution" } }, null).ok, true);
-  assert.equal(evidenceLadderFor({ id: "x", ladder: { ...ladder, l3Execution: null } }, null).ok, true);
+  // EVERY named step, not any: a shippable variant proven by some of its steps
+  // and skipped by the rest is not proven. This is the one place the two runtime
+  // rungs differ in mode, so it is asserted rather than assumed.
+  assert.equal(rung({ ...ladder, l3Execution: ["distribution", "neverRan"] }), "L2", "a list with one step unpassed earns no L3");
+
+  // Nothing is refused for its shape any more — the ADR deleted the gate, and a
+  // stale refusal would be worse than none.
+  for (const l3 of [["distribution"], "distribution", null, []]) {
+    assert.equal(evidenceLadderFor({ id: "ktor-backend", ladder: { ...ladder, l3Execution: l3 } }, null).ok, true, `l3Execution ${JSON.stringify(l3)} resolves`);
+  }
 });
 
 test("the fields the resolver compares are DERIVED from the grader's source, so the pair cannot drift", () => {
