@@ -392,10 +392,12 @@ function findTestDir() {
 }
 
 // `smoke` is the lane's cheapest profile: the steps that need no build tool, no
-// device and no network. Naming the build tool here ("no Gradle") was one
-// stack's word in the instrument that exists to prove this file has none — a
-// small lie, but in the one place that can least afford it.
-out(`framework check: bound=${BOUND_MS}ms per direction, profile=smoke (host-only steps: no build tool, no device, no network)`);
+// runtime instance and no network. Naming the build tool here ("no Gradle") was
+// one stack's word in the instrument that exists to prove this file has none — a
+// small lie, but in the one place that can least afford it. "no device" was the
+// same lie one word over, fixed 2026-09-10: the neighbour was corrected and this
+// was left, which is what a hand-written pair of words does.
+out(`framework check: bound=${BOUND_MS}ms per direction, profile=smoke (host-only steps: no build tool, no runtime instance, no network)`);
 
 // With no plant material the instrument cannot write a test, so the two plants
 // that need one are unavailable — reported by name, never quietly dropped.
@@ -752,13 +754,21 @@ try {
           (bad.length ? ` — ${bad.join("; ")}` : green.receipt ? ` (verdict ${green.receipt.verdict}, no failing step)` : " (no receipt at all)"),
       );
     }
+    // THE PLANTED ROW WEARS THE PROFILE'S OWN TIER NAME. It used to read
+    // `e2eSmoke` with a reason naming an Android env var, which meant a Python
+    // lane asserted its Stop hook against a step that does not exist in it and
+    // printed a mobile spelling to a reader who runs no phone. The assertion
+    // below was already stack-free (`a tier did not run`, keyed on `skipKind`);
+    // only the row was borrowed. A profile that declares no runtime tier still
+    // needs its hook asserted, so the fallback is a name no pack can own.
+    const [tierStep = "__plantedTier"] = evidenceLadderFor(PROFILE_MODULE).ladder?.deviceExecution ?? [];
     const planted = {
       ...green.receipt,
       profile: "local",
       stage: "change",
       steps: [
         ...green.receipt.steps,
-        { name: "e2eSmoke", verdict: "SKIP", skipKind: "environment", reason: "device tier disabled by CMP_DEVICE=none (planted)", durationMs: 0 },
+        { name: tierStep, verdict: "SKIP", skipKind: "environment", reason: "the runtime instance was unavailable (planted)", durationMs: 0 },
       ],
     };
     write(RECEIPT_REL, JSON.stringify(planted, null, 2));

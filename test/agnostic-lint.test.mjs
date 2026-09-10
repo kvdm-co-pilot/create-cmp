@@ -120,6 +120,19 @@ const STACK_SHAPES = [
   // are words the shell and console print. Named here, not silently dropped.
   [new RegExp(`(?<=[\\w*\\]])\\.(?:${EXTENSIONS.filter((e) => !AMBIGUOUS.has(e)).join("|")})(?=["'\\x60\\s/)\\]},;:]|$)`), "a source-file extension (Linguist-derived)"],
   [/\b(?:Kotlin|Swift|Java|Python|Golang|Rust|Ruby|Dart|Scala|Groovy|Compose|Gradle|Maven|Xcode|CocoaPods|Maestro|JUnit|pytest|Jest|KSP|Detekt|Konsist)\b/, "a language, framework or tool name"],
+  // THE RUNTIME NOUNS. The category the derivation above structurally cannot
+  // reach: Linguist has a table of file extensions and none of local runtime
+  // instances, so `emulator`, `adb` and `avd` are not a language, an extension
+  // or a build file, and every one of them walked past this lint into the
+  // shipped lane. They are typed, like the language names one line up, because
+  // there is no table in the world to derive them from.
+  //
+  // HOW IT FAILS: a stack whose runtime noun nobody here has met — `simulator`
+  // is listed, `qemu` and `wasmtime` are not — leaks exactly as these did. The
+  // mitigation is not a longer list: it is the profile contract (piece 2),
+  // after which a runtime instance is a DECLARATION and the lint can ask the
+  // profile what its nouns are instead of being told.
+  [/\b(?:emulator|simulator|adb|avd|AVD|CMP_DEVICE)\b/, "a local runtime instance's name — the profile owns this, not the core"],
   [/@Test\b|@Composable\b|\bfun\s+[`\w]|\bdef\s+test|\bfunc\s+Test|#\[test\]|\bsuspend\s+fun\b/, "a syntax token of one language"],
   [/\b(?:build\.gradle(?:\.kts)?|settings\.gradle(?:\.kts)?|libs\.versions\.toml|gradlew|Cargo\.toml|go\.mod|pyproject\.toml|Package\.swift|Podfile|pom\.xml)\b|(?<![\w)\]])\.(?:gradle|kotlin)\b/, "a build-tool file or directory"],
 ];
@@ -279,4 +292,51 @@ test("the cmp profile declares layout and tiers, and the core reads them only th
     const bad = importsOf(fs.readFileSync(abs, "utf8")).filter((s) => /profiles\/cmp\//.test(s));
     assert.deepEqual(bad, [], `${path.relative(REPO_ROOT, abs)} imports the cmp profile directly: ${bad.join(", ")}`);
   }
+});
+
+// ── The derived half: a profile's own runtime-tier step names ───────────────
+//
+// The words above are typed because no table names them. THESE are not: the
+// steps whose PASS earns the runtime rungs are declared by the profile, in its
+// own ladder, and the core has no business spelling any of them. Reading them
+// from the declaration means the day cmp renames `androidChecks` this lint
+// follows without anyone remembering it exists — the same reason the extension
+// list is Linguist's and not ours.
+//
+// SCOPED TO THE RUNTIME TIERS ON PURPOSE. cmp's ladder also names `build`,
+// `unitTests`, `conformance` and `a11y`, which any profile would use and the
+// core may legitimately discuss. Only the L2/L3 execution steps are the
+// stack's runtime made into a word, so only those are banned. With one
+// implementer there is no second ladder to diff against; when the profile
+// contract lands, "which declarations are the profile's" stops being a
+// judgement here and becomes a field there.
+const RUNTIME_TIER_STEPS = (() => {
+  const src = fs.readFileSync(path.join(PROFILES, "cmp", "ladder.mjs"), "utf8");
+  const list = src.match(/const DEVICE_EXECUTION = \[([^\]]*)\]/)?.[1] ?? "";
+  const release = src.match(/const RELEASE_EXECUTION = "([^"]+)"/)?.[1] ?? null;
+  const names = [...list.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  if (release) names.push(release);
+  return names;
+})();
+
+test("the runtime-tier step names are the profile's, and no core module spells one", () => {
+  assert.ok(
+    RUNTIME_TIER_STEPS.length >= 3,
+    `derived nothing from the cmp ladder — this lint is inert, which is worse than absent (saw ${JSON.stringify(RUNTIME_TIER_STEPS)})`,
+  );
+  const offenders = [];
+  for (const rel of coreModules()) {
+    if (STACK_COUPLED.has(rel)) continue;
+    const code = fs
+      .readFileSync(path.join(CORE, rel), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^[ \t]*\/\/.*$/gm, "");
+    const hits = RUNTIME_TIER_STEPS.filter((name) => new RegExp(`\\b${name}\\b`).test(code));
+    if (hits.length) offenders.push(`${rel}: ${hits.join(", ")}`);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `core modules spelling a step name only the profile may own — read it from the ladder instead:\n  ${offenders.join("\n  ")}`,
+  );
 });

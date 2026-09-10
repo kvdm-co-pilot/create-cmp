@@ -143,15 +143,26 @@ function evaluate() {
   // this reader nothing and gets no legacy fallback — the same honest silence
   // as a profile with no ladder at all, and the reason the top-level spelling
   // is the one `harness init` seeds and the one the resolver prefers.
-  const legacyPatterns = /no Android device|maestro CLI not installed|is held by|devices attached|CMP_DEVICE=none/;
+  // AND THE REASON TEXTS ARE THE PROFILE'S TOO. The names came from the ladder
+  // since Stage 0 PR 6c, but the patterns beside them stayed literal — "no
+  // Android device", "maestro CLI not installed" — so the core still held one
+  // stack's vocabulary to read one stack's old receipts. A profile that never
+  // emitted a pre-`skipKind` receipt declares none and gets no legacy fallback,
+  // which is the honest silence this block already chose over a guess.
   let legacyNames = null;
+  let legacyPatterns = null;
   try {
     const manifest = resolveHarnessManifest(ROOT);
     if (manifest.ok) {
       const loaded = loadProfileSync(ROOT, manifest.manifest.profile);
-      const resolved = evidenceLadderFor(loaded.ok ? loaded.profile : null);
+      const profile = loaded.ok ? loaded.profile : null;
+      const resolved = evidenceLadderFor(profile);
       const ladder = resolved.ok ? resolved.ladder : null;
       if (ladder && Array.isArray(ladder.deviceExecution)) legacyNames = ladder.deviceExecution;
+      const declared = profile?.legacySkipReasons;
+      if (Array.isArray(declared) && declared.length) {
+        legacyPatterns = new RegExp(declared.map((r) => String(r).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));
+      }
     }
   } catch {
     // The Stop hook never crashes over a legacy-compat lookup.
@@ -159,7 +170,7 @@ function evaluate() {
   const envSkipped = (Array.isArray(receipt.steps) ? receipt.steps : []).filter((s) => {
     if (!s || s.verdict !== "SKIP") return false;
     if (s.skipKind) return s.skipKind === "environment";
-    return Boolean(legacyNames && legacyNames.includes(s.name) && legacyPatterns.test(String(s.reason ?? "")));
+    return Boolean(legacyNames && legacyPatterns && legacyNames.includes(s.name) && legacyPatterns.test(String(s.reason ?? "")));
   });
   if (envSkipped.length) {
     return {

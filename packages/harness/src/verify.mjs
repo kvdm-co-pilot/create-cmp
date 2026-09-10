@@ -431,7 +431,7 @@ if (determinism && !profileExplicit) {
 
 // ── --fast: the inner loop, mechanically unable to claim done ───────────────
 // The genuinely slow tier is the pack's own: whatever it names in
-// FAST_EXCLUDED_NAMES (on mobile, the device and release steps). --fast
+// FAST_EXCLUDED_NAMES — whichever steps THIS profile calls expensive. --fast
 // filters that tier out of whatever profile resolved, UNCONDITIONALLY — so a
 // small change gets its did-I-break-anything-obvious signal without paying
 // for the expensive half. The rest of the profile still runs, but cheaply:
@@ -453,7 +453,7 @@ if (fast) {
   console.error(
     [
       "⚡⚡ FAST MODE — INNER LOOP ONLY, NOT THE DONE-GATE ⚡⚡",
-      `   skipping the device/release tier: ${fastExcluded.join(", ") || "(none in this profile)"}`,
+      `   skipping this profile's expensive steps: ${fastExcluded.join(", ") || "(none in this profile)"}`,
       '   this run\'s receipt records mode "fast", earns no evidence rung, and can NEVER satisfy "done"',
       "   run the full lane once (node qa/verify.mjs) before you finish",
     ].join("\n"),
@@ -865,7 +865,7 @@ if (asJson) {
   // Deliberately NOT the full lane's verdict-line shape: fast-green must never
   // be mistakable for done-green.
   console.log(
-    `\n${verdict === "PASS" ? "⚡⚡" : "❌"} verify lane [FAST — INNER LOOP ONLY, NOT DONE]: ${verdict} (skipped device/release tier: ${fastExcluded.join(", ") || "none"}) — this fast receipt satisfies no done-gate; run the full lane (node qa/verify.mjs) once before you finish`,
+    `\n${verdict === "PASS" ? "⚡⚡" : "❌"} verify lane [FAST — INNER LOOP ONLY, NOT DONE]: ${verdict} (skipped: ${fastExcluded.join(", ") || "none"}) — this fast receipt satisfies no done-gate; run the full lane (node qa/verify.mjs) once before you finish`,
   );
 } else {
   // The rung NEVER appears without the pack that defines it. §8.9 makes one

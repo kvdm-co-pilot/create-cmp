@@ -32,7 +32,7 @@ export { artifacts, governable } from "./artifacts.mjs";
  * whether a tier that could have run did — can ask without instantiating
  * anything. AGNOSTIC-HARNESS-ARCHITECTURE.md §4.2 #6.
  */
-export { CMP_LADDER as ladder } from "./ladder.mjs";
+export { CMP_LADDER as ladder, legacySkipReasons } from "./ladder.mjs";
 
 /**
  * The source this profile's Rule 0 instrument plants — a citation must sit on

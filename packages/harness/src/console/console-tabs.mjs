@@ -57,6 +57,21 @@ export const NEUTRAL_COPY = Object.freeze({
   kspName: "the code generator",
   kspCarriesLabel: "carries the language version",
   depGraphGatesNote: "The conformance gates (and the receipt they write, below) are authoritative.",
+  // WHICH STEP GOVERNS WHICH SECTION is the profile's, not the shell's. It was
+  // a literal map here, naming `e2eSmoke` and `tokenDrift` — so a backend's
+  // console linked steps it does not run and left every step it DOES run
+  // unlinked. Empty is the honest neutral: an unmapped step gets no link, which
+  // is already how this renders a step the profile did not claim.
+  stepGoverns: Object.freeze({}),
+  // The empty-state help for a recorded walkthrough. Neutral because the tool
+  // that records one is a profile TOOL, withheld from a foreign repo entirely —
+  // telling its user to run `adb forward` was advice to use a binary they do
+  // not have, for an app that is not theirs.
+  walkthroughPrereq: "With the app running and reachable by the harness",
+  // What the Start button will actually do. The literal here described booting
+  // an AVD and installing a debug build — one stack's chain, rendered on every
+  // console that has a live provider at all.
+  liveStartHint: "Start the whole chain from here — bring up the runtime, install the build, launch it, and wait for health:",
 });
 /**
  * The words in force. Module state, set ONCE by the console host that loaded
@@ -1790,17 +1805,7 @@ ${featureShapeHtml(featureShape)}
  * - tokenDrift → Design language (declared catalog vs live values).
  * - approvals → Approvals (the governed-artifact hash gate).
  */
-const STEP_GOVERNS = {
-  specCoverage: { section: "specs", label: "Specs" },
-  conformance: { section: "architecture", label: "Architecture" },
-  archDoc: { section: "architecture", label: "Architecture" },
-  componentStories: { section: "components", label: "Components" },
-  goldenTrees: { section: "screens", label: "Screens" },
-  a11y: { section: "screens", label: "Screens" },
-  e2eSmoke: { section: "screens", label: "Screens" },
-  tokenDrift: { section: "design-system", label: "Design language" },
-  approvals: { section: "approvals", label: "Approvals" },
-};
+
 
 // formatDurationMs moved to console-data.mjs on 2026-09-09 — the front door's
 // *now* rows render the same fact from the live step stream, and two private
@@ -1888,7 +1893,7 @@ export function stepTestCountsHtml(step) {
  *   binding;
  * - per-step rows: verdict, honest SKIP/FAIL reasons verbatim, humanized
  *   duration, and a link to the section the step governs where that mapping
- *   is real (STEP_GOVERNS — unmapped steps get no link);
+ *   is real (COPY.stepGoverns — unmapped steps get no link);
  * - timeline: the committed receipt audit trail, newest-first, reconstructed
  *   from git (receipt-bridge.mjs listReceiptHistory) — one attributed entry per
  *   verified commit; else the standardized absence line until the first receipt
@@ -1959,7 +1964,7 @@ export function evidenceBodyHtml(lastReceipt, history) {
     // the lane did not get to check this.
     const cls =
       s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
-    const governs = STEP_GOVERNS[s.name];
+    const governs = COPY.stepGoverns[s.name];
     const governsCell = governs ? `<a class="step-link" href="#${esc(governs.section)}">${esc(governs.label)}</a>` : "";
     // Detail, in falling order of what a release manager needs: the test
     // tally the step actually earned, its own honest fine print, then the
@@ -2431,7 +2436,7 @@ export function walkthroughTabHtml(wt) {
   if (!wt || !wt.available) {
     return `<div class="empty">
       <p>No walkthrough runs yet.</p>
-      <p>With the debug app live (adb forward tcp:9500), run <code>node qa/walkthrough.mjs</code> —
+      <p>${esc(COPY.walkthroughPrereq)}, run <code>node qa/walkthrough.mjs</code> —
       it walks every tab and parameterless route, captures pixels + tree + a11y from one proven
       frame per screen, reads the DB at capture time, and writes a committable report under
       <code>qa/evidence/walkthrough/</code>.</p>
@@ -2515,8 +2520,7 @@ ${session.steps
 ${chainHtml}`;
   }
   return `  <p class="meta"><span class="bad-inline">○</span> ${esc(live ? live.reason : "status unknown")}</p>
-  <p>Start the whole chain from here — boot a headless AVD if no device is attached, install the
-  debug build, launch it, forward the inspector port, and wait for health:</p>
+  <p>${esc(COPY.liveStartHint)}</p>
   <p><button id="live-start-btn"${session && session.running ? " disabled" : ""}>${session && session.running ? "Starting…" : "Start live session"}</button></p>
 ${chainHtml}
   <div id="live-error" class="banner" hidden></div>`;
