@@ -53,6 +53,8 @@ const EXT_TO_LANGUAGE = new Map();
 for (const [name, exts] of Object.entries(LINGUIST.languages)) for (const e of exts) if (!EXT_TO_LANGUAGE.has(e)) EXT_TO_LANGUAGE.set(e, name);
 
 import { colors, ok, warn, fail } from "./log.mjs";
+import { contractAt } from "../src/lib/profile-contract.mjs";
+import { askLadderMenu } from "./interview.mjs";
 import { loadShippedDeclarations, notPortable } from "./portability.mjs";
 import {
   MANIFEST_REL_PATH,
@@ -377,6 +379,163 @@ export function manifestFor(id, sourceRoots) {
 }
 
 /**
+ * THE LADDER LEGEND — ONE SET OF WORDS, TWO RENDERINGS.
+ *
+ * The skeleton writes this declaration COMMENTED OUT when nobody was
+ * interviewed and LIVE when somebody was, and the two have to say the same
+ * thing about the same fields. So the prose is stored once, in its commented
+ * form, and the live form is DERIVED by taking the `// ` off. The alternative
+ * is a second copy of fifty lines of prose, which drifts in one of them — and
+ * which one a given adopter reads would depend on whether there happened to be
+ * a human in front of their install.
+ */
+const LADDER_LEGEND = `// export const ladder = {
+//   // The evidence rungs THIS pack means, and which of ITS steps earn them. A
+//   // profile with no ladder earns no rung, which is the honest grade for a
+//   // ladder nobody has calibrated — but a rung is also the vocabulary your
+//   // evidence gets quoted in, so an uncalibrated ladder is worth ten minutes.
+//   //
+//   // A rung is DERIVED from steps that actually PASSed. A SKIP never earns
+//   // one, a FAILed lane earns none, and \`verify --fast\` earns none either.
+//   //
+//   //   names            rung id → the word YOUR stack means by it. The letters
+//   //                    are the core's shape; the words are yours, and nobody
+//   //                    else's stack is graded by them.
+//   //   l0Required       step names that must all PASS for the floor rung
+//   //   l1Required       and for L1, on top of L0
+//   //   l2Execution      step names that prove the artifact ran AS THE PROGRAM
+//   //                    — assembled, started the way it really starts, driven
+//   //                    through its real entry surface, on this machine. NOT
+//   //                    imported. ANY one of them PASSing lifts L1 to L2; a
+//   //                    SKIP never does
+//   //   l3Execution      the same, for the SHIPPABLE variant rather than the
+//   //                    development one. EVERY one must PASS — proven by some
+//   //                    and skipped by the rest is not proven. Declare none
+//   //                    and this profile tops out at L2, which is honest
+//   //
+//   // WHERE TO DECLARE IT — there are two places and this is the one to use.
+//   // A pack may also return \`evidenceLadder\` from steps() above, and the lane
+//   // reads either; but the object steps() returns exists only once a lane has
+//   // started, and a reader that must NOT start one — the Stop hook asking
+//   // whether a tier that could have run did — can only see this top-level
+//   // export. Declare it here and every reader agrees. Declare it in BOTH and
+//   // they must be the same ladder: the lane refuses to grade from two
+//   // declarations that disagree rather than pick whichever one it can see
+//   // (qa/lib/evidence-ladder.mjs carries the argument).`;
+
+/**
+ * The rung-label placeholder, which stays a COMMENT in BOTH renderings. Not an
+ * oversight: its values are ellipses, so uncommenting it would declare every
+ * rung's display name as "…" — a live wrong label, where a commented
+ * placeholder is an invitation.
+ */
+const LADDER_NAMES_HINT = `//   names: { L0: "…", L1: "…", L2: "…", L3: "…" },`;
+
+/** Declare from the bottom up — the rule, and it holds in both renderings. */
+const LADDER_DECLARE_RULE = `//   // NAMED, not empty. A rung whose steps you do not name is a rung you have
+//   // not claimed, so an empty l0Required grades nothing rather than granting
+//   // L0 for free. The two steps below are the two this command actually writes
+//   // into your pack, so this block works as it stands and every later step is
+//   // an addition.
+//   //
+//   // DECLARE FROM THE BOTTOM UP. No field here is required and declaring
+//   // fewer rungs earns fewer rungs, which is honest — but the rungs are
+//   // climbed in order, so naming steps for one while leaving the rung BENEATH
+//   // it empty is refused rather than graded: those steps could never lift
+//   // anything, and a lane that quietly ignored them would be the one thing
+//   // this ladder exists to prevent. Emptying l0Required below while l1Required
+//   // still names steps is exactly that, and the lane will say so by name.
+//   // Run: node qa/profile.mjs explain ladder.l1Required — it prints the same
+//   // sentence the refusal does.`;
+
+/** The two steps this command actually writes into the pack it is seeding. */
+const LADDER_SEEDED_STEPS = `//   l0Required: ["harnessIntegrity"],
+//   l1Required: ["harnessIntegrity", "specCoverage"],`;
+
+/** The execution rungs, seeded empty: nothing has been written that earns them. */
+const LADDER_SEEDED_EXECUTION = `//   l2Execution: [], l3Execution: [],`;
+
+/** A commented block, as it reads inside a live object literal. */
+function uncomment(block) {
+  return block
+    .split("\n")
+    .map((l) => l.replace(/^\/\/ /, ""))
+    .join("\n");
+}
+
+/**
+ * The `ladder` declaration this skeleton writes.
+ *
+ * WITH NO INTENT IT IS BYTE-IDENTICAL to what this command has always written —
+ * a fully commented block. That is the honest tree for an install nobody
+ * answered: `answers: {}` would carry nothing a reader could act on, and an
+ * empty map beside a comment saying a human answered would be worse than
+ * nothing. The COMMAND still says it asked and got no answers; the FILE only
+ * records what was decided (ADR-0017 §4).
+ *
+ * WITH AN INTENT IT IS LIVE, and the two step fields it names are not a guess:
+ * they are the two steps this command has just written into that same pack, and
+ * the legend above them already tells the author to name exactly those. No rung
+ * can be minted from them in any case until the author declares `plants` —
+ * qa/lib/plant-calibration.mjs refuses to grade a profile whose plants cannot be
+ * planted, and this skeleton seeds `plants` commented out — so an interviewed
+ * install and an uninterviewed one grade identically: at nothing.
+ *
+ * @param {Record<string,string>|null|undefined} answers bare field name → the
+ *   option string that field offers, verbatim. install/interview.mjs is the only
+ *   thing that produces one, and it produces only the contract's own strings.
+ * @returns {string}
+ */
+function ladderBlock(answers) {
+  const picked = Object.entries(answers ?? {});
+  if (!picked.length) {
+    return [LADDER_LEGEND, LADDER_NAMES_HINT, LADDER_DECLARE_RULE, LADDER_SEEDED_STEPS, LADDER_SEEDED_EXECUTION, "// };"].join("\n");
+  }
+  // ANSWERED, SO THE BLOCK GOES LIVE. Nothing records WHAT was answered — that
+  // would be a second claim beside the steps, verified by nothing. The answer is
+  // spent here instead: a human confirmed this project has rungs worth naming,
+  // so the two steps this command really wrote are declared rather than left
+  // commented for someone to find.
+  return [
+    uncomment(LADDER_LEGEND),
+    `  // ${uncomment(LADDER_NAMES_HINT).trim()}`,
+    uncomment(LADDER_DECLARE_RULE),
+    "  // THIS BLOCK IS LIVE because you answered the questions this command asked.",
+    "  // The two fields below are not a guess about your project: they are the two",
+    "  // steps it just wrote into this pack, which is what the legend above tells",
+    "  // you to name. They still earn nothing until you declare plants at the",
+    "  // bottom of this file — no plants, no rung, however green the lane — so",
+    "  // this pack grades exactly as an uninterviewed one does. Nothing was",
+    "  // decided on your behalf.",
+    uncomment(LADDER_SEEDED_STEPS),
+    "",
+    ...executionHint(picked),
+    "};",
+  ].join("\n");
+}
+
+/**
+ * The reminder left where the execution rungs would be declared, phrased from
+ * what the author just said — and omitted entirely for a rung they said this
+ * project does not have, because a TODO for a rung nobody wants is noise.
+ */
+function executionHint(picked) {
+  const wanted = picked.filter(([field, answer]) => answer !== contractAt(`ladder.${field}`)?.declinesRung);
+  if (!wanted.length) {
+    return [
+      "  // You answered that this project has no rung above L1 — nothing starts it",
+      "  // as a program that a lane could drive. No execution field is seeded, and",
+      "  // that is the honest ladder for it. Change your mind by naming steps here.",
+    ];
+  }
+  return [
+    "  // The execution rungs stay unnamed until the steps exist. You said this",
+    "  // project has them, so name them here when you write them:",
+    `  // ${wanted.map(([f]) => `${f}: []`).join(", ")},`,
+  ];
+}
+
+/**
  * The generated profile — a WORKING one, not stubs.
  *
  * Two steps, chosen because they are the only two that prove something on a
@@ -390,10 +549,10 @@ export function manifestFor(id, sourceRoots) {
  * field names, since every one of them was an undocumented guess in that report.
  *
  * @param {string} id
- * @param {{sourceRoots: string[], tiers: string[]}} opts
+ * @param {{sourceRoots: string[], tiers: string[], answers?: Record<string,string>}} opts
  * @returns {string}
  */
-export function profileSkeleton(id, { sourceRoots, tiers, lang = null, invocation = undefined }) {
+export function profileSkeleton(id, { sourceRoots, tiers, lang = null, invocation = undefined, answers = undefined }) {
   const roots = JSON.stringify(sourceRoots.length ? sourceRoots : ["src"]);
   const g = lang ? LANGUAGE_GRAMMARS[lang] ?? null : null;
   const exts = lang && LINGUIST.languages[lang] ? JSON.stringify(LINGUIST.languages[lang]) : '[".<your source extension>"]';
@@ -641,59 +800,7 @@ export function steps({ ROOT }) {
 //   return { ok: true };
 // }
 //
-// export const ladder = {
-//   // The evidence rungs THIS pack means, and which of ITS steps earn them. A
-//   // profile with no ladder earns no rung, which is the honest grade for a
-//   // ladder nobody has calibrated — but a rung is also the vocabulary your
-//   // evidence gets quoted in, so an uncalibrated ladder is worth ten minutes.
-//   //
-//   // A rung is DERIVED from steps that actually PASSed. A SKIP never earns
-//   // one, a FAILed lane earns none, and \`verify --fast\` earns none either.
-//   //
-//   //   names            rung id → the word YOUR stack means by it. The letters
-//   //                    are the core's shape; the words are yours, and nobody
-//   //                    else's stack is graded by them.
-//   //   l0Required       step names that must all PASS for the floor rung
-//   //   l1Required       and for L1, on top of L0
-//   //   l2Execution      step names that prove the artifact ran AS THE PROGRAM
-//   //                    — assembled, started the way it really starts, driven
-//   //                    through its real entry surface, on this machine. NOT
-//   //                    imported. ANY one of them PASSing lifts L1 to L2; a
-//   //                    SKIP never does
-//   //   l3Execution      the same, for the SHIPPABLE variant rather than the
-//   //                    development one. EVERY one must PASS — proven by some
-//   //                    and skipped by the rest is not proven. Declare none
-//   //                    and this profile tops out at L2, which is honest
-//   //
-//   // WHERE TO DECLARE IT — there are two places and this is the one to use.
-//   // A pack may also return \`evidenceLadder\` from steps() above, and the lane
-//   // reads either; but the object steps() returns exists only once a lane has
-//   // started, and a reader that must NOT start one — the Stop hook asking
-//   // whether a tier that could have run did — can only see this top-level
-//   // export. Declare it here and every reader agrees. Declare it in BOTH and
-//   // they must be the same ladder: the lane refuses to grade from two
-//   // declarations that disagree rather than pick whichever one it can see
-//   // (qa/lib/evidence-ladder.mjs carries the argument).
-//   names: { L0: "…", L1: "…", L2: "…", L3: "…" },
-//   // NAMED, not empty. A rung whose steps you do not name is a rung you have
-//   // not claimed, so an empty l0Required grades nothing rather than granting
-//   // L0 for free. The two steps below are the two this command actually writes
-//   // into your pack, so this block works as it stands and every later step is
-//   // an addition.
-//   //
-//   // DECLARE FROM THE BOTTOM UP. No field here is required and declaring
-//   // fewer rungs earns fewer rungs, which is honest — but the rungs are
-//   // climbed in order, so naming steps for one while leaving the rung BENEATH
-//   // it empty is refused rather than graded: those steps could never lift
-//   // anything, and a lane that quietly ignored them would be the one thing
-//   // this ladder exists to prevent. Emptying l0Required below while l1Required
-//   // still names steps is exactly that, and the lane will say so by name.
-//   // Run: node qa/profile.mjs explain ladder.l1Required — it prints the same
-//   // sentence the refusal does.
-//   l0Required: ["harnessIntegrity"],
-//   l1Required: ["harnessIntegrity", "specCoverage"],
-//   l2Execution: [], l3Execution: [],
-// };
+${ladderBlock(answers)}
 //
 // export const plants = {
 //   // The source Rule 0's instrument plants to prove the gates still bite.
@@ -714,11 +821,17 @@ export function steps({ ROOT }) {
 /**
  * The full file plan for an init — pure, so every decision is assertable
  * without touching a filesystem.
+ *
+ * `answers` is what a HUMAN answered at the interview, and it is optional in the
+ * strong sense: passing none is not a lesser call, it is the honest plan for an
+ * install nobody was present for. What it must never become is a default filled
+ * in here (ADR-0017 §5, install/interview.mjs's header).
+ *
  * @param {string} root
- * @param {{id: string}} opts
+ * @param {{id: string, invocation?: string, answers?: Record<string,string>}} opts
  * @returns {{vendor: {rel: string, src: string}[], write: {rel: string, content: string}[], id: string, sourceRoots: string[]}}
  */
-export async function planInit(root, { id, invocation = undefined }) {
+export async function planInit(root, { id, invocation = undefined, answers = undefined }) {
   const sourceRoots = detectSourceRoots(root);
   const tiers = ["unit"];
   const lang = detectLanguage(root, sourceRoots);
@@ -732,7 +845,7 @@ export async function planInit(root, { id, invocation = undefined }) {
     vendor: vendorPlan(),
     write: [
       { rel: MANIFEST_REL_PATH, content: JSON.stringify(manifestFor(id, sourceRoots), null, 2) + "\n" },
-      { rel: profileEntryRel(id), content: profileSkeleton(id, { sourceRoots, tiers, lang, invocation }) },
+      { rel: profileEntryRel(id), content: profileSkeleton(id, { sourceRoots, tiers, lang, invocation, answers }) },
       { rel: SURFACE_CONFIG_REL, content: JSON.stringify({ surface: seedSurface(root), ignore: [] }, null, 2) + "\n" },
     ],
   };
@@ -791,9 +904,16 @@ export async function runHarnessInit(flags, positional, opts = {}) {
     return 0;
   }
 
-  const plan = await planInit(root, { id, invocation: opts.invocation });
-  if (plan.claimedBy.length > 0 && !flags["new-profile"]) {
-    const c = plan.claimedBy;
+  // EVERY REFUSAL BEFORE THE FIRST QUESTION. This block used to read
+  // `plan.claimedBy` and sit after `planInit`; it runs here now because the
+  // interview is between the two, and asking a human two questions and THEN
+  // telling them the command was never going to run is the rudest possible
+  // ordering. `detect` is a handful of existsSync calls, so asking twice —
+  // here, and again inside the pure plan — costs nothing worth a shared
+  // variable threaded through a signature other callers depend on.
+  const claimedBy = await profileClaims(root);
+  if (claimedBy.length > 0 && !flags["new-profile"]) {
+    const c = claimedBy;
     fail(
       c.length === 1
         ? `this tree is claimed by the \`${c[0].id}\` profile — ${c[0].reason} (evidence: ${c[0].evidence.join(", ")}).\n` +
@@ -803,6 +923,29 @@ export async function runHarnessInit(flags, positional, opts = {}) {
     );
     return 2;
   }
+
+  // THE LADDER INTERVIEW — asked before a byte is written, because what it
+  // records goes INTO the file this command is about to write, and never asked
+  // when there is nobody there to answer. The three ways that happens are kept
+  // apart rather than collapsed into one boolean: the summary has to say which,
+  // and "no terminal" and "you said --no-interview" are different facts about
+  // the same empty result.
+  const noInterviewReason = flags["no-interview"]
+    ? "--no-interview"
+    : flags.yes || flags.y
+      ? "--yes"
+      : dryRun
+        ? "--dry-run"
+        : !process.stdin.isTTY || !process.stdout.isTTY
+          ? "not a terminal"
+          : null;
+  const interview = await askLadderMenu({
+    input: process.stdin,
+    output: process.stdout,
+    interactive: noInterviewReason === null,
+  });
+
+  const plan = await planInit(root, { id, invocation: opts.invocation, answers: interview.answers });
   const written = [];
   const kept = [];
 
@@ -854,6 +997,7 @@ export async function runHarnessInit(flags, positional, opts = {}) {
     `\n  ${colors.bold("profile")}  ${id}  →  ${profileEntryRel(id)}\n` +
       `  ${colors.bold("sources")}  ${plan.sourceRoots.length ? plan.sourceRoots.join(", ") : colors.yellow("none detected — edit citationRoots in the manifest")}\n` +
       `  ${colors.bold("language")} ${plan.lang ? `${plan.lang} — grammar seeded so citations bind on the first run` : colors.yellow("not detected — the profile uses the Kotlin/JS fallback grammar; declare your own if citations do not bind")}\n` +
+      ladderSummary(interview, noInterviewReason, kept.includes(profileEntryRel(id)) ? profileEntryRel(id) : null) +
       `  ${colors.bold("skipped")}  ${PROFILE_TOOLS.length + PROFILE_LIB.length} Compose-profile tools (not the spine)\n\n`
   );
 
@@ -906,6 +1050,61 @@ export async function runHarnessInit(flags, positional, opts = {}) {
 
   printNextSteps(id, plan.lang);
   return 0;
+}
+
+/**
+ * WHAT THE INTERVIEW RECORDED, OR WHY IT RECORDED NOTHING — and which of the
+ * three reasons it was, because they are three different states of the world.
+ *
+ * The FILE deliberately cannot tell "asked and skipped" from "never asked": an
+ * an empty answer map carries nothing a reader could act on, so the skeleton writes
+ * none at all (ADR-0017 §4). That is the right call for the file and the wrong
+ * one for the person standing here, who did answer a prompt and is owed the
+ * difference. So the honesty lives at the surface: this says "asked" when a
+ * human was asked, and names the flag or the missing terminal when one was not.
+ *
+ * @param {{asked: boolean, answers: Record<string,string>, why: string}} interview
+ * @param {string|null} reason why no interview ran, when none did
+ * @param {string|null} keptProfile the profile path that was KEPT rather than
+ *   written, when there is one. A tree that already has a profile but no
+ *   manifest keeps its own bytes — this command never clobbers — so the answers
+ *   have nowhere to go, and printing "recorded" over a file we did not touch
+ *   would be the product claiming an act it did not perform.
+ * @returns {string}
+ */
+function ladderSummary(interview, reason, keptProfile) {
+  const label = `  ${colors.bold("ladder")}   `;
+  const indent = " ".repeat(11);
+  const answers = Object.entries(interview.answers ?? {});
+  if (answers.length && keptProfile) {
+    return (
+      `${label}${colors.yellow("answered, but NOT recorded")} — ${keptProfile} already existed and is never overwritten\n` +
+      answers.map(([field, answer]) => `${indent}${colors.dim(`${field} = ${JSON.stringify(answer)}`)}`).join("\n") +
+      `\n${indent}${colors.dim("that file is never overwritten, so declare its ladder by hand if you want these.")}\n`
+    );
+  }
+  if (answers.length) {
+    return (
+      answers.map(([field, answer]) => `${label}${field} = ${colors.cyan(JSON.stringify(answer))}`).join("\n") +
+      `\n${indent}${colors.dim("the ladder is seeded live because you answered. The steps you name are what earns a rung.")}\n`
+    );
+  }
+  if (interview.asked) {
+    // THE INTERVIEW'S OWN SENTENCE, not one written here, because "you skipped
+    // every question" and "the input ended before the first one" are different
+    // things that both arrive as an empty map — and only the interview knows
+    // which happened. Reporting the first when it was the second is a small lie
+    // in the one place this feature exists to stop telling them.
+    return (
+      `${label}${colors.yellow(interview.why)}\n` +
+      `${indent}${colors.dim("the seeded ladder stays commented — uncomment it, or re-run in a fresh tree to answer.")}\n`
+    );
+  }
+  return (
+    `${label}${colors.yellow(`not asked (${reason ?? "no interview"})`)} — the seeded ladder stays commented, which is the honest state\n` +
+    `${indent}${colors.dim("nobody was asked, so nothing was declared on your behalf. Writing the recommended")}\n` +
+    `${indent}${colors.dim("answer here would be a guess wearing your answer, so this command does not.")}\n`
+  );
 }
 
 /**
