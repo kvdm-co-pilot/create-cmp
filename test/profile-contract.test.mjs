@@ -9,6 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+import { evidenceLadderFor } from "../packages/harness/src/lib/evidence-ladder.mjs";
 import {
   CONTRACT,
   CONTRACT_PATHS,
@@ -74,6 +75,44 @@ test("every published refusal says something actionable, and a required field pu
     assert.ok(
       CONTRACT.ladder.fields[name].refusal,
       `${name} is marked required but publishes no refusal — the loader would have nothing to say when it is missing`,
+    );
+  }
+});
+
+// A ladder that DOES trigger each published refusal. Hand-written because a
+// refusal is prose and cannot be mechanically turned into the declaration it
+// describes — that was the open question a review handed up, and this is the
+// answer: keep the set small enough to write out, and make it impossible to
+// publish a refusal without demonstrating it.
+//
+// The alternative shape considered and rejected: assert only that refusal text
+// exists. That is what the file said before, and it is how a refusal nobody
+// performs survived two reviews — `l2Execution` published one describing the
+// state `harness init` seeds by default, and nothing fired.
+const TRIGGERS = new Map([
+  ["l3Execution", { l0Required: ["a"], l1Required: ["a"], l3Execution: ["ship"] }],
+]);
+
+test("every refusal the contract publishes is one the loader actually performs", () => {
+  const published = Object.entries(CONTRACT.ladder.fields)
+    .filter(([, f]) => f.refusal !== null && f.refusal !== undefined)
+    .map(([name]) => name);
+
+  assert.deepEqual(
+    published.slice().sort(),
+    [...TRIGGERS.keys()].sort(),
+    "every published refusal needs a ladder here that provokes it, and every trigger needs a refusal — " +
+      "a refusal with no trigger is a promise nobody checked, which is exactly how `l2Execution` published " +
+      "one describing the state `harness init` seeds",
+  );
+
+  for (const [field, ladder] of TRIGGERS) {
+    const resolved = evidenceLadderFor({ id: "p", ladder }, null);
+    assert.equal(
+      resolved.ok,
+      false,
+      `explain("ladder.${field}") tells an author "REFUSED WHEN IT ${CONTRACT.ladder.fields[field].refusal}", ` +
+        `and this ladder does exactly that — but the loader graded it.`,
     );
   }
 });

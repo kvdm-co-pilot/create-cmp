@@ -113,6 +113,73 @@ function asList(value) {
 }
 
 /**
+ * ONE READER OF A LADDER. Every step-name field, normalised the same way, for
+ * every consumer.
+ *
+ * THE CLASS, not the instances. A review found `rungFor` reading `l2Execution`
+ * raw while `ladderStanding` read it through `asList`; the fix put `asList` on
+ * that field in both — and the NEXT review found the same defect one field over,
+ * because `scaffoldCore`, `l0Required` and `l1Required` were still read raw in
+ * one reader and array-guarded in the other. Five fields had five different
+ * normalisation expressions across two functions.
+ *
+ * Two readers of one declaration must normalise identically, or they are two
+ * declarations. The way to guarantee that is not to write the same expression
+ * twice carefully; it is to have one expression. Adding a sixth field cannot
+ * reintroduce the split, because there is nowhere else to add it.
+ *
+ * A lone string is a list of one EVERYWHERE, not just where ADR-0016 argued it:
+ * the argument was uniformity, and applying it to one field would have been the
+ * asymmetry again under a new name. Malformed entries are not dropped here —
+ * evidence-ladder.mjs refuses them, because a dropped entry is a step the author
+ * declared and nobody proved.
+ *
+ * @param {object|null|undefined} ladder
+ * @returns {{scaffoldCore: string[], l0Required: string[], l1Required: string[], l2Execution: string[], l3Execution: string[], names: object}}
+ */
+export function readLadder(ladder) {
+  const L = ladder && typeof ladder === "object" ? ladder : {};
+  const names = (v) => asList(v).filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+  return {
+    scaffoldCore: names(L.scaffoldCore),
+    l0Required: names(L.l0Required),
+    l1Required: names(L.l1Required),
+    l2Execution: names(L.l2Execution),
+    l3Execution: names(L.l3Execution),
+    names: L.names && typeof L.names === "object" ? L.names : {},
+  };
+}
+
+/**
+ * The rungs a ladder DECLARES, in order, with what earns each — derived once so
+ * that the grader and every no-lane reader agree about which rungs exist before
+ * anyone asks which are earned.
+ *
+ * A rung whose steps are not named is not declared. That is the same statement
+ * "declares no ladder, earns no rung" has always made, one level down, and it
+ * has to be made HERE rather than in each consumer: the previous fix gated the
+ * grader on `l1Required.length` and left `ladderStanding` listing L0 and L1
+ * unconditionally, so the console drew an L1 the lane could never mint — the
+ * very defect the gate had just been corrected for, recreated by correcting it.
+ *
+ * @param {ReturnType<typeof readLadder>} L
+ * @returns {Array<{id: string, requires: string[], mode: "all"|"any"}>}
+ */
+export function ladderRungs(L) {
+  const rungs = [];
+  if (L.l0Required.length) rungs.push({ id: "L0", requires: [...L.l0Required], mode: "all" });
+  if (rungs.length && L.l1Required.length) rungs.push({ id: "L1", requires: [...L.l1Required], mode: "all" });
+  if (rungs.length === 2 && L.l2Execution.length) rungs.push({ id: "L2", requires: [...L.l2Execution], mode: "any" });
+  if (rungs.length === 3 && L.l3Execution.length) rungs.push({ id: "L3", requires: [...L.l3Execution], mode: "all" });
+  return rungs;
+}
+
+/** Whether a rung's requirement is met by the set of PASSed step names. */
+function rungMet(rung, passed) {
+  return rung.mode === "any" ? rung.requires.some((n) => passed.has(n)) : rung.requires.every((n) => passed.has(n));
+}
+
+/**
  * Derive the receipt's evidence rung AND the sentence explaining an absent one.
  *
  * TWO RETURNS, ONE DECISION. `evidenceLevel` below is this function's `.level`
@@ -222,64 +289,34 @@ export function evidenceLevel(stepResults, profile, opts = {}) {
  * @returns {{rung: string, name: string, satisfiedBy: string[]}|null}
  */
 function rungFor(stepResults, ladder) {
-  const L = ladder;
-  const SCAFFOLD_CORE = L.scaffoldCore ?? [];
-  const L0_REQUIRED = L.l0Required ?? [];
-  const L1_REQUIRED = L.l1Required ?? [];
-  // BOTH rungs through `asList`, and the reason is a defect a review caught in
-  // this very file: `rungFor` read l2Execution raw while `ladderStanding` read
-  // it normalised, so the two readers of one declaration disagreed — the grader
-  // awarded L1 while the console drew an L2 the lane could never mint. Two
-  // readers of one declaration must normalise identically or they are two
-  // declarations.
-  const L2_EXECUTION = asList(L.l2Execution);
-  // A LIST, like every sibling (ADR-0016). It was the one graded field read as a
-  // single name, and that asymmetry cost a real second-stack author their L3 in
-  // silence: they wrote a list, because every other field is one, and it matched
-  // nothing. A string is still accepted and means exactly what it meant.
-  const L3_EXECUTION = asList(L.l3Execution);
-  // A ladder without labels still grades — the rung id is its own label.
-  const RUNG_NAMES = L.names ?? { L0: "L0", L1: "L1", L2: "L2", L3: "L3" };
+  // ONE READER, ONE RUNG TABLE. Everything this function used to normalise for
+  // itself now comes from `readLadder`, and which rungs exist comes from
+  // `ladderRungs` — the same two calls `ladderStanding` makes. Two readers that
+  // derive the same thing from the same bytes cannot disagree about it; two that
+  // each write the expression cannot be relied on not to.
+  const L = readLadder(ladder);
+  const rungs = ladderRungs(L);
+  const RUNG_NAMES = { L0: "L0", L1: "L1", L2: "L2", L3: "L3", ...L.names };
   const steps = Array.isArray(stepResults) ? stepResults.filter((s) => s && typeof s.name === "string") : [];
   // A failed lane has no rung — and a lane with a step that could not run
   // (ERROR) has none either: a rung is evidence, and "could not check" is not.
   if (steps.some((s) => s.verdict === "FAIL" || s.verdict === "ERROR")) return null;
   const passed = new Set(steps.filter((s) => s.verdict === "PASS").map((s) => s.name));
 
-  // AN EMPTY LIST EARNS NOTHING. `[].every()` is true of nothing, so a ladder
-  // declaring `l0Required: []` used to be handed L0 by a lane that proved
-  // nothing — and then L1 the same way. A rung nobody named steps for is a rung
-  // nobody earned; that is the same answer "declares no ladder" already gets,
-  // and it is the honest one. Found by review, 2026-09-10.
-  if (!L0_REQUIRED.length || !L0_REQUIRED.every((name) => passed.has(name))) return null;
+  // Climbed in order, stopping at the first unmet rung. A ladder that declares
+  // none earns none — which is what a rung with no steps named for it has always
+  // meant, and is now decided once, in `ladderRungs`, rather than by each
+  // consumer remembering to check a length.
+  const counted = new Set(L.scaffoldCore);
+  let rung = null;
+  for (const r of rungs) {
+    if (!rungMet(r, passed)) break;
+    rung = r.id;
+    for (const name of r.requires) counted.add(name);
+  }
+  if (!rung) return null;
 
   const inLaneOrder = (names) => steps.filter((s) => names.has(s.name) && passed.has(s.name)).map((s) => s.name);
-
-  let rung = "L0";
-  const counted = new Set(SCAFFOLD_CORE);
-
-  if (L1_REQUIRED.length && L1_REQUIRED.every((name) => passed.has(name))) {
-    rung = "L1";
-    for (const name of L1_REQUIRED) counted.add(name);
-
-    // Only an EXECUTED (PASSed) step lifts to L2 — a SKIP never does. ANY one
-    // of them: the rung asks whether the program ran, not whether every way of
-    // running it was tried.
-    const ranAsProgram = L2_EXECUTION.some((name) => passed.has(name));
-    if (ranAsProgram) {
-      rung = "L2";
-      for (const name of L2_EXECUTION) counted.add(name);
-
-      // EVERY one of them, unlike L2: a shippable variant proven by some of its
-      // steps and skipped by the rest is not proven. A SKIP — an unsigned
-      // artifact, an unavailable runtime — never lifts.
-      if (L3_EXECUTION.length && L3_EXECUTION.every((name) => passed.has(name))) {
-        rung = "L3";
-        for (const name of L3_EXECUTION) counted.add(name);
-      }
-    }
-  }
-
   return { rung, name: RUNG_NAMES[rung], satisfiedBy: inLaneOrder(counted) };
 }
 
@@ -326,20 +363,18 @@ export function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   }
   const L = ladder;
   const RUNG_NAMES = L.names ?? {};
-  const L2_EXECUTION = asList(L.l2Execution);
-  const L3_EXECUTION = asList(L.l3Execution);
-  const L0_REQUIRED = Array.isArray(L.l0Required) ? [...L.l0Required] : [];
-  const L1_REQUIRED = Array.isArray(L.l1Required) ? [...L.l1Required] : [];
-  // `all` and `any` are `rungFor`'s own two shapes and not a vocabulary of this
-  // function's own: every name must have PASSed (l0Required, l1Required, and now
-  // l3Execution), or at least one must have (l2Execution — the rung asks whether
-  // the program ran, not whether every way of running it was tried).
-  const declared = [
-    { id: "L0", requires: L0_REQUIRED, mode: "all" },
-    { id: "L1", requires: L1_REQUIRED, mode: "all" },
-    ...(L2_EXECUTION.length ? [{ id: "L2", requires: [...L2_EXECUTION], mode: "any" }] : []),
-    ...(L2_EXECUTION.length && L3_EXECUTION.length ? [{ id: "L3", requires: [...L3_EXECUTION], mode: "all" }] : []),
-  ].map((r) => ({ ...r, name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id }));
+  // THE SAME TWO CALLS THE GRADER MAKES. This function used to normalise four
+  // fields for itself and build its own rung list, gating L2 and L3 on length
+  // but listing L0 and L1 unconditionally. When the grader was corrected so that
+  // an empty required list earns nothing, this reader was not — so a ladder
+  // declaring only `l0Required` graded L0 forever while the console drew an L1
+  // with no steps in it, telling the adopter their next rung required nothing
+  // and was somehow unearned. The fix for two readers disagreeing cannot itself
+  // be written twice.
+  const declared = ladderRungs(readLadder(ladder)).map((r) => ({
+    ...r,
+    name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id,
+  }));
 
   const earnedId = typeof earned === "string" && earned.trim() ? earned.trim() : null;
   const earnedIdx = earnedId ? declared.findIndex((r) => r.id === earnedId) : -1;
