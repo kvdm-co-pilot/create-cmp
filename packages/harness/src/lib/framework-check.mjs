@@ -46,7 +46,7 @@
 // The badge floor's two halves, imported for the same reason as the grammar
 // above: the plant below calibrates THE grader the lane runs and THE definition
 // of plant material the runner plants from, not a re-statement of either.
-import { evidenceLevel } from "./evidence-level.mjs";
+import { evidenceLevel, readLadder } from "./evidence-level.mjs";
 import { plantCalibration } from "./plant-calibration.mjs";
 
 /**
@@ -548,7 +548,14 @@ export function assessBadgeFloor({ ladder, plants } = {}) {
         "(a ladder declared only on the object `steps(ctx)` returns is invisible here — qa/lib/evidence-ladder.mjs)",
     };
   }
-  const names = [...new Set([...(ladder.l0Required ?? []), ...(ladder.l1Required ?? [])])];
+  // Through `readLadder`, because this is Rule 0's instrument and it is called
+  // at top level with no try/catch: a lone-string `l0Required` spread here
+  // became eight one-character step names, earned no rung, and took the
+  // framework check down with an unhandled TypeError — the one thing that
+  // watches the badge floor still bite, brought down by a ladder the loader
+  // had graded clean.
+  const L = readLadder(ladder);
+  const names = [...new Set([...L.l0Required, ...L.l1Required])];
   const rows = names.map((name) => ({ name, verdict: "PASS" }));
   const earned = evidenceLevel(rows, null, { mode: "full", ladder, plants });
   if (!earned) {

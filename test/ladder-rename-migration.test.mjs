@@ -10,7 +10,6 @@ import assert from "node:assert/strict";
 
 import { profileSkeleton, vendorPlan } from "../packages/harness/install/init.mjs";
 import { evidenceLadderFor } from "../packages/harness/src/lib/evidence-ladder.mjs";
-import { requiredFields } from "../packages/harness/src/lib/profile-contract.mjs";
 
 const SKELETON = profileSkeleton("demo", { sourceRoots: ["src"], tiers: ["host"], lang: null });
 const LADDER_BLOCK = SKELETON.slice(SKELETON.indexOf("export const ladder"), SKELETON.indexOf("export const plants"));
@@ -32,12 +31,14 @@ test("the seeded skeleton's ladder legend documents `release`, the field the loa
   // field the legend names must be declarable without being refused for
   // declaring it. Testing that with a value the legend itself does not show
   // would be testing the fixture.
-  const valueFor = (field) => {
-    if (field === "names") return { L0: "x" };
-    return requiredFields("ladder").includes(field) ? ["a"] : [];
-  };
+  // A COHERENT ladder, with every step-name field named. Since 2026-09-10 a rung
+  // whose steps are declared while the rung beneath it is not is refused — L2
+  // with no L1 can never be earned however green the lane, and silently dropping
+  // it is the unreachable-rung defect this slice exists to close. So a fixture
+  // that leaves a lower field empty is testing that rule, not the property here.
+  const valueFor = (field) => (field === "names" ? { L0: "x" } : ["a"]);
   for (const field of legend) {
-    const declared = { l0Required: ["a"], l1Required: ["a"], [field]: valueFor(field) };
+    const declared = { ...{ l0Required: ["a"], l1Required: ["a"], l2Execution: ["a"], l3Execution: ["a"] }, [field]: valueFor(field) };
     const resolved = evidenceLadderFor({ id: "seeded", ladder: declared }, null);
     assert.equal(
       resolved.ok,
@@ -70,8 +71,8 @@ test("the not-a-ladder refusal still lists `release` as one of a ladder's fields
   // — same reason as the loop above: since 2026-09-10 an empty required field
   // is refused, so a fixture that declares one would be testing the fixture.
   for (const field of enumerated) {
-    const base = { l0Required: ["a"], l1Required: ["a"] };
-    const value = field === "names" ? { L0: "x" } : requiredFields("ladder").includes(field) ? ["a"] : [];
+    const base = { l0Required: ["a"], l1Required: ["a"], l2Execution: ["a"], l3Execution: ["a"] };
+    const value = field === "names" ? { L0: "x" } : ["a"];
     const check = evidenceLadderFor({ id: "p", ladder: { ...base, [field]: value } }, null);
     assert.equal(
       check.ok,
