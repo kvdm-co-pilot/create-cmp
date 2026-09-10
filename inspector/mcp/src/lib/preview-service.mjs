@@ -97,6 +97,7 @@ import { componentStoryCards, galleryHtml } from "prooflane-harness/console/prev
 import { nowFrame } from "prooflane-harness/console/console-now.mjs";
 import { setConsoleCopy } from "prooflane-harness/console/console-tabs.mjs";
 import { loadProfileSync } from "prooflane-harness/lib/profile-loader.mjs";
+import { resolveHarnessManifest } from "prooflane-harness/lib/harness-manifest.mjs";
 
 // Re-exported at their historical import site so every existing caller — the
 // MCP server, bin/console.mjs, scripts/stage05-gate.mjs, and the console tests
@@ -671,10 +672,22 @@ export function extractCompileErrors(text) {
  * `console` (a copy object) and this host — the one place that knows the
  * project root — sets it once. Best effort: a project with no loadable profile
  * renders the neutral words, which is correct for it.
+ *
+ * THE MANIFEST NAMES THE PROFILE, and this call used to omit it. `loadProfileSync`
+ * takes `(root, { id })`; called with the root alone it refused EVERY project
+ * with "profile id undefined", so the catch-all below silently delivered the
+ * neutral words to a cmp console that had its own. Nothing said so: the fallback
+ * is legitimate for a foreign repo, so the failure looked exactly like the
+ * success. It surfaced only when a literal map moved into this channel and its
+ * nine rows vanished from the Evidence tab — a latent break made visible by
+ * being used. `verify.mjs` had it right all along: resolve the manifest, pass
+ * what it names.
  */
 function applyConsoleCopy(projectDir) {
   try {
-    const loaded = loadProfileSync(projectDir);
+    const manifest = resolveHarnessManifest(projectDir);
+    if (!manifest.ok) return void setConsoleCopy(null);
+    const loaded = loadProfileSync(projectDir, manifest.manifest.profile);
     setConsoleCopy(loaded && loaded.ok ? loaded.profile?.console ?? null : null);
   } catch {
     setConsoleCopy(null);

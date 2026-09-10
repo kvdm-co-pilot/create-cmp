@@ -12,6 +12,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { CMP_LADDER } from "../packages/harness/src/lib/profiles/cmp/ladder.mjs";
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CORE = path.join(REPO_ROOT, "packages", "harness", "src");
 const PROFILES = path.join(CORE, "lib", "profiles");
@@ -310,14 +312,14 @@ test("the cmp profile declares layout and tiers, and the core reads them only th
 // implementer there is no second ladder to diff against; when the profile
 // contract lands, "which declarations are the profile's" stops being a
 // judgement here and becomes a field there.
-const RUNTIME_TIER_STEPS = (() => {
-  const src = fs.readFileSync(path.join(PROFILES, "cmp", "ladder.mjs"), "utf8");
-  const list = src.match(/const DEVICE_EXECUTION = \[([^\]]*)\]/)?.[1] ?? "";
-  const release = src.match(/const RELEASE_EXECUTION = "([^"]+)"/)?.[1] ?? null;
-  const names = [...list.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
-  if (release) names.push(release);
-  return names;
-})();
+// READ THE DECLARATION, NOT ITS SOURCE TEXT. The first draft regex-parsed
+// ladder.mjs for `const DEVICE_EXECUTION = [...]`, which meant single quotes, an
+// inlined `release:` or a renamed const would silently derive fewer names — and
+// the inertness guard below could not see it, because it was written to equal
+// the count of the half that still parsed. A lint that quietly stops banning a
+// word is worse than one that never banned it. Importing the frozen object
+// removes the failure mode rather than guarding it.
+const RUNTIME_TIER_STEPS = [...CMP_LADDER.deviceExecution, ...(CMP_LADDER.release ? [CMP_LADDER.release] : [])];
 
 test("the runtime-tier step names are the profile's, and no core module spells one", () => {
   assert.ok(

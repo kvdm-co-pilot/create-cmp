@@ -1792,19 +1792,6 @@ ${featureShapeHtml(featureShape)}
 // The lane is the law: this page renders ONLY what qa/evidence attests —
 // nothing here is a live re-derivation presented as a verdict.
 
-/**
- * Which console section a receipt step governs — only mappings the lane's own
- * step definitions state (template/qa/verify.mjs); `build` and `unitTests`
- * gate the whole tree, not one section, so they get NO link — never a
- * guessed one.
- * - specCoverage → Specs (the clause↔test citation gate).
- * - conformance / archDoc → Architecture (the ARCH-* gates; the doc-drift check).
- * - componentStories → Components (one story per registry component).
- * - goldenTrees / a11y / e2eSmoke → Screens (rendered-structure, a11y-floor,
- *   and on-device checks of the screens themselves).
- * - tokenDrift → Design language (declared catalog vs live values).
- * - approvals → Approvals (the governed-artifact hash gate).
- */
 
 
 // formatDurationMs moved to console-data.mjs on 2026-09-09 — the front door's
@@ -1964,7 +1951,7 @@ export function evidenceBodyHtml(lastReceipt, history) {
     // the lane did not get to check this.
     const cls =
       s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
-    const governs = COPY.stepGoverns[s.name];
+    const governs = (COPY.stepGoverns ?? {})[s.name];
     const governsCell = governs ? `<a class="step-link" href="#${esc(governs.section)}">${esc(governs.label)}</a>` : "";
     // Detail, in falling order of what a release manager needs: the test
     // tally the step actually earned, its own honest fine print, then the

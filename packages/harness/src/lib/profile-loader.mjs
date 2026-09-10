@@ -189,6 +189,11 @@ const INHERITABLE = Object.freeze([
   "detect",
   "tools",
   "ladder",
+  // Read against `ladder` by the Stop hook, so it must inherit WITH it: an heir
+  // that kept the step names and lost the reason texts would leave the gate
+  // that refuses "done" over a tier that never ran silently inert for its own
+  // legacy receipts. The halves are one fact.
+  "legacySkipReasons",
   "plants",
   "console",
   "version",
