@@ -32,10 +32,19 @@ const LEGEND = LADDER_BLOCK.split("\n")
 test("the contract publishes an l2Execution refusal nothing performs, and `harness init` seeds the state it names", () => {
   const published = CONTRACT.ladder.fields.l2Execution.refusal;
 
-  // The state the refusal names, spelled the only way it can be spelled: the
-  // tier is declared, and it names no step.
-  const declaresTierNamesNoStep = { l0Required: ["assemble"], l1Required: ["static"], l2Execution: [] };
-  const resolved = evidenceLadderFor({ id: "p", ladder: declaresTierNamesNoStep }, null);
+  // THE STATE THE REFUSAL NAMES — read from the refusal, not frozen into the
+  // fixture. When this test was written, `l2Execution` published "declares an
+  // l2Execution tier but names no step", and the state below was `l2Execution:
+  // []`. That refusal was withdrawn precisely because of this test: naming no
+  // step is declaring no L2, which `harness init` seeds and which must stay
+  // silent. The field publishes a DIFFERENT refusal now — steps named over an
+  // undeclared L1 — so the fixture follows the text rather than outliving it.
+  //
+  // The property is untouched: whatever `l2Execution` publishes, the loader
+  // performs. A fixture pinned to withdrawn wording would have asserted that a
+  // legitimate ladder is refused, which is the opposite of what this file is for.
+  const namesStepsOverAnUndeclaredRung = { l0Required: ["assemble"], l2Execution: ["run"] };
+  const resolved = evidenceLadderFor({ id: "p", ladder: namesStepsOverAnUndeclaredRung }, null);
 
   const seedsIt = /l2Execution:\s*\[\s*\]/.test(LADDER_BLOCK);
   assert.ok(
