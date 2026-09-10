@@ -113,7 +113,14 @@ export const CONTRACT = Object.freeze({
           "nothing — the tests import the code and call it",
         ]),
         default: "a local runtime instance the lane starts and tears down",
-        refusal: "declares an l2Execution tier but names no step — a rung nothing can earn",
+        // NO REFUSAL, for the same reason l0Required and l1Required publish
+        // none: naming no step is not malformed, it is declaring no L2 — the
+        // meaning above says so, and `harness init` seeds exactly that state.
+        // This field published "declares an l2Execution tier but names no step"
+        // until a review pointed out that nothing performed it and nothing
+        // could, since the state it named is the seeded default. A refusal
+        // nobody performs tells an author they are protected when they are not.
+        refusal: null,
       }),
       l3Execution: Object.freeze({
         required: false,

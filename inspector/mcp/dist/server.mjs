@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 69c1f710015669707ab06cc75a7a5defa2523a6675c41c1cca5b5213456cca34
+// cmp:bundle-inputs c08b56105f9ee93b91a29793040bf2c5acf9a53a069cfafb55efbfc584cf4e97
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35376,7 +35376,14 @@ var CONTRACT = Object.freeze({
           "nothing \u2014 the tests import the code and call it"
         ]),
         default: "a local runtime instance the lane starts and tears down",
-        refusal: "declares an l2Execution tier but names no step \u2014 a rung nothing can earn"
+        // NO REFUSAL, for the same reason l0Required and l1Required publish
+        // none: naming no step is not malformed, it is declaring no L2 — the
+        // meaning above says so, and `harness init` seeds exactly that state.
+        // This field published "declares an l2Execution tier but names no step"
+        // until a review pointed out that nothing performed it and nothing
+        // could, since the state it named is the seeded default. A refusal
+        // nobody performs tells an author they are protected when they are not.
+        refusal: null
       }),
       l3Execution: Object.freeze({
         required: false,
@@ -35540,6 +35547,26 @@ function asList(value) {
   if (value === void 0 || value === null) return [];
   return Array.isArray(value) ? [...value] : [value];
 }
+function readLadder(ladder) {
+  const L = ladder && typeof ladder === "object" ? ladder : {};
+  const names = (v) => asList(v).filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+  return {
+    scaffoldCore: names(L.scaffoldCore),
+    l0Required: names(L.l0Required),
+    l1Required: names(L.l1Required),
+    l2Execution: names(L.l2Execution),
+    l3Execution: names(L.l3Execution),
+    names: L.names && typeof L.names === "object" ? L.names : {}
+  };
+}
+function ladderRungs(L) {
+  const rungs = [];
+  if (L.l0Required.length) rungs.push({ id: "L0", requires: [...L.l0Required], mode: "all" });
+  if (rungs.length && L.l1Required.length) rungs.push({ id: "L1", requires: [...L.l1Required], mode: "all" });
+  if (rungs.length === 2 && L.l2Execution.length) rungs.push({ id: "L2", requires: [...L.l2Execution], mode: "any" });
+  if (rungs.length === 3 && L.l3Execution.length) rungs.push({ id: "L3", requires: [...L.l3Execution], mode: "all" });
+  return rungs;
+}
 function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   if (!ladder || typeof ladder !== "object") {
     return {
@@ -35549,16 +35576,10 @@ function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   }
   const L = ladder;
   const RUNG_NAMES = L.names ?? {};
-  const L2_EXECUTION = asList(L.l2Execution);
-  const L3_EXECUTION = asList(L.l3Execution);
-  const L0_REQUIRED = Array.isArray(L.l0Required) ? [...L.l0Required] : [];
-  const L1_REQUIRED = Array.isArray(L.l1Required) ? [...L.l1Required] : [];
-  const declared = [
-    { id: "L0", requires: L0_REQUIRED, mode: "all" },
-    { id: "L1", requires: L1_REQUIRED, mode: "all" },
-    ...L2_EXECUTION.length ? [{ id: "L2", requires: [...L2_EXECUTION], mode: "any" }] : [],
-    ...L2_EXECUTION.length && L3_EXECUTION.length ? [{ id: "L3", requires: [...L3_EXECUTION], mode: "all" }] : []
-  ].map((r) => ({ ...r, name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id }));
+  const declared = ladderRungs(readLadder(ladder)).map((r) => ({
+    ...r,
+    name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id
+  }));
   const earnedId = typeof earned === "string" && earned.trim() ? earned.trim() : null;
   const earnedIdx = earnedId ? declared.findIndex((r) => r.id === earnedId) : -1;
   const passedSet = new Set((Array.isArray(passed) ? passed : []).filter((s) => typeof s === "string"));

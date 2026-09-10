@@ -676,9 +676,11 @@ export function steps({ ROOT }) {
 //   // (qa/lib/evidence-ladder.mjs carries the argument).
 //   names: { L0: "…", L1: "…", L2: "…", L3: "…" },
 //   // NAMED, not empty. This legend showed four empty lists until 2026-09-10,
-//   // which meant uncommenting it verbatim produced a ladder the lane refuses:
-//   // l0Required and l1Required are required, and an empty one would earn its
-//   // rung vacuously. The two steps below are the two this command actually
+//   // which meant uncommenting it verbatim declared a ladder that earns no rung
+//   // at all: a rung whose steps you do not name is a rung you have not claimed,
+//   // so an empty l0Required grades nothing rather than granting L0 for free.
+//   // Nothing here is REQUIRED — declaring less earns less, which is honest and
+//   // is never refused. The two steps below are the two this command actually
 //   // writes into your pack, so this block works as it stands and every later
 //   // step is an addition.
 //   l0Required: ["harnessIntegrity"],
