@@ -196,8 +196,8 @@ function rungFor(stepResults, ladder) {
   const SCAFFOLD_CORE = L.scaffoldCore ?? [];
   const L0_REQUIRED = L.l0Required ?? [];
   const L1_REQUIRED = L.l1Required ?? [];
-  const DEVICE_EXECUTION = L.deviceExecution ?? [];
-  const RELEASE_EXECUTION = L.release ?? null;
+  const DEVICE_EXECUTION = L.l2Execution ?? [];
+  const RELEASE_EXECUTION = L.l3Execution ?? null;
   // A ladder without labels still grades — the rung id is its own label.
   const RUNG_NAMES = L.names ?? { L0: "L0", L1: "L1", L2: "L2", L3: "L3" };
   const steps = Array.isArray(stepResults) ? stepResults.filter((s) => s && typeof s.name === "string") : [];
@@ -254,7 +254,7 @@ function rungFor(stepResults, ladder) {
  * it takes the verdict rather than reaching for it.
  *
  * WHICH RUNGS EXIST is derived from the declaration too, never assumed to be
- * four. `rungFor` can only reach L2 when `deviceExecution` names a step, and
+ * four. `rungFor` can only reach L2 when `l2Execution` names a step, and
  * only reach L3 when `release` does — so a ladder that names neither has two
  * rungs, and drawing four with two forever dark would be the console promising
  * an adopter a rung their profile cannot mint.
@@ -278,8 +278,8 @@ export function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   }
   const L = ladder;
   const RUNG_NAMES = L.names ?? {};
-  const DEVICE_EXECUTION = Array.isArray(L.deviceExecution) ? L.deviceExecution : [];
-  const RELEASE_EXECUTION = typeof L.release === "string" && L.release.trim() ? L.release.trim() : null;
+  const DEVICE_EXECUTION = Array.isArray(L.l2Execution) ? L.l2Execution : [];
+  const RELEASE_EXECUTION = typeof L.l3Execution === "string" && L.l3Execution.trim() ? L.l3Execution.trim() : null;
   const L0_REQUIRED = Array.isArray(L.l0Required) ? [...L.l0Required] : [];
   const L1_REQUIRED = Array.isArray(L.l1Required) ? [...L.l1Required] : [];
   // `all` and `any` are `rungFor`'s own two shapes and not a vocabulary of this

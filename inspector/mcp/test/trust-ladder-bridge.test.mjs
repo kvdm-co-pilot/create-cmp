@@ -91,7 +91,7 @@ test("the ladder bridge asks the MANIFEST which profile this is — not the load
     const profileAbs = path.join(dir2, "qa", "lib", "profiles", manifest.profile.id, "index.mjs");
     fs.appendFileSync(
       profileAbs,
-      `\nexport const ladder = { l0Required: ["harnessIntegrity"], l1Required: ["specCoverage"], deviceExecution: ["integration"], release: "shipIt", names: { L0: "green", L1: "static", L2: "integrated", L3: "shipped" } };\n`,
+      `\nexport const ladder = { l0Required: ["harnessIntegrity"], l1Required: ["specCoverage"], l2Execution: ["integration"], l3Execution: "shipIt", names: { L0: "green", L1: "static", L2: "integrated", L3: "shipped" } };\n`,
     );
     const stand = readLadderStanding(dir2, {
       available: true,

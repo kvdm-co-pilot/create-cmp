@@ -122,11 +122,11 @@ export function steps() {
       names: { L0: "L0 — it imports", L1: "L1 — fast tests", L2: "L2 — slow tests", L3: "L3 — released" },
       l0Required: ["harness_integrity"],
       l1Required: ["harness_integrity", "spec_coverage", "py_tests_fast"],
-      deviceExecution: ["py_tests_slow"],
+      l2Execution: ["py_tests_slow"],
       // This stack declares no release step at all. `[]` used to say that and
       // now reads as the wrong shape — `null` says it in the one way the grader
       // and the resolver both understand.
-      release: null,
+      l3Execution: null,
     },
   };
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs c6462a1036831c3a8d654bcc52a543205f50cfe34825f019e295bc2c97ac7d87
+// cmp:bundle-inputs 4e68c9704cc0820ca5265d1e88aa9598a61cf5fb872e4d2dd05c30f064a65749
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35000,7 +35000,7 @@ function resolveHarnessManifest(root) {
 import fs11 from "node:fs";
 import { createRequire } from "node:module";
 import path11 from "node:path";
-var SUPPORTED_PROFILE_PROTOCOLS = Object.freeze([1, 2]);
+var SUPPORTED_PROFILE_PROTOCOLS = Object.freeze([1, 2, 3]);
 var EXTENDS_PROTOCOL = 2;
 var PROFILES_DIR_REL = "qa/lib/profiles";
 var REQUIRED_EXPORTS = Object.freeze(["id", "protocol", "layout", "tiers", "steps"]);
@@ -35334,7 +35334,7 @@ function readTrustRecord(root, { now = Date.now() } = {}) {
 }
 
 // ../../packages/harness/src/lib/evidence-ladder.mjs
-var GRADED_FIELDS = Object.freeze(["scaffoldCore", "l0Required", "l1Required", "deviceExecution", "release", "names"]);
+var GRADED_FIELDS = Object.freeze(["scaffoldCore", "l0Required", "l1Required", "l2Execution", "l3Execution", "names"]);
 var DECLARED_SPELLING = "`export const ladder` (the profile's top-level declaration)";
 var PACK_SPELLING = "`evidenceLadder` (a key on the object `steps(ctx)` returns)";
 function present(v) {
@@ -35372,7 +35372,7 @@ function evidenceLadderFor(profile, pack) {
       return {
         ok: false,
         source,
-        reason: `profile "${id}" declares ${spelling} as ${brief(value)}, which is not an evidence ladder \u2014 a ladder is an object of step names ({ names, l0Required, l1Required, deviceExecution, release }). Fix it or remove it; a profile that declares no ladder earns no rung, which is honest, and this is not that.`
+        reason: `profile "${id}" declares ${spelling} as ${brief(value)}, which is not an evidence ladder \u2014 a ladder is an object of step names ({ names, l0Required, l1Required, l2Execution, release }). Fix it or remove it; a profile that declares no ladder earns no rung, which is honest, and this is not that.`
       };
     }
   }
@@ -35380,12 +35380,29 @@ function evidenceLadderFor(profile, pack) {
     [declared, DECLARED_SPELLING, "profile"],
     [packed, PACK_SPELLING, "pack"]
   ]) {
-    const release = present(value) ? value.release : void 0;
-    if (present(release) && typeof release !== "string") {
+    if (!present(value)) continue;
+    for (const [was, now] of [
+      ["deviceExecution", "l2Execution"],
+      ["release", "l3Execution"]
+    ]) {
+      if (!(was in value)) continue;
       return {
         ok: false,
         source,
-        reason: `profile "${id}" declares ${spelling} with release = ${brief(release)}, which names no step. \`release\` takes ONE step name as a string \u2014 it is the only ladder field that is not a list, and a list here matches nothing, so L3 is unreachable and nothing says so. Write \`release: "${Array.isArray(release) && typeof release[0] === "string" ? release[0] : "yourReleaseStep"}"\`, or remove the field: a profile that declares no release step earns no L3, which is honest.`
+        reason: `profile "${id}" declares ${spelling} with \`${was}\`, which this lane no longer reads \u2014 it is \`${now}\` now. The rungs are local and pre-release for every stack, so they are named by position rather than by one stack's runtime: L2 is the rung where the artifact runs AS THE PROGRAM, L3 the same for the shippable variant. Rename the field (\`node qa/profile.mjs explain ladder.${now}\` says what it means), or run \`prooflane upgrade\`.`
+      };
+    }
+  }
+  for (const [value, spelling, source] of [
+    [declared, DECLARED_SPELLING, "profile"],
+    [packed, PACK_SPELLING, "pack"]
+  ]) {
+    const l3 = present(value) ? value.l3Execution : void 0;
+    if (present(l3) && typeof l3 !== "string") {
+      return {
+        ok: false,
+        source,
+        reason: `profile "${id}" declares ${spelling} with l3Execution = ${brief(l3)}, which names no step. \`l3Execution\` takes ONE step name as a string \u2014 it is the only ladder field that is not a list, and a list here matches nothing, so L3 is unreachable and nothing says so. Write \`l3Execution: "${Array.isArray(l3) && typeof l3[0] === "string" ? l3[0] : "yourReleaseStep"}"\`, or remove the field: a profile that declares no release step earns no L3, which is honest.`
       };
     }
   }
@@ -35422,8 +35439,8 @@ function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   }
   const L = ladder;
   const RUNG_NAMES = L.names ?? {};
-  const DEVICE_EXECUTION = Array.isArray(L.deviceExecution) ? L.deviceExecution : [];
-  const RELEASE_EXECUTION = typeof L.release === "string" && L.release.trim() ? L.release.trim() : null;
+  const DEVICE_EXECUTION = Array.isArray(L.l2Execution) ? L.l2Execution : [];
+  const RELEASE_EXECUTION = typeof L.l3Execution === "string" && L.l3Execution.trim() ? L.l3Execution.trim() : null;
   const L0_REQUIRED = Array.isArray(L.l0Required) ? [...L.l0Required] : [];
   const L1_REQUIRED = Array.isArray(L.l1Required) ? [...L.l1Required] : [];
   const declared = [

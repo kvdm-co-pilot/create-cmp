@@ -158,7 +158,7 @@ export function steps() {
       names: { L0: "L0 — it compiles", L1: "L1 — proven on the host", L2: "L2 — proven against a real database", L3: "L3 — release" },
       l0Required: ["harnessIntegrity"],
       l1Required: ["harnessIntegrity", "specCoverage", "unitTests"],
-      deviceExecution: ["integrationTests"],
+      l2Execution: ["integrationTests"],
       // AS AUTHORED this read `release: ["distribution"]` — a list, like every
       // other field on this ladder. The grader reads `release` as a single step
       // NAME, so the list matched nothing and this profile's L3 was unreachable
@@ -167,7 +167,7 @@ export function steps() {
       // evidence-ladder.mjs now refuses the shape by name. The mistake is kept
       // as a PLANT (test/evidence-ladder.test.mjs) rather than as a passive
       // fixture, because a plant is watched failing and a fixture is not.
-      release: "distribution",
+      l3Execution: "distribution",
     },
     // Nothing to lease: no device, and the container is owned by Testcontainers
     // for the life of the Gradle JVM.

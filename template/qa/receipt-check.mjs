@@ -158,7 +158,7 @@ function evaluate() {
       const profile = loaded.ok ? loaded.profile : null;
       const resolved = evidenceLadderFor(profile);
       const ladder = resolved.ok ? resolved.ladder : null;
-      if (ladder && Array.isArray(ladder.deviceExecution)) legacyNames = ladder.deviceExecution;
+      if (ladder && Array.isArray(ladder.l2Execution)) legacyNames = ladder.l2Execution;
       const declared = profile?.legacySkipReasons;
       if (Array.isArray(declared) && declared.length) {
         legacyPatterns = new RegExp(declared.map((r) => String(r).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));

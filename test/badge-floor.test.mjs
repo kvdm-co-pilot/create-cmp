@@ -58,8 +58,8 @@ const TWIN_LADDER = {
   names: { L0: "L0 — the lane is the locked one", L1: "L1 — every promise bound", L2: "L2 — unreachable here", L3: "L3 — unreachable here" },
   l0Required: ["harnessIntegrity"],
   l1Required: ["harnessIntegrity", "specCoverage"],
-  deviceExecution: [],
-  release: null,
+  l2Execution: [],
+  l3Execution: null,
 };
 
 /** The twins' green lane: both rows PASS, in both trees. */

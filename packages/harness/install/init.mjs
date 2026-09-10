@@ -655,7 +655,7 @@ export function steps({ ROOT }) {
 //   //                    else's stack is graded by them.
 //   //   l0Required       step names that must all PASS for the floor rung
 //   //   l1Required       and for L1, on top of L0
-//   //   deviceExecution  step names that need a resource the host may not have
+//   //   l2Execution  step names that need a resource the host may not have
 //   //                    (a phone, a container, a broker). ONE of them PASSing
 //   //                    lifts L1 to L2; a SKIP never does
 //   //   release          ONE step name (a string, not a list) whose PASS lifts
@@ -672,7 +672,7 @@ export function steps({ ROOT }) {
 //   // declarations that disagree rather than pick whichever one it can see
 //   // (qa/lib/evidence-ladder.mjs carries the argument).
 //   names: { L0: "…", L1: "…", L2: "…", L3: "…" },
-//   l0Required: [], l1Required: [], deviceExecution: [], release: null,
+//   l0Required: [], l1Required: [], l2Execution: [], l3Execution: null,
 // };
 //
 // export const plants = {

@@ -127,7 +127,7 @@ test("the generated profile satisfies the loader's contract with no human editin
       assert.match(src, new RegExp(`//\\s*export (?:function |const )?${optional}\\b`), `${optional} must be present and commented`);
     }
     assert.match(src, /testFileBasename/, "the plants block must carry its real field names");
-    assert.match(src, /deviceExecution/, "the ladder block must carry its real field names");
+    assert.match(src, /l2Execution/, "the ladder block must carry its real field names");
   } finally {
     fs.rmSync(path.dirname(dir), { recursive: true, force: true });
   }

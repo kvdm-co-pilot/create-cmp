@@ -61,7 +61,7 @@
  * declarations differing anywhere else are not in disagreement about any grade,
  * so they are not refused.
  */
-export const GRADED_FIELDS = Object.freeze(["scaffoldCore", "l0Required", "l1Required", "deviceExecution", "release", "names"]);
+export const GRADED_FIELDS = Object.freeze(["scaffoldCore", "l0Required", "l1Required", "l2Execution", "l3Execution", "names"]);
 
 /** The two spellings, named the way an author wrote them, for every message below. */
 const DECLARED_SPELLING = "`export const ladder` (the profile's top-level declaration)";
@@ -132,24 +132,24 @@ export function evidenceLadderFor(profile, pack) {
         source,
         reason:
           `profile "${id}" declares ${spelling} as ${brief(value)}, which is not an evidence ladder — ` +
-          `a ladder is an object of step names ({ names, l0Required, l1Required, deviceExecution, release }). ` +
+          `a ladder is an object of step names ({ names, l0Required, l1Required, l2Execution, release }). ` +
           `Fix it or remove it; a profile that declares no ladder earns no rung, which is honest, and this is not that.`,
       };
     }
   }
 
-  // `release` is the ONE graded field the grader reads as a single step name
+  // `l3Execution` is the ONE graded field the grader reads as a single step name
   // rather than as a list, and that asymmetry produces a silently wrong verdict.
-  // evidence-level.mjs does `passed.has(L.release)` against a Set of step-name
-  // STRINGS, so a `release: ["distribution"]` never matches anything and L3
+  // evidence-level.mjs does `passed.has(L.l3Execution)` against a Set of step-name
+  // STRINGS, so an `l3Execution: ["distribution"]` never matches anything and L3
   // becomes unreachable without one word being said about it. Every sibling
-  // field — scaffoldCore, l0Required, l1Required, deviceExecution — IS a list,
-  // and the seeded skeleton showed `release: []`, so the shape an author is
+  // field — scaffoldCore, l0Required, l1Required, l2Execution — IS a list,
+  // and the seeded skeleton showed an empty list, so the shape an author is
   // most likely to reach for is exactly the one that fails silently. A real
   // one did: the second-stack author who wrote the ktor-backend profile from
-  // the contract alone declared `release: ["distribution"]`, and their L3 was
-  // unreachable. Executed rather than read — the same ladder grades L2 as a
-  // list and L3 as a string.
+  // the contract alone declared it as a list, and their L3 was unreachable.
+  // Executed rather than read — the same ladder grades L2 as a list and L3 as
+  // a string.
   //
   // This REFUSES rather than reinterpreting. Accepting the list would be the
   // semantically obvious repair, and it is not taken here, because it would
@@ -158,22 +158,61 @@ export function evidenceLadderFor(profile, pack) {
   // first. A refusal changes no grade anywhere: a string means exactly what it
   // meant, an absent one earns no L3 exactly as before, and the only tree
   // whose behaviour moves is one that was already being graded wrongly and
-  // silently. Whether the ladder should be uniformly list-shaped is the open
-  // question, and it belongs in that ADR rather than in this fix.
+  // silently.
+  //
+  // THE RENAME DID NOT SETTLE THIS. `release` → `l3Execution` (2026-09-10) made
+  // the name uniform and deliberately left the SHAPE alone, for the reason
+  // above: a rename changes no grade, a reshape changes several. The open
+  // question is now ADR-0016, and this block is what it proposes to delete.
+  // THE PRE-RENAME SPELLINGS, REFUSED BY NAME. `deviceExecution` and `release`
+  // became `l2Execution` and `l3Execution` on 2026-09-10, because the core had
+  // no business calling a rung after one stack's runtime — a Python profile
+  // declaring `deviceExecution` was naming hardware it does not have, and the
+  // receipt field beside it could only ever be empty.
+  //
+  // Silently reading the old key would be the friendly thing and it is refused,
+  // for the reason every fallback in this loader is refused: a profile that
+  // still spells it the old way was written against a different meaning of the
+  // rung, and grading it anyway would put a rung on a tree whose author never
+  // answered the question the new name asks. The refusal names both the field
+  // and the command, which is the whole of the migration for a hand-written
+  // profile.
   for (const [value, spelling, source] of [
     [declared, DECLARED_SPELLING, "profile"],
     [packed, PACK_SPELLING, "pack"],
   ]) {
-    const release = present(value) ? value.release : undefined;
-    if (present(release) && typeof release !== "string") {
+    if (!present(value)) continue;
+    for (const [was, now] of [
+      ["deviceExecution", "l2Execution"],
+      ["release", "l3Execution"],
+    ]) {
+      if (!(was in value)) continue;
       return {
         ok: false,
         source,
         reason:
-          `profile "${id}" declares ${spelling} with release = ${brief(release)}, which names no step. ` +
-          `\`release\` takes ONE step name as a string — it is the only ladder field that is not a list, ` +
+          `profile "${id}" declares ${spelling} with \`${was}\`, which this lane no longer reads — it is \`${now}\` now. ` +
+          `The rungs are local and pre-release for every stack, so they are named by position rather than by one stack's runtime: ` +
+          `L2 is the rung where the artifact runs AS THE PROGRAM, L3 the same for the shippable variant. ` +
+          `Rename the field (\`node qa/profile.mjs explain ladder.${now}\` says what it means), or run \`prooflane upgrade\`.`,
+      };
+    }
+  }
+
+  for (const [value, spelling, source] of [
+    [declared, DECLARED_SPELLING, "profile"],
+    [packed, PACK_SPELLING, "pack"],
+  ]) {
+    const l3 = present(value) ? value.l3Execution : undefined;
+    if (present(l3) && typeof l3 !== "string") {
+      return {
+        ok: false,
+        source,
+        reason:
+          `profile "${id}" declares ${spelling} with l3Execution = ${brief(l3)}, which names no step. ` +
+          `\`l3Execution\` takes ONE step name as a string — it is the only ladder field that is not a list, ` +
           `and a list here matches nothing, so L3 is unreachable and nothing says so. ` +
-          `Write \`release: "${Array.isArray(release) && typeof release[0] === "string" ? release[0] : "yourReleaseStep"}"\`, ` +
+          `Write \`l3Execution: "${Array.isArray(l3) && typeof l3[0] === "string" ? l3[0] : "yourReleaseStep"}"\`, ` +
           `or remove the field: a profile that declares no release step earns no L3, which is honest.`,
       };
     }

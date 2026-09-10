@@ -49,7 +49,7 @@ import { PROFILE_ID_RE } from "./harness-manifest.mjs";
  * exactly that instead, which is why the version has to move for the message to
  * be worth anything.
  */
-export const PROFILE_PROTOCOL = 2;
+export const PROFILE_PROTOCOL = 3;
 
 /**
  * Every protocol this lane can load. A profile at 1 is one written before
@@ -57,7 +57,7 @@ export const PROFILE_PROTOCOL = 2;
  * refusing it would be a rename dressed as a version — the failure ADR-0007
  * refused for the receipt, one layer down.
  */
-export const SUPPORTED_PROFILE_PROTOCOLS = Object.freeze([1, 2]);
+export const SUPPORTED_PROFILE_PROTOCOLS = Object.freeze([1, 2, 3]);
 
 /** The protocol a profile must declare before it may use `extends`. */
 export const EXTENDS_PROTOCOL = 2;

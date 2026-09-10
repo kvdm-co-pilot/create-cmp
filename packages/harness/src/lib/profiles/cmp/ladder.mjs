@@ -80,7 +80,7 @@ export const CMP_LADDER = Object.freeze({
   scaffoldCore: Object.freeze(SCAFFOLD_CORE),
   l0Required: Object.freeze(L0_REQUIRED),
   l1Required: Object.freeze(L1_REQUIRED),
-  deviceExecution: Object.freeze(DEVICE_EXECUTION),
-  release: RELEASE_EXECUTION,
+  l2Execution: Object.freeze(DEVICE_EXECUTION),
+  l3Execution: RELEASE_EXECUTION,
   names: Object.freeze(RUNG_NAMES),
 });

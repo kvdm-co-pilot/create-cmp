@@ -218,14 +218,19 @@ test("THE CLASS: no console module reads the ladder DECLARATION — only what th
   // rung. Its observable spelling is reading the ladder's requirement lists,
   // and the list of those is DERIVED from the resolver's own GRADED_FIELDS so a
   // field added there is scanned for the day it is added.
-  const AMBIGUOUS = ["names", "release"];
+  const AMBIGUOUS = ["names"];
   const scanned = GRADED_FIELDS.filter((f) => !AMBIGUOUS.includes(f));
-  // `names` and `release` are ordinary English and collide with fields this
-  // console legitimately holds (a plant's `names`, a release date); the four
-  // that remain cannot be read by accident, and no grader can work without at
-  // least one of them. If GRADED_FIELDS ever loses one of the four, this count
-  // fails rather than quietly scanning less.
-  assert.equal(scanned.length, GRADED_FIELDS.length - 2, "exactly two graded fields are excluded, and deliberately");
+  // `names` is ordinary English and collides with a field this console
+  // legitimately holds (a plant's `names`); the rest cannot be read by accident,
+  // and no grader can work without at least one of them. If GRADED_FIELDS ever
+  // loses one, this count fails rather than quietly scanning less.
+  //
+  // `release` used to be excluded here too, for the same reason — it collided
+  // with a release date. The 2026-09-10 rename to `l3Execution` retired that
+  // collision: a positional field name cannot be ordinary English, so the scan
+  // covers one more field than it could before. Naming a thing after where it
+  // sits rather than after what one stack does with it buys this for free.
+  assert.equal(scanned.length, GRADED_FIELDS.length - 1, "exactly one graded field is excluded, and deliberately");
   assert.ok(scanned.length >= 4, `expected the ladder's requirement fields to be scanned, saw ${JSON.stringify(scanned)}`);
   const probe = new RegExp(`\\.\\s*(${scanned.join("|")})\\b|\\bevidenceLadder\\b`);
 
