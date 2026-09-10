@@ -1,0 +1,88 @@
+// The contract is read by three consumers — the loader, the interview, and the
+// author — and the whole reason it is one object is that they cannot then
+// disagree. These tests hold the properties that make that true.
+//
+// The one that matters most is the budget. A `meaning` is prose, and prose that
+// nobody enforces a limit on grows until it is skimmed rather than read — at
+// which point the contract has the same failure mode as the proposal table it
+// replaced, with more words.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  CONTRACT,
+  CONTRACT_PATHS,
+  MEANING_BUDGET,
+  contractAt,
+  explain,
+  requiredFields,
+} from "../packages/harness/src/lib/profile-contract.mjs";
+
+test("every field the contract describes carries a meaning, within a budget the suite enforces", () => {
+  assert.ok(CONTRACT_PATHS.length >= 6, `the contract describes ${CONTRACT_PATHS.length} fields — too few to be the ladder`);
+  const over = [];
+  for (const path of CONTRACT_PATHS) {
+    const entry = contractAt(path);
+    assert.ok(entry, `${path} resolves`);
+    assert.equal(typeof entry.meaning, "string", `${path} has a meaning`);
+    assert.ok(entry.meaning.trim().length > 40, `${path}'s meaning says something`);
+    if (entry.meaning.length > MEANING_BUDGET) over.push(`${path} (${entry.meaning.length})`);
+  }
+  assert.deepEqual(over, [], `a meaning over ${MEANING_BUDGET} chars stops being read — shorten it, or move the argument into an ADR:\n  ${over.join("\n  ")}`);
+});
+
+test("a field with options names a default, and the default is one of them", () => {
+  for (const path of CONTRACT_PATHS) {
+    const entry = contractAt(path);
+    if (!entry.options) continue;
+    assert.ok(entry.options.length >= 2, `${path} offers a choice`);
+    assert.ok(entry.default, `${path} has options but recommends none — the interview would render a menu with no recommendation`);
+    assert.ok(entry.options.includes(entry.default), `${path}'s default "${entry.default}" is not among its own options`);
+  }
+});
+
+// The interview can only ask what the contract phrases. A field with options and
+// no question is a menu the interview cannot title; the reverse is a question
+// with no answers to pick from. Either way the interview silently skips it and
+// the author is back to guessing — the failure this whole object exists to end.
+test("every field the interview must ask is askable: a question, and options to pick from", () => {
+  const asked = CONTRACT_PATHS.map((p) => [p, contractAt(p)]).filter(([, e]) => e.options || e.question);
+  assert.ok(asked.length >= 3, "the interview has something to ask");
+  for (const [path, entry] of asked) {
+    assert.equal(typeof entry.question, "string", `${path} has options but no question`);
+    assert.match(entry.question, /\?$/, `${path}'s question is phrased as one`);
+  }
+});
+
+test("a required field states the refusal that fires when it is missing", () => {
+  const required = requiredFields("ladder");
+  assert.deepEqual(required, ["l0Required", "l1Required"], "the two rungs a ladder cannot omit");
+  for (const name of required) {
+    const entry = CONTRACT.ladder.fields[name];
+    assert.ok(entry.refusal, `${name} is required but names no refusal — the loader would have nothing to say`);
+  }
+});
+
+// THE PROPERTY THE WHOLE DESIGN RESTS ON. `explain` must read the same object the
+// loader validates against. If it ever grew its own copy of the words, the help
+// and the enforcement could drift — which is precisely what a table in a proposal
+// did, and what this file exists to prevent.
+test("explain renders from the contract itself, and shows this project's real declaration", () => {
+  const out = explain("ladder.l2Execution", { declared: ["someStep"] });
+  const entry = contractAt("ladder.l2Execution");
+  assert.ok(out.includes(entry.meaning), "the rendered meaning IS the contract's, not a paraphrase");
+  assert.ok(out.includes(entry.question), "and so is the question");
+  for (const o of entry.options) assert.ok(out.includes(o), `option "${o}" is offered`);
+  assert.match(out, /THIS PROJECT DECLARES: \["someStep"\]/, "the worked example is the project's own value, never a copy in the core");
+  assert.match(out, /l2Execution/, "field names survive rendering with their capitalisation intact");
+  assert.equal(explain("ladder.nothingLikeThis"), null, "a path naming nothing returns null rather than inventing help");
+});
+
+test("the ladder is documented as local and pre-release, so no rung can be read as a deployment", () => {
+  const l3 = contractAt("ladder.l3Execution");
+  assert.match(l3.meaning, /shippable/i, "L3 is about the shippable VARIANT");
+  assert.match(l3.meaning, /on this machine/i, "and it is still local");
+  assert.match(l3.refusal, /l2Execution/, "L3 without L2 is refused by name");
+  const l2 = contractAt("ladder.l2Execution");
+  assert.match(l2.meaning, /NOT imported/, "the distinction an author gets wrong is stated, not implied");
+});
