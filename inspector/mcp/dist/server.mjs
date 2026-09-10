@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 97ca4f5e45206400de1a3985168f841d4a256c51cef46915d89baede13ccc814
+// cmp:bundle-inputs 7e847b5e428b72cb04965cc44b66a50357b93293ac1bf15cf1d7775afaef46f3
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -32334,7 +32334,13 @@ import { fileURLToPath } from "node:url";
 var PKG_ROOT = path3.resolve(path3.dirname(fileURLToPath(import.meta.url)), "..", "..");
 var BUNDLE_MARKER = "cmp:bundle-inputs";
 function consoleDir(root) {
-  const dir = path3.resolve(root, "..", "..", "packages", "harness", "src", "console");
+  return harnessDir(root, "console");
+}
+function harnessLibDir(root) {
+  return harnessDir(root, "lib");
+}
+function harnessDir(root, name) {
+  const dir = path3.resolve(root, "..", "..", "packages", "harness", "src", name);
   try {
     return fs3.statSync(dir).isDirectory() ? dir : null;
   } catch {
@@ -32351,13 +32357,12 @@ function sourceFiles(root = PKG_ROOT) {
     }
   };
   walk2(path3.join(root, "src"));
-  const console_ = consoleDir(root);
-  if (console_) walk2(console_);
+  for (const dir of [consoleDir(root), harnessLibDir(root)]) if (dir) walk2(dir);
   out.push(path3.join(root, "bin", "server.mjs"));
   return out.sort();
 }
 function sourceRoots(root = PKG_ROOT) {
-  return [path3.join(root, "src"), path3.join(root, "bin"), consoleDir(root)].filter((d) => {
+  return [path3.join(root, "src"), path3.join(root, "bin"), consoleDir(root), harnessLibDir(root)].filter((d) => {
     if (!d) return false;
     try {
       return fs3.statSync(d).isDirectory();
@@ -41902,7 +41907,7 @@ server.registerTool(
       harnessDir: external_exports.string().optional().describe("Harness project directory (default: the create-cmp checkout's inspector/harness).")
     }
   },
-  guarded(async ({ source, out, pngPath, projectDir, screen, harness, harnessDir }) => {
+  guarded(async ({ source, out, pngPath, projectDir, screen, harness, harnessDir: harnessDir2 }) => {
     if (source && source.kind === "live") {
       const live = sessionDefaultSource && sessionDefaultSource.kind === "live" ? sessionDefaultSource : {};
       const meta4 = await writeLiveScreenshot({
@@ -41968,7 +41973,7 @@ server.registerTool(
           "render_screen needs `projectDir` (render a real screen of a create-cmp app), `source:{kind:'live'}` (capture the running app), `pngPath` (an existing PNG), or `harness:true` (run the demo headless harness to produce one)."
         );
       }
-      const dir = resolvePath(harnessDir || DEFAULT_HARNESS_DIR);
+      const dir = resolvePath(harnessDir2 || DEFAULT_HARNESS_DIR);
       try {
         await execFileAsync2("./gradlew", ["run", "-q"], { cwd: dir, timeout: 3e5, env: gradleEnv() });
       } catch (err) {

@@ -45,7 +45,38 @@ export const BUNDLE_MARKER = "cmp:bundle-inputs";
  * @returns {string|null} the console directory, or null when there is none
  */
 function consoleDir(root) {
-  const dir = path.resolve(root, "..", "..", "packages", "harness", "src", "console");
+  return harnessDir(root, "console");
+}
+
+/**
+ * The harness package's lib, which this package's server ALSO bundles.
+ *
+ * The comment above got the console right and stopped one directory short. The
+ * server imports `prooflane-harness/lib/*.mjs` — profile-loader, evidence-level,
+ * harness-manifest and four more — and esbuild runs with `packages: "bundle"`,
+ * so it follows those too and inlines them. For as long as this function walked
+ * only `src` and `console`, editing any of them left the hash where it was and
+ * both freshness guards called a demonstrably stale bundle current. Reproduced
+ * 2026-09-10 by appending a token to profile-loader.mjs: `--check` printed
+ * "✓ dist/server.mjs is current" and the token was nowhere in the artifact.
+ *
+ * COVERS THE WHOLE DIRECTORY, not the seven modules actually inlined. Naming
+ * seven would be a hand-written list of what a bundler decided, drifting the
+ * first time an import is added — which is this bug, exactly. Over-covering
+ * moves the hash for a lib file the bundle does not carry, costing one rebuild
+ * that produces identical bytes; that is the safe direction, and the same
+ * choice §6 records for ignore-set hashing. What keeps the over-coverage
+ * honest is test/bundle-inputs-cover-the-bundle.test.mjs, which derives the
+ * REAL input set from esbuild's metafile and fails if this walk ever misses one
+ * again.
+ */
+function harnessLibDir(root) {
+  return harnessDir(root, "lib");
+}
+
+/** One subdirectory of the harness package's src, or null when absent. */
+function harnessDir(root, name) {
+  const dir = path.resolve(root, "..", "..", "packages", "harness", "src", name);
   try {
     return fs.statSync(dir).isDirectory() ? dir : null;
   } catch {
@@ -67,8 +98,7 @@ export function sourceFiles(root = PKG_ROOT) {
     }
   };
   walk(path.join(root, "src"));
-  const console_ = consoleDir(root);
-  if (console_) walk(console_);
+  for (const dir of [consoleDir(root), harnessLibDir(root)]) if (dir) walk(dir);
   out.push(path.join(root, "bin", "server.mjs"));
   return out.sort();
 }
@@ -80,7 +110,7 @@ export function sourceFiles(root = PKG_ROOT) {
  * @returns {string[]} absolute directory paths, existing ones only
  */
 export function sourceRoots(root = PKG_ROOT) {
-  return [path.join(root, "src"), path.join(root, "bin"), consoleDir(root)].filter((d) => {
+  return [path.join(root, "src"), path.join(root, "bin"), consoleDir(root), harnessLibDir(root)].filter((d) => {
     if (!d) return false;
     try {
       return fs.statSync(d).isDirectory();
