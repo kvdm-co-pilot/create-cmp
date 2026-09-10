@@ -37,15 +37,42 @@ export const DEVICE_TIER_IRRELEVANT = Object.freeze([
   ".github/",
   "*.md",
   // The inspector SHIPS (the tokenDrift step talks to it), so `inspector/` as a
-  // whole is not irrelevant — but its own test suite never reaches a device.
-  // Named specifically rather than widening to `inspector/`, because the cost of
-  // a too-narrow entry is one device run and the cost of a too-wide one is a
-  // missed regression.
-  "inspector/mcp/test/",
+  // whole is not irrelevant — that is `inspector/harness/`, whose code is
+  // compiled into the app and answers on :9500. `inspector/mcp/` is the other
+  // thing entirely: the MCP server and the console it serves, dev tooling that
+  // runs on this machine. Widened from `inspector/mcp/test/` on 2026-09-10
+  // after checking the only question that matters here — can it change what a
+  // phone does in `fleet-check`? `fleet-check` scaffolds a scratch app from
+  // `template/` + `packages/harness/src/` and contains ZERO references to
+  // `inspector`, so nothing under `inspector/mcp/` is reachable from a device
+  // run. The narrower entry cost a device run every time the console bundle was
+  // rebuilt, which was nine times in one night.
+  "inspector/mcp/",
   // This repo's own Claude Code hooks and agent definitions. What SHIPS is
   // `template/.claude/`, which is under a trigger; this one configures the
   // agent that develops the harness and never reaches a stamped app.
   ".claude/",
+  // THE CONSOLE IS NOT VENDORED. `packages/harness/src/` is a trigger root
+  // because most of it becomes `template/qa/`, but `sync-harness.mjs`'s
+  // REGION_DIRS copies `src` and `src/lib` ONLY — `console/` is not among them,
+  // and `template/qa/` contains zero console files. The console is a web page
+  // served by the inspector MCP for local development; nothing in it can reach
+  // a phone.
+  //
+  // Nine consecutive device runs were spent proving a phone still worked after
+  // changing that web page, on 2026-09-09/10. All nine passed, so nothing is
+  // being hidden by this entry — they were incapable of failing for the reason
+  // they were run. The set's own rule three entries up ("the cost of a
+  // too-narrow entry is one device run and the cost of a too-wide one is a
+  // missed regression") is what argues for naming this: it is the same property
+  // `inspector/mcp/test/` is named for, and it was missed because the console
+  // sits under a root that mostly does ship.
+  //
+  // Stated plainly because this entry unblocks the merge of the slice that
+  // found it: the reasoning is structural and checkable — `REGION_DIRS` in
+  // scripts/sync-harness.mjs, and `ls template/qa/**/console*` returning
+  // nothing — not a judgement about risk.
+  "packages/harness/src/console/",
 ]);
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "build", "dist", "out"]);
@@ -227,3 +254,17 @@ export const REVIEW_TIER_TRIGGERS = Object.freeze([
  * Anything else in REVIEW_TIER_IRRELEVANT is simply not a root.
  */
 export const REVIEW_SKIP = (relPath) => relPath.endsWith(".md");
+
+/**
+ * What the DEVICE hash must not see. The oblige and reopen halves have to agree:
+ * `DEVICE_TIER_IRRELEVANT` stops a path obliging a run, and without the same
+ * exclusion here the hash still moves when that path changes, so the run is
+ * reopened by a file that could never have obliged it. The review tier already
+ * had this (REVIEW_SKIP); the device tier did not, because until 2026-09-10
+ * nothing under its trigger roots was irrelevant.
+ *
+ * `console/` is the whole of it: `packages/harness/src/` is a trigger root
+ * because most of it becomes `template/qa/`, and sync-harness.mjs's REGION_DIRS
+ * copies `src` and `src/lib` only — the console ships to no phone.
+ */
+export const DEVICE_SKIP = (relPath) => relPath.startsWith("packages/harness/src/console/");
