@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 606f2f33bc3f700a72ff2aa3ed616ff68ff38e68a939ec68a92234c1dcb3cc82
+// cmp:bundle-inputs 7195d7d3c3fe8687c8cf4820ee048c1513d50299627a3e747c44b20ab44621c5
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35423,6 +35423,7 @@ var CONTRACT = Object.freeze({
       // partial ladders into refused profiles.
       l0Required: Object.freeze({
         required: false,
+        rung: "L0",
         mode: "all",
         meaning: "The steps that must PASS for the artifact to count as assembled at all. They run in every run profile and never SKIP. Declare none and this profile earns no L0 \u2014 and therefore no rung above it, since the rungs are climbed in order, which is why a ladder that names steps for a HIGHER rung and none for this one is refused rather than graded.",
         question: "Which steps prove the code assembles and its own tests run?",
@@ -35430,6 +35431,7 @@ var CONTRACT = Object.freeze({
       }),
       l1Required: Object.freeze({
         required: false,
+        rung: "L1",
         mode: "all",
         meaning: "The steps that judge the code WITHOUT running it as the program: compilation, tests against fakes and in-process calls, static analysis, and the shippable artifact BUILDING \u2014 building, not running. None of these may SKIP; they PASS or FAIL, so 'PASSed' is exactly 'ran green'. Declare none and this profile tops out at L0.",
         question: "Which steps judge the code without ever starting it as a program?",
@@ -35441,6 +35443,7 @@ var CONTRACT = Object.freeze({
       }),
       l2Execution: Object.freeze({
         required: false,
+        rung: "L2",
         mode: "any",
         meaning: "The steps whose PASS proves the artifact ran AS THE PROGRAM \u2014 assembled into its deployable form, started the way it really starts, and driven through its real entry surface. On this machine. NOT imported, NOT called in-process. A test that imports your app and calls its functions is L1 evidence however slow it is, whichever directory it lives in, and however real the data store behind it. What earns this rung is a local, disposable stand-in for the real runtime that the lane starts and tears down. Every stack has one. Declare none and this profile tops out at L1 \u2014 the honest grade for a project whose program is never started.",
         question: "What starts your app as the real program, and what drives it?",
@@ -35450,6 +35453,13 @@ var CONTRACT = Object.freeze({
           "nothing \u2014 the tests import the code and call it"
         ]),
         default: "a local runtime instance the lane starts and tears down",
+        // THE OPTION THAT SAYS "NOT HERE". Every other option describes a rung
+        // this project has; this one declares it absent. The core has to be able
+        // to tell them apart WITHOUT knowing what any of them say, which is why
+        // it is a field rather than a convention about list position or a word
+        // the loader greps for, so the interview can stop asking about rungs
+        // above one the author has just said does not exist here.
+        declinesRung: "nothing \u2014 the tests import the code and call it",
         // NAMING NO STEP IS NOT REFUSED — that is declaring no L2, and `harness
         // init` seeds exactly that state. This field once published "declares an
         // l2Execution tier but names no step", which nothing performed and
@@ -35463,6 +35473,7 @@ var CONTRACT = Object.freeze({
       }),
       l3Execution: Object.freeze({
         required: false,
+        rung: "L3",
         mode: "all",
         meaning: "The same proof as l2Execution against the SHIPPABLE variant rather than the development one, still on this machine. It exists because the shippable build runs machinery the development build does not \u2014 optimisation, shrinking, release-only checks, a production entry point \u2014 so a green development run says nothing about it. Requires l2Execution: the shippable program cannot be proven to run where no program runs.",
         question: "Is there a shippable variant, built differently from the development one?",
@@ -35471,8 +35482,16 @@ var CONTRACT = Object.freeze({
           "no \u2014 one variant only"
         ]),
         default: "no \u2014 one variant only",
+        declinesRung: "no \u2014 one variant only",
         refusal: "declares l3Execution without l2Execution \u2014 the shippable program cannot run where no program runs"
       }),
+      // INTENT IS A FIELD OF THE LADDER, not a file beside it, and that placement
+      // is the decision (ADR-0017). The ladder already cost this repository two
+      // spellings and four readers that disagreed; a second FILE holding half of
+      // it would be that class again, with a filesystem read added to a resolver
+      // that is pure precisely so its refusals are unit-testable. Living here, it
+      // arrives through `evidenceLadderFor` like everything else, and no reader
+      // has to remember to fetch it.
       names: Object.freeze({
         required: false,
         meaning: "What THIS stack calls each rung, for display only. The rung ids (L0..L3) are the core's and stay comparable across every profile; the words are yours. Two profiles may call L2 different things and still mean the same rung.",
@@ -35491,6 +35510,11 @@ var CONTRACT = Object.freeze({
 });
 var CONTRACT_PATHS = Object.freeze(
   Object.entries(CONTRACT).flatMap(([decl, spec]) => Object.keys(spec.fields ?? {}).map((f) => `${decl}.${f}`))
+);
+var MENU_FIELDS = Object.freeze(
+  Object.entries(CONTRACT).flatMap(
+    ([decl, spec]) => Object.entries(spec.fields ?? {}).filter(([, f]) => Array.isArray(f.options) && f.options.length).map(([name]) => `${decl}.${name}`)
+  )
 );
 function requiredFields(declaration) {
   const spec = CONTRACT[declaration];

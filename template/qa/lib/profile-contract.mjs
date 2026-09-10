@@ -5,6 +5,15 @@
 //   the interview  renders the menu at init/upgrade  (`question`/`options`/`default`)
 //   the author     reads WHY, at the moment it is declaring          (`meaning`)
 //
+// AND THREE KEYS THAT EXIST SO NO CONSUMER HAS TO HOLD A COPY OF THE MENU.
+// `declinesRung` names the one option meaning "this rung does not exist here";
+// `rung` names the rung a field earns, which is where the grader's rung order
+// now comes from; `MENU_FIELDS` is derived from which fields offer `options` at
+// all. Each replaced something a consumer would otherwise have written out — a
+// word to grep for, a rung table, a list of what to ask — and every one of those
+// is a copy that goes stale the first time this object is edited. The
+// field that records what a human ANSWERED, is checked against all three.
+//
 // PATTERN: prose inside the schema, never beside it. It is the shape every
 // function-calling tool description already has, and the shape `kubectl explain`
 // serves from the same bytes the API server validates with — help text and
@@ -74,6 +83,7 @@ export const CONTRACT = Object.freeze({
       // partial ladders into refused profiles.
       l0Required: Object.freeze({
         required: false,
+        rung: "L0",
         mode: "all",
         meaning:
           "The steps that must PASS for the artifact to count as assembled at all. They run in " +
@@ -86,6 +96,7 @@ export const CONTRACT = Object.freeze({
       }),
       l1Required: Object.freeze({
         required: false,
+        rung: "L1",
         mode: "all",
         meaning:
           "The steps that judge the code WITHOUT running it as the program: compilation, tests " +
@@ -101,6 +112,7 @@ export const CONTRACT = Object.freeze({
       }),
       l2Execution: Object.freeze({
         required: false,
+        rung: "L2",
         mode: "any",
         meaning:
           "The steps whose PASS proves the artifact ran AS THE PROGRAM — assembled into its " +
@@ -119,6 +131,13 @@ export const CONTRACT = Object.freeze({
           "nothing — the tests import the code and call it",
         ]),
         default: "a local runtime instance the lane starts and tears down",
+        // THE OPTION THAT SAYS "NOT HERE". Every other option describes a rung
+        // this project has; this one declares it absent. The core has to be able
+        // to tell them apart WITHOUT knowing what any of them say, which is why
+        // it is a field rather than a convention about list position or a word
+        // the loader greps for, so the interview can stop asking about rungs
+        // above one the author has just said does not exist here.
+        declinesRung: "nothing — the tests import the code and call it",
         // NAMING NO STEP IS NOT REFUSED — that is declaring no L2, and `harness
         // init` seeds exactly that state. This field once published "declares an
         // l2Execution tier but names no step", which nothing performed and
@@ -132,6 +151,7 @@ export const CONTRACT = Object.freeze({
       }),
       l3Execution: Object.freeze({
         required: false,
+        rung: "L3",
         mode: "all",
         meaning:
           "The same proof as l2Execution against the SHIPPABLE variant rather than the " +
@@ -145,8 +165,16 @@ export const CONTRACT = Object.freeze({
           "no — one variant only",
         ]),
         default: "no — one variant only",
+        declinesRung: "no — one variant only",
         refusal: "declares l3Execution without l2Execution — the shippable program cannot run where no program runs",
       }),
+      // INTENT IS A FIELD OF THE LADDER, not a file beside it, and that placement
+      // is the decision (ADR-0017). The ladder already cost this repository two
+      // spellings and four readers that disagreed; a second FILE holding half of
+      // it would be that class again, with a filesystem read added to a resolver
+      // that is pure precisely so its refusals are unit-testable. Living here, it
+      // arrives through `evidenceLadderFor` like everything else, and no reader
+      // has to remember to fetch it.
       names: Object.freeze({
         required: false,
         meaning:
@@ -172,6 +200,27 @@ export const CONTRACT = Object.freeze({
 /** Every field the contract describes, as `<declaration>.<field>`. */
 export const CONTRACT_PATHS = Object.freeze(
   Object.entries(CONTRACT).flatMap(([decl, spec]) => Object.keys(spec.fields ?? {}).map((f) => `${decl}.${f}`)),
+);
+
+/**
+ * The fields a human can answer FROM A MENU — derived from which of them offer
+ * options, never typed out. The interview asks exactly these, in exactly this
+ * order; give another field `options` tomorrow and the menu follows it the same
+ * day, which is the property a hand-maintained list is exactly the thing that
+ * loses (STEP_NAME_FIELDS in evidence-ladder.mjs carries the episode that taught
+ * this file that).
+ *
+ * THE ORDER IS LOAD-BEARING, not incidental. The rungs are climbed in order, so
+ * a field whose menu answer declines its rung declines every menu field after it
+ * — the shippable program cannot run where no program runs. `CONTRACT_PATHS`
+ * already depends on this same key order.
+ */
+export const MENU_FIELDS = Object.freeze(
+  Object.entries(CONTRACT).flatMap(([decl, spec]) =>
+    Object.entries(spec.fields ?? {})
+      .filter(([, f]) => Array.isArray(f.options) && f.options.length)
+      .map(([name]) => `${decl}.${name}`),
+  ),
 );
 
 /** The fields of one declaration that an author MUST provide. */
@@ -217,6 +266,7 @@ export function explain(path, { declared } = {}) {
     lines.push("", "OPTIONS:");
     for (const o of entry.options) lines.push(`  ${o === entry.default ? "*" : " "} ${o}`);
     lines.push("", "  (* recommended)");
+    if (entry.declinesRung) lines.push(`  (picking "${entry.declinesRung}" declares this rung absent — then name no step here)`);
   }
   if (entry.mode) lines.push("", `EARNED BY: ${entry.mode === "any" ? "any one" : "every one"} of the named steps passing`);
   lines.push("", entry.required ? "REQUIRED." : "OPTIONAL — declaring nothing is a valid, honest answer.");

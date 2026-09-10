@@ -13,6 +13,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CMP_LADDER } from "../packages/harness/src/lib/profiles/cmp/ladder.mjs";
+// THE ONE READER OF A LADDER FIELD. The derived half of this lint reads the
+// profile's runtime-tier steps through it rather than reaching into the
+// declaration itself — see the block above RUNTIME_TIER_STEPS for what reaching
+// in cost when `l3Execution` became a list.
+import { readLadder } from "../packages/harness/src/lib/evidence-level.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CORE = path.join(REPO_ROOT, "packages", "harness", "src");
@@ -329,13 +334,65 @@ test("the cmp profile declares layout and tiers, and the core reads them only th
 // the count of the half that still parsed. A lint that quietly stops banning a
 // word is worse than one that never banned it. Importing the frozen object
 // removes the failure mode rather than guarding it.
-const RUNTIME_TIER_STEPS = [...CMP_LADDER.l2Execution, ...(CMP_LADDER.l3Execution ? [CMP_LADDER.l3Execution] : [])];
+//
+// THROUGH THE ONE READER, because importing the frozen object was only half of
+// it. This line used to be:
+//
+//   [...CMP_LADDER.l2Execution, ...(CMP_LADDER.l3Execution ? [CMP_LADDER.l3Execution] : [])]
+//
+// which wraps `l3Execution` as if it were still a single step NAME. ADR-0016
+// made it a LIST and this line did not follow, so the L3 entry arrived here as
+// an ARRAY and worked only by String coercion inside the regex:
+// `String(["releaseSmoke"]) === "releaseSmoke"`. Add a second L3 step and the
+// pattern becomes `\breleaseSmoke,otherStep\b`, which matches nothing — the lint
+// keeps reporting green while banning neither name. That is precisely the
+// failure this block's own header warns about one paragraph up, reached by the
+// route the header did not consider: not a parser that reads too little, but a
+// shape that changed underneath a reader.
+//
+// `readLadder` (evidence-level.mjs) is the ONE reader of a ladder field, and the
+// reason it exists is this class: five fields were once normalised five
+// different ways across two functions. A lint that normalises a sixth way is the
+// same defect wearing a test's clothes.
+const CMP_RUNGS = readLadder(CMP_LADDER);
+const RUNTIME_TIER_STEPS = [...CMP_RUNGS.l2Execution, ...CMP_RUNGS.l3Execution];
+
+/**
+ * How many step names the profile DECLARED for those two rungs, counted off the
+ * raw declaration rather than off the normalised list.
+ *
+ * The two must be equal, and comparing them catches both directions of the
+ * defect above: a reader that flattens a list into one comma-joined name derives
+ * FEWER names than were declared, and so does one that silently drops a
+ * malformed entry. Either way the lint bans less than the profile declares,
+ * which is the inert-gate shape — and the `>= 3` guard beside it cannot see it,
+ * for exactly the reason the header gives: it was written to equal the count of
+ * the half that still worked.
+ */
+const rawCount = (v) => (Array.isArray(v) ? v.length : v ? 1 : 0);
+const DECLARED_RUNTIME_STEPS = rawCount(CMP_LADDER.l2Execution) + rawCount(CMP_LADDER.l3Execution);
 
 test("the runtime-tier step names are the profile's, and no core module spells one", () => {
   assert.ok(
     RUNTIME_TIER_STEPS.length >= 3,
     `derived nothing from the cmp ladder — this lint is inert, which is worse than absent (saw ${JSON.stringify(RUNTIME_TIER_STEPS)})`,
   );
+  assert.equal(
+    RUNTIME_TIER_STEPS.length,
+    DECLARED_RUNTIME_STEPS,
+    `the ladder declares ${DECLARED_RUNTIME_STEPS} runtime-tier step names and this lint derived ` +
+      `${RUNTIME_TIER_STEPS.length} (${JSON.stringify(RUNTIME_TIER_STEPS)}) — every one it loses is a step name the ` +
+      `core may then spell freely, with this test still green`,
+  );
+  for (const name of RUNTIME_TIER_STEPS) {
+    assert.equal(
+      typeof name === "string" && name.trim() !== "",
+      true,
+      `derived ${JSON.stringify(name)} as a step name. The ban is built as \`new RegExp("\\\\b" + name + "\\\\b")\`, so ` +
+        `anything that is not a string is coerced into one — a list of one becomes its single member and reads as ` +
+        `correct, a list of two becomes "a,b" and matches nothing at all.`,
+    );
+  }
   const offenders = [];
   for (const rel of coreModules()) {
     if (STACK_COUPLED.has(rel)) continue;

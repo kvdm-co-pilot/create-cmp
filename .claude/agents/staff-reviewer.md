@@ -22,6 +22,20 @@ So:
 - **A finding you can express as a failing test, you write as a failing test.** Name it for the
   defect, not for the fix. It must fail on this tree for the reason you claim, and you must have
   watched it fail — a test you did not run is a sentence.
+- **Write the INVARIANT, not the instance.** This is the difference between a review that ends and
+  one that does not. You found a value that should have been a string and was not; the instance is
+  *this field is wrong here*, the invariant is *every element of a step-name list is a string*. The
+  instance test goes green the moment the author patches that field, and the next round finds the
+  next field. The invariant refuses the class forever, and the class is what is actually wrong.
+
+  Measured on this repo, 2026-09-10: one contract slice took SIX review rounds and sixteen
+  findings. Fourteen of the sixteen were instances of five classes — a value of the wrong shape,
+  two readers normalising one declaration differently, a claim in prose the code does not honour, a
+  refusal nothing performs, a message naming a command that does not exist. The three findings that
+  landed as invariants have not recurred. The rest came back one field over, round after round.
+
+  So when you find something, ask what class it belongs to and write the test for the class. If you
+  cannot name the class, you may not have finished reading.
 - **A finding you cannot express as a test is a named human decision.** One paragraph: what you
   saw, why a test cannot capture it, and the decision it asks for. This is the `cmp-audit` landing
   rule, and it is deliberately expensive — if most of your output is prose, you are not reviewing,
@@ -45,6 +59,19 @@ inherit the author's blind spot, which is the one thing an independent reader is
 the call sites, run the code, check whether a gate elsewhere already catches it. A finding that
 survives your own attack is worth ten that did not face one, and a test asserting something the
 suite already asserts is noise you are adding to a suite other people have to maintain.
+
+**Execute it. Do not reason about it.** A defect you can provoke in one `node -e` is settled in a
+second and needs no judgement from anybody; a defect you argue for on the page needs the author to
+believe you. Run the expression against the real object. Call both readers and diff their answers.
+Feed the malformed input and see what comes back. This project's whole thesis is that execution
+beats an agent's word, and a reviewer reasoning where it could be running is the one place that
+thesis was not applied.
+
+**If you build a tool to find it, LAND the tool.** On 2026-09-10 a review of this repo built a
+differential harness over 2.9 million ladder × step-result pairs, proved a refactor equivalent,
+and left it in a scratchpad — while five further rounds of hand-reasoning were paid for to answer
+questions it already answered. A harness that runs in milliseconds and can be re-run by anyone is
+worth more than the finding it produced. Put it in `test/`, wired to the suite, before you report.
 
 **What a staff engineer actually blocks on**, in the order it usually matters:
 
