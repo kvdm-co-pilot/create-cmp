@@ -26,4 +26,23 @@ export const copy = Object.freeze({
   kspCarriesLabel: "carries Kotlin",
   kspCarriesNote: " — Room's KMP native compilation breaks on this.",
   depGraphGatesNote: "The Kotlin conformance gates (and the receipt they write, below) are authoritative.",
+  // Which of THIS pack's steps governs which console section. Lived in
+  // console/console-tabs.mjs as a literal until 2026-09-10, where it named
+  // `e2eSmoke` and `tokenDrift` to every adopter — the shell linking steps a
+  // backend never runs. The section ids are the shell's; which step earns them
+  // is ours, and only we can say.
+  stepGoverns: Object.freeze({
+    specCoverage: { section: "specs", label: "Specs" },
+    conformance: { section: "architecture", label: "Architecture" },
+    archDoc: { section: "architecture", label: "Architecture" },
+    componentStories: { section: "components", label: "Components" },
+    goldenTrees: { section: "screens", label: "Screens" },
+    a11y: { section: "screens", label: "Screens" },
+    e2eSmoke: { section: "screens", label: "Screens" },
+    tokenDrift: { section: "design-system", label: "Design language" },
+    approvals: { section: "approvals", label: "Approvals" },
+  }),
+  walkthroughPrereq: "With the debug app live (adb forward tcp:9500)",
+  liveStartHint:
+    "Start the whole chain from here — boot a headless AVD if no device is attached, install the debug build, launch it, forward the inspector port, and wait for health:",
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs d8ce1df979e8a8624c2a86da1b83d154651e720fa087902407b21656e54f212e
+// cmp:bundle-inputs 463e5b52a9e699dc5567fc871260ef024da00bb6d3c224d2a8bebf1d28fd2a41
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -36765,7 +36765,22 @@ var NEUTRAL_COPY = Object.freeze({
   kspCarriesNote: "",
   kspName: "the code generator",
   kspCarriesLabel: "carries the language version",
-  depGraphGatesNote: "The conformance gates (and the receipt they write, below) are authoritative."
+  depGraphGatesNote: "The conformance gates (and the receipt they write, below) are authoritative.",
+  // WHICH STEP GOVERNS WHICH SECTION is the profile's, not the shell's. It was
+  // a literal map here, naming `e2eSmoke` and `tokenDrift` — so a backend's
+  // console linked steps it does not run and left every step it DOES run
+  // unlinked. Empty is the honest neutral: an unmapped step gets no link, which
+  // is already how this renders a step the profile did not claim.
+  stepGoverns: Object.freeze({}),
+  // The empty-state help for a recorded walkthrough. Neutral because the tool
+  // that records one is a profile TOOL, withheld from a foreign repo entirely —
+  // telling its user to run `adb forward` was advice to use a binary they do
+  // not have, for an app that is not theirs.
+  walkthroughPrereq: "With the app running and reachable by the harness",
+  // What the Start button will actually do. The literal here described booting
+  // an AVD and installing a debug build — one stack's chain, rendered on every
+  // console that has a live provider at all.
+  liveStartHint: "Start the whole chain from here \u2014 bring up the runtime, install the build, launch it, and wait for health:"
 });
 var COPY = NEUTRAL_COPY;
 function setConsoleCopy(copy) {
@@ -37778,17 +37793,6 @@ ${mdTableHtml(doc && doc.decisions)}
 ${featureShapeHtml(featureShape)}
   </section>`;
 }
-var STEP_GOVERNS = {
-  specCoverage: { section: "specs", label: "Specs" },
-  conformance: { section: "architecture", label: "Architecture" },
-  archDoc: { section: "architecture", label: "Architecture" },
-  componentStories: { section: "components", label: "Components" },
-  goldenTrees: { section: "screens", label: "Screens" },
-  a11y: { section: "screens", label: "Screens" },
-  e2eSmoke: { section: "screens", label: "Screens" },
-  tokenDrift: { section: "design-system", label: "Design language" },
-  approvals: { section: "approvals", label: "Approvals" }
-};
 function inputsBindingHtml(r) {
   if (r.stale === true) {
     const move = r.inputsHash && r.currentInputsHash ? ` (<code>${esc8(shortHash2(r.inputsHash))}</code> &rarr; <code>${esc8(shortHash2(r.currentInputsHash))}</code>)` : "";
@@ -37853,7 +37857,7 @@ function evidenceBodyHtml(lastReceipt, history) {
   ].filter(Boolean).join("\n      ");
   const stepRowHtml2 = (s) => {
     const cls = s.verdict === "PASS" ? "step-verdict-pass" : s.verdict === "FAIL" ? "step-verdict-fail" : s.verdict === "ERROR" ? "step-verdict-error" : "step-verdict-skip";
-    const governs = STEP_GOVERNS[s.name];
+    const governs = COPY.stepGoverns[s.name];
     const governsCell = governs ? `<a class="step-link" href="#${esc8(governs.section)}">${esc8(governs.label)}</a>` : "";
     const counts = stepTestCountsHtml(s);
     const note = s.note ? `<span class="step-note">${esc8(s.note)}</span>` : "";
@@ -38164,7 +38168,7 @@ function walkthroughTabHtml(wt) {
   if (!wt || !wt.available) {
     return `<div class="empty">
       <p>No walkthrough runs yet.</p>
-      <p>With the debug app live (adb forward tcp:9500), run <code>node qa/walkthrough.mjs</code> \u2014
+      <p>${esc8(COPY.walkthroughPrereq)}, run <code>node qa/walkthrough.mjs</code> \u2014
       it walks every tab and parameterless route, captures pixels + tree + a11y from one proven
       frame per screen, reads the DB at capture time, and writes a committable report under
       <code>qa/evidence/walkthrough/</code>.</p>
@@ -38217,8 +38221,7 @@ ${session.steps.map(
 ${chainHtml}`;
   }
   return `  <p class="meta"><span class="bad-inline">\u25CB</span> ${esc8(live ? live.reason : "status unknown")}</p>
-  <p>Start the whole chain from here \u2014 boot a headless AVD if no device is attached, install the
-  debug build, launch it, forward the inspector port, and wait for health:</p>
+  <p>${esc8(COPY.liveStartHint)}</p>
   <p><button id="live-start-btn"${session && session.running ? " disabled" : ""}>${session && session.running ? "Starting\u2026" : "Start live session"}</button></p>
 ${chainHtml}
   <div id="live-error" class="banner" hidden></div>`;

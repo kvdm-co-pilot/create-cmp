@@ -77,7 +77,11 @@ test("ignore sets: the floor is universal, the rest is declared — and the decl
 
 test("the console's words are the profile's: the shell's defaults carry no Compose word, cmp's copy supplies them, and the host's setter merges", () => {
   const compose = /Kotlin|Compose|\.kt\b|KSP|Gradle|libs\.versions/;
-  for (const [k, v] of Object.entries(NEUTRAL_COPY)) assert.doesNotMatch(v, compose, `NEUTRAL_COPY.${k}`);
+  // SERIALISED, NOT ASSUMED TO BE A STRING. A provider supplies structured copy
+  // too (`stepGoverns` is a map of step name → section), and the rule must hold
+  // over the whole of it — keys included — or the shell grows a Compose word in
+  // the one shape this assertion cannot read.
+  for (const [k, v] of Object.entries(NEUTRAL_COPY)) assert.doesNotMatch(JSON.stringify(v), compose, `NEUTRAL_COPY.${k}`);
   assert.match(cmpCopy.componentsEmpty, /@Composable/);
   for (const k of Object.keys(NEUTRAL_COPY)) assert.ok(k in cmpCopy, `cmp copy covers ${k} — a missing key is the pattern's failure mode`);
   setConsoleCopy({ usesIn: "here" });

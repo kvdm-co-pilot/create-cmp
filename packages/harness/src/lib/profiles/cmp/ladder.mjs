@@ -57,6 +57,25 @@ const RELEASE_EXECUTION = "releaseSmoke";
 
 const RUNG_NAMES = { L0: "scaffold", L1: "desktop", L2: "device", L3: "release" };
 
+/**
+ * The reason texts a pre-`skipKind` receipt (0.19.0 and earlier) used when this
+ * profile's runtime tier skipped for an environmental reason. The Stop hook
+ * reads them ONLY for a receipt with no `skipKind`, and only for a step this
+ * ladder's runtime tier already names — two gates, both ours.
+ *
+ * They lived in the core (qa/receipt-check.mjs) until 2026-09-10, where they
+ * made the one gate that refuses "done" over a tier that never ran carry
+ * "no Android device" for every stack. A profile with no legacy receipts
+ * declares none, and the fallback simply does not apply.
+ */
+export const legacySkipReasons = Object.freeze([
+  "no Android device",
+  "maestro CLI not installed",
+  "is held by",
+  "devices attached",
+  "CMP_DEVICE=none",
+]);
+
 export const CMP_LADDER = Object.freeze({
   scaffoldCore: Object.freeze(SCAFFOLD_CORE),
   l0Required: Object.freeze(L0_REQUIRED),
