@@ -1,7 +1,17 @@
 # ADR-0016 — The ladder is named by position, and the open question of its shape
 
-**Status: PROPOSED.** The rename is landed. The reshape in §4 is the decision this asks for,
-and it is not taken until Karel accepts it in chat.
+**Status: ACCEPTED**, 2026-09-10.
+
+Both halves are landed: the rename, and the reshape §4 asked for.
+
+**How it was decided, stated plainly because it matters.** §4 was written PROPOSED with a
+recommendation. Karel read that recommendation and answered *"you can work autonomously again …
+You are the product owner and lead architect."* The reshape was then taken under that delegated
+authority — not on his explicit word for this ADR. Anyone auditing this record should read the
+decision as the architect's, made inside a standing grant, and weigh it accordingly. The
+standing rule this bends is real: ADRs are otherwise accepted only on Karel's instruction in
+chat, and if this one should not have been, it is the delegation that needs narrowing, not this
+document that needs quietly amending.
 
 **Date:** 2026-09-10
 **Supersedes:** nothing. **Amends:** the open question left in `evidence-ladder.mjs`.
@@ -73,18 +83,18 @@ name cannot become false when a profile's runtime is not the one the name assume
   not in this document — one frozen object read by the loader (which refuses), the interview
   (which asks), and the author (who declares). A rule stated twice drifts in one.
 
-**The shape is deliberately unchanged.** `l3Execution` still takes one step name as a string,
-and the refusal for a list is kept. A rename changes no grade anywhere; a reshape changes
-several, which is §10's question 5 and the reason this document exists.
+**The shape landed second, and separately.** The rename shipped with `l3Execution` still a
+string and the list-refusal intact, because a rename changes no grade anywhere while a reshape
+changes several — §10's question 5, and the reason this document exists. §4 is what changed it.
 
 One unbudgeted benefit, worth recording because it argues for positional naming generally:
 `test/console-ladder.test.mjs` excluded `release` from its scan because the word collides with
 ordinary English (a release date). `l3Execution` cannot collide, so the console lint now scans
 **one more field than it could before**.
 
-## 4. The open question — what this ADR asks Karel to decide
+## 4. The shape — decided: a list, like every sibling field
 
-**Should `l3Execution` become a list, like every sibling field?**
+**Question: should `l3Execution` become a list?** **Answer: yes.**
 
 **For.** Every other graded field is a list. The seeded skeleton shows a list. A real author
 reached for a list and was silently wrong. The refusal that catches it exists *only* because the
@@ -96,19 +106,25 @@ and cannot run, so no existing receipt moves — but a profile that would have b
 becomes gradeable, and its L3 becomes reachable. That is a grade appearing where none was, which
 is exactly the class §10 Q5 sends here.
 
-**Recommended: accept the list**, with `mode: "all"` (every named step must PASS), and delete the
-refusal in the same commit. The population it can affect is profiles that **cannot currently
-run at all**; no tree that has ever produced a receipt changes grade. Against that, the cost of
-keeping it is permanent: one field shaped unlike its siblings, guarded by a refusal, in the
+**Decided for the list**, with `mode: "all"` — every named step must PASS, unlike L2's `any`,
+because a shippable variant proven by some of its steps and skipped by the rest is not proven.
+The only profiles the change can affect are ones that **could not run at all**; no tree that has
+ever produced a receipt grades differently. Against that, the cost of keeping the asymmetry was
+permanent: one field shaped unlike its siblings, guarded by a refusal, sitting in the
 declaration an external author writes first and unaided.
 
-**If accepted**, the work is: `evidence-level.mjs` reads `l3Execution` as a list under
-`mode: "all"`; the refusal block and its kept plant are deleted; `cmp`'s ladder declares
-`l3Execution: ["releaseSmoke"]`; `profile-contract.mjs` drops the single-name sentence; the
-ktor-backend fixture is restored to what its author originally wrote, which becomes correct.
+**A lone string is still read as a list of one.** That is what makes this safe rather than
+merely defensible: `evidence-level.mjs`'s `asList` normalises both shapes, so every existing
+ladder grades exactly as before. Blank and non-string entries are dropped rather than carried —
+a value that is not a step name can never be in the PASSed set, and keeping it inside an `all`
+list would make the rung permanently unreachable, which is this defect re-entering by the back
+door.
 
-**If declined**, `profile-contract.mjs` must say plainly that this one field takes a single name
-and why — the author reads the contract, not this ADR.
+**Landed:** `evidence-level.mjs` reads both rungs through `asList`; the shape-refusal block is
+deleted from `evidence-ladder.mjs`; its kept plant is replaced — not merely removed — by the
+property that now holds, because a plant aimed at a deleted gate proves nothing; `cmp` declares
+`l3Execution: ["releaseSmoke"]`; and the ktor-backend fixture is restored to what its author
+originally wrote, which is now correct.
 
 ## 5. Consequences
 

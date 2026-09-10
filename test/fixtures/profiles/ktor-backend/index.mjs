@@ -167,7 +167,7 @@ export function steps() {
       // evidence-ladder.mjs now refuses the shape by name. The mistake is kept
       // as a PLANT (test/evidence-ladder.test.mjs) rather than as a passive
       // fixture, because a plant is watched failing and a fixture is not.
-      l3Execution: "distribution",
+      l3Execution: ["distribution"],
     },
     // Nothing to lease: no device, and the container is owned by Testcontainers
     // for the life of the Gradle JVM.

@@ -52,8 +52,8 @@ const L1_REQUIRED = ["releaseBuild", "conformance", "goldenTrees", "a11y"];
 /** On-device EXECUTION steps — the only steps that can earn L2. */
 const DEVICE_EXECUTION = ["e2eSmoke", "tokenDrift", "androidChecks"];
 
-/** The one step that can lift L2 to L3. */
-const RELEASE_EXECUTION = "releaseSmoke";
+/** The steps that lift L2 to L3 — every one must PASS (ADR-0016). */
+const L3_EXECUTION = ["releaseSmoke"];
 
 const RUNG_NAMES = { L0: "scaffold", L1: "desktop", L2: "device", L3: "release" };
 
@@ -81,6 +81,6 @@ export const CMP_LADDER = Object.freeze({
   l0Required: Object.freeze(L0_REQUIRED),
   l1Required: Object.freeze(L1_REQUIRED),
   l2Execution: Object.freeze(DEVICE_EXECUTION),
-  l3Execution: RELEASE_EXECUTION,
+  l3Execution: Object.freeze(L3_EXECUTION),
   names: Object.freeze(RUNG_NAMES),
 });
