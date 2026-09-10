@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 2bf12e155653a916bb46969d6828a9007bc0b06cc2385eb1cb3da17bb1aec636
+// cmp:bundle-inputs 606f2f33bc3f700a72ff2aa3ed616ff68ff38e68a939ec68a92234c1dcb3cc82
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35424,7 +35424,7 @@ var CONTRACT = Object.freeze({
       l0Required: Object.freeze({
         required: false,
         mode: "all",
-        meaning: "The steps that must PASS for the artifact to count as assembled at all. They run in every run profile and never SKIP. Declare none and this profile earns no L0 \u2014 and therefore no rung above it, since the rungs are climbed in order.",
+        meaning: "The steps that must PASS for the artifact to count as assembled at all. They run in every run profile and never SKIP. Declare none and this profile earns no L0 \u2014 and therefore no rung above it, since the rungs are climbed in order, which is why a ladder that names steps for a HIGHER rung and none for this one is refused rather than graded.",
         question: "Which steps prove the code assembles and its own tests run?",
         refusal: null
       }),
@@ -35433,7 +35433,11 @@ var CONTRACT = Object.freeze({
         mode: "all",
         meaning: "The steps that judge the code WITHOUT running it as the program: compilation, tests against fakes and in-process calls, static analysis, and the shippable artifact BUILDING \u2014 building, not running. None of these may SKIP; they PASS or FAIL, so 'PASSed' is exactly 'ran green'. Declare none and this profile tops out at L0.",
         question: "Which steps judge the code without ever starting it as a program?",
-        refusal: null
+        // PUBLISHED, because the loader performs it. Omitting this field is
+        // fine; declaring it over an undeclared L0 is not, and the difference
+        // is the whole point — steps named for a rung that can never be reached
+        // are steps the lane will never mention again.
+        refusal: "declares l1Required with no l0Required beneath it \u2014 L1 can never be earned however green the lane"
       }),
       l2Execution: Object.freeze({
         required: false,
@@ -35446,14 +35450,16 @@ var CONTRACT = Object.freeze({
           "nothing \u2014 the tests import the code and call it"
         ]),
         default: "a local runtime instance the lane starts and tears down",
-        // NO REFUSAL, for the same reason l0Required and l1Required publish
-        // none: naming no step is not malformed, it is declaring no L2 — the
-        // meaning above says so, and `harness init` seeds exactly that state.
-        // This field published "declares an l2Execution tier but names no step"
-        // until a review pointed out that nothing performed it and nothing
-        // could, since the state it named is the seeded default. A refusal
-        // nobody performs tells an author they are protected when they are not.
-        refusal: null
+        // NAMING NO STEP IS NOT REFUSED — that is declaring no L2, and `harness
+        // init` seeds exactly that state. This field once published "declares an
+        // l2Execution tier but names no step", which nothing performed and
+        // nothing could; a refusal nobody performs tells an author they are
+        // protected when they are not.
+        //
+        // What IS refused is the gap: steps named here over an undeclared L1.
+        // The rungs are climbed in order, so those steps can never lift
+        // anything, and the lane would never mention them again.
+        refusal: "declares l2Execution with no l1Required beneath it \u2014 L2 can never be earned however green the lane"
       }),
       l3Execution: Object.freeze({
         required: false,
@@ -35591,11 +35597,10 @@ function evidenceLadderFor(profile, pack) {
     for (const [field, rungId] of [["l1Required", "L1"], ["l2Execution", "L2"], ["l3Execution", "L3"]]) {
       if (!named(field).length || reachable.has(rungId)) continue;
       const below = { L1: "l0Required", L2: "l1Required", L3: "l2Execution" }[rungId];
-      const published = CONTRACT.ladder.fields[field].refusal;
       return {
         ok: false,
         source,
-        reason: `profile "${id}" declares ${spelling} with ${field} naming ${named(field).join(", ")}, and no ${below} beneath it \u2014 so ${rungId} can never be earned however green the lane, and nothing would say so. ` + (published ? `${published[0].toUpperCase()}${published.slice(1)}. ` : "") + `Name the steps that earn ${below}, or remove ${field}: a rung you do not declare is one you do not claim, which is honest.`
+        reason: `profile "${id}" ${CONTRACT.ladder.fields[field].refusal} \u2014 declared in ${spelling}, naming ${named(field).join(", ")}. Name the steps that earn ${below}, or remove ${field}: a rung you do not declare is one you do not claim, which is honest. \`node qa/profile.mjs explain ladder.${field}\` says what it is for.`
       };
     }
   }

@@ -90,6 +90,8 @@ test("every published refusal says something actionable, and a required field pu
 // performs survived two reviews — `l2Execution` published one describing the
 // state `harness init` seeds by default, and nothing fired.
 const TRIGGERS = new Map([
+  ["l1Required", { l1Required: ["static"] }],
+  ["l2Execution", { l0Required: ["a"], l2Execution: ["run"] }],
   ["l3Execution", { l0Required: ["a"], l1Required: ["a"], l3Execution: ["ship"] }],
 ]);
 

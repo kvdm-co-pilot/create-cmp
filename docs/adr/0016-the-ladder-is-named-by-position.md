@@ -145,6 +145,46 @@ one that shows where it was wrong.
    malformed entries are refused in `evidence-ladder.mjs`, derived from `GRADED_FIELDS` so a
    field added there is validated the day it is added.
 
+## 4b. The gap refusal — a breaking change, taken deliberately
+
+**Added 2026-09-10, after §4 landed. A review refused to decide this and was right to.**
+
+§4 was accepted on an explicit standard: *"The only profiles the change can affect are ones that
+could not run at all; no tree that has ever produced a receipt grades differently."* A refusal
+added one commit later **crosses that standard**, and this section is the record §4 would have
+demanded.
+
+**What it does.** A ladder that names steps for a rung while the rung beneath it is undeclared —
+`{l0Required: [...], l2Execution: [...]}` with no `l1Required` — is now refused by the loader.
+Before, it resolved clean and graded L0. `verify.mjs:396` prints the reason and exits 2, so the
+lane does not start; a tree in that state stops producing receipts until its ladder is fixed.
+
+**Why it is worth breaking.** Those L2 steps could never lift anything, and nothing said so. The
+console reported `atTop: true` — telling the adopter L0 was the top rung their pack declares —
+while the steps they had declared appeared on no surface and in no message. That is the
+silently-unreachable-rung defect this entire ADR exists to close, and it is the shape that
+already cost one second-stack author their L3. The identical shape one rung up (`l3Execution`
+with no `l2Execution`) was **already** refused; the only reason the L2 gap was silent is that the
+L3 case had been written by hand rather than derived. Keeping one and not the other is not a
+policy, it is an omission with a rationalisation available.
+
+**Blast radius, measured rather than asserted.** No ladder in this tree is affected: `cmp`, the
+`ktor-backend` and `py-alien` fixtures, the `stage2-gate` scratch adopter and the seeded skeleton
+all declare their rungs contiguously. The population is external profiles nobody here has seen.
+
+**Migration.** The refusal names the field, the missing field beneath it, both repairs (name the
+steps, or remove the higher field) and `node qa/profile.mjs explain ladder.<field>`. No
+`prooflane upgrade` step is needed: the fix is one line in the adopter's own ladder, and the
+harness cannot guess which repair the author meant — whether those steps earn a rung or should
+never have been declared is a claim about their project, not a rename.
+
+**What makes it honest rather than merely defensible:** `l1Required` and `l2Execution` now
+**publish** this refusal in the contract, so `explain` prints it as `REFUSED WHEN IT …` and the
+loader reads that same text. The first draft did not: it wrote its own sentence for two of the
+three gaps while the contract still told the author *"OPTIONAL — declaring nothing is a valid,
+honest answer."* An author read one and hit the other, which is the exact failure the contract
+exists to prevent, committed by the file that enforces it.
+
 ## 5. Consequences
 
 - A profile written for any stack declares its rungs in vocabulary that is true for it.

@@ -78,7 +78,9 @@ export const CONTRACT = Object.freeze({
         meaning:
           "The steps that must PASS for the artifact to count as assembled at all. They run in " +
           "every run profile and never SKIP. Declare none and this profile earns no L0 — and " +
-          "therefore no rung above it, since the rungs are climbed in order.",
+          "therefore no rung above it, since the rungs are climbed in order, which is why a " +
+          "ladder that names steps for a HIGHER rung and none for this one is refused rather " +
+          "than graded.",
         question: "Which steps prove the code assembles and its own tests run?",
         refusal: null,
       }),
@@ -91,7 +93,11 @@ export const CONTRACT = Object.freeze({
           "BUILDING — building, not running. None of these may SKIP; they PASS or FAIL, so " +
           "'PASSed' is exactly 'ran green'. Declare none and this profile tops out at L0.",
         question: "Which steps judge the code without ever starting it as a program?",
-        refusal: null,
+        // PUBLISHED, because the loader performs it. Omitting this field is
+        // fine; declaring it over an undeclared L0 is not, and the difference
+        // is the whole point — steps named for a rung that can never be reached
+        // are steps the lane will never mention again.
+        refusal: "declares l1Required with no l0Required beneath it — L1 can never be earned however green the lane",
       }),
       l2Execution: Object.freeze({
         required: false,
@@ -113,14 +119,16 @@ export const CONTRACT = Object.freeze({
           "nothing — the tests import the code and call it",
         ]),
         default: "a local runtime instance the lane starts and tears down",
-        // NO REFUSAL, for the same reason l0Required and l1Required publish
-        // none: naming no step is not malformed, it is declaring no L2 — the
-        // meaning above says so, and `harness init` seeds exactly that state.
-        // This field published "declares an l2Execution tier but names no step"
-        // until a review pointed out that nothing performed it and nothing
-        // could, since the state it named is the seeded default. A refusal
-        // nobody performs tells an author they are protected when they are not.
-        refusal: null,
+        // NAMING NO STEP IS NOT REFUSED — that is declaring no L2, and `harness
+        // init` seeds exactly that state. This field once published "declares an
+        // l2Execution tier but names no step", which nothing performed and
+        // nothing could; a refusal nobody performs tells an author they are
+        // protected when they are not.
+        //
+        // What IS refused is the gap: steps named here over an undeclared L1.
+        // The rungs are climbed in order, so those steps can never lift
+        // anything, and the lane would never mention them again.
+        refusal: "declares l2Execution with no l1Required beneath it — L2 can never be earned however green the lane",
       }),
       l3Execution: Object.freeze({
         required: false,

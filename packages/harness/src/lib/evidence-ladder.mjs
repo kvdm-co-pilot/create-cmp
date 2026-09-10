@@ -302,15 +302,21 @@ export function evidenceLadderFor(profile, pack) {
     for (const [field, rungId] of [["l1Required", "L1"], ["l2Execution", "L2"], ["l3Execution", "L3"]]) {
       if (!named(field).length || reachable.has(rungId)) continue;
       const below = { L1: "l0Required", L2: "l1Required", L3: "l2Execution" }[rungId];
-      const published = CONTRACT.ladder.fields[field].refusal;
+      // THE CONTRACT'S TEXT, NEVER A SECOND COPY — the rule stated ten lines
+      // above this block, which the first draft broke. It wrote its own sentence
+      // for two of the three gaps and fell back to the contract's for the third,
+      // and `(published ? … : "")` was the code knowing it. Worse, the two it
+      // wrote for were states the contract told the author were fine: `explain`
+      // ended "OPTIONAL — declaring nothing is a valid, honest answer" and
+      // printed no REFUSED line, while verify.mjs exited 2 before a step ran.
+      // Both now publish, so this reads one and cannot diverge from it.
       return {
         ok: false,
         source,
         reason:
-          `profile "${id}" declares ${spelling} with ${field} naming ${named(field).join(", ")}, ` +
-          `and no ${below} beneath it — so ${rungId} can never be earned however green the lane, and nothing would say so. ` +
-          (published ? `${published[0].toUpperCase()}${published.slice(1)}. ` : "") +
-          `Name the steps that earn ${below}, or remove ${field}: a rung you do not declare is one you do not claim, which is honest.`,
+          `profile "${id}" ${CONTRACT.ladder.fields[field].refusal} — declared in ${spelling}, naming ${named(field).join(", ")}. ` +
+          `Name the steps that earn ${below}, or remove ${field}: a rung you do not declare is one you do not claim, which is honest. ` +
+          `\`node qa/profile.mjs explain ladder.${field}\` says what it is for.`,
       };
     }
   }
