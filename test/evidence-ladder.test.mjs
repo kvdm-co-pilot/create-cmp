@@ -156,7 +156,7 @@ test("two declarations that AGREE by value — not by identity — are accepted,
   // The comparison must be structural: an author who writes the same ladder out
   // twice has not contradicted themselves, and refusing them would be a gate
   // with no wrong verdict behind it.
-  const ladder = { names: { L0: "x" }, l0Required: ["a"], l2Execution: [], l3Execution: null };
+  const ladder = { names: { L0: "x" }, l0Required: ["a"], l2Execution: [], l3Execution: [] };
   const resolved = evidenceLadderFor({ id: "svc", ladder }, { evidenceLadder: JSON.parse(JSON.stringify(ladder)) });
   assert.equal(resolved.ok, true);
   assert.equal(resolved.source, "both");
@@ -360,7 +360,7 @@ test("THE GATE: an adopter who declares the ladder the way `harness init` seeds 
     const before = fs.readFileSync(receiptPath, "utf8");
     fs.writeFileSync(
       entry,
-      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage", "aStepThisLaneDoesNotHave"], l2Execution: [], l3Execution: null }'),
+      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage", "aStepThisLaneDoesNotHave"], l2Execution: [], l3Execution: [] }'),
     );
     relockAndCommit();
     const planted = node(dir, [path.join(dir, "qa", "verify.mjs")]);
@@ -373,7 +373,7 @@ test("THE GATE: an adopter who declares the ladder the way `harness init` seeds 
     // ── Reverted: the same two declarations, made to agree ────────────────
     fs.writeFileSync(
       entry,
-      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound", L2: "unreachable here", L3: "unreachable here" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage"], l2Execution: [], l3Execution: null }'),
+      alsoOnThePack(alsoDeclarePlants(uncommentTheLadder(seeded)), '{ names: { L0: "locked", L1: "every promise bound", L2: "unreachable here", L3: "unreachable here" }, l0Required: ["harnessIntegrity"], l1Required: ["harnessIntegrity", "specCoverage"], l2Execution: [], l3Execution: [] }'),
     );
     relockAndCommit();
     const recovered = node(dir, [path.join(dir, "qa", "verify.mjs")]);

@@ -92,17 +92,24 @@ import { plantCalibration } from "./plant-calibration.mjs";
  * makes the list the shape and keeps a lone string accepted, so no ladder that
  * graded before grades differently now: one name is a list of one.
  *
- * Blank and non-string entries are dropped rather than carried. A value that is
- * not a step name can never be in the PASSed set, and keeping it in an `all`
- * list would make the rung permanently unreachable — the exact failure this
- * change exists to end, re-entering by the back door.
+ * SHAPE ONLY — it normalises, it does not filter. The first draft dropped blank
+ * and non-string entries here, on the reasoning that a value which is not a step
+ * name can never be PASSed anyway. That was wrong, and a review proved it in one
+ * line: `l3Execution: ["ship", null]` dropped the null, found every SURVIVING
+ * entry passed, and awarded L3 while a step the author declared went unproven.
+ * `mode: "all"` exists precisely because proven-by-some is not proven, and a
+ * silently dropped entry is skipped by another name. The same declaration was
+ * refused before this change.
+ *
+ * So malformed entries are REFUSED, in evidence-ladder.mjs where refusals live,
+ * and this function is left with the one job it can do without judgement.
  *
  * @param {unknown} value
- * @returns {string[]}
+ * @returns {unknown[]} the declared entries, unfiltered, as a list
  */
 function asList(value) {
-  const raw = Array.isArray(value) ? value : [value];
-  return raw.filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+  if (value === undefined || value === null) return [];
+  return Array.isArray(value) ? [...value] : [value];
 }
 
 /**
@@ -219,7 +226,13 @@ function rungFor(stepResults, ladder) {
   const SCAFFOLD_CORE = L.scaffoldCore ?? [];
   const L0_REQUIRED = L.l0Required ?? [];
   const L1_REQUIRED = L.l1Required ?? [];
-  const L2_EXECUTION = L.l2Execution ?? [];
+  // BOTH rungs through `asList`, and the reason is a defect a review caught in
+  // this very file: `rungFor` read l2Execution raw while `ladderStanding` read
+  // it normalised, so the two readers of one declaration disagreed — the grader
+  // awarded L1 while the console drew an L2 the lane could never mint. Two
+  // readers of one declaration must normalise identically or they are two
+  // declarations.
+  const L2_EXECUTION = asList(L.l2Execution);
   // A LIST, like every sibling (ADR-0016). It was the one graded field read as a
   // single name, and that asymmetry cost a real second-stack author their L3 in
   // silence: they wrote a list, because every other field is one, and it matched
@@ -233,14 +246,19 @@ function rungFor(stepResults, ladder) {
   if (steps.some((s) => s.verdict === "FAIL" || s.verdict === "ERROR")) return null;
   const passed = new Set(steps.filter((s) => s.verdict === "PASS").map((s) => s.name));
 
-  if (!L0_REQUIRED.every((name) => passed.has(name))) return null; // not even a stamp-time green build
+  // AN EMPTY LIST EARNS NOTHING. `[].every()` is true of nothing, so a ladder
+  // declaring `l0Required: []` used to be handed L0 by a lane that proved
+  // nothing — and then L1 the same way. A rung nobody named steps for is a rung
+  // nobody earned; that is the same answer "declares no ladder" already gets,
+  // and it is the honest one. Found by review, 2026-09-10.
+  if (!L0_REQUIRED.length || !L0_REQUIRED.every((name) => passed.has(name))) return null;
 
   const inLaneOrder = (names) => steps.filter((s) => names.has(s.name) && passed.has(s.name)).map((s) => s.name);
 
   let rung = "L0";
   const counted = new Set(SCAFFOLD_CORE);
 
-  if (L1_REQUIRED.every((name) => passed.has(name))) {
+  if (L1_REQUIRED.length && L1_REQUIRED.every((name) => passed.has(name))) {
     rung = "L1";
     for (const name of L1_REQUIRED) counted.add(name);
 

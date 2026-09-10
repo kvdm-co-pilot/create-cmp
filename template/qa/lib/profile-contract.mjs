@@ -60,25 +60,38 @@ export const CONTRACT = Object.freeze({
       "Declaring no ladder is honest and earns no rung — the correct grade for a project " +
       "that proves nothing by execution.",
     fields: Object.freeze({
+      // NOT `required`, and the reasoning is this harness's oldest idiom rather
+      // than leniency: declaring nothing earns nothing. A ladder that omits
+      // l0Required does not get refused — it gets no L0, which is the honest
+      // grade and the same answer a profile with no ladder at all receives.
+      //
+      // What IS refused is the vacuous version: an EMPTY list cannot lift its
+      // rung, because `[].every()` is true of nothing and would otherwise hand
+      // out the rung free. That check lives in the grader (evidence-level.mjs),
+      // not here — an unearnable rung is a grading fact, not a malformed
+      // declaration. Both halves were briefly implemented as a refusal on
+      // 2026-09-10 and it was the wrong shape: it turned three legitimate
+      // partial ladders into refused profiles.
       l0Required: Object.freeze({
-        required: true,
+        required: false,
         mode: "all",
         meaning:
           "The steps that must PASS for the artifact to count as assembled at all. They run in " +
-          "every run profile and never SKIP.",
+          "every run profile and never SKIP. Declare none and this profile earns no L0 — and " +
+          "therefore no rung above it, since the rungs are climbed in order.",
         question: "Which steps prove the code assembles and its own tests run?",
-        refusal: "declares a ladder with no l0Required — the bottom rung would have nothing to earn it",
+        refusal: null,
       }),
       l1Required: Object.freeze({
-        required: true,
+        required: false,
         mode: "all",
         meaning:
           "The steps that judge the code WITHOUT running it as the program: compilation, tests " +
           "against fakes and in-process calls, static analysis, and the shippable artifact " +
           "BUILDING — building, not running. None of these may SKIP; they PASS or FAIL, so " +
-          "'PASSed' is exactly 'ran green'.",
+          "'PASSed' is exactly 'ran green'. Declare none and this profile tops out at L0.",
         question: "Which steps judge the code without ever starting it as a program?",
-        refusal: "declares a ladder with no l1Required",
+        refusal: null,
       }),
       l2Execution: Object.freeze({
         required: false,

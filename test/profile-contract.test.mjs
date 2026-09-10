@@ -54,12 +54,27 @@ test("every field the interview must ask is askable: a question, and options to 
   }
 });
 
-test("a required field states the refusal that fires when it is missing", () => {
-  const required = requiredFields("ladder");
-  assert.deepEqual(required, ["l0Required", "l1Required"], "the two rungs a ladder cannot omit");
-  for (const name of required) {
-    const entry = CONTRACT.ladder.fields[name];
-    assert.ok(entry.refusal, `${name} is required but names no refusal — the loader would have nothing to say`);
+// A REFUSAL IS A PROMISE, so publishing one is the commitment — not marking a
+// field required. The first draft required l0Required and l1Required and had
+// the loader refuse a ladder without them; a review showed that turned three
+// legitimate partial ladders into refused profiles. "Declares no ladder, earns
+// no rung, which is honest" is this harness's oldest idiom, and a rung with no
+// steps named for it is the same statement one level down. So what is pinned
+// here is the invariant that outlives which fields happen to be required:
+// anything that PUBLISHES a refusal must say something an author can act on,
+// and anything marked required must publish one.
+test("every published refusal says something actionable, and a required field publishes one", () => {
+  const published = CONTRACT_PATHS.map((p) => [p, contractAt(p)]).filter(([, e]) => e.refusal !== null && e.refusal !== undefined);
+  assert.ok(published.length > 0, "the contract publishes at least one refusal, or this test asserts nothing");
+  for (const [path, entry] of published) {
+    assert.equal(typeof entry.refusal, "string", `${path}'s refusal is not text`);
+    assert.ok(entry.refusal.trim().length > 20, `${path}'s refusal says too little to act on: ${JSON.stringify(entry.refusal)}`);
+  }
+  for (const name of requiredFields("ladder")) {
+    assert.ok(
+      CONTRACT.ladder.fields[name].refusal,
+      `${name} is marked required but publishes no refusal — the loader would have nothing to say when it is missing`,
+    );
   }
 });
 

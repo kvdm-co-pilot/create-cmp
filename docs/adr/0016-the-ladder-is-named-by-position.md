@@ -126,6 +126,25 @@ property that now holds, because a plant aimed at a deleted gate proves nothing;
 `l3Execution: ["releaseSmoke"]`; and the ktor-backend fixture is restored to what its author
 originally wrote, which is now correct.
 
+**Two corrections to this document, made after a review of the commits it describes.** Both are
+recorded rather than edited away, because an ADR that quietly becomes true is worth less than
+one that shows where it was wrong.
+
+1. *"reads both rungs through `asList`"* **was false when written.** `rungFor` still read
+   `l2Execution` raw; only `ladderStanding` normalised it. Two readers of one declaration then
+   disagreed — the grader awarded L1 while the console drew an L2 the lane could never mint. It
+   is true now, and the rule it cost is worth stating: **two readers of one declaration must
+   normalise identically, or they are two declarations.**
+
+2. *`asList` originally DROPPED* blank and non-string entries, on the reasoning that a value
+   which is not a step name can never be PASSed anyway. That was wrong in one line:
+   `l3Execution: ["ship", null]` dropped the `null`, found every surviving entry passed, and
+   awarded L3 with a step the author had declared left unproven. `mode: "all"` exists precisely
+   because proven-by-some is not proven, and a dropped entry is skipped under another name — the
+   same declaration was **refused** before this ADR. `asList` normalises shape only now, and
+   malformed entries are refused in `evidence-ladder.mjs`, derived from `GRADED_FIELDS` so a
+   field added there is validated the day it is added.
+
 ## 5. Consequences
 
 - A profile written for any stack declares its rungs in vocabulary that is true for it.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs fefe833cbdfecc2867126c9d39074d5567edd855cf115ab5bd09f7f5c464bf67
+// cmp:bundle-inputs 69c1f710015669707ab06cc75a7a5defa2523a6675c41c1cca5b5213456cca34
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35333,8 +35333,91 @@ function readTrustRecord(root, { now = Date.now() } = {}) {
   return trustState(readFrameworkRecord(root), { now });
 }
 
+// ../../packages/harness/src/lib/profile-contract.mjs
+var CONTRACT = Object.freeze({
+  ladder: Object.freeze({
+    required: false,
+    meaning: "Which of this profile's steps earn which rung, and what the rungs are called. Declaring no ladder is honest and earns no rung \u2014 the correct grade for a project that proves nothing by execution.",
+    fields: Object.freeze({
+      // NOT `required`, and the reasoning is this harness's oldest idiom rather
+      // than leniency: declaring nothing earns nothing. A ladder that omits
+      // l0Required does not get refused — it gets no L0, which is the honest
+      // grade and the same answer a profile with no ladder at all receives.
+      //
+      // What IS refused is the vacuous version: an EMPTY list cannot lift its
+      // rung, because `[].every()` is true of nothing and would otherwise hand
+      // out the rung free. That check lives in the grader (evidence-level.mjs),
+      // not here — an unearnable rung is a grading fact, not a malformed
+      // declaration. Both halves were briefly implemented as a refusal on
+      // 2026-09-10 and it was the wrong shape: it turned three legitimate
+      // partial ladders into refused profiles.
+      l0Required: Object.freeze({
+        required: false,
+        mode: "all",
+        meaning: "The steps that must PASS for the artifact to count as assembled at all. They run in every run profile and never SKIP. Declare none and this profile earns no L0 \u2014 and therefore no rung above it, since the rungs are climbed in order.",
+        question: "Which steps prove the code assembles and its own tests run?",
+        refusal: null
+      }),
+      l1Required: Object.freeze({
+        required: false,
+        mode: "all",
+        meaning: "The steps that judge the code WITHOUT running it as the program: compilation, tests against fakes and in-process calls, static analysis, and the shippable artifact BUILDING \u2014 building, not running. None of these may SKIP; they PASS or FAIL, so 'PASSed' is exactly 'ran green'. Declare none and this profile tops out at L0.",
+        question: "Which steps judge the code without ever starting it as a program?",
+        refusal: null
+      }),
+      l2Execution: Object.freeze({
+        required: false,
+        mode: "any",
+        meaning: "The steps whose PASS proves the artifact ran AS THE PROGRAM \u2014 assembled into its deployable form, started the way it really starts, and driven through its real entry surface. On this machine. NOT imported, NOT called in-process. A test that imports your app and calls its functions is L1 evidence however slow it is, whichever directory it lives in, and however real the data store behind it. What earns this rung is a local, disposable stand-in for the real runtime that the lane starts and tears down. Every stack has one. Declare none and this profile tops out at L1 \u2014 the honest grade for a project whose program is never started.",
+        question: "What starts your app as the real program, and what drives it?",
+        options: Object.freeze([
+          "a local runtime instance the lane starts and tears down",
+          "a local process the lane starts, driven over a socket",
+          "nothing \u2014 the tests import the code and call it"
+        ]),
+        default: "a local runtime instance the lane starts and tears down",
+        refusal: "declares an l2Execution tier but names no step \u2014 a rung nothing can earn"
+      }),
+      l3Execution: Object.freeze({
+        required: false,
+        mode: "all",
+        meaning: "The same proof as l2Execution against the SHIPPABLE variant rather than the development one, still on this machine. It exists because the shippable build runs machinery the development build does not \u2014 optimisation, shrinking, release-only checks, a production entry point \u2014 so a green development run says nothing about it. Requires l2Execution: the shippable program cannot be proven to run where no program runs.",
+        question: "Is there a shippable variant, built differently from the development one?",
+        options: Object.freeze([
+          "yes \u2014 the shippable artifact, started the same way, on this machine",
+          "no \u2014 one variant only"
+        ]),
+        default: "no \u2014 one variant only",
+        refusal: "declares l3Execution without l2Execution \u2014 the shippable program cannot run where no program runs"
+      }),
+      names: Object.freeze({
+        required: false,
+        meaning: "What THIS stack calls each rung, for display only. The rung ids (L0..L3) are the core's and stay comparable across every profile; the words are yours. Two profiles may call L2 different things and still mean the same rung.",
+        question: "What do you call each rung?",
+        refusal: null
+      }),
+      scaffoldCore: Object.freeze({
+        required: false,
+        mode: "all",
+        meaning: "The subset of l0Required a freshly stamped tree can satisfy before any feature exists, so a scaffold can be graded without pretending it is a finished project.",
+        question: "Which steps does an empty, freshly stamped tree already pass?",
+        refusal: null
+      })
+    })
+  })
+});
+var CONTRACT_PATHS = Object.freeze(
+  Object.entries(CONTRACT).flatMap(([decl, spec]) => Object.keys(spec.fields ?? {}).map((f) => `${decl}.${f}`))
+);
+function requiredFields(declaration) {
+  const spec = CONTRACT[declaration];
+  if (!spec || !spec.fields) return [];
+  return Object.entries(spec.fields).filter(([, f]) => f.required).map(([name]) => name);
+}
+
 // ../../packages/harness/src/lib/evidence-ladder.mjs
 var GRADED_FIELDS = Object.freeze(["scaffoldCore", "l0Required", "l1Required", "l2Execution", "l3Execution", "names"]);
+var STEP_NAME_FIELDS = Object.freeze(GRADED_FIELDS.filter((f) => f !== "names"));
 var DECLARED_SPELLING = "`export const ladder` (the profile's top-level declaration)";
 var PACK_SPELLING = "`evidenceLadder` (a key on the object `steps(ctx)` returns)";
 function present(v) {
@@ -35372,7 +35455,25 @@ function evidenceLadderFor(profile, pack) {
       return {
         ok: false,
         source,
-        reason: `profile "${id}" declares ${spelling} as ${brief(value)}, which is not an evidence ladder \u2014 a ladder is an object of step names ({ names, l0Required, l1Required, l2Execution, release }). Fix it or remove it; a profile that declares no ladder earns no rung, which is honest, and this is not that.`
+        reason: `profile "${id}" declares ${spelling} as ${brief(value)}, which is not an evidence ladder \u2014 a ladder is an object of step names ({ ${["names", ...GRADED_FIELDS.filter((f) => f !== "names" && f !== "scaffoldCore")].join(", ")} }). Fix it or remove it; a profile that declares no ladder earns no rung, which is honest, and this is not that.`
+      };
+    }
+  }
+  for (const [value, spelling, source] of [
+    [declared, DECLARED_SPELLING, "profile"],
+    [packed, PACK_SPELLING, "pack"]
+  ]) {
+    if (!present(value)) continue;
+    for (const field of STEP_NAME_FIELDS) {
+      const raw = value[field];
+      if (raw === void 0 || raw === null) continue;
+      const entries = Array.isArray(raw) ? raw : [raw];
+      const bad = entries.filter((n) => typeof n !== "string" || !n.trim());
+      if (!bad.length) continue;
+      return {
+        ok: false,
+        source,
+        reason: `profile "${id}" declares ${spelling} with ${field} = ${brief(raw)}, which holds ${bad.length} entr${bad.length === 1 ? "y that is" : "ies that are"} not a step name. Every entry must be a non-empty step name: a rung is earned by matching these against the steps that PASSed, so a value that can never match would leave the rung unreachable with nothing said. Remove it, or name the step it was meant to be.`
       };
     }
   }
@@ -35392,6 +35493,24 @@ function evidenceLadderFor(profile, pack) {
         reason: `profile "${id}" declares ${spelling} with \`${was}\`, which this lane no longer reads \u2014 it is \`${now}\` now. The rungs are local and pre-release for every stack, so they are named by position rather than by one stack's runtime: L2 is the rung where the artifact runs AS THE PROGRAM, L3 the same for the shippable variant. Rename the field (\`node qa/profile.mjs explain ladder.${now}\` says what it means), or run \`prooflane upgrade\`.`
       };
     }
+  }
+  for (const [value, spelling, source] of [
+    [declared, DECLARED_SPELLING, "profile"],
+    [packed, PACK_SPELLING, "pack"]
+  ]) {
+    if (!present(value)) continue;
+    const named = (f) => {
+      const raw = value[f];
+      if (raw === void 0 || raw === null) return [];
+      return (Array.isArray(raw) ? raw : [raw]).filter((n) => typeof n === "string" && n.trim());
+    };
+    const refuse = (field) => ({
+      ok: false,
+      source,
+      reason: `profile "${id}" ${CONTRACT.ladder.fields[field].refusal}. Declared in ${spelling}; \`node qa/profile.mjs explain ladder.${field}\` says what it is for.`
+    });
+    for (const field of requiredFields("ladder")) if (!named(field).length) return refuse(field);
+    if (named("l3Execution").length && !named("l2Execution").length) return refuse("l3Execution");
   }
   if (present(declared) && present(packed)) {
     const differing = GRADED_FIELDS.filter((f) => !same(declared[f], packed[f]));
@@ -35418,8 +35537,8 @@ var PLANT_MATERIAL = Object.freeze([
 
 // ../../packages/harness/src/lib/evidence-level.mjs
 function asList(value) {
-  const raw = Array.isArray(value) ? value : [value];
-  return raw.filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+  if (value === void 0 || value === null) return [];
+  return Array.isArray(value) ? [...value] : [value];
 }
 function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   if (!ladder || typeof ladder !== "object") {
