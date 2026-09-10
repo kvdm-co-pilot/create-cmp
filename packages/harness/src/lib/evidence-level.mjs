@@ -113,6 +113,24 @@ function asList(value) {
 }
 
 /**
+ * A rung id → label map with every rung labelled and every label a string.
+ *
+ * The default IS the rung id: a ladder without labels still grades, and "L2" is
+ * a truthful name for L2. Anything a profile declares that is not a string is
+ * not a label and is replaced rather than propagated — the grader used to write
+ * such a value straight onto the receipt while the console showed the id.
+ *
+ * @param {unknown} declared
+ * @returns {{L0: string, L1: string, L2: string, L3: string}}
+ */
+function rungLabels(declared) {
+  const d = declared && typeof declared === "object" ? declared : {};
+  const out = {};
+  for (const id of ["L0", "L1", "L2", "L3"]) out[id] = typeof d[id] === "string" && d[id].trim() ? d[id] : id;
+  return out;
+}
+
+/**
  * ONE READER OF A LADDER. Every step-name field, normalised the same way, for
  * every consumer.
  *
@@ -146,7 +164,14 @@ export function readLadder(ladder) {
     l1Required: names(L.l1Required),
     l2Execution: names(L.l2Execution),
     l3Execution: names(L.l3Execution),
-    names: L.names && typeof L.names === "object" ? L.names : {},
+    // THE LABEL RULE, ONCE. `names` is the sixth field, and it was the one the
+    // two consumers still read differently: the grader spread the raw map over
+    // defaults, the console applied `typeof === "string" ? … : rung id`. Where a
+    // label is a string they agree; where it is a number or a list the grader
+    // wrote the raw value onto the receipt and the console showed the rung id —
+    // two labels for one rung of one ladder, and `names` is not a step-name
+    // field so nothing refused it. A non-string label is not a label.
+    names: rungLabels(L.names),
   };
 }
 
@@ -241,9 +266,18 @@ export function gradeEvidence(stepResults, profile, { mode, ladder, plants } = {
       `no evidence rung: ${red.map((s) => `${s.name} ${s.verdict}`).join(", ")} — a lane that failed, or that could not check, has no rung`,
     );
   }
-  const floor = (ladder.l0Required ?? []).filter((name) => !steps.some((s) => s.name === name && s.verdict === "PASS"));
+  // THROUGH `readLadder`, like every other read. This line was the FOURTH reader
+  // of a ladder field and it read raw — so `l0Required: "assemble"`, which the
+  // loader accepts as a list of one, threw `.filter is not a function` here.
+  // Not on the green path: on the path a lane with one SKIP takes, at
+  // verify.mjs:641, after every step has run and before the receipt is written.
+  // The commit that introduced `readLadder` claimed there was nowhere left to
+  // read a ladder from; there were two more, and this is why the claim is now a
+  // test rather than a sentence.
+  const l0 = readLadder(ladder).l0Required;
+  const floor = l0.filter((name) => !steps.some((s) => s.name === name && s.verdict === "PASS"));
   return none(
-    `no evidence rung: this ladder's floor rung needs ${(ladder.l0Required ?? []).join(", ") || "(nothing)"} to PASS and ` +
+    `no evidence rung: this ladder's floor rung needs ${l0.join(", ") || "(nothing)"} to PASS and ` +
       `${floor.join(", ")} did not — a SKIP never earns a rung`,
   );
 }
@@ -296,7 +330,6 @@ function rungFor(stepResults, ladder) {
   // each write the expression cannot be relied on not to.
   const L = readLadder(ladder);
   const rungs = ladderRungs(L);
-  const RUNG_NAMES = { L0: "L0", L1: "L1", L2: "L2", L3: "L3", ...L.names };
   const steps = Array.isArray(stepResults) ? stepResults.filter((s) => s && typeof s.name === "string") : [];
   // A failed lane has no rung — and a lane with a step that could not run
   // (ERROR) has none either: a rung is evidence, and "could not check" is not.
@@ -317,7 +350,7 @@ function rungFor(stepResults, ladder) {
   if (!rung) return null;
 
   const inLaneOrder = (names) => steps.filter((s) => names.has(s.name) && passed.has(s.name)).map((s) => s.name);
-  return { rung, name: RUNG_NAMES[rung], satisfiedBy: inLaneOrder(counted) };
+  return { rung, name: L.names[rung], satisfiedBy: inLaneOrder(counted) };
 }
 
 /**
@@ -361,8 +394,6 @@ export function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
       reason: "this profile declares no `ladder`, so there are no rungs to earn — which is the honest grade, not a failure",
     };
   }
-  const L = ladder;
-  const RUNG_NAMES = L.names ?? {};
   // THE SAME TWO CALLS THE GRADER MAKES. This function used to normalise four
   // fields for itself and build its own rung list, gating L2 and L3 on length
   // but listing L0 and L1 unconditionally. When the grader was corrected so that
@@ -371,10 +402,8 @@ export function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
   // with no steps in it, telling the adopter their next rung required nothing
   // and was somehow unearned. The fix for two readers disagreeing cannot itself
   // be written twice.
-  const declared = ladderRungs(readLadder(ladder)).map((r) => ({
-    ...r,
-    name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id,
-  }));
+  const L = readLadder(ladder);
+  const declared = ladderRungs(L).map((r) => ({ ...r, name: L.names[r.id] }));
 
   const earnedId = typeof earned === "string" && earned.trim() ? earned.trim() : null;
   const earnedIdx = earnedId ? declared.findIndex((r) => r.id === earnedId) : -1;

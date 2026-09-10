@@ -63,6 +63,7 @@ import {
 } from "./lib/framework-check.mjs";
 import { plantCalibration } from "./lib/plant-calibration.mjs";
 import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
+import { readLadder } from "./lib/evidence-level.mjs";
 import { listHarnessFiles } from "./lib/harness-region.mjs";
 import { checkHarnessIntegrity, describeIntegrity, writeHarnessLock } from "./lib/harness-lock.mjs";
 import { listFlowFiles, scanCitations, walkFiles } from "./lib/spec-coverage.mjs";
@@ -761,7 +762,7 @@ try {
     // below was already stack-free (`a tier did not run`, keyed on `skipKind`);
     // only the row was borrowed. A profile that declares no runtime tier still
     // needs its hook asserted, so the fallback is a name no pack can own.
-    const [tierStep = "__plantedTier"] = evidenceLadderFor(PROFILE_MODULE).ladder?.l2Execution ?? [];
+    const [tierStep = "__plantedTier"] = readLadder(evidenceLadderFor(PROFILE_MODULE).ladder).l2Execution;
     const planted = {
       ...green.receipt,
       profile: "local",

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs c08b56105f9ee93b91a29793040bf2c5acf9a53a069cfafb55efbfc584cf4e97
+// cmp:bundle-inputs 2bf12e155653a916bb46969d6828a9007bc0b06cc2385eb1cb3da17bb1aec636
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35333,6 +35333,76 @@ function readTrustRecord(root, { now = Date.now() } = {}) {
   return trustState(readFrameworkRecord(root), { now });
 }
 
+// ../../packages/harness/src/lib/plant-calibration.mjs
+var PLANT_MATERIAL = Object.freeze([
+  ["testFileBasename", "string", "the file a planted citation lives in"],
+  ["unboundCitationSource", "function", "a citation on a type declaration with no test under it"],
+  ["tierUnmetCitationSource", "function", "a host-tier test citing a clause only another tier can observe"]
+]);
+
+// ../../packages/harness/src/lib/evidence-level.mjs
+function asList(value) {
+  if (value === void 0 || value === null) return [];
+  return Array.isArray(value) ? [...value] : [value];
+}
+function rungLabels(declared) {
+  const d = declared && typeof declared === "object" ? declared : {};
+  const out = {};
+  for (const id of ["L0", "L1", "L2", "L3"]) out[id] = typeof d[id] === "string" && d[id].trim() ? d[id] : id;
+  return out;
+}
+function readLadder(ladder) {
+  const L = ladder && typeof ladder === "object" ? ladder : {};
+  const names = (v) => asList(v).filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+  return {
+    scaffoldCore: names(L.scaffoldCore),
+    l0Required: names(L.l0Required),
+    l1Required: names(L.l1Required),
+    l2Execution: names(L.l2Execution),
+    l3Execution: names(L.l3Execution),
+    // THE LABEL RULE, ONCE. `names` is the sixth field, and it was the one the
+    // two consumers still read differently: the grader spread the raw map over
+    // defaults, the console applied `typeof === "string" ? … : rung id`. Where a
+    // label is a string they agree; where it is a number or a list the grader
+    // wrote the raw value onto the receipt and the console showed the rung id —
+    // two labels for one rung of one ladder, and `names` is not a step-name
+    // field so nothing refused it. A non-string label is not a label.
+    names: rungLabels(L.names)
+  };
+}
+function ladderRungs(L) {
+  const rungs = [];
+  if (L.l0Required.length) rungs.push({ id: "L0", requires: [...L.l0Required], mode: "all" });
+  if (rungs.length && L.l1Required.length) rungs.push({ id: "L1", requires: [...L.l1Required], mode: "all" });
+  if (rungs.length === 2 && L.l2Execution.length) rungs.push({ id: "L2", requires: [...L.l2Execution], mode: "any" });
+  if (rungs.length === 3 && L.l3Execution.length) rungs.push({ id: "L3", requires: [...L.l3Execution], mode: "all" });
+  return rungs;
+}
+function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
+  if (!ladder || typeof ladder !== "object") {
+    return {
+      available: false,
+      reason: "this profile declares no `ladder`, so there are no rungs to earn \u2014 which is the honest grade, not a failure"
+    };
+  }
+  const L = readLadder(ladder);
+  const declared = ladderRungs(L).map((r) => ({ ...r, name: L.names[r.id] }));
+  const earnedId = typeof earned === "string" && earned.trim() ? earned.trim() : null;
+  const earnedIdx = earnedId ? declared.findIndex((r) => r.id === earnedId) : -1;
+  const passedSet = new Set((Array.isArray(passed) ? passed : []).filter((s) => typeof s === "string"));
+  const rungs = declared.map((r, i) => ({ ...r, earned: earnedIdx >= 0 && i <= earnedIdx }));
+  const nextIdx = earnedIdx + 1;
+  const next = nextIdx < declared.length ? { ...declared[nextIdx], unmet: declared[nextIdx].requires.filter((n) => !passedSet.has(n)) } : null;
+  return {
+    available: true,
+    earned: earnedId,
+    orphanRung: Boolean(earnedId) && earnedIdx === -1,
+    atTop: next === null && earnedIdx >= 0,
+    rungs,
+    next
+  };
+}
+
 // ../../packages/harness/src/lib/profile-contract.mjs
 var CONTRACT = Object.freeze({
   ladder: Object.freeze({
@@ -35517,7 +35587,17 @@ function evidenceLadderFor(profile, pack) {
       reason: `profile "${id}" ${CONTRACT.ladder.fields[field].refusal}. Declared in ${spelling}; \`node qa/profile.mjs explain ladder.${field}\` says what it is for.`
     });
     for (const field of requiredFields("ladder")) if (!named(field).length) return refuse(field);
-    if (named("l3Execution").length && !named("l2Execution").length) return refuse("l3Execution");
+    const reachable = new Set(ladderRungs(readLadder(value)).map((r) => r.id));
+    for (const [field, rungId] of [["l1Required", "L1"], ["l2Execution", "L2"], ["l3Execution", "L3"]]) {
+      if (!named(field).length || reachable.has(rungId)) continue;
+      const below = { L1: "l0Required", L2: "l1Required", L3: "l2Execution" }[rungId];
+      const published = CONTRACT.ladder.fields[field].refusal;
+      return {
+        ok: false,
+        source,
+        reason: `profile "${id}" declares ${spelling} with ${field} naming ${named(field).join(", ")}, and no ${below} beneath it \u2014 so ${rungId} can never be earned however green the lane, and nothing would say so. ` + (published ? `${published[0].toUpperCase()}${published.slice(1)}. ` : "") + `Name the steps that earn ${below}, or remove ${field}: a rung you do not declare is one you do not claim, which is honest.`
+      };
+    }
   }
   if (present(declared) && present(packed)) {
     const differing = GRADED_FIELDS.filter((f) => !same(declared[f], packed[f]));
@@ -35533,67 +35613,6 @@ function evidenceLadderFor(profile, pack) {
   if (present(declared)) return { ok: true, ladder: declared, source: "profile" };
   if (present(packed)) return { ok: true, ladder: packed, source: "pack" };
   return { ok: true, ladder: null, source: "none" };
-}
-
-// ../../packages/harness/src/lib/plant-calibration.mjs
-var PLANT_MATERIAL = Object.freeze([
-  ["testFileBasename", "string", "the file a planted citation lives in"],
-  ["unboundCitationSource", "function", "a citation on a type declaration with no test under it"],
-  ["tierUnmetCitationSource", "function", "a host-tier test citing a clause only another tier can observe"]
-]);
-
-// ../../packages/harness/src/lib/evidence-level.mjs
-function asList(value) {
-  if (value === void 0 || value === null) return [];
-  return Array.isArray(value) ? [...value] : [value];
-}
-function readLadder(ladder) {
-  const L = ladder && typeof ladder === "object" ? ladder : {};
-  const names = (v) => asList(v).filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
-  return {
-    scaffoldCore: names(L.scaffoldCore),
-    l0Required: names(L.l0Required),
-    l1Required: names(L.l1Required),
-    l2Execution: names(L.l2Execution),
-    l3Execution: names(L.l3Execution),
-    names: L.names && typeof L.names === "object" ? L.names : {}
-  };
-}
-function ladderRungs(L) {
-  const rungs = [];
-  if (L.l0Required.length) rungs.push({ id: "L0", requires: [...L.l0Required], mode: "all" });
-  if (rungs.length && L.l1Required.length) rungs.push({ id: "L1", requires: [...L.l1Required], mode: "all" });
-  if (rungs.length === 2 && L.l2Execution.length) rungs.push({ id: "L2", requires: [...L.l2Execution], mode: "any" });
-  if (rungs.length === 3 && L.l3Execution.length) rungs.push({ id: "L3", requires: [...L.l3Execution], mode: "all" });
-  return rungs;
-}
-function ladderStanding(ladder, { earned = null, passed = [] } = {}) {
-  if (!ladder || typeof ladder !== "object") {
-    return {
-      available: false,
-      reason: "this profile declares no `ladder`, so there are no rungs to earn \u2014 which is the honest grade, not a failure"
-    };
-  }
-  const L = ladder;
-  const RUNG_NAMES = L.names ?? {};
-  const declared = ladderRungs(readLadder(ladder)).map((r) => ({
-    ...r,
-    name: typeof RUNG_NAMES[r.id] === "string" ? RUNG_NAMES[r.id] : r.id
-  }));
-  const earnedId = typeof earned === "string" && earned.trim() ? earned.trim() : null;
-  const earnedIdx = earnedId ? declared.findIndex((r) => r.id === earnedId) : -1;
-  const passedSet = new Set((Array.isArray(passed) ? passed : []).filter((s) => typeof s === "string"));
-  const rungs = declared.map((r, i) => ({ ...r, earned: earnedIdx >= 0 && i <= earnedIdx }));
-  const nextIdx = earnedIdx + 1;
-  const next = nextIdx < declared.length ? { ...declared[nextIdx], unmet: declared[nextIdx].requires.filter((n) => !passedSet.has(n)) } : null;
-  return {
-    available: true,
-    earned: earnedId,
-    orphanRung: Boolean(earnedId) && earnedIdx === -1,
-    atTop: next === null && earnedIdx >= 0,
-    rungs,
-    next
-  };
 }
 
 // src/lib/ladder-bridge.mjs

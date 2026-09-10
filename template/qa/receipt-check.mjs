@@ -26,6 +26,7 @@ import { LANE_MARKER_STALE_MS, laneMarkerPath } from "./lib/lane-markers.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfileSync } from "./lib/profile-loader.mjs";
 import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
+import { readLadder } from "./lib/evidence-level.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -158,7 +159,7 @@ function evaluate() {
       const profile = loaded.ok ? loaded.profile : null;
       const resolved = evidenceLadderFor(profile);
       const ladder = resolved.ok ? resolved.ladder : null;
-      if (ladder && Array.isArray(ladder.l2Execution)) legacyNames = ladder.l2Execution;
+      if (ladder) legacyNames = readLadder(ladder).l2Execution;
       const declared = profile?.legacySkipReasons;
       if (Array.isArray(declared) && declared.length) {
         legacyPatterns = new RegExp(declared.map((r) => String(r).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));

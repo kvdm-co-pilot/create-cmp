@@ -59,6 +59,7 @@
 // The contract is DATA — no imports of its own, no I/O — so reading it here
 // costs a resolver's worth of nothing and buys the thing that makes it real:
 // the refusals an author is shown are the refusals that fire.
+import { ladderRungs, readLadder } from "./evidence-level.mjs";
 import { CONTRACT, requiredFields } from "./profile-contract.mjs";
 
 /**
@@ -284,7 +285,34 @@ export function evidenceLadderFor(profile, pack) {
     // partial ladders into refused profiles; the vacuous-grade half it was
     // reaching for belongs in the grader and lives there now.
     for (const field of requiredFields("ladder")) if (!named(field).length) return refuse(field);
-    if (named("l3Execution").length && !named("l2Execution").length) return refuse("l3Execution");
+
+    // A DECLARED RUNG THAT CANNOT BE REACHED IS REFUSED — the general rule, not
+    // one rung's special case. The rungs are climbed in order, so naming steps
+    // for L2 while declaring no L1 means those steps can never lift anything:
+    // the author declared a rung and the lane will never mention it again.
+    // That is the silently-unreachable-rung defect this whole slice exists to
+    // close, and it was the shape a second-stack author already hit once.
+    //
+    // Until now only the L3-without-L2 instance was refused, and a review asked
+    // the obvious question: why that one and not the identical shape a rung
+    // down? Because it had been written by hand, twice, instead of derived once.
+    // `ladderRungs` already decides which rungs a ladder actually declares, so
+    // the gap is the difference between that and the fields carrying steps.
+    const reachable = new Set(ladderRungs(readLadder(value)).map((r) => r.id));
+    for (const [field, rungId] of [["l1Required", "L1"], ["l2Execution", "L2"], ["l3Execution", "L3"]]) {
+      if (!named(field).length || reachable.has(rungId)) continue;
+      const below = { L1: "l0Required", L2: "l1Required", L3: "l2Execution" }[rungId];
+      const published = CONTRACT.ladder.fields[field].refusal;
+      return {
+        ok: false,
+        source,
+        reason:
+          `profile "${id}" declares ${spelling} with ${field} naming ${named(field).join(", ")}, ` +
+          `and no ${below} beneath it — so ${rungId} can never be earned however green the lane, and nothing would say so. ` +
+          (published ? `${published[0].toUpperCase()}${published.slice(1)}. ` : "") +
+          `Name the steps that earn ${below}, or remove ${field}: a rung you do not declare is one you do not claim, which is honest.`,
+      };
+    }
   }
 
   if (present(declared) && present(packed)) {
