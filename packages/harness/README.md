@@ -147,8 +147,11 @@ and a passing Rule 0 with nothing hand-edited.
 **The generated profile is the specification.** Prose about the protocol drifts from
 `lib/profile-loader.mjs` silently; a skeleton that has to load cannot. Read the file init
 writes rather than a description of it — the five required exports are real code with their
-reasons, and the four optional ones (`artifacts`, `governable`, `ladder`, `plants`) are
-present as commented blocks carrying their true field names.
+reasons, and three of the four optional ones (`artifacts`, `governable`, `plants`) are
+present as commented blocks carrying their true field names. The fourth is `ladder`, and it
+is the one shape this file cannot promise in advance: `init` asks a short menu, and what a
+human answers decides whether the block arrives commented — nobody asked — or LIVE, naming
+the rungs they said this project has.
 
 Two steps ship in it, chosen because they prove something on a stack nobody has seen:
 `harnessIntegrity` (this lane is the one that was locked) and `specCoverage` (every promise

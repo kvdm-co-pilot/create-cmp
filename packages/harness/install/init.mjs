@@ -533,16 +533,24 @@ function executionHint(picked) {
   // run as firmly as a declined one — seeding both would be answering a question
   // the human skipped, which is the one thing install/interview.mjs's header
   // says this must never do.
+  //
+  // WHICH FIELD STOPPED THE RUN IS THE THING TO REMEMBER, not merely that one
+  // did. The copy below speaks in the second person about a specific rung, so
+  // asking "was anything declined?" across the whole map puts a decline at L3
+  // into a sentence about L2 — told to an author who skipped that question and
+  // never said it. The answer map is spent at init and never stored, so this
+  // file is the only record of the interview either of them will ever have.
   const answered = new Map(picked);
   const wanted = [];
+  let stoppedBy = null;
   for (const field of MENU_FIELDS.map((path) => path.split(".").pop())) {
     const answer = answered.get(field);
-    if (answer === undefined || answer === contractAt(`ladder.${field}`)?.declinesRung) break;
+    if (answer === undefined) { stoppedBy = "skipped"; break; }
+    if (answer === contractAt(`ladder.${field}`)?.declinesRung) { stoppedBy = "declined"; break; }
     wanted.push([field, answer]);
   }
   if (!wanted.length) {
-    const declined = [...answered].some(([f, a]) => a === contractAt(`ladder.${f}`)?.declinesRung);
-    if (!declined) {
+    if (stoppedBy !== "declined") {
       return [
         "  // You answered about a higher rung but not the one beneath it, and the",
         "  // rungs are climbed in order — so nothing is seeded here rather than a",
