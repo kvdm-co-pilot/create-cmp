@@ -112,8 +112,26 @@ export async function askLadderMenu({ input, output, interactive, current = {} }
   const rl = createInterface({ input, output });
   // The input ending closes the interface, and a pending question at that
   // moment never settles. This is what turns that into an answerable state.
+  //
+  // AND ^C IS A THIRD FACT, not a fourth spelling of the second. The interview
+  // puts the terminal in raw mode, so readline owns the keystroke; with no
+  // SIGINT listener it simply closes the interface, the pending question rejects
+  // through the controller installed for the EOF case, and the two arrive
+  // byte-identical. The summary then told a person who pressed ^C that "the
+  // input ended before ladder.l2Execution was answered" — a sentence about a
+  // pipe, said to someone who was standing right there. The whole file is built
+  // on keeping apart facts about who was present; this is one of them.
+  //
+  // The reason rides on the abort, because the first abort wins and `askOne`
+  // already holds the signal. What the CALLER then does with an interrupt —
+  // install anyway, as `--no-interview` does, or stop — is a product decision
+  // and is deliberately not taken here (docs/KNOWN-DEFECTS.md KD-9).
   const ended = new AbortController();
-  rl.once("close", () => ended.abort());
+  rl.on("SIGINT", () => {
+    ended.abort("interrupted");
+    rl.close();
+  });
+  rl.once("close", () => ended.abort("ended"));
 
   const answers = {};
   let why = "";
@@ -139,6 +157,10 @@ export async function askLadderMenu({ input, output, interactive, current = {} }
       write(renderField(path, spec, held));
       const outcome = await askOne({ rl, signal: ended.signal, write, path, spec, fallback, held });
 
+      if (outcome.kind === "interrupted") {
+        why = `asked — interrupted at ${path}, so nothing further was recorded`;
+        break;
+      }
       if (outcome.kind === "ended") {
         why = `asked — the input ended before ${path} was answered, so nothing further was recorded`;
         break;
@@ -219,10 +241,11 @@ async function askOne({ rl, signal, write, path, spec, fallback, held }) {
     try {
       raw = await rl.question(promptFor(spec, fallback), { signal });
     } catch {
-      // The interface closed: the input ended, or the caller aborted. Either
-      // way there is no answer and inventing one is the thing this file exists
-      // not to do.
-      return { kind: "ended" };
+      // The interface closed: the input ended, the caller aborted, or a human
+      // pressed ^C. Either way there is no answer and inventing one is the thing
+      // this file exists not to do — but WHICH of them happened is a fact about
+      // who was there, and the summary says it out loud.
+      return { kind: signal?.reason === "interrupted" ? "interrupted" : "ended" };
     }
     const typed = String(raw).trim();
 

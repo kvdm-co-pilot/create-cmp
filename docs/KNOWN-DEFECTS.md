@@ -147,6 +147,40 @@ project path, which is the only thing that makes it noticeable.
 
 **Fires when:** anyone writes the flag before the directory. *Logged 2026-09-11, review round 4.*
 
+### KD-8 — the dangling-citation lint covers `ADR-NNNN`, and the instance that provoked it was a `§`
+
+`test/cited-decision-that-does-not-exist.test.mjs`
+
+The lint refuses a source comment citing an ADR number `docs/adr` does not hold. The finding it
+came from was `NORTH-STAR §11 D2` (removed by hand in 5a0251c) — a section citation, which the
+lint does not read. Measured 2026-09-11: nothing dangles today. Every `NORTH-STAR §N` and `§N.M`
+in source resolves (§6 has 7 numbered items, §8 has 12, §9.1/§9.2 are headings), and
+`PACKAGE-SPLIT D2` exists and says what the line citing it claims.
+
+Not raised as a defect because there is nothing to fail on, and not proposed as a lint: source
+cites eighteen documents in five numbering styles (`§8.9` is a list item, `§9.2` a heading, `D2` a
+table row, `Rule 4` neither), so a checker would be a slice with real false-positive risk — which
+is the one thing the helper's own header says gets a scanner deleted.
+
+**Fires when:** the next hand-typed `§` goes stale. *Logged 2026-09-11, review round 5.*
+
+### KD-9 — an interrupted `init` still writes a complete harness
+
+`packages/harness/install/init.mjs` (`runHarnessInit`), `packages/harness/install/interview.mjs`
+
+`^C` at a ladder question now REPORTS honestly — it is distinguishable from the input ending, and
+the summary says "interrupted at ladder.l2Execution" rather than a sentence about a pipe. What it
+still does is install: 52 files, exit 0.
+
+That is defensible and is left as it is deliberately. `--no-interview` also installs, the interview
+is explicitly not a gate on anything, and the questions are asked BEFORE a byte is written
+precisely so an unanswered one costs nothing. The other reading — `^C` means stop, and a
+half-answered interview should leave no tree — is equally defensible and is not mine to take.
+
+**Waiting on:** Karel. Product decision — install anyway, or treat `^C` as abandoning the install.
+*Logged 2026-09-12, handed up by review round 5. The reporting half was a defect and is fixed;
+this half is a choice.*
+
 ---
 
 ## Closed
