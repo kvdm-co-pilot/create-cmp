@@ -203,7 +203,7 @@ export function summary({ repoRoot, doFetch = true, timeoutMs = 3000 } = {}) {
     if (!key || entries.length === 0) return null;
 
     const fetched = doFetch && fs.existsSync(marketplaceDir) ? tryFetch(marketplaceDir, timeoutMs) : false;
-    const s = inspect({ repoRoot, marketplaceDir, cacheRoot, installed, pluginId, fetched });
+    const s = inspect({ repoRoot, marketplaceDir, cacheRoot, installed, pluginId });
     const behind = fetched ? s.behind : null;
     const wrongVersion = s.scopes.filter((x) => x.version !== s.repoDeclares);
     const goneSha = s.scopes.filter((x) => !x.shaExists);

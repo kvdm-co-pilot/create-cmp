@@ -56,7 +56,12 @@ test("the *waiting* row answers ONE question — it never repeats the flow rail'
   // is what this pins, because nothing else in the tree does.
   const statuses = [unsigned, drifted];
   const queue = deriveHumanQueue({ statuses, features: [] });
-  const summary = waitingSummary(overviewBodyHtml({ queue, statuses, statusGlyph, flowHere: "verify" }));
+  // No step name is passed, because there is no input that could carry one:
+  // the rail reaches this function already rendered, as `railHtml`. So what
+  // this pins is that the waiting row draws no such clause OF ITS OWN — it
+  // goes red if someone hardcodes one into the row, which is the way the
+  // ported clause would actually arrive.
+  const summary = waitingSummary(overviewBodyHtml({ queue, statuses, statusGlyph }));
 
   assert.doesNotMatch(summary, /next:/, `the waiting row grew the rail's clause: ${summary}`);
   assert.doesNotMatch(summary, /verify/, "…and it names the rail's step, one line under the rail that already named it");

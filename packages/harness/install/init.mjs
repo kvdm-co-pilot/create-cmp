@@ -471,7 +471,7 @@ function uncomment(block) {
  * answered: `answers: {}` would carry nothing a reader could act on, and an
  * empty map beside a comment saying a human answered would be worse than
  * nothing. The COMMAND still says it asked and got no answers; the FILE only
- * records what was decided (ADR-0017 §4).
+ * records what was decided.
  *
  * WITH AN INTENT IT IS LIVE, and the two step fields it names are not a guess:
  * they are the two steps this command has just written into that same pack, and
@@ -825,7 +825,7 @@ ${ladderBlock(answers)}
  * `answers` is what a HUMAN answered at the interview, and it is optional in the
  * strong sense: passing none is not a lesser call, it is the honest plan for an
  * install nobody was present for. What it must never become is a default filled
- * in here (ADR-0017 §5, install/interview.mjs's header).
+ * in here (install/interview.mjs's header).
  *
  * @param {string} root
  * @param {{id: string, invocation?: string, answers?: Record<string,string>}} opts
@@ -1058,7 +1058,7 @@ export async function runHarnessInit(flags, positional, opts = {}) {
  *
  * The FILE deliberately cannot tell "asked and skipped" from "never asked": an
  * an empty answer map carries nothing a reader could act on, so the skeleton writes
- * none at all (ADR-0017 §4). That is the right call for the file and the wrong
+ * none at all. That is the right call for the file and the wrong
  * one for the person standing here, who did answer a prompt and is owed the
  * difference. So the honesty lives at the surface: this says "asked" when a
  * human was asked, and names the flag or the missing terminal when one was not.

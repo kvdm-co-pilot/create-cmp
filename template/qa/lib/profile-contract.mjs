@@ -83,7 +83,6 @@ export const CONTRACT = Object.freeze({
       // partial ladders into refused profiles.
       l0Required: Object.freeze({
         required: false,
-        rung: "L0",
         mode: "all",
         meaning:
           "The steps that must PASS for the artifact to count as assembled at all. They run in " +
@@ -96,7 +95,6 @@ export const CONTRACT = Object.freeze({
       }),
       l1Required: Object.freeze({
         required: false,
-        rung: "L1",
         mode: "all",
         meaning:
           "The steps that judge the code WITHOUT running it as the program: compilation, tests " +
@@ -112,7 +110,6 @@ export const CONTRACT = Object.freeze({
       }),
       l2Execution: Object.freeze({
         required: false,
-        rung: "L2",
         mode: "any",
         meaning:
           "The steps whose PASS proves the artifact ran AS THE PROGRAM — assembled into its " +
@@ -151,7 +148,6 @@ export const CONTRACT = Object.freeze({
       }),
       l3Execution: Object.freeze({
         required: false,
-        rung: "L3",
         mode: "all",
         meaning:
           "The same proof as l2Execution against the SHIPPABLE variant rather than the " +
@@ -168,13 +164,6 @@ export const CONTRACT = Object.freeze({
         declinesRung: "no — one variant only",
         refusal: "declares l3Execution without l2Execution — the shippable program cannot run where no program runs",
       }),
-      // INTENT IS A FIELD OF THE LADDER, not a file beside it, and that placement
-      // is the decision (ADR-0017). The ladder already cost this repository two
-      // spellings and four readers that disagreed; a second FILE holding half of
-      // it would be that class again, with a filesystem read added to a resolver
-      // that is pure precisely so its refusals are unit-testable. Living here, it
-      // arrives through `evidenceLadderFor` like everything else, and no reader
-      // has to remember to fetch it.
       names: Object.freeze({
         required: false,
         meaning:
