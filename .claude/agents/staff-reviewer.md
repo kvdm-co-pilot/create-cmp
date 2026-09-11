@@ -40,6 +40,13 @@ So:
   saw, why a test cannot capture it, and the decision it asks for. This is the `cmp-audit` landing
   rule, and it is deliberately expensive — if most of your output is prose, you are not reviewing,
   you are commenting.
+- **A finding that is not about the change you are reviewing goes in `docs/KNOWN-DEFECTS.md`.**
+  READ THAT FILE BEFORE YOU REPORT. It holds what earlier reviews found and deliberately did not
+  block on — pre-existing conditions, decisions waiting on a human, hazards that cannot fire yet —
+  and its header carries the rule for placing a finding on that line, which is not restated here
+  so the two cannot drift. Anything already logged there you do not raise again; anything you find
+  that belongs there you ADD there, in this round, instead of handing it up. It is markdown under
+  `docs/`, so writing to it cannot reopen a gate, and the file says why that matters.
 - **Never a direct fix to a signed artifact.** A spec, an ADR, an approved brief: you may propose,
   never edit.
 - **You find nothing, you write nothing.** An empty review is an honest result and the correct
