@@ -88,7 +88,6 @@ test("governanceStripHtml: counts that name their artifact, then a handoff to th
       status("feature-brief:meal", "unreviewed"),
     ],
     features: [],
-    journal: [],
   });
   assert.match(html, /id="gov-strip"/);
   assert.match(html, /2 signed/);
@@ -122,7 +121,6 @@ test("governanceStripHtml: a single reopened/drifted artifact is NAMED and jumps
       { ...status("feature-design:meal", "reopened"), label: "Feature design (meal)" },
     ],
     features: [],
-    journal: [],
   });
   assert.match(redesign, /in redesign: Feature design \(meal\)/, "the count names the artifact");
   assert.match(redesign, /class="gov-n gov-redesign gov-jump"/);
@@ -135,7 +133,6 @@ test("governanceStripHtml: a single reopened/drifted artifact is NAMED and jumps
   const many = governanceStripHtml({
     statuses: [status("a", "changed-since-approval"), status("b", "changed-since-approval")],
     features: [],
-    journal: [],
   });
   assert.match(many, /2 drifted/);
   const countBtn = many.match(/<button[^>]*gov-drift[^>]*>/)[0];
@@ -144,11 +141,11 @@ test("governanceStripHtml: a single reopened/drifted artifact is NAMED and jumps
 });
 
 test("governanceStripHtml: nothing pending says so; no statuses at all renders NOTHING (silence, not a fabricated dashboard)", () => {
-  const clear = governanceStripHtml({ statuses: [status("intent", "approved")], features: [], journal: [] });
+  const clear = governanceStripHtml({ statuses: [status("intent", "approved")], features: [] });
   assert.match(clear, /Nothing waits on you\./);
   assert.doesNotMatch(clear, /gov-next/);
 
-  assert.equal(governanceStripHtml({ statuses: [], features: [], journal: [] }), "");
+  assert.equal(governanceStripHtml({ statuses: [], features: [] }), "");
 });
 
 // History moved to the front door (2026-08-22) — see console-overview.test.mjs.

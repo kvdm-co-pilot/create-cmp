@@ -230,11 +230,12 @@ async function askOne({ rl, signal, write, path, spec, fallback, held }) {
     if (SKIP_WORDS.includes(typed.toLowerCase())) return { kind: "skip" };
     if (typed === EXPLAIN_WORD) {
       // The contract's own explanation, rendered by the same function `node
-      // qa/profile.mjs explain` calls. `intended` is passed through so the
-      // tri-state line prints what is actually true here: the answer already on
-      // record, or "nobody has been asked" — the state this interview is in the
-      // middle of leaving.
-      write(`\n${indent(explain(path, { intended: held ?? null }))}\n\n`);
+      // qa/profile.mjs explain` calls. `declared` is the key that function
+      // reads, and it is handed over ONLY when something is on record: it
+      // prints `THIS PROJECT DECLARES: <value>`, and passing null would print
+      // that line reading "null" at a person who has simply never been asked.
+      // No answer, no line.
+      write(`\n${indent(explain(path, held ? { declared: held } : {}))}\n\n`);
       continue;
     }
     const n = Number(typed);

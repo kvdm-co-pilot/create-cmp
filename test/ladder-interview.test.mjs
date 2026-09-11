@@ -30,7 +30,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough, Writable } from "node:stream";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { askLadderMenu } from "../packages/harness/install/interview.mjs";
 import { CONTRACT, MENU_FIELDS, contractAt } from "../packages/harness/src/lib/profile-contract.mjs";
@@ -121,8 +121,10 @@ test("a number picks that option, verbatim, in the contract's own words", async 
   assert.equal(
     r.answers.l2Execution,
     L2.options[1],
-    "the recorded answer must be the option string the contract offers, byte for byte — evidenceLadderFor " +
-      "matches it against `options` by equality, so a paraphrase or a normalised copy is refused at load",
+    "the recorded answer must be the option string the contract offers, byte for byte. NOT because anything " +
+      "validates it later — the answer is SPENT at init, deciding what gets seeded, and is never stored, so " +
+      "there is nothing at load to match it against. It matters because `init` branches on the string, and a " +
+      "paraphrase would take the wrong branch in silence.",
   );
   assert.equal(r.asked, true);
 });
@@ -218,16 +220,53 @@ test("THE PROPERTY THE DESIGN RESTS ON: the interview holds no copy of the menu 
  * skeleton imports `../../harness-lock.mjs` and can only be loaded from
  * qa/lib/profiles/<id>/.
  */
-function skeletonTree(intent) {
+function skeletonTree(answers) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "interview-skeleton-"));
   const lib = path.join(dir, "qa", "lib");
   fs.mkdirSync(path.join(lib, "profiles", "probe"), { recursive: true });
   fs.writeFileSync(path.join(lib, "harness-lock.mjs"), "export const checkHarnessIntegrity = () => ({ status: 'unlocked' });\nexport const describeIntegrity = () => '';\n");
   fs.writeFileSync(path.join(lib, "spec-model.mjs"), "export const requireSpecModel = () => ({});\n");
   fs.writeFileSync(path.join(lib, "spec-coverage.mjs"), "export const scanSpecClauses = () => new Map();\nexport const scanCitations = () => [];\nexport const clauseTierCoverage = () => ({});\nexport const citationScanDiagnostic = () => null;\n");
-  fs.writeFileSync(path.join(lib, "profiles", "probe", "index.mjs"), profileSkeleton("probe", { sourceRoots: ["src"], tiers: ["unit"], lang: "Python", intent }));
+  fs.writeFileSync(path.join(lib, "profiles", "probe", "index.mjs"), profileSkeleton("probe", { sourceRoots: ["src"], tiers: ["unit"], lang: "Python", answers }));
   return dir;
 }
+test("the profile an interview writes actually LOADS — validated, ladder resolved, in a real tree", async () => {
+  // The one end-to-end assertion in this file: everything else checks what the
+  // interview RETURNS. This checks what the interview CAUSES — the generated
+  // module imported from the path it is written to, put through the same
+  // validator and the same ladder resolver the lane uses. It was verified by
+  // hand during review and not landed, which is how a check becomes a sentence.
+  const r = await interview([choice(L2, L2.default), choice(L3, L3.default)]);
+  // The contract publishes DOTTED paths ("ladder.l2Execution"); the interview
+  // records by the bare field name, because that is the key the ladder itself
+  // is written with. Both menu fields were asked, and both were answered.
+  assert.deepEqual(
+    [...Object.keys(r.answers)].sort(),
+    MENU_FIELDS.map((f) => f.split(".").pop()).sort(),
+    "every field the contract offers a menu for is a field the interview records",
+  );
+
+  const dir = skeletonTree(r.answers);
+  try {
+    const mod = await import(pathToFileURL(path.join(dir, "qa", "lib", "profiles", "probe", "index.mjs")).href);
+    assert.deepEqual(validateProfileModule(mod, "probe"), { ok: true }, "the skeleton an interview writes must satisfy the loader that reads it");
+
+    const resolved = evidenceLadderFor(mod, null);
+    assert.equal(resolved.ok, true, `the generated ladder is refused by the resolver: ${resolved.reason}`);
+
+    // The two step fields are not a guess: they are the steps this same command
+    // wrote into that same pack, which is the property that makes a LIVE ladder
+    // honest rather than aspirational.
+    const L = readLadder(resolved.ladder);
+    for (const field of ["l0Required", "l1Required"]) {
+      assert.ok(L[field].length > 0, `a live ladder declares ${field}, or it earns no rung at all`);
+      for (const step of L[field]) assert.equal(typeof step, "string", `${field} names a step that is not a string`);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("skipping every question records nothing, and leaves a profile byte-identical to an uninterviewed one", async () => {
   const r = await interview(["s", "s"]);
 
@@ -236,10 +275,10 @@ test("skipping every question records nothing, and leaves a profile byte-identic
 
   const opts = { sourceRoots: ["src"], tiers: ["unit"], lang: "Python" };
   assert.equal(
-    profileSkeleton("probe", { ...opts, intent: r.answers }),
+    profileSkeleton("probe", { ...opts, answers: r.answers }),
     profileSkeleton("probe", opts),
     "with no answers there is nothing to record, so the profile must be exactly the one an uninterviewed install " +
-      "writes. An empty `intent: {}` carries nothing any reader can act on, and a live ladder block wrapped around " +
+      "writes. An empty `answers: {}` carries nothing any reader can act on, and a live ladder block wrapped around " +
       "it would tell the next reader a human decided something. The COMMAND still reports that it asked — that " +
       "honesty belongs at the surface where the person is standing, not in a file that outlives the session.",
   );
