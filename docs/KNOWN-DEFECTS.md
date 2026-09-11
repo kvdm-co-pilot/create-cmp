@@ -93,12 +93,14 @@ breaks silently rather than loudly.
 
 `bin/create-cmp.mjs:133`
 
-Pre-existing, and narrower than the gate that now exists:
-`test/install-flag-its-own-help-never-names.test.mjs` covers flags `install/*` branches on, and
-`--new-profile` is parsed at the front door rather than there. The two help surfaces have
-drifted from each other, and `prooflane --help` is the fuller one.
+Pre-existing. The two help surfaces have drifted from each other, and `prooflane --help` is the
+fuller one — it names `--new-profile`, `create-cmp`'s `harness init flags:` line does not.
 
-*Logged 2026-09-11, noticed in review round 1.*
+*Logged 2026-09-11, noticed in review round 1. Reason corrected 2026-09-11 after review round 4:
+this entry first said `--new-profile` was "parsed at the front door rather than there" and so out
+of the new lint's reach. It is branched on at `packages/harness/install/init.mjs:950`, and the
+lint does cover it — against `prooflane --help`, which names it. Only create-cmp's help omits it.
+The conclusion held; the reason was wrong.*
 
 ### KD-5 — `tokenDrift` SKIPs whenever the debug app is not already running
 
@@ -123,6 +125,27 @@ framework-check, affected-tests, evidence-badge, evidence-html, flight-recorder,
 
 **Fires when:** someone sweeps those ten. The exception list is asserted to only ever shrink.
 *Logged 2026-09-11, measured earlier the same day.*
+
+### KD-7 — a boolean flag swallows the target directory, and the lane installs into the cwd
+
+`packages/harness/bin/prooflane.mjs` (`parseArgs`), `src/lib/args.mjs` (`parseArgs`)
+
+Both parsers read `--k <next>` as a value whenever `next` does not start with `--`, so a bare
+boolean flag eats the positional after it. Measured 2026-09-11:
+
+```
+$ cd cwdtest2 && prooflane init --new-profile ../pFlag2
+  project: …/cwdtest2          ← not ../pFlag2
+```
+
+`qa/` landed in `cwdtest2`; `../pFlag2` was untouched; exit 0. Same for `--dry-run <dir>`, which
+additionally dry-runs a directory the user did not name. Pre-existing — `--dry-run` and
+`--new-profile` predate the interview slice — but `--no-interview` joins the same parser and
+`prooflane init [dir] … [--no-interview|--yes]` is now printed as a usage line, so the order that
+breaks is the one the help suggests reading right to left. The banner does print the resolved
+project path, which is the only thing that makes it noticeable.
+
+**Fires when:** anyone writes the flag before the directory. *Logged 2026-09-11, review round 4.*
 
 ---
 
