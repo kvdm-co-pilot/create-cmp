@@ -303,6 +303,37 @@ export function ignoredOptionKeys(sources) {
     return sig ? { sig, definedIn: sources.get(imported.from).rel } : null;
   };
 
+/**
+ * The object literals an argument expression can actually HAND OVER.
+ *
+ * `f({ a: 1 })` is one of them. `f(cond ? { a: 1 } : {})` is two, and whichever
+ * branch is taken hands its keys to `f`, so both are judged.
+ *
+ * Requiring the whole argument to BE an object literal missed every conditional
+ * form — and missed them SILENTLY, which is the worse half: a call the scanner
+ * cannot see is a call it reports as clean. Measured 2026-09-11: renaming
+ * `explain`'s option key turned two stale call sites red and left a third green,
+ * and the third was `explain(path, held ? { declared: held } : {})` — the call
+ * this helper's own header uses as its worked example.
+ */
+function optionLiterals(arg) {
+  const out = [];
+  for (let i = 0; i < arg.length; i += 1) {
+    if (arg[i] !== "{") continue;
+    // EXPRESSION POSITION, and nothing else: the start of the argument, or
+    // straight after an operator that yields one of its sides. A `{` anywhere
+    // else is a nested property value or a function body, and the keys inside it
+    // are not this call's to answer for.
+    const before = arg.slice(0, i).trimEnd();
+    if (before !== "" && !/[(?:|&,]$/.test(before)) continue;
+    const end = matchBracket(arg, i);
+    if (end === -1) continue;
+    out.push(arg.slice(i, end + 1));
+    i = end;
+  }
+  return out;
+}
+
   const findings = [];
   for (const [abs, { rel, raw, masked }] of sources) {
     const imports = namedImports(raw, abs);
@@ -319,15 +350,13 @@ export function ignoredOptionKeys(sources) {
       if (close === -1) continue;
       const args = splitTopLevel(masked.slice(open + 1, close));
       const arg = (args[resolved.sig.index] ?? "").trim();
-      if (!arg.startsWith("{")) continue;
-      if (matchBracket(arg, 0) !== arg.length - 1) continue;
       // A spread in the ARGUMENT is not a reason to look away. `f({ ...opts,
       // intent })` can only ever ADD keys to what `opts` carries, so a key
       // written out here that the signature does not name is dropped whatever
       // the spread holds — and this is the exact shape the defect took in a test
       // that believed it was varying the thing it varied.
-      const { keys } = objectKeys(arg.slice(1, -1));
-      const ignored = keys.filter((k) => !resolved.sig.keys.has(k));
+      const written = optionLiterals(arg).flatMap((lit) => objectKeys(lit.slice(1, -1)).keys);
+      const ignored = [...new Set(written)].filter((k) => !resolved.sig.keys.has(k));
       if (ignored.length) {
         findings.push({
           rel,

@@ -181,9 +181,11 @@ test("an answer already on record is offered back, and enter keeps it", async ()
   assert.equal(
     r.answers.l2Execution,
     held,
-    "enter over an existing answer must KEEP it, not overwrite it with the recommendation. `prooflane upgrade` " +
-      "asks about a ladder that is already declared, and an interview that silently replaced the author's answer " +
-      "with the default would be the rewrite ADR-0008 promises never happens to a profile.",
+    "enter over an existing answer must KEEP it, not overwrite it with the recommendation — the recommendation is " +
+      "the contract's, the answer on record is a human's, and replacing the second with the first is the interview " +
+      "answering for someone, which this file's header calls the permanent temptation. NOTE: nothing in production " +
+      "passes `current` yet, so this path has no caller today (docs/KNOWN-DEFECTS.md KD-2); the property is the " +
+      "function's either way, and this says so rather than borrowing a reason from a caller that does not exist.",
   );
   assert.ok(r.out.includes(JSON.stringify(held)), "the answer on record must be visible before it is kept, or enter is a blind keystroke");
 });
