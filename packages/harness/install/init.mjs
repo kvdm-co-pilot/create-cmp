@@ -31,7 +31,7 @@
 // then runs qa/framework-check.mjs and prints the verdict — because a lane you
 // have not seen refuse is a lane you have not seen (GATE-RULES Rule 0).
 //
-// THE SKELETON IS THE SPEC (NORTH-STAR §11 D2, PACKAGE-SPLIT D2). Prose drifts
+// THE SKELETON IS THE SPEC (PACKAGE-SPLIT D2). Prose drifts
 // from the loader silently; a generated skeleton is checked by the code that
 // generates it and by the test that runs its lane. That is why the profile this
 // writes is a WORKING one — two real steps that prove something on any stack —
