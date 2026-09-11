@@ -110,7 +110,12 @@ const TIERS = Object.freeze({
     when: "at-close",
     cost: "~one read of the diff",
     cmd: "node scripts/proof-plan.mjs --discharge-review",
-    how: "invoke the staff-reviewer on this diff (.claude/agents/staff-reviewer.md); it writes qa-artifacts/review-latest.json — or `node scripts/proof-plan.mjs --record-review --nothing-found` if it found nothing",
+    how:
+      "invoke the staff-reviewer on this diff (.claude/agents/staff-reviewer.md); it writes qa-artifacts/review-latest.json — or `node scripts/proof-plan.mjs --record-review --nothing-found` if it found nothing.\n" +
+      "      A round ends when it produces no new DEFECT IN THE CODE THAT IS MERGING — not when a review finds nothing, which on a\n" +
+      "      real diff it rarely does. Everything else a review turns up goes to docs/KNOWN-DEFECTS.md, whose header holds that rule.\n" +
+      "      Bound your fix to the finding: on the slice that rule was written for, each round's fix reached past what was found and\n" +
+      "      became the next round's first finding.",
   },
 });
 
