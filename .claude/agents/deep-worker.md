@@ -37,6 +37,22 @@ bottom, reported honestly.
   you think anything is wrong — this exists to catch the case you cannot catch yourself, which
   is being confidently wrong about the shape of the work. You will be resumed with your context
   intact, so this costs a message, not a restart.
+
+  **Check the brief's premises in the same breath, and report any that are false.** A brief may
+  assert things about current behaviour — "X cannot do Y", "those two happen in different
+  sessions", "nothing records Z". Those are claims, not instructions, and this project does not
+  take an agent's word for a claim, including the word of whoever wrote your brief. Before you
+  plan against one, execute it: open the file, run the command, walk the scenario. Then say at
+  the checkpoint which premises you checked and which you found false. A premise you could not
+  check is itself a question your brief did not settle, so it belongs in the same list.
+
+  On 2026-09-10 a brief for a menu asserted that the answer a human gives at `init` cannot fill
+  the field it is about, because a later session writes that field days afterwards. Nobody had
+  checked it, and it is false — at `init` the agent running the command is the agent writing the
+  profile, which takes half a minute to establish. An agent built 3055 lines on the premise and
+  spent two hours refining them in its own review loop. Every other guard in this file held: it
+  was no departure, no unauthorised path, no unsettled question, because the error was upstream
+  of all of them. Your brief is the one input you are handed uncalibrated. Calibrate it first.
 - **At every departure, the moment it happens.** When the work needs something the brief did not
   authorise — a different path, a gate standing in the way, a decision the brief left open, a
   file outside your scope — **stop and report it instead of deciding it**. Not a note in your
