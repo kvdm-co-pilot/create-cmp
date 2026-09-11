@@ -82,7 +82,7 @@ async function main() {
       }
       process.stderr.write(
         `create-cmp harness: unknown subcommand ${JSON.stringify(sub ?? "")}\n` +
-          `  usage: create-cmp harness init   [--profile <id>] [--target-dir <dir>] [--dry-run]\n` +
+          `  usage: create-cmp harness init   [--profile <id>] [--target-dir <dir>] [--dry-run] [--no-interview|--yes]\n` +
           `         create-cmp harness relock [--target-dir <dir>] [--dry-run]\n`
       );
       process.exit(2);
@@ -131,6 +131,8 @@ function printHelp() {
       `harden flags:  --target-dir <dir>  --dry-run  --yes  --verify (run the lane after install)\n` +
       `attach flags:  --target-dir <dir>  --dry-run  --yes\n` +
       `harness init flags:   --profile <id>  --target-dir <dir>  --dry-run\n` +
+      `                      --no-interview | --yes  (skip the ladder questions and record NO answers —\n` +
+      `                      not the same as taking the defaults, which this command never does)\n` +
       `harness relock flags: --target-dir <dir>  --dry-run\n` +
       `  (relock covers qa/lib/profiles/<id>/** and qa/{verified-surface,harness-manifest}.json only —\n` +
       `   a machine-owned edit is a fork and is refused by name; \`upgrade --harness\` restores it)\n`

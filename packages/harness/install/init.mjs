@@ -53,7 +53,7 @@ const EXT_TO_LANGUAGE = new Map();
 for (const [name, exts] of Object.entries(LINGUIST.languages)) for (const e of exts) if (!EXT_TO_LANGUAGE.has(e)) EXT_TO_LANGUAGE.set(e, name);
 
 import { colors, ok, warn, fail } from "./log.mjs";
-import { contractAt } from "../src/lib/profile-contract.mjs";
+import { MENU_FIELDS, contractAt } from "../src/lib/profile-contract.mjs";
 import { askLadderMenu } from "./interview.mjs";
 import { loadShippedDeclarations, notPortable } from "./portability.mjs";
 import {
@@ -518,10 +518,37 @@ function ladderBlock(answers) {
  * The reminder left where the execution rungs would be declared, phrased from
  * what the author just said — and omitted entirely for a rung they said this
  * project does not have, because a TODO for a rung nobody wants is noise.
+ *
+ * IT INVITES IN RUNG ORDER, and that is the whole of the second condition. A
+ * decline is not the only reason a field must not be offered: the loader refuses
+ * `l3Execution` declared over an undeclared `l2Execution` ("the shippable program
+ * cannot run where no program runs"), so an invitation to fill in L3 alone sends
+ * the author to a refusal, twenty lines under this same skeleton's legend saying
+ * to declare from the bottom up. Filtering on `declinesRung` alone did exactly
+ * that for anyone who skipped the L2 question and answered the L3 one.
  */
 function executionHint(picked) {
-  const wanted = picked.filter(([field, answer]) => answer !== contractAt(`ladder.${field}`)?.declinesRung);
+  // The longest run from the bottom: a field is invited only when every rung
+  // beneath it was answered and wanted too. An UNANSWERED lower rung stops the
+  // run as firmly as a declined one — seeding both would be answering a question
+  // the human skipped, which is the one thing install/interview.mjs's header
+  // says this must never do.
+  const answered = new Map(picked);
+  const wanted = [];
+  for (const field of MENU_FIELDS.map((path) => path.split(".").pop())) {
+    const answer = answered.get(field);
+    if (answer === undefined || answer === contractAt(`ladder.${field}`)?.declinesRung) break;
+    wanted.push([field, answer]);
+  }
   if (!wanted.length) {
+    const declined = [...answered].some(([f, a]) => a === contractAt(`ladder.${f}`)?.declinesRung);
+    if (!declined) {
+      return [
+        "  // You answered about a higher rung but not the one beneath it, and the",
+        "  // rungs are climbed in order — so nothing is seeded here rather than a",
+        "  // field the loader would refuse. Name the lower one first.",
+      ];
+    }
     return [
       "  // You answered that this project has no rung above L1 — nothing starts it",
       "  // as a program that a lane could drive. No execution field is seeded, and",
@@ -932,7 +959,7 @@ export async function runHarnessInit(flags, positional, opts = {}) {
   // the same empty result.
   const noInterviewReason = flags["no-interview"]
     ? "--no-interview"
-    : flags.yes || flags.y
+    : flags.yes
       ? "--yes"
       : dryRun
         ? "--dry-run"

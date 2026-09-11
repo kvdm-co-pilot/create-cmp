@@ -5,14 +5,21 @@
 //   the interview  renders the menu at init/upgrade  (`question`/`options`/`default`)
 //   the author     reads WHY, at the moment it is declaring          (`meaning`)
 //
-// AND THREE KEYS THAT EXIST SO NO CONSUMER HAS TO HOLD A COPY OF THE MENU.
+// AND TWO KEYS THAT EXIST SO NO CONSUMER HAS TO HOLD A COPY OF THE MENU.
 // `declinesRung` names the one option meaning "this rung does not exist here";
-// `rung` names the rung a field earns, which is where the grader's rung order
-// now comes from; `MENU_FIELDS` is derived from which fields offer `options` at
-// all. Each replaced something a consumer would otherwise have written out — a
-// word to grep for, a rung table, a list of what to ask — and every one of those
-// is a copy that goes stale the first time this object is edited. The
-// field that records what a human ANSWERED, is checked against all three.
+// `MENU_FIELDS` is derived from which fields offer `options` at all. Each
+// replaced something a consumer would otherwise have written out — a word to
+// grep for, a list of what to ask — and both would go stale the first time this
+// object was edited without them.
+//
+// A THIRD key, naming the rung each field earns, was published here and deleted
+// on 2026-09-11 because nothing read it: the grader spells L0..L3 itself and
+// does not import this file, so it was a second spelling of "which field earns
+// which rung" with nothing comparing the two. It is described rather than named
+// here, because a key that does not exist should not be typeset as one — and
+// the paragraph that DID name it outlived the key by a commit, which is the
+// drift the PATTERN note below claims placement prevents. Placement is not
+// enough. The two lints now guarding both directions are.
 //
 // PATTERN: prose inside the schema, never beside it. It is the shape every
 // function-calling tool description already has, and the shape `kubectl explain`

@@ -8,10 +8,10 @@
 // "fix" that by falling back to the contract's recommended `default` is
 // permanent — it looks like a missing else-branch and it makes every CI install
 // produce a fuller-looking profile. It would also destroy the only distinction
-// `ladder.intent` exists to create: an absent intent means NOBODY WAS ASKED, an
-// answer equal to `declinesRung` means ASKED, AND THERE IS NO SUCH RUNG HERE,
-// and a default written on a human's behalf is the second one asserted by a
-// program that has no idea. Test 1 is that gate, and it names the value that
+// the ANSWER MAP carries: an absent key means NOBODY WAS ASKED, a value equal to
+// `declinesRung` means ASKED, AND THERE IS NO SUCH RUNG HERE, and a default
+// written on a human's behalf is the second one asserted by a program that has
+// no idea. Test 1 is that gate, and it names the value that
 // must not appear rather than merely counting keys.
 //
 // THE SECOND is an interview that holds a copy of the menu. Every question,
@@ -107,7 +107,7 @@ test("with nobody there to answer, the interview records NOTHING — not even th
     undefined,
     `the interview fell back to ${JSON.stringify(L2.default)} with no human present. That is the contract's ` +
       "RECOMMENDATION, not an answer: writing it here is an agent's guess wearing a human's answer, and it " +
-      "erases the one distinction ladder.intent exists to create — an absent intent means nobody was asked, " +
+      "erases the one distinction the answer map carries — an absent key means nobody was asked, " +
       `while an answer equal to ${JSON.stringify(L2.declinesRung)} means asked, and there is no such rung here. ` +
       "Those are opposite claims about the same project.",
   );

@@ -70,6 +70,9 @@ function usage() {
     `    --target-dir <dir>        the project to install into (default: .)\n` +
     `    --new-profile             seed a generic profile even if another claims this tree\n` +
     `    --dry-run                 print the plan, write nothing\n` +
+    `    --no-interview, --yes     skip the ladder questions and record NO answers.\n` +
+    `                              NOT the same as accepting the recommendations —\n` +
+    `                              nothing is ever answered on your behalf\n` +
     `    --version, --help\n\n` +
     `  After ${colors.cyan("prooflane init")}: commit what it wrote, then run\n` +
     `  ${colors.cyan("node qa/framework-check.mjs")} — a lane you have not seen refuse is a lane\n` +
@@ -110,7 +113,7 @@ async function main() {
 
   fail(`prooflane: unknown command ${JSON.stringify(command)}`);
   process.stdout.write(
-    `  usage: prooflane init    [dir] [--profile <id>] [--dry-run]\n` +
+    `  usage: prooflane init    [dir] [--profile <id>] [--dry-run] [--no-interview|--yes]\n` +
       `         prooflane relock  [dir] [--dry-run]\n` +
       `         prooflane upgrade [dir] [--dry-run]\n\n`
   );
