@@ -318,21 +318,45 @@ export function ignoredOptionKeys(sources) {
  */
 function optionLiterals(arg) {
   const out = [];
+  // A stack of the groups we are inside, each marked OPAQUE or not. Opaque means
+  // "whatever is in here is being handed to something that is not our callee":
+  // the parentheses of a nested call, an arrow's body, an array literal. The
+  // distinction is decidable from the character before the `(` — a CALL's paren
+  // follows an identifier or a `)`, a GROUPING paren follows nothing or an
+  // operator, and `=>` follows neither rule and is opaque by its own right.
+  //
+  // Both directions are gated by a test and they pull opposite ways:
+  // `f(({ k }))` must be judged, `f(g({ k }))` must not. Counting bracket depth
+  // alone cannot tell them apart, and getting it wrong in THIS direction is the
+  // fatal one — this file's header says a scanner that judges wrong is deleted
+  // the first time it is wrong, and a false positive reddens the suite while
+  // pointing at correct code.
+  const groups = [];
+  const inOpaque = () => groups.some(Boolean);
+  const OPERATOR = /[?:|&,]$/;
   for (let i = 0; i < arg.length; i += 1) {
-    if (arg[i] !== "{") continue;
-    // EXPRESSION POSITION, and nothing else: the start of the argument, or
-    // straight after an operator that yields one of its sides. A `{` anywhere
-    // else is a nested property value or a function body, and the keys inside it
-    // are not this call's to answer for.
+    const c = arg[i];
+    if (c === "(") {
+      const before = arg.slice(0, i).trimEnd();
+      groups.push(!(before === "" || OPERATOR.test(before)));
+      continue;
+    }
+    if (c === "[") { groups.push(true); continue; }
+    if (c === ")" || c === "]") { groups.pop(); continue; }
+    if (c !== "{") continue;
+    const close = matchBracket(arg, i);
+    if (close === -1) continue;
     const before = arg.slice(0, i).trimEnd();
-    if (before !== "" && !/[(?:|&,]$/.test(before)) continue;
-    const end = matchBracket(arg, i);
-    if (end === -1) continue;
-    out.push(arg.slice(i, end + 1));
-    i = end;
+    // Expression position, and not inside anything opaque. A `{` after anything
+    // else is an arrow body or a property value, not a thing handed over.
+    if (!inOpaque() && (before === "" || before.endsWith("(") || OPERATOR.test(before))) {
+      out.push(arg.slice(i, close + 1));
+    }
+    i = close;
   }
   return out;
 }
+
 
   const findings = [];
   for (const [abs, { rel, raw, masked }] of sources) {
