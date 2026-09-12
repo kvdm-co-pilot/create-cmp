@@ -252,6 +252,39 @@ Loosening that touches ADR-0014's "bound to this tree, so it cannot be recycled 
 *Logged 2026-09-12, by the author, deliberately not fixed on this branch: `scripts/` is a review
 trigger path and editing it would reopen the review under the rule being replaced.*
 
+
+### KD-13 — three of `ladderSummary`'s four branches drop a fact they were handed
+
+`packages/harness/install/init.mjs` (`ladderSummary`)
+
+It takes three inputs because three facts have to reach the person: what was answered, how the
+session ENDED (`interview.why`), and whether the profile was KEPT rather than written — the
+last one for the reason its own docstring gives, that "printing 'recorded' over a file we did
+not touch would be the product claiming an act it did not perform". `7a61470` taught one branch
+to print the ending. The other three each still drop one input. Measured 2026-09-12, by running
+the real command into a directory that already held `qa/lib/profiles/<id>/index.mjs`:
+
+| branch | drops | what the human reads |
+|---|---|---|
+| answers + profile kept | `interview.why` | ^C, a dead input and a finished session print the same paragraph, byte for byte |
+| no answers, but asked | `keptProfile` | "the seeded ladder stays commented — uncomment it" |
+| never asked (`--no-interview`) | `keptProfile` | "the seeded ladder stays commented, which is the honest state" |
+
+Nothing was seeded in the last two: that file is the adopter's own bytes, untouched. Logged
+rather than raised because of the second question on the placement line — the line above it does
+print `N kept (already present)`, and the tree that most often reaches this branch holds a
+profile an earlier `init` wrote, which does carry the commented ladder the sentence describes.
+It is a summary line that could be truer, not an adopter handed a wrong result.
+
+Repair if it is ever wanted, and it is small: round 6's clause in the kept branch, and a
+`keptProfile ? … : …` in the two empty-answer branches. Measured red on this tree and green
+under that repair, over a matrix of three endings x two shapes of tree x every position a
+question is still outstanding, driven exactly as
+`test/a-session-cut-short-is-reported-as-one-that-finished.test.mjs` drives one row of it.
+
+**Fires when:** an adopter whose profile was written by hand — not by an earlier `init` — runs it.
+*Logged 2026-09-12, review round 7.*
+
 ---
 
 ## Closed
