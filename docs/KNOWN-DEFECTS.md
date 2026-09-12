@@ -181,6 +181,52 @@ half-answered interview should leave no tree — is equally defensible and is no
 *Logged 2026-09-12, handed up by review round 5. The reporting half was a defect and is fixed;
 this half is a choice.*
 
+### KD-10 — enter records the contract's `default` without checking it is an option
+
+`packages/harness/install/interview.mjs` (`askOne`, `promptFor`)
+
+`fallback = held ?? spec.default`, and an empty line returns it verbatim: `{kind: "answer",
+value: fallback}`. Nothing asks whether `spec.default` is one of `spec.options`. A menu field
+declared without a `default` therefore makes ENTER record `undefined` — printed back as
+`recorded l2Execution: undefined`, carried into `answers`, and enough to flip the seeded ladder
+block LIVE while `executionHint` reads the same field as unanswered and writes the
+"you answered about a higher rung but not the one beneath it" sentence at someone who answered
+the lower one. A `default` that is merely *absent from* `options` records a value the loader
+would refuse. Both are the file's own stated defect — an answer nobody gave — arriving through
+the one keystroke the menu recommends.
+
+Not live: measured 2026-09-12, `default` is one of `options` for both `ladder.l2Execution` and
+`ladder.l3Execution`, and `MENU_FIELDS` only selects fields that have `options` at all. Not
+raised as a defect because there is nothing to fail on today, and not proposed as a test for
+the same reason — a green assertion over today's contract is not a failing test.
+
+**Fires when:** a field gains `options` and no `default`, or a `default` is edited out of step
+with its `options`. *Logged 2026-09-12, review round 6.*
+
+### KD-11 — the doc charter calls itself the map of every document, and four parts of it are stale
+
+`docs/DOCUMENTATION.md` §2
+
+Its own header: "The holistic map of **every document** in create-cmp." Measured against
+`git ls-files docs/**/*.md`, 2026-09-12:
+
+| | |
+|---|---|
+| top-level `docs/*.md` named nowhere in it | `PRINCIPLES.md`, `GATE-RULES.md`, `PUBLISHING.md`, `EVIDENCE-ECONOMICS-PLAN.md`, `KNOWN-DEFECTS.md` |
+| `docs/features/` | 7 files; the directory does not appear in the charter at all |
+| the `adr/` row | enumerates 0001–0006; 0007–0016 exist |
+| the `proposals/` row | "Currently:" names 5 of the 12 files present — omitting `AGNOSTIC-HARNESS-ARCHITECTURE.md` and `PACKAGE-SPLIT.md`, the two NORTH-STAR §12 declares authoritative |
+
+Pre-existing: this slice adds exactly one of these (`KNOWN-DEFECTS.md`), which is why it is
+logged rather than raised. Note the two maps are different instruments and neither covers the
+other — NORTH-STAR §12 is a PRECEDENCE table (which doc keeps authority over what), not an
+index — and no test opens either, so both drift silently. The obvious invariant ("every tracked
+doc is named in the charter") lands red across four sections on the day it is written, which
+makes it a slice rather than a review finding.
+
+**Waiting on:** Karel. Either the charter stops claiming to be exhaustive, or the sweep is a
+slice with a lint at the end of it. *Logged 2026-09-12, review round 6.*
+
 ---
 
 ## Closed

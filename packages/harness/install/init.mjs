@@ -1121,6 +1121,14 @@ function ladderSummary(interview, reason, keptProfile) {
   if (answers.length) {
     return (
       answers.map(([field, answer]) => `${label}${field} = ${colors.cyan(JSON.stringify(answer))}`).join("\n") +
+      // THE INTERVIEW'S OWN SENTENCE BELONGS HERE TOO, for the same reason the
+      // empty-map branch below gives — and it was missing here, which made that
+      // reason only half-applied. Listing the answers says what was RECORDED; it
+      // cannot say whether there were further questions the person never
+      // reached. So a session interrupted after one answer, one whose input ran
+      // out after one answer, and one that simply finished all printed the same
+      // three lines, while `interview.why` held three different facts.
+      `\n${indent}${colors.dim(interview.why)}` +
       `\n${indent}${colors.dim("the ladder is seeded live because you answered. The steps you name are what earns a rung.")}\n`
     );
   }
