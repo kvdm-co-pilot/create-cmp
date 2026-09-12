@@ -9,21 +9,28 @@
 
 ## The rule this file exists to make possible
 
-A review round ends when it produces **no new defect in the code that is merging**. It does
-not end when a review finds nothing, because a review of a non-trivial diff nearly always
-finds *something* — and before this file existed, that something had nowhere to go but the
-author's next round.
+**A slice gets two review rounds, and no third.** Round 1 reads the whole diff. Round 2 —
+only when round 1's fixes were more than trivial — reads what changed since round 1, not the
+diff again. After round 2 the review is done: whatever remains, from either round, comes here.
 
-So every finding is placed on one line first:
+The rule that stood here before said a round ends when it produces *no new defect*. That has
+no fixed point. An LLM reviewer at any real effort finds something in any real diff — it is
+calibrated to its own attention, not to the code's defect density — so "go again while it
+finds something" means go again. Measured on the `interview-menu` slice, a two-question menu:
+findings of 3, 3, 2, 1, 2, 1 across six rounds, four of them defects in the previous round's
+fix, the sixth round taking 1h55m to produce a nine-line change. Rounds 1–3 found both P1s and
+paid for themselves. Rounds 4–6 were the instrument reviewing itself.
+
+So every finding is placed on one line first, and the line has two questions on it:
 
 | | |
 |---|---|
-| **A defect in the code that is merging** | fixed before merge, as a failing test (ADR-0014) |
-| **Anything else** | logged here, in the same round it was found, and not raised again |
+| **A defect in the merging code that would wrongly serve an adopter** — sent into a refusal, told something false, handed a wrong result | fixed before merge, as a failing test (ADR-0014) |
+| **Anything else** — pre-existing, a product decision, a taste call, a hazard that cannot fire yet, *or a real defect an adopter would not be wrongly served by* | logged here, in the round it was found, and not raised again |
 
-"Anything else" is pre-existing conditions the diff merely walked past, product decisions
-that are the human's to make, taste calls, and hazards that cannot fire yet. A reviewer that
-cannot place a finding on that line says so rather than picking.
+A dead paragraph, an unread key, a scanner edge case, a summary line that could be truer:
+real, logged, shipped. A reviewer that cannot place a finding on that line says so rather
+than picking.
 
 **Reading this file before reporting is part of a review.** A finding already logged here is
 not reported again — that is the whole point, and the measured reason: on the `interview-menu`
@@ -226,6 +233,24 @@ makes it a slice rather than a review finding.
 
 **Waiting on:** Karel. Either the charter stops claiming to be exhaustive, or the sweep is a
 slice with a lint at the end of it. *Logged 2026-09-12, review round 6.*
+
+### KD-12 — the review gate still reopens on any byte, and its printed rule is the superseded one
+
+`scripts/proof-plan.mjs` (the `review` obligation's `how` text, and `--discharge-review`)
+
+Two halves of one follow-up. The `how` text printed at slice close still summarises the old
+rule ("a round ends when it produces no new defect") beside its pointer to this file — the
+pointer is right, the summary beside it is stale, and it was stale within a day, which is the
+argument for a pointer carrying no summary at all. And `--discharge-review` requires the review
+record's tree hash to equal the current tree, so any fix after round 2 reopens the obligation
+and the two-round rule above cannot be followed to its end without a third record.
+
+Loosening that touches ADR-0014's "bound to this tree, so it cannot be recycled across changes"
+— a signed decision — so it is its own slice with its own (one-round) review, not a rider here.
+
+**Waiting on:** the follow-up slice, opened straight after `interview-menu` merges.
+*Logged 2026-09-12, by the author, deliberately not fixed on this branch: `scripts/` is a review
+trigger path and editing it would reopen the review under the rule being replaced.*
 
 ---
 
