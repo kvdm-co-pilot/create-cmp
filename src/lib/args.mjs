@@ -4,25 +4,51 @@
 /**
  * The flags that take NO value, so the token after them belongs to the user.
  *
- * Derived by reading every call site rather than by taste: `specs`, `receipt`,
- * `set`, `region`, `auth` and `tabs` are each guarded by `typeof === "string"`,
- * so they take values and are absent here; `minimal` and `harness` are compared
- * against `true` and are present.
+ * DERIVED FROM `flagBool`'S CALL SITES, which is where this list went wrong the
+ * first time: reading `flags.x === true` found eight names and missed thirteen
+ * more reached through `flagBool` and `flagBoolWithAlias` — `--inspector
+ * ./my-app` ate the directory AND silently fell back to the default.
+ * `test/a-flag-is-boolean-to-one-reader-and-not-to-the-other.test.mjs` derives
+ * the same set by scanning and refuses this list when the two disagree, so it
+ * cannot drift again by hand.
  *
- * See prooflane.mjs's copy for why the list names BOOLEANS and not value flags:
- * a name missing here leaves one flag as it behaves today, where a name missing
- * from a value list would break a flag that works.
+ * Value flags stay absent and are checked at their call sites with `typeof ===
+ * "string"`: profile, target-dir, base-dir, set, specs, receipt, citation-roots,
+ * name, package, bundle-id, region, theme-prefix, auth, tabs.
  */
 export const BOOLEAN_FLAGS = new Set([
   "help", "h", "version", "v",
-  "yes", "force", "fix", "minimal", "harness", "verify",
-  "dry-run", "dry-run-verify", "no-install",
+  "yes", "force", "fix", "harness",
+  // every name `flagBool`/`flagBoolWithAlias` reads
+  "minimal", "verify", "ios", "firebase", "firestore", "storage", "functions",
+  "fcm", "room", "e2e", "appium", "inspector", "dev-client",
+  // the installer's own, so both front doors into it classify alike
+  "dry-run", "dry-run-verify", "no-install", "new-profile", "no-interview",
 ]);
+
+/** Is this flag one that takes no value? `no-` is boolean by construction. */
+export function takesNoValue(key, booleans = BOOLEAN_FLAGS) {
+  return booleans.has(key) || key.startsWith("no-");
+}
+
+/**
+ * Should `next` be read as this flag's value?
+ *
+ * A value flag takes whatever follows. A BOOLEAN flag takes only `true` or
+ * `false` — because `flagBool` below is tri-state by contract, and refusing the
+ * value form outright makes `--verify false ./my-app` mean verify ON with a
+ * directory named `false`: the flag inverted, and the wrong-directory defect
+ * re-created by its own removal. Anything else after a boolean is a positional.
+ */
+export function consumesNext(key, next, booleans = BOOLEAN_FLAGS) {
+  if (next === undefined || next.startsWith("--")) return false;
+  if (!takesNoValue(key, booleans)) return true;
+  return next === "true" || next === "false";
+}
 
 /**
  * Parse argv into positionals + flags. `--flag value` captures the value, unless
- * `--flag` is one that takes none — then `value` stays the user's positional.
- * A trailing flag, or one followed by another flag, is boolean true.
+ * `--flag` takes none — then `value` stays the user's positional.
  * @param {string[]} argv
  * @returns {{_: string[], flags: Record<string, string|boolean>}}
  */
@@ -32,15 +58,11 @@ export function parseArgs(argv) {
     const a = argv[i];
     if (a.startsWith("--")) {
       const key = a.slice(2);
-      const next = argv[i + 1];
-      // `no-` is boolean by construction — `flagBool` below reads `--no-x` as
-      // the negation of `x` — so it needs no entry in the list above.
-      const takesValue = !BOOLEAN_FLAGS.has(key) && !key.startsWith("no-");
-      if (!takesValue || next === undefined || next.startsWith("--")) {
-        args.flags[key] = true; // boolean flag
-      } else {
-        args.flags[key] = next;
+      if (consumesNext(key, argv[i + 1])) {
+        args.flags[key] = argv[i + 1];
         i++;
+      } else {
+        args.flags[key] = true;
       }
     } else {
       args._.push(a);

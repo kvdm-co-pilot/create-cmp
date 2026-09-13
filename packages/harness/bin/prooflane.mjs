@@ -27,63 +27,12 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { colors, fail } from "../install/log.mjs";
+import { parseArgs } from "../install/args.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(path.join(HERE, "..", "package.json"), "utf8"));
 
 /** Long flags only, `--k=v` or `--k v`, with a bare `--k` meaning true. */
-/**
- * The flags that take NO value, so the token after them is the user's and not
- * the flag's.
- *
- * Without this a bare boolean eats the positional after it: `prooflane init
- * --new-profile ../app` installed into the CURRENT directory, 52 files, exit 0,
- * against a tree nobody named (KD-7, measured 2026-09-11). `--profile svc` and
- * `--new-profile ../app` are syntactically identical, so no parser can tell them
- * apart unaided.
- *
- * IT LISTS THE BOOLEANS AND NOT THE VALUE FLAGS, and the direction is the whole
- * safety argument: a name missing from THIS list leaves that one flag behaving
- * as it does today — the old bug, no worse. A name missing from a value-flag
- * list would turn a working `--profile svc` into a boolean and drop `svc` into
- * the positionals, which is a NEW break. Same omission, and only one direction
- * invents a defect.
- */
-export const BOOLEAN_FLAGS = new Set([
-  "help", "h", "version", "v",
-  "dry-run", "new-profile",
-  "no-interview", "yes", "y",
-]);
-
-export function parseArgs(argv) {
-  const flags = {};
-  const positionals = [];
-  for (let i = 0; i < argv.length; i += 1) {
-    const a = argv[i];
-    if (!a.startsWith("--")) {
-      positionals.push(a);
-      continue;
-    }
-    const body = a.slice(2);
-    const eq = body.indexOf("=");
-    if (eq !== -1) {
-      flags[body.slice(0, eq)] = body.slice(eq + 1);
-      continue;
-    }
-    const next = argv[i + 1];
-    // `no-` is boolean by construction, not by list: `flagBool` reads `--no-x`
-    // as the negation of `x`, so a future `--no-anything` is covered the day it
-    // is written rather than the day someone remembers to add it here.
-    const takesValue = !BOOLEAN_FLAGS.has(body) && !body.startsWith("no-");
-    if (takesValue && next !== undefined && !next.startsWith("--")) {
-      flags[body] = next;
-      i += 1;
-    } else {
-      flags[body] = true;
-    }
-  }
-  return { flags, positionals };
-}
 
 function usage() {
   return (
@@ -147,16 +96,9 @@ async function main() {
   return 2;
 }
 
-// Run only when INVOKED, not when imported — the house idiom (ground-truth.mjs,
-// sync-harness.mjs, check-plugin-sync.mjs all guard this way). Without it,
-// importing this file to test `parseArgs` runs the CLI, prints the help and
-// exits, so the parser that decides where a lane installs had no unit test at
-// all. That is how KD-7 lived here unnoticed.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
-  main()
-    .then((code) => process.exit(code ?? 0))
-    .catch((err) => {
-      fail(`prooflane: ${err?.message ?? err}`);
-      process.exit(1);
-    });
-}
+main()
+  .then((code) => process.exit(code ?? 0))
+  .catch((err) => {
+    fail(`prooflane: ${err?.message ?? err}`);
+    process.exit(1);
+  });
