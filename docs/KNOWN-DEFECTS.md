@@ -285,6 +285,23 @@ question is still outstanding, driven exactly as
 **Fires when:** an adopter whose profile was written by hand — not by an earlier `init` — runs it.
 *Logged 2026-09-12, review round 7.*
 
+### KD-14 — `create-cmp`'s parser does not split `--flag=value`
+
+`src/lib/args.mjs` (`parseArgs`)
+
+`prooflane`'s parser splits on `=`; this one never has. `create-cmp harness init --profile=svc`
+produces a flag literally named `profile=svc` and the profile id falls back to the directory
+name. Not a regression and not promised — no help text in `bin/create-cmp.mjs` offers the `=`
+form, every example uses the space form — so a user reaches it only by habit from other CLIs.
+
+Found while fixing KD-7, as a test I had written that asserted the `=` form in BOTH parsers.
+That test was reaching past its own slice; it now asserts `=` where `=` is parsed, and this
+entry holds the rest.
+
+**Worth doing with KD-4:** both are drift between the two front doors, and one slice should
+close them together.
+*Logged 2026-09-13.*
+
 ---
 
 ## Closed
