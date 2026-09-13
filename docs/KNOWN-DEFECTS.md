@@ -368,14 +368,35 @@ direction is open — create-cmp declares `force`, `fix`, `harness`, `minimal`, 
 `dev-client`, `dry-run-verify` boolean and prooflane's parser knows none of them, so
 `prooflane init --minimal ../app` still consumes `../app` and installs into the cwd.
 
-Not blocked, and the direction is the reason: those are `create-cmp create` scaffold flags, not
-flags of the installer prooflane fronts, so reaching this needs a user to type a flag that does not
-exist on the command they are running. Closing it means either making the two lists equal — safe
-today, since no name in either is a value flag for the other CLI — or a parser that refuses an
-unknown flag outright, which is a slice and not a rider.
+Re-examined and still not blocked, 2026-09-14, after measuring rather than assuming — the severity
+is identical to the one that WAS blocked, so the case rests entirely on reachability and on what
+closing it would take.
 
-**Fires when:** someone carries a create-cmp habit to `prooflane init`.
-*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`.*
+| | measured |
+|---|---|
+| harm, when hit | `prooflane init --verify ../p1` → `project: …/c1`, **52 files into the cwd**, `../p1` untouched, exit 0 — the same as `--y` |
+| the other two commands | `prooflane upgrade --fleet ../p2` lands in a lane-less cwd and REFUSES: "Install one: prooflane init", nothing written. Only `init` writes |
+| reachability | thirteen of the seventeen are Compose/Firebase scaffold nouns nobody types at a stack-neutral lane. Four are generic — `--force`, `--fix`, `--harness`, `--verify` — and `--verify` is the most reachable name in the set, because it is this product's own noun |
+| advertised anywhere? | no. `prooflane --help` names only `--profile --target-dir --new-profile --dry-run --no-interview/--yes --version --help`, and no doc, help string or script in the repo pairs a prooflane command with any of the seventeen |
+
+And the list is not the shape of the fix. `--verfiy ../app` (a typo), `--anything ../app` and
+`-y ../app` have the same failure and no list reaches them: measured, `prooflane init -y ../app`
+resolves the project to a directory literally named `-y`, because a single-dash token is not a flag
+to either parser. The general case is **an unrecognised token before the directory**, which closes
+with a refusal for unknown flags — a slice with its own help text and a forward-compat escape — not
+by teaching a deliberately stack-neutral installer the words `firebase`, `ios`, `room` and `appium`.
+(The agnostic lint would not actually catch that: its scope is `packages/harness/src`, not
+`install/`. The reason to refuse it is the package's promise, not a gate.)
+
+The round-2 test shares that limit by construction — its universe is whatever the harness parser
+declares, so it protects a declared name and cannot see an undeclared one. Measured: deleting `y`
+from BOTH lists, the other candidate repair for KD-7's last instance, sends **both** front doors
+back to installing 52 files into the cwd and the test goes GREEN. Declaring the name was the right
+repair, and the gate only holds while names are added to that list, never removed.
+
+**Fires when:** someone types a flag that does not exist on the command they are running — most
+plausibly `prooflane init --verify <dir>`.
+*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`; reachability measured the same round.*
 
 ### KD-18 — the symlink gate reads two of the eight bins this repo publishes
 
