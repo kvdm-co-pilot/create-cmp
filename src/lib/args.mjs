@@ -18,7 +18,13 @@
  */
 export const BOOLEAN_FLAGS = new Set([
   "help", "h", "version", "v",
-  "yes", "force", "fix", "harness",
+  // `y` is read by neither CLI any more, and is declared anyway: an undeclared
+  // name is one that EATS the token after it, so a dead alias left off this list
+  // is `create-cmp harness init --y ../app` writing 52 files into the cwd. That
+  // was still true on this branch after KD-7 was "fixed", through this door only
+  // — declaring a flag boolean protects the user's positional whether or not
+  // anything reads the flag.
+  "yes", "y", "force", "fix", "harness",
   // every name `flagBool`/`flagBoolWithAlias` reads
   "minimal", "verify", "ios", "firebase", "firestore", "storage", "functions",
   "fcm", "room", "e2e", "appium", "inspector", "dev-client",
