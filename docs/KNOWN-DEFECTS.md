@@ -302,6 +302,25 @@ entry holds the rest.
 close them together.
 *Logged 2026-09-13.*
 
+### KD-15 — `create-cmp --version` scaffolds an app
+
+`bin/create-cmp.mjs`
+
+The dispatcher reads `--help`/`-h` and nothing else: `--version` sets a flag nobody looks at, the
+first positional is absent, so the default command runs. Measured 2026-09-13 in an empty directory:
+
+```
+$ create-cmp --version
+  › Copying template → …/myapp        ← a full scaffold, exit 0
+```
+
+`prooflane --version` prints its version, and `src/lib/args.mjs` now names `version`/`v` among the
+flags that take no value, which makes the create-cmp side look handled. It is not — that list only
+decides parsing; nothing reads the result. Pre-existing and untouched by the parser slice.
+
+**Fires when:** anyone checks which version they have the way every other CLI is asked.
+*Logged 2026-09-13, review round 1 of `fix-flag-eats-target`.*
+
 ---
 
 ## Closed

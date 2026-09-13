@@ -27,7 +27,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseArgs as parseHarnessArgs, BOOLEAN_FLAGS as HARNESS_BOOLEANS } from "../packages/harness/bin/prooflane.mjs";
+import { parseArgs as parseHarnessArgs, BOOLEAN_FLAGS as HARNESS_BOOLEANS } from "../packages/harness/install/args.mjs";
 import { parseArgs as parseCliArgs, BOOLEAN_FLAGS as CLI_BOOLEANS } from "../src/lib/args.mjs";
 
 const CLIS = [
