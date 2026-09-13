@@ -321,6 +321,81 @@ decides parsing; nothing reads the result. Pre-existing and untouched by the par
 **Fires when:** anyone checks which version they have the way every other CLI is asked.
 *Logged 2026-09-13, review round 1 of `fix-flag-eats-target`.*
 
+### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it
+
+`packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)
+
+`consumesNext` lets a declared boolean swallow the next token when it is exactly `true` or `false`,
+and its docstring gives the reason: "`flagBool` is tri-state by contract". Two places that value
+arrives where nothing is tri-state.
+
+**`packages/harness` has no `flagBool` at all** — `grep -rn flagBool packages/harness` finds the
+comment and no code. Every harness reader is truthiness (`Boolean(flags["dry-run"])` in
+`install/init.mjs:901`, `relock.mjs:161`, `upgrade.mjs:120`; `!flags["new-profile"]` at
+`init.mjs:950`; `flags["no-interview"]` at `init.mjs:968`), and `Boolean("false")` is `true`.
+Measured 2026-09-14:
+
+```
+$ cd cwd && prooflane init --dry-run false ../pC --no-interview
+  project: …/pC      ✓ 50 files written … ! --dry-run: nothing was written.
+```
+
+The user said "no, do not dry-run" and got a dry run, exit 0, nothing installed.
+
+**`flagBool` reads the value form of `x` but never of `no-x`**, while `consumesNext` consumes it
+either way — `takesNoValue` is true by the `no-` prefix. Measured the same day:
+`--no-ios true ./my-app` → `{"no-ios":"true"}`, and `flagBool(flags,"ios",true)` returns **true**:
+the token is eaten and the flag the user typed does nothing.
+
+Logged rather than raised because neither is a regression. A differential over both parsers at the
+merge-base and at `e80da0d` — every name in either `BOOLEAN_FLAGS` plus `profile`/`target-dir`/`set`
+× `{absent, --other, ./my-app, true, false, svc, -x, ""}`, 168 differing rows — shows the two
+parsers differ from their merge-base form **only** where a declared boolean is followed by something
+that is not `true`/`false`, which is the fix. For those two literals the behaviour is byte-identical
+to what shipped before, so an adopter is no worse served than they were.
+
+**Fires when:** anyone writes `--flag false` at prooflane, or `--no-flag true` anywhere.
+*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`.*
+
+### KD-17 — the mirror direction of the front-door split is not refused
+
+`src/lib/args.mjs`, `packages/harness/install/args.mjs`
+
+`test/a-front-door-swallows-the-directory-the-other-keeps.test.mjs` refuses one direction: a flag
+the SHARED installer's parser declares boolean must not eat the directory at either door. The other
+direction is open — create-cmp declares `force`, `fix`, `harness`, `minimal`, `verify`, `ios`,
+`firebase`, `firestore`, `storage`, `functions`, `fcm`, `room`, `e2e`, `appium`, `inspector`,
+`dev-client`, `dry-run-verify` boolean and prooflane's parser knows none of them, so
+`prooflane init --minimal ../app` still consumes `../app` and installs into the cwd.
+
+Not blocked, and the direction is the reason: those are `create-cmp create` scaffold flags, not
+flags of the installer prooflane fronts, so reaching this needs a user to type a flag that does not
+exist on the command they are running. Closing it means either making the two lists equal — safe
+today, since no name in either is a value flag for the other CLI — or a parser that refuses an
+unknown flag outright, which is a slice and not a rider.
+
+**Fires when:** someone carries a create-cmp habit to `prooflane init`.
+*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`.*
+
+### KD-18 — the symlink gate reads two of the eight bins this repo publishes
+
+`test/a-published-bin-does-nothing-when-npm-symlinks-it.test.mjs` (`declaredBins`)
+
+Its header says "EVERY bin every package.json declares". The scan reads the root manifest and
+`packages/*/package.json` — one level — so it sees `create-cmp` and `prooflane-harness` and misses
+the five alias bins under `packages/aliases/*/` (`prooflane`, `create-mobile`, `create-kmp`,
+`create-ktor`, `create-compose-multiplatform`) and `inspector/mcp`. `assert.ok(bins.length > 0)`
+passes on two, so the narrowing is silent. The missed set includes `prooflane`, which is the name an
+adopter actually `npx`es.
+
+Nothing is broken behind it: all eight were run directly and through a symlink on 2026-09-14 and
+every one produced identical bytes and status. Logged as a gate narrower than its own claim, not as
+a defect — the repair is to recurse `packages/` (or read `workspaces`) rather than to list two
+depths.
+
+**Fires when:** an alias bin gains an entry-point guard, or any other realpath-sensitive line.
+*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`.*
+
 ---
 
 ## Closed
