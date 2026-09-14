@@ -103,6 +103,18 @@ export function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith("--")) {
+    // `--` IS NOT A FLAG NAME, it is the POSIX end-of-options separator, and npx
+    // forwards it verbatim: `npm create <pkg> my-app -- --flag` is the shape
+    // every create-* CLI teaches, and both doors advertise `npx …` in their own
+    // help. `a.slice(2)` turns it into the EMPTY key, which the unknown-argument
+    // check then named back at the user as a flag they had never typed — a
+    // working invocation became exit 2.
+    //
+    // It is dropped rather than honoured as strict POSIX, because the intent in
+    // that shape is the opposite of POSIX's: the user writing `-- --dry-run`
+    // means `--dry-run` to be a FLAG, not a positional. Inert is what makes the
+    // separator change nothing.
+    if (a === "--") continue;
       const key = a.slice(2);
       if (consumesNext(key, argv[i + 1])) {
         args.flags[key] = argv[i + 1];
