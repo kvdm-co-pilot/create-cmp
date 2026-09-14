@@ -121,30 +121,6 @@ is the one thing the helper's own header says gets a scanner deleted.
 
 **Fires when:** the next hand-typed `§` goes stale. *Logged 2026-09-11, review round 5.*
 
-### KD-11 — the doc charter calls itself the map of every document, and four parts of it are stale
-
-`docs/DOCUMENTATION.md` §2
-
-Its own header: "The holistic map of **every document** in create-cmp." Measured against
-`git ls-files docs/**/*.md`, 2026-09-12:
-
-| | |
-|---|---|
-| top-level `docs/*.md` named nowhere in it | `PRINCIPLES.md`, `GATE-RULES.md`, `PUBLISHING.md`, `EVIDENCE-ECONOMICS-PLAN.md`, `KNOWN-DEFECTS.md` |
-| `docs/features/` | 7 files; the directory does not appear in the charter at all |
-| the `adr/` row | enumerates 0001–0006; 0007–0016 exist |
-| the `proposals/` row | "Currently:" names 5 of the 12 files present — omitting `AGNOSTIC-HARNESS-ARCHITECTURE.md` and `PACKAGE-SPLIT.md`, the two NORTH-STAR §12 declares authoritative |
-
-Pre-existing: this slice adds exactly one of these (`KNOWN-DEFECTS.md`), which is why it is
-logged rather than raised. Note the two maps are different instruments and neither covers the
-other — NORTH-STAR §12 is a PRECEDENCE table (which doc keeps authority over what), not an
-index — and no test opens either, so both drift silently. The obvious invariant ("every tracked
-doc is named in the charter") lands red across four sections on the day it is written, which
-makes it a slice rather than a review finding.
-
-**Waiting on:** Karel. Either the charter stops claiming to be exhaustive, or the sweep is a
-slice with a lint at the end of it. *Logged 2026-09-12, review round 6.*
-
 ### KD-12 — the review gate still reopens on any byte, and its printed rule is the superseded one
 
 `scripts/proof-plan.mjs` (the `review` obligation's `how` text, and `--discharge-review`)
@@ -307,6 +283,12 @@ the install** — every question is asked before a byte is written, so honouring
 and a person who pressed stop and found 52 files had been ignored. A menu default that is not one
 of its own options is refused at authoring time. And `ladderSummary` stopped telling a person to
 uncomment a seeded ladder in a file this command never wrote.
+
+### KD-11 — the doc charter claimed to be exhaustive — **CLOSED 2026-09-14, Karel's call**
+It stops claiming it. `DOCUMENTATION.md` is a curated reading order now, which can be honestly
+incomplete; an exhaustive index cannot, and nothing was ever going to enforce this one. The
+"which doc is authoritative" question points at NORTH-STAR §12, a precedence table and a
+different instrument.
 
 ### KD-7 — a boolean flag swallows the target directory — **CLOSED**
 `18af5c3`, `91a3ac2`. Flags that take no value are declared; the token after them stays the
