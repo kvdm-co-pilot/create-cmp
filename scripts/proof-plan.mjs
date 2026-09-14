@@ -110,12 +110,18 @@ const TIERS = Object.freeze({
     when: "at-close",
     cost: "~one read of the diff",
     cmd: "node scripts/proof-plan.mjs --discharge-review",
+    // A POINTER, AND NOT A SUMMARY OF WHAT IT POINTS AT. The four lines that
+    // stood here paraphrased the rule beside the pointer to it, and were stale
+    // within a day of the rule changing — they still said "a round ends when it
+    // produces no new defect" after the rule became "two rounds, and no third"
+    // (KD-12). A rule stated twice drifts in one, which this repo's own CLAUDE.md
+    // says, and the second statement is always the one nobody updates.
     how:
       "invoke the staff-reviewer on this diff (.claude/agents/staff-reviewer.md); it writes qa-artifacts/review-latest.json — or `node scripts/proof-plan.mjs --record-review --nothing-found` if it found nothing.\n" +
-      "      A round ends when it produces no new DEFECT IN THE CODE THAT IS MERGING — not when a review finds nothing, which on a\n" +
-      "      real diff it rarely does. Everything else a review turns up goes to docs/KNOWN-DEFECTS.md, whose header holds that rule.\n" +
-      "      Bound your fix to the finding: on the slice that rule was written for, each round's fix reached past what was found and\n" +
-      "      became the next round's first finding.",
+      "      HOW MANY ROUNDS, what blocks, and where everything else goes: docs/KNOWN-DEFECTS.md's header. It is the only\n" +
+      "      statement of that rule and this line deliberately does not paraphrase it.\n" +
+      "      After the LAST round's fix, that round re-records against the new tree — resume the same reviewer rather than\n" +
+      "      starting a cold one. Re-recording is not another round; it is how a review ends up bound to the bytes that merge.",
   },
 });
 
