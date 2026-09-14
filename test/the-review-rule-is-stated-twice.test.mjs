@@ -26,6 +26,11 @@
 // reviewer. A comment explaining why a rule changed may quote the dead rule as
 // history; that is not a second statement of the live one, and `TIERS.review`'s
 // comment block is deliberately outside this scan for exactly that reason.
+//
+// THIS FILE IS NOT AN ACTING TEXT EITHER — nobody routes a finding by reading a
+// test — but it is held to the same standard the only way a test can be: the one
+// sentence of the rule it depends on is READ from the rule of record below and
+// asserted, so it cannot quietly outlive it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -100,13 +105,18 @@ test("A POINTER AT THE REVIEW RULE QUOTES IT — the second statement that drift
 });
 
 test("AGE STILL ROUTES A FINDING TO THE LOG — the exemption the rule of record abolished, alive in a reader", () => {
-  // "Age decides who paid for it, never whether it blocks" (the rule of record,
-  // 2026-09-14). KD-7 is what the exemption cost: `prooflane init
-  // --new-profile ../app` wrote into the wrong repository and exited 0, and it
-  // was logged rather than fixed because it predated the slice. So no text that
-  // routes a finding may send it to the log BECAUSE it is old or because it is
-  // not about the change under review — in the rule of record itself, or in any
-  // reader that acts on it.
+  // THE PREMISE IS READ, NOT QUOTED. A test that bans restating the rule and
+  // then carries its own copy of it is the next thing to go stale — so the one
+  // sentence this lint enforces is taken from the rule of record at run time.
+  // If it goes, this stops enforcing it and says so, rather than policing an
+  // abolished criterion out of a comment nobody re-read.
+  const PREMISE = "Age decides who paid for it, never whether it blocks";
+  assert.ok(
+    ruleOfRecord().includes(PREMISE),
+    `${RULE_OF_RECORD}'s header no longer says "${PREMISE}" — this lint was derived from that sentence and ` +
+      `must be re-derived from whatever replaced it, not left running on a criterion the rule dropped.`,
+  );
+
   const AGE = /pre-existing|predate[sd]?|not about the change|already existed/i;
   const ROUTES_TO_THE_LOG = /KNOWN-DEFECTS|logged here|comes here|goes (in|to|here|there)|logged, not|are NOT defects/i;
   const sentences = (t) => t.replace(/\s+/g, " ").split(/(?<=[.!?])\s+/);
@@ -126,7 +136,53 @@ test("AGE STILL ROUTES A FINDING TO THE LOG — the exemption the rule of record
   assert.deepEqual(
     offenders,
     [],
-    `these sentences route a finding to the log by AGE, which the rule of record no longer does:\n    ${offenders.join("\n    ")}\n  ` +
-      `Pre-existing answers whose fault; the line asks how bad.`,
+    `these sentences route a finding to the log by AGE, which ${RULE_OF_RECORD} does not: "${PREMISE}".\n    ` +
+      `${offenders.join("\n    ")}`,
+  );
+});
+
+test("THE SCOPE BLOCKQUOTE ENUMERATES THE RULE'S ROW — a second list of the same categories, and lists disagree", () => {
+  // The one reader that still CARRIES the rule rather than naming it. Measured
+  // 2026-09-14: the printed `how` shares a 3-word run with the rule of record
+  // and names no category; the reviewer definition shares 5 and names none; the
+  // Scope blockquote names ALL FOUR. That is not wrong — a scope has to say what
+  // the file holds — but it is a copy, and the previous copy is what drifted:
+  // Scope opened with "pre-existing conditions" for a day after the row below
+  // had abolished exactly that category. A copy that is CHECKED cannot do that,
+  // so the two lists are compared here instead of trusted to stay equal.
+  const header = ruleOfRecord();
+  const whole = read(RULE_OF_RECORD);
+  const scope = whole.slice(0, whole.indexOf("## The rule this file exists"));
+
+  const CATEGORIES = {
+    "pre-existing": /pre-existing|predate/i,
+    "product decision": /product decisions?|decisions? waiting/i,
+    "taste call": /taste/i,
+    "hazard that cannot fire yet": /hazard/i,
+    "a real defect nobody is wrongly served by": /nobody is wrongly served|not be wrongly served/i,
+  };
+
+  const rowLine = header.split("\n").find((l) => l.startsWith("| **Anything else**"));
+  assert.ok(rowLine, `${RULE_OF_RECORD}'s header has no "Anything else" row — the non-blocking half of the line is the rule this compares against`);
+  const rowCell = rowLine.split("|")[1].split("—").slice(1).join("—");
+
+  // THE LEXICON IS CHECKED TOO. A category added to the row that this test
+  // cannot name would silently stop being compared, which is the same hole one
+  // level down — so every item in the row must match something here.
+  const items = rowCell.split(/,|\bor\b/).map((s) => s.replace(/[*_`]/g, "").trim()).filter((s) => s.length > 3);
+  const unknown = items.filter((i) => !Object.values(CATEGORIES).some((re) => re.test(i)));
+  assert.deepEqual(unknown, [], `the rule of record names categories this test cannot: ${unknown.join(" / ")} — teach it, or the new category is never compared against the Scope`);
+
+  const named = (t) => Object.entries(CATEGORIES).filter(([, re]) => re.test(t)).map(([k]) => k);
+  // "pre-existing" survives in Scope as HISTORY ("this line used to open with…"),
+  // which the age lint above already distinguishes from routing by it; what is
+  // compared here is the list of categories the two texts route INTO the log.
+  const inRow = named(rowCell);
+  const inScope = named(scope).filter((c) => c !== "pre-existing" || /pre-existing conditions(?!")/.test(scope));
+  assert.deepEqual(
+    inScope.sort(),
+    inRow.sort(),
+    `${RULE_OF_RECORD}'s Scope and its own placement row list different categories — the Scope is a copy of the row, ` +
+      `and the copy has drifted:\n    Scope: ${inScope.join(", ")}\n    row:   ${inRow.join(", ")}`,
   );
 });
