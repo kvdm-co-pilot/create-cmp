@@ -42,10 +42,13 @@ So:
   you are commenting.
 - **Only what would wrongly serve an adopter blocks the merge; the rest goes in
   `docs/KNOWN-DEFECTS.md`, and so does anything not about the change you are reviewing.**
-  READ THAT FILE BEFORE YOU REPORT. It holds what earlier reviews found and deliberately did not
-  block on — pre-existing conditions, decisions waiting on a human, hazards that cannot fire yet —
-  and its header carries the rule for placing a finding on that line, which is not restated here
-  so the two cannot drift. Anything already logged there you do not raise again; anything you find
+  READ ITS ONE-SCREEN TABLE BEFORE YOU REPORT — `## The open list, in one screen` — and a full
+  entry only when a row looks like it might cover something you found. The file holds what earlier
+  reviews deliberately did not block on, and its header carries the rule for placing a finding on
+  that line, which is not restated here so the two cannot drift. Read the table and not the whole
+  file because the whole file is the cost: on 2026-09-14 it reached 412 lines and two consecutive
+  review rounds stalled at the point of reading it, while the same round with the reading bounded
+  completed in ten minutes. A log nobody can afford to open stops being a log. Anything already logged there you do not raise again; anything you find
   that belongs there you ADD there, in this round, instead of handing it up. It is markdown under
   `docs/`, so writing to it cannot reopen a gate, and the file says why that matters.
 - **Never a direct fix to a signed artifact.** A spec, an ADR, an approved brief: you may propose,
