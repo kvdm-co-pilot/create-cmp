@@ -85,6 +85,46 @@ export const observedBy = Object.freeze({
   [PLANT_KINDS.NESTED_FLOW]: "e2eCoverage",
 });
 
+/**
+ * HOW TO BREAK THIS STACK'S STARTUP WITHOUT BREAKING ITS BUILD.
+ *
+ * The core owns the question — does an l2Execution step actually start the
+ * program? — and cannot own the answer, because only the stack knows what
+ * starting is. Here it is an Android Activity's `onCreate`; on a Ktor service it
+ * would be `embeddedServer(...).start()`, and on a Python app `__main__`.
+ *
+ * THE EDIT MUST COMPILE. That is the whole discipline of this plant: a throw
+ * inside `onCreate` is type-correct Kotlin, so `releaseBuild`, `conformance`,
+ * `goldenTrees` and `a11y` cannot tell anything happened, while every step that
+ * launches the app dies on the first frame. A plant that failed to compile
+ * would redden the L1 steps too and measure nothing — which the instrument
+ * refuses by name rather than reading as success.
+ *
+ * `super.onCreate` is called first deliberately. Throwing before it produces a
+ * different crash (a framework-level one about Activity lifecycle) that a lane
+ * could plausibly catch for the wrong reason; throwing after it means the
+ * Activity started correctly and the APP's own first instruction is what failed.
+ */
+export const startupPlant = Object.freeze({
+  /** The file that holds this stack's entry point, by basename — the instrument finds it under the source roots. */
+  entryPointBasename: "MainActivity.kt",
+
+  /** Does this source look like the entry point? Guards against finding a same-named file elsewhere. */
+  recognises: (src) => src.includes("override fun onCreate(") && src.includes("super.onCreate("),
+
+  /**
+   * Type-correct Kotlin that throws on the app's own first instruction.
+   * @param {string} src the original file
+   * @returns {string}
+   */
+  breakStartup: (src) =>
+    src.replace(
+      /(super\.onCreate\(savedInstanceState\))/,
+      "$1\n        // prooflane ladder plant — compiles, and dies at launch.\n" +
+        '        throw IllegalStateException("prooflane ladder plant: startup is broken on purpose")',
+    ),
+});
+
 /** What the instrument reads off the profile. */
 export const plants = Object.freeze({
   testFileBasename,
@@ -92,4 +132,5 @@ export const plants = Object.freeze({
   tierUnmetCitationSource,
   unmeetableTier,
   observedBy,
+  startupPlant,
 });
