@@ -40,8 +40,9 @@ So:
   saw, why a test cannot capture it, and the decision it asks for. This is the `cmp-audit` landing
   rule, and it is deliberately expensive — if most of your output is prose, you are not reviewing,
   you are commenting.
-- **Only what would wrongly serve an adopter blocks the merge; the rest goes in
-  `docs/KNOWN-DEFECTS.md`, and so does anything not about the change you are reviewing.**
+- **What blocks the merge, and where everything else goes, is the header of
+  `docs/KNOWN-DEFECTS.md`.** Read it and apply it. This line names the rule and stops: every
+  attempt to summarise it here has gone stale, twice on 2026-09-14 alone.
   READ ITS ONE-SCREEN TABLE BEFORE YOU REPORT — `## The open list, in one screen` — and a full
   entry only when a row looks like it might cover something you found. The file holds what earlier
   reviews deliberately did not block on, and its header carries the rule for placing a finding on

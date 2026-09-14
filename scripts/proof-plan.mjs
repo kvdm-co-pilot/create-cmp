@@ -118,10 +118,8 @@ const TIERS = Object.freeze({
     // says, and the second statement is always the one nobody updates.
     how:
       "invoke the staff-reviewer on this diff (.claude/agents/staff-reviewer.md); it writes qa-artifacts/review-latest.json — or `node scripts/proof-plan.mjs --record-review --nothing-found` if it found nothing.\n" +
-      "      HOW MANY ROUNDS, what blocks, and where everything else goes: docs/KNOWN-DEFECTS.md's header. It is the only\n" +
-      "      statement of that rule and this line deliberately does not paraphrase it.\n" +
-      "      After the LAST round's fix, that round re-records against the new tree — resume the same reviewer rather than\n" +
-      "      starting a cold one. Re-recording is not another round; it is how a review ends up bound to the bytes that merge.",
+      "      HOW MANY ROUNDS, what blocks, where everything else goes, and how the last round records: the header of\n" +
+      "      docs/KNOWN-DEFECTS.md. That is the rule's one statement. This line names it and stops.",
   },
 });
 
