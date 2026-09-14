@@ -281,6 +281,98 @@ entry holds the rest.
 close them together.
 *Logged 2026-09-13.*
 
+### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it — **RE-OPENED**
+
+`packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)
+
+`consumesNext` lets a declared boolean swallow the next token when it is exactly `true` or
+`false`, and its docstring gives the reason: "`flagBool` is tri-state by contract". Two places
+that value arrives where nothing is tri-state: `packages/harness` has no `flagBool` at all (every
+reader is truthiness, and `Boolean("false")` is `true`), and `flagBool` reads the value form of
+`x` but never of `no-x` while `consumesNext` consumes it either way.
+
+Re-opened by review round 1 of `refuse-unknown-args`, because `5c2cea6` moved it to **Closed**
+under a heading that describes KD-17 ("the flag lists could not reach a typo or a short flag"),
+and refusing an unrecognised argument cannot reach it: `--dry-run` and `--no-ios` are both
+*recognised*. Both halves reproduce verbatim on `5c2cea6`:
+
+```
+$ cd cwd && prooflane init --dry-run false ../pC --no-interview
+  project: …/pC   ✓ 50 files written   ! --dry-run: nothing was written.
+
+$ node -e 'parseArgs(["--no-ios","true","./my-app"])'  →  {"no-ios":"true"}
+  flagBool(flags, "ios", true)  →  true          ← the flag the user typed does nothing
+```
+
+Its placement on the line above has not changed and is not being re-litigated — neither half is a
+regression, the 168-row differential against the merge-base still stands, and an adopter is no
+worse served than before. What changed is only that the record said it was fixed.
+
+**Fires when:** anyone writes `--flag false` at prooflane, or `--no-flag true` anywhere.
+*Logged 2026-09-14 (review round 2 of `fix-flag-eats-target`); closed and re-opened 2026-09-14.*
+
+### KD-19 — a new refusal wording was added, and the reader that classifies refusals was not told
+
+`scripts/stage3-gate.mjs` (`looksUnimplemented`), `packages/harness/bin/prooflane.mjs`
+
+`looksUnimplemented` decides whether a front door *has no such command yet* or *answered and
+failed*, by matching `/unknown (sub)?command|not a command|unrecognized/i` on the child's output.
+`5c2cea6` gave both doors a second refusal — "`--fleet` is not a flag this command knows" — which
+that regex does not match, and criterion D spawns exactly `prooflane upgrade --fleet <manifest>`.
+Measured on `5c2cea6`:
+
+```
+✗ ONE command upgrades the whole fleet
+      `prooflane-harness prooflane.mjs upgrade --fleet` exited 2: ✗ prooflane: --fleet is not a flag …
+```
+
+where it used to read "no fleet command exists: … is not implemented". The criterion is red either
+way and Stage 3 is not exited, so nothing is wrongly served — it is a gate that now reports the
+wrong *reason* for a red it was always going to give. The class is the one worth naming: a refusal
+message has a reader somewhere, and adding a spelling without telling the reader makes the reader
+silently wrong.
+
+**Fires when:** Stage 3 is worked on, or any other caller comes to classify a CLI's refusal.
+*Logged 2026-09-14, review round 1 of `refuse-unknown-args`.*
+
+### KD-20 — the vendored lane's two strict parsers refuse `--` as well
+
+`packages/harness/src/verify.mjs` (~:199), `packages/harness/src/watch.mjs` (`parseWatchArgs`)
+
+The same defect a failing test now refuses at the two front doors, in the two parsers the adopter
+runs *inside* their repo. Executed on `5c2cea6`:
+`parseWatchArgs(["--", "--once"])` → `unknown argument "--" — run node qa/watch.mjs --help`.
+
+Pre-existing — both predate `refuse-unknown-args`, and neither is reached through npx (`node
+qa/verify.mjs` / `node qa/watch.mjs` are the documented forms, and node does not insert a
+separator), so the `npx` path that makes the front-door instance blocking does not exist here.
+Worth sweeping with whatever fix lands for the front doors, so there is one answer to `--` in the
+product rather than three.
+
+**Fires when:** an adopter wraps the lane in an `npm run` script and passes `-- --fast` through a
+layer that forwards the separator. *Logged 2026-09-14, review round 1 of `refuse-unknown-args`.*
+
+### KD-21 — `KNOWN_FLAGS` is a hand-written second spelling of "what this CLI reads", and the cost of forgetting it inverted
+
+`src/lib/args.mjs`, `packages/harness/install/args.mjs` (`KNOWN_FLAGS`)
+
+`BOOLEAN_FLAGS` has a deriver — `test/a-flag-is-boolean-to-one-reader-and-not-to-the-other.test.mjs`
+scans `flagBool`'s call sites and refuses the list when the two disagree, "so it cannot drift again
+by hand". `KNOWN_FLAGS` has no such gate, and it is now the more dangerous of the two: before
+`5c2cea6`, a name left off a list was ignored; after it, a name left off `KNOWN_FLAGS` makes the CLI
+**refuse a flag it documents and reads**.
+
+Not raised as a defect because there is nothing to fail on. Measured 2026-09-14 across both doors:
+every name reachable as `flags.x`, `flags["x"]`, `flagBool(flags,"x")` or `flagBoolWithAlias` in
+`src/**` + `bin/create-cmp.mjs` and in `packages/harness/{install,bin}/**` is in its door's
+`KNOWN_FLAGS`, and every `--flag` either door's own `--help` prints is too — zero gaps in both
+directions. The one repo invocation the refusal now rejects is
+`scripts/stage3-gate.mjs`'s `prooflane upgrade --fleet`, which names a command that does not exist
+yet (KD-19), so a deriver landed today would need an exception for it on day one.
+
+**Fires when:** the next flag is added to a command and not to `KNOWN_FLAGS`.
+*Logged 2026-09-14, review round 1 of `refuse-unknown-args`.*
+
 ### KD-18 — the symlink gate reads two of the eight bins this repo publishes
 
 `test/a-published-bin-does-nothing-when-npm-symlinks-it.test.mjs` (`declaredBins`)
@@ -317,7 +409,7 @@ Refusing the unrecognised never reached it: `--version` is a DOCUMENTED flag, so
 every check and fell through the dispatcher into `create`. It answers before acting now, the
 way `prooflane` always has.
 
-### KD-16 / KD-17 — the flag lists could not reach a typo or a short flag — **CLOSED**
+### KD-17 — the flag lists could not reach a typo or a short flag — **CLOSED**
 Not by a longer list. `--verfiy`, `--anything` and `-y` all failed identically and no list
 reaches them, so both doors now refuse an argument they cannot account for — by name, exit 2,
 nothing written — which is the answer `unknown command` already gave one branch down.
