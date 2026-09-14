@@ -115,6 +115,25 @@ export const CONTRACT = Object.freeze({
         // are steps the lane will never mention again.
         refusal: "declares l1Required with no l0Required beneath it — L1 can never be earned however green the lane",
       }),
+      // THE CLAIM BELOW IS FALSIFIABLE, AND WAS FALSIFIED-TEST-FIRST ON
+      // 2026-09-14. `lib/ladder-plant.mjs` breaks a program's startup so it
+      // still compiles and runs the lane twice: an L1 step must stay green (it
+      // cannot see a crash at launch) and an L2 step must go red. Measured on the
+      // cmp pack, AVD Medium_Phone_API_35 —
+      //
+      //   releaseBuild, conformance, goldenTrees, a11y   PASS, over the broken source
+      //   e2eSmoke                                        FAIL, "id: home_title is visible"
+      //
+      // Maestro launched the app and its home screen never rendered. That is
+      // what makes this `meaning` a description of behaviour rather than an
+      // intention: the same four steps that compiled the crash could not tell
+      // anything had happened, which is precisely the blindness that let a
+      // Python adopter earn L2 for an app its suite only ever imported.
+      //
+      // Run it with `node scripts/fleet-check.mjs --ladder-plant`. A profile
+      // that declares no startup plant of its own gets no such assurance and is
+      // told so by name rather than passing quietly — the break belongs to the
+      // stack, because only the stack knows what starting is.
       l2Execution: Object.freeze({
         required: false,
         mode: "any",
