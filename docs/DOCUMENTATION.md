@@ -1,10 +1,17 @@
 # Documentation Charter
 
-> **What this is.** The holistic map of every document in create-cmp: what exists, what each
-> is for, how they interlock, which industry standards they implement (and where we
-> deviated), and the rules for adding new docs so the pattern stays coherent as the project
-> grows. If you are wondering "where does this content go?" or "which doc is authoritative
-> for X?" — the answer is here.
+> **What this is.** A CURATED READING ORDER for create-cmp's documentation: what the
+> load-bearing documents are for, how they interlock, which industry standards they implement
+> (and where we deviated), and the rules for adding new docs so the pattern stays coherent as
+> the project grows. If you are wondering "where does this content go?" — the answer is here.
+>
+> **What it is NOT, since 2026-09-14: an index.** It said "the holistic map of every document"
+> and was thirty-five entries stale — missing `PRINCIPLES.md`, `GATE-RULES.md`, the whole of
+> `docs/features/`, ADRs 0007–0016, and both proposals NORTH-STAR §12 declares authoritative.
+> No test opened it, so the claim drifted silently for weeks (KD-11). A curated list can be
+> honestly incomplete; an exhaustive one cannot, and nothing here was ever going to enforce it.
+> For "which doc is authoritative for X?", **NORTH-STAR §12** is the precedence table — that is
+> a different instrument, and this one does not duplicate it.
 
 Status: living · Owner: harness maintainers · Established: 2026-07-06 · Rebuilt: 2026-08-20
 (after `docs/history/` was introduced; this doc pins no version numbers — `scripts/ground-truth.mjs` does)
