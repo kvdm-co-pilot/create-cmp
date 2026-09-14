@@ -48,6 +48,15 @@ argument-refusal slice were defects created while fixing the first one, includin
 entry-point guard that would have made every npm-installed `prooflane` a silent no-op. A round
 that checks only whether the finding is answered is half a round.
 
+**ENTRIES LOGGED UNDER THE OLD LINE KEEP THEIR PLACE, NOT THEIR REASON.** Age stopped being a
+routing criterion on 2026-09-14, and fourteen entries were placed before that — several citing
+"pre-existing" as the reason they did not block. Re-placing all of them at once would mean
+fourteen severity calls made in a batch, which is the least careful way to make any of them. So:
+an entry keeps its place until it is next touched, and whatever touches it re-places it against
+the line above or says why it still belongs. KD-24 was re-placed the day the rule changed,
+because it was the one a review named: `--yes` at create-cmp's door is inert, and the rest of
+the line still installs where the user pointed — that, and not its age, is why it does not block.
+
 **THE RECORD STAYS BOUND TO THE TREE, and that is not in tension with the cap.** ADR-0014
 binds a review record to the bytes it describes so it cannot be recycled across changes;
 discharging a review of tree A while merging tree B would be the thing this product exists to
@@ -92,7 +101,7 @@ you the same list without opening anything.
 | **KD-19** | the refusal-classifier does not match the new refusal wording | resolves when `upgrade --fleet` exists |
 | **KD-20** | the vendored lane's parsers refuse `--` as well | not npx-reachable |
 | **KD-21** | `KNOWN_FLAGS` is hand-written where `BOOLEAN_FLAGS` is derived | zero gaps measured, both directions |
-| **KD-24** | `--yes` refused at one door, accepted-and-ignored at the other | pre-existing and wider; pairs with KD-4/14 |
+| **KD-24** | `--yes` refused at one door, accepted-and-ignored at the other | the flag is inert; the rest of the line still does what was asked |
 | **KD-25** | an interrupt that printed nothing would pass the suite | wording deliberately not pinned |
 | **KD-26** | `npm test` is bare `node --test`, so it globs any worktree in the tree | measured below |
 | **KD-27** | the lane-already-running refusal does not say WHICH repo is running it | four commands to find out |
