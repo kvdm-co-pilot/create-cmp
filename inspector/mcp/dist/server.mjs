@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 2d9581c87a85cac89341b5ea8d4d6e572a9d60ef38ee9a3cdc603955fecde0ad
+// cmp:bundle-inputs cce2fbba514f07c9e6e571aecbe2dd8e88b614d0d9f34c04b6667b1dc00c1814
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35439,6 +35439,25 @@ var CONTRACT = Object.freeze({
         // are steps the lane will never mention again.
         refusal: "declares l1Required with no l0Required beneath it \u2014 L1 can never be earned however green the lane"
       }),
+      // THE CLAIM BELOW IS FALSIFIABLE, AND WAS FALSIFIED-TEST-FIRST ON
+      // 2026-09-14. `lib/ladder-plant.mjs` breaks a program's startup so it
+      // still compiles and runs the lane twice: an L1 step must stay green (it
+      // cannot see a crash at launch) and an L2 step must go red. Measured on the
+      // cmp pack, AVD Medium_Phone_API_35 —
+      //
+      //   releaseBuild, conformance, goldenTrees, a11y   PASS, over the broken source
+      //   e2eSmoke                                        FAIL, "id: home_title is visible"
+      //
+      // Maestro launched the app and its home screen never rendered. That is
+      // what makes this `meaning` a description of behaviour rather than an
+      // intention: the same four steps that compiled the crash could not tell
+      // anything had happened, which is precisely the blindness that let a
+      // Python adopter earn L2 for an app its suite only ever imported.
+      //
+      // Run it with `node scripts/fleet-check.mjs --ladder-plant`. A profile
+      // that declares no startup plant of its own gets no such assurance and is
+      // told so by name rather than passing quietly — the break belongs to the
+      // stack, because only the stack knows what starting is.
       l2Execution: Object.freeze({
         required: false,
         mode: "any",
