@@ -73,6 +73,7 @@ you the same list without opening anything.
 | **KD-24** | `--yes` refused at one door, accepted-and-ignored at the other | pre-existing and wider; pairs with KD-4/14 |
 | **KD-25** | an interrupt that printed nothing would pass the suite | wording deliberately not pinned |
 | **KD-26** | `npm test` is bare `node --test`, so it globs any worktree in the tree | measured below |
+| **KD-27** | the lane-already-running refusal does not say WHICH repo is running it | four commands to find out |
 
 ---
 
@@ -321,6 +322,27 @@ the create-cmp door is told nothing, not told something false.
 slice should close them together. A per-COMMAND known-flag set, rather than a per-door one, is
 what would make the class unreachable.
 *Logged 2026-09-14, review round 1 of `interview-decisions`.*
+
+### KD-27 — the lane-already-running refusal names a PID and not a project
+
+`scripts/fleet-check.mjs` (the concurrent-lane guard)
+
+    a verify lane is already running (7360 node qa/verify.mjs) — a concurrent device
+    run collides with it (wedged adbd, false reds). Wait for it, then run the tier once.
+
+The refusal is RIGHT — two lanes share one adb and one emulator, so the second must not
+start — and it is right across repositories, which is the part the message does not say.
+Measured 2026-09-14: the blocking lane's cwd was `/Users/test/dev/payment-blueprint`, an
+unrelated project, and finding that out took four commands (`ps`, `pgrep -fl`, `lsof`, then
+reading the guard). The message had the PID all along and could have had the path.
+
+It matters more than a nicety because of what the reader concludes in the meantime. A lane
+"already running" in YOUR repo is something you started and can wait for or kill; one in
+someone else's is neither, and the two demand opposite actions. Until the message says which,
+the fastest wrong move — killing it — is also the most tempting.
+
+**Fires when:** anyone runs two lanes on one machine, which fleet work makes normal.
+*Logged 2026-09-14, hit while closing the interview slice.*
 
 ### KD-26 — `npm test` globs into any worktree left in the repo root
 
