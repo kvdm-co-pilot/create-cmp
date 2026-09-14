@@ -44,6 +44,10 @@ import { fileURLToPath } from "node:url";
 import { observedTreeHash, DEVICE_TIER_TRIGGERS, DEVICE_SKIP } from "./observed-tree.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { assessLadderPlant, describeLadderPlant } from "../packages/harness/src/lib/ladder-plant.mjs";
+import { evidenceLadderFor } from "../packages/harness/src/lib/evidence-ladder.mjs";
+import { readLadder } from "../packages/harness/src/lib/evidence-level.mjs";
+
 const REPO_ROOT = path.resolve(__dirname, "..");
 
 const PROFILES = new Set(["smoke", "scaffold", "local", "ci", "nightly", "release"]);
@@ -157,6 +161,10 @@ skill (.claude/skills/npm-publish/SKILL.md).
                            CMP_DEVICE=none is the explicit opt-out and fails
                            this check). Pass --min-level L1 for a deliberately
                            desktop-only check.
+  --ladder-plant           after a green run, break the app's STARTUP and run the lane
+                           again. Requires an l2Execution step to go RED and every
+                           l1Required step to stay GREEN — the proof that "L2" means
+                           the program ran, and not that a suite imported it.
   --keep                   retain the scratch app dir even on success (on
                            failure it is always kept and its path printed)
   --help                   this text
@@ -165,11 +173,12 @@ Exit 0 = fleet check PASS; exit 1 = FAIL; exit 2 = usage error.
 `;
 
 function parseArgs(argv) {
-  const args = { profile: "local", minLevel: null, keep: false, help: false };
+  const args = { profile: "local", minLevel: null, keep: false, help: false, ladderPlant: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--help" || a === "-h") args.help = true;
     else if (a === "--keep") args.keep = true;
+    else if (a === "--ladder-plant") args.ladderPlant = true;
     else if (a === "--profile") args.profile = argv[++i];
     else if (a === "--min-level") args.minLevel = argv[++i];
     else throw new Error(`unknown flag: ${a}`);
@@ -215,6 +224,82 @@ for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"]) {
   });
 }
 const run = runCommand;
+
+/**
+ * Break the scratch app's startup, run its lane again, and ask which steps
+ * noticed — the discrimination `packages/harness/src/lib/ladder-plant.mjs`
+ * documents and judges.
+ *
+ * The edit is the PROFILE's (only the stack knows what starting is); the
+ * question, the second run and the verdict are the core's. The scratch app is
+ * disposable, so the break is never reverted — it is deleted with the tree, and
+ * a kept tree (`--keep`) is kept BROKEN on purpose, because a half-reverted
+ * scratch app is a worse thing to hand someone than an obviously broken one.
+ */
+async function runLadderPlant({ appDir, args, before }) {
+  const { startupPlant } = await import(path.join(appDir, "qa", "lib", "profiles", "cmp", "plants.mjs"))
+    .catch(() => ({ startupPlant: null }));
+  if (!startupPlant) {
+    return { ok: false, line: "ladder plant: FAIL — this profile declares no startupPlant, so nothing here can test what l2Execution claims", reason: "profile declares no startupPlant" };
+  }
+
+  const entry = findEntryPoint(appDir, startupPlant);
+  if (!entry) {
+    return {
+      ok: false,
+      line: `ladder plant: FAIL — no file named ${startupPlant.entryPointBasename} under this app that the profile recognises as its entry point`,
+      reason: `startup plant found no ${startupPlant.entryPointBasename} to break`,
+    };
+  }
+
+  const original = fs.readFileSync(entry, "utf8");
+  const broken = startupPlant.breakStartup(original);
+  if (broken === original) {
+    return {
+      ok: false,
+      line: `ladder plant: FAIL — breakStartup left ${path.relative(appDir, entry)} unchanged; a green lane would then read as proof that startup was broken`,
+      reason: "the startup plant planted nothing",
+    };
+  }
+  fs.writeFileSync(entry, broken);
+  process.stdout.write(`\n── startup broken in ${path.relative(appDir, entry)} — running the lane again\n`);
+
+  await run(process.execPath, [path.join(appDir, "qa", "verify.mjs"), "--profile", args.profile], {
+    cwd: appDir,
+    env: { ...process.env },
+  });
+
+  const afterPath = path.join(appDir, "qa", "evidence", "latest.json");
+  if (!fs.existsSync(afterPath)) {
+    return { ok: false, line: "ladder plant: FAIL — the second lane run left no receipt", reason: "no receipt from the planted run" };
+  }
+  const after = JSON.parse(fs.readFileSync(afterPath, "utf8"));
+  const ladder = readLadder(evidenceLadderFor(await loadScratchProfile(appDir), null).ladder);
+  const result = assessLadderPlant({ before, after, ladder });
+  return { ok: result.ok, line: describeLadderPlant(result), reason: result.reason };
+}
+
+/** The entry point the profile named, under this app's sources, that it also recognises. */
+function findEntryPoint(appDir, startupPlant) {
+  const stack = [path.join(appDir, "composeApp", "src")];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      const abs = path.join(dir, e.name);
+      if (e.isDirectory()) stack.push(abs);
+      else if (e.name === startupPlant.entryPointBasename && startupPlant.recognises(fs.readFileSync(abs, "utf8"))) return abs;
+    }
+  }
+  return null;
+}
+
+/** The scratch app's own profile module, loaded from the tree it was vendored into. */
+async function loadScratchProfile(appDir) {
+  const mod = await import(path.join(appDir, "qa", "lib", "profiles", "cmp", "index.mjs"));
+  return mod.default ?? mod;
+}
 
 async function main() {
   let args;
@@ -353,6 +438,24 @@ async function main() {
   );
 
   writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null });
+
+  // 5. THE LADDER PLANT — only when asked, and only over a green baseline.
+  //
+  //    Every step above proves the lane RETURNS. This proves one thing more, and
+  //    it is the rung's own claim: that the steps named in `l2Execution` START
+  //    THE PROGRAM. Break startup so it still compiles, run the lane again, and
+  //    require both halves — the L1 steps blind to it, at least one L2 step red.
+  //    A profile that cannot say how to break its own startup gets no L2
+  //    assurance and is told so by name.
+  //
+  //    It runs after the verdict, never instead of it: a fleet check that failed
+  //    has nothing to plant against, and the baseline receipt is what makes a
+  //    second red meaningful rather than merely red.
+  if (args.ladderPlant && !failures.length) {
+    const plantResult = await runLadderPlant({ appDir, args, before: receipt });
+    process.stdout.write(`\n  ${plantResult.line}\n`);
+    if (!plantResult.ok) failures.push(plantResult.reason);
+  }
 
   if (failures.length) {
     process.stderr.write(`\nfleet check: FAIL\n`);
