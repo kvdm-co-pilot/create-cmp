@@ -85,9 +85,9 @@ function session(lines) {
 }
 
 /** One interview, driven by `lines`. */
-async function interview(lines, current = {}) {
+async function interview(lines) {
   const s = session(lines);
-  const result = await askLadderMenu({ input: s.input, output: s.output, interactive: true, current });
+  const result = await askLadderMenu({ input: s.input, output: s.output, interactive: true });
   return { ...result, out: s.read() };
 }
 
@@ -172,23 +172,13 @@ test("answering that a rung does not exist here ends the interview, and says why
   );
 });
 
-test("an answer already on record is offered back, and enter keeps it", async () => {
-  const held = L2.options[1];
-  assert.notEqual(held, L2.default, "this test is only meaningful while the held answer differs from the recommendation");
-
-  const r = await interview(["", "s"], { l2Execution: held });
-
-  assert.equal(
-    r.answers.l2Execution,
-    held,
-    "enter over an existing answer must KEEP it, not overwrite it with the recommendation — the recommendation is " +
-      "the contract's, the answer on record is a human's, and replacing the second with the first is the interview " +
-      "answering for someone, which this file's header calls the permanent temptation. NOTE: nothing in production " +
-      "passes `current` yet, so this path has no caller today (docs/KNOWN-DEFECTS.md KD-2); the property is the " +
-      "function's either way, and this says so rather than borrowing a reason from a caller that does not exist.",
-  );
-  assert.ok(r.out.includes(JSON.stringify(held)), "the answer on record must be visible before it is kept, or enter is a blind keystroke");
-});
+// REMOVED 2026-09-14 — "an answer already on record is offered back, and enter
+// keeps it". The `current` parameter it exercised had no production caller:
+// `init.mjs` never passed one and `upgrade.mjs` never runs an interview, because
+// it leaves qa/lib/profiles/<id>/** untouched by design. The test justified
+// itself with "`prooflane upgrade` asks about a ladder that is already
+// declared", which nothing did. Karel's call (KD-2): delete the path and both
+// stated reasons rather than keep code for a caller that was never coming.
 
 test("THE PROPERTY THE DESIGN RESTS ON: the interview holds no copy of the menu it renders", async () => {
   const src = fs.readFileSync(INTERVIEW_SRC, "utf8");

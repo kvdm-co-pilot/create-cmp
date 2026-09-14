@@ -28,7 +28,7 @@
 export const BOOLEAN_FLAGS = new Set([
   "help", "h", "version", "v",
   "dry-run", "new-profile",
-  "no-interview", "yes", "y",
+  "no-interview",
 ]);
 
 /**
@@ -49,7 +49,7 @@ export const BOOLEAN_FLAGS = new Set([
 export const KNOWN_FLAGS = new Set([
   "help", "h", "version", "v",
   "profile", "target-dir",
-  "dry-run", "new-profile", "no-interview", "yes", "y",
+  "dry-run", "new-profile", "no-interview",
 ]);
 
 /**

@@ -965,11 +965,16 @@ export async function runHarnessInit(flags, positional, opts = {}) {
   // apart rather than collapsed into one boolean: the summary has to say which,
   // and "no terminal" and "you said --no-interview" are different facts about
   // the same empty result.
+  // `--yes` IS GONE from this command, by Karel's call on 2026-09-14 (KD-1).
+  // It meant "record NOTHING" here and "take the defaults and proceed" on
+  // `harden` and `attach` in the same CLI — one word, two opposite meanings, and
+  // taking the defaults is the one thing install/interview.mjs's header argues
+  // must never happen unattended. `--no-interview` says what it does. Nobody
+  // ever had the old spelling: create-cmp-cli 0.25.0 was published 2026-09-09
+  // and the interview merged on the 12th.
   const noInterviewReason = flags["no-interview"]
     ? "--no-interview"
-    : flags.yes
-      ? "--yes"
-      : dryRun
+    : dryRun
         ? "--dry-run"
         : !process.stdin.isTTY || !process.stdout.isTTY
           ? "not a terminal"
@@ -979,6 +984,20 @@ export async function runHarnessInit(flags, positional, opts = {}) {
     output: process.stdout,
     interactive: noInterviewReason === null,
   });
+
+  // AN INTERRUPT ABANDONS THE INSTALL (KD-9, Karel's call 2026-09-14). Every
+  // question is asked BEFORE a byte is written, which is what makes honouring
+  // ^C free: there is no half-made tree to finish or unwind, only a decision not
+  // to start. Someone who pressed ^C and then found fifty-two files had been
+  // ignored — and `--no-interview` still installs, because asking to SKIP the
+  // questions is not the same as saying stop.
+  if (interview.interrupted) {
+    process.stdout.write(
+      `\n  ${colors.yellow("interrupted")} — nothing was written.\n` +
+        `  ${colors.dim("Run the command again when you are ready, or pass --no-interview to install without the questions.")}\n\n`
+    );
+    return 1;
+  }
 
   const plan = await planInit(root, { id, invocation: opts.invocation, answers: interview.answers });
   const written = [];
@@ -1111,10 +1130,24 @@ function ladderSummary(interview, reason, keptProfile) {
   const label = `  ${colors.bold("ladder")}   `;
   const indent = " ".repeat(11);
   const answers = Object.entries(interview.answers ?? {});
+  // WHAT TO DO NEXT DEPENDS ON WHETHER A LADDER WAS SEEDED AT ALL, and two
+  // branches below used to answer as though one always had been. Over a profile
+  // this command KEPT, "the seeded ladder stays commented — uncomment it" sends
+  // a person to a block that is not there: the file is their own bytes and
+  // `init` never wrote a line of it. That is the act-it-did-not-perform the
+  // `keptProfile` parameter exists to prevent, arriving through the branches
+  // that never read it (KD-13).
+  const advice = keptProfile
+    ? `${keptProfile} is yours and is never overwritten — nothing was seeded into it, so declare its ladder by hand.`
+    : "the seeded ladder stays commented — uncomment it, or re-run in a fresh tree to answer.";
+
   if (answers.length && keptProfile) {
     return (
       `${label}${colors.yellow("answered, but NOT recorded")} — ${keptProfile} already existed and is never overwritten\n` +
       answers.map(([field, answer]) => `${indent}${colors.dim(`${field} = ${JSON.stringify(answer)}`)}`).join("\n") +
+      // The interview's own sentence, here too: listing what was recorded cannot
+      // say whether there were further questions the person never reached.
+      `\n${indent}${colors.dim(interview.why)}` +
       `\n${indent}${colors.dim("that file is never overwritten, so declare its ladder by hand if you want these.")}\n`
     );
   }
@@ -1140,11 +1173,11 @@ function ladderSummary(interview, reason, keptProfile) {
     // in the one place this feature exists to stop telling them.
     return (
       `${label}${colors.yellow(interview.why)}\n` +
-      `${indent}${colors.dim("the seeded ladder stays commented — uncomment it, or re-run in a fresh tree to answer.")}\n`
+      `${indent}${colors.dim(advice)}\n`
     );
   }
   return (
-    `${label}${colors.yellow(`not asked (${reason ?? "no interview"})`)} — the seeded ladder stays commented, which is the honest state\n` +
+    `${label}${colors.yellow(`not asked (${reason ?? "no interview"})`)} — ${keptProfile ? `${keptProfile} is yours and was left alone` : "the seeded ladder stays commented"}, which is the honest state\n` +
     `${indent}${colors.dim("nobody was asked, so nothing was declared on your behalf. Writing the recommended")}\n` +
     `${indent}${colors.dim("answer here would be a guess wearing your answer, so this command does not.")}\n`
   );

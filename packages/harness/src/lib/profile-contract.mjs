@@ -2,7 +2,7 @@
 // MEANS, and the question that elicits it. One object, three consumers.
 //
 //   the loader     validates a declaration and refuses by name      (`refusal`)
-//   the interview  renders the menu at init/upgrade  (`question`/`options`/`default`)
+//   the interview  renders the menu at init  (`question`/`options`/`default`)
 //   the author     reads WHY, at the moment it is declaring          (`meaning`)
 //
 // AND TWO KEYS THAT EXIST SO NO CONSUMER HAS TO HOLD A COPY OF THE MENU.

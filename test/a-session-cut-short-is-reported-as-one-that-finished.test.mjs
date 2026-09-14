@@ -141,6 +141,9 @@ async function interviewWhy(answered, ending) {
   return r.why;
 }
 
+/** The report an abandoned install has instead of a summary: none, and no tree. */
+const INTERRUPTED = Symbol("interrupted — nothing written");
+
 /**
  * What `prooflane init` PRINTS BACK — the block of the summary that names the
  * profile it wrote. Found by the blank lines around it rather than by any label,
@@ -157,6 +160,20 @@ async function initReport(answered, ending) {
     const code = await runHarnessInit({ profile: PROFILE }, dir, { invocation: "prooflane" });
     Object.defineProperty(process, "stdout", stdout);
     Object.defineProperty(process, "stdin", stdin);
+    // ^C ABANDONS THE INSTALL since 2026-09-14 (KD-9, Karel's call), so it is no
+    // longer one of the endings that produces a summary to compare — it produces
+    // no install at all. That is a STRONGER distinction than the one this file
+    // was written to demand, not a weaker one, and the assertion below checks it
+    // rather than excusing it: nothing written, and a non-zero exit.
+    if (ending === "pressed ctrl-C") {
+      assert.notEqual(code, 0, `an interrupted install reported success (exit ${code})`);
+      assert.deepEqual(
+        fs.readdirSync(dir),
+        [],
+        `an interrupted install wrote into the tree: ${fs.readdirSync(dir).join(", ")}`,
+      );
+      return INTERRUPTED;
+    }
     assert.equal(code, 0, `prooflane init exited ${code} (${ending}, ${answered} answered)`);
   } finally {
     Object.defineProperty(process, "stdin", stdin);

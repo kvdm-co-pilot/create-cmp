@@ -94,7 +94,7 @@ const EXPLAIN_WORD = "?";
  * @returns {Promise<{asked: boolean, answers: Record<string,string>, why: string}>}
  *   `answers` is keyed by BARE field name.
  */
-export async function askLadderMenu({ input, output, interactive, current = {} } = {}) {
+export async function askLadderMenu({ input, output, interactive } = {}) {
   const paths = MENU_FIELDS.filter((p) => p.startsWith(LADDER));
 
   if (!interactive) {
@@ -135,6 +135,7 @@ export async function askLadderMenu({ input, output, interactive, current = {} }
 
   const answers = {};
   let why = "";
+  let interrupted = false;
 
   try {
     write(
@@ -151,13 +152,20 @@ export async function askLadderMenu({ input, output, interactive, current = {} }
       // An answer already on record is only offered back when the contract
       // still offers it. A stale one kept by Enter would be recorded verbatim
       // and refused by the loader — the caller's data, our refusal.
-      const held = spec.options.includes(current[field]) ? current[field] : null;
+      // Nothing is ever offered back, because nothing calls this with answers
+      // on record. `upgrade` leaves qa/lib/profiles/<id>/** untouched by design,
+      // so an interview there would ask a question it could not act on — the
+      // `current` parameter and the two sentences claiming `upgrade` asks were
+      // removed on 2026-09-14 rather than kept for a caller that was never
+      // coming (KD-2, Karel's call).
+      const held = null;
       const fallback = held ?? spec.default;
 
       write(renderField(path, spec, held));
       const outcome = await askOne({ rl, signal: ended.signal, write, path, spec, fallback, held });
 
       if (outcome.kind === "interrupted") {
+        interrupted = true;
         why = `asked — interrupted at ${path}, so nothing further was recorded`;
         break;
       }
@@ -198,7 +206,10 @@ export async function askLadderMenu({ input, output, interactive, current = {} }
       ? `asked — ${n} answer${n === 1 ? "" : "s"} recorded`
       : "asked — every question was skipped, so nothing was recorded";
   }
-  return { asked: true, answers, why };
+  // `interrupted` is a FIELD and not only a sentence, because the caller
+  // decides whether to write fifty-two files and cannot be asked to regex prose
+  // to do it. `why` stays for the human; this is for `runHarnessInit`.
+  return { asked: true, answers, why, interrupted };
 }
 
 /**
