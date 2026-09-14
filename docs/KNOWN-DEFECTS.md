@@ -54,35 +54,6 @@ reviewer finding too much.
 
 ## Open
 
-### KD-1 — `--yes` means the opposite on `harness init` than everywhere else
-
-`packages/harness/install/init.mjs:960`, `bin/create-cmp.mjs`, `packages/harness/bin/prooflane.mjs`
-
-On `harden` and `attach`, `--yes` means "yes to all, take the defaults and proceed". On
-`harness init` it suppresses the ladder interview and records **nothing** — and taking the
-defaults is precisely what `install/interview.mjs`'s header argues must never happen
-unattended. Both readings are defensible; one CLI cannot spell both `--yes`. Both help
-surfaces now state the local meaning, so the collision is visible rather than silent.
-
-**Waiting on:** Karel. Product decision — rename, or accept the overload.
-*Logged 2026-09-11, raised in review rounds 2 and 3.*
-
-### KD-2 — `askLadderMenu({current})` has no production caller
-
-`packages/harness/install/interview.mjs`, `packages/harness/install/upgrade.mjs`,
-`packages/harness/src/lib/profile-contract.mjs:5`, `test/ladder-interview.test.mjs:184`
-
-`init.mjs` is the only caller and passes no `current`, so the "offered back, and kept by
-Enter" path exists solely for its own test. Two pieces of prose claim otherwise:
-`profile-contract.mjs:5` says the interview renders "at init/**upgrade**", and the test
-justifies the held-answer assertion with "`prooflane upgrade` asks about a ladder that is
-already declared". `upgrade.mjs` neither runs an interview nor writes a skeleton.
-
-Either wire `upgrade`, or drop the parameter along with both stated reasons.
-
-**Waiting on:** Karel — it is a scope call (a next-slice feature, or dead weight), not a bug.
-*Logged 2026-09-11, raised in review rounds 1, 2 and 3 — the entry this file was written for.*
-
 ### KD-3 — `executionHint` reads menu paths without the prefix filter its sibling applies
 
 `packages/harness/install/init.mjs` (`executionHint`) vs `packages/harness/install/interview.mjs`
@@ -150,45 +121,6 @@ is the one thing the helper's own header says gets a scanner deleted.
 
 **Fires when:** the next hand-typed `§` goes stale. *Logged 2026-09-11, review round 5.*
 
-### KD-9 — an interrupted `init` still writes a complete harness
-
-`packages/harness/install/init.mjs` (`runHarnessInit`), `packages/harness/install/interview.mjs`
-
-`^C` at a ladder question now REPORTS honestly — it is distinguishable from the input ending, and
-the summary says "interrupted at ladder.l2Execution" rather than a sentence about a pipe. What it
-still does is install: 52 files, exit 0.
-
-That is defensible and is left as it is deliberately. `--no-interview` also installs, the interview
-is explicitly not a gate on anything, and the questions are asked BEFORE a byte is written
-precisely so an unanswered one costs nothing. The other reading — `^C` means stop, and a
-half-answered interview should leave no tree — is equally defensible and is not mine to take.
-
-**Waiting on:** Karel. Product decision — install anyway, or treat `^C` as abandoning the install.
-*Logged 2026-09-12, handed up by review round 5. The reporting half was a defect and is fixed;
-this half is a choice.*
-
-### KD-10 — enter records the contract's `default` without checking it is an option
-
-`packages/harness/install/interview.mjs` (`askOne`, `promptFor`)
-
-`fallback = held ?? spec.default`, and an empty line returns it verbatim: `{kind: "answer",
-value: fallback}`. Nothing asks whether `spec.default` is one of `spec.options`. A menu field
-declared without a `default` therefore makes ENTER record `undefined` — printed back as
-`recorded l2Execution: undefined`, carried into `answers`, and enough to flip the seeded ladder
-block LIVE while `executionHint` reads the same field as unanswered and writes the
-"you answered about a higher rung but not the one beneath it" sentence at someone who answered
-the lower one. A `default` that is merely *absent from* `options` records a value the loader
-would refuse. Both are the file's own stated defect — an answer nobody gave — arriving through
-the one keystroke the menu recommends.
-
-Not live: measured 2026-09-12, `default` is one of `options` for both `ladder.l2Execution` and
-`ladder.l3Execution`, and `MENU_FIELDS` only selects fields that have `options` at all. Not
-raised as a defect because there is nothing to fail on today, and not proposed as a test for
-the same reason — a green assertion over today's contract is not a failing test.
-
-**Fires when:** a field gains `options` and no `default`, or a `default` is edited out of step
-with its `options`. *Logged 2026-09-12, review round 6.*
-
 ### KD-11 — the doc charter calls itself the map of every document, and four parts of it are stale
 
 `docs/DOCUMENTATION.md` §2
@@ -231,38 +163,6 @@ Loosening that touches ADR-0014's "bound to this tree, so it cannot be recycled 
 *Logged 2026-09-12, by the author, deliberately not fixed on this branch: `scripts/` is a review
 trigger path and editing it would reopen the review under the rule being replaced.*
 
-
-### KD-13 — three of `ladderSummary`'s four branches drop a fact they were handed
-
-`packages/harness/install/init.mjs` (`ladderSummary`)
-
-It takes three inputs because three facts have to reach the person: what was answered, how the
-session ENDED (`interview.why`), and whether the profile was KEPT rather than written — the
-last one for the reason its own docstring gives, that "printing 'recorded' over a file we did
-not touch would be the product claiming an act it did not perform". `7a61470` taught one branch
-to print the ending. The other three each still drop one input. Measured 2026-09-12, by running
-the real command into a directory that already held `qa/lib/profiles/<id>/index.mjs`:
-
-| branch | drops | what the human reads |
-|---|---|---|
-| answers + profile kept | `interview.why` | ^C, a dead input and a finished session print the same paragraph, byte for byte |
-| no answers, but asked | `keptProfile` | "the seeded ladder stays commented — uncomment it" |
-| never asked (`--no-interview`) | `keptProfile` | "the seeded ladder stays commented, which is the honest state" |
-
-Nothing was seeded in the last two: that file is the adopter's own bytes, untouched. Logged
-rather than raised because of the second question on the placement line — the line above it does
-print `N kept (already present)`, and the tree that most often reaches this branch holds a
-profile an earlier `init` wrote, which does carry the commented ladder the sentence describes.
-It is a summary line that could be truer, not an adopter handed a wrong result.
-
-Repair if it is ever wanted, and it is small: round 6's clause in the kept branch, and a
-`keptProfile ? … : …` in the two empty-answer branches. Measured red on this tree and green
-under that repair, over a matrix of three endings x two shapes of tree x every position a
-question is still outstanding, driven exactly as
-`test/a-session-cut-short-is-reported-as-one-that-finished.test.mjs` drives one row of it.
-
-**Fires when:** an adopter whose profile was written by hand — not by an earlier `init` — runs it.
-*Logged 2026-09-12, review round 7.*
 
 ### KD-14 — `create-cmp`'s parser does not split `--flag=value`
 
@@ -398,6 +298,15 @@ depths.
 
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
+
+### KD-1, KD-2, KD-9, KD-10, KD-13 — the ladder interview — **CLOSED 2026-09-14, Karel's calls**
+`--yes` dropped from `harness init` (it meant the opposite of `--yes` everywhere else in the same
+CLI, and never reached a user — 0.25.0 shipped three days before the interview merged).
+`askLadderMenu({current})` deleted with both sentences claiming `upgrade` asks. **`^C` abandons
+the install** — every question is asked before a byte is written, so honouring it costs nothing,
+and a person who pressed stop and found 52 files had been ignored. A menu default that is not one
+of its own options is refused at authoring time. And `ladderSummary` stopped telling a person to
+uncomment a seeded ladder in a file this command never wrote.
 
 ### KD-7 — a boolean flag swallows the target directory — **CLOSED**
 `18af5c3`, `91a3ac2`. Flags that take no value are declared; the token after them stays the
