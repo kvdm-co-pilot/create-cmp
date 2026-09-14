@@ -31,10 +31,14 @@
 //
 // The person who pressed ^C is told what they answered and nothing about having
 // stopped; the pipe that died is told the same; the author who deliberately
-// skipped the rest is told the same. Whether an interrupted install should still
-// write is a separate, open question (docs/KNOWN-DEFECTS.md KD-9) and this test
-// takes no position on it — writing the tree is one act, telling the person what
-// happened is another, and only the second is under test here.
+// skipped the rest is told the same.
+//
+// WHAT AN INTERRUPT DOES was open when this file was written and is now settled:
+// since 2026-09-14 it ABANDONS the install (KD-9, Karel's call). So this file
+// takes a position where it once declined to — for ^C it asserts a non-zero exit
+// and an empty tree, and for every other ending the report comparison it was
+// written for. The two halves are still different acts; only one of them is now
+// a decision rather than a question.
 //
 // THE CLASS, NOT THE INSTANCE. The invariant is not "print the ^C sentence" and
 // not "read `why` in that branch" — either could be implemented another way.
@@ -258,8 +262,8 @@ test("every ending the interview tells apart is told apart in what the command p
       "the answer map is EMPTY; one recorded answer sends it down an earlier branch that lists the answers and " +
       "appends a fixed clause, and the ending is gone. A distinction that is computed and never printed is not a " +
       "distinction the product makes.\n" +
-      "  What an interrupted install should DO — write anyway, or stop — is a separate open decision " +
-      "(docs/KNOWN-DEFECTS.md KD-9) and this test does not touch it. It asks only that the report say which of the " +
-      "three happened.",
+      "  An interrupted install now STOPS (KD-9, settled 2026-09-14), so ^C is checked by its exit code and its " +
+      "empty tree rather than compared here. This asks of the remaining endings only that the report say which " +
+      "of them happened.",
   );
 });

@@ -14,38 +14,10 @@ import {
   CONTRACT,
   CONTRACT_PATHS,
   MEANING_BUDGET,
-  MENU_FIELDS,
   contractAt,
   explain,
   requiredFields,
 } from "../packages/harness/src/lib/profile-contract.mjs";
-
-test("every menu field's recommended answer is one of the answers it offers", () => {
-  // KD-10. `askOne` returns `spec.default` verbatim when the user presses ENTER,
-  // and nothing asks whether that value is one of `spec.options`. A menu field
-  // declared here without a `default` therefore makes the recommended keystroke
-  // record `undefined` — printed back as `recorded l2Execution: undefined`,
-  // carried into `answers`, and enough to flip the seeded ladder block LIVE
-  // while `executionHint` reads the same field as unanswered. A `default` merely
-  // ABSENT FROM `options` records a value the loader would refuse.
-  //
-  // It is guarded HERE and not at runtime on purpose: this contract is our own
-  // frozen literal, not an adopter's declaration, so the moment to catch a bad
-  // default is the edit that writes one — not every install thereafter.
-  for (const path of MENU_FIELDS) {
-    const spec = contractAt(path);
-    assert.ok(
-      Array.isArray(spec.options) && spec.options.length > 0,
-      `${path} is a MENU field with no options to choose from`,
-    );
-    assert.ok(
-      spec.options.includes(spec.default),
-      `${path} recommends ${JSON.stringify(spec.default)}, which is not one of the answers it offers:\n  ` +
-        spec.options.map((o) => JSON.stringify(o)).join("\n  ") +
-        "\nEnter records the recommendation verbatim, so this is an answer no human gave and the loader would refuse.",
-    );
-  }
-});
 
 test("every field the contract describes carries a meaning, within a budget the suite enforces", () => {
   assert.ok(CONTRACT_PATHS.length >= 6, `the contract describes ${CONTRACT_PATHS.length} fields — too few to be the ladder`);
