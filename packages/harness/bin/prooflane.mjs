@@ -27,7 +27,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { colors, fail } from "../install/log.mjs";
-import { parseArgs } from "../install/args.mjs";
+import { parseArgs, unknownFlags } from "../install/args.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(path.join(HERE, "..", "package.json"), "utf8"));
@@ -67,6 +67,30 @@ async function main() {
 
   const command = positionals[0];
   const askedForHelp = Boolean(flags.help || flags.h) || command === "help";
+
+  // REFUSE WHAT WE CANNOT ACCOUNT FOR, before anything runs. `unknown command`
+  // already does this one branch down; an unknown FLAG was parsed as best it
+  // could be and the command proceeded — `--verfiy ../app` put the lane in the
+  // cwd and exited 0. Refusing after the help/version short-circuit is
+  // deliberate: `--help` must answer even when the rest of the line is wrong,
+  // because a wrong line is the likeliest reason someone is asking.
+  const unknown = unknownFlags(flags);
+  if (!askedForHelp && unknown.length) {
+    fail(`prooflane: ${unknown.map((f) => `--${f}`).join(", ")} ${unknown.length === 1 ? "is not a flag" : "are not flags"} this command knows`);
+    process.stdout.write(`  run ${colors.cyan("prooflane --help")} for the flags it does know. Nothing was written.\n\n`);
+    return 2;
+  }
+
+  // A single-dash token is a flag to neither parser, so it lands in the
+  // positionals — and the first positional after the command is the target
+  // DIRECTORY. `prooflane init -y ../app` resolved the project to a directory
+  // literally named `-y`.
+  const shortish = positionals.filter((p) => p.startsWith("-") && !p.startsWith("--"));
+  if (!askedForHelp && shortish.length) {
+    fail(`prooflane: ${shortish.join(", ")} — this command takes long flags only, and a bare \`-x\` would be read as the directory to install into`);
+    process.stdout.write(`  run ${colors.cyan("prooflane --help")} for the flags it does know. Nothing was written.\n\n`);
+    return 2;
+  }
   if (askedForHelp || !command) {
     process.stdout.write(usage());
     // Asked for: success. Nothing asked for at all: usage is the answer to a
