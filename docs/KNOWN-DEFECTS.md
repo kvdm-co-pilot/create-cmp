@@ -1,8 +1,10 @@
 # Known defects — logged, not re-raised
 
-> **Scope.** Things a review found that are NOT defects in the change it was reviewing:
-> pre-existing conditions, product decisions waiting on a human, and hazards that are not
-> live yet. `docs/DOGFOODING-FINDINGS.md` is the other backlog and is not this — that one
+> **Scope.** What a review found and deliberately did not block on — decisions waiting on a
+> human, taste calls, hazards that cannot fire yet, and real defects nobody is wrongly served
+> by. The rule below is what decides that, and AGE IS NOT PART OF IT: this line used to open
+> with "pre-existing conditions" while the table three paragraphs down had abolished exactly
+> that criterion, which is the drift the file exists to catch, in the file, about itself. `docs/DOGFOODING-FINDINGS.md` is the other backlog and is not this — that one
 > collects what building real apps on the harness surfaces, from a different source and at a
 > different size. **This file is read by a reviewer on every round, so it stays short.** An
 > entry that grows into a slice leaves here and becomes one.
@@ -94,6 +96,7 @@ you the same list without opening anything.
 | **KD-25** | an interrupt that printed nothing would pass the suite | wording deliberately not pinned |
 | **KD-26** | `npm test` is bare `node --test`, so it globs any worktree in the tree | measured below |
 | **KD-27** | the lane-already-running refusal does not say WHICH repo is running it | four commands to find out |
+| **KD-28** | the header's KD-7 measurement cites a count this log attaches to another defect | the argument does not rest on the number |
 
 ---
 
@@ -354,6 +357,19 @@ the fastest wrong move — killing it — is also the most tempting.
 
 **Fires when:** anyone runs two lanes on one machine, which fleet work makes normal.
 *Logged 2026-09-14, hit while closing the interview slice.*
+
+### KD-28 — the rule's own KD-7 measurement cites a count this log attaches to another defect
+
+`docs/KNOWN-DEFECTS.md` (the header's pre-existing paragraph)
+
+The paragraph says `prooflane init --new-profile ../app` "wrote fifty-two files into the wrong
+repository and exited 0". KD-7 measured `qa/` landing in `cwdtest2` with exit 0 and no count;
+the only 52 in this file belongs to a different finding — the `^C` decision, "a person who
+pressed stop and found 52 files had been ignored". The argument does not rest on the number:
+wrong repository, exit 0, logged because it predated the slice is the whole of it.
+
+**Fires when:** the next reader checks the measurement and finds the other defect.
+*Logged 2026-09-14, review round 1 of `review-gate-rule`.*
 
 ### KD-26 — `npm test` globs into any worktree left in the repo root
 
