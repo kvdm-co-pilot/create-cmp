@@ -31,6 +31,38 @@ export const BOOLEAN_FLAGS = new Set([
   "no-interview", "yes", "y",
 ]);
 
+/**
+ * The flags this front door documents, in any command.
+ *
+ * A name absent from here is REFUSED rather than guessed at. That is the whole
+ * of the fix for six log entries that were really one defect: an argument the
+ * CLI does not recognise was parsed as best it could be and the command ran
+ * anyway — usually by eating the directory that followed it. A longer list of
+ * booleans could never reach `--verfiy` (a typo) or `-y` (a single dash), and a
+ * refusal reaches all of them.
+ *
+ * It is one set for every command rather than one per command on purpose: a
+ * per-command set refuses a flag that IS documented elsewhere, which trades a
+ * swallowed directory for a rejected valid invocation. Accepting a meaningless
+ * but real flag is the cheaper mistake.
+ */
+export const KNOWN_FLAGS = new Set([
+  "help", "h", "version", "v",
+  "profile", "target-dir",
+  "dry-run", "new-profile", "no-interview", "yes", "y",
+]);
+
+/**
+ * The argument names this door cannot account for. `no-x` is known when `x` is,
+ * because `flagBool` reads them as one flag.
+ */
+export function unknownFlags(flags, known = KNOWN_FLAGS) {
+  return Object.keys(flags).filter((k) => {
+    const base = k.startsWith("no-") ? k.slice(3) : k;
+    return !known.has(k) && !known.has(base);
+  });
+}
+
 /** Is this flag one that takes no value? `no-` is boolean by construction. */
 export function takesNoValue(key, booleans = BOOLEAN_FLAGS) {
   return booleans.has(key) || key.startsWith("no-");

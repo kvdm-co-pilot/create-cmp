@@ -13,7 +13,11 @@
 //   npx create-cmp clean   [flags]             # konan/Gradle cache & build-output hygiene
 //   npx create-cmp verify  [flags]             # green-build gate on an existing project
 
-import { parseArgs } from "../src/lib/args.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { parseArgs, unknownFlags } from "../src/lib/args.mjs";
 
 const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "harden", "attach", "harness", "help"]);
 
@@ -27,9 +31,36 @@ async function main() {
   const command = COMMANDS.has(positionals[0]) ? positionals[0] : "create";
   const rest = COMMANDS.has(positionals[0]) ? positionals.slice(1) : positionals;
 
+  // ANSWER BEFORE ACTING. `--version` is a documented flag, so refusing the
+  // unrecognised never reaches it — it used to pass every check and fall through
+  // the dispatcher into `create`, scaffolding a whole app into ./myapp while the
+  // user waited for a version string (KD-15). prooflane has always short-circuited
+  // both; this is the same rule at the other door.
+  if (flags.version || flags.v) {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(fs.readFileSync(path.join(here, "..", "package.json"), "utf8"));
+    process.stdout.write(`${pkg.name} ${pkg.version}\n`);
+    process.exit(0);
+  }
+
   if (flags.help || flags.h || command === "help") {
     printHelp();
     process.exit(0);
+  }
+
+  // Refuse what this door cannot account for, before any command runs — the
+  // same answer `unknown command` gives, applied to the flags nothing looked at.
+  // An unrecognised flag used to be parsed as best it could be, which for
+  // `harness init` meant eating the directory and installing into the cwd.
+  const unknown = unknownFlags(flags);
+  const shortish = positionals.filter((p) => p.startsWith("-") && !p.startsWith("--"));
+  if (unknown.length || shortish.length) {
+    const named = [...unknown.map((f) => `--${f}`), ...shortish].join(", ");
+    process.stderr.write(
+      `create-cmp: ${named} ${unknown.length + shortish.length === 1 ? "is not an argument" : "are not arguments"} this command knows.\n` +
+        `  run \`create-cmp --help\` for the ones it does. Nothing was written.\n`
+    );
+    process.exit(2);
   }
 
   switch (command) {

@@ -133,27 +133,6 @@ framework-check, affected-tests, evidence-badge, evidence-html, flight-recorder,
 **Fires when:** someone sweeps those ten. The exception list is asserted to only ever shrink.
 *Logged 2026-09-11, measured earlier the same day.*
 
-### KD-7 — a boolean flag swallows the target directory, and the lane installs into the cwd
-
-`packages/harness/bin/prooflane.mjs` (`parseArgs`), `src/lib/args.mjs` (`parseArgs`)
-
-Both parsers read `--k <next>` as a value whenever `next` does not start with `--`, so a bare
-boolean flag eats the positional after it. Measured 2026-09-11:
-
-```
-$ cd cwdtest2 && prooflane init --new-profile ../pFlag2
-  project: …/cwdtest2          ← not ../pFlag2
-```
-
-`qa/` landed in `cwdtest2`; `../pFlag2` was untouched; exit 0. Same for `--dry-run <dir>`, which
-additionally dry-runs a directory the user did not name. Pre-existing — `--dry-run` and
-`--new-profile` predate the interview slice — but `--no-interview` joins the same parser and
-`prooflane init [dir] … [--no-interview|--yes]` is now printed as a usage line, so the order that
-breaks is the one the help suggests reading right to left. The banner does print the resolved
-project path, which is the only thing that makes it noticeable.
-
-**Fires when:** anyone writes the flag before the directory. *Logged 2026-09-11, review round 4.*
-
 ### KD-8 — the dangling-citation lint covers `ADR-NNNN`, and the instance that provoked it was a `§`
 
 `test/cited-decision-that-does-not-exist.test.mjs`
@@ -302,102 +281,6 @@ entry holds the rest.
 close them together.
 *Logged 2026-09-13.*
 
-### KD-15 — `create-cmp --version` scaffolds an app
-
-`bin/create-cmp.mjs`
-
-The dispatcher reads `--help`/`-h` and nothing else: `--version` sets a flag nobody looks at, the
-first positional is absent, so the default command runs. Measured 2026-09-13 in an empty directory:
-
-```
-$ create-cmp --version
-  › Copying template → …/myapp        ← a full scaffold, exit 0
-```
-
-`prooflane --version` prints its version, and `src/lib/args.mjs` now names `version`/`v` among the
-flags that take no value, which makes the create-cmp side look handled. It is not — that list only
-decides parsing; nothing reads the result. Pre-existing and untouched by the parser slice.
-
-**Fires when:** anyone checks which version they have the way every other CLI is asked.
-*Logged 2026-09-13, review round 1 of `fix-flag-eats-target`.*
-
-### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it
-
-`packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)
-
-`consumesNext` lets a declared boolean swallow the next token when it is exactly `true` or `false`,
-and its docstring gives the reason: "`flagBool` is tri-state by contract". Two places that value
-arrives where nothing is tri-state.
-
-**`packages/harness` has no `flagBool` at all** — `grep -rn flagBool packages/harness` finds the
-comment and no code. Every harness reader is truthiness (`Boolean(flags["dry-run"])` in
-`install/init.mjs:901`, `relock.mjs:161`, `upgrade.mjs:120`; `!flags["new-profile"]` at
-`init.mjs:950`; `flags["no-interview"]` at `init.mjs:968`), and `Boolean("false")` is `true`.
-Measured 2026-09-14:
-
-```
-$ cd cwd && prooflane init --dry-run false ../pC --no-interview
-  project: …/pC      ✓ 50 files written … ! --dry-run: nothing was written.
-```
-
-The user said "no, do not dry-run" and got a dry run, exit 0, nothing installed.
-
-**`flagBool` reads the value form of `x` but never of `no-x`**, while `consumesNext` consumes it
-either way — `takesNoValue` is true by the `no-` prefix. Measured the same day:
-`--no-ios true ./my-app` → `{"no-ios":"true"}`, and `flagBool(flags,"ios",true)` returns **true**:
-the token is eaten and the flag the user typed does nothing.
-
-Logged rather than raised because neither is a regression. A differential over both parsers at the
-merge-base and at `e80da0d` — every name in either `BOOLEAN_FLAGS` plus `profile`/`target-dir`/`set`
-× `{absent, --other, ./my-app, true, false, svc, -x, ""}`, 168 differing rows — shows the two
-parsers differ from their merge-base form **only** where a declared boolean is followed by something
-that is not `true`/`false`, which is the fix. For those two literals the behaviour is byte-identical
-to what shipped before, so an adopter is no worse served than they were.
-
-**Fires when:** anyone writes `--flag false` at prooflane, or `--no-flag true` anywhere.
-*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`.*
-
-### KD-17 — the mirror direction of the front-door split is not refused
-
-`src/lib/args.mjs`, `packages/harness/install/args.mjs`
-
-`test/a-front-door-swallows-the-directory-the-other-keeps.test.mjs` refuses one direction: a flag
-the SHARED installer's parser declares boolean must not eat the directory at either door. The other
-direction is open — create-cmp declares `force`, `fix`, `harness`, `minimal`, `verify`, `ios`,
-`firebase`, `firestore`, `storage`, `functions`, `fcm`, `room`, `e2e`, `appium`, `inspector`,
-`dev-client`, `dry-run-verify` boolean and prooflane's parser knows none of them, so
-`prooflane init --minimal ../app` still consumes `../app` and installs into the cwd.
-
-Re-examined and still not blocked, 2026-09-14, after measuring rather than assuming — the severity
-is identical to the one that WAS blocked, so the case rests entirely on reachability and on what
-closing it would take.
-
-| | measured |
-|---|---|
-| harm, when hit | `prooflane init --verify ../p1` → `project: …/c1`, **52 files into the cwd**, `../p1` untouched, exit 0 — the same as `--y` |
-| the other two commands | `prooflane upgrade --fleet ../p2` lands in a lane-less cwd and REFUSES: "Install one: prooflane init", nothing written. Only `init` writes |
-| reachability | thirteen of the seventeen are Compose/Firebase scaffold nouns nobody types at a stack-neutral lane. Four are generic — `--force`, `--fix`, `--harness`, `--verify` — and `--verify` is the most reachable name in the set, because it is this product's own noun |
-| advertised anywhere? | no. `prooflane --help` names only `--profile --target-dir --new-profile --dry-run --no-interview/--yes --version --help`, and no doc, help string or script in the repo pairs a prooflane command with any of the seventeen |
-
-And the list is not the shape of the fix. `--verfiy ../app` (a typo), `--anything ../app` and
-`-y ../app` have the same failure and no list reaches them: measured, `prooflane init -y ../app`
-resolves the project to a directory literally named `-y`, because a single-dash token is not a flag
-to either parser. The general case is **an unrecognised token before the directory**, which closes
-with a refusal for unknown flags — a slice with its own help text and a forward-compat escape — not
-by teaching a deliberately stack-neutral installer the words `firebase`, `ios`, `room` and `appium`.
-(The agnostic lint would not actually catch that: its scope is `packages/harness/src`, not
-`install/`. The reason to refuse it is the package's promise, not a gate.)
-
-The round-2 test shares that limit by construction — its universe is whatever the harness parser
-declares, so it protects a declared name and cannot see an undeclared one. Measured: deleting `y`
-from BOTH lists, the other candidate repair for KD-7's last instance, sends **both** front doors
-back to installing 52 files into the cwd and the test goes GREEN. Declaring the name was the right
-repair, and the gate only holds while names are added to that list, never removed.
-
-**Fires when:** someone types a flag that does not exist on the command they are running — most
-plausibly `prooflane init --verify <dir>`.
-*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`; reachability measured the same round.*
-
 ### KD-18 — the symlink gate reads two of the eight bins this repo publishes
 
 `test/a-published-bin-does-nothing-when-npm-symlinks-it.test.mjs` (`declaredBins`)
@@ -421,5 +304,20 @@ depths.
 
 ## Closed
 
-*(An entry moves here when the thing is fixed or the decision is taken, with the commit that
-did it. Nothing yet.)*
+*An entry moves here when the thing is fixed or the decision is taken, with the commit that did
+it.*
+
+### KD-7 — a boolean flag swallows the target directory — **CLOSED**
+`18af5c3`, `91a3ac2`. Flags that take no value are declared; the token after them stays the
+user's. Two rounds of review found three more defects in the fix itself, including an
+entry-point guard that would have made every npm-installed `prooflane` a silent no-op.
+
+### KD-15 — `create-cmp --version` scaffolds an app — **CLOSED**
+Refusing the unrecognised never reached it: `--version` is a DOCUMENTED flag, so it passed
+every check and fell through the dispatcher into `create`. It answers before acting now, the
+way `prooflane` always has.
+
+### KD-16 / KD-17 — the flag lists could not reach a typo or a short flag — **CLOSED**
+Not by a longer list. `--verfiy`, `--anything` and `-y` all failed identically and no list
+reaches them, so both doors now refuse an argument they cannot account for — by name, exit 2,
+nothing written — which is the answer `unknown command` already gave one branch down.
