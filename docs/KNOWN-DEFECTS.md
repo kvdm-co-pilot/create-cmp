@@ -25,12 +25,33 @@ So every finding is placed on one line first, and the line has two questions on 
 
 | | |
 |---|---|
-| **A defect in the merging code that would wrongly serve an adopter** — sent into a refusal, told something false, handed a wrong result | fixed before merge, as a failing test (ADR-0014) |
-| **Anything else** — pre-existing, a product decision, a taste call, a hazard that cannot fire yet, *or a real defect an adopter would not be wrongly served by* | logged here, in the round it was found, and not raised again |
+| **Would shipping it WRONGLY SERVE an adopter?** — sent into a refusal, told something false, handed a wrong result, given a tree they did not ask for | fixed before merge, as a failing test (ADR-0014) |
+| **Anything else** — a product decision, a taste call, a hazard that cannot fire yet, *or a real defect nobody is wrongly served by* | logged here, in the round it was found, and not raised again |
 
 A dead paragraph, an unread key, a scanner edge case, a summary line that could be truer:
 real, logged, shipped. A reviewer that cannot place a finding on that line says so rather
 than picking.
+
+**PRE-EXISTING IS NOT ON THAT LINE.** It used to sit in the second row and it reads as an
+exemption, which it is not: *pre-existing* answers whose fault, and the question above is how
+bad. KD-7 is the measurement — `prooflane init --new-profile ../app` wrote fifty-two files
+into the wrong repository and exited 0, was logged as non-blocking because it predated the
+slice, and an adopter whose harness lands in the wrong repo is wrongly served whenever the bug
+arrived. Age decides who paid for it, never whether it blocks.
+
+**A FIX'S OWN NEW BEHAVIOUR IS IN SCOPE FOR THE ROUND THAT REVIEWS IT.** Not only the finding
+it answers — the behaviour it introduces on the way. Measured across two slices: four of six
+rounds found a defect in the previous round's fix, and three of round 1's four findings on the
+argument-refusal slice were defects created while fixing the first one, including an
+entry-point guard that would have made every npm-installed `prooflane` a silent no-op. A round
+that checks only whether the finding is answered is half a round.
+
+**THE RECORD STAYS BOUND TO THE TREE, and that is not in tension with the cap.** ADR-0014
+binds a review record to the bytes it describes so it cannot be recycled across changes;
+discharging a review of tree A while merging tree B would be the thing this product exists to
+refuse. So the LAST round re-records after its own fix — resume that reviewer, do not start a
+cold one. Re-recording is not another round: the same reader confirms the same finding against
+the bytes that merge, and it costs one message rather than a fresh read of the diff.
 
 **Reading this file before reporting is part of a review.** A finding already logged here is
 not reported again — that is the whole point, and the measured reason: on the `interview-menu`
@@ -63,7 +84,6 @@ you the same list without opening anything.
 | **KD-5** | `tokenDrift` SKIPs whenever the debug app is not running | environmental, indistinguishable from broken |
 | **KD-6** | `device` is not among the agnostic lint's runtime nouns | adding it fails ten core modules today |
 | **KD-8** | the dangling-citation lint reads `ADR-NNNN`, not `§` | nothing dangles; a checker risks false positives |
-| **KD-12** | the review gate reopens on any byte, and prints the superseded rule | touches signed ADR-0014 — its own slice |
 | **KD-14** | `create-cmp`'s parser does not split `--flag=value` | never promised; pairs with KD-4 |
 | **KD-16** | a boolean's value form is consumed by a reader that cannot read it | `prooflane` has no `flagBool` at all |
 | **KD-18** | the symlink gate reads 2 of the 8 bins this repo publishes | all eight pass today |
@@ -145,25 +165,6 @@ table row, `Rule 4` neither), so a checker would be a slice with real false-posi
 is the one thing the helper's own header says gets a scanner deleted.
 
 **Fires when:** the next hand-typed `§` goes stale. *Logged 2026-09-11, review round 5.*
-
-### KD-12 — the review gate still reopens on any byte, and its printed rule is the superseded one
-
-`scripts/proof-plan.mjs` (the `review` obligation's `how` text, and `--discharge-review`)
-
-Two halves of one follow-up. The `how` text printed at slice close still summarises the old
-rule ("a round ends when it produces no new defect") beside its pointer to this file — the
-pointer is right, the summary beside it is stale, and it was stale within a day, which is the
-argument for a pointer carrying no summary at all. And `--discharge-review` requires the review
-record's tree hash to equal the current tree, so any fix after round 2 reopens the obligation
-and the two-round rule above cannot be followed to its end without a third record.
-
-Loosening that touches ADR-0014's "bound to this tree, so it cannot be recycled across changes"
-— a signed decision — so it is its own slice with its own (one-round) review, not a rider here.
-
-**Waiting on:** the follow-up slice, opened straight after `interview-menu` merges.
-*Logged 2026-09-12, by the author, deliberately not fixed on this branch: `scripts/` is a review
-trigger path and editing it would reopen the review under the rule being replaced.*
-
 
 ### KD-14 — `create-cmp`'s parser does not split `--flag=value`
 
@@ -322,6 +323,16 @@ the create-cmp door is told nothing, not told something false.
 slice should close them together. A per-COMMAND known-flag set, rather than a per-door one, is
 what would make the class unreachable.
 *Logged 2026-09-14, review round 1 of `interview-decisions`.*
+
+### KD-12 — the gate printed a rule that contradicted the rule — **CLOSED 2026-09-14**
+Half real, half not, and checking which was the work. The printed paraphrase WAS stale — it
+carried the new severity test on the old termination shape — and it is now a pointer that
+paraphrases nothing, because the second statement of a rule is always the one nobody updates.
+The other half asked to loosen `--discharge-review`'s tree binding so the last round's fix
+could discharge. It does not need loosening: ADR-0014 is right that merging bytes nobody read
+is the thing to refuse, and the last round RE-RECORDS after its own fix instead. That is not a
+third round, it costs one message, and it had already been the working practice for three
+slices before anyone wrote it down.
 
 ### KD-27 — the lane-already-running refusal names a PID and not a project
 
