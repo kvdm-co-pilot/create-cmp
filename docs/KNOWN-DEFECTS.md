@@ -268,6 +268,109 @@ depths.
 **Fires when:** an alias bin gains an entry-point guard, or any other realpath-sensitive line.
 *Logged 2026-09-14, review round 2 of `fix-flag-eats-target`.*
 
+### KD-22 — KD-10's guard already existed, so the test that closed it is a duplicate 41 lines below its twin
+
+`test/profile-contract.test.mjs`
+
+The new `every menu field's recommended answer is one of the answers it offers` asserts
+`options.includes(default)` over `MENU_FIELDS`. `a field with options names a default, and the
+default is one of them` (line 63, predates the merge-base) asserts the same thing plus
+`options.length >= 2` and `default` truthy, over `CONTRACT_PATHS.filter(e => e.options)` —
+**measured the same two paths**, `["ladder.l2Execution","ladder.l3Execution"]`. The new test's
+only other assertion, `Array.isArray(options) && options.length > 0`, is tautological: that
+predicate is how `MENU_FIELDS` is derived. Executed on the merge-base `a142be1`: the new test
+passes there, so it gates nothing that was not already gated.
+
+Consequence for the record, not just the suite: the Closed entry below says KD-10 was closed by
+this change ("a menu default that is not one of its own options is refused at authoring time").
+It was refused at authoring time before this change too. Nothing is wrongly served — the
+invariant is held twice — but a second spelling of one assertion is the thing that drifts in one
+of them, and a closure line names an act the change did not perform.
+
+**Fires when:** someone changes one of the two and not the other, and the suite stays green.
+*Logged 2026-09-14, review round 1 of `interview-decisions`.*
+
+### KD-23 — the charter stopped claiming to be an index in its header, and still requires it of itself in §6 and §7
+
+`docs/DOCUMENTATION.md` §6.2, §7
+
+The new header says it is "NOT, since 2026-09-14: an index" and that "a curated list can be
+honestly incomplete". Two sections below, unchanged: §6.2 tracks "**This charter's own
+currency** — `docs/DOCUMENTATION.md` drifts whenever a doc is added, moved, or superseded
+without updating this map", and §7's **New doc** rule still says "add it to the map in §2/§3 in
+the same PR. A doc not in this charter's map is a doc nobody will find." Those are the
+exhaustiveness obligation the header renounced, stated as a rule to future contributors — which
+is how the claim got thirty-five entries stale the first time.
+
+Not adopter-facing (this doc is repo-internal), and the header is the half that a reader meets
+first. Logged rather than blocked, as the instance/class split: the header was the instance, the
+three places that assert exhaustiveness are the class, and two of them still do.
+
+**Fires when:** the next contributor follows §7 and re-grows an index nothing enforces.
+*Logged 2026-09-14, review round 1 of `interview-decisions`.*
+
+### KD-24 — `--yes` is refused by one door of `harness init` and accepted-and-ignored by the other
+
+`packages/harness/install/args.mjs` vs `src/lib/args.mjs`, for the one shared installer
+
+Executed on `cfddc58`, same command, same flag, same tree:
+
+```
+$ prooflane init ./p --dry-run --no-interview --yes
+  ✗ prooflane: --yes is not a flag this command knows … Nothing was written.     (exit 2)
+$ create-cmp harness init ./p --dry-run --no-interview --yes
+  … ladder   not asked (--no-interview) … ! --dry-run: nothing was written.      (exit 0)
+```
+
+`yes`/`y` left `packages/harness/install/args.mjs` with this change and stay in `src/lib/args.mjs`,
+where `harden`, `attach`, `doctor`, `clean`, `upgrade` and `create` genuinely read them — so the
+create-cmp door cannot drop them, and `harness init` is the one command there for which they now
+mean nothing. `prooflane.mjs`'s own header states the property this crosses: "Two front doors, one
+behaviour." The class is pre-existing and wider than `--yes` (`--force`, `--minimal`, `--fix` are
+accepted-and-ignored by `create-cmp harness init` today); `--yes` is the newest member.
+
+Not blocked: no published package ever gave `--yes` a meaning here — `create-cmp-cli 0.25.0` and
+`prooflane-harness 0.21.1` both shipped 2026-09-09, `flags.yes` entered `install/init.mjs` with the
+interview on the 12th (`47943de`), and neither published `--help` named it. An adopter typing it at
+the create-cmp door is told nothing, not told something false.
+
+**Worth doing with KD-4 and KD-14** — all three are drift between the two front doors, and one
+slice should close them together. A per-COMMAND known-flag set, rather than a per-door one, is
+what would make the class unreachable.
+*Logged 2026-09-14, review round 1 of `interview-decisions`.*
+
+### KD-25 — an interrupt that printed nothing at all would pass the suite, and two test files still describe the old decision
+
+`test/a-session-cut-short-is-reported-as-one-that-finished.test.mjs`,
+`test/an-interrupt-still-installs.test.mjs`, `packages/harness/install/interview.mjs`
+
+The edited gate is real — executed on the merge-base it fails with `an interrupted install
+reported success (exit 0)` — and its new assertion (non-zero exit, empty tree) is strictly
+stronger about the TREE. What it stopped asserting for that one ending is the property the file
+is named for: that the ending is told apart *in what the command prints*. `init` does print
+"interrupted — nothing was written", and nothing refuses its absence; a change that exits 1
+silently is green in every test here. Pinning the wording is what the author deliberately
+declined, so this is a gap without an obvious cheap repair, and no adopter is wrongly served
+today.
+
+Three prose claims around it now read backwards, all of them in files this change touched:
+the gate's header and its failure message still say "whether an interrupted install should still
+write is a separate, open question (docs/KNOWN-DEFECTS.md KD-9) and this test takes no position
+on it" — it takes exactly that position now, and KD-9 is Closed below; `interview.mjs`'s SIGINT
+comment still defers the same decision to KD-9; and the new file is named
+`an-interrupt-still-installs.test.mjs` under the header "^C AT A LADDER QUESTION STILL WRITES THE
+WHOLE HARNESS", which is the defect it was written against and the opposite of what the tree now
+does. That file's stated CONTROL ("a session that answers, and one that skips every question,
+must still install") is asserted only against `askLadderMenu`'s return value; the install half of
+the control lives in the gate above and in `test/prooflane-bin.test.mjs`.
+
+One dead branch rides along: `interview.mjs` sets `const held = null` and still threads `held`
+through `renderField`, `askOne` and `explain`, so `(currently: …)` and the `declared` line can no
+longer render.
+
+**Fires when:** someone makes the interrupt path quieter, or reads either file's header for what
+the product does. *Logged 2026-09-14, review round 1 of `interview-decisions`.*
+
 ---
 
 ## Closed
@@ -280,8 +383,11 @@ it.*
 CLI, and never reached a user — 0.25.0 shipped three days before the interview merged).
 `askLadderMenu({current})` deleted with both sentences claiming `upgrade` asks. **`^C` abandons
 the install** — every question is asked before a byte is written, so honouring it costs nothing,
-and a person who pressed stop and found 52 files had been ignored. A menu default that is not one
-of its own options is refused at authoring time. And `ladderSummary` stopped telling a person to
+and a person who pressed stop and found 52 files had been ignored. A menu default that is not one of its own
+options was ALREADY gated — `a field with options names a default, and the default is one of
+them` has asserted it since before this branch, and the duplicate I added claiming to close
+KD-10 was removed rather than kept (KD-22). KD-10 is closed because it was never live, not
+because this change fixed it. And `ladderSummary` stopped telling a person to
 uncomment a seeded ladder in a file this command never wrote.
 
 ### KD-11 — the doc charter claimed to be exhaustive — **CLOSED 2026-09-14, Karel's call**

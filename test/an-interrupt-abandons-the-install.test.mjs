@@ -1,6 +1,9 @@
-// ^C AT A LADDER QUESTION STILL WRITES THE WHOLE HARNESS.
+// ^C AT A LADDER QUESTION ABANDONS THE INSTALL.
 //
-// Karel's decision, 2026-09-14: an interrupt abandons the install. The interview
+// Karel's decision, 2026-09-14. It was named for the DEFECT while it was one —
+// "still writes the whole harness" — and renamed once the tree stopped doing
+// that, because a file named for a behaviour the tree no longer has tells the
+// next reader the opposite of what is true. The interview
 // runs BEFORE a single byte is written — that is the design, stated in
 // install/init.mjs's own header — so honouring the interrupt costs nothing, and
 // a person who pressed ^C and then finds fifty-two files has been ignored.

@@ -205,9 +205,12 @@ Tracked here so the charter never claims more than the repo delivers:
 1. **SD4 living-doc report** — the evidence receipt exists and is clause-keyed; a
    spec-organized human-readable report (the test report reads as the spec, pass/fail per
    clause) has not shipped as its own artifact.
-2. **This charter's own currency** — `docs/DOCUMENTATION.md` drifts whenever a doc is added,
-   moved, or superseded without updating this map (§7 exists precisely to prevent that). The
-   2026-07-06→2026-08-20 gap that preceded this rebuild is the cautionary example.
+2. **This charter's own currency** — the READING ORDER below drifts whenever a load-bearing
+   doc is added, moved, or superseded without updating it (§7 exists to prevent that). It is
+   not an index and no longer claims to be one: it claimed that until 2026-09-14 and was
+   thirty-five entries stale, because nothing opened it to check (KD-11). The
+   2026-07-06→2026-08-20 gap that preceded the rebuild is the cautionary example, and the
+   stale claim is the sharper one — a gap is visible, a false promise of completeness is not.
 
 Closed (kept one release for the record, then prune):
 
@@ -234,8 +237,10 @@ Closed (kept one release for the record, then prune):
   then tests citing the id, then code. Never the reverse.
 - **New significant decision** → ADR (copy `docs/adr/template.md`), numbered next in
   sequence. If it changes behavior, the spec clause cites the ADR.
-- **New doc** → pick its universe (§1) and its type (§4), add it to the map in §2/§3 in
-  the same PR. A doc not in this charter's map is a doc nobody will find.
+- **New doc** → pick its universe (§1) and its type (§4), and if it is LOAD-BEARING add it to
+  §2/§3 in the same PR. A doc absent from here is not thereby unfindable: `git ls-files docs/`
+  is the index, and NORTH-STAR §12 is the precedence table. This is a reading order, and the
+  bar for entry is whether a newcomer needs it to understand the others.
 - **New industry standard adopted/adapted/rejected** → add a row to §5 with the deviation
   rationale. The ledger is only useful if it stays complete.
 - **Completed plan** → graduate durable content to reference docs/specs; log the

@@ -89,10 +89,10 @@ const EXPLAIN_WORD = "?";
  * @param {boolean} [opts.interactive] whether a human is there to answer. The
  *   caller decides this — it owns the flags and the TTY check, and the streams
  *   here are injected precisely so a test can drive a real interview.
- * @param {Record<string,string>} [opts.current] answers already on record,
- *   keyed by bare field name. Offered back, and kept by Enter.
- * @returns {Promise<{asked: boolean, answers: Record<string,string>, why: string}>}
- *   `answers` is keyed by BARE field name.
+ * @returns {Promise<{asked: boolean, answers: Record<string,string>, why: string,
+ *   interrupted: boolean}>} `answers` is keyed by BARE field name. `why` is the
+ *   sentence for the human; `interrupted` is the fact for the CALLER, which
+ *   decides whether to write fifty-two files and cannot be asked to read prose.
  */
 export async function askLadderMenu({ input, output, interactive } = {}) {
   const paths = MENU_FIELDS.filter((p) => p.startsWith(LADDER));
@@ -123,9 +123,10 @@ export async function askLadderMenu({ input, output, interactive } = {}) {
   // on keeping apart facts about who was present; this is one of them.
   //
   // The reason rides on the abort, because the first abort wins and `askOne`
-  // already holds the signal. What the CALLER then does with an interrupt —
-  // install anyway, as `--no-interview` does, or stop — is a product decision
-  // and is deliberately not taken here (docs/KNOWN-DEFECTS.md KD-9).
+  // already holds the signal. What the CALLER does with it was Karel's decision
+  // on 2026-09-14 and is taken: an interrupt ABANDONS the install, because every
+  // question is asked before a byte is written, so honouring it costs nothing.
+  // `--no-interview` still installs — asking to skip is not saying stop.
   const ended = new AbortController();
   rl.on("SIGINT", () => {
     ended.abort("interrupted");
@@ -152,17 +153,16 @@ export async function askLadderMenu({ input, output, interactive } = {}) {
       // An answer already on record is only offered back when the contract
       // still offers it. A stale one kept by Enter would be recorded verbatim
       // and refused by the loader — the caller's data, our refusal.
-      // Nothing is ever offered back, because nothing calls this with answers
-      // on record. `upgrade` leaves qa/lib/profiles/<id>/** untouched by design,
-      // so an interview there would ask a question it could not act on — the
-      // `current` parameter and the two sentences claiming `upgrade` asks were
-      // removed on 2026-09-14 rather than kept for a caller that was never
-      // coming (KD-2, Karel's call).
-      const held = null;
-      const fallback = held ?? spec.default;
+      // NOTHING IS EVER OFFERED BACK. `upgrade` leaves qa/lib/profiles/<id>/**
+      // untouched by design, so an interview there would ask a question it could
+      // not act on — the `current` parameter and the two sentences claiming
+      // `upgrade` asks were removed on 2026-09-14 (KD-2, Karel's call), and the
+      // `held` value threaded through three functions went with them rather than
+      // staying as a `null` that no branch could ever be true for.
+      const fallback = spec.default;
 
-      write(renderField(path, spec, held));
-      const outcome = await askOne({ rl, signal: ended.signal, write, path, spec, fallback, held });
+      write(renderField(path, spec));
+      const outcome = await askOne({ rl, signal: ended.signal, write, path, spec, fallback });
 
       if (outcome.kind === "interrupted") {
         interrupted = true;
@@ -218,7 +218,7 @@ export async function askLadderMenu({ input, output, interactive } = {}) {
  * two keys, and an author who runs `node qa/profile.mjs explain` should not meet
  * a second convention for the same fact.
  */
-function renderField(path, spec, held) {
+function renderField(path, spec) {
   const lines = [
     "",
     `  ${colors.bold(spec.question)}`,
@@ -227,7 +227,6 @@ function renderField(path, spec, held) {
     ...spec.options.map((o, i) => `    ${o === spec.default ? "*" : " "} ${i + 1}  ${o}`),
     `      ${colors.dim("(* recommended)")}`,
   ];
-  if (held) lines.push(`      ${colors.dim(`(currently: ${JSON.stringify(held)})`)}`);
   return lines.join("\n") + "\n";
 }
 
@@ -246,7 +245,7 @@ function promptFor(spec, fallback) {
  * the input closed underneath us — three outcomes, because "no answer" and "no
  * more input" are different facts about who was there.
  */
-async function askOne({ rl, signal, write, path, spec, fallback, held }) {
+async function askOne({ rl, signal, write, path, spec, fallback }) {
   for (let read = 0; read < MAX_READS_PER_FIELD; read += 1) {
     let raw;
     try {
@@ -264,12 +263,11 @@ async function askOne({ rl, signal, write, path, spec, fallback, held }) {
     if (SKIP_WORDS.includes(typed.toLowerCase())) return { kind: "skip" };
     if (typed === EXPLAIN_WORD) {
       // The contract's own explanation, rendered by the same function `node
-      // qa/profile.mjs explain` calls. `declared` is the key that function
-      // reads, and it is handed over ONLY when something is on record: it
-      // prints `THIS PROJECT DECLARES: <value>`, and passing null would print
-      // that line reading "null" at a person who has simply never been asked.
-      // No answer, no line.
-      write(`\n${indent(explain(path, held ? { declared: held } : {}))}\n\n`);
+      // qa/profile.mjs explain` calls. Nothing is on record — this interview
+      // is never handed existing answers — so `declared` is never passed, and
+      // the `THIS PROJECT DECLARES:` line it controls never renders here. It
+      // would print "null" at a person who has simply never been asked.
+      write(`\n${indent(explain(path))}\n\n`);
       continue;
     }
     const n = Number(typed);
