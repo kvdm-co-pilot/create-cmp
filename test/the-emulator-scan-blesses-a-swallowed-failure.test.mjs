@@ -6,19 +6,27 @@
 // whole of what is held. A gate that is the only gate has to refuse the DEFECT,
 // not one spelling of it.
 //
-// It refuses one spelling. Measured by this file, on the tree that added it:
+// It refuses the spellings it has been shown. Measured by this file, twice:
 //
-//   RED    runCatching restored                 <- the spelling that shipped
-//   RED    the build gate deleted               <- the iOS defect
-//   GREEN  catch (cause: Throwable) { }         <- the same swallow, one word over
-//   GREEN  catch (cause: Throwable) { log(…) }  <- likewise
-//   GREEN  configureFirebaseEmulators() never called
+//   b549f3b  RED    runCatching restored                 <- the spelling that shipped
+//   b549f3b  RED    the build gate deleted               <- the iOS defect
+//   b549f3b  GREEN  catch (cause: Throwable) { }         <- the same swallow, one word over
+//   b549f3b  GREEN  catch (cause: Throwable) { log(…) }  <- likewise
+//   b549f3b  GREEN  configureFirebaseEmulators() never called
+//   79eafd3  GREEN  a rethrowing catch, and a SECOND catch that discards
 //
-// The first two are the instance the author had in front of them. The last
-// three are the class, and the class is what is actually wrong: `runCatching`
-// was never the defect, DISCARDING THE FAILURE was, and an empty catch discards
-// it identically while satisfying the scan's `/\bcatch\s*\(/` as "a failure path
-// exists". A refusal nothing calls is not a refusal at all.
+// `runCatching` was never the defect; DISCARDING THE FAILURE was, and an empty
+// catch discards it identically while satisfying "a failure path exists". A
+// refusal nothing calls is not a refusal at all. Those five closed in 79eafd3 —
+// the catch must now rethrow, and the call site is asserted.
+//
+// THE SIXTH IS THE SAME SHAPE AGAIN, one construct further out. Kotlin chains
+// catches; the scan reads the first one and stops. So the leading catch this
+// repo's own ARCH-08 teaches — `catch (e: CancellationException) { throw e }` —
+// supplies the `throw` the scan looks for, and a broad catch behind it discards
+// every real failure, green. The convention the codebase pushes an author
+// toward is the one that walks past the guard, which is why this is the likely
+// shape and not the exotic one. The invariant is EVERY catch, not the first.
 //
 // WHY A MUTATION TEST AND NOT A STRONGER SCAN. The template's Kotlin is correct
 // today: it is gated, it throws, and it is called. So an invariant asserted
@@ -72,6 +80,36 @@ function withCatchBody(raw, replacement) {
   const close = matchBracket(masked, open);
   assert.notEqual(close, -1, "the catch block has no closing brace");
   return `${raw.slice(0, open + 1)}\n${replacement}\n    ${raw.slice(close)}`;
+}
+
+/**
+ * A FIRST catch that rethrows, and the existing one emptied behind it.
+ *
+ * Kotlin allows a chain of catches, and this repo's own ARCH-08 teaches the
+ * leading one: `catch (e: CancellationException) { throw e }` before the broad
+ * one. An author who follows that convention here writes a rethrow the scan
+ * finds and a swallow it never reaches.
+ */
+function withSwallowingSecondCatch(raw) {
+  const masked = maskSource(raw);
+  const at = masked.indexOf("catch (");
+  assert.notEqual(at, -1, "the redirect no longer has a catch block — this mutation is aimed at nothing");
+  const open = masked.indexOf("{", masked.indexOf(")", at));
+  const close = matchBracket(masked, open);
+  assert.notEqual(close, -1, "the catch block has no closing brace");
+  const indent = /^[ \t]*/.exec(raw.slice(raw.lastIndexOf("\n", at) + 1))[0];
+  const inner = `${indent}    `;
+  const rethrowFirst =
+    "catch (cancel: kotlin.coroutines.cancellation.CancellationException) {\n" +
+    `${inner}throw cancel\n` +
+    `${indent}} `;
+  return (
+    raw.slice(0, at) +
+    rethrowFirst +
+    raw.slice(at, open + 1) +
+    `\n${inner}// swallowed\n${indent}` +
+    raw.slice(close)
+  );
 }
 
 /** The CALL, never the declaration: a call sits alone on its line, a declaration does not. */
@@ -194,6 +232,24 @@ const CASES = [
     android: unchanged,
     ios: withoutTheCall,
     why: "same, on the platform whose call site is a single line in initKoin()",
+  },
+  {
+    what: "android: a second catch, behind one that rethrows, discards everything else",
+    expect: "RED",
+    android: withSwallowingSecondCatch,
+    ios: unchanged,
+    why:
+      "the scan reads the FIRST catch and stops. Kotlin chains them, and the leading one this repo's own " +
+      "ARCH-08 teaches — `catch (e: CancellationException) { throw e }` — supplies the `throw` the scan " +
+      "looks for, while the broad catch behind it discards every real failure. The convention the codebase " +
+      "pushes an author toward is the one that walks past the guard",
+  },
+  {
+    what: "ios: a second catch, behind one that rethrows, discards everything else",
+    expect: "RED",
+    android: unchanged,
+    ios: withSwallowingSecondCatch,
+    why: "same shape, same reason — one catch checked out of however many are written",
   },
 ];
 
