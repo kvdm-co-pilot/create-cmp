@@ -119,7 +119,7 @@ you the same list without opening anything.
 | **KD-49** | a nested `node --test` exits 0 whatever its tests did, when `NODE_TEST_CONTEXT` is inherited | nothing in the suite spawns one except the harness that measured it, which scrubs the env |
 | **KD-50** | the template ships create-cmp's own changelog as source comments in the adopter's app | true prose, wrong repository |
 | **KD-51** | a JS masker reads the template's Kotlin; a raw string mis-parses and truncates the scanned body | it reds, not greens — the `useEmulator` tripwire catches the stub — and neither file has a raw string |
-| **KD-52** | the call-site assertion excludes the declaration twice, and one of the two clauses is inert | the live clause does the work; the tail cases cannot produce a false green |
+| **KD-52** | what the emulator scan's two token-level assertions do NOT decide | the inert clause is gone (`f474f17`); the rest is the floor of a shape scan, and no shape reaches it |
 
 ---
 
@@ -719,17 +719,19 @@ not a shipped defect. Neither Kotlin file contains a raw string, a nested commen
 identifier today. *Logged 2026-09-15, review of `b549f3b`.*
 
 
-### KD-52 — the call-site assertion excludes the declaration with one live clause and one dead one
+### KD-52 — the floor of the emulator scan: what its two token assertions do not decide
 
-`test/the-emulator-redirect-cannot-fail-quietly.test.mjs` ("the refusal is actually CALLED")
+`test/the-emulator-redirect-cannot-fail-quietly.test.mjs`
 
-`calls.some((at) => at !== declaration && !src.slice(at - 4, at).includes("fun "))`. **`at !==
-declaration` can never be false**: `declaration` is the index of `fun`, every match index is that
-plus four — executed on both files, `2144` vs `2148` and `1620` vs `1624`. The whole exclusion rests
-on the four-character lookbehind, and that half works. Two spellings of one intent, one of them
-inert.
+**The one defect here is fixed.** `calls.some((at) => at !== declaration && …)` carried a clause
+that can never be false — `declaration` indexes `fun`, every match indexes that plus four, measured
+`2144` vs `2148` and `1620` vs `1624` — so the four-character lookbehind was doing the whole job
+while a second spelling of the same intent sat inside a guard about second spellings. Removed in
+`f474f17`. The rest of this entry is not a defect list; it is **the boundary of what a token-level
+scan of Kotlin source can decide**, recorded once so the next round does not rediscover it as a
+finding. Every item is measured, and none is a false GREEN a plausible edit would reach.
 
-Three more, all attacked and none of them a false GREEN on its own:
+The call-site assertion:
 
 - **Presence is not reachability.** Move the call into a `private fun unusedSetup()` that nothing
   invokes and the assertion passes — the refusal still never runs. The realistic form of this defect
@@ -744,7 +746,23 @@ Three more, all attacked and none of them a false GREEN on its own:
   `configureFirebaseEmulators( )` are real calls the `\bname\(\)` regex does not match. Nobody
   writes the second; the first is idiomatic Kotlin but not plausible at this call site.
 
-*Logged 2026-09-15, review of `79eafd3`.*
+The rethrow assertion, now that `f474f17` applies it to EVERY catch rather than the first — it asks
+for `\bthrow\b` somewhere in the catch body, and two shapes satisfy that without refusing anything.
+Both measured GREEN against `f474f17`:
+
+- `catch (cause: Throwable) { if (cause is X) throw cause }` — a conditional rethrow swallows
+  everything the condition does not name.
+- `catch (cause: Throwable) { val giveUp = { throw … } }` — a `throw` inside a lambda nobody
+  invokes.
+
+**Neither is where the multi-catch hole was, and that distinction is the whole reason this is logged
+rather than fixed.** The multi-catch shape is the one `ARCH-08` and `template/CLAUDE.md` actively
+teach, so an author following the house rules writes it; these two are shapes nobody writes — there
+is no condition to branch on in a four-line redirect, and an uninvoked throwing lambda is not a
+thing. Closing them needs flow analysis, which is a parser, which is a dependency this repo has
+decided not to grow for a lint (`test/helpers/js-source-scan.mjs`, header). *Logged 2026-09-15
+(review of `79eafd3`), re-placed 2026-09-15 after `f474f17` removed the inert clause and widened the
+rethrow assertion.*
 
 
 ## Closed
