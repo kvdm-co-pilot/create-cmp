@@ -59,6 +59,9 @@ export const KNOWN_FLAGS = new Set([
   "e2e", "appium", "inspector", "dev-client",
   // the harness subcommand, which shares an installer with prooflane
   "harness", "profile", "dry-run", "dry-run-verify", "new-profile", "no-interview",
+  // takes a VALUE (the manifest path) — never a boolean, see args.mjs in the
+  // harness package for why that distinction is load-bearing
+  "fleet",
 ]);
 
 /**

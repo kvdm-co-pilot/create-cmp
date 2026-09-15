@@ -188,6 +188,37 @@ now carry, and where it came from), re-takes the lock, and leaves your profile a
 declarations untouched. Run `node qa/framework-check.mjs` afterwards — the lane changed, so
 prove it still refuses — then commit the lane, the lock and the provenance record together.
 
+#### A fleet of repos
+
+Hold more than a couple of repos and the thing you need is not the ability to type that command
+ten times — you have a shell. It is that the ten upgrades come from **one** resolved harness, so
+the fleet ends up on one version instead of on whatever each directory's `node_modules` happened
+to hold. A shell loop cannot promise that; one process can.
+
+Declare the fleet in a file you write, and name each repo by a path:
+
+```json
+{
+  "schema": "prooflane-fleet/1",
+  "repos": [
+    { "id": "cart-service", "path": "../cart-service" },
+    { "id": "web-bff",      "path": "../web-bff" }
+  ]
+}
+```
+
+```
+npx prooflane upgrade --fleet ./fleet.json
+```
+
+Paths resolve against **the manifest**, never your cwd, so the file can be committed and still
+mean the same thing from anywhere. Every repo runs even after one fails — stopping at the first
+would report one problem when there are three and leave the fleet half-upgraded either way — and
+the command exits non-zero if any did. `--dry-run` works the same, for the whole fleet.
+
+A repo named by `url` rather than `path` is refused: an upgrade writes to a working tree, and
+this command will not put a clone on your disk at a path it chose for you.
+
 It re-hashes the region and rewrites `qa/harness.lock.json`, **only** when every difference is
 a file you own (`qa/lib/profiles/<id>/**`, `qa/verified-surface.json`, `qa/harness-manifest.json`).
 A machine-owned file among them and it refuses by name: that is a fork, and `create-cmp upgrade

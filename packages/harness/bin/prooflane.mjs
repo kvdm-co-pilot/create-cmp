@@ -40,7 +40,9 @@ function usage() {
     `  ${colors.bold("Commands")}\n` +
     `    prooflane init [dir]      install the lane, then prove it refuses\n` +
     `    prooflane relock [dir]    re-take the lock after editing YOUR profile or declarations\n` +
-    `    prooflane upgrade [dir]   re-vendor the lane from the installed harness, then re-lock\n\n` +
+    `    prooflane upgrade [dir]   re-vendor the lane from the installed harness, then re-lock\n` +
+    `    prooflane upgrade --fleet <manifest>\n` +
+    `                              the same, for every repo a fleet manifest names\n\n` +
     `  ${colors.bold("Flags")}\n` +
     `    --profile <id>            the profile id to write (default: the directory name)\n` +
     `    --target-dir <dir>        the project to install into (default: .)\n` +
@@ -107,6 +109,10 @@ async function main() {
     return await runHarnessRelock(flags, positionals[1], { invocation: "prooflane" });
   }
   if (command === "upgrade") {
+    if ("fleet" in flags) {
+      const { runFleetUpgrade } = await import("../install/fleet.mjs");
+      return await runFleetUpgrade(flags, positionals[1], { invocation: "prooflane" });
+    }
     const { runHarnessUpgrade } = await import("../install/upgrade.mjs");
     return await runHarnessUpgrade(flags, positionals[1], { invocation: "prooflane" });
   }
@@ -115,7 +121,8 @@ async function main() {
   process.stdout.write(
     `  usage: prooflane init    [dir] [--profile <id>] [--dry-run] [--no-interview]\n` +
       `         prooflane relock  [dir] [--dry-run]\n` +
-      `         prooflane upgrade [dir] [--dry-run]\n\n`
+      `         prooflane upgrade [dir] [--dry-run]\n` +
+      `         prooflane upgrade --fleet <manifest> [--dry-run]\n\n`
   );
   return 2;
 }

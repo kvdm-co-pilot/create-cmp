@@ -50,6 +50,11 @@ export const KNOWN_FLAGS = new Set([
   "help", "h", "version", "v",
   "profile", "target-dir",
   "dry-run", "new-profile", "no-interview",
+  // `--fleet <manifest>` takes a VALUE, so it is known here and deliberately
+  // absent from BOOLEAN_FLAGS — declaring it boolean would make
+  // `upgrade --fleet ./fleet.json` mean "upgrade the fleet" plus a positional
+  // directory called ./fleet.json, which is the KD-16 shape exactly.
+  "fleet",
 ]);
 
 /**
