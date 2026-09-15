@@ -113,6 +113,12 @@ you the same list without opening anything.
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 | **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
 | **KD-45** | no gate in this repo executes the template's Firebase or iOS paths | the device tier stamps `--no-ios --no-firebase`; shape is scanned, runtime is not |
+| **KD-46** | the iOS refusal names two causes its `catch` cannot see, and throws away the one it can | Obj-C raises abort the process before any Kotlin frame; the app stops either way |
+| **KD-47** | the four emulator ports are spelled in `build.gradle.kts` and again in `KoinHelper.kt` | they agree today, and no `firebase.json` ships to be a third |
+| **KD-48** | `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin | the shipped Xcode project has only `Debug`/`Release`, which map correctly |
+| **KD-49** | a nested `node --test` exits 0 whatever its tests did, when `NODE_TEST_CONTEXT` is inherited | nothing in the suite spawns one except the harness that measured it, which scrubs the env |
+| **KD-50** | the template ships create-cmp's own changelog as source comments in the adopter's app | true prose, wrong repository |
+| **KD-51** | a JS masker reads the template's Kotlin; a raw string mis-parses and truncates the scanned body | it reds, not greens — the `useEmulator` tripwire catches the stub — and neither file has a raw string |
 
 ---
 
@@ -611,6 +617,86 @@ local | ci | nightly | release), so the seam exists and nothing here needs inven
 **Fires when:** any defect in the template's Firebase or iOS code. It cannot be caught by this
 repo's own evidence, only by an adopter. *Logged 2026-09-15, found while fixing the emulator
 redirect.*
+
+### KD-46 — the iOS refusal names two causes its catch cannot see
+
+`template/composeApp/src/iosMain/kotlin/com/example/app/KoinHelper.kt`
+
+The catch tells the reader to "check that FirebaseApp.configure() ran first" and that "no Firebase
+client was used before initKoin()". Both of those fail inside the Firebase iOS SDK as an
+Objective-C raise or a Swift `fatalError` — neither of which a Kotlin/Native `catch (cause:
+Throwable)` frame can intercept; the process aborts before the catch exists. The failures it CAN
+catch are Kotlin ones from the GitLive bindings, which are not the two it names. And what it does
+with the one it catches is `error(msg)`, which builds an `IllegalStateException` with **no cause**:
+the original stack is dropped and the message interpolates `cause.message`, which is null for a
+great many bridged throwables — so the crash an adopter reads can say `Cause: null` and nothing
+else. Not blocking: the app stops in every one of these cases, which is what the refusal is for,
+and the diagnosis is lost rather than wrong. *Logged 2026-09-15, review of `b549f3b`.*
+
+### KD-47 — the emulator ports are spelled twice, and declared nowhere
+
+`template/composeApp/build.gradle.kts` (debug `buildConfigField`) · `.../iosMain/.../KoinHelper.kt`
+
+9099 / 8080 / 5001 / 9199 appear as Android BuildConfig fields and again as integer literals in the
+iOS redirect. There is no `firebase.json` in the template, so nothing declares them once and the
+Firebase CLI defaults are the only thing keeping the two copies honest. An adopter who moves a port
+moves it on one platform. Measured today: both copies agree, and the host legitimately differs
+(`10.0.2.2` is the Android emulator's host alias, `127.0.0.1` the simulator's), so this is one fact
+with two spellings and no drift yet. *Logged 2026-09-15, review of `b549f3b`.*
+
+### KD-48 — `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin
+
+`template/composeApp/src/iosMain/kotlin/com/example/app/KoinHelper.kt`
+
+The comment calls it "the Kotlin/Native equivalent of the Android flag". It is not equivalent in two
+ways. It is not an opt-out — an adopter can set `USE_FIREBASE_EMULATORS=false` and debug against a
+real staging project on Android, and has no iOS lever at all. And it reports the Kotlin/Native build
+type, which the Kotlin Gradle plugin derives from Xcode's `$CONFIGURATION` **by name**: a
+configuration called `Staging` or `QA` is not `Debug`, so it builds a release framework and the
+emulators go quietly off in the build that wanted them. Cannot fire as shipped — `iosApp/project.yml`
+declares no configuration beyond XcodeGen's `Debug`/`Release`. *Logged 2026-09-15, review of `b549f3b`.*
+
+### KD-49 — a nested `node --test` cannot fail
+
+Node's test runner sets `NODE_TEST_CONTEXT` in every file it spawns. A `node --test` started from
+inside one inherits it, reports through the parent protocol, and **exits 0 whatever its tests did**.
+Measured on Node 24 against one deliberately failing file: exit 1 from a clean env, exit 0 with
+`NODE_TEST_CONTEXT=child-v8` set. The first draft of
+`test/the-emulator-scan-blesses-a-swallowed-failure.test.mjs` read that 0 and pronounced six planted
+defects refused. Nothing else in the suite spawns a nested runner today, and that harness now scrubs
+the env and reads TAP counts instead of the exit code — but the trap is invisible, the symptom is a
+gate that is always green, and the next person to reach for `execFileSync(node, ["--test", …])`
+inside a test will hit it. *Logged 2026-09-15, review of `b549f3b`.*
+
+### KD-50 — the template ships create-cmp's changelog as the adopter's source comments
+
+`.../iosMain/.../KoinHelper.kt` · `.../androidMain/.../AppApplication.kt`
+
+"TWO DEFECTS LIVED HERE, and the comment above described neither" and "This was `runCatching { … }`
+with the Result discarded" are stamped verbatim into every `--firebase` scaffold. They are true, and
+they are about create-cmp's history, not the adopter's app — a reader of their own repo is told about
+a bug that was never in it. The invariant the comments are protecting (do not re-wrap this in
+something that discards the failure) is worth stating; the archaeology belongs in create-cmp's
+CHANGELOG. Taste call, nobody wrongly served. *Logged 2026-09-15, review of `b549f3b`.*
+
+
+### KD-51 — the emulator scan masks Kotlin with a masker written for `.mjs`
+
+`test/the-emulator-redirect-cannot-fail-quietly.test.mjs` → `test/helpers/js-source-scan.mjs`
+
+`maskSource` handles `//`, `/* */` and `"…"`, which is what the scan reads — and Kotlin agrees with
+JavaScript on all three. It does not agree on raw strings. Executed: insert the perfectly valid
+`val hint = """try: firebase emulators:start" }"""` before the redirect and the masker leaves that
+`}` live, so the brace matcher closes the function 253 characters in and the scan reads a stub.
+Kotlin also has nested block comments (JavaScript has none) and backtick identifiers (JavaScript
+reads a backtick as a template literal).
+
+**It fails toward red, which is the survivable direction, and that is not luck** — the scan asserts
+`body.includes("useEmulator")` before judging, so a truncated body is refused as "aimed at nothing"
+rather than blessed as clean. The message then blames the wrong thing, which costs a reader minutes,
+not a shipped defect. Neither Kotlin file contains a raw string, a nested comment or a backtick
+identifier today. *Logged 2026-09-15, review of `b549f3b`.*
+
 
 ## Closed
 

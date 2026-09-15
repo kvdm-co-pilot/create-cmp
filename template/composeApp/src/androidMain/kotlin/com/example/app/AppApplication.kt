@@ -79,12 +79,16 @@ class AppApplication : Application() {
                 .useEmulator(host, BuildConfig.FIREBASE_FUNCTIONS_PORT)
             Firebase.storage.useEmulator(host, BuildConfig.FIREBASE_STORAGE_PORT)
         } catch (cause: Throwable) {
-            error(
+            // `throw IllegalStateException(msg, cause)`, never `error(msg)`: error()
+            // takes no cause, so the underlying stack — the only thing that says
+            // WHICH of the four calls failed and why — is dropped and the crash
+            // reads `Cause: null`.
+            throw IllegalStateException(
                 "Firebase emulator redirect to $host FAILED, and this build asked for emulators " +
                     "(USE_FIREBASE_EMULATORS=true). Refusing to start: continuing would authenticate and " +
                     "write against the real project in google-services.json. Usual cause: a Firebase client " +
-                    "was already used before this ran, so useEmulator can no longer take effect. " +
-                    "Cause: ${cause.message}"
+                    "was already used before this ran, so useEmulator can no longer take effect.",
+                cause,
             )
         }
     }
