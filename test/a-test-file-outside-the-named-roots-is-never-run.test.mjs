@@ -8,22 +8,35 @@
 // test. The reverse is worse and silent: a worktree whose tests all pass adds
 // green rows to a number nobody audits.
 //
-// So the script names its roots. That trade has its own failure mode, and it is
-// the dangerous direction: a root that is misspelled, or a test file written
-// somewhere no root covers, is not an error — it is a smaller suite that still
-// says PASS. This file is what makes that loud.
+// So the script names the patterns it runs. That trade has its own failure mode,
+// and it is the dangerous direction: a pattern that matches nothing, or a test
+// written where no pattern reaches, is not an error — it is a smaller suite that
+// still says PASS. This file is what makes that loud.
 //
 // BOTH DIRECTIONS, because each is a different lie:
 //
-//   a file no root covers     the suite silently shrinks; a test that was
-//                             written, reviewed and committed never runs, and
-//                             nothing says so
-//   a root covering nothing   a typo'd path contributes zero files and looks
-//                             exactly like a path whose tests all pass
+//   a file no pattern matches    the suite silently shrinks; a test that was
+//                                written, reviewed and committed never runs,
+//                                and nothing says so
+//   a pattern matching nothing   contributes zero files and looks exactly like
+//                                a pattern whose tests all pass
 //
-// The roots are read from `package.json` rather than repeated here. A constant
-// in this file would be a second declaration of the same fact, and the two
-// would drift — which is the defect class, not a guard against it.
+// IT ASKS THE GLOBBER, NOT THE PREFIX. The first version derived a root as the
+// substring before the first `*` and compared with `startsWith`, which is
+// containment, not matching — so every narrowing AFTER the root was invisible.
+// Review measured it: declaring `test/**\/nope*` for all three patterns ran the
+// suite to ZERO tests, exit 0, with all three assertions passing. `node --test`
+// never complains about a pattern matching nothing.
+//
+// That is the shape a peer session named the same day, having paid for it in a
+// Gradle task that existed, ran, compiled nothing and exited 0: **a guard
+// written against ABSENCE does not catch VACUITY.** A missing pattern was always
+// caught. Present-and-matching-nothing is the one that got through, and from
+// outside it is identical to a property that holds.
+//
+// The patterns are read from `package.json` rather than repeated here. A
+// constant in this file would be a second declaration of the same fact, and the
+// two would drift — which is the defect class, not a guard against it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -50,39 +63,86 @@ function trackedTestFiles() {
     .filter(Boolean);
 }
 
-/** `test/**\/*.test.mjs` → `test/` — the directory a pattern draws from. */
-const rootOf = (pattern) => pattern.slice(0, pattern.indexOf("*"));
+/**
+ * Does this glob match this path? Hand-rolled, and here is why.
+ *
+ * `fs.globSync` is the obvious answer and it is Node 22+; this repo's floor is
+ * 20.19 and `test/node-floor.test.mjs` refuses a newer API by name — correctly,
+ * and it caught this within a minute of being written. Raising the floor to
+ * satisfy a test would be the gate-edited-into-agreement move.
+ *
+ * Matching the TRACKED set rather than the disk is the better answer anyway.
+ * "Which files should run" is a question about what is committed; a disk walk
+ * also sees scratch files, build output and anything a worktree left behind —
+ * which is the class of problem this whole file exists for.
+ *
+ * Two constructs, and no more: `**\/` spans any number of segments, `*` spans
+ * any characters within one. Everything else is literal. The translation is
+ * asserted below rather than trusted, because it is the mechanism deciding
+ * whether the suite is complete.
+ */
+function globMatches(pattern, rel) {
+  const SPAN = "\u0000";
+  const source = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\//g, SPAN)
+    .replace(/\*/g, "[^/]*")
+    .replace(new RegExp(SPAN, "g"), "(?:.*/)?");
+  return new RegExp(`^${source}$`).test(rel);
+}
 
-test("every test file this repo tracks is under a root `npm test` names", () => {
-  const roots = declaredPatterns().map(rootOf);
-  assert.ok(roots.length, "the test script names no patterns — it is globbing the whole tree again");
+test("the glob translation this guard rests on is correct", () => {
+  // The guard is only as good as this function, and it is the one piece here
+  // nobody else owns. A translation that matched everything would make both
+  // assertions below vacuous while they read as passing.
+  const cases = [
+    ["test/**/*.test.mjs", "test/a.test.mjs", true],
+    ["test/**/*.test.mjs", "test/sub/a.test.mjs", true],
+    ["test/**/*.test.mjs", "test/sub/deep/a.test.mjs", true],
+    ["test/*.test.mjs", "test/a.test.mjs", true],
+    ["test/*.test.mjs", "test/sub/a.test.mjs", false],
+    ["test/**/*.test.mjs", "other/a.test.mjs", false],
+    ["test/**/*.test.mjs", "test/a.mjs", false],
+    ["test/**/nope*.mjs", "test/a.test.mjs", false],
+    ["inspector/mcp/test/**/*.test.mjs", "inspector/mcp/test/x.test.mjs", true],
+    ["inspector/mcp/test/**/*.test.mjs", "inspector/mcp/other/x.test.mjs", false],
+    // `.` is a literal, not "any character" — or `test/x-test.mjs` would match
+    // a pattern written for `test/x.test.mjs`.
+    ["test/x.test.mjs", "test/xytest.mjs", false],
+  ];
+  for (const [pattern, rel, want] of cases) {
+    assert.equal(globMatches(pattern, rel), want, `${pattern} vs ${rel} should be ${want}`);
+  }
+});
 
-  const orphans = trackedTestFiles().filter((rel) => !roots.some((r) => rel.startsWith(r)));
+test("every test file this repo tracks is matched by a pattern `npm test` names", () => {
+  const patterns = declaredPatterns();
+  assert.ok(patterns.length, "the test script names no patterns — it is globbing the whole tree again");
+
+  const orphans = trackedTestFiles().filter((rel) => !patterns.some((p) => globMatches(p, rel)));
   assert.deepEqual(
     orphans,
     [],
-    `${orphans.length} committed test file(s) are not under any root \`npm test\` names, so they NEVER RUN ` +
+    `${orphans.length} committed test file(s) are matched by no pattern \`npm test\` names, so they NEVER RUN ` +
       `and the suite is green without them:\n    ${orphans.join("\n    ")}\n` +
-      `  roots: ${roots.join(", ")}\n` +
-      `  Either move the file under a named root, or add its root to the \`test\` script in package.json.`,
+      `  patterns: ${patterns.join(", ")}\n` +
+      `  Either move the file under a named pattern, or add its pattern to the \`test\` script in package.json.`,
   );
 });
 
-test("every root `npm test` names actually holds test files", () => {
-  // A misspelled root contributes nothing and is indistinguishable from a root
-  // whose tests all passed. The suite shrinks by however many files lived there.
-  const empty = declaredPatterns()
-    .map(rootOf)
-    .filter((r) => {
-      const abs = path.join(ROOT, r);
-      if (!fs.existsSync(abs)) return true;
-      return !trackedTestFiles().some((rel) => rel.startsWith(r));
-    });
+test("every pattern `npm test` names actually matches test files", () => {
+  // VACUITY, not absence — the distinction a peer session paid for today. A
+  // pattern that matches nothing is not an error to `node --test`; it is a
+  // smaller suite, or an empty one, reported as PASS. A missing root was always
+  // caught; present-and-matching-nothing is the one that got through.
+  const tracked = trackedTestFiles();
+  const empty = declaredPatterns().filter((p) => !tracked.some((rel) => globMatches(p, rel)));
   assert.deepEqual(
     empty,
     [],
-    `${empty.length} root(s) in the \`test\` script match no tracked test file: ${empty.join(", ")}. ` +
-      `A root that contributes nothing looks exactly like a root whose tests all pass.`,
+    `${empty.length} pattern(s) in the \`test\` script match no file: ${empty.join(", ")}. ` +
+      `\`node --test\` does not complain about a pattern matching nothing — it just runs fewer tests, ` +
+      `or none, and exits 0.`,
   );
 });
 
