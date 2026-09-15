@@ -102,7 +102,6 @@ you the same list without opening anything.
 | **KD-21** | `KNOWN_FLAGS` is hand-written where `BOOLEAN_FLAGS` is derived | zero gaps measured, both directions |
 | **KD-24** | `--yes` refused at one door, accepted-and-ignored at the other | the flag is inert; the rest of the line still does what was asked |
 | **KD-25** | an interrupt that printed nothing would pass the suite | wording deliberately not pinned |
-| **KD-26** | `npm test` is bare `node --test`, so it globs any worktree in the tree | measured below |
 | **KD-27** | the lane-already-running refusal does not say WHICH repo is running it | four commands to find out |
 | **KD-28** | the header's KD-7 measurement cites a count this log attaches to another defect | the argument does not rest on the number |
 | **KD-30** | the "second lane run left no receipt" guard reads the path the first run's receipt is at | unreachable; the stale receipt reads as the overclaim |
@@ -110,6 +109,7 @@ you the same list without opening anything.
 | **KD-32** | the plant driver spells cmp's source root and pack id as literals | both fail loud, and there is one pack |
 | **KD-37** | two fleet ids naming one directory are counted as two repos upgraded | the second pass is idempotent; both were named |
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
+| **KD-40** | `--minimal` strips the lane and leaves `qa/harness.lock.json` describing it | the lock is invisible to the stripper: not `.mjs`, not a declaration |
 
 ---
 
@@ -360,22 +360,6 @@ wrong repository, exit 0, logged because it predated the slice is the whole of i
 **Fires when:** the next reader checks the measurement and finds the other defect.
 *Logged 2026-09-14, review round 1 of `review-gate-rule`.*
 
-### KD-26 — `npm test` globs into any worktree left in the repo root
-
-`package.json` (`"test": "node --test"`), `.gitignore`
-
-Bare `node --test` walks the whole tree, so a git worktree checked out inside the repo — the
-shape a reviewer creates to run this slice's tests against the merge-base — is discovered and
-its tests run as though they were this tree's. Measured 2026-09-14: with `prev-wt/` present the
-suite reported **fail 3**, all three from inside it; removed, **1894/1894**. It is also not
-gitignored, so `git add -A` offers to commit it.
-
-Not adopter-facing — it is this repo's own dev loop — but it silently changes what a green
-suite means, which is the one thing this product exists to stop. The fix is a scope on the glob
-or an ignore, and it is a slice because the right answer decides what `node --test` should see.
-
-*Logged 2026-09-14, review round 2. The worktree was removed; the hazard was not.*
-
 ### KD-25 — an interrupt that printed nothing at all would pass the suite
 
 `test/a-session-cut-short-is-reported-as-one-that-finished.test.mjs`,
@@ -488,6 +472,40 @@ name) rather than any ancestor. **Fires when:** someone vendors this repo inside
 a future installer nests package roots differently. *Logged 2026-09-15, review round 2
 (re-record) of `fleet-upgrade`.*
 
+### KD-40 — a minimal scaffold keeps the lock for a lane it just deleted
+
+`src/lib/minimal.mjs` (`subtractLane`), `packages/harness/src/lib/harness-region.mjs` (`isHarnessFile`)
+
+`subtractLane` deletes every machine-owned lane file outside the keep-set, walking
+`listHarnessFiles`, which yields only what `isHarnessFile` accepts: the two DECLARATIONS, the one
+GENERATED record, and otherwise `.mjs` alone. `qa/harness.lock.json` is none of those, so the
+stripper never sees it. Executed:
+
+```
+qa/harness.lock.json     NOT a harness file — --minimal never sees it
+qa/harness-source.json   IS a harness file (strippable)
+qa/harness-manifest.json IS a harness file (strippable)
+qa/verify.mjs            IS a harness file (strippable)
+```
+
+So a minimal scaffold keeps a lock whose `files` map names a hundred-odd paths that no longer exist
+and whose `fileCount` is wrong — a record that describes a lane the same command removed.
+
+**Reported from outside, with its cost measured.** The `payment-blueprint` session hit this: a
+`--minimal` re-scaffold stripped 66 lane files and left the lock, and `gitleaks` then flagged a
+SHA-256 content digest inside it as a `generic-api-key`. Its lane went red on an orphan written by
+nothing and read by nothing. That is the honest shape of the harm — not that the lock is wrong (no
+reader is left to be misled) but that it is an unexplained file full of high-entropy strings sitting
+in an adopter's repo, and a secret scanner is exactly the thing that will find it.
+
+**Not fixed here**, and the fix is a decision rather than a line: either the stripper learns about
+the lock (and `isHarnessFile`'s `.mjs`-or-declaration rule grows a third case), or `--minimal`
+stops being a lane-subtraction and becomes a lane-less install. The second is probably right and is
+a slice, not an edit.
+
+**Fires when:** anyone runs `create-cmp … --minimal` over a tree that has a lane. *Logged
+2026-09-15, reported by the payment-blueprint session and verified here by execution.*
+
 ## Closed
 
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
@@ -542,6 +560,38 @@ The class is one this branch has now hit three times and it is worth stating onc
 that cannot refuse the defect in its own name is worse than no test, because the file's name says
 it is covered.** Here the fix was to strengthen rather than to cut, because the criterion is real
 and per-commit; the two earlier cases had nothing left to assert once the duplicate was removed.
+
+### KD-26 — `npm test` globbed the whole tree, so any directory in it was this repo's suite — **CLOSED, 2026-09-15**
+The script names its roots:
+
+```
+node --test "test/**/*.test.mjs" "inspector/mcp/test/**/*.test.mjs" "packages/receipts/test/**/*.test.mjs"
+```
+
+**The defect, executed both ways.** A stray `wt-probe/test/planted.test.mjs` with one failing
+assertion: under the bare glob, `tests 1926, fail 1` — a tree that is not this repo's, failing this
+repo's suite. Under the named roots, `tests 1920, fail 0`. The silent direction is the worse one and
+the same fix closes it: a worktree whose tests all PASS was adding green rows to a number nobody
+audits.
+
+**1925 → 1917, and the eight were not tests.** Node's default patterns include `**/test/**/*.mjs`
+and `**/*-test.mjs`, not just `*.test.mjs`, so the runner was executing seven fixtures and helpers
+(`test/fixtures/profiles/py-alien/index.mjs`, `test/helpers/harness-fixture.mjs`, …) and — the
+one worth naming — `scripts/fit-test.mjs`, a PROGRAM, on every `npm test`. Each counted as one
+passing test for not throwing. Those eight rows asserted nothing, and `scripts/fit-test.mjs` is
+covered properly by `test/fit-test.test.mjs`, which predates this.
+
+**The fix has its own failure mode, and it is the dangerous direction**: a misspelled root, or a test
+written where no root reaches, is not an error — it is a smaller suite that still says PASS. So
+`test/a-test-file-outside-the-named-roots-is-never-run.test.mjs` reads the roots OUT of
+`package.json` (a constant here would be a second declaration of one fact, which is the defect class
+rather than a guard against it) and refuses both directions: a tracked test file under no root, and a
+root matching no tracked file. Four mutations, each caught by name — a root dropped, a root
+misspelled, an unanchored pattern, and a regression to the bare glob.
+
+**`.claude/worktrees/` is now in `.gitignore`**, not only in `.git/info/exclude`. It holds 355 test
+files and was invisible to the old glob solely because Node skips dot-directories — on any other
+clone it is 355 untracked files inside the repo, and every "is the tree clean" check sees them.
 
 ### KD-19 — a refusal wording the classifier could not read — **CLOSED, 2026-09-15**
 Resolved exactly as the entry predicted, by `upgrade --fleet` existing.
