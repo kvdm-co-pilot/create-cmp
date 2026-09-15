@@ -139,23 +139,36 @@ for (const site of SITES) {
     // only that a catch EXISTED, and review proved the gap by planting
     // `catch (cause: Throwable) { }` and `catch (cause: Throwable) { println(…) }`
     // on the two sites: both passed, and the app still starts against production.
-    const catchAt = body.search(/\bcatch\s*\(/);
-    assert.notEqual(
-      catchAt,
-      -1,
+    // EVERY catch, not the first. Kotlin chains them, and reading only the
+    // leading one blessed exactly the shape this repo TEACHES:
+    //
+    //   } catch (cancel: CancellationException) { throw cancel }
+    //   } catch (cause: Throwable) { /* swallowed */ }
+    //
+    // The first supplies the `throw` a single-catch assertion looks for; the
+    // broad one behind it discards every real failure and the app starts against
+    // the real project. ARCH-08 and template/CLAUDE.md name that two-catch form
+    // as the house convention for the data layer, so an author following the
+    // rules writes the shape that walks past the guard. Found in review round 2.
+    const catches = [...body.matchAll(/\bcatch\s*\(/g)].map((m) => m.index);
+    assert.ok(
+      catches.length,
       `${site.rel}: nothing in configureFirebaseEmulators() handles a failure. The redirect must ` +
         `propagate or refuse by name — a build that cannot honour an explicit request for emulators has no ` +
         `safe way to continue.`,
     );
-    const caught = braceBody(body, body.indexOf("{", catchAt), site.rel);
-    assert.match(
-      caught,
-      /\bthrow\b/,
-      `${site.rel}: the catch around the emulator redirect does not rethrow. Catching and continuing is ` +
-        `the defect this file exists to refuse, wearing a different keyword — the build asked for emulators, ` +
-        `did not get them, and carries on against the REAL project. Logging is not refusing: nobody reads ` +
-        `logcat on the run where it mattered.`,
-    );
+    catches.forEach((at, i) => {
+      const caught = braceBody(body, body.indexOf("{", at), site.rel);
+      assert.match(
+        caught,
+        /\bthrow\b/,
+        `${site.rel}: catch #${i + 1} of ${catches.length} around the emulator redirect does not rethrow. ` +
+          `Catching and continuing is the defect this file exists to refuse, wearing a different keyword — ` +
+          `the build asked for emulators, did not get them, and carries on against the REAL project. ` +
+          `Logging is not refusing: nobody reads logcat on the run where it mattered. A chained catch counts: ` +
+          `one that rethrows CancellationException does not license a broad one behind it that does not.`,
+      );
+    });
   });
 
   test(`${platform}: the refusal is actually CALLED`, () => {
@@ -163,10 +176,13 @@ for (const site of SITES) {
     // call site on each platform and every other assertion here still passed —
     // a guard blessing a gate that never runs.
     const src = maskSource(fs.readFileSync(path.join(ROOT, site.rel), "utf8"));
-    const declaration = src.indexOf("fun configureFirebaseEmulators()");
     const calls = [...src.matchAll(/\bconfigureFirebaseEmulators\(\)/g)].map((m) => m.index);
+    // The lookbehind is the whole test. `at !== declaration` was also here and
+    // can never be false — `declaration` indexes `fun`, every match indexes that
+    // plus four — so it was a second spelling of one intent, which is the class
+    // this repo keeps closing. Removed rather than left decorative (KD-52).
     assert.ok(
-      calls.some((at) => at !== declaration && !src.slice(Math.max(0, at - 4), at).includes("fun ")),
+      calls.some((at) => !src.slice(Math.max(0, at - 4), at).includes("fun ")),
       `${site.rel}: configureFirebaseEmulators() is declared and never called. Everything else this file ` +
         `asserts is true of code that does not run — the redirect never happens, and the build talks to ` +
         `whatever google-services.json / GoogleService-Info.plist names.`,

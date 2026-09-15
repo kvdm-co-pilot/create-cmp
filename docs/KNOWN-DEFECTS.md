@@ -113,12 +113,13 @@ you the same list without opening anything.
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 | **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
 | **KD-45** | no gate in this repo executes the template's Firebase or iOS paths | the device tier stamps `--no-ios --no-firebase`; shape is scanned, runtime is not |
-| **KD-46** | the iOS refusal names two causes its `catch` cannot see, and throws away the one it can | Obj-C raises abort the process before any Kotlin frame; the app stops either way |
+| **KD-46** | the iOS refusal names two causes its `catch` cannot see | half fixed in `79eafd3` (the cause is carried now); Obj-C raises abort before any Kotlin frame, and the app stops either way |
 | **KD-47** | the four emulator ports are spelled in `build.gradle.kts` and again in `KoinHelper.kt` | they agree today, and no `firebase.json` ships to be a third |
 | **KD-48** | `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin | the shipped Xcode project has only `Debug`/`Release`, which map correctly |
 | **KD-49** | a nested `node --test` exits 0 whatever its tests did, when `NODE_TEST_CONTEXT` is inherited | nothing in the suite spawns one except the harness that measured it, which scrubs the env |
 | **KD-50** | the template ships create-cmp's own changelog as source comments in the adopter's app | true prose, wrong repository |
 | **KD-51** | a JS masker reads the template's Kotlin; a raw string mis-parses and truncates the scanned body | it reds, not greens — the `useEmulator` tripwire catches the stub — and neither file has a raw string |
+| **KD-52** | the call-site assertion excludes the declaration twice, and one of the two clauses is inert | the live clause does the work; the tail cases cannot produce a false green |
 
 ---
 
@@ -626,12 +627,20 @@ The catch tells the reader to "check that FirebaseApp.configure() ran first" and
 client was used before initKoin()". Both of those fail inside the Firebase iOS SDK as an
 Objective-C raise or a Swift `fatalError` — neither of which a Kotlin/Native `catch (cause:
 Throwable)` frame can intercept; the process aborts before the catch exists. The failures it CAN
-catch are Kotlin ones from the GitLive bindings, which are not the two it names. And what it does
-with the one it catches is `error(msg)`, which builds an `IllegalStateException` with **no cause**:
-the original stack is dropped and the message interpolates `cause.message`, which is null for a
-great many bridged throwables — so the crash an adopter reads can say `Cause: null` and nothing
-else. Not blocking: the app stops in every one of these cases, which is what the refusal is for,
-and the diagnosis is lost rather than wrong. *Logged 2026-09-15, review of `b549f3b`.*
+catch are Kotlin ones from the GitLive bindings, which are not the two it names.
+
+**The second half is fixed; this is the first half, still open.** As logged, the catch also threw
+`error(msg)`, which builds an `IllegalStateException` with **no cause** — the original stack
+dropped, `cause.message` interpolated, and `Cause: null` in the crash for a great many bridged
+throwables. `79eafd3` replaced both sites with `throw IllegalStateException(msg, cause)`. What
+remains is the message itself: it still tells the reader to check `FirebaseApp.configure()` and
+prior client use, and those are exactly the two conditions under which this catch cannot have run.
+The honest shape is a message about what it CAN see — a Kotlin-level failure in the GitLive
+binding, plus the cause it now carries — with the configure/ordering advice in the comment above
+the function, where a human reads it before the crash rather than in a string that can only print
+when neither happened. Still not blocking: the app stops in every one of these cases, which is what
+the refusal is for. *Logged 2026-09-15 (review of `b549f3b`), re-placed 2026-09-15 after `79eafd3`
+closed the cause-dropping half.*
 
 ### KD-47 — the emulator ports are spelled twice, and declared nowhere
 
@@ -677,7 +686,19 @@ with the Result discarded" are stamped verbatim into every `--firebase` scaffold
 they are about create-cmp's history, not the adopter's app — a reader of their own repo is told about
 a bug that was never in it. The invariant the comments are protecting (do not re-wrap this in
 something that discards the failure) is worth stating; the archaeology belongs in create-cmp's
-CHANGELOG. Taste call, nobody wrongly served. *Logged 2026-09-15, review of `b549f3b`.*
+CHANGELOG. Taste call, nobody wrongly served.
+
+**MEASURED, because the question asked was whether it belongs in this slice: it is five sites, and
+three of them predate this slice.** The two above, plus `template/composeApp/build.gradle.kts` at
+lines 209 ("dead files that look live: the debug network-security config never applied"), 243
+("Declaring the flag alone made release the one build…") and 280 ("AGP's bug, **not ours**" — where
+*ours* is create-cmp, in a file that is the adopter's). So fixing it here edits two of five and
+leaves three, which is the instance-over-class pattern this log's header was written about. **It is
+its own slice**, and what that slice produces is not two rewritten comments but a rule — a template
+comment is addressed to the adopter, in the present tense, about their code — and something that
+can hold it, which is buildable: the tell is first-person and past-tense prose in a shipped template
+comment, and it greps. *Logged 2026-09-15 (review of `b549f3b`), scoped 2026-09-15 in review of
+`79eafd3`.*
 
 
 ### KD-51 — the emulator scan masks Kotlin with a masker written for `.mjs`
@@ -696,6 +717,34 @@ reads a backtick as a template literal).
 rather than blessed as clean. The message then blames the wrong thing, which costs a reader minutes,
 not a shipped defect. Neither Kotlin file contains a raw string, a nested comment or a backtick
 identifier today. *Logged 2026-09-15, review of `b549f3b`.*
+
+
+### KD-52 — the call-site assertion excludes the declaration with one live clause and one dead one
+
+`test/the-emulator-redirect-cannot-fail-quietly.test.mjs` ("the refusal is actually CALLED")
+
+`calls.some((at) => at !== declaration && !src.slice(at - 4, at).includes("fun "))`. **`at !==
+declaration` can never be false**: `declaration` is the index of `fun`, every match index is that
+plus four — executed on both files, `2144` vs `2148` and `1620` vs `1624`. The whole exclusion rests
+on the four-character lookbehind, and that half works. Two spellings of one intent, one of them
+inert.
+
+Three more, all attacked and none of them a false GREEN on its own:
+
+- **Presence is not reachability.** Move the call into a `private fun unusedSetup()` that nothing
+  invokes and the assertion passes — the refusal still never runs. The realistic form of this defect
+  is deleting the call, which `79eafd3` now catches; relocating it into dead code is the tail. The
+  cheap close, if it is ever worth it, is to require the call inside the entry point the comment
+  already names (`onCreate` / `initKoin`), using the brace matcher the file already has.
+- **A declaration the lookbehind misses** — `fun  configureFirebaseEmulators()` with two spaces is
+  valid Kotlin and is not preceded by `fun `, so it counts as its own caller. It cannot ship a false
+  green: `redirectBody` keys off the single-space spelling, so the sibling assertions go red first.
+  Measured.
+- **Two false REDs on correct code** — `run(::configureFirebaseEmulators)` and
+  `configureFirebaseEmulators( )` are real calls the `\bname\(\)` regex does not match. Nobody
+  writes the second; the first is idiomatic Kotlin but not plausible at this call site.
+
+*Logged 2026-09-15, review of `79eafd3`.*
 
 
 ## Closed
