@@ -106,6 +106,9 @@ you the same list without opening anything.
 | **KD-26** | `npm test` is bare `node --test`, so it globs any worktree in the tree | measured below |
 | **KD-27** | the lane-already-running refusal does not say WHICH repo is running it | four commands to find out |
 | **KD-28** | the header's KD-7 measurement cites a count this log attaches to another defect | the argument does not rest on the number |
+| **KD-30** | the "second lane run left no receipt" guard reads the path the first run's receipt is at | unreachable; the stale receipt reads as the overclaim |
+| **KD-31** | the vendored contract tells its reader to run `scripts/fleet-check.mjs`, which no stamped app has | an import error, not a wrong result |
+| **KD-32** | the plant driver spells cmp's source root and pack id as literals | both fail loud, and there is one pack |
 
 ---
 
@@ -418,12 +421,70 @@ the gate above and in `test/prooflane-bin.test.mjs`, not in the file whose heade
 measures. *Logged 2026-09-14, review round 1 of `interview-decisions`; narrowed in round 2 to what
 `af1ba7e` left standing.*
 
+### KD-30 — the plant's "no receipt from the second run" guard reads the first run's receipt
+
+`scripts/fleet-check.mjs` (`runLadderPlant`)
+
+`afterPath` is `qa/evidence/latest.json` — the same path `main()` already refused to continue
+without at step 3. So `if (!fs.existsSync(afterPath))` cannot fire, and a second lane run that dies
+before writing a receipt (killed, a wedged daemon, a throw in the runner) leaves the BASELINE
+receipt in place to be read as the "after". Every L2 step is green in it, so the instrument returns
+the overclaim: "startup is broken and every l2Execution step still passes … These steps do not start
+the program." A profile is accused of the exact defect the instrument exists to catch, because the
+run that would have exonerated it never happened. Receipts carry `generatedAt`; nothing compares the
+two.
+
+Not blocking: repo-only, and a human reads the line. *Logged 2026-09-14, review round 1 of
+`startup-plant`.*
+
+### KD-31 — the contract vendored into every stamped app names a script no stamped app has
+
+`template/qa/lib/profile-contract.mjs` (comment above `l2Execution`)
+
+"Run it with `node scripts/fleet-check.mjs --ladder-plant`." The template ships no `scripts/`
+directory; `fleet-check.mjs` lives in create-cmp and is not vendored. The contract's own header
+names "the author" — a person writing a profile, in their own tree — as one of its three consumers,
+and this is the one instruction it gives them that their tree cannot carry out. The file already
+carries one reference of the same shape (`node scripts/sync-harness.mjs`, `profile.mjs:26`), but
+that one says "in the create-cmp repo" beside it.
+
+Not blocking: a reader who tries gets `Cannot find module`, immediately, rather than a wrong answer.
+**Fires when:** a second-stack author follows it. *Logged 2026-09-14, review round 1 of
+`startup-plant`.*
+
+### KD-32 — the plant driver spells this stack's tree shape where the seam says it must not
+
+`scripts/fleet-check.mjs` (`findEntryPoint`, `runLadderPlant`)
+
+The slice's own division is that the profile owns the break and the core owns the question.
+`findEntryPoint` walks from `path.join(appDir, "composeApp", "src")` — a literal cmp source root —
+while its own doc comment says the instrument "finds it under the source roots", which the profile
+declares as `layout`. `runLadderPlant` imports `qa/lib/profiles/cmp/plants.mjs` by a hardcoded pack
+id, three lines below a `packId` the same run read off the receipt. Both are second spellings of
+facts a profile already publishes.
+
+Not blocking: both fail loud (no entry point found; the `.catch` reports "declares no startupPlant"),
+never quietly, and there is one pack. **Fires when:** a second pack, or a template whose source root
+moves. *Logged 2026-09-14, review round 1 of `startup-plant`.*
+
 ---
 
 ## Closed
 
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
+
+### KD-29 — the ladder plant blessed a run that never showed the edit compiled — **CLOSED, 2026-09-15**
+The refusal is now symmetric. `assessLadderPlant` requires an `l1Required` step that PASSED before
+the plant, exactly as it already required one for `l2Execution`, and names what it saw instead of
+asserting a generality. The comment above `wasGreen` was right all along and applied to one half:
+"a step that did not PASS before the plant proves nothing after it."
+
+Both halves of the refusal are red at `46393d0` and green here — the receipt from the report
+(`releaseBuild: FAIL` before and after, `e2eSmoke` PASS→FAIL) and the one-line version, a ladder
+declaring `l2Execution` with no `l1Required` at all. A third test asserting that a blessed verdict
+names both halves was written and **cut**: it is green at the merge-base, so it proves nothing about
+this fix, and a name like "PASS is never printed with a hole" would have read as the proof.
 
 ### KD-22, KD-23 — a duplicate contract test, and a charter that still required an index of itself — **CLOSED `af1ba7e`, 2026-09-14**
 The duplicate `every menu field's recommended answer is one of the answers it offers` was deleted;

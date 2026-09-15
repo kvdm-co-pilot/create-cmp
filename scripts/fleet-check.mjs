@@ -437,8 +437,6 @@ async function main() {
     ` | required: >=${minLevel} | verdict: ${receipt.verdict}\n`
   );
 
-  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null });
-
   // 5. THE LADDER PLANT — only when asked, and only over a green baseline.
   //
   //    Every step above proves the lane RETURNS. This proves one thing more, and
@@ -456,6 +454,20 @@ async function main() {
     process.stdout.write(`\n  ${plantResult.line}\n`);
     if (!plantResult.ok) failures.push(plantResult.reason);
   }
+
+  // THE RECORD IS WRITTEN AFTER THE LAST CHECK THAT CAN STILL FAIL THE RUN, and
+  // that ordering is load-bearing rather than tidy. `writeFleetRecord` computes
+  // `verdict: failures.length ? "FAIL" : "PASS"` on the spot, so a check that
+  // pushes a failure BELOW it leaves the record saying PASS about a run that
+  // failed. This file's record is not bookkeeping — scripts/hooks/proof-gate.mjs
+  // allows `npm publish` on it, and scripts/proof-plan.mjs discharges the device
+  // tier on it — so a stale PASS there is a release shipped on a failed proof.
+  //
+  // The ladder plant was the first check ever placed after the write (every
+  // earlier `failures.push` sat above it), and it is the worst one to get wrong
+  // this way: it fails precisely when the shipped l2Execution claim is an
+  // overclaim, which is the thing that should stop a release hardest.
+  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null });
 
   if (failures.length) {
     process.stderr.write(`\nfleet check: FAIL\n`);
