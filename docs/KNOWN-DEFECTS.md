@@ -111,6 +111,7 @@ you the same list without opening anything.
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
 | **KD-40** | `--minimal` strips the lane and leaves `qa/harness.lock.json` describing it | the lock is invisible to the stripper: not `.mjs`, not a declaration |
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
+| **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
 
 ---
 
@@ -526,6 +527,61 @@ edit to the declaration cannot reach main without a review round that reads it.
 **Fires when:** someone edits `scripts.test` to exclude `test/**` and no reviewer reads the diff.
 *Logged 2026-09-15, review round 2 of `test-roots-named`, raised in round 1 and kept deliberately.*
 
+### KD-44 — the matcher still reports coverage the runner does not give, using the declared pattern
+
+`test/a-test-file-outside-the-named-roots-is-never-run.test.mjs` (`globMatches`)
+
+KD-42 refused four constructs the translation does not implement. The unsafe direction survives in
+the two it does: `*` becomes `[^/]*` and `**/` becomes `(?:.*/)?`, and both match a leading dot,
+where `node --test` matches neither. Measured against the runner with THIS repo's declared pattern,
+`test/**/*.test.mjs`, nothing exotic and no refusal triggered:
+
+```
+runner runs : test/a.test.mjs
+guard covers: test/a.test.mjs, test/.hidden.test.mjs, test/.dotdir/a.test.mjs, test/sub/.hidden.test.mjs
+GUARD SAYS COVERED, RUNNER NEVER RUNS: the three dotted ones
+```
+
+So a committed `test/.something.test.mjs`, or anything under a `test/.fixtures/`, is reported as
+covered and never runs — "yes, that is tested" about a file the runner skips, which is the one
+direction this guard exists to refuse. It is also the assumption KD-26 was built on, inverted: that
+entry's whole argument was that Node skips dot-directories.
+
+**Same round also measured, same class, harmless direction:** the refusal is a BLACKLIST, so the
+extglob forms `+(a|b)`, `!(b)`, `@(a)`, `*(a)` — all honoured by the runner — pass it and are
+translated as literals, as do `./test/*.test.mjs` and `test//*.test.mjs`. Every one of those makes
+the guard match FEWER files than the runner, so they fail loud and mislead rather than lie. They are
+listed because they are the evidence for the shape of the fix: enumerating the constructs known to
+be missing cannot terminate, since the list is a fact about the runner's globber that nobody here
+owns. An alphabet whitelist — refuse any pattern with a character outside the implemented set —
+terminates, and the temp-dir replica recorded under KD-42 gets dotfiles right for free because the
+runner answers.
+
+**Not blocking:** no tracked test file is dotted, so it cannot fire today. **Fires when:** anyone
+commits a test file, or a directory of them, whose name begins with a dot. *Logged 2026-09-15,
+review round 2 (re-record) of `test-roots-named`, measured differentially against `node --test`.*
+
+
+**THE THIRD HOLE OF THIS SHAPE IN ONE FUNCTION, and that is the finding.** `globMatches` has now
+reported "covered" about a file the runner never runs three times: by prefix containment (KD-41), by
+`?` reaching the RegExp as a quantifier (KD-42), and now by a leading dot — this one with **no
+exotic construct at all**, using the declaration this repo actually ships. Each patch was correct
+and each left another hole, which is the tell that the approach is wrong rather than the
+implementation.
+
+The round that found it named why, and it is worth keeping in these words: enumerating the
+constructs a translation is missing **cannot terminate**, because the list is a fact about a globber
+nobody in this repo owns. Two things do terminate — an alphabet whitelist (refuse any pattern
+outside a known-safe character set, rather than listing what is known-bad), or replacing the
+translation entirely: materialise the tracked paths as empty files in a temp dir and let
+`node --test` itself answer. The second gets dotfiles right for free, because the runner is the
+authority being asked.
+
+**Deliberately not patched a fourth time.** No tracked test file is dotted, so nobody is wrongly
+served, and the slice's actual defect — three spellings of the runner, and a whole-tree glob — is
+fixed and proven. A fourth patch to the same function is the over-correction loop this log's header
+was written about: five consecutive rounds where the fix became the next round's finding. **Whoever
+touches this next should take one of the two terminating fixes rather than add a fifth case.**
 ## Closed
 
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
