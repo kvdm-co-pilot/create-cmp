@@ -561,6 +561,34 @@ that cannot refuse the defect in its own name is worse than no test, because the
 it is covered.** Here the fix was to strengthen rather than to cut, because the criterion is real
 and per-commit; the two earlier cases had nothing left to assert once the duplicate was removed.
 
+### KD-41 — the guard checked a root PREFIX, so a pattern matching nothing satisfied it — **CLOSED, 2026-09-15**
+It asks the globber now: `fs.globSync(pattern, { cwd: ROOT })`, and the two assertions became "every
+tracked test file is MATCHED by some pattern" and "every pattern MATCHES something".
+
+Logged non-blocking by the round that found it and fixed in the same round, because what it
+measured is the guard failing at its one job. `rootOf` took the substring before the first `*` and
+compared with `startsWith` — containment, not matching — so every narrowing after the root was
+invisible. Executed: declaring `test/**/nope*` for all three patterns ran `npm test` to **zero
+tests, exit 0**, with all three assertions passing. A guard whose entire purpose is "the suite
+cannot silently shrink" passed a suite that had shrunk to nothing.
+
+**This is the shape a peer session named the same day**, having paid for it in a Gradle task that
+existed, ran, compiled zero Kotlin files and exited 0 while a criterion sat green over a client
+nothing ever built: **a guard written against ABSENCE does not catch VACUITY.** Missing pattern,
+missing task, missing term — all anticipated. Present-and-empty is the one that gets through, and
+from outside it is identical to a property that holds. Three of this session's findings are that
+one shape, and it is now the reason this guard asks what a pattern MATCHES rather than where it
+points.
+
+Four mutations, each red: patterns matching nothing; `prepublishOnly` back to a bare glob; `ci.yml`
+back to a bare glob; and `test/**/*` narrowed to `test/*` — that last one green until a
+`test/sub/` file exists, so it was proved at the moment it costs something by creating one and
+watching the guard refuse.
+
+The structural half the round also named stands and is not re-logged: the guard lives under a
+pattern it audits, so it cannot refuse a declaration that excludes itself. Nothing checks that, and
+a fix would be a third declaration of the same fact.
+
 ### KD-26 — `npm test` globbed the whole tree, so any directory in it was this repo's suite — **CLOSED, 2026-09-15**
 The script names its roots:
 

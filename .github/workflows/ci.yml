@@ -43,7 +43,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
       - name: Run tests
-        run: node --test
+        # `npm test`, never a second spelling of the runner: the declared suite is
+        # package.json's `test` script and CI must run THAT, not its own idea of it.
+        run: npm test
 
   stamp-android:
     name: stamp + Android assembleDebug
