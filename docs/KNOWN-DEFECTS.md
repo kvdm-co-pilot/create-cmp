@@ -109,6 +109,7 @@ you the same list without opening anything.
 | **KD-30** | the "second lane run left no receipt" guard reads the path the first run's receipt is at | unreachable; the stale receipt reads as the overclaim |
 | **KD-31** | the vendored contract tells its reader to run `scripts/fleet-check.mjs`, which no stamped app has | an import error, not a wrong result |
 | **KD-32** | the plant driver spells cmp's source root and pack id as literals | both fail loud, and there is one pack |
+| **KD-33** | the plugin `.mcp.json` names the bundle by a path relative to an unspecified cwd | fix is already in the installed cache; the gate pins the literal string |
 
 ---
 
@@ -468,6 +469,31 @@ never quietly, and there is one pack. **Fires when:** a second pack, or a templa
 moves. *Logged 2026-09-14, review round 1 of `startup-plant`.*
 
 ---
+
+### KD-33 — the plugin launches its MCP server by a path relative to nothing in particular
+
+`.mcp.json`, and `inspector/mcp/test/bundle-freshness.test.mjs:126`
+
+`args: ["inspector/mcp/dist/server.mjs"]` — relative, and a plugin-loaded MCP server is not launched
+from the plugin root. `f5077c8` fixed the real bug there (launch the bundle instead of
+`bin/server.mjs`, measured against the actual cached install) and inherited the relative spelling
+without weighing it; Claude Code publishes `${CLAUDE_PLUGIN_ROOT}` for exactly this.
+
+**Found by measurement, not by reading:** the installed cache at
+`~/.claude/plugins/cache/create-cmp/create-cmp/` holds `${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs` at
+0.25.0 and the relative path at 0.23.0 and 0.24.0. Someone hit this, fixed it in the cache to prove
+the fix, and mirrored it into this repo's working tree.
+
+The reason it is not already merged is the gate. The test asserts `deepEqual(args,
+["inspector/mcp/dist/server.mjs"])` — the literal string — while its own comment says what it cares
+about is that the plugin launches the BUNDLE rather than `bin/server.mjs`, which the corrected
+spelling still does. So the fix needs the assertion re-aimed at the target it names, and **a gate
+loosened to let a change through is the most dangerous edit in this repo.** It gets its own slice
+and its own review round rather than riding inside one about the ladder plant.
+
+**Fires when:** anyone installs the plugin from the marketplace and the client's cwd is not the
+plugin root — the normal case, and why `cmp-inspector` has been failing to start for everyone but
+a repo checkout. *Logged 2026-09-15, found while closing `startup-plant`.*
 
 ## Closed
 
