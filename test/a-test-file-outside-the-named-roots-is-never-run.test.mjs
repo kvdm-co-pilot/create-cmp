@@ -82,6 +82,30 @@ function trackedTestFiles() {
  * whether the suite is complete.
  */
 function globMatches(pattern, rel) {
+  // REFUSES WHAT IT CANNOT TRANSLATE, rather than translating it wrongly. `?`,
+  // character classes and brace alternation are all real glob constructs the
+  // runner honours and this function does not implement — and `?` is the
+  // dangerous one: it is not in the escape set, so it reaches the RegExp as a
+  // QUANTIFIER. Measured by differential against the runner on a fixture tree:
+  // `test/a?.test.mjs` runs `ab.test.mjs` and this matched `a.test.mjs`, so the
+  // guard would call a file covered that never runs — KD-41's unsafe direction,
+  // one construct over, in the function written to close KD-41.
+  //
+  // Five of the six divergences were the safe direction (guard stricter than
+  // runner) and would only have caused a false alarm. Refusing the whole set is
+  // still right: a translation that silently disagrees with the runner about
+  // ANY construct cannot be trusted about the ones it does implement, and
+  // "which of these six is safe today" is a fact about today's declaration.
+  const untranslatable = /[?[\]{}]/.exec(pattern) ?? /\*\*(?!\/)/.exec(pattern);
+  assert.equal(
+    untranslatable,
+    null,
+    `the test script declares ${JSON.stringify(pattern)}, which uses the glob construct ` +
+      `${JSON.stringify(untranslatable?.[0])} that this guard does not implement. It translates exactly two: ` +
+      `\`**/\` spans path segments and \`*\` spans characters within one. Rather than guess, it refuses — ` +
+      `a guard that disagrees with \`node --test\` about what a pattern matches is worse than no guard, ` +
+      `because it reports coverage for files that never run.`,
+  );
   const SPAN = "\u0000";
   const source = pattern
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
@@ -113,6 +137,22 @@ test("the glob translation this guard rests on is correct", () => {
   for (const [pattern, rel, want] of cases) {
     assert.equal(globMatches(pattern, rel), want, `${pattern} vs ${rel} should be ${want}`);
   }
+});
+
+test("a glob construct this guard cannot translate is REFUSED, not guessed at", () => {
+  // Each of these is a construct `node --test` honours and this translation does
+  // not. Measured against the runner on a fixture tree before being refused —
+  // they diverge, and `?` diverges in the direction that reports false coverage.
+  for (const pattern of ["test/a?.test.mjs", "test/[ab].test.mjs", "test/{a,b}.test.mjs", "test/**"]) {
+    assert.throws(
+      () => globMatches(pattern, "test/a.test.mjs"),
+      /does not implement/,
+      `${pattern} was translated rather than refused`,
+    );
+  }
+  // And the two it DOES implement still work, or the refusal is over-broad and
+  // the declaration itself would be rejected.
+  assert.equal(globMatches("test/**/*.test.mjs", "test/sub/a.test.mjs"), true);
 });
 
 test("every test file this repo tracks is matched by a pattern `npm test` names", () => {

@@ -110,6 +110,7 @@ you the same list without opening anything.
 | **KD-37** | two fleet ids naming one directory are counted as two repos upgraded | the second pass is idempotent; both were named |
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
 | **KD-40** | `--minimal` strips the lane and leaves `qa/harness.lock.json` describing it | the lock is invisible to the stripper: not `.mjs`, not a declaration |
+| **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 
 ---
 
@@ -506,6 +507,25 @@ a slice, not an edit.
 **Fires when:** anyone runs `create-cmp … --minimal` over a tree that has a lane. *Logged
 2026-09-15, reported by the payment-blueprint session and verified here by execution.*
 
+### KD-43 — the guard that says the suite is complete is collected by the suite
+
+`test/a-test-file-outside-the-named-roots-is-never-run.test.mjs`, `package.json` (`scripts.test`)
+
+The guard is matched by one of the patterns it audits, so the declaration that would defeat it —
+one that stops collecting the guard — is the one it cannot refuse. Measured in round 1: patterns
+narrowed to match nothing ran `npm test` to zero tests, exit 0, with the guard not collected and
+therefore not consulted.
+
+**It stands, and this entry is why, so the next cold reader does not re-raise it.** Every check
+that lives in the suite has this fixed point; moving it outside means something other than
+`scripts.test` deciding what the suite is, which is a second spelling of the fact the round just
+finished collapsing into one — a worse defect than the one it closes. The control that actually
+holds is not a test: `package.json` is a trigger path for both the review and device tiers, so an
+edit to the declaration cannot reach main without a review round that reads it.
+
+**Fires when:** someone edits `scripts.test` to exclude `test/**` and no reviewer reads the diff.
+*Logged 2026-09-15, review round 2 of `test-roots-named`, raised in round 1 and kept deliberately.*
+
 ## Closed
 
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
@@ -560,6 +580,34 @@ The class is one this branch has now hit three times and it is worth stating onc
 that cannot refuse the defect in its own name is worse than no test, because the file's name says
 it is covered.** Here the fix was to strengthen rather than to cut, because the criterion is real
 and per-commit; the two earlier cases had nothing left to assert once the duplicate was removed.
+
+### KD-42 — the hand-rolled glob translation disagreed with the runner — **CLOSED, 2026-09-15**
+It refuses what it cannot translate. `?`, character classes, brace alternation and a bare `**` all
+throw by name; the two constructs it implements (`**/` spans path segments, `*` spans characters
+within one) are unchanged.
+
+Found by differential against the actual runner on a fixture tree — eleven pattern shapes, six
+divergent — not by reading. Five diverged in the SAFE direction (guard stricter than runner, a false
+alarm at worst). One did not:
+
+```
+"test/a?.test.mjs"   runner ran [ab.test.mjs]   guard matched [a.test.mjs]
+```
+
+`?` is absent from the escape set, so it reached the RegExp as a QUANTIFIER and the guard reported a
+file covered that never runs — **KD-41's unsafe direction, one construct over, inside the function
+written to close KD-41.**
+
+Logged non-blocking (nothing in the declaration uses those constructs) and fixed anyway, for the
+reason that keeps recurring this week: a translation that silently disagrees with the runner about
+ANY construct cannot be trusted about the ones it does implement, and "which of the six is safe" is
+a fact about today's declaration rather than about the function. Refusing the whole set ends the
+class instead of patching the one character that happened to be dangerous.
+
+The alternative the round offered — stop translating, materialise the tracked paths as empty files
+in a temp dir and let `node --test` itself answer in about a second — is the better long-term shape
+and is not taken here, because it trades a pure function for a temp-dir side effect in a guard that
+runs on every commit. Recorded so nobody re-derives it.
 
 ### KD-41 — the guard checked a root PREFIX, so a pattern matching nothing satisfied it — **CLOSED, 2026-09-15**
 It asks the globber now: `fs.globSync(pattern, { cwd: ROOT })`, and the two assertions became "every
