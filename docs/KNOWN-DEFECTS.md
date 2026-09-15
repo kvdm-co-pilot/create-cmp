@@ -108,6 +108,7 @@ you the same list without opening anything.
 | **KD-30** | the "second lane run left no receipt" guard reads the path the first run's receipt is at | unreachable; the stale receipt reads as the overclaim |
 | **KD-31** | the vendored contract tells its reader to run `scripts/fleet-check.mjs`, which no stamped app has | an import error, not a wrong result |
 | **KD-32** | the plant driver spells cmp's source root and pack id as literals | both fail loud, and there is one pack |
+| **KD-37** | two fleet ids naming one directory are counted as two repos upgraded | the second pass is idempotent; both were named |
 
 ---
 
@@ -442,6 +443,20 @@ Not blocking: both fail loud (no entry point found; the `.catch` reports "declar
 never quietly, and there is one pack. **Fires when:** a second pack, or a template whose source root
 moves. *Logged 2026-09-14, review round 1 of `startup-plant`.*
 
+### KD-37 — two ids naming one directory are two repos in the fleet's report
+
+`packages/harness/install/fleet.mjs` (`readFleetManifest`)
+
+Duplicate `id`s are refused by name; duplicate *directories* are not. `[{id:"a",path:"../x"},
+{id:"b",path:"../x"}]` — or the same tree reached once directly and once through a symlink or a
+`..` — upgrades `../x` twice and reports "fleet: 2 of 2 repo(s) upgraded". The second pass is
+idempotent, so nothing is corrupted and no unnamed tree is touched; the cost is a count that reads
+as two repositories when the operator has one, in the summary line that is the whole output of an
+unattended run. Not blocking: the manifest is the operator's own file, and every directory in the
+report is one they named. **Fires when:** a fleet grows past the size its author can hold in their
+head, which is the size at which this command starts being worth having. *Logged 2026-09-15, review
+round 1 of `fleet-upgrade`.*
+
 ---
 
 ## Closed
@@ -461,6 +476,23 @@ Logged as non-blocking and fixed anyway, because the round had just established 
 move the review hash. The log exists to stop findings being re-litigated, not to preserve a sentence
 I know is wrong and can correct at no cost to any gate. Both sites now name what the reader sees,
 and the README names all three layers, since which one you get depends on where you are standing.
+
+### KD-36 — the criterion-E test proved its plant was gone, not that bytes arrived — **CLOSED, 2026-09-15**
+Logged non-blocking by the round that found it, and fixed in the same round, because the test's NAME
+was the harm: "THE CRITERION: one command, and the bytes arrive in EVERY tree". It planted staleness
+by APPENDING a comment to a vendored file, so "the upgrade arrived" and "my edit was undone" were
+the same observation. Review ran the two assertions against a three-line impostor that reverted the
+planted file and did nothing else; both passed.
+
+The plant now also DELETES a machine-owned file (`qa/lib/evidence-ladder.mjs`), and the test asserts
+it is back and byte-identical to the package's copy. Nothing can put a deleted file back except
+vendoring it. Verified by mutation rather than by reasoning: an upgrade that copies `changed` files
+but skips `new` ones — precisely a reverter — turns it red.
+
+The class is one this branch has now hit three times and it is worth stating once more: **a test
+that cannot refuse the defect in its own name is worse than no test, because the file's name says
+it is covered.** Here the fix was to strengthen rather than to cut, because the criterion is real
+and per-commit; the two earlier cases had nothing left to assert once the duplicate was removed.
 
 ### KD-19 — a refusal wording the classifier could not read — **CLOSED, 2026-09-15**
 Resolved exactly as the entry predicted, by `upgrade --fleet` existing.

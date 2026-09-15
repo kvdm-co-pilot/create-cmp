@@ -22,6 +22,10 @@ import { readFleetManifest as gateReadFleetManifest } from "../scripts/stage3-ga
 import { hashHarnessRegion, compareHarnessRegion } from "../packages/harness/src/lib/harness-region.mjs";
 import { LOCK_PATH } from "../packages/harness/src/lib/harness-lock.mjs";
 import { runHarnessInit } from "../packages/harness/install/init.mjs";
+import { runningHarness } from "../packages/harness/install/upgrade.mjs";
+
+/** The `src/` of the artifact this process ships — where vendored bytes come from. */
+const PKG_SRC = runningHarness().src;
 
 /** Run something with stdout swallowed — these commands are chatty by design. */
 async function quiet(fn) {
@@ -174,15 +178,26 @@ test("--fleet with no value is refused and prints how to declare one", async () 
   assert.equal(await quiet(() => runFleetUpgrade({ fleet: true }, undefined, {})), 2);
 });
 
-/** A scratch repo with a real vendored lane, and its region made stale. */
+/** One vendored file that must come BACK, and can only come from the package. */
+const DELETED_REL = ["qa", "lib", "evidence-ladder.mjs"];
+
+/**
+ * A scratch repo with a real vendored lane, made stale two ways.
+ *
+ * THE APPEND ALONE WAS NOT ENOUGH, and review proved it: a three-line impostor
+ * that reverted the planted edit and did nothing else passed both of the
+ * assertions below. Staleness planted as a delta FROM the correct bytes makes
+ * "the upgrade arrived" and "my edit was undone" the same observation, and the
+ * test's name claims the first. So a whole file is DELETED as well — nothing
+ * can put that back except vendoring it from the package (KD-36).
+ */
 async function repoWithStaleLane(root) {
   fs.mkdirSync(root, { recursive: true });
   await quiet(() => runHarnessInit({ "no-interview": true }, root, { invocation: "prooflane" }));
-  // A machine-owned file that no longer matches the package, so the upgrade has
-  // something to carry. Without this the command is correctly idempotent and
-  // nothing moves — which would make the assertions below vacuous.
-  const spine = path.join(root, "qa", "lib", "harness-lock.mjs");
-  fs.appendFileSync(spine, "\n// planted: this lane is behind the package\n");
+  fs.appendFileSync(path.join(root, "qa", "lib", "harness-lock.mjs"), "\n// planted: this lane is behind the package\n");
+  const gone = path.join(root, ...DELETED_REL);
+  assert.ok(fs.existsSync(gone), `the lane no longer vendors ${DELETED_REL.join("/")} — this plant aims at nothing`);
+  fs.rmSync(gone);
   return hashHarnessRegion(root).sha256;
 }
 
@@ -203,6 +218,15 @@ test("THE CRITERION: one command, and the bytes arrive in EVERY tree", async () 
       const root = path.join(dir, id);
       const after = hashHarnessRegion(root).sha256;
       assert.notEqual(after, before.get(id), `${id}: not one vendored byte moved — the command reported success over a tree it did not change`);
+
+      // ARRIVED, not merely changed. The deleted file is back, and byte-identical
+      // to the package's copy — which no reverter of the planted edit can fake.
+      const landed = path.join(root, ...DELETED_REL);
+      assert.ok(fs.existsSync(landed), `${id}: a deleted machine-owned file was not restored — nothing was vendored`);
+      assert.ok(
+        fs.readFileSync(landed).equals(fs.readFileSync(path.join(PKG_SRC, ...DELETED_REL.slice(1)))),
+        `${id}: ${DELETED_REL.join("/")} is back but is not the package's bytes`,
+      );
 
       // The other half, and ADR-0008's whole point: a fix arrives as a re-lock
       // over NEW BYTES, never as a version number over the old ones.

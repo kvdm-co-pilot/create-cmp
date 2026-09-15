@@ -24,7 +24,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { colors, fail, ok, warn } from "./log.mjs";
-import { runHarnessUpgrade } from "./upgrade.mjs";
+import { frontDoor } from "./init.mjs";
+import { runHarnessUpgrade, runningHarness } from "./upgrade.mjs";
 
 /** The one schema this reads. A manifest that says anything else is refused. */
 export const FLEET_SCHEMA = "prooflane-fleet/1";
@@ -119,6 +120,15 @@ export function readFleetManifest(abs) {
       problems.push(`${where} must name exactly one of "path" or "url"`);
       return;
     }
+    // Validated because the OTHER reader validates it. `scripts/stage3-gate.mjs`
+    // has had this check since it was written; this one did not, so
+    // `{"ref": 5}` was accepted here and refused there — a drift the twelve-
+    // manifest corpus could not see, because it varied `ref` exactly once and
+    // only as a string. The generated corpus that replaced it reported 72 of
+    // 2016 manifests disagreeing, all of them this.
+    if ("ref" in entry && typeof entry.ref !== "string") {
+      problems.push(`${where}.ref must be a string when present (got ${JSON.stringify(entry.ref)})`);
+    }
     if (hasUrl) {
       // An upgrade WRITES to a working tree. A URL is not one, and cloning on
       // the operator's behalf would put a repo on their disk they did not ask
@@ -147,10 +157,24 @@ export function readFleetManifest(abs) {
  * @returns {Promise<number>} exit code — 0 only when every repo succeeded
  */
 export async function runFleetUpgrade(flags, positional, opts = {}) {
+  const cmd = frontDoor(opts.invocation);
   const value = flags.fleet;
   if (typeof value !== "string" || !value) {
     fail("--fleet needs the path to a fleet manifest.");
-    process.stdout.write(`\n  ${HOW_TO_DECLARE_A_FLEET}\n\n  Then: ${colors.cyan("prooflane upgrade --fleet ./fleet.json")}\n\n`);
+    process.stdout.write(`\n  ${HOW_TO_DECLARE_A_FLEET}\n\n  Then: ${colors.cyan(`${cmd.upgrade} --fleet ./fleet.json`)}\n\n`);
+    return 2;
+  }
+  if (typeof flags["target-dir"] === "string") {
+    // The manifest names every tree this writes to. A flag that renames the
+    // target outranks `repo.dir` inside `runHarnessUpgrade` — so this ran N
+    // times against ONE directory nobody declared and reported "N of N
+    // upgraded". That is KD-7's shape (fifty-two files into the wrong
+    // repository, exit 0) inside the one command that writes, unattended, to
+    // repositories the operator does not have open.
+    fail(`--target-dir and --fleet name different trees — pass one.`);
+    process.stdout.write(
+      `\n  ${colors.dim("A fleet upgrade writes to the directories its manifest names, and to nothing else.")}\n\n`,
+    );
     return 2;
   }
   if (positional) {
@@ -171,11 +195,27 @@ export async function runFleetUpgrade(flags, positional, opts = {}) {
     return 2;
   }
 
+  // ONE ARTIFACT, RESOLVED ONCE, FOR THE WHOLE FLEET — the single property that
+  // makes this command worth more than a shell loop, and it has to be taken
+  // HERE. `runHarnessUpgrade` resolves per project and prefers that project's
+  // own node_modules, which is right for one repo (the adopter installed the
+  // version they meant to carry) and exactly wrong for a fleet: ten repos would
+  // land on whatever each directory happened to hold, from one green run.
+  // Measured before this line existed — two repos, one command, versions
+  // 0.0.1-ancient and 0.21.1, "2 of 2 repo(s) upgraded", no warning.
+  const harness = runningHarness();
+  if (!harness) {
+    fail(`could not resolve the harness this command ships from — there is nothing to carry into the fleet.`);
+    process.stdout.write("\n");
+    return 2;
+  }
+
   const dryRun = Boolean(flags["dry-run"]);
   process.stdout.write(
-    `\n${colors.bold("prooflane upgrade --fleet")} — re-vendor every lane the manifest names\n` +
+    `\n${colors.bold(`${cmd.upgrade} --fleet`)} — re-vendor every lane the manifest names\n` +
       `  manifest: ${colors.cyan(manifestPath)}\n` +
-      `  repos:    ${colors.cyan(String(read.repos.length))}${dryRun ? colors.yellow("   (--dry-run — nothing will be written)") : ""}\n`,
+      `  repos:    ${colors.cyan(String(read.repos.length))}${dryRun ? colors.yellow("   (--dry-run — nothing will be written)") : ""}\n` +
+      `  carrying: ${colors.cyan(`${harness.version}`)} ${colors.dim("— the same bytes into every repo below")}\n`,
   );
 
   const results = [];
@@ -191,7 +231,13 @@ export async function runFleetUpgrade(flags, positional, opts = {}) {
     }
     let code;
     try {
-      code = await runHarnessUpgrade({ ...flags, fleet: undefined }, repo.dir, opts);
+      // AN ALLOWLIST, NOT A SPREAD. Forwarding `{...flags}` handed every flag
+      // this door accepts to a command whose target is already decided, and one
+      // of them (`--target-dir`) silently outranked it. A denylist would have
+      // to be extended by whoever adds the next targeting flag, in a file they
+      // are not editing; an allowlist is wrong only about flags that do not
+      // reach here yet, which is the safe direction for a command that writes.
+      code = await runHarnessUpgrade({ "dry-run": dryRun }, repo.dir, { ...opts, harness });
     } catch (err) {
       // A throw in one repo is that repo's failure, never the fleet's crash.
       fail(`${repo.id}: ${err?.message ?? err}`);
