@@ -65,26 +65,43 @@ const PKG_NAME = HARNESS_PKG_NAME;
  * @param {string} root project root
  * @returns {{src: string, pkgDir: string, version: string, where: string}|null}
  */
-export function resolveHarness(root) {
-  const candidates = [
-    { pkgDir: path.join(root, "node_modules", PKG_NAME), where: "node_modules" },
-    { pkgDir: path.resolve(HARNESS_SRC, ".."), where: "this package" },
-  ];
-  for (const c of candidates) {
-    const manifest = path.join(c.pkgDir, "package.json");
-    if (!fs.existsSync(manifest)) continue;
-    let version;
-    try {
-      version = JSON.parse(fs.readFileSync(manifest, "utf8")).version;
-    } catch {
-      continue;
-    }
-    if (typeof version !== "string" || !version) continue;
-    const src = path.join(c.pkgDir, "src");
-    if (!fs.existsSync(src)) continue;
-    return { src, pkgDir: c.pkgDir, version, where: c.where };
+function harnessAt(pkgDir, where) {
+  const manifest = path.join(pkgDir, "package.json");
+  if (!fs.existsSync(manifest)) return null;
+  let version;
+  try {
+    version = JSON.parse(fs.readFileSync(manifest, "utf8")).version;
+  } catch {
+    return null;
   }
-  return null;
+  if (typeof version !== "string" || !version) return null;
+  const src = path.join(pkgDir, "src");
+  if (!fs.existsSync(src)) return null;
+  return { src, pkgDir, version, where };
+}
+
+export function resolveHarness(root) {
+  return (
+    harnessAt(path.join(root, "node_modules", PKG_NAME), "node_modules") ??
+    harnessAt(path.resolve(HARNESS_SRC, ".."), "this package")
+  );
+}
+
+/**
+ * The harness THIS PROCESS ships from, ignoring every project's node_modules.
+ *
+ * `resolveHarness` deliberately prefers the target's own node_modules, because
+ * for a single repo the version an adopter installed is the version they asked
+ * to carry. A FLEET cannot use that rule: resolving per repo means ten repos
+ * end up on whatever each directory happened to hold, which is precisely the
+ * outcome one fleet command exists to prevent. Measured on 2026-09-15, before
+ * this existed — one process, one command, two repos, two different versions,
+ * and a green "2 of 2 upgraded".
+ *
+ * @returns {{src: string, pkgDir: string, version: string, where: string}|null}
+ */
+export function runningHarness() {
+  return harnessAt(path.resolve(HARNESS_SRC, ".."), "this package");
 }
 
 /**
@@ -110,7 +127,7 @@ export function upgradePlan(root, srcRoot) {
  * `prooflane upgrade` — re-vendor an installed lane from the resolved harness.
  * @param {Record<string, string|boolean>} flags
  * @param {string|undefined} positional
- * @param {{invocation?: string}} [opts]
+ * @param {{invocation?: string, harness?: {src: string, pkgDir: string, version: string, where: string}}} [opts]
  * @returns {Promise<number>} exit code
  */
 export async function runHarnessUpgrade(flags, positional, opts = {}) {
@@ -129,7 +146,9 @@ export async function runHarnessUpgrade(flags, positional, opts = {}) {
     return 2;
   }
 
-  const resolved = resolveHarness(root);
+  // A caller that already resolved one artifact passes it in, so every repo in
+  // a fleet gets the SAME bytes. Absent, this resolves per project as before.
+  const resolved = opts.harness ?? resolveHarness(root);
   if (!resolved) {
     fail(`could not resolve ${PKG_NAME} — nothing to upgrade from.`);
     process.stdout.write(
