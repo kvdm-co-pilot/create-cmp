@@ -112,6 +112,7 @@ you the same list without opening anything.
 | **KD-40** | `--minimal` strips the lane and leaves `qa/harness.lock.json` describing it | the lock is invisible to the stripper: not `.mjs`, not a declaration |
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 | **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
+| **KD-45** | no gate in this repo executes the template's Firebase or iOS paths | the device tier stamps `--no-ios --no-firebase`; shape is scanned, runtime is not |
 
 ---
 
@@ -582,6 +583,35 @@ served, and the slice's actual defect — three spellings of the runner, and a w
 fixed and proven. A fourth patch to the same function is the over-correction loop this log's header
 was written about: five consecutive rounds where the fix became the next round's finding. **Whoever
 touches this next should take one of the two terminating fixes rather than add a fifth case.**
+### KD-45 — the device tier has never run the template's Firebase or iOS code
+
+`scripts/fleet-check.mjs` (the scratch app's flags)
+
+The scratch app every device run stamps is `--no-ios --no-firebase` (`scripts/fleet-check.mjs`, and
+the banner says so out loud). So no gate in this repository executes either path: not the device
+tier, not `framework-check`, not the suite. The evidence ladder's L2 rung — "the artifact ran AS THE
+PROGRAM" — is earned every time by a program with Firebase and iOS compiled out.
+
+**Measured cost, today.** Both emulator-redirect defects fixed in this slice were invisible to every
+gate here and were found by an adopter session reading the code. One of them — the iOS path having
+no build gate at all, so release builds redirect to 127.0.0.1 — had shipped in the template
+unnoticed. A scan of the SHAPE now holds them (`test/the-emulator-redirect-cannot-fail-quietly.test.mjs`,
+three of five assertions red against the code as it shipped), and a shape scan is not a run.
+
+**Why the flags are there is sound**, which is why this is a gap and not a mistake: Firebase needs a
+project and running emulators, and iOS needs Xcode, a simulator and roughly six minutes of
+Kotlin/Native compile — this slice measured 367s for one iOS scaffold build. Paying that on every
+device run would push the tier from ~3.5min to something nobody runs at slice close, and Rule 1's
+answer to a cost like that is a nightly stage, not a per-slice gate.
+
+**What would close it:** a second, slower fleet profile that stamps `--firebase --ios` and runs at
+nightly cadence rather than per slice. `fleet-check` already takes a `--profile` (smoke | scaffold |
+local | ci | nightly | release), so the seam exists and nothing here needs inventing.
+
+**Fires when:** any defect in the template's Firebase or iOS code. It cannot be caught by this
+repo's own evidence, only by an adopter. *Logged 2026-09-15, found while fixing the emulator
+redirect.*
+
 ## Closed
 
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
