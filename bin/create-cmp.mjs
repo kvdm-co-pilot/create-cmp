@@ -111,10 +111,26 @@ async function main() {
         const { runHarnessRelock } = await import("../packages/harness/install/relock.mjs");
         process.exit((await runHarnessRelock(flags, rest[1], { invocation: "create-cmp" })) ?? 0);
       }
+      // The sibling the comment above predicted, arriving with `--fleet`. It is
+      // here and not only on `prooflane` because a door offering init and
+      // relock but not upgrade is the asymmetry KD-4 and KD-24 are both about,
+      // and because scripts/stage3-gate.mjs names THIS door as its fallback
+      // when the harness package cannot be resolved — a gate pointing at a
+      // subcommand that does not exist is a landmine with a timer on it.
+      if (sub === "upgrade") {
+        if ("fleet" in flags) {
+          const { runFleetUpgrade } = await import("../packages/harness/install/fleet.mjs");
+          process.exit((await runFleetUpgrade(flags, rest[1], { invocation: "create-cmp" })) ?? 0);
+        }
+        const { runHarnessUpgrade } = await import("../packages/harness/install/upgrade.mjs");
+        process.exit((await runHarnessUpgrade(flags, rest[1], { invocation: "create-cmp" })) ?? 0);
+      }
       process.stderr.write(
         `create-cmp harness: unknown subcommand ${JSON.stringify(sub ?? "")}\n` +
-          `  usage: create-cmp harness init   [--profile <id>] [--target-dir <dir>] [--dry-run] [--no-interview]\n` +
-          `         create-cmp harness relock [--target-dir <dir>] [--dry-run]\n`
+          `  usage: create-cmp harness init    [--profile <id>] [--target-dir <dir>] [--dry-run] [--no-interview]\n` +
+          `         create-cmp harness relock  [--target-dir <dir>] [--dry-run]\n` +
+          `         create-cmp harness upgrade [--target-dir <dir>] [--dry-run]\n` +
+          `         create-cmp harness upgrade --fleet <manifest> [--dry-run]\n`
       );
       process.exit(2);
     }

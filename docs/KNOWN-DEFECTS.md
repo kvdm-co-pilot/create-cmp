@@ -98,7 +98,6 @@ you the same list without opening anything.
 | **KD-14** | `create-cmp`'s parser does not split `--flag=value` | never promised; pairs with KD-4 |
 | **KD-16** | a boolean's value form is consumed by a reader that cannot read it | `prooflane` has no `flagBool` at all |
 | **KD-18** | the symlink gate reads 2 of the 8 bins this repo publishes | all eight pass today |
-| **KD-19** | the refusal-classifier does not match the new refusal wording | resolves when `upgrade --fleet` exists |
 | **KD-20** | the vendored lane's parsers refuse `--` as well | not npx-reachable |
 | **KD-21** | `KNOWN_FLAGS` is hand-written where `BOOLEAN_FLAGS` is derived | zero gaps measured, both directions |
 | **KD-24** | `--yes` refused at one door, accepted-and-ignored at the other | the flag is inert; the rest of the line still does what was asked |
@@ -227,30 +226,6 @@ worse served than before. What changed is only that the record said it was fixed
 
 **Fires when:** anyone writes `--flag false` at prooflane, or `--no-flag true` anywhere.
 *Logged 2026-09-14 (review round 2 of `fix-flag-eats-target`); closed and re-opened 2026-09-14.*
-
-### KD-19 — a new refusal wording was added, and the reader that classifies refusals was not told
-
-`scripts/stage3-gate.mjs` (`looksUnimplemented`), `packages/harness/bin/prooflane.mjs`
-
-`looksUnimplemented` decides whether a front door *has no such command yet* or *answered and
-failed*, by matching `/unknown (sub)?command|not a command|unrecognized/i` on the child's output.
-`5c2cea6` gave both doors a second refusal — "`--fleet` is not a flag this command knows" — which
-that regex does not match, and criterion D spawns exactly `prooflane upgrade --fleet <manifest>`.
-Measured on `5c2cea6`:
-
-```
-✗ ONE command upgrades the whole fleet
-      `prooflane-harness prooflane.mjs upgrade --fleet` exited 2: ✗ prooflane: --fleet is not a flag …
-```
-
-where it used to read "no fleet command exists: … is not implemented". The criterion is red either
-way and Stage 3 is not exited, so nothing is wrongly served — it is a gate that now reports the
-wrong *reason* for a red it was always going to give. The class is the one worth naming: a refusal
-message has a reader somewhere, and adding a spelling without telling the reader makes the reader
-silently wrong.
-
-**Fires when:** Stage 3 is worked on, or any other caller comes to classify a CLI's refusal.
-*Logged 2026-09-14, review round 1 of `refuse-unknown-args`.*
 
 ### KD-20 — the vendored lane's two strict parsers refuse `--` as well
 
@@ -486,6 +461,20 @@ Logged as non-blocking and fixed anyway, because the round had just established 
 move the review hash. The log exists to stop findings being re-litigated, not to preserve a sentence
 I know is wrong and can correct at no cost to any gate. Both sites now name what the reader sees,
 and the README names all three layers, since which one you get depends on where you are standing.
+
+### KD-19 — a refusal wording the classifier could not read — **CLOSED, 2026-09-15**
+Resolved exactly as the entry predicted, by `upgrade --fleet` existing.
+
+`looksUnimplemented` decides *no such command yet* versus *answered and failed* by matching
+`/unknown (sub)?command|not a command|unrecognized/i`, and "`--fleet` is not a flag this command
+knows" matched neither. That misclassification needed the flag to be UNIMPLEMENTED to fire. It is
+implemented, so criterion D now spawns a command that runs, and a non-zero exit from it genuinely
+is a failure rather than an absence — which is what the classifier would say.
+
+Closed on the instance, and the class it named stands and is worth restating once: **a refusal
+message has a reader somewhere, and adding a spelling without telling the reader makes the reader
+silently wrong.** Nothing gates that today. It is not re-logged as an open entry, because an entry
+that says "be careful" with no measurement behind it is the kind this file's header refuses.
 
 ### KD-33 — the plugin launched its MCP server by a path relative to nothing in particular — **CLOSED, 2026-09-15**
 `.mcp.json` names `${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs`, and the gate now asserts the two properties
