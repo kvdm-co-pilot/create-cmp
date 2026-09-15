@@ -55,3 +55,9 @@ qa-artifacts/
 # Scratch scaffolds from engine test runs — generated apps, build output and all.
 # The engine is tested by STAMPING these, not by keeping them.
 myapp/
+
+# Agent worktrees. Ignored here and not only in .git/info/exclude, which is
+# local to one machine: on any other clone these are 350+ untracked test files
+# sitting inside the repo. `npm test` no longer globs them (it names its roots),
+# but `git status` and every "is the tree clean" check still would.
+.claude/worktrees/
