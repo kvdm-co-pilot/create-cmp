@@ -241,7 +241,8 @@ what loads when the `create-cmp` plugin is active, in whatever project you are w
 
 **That block is not a template — do not copy it into another project.** `${CLAUDE_PLUGIN_ROOT}` is
 substituted for a plugin's config and nowhere else; in a project-scoped `.mcp.json` the literal
-string reaches `node` and the server dies on ENOENT. It is a relative path that made this server
+string reaches `node`, which looks for a directory literally called `${CLAUDE_PLUGIN_ROOT}`
+under the cwd and exits with `MODULE_NOT_FOUND` — an MCP client shows you `CONNECTION_CLOSED`. It is a relative path that made this server
 start only for someone whose cwd happened to be the plugin root; the variable is what fixed that.
 
 To use it in another project, **install the plugin** — that is what the block above is for. To

@@ -474,6 +474,19 @@ moves. *Logged 2026-09-14, review round 1 of `startup-plant`.*
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-35 — the prose named a syscall nobody sees — **CLOSED, 2026-09-15**
+Round 2 executed two error-code claims I had written from memory twenty minutes earlier and found
+one wrong in both places: `node '${CLAUDE_PLUGIN_ROOT}/…/server.mjs'` exits `MODULE_NOT_FOUND`, not
+`ENOENT`. ENOENT is the syscall underneath; an MCP client shows a third thing again,
+`CONNECTION_CLOSED`. (The other claim held — `bin/server.mjs` with no `node_modules` really is
+`ERR_MODULE_NOT_FOUND` for `@modelcontextprotocol/sdk`.)
+
+Logged as non-blocking and fixed anyway, because the round had just established that it was FREE to:
+`scripts/observed-tree.mjs`'s `REVIEW_SKIP` is `relPath.endsWith(".md")`, so a markdown edit cannot
+move the review hash. The log exists to stop findings being re-litigated, not to preserve a sentence
+I know is wrong and can correct at no cost to any gate. Both sites now name what the reader sees,
+and the README names all three layers, since which one you get depends on where you are standing.
+
 ### KD-33 — the plugin launched its MCP server by a path relative to nothing in particular — **CLOSED, 2026-09-15**
 `.mcp.json` names `${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs`, and the gate now asserts the two properties
 its own comment always claimed to be about.
@@ -494,7 +507,7 @@ Corrected, both halves executed:
 plugin_create-cmp_cmp-inspector   answers          → resolves in PLUGIN scope
 cmp-inspector (project)           CONNECTION_CLOSED → does NOT resolve in project scope
 printenv CLAUDE_PLUGIN_ROOT       unset             → not an environment variable
-node '${CLAUDE_PLUGIN_ROOT}/…/server.mjs'  ENOENT
+node '${CLAUDE_PLUGIN_ROOT}/…/server.mjs'  MODULE_NOT_FOUND
 ```
 
 **ONE FILE, TWO ROLES — the thing the next reader will trip on.** This repo IS the plugin, so
