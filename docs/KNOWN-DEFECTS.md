@@ -109,7 +109,6 @@ you the same list without opening anything.
 | **KD-30** | the "second lane run left no receipt" guard reads the path the first run's receipt is at | unreachable; the stale receipt reads as the overclaim |
 | **KD-31** | the vendored contract tells its reader to run `scripts/fleet-check.mjs`, which no stamped app has | an import error, not a wrong result |
 | **KD-32** | the plant driver spells cmp's source root and pack id as literals | both fail loud, and there is one pack |
-| **KD-33** | the plugin `.mcp.json` names the bundle by a path relative to an unspecified cwd | fix is already in the installed cache; the gate pins the literal string |
 
 ---
 
@@ -470,35 +469,61 @@ moves. *Logged 2026-09-14, review round 1 of `startup-plant`.*
 
 ---
 
-### KD-33 — the plugin launches its MCP server by a path relative to nothing in particular
-
-`.mcp.json`, and `inspector/mcp/test/bundle-freshness.test.mjs:126`
-
-`args: ["inspector/mcp/dist/server.mjs"]` — relative, and a plugin-loaded MCP server is not launched
-from the plugin root. `f5077c8` fixed the real bug there (launch the bundle instead of
-`bin/server.mjs`, measured against the actual cached install) and inherited the relative spelling
-without weighing it; Claude Code publishes `${CLAUDE_PLUGIN_ROOT}` for exactly this.
-
-**Found by measurement, not by reading:** the installed cache at
-`~/.claude/plugins/cache/create-cmp/create-cmp/` holds `${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs` at
-0.25.0 and the relative path at 0.23.0 and 0.24.0. Someone hit this, fixed it in the cache to prove
-the fix, and mirrored it into this repo's working tree.
-
-The reason it is not already merged is the gate. The test asserts `deepEqual(args,
-["inspector/mcp/dist/server.mjs"])` — the literal string — while its own comment says what it cares
-about is that the plugin launches the BUNDLE rather than `bin/server.mjs`, which the corrected
-spelling still does. So the fix needs the assertion re-aimed at the target it names, and **a gate
-loosened to let a change through is the most dangerous edit in this repo.** It gets its own slice
-and its own review round rather than riding inside one about the ladder plant.
-
-**Fires when:** anyone installs the plugin from the marketplace and the client's cwd is not the
-plugin root — the normal case, and why `cmp-inspector` has been failing to start for everyone but
-a repo checkout. *Logged 2026-09-15, found while closing `startup-plant`.*
-
 ## Closed
 
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
+
+### KD-33 — the plugin launched its MCP server by a path relative to nothing in particular — **CLOSED, 2026-09-15**
+`.mcp.json` names `${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs`, and the gate now asserts the two properties
+its own comment always claimed to be about.
+
+**Karel's change, and his reason is the precise one:** point at this repo from another. A relative
+path resolves against the MCP client's cwd, so the plugin's server only ever started for someone
+whose cwd happened to be the plugin root.
+
+**Where the variable resolves, measured — and my first measurement of it was WRONG.** I called the
+project-scoped `cmp-inspector` after editing the file, got the server's own error rather than a
+transport failure, and concluded the path had resolved. MCP servers launch at SESSION START: the
+server that answered was started from the relative path, in a checkout where it works. The tell was
+in the next session reminder, not in my reasoning.
+
+Corrected, both halves executed:
+
+```
+plugin_create-cmp_cmp-inspector   answers          → resolves in PLUGIN scope
+cmp-inspector (project)           CONNECTION_CLOSED → does NOT resolve in project scope
+printenv CLAUDE_PLUGIN_ROOT       unset             → not an environment variable
+node '${CLAUDE_PLUGIN_ROOT}/…/server.mjs'  ENOENT
+```
+
+**ONE FILE, TWO ROLES — the thing the next reader will trip on.** This repo IS the plugin, so
+`.mcp.json` is the plugin's config from the marketplace cache and a project config in this checkout.
+The anchored spelling that makes the plugin work everywhere leaves the project-scoped copy dead in
+this one directory. That is the correct trade, not a defect: the plugin server serves the same tools
+from anywhere, and the project-scoped one was a duplicate that only ever worked here. The test
+carries that paragraph so the round trip — seeing `CONNECTION_CLOSED` and "fixing" it by going
+relative again — is refused rather than rediscovered.
+
+**The test was re-aimed, and that is a strengthening; here is the direction rather than the
+argument.** It pinned `deepEqual(args, ["inspector/mcp/dist/server.mjs"])` — a spelling. Pinning a
+spelling looks stricter than asserting a property and is weaker: it cannot tell a correction from a
+regression, so it refuses both. The new form asserts one argument, anchored to the plugin root,
+naming the committed bundle rather than `bin/server.mjs`, at a path that EXISTS — which the old form
+could not reach at all. Executed against four wrong shapes:
+
+```
+the OLD spelling (relative, pre-fix)            RED
+anchored but pointing at bin/server.mjs         RED
+anchored, right shape, file does not exist      RED
+two arguments                                   RED
+the fix itself                                  green
+```
+
+It is not a strict superset and should not be described as one: it gives up exactly one refusal —
+of the correct spelling — and buys four. `f5077c8` fixed WHICH FILE, measured against the real
+cached install, and inherited FROM WHERE without weighing it; for a year the gate held the half that
+had already been fixed.
 
 ### KD-34 — a test named for the record-ordering defect was green at the commit that had it — **CLOSED, 2026-09-15**
 Cut, which is what the entry asked for, in the round that logged it. Round 2 measured rather than
