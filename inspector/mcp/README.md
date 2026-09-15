@@ -225,25 +225,35 @@ node bin/server.mjs  # start the stdio MCP server
 
 ## Registering the server with Claude Code
 
-This repo registers the server via a root **`.mcp.json`** so it loads whenever the project (or the
-`create-cmp` plugin) is active:
+This repo registers the server via a root **`.mcp.json`**, which is the **plugin's** config — it is
+what loads when the `create-cmp` plugin is active, in whatever project you are working in:
 
 ```json
 {
   "mcpServers": {
     "cmp-inspector": {
       "command": "node",
-      "args": ["inspector/mcp/dist/server.mjs"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs"]
     }
   }
 }
 ```
 
-To register it manually in another project, add the same block to that project's `.mcp.json`, or:
+**That block is not a template — do not copy it into another project.** `${CLAUDE_PLUGIN_ROOT}` is
+substituted for a plugin's config and nowhere else; in a project-scoped `.mcp.json` the literal
+string reaches `node` and the server dies on ENOENT. It is a relative path that made this server
+start only for someone whose cwd happened to be the plugin root; the variable is what fixed that.
+
+To use it in another project, **install the plugin** — that is what the block above is for. To
+register it by hand instead, give an ABSOLUTE path, and name `dist/server.mjs`:
 
 ```bash
-claude mcp add cmp-inspector -- node /absolute/path/to/inspector/mcp/dist/server.mjs
+claude mcp add cmp-inspector -- node /absolute/path/to/create-cmp/inspector/mcp/dist/server.mjs
 ```
+
+`dist/server.mjs` is the committed, self-contained bundle. `bin/server.mjs` is the unbundled entry
+and needs `inspector/mcp/node_modules`, which a plugin install does not have — it dies on
+`ERR_MODULE_NOT_FOUND` for `@modelcontextprotocol/sdk` before serving a single tool.
 
 Optionally export a default tree so tools can be called without `treePath`:
 

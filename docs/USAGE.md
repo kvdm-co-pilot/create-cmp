@@ -119,7 +119,7 @@ session's skill list still looks stale after installedPlugins shows the entry, r
 **Register the MCP standalone** (outside the plugin):
 
 ```bash
-claude mcp add cmp-inspector -- node /absolute/path/to/inspector/mcp/bin/server.mjs
+claude mcp add cmp-inspector -- node /absolute/path/to/create-cmp/inspector/mcp/dist/server.mjs
 ```
 
 **First move on any machine:** run **`doctor`** — it verifies (and heals) the toolchain, and
@@ -209,7 +209,8 @@ intent — the descriptions carry rich triggers.
 ## 5. The `cmp-inspector` MCP (15 tools)
 
 A stdio server that reads a Compose UI as a **single JSON tree contract** and never returns pixel
-bytes. Node: `node inspector/mcp/bin/server.mjs`.
+bytes. Node: `node inspector/mcp/dist/server.mjs` — the committed bundle, which is what
+`.mcp.json` launches.
 
 ### The tree contract (schemaVersion 1)
 
