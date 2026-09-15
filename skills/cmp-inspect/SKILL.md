@@ -246,11 +246,13 @@ headless loop transfers to the live app:
 ## Registering the MCP
 
 The `create-cmp` plugin ships this server; it's registered via the repo-root `.mcp.json`
-(`cmp-inspector` → `node inspector/mcp/bin/server.mjs`), so it loads when the project/plugin is
-active. To wire it into another project manually:
+(`cmp-inspector` → `node ${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs`), so it loads
+wherever the plugin is active. To wire it into another project by hand, give an ABSOLUTE path to
+the bundle — the variable only substitutes for a plugin's own config, and `bin/server.mjs` needs
+node_modules a plugin install does not have:
 
 ```bash
-claude mcp add cmp-inspector -- node /absolute/path/to/inspector/mcp/bin/server.mjs
+claude mcp add cmp-inspector -- node /absolute/path/to/create-cmp/inspector/mcp/dist/server.mjs
 ```
 
 See `inspector/mcp/README.md` for the full tool reference and the tier roadmap.

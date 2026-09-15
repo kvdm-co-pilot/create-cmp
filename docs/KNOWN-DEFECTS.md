@@ -525,6 +525,19 @@ of the correct spelling — and buys four. `f5077c8` fixed WHICH FILE, measured 
 cached install, and inherited FROM WHERE without weighing it; for a year the gate held the half that
 had already been fixed.
 
+**"Buys four" is an overclaim, measured — the review round that checked it, 2026-09-15.** Both
+forms accept exactly ONE string and refuse every other, so `deepEqual` already refused all four of
+those shapes; the new form does not buy them, it inherits them. Run differentially — old gate and
+new gate over the same eight candidate `args`, `.mcp.json` rewritten between runs — the two
+acceptance sets are singletons that swap: old accepts only the relative spelling, new only the
+anchored one, and every other shape (bin, nonexistent file, two args, empty, absolute, trailing
+space) is RED under both. What the re-aim actually buys is not a refusal count: the expected value
+is now COMPUTED from `BUNDLE` rather than typed, so it tracks a rename instead of pinning a
+spelling, and it says WHICH property failed when it fails. The third property — that the file
+exists — is real but not new to the suite: `bundle-freshness.test.mjs`'s first test has asserted
+`fs.existsSync(BUNDLE)` all along. Nothing to fix; the gate is sound and the argument for it was
+one notch stronger than the facts. *Logged 2026-09-15, review round 1 of `plugin-root-path`.*
+
 ### KD-34 — a test named for the record-ordering defect was green at the commit that had it — **CLOSED, 2026-09-15**
 Cut, which is what the entry asked for, in the round that logged it. Round 2 measured rather than
 read: it built a worktree at `283294e` — the tree where the record was written before the ladder
