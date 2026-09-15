@@ -457,8 +457,6 @@ report is one they named. **Fires when:** a fleet grows past the size its author
 head, which is the size at which this command starts being worth having. *Logged 2026-09-15, review
 round 1 of `fleet-upgrade`.*
 
----
-
 ## Closed
 
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
@@ -476,6 +474,26 @@ Logged as non-blocking and fixed anyway, because the round had just established 
 move the review hash. The log exists to stop findings being re-litigated, not to preserve a sentence
 I know is wrong and can correct at no cost to any gate. Both sites now name what the reader sees,
 and the README names all three layers, since which one you get depends on where you are standing.
+
+### KD-38 — the fix moved the mechanism and left the prose pointing at the old one — **CLOSED, 2026-09-15**
+Both halves were comments, and both were mine, written in the round that fixed the thing they
+described. Fixed rather than logged because a comment file cannot be edited "for free" the way
+markdown can — `REVIEW_SKIP` is `.md` only — but the provenance fix in the same commit was already
+moving the review hash, so there was no round to save by leaving them.
+
+**`fleet.mjs`'s header still asserted the claim round 1 measured as false.** "`resolveHarness` falls
+back to the package the running binary ships from, so a single process carries a single artifact
+into every tree" — naming a function `runFleetUpgrade` no longer calls, whose rule is deliberately
+the opposite. The paragraph now says what the mechanism is AND carries the measurement that killed
+the old one, because a header that only states the right answer teaches nobody why the wrong one was
+attractive.
+
+**Extracting `harnessAt` stranded `resolveHarness`'s JSDoc on it.** "`node_modules` first is the
+whole point… @param {string} root" sat above a function taking `(pkgDir, where)`, and the exported
+`resolveHarness` had no doc at all. Moved back, with a line pointing at `runningHarness` for why a
+fleet does not use it.
+
+*Found in review round 2 of `fleet-upgrade`, fixed in it.*
 
 ### KD-36 — the criterion-E test proved its plant was gone, not that bytes arrived — **CLOSED, 2026-09-15**
 Logged non-blocking by the round that found it, and fixed in the same round, because the test's NAME
