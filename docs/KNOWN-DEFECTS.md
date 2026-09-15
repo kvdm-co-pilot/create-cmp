@@ -109,6 +109,7 @@ you the same list without opening anything.
 | **KD-31** | the vendored contract tells its reader to run `scripts/fleet-check.mjs`, which no stamped app has | an import error, not a wrong result |
 | **KD-32** | the plant driver spells cmp's source root and pack id as literals | both fail loud, and there is one pack |
 | **KD-37** | two fleet ids naming one directory are counted as two repos upgraded | the second pass is idempotent; both were named |
+| **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
 
 ---
 
@@ -456,6 +457,36 @@ unattended run. Not blocking: the manifest is the operator's own file, and every
 report is one they named. **Fires when:** a fleet grows past the size its author can hold in their
 head, which is the size at which this command starts being worth having. *Logged 2026-09-15, review
 round 1 of `fleet-upgrade`.*
+
+### KD-39 — `lastIndexOf("node_modules")` answers for a package root that is merely nested under one
+
+`packages/harness/install/upgrade.mjs` (`runningHarness`)
+
+The fleet's artifact now derives its own `source` by finding a `node_modules` segment in its package
+root and asking the project above it. The segment is found, never verified to be the one that
+INSTALLED this package, so a harness at `proj/node_modules/mono/packages/harness` reads
+`proj/package-lock.json` and inherits whatever origin that project recorded for its own
+`prooflane-harness` — a different artifact. Measured 2026-09-15 by copying the package to each
+layout and importing `runningHarness` from the copy:
+
+| layout | `source` | right? |
+|---|---|---|
+| dev checkout, no `node_modules` in the path | `"local"` | yes |
+| `proj/node_modules/prooflane-harness` + lockfile | `"registry"` | yes |
+| `proj/node_modules/foo/node_modules/prooflane-harness` | `null` | yes — `indexOf` would have said `"registry"` |
+| pnpm: `node_modules/.pnpm/prooflane-harness@X/node_modules/prooflane-harness` | `null` | yes, honestly unrecorded |
+| npx cache: `_npx/<hash>/node_modules/prooflane-harness` | `"registry"` | yes |
+| `proj/node_modules/mono/packages/harness` | `"registry"` | **no — borrowed** |
+
+So `lastIndexOf` is the right call for both cases it was chosen for, and the only wrong answer needs
+the running harness's package root to sit inside some *other* installed package whose project
+lockfile also names `prooflane-harness`. No installer produces that. Not blocking: unreachable in
+every real layout, and `verify.mjs` states the field "is reported, never consulted: no verdict, gate
+or level reads this field". The tightening, if it is ever wanted, is one condition — require the
+segment after `node_modules` to be the package itself (`prooflane-harness`, or `@scope` then the
+name) rather than any ancestor. **Fires when:** someone vendors this repo inside a dependency, or
+a future installer nests package roots differently. *Logged 2026-09-15, review round 2
+(re-record) of `fleet-upgrade`.*
 
 ## Closed
 
