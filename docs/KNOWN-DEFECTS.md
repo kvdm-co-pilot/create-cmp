@@ -500,6 +500,27 @@ a repo checkout. *Logged 2026-09-15, found while closing `startup-plant`.*
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-34 — a test named for the record-ordering defect was green at the commit that had it — **CLOSED, 2026-09-15**
+Cut, which is what the entry asked for, in the round that logged it. Round 2 measured rather than
+read: it built a worktree at `283294e` — the tree where the record was written before the ladder
+plant — copied both of HEAD's tests in, and ran them. The source scan FAILED there and passes here,
+which is the whole gate and it is sound. `a run that FAILED its last check leaves a record the
+publish gate refuses` PASSED there, carrying the defect's name and unable to refuse it. I reproduced
+that before agreeing.
+
+It could never have done otherwise. Ordering is a fact about the SOURCE; the writer was always
+correct, and nothing done with the writer in isolation can see when it is called. The test's first
+half restated `verdict: failures.length ? "FAIL" : "PASS"` one line from itself and its second is
+asserted by `test/proof-gate-hook.test.mjs:93`, which predates this branch.
+
+Residue of a correct catch, and the round-1 version was mine and worse — it replayed the old call
+order by hand and asserted a property no fix could give it. Rewriting it to something TRUE traded a
+test that was red for the wrong reason for one that was green for no reason, and kept the name.
+That is the third time on this branch that the honest move was to remove a test rather than keep
+it: the duplicate that "closed" KD-10, the third KD-29 test, and this. **A test that cannot refuse
+the defect in its own name is worse than no test, because the file's name says it is covered.** The
+header now says so, and the file carries one test.
+
 ### KD-29 — the ladder plant blessed a run that never showed the edit compiled — **CLOSED, 2026-09-15**
 The refusal is now symmetric. `assessLadderPlant` requires an `l1Required` step that PASSED before
 the plant, exactly as it already required one for `l2Execution`, and names what it saw instead of
