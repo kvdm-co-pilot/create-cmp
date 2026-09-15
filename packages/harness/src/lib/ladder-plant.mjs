@@ -72,6 +72,23 @@ export function assessLadderPlant({ before, after, ladder }) {
   const l1Green = l1.filter(wasGreen);
   const l2Green = l2.filter(wasGreen);
 
+  // The rule above has two halves and until 2026-09-15 it was enforced for one
+  // of them. With no l1Required step green beforehand, `l1Green` is empty, so
+  // `broke` is empty, so the disqualifier below cannot fire — and a single red
+  // L2 step returned ok:true over a receipt that shows nothing about whether
+  // the edit compiled. The sentence it printed said so out loud, with a hole
+  // where the blind steps go: "e2eSmoke went red while  stayed green".
+  if (!l1Green.length) {
+    return {
+      ok: false,
+      reason:
+        `no l1Required step PASSED before the plant (${l1.map((n) => `${n}=${verdictOf(before, n) ?? "absent"}`).join(", ") || "none declared"}), ` +
+        "so nothing in this run can show the edit still COMPILES. A red l2Execution step is evidence about " +
+        "STARTUP only when the build it started from was green.",
+      blind: [], caught: [], broke: [],
+    };
+  }
+
   if (!l2Green.length) {
     return {
       ok: false,

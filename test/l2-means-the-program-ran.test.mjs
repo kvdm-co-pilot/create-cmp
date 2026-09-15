@@ -87,6 +87,35 @@ test("a step that was not green BEFORE the plant cannot be evidence after it", (
   assert.match(r.reason, /e2eSmoke=SKIP/, "the refusal names what it saw rather than asserting a generality");
 });
 
+test("a red L2 step is not evidence when no L1 step was green to begin with", () => {
+  // The SYMMETRIC hole, and the one that pays the instrument's whole claim to
+  // the ground. The disqualifier below — "the plant broke the BUILD" — can only
+  // fire over L1 steps that were green first. Hand it a receipt where none
+  // were, and it has nothing to disqualify: one red L2 step reads as a catch,
+  // and the run is blessed without anything in it showing the edit compiled.
+  // A crash at launch and a file that no longer builds redden the same step.
+  const r = assessLadderPlant({
+    before: receipt({ releaseBuild: "FAIL", conformance: "SKIP", e2eSmoke: "PASS", androidChecks: "PASS" }),
+    after: receipt({ releaseBuild: "FAIL", conformance: "SKIP", e2eSmoke: "FAIL", androidChecks: "FAIL" }),
+    ladder: LADDER,
+  });
+  assert.equal(r.ok, false, "an L2 step went red over a build that was never green");
+  assert.match(r.reason, /no l1Required step PASSED before the plant/);
+  assert.match(r.reason, /releaseBuild=FAIL/, "the refusal names what it saw rather than asserting a generality");
+});
+
+test("a profile with no l1Required steps at all gets no L2 assurance from a plant", () => {
+  // Same hole, reached by a ladder rather than a bad run: nothing declared to
+  // stay green means nothing can witness that the edit still compiles.
+  const r = assessLadderPlant({
+    before: receipt({ e2eSmoke: "PASS" }),
+    after: receipt({ e2eSmoke: "FAIL" }),
+    ladder: { l1Required: [], l2Execution: ["e2eSmoke"] },
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /none declared/);
+});
+
 test("one L2 step catching it is enough, and the others are not held against the rung", () => {
   // `tokenDrift` SKIPs whenever the debug app is not running (KD-5), and a
   // profile may legitimately declare an execution step that a given run cannot
