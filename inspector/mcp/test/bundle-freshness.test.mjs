@@ -123,9 +123,61 @@ test("dist/server.mjs boots and serves every tool with NO node_modules in scope"
   }
 });
 
-test("the plugin's .mcp.json points at the bundle, not the unbundled entry", () => {
-  // The cache has no node_modules; bin/server.mjs there dies on ERR_MODULE_NOT_FOUND.
-  const mcp = JSON.parse(fs.readFileSync(path.join(MCP_ROOT, "..", "..", ".mcp.json"), "utf8"));
+test("the plugin's .mcp.json names the bundle, and anchors it to the plugin root", () => {
+  // TWO independent ways this line can be wrong, and for a year it gated one.
+  //
+  //   WHICH FILE — the cache has no node_modules, so bin/server.mjs there dies
+  //                on ERR_MODULE_NOT_FOUND. f5077c8 fixed that, measured against
+  //                the real cached install, and this test was written for it.
+  //   FROM WHERE — a relative path resolves against the client's cwd, and a
+  //                plugin-loaded server is not launched from the plugin root.
+  //                So the right file, named the wrong way, still does not start.
+  //
+  // ONE FILE, TWO ROLES, and this is the trap for whoever reads it next. This
+  // repo IS the plugin, so `.mcp.json` is the PLUGIN's config when loaded from
+  // the marketplace cache and a PROJECT config when you work in this checkout.
+  // ${CLAUDE_PLUGIN_ROOT} is substituted in the first and not the second — it is
+  // not an environment variable, `printenv` finds nothing — so the anchored
+  // spelling that makes the plugin work from any repo leaves the project-scoped
+  // copy dying with CONNECTION_CLOSED right here. Measured 2026-09-15: the
+  // plugin-scoped server answers, the project-scoped one does not.
+  //
+  // That is the correct trade and not a defect. The plugin server serves the
+  // same tools from anywhere, which is the whole point; the project-scoped one
+  // was a duplicate that only ever worked in this one directory. DO NOT "fix"
+  // the CONNECTION_CLOSED by making this path relative again — that is the bug,
+  // and this test is what stops the round trip.
+  //
+  // The second was not gated, because the test pinned the literal string the
+  // first fix happened to leave behind. Pinning a spelling looks stricter than
+  // asserting a property and is weaker: it cannot tell a correction from a
+  // regression, so it refuses both. This asserts the two properties its own
+  // comment always claimed to be about, plus a third the old form could not
+  // reach at all — that the file is actually THERE.
+  const root = path.join(MCP_ROOT, "..", "..");
+  const mcp = JSON.parse(fs.readFileSync(path.join(root, ".mcp.json"), "utf8"));
   const args = mcp.mcpServers["cmp-inspector"].args;
-  assert.deepEqual(args, ["inspector/mcp/dist/server.mjs"], "the plugin must launch the self-contained bundle");
+
+  assert.equal(args.length, 1, `the server is launched with exactly one argument, got ${JSON.stringify(args)}`);
+  const arg = args[0];
+
+  const PLUGIN_ROOT = "${CLAUDE_PLUGIN_ROOT}";
+  assert.ok(
+    arg.startsWith(`${PLUGIN_ROOT}/`),
+    `the path must be anchored to ${PLUGIN_ROOT}, got ${JSON.stringify(arg)}. A relative path resolves ` +
+      "against whatever cwd the MCP client happens to have, which for a plugin-loaded server is not the " +
+      "plugin root — so the bundle is not found and no tool is ever served.",
+  );
+
+  const rel = arg.slice(PLUGIN_ROOT.length + 1);
+  assert.equal(
+    rel,
+    path.relative(root, BUNDLE),
+    "the plugin must launch the self-contained bundle, never bin/server.mjs — that is the file with no " +
+      "node_modules to resolve",
+  );
+  assert.ok(
+    fs.existsSync(path.join(root, rel)),
+    `.mcp.json names ${rel}, and there is no such file in this repo — the plugin would launch nothing`,
+  );
 });

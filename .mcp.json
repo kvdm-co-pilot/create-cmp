@@ -2,7 +2,7 @@
   "mcpServers": {
     "cmp-inspector": {
       "command": "node",
-      "args": ["inspector/mcp/dist/server.mjs"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs"]
     }
   }
 }
