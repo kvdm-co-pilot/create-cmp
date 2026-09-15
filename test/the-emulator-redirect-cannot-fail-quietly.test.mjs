@@ -20,10 +20,24 @@
 //
 // WHY THIS IS A SOURCE SCAN AND NOT A RUN. `scripts/fleet-check.mjs` stamps its
 // scratch app `--no-ios --no-firebase`, so no gate in this repo executes either
-// path: not the device tier, not the framework check, not the suite. Proving
-// the runtime behaviour needs a device, a Firebase project and running
-// emulators, which is a slice of its own (KD-45). Until then the shape is what
-// can be held, and holding the shape is worth more than holding nothing.
+// path: not the device tier, not the framework check, not the suite. That gap is
+// KD-45, and it is why an adopter found this defect and we did not.
+//
+// THE ONE QUESTION A SCAN COULD NOT ANSWER WAS MEASURED ONCE, BY HAND. Review
+// asked whether the old `runCatching` was load-bearing for the placeholder
+// `google-services.json` the template ships — if `Firebase.auth` throws under
+// placeholder config, making the redirect throw turns every adopter's first
+// `installDebug` into a crash. Reasoning said probably not; reasoning is not
+// evidence. So: scaffold `--firebase --no-ios` against this template, headless
+// Medium_Phone_API_35, `installDebug`, `am start`, read logcat.
+//
+//   BuildConfig.USE_FIREBASE_EMULATORS   true    (the gate passed; the redirect RAN)
+//   FATAL / IllegalStateException         none
+//   process after launch                  alive, and still alive 20s later
+//
+// The redirect executed against placeholder config and did not throw. The
+// `runCatching` was hiding nothing that happens on a first run — which is
+// exactly why it was so cheap to leave in and so expensive to keep.
 //
 // These assertions are deliberately about STRUCTURE, not wording. They ask that
 // a gate exists, that the call is not swallowed, and that a failure path exists
@@ -73,7 +87,12 @@ function redirectBody(raw, rel) {
   const src = maskSource(raw);
   const at = src.indexOf("fun configureFirebaseEmulators()");
   assert.notEqual(at, -1, `${rel} no longer declares configureFirebaseEmulators() — this test is aimed at nothing`);
-  const open = src.indexOf("{", at);
+  return braceBody(src, src.indexOf("{", at), rel);
+}
+
+/** The `{ … }` starting at `open`, brace-matched. */
+function braceBody(src, open, rel) {
+  assert.notEqual(open, -1, `${rel}: expected a block and found none`);
   let depth = 0;
   for (let i = open; i < src.length; i += 1) {
     if (src[i] === "{") depth += 1;
@@ -82,7 +101,7 @@ function redirectBody(raw, rel) {
       if (depth === 0) return src.slice(open, i + 1);
     }
   }
-  assert.fail(`${rel}: configureFirebaseEmulators() has no closing brace`);
+  assert.fail(`${rel}: a block opened at ${open} has no closing brace`);
 }
 
 for (const site of SITES) {
@@ -115,12 +134,42 @@ for (const site of SITES) {
         `REAL project, reading, writing and authenticating against production. Partial failure is worse: ` +
         `four useEmulator calls, nothing atomic, so auth can redirect while firestore does not.`,
     );
-    assert.match(
-      body,
-      /\bcatch\s*\(|\berror\(|\bthrow\b/,
-      `${site.rel}: nothing in configureFirebaseEmulators() handles a failure. The redirect must either ` +
+    // `runCatching` WAS NEVER THE DEFECT — discarding the failure was, and an
+    // empty catch discards it identically. The first version of this test asked
+    // only that a catch EXISTED, and review proved the gap by planting
+    // `catch (cause: Throwable) { }` and `catch (cause: Throwable) { println(…) }`
+    // on the two sites: both passed, and the app still starts against production.
+    const catchAt = body.search(/\bcatch\s*\(/);
+    assert.notEqual(
+      catchAt,
+      -1,
+      `${site.rel}: nothing in configureFirebaseEmulators() handles a failure. The redirect must ` +
         `propagate or refuse by name — a build that cannot honour an explicit request for emulators has no ` +
         `safe way to continue.`,
+    );
+    const caught = braceBody(body, body.indexOf("{", catchAt), site.rel);
+    assert.match(
+      caught,
+      /\bthrow\b/,
+      `${site.rel}: the catch around the emulator redirect does not rethrow. Catching and continuing is ` +
+        `the defect this file exists to refuse, wearing a different keyword — the build asked for emulators, ` +
+        `did not get them, and carries on against the REAL project. Logging is not refusing: nobody reads ` +
+        `logcat on the run where it mattered.`,
+    );
+  });
+
+  test(`${platform}: the refusal is actually CALLED`, () => {
+    // A refusal nothing invokes is not a refusal. Review deleted the one-line
+    // call site on each platform and every other assertion here still passed —
+    // a guard blessing a gate that never runs.
+    const src = maskSource(fs.readFileSync(path.join(ROOT, site.rel), "utf8"));
+    const declaration = src.indexOf("fun configureFirebaseEmulators()");
+    const calls = [...src.matchAll(/\bconfigureFirebaseEmulators\(\)/g)].map((m) => m.index);
+    assert.ok(
+      calls.some((at) => at !== declaration && !src.slice(Math.max(0, at - 4), at).includes("fun ")),
+      `${site.rel}: configureFirebaseEmulators() is declared and never called. Everything else this file ` +
+        `asserts is true of code that does not run — the redirect never happens, and the build talks to ` +
+        `whatever google-services.json / GoogleService-Info.plist names.`,
     );
   });
 }

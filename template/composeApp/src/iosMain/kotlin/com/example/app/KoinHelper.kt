@@ -45,11 +45,12 @@ private fun configureFirebaseEmulators() {
         Firebase.functions(FIREBASE_FUNCTIONS_REGION).useEmulator(host, 5001)
         Firebase.storage.useEmulator(host, 9199)
     } catch (cause: Throwable) {
-        error(
+        throw IllegalStateException(
             "Firebase emulator redirect to $host FAILED in a debug build. Refusing to start: " +
                 "continuing would authenticate and write against the real project in " +
                 "GoogleService-Info.plist. Check that FirebaseApp.configure() ran first (iOSApp.swift) " +
-                "and that no Firebase client was used before initKoin(). Cause: ${cause.message}"
+                "and that no Firebase client was used before initKoin().",
+            cause,
         )
     }
 }
