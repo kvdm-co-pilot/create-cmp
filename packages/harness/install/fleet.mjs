@@ -10,10 +10,19 @@
 // WHY ONE COMMAND AND NOT A LOOP THE HUMAN WRITES. The thing an operator
 // holding ten repos actually needs is not the ability to type `prooflane
 // upgrade` ten times — they have a shell. It is that the ten upgrades come
-// from ONE resolved harness, so the fleet ends up on one version rather than
-// on whatever each directory's node_modules happened to hold. `resolveHarness`
-// falls back to the package the running binary ships from, so a single process
-// carries a single artifact into every tree. A shell loop cannot promise that.
+// from ONE artifact, so the fleet ends up on one version rather than on
+// whatever each directory's node_modules happened to hold.
+//
+// That does not happen by itself, and this paragraph used to claim it did —
+// "`resolveHarness` falls back to the package the running binary ships from".
+// It is a FALLBACK: its first candidate is the target's own node_modules, which
+// is the right rule for one repo (the adopter installed the version they meant
+// to carry) and the exact wrong one here. Measured before `runningHarness`
+// existed: one process, one command, two repos, versions 0.0.1-ancient and
+// 0.21.1, "2 of 2 repo(s) upgraded", no warning. So the artifact is resolved
+// ONCE, below, and handed to every repo — and it carries its own provenance,
+// because deriving the version from it and the ORIGIN from each target's
+// lockfile gave one set of bytes three different origins in four repos.
 //
 // EVERY REPO RUNS, EVEN AFTER ONE FAILS. Stopping at the first failure reports
 // one problem when there are three, and leaves the fleet half-upgraded either

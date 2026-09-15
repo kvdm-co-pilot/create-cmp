@@ -54,15 +54,10 @@ import { SOURCE_PATH, resolvedSourceKind, HARNESS_PKG_NAME } from "../src/lib/ha
 const PKG_NAME = HARNESS_PKG_NAME;
 
 /**
- * WHERE THE NEW BYTES COME FROM, in the order an adopter would expect.
+ * One candidate directory, read — or null if it is not a usable harness.
  *
- * `node_modules` first is the whole point: the adopter ran `npm install
- * prooflane-harness@<newer>`, and this command's job is to carry what that
- * fetched into the tree. The package this binary itself ships from is the
- * fallback, which is the normal case in a development checkout where the two
- * are the same directory.
- *
- * @param {string} root project root
+ * @param {string} pkgDir
+ * @param {string} where how the caller found it, for the line it prints back
  * @returns {{src: string, pkgDir: string, version: string, where: string}|null}
  */
 function harnessAt(pkgDir, where) {
@@ -80,6 +75,21 @@ function harnessAt(pkgDir, where) {
   return { src, pkgDir, version, where };
 }
 
+/**
+ * WHERE THE NEW BYTES COME FROM, in the order an adopter would expect.
+ *
+ * `node_modules` first is the whole point: the adopter ran `npm install
+ * prooflane-harness@<newer>`, and this command's job is to carry what that
+ * fetched into the tree. The package this binary itself ships from is the
+ * fallback, which is the normal case in a development checkout where the two
+ * are the same directory.
+ *
+ * A FLEET DELIBERATELY DOES NOT USE THIS — see `runningHarness` below. The
+ * preference above is right for one repo and wrong for ten.
+ *
+ * @param {string} root project root
+ * @returns {{src: string, pkgDir: string, version: string, where: string}|null}
+ */
 export function resolveHarness(root) {
   return (
     harnessAt(path.join(root, "node_modules", PKG_NAME), "node_modules") ??
@@ -98,10 +108,29 @@ export function resolveHarness(root) {
  * this existed — one process, one command, two repos, two different versions,
  * and a green "2 of 2 upgraded".
  *
- * @returns {{src: string, pkgDir: string, version: string, where: string}|null}
+ * IT CARRIES ITS OWN PROVENANCE, and that is not decoration. The record written
+ * into each tree says which artifact the lane came from, so a notary can fetch
+ * it; derive `version` from this object and `source` from the TARGET's lockfile
+ * and the two describe different things. Measured on `e1596a0`, one command and
+ * one artifact into four repos: `version` 0.21.1 four times, `source` registry,
+ * local, git, local — three origins for one set of bytes, two of them naming a
+ * place those bytes have never been. So the origin is answered ONCE, here, by
+ * the same rule `runHarnessUpgrade` uses for a single repo, rooted at the
+ * artifact's own installer rather than at whoever is receiving it.
+ *
+ * @returns {{src: string, pkgDir: string, version: string, where: string, source: string|null}|null}
  */
 export function runningHarness() {
-  return harnessAt(path.resolve(HARNESS_SRC, ".."), "this package");
+  const found = harnessAt(path.resolve(HARNESS_SRC, ".."), "this package");
+  if (!found) return null;
+
+  // Whoever installed THIS package is the one with the answer. Inside a
+  // node_modules, that is the project the node_modules belongs to; outside one,
+  // this is a checkout on disk, which is what "local" has always meant here.
+  const parts = found.pkgDir.split(path.sep);
+  const at = parts.lastIndexOf("node_modules");
+  const source = at === -1 ? "local" : resolvedSourceKind(parts.slice(0, at).join(path.sep), PKG_NAME);
+  return { ...found, source };
 }
 
 /**
@@ -170,7 +199,12 @@ export async function runHarnessUpgrade(flags, positional, opts = {}) {
   const plan = upgradePlan(root, resolved.src);
   const changed = plan.filter((f) => f.state === "changed");
   const added = plan.filter((f) => f.state === "new");
-  const sourceKind = resolvedSourceKind(root, PKG_NAME) ?? (resolved.where === "node_modules" ? null : "local");
+  // A handed-down artifact answers for its own origin. Asking the TARGET's
+  // lockfile about bytes that came from somewhere else is how one artifact
+  // acquired three provenances in four repos.
+  const sourceKind = opts.harness
+    ? (opts.harness.source ?? null)
+    : (resolvedSourceKind(root, PKG_NAME) ?? (resolved.where === "node_modules" ? null : "local"));
   const versionMoves = before?.version !== resolved.version;
 
   // IDEMPOTENT, and it has to say why. Same version, nothing to replace, a lock
