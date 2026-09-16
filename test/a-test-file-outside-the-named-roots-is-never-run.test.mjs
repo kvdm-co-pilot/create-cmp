@@ -8,7 +8,9 @@
 // test. The reverse is worse and silent: a worktree whose tests all pass adds
 // green rows to a number nobody audits.
 //
-// So the script names the patterns it runs. That trade has its own failure mode,
+// So the script names the patterns it runs — unquoted, single-level, expanded by
+// the shell (see "the declared patterns run on the Node floor" below for why
+// both). That trade has its own failure mode,
 // and it is the dangerous direction: a pattern that matches nothing, or a test
 // written where no pattern reaches, is not an error — it is a smaller suite that
 // still says PASS. This file is what makes that loud.
@@ -47,13 +49,11 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** The glob patterns `npm test` hands to the runner, in the order it hands them. */
+/** The glob patterns `npm test` hands to the shell, in the order it hands them. */
 function declaredPatterns() {
   const script = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).scripts.test;
   assert.match(script, /^node --test /, `the test script is no longer \`node --test <patterns>\`: ${script}`);
-  // Quoted arguments only. An unquoted `**` would be expanded by the shell
-  // before Node sees it, which makes what runs depend on the operator's shell.
-  return [...script.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  return script.replace(/^node --test\s+/, "").split(/\s+/).filter(Boolean);
 }
 
 /** Every test file git is tracking — the set that SHOULD run. */
@@ -184,6 +184,39 @@ test("every pattern `npm test` names actually matches test files", () => {
       `\`node --test\` does not complain about a pattern matching nothing — it just runs fewer tests, ` +
       `or none, and exits 0.`,
   );
+});
+
+test("the declared patterns run on the Node floor this repo declares", () => {
+  // UNQUOTED AND SINGLE-LEVEL, and both halves were paid for.
+  //
+  // QUOTED globs reach Node unexpanded, and Node 20's `node --test` does not
+  // expand them: CI on Node 20 failed at the first step with "Could not find
+  // '…/test/**/*.test.mjs'" on every commit from the one that quoted them, the
+  // Node 22 and 24 jobs were cancelled behind it, and the Android and iOS stamp
+  // jobs that depend on the suite were skipped. `engines.node` says >=20.19.0.
+  // Local runs were on Node 24, which does expand them, so every gate reported
+  // green. So the patterns are unquoted and the SHELL expands them before any
+  // Node version sees them.
+  //
+  // `**` IS REFUSED because of that choice. `npm test` runs under `sh`, and POSIX
+  // `sh` has no globstar — `**` silently means `*`, so `test/**/*.test.mjs`
+  // would match one directory level on CI while matching every level in an
+  // interactive bash or zsh. Every test file sits directly in its root today
+  // (228 of 228), which is why one level is enough; a test written in a
+  // subdirectory is caught by the orphan check above rather than by a pattern
+  // that means different things on different machines.
+  for (const pattern of declaredPatterns()) {
+    assert.ok(
+      !/["']/.test(pattern),
+      `${pattern} is quoted, so it reaches Node unexpanded — and Node 20, this repo's declared floor, does not ` +
+        `expand a glob passed to \`node --test\`. That is how CI on Node 20 failed at the first step.`,
+    );
+    assert.ok(
+      !pattern.includes("**"),
+      `${pattern} uses \`**\`. These patterns are expanded by \`sh\`, which has no globstar, so \`**\` silently ` +
+        `means \`*\` on CI and every level in an interactive shell — one declaration, two suites.`,
+    );
+  }
 });
 
 test("a stray tree inside this repo cannot add tests to this repo's suite", () => {
