@@ -202,7 +202,7 @@ test("the declared patterns run on the Node floor this repo declares", () => {
   // `sh` has no globstar — `**` silently means `*`, so `test/**/*.test.mjs`
   // would match one directory level on CI while matching every level in an
   // interactive bash or zsh. Every test file sits directly in its root today
-  // (228 of 228), which is why one level is enough; a test written in a
+  // (the orphan check above enforces it), which is why one level is enough; a test written in a
   // subdirectory is caught by the orphan check above rather than by a pattern
   // that means different things on different machines.
   for (const pattern of declaredPatterns()) {

@@ -770,6 +770,30 @@ rethrow assertion.*
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-57 — on Node 20, nine tests ran and did not report — **CLOSED, 2026-09-16**
+
+CI on `f58ca39`: Node 20 counted `1932` tests where Node 22 and 24 counted `1941` on the same runner
+and the same `sh`-expanded file list, `fail 0`. The nine were every test in
+`test/one-command-upgrades-a-declared-fleet.test.mjs` but the last. Its `quiet(fn)` helper replaced
+the global `process.stdout.write` with a no-op across an `await`, and Node 20's runner writes each
+result through that writer — so results emitted while a swap was pending went into it. Review
+reproduced it on 20.19.0 (`# tests 1` for the file alone) and showed a failure inside a swap still
+exited 1: the COUNT lied, not the verdict. Fixed by removing the helper; the commands' output is let
+through, and none of it reads as TAP. Logged by review as KD-53 and renumbered, because the 0.26.0
+branch had already taken 53–56.
+
+**Four more test files swap the same writer** —
+`a-fleet-upgrade-lands-a-different-harness-in-each-repo`,
+`a-fleet-upgrade-writes-to-a-tree-the-manifest-never-named`,
+`one-artifact-is-recorded-with-a-different-origin-in-each-repo`, and
+`the-fleet-command-names-a-front-door-the-caller-did-not-use` (which captures rather than discards).
+None lost a result on this CI run; each would, on Node 20, the day a test is added after its swap.
+Not fixed here, because nothing is lost today and the change asked for was the one that was.
+
+The same round corrected a count: the guard's comment said 228 tracked test files, and on this
+branch there are 226 — 228 was measured on the 0.26.0 branch, which adds two. The comment no longer
+carries a number.
+
 ### KD-35 — the prose named a syscall nobody sees — **CLOSED, 2026-09-15**
 Round 2 executed two error-code claims I had written from memory twenty minutes earlier and found
 one wrong in both places: `node '${CLAUDE_PLUGIN_ROOT}/…/server.mjs'` exits `MODULE_NOT_FOUND`, not
