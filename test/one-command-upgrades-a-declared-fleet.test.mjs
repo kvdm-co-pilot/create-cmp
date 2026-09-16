@@ -27,16 +27,16 @@ import { runningHarness } from "../packages/harness/install/upgrade.mjs";
 /** The `src/` of the artifact this process ships — where vendored bytes come from. */
 const PKG_SRC = runningHarness().src;
 
-/** Run something with stdout swallowed — these commands are chatty by design. */
-async function quiet(fn) {
-  const write = process.stdout.write.bind(process.stdout);
-  process.stdout.write = () => true;
-  try {
-    return await fn();
-  } finally {
-    process.stdout.write = write;
-  }
-}
+// NO STDOUT IS SWALLOWED HERE, and one was. A `quiet(fn)` helper replaced the
+// global `process.stdout.write` with a no-op across an `await`. Node 20's test
+// runner writes each result through that same function, so every result emitted
+// while a swap was pending went into the no-op: CI on Node 20 counted 1932 tests
+// against Node 22's 1941 on the same runner, `fail 0`, and the nine missing were
+// every test in this file but the last — whose result arrived after the final
+// restore. Node 22+ reports over a separate channel, which is why only 20 lost
+// them. A failure inside a swap still exited 1 (measured on 20.19.0); it was the
+// COUNT that lied. The commands' output is TAP-safe — no line of it begins `ok`,
+// `not ok`, `Bail out!` or a plan — so it is simply let through.
 
 function manifestIn(dir, body) {
   const abs = path.join(dir, "fleet.json");
@@ -167,7 +167,7 @@ test("--fleet and a directory are two targets, and it refuses rather than pickin
   const dir = tmp();
   try {
     const abs = manifestIn(dir, { schema: FLEET_SCHEMA, repos: [{ id: "a", path: "./a" }] });
-    const code = await quiet(() => runFleetUpgrade({ fleet: abs }, "./some-dir", {}));
+    const code = await runFleetUpgrade({ fleet: abs }, "./some-dir", {});
     assert.equal(code, 2, "guessing here would upgrade a directory nobody named");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -175,7 +175,7 @@ test("--fleet and a directory are two targets, and it refuses rather than pickin
 });
 
 test("--fleet with no value is refused and prints how to declare one", async () => {
-  assert.equal(await quiet(() => runFleetUpgrade({ fleet: true }, undefined, {})), 2);
+  assert.equal(await runFleetUpgrade({ fleet: true }, undefined, {}), 2);
 });
 
 /** One vendored file that must come BACK, and can only come from the package. */
@@ -193,7 +193,7 @@ const DELETED_REL = ["qa", "lib", "evidence-ladder.mjs"];
  */
 async function repoWithStaleLane(root) {
   fs.mkdirSync(root, { recursive: true });
-  await quiet(() => runHarnessInit({ "no-interview": true }, root, { invocation: "prooflane" }));
+  await runHarnessInit({ "no-interview": true }, root, { invocation: "prooflane" });
   fs.appendFileSync(path.join(root, "qa", "lib", "harness-lock.mjs"), "\n// planted: this lane is behind the package\n");
   const gone = path.join(root, ...DELETED_REL);
   assert.ok(fs.existsSync(gone), `the lane no longer vendors ${DELETED_REL.join("/")} — this plant aims at nothing`);
@@ -212,7 +212,7 @@ test("THE CRITERION: one command, and the bytes arrive in EVERY tree", async () 
       schema: FLEET_SCHEMA,
       repos: [{ id: "alpha", path: "./alpha" }, { id: "beta", path: "./beta" }],
     });
-    assert.equal(await quiet(() => runFleetUpgrade({ fleet: abs }, undefined, {})), 0);
+    assert.equal(await runFleetUpgrade({ fleet: abs }, undefined, {}), 0);
 
     for (const id of ["alpha", "beta"]) {
       const root = path.join(dir, id);
@@ -250,7 +250,7 @@ test("one repo failing does not stop the fleet, and the exit code still says so"
       repos: [{ id: "ghost", path: "./not-there" }, { id: "real", path: "./real" }],
     });
 
-    const code = await quiet(() => runFleetUpgrade({ fleet: abs }, undefined, {}));
+    const code = await runFleetUpgrade({ fleet: abs }, undefined, {});
     assert.equal(code, 1, "a fleet with a failure exits non-zero");
     assert.notEqual(
       hashHarnessRegion(path.join(dir, "real")).sha256,
@@ -267,7 +267,7 @@ test("--dry-run upgrades nothing, in every tree", async () => {
   try {
     const before = await repoWithStaleLane(path.join(dir, "alpha"));
     const abs = manifestIn(dir, { schema: FLEET_SCHEMA, repos: [{ id: "alpha", path: "./alpha" }] });
-    assert.equal(await quiet(() => runFleetUpgrade({ fleet: abs, "dry-run": true }, undefined, {})), 0);
+    assert.equal(await runFleetUpgrade({ fleet: abs, "dry-run": true }, undefined, {}), 0);
     assert.equal(hashHarnessRegion(path.join(dir, "alpha")).sha256, before, "--dry-run wrote to the tree");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
