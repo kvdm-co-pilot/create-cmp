@@ -120,6 +120,7 @@ you the same list without opening anything.
 | **KD-50** | the template ships create-cmp's own changelog as source comments in the adopter's app | true prose, wrong repository |
 | **KD-51** | a JS masker reads the template's Kotlin; a raw string mis-parses and truncates the scanned body | it reds, not greens — the `useEmulator` tripwire catches the stub — and neither file has a raw string |
 | **KD-52** | what the emulator scan's two token-level assertions do NOT decide | the inert clause is gone (`f474f17`); the rest is the floor of a shape scan, and no shape reaches it |
+| **KD-56** | `console-now-sse` failed once inside a full suite run during a live lane, and the fit test threw away why | unreproduced in 1 + 5 + 2 runs; the transport already polls behind its watch |
 
 ---
 
@@ -764,6 +765,28 @@ decided not to grow for a lint (`test/helpers/js-source-scan.mjs`, header). *Log
 (review of `79eafd3`), re-placed 2026-09-15 after `f474f17` removed the inert clause and widened the
 rethrow assertion.*
 
+### KD-56 — one unreproduced failure, and the instrument that saw it discarded the reason
+
+`node scripts/fit-test.mjs` ran `npm test` while `fleet-check` was compiling the scratch app and
+booting the emulator, and reported `1951/1952 — 1 FAILING ✖ inspector/mcp/test/console-now-sse.test.mjs`
+on `f2f7d24`. Nothing that followed reproduced it: that file alone five times with the emulator
+running, 5/5; the full suite idle, 1951/1951; the full suite with all eight cores saturated by `yes`,
+1951/1951. The slice touched neither the test nor `steps-bridge.mjs`/`preview-service.mjs`.
+
+Two readings of the source narrow it. The lane-silence bound is 30 minutes, so the fixture's
+`startedAt` cannot go stale inside a run. And `watchStepStream` polls once a second behind its
+`fs.watch` — written precisely because "fs.watch on macOS coalesces and can drop under load" — so a
+dropped FSEvents notification cannot outlast the test's 8 s frame deadline. What remains is a
+test-process event loop starved for most of 8 s, under a load CPU alone did not recreate (the real
+condition also had Gradle's and the emulator's disk I/O), or a failure that is not a frame timeout.
+
+**It is logged and not chased further because the message is gone**, and that is the finding worth
+keeping. `fit-test.mjs` runs the suite fresh and parses its stdout for the NAMES of failing tests — its
+own comment says a bare count is unactionable — and discards the rest, so the one run that failed left
+a name and no reason. Keeping the failing tests' output (or the whole log, under `qa-artifacts/`) is
+the change that turns the next occurrence into a diagnosis. Not an adopter-facing defect: it is a test
+of the live console's transport, which has the fallback that would make the real feature survive this.
+*Logged 2026-09-16, during the device tier of `published-bytes-drift`.*
 
 ## Closed
 
@@ -793,6 +816,27 @@ Not fixed here, because nothing is lost today and the change asked for was the o
 The same round corrected a count: the guard's comment said 228 tracked test files, and on this
 branch there are 226 — 228 was measured on the 0.26.0 branch, which adds two. The comment no longer
 carries a number.
+
+### KD-53, KD-54, KD-55 — three holes in the drift walk, logged by round 1 and closed in its own fix — **CLOSED, 2026-09-16**
+
+All three were logged by the review of `7ca2fec` as not blocking, and all three sat inside
+`publishedBytesDrift()`'s walk, which round 1's blocking findings required rewriting anyway. The
+reviewer's own note on KD-53 said whoever next touched the walk should close it there rather than
+paying for a second fixture; that was the same afternoon.
+
+- **KD-53, the anchor was the newest unbroken run of a version.** Bump away and revert onto a
+  published number, and the anchor became the revert — everything shipped under the first run was
+  forgiven. The walk now takes the OLDEST commit that ever bore the version, which over-reports rather
+  than under-reports; a version reused across two trees is the defect itself, so over-reporting it is
+  not a false alarm. Held by a fixture in
+  `test/a-version-number-cannot-name-two-different-trees.test.mjs`, and planting the run form back
+  turns that test red.
+- **KD-54, git read one tree and the manifest another.** The walk ran git in `cwd` and read `files`
+  from the module's own `ROOT`. Round 1's fix added npm as a third reader in `cwd`, which would have
+  made the split two-against-one — so all three now read one tree. Held by a fixture whose `files`
+  names a directory no package in this repo ships; planting the `ROOT` read back turns it red.
+- **KD-55, "SIXTY-FOUR" and an unreachable branch.** The header now says 66, as the commit, the test
+  and the measurement do; the dead `p.unanchored ?` arm went with the renderer rewrite.
 
 ### KD-35 — the prose named a syscall nobody sees — **CLOSED, 2026-09-15**
 Round 2 executed two error-code claims I had written from memory twenty minutes earlier and found

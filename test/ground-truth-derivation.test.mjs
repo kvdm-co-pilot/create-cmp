@@ -24,29 +24,37 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { groundTruth, registryStatus } from "../scripts/ground-truth.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("ownership is derived from the manifests on disk, not from a list in the source", () => {
+test("ownership is derived from every manifest in the tree, not from a directory convention", () => {
+  // THIS USED TO ASK ONLY ABOUT `packages/`, and so did the deriver — which is
+  // how `@create-cmp/inspector` stayed published, live, and in no list for
+  // weeks: it sits at `inspector/mcp`, the deriver read `packages/`, and this
+  // test agreed with it. Two mirrors of one convention are not a check.
+  //
+  // So the expected set comes from git, a DIFFERENT mechanism than the
+  // deriver's filesystem walk. If the two ever disagree, one of them is wrong
+  // about what this repo publishes, which is the only fact either is for.
   const gt = groundTruth();
-  const onDisk = fs
-    .readdirSync(path.join(ROOT, "packages"), { withFileTypes: true })
-    .filter((e) => e.isDirectory() && e.name !== "aliases")
-    .filter((e) => fs.existsSync(path.join(ROOT, "packages", e.name, "package.json")))
-    .map((e) => JSON.parse(fs.readFileSync(path.join(ROOT, "packages", e.name, "package.json"), "utf8")))
-    .filter((p) => !p.private)
-    .map((p) => p.name)
-    .sort();
+  const tracked = execFileSync("git", ["ls-files", "*package.json"], { cwd: ROOT, encoding: "utf8" })
+    .split("\n")
+    .filter(Boolean)
+    .filter((rel) => !rel.includes("node_modules/"))
+    .map((rel) => ({ rel, p: JSON.parse(fs.readFileSync(path.join(ROOT, rel), "utf8")) }))
+    .filter(({ p }) => !p.private);
 
   assert.deepEqual(
-    gt.npm.independent.map((p) => p.name).sort(),
-    onDisk,
-    "the independent list must equal what is on disk — if this fails, someone re-introduced a hand-written list",
+    [...gt.npm.independent, ...gt.npm.aliases, gt.npm.primary].map((p) => p.name).sort(),
+    tracked.map(({ p }) => p.name).sort(),
+    "what the deriver owns must equal what this repo tracks and publishes — if this fails, either a " +
+      "hand-written list came back or a publishable package is invisible to `--registry`",
   );
-  assert.ok(onDisk.length > 0, "the fixture is vacuous if no publishable package exists under packages/");
+  assert.ok(tracked.length > 1, "the fixture is vacuous if the tree tracks no publishable package");
 });
 
 test("no package name is hard-coded in the deriver's source", () => {
