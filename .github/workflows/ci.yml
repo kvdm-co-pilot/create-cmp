@@ -21,7 +21,17 @@ jobs:
       matrix:
         node: [20, 22, 24]
     steps:
+      # WHOLE HISTORY, and without it one gate in the suite is green by
+      # construction. `scripts/ground-truth.mjs` decides whether a published
+      # version number still names these bytes by walking each manifest back to
+      # the commit that set its version. The default checkout is depth 1, so that
+      # walk anchors on the PR head and compares it against itself. Measured:
+      # same bytes, same head — a full clone refuses and a depth-1 clone exits 0.
+      # The derivation now refuses a shallow history rather than trusting this
+      # line, so deleting it turns the suite red instead of silently vacuous.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}

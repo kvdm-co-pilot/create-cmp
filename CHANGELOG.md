@@ -6,6 +6,52 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-09-16
+
+### Fixed
+
+- **A version number named two different trees, and the check that exists to notice said the
+  property held.** `node scripts/ground-truth.mjs --registry` printed *"every name this repo owns is
+  live at the version this tree holds"* while the registry's `create-cmp-cli@0.25.0` and this tree's
+  `0.25.0` were **66 shipped files apart** — among them the two Kotlin files whose
+  `configureFirebaseEmulators()` had just stopped swallowing a failed emulator redirect. The fix was
+  on main; every `npx create-cmp-cli` still scaffolded the defect. **It compared NUMBERS and reported
+  the answer as though it had compared BYTES** — this repo's recurring shape (a guard written against
+  ABSENCE does not catch VACUITY) arriving in the version spine, where an unpublished name was always
+  caught and present-and-equal-over-different-content never was.
+
+  Seven of twelve names were in it, not one: the CLI by 66 files, `prooflane-harness` by 39,
+  `@create-cmp/inspector` by 24 and for three weeks, `prooflane-receipts` by 1, and three aliases by
+  a README each. `publishedBytesDrift()` now derives the answer from git, offline: *did anything a
+  package SHIPS change after the commit that last SET its version?* The anchor is the manifest's own
+  history and not a release tag, because `npm version` tags the CLI alone and the three libraries
+  publish independently — a tag-anchored guard would have closed this for one package of four.
+  `test/a-version-number-cannot-name-two-different-trees.test.mjs` holds it, and fails on NOT
+  DERIVABLE as loudly as on drift.
+
+- **Every scaffolded app carried another machine's Gradle cache.** `create-cmp-cli@0.25.0` — and the
+  releases before it — packed seven files of the publisher's local `template/.gradle/` state
+  (`fileHashes.lock`, `checksums.lock`, `last-build.bin` among them), and `copyDir` copies a
+  template whole, so `npx create-cmp-cli` put them into every adopter's brand-new project. git ignores
+  that directory; npm does not ask git — a path inside a `files` entry cannot be excluded by
+  `.gitignore`. `"!template/.gradle"` now follows `"template"` in `files`, and the drift derivation
+  refuses outright when npm would pack a file git cannot see, asking npm itself which of git's
+  candidates actually ship rather than keeping a second copy of npm's exclusion rules. Found by review
+  measuring the derivation against `npm pack`, then against the registry's own tarball.
+
+- **The new gate was green by construction on every pull request.** CI checked out at
+  `actions/checkout`'s default depth of 1, and a walk that anchors on the commit that set a version
+  anchored on the PR head instead — comparing the tip against itself. Measured: same bytes, same head,
+  a full clone refuses and a depth-1 clone exits 0. The suite job now fetches the whole history, and
+  the derivation refuses a shallow repository rather than trusting that it did.
+
+- **`@create-cmp/inspector` was published, live, and in no list.** `ownedNames()` calls itself "every
+  name this repo owns" and was built by reading `packages/`; the inspector lives at `inspector/mcp`,
+  so `--registry` printed that sentence over eleven of twelve names. The expected set is now derived
+  from `git ls-files` rather than from a directory convention, so the next package cannot escape the
+  same way.
+
+
 ### Added
 
 - **The front door answers the last two of its five questions — Live Console Phases C and D**
@@ -3175,7 +3221,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.25.0...HEAD
+[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.24.0...v0.25.0
 [0.20.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.18.0...v0.19.0
