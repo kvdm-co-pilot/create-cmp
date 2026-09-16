@@ -22,7 +22,7 @@
     "llms.txt"
   ],
   "scripts": {
-    "test": "node --test \"test/**/*.test.mjs\" \"inspector/mcp/test/**/*.test.mjs\" \"packages/receipts/test/**/*.test.mjs\"",
+    "test": "node --test test/*.test.mjs inspector/mcp/test/*.test.mjs packages/receipts/test/*.test.mjs",
     "prepublishOnly": "npm test",
     "doctor": "node bin/create-cmp.mjs doctor"
   },
