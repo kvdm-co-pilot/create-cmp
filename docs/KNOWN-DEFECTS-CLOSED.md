@@ -424,3 +424,32 @@ way `prooflane` always has.
 Not by a longer list. `--verfiy`, `--anything` and `-y` all failed identically and no list
 reaches them, so both doors now refuse an argument they cannot account for — by name, exit 2,
 nothing written — which is the answer `unknown command` already gave one branch down.
+
+### KD-27 — the lane-already-running refusal names a PID and not a project — **CLOSED 2026-09-17**
+
+`scripts/fleet-check.mjs` (the concurrent-lane guard)
+
+    a verify lane is already running (7360 node qa/verify.mjs) — a concurrent device
+    run collides with it (wedged adbd, false reds). Wait for it, then run the tier once.
+
+The refusal is RIGHT — two lanes share one adb and one emulator, so the second must not
+start — and it is right across repositories, which is the part the message does not say.
+Measured 2026-09-14: the blocking lane's cwd was `/Users/test/dev/payment-blueprint`, an
+unrelated project, and finding that out took four commands (`ps`, `pgrep -fl`, `lsof`, then
+reading the guard). The message had the PID all along and could have had the path.
+
+It matters more than a nicety because of what the reader concludes in the meantime. A lane
+"already running" in YOUR repo is something you started and can wait for or kill; one in
+someone else's is neither, and the two demand opposite actions. Until the message says which,
+the fastest wrong move — killing it — is also the most tempting.
+
+**Fires when:** anyone runs two lanes on one machine, which fleet work makes normal.
+*Logged 2026-09-14, hit while closing the interview slice.*
+
+Closed by `describeLane` in `scripts/hooks/proof-gate.mjs`: the refusal now names the project
+(resolved from the lane's own cwd via `/proc/<pid>/cwd` or `lsof`, and from an absolute operand
+when it has one), says outright when it is ANOTHER project's and must not be killed, and reports
+the step and the time left from the lane's own `qa/.lane-in-progress` marker measured against its
+last full run — or says which of the two it could not find, never guessing.
+`test/a-lane-refusal-names-a-pid-and-not-a-project.test.mjs` holds it, with one test pointed at a
+REAL spawned lane process so the `lsof`/`/proc` read is not an unread instrument.

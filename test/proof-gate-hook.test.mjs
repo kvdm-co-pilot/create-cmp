@@ -175,7 +175,7 @@ test("the wiring: .claude/settings.json registers all three events on this hook 
 });
 
 test("a running verify lane refuses an OWED device run — the memory's 'pgrep first' is now checked", () => {
-  const d = decide("device", o("owed"), TIERS, { runningLane: "12345 node qa/verify.mjs" });
+  const d = decide("device", o("owed"), TIERS, { runningLane: { pid: 12345, args: "node qa/verify.mjs", project: null, marker: null } });
   assert.equal(d.action, "deny");
   assert.match(d.reason, /already running/);
   assert.equal(decide("device", o("owed"), TIERS, { runningLane: null }).action, "allow");
