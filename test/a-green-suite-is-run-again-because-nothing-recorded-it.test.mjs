@@ -159,8 +159,8 @@ test("the declared suite really records itself — the runner, the reporter and 
     // that exits 0 whatever happens — scrub it, or this proves nothing.
     delete env.NODE_TEST_CONTEXT;
     delete env.NODE_OPTIONS;
-    const runner = (extraEnv = {}) =>
-      spawnSync(process.execPath, ["--test", "--test-reporter=spec", "--test-reporter-destination=stdout", `--test-reporter=${reporter}`, "--test-reporter-destination=stderr", "ok.test.mjs", "bad.test.mjs"], { cwd: root, env: { ...env, ...extraEnv }, encoding: "utf8" });
+    const runner = ({ flags = [], extraEnv = {} } = {}) =>
+      spawnSync(process.execPath, ["--test", ...flags, "--test-reporter=spec", "--test-reporter-destination=stdout", `--test-reporter=${reporter}`, "--test-reporter-destination=stderr", "ok.test.mjs", "bad.test.mjs"], { cwd: root, env: { ...env, ...extraEnv }, encoding: "utf8" });
     const r = runner();
     assert.equal(r.status, 1, r.stdout + r.stderr);
     const rec = readSuiteRecord(root);
@@ -170,13 +170,22 @@ test("the declared suite really records itself — the runner, the reporter and 
     assert.deepEqual(rec.failing, ["bad"]);
     assert.equal(rec.counts.pass, 1);
 
-    // KD-61, the way it was found: the same command, narrowed from the environment.
-    const narrowed = runner({ NODE_OPTIONS: "--test-name-pattern=ok" });
-    assert.equal(narrowed.status, 0, narrowed.stdout + narrowed.stderr);
-    const nrec = readSuiteRecord(root);
-    assert.equal(nrec.verdict, "PASS");
-    assert.equal(nrec.scope, "narrowed");
-    assert.equal(suiteStatus({ record: nrec, now: suiteTreeHash(root) }).state, "narrowed");
+    // KD-61: the same run, narrowed to its green half. A green narrowed run is the
+    // dangerous one, and it must still read as narrowed, never as the suite.
+    const expectNarrowed = (label, result) => {
+      assert.equal(result.status, 0, `${label}: ${result.stdout}${result.stderr}`);
+      const nrec = readSuiteRecord(root);
+      assert.equal(nrec.verdict, "PASS", label);
+      assert.equal(nrec.scope, "narrowed", label);
+      assert.equal(suiteStatus({ record: nrec, now: suiteTreeHash(root) }).state, "narrowed", label);
+    };
+    expectNarrowed("a filter flag on the command line", runner({ flags: ["--test-name-pattern=ok"] }));
+    // The way it was FOUND — from the environment, where `npm test` itself cannot see
+    // it. Node 20 refuses the flag in NODE_OPTIONS (CI measured it, exit 9), so the
+    // route only exists where Node allows it, and is only asserted there.
+    if (process.allowedNodeEnvironmentFlags.has("--test-name-pattern")) {
+      expectNarrowed("a filter flag in NODE_OPTIONS", runner({ extraEnv: { NODE_OPTIONS: "--test-name-pattern=ok" } }));
+    }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
