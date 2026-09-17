@@ -9,6 +9,42 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-61 — a narrowed run of the declared suite is recorded as the suite — **CLOSED 2026-09-17, in the slice that found it**
+
+`scripts/suite-reporter.mjs` says it records "exactly when the DECLARED suite runs … and never for a
+targeted run, which must not be recorded as one". It cannot tell. Provoked 2026-09-17 in a scratch repo
+whose one test file holds a passing and a failing test, with `package.json`'s `test` script copied
+verbatim: `NODE_OPTIONS=--test-name-pattern=ok npm test` exits 0 and writes `verdict: PASS`,
+`tests: 1`, bound to the tree hash; `suiteStatus` calls it `fresh` and `describeSuiteStatus` prints
+`PASS 1/1 … for this exact tree — read it, do not re-run it`, and `fit-test.mjs` would print it as the
+suite. The same holds for `NODE_OPTIONS=--test-skip-pattern=…` and `--test-only` (both measured), and for any hand-run
+`node --test --test-reporter=./scripts/suite-reporter.mjs <fewer files>`. (`npm test -- --test-name-pattern=x`
+does NOT narrow: the flag lands after the file operands and the whole suite runs.) Relatedly,
+`suiteStatus` never reads `verdict`, so an `INCOMPLETE` record for these bytes is also `fresh` — the
+reporter writes none on SIGINT (measured), so no path to one was found.
+
+Not blocking: every reach is deliberate narrowing, and the readers are this repo's own gates and
+agents, not an adopter. The class, when it is fixed: a record is fresh only for a finished,
+unnarrowed run of the declared operands — the reporter can see the runner's flags in
+`process.execArgv` and `NODE_OPTIONS`. *Logged 2026-09-17, review round 1 of `suite-record`.*
+
+**Closed before merge** (`suite-record`, round 1 → fix): the reporter compares the run's own filter flags (execArgv, NODE_OPTIONS) and file operands with the files package.json declares, expanded by the shell; anything less is recorded `scope: "narrowed"` with its reasons, and `suiteStatus` reads only a finished run of the declared suite as fresh. Pinned by `test/a-green-suite-is-run-again-because-nothing-recorded-it.test.mjs`, including the NODE_OPTIONS reproduction end to end.
+
+### KD-62 — the suite hash skips gitignored files a suite test reads — **CLOSED 2026-09-17, in the slice that found it**
+
+`scripts/suite-record.mjs` justifies its git view with "tracked plus untracked-not-ignored files is
+exactly the working tree a test run sees". Not quite: `test/ground-truth-derivation.test.mjs` reads
+`docs/research/launch/GROUND-TRUTH.md` when present, and `git check-ignore` confirms `docs/research/`
+is ignored — so regenerating that file (`ground-truth.mjs --markdown`) can turn the assertion red
+without moving the hash, and a fresh PASS record survives it. `node_modules/` is the same shape for a
+dependency changed without a lockfile edit.
+
+Not blocking: one optional file, one assertion, repo-internal reader. The class, when it is fixed:
+either no suite test reads an ignored path, or the hash covers what the suite reads. *Logged 2026-09-17,
+review round 1 of `suite-record`.*
+
+**Closed before merge** (`suite-record`, round 1 → fix): the suite hash covers every file git can list, ignored ones included, minus generated output (`SUITE_HASH_SKIP`), so a gitignored input that moves makes the record stale. A directory missing from the skip list costs a re-run, never a false fresh.
+
 ### KD-59 — the plan history records as `closed` slices that never closed — **CLOSED 2026-09-17, in the slice that found it**
 
 `close()` appends a `closed` row for whatever plan `obligation()` hands it, and on trunk that is
