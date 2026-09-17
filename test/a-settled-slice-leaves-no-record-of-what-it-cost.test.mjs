@@ -65,11 +65,52 @@ test("after `gh pr merge --delete-branch` the plan arrives STALE (the checkout i
     const planPath = path.join(root, "qa-artifacts", "proof-plan.json");
     fs.mkdirSync(path.dirname(planPath), { recursive: true });
     fs.writeFileSync(planPath, JSON.stringify(plan()));
-    close({ state: "none", trunk: true, plan: null, stale: plan(), branch: "main", review: { state: "none" } }, { planPath, historyFile: historyPath(root, "plans"), via: "merge" });
+    close(
+      { state: "none", trunk: true, plan: null, stale: plan(), branch: "main", review: { state: "none" } },
+      { planPath, historyFile: historyPath(root, "plans"), via: "merge", branchExists: () => false },
+    );
     const kept = rows(root, "plans");
     assert.equal(kept.length, 1);
+    assert.equal(kept[0].event, "closed", "its branch is gone — this is the slice the merge landed");
     assert.equal(kept[0].plan.branch, "a-slice-under-test");
     assert.equal(kept[0].onBranch, "main");
+    assert.equal(kept[0].device, null, "trunk's `none` describes trunk, not the slice — the slice's own state is in the plan");
+    assert.equal(kept[0].plan.discharged.verdict, "PASS");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("KD-59: a leftover plan whose branch still exists did not close here — it is `cleared`, never `closed`", () => {
+  const root = tmp();
+  try {
+    const planPath = path.join(root, "qa-artifacts", "proof-plan.json");
+    fs.mkdirSync(path.dirname(planPath), { recursive: true });
+    fs.writeFileSync(planPath, JSON.stringify(plan({ branch: "abandoned", discharged: null })));
+    close(
+      { state: "none", trunk: true, plan: null, stale: plan({ branch: "abandoned", discharged: null }), branch: "main", review: { state: "none" } },
+      { planPath, historyFile: historyPath(root, "plans"), via: "merge", branchExists: (b) => b === "abandoned" },
+    );
+    const kept = rows(root, "plans");
+    assert.equal(kept.length, 1);
+    assert.equal(kept[0].event, "cleared");
+    assert.equal(summarize({ plans: kept }).totals.closed, 0, "a cleared plan must not count as a slice that closed");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a slice closed on its OWN branch records the tiers' states as they stood at close", () => {
+  const root = tmp();
+  try {
+    const planPath = path.join(root, "qa-artifacts", "proof-plan.json");
+    close(
+      { state: "discharged", plan: plan(), stale: null, branch: "a-slice-under-test", review: { state: "none" } },
+      { planPath, historyFile: historyPath(root, "plans"), via: "close" },
+    );
+    const [row] = rows(root, "plans");
+    assert.equal(row.device, "discharged");
+    assert.equal(row.review, "none");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -164,6 +205,30 @@ test("the reader gives a slice only what ran on ITS branch inside ITS lifetime, 
   assert.equal(summary.totals.unattributedReviews, 1);
   assert.equal(summary.totals.medianSliceMs, 90 * 60000);
   assert.match(renderHistory(summary), /2 slice\(s\) closed/);
+});
+
+test("KD-60: every row lands in exactly one bucket — closed slices, slices that never closed, unattributed", () => {
+  const ev = (event, slice, openedAt, at) => ({ schema: PLAN_EVENT_SCHEMA, event, at, plan: { slice, branch: "b", openedAt } });
+  const summary = summarize({
+    plans: [ev("replaced", "first", "2026-09-17T10:00:00Z", "2026-09-17T11:00:00Z"), ev("closed", "second", "2026-09-17T11:00:01Z", "2026-09-17T12:00:00Z"), ev("cleared", "third", "2026-09-18T09:00:00Z", "2026-09-18T10:00:00Z")],
+    fleet: [
+      { branch: "b", verdict: "PASS", ranAt: "2026-09-17T10:30:00Z" },
+      { branch: "b", verdict: "PASS", ranAt: "2026-09-17T11:30:00Z" },
+      { branch: "b", verdict: "FAIL", ranAt: "2026-09-18T09:30:00Z" },
+      { branch: "main", verdict: "PASS", ranAt: "2026-09-17T11:45:00Z" },
+    ],
+    reviews: [
+      { branch: "b", ranAt: "2026-09-17T10:40:00Z", tests: [], decisions: [], nothingFound: true },
+      { branch: "b", ranAt: "2026-09-17T11:40:00Z", tests: ["t"], decisions: [], nothingFound: false },
+      { branch: "c", ranAt: "2026-09-17T11:40:00Z", tests: [], decisions: [], nothingFound: true },
+    ],
+  });
+  const t = summary.totals;
+  assert.equal(t.deviceRuns + t.deviceRunsInOtherSlices + t.unattributedDeviceRuns, 4, "device runs must add up to the history");
+  assert.equal(t.reviews + t.reviewsInOtherSlices + t.unattributedReviews, 3, "reviews must add up to the history");
+  assert.equal(t.deviceRuns, 1);
+  assert.equal(t.deviceRunsInOtherSlices, 2);
+  assert.equal(t.closed, 1);
 });
 
 test("bookkeeping never fails a gate: an append that cannot be written returns false and does not throw", () => {

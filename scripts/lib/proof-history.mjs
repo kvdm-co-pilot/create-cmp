@@ -30,10 +30,18 @@ export const HISTORY_FILES = Object.freeze({
 
 export const PLAN_EVENT_SCHEMA = "prooflane-proof-plan-event/1";
 
-/** Where a kind of history lives under a repo root. */
+/**
+ * Where a kind of history lives under a repo root.
+ *
+ * `PROOFLANE_HISTORY_DIR` moves it, and only a test that drives a REAL writer as a
+ * subprocess (the merge hook) sets it: that test's fixture plan is otherwise kept
+ * as a closed slice in this repo's own history on every `npm test` from trunk —
+ * KD-59, found by review of the slice that added the history.
+ */
 export function historyPath(root, kind) {
   if (!HISTORY_FILES[kind]) throw new Error(`no history kind "${kind}" — known: ${Object.keys(HISTORY_FILES).join(", ")}`);
-  return path.join(root, "qa-artifacts", HISTORY_FILES[kind]);
+  const dir = process.env.PROOFLANE_HISTORY_DIR || path.join(root, "qa-artifacts");
+  return path.join(dir, HISTORY_FILES[kind]);
 }
 
 /** Append one row. Never throws; `false` means it was not written. */
@@ -89,9 +97,10 @@ const median = (xs) => {
  * A device run or a review belongs to a slice when it was recorded ON that
  * slice's branch INSIDE that slice's lifetime (opened → closed). Both halves are
  * needed: a branch name is reused (`fix-ci` twice in a month), and a window alone
- * would hand one slice another session's run. Anything that matches no closed
- * slice — a release proof on trunk, a slice still open — is counted as
- * unattributed rather than dropped, so the totals always add up.
+ * would hand one slice another session's run. Every row lands in exactly one
+ * bucket — a closed slice, a slice that never closed (replaced, cleared), or
+ * unattributed (a release proof on trunk, a slice still open) — so the three
+ * always add up to the history.
  *
  * @param {{plans: object[], reviews: object[], fleet: object[]}} rows
  */
@@ -127,14 +136,18 @@ export function summarize({ plans = [], reviews = [], fleet = [] }) {
       })),
     });
   }
+  // Per-slice rates are over CLOSED slices only — a replaced or cleared plan is not
+  // a slice that finished — but every row lands in exactly one of three buckets, so
+  // closed + other slices + unattributed is always the whole history (KD-60).
   const closed = slices.filter((s) => s.event === "closed");
+  const others = slices.filter((s) => s.event !== "closed");
   const allRuns = closed.flatMap((s) => s.device);
   const allReads = closed.flatMap((s) => s.reviews);
   return {
     slices,
     totals: {
       closed: closed.length,
-      replaced: slices.filter((s) => s.event === "replaced").length,
+      notClosed: others.length,
       medianSliceMs: median(closed.map((s) => s.durationMs)),
       deviceRuns: allRuns.length,
       devicePass: allRuns.filter((r) => r.verdict === "PASS").length,
@@ -144,6 +157,8 @@ export function summarize({ plans = [], reviews = [], fleet = [] }) {
       reviewsNothingFound: allReads.filter((r) => r.nothingFound).length,
       reviewTests: allReads.reduce((a, r) => a + r.tests, 0),
       reviewDecisions: allReads.reduce((a, r) => a + r.decisions, 0),
+      deviceRunsInOtherSlices: others.reduce((a, s) => a + s.device.length, 0),
+      reviewsInOtherSlices: others.reduce((a, s) => a + s.reviews.length, 0),
       unattributedDeviceRuns: fleet.length - claimed.fleet.size,
       unattributedReviews: reviews.length - claimed.reviews.size,
     },
@@ -161,7 +176,7 @@ export function renderHistory(summary, { malformed = 0 } = {}) {
   for (const s of summary.slices) {
     const found = s.reviews.map((r) => (r.nothingFound ? "nothing" : `${r.tests}t/${r.decisions}d`)).join(", ") || "none";
     const runs = s.device.map((r) => `${r.verdict}${r.durationMs === null ? "" : ` ${minutes(r.durationMs)}`}`).join(", ") || "none";
-    L.push(`  ${s.event === "replaced" ? "(replaced) " : ""}${s.slice}`);
+    L.push(`  ${s.event === "closed" ? "" : `(${s.event}) `}${s.slice}`);
     L.push(`      ${s.branch} · ${s.openedAt.slice(0, 16)} → ${s.endedAt.slice(0, 16)} · ${minutes(s.durationMs)} · device ${runs} · reviews ${found}`);
   }
   if (t.closed) {
@@ -171,6 +186,9 @@ export function renderHistory(summary, { malformed = 0 } = {}) {
         `device runs ${(t.deviceRuns / t.closed).toFixed(1)} per slice (${t.devicePass} PASS of ${t.deviceRuns}, median ${minutes(t.medianDeviceRunMs)}) · ` +
         `reviews ${(t.reviews / t.closed).toFixed(1)} per slice — ${t.reviewsWithTests} wrote a test (${t.reviewTests} tests), ${t.reviewDecisions} decision(s) handed up, ${t.reviewsNothingFound} found nothing`,
     );
+  }
+  if (t.deviceRunsInOtherSlices || t.reviewsInOtherSlices) {
+    L.push(`  inside ${t.notClosed} slice(s) that never closed (replaced, or cleared): ${t.deviceRunsInOtherSlices} device run(s), ${t.reviewsInOtherSlices} review(s)`);
   }
   if (t.unattributedDeviceRuns || t.unattributedReviews) {
     L.push(`  not inside any settled slice: ${t.unattributedDeviceRuns} device run(s), ${t.unattributedReviews} review(s) — trunk release proofs, or a slice still open`);
