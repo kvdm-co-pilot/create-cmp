@@ -6,6 +6,47 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **The marketplace said "Eleven skills" and the plugin shipped twelve — and the gate that exists
+  to refuse exactly that was reading three of ten public surfaces.** `.claude-plugin/plugin.json`
+  and the marketplace entry are the text an agent or a human reads BEFORE the install, before this
+  repo is ever fetched, and both understated what they were offering. The count itself was the
+  smaller half. `test/doc-counts.test.mjs` derives every count from `scripts/ground-truth.mjs` and
+  refuses any public surface that contradicts it — but its `PUBLIC_SURFACES` was a hand-written
+  list of three markdown files, and **the split it produced was total: every surface ON the list
+  stated the right number, and every count-stating surface off it was stale.** Six of them: both
+  plugin manifests at "Eleven skills", `AGENTS.md` and `docs/DOCUMENTATION.md` at "10 skills", and
+  the `create-mobile` / `create-kmp` / `create-compose-multiplatform` READMEs — published npm front
+  doors — at "10 skills". The sharpest case is that the same `plugin.json` was already read by this
+  gate for its `skills` LIST and never for its own PROSE.
+
+  The list is now derived where the category is closed (`.claude-plugin/*.json`; every `README.md`
+  under `packages/`) and named only where it is not, so the next manifest and the next alias cannot
+  escape the same way. It is deliberately not the whole tree: `docs/proposals/`, `docs/adr/`,
+  `docs/history/`, `docs/HARNESS-PLAN.md` and `inspector/mcp/README.md` ("15+ of the 28 tools had
+  ZERO calls") legitimately record PAST trees, and a scanner that cannot tell a record from a claim
+  deletes honest prose.
+
+- **The lane's size was stated eight times on public surfaces and was wrong all eight times**,
+  because the docs stopped using the one phrase the gate reads. `docs/USAGE.md` §3 opens by
+  explaining that *"how many steps run depends on `--profile`, so 'N gates' is never a fixed
+  number"* — correct, and then every number behind it rotted: one step was added to the shared
+  spine and all of `scaffold`/`local`/`ci`/`smoke`/`release` were left an off-by-one, with
+  `llms.txt` (the surface written for agents) repeating two of them. A profile-bound reader now
+  gates both forms the docs actually use — a table row and the prose that cites it — with the
+  profile names coming from the deriver rather than a list. Measured before wiring: eight matches,
+  eight drifts, zero false positives. A bare "<n> steps" is deliberately NOT gated (KD-67): it
+  refuses four strings on the same surfaces and two are honest prose, so the ambiguity is in the
+  noun rather than in the claim.
+
+- **Both readers are calibrated, and the calibration is kept.** GATE-RULES Rule 1 in the
+  instrument rather than by hand: one test plants a wrong number into every surface the gate lists
+  and every count it derives, and requires each one back refused — 8.7 ms, run by everyone,
+  forever. It is the non-vacuity check the surface list never had, and it earned that during
+  wiring: dropping one character from the globbed directory name put both plugin manifests back
+  outside the gate while every count assertion still passed.
+
 ## [0.26.0] - 2026-09-16
 
 ### Fixed
