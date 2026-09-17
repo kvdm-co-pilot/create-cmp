@@ -108,8 +108,16 @@ export function decide(kind, o, tiers, ctx) {
       case "reopened":
         // A lane already driving the one device makes a second run worse than
         // wasted: it has wedged Maestro before its first flow. This was a line in
-        // a memory file ("check pgrep first") — now it is checked.
-        if (ctx?.runningLane) return deny(`a verify lane is already running (${ctx.runningLane}) — a concurrent device run collides with it (wedged adbd, false reds). Wait for it, then run the tier once.`);
+        // a memory file ("check pgrep first") — now it is checked. And the refusal
+        // says WHOSE lane it is and how long it has left (KD-27): the two cases
+        // want opposite actions, and a bare PID left the wrong one tempting.
+        if (ctx?.runningLane) {
+          const { ours, text } = describeLane(ctx.runningLane, { repoRoot: ctx.repoRoot ?? null });
+          return deny(
+            `a verify lane is already running: ${text}. A concurrent device run collides with it (wedged adbd, false reds). ` +
+              (ours ? "Wait for it, then run the tier once." : "Do not kill it — it is not this slice's. Wait for it, then run the tier once."),
+          );
+        }
         return allow(`the device tier is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — a trigger path edited afterwards reopens the slice. Then: node scripts/proof-plan.mjs --discharge`);
       default:
         return deny(`the proof plan is in an unknown state (${o.state}) — refusing rather than guessing`);
@@ -222,8 +230,7 @@ export async function memoryRestatements(dir = process.env.PROOFLANE_MEMORY_DIR)
  */
 function runningLane() {
   try {
-    const { execSync } = createRequire(import.meta.url)("node:child_process");
-    const run = (cmd) => execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const run = shell();
     const pids = run("pgrep -f 'qa/verify\\.mjs'").split("\n").filter(Boolean);
     for (const pid of pids) {
       if (String(pid) === String(process.pid)) continue;
@@ -240,12 +247,111 @@ function runningLane() {
       } catch {
         args = comm;
       }
-      return `${pid} ${args}`.slice(0, 80);
+      return laneAt(pid, args, run);
     }
     return null;
   } catch {
     return null; // pgrep exits 1 when nothing matches
   }
+}
+
+/** A synchronous shell runner, loaded only when a matched command needs one. */
+function shell() {
+  const { execSync } = createRequire(import.meta.url)("node:child_process");
+  return (cmd) => execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+}
+
+/**
+ * How long a lane has left, from what it declared about itself — or null.
+ *
+ * The lane stamps `qa/.lane-in-progress` before every step with when it started
+ * (`at`) and `expectedLaneMs`, its last full run's length
+ * (packages/harness/src/lib/lane-runner.mjs). Nothing here estimates; a lane with
+ * no measured full run has no answer, and gets none.
+ */
+export function laneRemainingMs(marker, nowMs = Date.now()) {
+  const at = Date.parse(marker?.at ?? "");
+  const expected = marker?.expectedLaneMs;
+  if (!Number.isFinite(at) || !(typeof expected === "number" && expected > 0)) return null;
+  return Math.max(0, expected - (nowMs - at));
+}
+
+const shortMs = (ms) => {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
+};
+
+/**
+ * WHOSE lane, and how long it has left — the refusal's sentence, pure (KD-27).
+ *
+ * It used to be "a verify lane is already running (7360 node qa/verify.mjs)". On
+ * 2026-09-14 that lane's cwd was /Users/test/dev/payment-blueprint, an unrelated
+ * project, and finding out took four commands. This repository's own run (inside
+ * `repoRoot`, or a fleet-check scratch app named `cmp-fleet-check-*`) is yours to
+ * wait for or stop; another project's is neither — and a bare PID made the wrong
+ * move, killing it, the fastest. Nine such refusals in ten days
+ * (docs/research/g2-measure/).
+ *
+ * @param {{pid: number|string, project: string|null, marker: object|null}} lane
+ */
+export function describeLane(lane, { nowMs = Date.now(), repoRoot = null } = {}) {
+  const project = lane?.project ?? null;
+  const inRepo = Boolean(project && repoRoot && (project === repoRoot || project.startsWith(`${repoRoot}${path.sep}`)));
+  const ours = inRepo || Boolean(project && /(^|[\\/])cmp-fleet-check-[^\\/]+([\\/]|$)/.test(project));
+  const whose = !project
+    ? "in a project this gate could not locate"
+    : ours
+      ? `in ${project} — this repository's own run`
+      : `in ${project} — ANOTHER project's lane, not yours to stop`;
+  const m = lane?.marker ?? null;
+  const step = m?.step ? `at ${m.step}${m.index && m.total ? ` (step ${m.index} of ${m.total})` : ""}` : null;
+  const left = laneRemainingMs(m, nowMs);
+  const eta = !m
+    ? "it wrote no progress marker, so nothing says how long it has left"
+    : left === null
+      ? "that lane has no measured full run, so nothing says how long it has left"
+      : left === 0
+        ? "already past its last full run's length"
+        : `~${shortMs(left)} left by its last full run`;
+  return { ours, text: `pid ${lane?.pid ?? "?"} ${whose}; ${[step, eta].filter(Boolean).join(", ")}` };
+}
+
+/**
+ * The project a lane process runs in. An absolute `…/qa/verify.mjs` names it; a
+ * relative one resolves against the process's own cwd — `/proc/<pid>/cwd` on Linux,
+ * `lsof -d cwd` on macOS. `null` when neither answers, and the refusal says so.
+ */
+export function laneProject(pid, args, run = shell()) {
+  const abs = /(?:^|\s)(\/\S*?)\/qa\/verify\.mjs(?=\s|$)/.exec(args ?? "");
+  if (abs) return abs[1];
+  const fs = createRequire(import.meta.url)("node:fs");
+  let cwd = null;
+  try {
+    cwd = fs.readlinkSync(`/proc/${Number(pid)}/cwd`);
+  } catch {
+    try {
+      cwd = run(`lsof -a -p ${Number(pid)} -d cwd -Fn`).split("\n").find((l) => l.startsWith("n"))?.slice(1) ?? null;
+    } catch {
+      cwd = null;
+    }
+  }
+  if (!cwd) return null;
+  const rel = /(?:^|\s)((?:[^\s/]+\/)*)qa\/verify\.mjs(?=\s|$)/.exec(args ?? "")?.[1] ?? "";
+  return path.resolve(cwd, rel);
+}
+
+/** Everything the refusal says about one lane process. Exported so a test can point it at a real one. */
+export function laneAt(pid, args, run = shell()) {
+  const project = laneProject(pid, args, run);
+  let marker = null;
+  if (project) {
+    try {
+      marker = JSON.parse(createRequire(import.meta.url)("node:fs").readFileSync(path.join(project, "qa", ".lane-in-progress"), "utf8"));
+    } catch {
+      marker = null;
+    }
+  }
+  return { pid: Number(pid), args, project, marker };
 }
 
 /** The fleet record and the hash of the tree it would have to describe. */
@@ -291,7 +397,12 @@ async function main() {
     // Matched. From here on, a failure is a refusal.
     try {
       const { obligation, TIERS } = await import("../proof-plan.mjs");
-      const ctx = kind === "publish" ? await releaseContext() : kind === "device" ? { runningLane: runningLane() } : undefined;
+      const ctx =
+        kind === "publish"
+          ? await releaseContext()
+          : kind === "device"
+            ? { runningLane: runningLane(), repoRoot: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..") }
+            : undefined;
       const d = decide(kind, obligation(), TIERS, ctx);
       if (d.action === "silent") return;
       emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: d.action, permissionDecisionReason: d.reason } });

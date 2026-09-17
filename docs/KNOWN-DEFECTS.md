@@ -102,7 +102,6 @@ you the same list without opening anything.
 | **KD-21** | `KNOWN_FLAGS` is hand-written where `BOOLEAN_FLAGS` is derived | zero gaps measured, both directions |
 | **KD-24** | `--yes` refused at one door, accepted-and-ignored at the other | the flag is inert; the rest of the line still does what was asked |
 | **KD-25** | an interrupt that printed nothing would pass the suite | wording deliberately not pinned |
-| **KD-27** | the lane-already-running refusal does not say WHICH repo is running it | four commands to find out |
 | **KD-28** | the header's KD-7 measurement cites a count this log attaches to another defect | the argument does not rest on the number |
 | **KD-30** | the "second lane run left no receipt" guard reads the path the first run's receipt is at | unreachable; the stale receipt reads as the overclaim |
 | **KD-31** | the vendored contract tells its reader to run `scripts/fleet-check.mjs`, which no stamped app has | an import error, not a wrong result |
@@ -327,27 +326,6 @@ the create-cmp door is told nothing, not told something false.
 slice should close them together. A per-COMMAND known-flag set, rather than a per-door one, is
 what would make the class unreachable.
 *Logged 2026-09-14, review round 1 of `interview-decisions`.*
-
-### KD-27 — the lane-already-running refusal names a PID and not a project
-
-`scripts/fleet-check.mjs` (the concurrent-lane guard)
-
-    a verify lane is already running (7360 node qa/verify.mjs) — a concurrent device
-    run collides with it (wedged adbd, false reds). Wait for it, then run the tier once.
-
-The refusal is RIGHT — two lanes share one adb and one emulator, so the second must not
-start — and it is right across repositories, which is the part the message does not say.
-Measured 2026-09-14: the blocking lane's cwd was `/Users/test/dev/payment-blueprint`, an
-unrelated project, and finding that out took four commands (`ps`, `pgrep -fl`, `lsof`, then
-reading the guard). The message had the PID all along and could have had the path.
-
-It matters more than a nicety because of what the reader concludes in the meantime. A lane
-"already running" in YOUR repo is something you started and can wait for or kill; one in
-someone else's is neither, and the two demand opposite actions. Until the message says which,
-the fastest wrong move — killing it — is also the most tempting.
-
-**Fires when:** anyone runs two lanes on one machine, which fleet work makes normal.
-*Logged 2026-09-14, hit while closing the interview slice.*
 
 ### KD-28 — the rule's own KD-7 measurement cites a count this log attaches to another defect
 
