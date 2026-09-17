@@ -70,6 +70,7 @@ import {
   REVIEW_TIER_IRRELEVANT,
   REVIEW_SKIP,
   DEVICE_SKIP,
+  deviceTreeHash,
 } from "./observed-tree.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -219,7 +220,7 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
   // costs a read of the diff rather than an unreviewed change.
   const reviewNeed = deriveTierNeed(paths, { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" });
 
-  const dev = tierState(need.required, plan, plan?.discharged, () => observedTreeHash(REPO_ROOT, DEVICE_TIER_TRIGGERS, { skip: DEVICE_SKIP }));
+  const dev = tierState(need.required, plan, plan?.discharged, () => deviceTreeHash(REPO_ROOT));
   const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }));
   return { ...dev, need, ...base, review: { ...rev, need: reviewNeed } };
 }
@@ -532,7 +533,7 @@ function main() {
       process.stderr.write("no device run is recorded — run the fleet check first; a discharge is read from its record, never asserted\n");
       process.exit(2);
     }
-    const now = observedTreeHash(REPO_ROOT, DEVICE_TIER_TRIGGERS, { skip: DEVICE_SKIP });
+    const now = deviceTreeHash(REPO_ROOT);
     if (rec.observedHash !== now) {
       process.stderr.write(`the recorded device run does not describe this tree (${String(rec.observedHash).slice(0, 7)} → ${now.slice(0, 7)}) — it cannot discharge anything\n`);
       process.exit(1);

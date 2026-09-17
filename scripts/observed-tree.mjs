@@ -268,3 +268,18 @@ export const REVIEW_SKIP = (relPath) => relPath.endsWith(".md");
  * copies `src` and `src/lib` only — the console ships to no phone.
  */
 export const DEVICE_SKIP = (relPath) => relPath.startsWith("packages/harness/src/console/");
+
+/**
+ * The device tier's hash of a tree — the one spelling of it.
+ *
+ * There were three. `fleet-check` recorded `observedTreeHash(root, DEVICE_TIER_TRIGGERS,
+ * { skip: DEVICE_SKIP })`, `proof-plan --discharge` compared the same, and the publish gate in
+ * `hooks/proof-gate.mjs` computed it WITHOUT the skip — so it hashed the console files the record
+ * deliberately leaves out, and the two could never be equal. Measured on 2026-09-17: a release
+ * proof PASSED at L2 on `main`, recorded `3ed5e09`, and the gate computed `eb734f5` for the same
+ * bytes and refused `npm publish` — twice, on two proofs. A gate that no passing run can satisfy.
+ * Its test had injected `now` by hand, so it never compared the two.
+ */
+export function deviceTreeHash(root) {
+  return observedTreeHash(root, DEVICE_TIER_TRIGGERS, { skip: DEVICE_SKIP });
+}

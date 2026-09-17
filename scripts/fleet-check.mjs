@@ -41,7 +41,7 @@ import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { observedTreeHash, DEVICE_TIER_TRIGGERS, DEVICE_SKIP } from "./observed-tree.mjs";
+import { deviceTreeHash } from "./observed-tree.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { assessLadderPlant, describeLadderPlant } from "../packages/harness/src/lib/ladder-plant.mjs";
@@ -518,7 +518,7 @@ export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failure
     // the run precedes the commit that carries it, so a commit-keyed record
     // reads stale the moment it lands (see observed-tree.mjs). The commit is
     // kept beside it as provenance a human can read, never as the key.
-    observedHash: observedTreeHash(root, DEVICE_TIER_TRIGGERS, { skip: DEVICE_SKIP }),
+    observedHash: deviceTreeHash(root),
     commit: head.status === 0 ? head.stdout.trim() : null,
     treeWasDirty: dirty.status !== 0 || (dirty.stdout ?? "").trim() !== "",
     laneVerdict: receipt?.verdict ?? null,
