@@ -169,12 +169,12 @@ never a fixed number. Bare `node qa/verify.mjs` (no `--profile`) defaults to `lo
 
 | Profile | Steps | What it adds over the previous tier |
 |---|---|---|
-| `scaffold` | 9 | What `create-cmp --verify` proves at stamp time: harness integrity, specCoverage, approvals, componentStories, reachability, archDoc, schemaHistory, build, unitTests. |
-| `local` | 16 | The full JVM tier (conformance, goldenTrees, tokenDrift, a11y), the release-build compile check, `androidChecks`, and (device attached) `e2eSmoke` — device-dependent steps SKIP honestly with no device. |
-| `ci` | 17 | `local` plus the determinism probe's row (the probe itself stays opt-in behind `--determinism`; the row records whether it ran, so a SKIP is visible rather than absent). |
-| `smoke` | 7 | Every pure-Node gate and **no Gradle** — the smallest end-to-end lane through the real runner, receipt and journal. Seconds. Proves the *framework* returns, both ways; never the change — its receipt is refused as done-evidence. Driven by `node qa/framework-check.mjs` (GATE-RULES Rule 0). |
-| `nightly` | 17 | `ci` with the determinism probe **forced on** (it doubles the JVM test tier — the budget a scheduled run has and a per-change run does not). Proves the harness and the tree's invariants, never a change: its receipt carries `stage: "nightly"` and is refused as done-evidence by `qa/receipt-check.mjs`. The stage where any future suite-scaled proof (load, chaos) lands. |
-| `release` | 19 | `ci` plus the audit-cadence report and the release-APK behavior smoke (`releaseSmoke`) — the ship-time profile, run before cutting a release, never per-change. |
+| `scaffold` | 10 | What `create-cmp --verify` proves at stamp time: harness integrity, specCoverage, approvals, componentStories, reachability, archDoc, schemaHistory, build, unitTests. |
+| `local` | 17 | The full JVM tier (conformance, goldenTrees, tokenDrift, a11y), the release-build compile check, `androidChecks`, and (device attached) `e2eSmoke` — device-dependent steps SKIP honestly with no device. |
+| `ci` | 18 | `local` plus the determinism probe's row (the probe itself stays opt-in behind `--determinism`; the row records whether it ran, so a SKIP is visible rather than absent). |
+| `smoke` | 8 | Every pure-Node gate and **no Gradle** — the smallest end-to-end lane through the real runner, receipt and journal. Seconds. Proves the *framework* returns, both ways; never the change — its receipt is refused as done-evidence. Driven by `node qa/framework-check.mjs` (GATE-RULES Rule 0). |
+| `nightly` | = `ci` | `ci` with the determinism probe **forced on** (it doubles the JVM test tier — the budget a scheduled run has and a per-change run does not). Proves the harness and the tree's invariants, never a change: its receipt carries `stage: "nightly"` and is refused as done-evidence by `qa/receipt-check.mjs`. The stage where any future suite-scaled proof (load, chaos) lands. |
+| `release` | 20 | `ci` plus the audit-cadence report and the release-APK behavior smoke (`releaseSmoke`) — the ship-time profile, run before cutting a release, never per-change. |
 
 Every receipt names its **stage** — `scaffold` / `change` (local) / `merge` (ci) / `nightly` / `release` — so an evidence rung can never be read as more than its stage allows.
 
@@ -533,7 +533,7 @@ Code session can extend it correctly — **the create-cmp plugin is not required
    which shells to `qa/scaffold-feature.mjs`, a deterministic stamper (whole-word rename map,
    anchor injection) that clones the `home` exemplar: Screen + ViewModel + UseCase + Repository +
    DI + navigation, with tests at every layer and a golden-tree baseline, spec-linked from birth.
-3. Claude runs `node qa/verify.mjs` — the profile-tiered lane (§3: 16 steps at `local`, from
+3. Claude runs `node qa/verify.mjs` — the profile-tiered lane (§3: 17 steps at `local`, from
    `harnessIntegrity` first through build, the full JVM test tier, and the device steps when one
    is attached) — into one typed PASS/FAIL/SKIP/ERROR verdict (ERROR = the step could not run: a deadline, zero tests executed, a throw — it fails the lane but never accuses the change) + a schema-validated evidence-pack JSON
    (`qa/evidence/latest.json`).

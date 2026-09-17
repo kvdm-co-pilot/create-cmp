@@ -131,6 +131,8 @@ you the same list without opening anything.
 | **KD-70** | a `file.mjs:NNN` citation goes stale the moment anything is inserted above it, and nothing checks one | 154 in the tree; three went stale in one slice; all of them are in comments and logs, none in a surface an adopter reads |
 | **KD-71** | `isCalendarDay` calls every year 0001–0099 a day the calendar does not have — `Date.UTC`'s two-digit-year mapping | the refusal is right, its reason is false, and no signer types a three-leading-zero year |
 | **KD-72** | the signed attestation can be rewritten without owing or reopening a review — `REVIEW_TIER_TRIGGERS` is a code allow-list and `docs/` is not on it, but that is where this one evidence-bearing file lives | the exemption is right for prose and wrong for this file; nothing is mis-served today, and the harm needs a future edit |
+| **KD-73** | a bare "<n> steps" is not gated, where "<n> steps at \`<profile>\`" now is | measured 50% false positives; the profile-bound form catches every drift there was |
+| **KD-74** | `nightly` is a lane profile `ground-truth.mjs` does not enumerate, so no gate can check its row | the row states no number now, so nothing false ships |
 
 ---
 
@@ -1010,6 +1012,46 @@ shape-conforming non-day is still refused, so the check cannot be deleted to mak
 
 **Fires when:** an attestation's `date` names a year between 0001 and 0099.
 *Logged 2026-09-18, in the round that reviewed the `needsText` / `isCalendarDay` fix.*
+### KD-73 — a bare "<n> steps" claim is not gated, and cannot be without deleting honest prose
+
+`test/doc-counts.test.mjs` (`laneSizeClaims`)
+
+The count gate now refuses a lane size bound to a profile — `` | `local` | 17 | ``, `17 steps at
+`local``, `20 at `release`` — and eight such claims were wrong when it was wired. A bare `<n>
+steps` is still invisible, and the measurement is why: across the seventeen surfaces the gate
+reads, a bare-noun scanner refuses four strings and **two of them are honest prose** — README's
+"three steps, each priced in what you have at that moment" and `packages/harness/README.md`'s
+"Two steps ship in it". A 50% false-positive rate on a gate that blocks a merge is the shape this
+repo deletes scanners for (KD-8's reasoning), and the alternative — an exception list of allowed
+sentences — is a hand-maintained list inside a derivation, which is the defect class KD-21 already
+logs.
+
+Not blocking: the ambiguity is in the NOUN, not in the claim. Every drift actually measured named
+its profile, and that form is gated. A stale bare "<n> steps" would have to be written in a shape
+no surface currently uses.
+
+**Fires when:** someone writes a lane size in prose without naming the profile.
+*Logged 2026-09-18, measured the same day while wiring the profile-bound reader.*
+
+### KD-74 — `nightly` is a profile the lane offers and the deriver does not enumerate
+
+`scripts/ground-truth.mjs` (`verifyProfiles`) vs `docs/USAGE.md` §3
+
+`groundTruth().verifyProfiles` derives five profiles — `smoke`, `scaffold`, `local`, `ci`,
+`release`. The lane offers a sixth: `nightly` is documented in §3's table, named as a receipt
+`stage`, and refused as done-evidence by `qa/receipt-check.mjs` under that name. Because the
+deriver does not know it, no gate can check a number written against it — and §3's `nightly` row
+held `17` while `ci`, which it is defined as ("`ci` with the determinism probe **forced on**"),
+had moved to 18.
+
+Nobody is wrongly served today, because the remedy applied was to state no number rather than a
+hand-counted one: the row now reads `` = `ci` ``, which is what its own description says and
+cannot drift. The defect is the deriver's blind spot, not the doc's.
+
+**Worth deciding:** whether `nightly` is a profile `verifyProfiles` should enumerate, or a stage
+that reuses `ci`'s step set — the two answers want different fixes, and the second may mean the
+row is already as true as it can be.
+*Logged 2026-09-18, found while gating the profile-bound lane size.*
 
 ## Closed
 

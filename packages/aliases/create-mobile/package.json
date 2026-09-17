@@ -1,6 +1,6 @@
 {
   "name": "create-mobile",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The honest front door to a new mobile app. `npm create mobile` recommends Kotlin/Compose Multiplatform as the modern default, states the real trade-offs vs React Native/Flutter, and lets you choose — then, if you continue, scaffolds a green-building Android + iOS app (one Kotlin codebase) with a machine-enforced verify lane and evidence receipts. Official alias for create-cmp-cli; not a redirect — a fit check first.",
   "type": "module",
   "bin": {
