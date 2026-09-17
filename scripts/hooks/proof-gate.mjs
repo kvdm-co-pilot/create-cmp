@@ -255,10 +255,41 @@ function runningLane() {
   }
 }
 
-/** A synchronous shell runner, loaded only when a matched command needs one. */
-function shell() {
+/**
+ * A synchronous shell runner, loaded only when a matched command needs one —
+ * and BOUNDED, because this gate can be killed while it is holding a refusal.
+ *
+ * `.claude/settings.json` gives this PreToolUse hook a timeout. Past it the hook
+ * is killed and its decision is never delivered, and a PreToolUse decision that
+ * is never delivered is not a refusal — it is a permitted command. So the budget
+ * is the boundary between "refused" and "allowed", not a performance nicety, and
+ * every subprocess run inside it has to be bounded by something smaller. None was:
+ * measured on this tree with an `lsof` that took 20s, the hook answered at 22.2s
+ * holding a `deny`, twelve seconds after it was already dead and the device run
+ * had gone ahead. The process-table commands here answer in tens of milliseconds;
+ * `lsof` on a wedged mount or a stuck fd answers never.
+ *
+ * Both bounds are well under the declared budget, and the whole probe shares one
+ * deadline so that several slow calls cannot sum past it. Tripping either one
+ * degrades exactly the way an unreadable process table already does — null, "a
+ * project this gate could not locate", and the refusal still fires on time.
+ */
+const LANE_PROBE_CALL_MS = 1200;
+const LANE_PROBE_TOTAL_MS = 3000;
+
+function shell({ callMs = LANE_PROBE_CALL_MS, totalMs = LANE_PROBE_TOTAL_MS } = {}) {
   const { execSync } = createRequire(import.meta.url)("node:child_process");
-  return (cmd) => execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  const deadline = Date.now() + totalMs;
+  return (cmd) => {
+    const left = deadline - Date.now();
+    if (left <= 0) throw new Error("the lane probe is out of time — answering without it");
+    return execSync(cmd, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: Math.min(callMs, left),
+      killSignal: "SIGKILL",
+    }).trim();
+  };
 }
 
 /**
@@ -322,8 +353,10 @@ export function describeLane(lane, { nowMs = Date.now(), repoRoot = null } = {})
  * `lsof -d cwd` on macOS. `null` when neither answers, and the refusal says so.
  */
 export function laneProject(pid, args, run = shell()) {
-  const abs = /(?:^|\s)(\/\S*?)\/qa\/verify\.mjs(?=\s|$)/.exec(args ?? "");
-  if (abs) return abs[1];
+  const read = laneOperand(args);
+  if (!read) return null;
+  if (read.absolute) return projectOf(read.operand);
+
   const fs = createRequire(import.meta.url)("node:fs");
   let cwd = null;
   try {
@@ -336,8 +369,69 @@ export function laneProject(pid, args, run = shell()) {
     }
   }
   if (!cwd) return null;
-  const rel = /(?:^|\s)((?:[^\s/]+\/)*)qa\/verify\.mjs(?=\s|$)/.exec(args ?? "")?.[1] ?? "";
-  return path.resolve(cwd, rel);
+
+  const relative = path.resolve(cwd, projectOf(read.operand));
+  // One reading, because nothing before the operand could have been the start of
+  // an absolute path the space-join split in two.
+  if (!read.joined) return relative;
+  // Two readings, and the disk decides between them: the lane's own file is in
+  // exactly one of these directories. Neither, or both, and the gate says it
+  // could not locate the project rather than picking (KD-27).
+  const absolute = projectOf(read.joined);
+  const holdsLane = (dir) => {
+    try {
+      return fs.existsSync(path.join(dir, "qa", "verify.mjs"));
+    } catch {
+      return false;
+    }
+  };
+  const a = holdsLane(absolute);
+  const r = holdsLane(relative);
+  if (a === r) return null;
+  return a ? absolute : relative;
+}
+
+/** `…/qa/verify.mjs` -> the project directory two levels up. */
+const projectOf = (operand) => path.dirname(path.dirname(operand));
+
+/**
+ * The `…/qa/verify.mjs` operand in a process's argument string, or null.
+ *
+ * `ps -o args=` hands back argv JOINED BY SPACES, and that join is lossy: a
+ * project path containing a space is indistinguishable from two arguments. The
+ * old reading tried an absolute pattern, then fell back to a relative one that
+ * happily matched a FRAGMENT of the same absolute path and resolved it against
+ * the wrong directory — `node /Users/k/my proj/qa/verify.mjs` named `<cwd>/proj`,
+ * a directory that does not exist and, being inside repoRoot, made the refusal
+ * call another project's lane "this repository's own run". That is the precise
+ * move KD-27 exists to stop a reader making, made by the gate itself.
+ *
+ * So: a quoted operand is delimited and is read exactly. An unquoted one that
+ * starts with `/` is its own operand. An unquoted RELATIVE one preceded by an
+ * absolute-looking argument has two readings and is returned as both, for the
+ * caller to settle against the disk — never silently completed into one.
+ */
+function laneOperand(args) {
+  const s = String(args ?? "");
+  const quoted = /(?:^|\s)(["'])((?:[^"']*\/)?qa\/verify\.mjs)\1(?=\s|$)/.exec(s);
+  if (quoted) return { operand: quoted[2], absolute: quoted[2].startsWith("/"), joined: null };
+
+  const tokens = s.split(/\s+/).filter(Boolean);
+  const i = tokens.findIndex((t) => t === "qa/verify.mjs" || t.endsWith("/qa/verify.mjs"));
+  if (i === -1) return null;
+  const operand = tokens[i];
+  if (operand.startsWith("/")) return { operand, absolute: true, joined: null };
+
+  // The last absolute-looking token before it: if the real operand was an
+  // absolute path with a space in it, that is where it began.
+  let j = -1;
+  for (let k = i - 1; k >= 0; k -= 1) {
+    if (tokens[k].startsWith("/")) {
+      j = k;
+      break;
+    }
+  }
+  return { operand, absolute: false, joined: j === -1 ? null : tokens.slice(j, i + 1).join(" ") };
 }
 
 /** Everything the refusal says about one lane process. Exported so a test can point it at a real one. */

@@ -121,6 +121,10 @@ you the same list without opening anything.
 | **KD-52** | what the emulator scan's two token-level assertions do NOT decide | the inert clause is gone (`f474f17`); the rest is the floor of a shape scan, and no shape reaches it |
 | **KD-56** | `console-now-sse` failed once inside a full suite run during a live lane, and the fit test threw away why | unreproduced in 1 + 5 + 2 runs; the transport already polls behind its watch |
 | **KD-58** | the proof gate reads the publish command's words inside a quoted pattern or a heredoc as the act, and refuses | refuses, never allows — and only the agent is refused |
+| **KD-63** | the lane refusal reads `qa/.lane-in-progress` with none of the guards its other readers apply | one clause of the sentence degrades; the refusal, the project and ours/not-ours are unaffected |
+| **KD-64** | a sibling git worktree of this repository is described as ANOTHER project's lane | errs toward waiting, and the path it prints is true |
+| **KD-65** | the lane's project can still be a token the gate never verified — a `--flag=` value, or the first of two occurrences | no producer: every argv this repo and the harness spawn was verified correct |
+| **KD-66** | the lane probe's bound covers its subprocesses, not the `existsSync` the same fix added | unmeasurable here — no portable way to plant a wedged mount |
 
 ---
 
@@ -769,6 +773,97 @@ Not blocking: it can only REFUSE, never allow, and only an agent's tool call pas
 But a refusal that fires on a search makes the gate's real refusals easier to dismiss, and it fired
 while the gate was refusing every release for a different reason (the hash defect fixed beside this
 entry). *Logged 2026-09-17.*
+
+### KD-63 — the lane refusal reads the lane's marker with none of the guards its other readers apply
+
+`scripts/hooks/proof-gate.mjs` (`laneAt`, `describeLane`) vs `packages/harness/src/lib/plan.mjs`
+(`markerInfo`) and `packages/harness/src/lib/lane-markers.mjs`
+
+`laneAt` JSON-parses `qa/.lane-in-progress` and renders anything it cannot parse as "it wrote no
+progress marker, so nothing says how long it has left". Three guards the file's other readers apply
+are missing here:
+
+- **The legacy `"<pid> <iso>"` form reads as absent.** `markerInfo` documents and accepts it
+  ("older lanes"), and this repo writes it today — `packages/harness/src/verify.mjs:415` stamps it
+  around the `--determinism` probe. Planted on 2026-09-17: a real legacy marker on disk produced
+  "it wrote no progress marker". The gate's whole job is reading ANOTHER project's marker, whose
+  vendored harness version it does not control, so the older form is the likely one there.
+- **No staleness bound.** `LANE_MARKER_STALE_MS` (30 min) is what every other reader uses to tell a
+  lane from a killed lane's leftover; `laneAt` has none.
+- **No attribution.** The marker carries the `pid` that wrote it and the gate holds the pid it is
+  describing, and the two are never compared — so the step and the ETA are narrated for a process
+  that may not have written them.
+
+Not blocking: the refusal still fires, still names the project, and still decides ours/not-ours
+without touching the marker. What degrades is one clause — "it wrote no progress marker" where "a
+marker I could not read" is what is true, or a step name from a run that has ended. Nobody is sent
+into or out of a refusal by it.
+
+**Fires when:** the foreign project runs an older vendored lane, or `verify.mjs --determinism`, or a
+killed lane's marker is still on disk. *Logged 2026-09-17, raised in review round 1 of
+`lane-refusal-names-project`.*
+
+### KD-64 — a sibling worktree of this repository is called ANOTHER project's lane
+
+`scripts/hooks/proof-gate.mjs` (`describeLane`)
+
+`ours` is prefix containment against `repoRoot`, which is the directory the hook file itself sits
+in. This repository's normal way of working is worktrees (`.claude/worktrees/*`), so a lane running
+in the main checkout — or in another worktree of the same repo, against the same emulator — is
+outside `repoRoot` and is described as "ANOTHER project's lane, not yours to stop", with "Do not
+kill it — it is not this slice's."
+
+Not blocking: the path it prints is true, and the advice errs toward waiting, which is the safe
+direction for a lane holding the one device. Making it right means asking git for the common git
+dir from inside a hook that has a 10s budget, which is a call worth making deliberately rather than
+in passing. *Logged 2026-09-17, raised in review round 1 of `lane-refusal-names-project`.*
+
+### KD-65 — the lane's project can still be a token the gate never verified
+
+`scripts/hooks/proof-gate.mjs` (`laneOperand`, `laneProject`)
+
+The reading is settled against the disk only when the operand has TWO readings. A single reading is
+returned unverified, and the operand is any token ENDING in `/qa/verify.mjs` — so a flag carrying the
+path is read as the path. Measured 2026-09-17, with the lane's cwd at `<cwd>`:
+
+```
+node --import=/p/qa/verify.mjs                    ->  <cwd>/--import=/p   (a directory that cannot exist)
+node -r /decoy/qa/verify.mjs /proj/qa/verify.mjs  ->  /decoy              (the first occurrence wins)
+```
+
+Both belong to the class round 1 blocked on — a project the gate names without being able to see it —
+and both are one line from gone: `holdsLane` already exists and already states the invariant (the
+named project holds the lane's own `qa/verify.mjs`), and it is applied to the ambiguous branch only.
+
+Not blocking: nothing in this repo or the harness produces either argv. The lane is spawned as
+`node <abs>/qa/verify.mjs` (`packages/harness/src/framework-check.mjs:269`) or `node qa/verify.mjs`
+(`refusal-demo.mjs`), and every shape that IS produced was re-verified against a real project
+directory whose path contains a space — bare, quoted, relative-after-an-absolute-node — all exact. A
+scanner edge case with no producer.
+
+**Fires when:** a node process's argv carries `…/qa/verify.mjs` inside a `--flag=` value, or twice.
+*Logged 2026-09-17, raised in review round 2 of `lane-refusal-names-project`.*
+
+### KD-66 — the lane probe's bound covers its subprocesses, not its filesystem
+
+`scripts/hooks/proof-gate.mjs` (`shell`, `holdsLane`)
+
+`LANE_PROBE_CALL_MS` / `LANE_PROBE_TOTAL_MS` bound every `execSync` the probe runs, which was the
+whole of the hazard when they were written. The same change then added `fs.existsSync` on a directory
+derived from ANOTHER process's argv, and a synchronous stat takes no timeout: on a wedged or
+automounting path it blocks in the kernel past the budget, and a PreToolUse decision that arrives
+late is a permitted command — the same shape as the defect the bound answers.
+
+Unmeasured, and deliberately: `/net/<nonexistent>` and a missing `/Volumes/<x>` both answered in
+under 1ms here, and there is no portable way to plant a wedged mount in the suite — which is why the
+landed budget test (`the-proof-gate-can-outlive-the-timeout-its-own-wiring-declares`) plants a slow
+`lsof` and cannot plant a slow stat. Narrow besides: the directories stat'd are ones a LIVE process's
+argv names, so the mount under them is one something is currently running from.
+
+Second, smaller: `killSignal: "SIGKILL"` kills the `/bin/sh` that `execSync` spawned, not the probe
+under it. Observed after a trip — a `sleep 12` reparented to pid 1, outliving the gate that gave up
+on it. A stuck `lsof` would be stuck anyway and the gate no longer waits for it; it leaves one behind
+per trip. *Logged 2026-09-17, raised in review round 2 of `lane-refusal-names-project`.*
 
 ## Closed
 
