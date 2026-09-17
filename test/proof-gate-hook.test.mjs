@@ -17,7 +17,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { classify, decide } from "../scripts/hooks/proof-gate.mjs";
+import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
+import { observedTreeHash, deviceTreeHash, DEVICE_TIER_TRIGGERS } from "../scripts/observed-tree.mjs";
 import { TIERS } from "../scripts/proof-plan.mjs";
 
 const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/hooks/proof-gate.mjs");
@@ -98,6 +99,20 @@ test("npm publish: the publish skill's first two steps as a program — clean tr
   assert.equal(ok.action, "allow");
   assert.match(ok.reason, /PASS at L2/);
   assert.equal(decide("publish", onTrunk, TIERS, { record: rec({ rung: "L3" }), now }).action, "allow", "a higher rung is not a lower one");
+});
+
+test("npm publish: the gate hashes THIS tree exactly as the release proof records it", async () => {
+  // The test above injects `now`, so it could never see the gate and the recorder disagree —
+  // and they did: the gate hashed without DEVICE_SKIP, every passing proof was refused, and a
+  // release had to be published by hand. This calls the gate's real context builder.
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  assert.notEqual(
+    observedTreeHash(ROOT, DEVICE_TIER_TRIGGERS),
+    deviceTreeHash(ROOT),
+    "DEVICE_SKIP excludes nothing in this tree, so this test cannot tell the two hashes apart",
+  );
+  const { now } = await releaseContext();
+  assert.equal(now, deviceTreeHash(ROOT), "the publish gate and fleet-check's record hash the same tree differently");
 });
 
 test("gh pr merge: refused while the tier is owed — the slice closes here, so this is where it is collected", () => {

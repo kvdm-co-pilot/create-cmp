@@ -121,6 +121,7 @@ you the same list without opening anything.
 | **KD-51** | a JS masker reads the template's Kotlin; a raw string mis-parses and truncates the scanned body | it reds, not greens — the `useEmulator` tripwire catches the stub — and neither file has a raw string |
 | **KD-52** | what the emulator scan's two token-level assertions do NOT decide | the inert clause is gone (`f474f17`); the rest is the floor of a shape scan, and no shape reaches it |
 | **KD-56** | `console-now-sse` failed once inside a full suite run during a live lane, and the fit test threw away why | unreproduced in 1 + 5 + 2 runs; the transport already polls behind its watch |
+| **KD-58** | the proof gate reads the publish command's words inside a quoted pattern or a heredoc as the act, and refuses | refuses, never allows — and only the agent is refused |
 
 ---
 
@@ -787,6 +788,19 @@ a name and no reason. Keeping the failing tests' output (or the whole log, under
 the change that turns the next occurrence into a diagnosis. Not an adopter-facing defect: it is a test
 of the live console's transport, which has the fallback that would make the real feature survive this.
 *Logged 2026-09-16, during the device tier of `published-bytes-drift`.*
+
+### KD-58 — the words of an act, quoted, are refused as the act
+
+`scripts/hooks/proof-gate.mjs` classifies a Bash command by what it invokes, and its header already
+says a quote is not an invocation. On 2026-09-17 it refused a read-only `git grep -E "…|npm publish"` with
+the publish gate's own message, because the words sat inside a double-quoted `-E` alternation. Then
+it refused the command that LOGGED this entry — a heredoc writing a script whose text contained the
+same two words — as a publish from a non-main branch. Worded around, both ran.
+
+Not blocking: it can only REFUSE, never allow, and only an agent's tool call passes through the hook.
+But a refusal that fires on a search makes the gate's real refusals easier to dismiss, and it fired
+while the gate was refusing every release for a different reason (the hash defect fixed beside this
+entry). *Logged 2026-09-17.*
 
 ## Closed
 

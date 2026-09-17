@@ -249,9 +249,9 @@ function runningLane() {
 }
 
 /** The fleet record and the hash of the tree it would have to describe. */
-async function releaseContext() {
+export async function releaseContext() {
   const fs = await import("node:fs");
-  const { observedTreeHash, DEVICE_TIER_TRIGGERS } = await import("../observed-tree.mjs");
+  const { deviceTreeHash } = await import("../observed-tree.mjs");
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
   let record = null;
   try {
@@ -259,7 +259,7 @@ async function releaseContext() {
   } catch {
     record = null;
   }
-  return { record, now: observedTreeHash(root, DEVICE_TIER_TRIGGERS) };
+  return { record, now: deviceTreeHash(root) };
 }
 
 function readStdin() {
