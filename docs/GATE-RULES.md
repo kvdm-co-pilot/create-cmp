@@ -298,7 +298,12 @@ node scripts/proof-plan.mjs --discharge                        # after the run, 
 node scripts/proof-plan.mjs --record-review                    # the reviewer's own output, bound to this tree
 node scripts/proof-plan.mjs --discharge-review                 # after the review, read from its record
 node scripts/proof-plan.mjs --close                            # refuses if anything is owed
+node scripts/proof-plan.mjs --history                          # what settled slices cost, read from the kept records
 ```
+
+Nothing a slice writes is thrown away: settled plans, every review record and every device run are
+appended to `qa-artifacts/*-history.jsonl`, so a slice's cost is read from this repository — not
+reconstructed from session transcripts, which is how it had to be measured on 2026-09-17.
 
 ### Why: the rule was stated in eighteen documents and lost every time
 

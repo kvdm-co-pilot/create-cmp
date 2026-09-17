@@ -42,6 +42,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { deviceTreeHash } from "./observed-tree.mjs";
+import { appendHistory, historyPath } from "./lib/proof-history.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { assessLadderPlant, describeLadderPlant } from "../packages/harness/src/lib/ladder-plant.mjs";
@@ -317,6 +318,9 @@ async function main() {
     process.stderr.write(`Unknown profile "${args.profile}" — use smoke | scaffold | local | ci | nightly | release.\n`);
     process.exit(2);
   }
+  // When the run began, for the kept history: the record's `ranAt` is when it
+  // ENDED, and the steps' durations leave out stamping and booting a device.
+  const startedAt = new Date().toISOString();
   let minLevel = normalizeLevel(args.minLevel);
   if (args.minLevel && !minLevel) {
     process.stderr.write(`Unknown --min-level "${args.minLevel}" — use L1 | L2 | L3.\n`);
@@ -467,7 +471,7 @@ async function main() {
   // earlier `failures.push` sat above it), and it is the worst one to get wrong
   // this way: it fails precisely when the shipped l2Execution claim is an
   // overclaim, which is the thing that should stop a release hardest.
-  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null });
+  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null, startedAt });
 
   if (failures.length) {
     process.stderr.write(`\nfleet check: FAIL\n`);
@@ -499,8 +503,9 @@ async function main() {
  * Lives under qa/evidence/, which inputs-hash excludes as lane output, so
  * recording a run never invalidates a receipt.
  */
-export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failures, avd, root = REPO_ROOT }) {
+export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failures, avd, root = REPO_ROOT, startedAt = null }) {
   const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+  const branch = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" });
   const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
   const record = {
     schema: "cmp-fleet-check/1",
@@ -545,6 +550,15 @@ export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failure
   } catch {
     // Never let bookkeeping fail a gate.
   }
+  // Every run is also KEPT: the latest record answers "does this tree have a
+  // proof", the history answers what proving cost (scripts/lib/proof-history.mjs).
+  // `startedAt` and `branch` ride on the history row only, so the record every
+  // gate reads keeps exactly the shape those gates were written against.
+  appendHistory(historyPath(root, "fleet"), {
+    ...record,
+    startedAt,
+    branch: branch.status === 0 ? branch.stdout.trim() || null : null,
+  });
 }
 
 // Main guard: the module is import-safe for tests (comparator exports above).
