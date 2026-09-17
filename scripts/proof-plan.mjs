@@ -27,6 +27,12 @@
 //   node scripts/proof-plan.mjs --record-review     write the review record (the reviewer's own output)
 //   node scripts/proof-plan.mjs --discharge-review  record that a review of this tree happened
 //   node scripts/proof-plan.mjs --close             refuse if anything is still owed
+//   node scripts/proof-plan.mjs --history [--json]  what settled slices cost, from the kept records
+//
+// NOTHING IS DELETED WITHOUT BEING KEPT. A settled plan, every review record and
+// every device run are appended to `qa-artifacts/*-history.jsonl` as they are
+// written (scripts/lib/proof-history.mjs says why), so the cost of a slice is
+// read from this repository rather than reconstructed from session logs.
 //
 // THE SECOND AT-CLOSE TIER: A REVIEW (ADR-0014, Karel 2026-09-09 — "gating its
 // existence, never its content"). A qualifying slice owes a review record, and
@@ -72,6 +78,7 @@ import {
   DEVICE_SKIP,
   deviceTreeHash,
 } from "./observed-tree.mjs";
+import { appendHistory, historyPath, readHistory, summarize, renderHistory, PLAN_EVENT_SCHEMA } from "./lib/proof-history.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PLAN_PATH = path.join(REPO_ROOT, "qa-artifacts", "proof-plan.json");
@@ -250,15 +257,57 @@ function tierState(required, plan, discharged, hash) {
  * Close the slice: remove the plan when nothing is owed. The merge hook calls
  * this after `gh pr merge` so a finished slice's plan never lies around to be
  * named stale by the next one — the 2026-09-08 audit found PR #84's still there.
+ *
+ * Removed from the working state, KEPT in the history: the plan is appended as a
+ * `closed` event first. After `gh pr merge --delete-branch` the checkout is
+ * already back on trunk, so the plan arrives here as `stale` rather than `plan` —
+ * both are the slice that just ended, and both are kept.
  */
-export function close(o = obligation()) {
+export function close(o = obligation(), { planPath = PLAN_PATH, historyFile = historyPath(REPO_ROOT, "plans"), via = null, now = new Date() } = {}) {
   const isSettled = (s) => s === "none" || s === "discharged";
   // BOTH at-close tiers, or the plan stays: a slice that closed with a review
   // owed would be a slice whose next reader is told nothing is outstanding.
   const settled = isSettled(o.state) && isSettled(o.review?.state ?? "none");
-  const had = Boolean(o.plan || o.stale);
-  if (settled && had) fs.rmSync(PLAN_PATH, { force: true });
-  return { closed: settled, removed: settled && had, state: o.state, reviewState: o.review?.state ?? "none" };
+  const ended = o.plan ?? o.stale ?? null;
+  if (settled && ended) {
+    appendHistory(historyFile, planEvent("closed", ended, { via, onBranch: o.branch ?? null, device: o.state, review: o.review?.state ?? "none", now }));
+    fs.rmSync(planPath, { force: true });
+  }
+  return { closed: settled, removed: Boolean(settled && ended), state: o.state, reviewState: o.review?.state ?? "none" };
+}
+
+/** One history row about a plan: what happened to it, when, and the plan as it stood. */
+function planEvent(event, plan, { via = null, onBranch = null, device = null, review = null, now = new Date() } = {}) {
+  return { schema: PLAN_EVENT_SCHEMA, event, via, at: now.toISOString(), onBranch, device, review, plan };
+}
+
+/**
+ * Declare a slice. A plan already on disk is not silently overwritten: it is kept
+ * in the history as `replaced`, because a slice abandoned for another is still a
+ * slice that cost something.
+ */
+export function openPlan({ name, branch, base = null }, { planPath = PLAN_PATH, historyFile = historyPath(REPO_ROOT, "plans"), now = new Date() } = {}) {
+  let existing = null;
+  try {
+    const p = JSON.parse(fs.readFileSync(planPath, "utf8"));
+    if (p && p.schema === SCHEMA) existing = p;
+  } catch {
+    existing = null;
+  }
+  if (existing) appendHistory(historyFile, planEvent("replaced", existing, { via: "open", onBranch: branch, now }));
+  const plan = {
+    schema: SCHEMA,
+    slice: name,
+    branch,
+    openedAt: now.toISOString(),
+    base,
+    declared: Object.fromEntries(Object.entries(TIERS).map(([k, v]) => [k, v.when])),
+    discharged: null,
+    reviewDischarged: null,
+  };
+  fs.mkdirSync(path.dirname(planPath), { recursive: true });
+  fs.writeFileSync(planPath, `${JSON.stringify(plan, null, 2)}\n`);
+  return plan;
 }
 
 /** What is still outstanding, by tier name — the sentence `--close` refuses with. */
@@ -362,6 +411,37 @@ function renderReview(o, L) {
   }
 }
 
+/**
+ * Write the reviewer's record, and keep it. WHAT was found comes from the caller
+ * (only the reviewer knows it); WHICH TREE was read is computed here, so no caller
+ * can assert that a review describes bytes it never saw. The latest record is what
+ * a discharge reads; the history row is the same record with the branch it was
+ * written on, so a review can be attributed to its slice after the plan is gone.
+ */
+export function recordReview({ tests = [], decisions = [], nothingFound = false }, { root = REPO_ROOT, now = new Date() } = {}) {
+  const git = (args) => spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  const head = git(["rev-parse", "HEAD"]);
+  const branch = git(["branch", "--show-current"]);
+  const record = {
+    schema: REVIEW_SCHEMA,
+    ranAt: now.toISOString(),
+    // WHICH TREE was read, as content — the same binding the fleet record
+    // uses and for the same reason: a review predates the commit that carries
+    // it, so a commit-keyed record reads stale the moment it lands. The commit
+    // is kept beside it as provenance a human can read, never as the key.
+    observedHash: observedTreeHash(root, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }),
+    commit: head.status === 0 ? head.stdout.trim() : null,
+    tests,
+    decisions,
+    nothingFound,
+  };
+  const latest = path.join(root, "qa-artifacts", "review-latest.json");
+  fs.mkdirSync(path.dirname(latest), { recursive: true });
+  fs.writeFileSync(latest, `${JSON.stringify(record, null, 2)}\n`);
+  appendHistory(historyPath(root, "reviews"), { ...record, branch: branch.status === 0 ? branch.stdout.trim() || null : null });
+  return record;
+}
+
 /** The review record on disk, or null. Never throws — an absent record is a state, not a crash. */
 export function readReviewRecord(file = REVIEW_PATH) {
   try {
@@ -437,17 +517,16 @@ function main() {
       process.exit(2);
     }
     const base = sh("git", ["merge-base", "HEAD", "origin/main"]);
-    write({
-      schema: SCHEMA,
-      slice: name,
-      branch,
-      openedAt: new Date().toISOString(),
-      base: base.status === 0 ? base.stdout.trim() : null,
-      declared: Object.fromEntries(Object.entries(TIERS).map(([k, v]) => [k, v.when])),
-      discharged: null,
-      reviewDischarged: null,
-    });
+    openPlan({ name, branch, base: base.status === 0 ? base.stdout.trim() : null });
     process.stdout.write(`${render(obligation())}\n`);
+    process.exit(0);
+  }
+
+  if (flag("--history") !== -1) {
+    const kept = Object.fromEntries(["plans", "reviews", "fleet"].map((k) => [k, readHistory(historyPath(REPO_ROOT, k))]));
+    const summary = summarize({ plans: kept.plans.rows, reviews: kept.reviews.rows, fleet: kept.fleet.rows });
+    const malformed = kept.plans.malformed + kept.reviews.malformed + kept.fleet.malformed;
+    process.stdout.write(flag("--json") !== -1 ? `${JSON.stringify({ ...summary, malformed }, null, 2)}\n` : `${renderHistory(summary, { malformed })}\n`);
     process.exit(0);
   }
 
@@ -474,22 +553,7 @@ function main() {
       process.stderr.write("--nothing-found contradicts the findings passed with it — one record cannot say both\n");
       process.exit(2);
     }
-    const head = sh("git", ["rev-parse", "HEAD"]);
-    const record = {
-      schema: REVIEW_SCHEMA,
-      ranAt: new Date().toISOString(),
-      // WHICH TREE was read, as content — the same binding the fleet record
-      // uses and for the same reason: a review predates the commit that carries
-      // it, so a commit-keyed record reads stale the moment it lands. The commit
-      // is kept beside it as provenance a human can read, never as the key.
-      observedHash: observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }),
-      commit: head.status === 0 ? head.stdout.trim() : null,
-      tests,
-      decisions,
-      nothingFound,
-    };
-    fs.mkdirSync(path.dirname(REVIEW_PATH), { recursive: true });
-    fs.writeFileSync(REVIEW_PATH, `${JSON.stringify(record, null, 2)}\n`);
+    const record = recordReview({ tests, decisions, nothingFound });
     process.stdout.write(`review recorded — qa-artifacts/review-latest.json, tree ${record.observedHash.slice(0, 7)}\nNow: ${TIERS.review.cmd}\n`);
     process.exit(0);
   }
@@ -551,7 +615,7 @@ function main() {
   const o = obligation();
   if (flag("--close") !== -1) {
     process.stdout.write(`${render(o)}\n`);
-    if (close(o).closed) {
+    if (close(o, { via: "close" }).closed) {
       process.stdout.write("\nslice closed — nothing owed.\n");
       process.exit(0);
     }

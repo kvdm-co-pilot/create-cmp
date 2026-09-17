@@ -308,7 +308,7 @@ async function main() {
     // nothing is owed, which after a merge the gate allowed is always true.
     try {
       const { close } = await import("../proof-plan.mjs");
-      close();
+      close(undefined, { via: "merge" });
     } catch {
       /* a failed close leaves the plan, which the next session names as stale */
     }
