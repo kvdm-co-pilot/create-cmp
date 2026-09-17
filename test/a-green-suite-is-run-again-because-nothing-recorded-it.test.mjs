@@ -18,7 +18,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { SUITE_SCHEMA, suiteTreeHash, suiteStatus, readSuiteRecord } from "../scripts/suite-record.mjs";
-import { recordRun } from "../scripts/suite-reporter.mjs";
+import { recordRun, narrowing } from "../scripts/suite-reporter.mjs";
 import { readHistory, historyPath } from "../scripts/lib/proof-history.mjs";
 import { render, suiteFromRecord } from "../scripts/fit-test.mjs";
 
@@ -30,7 +30,7 @@ function scratchRepo() {
   const git = (...a) => spawnSync("git", a, { cwd: root, encoding: "utf8" });
   git("init", "-q");
   fs.writeFileSync(path.join(root, "a.txt"), "one\n");
-  fs.writeFileSync(path.join(root, ".gitignore"), "qa-artifacts/\n");
+  fs.writeFileSync(path.join(root, ".gitignore"), "qa-artifacts/\nignored-input.md\n");
   git("add", ".");
   return root;
 }
@@ -58,11 +58,43 @@ test("a finished run records its verdict, its counts, and the tree and Node it r
   }
 });
 
-test("a run with no summary did not finish: INCOMPLETE, never PASS", async () => {
+test("a run with no summary did not finish: INCOMPLETE, never PASS — and never read as the suite", async () => {
   const root = scratchRepo();
   try {
     const record = await recordRun(events([{ type: "test:pass", data: { name: "x" } }]), { root });
     assert.equal(record.verdict, "INCOMPLETE");
+    assert.equal(suiteStatus({ record, now: suiteTreeHash(root) }).state, "incomplete");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("KD-61: a narrowed run is recorded as narrowed and never read as the suite, however green", async () => {
+  const root = scratchRepo();
+  try {
+    const record = await recordRun(events(SUMMARY(1, 0)), { root, narrowedBy: ["runner flag --test-name-pattern=ok"] });
+    assert.equal(record.verdict, "PASS");
+    assert.equal(record.scope, "narrowed");
+    assert.equal(suiteStatus({ record, now: suiteTreeHash(root) }).state, "narrowed", "PASS 1/1 of a filtered run is not the suite's verdict");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("KD-61: what counts as narrowing — a filter flag in execArgv or NODE_OPTIONS, or a declared file that did not run", () => {
+  const root = scratchRepo();
+  try {
+    fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "node --test --test-reporter=spec a.test.mjs b.test.mjs" } }));
+    fs.writeFileSync(path.join(root, "a.test.mjs"), "");
+    fs.writeFileSync(path.join(root, "b.test.mjs"), "");
+    const base = { root, cwd: root, execArgv: ["--test"], nodeOptions: "", argvFiles: ["a.test.mjs", "b.test.mjs"] };
+    assert.deepEqual(narrowing(base), [], "the declared suite, whole");
+    assert.deepEqual(narrowing({ ...base, argvFiles: ["a.test.mjs", "b.test.mjs", "extra.test.mjs"] }), [], "more than declared still ran all of it");
+    assert.match(narrowing({ ...base, execArgv: ["--test", "--test-only"] }).join(), /--test-only/);
+    assert.match(narrowing({ ...base, nodeOptions: "--test-skip-pattern=b" }).join(), /--test-skip-pattern/);
+    assert.match(narrowing({ ...base, argvFiles: ["a.test.mjs"] }).join(), /1 declared test file\(s\) did not run, e\.g\. b\.test\.mjs/);
+    fs.rmSync(path.join(root, "package.json"));
+    assert.match(narrowing(base).join(), /no declared suite/, "with nothing declared, nothing can be the suite");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -93,7 +125,11 @@ test("a record is FRESH for exactly its bytes and its Node — an edit, an untra
     fs.rmSync(path.join(root, "new.test.mjs"));
     fs.mkdirSync(path.join(root, "qa-artifacts"), { recursive: true });
     fs.writeFileSync(path.join(root, "qa-artifacts", "noise.json"), "{}");
-    assert.equal(suiteStatus({ record, now: suiteTreeHash(root) }).state, "fresh", "an ignored file is not part of the tree — the record itself lives there");
+    assert.equal(suiteStatus({ record, now: suiteTreeHash(root) }).state, "fresh", "generated output is not part of the tree — the record itself lives there");
+    fs.writeFileSync(path.join(root, "ignored-input.md"), "a gitignored file a test reads\n");
+    assert.equal(suiteStatus({ record, now: suiteTreeHash(root) }).state, "stale", "KD-62: a test can read a gitignored file, so an ignored file is part of the tree");
+    fs.rmSync(path.join(root, "ignored-input.md"));
+    assert.equal(suiteStatus({ record, now: suiteTreeHash(root) }).state, "fresh");
     fs.writeFileSync(path.join(root, "a.txt"), "two\n");
     assert.equal(suiteStatus({ record, now: suiteTreeHash(root) }).state, "stale");
     assert.equal(suiteStatus({ record: null, now: suiteTreeHash(root) }).state, "absent");
@@ -115,19 +151,32 @@ test("the declared suite really records itself — the runner, the reporter and 
   try {
     fs.writeFileSync(path.join(root, "ok.test.mjs"), 'import { test } from "node:test";\ntest("ok", () => {});\n');
     fs.writeFileSync(path.join(root, "bad.test.mjs"), 'import { test } from "node:test";\ntest("bad", () => { throw new Error("x"); });\n');
+    fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "node --test ok.test.mjs bad.test.mjs" } }));
     spawnSync("git", ["add", "."], { cwd: root });
     const reporter = path.join(REPO_ROOT, "scripts", "suite-reporter.mjs");
     const env = { ...process.env, PROOFLANE_SUITE_ROOT: root };
     // KD-49: an inherited NODE_TEST_CONTEXT turns the child into a subtest reporter
     // that exits 0 whatever happens — scrub it, or this proves nothing.
     delete env.NODE_TEST_CONTEXT;
-    const r = spawnSync(process.execPath, ["--test", "--test-reporter=spec", "--test-reporter-destination=stdout", `--test-reporter=${reporter}`, "--test-reporter-destination=stderr", "ok.test.mjs", "bad.test.mjs"], { cwd: root, env, encoding: "utf8" });
+    delete env.NODE_OPTIONS;
+    const runner = (extraEnv = {}) =>
+      spawnSync(process.execPath, ["--test", "--test-reporter=spec", "--test-reporter-destination=stdout", `--test-reporter=${reporter}`, "--test-reporter-destination=stderr", "ok.test.mjs", "bad.test.mjs"], { cwd: root, env: { ...env, ...extraEnv }, encoding: "utf8" });
+    const r = runner();
     assert.equal(r.status, 1, r.stdout + r.stderr);
     const rec = readSuiteRecord(root);
     assert.ok(rec, "the reporter wrote no record");
     assert.equal(rec.verdict, "FAIL");
+    assert.equal(rec.scope, "declared", `the whole declared suite ran: ${JSON.stringify(rec.narrowedBy)}`);
     assert.deepEqual(rec.failing, ["bad"]);
     assert.equal(rec.counts.pass, 1);
+
+    // KD-61, the way it was found: the same command, narrowed from the environment.
+    const narrowed = runner({ NODE_OPTIONS: "--test-name-pattern=ok" });
+    assert.equal(narrowed.status, 0, narrowed.stdout + narrowed.stderr);
+    const nrec = readSuiteRecord(root);
+    assert.equal(nrec.verdict, "PASS");
+    assert.equal(nrec.scope, "narrowed");
+    assert.equal(suiteStatus({ record: nrec, now: suiteTreeHash(root) }).state, "narrowed");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
