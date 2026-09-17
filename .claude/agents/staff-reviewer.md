@@ -101,6 +101,11 @@ worth more than the finding it produced. Put it in `test/`, wired to the suite, 
 6. **Scope the author took on quietly** — a refactor riding along, a dependency added, a
    convention changed in passing.
 
+**Do not re-run a green suite to see that it is green.** `node scripts/proof-plan.mjs` prints, under
+`suite`, whether `npm test` has already run over these exact bytes on this Node and what it found.
+If it says so, that is your baseline. Run the tests you write, and the whole suite only once your
+tests have changed the tree.
+
 **Where you sit:** the exit of Build, before Prove. Prove runs the suite, so the tests you write
 are what enforce your review; you need no gate of your own and this project is not adding one for
 you. Work fast enough to be run every time — a review that costs more than the fix it finds gets

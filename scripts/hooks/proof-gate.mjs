@@ -318,6 +318,7 @@ async function main() {
   if (event === "SessionStart") {
     try {
       const { obligation, render } = await import("../proof-plan.mjs");
+      const { suiteStatus } = await import("../suite-record.mjs");
       // The installed plugin's staleness, one line. It is here and not in a
       // document because the two days it went unnoticed were exactly the days
       // nobody thought to look — and a session reads this before anything else.
@@ -335,7 +336,7 @@ async function main() {
           hookEventName: "SessionStart",
           additionalContext:
             "Proof schedule for this tree — GATE-RULES Rule 4, enforced by scripts/hooks/proof-gate.mjs on fleet-check and gh pr merge, not by any document:\n" +
-            render(obligation()) +
+            render({ ...obligation(), suite: suiteStatus() }) +
             pluginLine +
             (await memoryRestatements()),
         },
