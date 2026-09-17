@@ -13,12 +13,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
-import { observedTreeHash, deviceTreeHash, DEVICE_TIER_TRIGGERS } from "../scripts/observed-tree.mjs";
+import { observedTreeHash, deviceTreeHash, DEVICE_TIER_TRIGGERS, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
 import { TIERS } from "../scripts/proof-plan.mjs";
 
 const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/hooks/proof-gate.mjs");
@@ -196,30 +197,59 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
   // So the live plan is saved and restored, and the destructive branch is
   // exercised against a plan this test WRITES — which also means the removal is
   // asserted rather than merely assumed to be harmless.
-  const post = (command) => run(JSON.stringify({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command }, tool_response: { stdout: "" } }));
+  // The same lesson one file over (KD-59): close() now KEEPS what it removes, so the
+  // plan this test writes would land in this repo's own history as a closed slice on
+  // every trunk run of the suite. The hook subprocess is pointed at a scratch
+  // history, and the real one is asserted untouched.
+  const scratchHistory = fs.mkdtempSync(path.join(os.tmpdir(), "hook-history-"));
+  const realHistory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../qa-artifacts/proof-plan-history.jsonl");
+  const historyBefore = fs.existsSync(realHistory) ? fs.readFileSync(realHistory, "utf8") : null;
+  const post = (command) =>
+    spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command }, tool_response: { stdout: "" } }),
+      encoding: "utf8",
+      timeout: 15000,
+      env: { ...process.env, PROOFLANE_HISTORY_DIR: scratchHistory },
+    });
   const planPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../qa-artifacts/proof-plan.json");
   const saved = fs.existsSync(planPath) ? fs.readFileSync(planPath) : null;
   try {
-    // A settled plan — discharged, so close() will remove it — on this branch.
+    // A settled plan on this branch: both tiers discharged against the live tree's
+    // own hashes, so close() settles it wherever the suite runs — trunk, a docs
+    // branch, or a slice mid-flight. (It used to carry `treeHash: "n/a"`, which
+    // settled only on trunk; that is the state KD-59 was measured in.)
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
     const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).stdout.trim();
+    const at = new Date().toISOString();
     fs.mkdirSync(path.dirname(planPath), { recursive: true });
     fs.writeFileSync(
       planPath,
-      `${JSON.stringify({ schema: "prooflane-proof-plan/1", slice: "a plan this test wrote", branch, openedAt: new Date().toISOString(), declared: { device: "at-close" }, discharged: { at: new Date().toISOString(), treeHash: "n/a", verdict: "PASS", rung: "L2" } }, null, 2)}\n`,
+      `${JSON.stringify({
+        schema: "prooflane-proof-plan/1",
+        slice: "a plan this test wrote",
+        branch,
+        openedAt: at,
+        declared: { device: "at-close", review: "at-close" },
+        discharged: { at, treeHash: deviceTreeHash(repoRoot), verdict: "PASS", rung: "L2" },
+        reviewDischarged: { at, treeHash: observedTreeHash(repoRoot, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }), tests: [], decisions: [], nothingFound: true },
+      }, null, 2)}\n`,
     );
 
     const merged = post("gh pr merge 86 --rebase --delete-branch");
     assert.equal(merged.status, 0, merged.stderr);
     assert.equal(merged.stdout, "", "the close is silent — a merge is not the place for a lecture");
 
-    // Not asserted: whether THIS plan was removed. close() compares the plan's
-    // tree hash against the live tree, and a fixture cannot honestly carry one.
-    // What is asserted is that the handler ran and stayed quiet; the removal
-    // itself is proved by test/proof-plan.test.mjs against close() directly.
     assert.equal(post("npm test").stdout, "", "an unmatched command closes nothing");
+    const kept = fs.existsSync(path.join(scratchHistory, "proof-plan-history.jsonl"))
+      ? fs.readFileSync(path.join(scratchHistory, "proof-plan-history.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l))
+      : [];
+    assert.deepEqual(kept.map((r) => r.plan.slice), ["a plan this test wrote"], "the merge hook keeps the plan it closes — in the history it was pointed at");
+    const historyAfter = fs.existsSync(realHistory) ? fs.readFileSync(realHistory, "utf8") : null;
+    assert.equal(historyAfter, historyBefore, "a fixture plan must never become a closed slice in this repo's own history");
   } finally {
     if (saved === null) fs.rmSync(planPath, { force: true });
     else fs.writeFileSync(planPath, saved);
+    fs.rmSync(scratchHistory, { recursive: true, force: true });
   }
 });
 

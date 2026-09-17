@@ -9,6 +9,40 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-59 — the plan history records as `closed` slices that never closed — **CLOSED 2026-09-17, in the slice that found it**
+
+`close()` appends a `closed` row for whatever plan `obligation()` hands it, and on trunk that is
+`o.stale` — ANY leftover plan, not the one the merge just landed. Two ways that row attests nothing,
+both executed on 2026-09-17 (branch `proof-history`, round 1):
+
+- `test/proof-gate-hook.test.mjs` "PostToolUse after a merge" writes a fake discharged plan and runs
+  the real hook. It restores `proof-plan.json` but not the history: `npm test` on a clean `main`
+  (a clone with `origin/main` = HEAD) left `a plan this test wrote · 0 min` in
+  `qa-artifacts/proof-plan-history.jsonl`, and `--history` counted it as a closed slice. Every suite
+  run on trunk, or on a docs-only branch, adds another and pulls the median toward zero.
+- A plan abandoned on branch `a` (never discharged, never merged) is recorded as `closed via merge`
+  when some OTHER branch merges without `--open`, with a duration spanning both. The row's
+  `device`/`review` fields are the trunk's `none`, never the slice's — in the ordinary merge path too.
+
+Not blocking: `scripts/` is not shipped and `--history` sits in no refusal path; nobody but this
+repo's own G2 measurement is misled. But that measurement is the slice's whole reason. The fix is
+two lines of isolation (the hook test must also save/restore the history, or the hook take a history
+path from env) plus recording a stale plan whose branch is not the merged one as `abandoned`, not
+`closed`. *Logged 2026-09-17.*
+
+**Closed before merge** (`proof-history`, round 1 → fix): the merge-hook test now points the hook at a scratch history (`PROOFLANE_HISTORY_DIR`) with a fixture that settles on every branch, and asserts the real history is untouched; a leftover plan whose branch still exists is recorded `cleared`, and a stale plan's row no longer carries trunk's tier states. Pinned by `test/a-settled-slice-leaves-no-record-of-what-it-cost.test.mjs` and `test/proof-gate-hook.test.mjs`.
+
+### KD-60 — "the totals always add up" does not hold once a plan is replaced — **CLOSED 2026-09-17, in the slice that found it**
+
+`summarize()` claims a device run or review matching no closed slice is counted as unattributed
+"so the totals always add up". A run inside a `replaced` slice's window is claimed (so not
+unattributed) and excluded from `deviceRuns` (closed only): replaced run at 10:30 + closed run at
+11:30 on one branch gives `deviceRuns 1, unattributedDeviceRuns 0` of 2 rows. The per-slice line
+still shows it; the summary line does not. Not blocking: a report line under-counts, no gate reads
+it. *Logged 2026-09-17.*
+
+**Closed before merge** (`proof-history`, round 1 → fix): totals now have three buckets — closed slices, slices that never closed, unattributed — and a test asserts they add up to the history for both runs and reviews.
+
 ### KD-57 — on Node 20, nine tests ran and did not report — **CLOSED, 2026-09-16**
 
 CI on `f58ca39`: Node 20 counted `1932` tests where Node 22 and 24 counted `1941` on the same runner

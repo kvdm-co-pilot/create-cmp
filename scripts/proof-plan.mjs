@@ -258,22 +258,43 @@ function tierState(required, plan, discharged, hash) {
  * this after `gh pr merge` so a finished slice's plan never lies around to be
  * named stale by the next one — the 2026-09-08 audit found PR #84's still there.
  *
- * Removed from the working state, KEPT in the history: the plan is appended as a
- * `closed` event first. After `gh pr merge --delete-branch` the checkout is
- * already back on trunk, so the plan arrives here as `stale` rather than `plan` —
- * both are the slice that just ended, and both are kept.
+ * Removed from the working state, KEPT in the history — and kept under the name
+ * that is true, which review of the slice that added the history showed is not
+ * always `closed` (KD-59):
+ *
+ *   - the plan of THIS branch, settled: `closed`, with the tiers' states as they
+ *     stood at close.
+ *   - a plan from ANOTHER branch, found after `gh pr merge --delete-branch` has
+ *     moved the checkout to trunk and deleted that branch: `closed` — it is the
+ *     slice the merge just landed. Its tier states are the ones in the plan; the
+ *     obligation computed on trunk says `none` and describes trunk, not the slice.
+ *   - a plan from another branch whose branch STILL EXISTS: `cleared`. Something
+ *     else merged or closed; this plan's slice did not end here, and recording it
+ *     as closed would hand it a lifetime spanning two slices.
  */
-export function close(o = obligation(), { planPath = PLAN_PATH, historyFile = historyPath(REPO_ROOT, "plans"), via = null, now = new Date() } = {}) {
+export function close(o = obligation(), { planPath = PLAN_PATH, historyFile = historyPath(REPO_ROOT, "plans"), via = null, now = new Date(), branchExists = localBranchExists } = {}) {
   const isSettled = (s) => s === "none" || s === "discharged";
   // BOTH at-close tiers, or the plan stays: a slice that closed with a review
   // owed would be a slice whose next reader is told nothing is outstanding.
   const settled = isSettled(o.state) && isSettled(o.review?.state ?? "none");
   const ended = o.plan ?? o.stale ?? null;
   if (settled && ended) {
-    appendHistory(historyFile, planEvent("closed", ended, { via, onBranch: o.branch ?? null, device: o.state, review: o.review?.state ?? "none", now }));
+    const own = Boolean(o.plan);
+    const event = own || !branchExists(ended.branch) ? "closed" : "cleared";
+    appendHistory(
+      historyFile,
+      planEvent(event, ended, { via, onBranch: o.branch ?? null, device: own ? o.state : null, review: own ? (o.review?.state ?? "none") : null, now }),
+    );
     fs.rmSync(planPath, { force: true });
   }
   return { closed: settled, removed: Boolean(settled && ended), state: o.state, reviewState: o.review?.state ?? "none" };
+}
+
+/** Whether a local branch of this name exists. Unanswerable counts as existing, so a doubt records `cleared`, never a false `closed`. */
+function localBranchExists(name) {
+  if (!name) return false;
+  const r = sh("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${name}`]);
+  return r.status !== 1;
 }
 
 /** One history row about a plan: what happened to it, when, and the plan as it stood. */
