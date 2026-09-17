@@ -26,6 +26,7 @@ export const HISTORY_FILES = Object.freeze({
   plans: "proof-plan-history.jsonl",
   reviews: "review-history.jsonl",
   fleet: "fleet-history.jsonl",
+  suite: "suite-history.jsonl",
 });
 
 export const PLAN_EVENT_SCHEMA = "prooflane-proof-plan-event/1";

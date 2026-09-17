@@ -53,7 +53,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 function declaredPatterns() {
   const script = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).scripts.test;
   assert.match(script, /^node --test /, `the test script is no longer \`node --test <patterns>\`: ${script}`);
-  return script.replace(/^node --test\s+/, "").split(/\s+/).filter(Boolean);
+  // Runner FLAGS are not patterns: `--test-reporter=…` chooses how the run is
+  // reported (and recorded — scripts/suite-reporter.mjs), not which files run.
+  // The sibling guard's `runnerOperands` skips them the same way.
+  return script.replace(/^node --test\s+/, "").split(/\s+/).filter(Boolean).filter((t) => !t.startsWith("-"));
 }
 
 /** Every test file git is tracking — the set that SHOULD run. */

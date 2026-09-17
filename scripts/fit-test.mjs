@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
 import { deviceTreeHash, DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
 import { obligation, changedPaths } from "./proof-plan.mjs";
+import { suiteStatus } from "./suite-record.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FLEET_RECORD = path.join(REPO_ROOT, "qa-artifacts", "fleet-latest.json");
@@ -91,8 +92,29 @@ export function readFleetRecord(recordPath = FLEET_RECORD, currentHash = null) {
   };
 }
 
+/**
+ * The suite's line, read from a recorded run instead of spent again — the same
+ * shape `parseSuite` returns, plus when it was recorded, so the printed number
+ * says where it came from. Only ever called with a record `suiteStatus` found
+ * FRESH: same bytes, same Node, a tree that did not move under the run.
+ */
+export function suiteFromRecord(record) {
+  const c = record?.counts ?? {};
+  return {
+    tests: typeof c.tests === "number" ? c.tests : null,
+    pass: typeof c.pass === "number" ? c.pass : null,
+    fail: typeof c.fail === "number" ? c.fail : null,
+    failing: Array.isArray(record?.failing) ? record.failing : [],
+    recordedAt: record?.ranAt ?? null,
+  };
+}
+
 function collect({ run }) {
-  const suite = run ? parseSuite(sh("npm", ["test"]).stdout ?? "") : null;
+  // The suite this author just ran is not run again: a record for these exact
+  // bytes, on this Node, is the run (scripts/suite-record.mjs). Anything else —
+  // stale, moved, another Node, absent — runs it, as before.
+  const status = suiteStatus();
+  const suite = status.state === "fresh" ? suiteFromRecord(status.record) : run ? parseSuite(sh("npm", ["test"]).stdout ?? "") : null;
   const fc = run ? parseFrameworkCheck(sh("node", ["scripts/framework-check.mjs"]).stdout ?? "") : null;
   const paths = changedPaths();
   const device = deviceTierRequired(paths);
@@ -103,7 +125,9 @@ function render(d) {
   const L = [];
   L.push("fit test — the derived half (docs/NORTH-STAR.md §10)\n");
   L.push("6. Proof at altitude");
-  L.push(`   suite             ${d.suite ? `${d.suite.pass}/${d.suite.tests}${d.suite.fail ? ` — ${d.suite.fail} FAILING` : ""}` : "not run (--no-run)"}`);
+  L.push(
+    `   suite             ${d.suite ? `${d.suite.pass}/${d.suite.tests}${d.suite.fail ? ` — ${d.suite.fail} FAILING` : ""}${d.suite.recordedAt ? ` · recorded ${String(d.suite.recordedAt).slice(0, 16)} for this exact tree, not re-run` : ""}` : "not run (--no-run)"}`,
+  );
   for (const name of d.suite?.failing ?? []) L.push(`                     ✖ ${name}`);
   L.push(`   framework-check   ${d.frameworkCheck ? `${d.frameworkCheck.verdict} · ${d.frameworkCheck.plants} plants · ${d.frameworkCheck.ms} ms` : "not run (--no-run)"}`);
 

@@ -79,6 +79,7 @@ import {
   deviceTreeHash,
 } from "./observed-tree.mjs";
 import { appendHistory, historyPath, readHistory, summarize, renderHistory, PLAN_EVENT_SCHEMA } from "./lib/proof-history.mjs";
+import { suiteStatus, describeSuiteStatus } from "./suite-record.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PLAN_PATH = path.join(REPO_ROOT, "qa-artifacts", "proof-plan.json");
@@ -351,6 +352,9 @@ export function render(o) {
   for (const [name, tier] of Object.entries(TIERS)) {
     if (tier.when === "at-close") continue;
     L.push(`  ${name.padEnd(16)} ${tier.when.padEnd(12)} ${tier.cost.padEnd(22)} ${tier.cmd}`);
+    // Whether the suite has ALREADY run over these bytes — the line a reviewer or
+    // an author reads before spending a minute re-deriving it (scripts/suite-record.mjs).
+    if (name === "suite" && o.suite) L.push(`      ${describeSuiteStatus(o.suite)}`);
   }
 
   const line = (verdict, detail) => L.push(`  ${"device (fleet L2)".padEnd(16)} ${verdict}\n      ${detail}`);
@@ -633,7 +637,7 @@ function main() {
     process.exit(0);
   }
 
-  const o = obligation();
+  const o = { ...obligation(), suite: suiteStatus() };
   if (flag("--close") !== -1) {
     process.stdout.write(`${render(o)}\n`);
     if (close(o, { via: "close" }).closed) {
