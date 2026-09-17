@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 
 import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
 import { observedTreeHash, deviceTreeHash, DEVICE_TIER_TRIGGERS, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
-import { TIERS } from "../scripts/proof-plan.mjs";
+import { TIERS, currentBranch } from "../scripts/proof-plan.mjs";
 
 const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/hooks/proof-gate.mjs");
 const FC = "scripts/fleet-check.mjs";
@@ -219,7 +219,11 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
     // branch, or a slice mid-flight. (It used to carry `treeHash: "n/a"`, which
     // settled only on trunk; that is the state KD-59 was measured in.)
     const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-    const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).stdout.trim();
+    // The READER's spelling of the current branch, not a second one: on a detached
+    // checkout (every GitHub Actions pull_request) `rev-parse --abbrev-ref HEAD`
+    // says "HEAD" where proof-plan says "", and the fixture stopped being this
+    // branch's plan (test/the-current-branch-is-read-two-ways.test.mjs).
+    const branch = currentBranch();
     const at = new Date().toISOString();
     fs.mkdirSync(path.dirname(planPath), { recursive: true });
     fs.writeFileSync(
