@@ -3,7 +3,7 @@
 // `agents/cmp-orchestrator.md` told the orchestrator to "re-brief the same agent
 // (`SendMessage`)" from the commit that created it on 2026-07-06. Its frontmatter
 // never listed `SendMessage`. The contradiction shipped for ten weeks and cost
-// nothing, because nobody drove that path — then on 2026-09-18 seven orchestrators
+// nothing, because nobody drove that path — then on 2026-09-18 FOUR orchestrators
 // took it in one day, could not resume a reviewer, and each ran a COLD substitute
 // pass instead, which is precisely what docs/KNOWN-DEFECTS.md's header forbids for
 // a re-record: the point is that the same reader confirms against the merging bytes.
