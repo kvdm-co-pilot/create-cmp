@@ -187,6 +187,8 @@ you the same list without opening anything.
 | **KD-160** | every create-cmp tree commits `qa/harness.lock.json`, whose `files` map holds one sha256 per locked path — 73 digests in a full stamp, 7 in a `--minimal` one — and a secret scanner reads a 64-char hex string as a credential | measured after an adopter's gitleaks flagged one as `generic-api-key` and reddened their CI on a file they did not author. The digests are load-bearing (the lock is what says whether the machine-owned region was edited) so they cannot simply go; the remedies are an allowlist shipped with the template or documenting the shape, and both are product decisions rather than lines |
 | **KD-161** | the round block prices round 2 from whether the DELTA is empty, and a round 1 that logs its findings writes to `docs/KNOWN-DEFECTS.md` — so the delta is almost never empty and the one NOT-OWED case is almost never reachable | measured on its own first use: round 1 of the slice that added it found nothing blocking, made NO fixes, wrote two log entries, and the block priced round 2 OWED. The header's rule is about round 1's FIXES, not about any delta. Advisory only — a human read it, disagreed, and took the header's answer |
 | **KD-162** | the sweep proving the lock is a "class of one" allow-lists `qa/e2e/` and `qa/golden/` by PREFIX, so a machine-written file added under either is invisible to it | measured: today's three survivors under those prefixes really are app content and the lock really is the only other one, so the claim holds — what is unpinned is tomorrow's addition, not today's answer |
+| **KD-132** | the review-round measurement *"round 1 took 6.9 minutes and round 2 took 3.6"* is stated in three places — `scripts/change-price.mjs`'s PART 4 header, the new round test's header and `docs/features/price-the-next-review-round.md` — and none of them says what was timed; the instrument was an agent's wall clock from spawn to report, which is outside this tree | nothing routes on the numbers and the design they support rests on the rule of record, not on them. What a reader CAN compute here is the gap between that slice's two review-history rows (20:16:05.182Z → 20:21:21.355Z, 5.3 min), which is a different quantity and matches neither figure — so the claim can be believed but never checked. KD-128 one file over |
+| **KD-133** | `nextRound`'s CAP SPENT arm returns `read: null` and `settles: []` even when proof-plan reports the review tier REOPENED — the moment the rule of record's header makes the last round owe a re-record, which is what this slice's own `--kind rerecord` is for; its NOT-OWED sibling names that obligation in the same state | driven and read back rather than argued: the same screen's `spent` review row already prints *"REOPENED … a fresh record is owed for the SAME round"*, so no reader of the program's output is misled. What is missing is the block's own answer at the moment that block is the thing being read |
 
 ---
 
@@ -2502,6 +2504,60 @@ is followed by a `PASS` over the same hash.
 
 *Logged 2026-09-19 by the slice that ran the suite, before any review round.*
 
+### KD-132 — a review-round measurement stated three times, and re-readable in none of them
+
+`scripts/change-price.mjs` (PART 4 header) · `test/nothing-says-which-review-round-is-next-or-what-it-must-read.test.mjs` (header) · `docs/features/price-the-next-review-round.md`
+
+All three carry the same sentence about the KD-123 slice — round 1 took **6.9 minutes**, round 2
+took **3.6** — as the measurement that justifies printing the delta command for a later round. None
+of the three says what was timed. The instrument was an agent's wall clock from spawn to report,
+held by the human who ran it; nothing in this repository records a round's duration. The only
+quantity a reader here can compute is the gap between that slice's two rows in
+`qa-artifacts/review-history.jsonl` — `2026-09-18T20:16:05.182Z` to `20:21:21.355Z`, 5.3 minutes —
+which is a different measurement of a different thing and matches neither number. So a reader who
+tries to check the claim against the tree finds a third figure and no way to tell which is which.
+
+**Why it does not block.** Nothing routes on the numbers, and the design they are offered in support
+of does not rest on them: a later round reads the delta because `docs/KNOWN-DEFECTS.md`'s header
+bounds it there, not because a stopwatch said so. The figures are very likely right.
+
+**Why logged and not fixed.** The two honest remedies are both worse than the entry. Naming the
+instrument in each of the three places makes three copies of one unheld fact where there are already
+three copies of the fact itself. Recording it instead is new mechanism: a record carries `ranAt`,
+which is one point in time, so a duration needs a start the reviewer does not currently write down.
+This is KD-128's shape — a fact stated here that this repository can never red on — one file over.
+
+*Logged 2026-09-19, review round 1. The 5.3-minute figure was computed from the kept records, not
+estimated.*
+
+### KD-133 — the round block says CAP SPENT and hands back nothing, at the moment a re-record is owed
+
+`scripts/change-price.mjs` (`nextRound`, the cap arm)
+
+Driven and read back rather than argued. With two rows attributed to the slice stating rounds 1 and
+2 and `reviewState: "reopened"`, `nextRound` returns `verdict: "CAP SPENT — no third round"`,
+`read: null`, `settles: []`. REOPENED is precisely the state the header's *"the LAST round re-records
+after its own fix"* paragraph is about, and `--kind rerecord` — added by this same slice so that row
+can be told from a cold read — is how that record is written. The sibling NOT-OWED arm, in the same
+state, appends: *"proof-plan still reports the review tier REOPENED — that is a RECORD owed for these
+bytes (`--record-review`, then `--discharge-review`), which is not another round."* Two arms of one
+function, one of which knows this and one of which does not.
+
+**Why it does not block.** The same screen already says it. Rendering that state end to end, the
+`spent` review row prints *"REOPENED — nothing recorded here is standing … a fresh record is owed for
+the SAME round"*, so no reader of the program's output is left without the act. What is lost is the
+block's own answer at the moment that block is the thing being read, and the block is advisory
+either way.
+
+**Measured alongside it, and smaller:** the NOT-OWED arm's dirty branch — *"and the working tree adds
+nothing either"* — cannot fire. `changedPaths` unions the range with `git status --porcelain`, so a
+dirty tree always makes the delta non-empty and an empty delta always means a clean one. A sweep of
+745,040 synthetic states over `nextRound` found NOT OWED reached only with an empty anchor delta and
+CAP SPENT only with a row stating round ≥ 2 — the two directions that would ship a skipped review —
+with that clause the only arm nothing reaches.
+
+*Logged 2026-09-19, review round 1.*
+
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
 taken, with the commit that did it.
@@ -2581,7 +2637,7 @@ a round that finds something and logs it is the normal case, and logging writes 
 the delta is non-empty after almost every round 1, and the single NOT-OWED case the block can reach
 is nearly unreachable in practice. The author of the slice predicted the same shape from the other
 side — that until `--round` is populated everywhere, unknown resolves to OWED — and named the risk
-as the "fleet L2 REQUIRED" wallpaper that `scripts/proof-plan.mjs`'s own header was born from.
+as the `fleet L2 REQUIRED` wallpaper that `scripts/proof-plan.mjs`'s own header was born from.
 
 **Why logged and not fixed, and why nobody is wrongly served.** It is an advisory: it refuses
 nothing, exits 0, and in the measured case a human read it, disagreed with it and took the header's
