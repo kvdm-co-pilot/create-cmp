@@ -187,7 +187,11 @@ anything you are about to act on. So:
   carry on. That is the whole fix.
 - **Only background work you will genuinely not touch this turn**, and then actually do something
   else with the turn rather than ending it.
-- The "status you owe upward past ~5 minutes" rule below means post a line and **keep working**.
+- **`SendMessage` has no such parameter — a send never blocks.** Re-briefing an agent and then
+  ending the turn strands the reply exactly as backgrounding does, and `run_in_background: false`
+  is not available to fix it. Either carry on working in the same turn and handle the reply when
+  it is delivered, or subscribe with `notify_when_idle: true` and say out loud that you did.
+- The "status you owe upward past ~5 minutes" rule above means post a line and **keep working**.
   It never means end the turn. If you have nothing left to do but wait, you spawned it wrong.
 
 ## Parallelism
