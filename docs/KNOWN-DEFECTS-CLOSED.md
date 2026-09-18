@@ -9,7 +9,7 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
-### KD-112 — one measurement, two defect numbers: the doc credited KD-79 where the code credits KD-105 — **CLOSED 2026-09-18, in the round that found it**
+### KD-117 — one measurement, two defect numbers: the doc credited KD-79 where the code credits KD-105 — **CLOSED 2026-09-18, in the round that found it**
 
 `docs/GATE-RULES.md` (Rule 4) vs `scripts/hooks/proof-gate.mjs` (`IN_WORD`, `GAP`)
 
@@ -72,7 +72,7 @@ Closed by `COMMAND_PREFIX` in `scripts/hooks/proof-gate.mjs` — one exported de
 stand between a separator and a command, embedded by BOTH `invocation()` and `COMPOUND`, with a test
 that reads it back out of each so a third spelling cannot be added without failing. The accepted
 wrapper words are a closed list stated in `docs/GATE-RULES.md` (Rule 4) and bound to the code by the
-same test; what the list does not read through is named there and logged as KD-109 rather than
+same test; what the list does not read through is named there and logged as KD-114 rather than
 inferred. The separator classes were deliberately NOT unified, and that is the one place the fix
 departs from the entry above: the two readers run at different moments — `invocation()` on raw text,
 `COMPOUND` after every quoted span has been blanked — so `-c "` is meaningful only to the first and

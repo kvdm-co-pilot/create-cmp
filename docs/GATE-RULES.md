@@ -384,7 +384,7 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   So `watch -n 5 …`, `script`, `parallel`, `ssh host '…'`, `docker run …`, `find … -exec`, a `-c`
   not spelled exactly `-c` (`bash -lc "…"`), and a brace group whose first word is the gated command
   (`{ gh pr merge; }`) are not read through. What is not read through is a fail-open with no
-  producer here and is logged (KD-109), not inferred silently.
+  producer here and is logged (KD-114), not inferred silently.
 
   That sentence is the rule, and the arity is per wrapper rather than one number, because the
   version that guessed shipped both of this gate's historical mistakes at once. Given "a wrapper may
@@ -404,7 +404,7 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   READ while this declaration was being unified, including `time . /x/s.sh; gh pr merge` — the
   six-shape class KD-105's own fix had just closed. The clause is true of the wrapper run and NOT of
   the assignment and redirection alternatives beside it, which are still `\S*`; that asymmetry is
-  logged as KD-110, with the sweep that went looking for a consequence and could not produce one. Both directions are swept against `/bin/sh` in
+  logged as KD-115, with the sweep that went looking for a consequence and could not produce one. Both directions are swept against `/bin/sh` in
   `test/a-wrapper-word-walks-an-unproven-merge-past-the-gate.test.mjs`, which asks the shell whether
   the gated program was really executed rather than asserting that it was.
 - **And it judges the tree the COMMAND acts on, never the session's.** `.claude/settings.json`

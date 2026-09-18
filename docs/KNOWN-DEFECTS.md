@@ -168,11 +168,11 @@ you the same list without opening anything.
 | **KD-111** | `installedFrom` is npm's layout — a Yarn PnP checkout has no `node_modules` at all, so every declared dependency reads missing and a working tree is refused | no producer: this repo declares npm (`package-lock.json`, npm `workspaces`, `npm ci` in CI) and no other lockfile is in the tree; the failure is a loud refusal naming a command, never a silent pass |
 | **KD-112** | the door has no bypass, so every way it can be wrong ends in a correctly installed tree that cannot run its suite at all — a named `PROOFLANE_SKIP_PREFLIGHT=1` would bound the class at one line | a product decision, handed up rather than taken: the population is empty today (KD-111 has no producer, and the one real divergence found in review is fixed), and an escape hatch is how a guard becomes optional |
 | **KD-113** | the two readers spell a NAMELESS workspace's name differently — npm synthesizes the directory basename (`noname`), the door falls back to the rel path (`ws/noname`) — and the landed invariant test uses that name as the set's identity | measured over twelve layouts, the only divergence left and the only one that is a LABEL rather than a member: coverage, refusal and remedy are identical. No producer — every package this repo declares names itself — and the first one that does not reds the invariant test for a reason that is not the defect it is about |
-| **KD-109** | the closed wrapper list KD-107 landed does not read through five further shapes — `bash -lc "gh pr merge"`, `{ gh pr merge; }`, `ssh host '…'`, `watch -n 5 …`, and a wrapper carrying more than two bare operands (`sudo -u me -g grp extra …`) | fail-open at the classifier, and the residue the closed list names out loud rather than guessing at (docs/GATE-RULES.md, Rule 4); no producer — a merge here is typed `gh pr merge --rebase --delete-branch`, bare or behind a `cd` |
-| **KD-109** | the closed wrapper list KD-107 landed does not read through five further shapes — `bash -lc "gh pr merge"`, `{ gh pr merge; }`, `ssh host '…'`, `watch -n 5 …`, and a wrapper carrying an operand its table entry does not declare (`sudo -u me -g grp extra …`) | fail-open at the classifier, and the residue the closed list names out loud rather than guessing at (docs/GATE-RULES.md, Rule 4); no producer — a merge here is typed `gh pr merge --rebase --delete-branch`, bare or behind a `cd` |
-| **KD-110** | "no word in a command prefix crosses a character that ends a command" is honoured by ONE of `COMMAND_PREFIX`'s three alternatives — the assignment and redirection alternatives are still `\S*`, and `A=a;b `, `A=a&&b `, `2>a;b ` all match the prefix across the separator | the comment is wider than the code, and the code is right by accident: leftmost-match still starts the invocation at or after any `cd`, so no shape resolves a different tree — swept for one and none found. Nobody is served wrongly today; the next reader of that comment is |
-| **KD-111** | `IN_WORD` and `GAP` — the two clauses that say a wrapper run does not cross a character that ends a command — are pinned by no test since the bare-operand run they guarded was removed: relaxing either to `\S`/`\s+` leaves the whole suite green | not a wrong clause, an unpinned one: both are right about the shell, nobody is served wrongly, and the honest remedy (the declaration's comment states which clauses are measured) was taken. A test with no consequence to assert would have to assert the regex's own source — the third spelling that KD-107 was |
-| **KD-113** | the letter sweep runs only the direction where the shell PRINTS, so a value-taking letter MISSING from `WRAPPER_ARITY` is invisible to it — the run ends a word early and the gated program is read as the flag's value. Two were found by hand at the re-record (`command time -o F gh pr merge`, `xargs -J R gh pr merge`; both really merge, both answered `null`) and both are FIXED; what is logged is that nothing would catch a third | fail-open at the classifier, no producer — zero hits for `command time`, `/usr/bin/time` or `xargs -J` in this tree. The fix is a second sweep, costed at 13 spawns done per-wrapper (676 done per-letter); not built because this slice's two rounds are spent and it is a new mechanism rather than a correction |
+| **KD-114** | the closed wrapper list KD-107 landed does not read through five further shapes — `bash -lc "gh pr merge"`, `{ gh pr merge; }`, `ssh host '…'`, `watch -n 5 …`, and a wrapper carrying an operand its table entry does not declare (`sudo -u me -g grp extra …`) | fail-open at the classifier, and the residue the closed list names out loud rather than guessing at (docs/GATE-RULES.md, Rule 4); no producer — a merge here is typed `gh pr merge --rebase --delete-branch`, bare or behind a `cd` |
+| **KD-115** | "no word in a command prefix crosses a character that ends a command" is honoured by ONE of `COMMAND_PREFIX`'s three alternatives — the assignment and redirection alternatives are still `\S*`, and `A=a;b `, `A=a&&b `, `2>a;b ` all match the prefix across the separator | the comment is wider than the code, and the code is right by accident: leftmost-match still starts the invocation at or after any `cd`, so no shape resolves a different tree — swept for one and none found. Nobody is served wrongly today; the next reader of that comment is |
+| **KD-116** | `IN_WORD` and `GAP` — the two clauses that say a wrapper run does not cross a character that ends a command — are pinned by no test since the bare-operand run they guarded was removed: relaxing either to `\S`/`\s+` leaves the whole suite green | not a wrong clause, an unpinned one: both are right about the shell, nobody is served wrongly, and the honest remedy (the declaration's comment states which clauses are measured) was taken. A test with no consequence to assert would have to assert the regex's own source — the third spelling that KD-107 was |
+| **KD-118** | the letter sweep runs only the direction where the shell PRINTS, so a value-taking letter MISSING from `WRAPPER_ARITY` is invisible to it — the run ends a word early and the gated program is read as the flag's value. Two were found by hand at the re-record (`command time -o F gh pr merge`, `xargs -J R gh pr merge`; both really merge, both answered `null`) and both are FIXED; what is logged is that nothing would catch a third | fail-open at the classifier, no producer — zero hits for `command time`, `/usr/bin/time` or `xargs -J` in this tree. The fix is a second sweep, costed at 13 spawns done per-wrapper (676 done per-letter); not built because this slice's two rounds are spent and it is a new mechanism rather than a correction |
+| **KD-119** | KD numbers are allocated per BRANCH, so two branches in flight allocate the same ones: as found, this branch's KD-109..113 and `origin/main`'s KD-109..113 named ten unrelated defects under five numbers, and `scripts/hooks/proof-gate.mjs` cites three of them in comments no rebase conflict ever shows. The collision is FIXED — this branch renumbered to 114-119, above main's maximum, before any rebase | the log is prose and no program routes on a KD number; what stays logged is that nothing makes re-reading main's maximum routine, and that a deriver for it would have to fetch — which `proof-plan.mjs` deliberately never does, because a gate that fetched would move the baseline it judges |
 
 ---
 
@@ -2013,7 +2013,7 @@ decides whether the oracle compares `rel` and the name is display-only, or the f
 *Logged 2026-09-18, review round 2 (the re-record) of the slice that closed KD-89. Measured by
 execution over twelve layouts against `npm pkg get name --workspaces`; not landed as a test, because
 this slice's two rounds are spent and nobody is wrongly served by it.*
-### KD-109 — what the closed wrapper list does not read through, named rather than guessed at
+### KD-114 — what the closed wrapper list does not read through, named rather than guessed at
 
 `scripts/hooks/proof-gate.mjs` (`COMMAND_PREFIX`)
 
@@ -2044,7 +2044,7 @@ invokes anything. `{ gh pr merge; }` is the one with a genuine argument against 
 reader runs before quoted spans are blanked — KD-64's mistake in a new costume. *Logged 2026-09-18,
 by the slice that closed KD-107, from the probe that measured its own fix.*
 
-### KD-110 — the clause that makes the declaration safe is in one of its three alternatives
+### KD-115 — the clause that makes the declaration safe is in one of its three alternatives
 
 `scripts/hooks/proof-gate.mjs` (`COMMAND_PREFIX`)
 
@@ -2081,7 +2081,7 @@ risk. Narrowing the two alternatives to `IN_WORD` was not taken, on the entry's 
 is no failing test to justify it, and this file has twice been where a pattern was widened or
 narrowed without a shell to check it against.
 
-### KD-111 — two clauses of the command-position declaration are right about the shell and pinned by nothing
+### KD-116 — two clauses of the command-position declaration are right about the shell and pinned by nothing
 
 `scripts/hooks/proof-gate.mjs` (`IN_WORD`, `GAP`)
 
@@ -2110,7 +2110,7 @@ exactly what KD-107 was. The honest remedy was taken instead: the declaration's 
 which of its clauses are measured and which are not. *Logged 2026-09-18, by the slice that closed
 KD-107, from the mutation run over its own new tests.*
 
-### KD-113 — a value-taking letter MISSING from the wrapper table is the direction nothing sweeps
+### KD-118 — a value-taking letter MISSING from the wrapper table is the direction nothing sweeps
 
 `scripts/hooks/proof-gate.mjs` (`WRAPPER_ARITY`) and
 `test/a-wrapper-flag-the-program-takes-no-value-for-eats-the-command-name.test.mjs`
@@ -2136,8 +2136,11 @@ still ends it:
     command time -o F echo gh pr …    null    (and the shell really prints)
     time -o F gh pr merge             merge   (and the shell refuses the line: `-o: command not found`)
 
-The whole residue of the fork is the third row: a message about a command that runs nothing, which
-is the cheapest error available and the direction Rule 4 settles on.
+The residue of the fork is the third row's CLASS, and it is worth naming as a class rather than as
+one shape: `time -f F gh pr merge`, `eval time -o F gh pr merge`, `builtin time -o F gh pr merge`,
+and `command time -f F gh pr merge` (BSD `/usr/bin/time` has no `-f`) join it. Every member is a
+message about a command the shell refuses to run — the cheapest error available, and the direction
+Rule 4 settles on. Swept for a member in the expensive direction and there is not one.
 
 **Direction: fail-open at the classifier, and no producer** — zero hits for `command time`,
 `/usr/bin/time` or `xargs -J` anywhere in this tree, and a merge here is typed `gh pr merge --rebase
@@ -2148,13 +2151,56 @@ a 90s suite; spelled one shell per wrapper looping over letters it is 13, and th
 build. It is not built here because this slice's two rounds are spent and it is a new mechanism, not
 a correction — the rule that a round has a fixed point is worth more than this entry.
 
-**Two further measurements about that sweep, recorded rather than raised again:** on darwin it
-confirms 4 of 23 declared letters (`env -u`, `exec -a`, `xargs -E`, `xargs -I`) and drops the other
-19 as unmeasurable — `sudo` needs a tty, `timeout` is not installed, and `caffeinate -t`/`nice -n`/
-`xargs -n` reject `echo` as a value. It says so in its own failure message, which is the honest
-form, but it is thinner than its title reads. *Logged 2026-09-18 at the re-record of the slice that
+**One further measurement about that sweep, recorded rather than raised again:** on darwin it
+confirms 5 of the 28 declared letters (`env -u`, `exec -a`, `xargs -E`, `xargs -I`, `xargs -J`) and
+drops the other 23 as unmeasurable — `sudo` needs a tty, `timeout` is not installed, and
+`caffeinate -t`/`nice -n`/`xargs -n` reject `echo` as a value. It says so in its own failure
+message, which is the honest form, but it is thinner than its title reads. That census is a count of
+THIS tree and moves whenever a letter is added: it read 4 of 23 one commit ago, and the five letters
+this entry is about moved it. *Logged 2026-09-18 at the re-record of the slice that
 closed KD-107; the two letters it found were fixed in the same commit, and the sweep that would
 have found them was not.*
+
+### KD-119 — a KD number is allocated per branch, and two branches in flight allocate the same one
+
+`docs/KNOWN-DEFECTS.md` (the open table and its entries), `scripts/hooks/proof-gate.mjs` (comments
+that cite a KD number)
+
+Measured 2026-09-18 at this slice's final re-record, between this branch and `origin/main` at
+`4b59451`. Both files number their new entries from the highest number they can see, and neither
+branch can see the other's. As found, FIVE numbers named two unrelated defects each:
+
+    this branch   KD-109  KD-110  KD-111  KD-112  KD-113   (109-111, 113 open; 112 closed)
+    origin/main   KD-109  KD-110  KD-111  KD-112  KD-113   (all open)
+
+`origin/main`'s KD-110 is the preflight guarding `npm test`; this branch's was `COMMAND_PREFIX`'s
+three alternatives. Its KD-113 is a nameless workspace spelled two ways; this branch's was the letter
+sweep's blind direction. The table rows and entry bodies collide in the same file, so a rebase puts
+both in front of whoever does it — the same surface as `b3670aa`, "the rebase kept both copies of
+this branch's own rows", one step earlier. **What a rebase does NOT put in front of anybody is the
+citation in code:** `scripts/hooks/proof-gate.mjs` cites KD numbers in three comments, and no
+conflict hunk ever shows them.
+
+**The collision itself is FIXED, in the commit that logged this:** this branch's five ids were
+renumbered to 114-119 — above `origin/main`'s maximum, in every file that carries one including the
+three code comments — BEFORE any rebase, because renumbering inside conflict hunks misses the entry
+sections that do not conflict. What stays logged is the absence of anything that makes that routine,
+and the fact that this entry's own body was rewritten by the renumber that fixed it: a blanket
+substitution moved the `origin/main` row of the table above as well as this branch's, which is the
+smallest possible demonstration that a KD number is a string in prose and nothing else.
+
+**Direction: a reader is sent to the wrong entry, and nothing else.** No program in this repo parses
+a KD number — grepped `scripts/` and `test/`, and `proof-plan.mjs`'s only mention of this file is a
+sentence naming it — so no gate, refusal or count routes on one. Nothing false reaches an adopter.
+The rule that avoids it is that the number comes from a place both branches can see — `origin/main`'s
+highest, re-read at logging time, not the branch's own — and it is a convention, not a program.
+Making it one is cheap to state and not free to get right: the deriver would have to fetch, which is
+the thing `scripts/proof-plan.mjs` deliberately never does because a gate that fetched would move
+the baseline it judges. So the convention stands, unenforced, and this entry is the record of what
+it costs when it is missed. *Found 2026-09-18 by the third declared substitute reader, at the final
+re-record of the slice that closed KD-107 — outside the four confirmations that re-record was
+bounded to, so it landed as a log entry rather than a fix. The author took the fix on the same pass,
+because a renumber is cheaper before a rebase than inside one.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
