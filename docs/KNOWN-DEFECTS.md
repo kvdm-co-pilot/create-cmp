@@ -136,7 +136,6 @@ you the same list without opening anything.
 | **KD-75** | the profile-bound lane reader refuses a SUBSET of a profile's steps, and any number in a table's second column | measured: three shapes, none of them written anywhere in the tree today |
 | **KD-76** | the same reader PASSES a wrong lane size written as a word, or with the profile named first | measured: three shapes, none written anywhere in the tree today |
 | **KD-77** | the CLI-command count is derived, gated, and calibrated by nothing — no surface states it | the reader is idle, not wrong; a future "<n> commands" is still refused |
-| **KD-78** | two npm pages still serve "8 gates" from bytes already published; the tree's copy is fixed | no act available here — a registry description changes only by publishing |
 | **KD-80** | the ordering precondition guards the device RUN; `gh pr merge --rebase` is where an unproven tree actually lands | the hand-rebase case reopens the tier and is refused at the merge gate already |
 | **KD-81** | a branch git could not name routes to "does not apply", so the check passes SILENTLY | no producer: the same git failure makes `obligation()` report `none`, which never reaches the check |
 | **KD-82** | the ordering verdict is commit-graph ancestry where every other obligation here is trigger-path bytes | the refusal's remedy is the rebase you owe the merge anyway; it costs a rebase, never a run |
@@ -1201,29 +1200,6 @@ today, because nothing goes through it.
 **Fires when:** `claims()` breaks for a noun no surface currently uses, and the calibration reports
 green over it.
 *Logged 2026-09-18, measured in review of `slice-22-eleven-skills-twelve`.*
-
-### KD-78 — the npm pages for two aliases still say "8 gates", and no commit can change that
-
-`packages/aliases/create-kmp/package.json:4`, `packages/aliases/create-compose-multiplatform/package.json:4`
-
-Both descriptions read *"a machine-enforced verify lane (8 gates, evidence receipts)"*. The lane
-that holds an AI-driven change is `local` (17) or `ci` (18); the only profile that runs 8 is
-`smoke`, whose receipt `qa/receipt-check.mjs` refuses as done-evidence. **In the tree this is
-fixed** — the bare number is gone, and
-`test/a-published-npm-description-states-a-lane-size-that-names-no-profile.test.mjs` refuses the
-next one. What is NOT fixed, and cannot be from here, is what npmjs.com serves: a registry
-description is a property of *published bytes*, and it changes only when someone publishes. Until
-`create-kmp@0.1.6` and `create-compose-multiplatform@0.1.6` are published, the pages a stranger
-reads before installing still carry the false number, at the versions already live (`0.1.4`).
-
-This is logged rather than blocked because there is no act available in this repository that would
-close it — not because nobody is wrongly served. Somebody is, on two npm pages, right now. The
-remedy is an outward-facing human act (`docs/PUBLISHING.md`), and standing one up unasked is the
-thing this project does not do on its own.
-
-**Fires until:** both aliases are published at the versions this tree holds.
-*Logged 2026-09-18, review round 1 of the count-gate slice; the tree-side half was fixed in the
-same round.*
 
 ### KD-80 — the ordering precondition guards the device RUN, not the merge that moves the tree
 
@@ -2470,3 +2446,42 @@ reviewer can read every round. An entry moves there when the thing is fixed or t
 taken, with the commit that did it.
 
 ## Closed
+
+### KD-78 — the npm pages for two aliases said "8 gates" — **CLOSED 2026-09-18**
+
+`packages/aliases/create-kmp/package.json:4`, `packages/aliases/create-compose-multiplatform/package.json:4`
+
+Both descriptions read *"a machine-enforced verify lane (8 gates, evidence receipts)"*. The lane
+that holds an AI-driven change is `local` (17) or `ci` (18); the only profile that runs 8 is
+`smoke`, whose receipt `qa/receipt-check.mjs` refuses as done-evidence. **In the tree this is
+fixed** — the bare number is gone, and
+`test/a-published-npm-description-states-a-lane-size-that-names-no-profile.test.mjs` refuses the
+next one. What is NOT fixed, and cannot be from here, is what npmjs.com serves: a registry
+description is a property of *published bytes*, and it changes only when someone publishes. Until
+`create-kmp@0.1.6` and `create-compose-multiplatform@0.1.6` are published, the pages a stranger
+reads before installing still carry the false number, at the versions already live (`0.1.4`).
+
+This is logged rather than blocked because there is no act available in this repository that would
+close it — not because nobody is wrongly served. Somebody is, on two npm pages, right now. The
+remedy is an outward-facing human act (`docs/PUBLISHING.md`), and standing one up unasked is the
+thing this project does not do on its own.
+
+**Fires until:** both aliases are published at the versions this tree holds.
+*Logged 2026-09-18, review round 1 of the count-gate slice; the tree-side half was fixed in the
+same round.*
+
+**CLOSED by publishing, which is the only act that could close it.** `create-kmp@0.1.6`,
+`create-compose-multiplatform@0.1.6` and `create-mobile@0.1.2` are live; the registry's `latest`
+tag serves all three, and none of their descriptions contains the bare number. Verified against
+`https://registry.npmjs.org/<name>` directly rather than through `npm view`, because npm's local
+packument cache served the OLD versions for several minutes after the publishes succeeded — long
+enough that `npx <alias>@latest` failed `ETARGET` against a registry that already had the bytes.
+A cache reading stale is the `served-page-is-not-your-code` shape, one registry over.
+
+The release proof this publish required (`scripts/hooks/proof-gate.mjs` refuses `npm publish`
+without it): fleet check PASS at rung L2 on `06c5aa1`, clean trunk, `treeWasDirty: false`.
+
+*Closed 2026-09-18 by the publish itself. The entry is kept whole above because its reasoning —
+that a registry description is a property of published bytes and no commit here can change one —
+is the record, and it is the same shape as every other artifact this repo cannot reach from a
+commit.*
