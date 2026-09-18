@@ -9,7 +9,7 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
-### KD-98 — `COMPOUND` and `WATCHED` do not mean the same thing by "a command position" — **CLOSED 2026-09-18, in the round that found it**
+### KD-105 — `COMPOUND` and `WATCHED` do not mean the same thing by "a command position" — **CLOSED 2026-09-18, in the round that found it**
 
 `scripts/hooks/proof-gate.mjs` (`COMPOUND`, `invocation`)
 
