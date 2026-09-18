@@ -1,0 +1,23 @@
+{
+  "schema": "prooflane-attestation/1",
+  "claim": "stage2-external-profile",
+  "date": "",
+  "attestedBy": {
+    "name": "",
+    "role": ""
+  },
+  "profile": {
+    "id": "fuelled-api"
+  },
+  "authoredBy": {
+    "organisation": "",
+    "team": "",
+    "contact": "",
+    "relationship": ""
+  },
+  "artifact": {
+    "kind": "path",
+    "location": "/Users/test/dev/fuelled-api"
+  },
+  "receipt": "docs/attestations/fuelled-api-receipt.json"
+}

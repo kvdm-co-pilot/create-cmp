@@ -125,6 +125,11 @@ you the same list without opening anything.
 | **KD-64** | a sibling git worktree of this repository is described as ANOTHER project's lane | errs toward waiting, and the path it prints is true |
 | **KD-65** | the lane's project can still be a token the gate never verified — a `--flag=` value, or the first of two occurrences | no producer: every argv this repo and the harness spawn was verified correct |
 | **KD-66** | the lane probe's bound covers its subprocesses, not the `existsSync` the same fix added | unmeasurable here — no portable way to plant a wedged mount |
+| **KD-67** | §9 says the attestation is NOT MET "while none exists", and one now does, unsigned | the gate names the real reason; the row and the count are unchanged |
+| **KD-68** | criterion B omits `checkFreshness`, which needs no tree — the vendored receipt goes stale 2026-10-17 | B is behind an unsigned criterion A and reports "not reached" |
+| **KD-69** | three fields of the attestation shape the gate documents are read by nothing — `schema`, `artifact.kind`, and whether `receipt` is there at all | ADR-0007: nothing routes on `schema`; the other two fail loud in criterion B |
+| **KD-70** | a `file.mjs:NNN` citation goes stale the moment anything is inserted above it, and nothing checks one | 154 in the tree; three went stale in one slice; all of them are in comments and logs, none in a surface an adopter reads |
+| **KD-71** | `isCalendarDay` calls every year 0001–0099 a day the calendar does not have — `Date.UTC`'s two-digit-year mapping | the refusal is right, its reason is false, and no signer types a three-leading-zero year |
 
 ---
 
@@ -864,6 +869,146 @@ Second, smaller: `killSignal: "SIGKILL"` kills the `/bin/sh` that `execSync` spa
 under it. Observed after a trip — a `sleep 12` reparented to pid 1, outliving the gate that gave up
 on it. A stuck `lsof` would be stuck anyway and the gate no longer waits for it; it leaves one behind
 per trip. *Logged 2026-09-17, raised in review round 2 of `lane-refusal-names-project`.*
+
+### KD-67 — §9 says the attestation is reported NOT MET "while none exists", and one now does
+
+`docs/NORTH-STAR.md:418`
+
+The road's Stage 2 row describes the provenance half as "reported NOT MET **while none exists** and
+never derived". As of the `everything-but-the-signature` slice, `docs/attestations/stage2-external-profile.json`
+exists with its derivable fields measured and its four human-owned fields empty, so the gate's
+refusal is no longer "the file is absent" — it is "these four fields are". §9's sentence is still
+true as a conditional and its conclusion is unchanged (the row is red, the count is 8/10), but a
+reader of §9 alone would conclude no such file is in the tree.
+
+Not blocked, and not edited: NORTH-STAR is signed, a reviewer proposes rather than writes, and the
+instrument a reader is sent to — `node scripts/stage2-gate.mjs` — names the current reason exactly.
+Nobody is wrongly served by the doc being one state behind the program it points at.
+
+**Fires when:** someone reads §9's provenance sentence instead of running the gate.
+*Logged 2026-09-18, raised in review round 1 of `everything-but-the-signature-for-the-first-adoption`.*
+
+### KD-68 — criterion B will keep accepting a vendored receipt the repo's own hosted policy calls stale
+
+`scripts/stage2-gate.mjs` (criterion B) · `packages/harness/src/lib/receipt-validate.mjs:183-247`
+
+B runs `checkLaneVouching` and says it omits only "the half that needs the adopter's tree" (the
+inputs hash). `checkFreshness` needs no tree, is documented in `receipt-validate.mjs` as one of the
+"service-grade checks (hosted validators)" — i.e. what a notary runs — and `DEFAULT_POLICY.maxAgeMs`
+is 30 days. `docs/attestations/fuelled-api-receipt.json` carries `generatedAt`
+`2026-09-17T22:12:03.948Z`; measured today it is `{ok: true, ageMs: 739912}`, and on 2026-10-17 it
+becomes `ok: false` with B still printing PASS. The signature the artifact is waiting for has no
+deadline, so the two will diverge if it takes a month.
+
+Also, a vendored receipt is a copy: B reads the copy and nothing re-checks it against the lane that
+minted it. That half IS now guarded — `test/the-attested-profiles-agent-co-author-is-not-named-to-its-signer.test.mjs`
+compares the bytes whenever `artifact.location` is reachable — so what remains here is only the
+freshness gap.
+
+Not blocking: B is currently sequenced behind an unsigned criterion A and reports "not reached", so
+nothing reads a verdict from it at all, and a stale-but-genuine receipt over-states nothing about
+what the lane did.
+
+**Fires when:** criterion A is signed more than `maxAgeMs` after the receipt was minted.
+*Logged 2026-09-18, raised in review round 1 of `everything-but-the-signature-for-the-first-adoption`.*
+
+### KD-69 — three fields of the attestation's documented shape are read by nothing
+
+`scripts/stage2-gate.mjs:57-69` (the documented shape) · `:571-591` (`attestationProblems`)
+
+The header comment publishes the attestation's shape and a human hand-writes the file against it,
+but the validator checks only `claim`, `date`, `attestedBy.name`, `profile.id`,
+`authoredBy.organisation`, `authoredBy.contact` and `artifact.location`. Measured by blanking each
+of the rest on a fully-filled document: `schema: "someone-elses/9"`, `schema` absent,
+`artifact.kind: "banana"`, `artifact.kind` absent and `receipt` absent all return `[]`.
+
+`prooflane-attestation/1` is also the only schema id in the tree that exists nowhere but a comment:
+`prooflane-evidence/1` has `packages/harness/evidence/schema.json` with an enum, and
+`prooflane-harness-source/1` has an exported `SOURCE_SCHEMA` plus a test.
+
+Not blocking, and a refusal would argue with a signed decision: `evidence/schema.json` records
+ADR-0007's position that `schema` is "ROUTING METADATA, not part of the claim … Nothing routes on
+this field — readers dispatch on field SHAPE". The two that could mislead cannot: a wrong
+`artifact.kind` contradicts a `location` a reader can see, and a missing `receipt` is criterion B's
+first refusal, by name. Related, one line: `docs/attestations/README.md` says "Three more fields are
+in the shape and checked by nothing" — true of the human-owned fields, and `schema` and
+`artifact.kind` make it five.
+
+**Fires when:** someone hand-writes the attestation from the documented shape and mistypes a field
+the gate does not read.
+*Logged 2026-09-18, raised in review of `everything-but-the-signature-for-the-first-adoption`.*
+
+### KD-70 — a `file:line` citation is a claim nothing in this repository checks
+
+`test/an-attestation-is-dated-by-a-clock-that-is-not-a-calendar.test.mjs:4` ·
+`test/a-recorded-probe-reports-a-gate-outcome-its-own-inputs-cannot-produce.test.mjs:20` ·
+`docs/KNOWN-DEFECTS.md` KD-69's own header
+
+Measured on this tree. The `isCalendarDay` / `dayBegunSomewhere` fix inserted 48 lines at
+`scripts/stage2-gate.mjs:565`, and every citation into that file below the insertion point moved
+without its citer moving. Three now name the wrong lines in the present tense:
+
+- two test headers say *"scripts/stage2-gate.mjs:580-581 is the whole of it"* and *"criterion A
+  refuses any `date` that is not four-two-two (scripts/stage2-gate.mjs:580)"*. `:580-581` is now
+  `isCalendarDay`'s `return` and its closing brace.
+- KD-69, three entries above, cites `:571-591` for `attestationProblems`, which is at `:615-637`.
+
+The citations above the insertion point were checked and are correct — `:13-17` and `:226`, quoted
+in `docs/attestations/README.md`, still say what it quotes, and `:3-6` still quotes §9.
+
+**Why this is logged and not fixed.** The instance is three comments; the class is 154 distinct
+`file.(mjs|md|json):NNN` citations across `test/`, `docs/`, `scripts/` and `packages/harness/src/`,
+and a checker for them is a slice, not an edit — it needs a rule for what a citation asserts (that
+the lines exist? that they contain a quoted fragment?) before it can refuse anything, and
+`docs/KNOWN-DEFECTS.md` KD-8 already records the same shape of decision for `ADR-NNNN` citations
+and the false-positive risk in checking them. Fixing three and leaving 151 unguarded buys one round
+of tidiness and no invariant.
+
+**Nobody is wrongly served.** Every one of the 154 is in a source comment, a log entry or a
+proposal — none is in a refusal message, a receipt, a CLI surface or anything a `prooflane` adopter
+reads. A reader who follows a stale one lands a few lines off in a file whose symbol names are
+right beside them; the surrounding prose names the function, which `grep` finds.
+
+**Fires when:** anything is inserted above a cited line, which is most commits.
+*Logged 2026-09-18, raised in the final review round of `everything-but-the-signature-for-the-first-adoption`.*
+
+### KD-71 — `date 0050-06-15 names no calendar day`, and it does
+
+`scripts/stage2-gate.mjs` → `isCalendarDay`
+
+Measured on this tree, against the function as it stands:
+
+```
+date 0050-06-15  → ["date 0050-06-15 names no calendar day"]
+date 0099-12-31  → ["date 0099-12-31 names no calendar day"]
+date 0100-01-01  → []
+date 1750-03-04  → []
+```
+
+`new Date(Date.UTC(50, 5, 15)).getUTCFullYear()` is **1950**: `Date.UTC` maps years 0–99 to
+1900+year, by specification and forever. So the round-trip `isCalendarDay` uses to separate a day
+from four-two-two digits reads back a year the caller never asked about, and every date in the
+first century fails a check it should pass. Years ≥ 100 are unaffected — the mapping does not
+apply — which is why `1750-03-04` is accepted. The independent oracle is date-only ISO parsing,
+which has no such mapping: `new Date("0050-06-15T00:00:00Z").toISOString()` round-trips exactly,
+while `new Date("2026-02-30T00:00:00Z")` rolls forward to March, so it still refuses a non-day.
+
+This is the same class as the defect the fix that introduced it answered — a refusal stating
+something false about the value it refused — one message over, which is why it is recorded here
+rather than left to be re-found.
+
+**Nobody is wrongly served.** The only reachable value is a `date` a human types into
+`docs/attestations/stage2-external-profile.json`, and reaching this needs a four-digit year under
+100, i.e. two or three deliberate leading zeros — no plausible typo of `2026` produces one
+(dropping a digit leaves three characters, which the shape check refuses with the right reason).
+The outcome is correct in every case that reaches it: a date two millennia off must be refused.
+Only the sentence is wrong, and the year is 2000 years from what the signer meant, so they are not
+sent hunting for a fault they cannot see — it is in front of them.
+`an-attestation-is-dated-by-a-clock-that-is-not-a-calendar.test.mjs` keeps the control that a
+shape-conforming non-day is still refused, so the check cannot be deleted to make this go away.
+
+**Fires when:** an attestation's `date` names a year between 0001 and 0099.
+*Logged 2026-09-18, in the round that reviewed the `needsText` / `isCalendarDay` fix.*
 
 ## Closed
 

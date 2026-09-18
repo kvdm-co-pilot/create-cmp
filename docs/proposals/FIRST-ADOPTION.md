@@ -12,6 +12,12 @@
   code of, and the honest account of which parts an agent may do and which are Karel's alone.
 - **What this is not:** an attestation. `docs/attestations/stage2-external-profile.json` is not
   written here and must never be written by an agent — see §6.
+  **PREPARED, UNSIGNED, 2026-09-17:** that file now exists with every *derivable* field filled
+  from a measured run of `fuelled-api`'s lane and every *human-owned* field deliberately empty,
+  beside `docs/attestations/README.md`, which records what is proven and what a signature would
+  and would not claim. `node scripts/stage2-gate.mjs` still reports criterion A NOT MET and now
+  names the four fields only Karel can fill — the gate as the checklist. Stage 2 stays 8/10;
+  preparing the derivable half earns nothing and the gate keeps saying so.
 
 ## 1. Why payment-blueprint counts, and the part that is genuinely thin
 
@@ -155,6 +161,14 @@ purpose** — see §7.1, which is the part a reader is most likely to undo by ac
 
 Step 4 is a gate no amount of engineering removes, and it is the point.
 
+**Where this stands, 2026-09-17.** Steps 1 and 2 are done — both repos carry a registry-sourced
+lane (§9), `fuelled-api`'s profile is ported to protocol 2 with its own `0.1.0`, and its lane and
+`framework-check` were re-run and re-read rather than taken on file. Everything in step 4 that is
+*not* a human's judgement has been carried out and recorded in `docs/attestations/` — the profile
+id, the artifact's location, and the minted receipt, which the notary predicate
+(`checkLaneVouching`) already accepts. What is left of step 4 is the signature itself, which is
+the whole of what step 4 ever was.
+
 ### 7.1 Why `fuelled-api` is ported and `pantry-api` is regenerated
 
 **Decision — Karel, 2026-09-09, in session:** *"split the difference port fuelled-api, regenerate
@@ -182,6 +196,16 @@ first run of agent authorship. Neither would be had by treating both repos the s
 rewriting to reach protocol 2 that the human authorship is notional by the end. If that happens, say
 so in the attestation's `relationship` rather than continuing to claim a provenance the file no
 longer has.
+
+**MEASURED 2026-09-17, and it narrows this section's claim.** All three commits that wrote
+`qa/lib/profiles/fuelled-api` carry `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
+alongside Karel as author. The decision above is unaffected — `pantry-api`'s pack still declares
+agent authorship outright, and this one was still human-driven, so *"split the difference"* picks
+the same two repos it always did. What changes is the sentence *"A human wrote those 310 lines"*,
+which is now known to be less clean than it reads: the profile was co-authored. §9's bar is
+specifically that *"our own agents authoring one no longer counts"*, and nothing in this repository
+reads that trailer or can weigh it. It is therefore recorded here and disclosed to the signer in
+`docs/attestations/README.md`, and left open rather than answered by an agent.
 
 ## 8. What this changes in this repo today
 
