@@ -31,7 +31,7 @@
 // Scope: published `package.json` descriptions, derived from
 // `scripts/ground-truth.mjs`'s npm list, and nothing else. A description is a
 // one-sentence claim about THIS product, so "<n> gates" in one is always a lane
-// size. Narrative prose is not in scope and must not be — KD-67 measured a bare
+// size. Narrative prose is not in scope and must not be — KD-73 measured a bare
 // "<n> steps" scanner at 50% false positives on README bodies.
 
 import assert from "node:assert/strict";

@@ -146,7 +146,7 @@ function drift(text, noun, allowed) {
  * the list: EIGHT profile-bound claims, eight of them wrong, none right. One
  * step was added to the shared spine; five of §3's six rows were left an
  * off-by-one, and the sixth names a profile the deriver does not enumerate at
- * all, so no gate can read it either way (KD-68).
+ * all, so no gate can read it either way (KD-74).
  *
  * BOUND TO A PROFILE NAME, which is the whole of why it is safe to read the
  * word `steps` here at all. A bare "<n> steps" is polysemous and was measured
@@ -154,7 +154,7 @@ function drift(text, noun, allowed) {
  * prose — README's "three steps, each priced in what you have at that moment"
  * and the harness README's "Two steps ship in it". The ambiguity is in the
  * noun, never in the claim; nobody writes "three steps at `local`"
- * narratively. So the bare noun stays out (KD-67) and the profile-bound form
+ * narratively. So the bare noun stays out (KD-73) and the profile-bound form
  * goes in. Profile names come from the deriver, so nothing here is a
  * hand-maintained list — a sixth profile is covered the day it is derived.
  */

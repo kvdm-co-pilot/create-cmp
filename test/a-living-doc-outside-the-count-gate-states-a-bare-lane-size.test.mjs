@@ -45,7 +45,7 @@
 // `doc-counts.test.mjs` uses (space+plural, or hyphen+either — space+singular
 // is not a claim, which is what keeps NORTH-STAR's "Stage 0 gate" out): the
 // `gates` noun matches EXACTLY ONE string in the whole set, and it is this one.
-// Zero false positives. That is a different measurement from KD-67's, which
+// Zero false positives. That is a different measurement from KD-73's, which
 // found 50% on the bare `steps` noun and is why THAT noun stays out here too.
 
 import assert from "node:assert/strict";
