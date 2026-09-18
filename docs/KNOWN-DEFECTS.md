@@ -191,6 +191,7 @@ you the same list without opening anything.
 | **KD-133** | `nextRound`'s CAP SPENT arm returns `read: null` and `settles: []` even when proof-plan reports the review tier REOPENED — the moment the rule of record's header makes the last round owe a re-record, which is what this slice's own `--kind rerecord` is for; its NOT-OWED sibling names that obligation in the same state | driven and read back rather than argued: the same screen's `spent` review row already prints *"REOPENED … a fresh record is owed for the SAME round"*, so no reader of the program's output is misled. What is missing is the block's own answer at the moment that block is the thing being read |
 | **KD-180** | doctor's new status-line verdict over-reports an ABSOLUTE path (`node /Users/x/app/qa/walk-status.mjs` reads as cwd-relative), and its `ok` is unreachable end-to-end while `ANCHORABLE_SURFACES.statusLine` is `false` | measured, both directions: nothing in this repo or its heal writes an absolute status line, so the over-report has no subject; the direction is the conservative one the detector chooses on purpose, and the under-report direction — an `ok` over a silent surface — is what this slice closed |
 | **KD-181** | this tree stated the statusLine's stdin BOTH ways, and the false one governed a live path: `walk-status.mjs` said *the statusline gets no stdin*, `hooks.mjs` and KD-90 said it carries `workspace.project_dir` | settled 2026-09-19 from the official statusLine documentation (out of tree, KD-128's class): the comment was false and is corrected here. So the status line IS fixable — via stdin, not via the env var — and what is logged is that this slice does not take it: whether `$(cat)` can block with no payload is undocumented, and a status line that hangs is worse than one that prints nothing |
+| **KD-182** | the comment explaining the new check calls `node qa/walk-status.mjs --statusline` "the pre-0.26.3" form, and it is what `template/.claude/settings.json` ships TODAY at 0.26.7 | the same slice's CHANGELOG states the population correctly ("**every new stamp**"), so nothing an adopter reads is wrong; what the false attribution can do is tell the next reader of that code that the shipped template is not among the affected |
 
 ---
 
@@ -2593,6 +2594,35 @@ CAP SPENT only with a row stating round ≥ 2 — the two directions that would 
 with that clause the only arm nothing reaches.
 
 *Logged 2026-09-19, review round 1.*
+### KD-182 — the new check's own comment dates the shipped status line to a version that predates it
+
+`src/commands/doctor.mjs` (`cwdRelativeWalkSurfaces`, docblock) · `template/.claude/settings.json`
+
+> *"`invokesWalk` above can only answer presence — it is a substring test, so the pre-0.26.3
+> `node qa/walk-status.mjs --statusline` satisfies it while resolving against the SESSION's
+> directory rather than this one."*
+
+`template/.claude/settings.json` at 0.26.7 ships
+`test -f qa/walk-status.mjs && node qa/walk-status.mjs --statusline || true`. The form the comment
+dates to before 0.26.3 is the form in the tree now, and `git log -S` over that file finds no commit
+that ever anchored the status line — KD-90 is the record of why it cannot be. So the sentence names
+a population (older stamps) where the truth is every stamp, which is the very claim the same
+commit's CHANGELOG gets right two files away: *"and **every new stamp**, because the template's
+status line is still relative as it ships."*
+
+**Nobody outside the repository is served by it** — it is a code comment, the diagnostic's behaviour
+is correct, and the adopter-facing text does not repeat the error. What it can do is mislead the
+next reader of the check into believing a current stamp is unaffected, which is the reader most
+likely to touch it.
+
+**Found in the same read:** `diagnoseProject` spells the new input `walk.cwdRelative ?? []`, so walk
+inputs that omit the field score `ok` — health from an absent field, the fail-open direction. No
+producer: `gatherWalkInputs` sets it on every return path and is the only caller. It is noted here
+rather than separately because the remedy (drop the `??`) also edits
+`test/project-doctor.test.mjs`'s untouched `wired` fixture, which is a second slice's decision.
+
+*Logged 2026-09-19, review round 1 of the doctor-wiring slice.*
+
 ### KD-180 — doctor's status-line verdict over-reports an absolute path, and its `ok` cannot be reached from a project
 
 `src/commands/doctor.mjs` (`cwdRelativeWalkSurfaces`) · `src/lib/hooks.mjs` (`ANCHORABLE_SURFACES`, `SCRIPT_PATH`)
@@ -2617,6 +2647,14 @@ subject today; and over-reporting is the direction `src/lib/hooks.mjs` chooses o
 the other direction is an `ok` over a broken surface — the defect this slice exists to close. The
 hook side keeps KD-86's blind spot unchanged: a single-segment `node walk-status.mjs` in a HOOK
 still reads clean, where the same shape on the status line no longer does.
+
+**Amended by review round 1, 2026-09-19 — the hook-side clause is unchanged in COVERAGE and changed
+in CONSEQUENCE.** Reading clean used to withhold a warning; in the new finding it is read as credit
+and printed as *"The UserPromptSubmit hook is anchored and still works from any directory"*, which
+is a false sentence about a surface that produces nothing. That is not this entry's second row — an
+adopter is told something false — so it is landed as a failing test rather than logged here:
+`test/doctor-names-an-unanchored-surface-as-working.test.mjs`, which sweeps six hook spellings and
+reds on three (bare basename, `sh -c '…'`, `eval '…'`).
 
 **Fires when:** an app hand-writes an absolute status line and is told to fix a surface that works;
 or `ANCHORABLE_SURFACES.statusLine` becomes `true`, at which point `ok` becomes reachable and the
