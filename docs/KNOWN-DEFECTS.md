@@ -168,6 +168,7 @@ you the same list without opening anything.
 | **KD-110** | the preflight is npm's `pretest`, so it guards `npm test`, `prepublishOnly` and CI — and not `node --test <file>`, which is how a contributor or an agent narrows to one file | the defect KD-89 recorded is a FIRST impression of the documented command, and that command is refused by name; someone running one file directly has already chosen the narrower instrument |
 | **KD-111** | `installedFrom` is npm's layout — a Yarn PnP checkout has no `node_modules` at all, so every declared dependency reads missing and a working tree is refused | no producer: this repo declares npm (`package-lock.json`, npm `workspaces`, `npm ci` in CI) and no other lockfile is in the tree; the failure is a loud refusal naming a command, never a silent pass |
 | **KD-112** | the door has no bypass, so every way it can be wrong ends in a correctly installed tree that cannot run its suite at all — a named `PROOFLANE_SKIP_PREFLIGHT=1` would bound the class at one line | a product decision, handed up rather than taken: the population is empty today (KD-111 has no producer, and the one real divergence found in review is fixed), and an escape hatch is how a guard becomes optional |
+| **KD-113** | the two readers spell a NAMELESS workspace's name differently — npm synthesizes the directory basename (`noname`), the door falls back to the rel path (`ws/noname`) — and the landed invariant test uses that name as the set's identity | measured over twelve layouts, the only divergence left and the only one that is a LABEL rather than a member: coverage, refusal and remedy are identical. No producer — every package this repo declares names itself — and the first one that does not reds the invariant test for a reason that is not the defect it is about |
 
 ---
 
@@ -2011,6 +2012,41 @@ the refusal carries a bypass at all. If yes, it belongs in the refusal TEXT, bec
 can find is the same as none.
 
 *Logged 2026-09-18, review round 1 of the slice that closed KD-89, handed up rather than decided.*
+
+### KD-113 — a nameless workspace is named by the two readers differently, and the invariant test compares names
+
+`scripts/suite-preflight.mjs` · `test/a-package-the-workspace-declaration-excludes-is-refused-as-uninstalled.test.mjs`
+
+Found while attacking the expansion fix, by running the declaration through both readers over twelve
+directory layouts rather than the three the landed test carries. Eleven agree. The twelfth is a
+workspace whose `package.json` has no `name`:
+
+    ws/noname/package.json = { "version": "0.0.0" }   under the declaration ["ws/*"]
+        npm  : [@f/a, noname]        — npm synthesizes the directory basename
+        door : [@f/a, ws/noname]     — `name: typeof pkg.name === "string" ? pkg.name : rel`
+
+The same directory, counted by both, spelled two ways. Everything that matters is identical: the
+package is in the set, its dependencies are walked, and a missing one is refused with the same
+remedy. Only the label in the refusal's `rel (name)` column differs, and the door's label is a true
+fact about the tree rather than a false one.
+
+**Why it is logged and not fixed.** Nobody is wrongly served: no package this repo declares is
+nameless (`this repository's own declaration is one both readers agree on` passes), so there is no
+producer, and the divergence cannot change a verdict — only how a line reads.
+
+**What makes it worth a line anyway** is where it lands. The invariant this slice wrote is *the
+door's package set is npm's own, or the door declines*, and the test asks that question by comparing
+NAMES — a label the two readers derive by different rules — rather than rel paths, which they derive
+identically. So the first nameless workspace anyone adds reds
+`the door expands a glob the way npm expands it, or declines` and
+`the preflight judges the packages npm declares, or declines to judge`, for a cosmetic reason, and
+whoever sees it will be reading the expansion for a bug that is not there. Whoever touches this next
+decides whether the oracle compares `rel` and the name is display-only, or the fallback becomes
+`path.basename(rel)` so the two spellings converge.
+
+*Logged 2026-09-18, review round 2 (the re-record) of the slice that closed KD-89. Measured by
+execution over twelve layouts against `npm pkg get name --workspaces`; not landed as a test, because
+this slice's two rounds are spent and nobody is wrongly served by it.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
