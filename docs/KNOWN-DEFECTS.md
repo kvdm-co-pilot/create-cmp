@@ -172,7 +172,7 @@ you the same list without opening anything.
 | **KD-109** | the closed wrapper list KD-107 landed does not read through five further shapes — `bash -lc "gh pr merge"`, `{ gh pr merge; }`, `ssh host '…'`, `watch -n 5 …`, and a wrapper carrying an operand its table entry does not declare (`sudo -u me -g grp extra …`) | fail-open at the classifier, and the residue the closed list names out loud rather than guessing at (docs/GATE-RULES.md, Rule 4); no producer — a merge here is typed `gh pr merge --rebase --delete-branch`, bare or behind a `cd` |
 | **KD-110** | "no word in a command prefix crosses a character that ends a command" is honoured by ONE of `COMMAND_PREFIX`'s three alternatives — the assignment and redirection alternatives are still `\S*`, and `A=a;b `, `A=a&&b `, `2>a;b ` all match the prefix across the separator | the comment is wider than the code, and the code is right by accident: leftmost-match still starts the invocation at or after any `cd`, so no shape resolves a different tree — swept for one and none found. Nobody is served wrongly today; the next reader of that comment is |
 | **KD-111** | `IN_WORD` and `GAP` — the two clauses that say a wrapper run does not cross a character that ends a command — are pinned by no test since the bare-operand run they guarded was removed: relaxing either to `\S`/`\s+` leaves the whole suite green | not a wrong clause, an unpinned one: both are right about the shell, nobody is served wrongly, and the honest remedy (the declaration's comment states which clauses are measured) was taken. A test with no consequence to assert would have to assert the regex's own source — the third spelling that KD-107 was |
-| **KD-113** | `time` names TWO programs and one `flags` entry answers for both: `time -o f …` is the shell's keyword and `-o` is not a flag, but `command time -o f gh pr merge` is `/usr/bin/time`, which really consumes `f` — measured, the merge RUNS and the gate answers `null`. Either setting of `time.flags` is wrong for one spelling. The new letter sweep only runs the direction where the shell PRINTS, so a value-taking letter MISSING from the table (also `xargs -J`) is invisible to it | fail-open at the classifier, KD-109's named residue in the letter direction; no producer — zero hits for `command time`, `/usr/bin/time` or `xargs -J` anywhere in this tree, and a merge here is typed `gh pr merge --rebase --delete-branch`. Not a typo with a one-word fix: it is a fork between two programs sharing a name, and restoring `of` would refuse a bare `time -o f gh pr merge` that merges nothing |
+| **KD-113** | the letter sweep runs only the direction where the shell PRINTS, so a value-taking letter MISSING from `WRAPPER_ARITY` is invisible to it — the run ends a word early and the gated program is read as the flag's value. Two were found by hand at the re-record (`command time -o F gh pr merge`, `xargs -J R gh pr merge`; both really merge, both answered `null`) and both are FIXED; what is logged is that nothing would catch a third | fail-open at the classifier, no producer — zero hits for `command time`, `/usr/bin/time` or `xargs -J` in this tree. The fix is a second sweep, costed at 13 spawns done per-wrapper (676 done per-letter); not built because this slice's two rounds are spent and it is a new mechanism rather than a correction |
 
 ---
 
@@ -2110,51 +2110,51 @@ exactly what KD-107 was. The honest remedy was taken instead: the declaration's 
 which of its clauses are measured and which are not. *Logged 2026-09-18, by the slice that closed
 KD-107, from the mutation run over its own new tests.*
 
-### KD-113 — `time` is two programs, `time.flags` answers for one, and a letter missing from the table is the direction nothing sweeps
+### KD-113 — a value-taking letter MISSING from the wrapper table is the direction nothing sweeps
 
-`scripts/hooks/proof-gate.mjs` (`WRAPPER_ARITY.time`, `WRAPPER_ARITY.xargs`) and
+`scripts/hooks/proof-gate.mjs` (`WRAPPER_ARITY`) and
 `test/a-wrapper-flag-the-program-takes-no-value-for-eats-the-command-name.test.mjs`
 
-Review round 2 found the direction where a letter is on the table and the program takes no value
-for it: the reader swallows the command name and puts a command position where the shell has none,
-so a merge that is only PRINTED is refused. The fix corrected four letters, and `time`'s `of` came
-out on the argument that "`time` here is the shell's keyword, which takes only `-p`". That sentence
-is in the source comment, and it is true of one of the two programs `time` names. Measured on this
-tree, 2026-09-18, against the real programs on this machine, with a stand-in `gh` that records
-whether it was invoked:
+Round 2's sweep enumerates the letters the READER believes take a value and asks `/bin/sh` to
+contradict them. The opposite direction — a letter the reader does NOT believe in, which the program
+really does consume — is outside that sweep by construction: a letter the reader never spells is
+never run. And it is the expensive direction. The run ends a word early, the gated program is read
+as the flag's value, and nothing reaches the gate at all. The re-record found two, measured against
+the real programs with a stand-in `gh` that records whether it was invoked:
 
-    time -o f gh pr merge 1 --rebase             /bin/sh: `-o: command not found` — nothing merged
-    command time -o F gh pr merge 1 --rebase     /usr/bin/time ran it: the merge REALLY RAN
-                                                 the gate: null  (before 21c09e7: merge)
-    nohup command time -o F gh pr merge …        the merge REALLY RAN; the gate: null
-    printf 'x\n' | xargs -J R gh pr merge …      the merge REALLY RAN; the gate: null
+    command time -o F gh pr merge 1 --rebase     /usr/bin/time ran it — the merge REALLY RAN, gate: null
+    printf 'x\n' | xargs -J R gh pr merge R      xargs ran it — the merge REALLY RAN, gate: null
 
-`command` is itself on the closed wrapper list, so the spelling that reaches `/usr/bin/time` is one
-the declaration hands the user. `-o file` is consumed there, the run ends one word early, and the
-gated program is read as the flag's value — the mirror of round 2's finding, and the same fail-open
-KD-109 names for an undeclared operand. `sudo -h` came out on the same commit and that removal is
-RIGHT: `sudo -h host command` is refused by sudo itself ("a remote host may only be specified when
-listing privileges"), so no command ever stands behind it.
+**Both were one letter and both are fixed** (`time: "of"`, `xargs: "…JRS"`), so what is logged here
+is not those two — it is that nothing would have caught a third. The re-record also argued `time`
+was a fork with no one-word answer, because `time` names two programs: the shell's keyword, which
+takes only `-p`, and `/usr/bin/time`, which `command time` reaches. Measured on this tree, that
+argument does not hold. The flag's value is consumed on BOTH readings before the run ends, so `echo`
+still ends it:
 
-**Why the new sweep cannot see it.** It enumerates the letters the READER believes are value-taking
-and asks the shell to contradict them; a letter the reader does NOT believe in is never spelled, so
-this direction is outside its domain by construction. Two further measurements about that file,
-recorded here rather than raised again: on darwin it confirms 4 of the 23 declared letters
-(`env -u`, `exec -a`, `xargs -E`, `xargs -I`) and drops 19 as unmeasurable — `sudo` needs a tty,
-`timeout` is not installed, and `caffeinate -t`/`nice -n`/`xargs -n` reject `echo` as a value. It
-says so in its own failure message, which is the honest form, but the sweep is thinner than its
-title reads.
+    command time -o F gh pr merge     merge   (and the shell really merges)
+    command time -o F echo gh pr …    null    (and the shell really prints)
+    time -o F gh pr merge             merge   (and the shell refuses the line: `-o: command not found`)
 
-**Direction: fail-open at the classifier, and no producer.** Grepped: zero occurrences of
-`command time`, `/usr/bin/time` or `xargs -J` in any `.md`, `.mjs`, `.js`, `.json` or `.sh` in this
-repository. A merge here is typed `gh pr merge --rebase --delete-branch`, bare or behind a `cd`.
-**And it is not a one-word fix, which is why it is logged rather than patched in a re-record:**
-putting `of` back makes `time -o f gh pr merge` classify as a merge, and the shell runs no merge for
-it — an agent refused for an act it did not perform, which is the very thing round 2 removed. One
-`flags` entry cannot be right for both a shell keyword and `/usr/bin/time` under the same name; the
-decision is whether the table gets a spelling-sensitive entry, or `time` leaves the closed list.
-*Logged 2026-09-18, in the re-record of the slice that closed KD-107, by the declared substitute for
-round 2's reader — a finding of the round's own fix, outside the two rounds the slice is allowed.*
+The whole residue of the fork is the third row: a message about a command that runs nothing, which
+is the cheapest error available and the direction Rule 4 settles on.
+
+**Direction: fail-open at the classifier, and no producer** — zero hits for `command time`,
+`/usr/bin/time` or `xargs -J` anywhere in this tree, and a merge here is typed `gh pr merge --rebase
+--delete-branch`, bare or behind a `cd`. **The fix is a second sweep and it is costed, not
+hand-waved:** for each wrapper, run the letters it does NOT declare and ask whether the program
+consumed the next word. Spelled one shell per letter that is 13 x 52 = 676 spawns, roughly 7-10s on
+a 90s suite; spelled one shell per wrapper looping over letters it is 13, and that is the shape to
+build. It is not built here because this slice's two rounds are spent and it is a new mechanism, not
+a correction — the rule that a round has a fixed point is worth more than this entry.
+
+**Two further measurements about that sweep, recorded rather than raised again:** on darwin it
+confirms 4 of 23 declared letters (`env -u`, `exec -a`, `xargs -E`, `xargs -I`) and drops the other
+19 as unmeasurable — `sudo` needs a tty, `timeout` is not installed, and `caffeinate -t`/`nice -n`/
+`xargs -n` reject `echo` as a value. It says so in its own failure message, which is the honest
+form, but it is thinner than its title reads. *Logged 2026-09-18 at the re-record of the slice that
+closed KD-107; the two letters it found were fixed in the same commit, and the sweep that would
+have found them was not.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
