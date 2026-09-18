@@ -143,6 +143,16 @@ you the same list without opening anything.
 | **KD-82** | the ordering verdict is commit-graph ancestry where every other obligation here is trigger-path bytes | the refusal's remedy is the rebase you owe the merge anyway; it costs a rebase, never a run |
 | **KD-83** | "the ordinary owed-allow is byte-identical to before the ordering check" is verified by nothing | the cross-path comparison beside it is real; only the historical claim is unpinned |
 | **KD-84** | `declaredBudgetMs` has two implementations and the declared 10s has three spellings | all three agree today, and the unreadable-settings fallback errs small |
+| **KD-85** | every app stamped through 0.26.2 keeps three cwd-relative hook commands, and nothing retro-anchors them — not `doctor --fix`, which adds the walk wiring and never rewrites a hook the app already has | no act available here — those trees are other repositories; and no command an adopter runs would tell them |
+| **KD-86** | the anchoring detector judges `.mjs/.cjs/.js/.sh` only, so a hook invoking `python qa/x.py` or a bare `qa/tool` reads clean | measured against the template: every command it ships is `node` or `test -f`, so the allow-list refuses nothing that exists today |
+| **KD-87** | the anchoring detector equates *single-quoted* with *not executed*, so `sh -c '…'` / `eval '…'` read clean; and it reads each match's prefix from the UNMASKED command, so a shell-inert `'${CLAUDE_PROJECT_DIR:-.}/…'` counts as anchored | both measured by execution and bounded by `test/hook-anchoring-differential.test.mjs`; no command in either shipped settings file is in the blind spot, and the gate reds the day one is |
+| **KD-88** | "every surface that carries a command" is spelled as a two-item list (`hooks[*][*].hooks[*].command` + `statusLine.command`) in both readers, and `settings.json` executes more than that — `apiKeyHelper`, `awsAuthRefresh`, `awsCredentialExport` | measured: a fourth hook EVENT and a second hook in an existing group are both caught BY NAME; only a non-`hooks`, non-`statusLine` key is invisible, and neither settings file has one |
+| **KD-89** | in a tree whose workspaces are not installed, three suite tests fail and only one of them looks like a missing install — the other two read as product defects | measured on a fresh worktree; root `npm ci` provisions the workspace and CI does exactly that, so no adopter and no CI run is affected |
+| **KD-90** | the `statusLine` third of the hook-anchoring fix is NOT fixed — `CLAUDE_PROJECT_DIR` is not exported to a statusLine command, so the anchor would be inert | measured against the docs, not guessed; the surface keeps its relative form rather than an anchor that reads as protection, and a behavioural test pins it still failing |
+| **KD-91** | the differential's `invoking >= 3` vacuity floor names the statusLine, which its own antecedent now skips | five surfaces are counted, so the floor holds with margin; only the sentence is stale |
+| **KD-92** | the actionable subset all three anchoring gates call is calibrated by nothing — `unfixedHookAnchors` replaced by `return []` leaves every anchoring test green | measured: the detector is right today, and the PLANT test calibrates the honest total; only the filter under it is unpinned |
+| **KD-93** | surface-awareness landed in ONE of the two readers — the differential asks `unanchoredPaths` with no surface (whose default is "anchorable"), and both behavioural harnesses export `CLAUDE_PROJECT_DIR` to the statusLine | the shipped statusLine is relative, so no instrument answers differently today; it fires only if someone writes the anchor on that surface |
+| **KD-94** | this file's header says adding an entry "cannot reopen a gate"; it reopens the SUITE gate, because the suite hash deliberately covers markdown | measured: logging costs one ~50s `npm test`, never a device run or a review round — the header's argument holds, its blanket sentence does not |
 
 ---
 
@@ -1337,6 +1347,273 @@ exempt. That is a one-line change to a trigger path, which reopens the review ob
 construction, so it belongs to a slice that can pay for a round rather than to the slice that
 happened to notice it. Found while signing, under an explicit instruction not to reopen the
 review to record it.
+
+### KD-85 — apps stamped through 0.26.2 keep the unanchored hooks, and nothing this repo can run will fix them
+
+`template/.claude/settings.json` (fixed in 0.26.3) · `src/commands/doctor.mjs` (`applySafeFixes`)
+
+Through 0.26.2 the template shipped three cwd-relative hook commands — `Stop`
+(`node qa/receipt-check.mjs --hook`), `UserPromptSubmit` and `statusLine` (both
+`test -f qa/walk-status.mjs && … || true`). Claude Code runs a hook in the SESSION's working
+directory, so a session opened in a subdirectory loses the Stop gate loudly and loses the walk's
+status line and prompt injection **silently**, because `|| true` turns a wrong directory into a
+clean exit with no output. payment-blueprint hit the loud half on 2026-09-02 and anchored its own
+copy on 2026-09-10; the template was never fixed, so every app stamped in between carries it.
+
+**This slice anchors the template and gates it, and that reaches new stamps only.** Two reasons
+the existing population stays broken, and neither is age:
+
+1. Those trees are *other repositories*. No commit here edits them, which is the KD-78 shape — the
+   entry exists so the gap is recorded rather than mistaken for coverage.
+2. `create-cmp doctor --fix` is the one command that already writes into an app's
+   `.claude/settings.json`, and it deliberately **adds** the walk wiring without ever rewriting a
+   hook the app already has. That restraint is correct (it is the app's file), and it is also why
+   the heal cannot carry this fix. `test/doctor-walk-wiring.test.mjs` pins the legacy string
+   deliberately so the limit is stated rather than discovered. What the heal writes IS anchored,
+   because it copies the template — gated in the same file.
+
+**What the fix would be, when it is taken:** a `doctor` finding that reports unanchored commands
+(the detector is already exported — `anchorViolations` in `src/lib/hooks.mjs`), and a heal that
+rewrites only commands matching the shapes the template itself shipped, leaving anything an app
+authored alone. That is a new adopter-facing diagnosis with its own consent question about
+rewriting a file the app owns, so it is a slice, not a line — and it is the same change that would
+close KD-86's half of this.
+
+### KD-86 — the anchoring detector reads four script extensions, and a hook could invoke something else
+
+`src/lib/hooks.mjs` (`SCRIPT_PATH`)
+
+`unanchoredPaths` recognises a path only if it ends `.mjs`, `.cjs`, `.js` or `.sh`. A hook written
+`python qa/report.py`, or one invoking a bare executable `qa/tool`, would read clean while being
+exactly as unanchored. The bare-executable case is the harder one and is deliberately out: a
+single-segment word is not distinguishable from a command name, and a detector that guessed would
+flag `grep`, `node` and `printf`.
+
+**Nobody is wrongly served, which is why this is logged rather than fixed.** Measured against the
+template as it ships: every command it carries is `node` or `test -f` against a `.mjs` path, so the
+allow-list refuses nothing that exists. The gate is narrower than its name suggests, not wrong —
+and the shape it would miss is one nothing in this repo writes. Found while writing the detector,
+and left narrow on purpose: widening it costs false positives on narration, which is the failure
+mode that would make the gate un-adoptable.
+
+### KD-87 — "inside single quotes" is not "not executed", and an inert anchor still counts as anchoring
+
+`src/lib/hooks.mjs` (`maskQuotedNarration`, `unanchoredPaths`)
+
+`unanchoredPaths` masks single-quoted spans so that narration naming `qa/…` is not mistaken for an
+invocation. Two shapes escape it, both **measured by execution** (root vs. one directory down) in
+`test/hook-anchoring-differential.test.mjs` rather than argued:
+
+1. **A single-quoted span the shell hands to another interpreter executes.** `sh -c 'node
+   qa/walk-status.mjs'` and `eval 'node qa/walk-status.mjs'` both run the script at the project root
+   and both fail one directory down, while the detector returns `[]`. This is the *under-report*
+   direction — the one the module's own comment says it is conservative against.
+2. **The anchor's prefix is read from the UNMASKED command.** `node
+   '${CLAUDE_PROJECT_DIR:-.}/qa/walk-status.mjs'` reads as anchored because the literal text is
+   there, but the shell never expands a single-quoted variable, so the command reaches nothing from
+   anywhere. Measured: the static gate on the STAMPED settings (`harness-surfaces`) and the gate on
+   what `doctor --fix` writes (`doctor-walk-wiring`) both pass green against a template mutated this
+   way; only the behavioural tests in `hook-anchoring.test.mjs` catch it, and those name three
+   commands by literal index.
+
+**Nobody is wrongly served, which is why this is logged rather than fixed.** Neither shape is
+written anywhere in this repo — `template/.claude/settings.json` and `.claude/settings.json` between
+them carry ten commands, every anchor double-quoted and no subshell payload — and the detector is a
+test-only gate no adopter runs. The bound is now a program rather than this paragraph: the
+differential test executes **every** command in both files and refuses any the detector calls
+anchored that loses a script from a subdirectory, which is also the coverage the three hand-indexed
+behavioural tests do not extend to a fourth command.
+
+**One correction to the reason, not the verdict.** `src/lib/hooks.mjs` and the 0.26.3 CHANGELOG
+entry both justify the parse as "exact here rather than approximate, because `sessionStartCommand`
+already REFUSES copy containing an apostrophe." That guarantee does not cover the input: the
+template's SessionStart and PreToolUse commands are hand-written JSON that `sessionStartCommand`
+never builds, and nothing refuses an apostrophe in them. The conclusion survives for a better
+reason — `sh` pairs single quotes by exactly the rule the masker does, so an odd apostrophe is a
+shell **syntax error** rather than a hidden invocation (measured; the shape does not run at the
+project root either). KD-71's shape: the verdict is right and its stated reason is not.
+
+*Logged 2026-09-18, review round 1 of the hook-anchoring slice.*
+
+### KD-88 — the detector enumerates command surfaces by hand, and `settings.json` has more than two
+
+`src/lib/hooks.mjs` (`anchorViolations`) · `test/hook-anchoring-differential.test.mjs` (`commandSurfaces`)
+
+The narrow form of the question is answered, and answered well. Measured against the real template:
+a FOURTH hook event added tomorrow (`hooks.PostToolUse[0].hooks[0]`) and a second hook inside an
+existing group (`hooks.Stop[0].hooks[1]`) are both reported by surface name, because the walk is
+`Object.entries(settings.hooks)` and not a list of the four events the template happens to ship. An
+unanchored command in a new hook does not silently pass.
+
+What is invisible is a command-bearing KEY that is neither `hooks` nor `statusLine`. Claude Code's
+`settings.json` runs `apiKeyHelper` through `/bin/sh`, and `awsAuthRefresh` / `awsCredentialExport`
+the same way. Measured: plant all three into the template with cwd-relative paths
+(`"apiKeyHelper": "qa/key-helper.sh"`) and `anchorViolations` returns `[]`. The same two-item list is
+spelled a second time in the differential harness's `commandSurfaces()`, so the blind spot is
+identical in the instrument built to check the detector — which is the shape that makes it worth a
+line here rather than a shrug.
+
+**Nobody is wrongly served, which is why this is logged rather than fixed.** Neither
+`template/.claude/settings.json` nor `.claude/settings.json` carries any of those keys, and none of
+them is a surface this harness has a reason to write. It is also the third time this module has paid
+for the same enumeration: its own header records that the minimal-mode rule "just has to be applied
+to every surface that carries a command, not only to `hooks`" after a lane-referencing `statusLine`
+shipped into a minimal scaffold. The fix, when it is taken, is to stop enumerating — walk the
+settings object for string values and judge every one — which costs false positives on
+`permissions` entries and is therefore a decision, not a line.
+
+*Logged 2026-09-18, review round 1 of the hook-anchoring slice.*
+
+### KD-89 — a partly-installed tree fails three tests, and two of them do not look like a missing install
+
+`package.json` (`workspaces`, `scripts.test`) · `scripts/suite-reporter.mjs`
+
+Measured 2026-09-18 in a fresh git worktree whose ROOT `node_modules` existed but whose
+`inspector/mcp/node_modules` did not. `npm test` reported three failures:
+
+```
+✖ inspector/mcp/test/bundle-freshness.test.mjs   ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'
+✖ inspector/mcp/test/server-tools.test.mjs
+✖ the console host delivers no profile console copy, so the Evidence tab links no step
+    to the section it governs        AssertionError: the host delivered stepGoverns={}
+```
+
+`npm ci` provisioning the workspace turned all three green, with the tree otherwise untouched.
+
+**The defect is not that an uninstalled tree fails — it is the SHAPE of two of the three failures.**
+`inspector/mcp` is a root workspace (`package.json`), so one root `npm ci` provisions it, and
+`.github/workflows/ci.yml` does exactly that deliberately ("ONE install, not two"). CI is therefore
+never in this state and no adopter ever is. A contributor in a worktree can be, and what they are
+shown is one honest module error and **one semantic assertion about console copy and `stepGoverns`**
+— a message that reads as a real product defect in code they may have just touched. The cost is a
+wrong diagnosis, not a wrong verdict, which is why it is here and not on the first row: nobody is
+served anything false by the shipped product, and the failure is loud rather than silent.
+
+It is recorded because it was expensive to disbelieve. The honest way to clear it was to run the
+three files on a clean `origin/main` FIRST and watch them fail there too — which proves "not mine"
+but still misattributes the cause to the repo. Only chasing `ERR_MODULE_NOT_FOUND` to an absent
+workspace directory got the real answer.
+
+**What the fix would be, when it is taken:** a preflight in the suite reporter that checks each
+declared workspace has a `node_modules` before the run and says *"workspaces are not installed — run
+`npm ci` at the repository root"* instead of letting the assertions speak. That is a change to how
+the suite bootstraps, which is a slice with its own failure modes (a preflight that itself goes
+wrong makes every run unrunnable), not a line in this one.
+
+### KD-90 — the statusLine third of the anchoring fix is not fixed, and was described as fixed
+
+`template/.claude/settings.json` (`statusLine`) · `src/lib/hooks.mjs` (`ANCHORABLE_SURFACES`)
+
+The hook-anchoring slice found three cwd-relative commands, anchored all three with
+`${CLAUDE_PROJECT_DIR:-.}`, and said so. **The anchor only reaches two of them.**
+`CLAUDE_PROJECT_DIR` is documented as exported to HOOK commands; the hooks reference additionally
+names stdio MCP servers and plugin LSP servers as the other places Claude Code sets it, and
+`statusLine` does not appear on that list — the list whose whole purpose is to enumerate the
+non-hook consumers. The statusline reference names only `COLUMNS` and `LINES` as variables Claude
+Code sets. On a statusLine command the anchor therefore expands to nothing and `:-.` silently
+restores exactly the behaviour it was added to repair.
+
+**The remedy taken was to stop claiming it, not to paper it.** The statusLine keeps its relative
+form. An anchor that cannot work is worse than no anchor, for the same reason KD-87's second shape
+is: it READS as protection, and the next person to look would have counted the surface as covered.
+`ANCHORABLE_SURFACES` now records where the mechanism applies, and a behavioural test asserts the
+statusLine *still* fails silently one directory down — a test that fails the day someone fixes it,
+which is how this entry gets closed.
+
+**Nobody is wrongly served, which is why this is logged rather than blocking.** The surface is
+exactly as it was before the slice; nothing regressed, and the two surfaces that could be fixed
+were. What would have wrongly served a reader is the sentence claiming three.
+
+**What the fix would be, when it is taken:** a statusLine receives the project root on STDIN as
+`workspace.project_dir`. That is a different MECHANISM, not a different spelling — the command has
+to consume its own stdin, extract the root, and replay the payload into `qa/walk-status.mjs`, which
+still expects the JSON. Two candidates were costed and neither is a one-line edit to this slice: a
+`jq` pipeline adds a binary dependency to a shipped template, and `git rev-parse --show-toplevel`
+is actively WRONG for the monorepo case this whole slice exists to serve (it returns the repository
+root, not the app directory, which for payment-blueprint's `services/` layout is the wrong
+directory). Note also that `project_dir` is launch-anchored — "where Claude Code was launched" —
+so it is not a synonym for the project root either.
+
+### KD-91 — the differential's vacuity floor names a command that can no longer reach it
+
+`test/hook-anchoring-differential.test.mjs` (the `invoking >= 3` guard)
+
+The floor exists so the differential cannot go quietly vacuous: *"expected at least the Stop,
+UserPromptSubmit and statusLine commands to actually run a script"*. Its antecedent is
+`unanchoredPaths(command).length === 0`, so the statusLine — reverted to its relative form in the
+same commit, and therefore a violation — is `continue`d before it can be counted. The three the
+message names are now two. Measured on this tree: five surfaces are counted (the template's Stop
+and UserPromptSubmit, and this repo's own three `scripts/hooks/proof-gate.mjs` entries), so the
+floor holds with margin and nothing is vacuous today.
+
+**Nobody is wrongly served, which is why this is logged.** The guard still guards; only its
+sentence is stale, and the surface it over-claims is the one KD-90 already says is unfixed. It is
+worth a line because the floor is the thing standing between this gate and silence, and a floor
+justified by a command that can never satisfy it is a floor nobody can re-derive.
+
+### KD-92 — the actionable anchoring gate has no negative control; emptied, it would be invisible
+
+`src/lib/hooks.mjs` (`unfixedHookAnchors`) · its three callers
+
+`unfixedHookAnchors` is what the gates ask — `test/hook-anchoring.test.mjs` (the template),
+`test/harness-surfaces.test.mjs` (the stamped `settings.json`), `test/doctor-walk-wiring.test.mjs`
+(what `doctor --fix` writes) — and all three assert it is EMPTY. Nothing anywhere asserts it is
+ever non-empty. Measured on this tree: replacing its body with `return []` leaves all 62 tests in
+those three files plus `test/hook-anchoring-differential.test.mjs` and
+`test/inert-anchor-scored-as-protection.test.mjs` green, 0 failures. The PLANT test is the
+calibration that makes the mechanism trustworthy, but it reads `anchorViolations` — the honest
+total — so the filter standing between the total and the three gates is pinned by nothing.
+
+**Nobody is wrongly served, which is why this is logged.** The filter is correct today, measured
+by execution rather than read: a relative hook command yields one violation with `kind:"hooks"`,
+the anchored form yields none, and the fix's new selector (`ANCHORABLE_SURFACES[v.kind] === true`)
+returns the same surfaces as the one it replaced (`v.event !== null`) on the template, on this
+repo's own settings, on a planted all-relative template, and on an anchored statusLine.
+
+**Fires when:** anything changes the `kind` `anchorViolations` records, or the predicate reading
+it, such that no hook surface is selected — at which point every gate demanding zero goes green by
+being handed nothing, in the file whose subject is instruments that read as protection.
+
+### KD-93 — the anchor's surface-awareness landed in one reader; the harnesses still assume the other
+
+`test/hook-anchoring-differential.test.mjs` (`reached`, and `unanchoredPaths(command)` with no
+surface) · `test/hook-anchoring.test.mjs` (`runHook`, the statusLine pin) · `src/lib/hooks.mjs`
+(`unanchoredPaths`'s `anchorable = true` default)
+
+`anchorViolations` now passes each surface's `ANCHORABLE_SURFACES` answer, so no spelling of the
+anchor can clear a statusLine violation. The differential asks the same question a second way —
+`unanchoredPaths(command)` with no options, over a surface list that includes `statusLine` — and
+the parameter's default is `anchorable = true`, the "assume it reaches" default that the comment
+two functions below calls the unsafe one. Both behavioural harnesses then execute every command
+with `CLAUDE_PROJECT_DIR` set, including the surface ANCHORABLE_SURFACES declares never receives it.
+
+**Nothing answers differently today**, which is why this is logged: the shipped statusLine is
+relative, so the differential `continue`s past it and the behavioural pin gets the same silence
+with the variable set or unset, and `test/inert-anchor-scored-as-protection.test.mjs` executes the
+unset case head-on. **Fires when:** someone writes the anchor on the statusLine. `anchorViolations`
+keeps reporting the violation (so the static KD-90 pin stays GREEN and says nothing), the
+differential credits the anchor and then measures it in a world with the variable set (so it stays
+green too), and the single instrument that reds is the behavioural pin, whose message reads *"if it
+was fixed, delete this test and close KD-90"* — the wrong remedy, for a command still broken in
+every stamped app.
+
+### KD-94 — "logging is free" is one gate too broad: an entry here stales the suite record
+
+`docs/KNOWN-DEFECTS.md` (the header's *"Logging is free"* paragraph) · `scripts/suite-record.mjs`
+(`SUITE_HASH_SKIP`)
+
+The header names `REVIEW_TIER_IRRELEVANT` and `DEVICE_TIER_IRRELEVANT` — both true, `docs/` and
+`*.md` are in the first — and then concludes *"Adding an entry cannot reopen a gate."* The suite
+hash is a third hash and it covers markdown ON PURPOSE (`scripts/suite-record.mjs`: a hash that
+skipped markdown would be wrong more often than it saved, "and it errs toward re-running").
+Measured while adding KD-92/93 to this file: with them, `node scripts/proof-plan.mjs` prints *"the
+recorded run (PASS 2027/2028) describes another tree — run npm test"*; with the file reverted, the
+same command prints *"for this exact tree — read it, do not re-run it"*.
+
+**Nobody is wrongly served, which is why this is logged.** The paragraph's ARGUMENT is intact —
+logging cannot cost a device run or a review round, which is what it is defending. The cost it
+does carry is one ~50s suite re-run, which a reviewer who logs late has to either run or hand to
+the author. The sentence is one gate too broad, not the policy.
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is

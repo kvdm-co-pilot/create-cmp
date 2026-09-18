@@ -27,6 +27,7 @@ import { CMP_LADDER } from "../packages/harness/src/lib/profiles/cmp/ladder.mjs"
 // test/badge-floor.test.mjs.
 import { plants as CMP_PLANTS } from "../packages/harness/src/lib/profiles/cmp/plants.mjs";
 import { isHarnessFile } from "../packages/harness/src/lib/harness-region.mjs";
+import { describeAnchorViolations, unfixedHookAnchors } from "../src/lib/hooks.mjs";
 
 // S8b: the lane is TWO files now — qa/verify.mjs (the spine) and
 // qa/lib/profiles/cmp/steps-cmp.mjs (the step pack). A structural read of "the lane's
@@ -135,9 +136,35 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       const stopHooks = settings.hooks?.Stop;
       assert.ok(Array.isArray(stopHooks) && stopHooks.length > 0, "has a Stop hook entry");
       const commands = stopHooks.flatMap((entry) => (entry.hooks || []).map((h) => h.command));
+      // The path is anchored (see the anchoring test below), so a closing quote
+      // now sits between the script and its flag. Keep the ADJACENCY anyway —
+      // two independent `includes` would accept a command that mentions --hook
+      // somewhere else entirely, which is strictly weaker than what this
+      // assertion refused before the anchor was added.
       assert.ok(
-        commands.some((c) => typeof c === "string" && c.includes("qa/receipt-check.mjs --hook")),
-        `Stop hook command references qa/receipt-check.mjs --hook (got: ${JSON.stringify(commands)})`
+        commands.some((c) => typeof c === "string" && /qa\/receipt-check\.mjs"?\s+--hook\b/.test(c)),
+        `Stop hook command runs qa/receipt-check.mjs --hook (got: ${JSON.stringify(commands)})`
+      );
+    });
+
+    await t.test("every HOOK command the STAMPED settings.json executes resolves from any directory", () => {
+      // The template being anchored is not the claim an adopter cares about —
+      // this reads the file that actually landed in their project. A hook runs in
+      // the SESSION's cwd, so a session opened one directory down would otherwise
+      // lose the Stop gate loudly and the walk's UserPromptSubmit injection
+      // SILENTLY (`test -f … || true` swallows it).
+      //
+      // HOOK commands only, deliberately: CLAUDE_PROJECT_DIR is not exported to a
+      // statusLine command, so that surface cannot be fixed this way and is a
+      // known gap (KD-90), not a regression this gate should demand a remedy for.
+      // The behavioural proof, and the kept plant this detector was calibrated on,
+      // are in test/hook-anchoring.test.mjs.
+      const settings = JSON.parse(fs.readFileSync(path.join(out, ".claude/settings.json"), "utf8"));
+      const found = unfixedHookAnchors(settings);
+      assert.deepEqual(
+        found,
+        [],
+        `the stamped .claude/settings.json invokes a path that will not resolve from a subdirectory:\n${describeAnchorViolations(found)}`
       );
     });
 

@@ -129,7 +129,11 @@ For AI sessions using Claude Code, a **Stop hook** (`.claude/settings.json`) mak
 `CLAUDE.md`'s definition of done mechanical instead of honor-system.
 
 **What it does:** when a session tries to end, the hook runs
-`node qa/receipt-check.mjs --hook`. That script recomputes a sha256 hash over the project's
+`node "${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs" --hook`. The path is anchored to the
+project root because Claude Code runs a hook in the *session's* working directory, which is not
+always this one — a session opened in a subdirectory would otherwise fail to find the script.
+(`:-.` means an unset `CLAUDE_PROJECT_DIR` falls back to the current directory, so the hook is
+never worse off than a plain relative path.) That script recomputes a sha256 hash over the project's
 verified surface (`composeApp/`, `specs/`, `qa/`, and the Gradle build files — see
 `qa/lib/inputs-hash.mjs`) and compares it to the `inputs.hash` in the committed
 `qa/evidence/latest.json`. A `PASS` receipt whose hash matches the tree ends the session

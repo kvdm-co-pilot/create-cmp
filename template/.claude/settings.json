@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node qa/receipt-check.mjs --hook"
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook"
           }
         ]
       }
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "test -f qa/walk-status.mjs && node qa/walk-status.mjs --inject || true"
+            "command": "test -f \"${CLAUDE_PROJECT_DIR:-.}/qa/walk-status.mjs\" && node \"${CLAUDE_PROJECT_DIR:-.}/qa/walk-status.mjs\" --inject || true"
           }
         ]
       }
