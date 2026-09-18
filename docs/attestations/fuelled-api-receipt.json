@@ -1,0 +1,95 @@
+{
+  "schema": "prooflane-evidence/1",
+  "profile": "local",
+  "stage": "change",
+  "mode": "full",
+  "verdict": "PASS",
+  "commit": {
+    "sha": "89a0a4e308d01731c8e8860f22ebd357c4d3e194",
+    "dirty": []
+  },
+  "inputs": {
+    "hash": "b3cb85778da0c81d29fe597b7a7c2af242c1aff7f5e5b14ae1059925be905ecf",
+    "fileCount": 73,
+    "undeclared": [
+      "gradle",
+      "gradlew",
+      "gradlew.bat",
+      "package-lock.json",
+      "package.json"
+    ]
+  },
+  "steps": [
+    {
+      "name": "harnessIntegrity",
+      "verdict": "PASS",
+      "layer": "spine",
+      "durationMs": 7,
+      "reason": "prooflane-harness 0.21.1 (region b2a1d03d) — 46 files verified"
+    },
+    {
+      "name": "specCoverage",
+      "verdict": "PASS",
+      "layer": "spine",
+      "durationMs": 13,
+      "reason": "9 live clause(s), 14 citation(s); 6 clauses cited only from host-only tiers (LOG-01, LOG-02, SRV-01, SRV-02, SRV-03, SRV-04)",
+      "details": {
+        "live": 9,
+        "citations": 14,
+        "hostOnlyClauses": [
+          "LOG-01",
+          "LOG-02",
+          "SRV-01",
+          "SRV-02",
+          "SRV-03",
+          "SRV-04"
+        ]
+      }
+    },
+    {
+      "name": "unitTests",
+      "verdict": "PASS",
+      "layer": "backend",
+      "durationMs": 15974,
+      "reason": "unit tier green"
+    },
+    {
+      "name": "integrationTests",
+      "verdict": "SKIP",
+      "skipKind": "environment",
+      "layer": "backend",
+      "durationMs": 4,
+      "reason": "no container runtime — the integration tier cannot observe anything (no docker CLI on PATH and no reachable daemon)"
+    }
+  ],
+  "harness": {
+    "name": "prooflane-harness",
+    "version": "0.21.1",
+    "sha256": "b2a1d03db849d3d181144d6ede4b77aa2233f436de47341f631d97e9a3c8ec1e",
+    "status": "intact",
+    "intact": true,
+    "source": "registry"
+  },
+  "pack": {
+    "id": "fuelled-api",
+    "version": "0.1.0"
+  },
+  "strength": {
+    "onDeviceSteps": []
+  },
+  "evidenceLevel": {
+    "rung": "L1",
+    "name": "L1 — proven on the host",
+    "satisfiedBy": [
+      "harnessIntegrity",
+      "specCoverage",
+      "unitTests"
+    ]
+  },
+  "artifacts": [],
+  "toolVersions": {
+    "node": "v24.18.0",
+    "platform": "darwin-arm64"
+  },
+  "generatedAt": "2026-09-17T22:12:03.948Z"
+}

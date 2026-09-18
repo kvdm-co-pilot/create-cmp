@@ -563,6 +563,50 @@ function ourProfileIds() {
 }
 
 /**
+ * Does this string name a day that exists? `/^\d{4}-\d{2}-\d{2}$/` is a SHAPE,
+ * not a calendar: it accepts `2026-13-45`, `2026-02-30` and `0000-00-00`, and
+ * `Date.parse` then returns NaN for some and silently rolls others forward, so
+ * the old spelling reported no problem at all and criterion A would have printed
+ * `attested 0000-00-00 by …` and passed. Round-tripping through UTC is what
+ * separates a day from four-two-two digits.
+ * @param {string} s
+ */
+function isCalendarDay(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number);
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  return probe.getUTCFullYear() === y && probe.getUTCMonth() === m - 1 && probe.getUTCDate() === d;
+}
+
+/**
+ * The latest calendar day that has begun ANYWHERE on earth at `now` — the
+ * boundary past which a date is genuinely forward-dated rather than merely
+ * east of this machine.
+ *
+ * WHY NOT `Date.parse(date) > Date.now()`, which this replaces: a date-ONLY
+ * string is fixed by ECMAScript at midnight UTC, and comparing that instant to a
+ * wall-clock instant refuses the signer's own current day for everyone east of
+ * UTC, by exactly their offset, for exactly that many hours every day. The first
+ * act of the only person who can close criterion A is to type a date, and on a
+ * GMT+0200 machine typing today's date made this gate answer `date … is in the
+ * future` and name the signer's calendar as the fault — a refusal path refusing
+ * the correct input.
+ *
+ * The fix is deliberately the WEAKEST correct one, and it is stated as a day
+ * rather than an instant so the verdict does not depend on which machine runs
+ * the gate: a CI box in UTC and a laptop in Auckland must read the same document
+ * the same way. UTC+14 (Pacific/Kiritimati) is the furthest-ahead civil offset,
+ * so a day later than the day it is there has started nowhere and is a claim
+ * about the future. Forward-dating is still refused; only the 14 hours that
+ * date-only strings cannot express are conceded.
+ * @param {number} now
+ */
+function dayBegunSomewhere(now) {
+  const FURTHEST_AHEAD_OFFSET_MS = 14 * 60 * 60 * 1000;
+  return new Date(now + FURTHEST_AHEAD_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/**
  * Judge the attestation as a DOCUMENT. Everything checkable is checked; the one
  * thing that is not — whether the named people exist — is returned as a caveat
  * the criterion prints, so a reader is never told this gate proved provenance.
@@ -576,13 +620,35 @@ function attestationProblems(a) {
   need(a && typeof a === "object", "not a JSON object");
   if (!a || typeof a !== "object") return problems;
   need(a.claim === "stage2-external-profile", `claim must be "stage2-external-profile" (got ${JSON.stringify(a.claim)})`);
-  need(typeof a.attestedBy?.name === "string" && a.attestedBy.name.trim(), "attestedBy.name is missing — an attestation nobody signed is a note");
-  need(/^\d{4}-\d{2}-\d{2}$/.test(String(a.date ?? "")), "date must be YYYY-MM-DD");
-  if (/^\d{4}-\d{2}-\d{2}$/.test(String(a.date ?? "")) && Date.parse(a.date) > Date.now()) problems.push(`date ${a.date} is in the future`);
-  need(typeof a.profile?.id === "string" && a.profile.id.trim(), "profile.id is missing");
-  need(typeof a.authoredBy?.organisation === "string" && a.authoredBy.organisation.trim(), "authoredBy.organisation is missing");
-  need(typeof a.authoredBy?.contact === "string" && a.authoredBy.contact.trim(), "authoredBy.contact is missing — an unfalsifiable claim is not evidence");
-  need(typeof a.artifact?.location === "string" && a.artifact.location.trim(), "artifact.location is missing — where the profile lives");
+
+  // A refusal may never state, as the whole of its reason, a property the value
+  // already has: an array in `attestedBy.name` is not "missing", and saying so
+  // sends an author hunting for an absent field they are looking straight at.
+  // So "absent or blank" and "present but not text" are different sentences.
+  // The blank-field wording is unchanged, deliberately — it is what criterion A
+  // prints for the unsigned record today, and docs/attestations/README.md quotes
+  // those strings verbatim as the list of what a signer still owes.
+  const needsText = (value, dotted, blankMsg) => {
+    if (value === undefined || value === null || (typeof value === "string" && !value.trim())) problems.push(blankMsg);
+    else if (typeof value !== "string") problems.push(`${dotted} must be text — got ${JSON.stringify(value)}`);
+  };
+
+  needsText(a.attestedBy?.name, "attestedBy.name", "attestedBy.name is missing — an attestation nobody signed is a note");
+
+  // Three failures, three reasons. `2026-09-31` IS `YYYY-MM-DD`, so answering it
+  // with "date must be YYYY-MM-DD" would refuse a correct format for naming a day
+  // September does not have — and a month's length is the commonest date typo
+  // there is, on the one field only the signer can fill.
+  const dated = typeof a.date === "string" ? a.date : "";
+  const shaped = /^\d{4}-\d{2}-\d{2}$/.test(dated);
+  need(shaped, "date must be YYYY-MM-DD");
+  if (shaped && !isCalendarDay(dated)) problems.push(`date ${dated} names no calendar day`);
+  if (shaped && isCalendarDay(dated) && dated > dayBegunSomewhere(Date.now())) problems.push(`date ${dated} is in the future`);
+
+  needsText(a.profile?.id, "profile.id", "profile.id is missing");
+  needsText(a.authoredBy?.organisation, "authoredBy.organisation", "authoredBy.organisation is missing");
+  needsText(a.authoredBy?.contact, "authoredBy.contact", "authoredBy.contact is missing — an unfalsifiable claim is not evidence");
+  needsText(a.artifact?.location, "artifact.location", "artifact.location is missing — where the profile lives");
   // The one cheap trick that IS checkable: attesting a profile we wrote.
   const ours = ourProfileIds();
   if (typeof a.profile?.id === "string" && ours.has(a.profile.id)) {
