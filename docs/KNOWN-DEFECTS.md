@@ -186,6 +186,7 @@ you the same list without opening anything.
 | **KD-134** | `scripts/ground-truth.mjs` reports the version spine as three names — `cli`, `plugin`, `marketplace` — while a bump must move FOUR surfaces: `package-lock.json` records the root version twice and is not among them | the suite refuses the drift by name (`test/workspace-lock-sync.test.mjs`) with the remedy printed, so nobody is wrongly served. What is logged is that the deriver `CLAUDE.md` names as the thing to ask INSTEAD of a document is silent about a surface that must move in lockstep — and it caught out this slice's own author, at the second amendment |
 | **KD-160** | every create-cmp tree commits `qa/harness.lock.json`, whose `files` map holds one sha256 per locked path — 73 digests in a full stamp, 7 in a `--minimal` one — and a secret scanner reads a 64-char hex string as a credential | measured after an adopter's gitleaks flagged one as `generic-api-key` and reddened their CI on a file they did not author. The digests are load-bearing (the lock is what says whether the machine-owned region was edited) so they cannot simply go; the remedies are an allowlist shipped with the template or documenting the shape, and both are product decisions rather than lines |
 | **KD-161** | the round block prices round 2 from whether the DELTA is empty, and a round 1 that logs its findings writes to `docs/KNOWN-DEFECTS.md` — so the delta is almost never empty and the one NOT-OWED case is almost never reachable | measured on its own first use: round 1 of the slice that added it found nothing blocking, made NO fixes, wrote two log entries, and the block priced round 2 OWED. The header's rule is about round 1's FIXES, not about any delta. Advisory only — a human read it, disagreed, and took the header's answer |
+| **KD-162** | the sweep proving the lock is a "class of one" allow-lists `qa/e2e/` and `qa/golden/` by PREFIX, so a machine-written file added under either is invisible to it | measured: today's three survivors under those prefixes really are app content and the lock really is the only other one, so the claim holds — what is unpinned is tomorrow's addition, not today's answer |
 
 ---
 
@@ -2597,3 +2598,24 @@ answered the round — a fact nothing captures today, and the same shape as the 
 this slice just closed one level up.
 
 *Logged 2026-09-19, from the first real use of the program it is about.*
+
+### KD-162 — the class-of-one sweep assumes its conclusion for two directories
+
+`test/a-minimal-lock-names-a-lane-the-tree-does-not-carry.test.mjs` (third case)
+
+The third case proves `qa/harness.lock.json` is the only machine-written file outliving `--minimal`
+by filtering the survivors through `APP_OWNED = ["qa/e2e/", "qa/golden/"]` — two whole directories
+taken as app content by prefix. **That assumes the conclusion for everything under them.**
+
+Executed on a real `--minimal` stamp, the claim is true today: the `qa/` survivors are exactly
+`e2e/README.md`, `e2e/smoke.yaml`, `golden/home.json` (all authored for the app), the seven region
+files, and the lock. So the sweep's answer is right; its *reason* is one degree weaker than it
+reads.
+
+**Why logged and not fixed.** A stronger sweep would have to derive app-ownership rather than
+declare it, and nothing in the tree records who authors a file under `qa/e2e/`. Nobody is wrongly
+served — the test's own subject is unaffected, and a new machine-written file under either prefix
+would be a change someone made deliberately.
+
+*Logged 2026-09-19, review round 1 of the KD-40 closure. Found by a reviewer reading the sweep's
+allow-list rather than its verdict.*
