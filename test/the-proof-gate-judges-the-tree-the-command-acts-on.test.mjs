@@ -235,7 +235,13 @@ test("when the gate cannot tell which tree the command acts on, it REFUSES", () 
     // The two halves of "this reader could not even find the commands". A shell
     // would reject the first outright and read the second as the tail of
     // something that began out of sight; either way the tree is not knowable.
-    ["a quotation the prefix never closes", `cd ${B} " && gh pr merge 1`, /never closes/],
+    ["a quotation still open where the command begins", `cd ${B} " && gh pr merge 1`, /still open where the command begins/],
+    // The same refusal, reached the other way: the command is INSIDE the
+    // quotation, which is a nested shell whose directory this reader does not
+    // follow. Saying the quote "never closes" was false of this one — it closes,
+    // after the command — and this is a spelling proof-gate-hook.test.mjs lists
+    // as an invocation, so the sentence it gets has to be true of it.
+    ["the command inside a quoted script", `sh -c "cd ${B} && gh pr merge 1"`, /still open where the command begins/],
     ["a `)` whose opener this reader never saw", `cd ${B} ) && gh pr merge 1`, /no opener/],
     ["a device run whose tree is unreadable", `cd "$SLICE_DIR" && ${DEVICE}`, /cannot read literally/],
     // npm publishes a PACKAGE, and the three ways of naming one that is not the
@@ -328,6 +334,34 @@ test("a cd the shell DOES perform is not silently ignored in favour of the sessi
   ]) {
     const d = pre(command, A);
     assert.notEqual(d.action, "silent", `${how}: the merge runs in ${B}, and the gate judged the session's worktree instead`);
+  }
+});
+
+test("an everyday command in front of a merge is not a construct, and does not turn a verdict into a refusal", () => {
+  // THE COST OF READING THE SPELLING INSTEAD OF THE POSITION. The reader refuses
+  // a prefix it cannot follow, which is right, but it decides what it cannot
+  // follow by looking for the WORDS `if`/`for`/`done`/`.` anywhere a space
+  // precedes them — and `git add .`, `echo done` and `touch case` are ordinary
+  // commands in which none of those is a keyword. A shell keyword is a keyword
+  // at a command position and an argument anywhere else.
+  //
+  // Refusing is the safe direction for a tree that cannot be read; it is not
+  // safe for a tree that can. The agent is stopped from merging, and the sentence
+  // it is handed names if/for/while/case/{ }/source, so there is nothing in the
+  // command it can change to get past it. That is the failure this gate is least
+  // allowed to have (KD-64), reached through the check that was added to fix the
+  // previous round's finding.
+  const MERGE = "gh pr merge 1 --rebase";
+  const plain = pre(`echo word && ${MERGE}`, A);
+  for (const [how, prefix] of [
+    ["git's most-typed operand", "git add . &&"],
+    ["a word that spells a keyword", "echo done &&"],
+    ["the same, as a file", "touch done &&"],
+    ["a loop word as an argument", "echo for &&"],
+  ]) {
+    const d = pre(`${prefix} ${MERGE}`, A);
+    assert.doesNotMatch(d.reason, /could not tell which tree/, `${how}: \`${prefix} ${MERGE}\` — ${d.reason}`);
+    assert.equal(d.action, plain.action, `${how}: the verdict moved because of a word in an argument — ${d.reason}`);
   }
 });
 
