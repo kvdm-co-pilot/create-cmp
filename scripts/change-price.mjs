@@ -21,6 +21,12 @@
 // LITTLE proof and NOTHING refuses too much: over-proof produces green receipts
 // and burns only wall-clock, which no receipt records.
 //
+// AND WHICH REVIEW ROUND IS NEXT, added the night of 2026-09-18 for the same
+// reason one file over: the review rule is conditional, its condition turns on
+// what round 1's fixes were, and nothing recorded which record was a round. PART
+// 4 says what it can read and hands back what it cannot; its own header carries
+// the measured counter-example that keeps a path-based triviality rule out.
+//
 //   node scripts/change-price.mjs          the block below, for this tree
 //   node scripts/change-price.mjs --json   the same facts, as data
 //
@@ -72,7 +78,7 @@ import { fileURLToPath } from "node:url";
 // The branch is read through `currentBranch()` and never spelled here: the two
 // spellings disagree on a detached HEAD, which is where CI runs
 // (test/the-current-branch-is-read-two-ways.test.mjs).
-import { obligation, changedPaths, currentBranch, read } from "./proof-plan.mjs";
+import { obligation, changedPaths, currentBranch, read, REVIEW_KINDS } from "./proof-plan.mjs";
 import { historyPath, readHistory } from "./lib/proof-history.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -428,7 +434,9 @@ export const CEREMONY = Object.freeze([
     direct: 'one round on the diff. Whether a second is owed is a judgement about round 1\'s fixes ("more than trivial"), and there is no third',
     brief: "the same — the lane does not change how many rounds a slice gets",
     cite: "docs/KNOWN-DEFECTS.md (its header is the rule of record; this points at it rather than restating it)",
-    note: () => "this cannot know whether the fixes from round 1 were more than trivial, because nothing records it, and it does not guess",
+    note: () =>
+      "this cannot know whether the fixes from round 1 were more than trivial, because nothing records it, and it does not guess. " +
+      "What it CAN read is in the `round` block below: which round is next, the literal command that round has to read, and whether it is owed — where the records cannot settle that, the block says OWED rather than picking.",
   }),
   Object.freeze({
     item: "kept plant",
@@ -501,14 +509,23 @@ const stamp = (iso) => {
  * one answer. The second is counted as `undated` and reported, because every row
  * lost that way makes the spend look SMALLER, and understating spend is the one
  * direction a program written against over-proof cannot afford to be wrong in.
+ *
+ * THE ROWS COME BACK, NOT ONLY THE COUNT, and `recorded` is their length rather
+ * than a separately computed number. `nextRound` below needs the commit each
+ * record was written at, and a second walk of the same file under a second
+ * filter would be a second attribution rule — the KD-124 shape, which is one
+ * rule spelled in two files with no shared code. They are returned IN FILE
+ * ORDER, which is chronological by construction: `appendHistory` appends one
+ * line per write and nothing rewrites the file.
  */
 export function attribute(history, { branch, openedAt = null }) {
-  if (!history?.exists) return { recorded: null, byBranchOnly: false, undated: 0 };
+  if (!history?.exists) return { recorded: null, rows: [], byBranchOnly: false, undated: 0 };
   const rows = (history.rows ?? []).filter((r) => r && r.branch === branch);
   const from = stamp(openedAt);
-  if (from === null) return { recorded: rows.length, byBranchOnly: true, undated: 0 };
+  if (from === null) return { recorded: rows.length, rows, byBranchOnly: true, undated: 0 };
   const dated = rows.filter((r) => stamp(r.ranAt) !== null);
-  return { recorded: dated.filter((r) => stamp(r.ranAt) >= from).length, byBranchOnly: false, undated: rows.length - dated.length };
+  const mine = dated.filter((r) => stamp(r.ranAt) >= from);
+  return { recorded: mine.length, rows: mine, byBranchOnly: false, undated: rows.length - dated.length };
 }
 
 /**
@@ -528,10 +545,21 @@ function suiteOwed(plan, commits, dirty) {
   return { owed: perCommit, how: "owed count: no plan on this branch declares a suite cadence, so per-commit is ASSUMED — this is what a declared plan would have said, not what one did." };
 }
 
-/** Why the review row's count is not the unit docs/KNOWN-DEFECTS.md's rule is about. */
+/**
+ * Why the review row's count is not the unit docs/KNOWN-DEFECTS.md's rule is
+ * about.
+ *
+ * ITS LAST SENTENCE USED TO BE THE REASON AND IS NOW THE POINTER. It read
+ * "nothing here records which of these rows was a round", which was true of the
+ * tree until `--record-review` grew `--round` and `--kind` in this same slice —
+ * and a sentence a reader checks their own records against is the worst place
+ * for a fact that has stopped being one. What is unchanged is the COUNT: this
+ * row counts every row, re-records included, so it is still an upper bound. What
+ * changed is that a row can now say, and the `round` block below reads it.
+ */
 const REVIEW_IS_RECORDS =
   "records are not rounds, so this count is an UPPER BOUND on rounds and is never called over: proof-plan REOPENS the review obligation whenever a trigger path moves after a record, and every --record-review appends a row, " +
-  "so a slice that took exactly two rounds with one post-review fix in between holds three. The rule about ROUNDS — two, and no third — is docs/KNOWN-DEFECTS.md's header, and nothing here records which of these rows was a round.";
+  "so a slice that took exactly two rounds with one post-review fix in between holds three. The rule about ROUNDS — two, and no third — is docs/KNOWN-DEFECTS.md's header. This row counts every record; which of them SAY they are a round is read in the round block, and a row that says nothing is counted here anyway.";
 
 /**
  * ONE VERDICT RULE, APPLIED TO EVERY ROW. There were three, and they gave one
@@ -607,6 +635,231 @@ export const SPEND_LIMIT =
   "The only defence against the rest is the owes block above, read BEFORE the work.";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PART 4 — THE NEXT REVIEW ROUND: WHICH ONE, WHAT IT READS, WHETHER IT IS OWED
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * THE DEFECT THIS PART CLOSES, and the one it refuses to close by guessing.
+ *
+ * The `owes` review row above says a second round turns on a judgement about
+ * round 1's fixes and that this program does not make it. That was the whole
+ * answer until 2026-09-18, and it left two things unsaid that cost more than the
+ * judgement would have:
+ *
+ *   WHICH ROUND IS NEXT. `--record-review` appends a row per call and a
+ *   re-record after a rebase (ADR-0014 rebinds a record to the merging bytes)
+ *   was indistinguishable from a fresh cold read, so nothing could count rounds
+ *   — REVIEW_IS_RECORDS above says exactly that, out loud. `recordReview` now
+ *   takes `round` and `kind` (scripts/proof-plan.mjs, REVIEW_KINDS), and this
+ *   reads them. Absent means UNKNOWN and resolves the expensive way.
+ *
+ *   WHAT THAT ROUND MUST READ. A later round's subject is bounded, and
+ *   docs/KNOWN-DEFECTS.md's header is where that bound is stated; this points at
+ *   it and prints the bytes. Measured 2026-09-18 on the KD-123 slice: round 1
+ *   took 6.9 minutes and round 2 took 3.6, and the only reason the second was
+ *   cheap is that a human said by hand which bytes to read. So the literal
+ *   command is printed. That half is where the time actually goes.
+ *
+ * THE RULE THAT IS NOT HERE, AND THE MEASUREMENT THAT KEEPS IT OUT. The obvious
+ * design is "if round 1's fixes touched only review-irrelevant paths, round 2 is
+ * not owed". It is wrong, and the counter-example is in this repository: commit
+ * adc947c is round 1's fix on the KD-123 slice, and it touched
+ * `agents/cmp-orchestrator.md` and `docs/KNOWN-DEFECTS.md` — both matching
+ * REVIEW_TIER_IRRELEVANT (`scripts/observed-tree.mjs`: `docs/`, `*.md`,
+ * `*.gitkeep`, `inspector/mcp/dist/`). A path rule would have said NOT OWED.
+ * Round 2 then found a BLOCKING defect in it. Two more the same way: a false
+ * justification in a code comment (KD-121) and a wrong count in a test file's
+ * header comment (KD-123). So "comment-only" and "prose-only" are not proxies
+ * for trivial either, and none of the three is implemented.
+ *
+ * REVIEW_TIER_IRRELEVANT answers "does this DIFF owe a review at all", which is
+ * a different question from "were round 1's fixes trivial" wearing the same
+ * words. It is consumed here only through `reviewState` — proof-plan's own
+ * answer over the WHOLE diff — and never applied to the delta. The delta is
+ * asked one question, and it is not about paths: is it EMPTY.
+ *
+ * WHICH MAKES THE ONE NOT-OWED CASE THE ONLY ONE IT CAN BE: round 1 required no
+ * fixes, so there is nothing for round 2 to read. Everything else is OWED, or is
+ * CANNOT TELL and therefore OWED — the asymmetry is deliberate and is Karel's
+ * call (docs/features/price-the-next-review-round.md): this advisory's errors do
+ * not cost paperwork like the lane half's do. They cost a skipped review.
+ */
+
+/** The five things this can answer, spelled once so the render and the tests read the same words. */
+export const ROUND_VERDICTS = Object.freeze({
+  owed: "OWED",
+  notOwed: "NOT OWED",
+  cannotTell: "CANNOT TELL — SO OWED",
+  capSpent: "CAP SPENT — no third round",
+  noTier: "NO ROUND — the review tier is not owed on this diff at all",
+});
+
+const ROUND_CITE = "docs/KNOWN-DEFECTS.md (its header is the rule of record; this counts against it rather than restating it)";
+
+/** A stated round number, or null. A row that says nothing says nothing — never 0, never "the first". */
+const statedRound = (r) => (Number.isInteger(r?.round) && r.round >= 1 ? r.round : null);
+/** A stated kind, or null — measured against proof-plan's vocabulary rather than a second copy of it. */
+const statedKind = (r) => (REVIEW_KINDS.includes(r?.kind) ? r.kind : null);
+
+/** The whole diff, as a command a reader can run — round 1's reading. */
+const wholeDiffCmd = (mergeBase) => `git diff ${mergeBase ?? "$(git merge-base HEAD origin/main)"}...HEAD`;
+
+/**
+ * What to read, as the commands that were actually run to price it. `dirty` adds
+ * the second half rather than being left implicit: `changedPaths` unions the
+ * range with `git status --porcelain`, so a delta this calls non-empty can be
+ * non-empty entirely in bytes nobody has committed, and a reader sent to `git
+ * diff` alone would see nothing and conclude the opposite.
+ */
+const reading = (what, cmds, dirty) => ({ what, cmds: dirty ? [...cmds, "git status --porcelain   # the uncommitted half, which the delta above counts too"] : cmds });
+
+/**
+ * Which round is next, what it must read, and whether it is owed — from the
+ * records and the tree, and from nothing else.
+ *
+ * @param {object} arg
+ * @param {string} arg.reviewState proof-plan's state for the review tier on this diff
+ * @param {{recorded: number|null, rows: object[], byBranchOnly: boolean, undated: number}} arg.attributed `attribute()`'s answer over the review history
+ * @param {Record<string, string[]|null>} arg.deltas paths changed since each record's commit; null where git could not answer
+ * @param {boolean} arg.dirty whether anything is uncommitted
+ * @param {string|null} arg.mergeBase this branch's merge-base with origin/main, for the round-1 command
+ */
+export function nextRound({ reviewState, attributed = { recorded: null, rows: [], byBranchOnly: false, undated: 0 }, deltas = {}, dirty = false, mergeBase = null }) {
+  const rows = attributed.rows ?? [];
+  const undated = attributed.undated ?? 0;
+  const V = ROUND_VERDICTS;
+  const base = {
+    cite: ROUND_CITE,
+    records: { attributed: attributed.recorded, stating: rows.filter((r) => statedRound(r) !== null).length, undated, byBranchOnly: Boolean(attributed.byBranchOnly) },
+  };
+
+  // 0 — the tier itself is not owed, and that is proof-plan's answer, quoted.
+  // This block prices ROUNDS of a review; whether a review is owed at all is
+  // derived from REVIEW_TIER_IRRELEVANT over the whole diff, one program over,
+  // and re-deriving it here would be the second spelling this file's own
+  // attribution comment refuses.
+  if (reviewState === "none") {
+    return { ...base, round: null, verdict: V.noTier, headline: "no round is priced — `node scripts/proof-plan.mjs` says the review tier is NOT OWED on this diff", why: ["That answer is proof-plan's, over the whole diff, and its reason is printed there rather than restated here.", "A round is a round OF a review. Where none is owed there is no first round to be next."], read: null, settles: [] };
+  }
+
+  // 1 — proof-plan could not answer, so neither can this.
+  if (reviewState === "unknown") {
+    return { ...base, round: 1, verdict: V.cannotTell, headline: "CANNOT TELL — proof-plan could not say whether a review is owed, so this prices the first round anyway", why: ["`node scripts/proof-plan.mjs` returned no readable state for the review tier."], read: reading("the whole diff — there is nothing yet to read a delta against", [wholeDiffCmd(mergeBase)], dirty), settles: ["run `node scripts/proof-plan.mjs` and read the review line: it says NOT OWED, OWED, DISCHARGED or REOPENED, and this follows it."] };
+  }
+
+  const doubt = [];
+  if (undated) doubt.push(`${undated} record(s) on this branch carry no readable ranAt and could not be attributed, so the count below is a floor and the earliest record this could anchor on may not be the earliest that exists.`);
+  if (attributed.byBranchOnly) doubt.push('no plan is declared for this branch, so records are attributed by branch name alone and may span two slices — `node scripts/proof-plan.mjs --open "<what you are building>"` bounds them.');
+
+  // 2 — nothing is attributed to this slice: round 1 is what is next, and the
+  // whole diff is what it reads. A DISCHARGED tier with no attributable record
+  // is a contradiction rather than a zero, and is not counted as one.
+  if (!rows.length) {
+    const stale = reviewState === "discharged" || reviewState === "reopened";
+    return {
+      ...base,
+      round: 1,
+      verdict: stale || doubt.length ? V.cannotTell : V.owed,
+      headline: stale ? `ROUND 1 — but proof-plan says the review tier is ${reviewState.toUpperCase()} while no record here belongs to this slice` : "ROUND 1 — nothing has read this diff yet",
+      why: [
+        attributed.recorded === null ? "no review history file exists, so no record can be attributed to this slice." : `${attributed.recorded} record(s) are attributed to this slice.`,
+        ...(stale ? [`A record discharged or reopened these bytes, and none of the rows on this branch fall inside this slice — the two disagree, and this counts from zero rather than assuming a round it cannot see.`] : []),
+        ...doubt,
+      ],
+      read: reading("the whole diff — round 1 reads all of it", [wholeDiffCmd(mergeBase)], dirty),
+      settles: stale || doubt.length ? ["record the next review with `--round <n>`, and the rows after it can be counted rather than bounded."] : [],
+    };
+  }
+
+  // WHICH RECORD ROUND 2 READS FROM. The rows that SAY they are round 1 if any
+  // say anything, else all of them; the first in file order, which is the
+  // earliest written. Earliest is the conservative pick on purpose — an earlier
+  // anchor spans more bytes, and every byte it adds is one round 2 was going to
+  // be told to read anyway. A later one could hide round 1's own fixes.
+  const firsts = rows.filter((r) => statedRound(r) === 1);
+  const anchor = (firsts.length ? firsts : rows)[0];
+  const sha = anchor?.commit ?? null;
+  const delta = sha ? (deltas[sha] ?? null) : null;
+  const shortSha = sha ? String(sha).slice(0, 7) : null;
+  const deltaRead = reading(
+    `the delta since ${shortSha ?? "round 1's record"} — the record ${firsts.length ? "that says it is round 1" : "written first on this slice"}, not the whole diff again`,
+    [`git diff ${sha ?? "<the commit of round 1's record>"}..HEAD`],
+    dirty,
+  );
+
+  // 3 — the cap. A row saying `round: 2` attests that a second round happened
+  // whether it was a fresh read or a re-confirmation of one, so the highest
+  // STATED round decides this and an unstated row cannot lower it — an unread
+  // row can only add rounds, never subtract one.
+  const maxStated = rows.reduce((m, r) => Math.max(m, statedRound(r) ?? 0), 0);
+  if (maxStated >= 2) {
+    return {
+      ...base,
+      round: null,
+      verdict: V.capSpent,
+      headline: `CAP SPENT — a record on this slice states round ${maxStated}`,
+      why: [
+        `${rows.length} record(s) attributed here, the highest stating round ${maxStated}.`,
+        "A third round is not the remedy for whatever round 2 left open; docs/KNOWN-DEFECTS.md's header says what is, and its own file is where it goes.",
+        ...doubt,
+      ],
+      read: null,
+      settles: [],
+    };
+  }
+
+  // 4 — THE ONE NOT-OWED CASE. Nothing has changed since the anchor record, so
+  // round 1 required no fixes and round 2 has nothing to read. It is a fact
+  // about the SIZE of the delta and never about what is in it: see the header
+  // of this part, and adc947c.
+  if (Array.isArray(delta) && delta.length === 0 && !undated) {
+    const undischarged = reviewState === "owed" || reviewState === "reopened";
+    return {
+      ...base,
+      round: null,
+      verdict: V.notOwed,
+      headline: "NOT OWED — nothing has changed since the review record, so a further round has nothing to read",
+      why: [
+        `${deltaRead.cmds[0]} came back empty${dirty ? ", and the working tree adds nothing either" : " and the working tree is clean"}.`,
+        "Round 1 required no fixes. This is the only ground on which this block says NOT OWED, and it is the size of the delta rather than anything about the paths in it.",
+        ...(undischarged ? [`proof-plan still reports the review tier ${reviewState.toUpperCase()} — that is a RECORD owed for these bytes (\`--record-review\`, then \`--discharge-review\`), which is not another round.`] : []),
+        ...doubt,
+      ],
+      read: deltaRead,
+      settles: [],
+    };
+  }
+
+  // 5 — round 2, owed. Which of the two ways it is owed depends on whether the
+  // records can be counted at all, and the difference is stated rather than
+  // averaged: a reader who is told CANNOT TELL can go and make it tellable.
+  const unstated = rows.filter((r) => statedRound(r) === null).length;
+  const rerecords = rows.filter((r) => statedKind(r) === "rerecord").length;
+  const why = [];
+  if (maxStated === 1) why.push(`${rows.length} record(s) attributed to this slice, the highest stating round 1${rerecords ? `, of which ${rerecords} say they are a re-record rather than a round` : ""}.`);
+  else why.push(`${rows.length} record(s) attributed to this slice, and none says which round it is — so at least one round has happened and this is an upper bound of ${rows.length}, not a count.`);
+  if (delta === null) why.push(sha ? `\`git diff ${sha}..HEAD\` could not be read — the commit may not survive in this tree, which a rebase makes ordinary — so the delta is unknown and unknown is owed.` : "the record carries no commit, so there is no floor to measure a delta from.");
+  else why.push(`${delta.length} path(s) have changed since ${shortSha}, so there is something for round 2 to read.`);
+  why.push(...doubt);
+
+  const tellable = maxStated === 1 && !unstated && !doubt.length && Array.isArray(delta);
+  const settles = [];
+  if (unstated || !maxStated) settles.push("record each review with `--round <n>` and, where it is a re-confirmation rather than a read, `--kind rerecord` — with those, this counts rounds instead of bounding them.");
+  if (delta === null) settles.push(sha ? `make the anchor commit readable (\`git cat-file -e ${sha}\`), or record the next round on a commit this tree has.` : "a record with a commit — `recordReview` writes one whenever git can answer.");
+  if (doubt.length) settles.push('a declared plan and dated rows bound the attribution: `node scripts/proof-plan.mjs --open "<what you are building>"`.');
+
+  return {
+    ...base,
+    round: 2,
+    verdict: tellable ? V.owed : V.cannotTell,
+    headline: tellable ? "ROUND 2 — owed, and it reads the delta rather than the diff" : "ROUND 2 — the records cannot settle whether it is owed, so it is",
+    why,
+    read: deltaRead,
+    settles,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // THE MODEL, AND THE TWO WAYS IT IS PRINTED
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -629,11 +882,20 @@ export function observe({ root = REPO_ROOT } = {}) {
       return [kind, { file: path.relative(root, file), exists: fs.existsSync(file), ...readHistory(file) }];
     }),
   );
-  return { branch, paths, subjects, dirty, o, histories };
+  // WHAT HAS CHANGED SINCE EACH REVIEW RECORD THIS SLICE OWNS. Read here, where
+  // everything else this program reads is read, so `price` stays pure and a test
+  // can drive every branch of PART 4 without a repository in a state. The rows
+  // come from `attribute` rather than a filter written for this — one
+  // attribution rule, called twice — and `changedPaths(sha)` is proof-plan's own
+  // union of the range with the working tree, called with a different floor.
+  const reviews = attribute(histories.reviews, { branch, openedAt: o?.plan?.openedAt ?? null });
+  const deltas = {};
+  for (const sha of new Set((reviews.rows ?? []).map((r) => r?.commit).filter(Boolean))) deltas[sha] = changedPaths(sha);
+  return { branch, paths, subjects, dirty, o, histories, deltas, mergeBase: base.status === 0 ? base.stdout.trim() : null };
 }
 
 /** The whole answer, from those observations — pure, so a test can drive every branch of it. */
-export function price({ branch, paths, subjects, dirty, o, histories }) {
+export function price({ branch, paths, subjects, dirty, o, histories, deltas = {}, mergeBase = null }) {
   const { types, commits, ...lane } = laneOf(paths, subjects);
   const device = o?.state ?? "unknown";
   const review = o?.review?.state ?? "unknown";
@@ -656,6 +918,15 @@ export function price({ branch, paths, subjects, dirty, o, histories }) {
     diff: { paths: paths === null ? null : paths.length, commits, dirty, types },
     lane,
     owes: priceable ? owesFor(lane.lane, { paths: paths ?? [], device, review }) : [],
+    round: priceable
+      ? nextRound({
+          reviewState: review,
+          attributed: attribute(histories.reviews, { branch, openedAt: plan?.openedAt ?? null }),
+          deltas,
+          dirty: Boolean(dirty),
+          mergeBase,
+        })
+      : null,
     spent: priceable ? spendOf({ branch, plan, device, review, commits: commits ?? 0, dirty: Boolean(dirty), histories }) : [],
   };
 }
@@ -687,7 +958,7 @@ function row(indent, label, width, text) {
 
 export function render(m) {
   const L = [];
-  L.push("change price — which lane this change is on, what it owes, and what it already cost");
+  L.push("change price — which lane this change is on, what it owes, which review round is next, and what it already cost");
   L.push("ADVISORY: this refuses nothing, gates nothing, and exits 0 on every path. The header says why.");
   L.push("");
   L.push(`  ${"branch".padEnd(9)}${m.branch || "(detached)"}`);
@@ -720,6 +991,19 @@ export function render(m) {
       if (r.note) L.push(...at(10, r.note));
       L.push(...at(10, `— ${r.cite}`));
     }
+  }
+
+  if (m.round) {
+    L.push("");
+    L.push(...row("  ", "round", 9, m.round.headline));
+    L.push(...at(6, `verdict: ${m.round.verdict}`));
+    for (const w of m.round.why) L.push(...at(6, w));
+    if (m.round.read) {
+      L.push(...at(6, `reads: ${m.round.read.what}`));
+      for (const c of m.round.read.cmds) L.push(`          ${c}`);
+    }
+    for (const settle of m.round.settles) L.push(...at(6, `what would settle it: ${settle}`));
+    L.push(...at(6, `cite: ${m.round.cite}`));
   }
 
   if (m.spent.length) {

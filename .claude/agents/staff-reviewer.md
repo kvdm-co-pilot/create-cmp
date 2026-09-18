@@ -115,9 +115,18 @@ skipped, and a skipped reviewer finds nothing.
 Karel, 2026-09-09: *"gating its existence, never its content"*. Do not hand-write it:
 
 ```
-node scripts/proof-plan.mjs --record-review --tests "<names you added>" --decisions "<handed up>"
-node scripts/proof-plan.mjs --record-review --nothing-found        # the common case
+node scripts/proof-plan.mjs --record-review --round <n> --tests "<names you added>" --decisions "<handed up>"
+node scripts/proof-plan.mjs --record-review --round <n> --nothing-found                 # the common case
+node scripts/proof-plan.mjs --record-review --round <n> --kind rerecord --nothing-found # re-confirming bytes that moved
 ```
+
+**Say which round you are.** `--round <n>` is the round whose reading this record attests, and
+`--kind rerecord` marks a row that re-confirms moved bytes instead of reading a diff — what
+separates them, and what each is for, is the header of `docs/KNOWN-DEFECTS.md`. Your brief says
+which you are; if it does not, ask, and do not pick a number. Leave them off and the row cannot
+be counted: `node scripts/change-price.mjs` then prices the next round OWED on the ground that
+it cannot tell, which buys a review nobody needed. A wrong number is worse — it buys one nobody
+gets.
 
 **The tree hash is computed, never accepted from you.** A record whose hash came from its author
 is a claim, and this product refuses that shape — so a hand-written record is refused, and the

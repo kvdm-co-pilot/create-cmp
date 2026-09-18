@@ -295,7 +295,7 @@ obligation accrues until the slice closes.
 node scripts/proof-plan.mjs --open "<what you are building>"   # before the work
 node scripts/proof-plan.mjs                                    # what is owed, and WHEN
 node scripts/proof-plan.mjs --discharge                        # after the run, read from its record
-node scripts/proof-plan.mjs --record-review                    # the reviewer's own output, bound to this tree
+node scripts/proof-plan.mjs --record-review --round <n>        # the reviewer's own output, bound to this tree
 node scripts/proof-plan.mjs --discharge-review                 # after the review, read from its record
 node scripts/proof-plan.mjs --close                            # refuses if anything is owed
 node scripts/proof-plan.mjs --history                          # what settled slices cost, read from the kept records
