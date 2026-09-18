@@ -162,13 +162,13 @@ you the same list without opening anything.
 | **KD-103** | the list operator that decides whether a `cd` runs — an `&&`/`\|\|` guard, a pipeline, a backgrounded list, `!` — is not read: 26 of 108 generated shapes resolve a tree the shell would not use | fail-open, and no producer: each needs a mixed `&&`/`;` list whose guard fails at runtime, a `cd` as a pipeline element, or a backgrounded AND-list in front of the gated command |
 | **KD-104** | a gated command inside `sh -c '…'` is refused when anything stands in front of it INSIDE the quote, and judged at the payload's cwd when nothing does | a refusal in the first shape, sentence now true of it, remedy in the command; the second lands on the right tree — a nested shell with no `cd` inherits the cwd |
 | **KD-106** | `{}` as an ARGUMENT is read as a brace group, because its own `{` is the separator its `}` needs — `find … -exec rm {} \; && gh pr merge` is refused | a refusal, only the agent is refused, the sentence names `{ }` and it IS in the command; no producer — no merge, publish or fleet-check here is typed behind a `find -exec`/`xargs -I` |
-| **KD-107** | the two readers still spell "a command position" differently, now the other way: `COMPOUND` knows `!`, `command`, `builtin` and redirections, `WATCHED` does not — so `timeout 300 gh pr merge` is not classified as a merge and the gate is SILENT | fail-open at the classifier, unchanged from `main` — `invocation()` is not edited by this slice; no producer: a merge here is typed `gh pr merge --rebase --delete-branch`, and `time`/`env`/`sudo`/`nohup`/`VAR=x` in front of one ARE classified |
 | **KD-108** | a refusal quotes the MASKED scope, not what was typed, so a quoted `cd` destination vanishes from the sentence — `cd "$HOME" && gh pr merge` is refused with the evidence `(cd)` | the refusal and its direction are right; only the parenthetical is emptier than it reads, and the remedy is still the operand in front of the user |
 | **KD-109** | the third of KD-89's three failures never reproduced — and `applyConsoleCopy`'s bare `catch {}` still re-narrates ANY profile load error, a missing module included, as "this project declares no console copy" | the door refuses an uninstalled tree before any of the three runs, so the misattribution cannot reach a contributor whatever the third's trigger was; the fallback itself is deliberate — a page load must not crash on an unreadable profile |
 | **KD-110** | the preflight is npm's `pretest`, so it guards `npm test`, `prepublishOnly` and CI — and not `node --test <file>`, which is how a contributor or an agent narrows to one file | the defect KD-89 recorded is a FIRST impression of the documented command, and that command is refused by name; someone running one file directly has already chosen the narrower instrument |
 | **KD-111** | `installedFrom` is npm's layout — a Yarn PnP checkout has no `node_modules` at all, so every declared dependency reads missing and a working tree is refused | no producer: this repo declares npm (`package-lock.json`, npm `workspaces`, `npm ci` in CI) and no other lockfile is in the tree; the failure is a loud refusal naming a command, never a silent pass |
 | **KD-112** | the door has no bypass, so every way it can be wrong ends in a correctly installed tree that cannot run its suite at all — a named `PROOFLANE_SKIP_PREFLIGHT=1` would bound the class at one line | a product decision, handed up rather than taken: the population is empty today (KD-111 has no producer, and the one real divergence found in review is fixed), and an escape hatch is how a guard becomes optional |
 | **KD-113** | the two readers spell a NAMELESS workspace's name differently — npm synthesizes the directory basename (`noname`), the door falls back to the rel path (`ws/noname`) — and the landed invariant test uses that name as the set's identity | measured over twelve layouts, the only divergence left and the only one that is a LABEL rather than a member: coverage, refusal and remedy are identical. No producer — every package this repo declares names itself — and the first one that does not reds the invariant test for a reason that is not the defect it is about |
+| **KD-109** | the closed wrapper list KD-107 landed does not read through five further shapes — `bash -lc "gh pr merge"`, `{ gh pr merge; }`, `ssh host '…'`, `watch -n 5 …`, and a wrapper carrying more than two bare operands (`sudo -u me -g grp extra …`) | fail-open at the classifier, and the residue the closed list names out loud rather than guessing at (docs/GATE-RULES.md, Rule 4); no producer — a merge here is typed `gh pr merge --rebase --delete-branch`, bare or behind a `cd` |
 
 ---
 
@@ -1844,44 +1844,6 @@ the reader would need to see that `{}` is one word — which is a tokenizer, not
 next spelling of this class (`{};`, `{}\;`) arrives with it. *Logged 2026-09-18, at the re-record of
 review round 2 (KD-79's slice); the placement call is the reviewer's and the header's second row.*
 
-### KD-107 — the two readers agree in one direction, and the other direction is where the gate goes silent
-
-`scripts/hooks/proof-gate.mjs` (`COMPOUND` vs `invocation`)
-
-KD-105 was *the two readers in this file do not mean the same thing by a command position*, and the
-fix gave `COMPOUND` a wrapper run of its own. It is a second literal spelling, not the shared
-declaration KD-105's entry proposed, and it is not the same list: `COMPOUND` carries
-`!|nohup|time|env|caffeinate|sudo|command|builtin` plus `\d*[<>]+\S*` redirections, `invocation()`
-carries `nohup|time|env|caffeinate|sudo` and nothing else. So the two still answer differently — now
-with `COMPOUND` the wider one, which is the safe direction FOR COMPOUND and the unsafe one for the
-reader that decides whether this gate runs at all.
-
-Measured 2026-09-18 at `7bc38dd`, by feeding the hook a real `PreToolUse` payload on this worktree:
-
-    gh pr merge 1 --rebase               deny
-    time gh pr merge 1 --rebase          deny
-    ! gh pr merge 1 --rebase             SILENT — classify() returns null, no gate runs
-    command gh pr merge 1 --rebase       SILENT
-    2>/dev/null gh pr merge 1 --rebase   SILENT
-    timeout 300 gh pr merge 1 --rebase   SILENT
-
-`classify()` returning null makes the hook `return` before any verdict, so these merge without the
-proof gate having an opinion — a fail-open at the door rather than in the tree-reading this slice is
-about. It is also why the comment above `COMPOUND` still cannot be read literally: it says *the same
-rule `WATCHED` uses*, which is what `168187f`'s comment said and what KD-105 was written about, and it
-is no truer now, only untrue in the opposite direction.
-
-**Direction: fail-open, and UNCHANGED FROM `main`** — `invocation()` is byte-identical on `main` and
-on this branch; nothing in this slice widened or narrowed it, and merging changes nothing about which
-commands reach the gate. **No producer:** every merge, publish and fleet-check in this repository is
-typed bare or behind a `cd`, and the four wrappers that a human or an agent plausibly writes in front
-of a long command — `time`, `env`, `sudo`, `nohup` — plus `VAR=x` assignments are all classified
-today. **The fix is one declaration, not two lists:** export the command-position prefix once and let
-both readers spell it from that, which is the invariant KD-105's closed entry already names and the
-only thing that stops this pair drifting a third time. *Logged 2026-09-18, at the re-record of review
-round 2 (KD-79's slice). The placement call is the reviewer's: it is a fail-open, and it blocks
-nothing only because merging is not what introduces it.*
-
 ### KD-108 — the refusal's evidence is read from the masked scope, so a quoted destination is not in it
 
 `scripts/hooks/proof-gate.mjs` (`commandCwd`, the `cd`-not-literal branch)
@@ -2047,6 +2009,35 @@ decides whether the oracle compares `rel` and the name is display-only, or the f
 *Logged 2026-09-18, review round 2 (the re-record) of the slice that closed KD-89. Measured by
 execution over twelve layouts against `npm pkg get name --workspaces`; not landed as a test, because
 this slice's two rounds are spent and nobody is wrongly served by it.*
+### KD-109 — what the closed wrapper list does not read through, named rather than guessed at
+
+`scripts/hooks/proof-gate.mjs` (`COMMAND_PREFIX`)
+
+KD-107's fix makes the accepted command-position prefix a CLOSED list: a separator, then any run of
+`VAR=value` assignments, redirections, and thirteen wrapper words each carrying its own options and
+at most two bare operands. A word the list does not know ends the run and is read as the command
+itself. That is the right direction for a reader over raw text — a run that walked across an unknown
+word would read the `gh pr merge` inside `time git commit -m "then gh pr merge"` as a merge — but it
+leaves a residue, and the residue is a fail-open, so it is named here rather than inferred from the
+regex. Measured 2026-09-18 by importing `classify` on this tree:
+
+    bash -lc "gh pr merge 1"                 null   — the `-c` boundary is spelled `-c`, and `-lc` is not it
+    { gh pr merge 1; }                       null   — `{` is a separator to COMPOUND, not to the raw reader
+    ssh host "gh pr merge 1"                 null   — the command runs on another machine's shell
+    watch -n 5 gh pr merge 1                 null   — `watch` is not on the list
+    sudo -u me -g grp extra gh pr merge 1    null   — flags then TWO bare operands; this is three
+
+**Direction: fail-open at the classifier**, the same class as KD-107 and without KD-107's producers:
+`!` and `timeout N` are things an agent types, and these are not. Every merge, publish and fleet
+check in this repository is typed bare or behind a `cd`, nothing here runs a gated act over `ssh` or
+under `watch`, and `sudo` in front of one would already be unusual. **The fix for the first four is
+one list entry each and the fifth is a quantifier**, which is exactly why they are not taken now: a
+list widened without a shell to check it against is how KD-105 and KD-107 happened, and each of
+these wants its own row in the `/bin/sh` sweep, where the shell says whether the shape really
+invokes anything. `{ gh pr merge; }` is the one with a genuine argument against fixing it: making
+`{` a separator for the RAW reader turns `git commit -m "{gh pr merge}"` into a merge, because that
+reader runs before quoted spans are blanked — KD-64's mistake in a new costume. *Logged 2026-09-18,
+by the slice that closed KD-107, from the probe that measured its own fix.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
