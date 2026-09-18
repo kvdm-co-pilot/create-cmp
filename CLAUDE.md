@@ -6,6 +6,8 @@ The rules that are programs, and which program — ask these, not a document:
 
 - what this slice owes and **when**: `node scripts/proof-plan.mjs` (GATE-RULES Rule 4), enforced by
   `.claude/settings.json` → `scripts/hooks/proof-gate.mjs`. If it refuses you, it is right.
+- which **lane** this change is on, and what that lane therefore owes:
+  `node scripts/change-price.mjs` (docs/CHANGE-FLOW-DESIGN.md §3). Advisory — it refuses nothing.
 - the lane returns both ways: `node scripts/framework-check.mjs`
 - a stage's exit: `node scripts/stage-gate.mjs`
 - counts and versions: `node scripts/ground-truth.mjs`, never by hand
