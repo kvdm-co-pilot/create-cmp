@@ -158,6 +158,14 @@ function cwdRelativeWalkSurfaces(settings) {
  */
 function anchoredWalkSurfaces(settings) {
   const carries = (entry) => String(entry?.command ?? "").includes(PROJECT_DIR_ANCHOR);
+  // Carrying the anchor is not the same as the WALK's own path carrying it. The
+  // template anchors its hook twice, so a hand-upgrade that anchors the `test -f`
+  // and leaves `node qa/walk-status.mjs` relative contains the anchor and resolves
+  // nowhere — and an anchor on an unrelated path, or inside quoted narration, does
+  // the same. Whatever the detector calls cwd-relative is therefore subtracted
+  // here, so these two lists cannot both name one surface. A surface in both would
+  // be this program disagreeing with itself, whichever half is right.
+  const inert = cwdRelativeWalkSurfaces(settings);
   const out = [];
   if (ANCHORABLE_SURFACES.statusLine === true && invokesWalk(settings?.statusLine) && carries(settings.statusLine)) {
     out.push("statusLine");
@@ -168,7 +176,7 @@ function anchoredWalkSurfaces(settings) {
   if (ANCHORABLE_SURFACES.hooks === true && invocations.length > 0 && invocations.every(carries)) {
     out.push("UserPromptSubmit");
   }
-  return out;
+  return out.filter((s) => !inert.includes(s));
 }
 
 /**
