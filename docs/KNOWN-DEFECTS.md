@@ -2591,35 +2591,6 @@ an entry whose central claim was false.*
 
 ### KD-161 — the round block asks whether the delta is empty, where the rule asks whether there were FIXES
 
-*Closed 2026-09-18 by the publish itself. The entry is kept whole above because its reasoning —
-that a registry description is a property of published bytes and no commit here can change one —
-is the record, and it is the same shape as every other artifact this repo cannot reach from a
-commit.*
-
-### KD-134 — the version deriver names three surfaces where a bump must move four
-
-`scripts/ground-truth.mjs` · `package-lock.json`
-
-`CLAUDE.md` says to ask the programs, not a document, and names `ground-truth.mjs` for "counts and
-versions, never by hand". It reports the spine as `cli / plugin / marketplace`. A version bump must
-actually move **four** surfaces: those three plus `package-lock.json`, which records the root
-manifest's own version in two places.
-
-**Measured on this slice.** Bumping 0.26.4 → 0.26.5 across the three the deriver names left the
-suite red: `actual: '0.26.4', expected: '0.26.5'`. The author had read the deriver, moved exactly
-what it listed, and was still wrong.
-
-**Nobody is wrongly served, and that is why it is logged.** `test/workspace-lock-sync.test.mjs`
-refuses the drift by name with the remedy printed, so the lockfile cannot ship stale. The lock is
-also genuinely derived state, which is a fair reason for a *count* deriver not to list it as a
-package.
-
-**What is logged is narrower and worse:** "which surfaces must move together" is not derived
-anywhere, and the program that exists so nobody hand-counts this answers with three of four. A
-reader who trusts it exactly as `CLAUDE.md` instructs is handed an incomplete answer and finds out
-from a test. That is the drift `ground-truth.mjs` was written to abolish, in the deriver itself.
-
-*Logged 2026-09-19, review round 1 of the packaging slice — by the reviewer, about the author.*
 `scripts/change-price.mjs` (`nextRound`) · the rule is `docs/KNOWN-DEFECTS.md`'s header
 
 The header conditions round 2 on one thing: **round 1's fixes were more than trivial.** The block
@@ -2654,6 +2625,31 @@ answered the round — a fact nothing captures today, and the same shape as the 
 this slice just closed one level up.
 
 *Logged 2026-09-19, from the first real use of the program it is about.*
+
+### KD-134 — the version deriver names three surfaces where a bump must move four
+
+`scripts/ground-truth.mjs` · `package-lock.json`
+
+`CLAUDE.md` says to ask the programs, not a document, and names `ground-truth.mjs` for "counts and
+versions, never by hand". It reports the spine as `cli / plugin / marketplace`. A version bump must
+actually move **four** surfaces: those three plus `package-lock.json`, which records the root
+manifest's own version in two places.
+
+**Measured on this slice.** Bumping 0.26.4 → 0.26.5 across the three the deriver names left the
+suite red: `actual: '0.26.4', expected: '0.26.5'`. The author had read the deriver, moved exactly
+what it listed, and was still wrong.
+
+**Nobody is wrongly served, and that is why it is logged.** `test/workspace-lock-sync.test.mjs`
+refuses the drift by name with the remedy printed, so the lockfile cannot ship stale. The lock is
+also genuinely derived state, which is a fair reason for a *count* deriver not to list it as a
+package.
+
+**What is logged is narrower and worse:** "which surfaces must move together" is not derived
+anywhere, and the program that exists so nobody hand-counts this answers with three of four. A
+reader who trusts it exactly as `CLAUDE.md` instructs is handed an incomplete answer and finds out
+from a test. That is the drift `ground-truth.mjs` was written to abolish, in the deriver itself.
+
+*Logged 2026-09-19, review round 1 of the packaging slice — by the reviewer, about the author.*
 
 ### KD-162 — the class-of-one sweep assumes its conclusion for two directories
 
