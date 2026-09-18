@@ -130,6 +130,7 @@ you the same list without opening anything.
 | **KD-69** | three fields of the attestation shape the gate documents are read by nothing — `schema`, `artifact.kind`, and whether `receipt` is there at all | ADR-0007: nothing routes on `schema`; the other two fail loud in criterion B |
 | **KD-70** | a `file.mjs:NNN` citation goes stale the moment anything is inserted above it, and nothing checks one | 154 in the tree; three went stale in one slice; all of them are in comments and logs, none in a surface an adopter reads |
 | **KD-71** | `isCalendarDay` calls every year 0001–0099 a day the calendar does not have — `Date.UTC`'s two-digit-year mapping | the refusal is right, its reason is false, and no signer types a three-leading-zero year |
+| **KD-72** | the signed attestation can be rewritten without owing or reopening a review — `REVIEW_TIER_TRIGGERS` is a code allow-list and `docs/` is not on it, but that is where this one evidence-bearing file lives | the exemption is right for prose and wrong for this file; nothing is mis-served today, and the harm needs a future edit |
 
 ---
 
@@ -1011,6 +1012,54 @@ shape-conforming non-day is still refused, so the check cannot be deleted to mak
 *Logged 2026-09-18, in the round that reviewed the `needsText` / `isCalendarDay` fix.*
 
 ## Closed
+
+### KD-72 — the one file whose CONTENT is the evidence is outside the review trigger
+
+`scripts/observed-tree.mjs` → `REVIEW_TIER_TRIGGERS`, against
+`docs/attestations/stage2-external-profile.json`
+
+Measured on this tree, while signing that attestation:
+
+```
+before the signature   review DISCHARGED — a review of this exact tree is recorded …
+edit docs/attestations/stage2-external-profile.json  (empty fields → a full signature)
+after the signature    review DISCHARGED — … and no trigger path has moved since
+```
+
+`REVIEW_TIER_TRIGGERS` is an allow-list of code paths — `src/`, `bin/`, `scripts/`, `test/`,
+`packages/`, `template/`, `inspector/`, `skills/`, `agents/`, `.github/`, and a handful of named
+root files. `docs/` is not on it, and `grep -c docs` over the list returns **0**. So a change
+confined to `docs/` never enters the hash a review is recorded against: it neither owes a review
+nor reopens one. (`REVIEW_SKIP` is a second, separate filter and skips only `.md`; it is not what
+does this — the attestation is `.json`.)
+
+That exemption is correct for what `docs/` almost entirely is. Prose restates decisions taken
+elsewhere, and gating a reviewer on a typo in a paragraph would make the review obligation fire
+constantly and mean nothing. **One file in that directory is not prose.**
+`docs/attestations/stage2-external-profile.json` is the artifact criterion A reads, and its
+CONTENT is the evidence — a name, a date, an organisation, and the disclosure paragraph a reader
+is meant to judge the claim by. Rewriting it changes what this repository asserts to an outside
+party. Today that file can go from unsigned to signed, or from one signatory to another, or have
+its `authoredBy.relationship` disclosure quietly shortened, and `proof-plan.mjs` will keep
+printing `no trigger path has moved since`.
+
+The sentence the gate prints is not false — nothing moved, by its own definition of a trigger
+path. It is narrower than a reader will assume, which is the more interesting failure and the
+harder one to notice.
+
+**Nobody is wrongly served, which is why this is logged rather than fixed.** The file is correct
+as it stands, it was read closely by the review rounds that ran over this slice, and no adopter
+is sent into a refusal or told something false today. The harm this describes needs a *future*
+edit to a signed artifact, so it sits on the second row of the line above: a real defect nobody is
+wrongly served by. Placing it on the first row would mean claiming someone is mis-served now, and
+nobody is.
+
+**What the fix would be, when it is taken:** add `docs/attestations/` — not `docs/` — to
+`REVIEW_TIER_TRIGGERS`, so the evidence-bearing directory triggers a review while prose stays
+exempt. That is a one-line change to a trigger path, which reopens the review obligation by
+construction, so it belongs to a slice that can pay for a round rather than to the slice that
+happened to notice it. Found while signing, under an explicit instruction not to reopen the
+review to record it.
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
