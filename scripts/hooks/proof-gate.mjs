@@ -95,10 +95,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
  * operand run (a wrapper now carries only what its own table entry declares), and
  * with it gone, a mutation run relaxing either of these to `\S` and `\s+` leaves
  * every test in this tree green. They are kept because they are right about the
- * shell, not because anything currently measures them; that is KD-111.
+ * shell, not because anything currently measures them; that is KD-116.
  *
  * The assignment and redirection alternatives below are `\S*` and the first
- * clause is NOT true of them — KD-110, logged with the sweep that went looking
+ * clause is NOT true of them — KD-115, logged with the sweep that went looking
  * for a consequence and could not produce one.
  */
 const IN_WORD = "[^\\s;&|()<>]";
@@ -148,7 +148,7 @@ const GAP = "[^\\S\\n]+";
  * sweeps the FIRST direction, reading the value-taking set off this table's own
  * behaviour so a letter added tomorrow arrives with a row of its own. The second
  * direction — a letter that is absent — is outside that sweep by construction and
- * is swept by nothing: KD-113.
+ * is swept by nothing: KD-118.
  *
  * **EVERY OTHER WORD ENDS THE RUN AND IS THE COMMAND.** That sentence is the
  * whole rule, and it is here because the version that guessed at it shipped both
