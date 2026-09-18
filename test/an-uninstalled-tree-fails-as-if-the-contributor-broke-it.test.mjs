@@ -77,6 +77,17 @@ function cleanEnv(extra = {}) {
  * The marker is the point — it is how "the runner never started" is observed
  * rather than inferred from an exit code.
  */
+/**
+ * Four packages nobody will ever publish, one per axis of the door's SCOPE: the
+ * root's own dependencies, a workspace's, a second entry in one package (so a
+ * refusal that names only the first is visible), and a devDependency. Each was
+ * added because a mutation of `declaredPackages` that dropped that axis left
+ * every test in this file green.
+ */
+const ROOT_DEP = "a-root-package-nobody-installed";
+const SECOND_DEP = "a-second-package-nobody-installed";
+const DEV_DEP = "a-dev-package-nobody-installed";
+
 function fixture({ dep = "a-package-nobody-installed", workspaces = ["ws"] } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-preflight-"));
   fs.mkdirSync(path.join(dir, "ws"));
@@ -90,6 +101,11 @@ function fixture({ dep = "a-package-nobody-installed", workspaces = ["ws"] } = {
         private: true,
         type: "module",
         workspaces,
+        // THE ROOT IS A PACKAGE TOO, and a fixture whose only dependencies live
+        // in a workspace cannot tell a door that walks the root from one that
+        // does not: both return the same refusal. Measured by mutation —
+        // dropping "." from `rels` left all eight tests green.
+        dependencies: { [ROOT_DEP]: "^1.0.0" },
         scripts: { pretest: `node ${JSON.stringify(DOOR)}`, test: "node ./ran.mjs" },
       },
       null,
@@ -98,7 +114,19 @@ function fixture({ dep = "a-package-nobody-installed", workspaces = ["ws"] } = {
   );
   fs.writeFileSync(
     path.join(dir, "ws", "package.json"),
-    `${JSON.stringify({ name: "@fixture/ws", version: "0.0.0", dependencies: { [dep]: "^1.0.0" } }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        name: "@fixture/ws",
+        version: "0.0.0",
+        dependencies: { [dep]: "^1.0.0", [SECOND_DEP]: "^1.0.0" },
+        // Same argument twice more: a door reading only `dependencies` and a
+        // refusal naming only the first missing package were both invisible to
+        // this fixture until it carried a devDependency and a second entry.
+        devDependencies: { [DEV_DEP]: "^1.0.0" },
+      },
+      null,
+      2,
+    )}\n`,
   );
   return dir;
 }
@@ -118,11 +146,16 @@ test("a tree whose packages are not installed is refused by name, and the runner
       "the door refused and the test script RAN ANYWAY — a refusal that does not stop the run is a log line",
     );
     // What the refusal has to say, in the words a reader can act on: which
-    // package, which dependency, and the one command. Not the shape of the
-    // sentence — three substrings, so the prose can be improved without this
-    // file becoming the place it is spelled.
-    for (const want of ["ws", "a-package-nobody-installed", "npm ci"]) {
-      assert.ok(out.includes(want), `the refusal never names ${JSON.stringify(want)}:\n${out}`);
+    // packages, which dependencies, and the one command. Substrings rather than
+    // a shape, so the prose can be improved without this file becoming the place
+    // it is spelled — but EVERY axis of the door's scope, because a refusal that
+    // silently covered one fewer of them read identically here until it did.
+    for (const want of ["ws", "a-package-nobody-installed", ROOT_DEP, SECOND_DEP, DEV_DEP, "npm ci"]) {
+      assert.ok(
+        out.includes(want),
+        `the refusal never names ${JSON.stringify(want)}, so the door is not walking it — ` +
+          `a package or a dependency field outside its scope is one it can never refuse:\n${out}`,
+      );
     }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -155,8 +188,16 @@ test("the door finds nothing on this installed tree, so it can hide no failure h
   assert.deepEqual(
     findings.map((f) => `${f.rel}: ${f.missing.join(", ")}`),
     [],
-    "the preflight reports THIS tree uninstalled while its own suite is running — " +
-      "the predicate is wrong, and on a tree it wrongly refuses nothing can run at all",
+    // THIS MESSAGE NAMES BOTH CAUSES, and the cheap one first, because this file
+    // is reachable by a direct `node --test` run that the `pretest` door does not
+    // guard — and on an uninstalled tree the true reason is the boring one. An
+    // earlier draft said only "the predicate is wrong", which is this slice's own
+    // defect committed inside the file that closes it: a message that invites the
+    // reader to suspect the code in front of them when their tree is the answer.
+    "the preflight reports THIS tree uninstalled while its own suite is running. Either this tree's " +
+      "packages are NOT installed — run `npm ci` at the repository root, which is the likely answer if " +
+      "you invoked the runner directly rather than through `npm test` — or the predicate is wrong, and " +
+      "on a tree it wrongly refuses nothing can run at all",
   );
   // Non-vacuity: an empty list is also what a predicate that inspects nothing
   // returns. These are the packages it actually walked.
@@ -183,7 +224,17 @@ test("the three files a missing workspace hurt still RUN in full, and none of th
     const m = new RegExp(`^# ${field} (\\d+)$`, "m").exec(out);
     return m ? Number(m[1]) : null;
   };
-  assert.equal(count("fail"), 0, `one of the three failed while this tree is installed:\n${out.slice(-3000)}`);
+  // Third message with the same rule. Run directly on an uninstalled tree this
+  // is the FIRST of the three to go red, and its output is the two
+  // ERR_MODULE_NOT_FOUND from KD-89 — so it must not open by asserting the tree
+  // is installed, which is precisely the claim in doubt.
+  assert.equal(
+    count("fail"),
+    0,
+    "one of the three failed. If the output below is ERR_MODULE_NOT_FOUND, this tree's packages are not " +
+      "installed — run `npm ci` at the repository root; `npm test` refuses before reaching here, so this " +
+      `is a direct runner invocation. Anything else is a real failure in those files:\n${out.slice(-3000)}`,
+  );
   assert.equal(
     count("skipped"),
     0,
@@ -240,7 +291,15 @@ test("the predicate answers about the directory it was asked about", () => {
   // package. inspector/mcp's dependencies are NOT visible from the repository
   // root and ARE visible from inspector/mcp — one predicate, two answers, which
   // is the whole reason it is a walk.
-  assert.equal(installedFrom(path.join(ROOT, "inspector", "mcp"), "esbuild"), true, "esbuild is installed for inspector/mcp");
+  // Same rule as the message above: the boring cause first. `esbuild` is
+  // inspector/mcp's devDependency, so this assertion is about the TREE before it
+  // is about the predicate, and on an uninstalled tree it is the tree.
+  assert.equal(
+    installedFrom(path.join(ROOT, "inspector", "mcp"), "esbuild"),
+    true,
+    "esbuild is not visible from inspector/mcp. Either this tree's packages are not installed — run " +
+      "`npm ci` at the repository root — or the walk is not finding a package that is there",
+  );
   assert.equal(installedFrom(ROOT, "esbuild"), false, "esbuild is NOT a root dependency — a predicate that says it is, is not walking");
   assert.equal(installedFrom(ROOT, "no-such-package-anywhere"), false, "a package nobody declared cannot be installed");
 });

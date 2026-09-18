@@ -42,6 +42,33 @@ All notable changes to this project are documented here. The format is based on
   exact risk this change exists to design against. The walk is the resolver's own directory lookup
   and nothing above it, so it cannot disagree with what an import would do.
 
+- **Two readers of one `workspaces` declaration disagreed, and the disagreement was the refusing
+  direction.** Found by review, landed as a failing test. npm resolves workspaces with
+  `@npmcli/map-workspaces`, which accepts negation, braces, `**` and character classes; the
+  preflight's first reader rejected only a misplaced `*`. So `["ws/*", "!ws/b"]` — a shape npm
+  accepts — made the door walk the package **npm had excluded** and refuse over dependencies
+  `npm ci` will never install: a correctly installed tree that can never run its suite, where the
+  single command the refusal names cannot clear it (measured end to end: `npm install` exit 0,
+  `npm ci` exit 0, `npm test` exit 1 both times, same text). `["ws/{a,b}"]` failed the other way,
+  walking **neither** package silently, which contradicted the function's own promise to decline
+  what it cannot implement. Both are now one rule: an **allow-list** — a literal path, optionally
+  with a trailing `/*` — mirroring the allow-list `declaredSuiteFiles` already applies to the
+  patterns it hands a shell. Anything else declines and the suite runs untouched. The test writes
+  the invariant rather than the `!`: *the door's package set is npm's own, or the door declines*,
+  with `npm pkg get name --workspaces` as the oracle per fixture so a hard-coded expectation cannot
+  become a third spelling of the same fact.
+
+- **The door's SCOPE was calibrated by nothing, and the file that closes KD-89 committed KD-89's own
+  defect.** Both found by review. Three mutations of the walk — dropping `devDependencies`, dropping
+  the root package, reporting only the first missing dependency — each left all eight new tests
+  green, because the fixture declared one `dependencies` entry in one workspace; it now carries a
+  root dependency, a second missing entry and a devDependency, and the refusal is asserted to name
+  every one. Separately, run through a direct `node --test` on an uninstalled tree, the new test
+  file's own loudest message read *"the predicate is wrong"* when the predicate was right and the
+  tree was simply uninstalled — the exact misattribution this slice exists to end, inside the file
+  that ends it. All three messages now name an uninstalled tree as the first candidate, with the
+  command, and say that `npm test` would have refused before reaching them.
+
 - **The preflight fails OPEN, and imports only `node:` builtins.** KD-89 named the first risk in
   the same breath as the fix — "a preflight that itself goes wrong makes every run unrunnable" — so
   anything it cannot read or does not understand prints a note and exits 0, leaving the suite to do
