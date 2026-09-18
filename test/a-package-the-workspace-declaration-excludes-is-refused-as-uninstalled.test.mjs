@@ -210,3 +210,95 @@ test("this repository's own declaration is one both readers agree on", () => {
       "about a set nobody installs",
   );
 });
+
+// THE ALLOW-LIST CONSTRAINS THE PATTERN. THE EXPANSION IS STILL A SECOND GLOB.
+//
+// `LITERAL_PATH` decides which DECLARATIONS this reader will touch, and the
+// three tests above vary the declaration against ONE fixed directory layout.
+// The divergence has two axes and the allow-list closed one: for a pattern it
+// ADMITS, `declaredPackages` expands `ws/*` with its own `readdirSync` +
+// `isDirectory()`, while npm expands the same `ws/*` with
+// `@npmcli/map-workspaces`. Two globbers, one declaration — the `!ws/b` finding
+// one axis over.
+//
+// MEASURED 2026-09-18, declaration `["ws/*"]` in every case:
+//
+//   ws/.hidden/       npm: [a]        door: [a, hidden]
+//                     npm's glob does not match a leading dot; `readdirSync`
+//                     returns it. This is the REFUSING direction: the door
+//                     counts a package npm never installs, refuses `npm test`
+//                     over its missing dependencies, and `npm ci` — the one
+//                     command the refusal names — cannot clear it.
+//   ws/linked -> ../  npm: [a, linked]  door: [a]
+//                     `entry.isDirectory()` is false for a symlink, so the door
+//                     covers LESS than it claims, silently, which
+//                     `declaredPackages`'s own docstring promises not to do.
+//
+// This is KD-44's class arriving in a second module: that entry measured the
+// same dot-entry divergence in `globMatches` and named the remedy — do not
+// re-implement the other reader's globber; either ask it or decline the input.
+const LAYOUTS = {
+  // The control. If this diverges, the fixture is wrong rather than the door.
+  "a plain directory": () => {},
+  "a dot-directory the glob does not match": (dir, write) =>
+    write("ws/.hidden/package.json", {
+      name: "@fixture/hidden",
+      version: "0.0.0",
+      dependencies: { "a-package-nobody-installed": "^1.0.0" },
+    }),
+  "a symlinked directory": (dir, write) => {
+    write("elsewhere/package.json", {
+      name: "@fixture/linked",
+      version: "0.0.0",
+      dependencies: { "a-package-nobody-installed": "^1.0.0" },
+    });
+    fs.symlinkSync(path.join(dir, "elsewhere"), path.join(dir, "ws", "linked"), "dir");
+  },
+};
+
+test("the door expands a glob the way npm expands it, or declines — the layout is the other axis", () => {
+  const divergent = [];
+  let compared = 0;
+  for (const [label, layout] of Object.entries(LAYOUTS)) {
+    const dir = fixture(["ws/*"]);
+    try {
+      const write = (rel, obj) => {
+        fs.mkdirSync(path.join(dir, path.dirname(rel)), { recursive: true });
+        fs.writeFileSync(path.join(dir, rel), `${JSON.stringify(obj, null, 2)}\n`);
+      };
+      try {
+        layout(dir, write);
+      } catch {
+        // A layout this filesystem cannot build (symlink privileges on Windows)
+        // is not evidence about the door. Every other layout still runs, and
+        // the non-vacuity guard below still has to be satisfied.
+        continue;
+      }
+      const npmNames = npmWorkspaceNames(dir);
+      const door = doorNames(dir);
+      if (door.declined) continue; // declining is the documented answer
+      compared += 1;
+      if (JSON.stringify(door.names) !== JSON.stringify(npmNames)) {
+        divergent.push(
+          `    ${label}\n` +
+            `        npm  : ${npmNames.join(", ") || "(none)"}\n` +
+            `        door : ${door.names.join(", ") || "(none)"}`,
+        );
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  assert.ok(compared >= 2, `only ${compared} layout(s) were compared — this guard would pass vacuously`);
+  assert.deepEqual(
+    divergent,
+    [],
+    `${divergent.length} directory layout(s) under a glob this reader ACCEPTS are expanded differently by ` +
+      `scripts/suite-preflight.mjs:\n${divergent.join("\n")}\n` +
+      `  The allow-list decides which PATTERNS the reader touches; it does not make the expansion npm's. A ` +
+      `dot-directory is counted here and not by npm, so the door refuses a tree npm built correctly and names ` +
+      `\`npm ci\`, which cannot clear it — the same outcome as the \`!\` pattern, one axis over. A symlinked ` +
+      `workspace is npm's and not the door's, so the door covers less than its docstring promises. Either ` +
+      `expand the way npm does, or decline.`,
+  );
+});

@@ -58,6 +58,16 @@ All notable changes to this project are documented here. The format is based on
   with `npm pkg get name --workspaces` as the oracle per fixture so a hard-coded expectation cannot
   become a third spelling of the same fact.
 
+  **A re-record found the same defect one axis over, and it is fixed too.** Constraining the
+  *pattern* says nothing about the *expansion*, and the expansion was `readdirSync` +
+  `isDirectory()` standing in for npm's globber — wrong in both directions at once. Measured:
+  `ws/.hidden/` is not a workspace to npm and the door counted it (the refusing direction again,
+  and again unclearable by `npm ci`); a symlinked `ws/linked` IS a workspace to npm and the door
+  dropped it, because `isDirectory()` is false for a symlink. The loop no longer judges: it skips
+  dot-entries, as npm's globber does, and leaves everything else to the `package.json` check the
+  next loop already performs — which is the same rule KD-44 named one module over, *do not
+  re-implement the other reader's globber*.
+
 - **The door's SCOPE was calibrated by nothing, and the file that closes KD-89 committed KD-89's own
   defect.** Both found by review. Three mutations of the walk — dropping `devDependencies`, dropping
   the root package, reporting only the first missing dependency — each left all eight new tests

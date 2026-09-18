@@ -167,8 +167,22 @@ export function declaredPackages(root = REPO_ROOT) {
       rels.push(pattern);
       continue;
     }
-    for (const entry of fs.readdirSync(path.join(root, literal), { withFileTypes: true })) {
-      if (entry.isDirectory()) rels.push(path.posix.join(literal, entry.name));
+    // THE EXPANSION IS THE SECOND AXIS, and it diverged from npm in both
+    // directions until this loop stopped asking `isDirectory()`. Measured:
+    //
+    //   ws/.hidden/     npm: [a]          door: [a, hidden]   REFUSING direction
+    //   ws/linked -> …  npm: [a, linked]  door: [a]           silent under-coverage
+    //
+    // npm's globber ignores dot-entries by default, and `isDirectory()` is FALSE
+    // for a symlinked directory that npm follows. Neither judgement belongs
+    // here: a dot-entry is not a workspace to npm, and everything else is
+    // decided by whether it holds a `package.json` — which is the same question
+    // the `rels` loop below already asks, so asking it twice with two different
+    // answers was the whole defect. This is KD-44's rule one module over: do not
+    // re-implement the other reader's globber.
+    for (const entry of fs.readdirSync(path.join(root, literal))) {
+      if (entry.startsWith(".")) continue;
+      rels.push(path.posix.join(literal, entry));
     }
   }
   const packages = [];
