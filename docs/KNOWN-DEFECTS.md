@@ -146,7 +146,6 @@ you the same list without opening anything.
 | **KD-86** | the anchoring detector judges `.mjs/.cjs/.js/.sh` only, so a hook invoking `python qa/x.py` or a bare `qa/tool` reads clean | measured against the template: every command it ships is `node` or `test -f`, so the allow-list refuses nothing that exists today |
 | **KD-87** | the anchoring detector equates *single-quoted* with *not executed*, so `sh -c '…'` / `eval '…'` read clean; and it reads each match's prefix from the UNMASKED command, so a shell-inert `'${CLAUDE_PROJECT_DIR:-.}/…'` counts as anchored | both measured by execution and bounded by `test/hook-anchoring-differential.test.mjs`; no command in either shipped settings file is in the blind spot, and the gate reds the day one is |
 | **KD-88** | "every surface that carries a command" is spelled as a two-item list (`hooks[*][*].hooks[*].command` + `statusLine.command`) in both readers, and `settings.json` executes more than that — `apiKeyHelper`, `awsAuthRefresh`, `awsCredentialExport` | measured: a fourth hook EVENT and a second hook in an existing group are both caught BY NAME; only a non-`hooks`, non-`statusLine` key is invisible, and neither settings file has one |
-| **KD-89** | in a tree whose workspaces are not installed, three suite tests fail and only one of them looks like a missing install — the other two read as product defects | measured on a fresh worktree; root `npm ci` provisions the workspace and CI does exactly that, so no adopter and no CI run is affected |
 | **KD-90** | the `statusLine` third of the hook-anchoring fix is NOT fixed — `CLAUDE_PROJECT_DIR` is not exported to a statusLine command, so the anchor would be inert | measured against the docs, not guessed; the surface keeps its relative form rather than an anchor that reads as protection, and a behavioural test pins it still failing |
 | **KD-91** | the differential's `invoking >= 3` vacuity floor names the statusLine, which its own antecedent now skips | five surfaces are counted, so the floor holds with margin; only the sentence is stale |
 | **KD-92** | the actionable subset all three anchoring gates call is calibrated by nothing — `unfixedHookAnchors` replaced by `return []` leaves every anchoring test green | measured: the detector is right today, and the PLANT test calibrates the honest total; only the filter under it is unpinned |
@@ -165,6 +164,9 @@ you the same list without opening anything.
 | **KD-106** | `{}` as an ARGUMENT is read as a brace group, because its own `{` is the separator its `}` needs — `find … -exec rm {} \; && gh pr merge` is refused | a refusal, only the agent is refused, the sentence names `{ }` and it IS in the command; no producer — no merge, publish or fleet-check here is typed behind a `find -exec`/`xargs -I` |
 | **KD-107** | the two readers still spell "a command position" differently, now the other way: `COMPOUND` knows `!`, `command`, `builtin` and redirections, `WATCHED` does not — so `timeout 300 gh pr merge` is not classified as a merge and the gate is SILENT | fail-open at the classifier, unchanged from `main` — `invocation()` is not edited by this slice; no producer: a merge here is typed `gh pr merge --rebase --delete-branch`, and `time`/`env`/`sudo`/`nohup`/`VAR=x` in front of one ARE classified |
 | **KD-108** | a refusal quotes the MASKED scope, not what was typed, so a quoted `cd` destination vanishes from the sentence — `cd "$HOME" && gh pr merge` is refused with the evidence `(cd)` | the refusal and its direction are right; only the parenthetical is emptier than it reads, and the remedy is still the operand in front of the user |
+| **KD-109** | the third of KD-89's three failures never reproduced — and `applyConsoleCopy`'s bare `catch {}` still re-narrates ANY profile load error, a missing module included, as "this project declares no console copy" | the door refuses an uninstalled tree before any of the three runs, so the misattribution cannot reach a contributor whatever the third's trigger was; the fallback itself is deliberate — a page load must not crash on an unreadable profile |
+| **KD-110** | the preflight is npm's `pretest`, so it guards `npm test`, `prepublishOnly` and CI — and not `node --test <file>`, which is how a contributor or an agent narrows to one file | the defect KD-89 recorded is a FIRST impression of the documented command, and that command is refused by name; someone running one file directly has already chosen the narrower instrument |
+| **KD-111** | `installedFrom` is npm's layout — a Yarn PnP checkout has no `node_modules` at all, so every declared dependency reads missing and a working tree is refused | no producer: this repo declares npm (`package-lock.json`, npm `workspaces`, `npm ci` in CI) and no other lockfile is in the tree; the failure is a loud refusal naming a command, never a silent pass |
 
 ---
 
@@ -1456,42 +1458,6 @@ settings object for string values and judge every one — which costs false posi
 
 *Logged 2026-09-18, review round 1 of the hook-anchoring slice.*
 
-### KD-89 — a partly-installed tree fails three tests, and two of them do not look like a missing install
-
-`package.json` (`workspaces`, `scripts.test`) · `scripts/suite-reporter.mjs`
-
-Measured 2026-09-18 in a fresh git worktree whose ROOT `node_modules` existed but whose
-`inspector/mcp/node_modules` did not. `npm test` reported three failures:
-
-```
-✖ inspector/mcp/test/bundle-freshness.test.mjs   ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'
-✖ inspector/mcp/test/server-tools.test.mjs
-✖ the console host delivers no profile console copy, so the Evidence tab links no step
-    to the section it governs        AssertionError: the host delivered stepGoverns={}
-```
-
-`npm ci` provisioning the workspace turned all three green, with the tree otherwise untouched.
-
-**The defect is not that an uninstalled tree fails — it is the SHAPE of two of the three failures.**
-`inspector/mcp` is a root workspace (`package.json`), so one root `npm ci` provisions it, and
-`.github/workflows/ci.yml` does exactly that deliberately ("ONE install, not two"). CI is therefore
-never in this state and no adopter ever is. A contributor in a worktree can be, and what they are
-shown is one honest module error and **one semantic assertion about console copy and `stepGoverns`**
-— a message that reads as a real product defect in code they may have just touched. The cost is a
-wrong diagnosis, not a wrong verdict, which is why it is here and not on the first row: nobody is
-served anything false by the shipped product, and the failure is loud rather than silent.
-
-It is recorded because it was expensive to disbelieve. The honest way to clear it was to run the
-three files on a clean `origin/main` FIRST and watch them fail there too — which proves "not mine"
-but still misattributes the cause to the repo. Only chasing `ERR_MODULE_NOT_FOUND` to an absent
-workspace directory got the real answer.
-
-**What the fix would be, when it is taken:** a preflight in the suite reporter that checks each
-declared workspace has a `node_modules` before the run and says *"workspaces are not installed — run
-`npm ci` at the repository root"* instead of letting the assertions speak. That is a change to how
-the suite bootstraps, which is a slice with its own failure modes (a preflight that itself goes
-wrong makes every run unrunnable), not a line in this one.
-
 ### KD-90 — the statusLine third of the anchoring fix is not fixed, and was described as fixed
 
 `template/.claude/settings.json` (`statusLine`) · `src/lib/hooks.mjs` (`ANCHORABLE_SURFACES`)
@@ -1942,6 +1908,74 @@ what it says — the same property the `&`-backgrounding check two lines below i
 sentence, not the verdict; KD-95 covers the space case's refusal, and this covers what all of them
 say. *Logged 2026-09-18, at the re-record of review round 2 (KD-79's slice), found by probing the
 reader with the `${CLAUDE_PROJECT_DIR:-.}` construct the sibling slice put into the hook commands.*
+
+### KD-109 — the third of KD-89's three failures has a channel and no reproduction
+
+`inspector/mcp/src/lib/preview-service.mjs` (`applyConsoleCopy`) · `test/console-copy-delivery.test.mjs`
+
+KD-89 recorded three failures on a partly-installed tree, and the slice that closed it reproduced
+**two**. With `inspector/mcp/node_modules` removed from an otherwise clean worktree, both
+`bundle-freshness` and `server-tools` fail with `ERR_MODULE_NOT_FOUND`, deterministically, every
+time; `console-copy-delivery` **passes**. The original measurement records only that the root
+`node_modules` existed and the workspace's did not, and on exactly that state the third test is
+green — so the tree that produced `stepGoverns={}` is not recoverable from what was written down.
+
+What the slice did find is the CHANNEL that can produce it, and it is still here. `applyConsoleCopy`
+wraps the manifest read and the profile load in a bare `catch { setConsoleCopy(null) }`, so any
+throw — a module the resolver cannot find included — is re-narrated downstream as *this project
+declares no console copy*, and the first thing a reader sees is an assertion about the Evidence tab
+not linking a step to the section it governs. The degradation is deliberate and should stay: a page
+load must not crash because a profile is unreadable. Discarding the cause is the part that is not.
+
+**Why it does not block.** The door refuses an uninstalled tree before any of the three runs, so the
+misattribution cannot reach a contributor whatever the third's trigger was — which is itself the
+argument for a door over a skip, since a skip would have had to name this victim and nobody can.
+What remains is a console that renders neutral without saying why, to a reader who is already
+looking at something else. **What the fix would be, when it is taken:** keep the fallback and stop
+throwing the cause away — log the caught error, or carry it into the console copy so a neutral page
+states its reason. That is a change to the inspector's degradation contract, not a line.
+
+*Logged 2026-09-18, by the slice that closed KD-89.*
+
+### KD-110 — the preflight guards `npm test`, and this repo is often run one file at a time
+
+`package.json` (`pretest`) · `scripts/suite-preflight.mjs`
+
+The door is npm's `pretest` lifecycle, which is what lets one wiring reach `npm test`,
+`prepublishOnly` and `.github/workflows/ci.yml` without any of the three naming it. It does not
+reach `node --test <file>`. That is how a contributor or an agent narrows to one file while working,
+and it is how KD-89's three failures were read in the first place; on an uninstalled tree that path
+still produces the original misattribution, unchanged.
+
+**Why it does not block.** What KD-89 recorded is a FIRST impression — a fresh clone running the
+command this repository documents — and that command is now refused by name before anything runs.
+Someone invoking the runner directly has already chosen the narrower instrument and is not being
+told anything false about it. **What the fix would be, when it is taken:** the runner has no
+per-file preflight hook, so covering that path means either a guard inside each test file — the skip
+this slice measured its way out of — or a wrapper every direct run must be typed through, which is a
+change to how the repo is worked rather than a line in it.
+
+*Logged 2026-09-18, by the slice that closed KD-89.*
+
+### KD-111 — the walk is npm's layout, so a working Yarn PnP checkout is refused
+
+`scripts/suite-preflight.mjs` (`installedFrom`)
+
+`installedFrom` is Node's `node_modules` walk: up from the package's directory, asking whether
+`node_modules/<name>/package.json` exists. Under Yarn PnP there is no `node_modules` at all —
+resolution goes through `.pnp.cjs` — so every declared dependency reads missing and the door refuses
+a tree that works perfectly. pnpm is unaffected: it links direct dependencies into `node_modules`,
+which is the thing the walk looks for.
+
+**Why it does not block.** This repository declares npm and nothing else — `package-lock.json`, npm
+`workspaces`, `npm ci` in CI — and no other package manager's lockfile is in the tree, so there is
+no producer today. The failure is also in the safe direction: a loud refusal naming a command, never
+a silent pass. **What the fix would be, when it is taken:** ask the resolver instead of the
+filesystem — but every resolver spelling measured for this slice calls an installed package missing
+for its own reason (`exports` maps with no `.` entry, and `import.meta.resolve`'s second argument
+being ignored unflagged), so this needs a real answer rather than a swap.
+
+*Logged 2026-09-18, by the slice that closed KD-89.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
