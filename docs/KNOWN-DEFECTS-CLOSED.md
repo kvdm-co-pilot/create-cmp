@@ -9,6 +9,72 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-79 — the scheduler says the device tier is OWED and the gate enforcing it says nothing is owed — **CLOSED 2026-09-18, in the slice that fixed it**
+
+`scripts/hooks/proof-gate.mjs` (`decide`, `kind === "device"`, `o.state === "none"`) vs
+`scripts/proof-plan.mjs`
+
+Measured 2026-09-18 on this branch, one command apart. `node scripts/proof-plan.mjs`:
+
+```
+device (fleet L2) OWED — discharge at slice close, NOT NOW
+    8 changed path(s) are not declared irrelevant to fleet L2:
+    .claude-plugin/marketplace.json, .claude-plugin/plugin.json, llms.txt, ….
+```
+
+`CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level L2`, refused by the
+PreToolUse hook before the runner started:
+
+```
+nothing is owed — every changed path is declared unable to affect fleet L2
+(docs/, test/, scripts/, .github/, *.md, inspector/mcp/, .claude/, packages/harness/src/console/).
+```
+
+Both read `obligation()` from the same module, so they cannot disagree on one input — and the
+hook's stated reason is impossible for this slice's change set. `.claude-plugin/` is not `.claude/`,
+`llms.txt` is not `*.md`, and `package.json`, `package-lock.json` and
+`packages/aliases/*/package.json` match no prefix on that list. Whatever set it judged, it was not
+this branch's. Two candidates, not distinguished here: the hook compared the WORKING TREE against
+HEAD, which is clean after a commit, so "every changed path is irrelevant" is vacuously true over
+an empty set — this repo's own recurring shape, a guard written against ABSENCE passing on
+VACUITY; or it resolved a sibling git worktree, whose uncommitted paths that day were exactly
+`docs/GATE-RULES.md`, `scripts/hooks/proof-gate.mjs` and one `test/` file — every one of them on
+the irrelevant list, which would explain the reason word for word (KD-64 is the same reader
+confusing sibling worktrees).
+
+**Not fixed here, deliberately.** `scripts/hooks/proof-gate.mjs` is owned by another slice that was
+in flight the same day, and editing a gate from under it is worse than the disagreement. Nor was
+the refusal worked around: a gate that refuses is obeyed, and this slice's device tier is left owed
+and undischarged rather than run behind the gate's back.
+
+**The direction is safe, and that is why this is logged rather than blocking**: it REFUSES a run
+that is owed, so nothing false is ever certified. The cost is a slice that cannot close its own
+last gate. The unsafe mirror image — allowing a run to discharge a tier the merge will not keep —
+is what the sibling slice is about, so both directions are known.
+
+**Fires when:** the tier is invoked from a worktree whose slice changes only paths one of the two
+readers can see.
+*Logged 2026-09-18, measured while closing the count-gate slice.*
+
+Closed by the tree resolution in `scripts/hooks/proof-gate.mjs` ("WHICH TREE IS THIS COMMAND
+ABOUT?"). **Of the two candidates above, the second is the one that fired**, and the first is ruled
+out: `changedPaths()` reads `merge-base HEAD origin/main`, never `HEAD`, so a clean working tree
+after a commit is not an empty change set. The hook judged the SESSION's worktree — `REPO_ROOT`,
+fixed by the `node "${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs"` wiring — whatever tree
+the command it was gating would run in, and this repo keeps several worktrees of itself checked out
+at once. The reason it printed was word-for-word true of that other tree, which is why it read as
+impossible.
+
+Every PreToolUse verdict is now about the tree the command will act on: read from the payload's
+`cwd` and from the command's own leading `cd`, settled by `git rev-parse --show-toplevel
+--git-common-dir` — the call KD-64 named and left for a slice that could pay for it deliberately —
+and REFUSED outright when it cannot be told, because "assume the session's" is the defect and not
+the fallback. A tree that is not a worktree of this repository gets silence rather than a refusal
+about somebody else's slice. `test/the-proof-gate-judges-the-tree-the-command-acts-on.test.mjs`
+holds it on two real worktrees of one throwaway repository, running a copy of this tree's own
+`scripts/` — including the FAIL-OPEN half nobody had measured, a merge ALLOWED because the session's
+tree owed nothing while the tree being merged owed both at-close tiers.
+
 ### KD-61 — a narrowed run of the declared suite is recorded as the suite — **CLOSED 2026-09-17, in the slice that found it**
 
 `scripts/suite-reporter.mjs` says it records "exactly when the DECLARED suite runs … and never for a

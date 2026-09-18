@@ -361,6 +361,39 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   A rule made executable and left for the reader to remember to run is the same defect one layer
   up — while the template this repo stamps had carried the equivalent PreToolUse hooks for
   adopters all along. The harness enforced on adopters what it did not enforce on itself.
+- **And it judges the tree the COMMAND acts on, never the session's.** `.claude/settings.json`
+  spells the hook `node "${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs"`, so until
+  2026-09-18 every verdict was about the SESSION's worktree whatever tree the command ran in — and
+  this repo keeps several worktrees of itself checked out at once, inside the checkout. Measured
+  three times in one session (KD-79): an OWED device run refused as "nothing is owed", `gh pr merge`
+  refused over three files that were in a different worktree, and — silently, the mirror image — a
+  merge ALLOWED because the session's tree owed nothing while the tree being merged owed both
+  at-close tiers. The tree is now read from the payload's `cwd` and from the command's own leading
+  `cd`, and git settles the rest with one `rev-parse --show-toplevel --git-common-dir`, because no
+  string comparison can: the worktrees live under `.claude/worktrees/`, so the tree to judge is
+  routinely a subdirectory of the tree not to.
+
+  **It honours exactly four forms, and refuses to guess at anything else.** A gate that infers a
+  directory from a command string will be wrong on some string, so the set is small enough to state
+  in one place and every refusal names which form it wanted:
+  1. the `cwd` in the hook payload — or, when there is none, the hook process's own, which is the
+     directory the wiring's `:-.` already resolves this file against;
+  2. a `cd` at a command position before the invocation, written literally, not inside a subshell
+     that has already closed — chained `cd a && cd b` compose, and a subdirectory resolves to the
+     worktree that holds it, so `cd packages/harness && npm publish` reads the tree it is in;
+  3. the path in `node <somewhere>/scripts/fleet-check.mjs`, which names the tree a run will prove
+     whatever directory it was typed in;
+  4. nothing else.
+
+  Everything outside that set REFUSES and says why: `pushd`, a `cd` whose destination is a
+  variable, a subshell, a glob, `~` or a path with a space in it, a directory that is not there,
+  `gh --repo`/`-R`/`GH_REPO` naming a repository out of band, `npm publish --prefix`/`-C`/`-w` or a
+  folder or tarball operand, and any git question about the directory that git did not answer. A
+  false refusal costs a minute and a message that says what to type; a false allow certifies
+  something untrue, which is the one thing this product exists to prevent. A tree that is not a
+  worktree of this repository is the one case that gets SILENCE rather than either — this gate has
+  no obligation of its own to state about another repository, and refusing there would block real
+  work for a reason that is not true (KD-64 is that mistake made the other way round).
 - **And ORDERED: a device run proves a tree the merge has to keep.** The same hook refuses an
   invocation of `fleet-check.mjs` on a branch that does not contain `origin/main`. The merge brings
   trunk in and the bytes move — the tier REOPENS for any of them that is a device trigger path, and

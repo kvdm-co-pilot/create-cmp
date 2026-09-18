@@ -137,7 +137,6 @@ you the same list without opening anything.
 | **KD-76** | the same reader PASSES a wrong lane size written as a word, or with the profile named first | measured: three shapes, none written anywhere in the tree today |
 | **KD-77** | the CLI-command count is derived, gated, and calibrated by nothing — no surface states it | the reader is idle, not wrong; a future "<n> commands" is still refused |
 | **KD-78** | two npm pages still serve "8 gates" from bytes already published; the tree's copy is fixed | no act available here — a registry description changes only by publishing |
-| **KD-79** | the proof gate refused an OWED device tier, naming a change set that cannot be this slice's | it refuses, never allows — but the tier it refuses is one `proof-plan.mjs` says is owed |
 | **KD-80** | the ordering precondition guards the device RUN; `gh pr merge --rebase` is where an unproven tree actually lands | the hand-rebase case reopens the tier and is refused at the merge gate already |
 | **KD-81** | a branch git could not name routes to "does not apply", so the check passes SILENTLY | no producer: the same git failure makes `obligation()` report `none`, which never reaches the check |
 | **KD-82** | the ordering verdict is commit-graph ancestry where every other obligation here is trigger-path bytes | the refusal's remedy is the rebase you owe the merge anyway; it costs a rebase, never a run |
@@ -153,6 +152,10 @@ you the same list without opening anything.
 | **KD-92** | the actionable subset all three anchoring gates call is calibrated by nothing — `unfixedHookAnchors` replaced by `return []` leaves every anchoring test green | measured: the detector is right today, and the PLANT test calibrates the honest total; only the filter under it is unpinned |
 | **KD-93** | surface-awareness landed in ONE of the two readers — the differential asks `unanchoredPaths` with no surface (whose default is "anchorable"), and both behavioural harnesses export `CLAUDE_PROJECT_DIR` to the statusLine | the shipped statusLine is relative, so no instrument answers differently today; it fires only if someone writes the anchor on that surface |
 | **KD-94** | this file's header says adding an entry "cannot reopen a gate"; it reopens the SUITE gate, because the suite hash deliberately covers markdown | measured: logging costs one ~50s `npm test`, never a device run or a review round — the header's argument holds, its blanket sentence does not |
+| **KD-88** | a worktree under a path containing a space cannot be read from a `cd` or a fleet-check operand | no producer: every worktree of this repo lives under a space-free path, and the answer is a refusal |
+| **KD-89** | SessionStart still prints the tree the hook was LOADED from as "this tree" | a context line, not a gate — every PreToolUse verdict now judges the tree the command acts on |
+| **KD-90** | the judged worktree's own `proof-plan.mjs` decides, whatever commit or state it is in | both ways it can differ fail safe: that tree's own answer, or a refusal |
+| **KD-91** | an npm flag whose value the gate does not know is read as a folder operand, and the refusal names it | the direction is a refusal, and the seven flags a publish here actually uses are known |
 
 ---
 
@@ -1170,52 +1173,6 @@ thing this project does not do on its own.
 *Logged 2026-09-18, review round 1 of the count-gate slice; the tree-side half was fixed in the
 same round.*
 
-### KD-79 — the scheduler says the device tier is OWED and the gate enforcing it says nothing is owed
-
-`scripts/hooks/proof-gate.mjs` (`decide`, `kind === "device"`, `o.state === "none"`) vs
-`scripts/proof-plan.mjs`
-
-Measured 2026-09-18 on this branch, one command apart. `node scripts/proof-plan.mjs`:
-
-```
-device (fleet L2) OWED — discharge at slice close, NOT NOW
-    8 changed path(s) are not declared irrelevant to fleet L2:
-    .claude-plugin/marketplace.json, .claude-plugin/plugin.json, llms.txt, ….
-```
-
-`CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level L2`, refused by the
-PreToolUse hook before the runner started:
-
-```
-nothing is owed — every changed path is declared unable to affect fleet L2
-(docs/, test/, scripts/, .github/, *.md, inspector/mcp/, .claude/, packages/harness/src/console/).
-```
-
-Both read `obligation()` from the same module, so they cannot disagree on one input — and the
-hook's stated reason is impossible for this slice's change set. `.claude-plugin/` is not `.claude/`,
-`llms.txt` is not `*.md`, and `package.json`, `package-lock.json` and
-`packages/aliases/*/package.json` match no prefix on that list. Whatever set it judged, it was not
-this branch's. Two candidates, not distinguished here: the hook compared the WORKING TREE against
-HEAD, which is clean after a commit, so "every changed path is irrelevant" is vacuously true over
-an empty set — this repo's own recurring shape, a guard written against ABSENCE passing on
-VACUITY; or it resolved a sibling git worktree, whose uncommitted paths that day were exactly
-`docs/GATE-RULES.md`, `scripts/hooks/proof-gate.mjs` and one `test/` file — every one of them on
-the irrelevant list, which would explain the reason word for word (KD-64 is the same reader
-confusing sibling worktrees).
-
-**Not fixed here, deliberately.** `scripts/hooks/proof-gate.mjs` is owned by another slice that was
-in flight the same day, and editing a gate from under it is worse than the disagreement. Nor was
-the refusal worked around: a gate that refuses is obeyed, and this slice's device tier is left owed
-and undischarged rather than run behind the gate's back.
-
-**The direction is safe, and that is why this is logged rather than blocking**: it REFUSES a run
-that is owed, so nothing false is ever certified. The cost is a slice that cannot close its own
-last gate. The unsafe mirror image — allowing a run to discharge a tier the merge will not keep —
-is what the sibling slice is about, so both directions are known.
-
-**Fires when:** the tier is invoked from a worktree whose slice changes only paths one of the two
-readers can see.
-*Logged 2026-09-18, measured while closing the count-gate slice.*
 ### KD-80 — the ordering precondition guards the device RUN, not the merge that moves the tree
 
 `scripts/hooks/proof-gate.mjs` (`decide`, kind `device` vs kind `merge`)
@@ -1614,6 +1571,80 @@ same command prints *"for this exact tree — read it, do not re-run it"*.
 logging cannot cost a device run or a review round, which is what it is defending. The cost it
 does carry is one ~50s suite re-run, which a reviewer who logs late has to either run or hand to
 the author. The sentence is one gate too broad, not the policy.
+### KD-88 — a worktree under a path with a space in it is a tree this gate refuses to name
+
+`scripts/hooks/proof-gate.mjs` (`literalDir` / `LITERAL_PATH`, and the fleet-check operand reader)
+
+The gate reads the tree a command acts on from the command's own `cd` and from a
+`…/scripts/fleet-check.mjs` operand, and it reads both only when they are written literally —
+`LITERAL_PATH` excludes whitespace along with `$`, backticks, globs and `~`, and the operand reader
+is a `\S*` that cannot cross a space. So `cd "/Users/k/my trees/slice" && gh pr merge` is refused
+with "a `cd` this gate cannot read literally", and `node "/Users/k/my trees/scripts/fleet-check.mjs"`
+with "a form this gate cannot resolve to a file". Both are true sentences and both are refusals of
+work that is real.
+
+The quoted case is the one that could be read exactly — quotes delimit, so a space inside them is
+part of the path — and it is not, because the unquoted case next to it cannot be, and one relaxation
+without the other is the kind of half-rule that reads as a general guarantee. Nobody is wrongly
+served today: every worktree of this repository lives under a space-free path, and the alternative
+to refusing is resolving half a path and judging whatever tree happens to sit there — the defect
+this slice just closed, made by the gate itself. **Fires when:** a worktree of this repo is checked
+out under a path containing a space and a gated command names it. *Logged 2026-09-18, in the slice
+that added the reader (KD-79).*
+
+### KD-89 — the schedule a session reads is still the tree the hook was loaded from
+
+`scripts/hooks/proof-gate.mjs` (`main`, the SessionStart branch)
+
+PreToolUse now resolves the tree the command will act on. SessionStart does not: it renders
+`obligation()` from `REPO_ROOT` under the heading "Proof schedule for this tree". In a session whose
+cwd is a different worktree of this repository — which is how this repo is worked, several at once —
+the first thing the session reads is another tree's schedule, stated as though it were this one's.
+
+Not fixed here, deliberately. SessionStart is a context line and nothing routes on it; every
+refusal that can cost or permit anything is PreToolUse, and all of those now judge the right tree.
+Fixing it means resolving from the SessionStart payload's cwd and threading a root through
+`render`, `suiteStatus` and `plugin-refresh.summary` — three more surfaces in a slice whose subject
+is the gate. **Fires when:** a session's cwd is not the worktree the hook file was loaded from.
+*Logged 2026-09-18, in the slice that fixed the PreToolUse half (KD-79).*
+
+### KD-90 — the judged worktree's own scheduler decides, whatever commit or state it is in
+
+`scripts/hooks/proof-gate.mjs` (`planOf`)
+
+A worktree of this repository answers for itself: the gate imports `<that tree>/scripts/proof-plan.mjs`
+rather than re-deriving another tree's obligations with this one's code. That is deliberate — its
+plan file, its change set, its branch rule, its trigger lists, and no second copy of `obligation()`
+to drift — and it has two consequences worth writing down. A worktree parked on an older commit is
+judged by that commit's rules, which may be looser than trunk's. And a worktree whose
+`proof-plan.mjs` is mid-edit and throws lands in the gate's catch-all: exit 2, "could not answer …
+refusing rather than allowing", carrying a module resolver's words rather than the gate's.
+
+Both are the safe direction, which is why this is logged and not fixed. The second refuses. The
+first gives exactly the answer that tree's own `node scripts/proof-plan.mjs` gives, which is the
+answer its slice will be held to at its own merge — a gate that overruled it with trunk's rules
+would be judging the tree by bytes the tree does not have. Only the second case's message is worse
+than it could be. **Fires when:** a gated command acts on a worktree at a different commit, or on
+one whose scheduler is being edited. *Logged 2026-09-18, in the slice that added it (KD-79).*
+
+### KD-91 — an npm flag whose value this gate does not know is read as a folder, and the refusal says so
+
+`scripts/hooks/proof-gate.mjs` (`NPM_TAKES_VALUE`, in `commandCwd`)
+
+`npm publish` can name a package that is not the directory it runs in, so any bare token after
+`publish` is read as a folder or tarball operand and refused. Which tokens are *values* of a
+preceding flag is decided by a list of seven — `--access`, `--tag`, `--otp`, `--registry`,
+`--auth-type`, `--userconfig`, `--provenance-file` — and a flag outside it whose value is spelled
+with a space (`npm publish --cache /tmp/x`) has that value read as the package: refused, with a
+sentence that names `/tmp/x` as the thing being published, which it is not.
+
+The direction is the safe one and the honest fix is not obvious — npm's flag surface is large, it
+moves between majors, and a gate that shelled out to `npm` to ask would be running the command it
+is gating. Nobody is wrongly served today: every publish in this repo is `cd <package> && npm
+publish [--access public]` (`docs/PUBLISHING.md`, the npm-publish skill), and `--access` is on the
+list. What is wrong is only the sentence, and only in a refusal that is otherwise correct to make.
+**Fires when:** a publish uses a space-separated value for a flag outside those seven.
+*Logged 2026-09-18, in the slice that added the reader (KD-79).*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is

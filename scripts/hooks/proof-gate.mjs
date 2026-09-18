@@ -47,10 +47,17 @@
 // "I could not check" is not "I checked". An unmatched command never reaches code
 // that can throw — a gate that blocked every Bash call because stdin was odd would
 // be removed within the hour, and rightly.
+//
+// AND EVERY ONE OF THOSE VERDICTS IS ABOUT THE TREE THE COMMAND WILL ACT ON, which
+// is not necessarily the tree this file was loaded from. See "WHICH TREE IS THIS
+// COMMAND ABOUT?" below (KD-79): the tree is resolved from the payload's cwd and
+// the command's own leading `cd`, git says whether that is a worktree of THIS
+// repository, and the answer decides between judging it, saying nothing about
+// somebody else's repository, and refusing because the gate could not tell.
 import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /**
  * The commands this gate has an opinion about. Anything else is none of its
@@ -301,6 +308,17 @@ export const REMOTE_CALL_FLOOR_MS = 1000;
 const LOCAL_CALL_CAP_MS = 1000;
 
 /**
+ * The whole "which tree is this command about" question, on one purse.
+ *
+ * It is at most two `rev-parse` calls against local git dirs, which answer in
+ * ~10ms; this is a hundred times that, and it is spent BEFORE anything else the
+ * gate does, so it shrinks the purse the ordering check is later given
+ * (remoteBudgetMs reads the clock, not a constant). Exported because it is now
+ * a term of the arithmetic invariant a test reads off the wiring.
+ */
+export const TREE_PROBE_TOTAL_MS = 1000;
+
+/**
  * The budget this hook's own wiring declares for it, in ms.
  *
  * Past it the hook is KILLED and its decision is never delivered — and a
@@ -495,6 +513,266 @@ function askOrigin(git, { local, deadline, behindBy, contains }) {
   if (says === null) return cannotSay(`origin/main is ${remote.slice(0, 7)} and git could not compare it with this branch`);
   if (says) return { contained: true, behind: 0, sha: remote, source: "remote", reachedRemote: true, unfetched: false, reason: null };
   return { contained: false, behind: behindBy(remote), sha: remote, source: "remote", reachedRemote: true, unfetched: false, reason: null };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WHICH TREE IS THIS COMMAND ABOUT? (KD-79)
+//
+// Everything above judges a TREE, and until this section existed the tree was
+// always this file's own — `REPO_ROOT`, which `.claude/settings.json` fixes to
+// the SESSION's worktree by spelling the hook `node
+// "${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs"`. The command being
+// gated runs wherever the Bash tool runs it, and with more than one worktree of
+// this repository checked out at once — which is how this repo is worked —
+// those are routinely different trees. Measured 2026-09-18, three times in one
+// session: an OWED fleet check refused as "nothing is owed"; `gh pr merge` on
+// PR #150 refused over three files that were in another worktree; and, silently,
+// the mirror image, a merge ALLOWED because the session's tree happened to owe
+// nothing while the tree being merged owed both at-close tiers.
+//
+// So the tree is resolved first, from two things the gate is actually given:
+//   the cwd     Claude Code puts it in the PreToolUse payload. Absent, the hook
+//               process's own cwd is read — which is not a guess: the wiring's
+//               own `:-.` fallback already resolves this file against exactly
+//               that directory, so when it is taken, cwd IS `REPO_ROOT`.
+//   the command a command that runs elsewhere usually says so. A leading `cd`
+//               is read when it is written literally, and `node
+//               <somewhere>/scripts/fleet-check.mjs` names its tree outright.
+// Then git decides the rest, because no string comparison can: this repo keeps
+// its worktrees INSIDE the checkout (`.claude/worktrees/`), so the tree that
+// must be judged is routinely a subdirectory of the tree that must not be. Two
+// `rev-parse --show-toplevel --git-common-dir` calls settle both questions —
+// where the worktree begins, and whether it is a worktree of THIS repository.
+// KD-64 named this call and left it for a slice that could pay for it
+// deliberately; this is that slice.
+//
+// THREE ANSWERS, AND THE DIRECTION OF EACH IS THE POINT:
+//   a worktree of this repo   judge it — its plan, its diff, its branch.
+//   NOT this repo             SILENT. This gate enforces this repository's proof
+//                             schedule; a command acting on another repository's
+//                             tree has no obligation here to state, and refusing
+//                             one would be a gate blocking real work for a reason
+//                             that is not true (KD-64 is that mistake, made the
+//                             other way round).
+//   could not tell            REFUSE. Not "assume the session's" — that
+//                             assumption IS the defect. The one exception is
+//                             `gh pr create`, which is advisory by design and
+//                             says it could not tell instead of blocking.
+// Every parsing failure below lands in the third answer, which is why the
+// parsing is allowed to be conservative rather than clever.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A directory operand this gate will act on only when it is written literally — no variable, subshell, glob, `~` or embedded space. */
+const LITERAL_PATH = /^[^$`*?[\]~\s]+$/;
+
+/** The ways a shell changes directory, at a command position (the same "invocation, never a mention" rule as WATCHED). */
+const CHDIR = /(?:^|[;&|(\n]|-c\s+["'])\s*(cd|pushd|popd|chdir)(?=[\s;&|)]|$)([^;&|)\n]*)/g;
+
+/** `gh` will act on a repository named out of band from ANY directory, so a command that names one has no tree to read. */
+const NAMED_REPO = /(?:^|\s)(?:--repo[=\s]|-R\s)|(?:^|\s)GH_REPO=/;
+
+/** npm flags that move the package being published away from the directory the command runs in. */
+const NPM_RELOCATES = /(?:^|\s)(?:--prefix|--workspaces?|-w|-C)(?:[=\s]|$)/;
+
+/** npm flags whose NEXT token is a value, not the folder operand — so `npm publish --access public` is not read as publishing "public". */
+const NPM_TAKES_VALUE = new Set(["--access", "--tag", "--otp", "--registry", "--auth-type", "--userconfig", "--provenance-file"]);
+
+/** The operand of a `cd`, when it is a directory this gate can name with certainty. */
+function literalDir(raw) {
+  let s = String(raw ?? "").trim();
+  const quoted = /^(["'])(.*)\1$/.exec(s);
+  // A quoted operand is delimited and is read exactly; an unquoted one can still
+  // carry the closing quote of the `sh -c "…"` wrapper it was found inside.
+  s = quoted ? quoted[2].trim() : s.replace(/["']+$/, "").trim();
+  if (!s || s.startsWith("-")) return null; // `cd -`, `cd -P /x`: a destination this gate does not compute
+  return LITERAL_PATH.test(s) ? s : null;
+}
+
+/**
+ * The directory the command will run in — from the cwd the hook was given, and
+ * from the command itself. `{ unknown }` when it cannot be read, never a guess.
+ *
+ * A `cd` whose destination is a variable refuses. A `cd` into a directory that is
+ * not there refuses (below, on the disk) — which also covers `cd /gone; gh pr
+ * merge`, where the `;` means the merge runs in the ORIGINAL directory after the
+ * `cd` fails: the gate cannot tell those apart, so it does not try.
+ */
+export function commandCwd(kind, command, cwd) {
+  const cmd = String(command ?? "");
+  let dir = typeof cwd === "string" && cwd ? cwd : process.cwd();
+  const at = WATCHED[kind]?.exec(cmd)?.index ?? 0;
+  const prefix = cmd.slice(0, at);
+
+  // THE `gh` COMMAND'S OWN ARGUMENTS, and not the whole string: `cp -R a b && gh
+  // pr merge` is a compound command whose first half happens to contain gh's
+  // short spelling of --repo, and refusing it would be this gate blocking real
+  // work for a reason that is not true — the failure it is least allowed to have.
+  const invoked = cmd.slice(at).replace(/^[;&|(\n]+/, "").split(/[;&|)\n]/)[0];
+  if ((kind === "merge" || kind === "create") && NAMED_REPO.test(invoked)) {
+    return { unknown: "it names its repository out of band (--repo / GH_REPO), which is not a directory on this machine" };
+  }
+  // A SUBSHELL'S `cd` DIES WITH THE SUBSHELL. `x=$(cd /elsewhere && pwd) && gh
+  // pr merge` changes nothing for the merge, and reading it would hand the gate
+  // a tree the command never touches — which is KD-79 again, with the gate's own
+  // parser as the mistaken reader. So each `cd` is applied only when the depth it
+  // sits at is still open where the command is: deeper means its scope closed first.
+  const depthAt = (i) => (prefix.slice(0, i).match(/\(/g)?.length ?? 0) - (prefix.slice(0, i).match(/\)/g)?.length ?? 0);
+  const here = depthAt(prefix.length);
+  CHDIR.lastIndex = 0;
+  for (let m = CHDIR.exec(prefix); m; m = CHDIR.exec(prefix)) {
+    // At the VERB, not at the match — the match begins on the separator before
+    // it, and for `$(cd …` that separator IS the paren that opens the subshell.
+    if (depthAt(m.index + m[0].indexOf(m[1])) > here) continue;
+    if (m[1] !== "cd") return { unknown: `it changes directory with \`${m[1]}\`, whose destination this gate does not track` };
+    const to = literalDir(m[2]);
+    if (!to) return { unknown: `it begins with a \`cd\` this gate cannot read literally (${m[0].trim()})` };
+    dir = path.resolve(dir, to);
+  }
+
+  if (kind === "device") {
+    // The fleet check is a FILE, and a path to it names the tree the run will
+    // prove more directly than any cwd does: `node /elsewhere/scripts/fleet-check.mjs`
+    // proves /elsewhere, whatever directory it was typed in.
+    const m = /node\s+(["']?)((?:\S*\/)?)fleet-check\.mjs/.exec(cmd.slice(at));
+    if (!m) return { unknown: "the fleet check it invokes is written in a form this gate cannot resolve to a file" };
+    if (m[2] && !LITERAL_PATH.test(m[2])) return { unknown: `the fleet check it names sits under a path this gate cannot read literally (${m[2]})` };
+    if (m[2]) dir = path.resolve(dir, m[2], "..");
+  }
+
+  if (kind === "publish") {
+    // npm publishes a PACKAGE, and the package is not always the directory the
+    // command runs in: `--prefix`/`-C` move the whole run, `-w` picks a workspace
+    // under it, and a positional operand names a folder or a tarball outright.
+    // This reader resolves directories, so a command that names its package any
+    // other way is one whose tree it has not read — and the publish gate is the
+    // one place a wrong answer ships bytes to a registry.
+    if (NPM_RELOCATES.test(invoked)) return { unknown: "it names the package directory out of band (--prefix, -C or --workspace), which this gate does not resolve to a tree" };
+    const tokens = invoked.split(/\s+/).filter(Boolean);
+    for (let k = tokens.indexOf("publish") + 1; k > 0 && k < tokens.length; k += 1) {
+      if (!tokens[k].startsWith("-")) return { unknown: `it publishes "${tokens[k]}" rather than the directory it runs in, and this gate reads only directories` };
+      if (NPM_TAKES_VALUE.has(tokens[k])) k += 1;
+    }
+  }
+  return { dir };
+}
+
+/** A path as the disk knows it, so /var and /private/var are one directory and not two. */
+function realpath(p) {
+  try {
+    return createRequire(import.meta.url)("node:fs").realpathSync(p);
+  } catch {
+    return path.resolve(p);
+  }
+}
+
+/**
+ * The worktree a directory sits in, and the repository that worktree is OF.
+ *
+ * One call, two answers: `--show-toplevel` is where the worktree begins and
+ * `--git-common-dir` is the repository's identity — the same for every linked
+ * worktree of one repo, and different for any other repo. `-C` rather than a
+ * spawn cwd on purpose: a spawn into a missing directory comes back ENOENT,
+ * which `whyNoAnswer` renders as "git could not be run", indistinguishable from
+ * git not being on PATH. With `-C`, git answers about the directory.
+ */
+function worktreeAt(dir, git) {
+  const r = git(["-C", dir, "rev-parse", "--show-toplevel", "--git-common-dir"]);
+  if (!r.answered) return { why: `${r.why}, so this gate could not ask which tree ${dir} belongs to` };
+  if (!r.ok) return { outside: true };
+  const [top, common] = r.out.split("\n").map((s) => s.trim());
+  if (!top || !common) return { why: `git named no worktree for ${dir}` };
+  // `--git-common-dir` is relative to where git ran, which `-C` made `dir`.
+  return { root: realpath(top), id: realpath(path.resolve(dir, common)) };
+}
+
+/**
+ * The tree this gate will judge this command against.
+ *
+ *   { root }     a worktree of this repository — judge it.
+ *   { foreign }  not this repository's tree — silence.
+ *   { unknown }  REFUSE (and, for `gh pr create`, say so and allow anyway).
+ */
+export function judgedTree(kind, command, cwd, { budgetMs = TREE_PROBE_TOTAL_MS, repoRoot = REPO_ROOT } = {}) {
+  const asked = commandCwd(kind, command, cwd);
+  if (asked.unknown) return asked;
+  const dir = path.resolve(asked.dir);
+  // THE ORDINARY CASE PAYS NOTHING. One session, one worktree, no `cd`: the
+  // directory is this file's own tree and not a single git call is made — which
+  // is also why every existing test of this hook is untouched by any of it.
+  if (dir === repoRoot) return { root: repoRoot };
+
+  const fs = createRequire(import.meta.url)("node:fs");
+  let there;
+  try {
+    if (!fs.statSync(dir).isDirectory()) return { unknown: `the path it runs in (${dir}) is not a directory` };
+  } catch {
+    return { unknown: `the directory it runs in (${dir}) is not there` };
+  }
+
+  const git = gitAt(repoRoot, Date.now() + budgetMs);
+  there = worktreeAt(dir, git);
+  if (there.why) return { unknown: there.why };
+  if (there.outside) return { foreign: `${dir} is not inside a git worktree` };
+
+  const here = worktreeAt(repoRoot, git);
+  if (here.why || here.outside) {
+    const why = here.why ?? `this gate's own checkout (${repoRoot}) is not inside a git worktree`;
+    return { unknown: `${why}, so it could not tell whether ${dir} is a worktree of the repository this gate enforces` };
+  }
+  if (there.id !== here.id) return { foreign: `${there.root} is a worktree of another repository` };
+
+  // A worktree of this repo checked out before this program existed has no
+  // schedule to read, and importing a file that is not there would come back as
+  // "could not answer" with a module resolver's words rather than this gate's.
+  if (!fs.existsSync(path.join(there.root, "scripts", "proof-plan.mjs"))) {
+    return { unknown: `the worktree at ${there.root} carries no scripts/proof-plan.mjs, so it has no proof schedule to read` };
+  }
+  return { root: there.root };
+}
+
+/** The judged tree's OWN scheduler — its plan file, its change set, its branch rule, its trigger lists. A worktree answers for itself. */
+const planOf = (root) => (root === REPO_ROOT ? import("../proof-plan.mjs") : import(pathToFileURL(path.join(root, "scripts", "proof-plan.mjs")).href));
+
+const HONOURED = "Three forms are read: the cwd this hook was given, a literal `cd /absolute/path && …` in front of the command (a subdirectory is fine — it resolves to the worktree that holds it), and `node /absolute/path/scripts/fleet-check.mjs`. Anything else is refused rather than guessed at (docs/GATE-RULES.md, Rule 4).";
+
+const cannotTell = (why) =>
+  `this gate could not tell which tree this command will act on: ${why}. It judges the tree the command RUNS IN, never the session's own — that assumption is KD-79, which refused an owed device run and refused a merge over another worktree's files — so a tree it cannot name is a tree it cannot check. ${HONOURED}`;
+
+const cannotTellCreate = (why) =>
+  `reminder: this gate could not tell which tree this command will act on: ${why}. Nothing is blocked — the PR is the review surface and gh pr merge is where the at-close tiers are collected — but the reminder you would normally get here would be about a tree this gate could not name, so none is being invented. ${HONOURED}`;
+
+/**
+ * The whole PreToolUse decision: which tree, then what that tree owes.
+ *
+ * The lane probe stays EAGER for every device payload whose tree is known — it
+ * is what the timeout proof stalls inside, and making it conditional would
+ * retire that proof without anyone noticing.
+ */
+async function verdict(kind, command, cwd) {
+  const where = judgedTree(kind, command, cwd);
+  if (where.foreign) return SILENT;
+  if (where.unknown) return kind === "create" ? allow(cannotTellCreate(where.unknown)) : deny(cannotTell(where.unknown));
+
+  const root = where.root;
+  const { obligation, TIERS, isTrunk } = await planOf(root);
+  const o = obligation();
+  let ctx;
+  if (kind === "publish") ctx = await releaseContext(root);
+  else if (kind === "device") {
+    ctx = { runningLane: runningLane(), repoRoot: root };
+    // Where trunk is only matters when the run would otherwise go ahead. A run
+    // already refused — nothing owed, discharged, undeclared, or a lane in
+    // flight — needs no second reason, and the lane refusal is reported alone
+    // because it asks for something else entirely.
+    if (!ctx.runningLane && (o.state === "owed" || o.state === "reopened")) ctx.base = baseContext(root, { branch: o.branch, isTrunk });
+  }
+  const d = decide(kind, o, TIERS, ctx);
+  if (root === REPO_ROOT || d.action === "silent") return d;
+  // KD-79's refusals were unplaceable: they named a change set the reader could
+  // not locate. When the judged tree is not the one this file was loaded from,
+  // the decision says so — which is also the line that makes a WRONG resolution
+  // visible instead of mysterious.
+  return { ...d, reason: `${d.reason}\n\nJUDGED TREE: ${root} — the worktree this command runs in, not the one this gate was loaded from (${REPO_ROOT}).` };
 }
 
 /**
@@ -763,11 +1041,15 @@ export function laneAt(pid, args, run = shell()) {
   return { pid: Number(pid), args, project, marker };
 }
 
-/** The fleet record and the hash of the tree it would have to describe. */
-export async function releaseContext() {
+/**
+ * The fleet record and the hash of the tree it would have to describe — for the
+ * tree the publish will act on, hashed by THAT tree's own trigger lists, because
+ * a record written by one worktree's `fleet-check` is only comparable with the
+ * hash its own `observed-tree.mjs` takes.
+ */
+export async function releaseContext(root = REPO_ROOT) {
   const fs = await import("node:fs");
-  const { deviceTreeHash } = await import("../observed-tree.mjs");
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+  const { deviceTreeHash } = root === REPO_ROOT ? await import("../observed-tree.mjs") : await import(pathToFileURL(path.join(root, "scripts", "observed-tree.mjs")).href);
   let record = null;
   try {
     record = JSON.parse(fs.readFileSync(path.join(root, "qa-artifacts", "fleet-latest.json"), "utf8"));
@@ -801,26 +1083,12 @@ async function main() {
 
   if (event === "PreToolUse") {
     if (input.tool_name !== "Bash") return;
-    const kind = classify(String(input.tool_input?.command ?? ""));
+    const command = String(input.tool_input?.command ?? "");
+    const kind = classify(command);
     if (!kind) return;
     // Matched. From here on, a failure is a refusal.
     try {
-      const { obligation, TIERS, isTrunk } = await import("../proof-plan.mjs");
-      const o = obligation();
-      let ctx;
-      if (kind === "publish") ctx = await releaseContext();
-      else if (kind === "device") {
-        // The lane probe stays EAGER for every device payload: it is what the
-        // timeout proof stalls inside, and making it conditional would retire
-        // that proof without anyone noticing.
-        ctx = { runningLane: runningLane(), repoRoot: REPO_ROOT };
-        // Where trunk is only matters when the run would otherwise go ahead. A
-        // run already refused — nothing owed, discharged, undeclared, or a lane
-        // in flight — needs no second reason, and the lane refusal is reported
-        // alone because it asks for something else entirely.
-        if (!ctx.runningLane && (o.state === "owed" || o.state === "reopened")) ctx.base = baseContext(REPO_ROOT, { branch: o.branch, isTrunk });
-      }
-      const d = decide(kind, o, TIERS, ctx);
+      const d = await verdict(kind, command, input.cwd);
       if (d.action === "silent") return;
       emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: d.action, permissionDecisionReason: d.reason } });
     } catch (e) {
@@ -831,11 +1099,18 @@ async function main() {
   }
 
   if (event === "PostToolUse") {
-    if (input.tool_name !== "Bash" || classify(String(input.tool_input?.command ?? "")) !== "merge") return;
+    if (input.tool_name !== "Bash") return;
+    const command = String(input.tool_input?.command ?? "");
+    if (classify(command) !== "merge") return;
     // Best effort and read-only in effect: close() removes the plan only when
-    // nothing is owed, which after a merge the gate allowed is always true.
+    // nothing is owed, which after a merge the gate allowed is always true. It
+    // closes the plan of the tree that was MERGED — closing the session's
+    // instead would delete a slice that is still open, which is the same
+    // mistaken reader as KD-79 doing damage rather than refusing.
     try {
-      const { close } = await import("../proof-plan.mjs");
+      const where = judgedTree("merge", command, input.cwd);
+      if (!where.root) return; // another repository's merge, or a tree that could not be named: close nothing
+      const { close } = await planOf(where.root);
       close(undefined, { via: "merge" });
     } catch {
       /* a failed close leaves the plan, which the next session names as stale */
