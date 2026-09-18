@@ -179,8 +179,6 @@ you the same list without opening anything.
 | **KD-123** | three prose facts this change states that the tree does not support: the new section cites the 5-minute rule as "below" when it is 44 lines above; its actionable remedy is scoped to `Agent` while `SendMessage` — granted by the same commit, and what RE-DELEGATE step 2 tells it to use — has the same stall shape; and the test's header attributes to SEVEN orchestrators a cold-substitute cost the commit measures at FOUR | the section's general rule ("nothing left to do but wait means you spawned it wrong") does cover the `SendMessage` path, so only the bullet is narrow; the count and the direction word are narration, and nothing routes on either |
 | **KD-124** | `attribute()` in `scripts/change-price.mjs` and `mine()` inside `summarize()` in `scripts/lib/proof-history.mjs` are two spellings of ONE attribution rule — a branch match plus a time window — in two files that share no code | nobody is wrongly served: the new reader is advisory, prints a count and refuses nothing, and the difference between the two spellings is the deliberate one its own docblock names. The honest remedy edits a file this slice put out of scope |
 | **KD-125** | `attribute()` matches `row.branch === branch`, and `currentBranch()` spells a detached HEAD `""` where all three history writers spell it `null` — so on a detached HEAD every recorded run is attributed to nobody and each row reads `0 record(s)` | no producer: this is an advisory a human reads on a branch, and the block's own `branch` line already prints `(detached)`. One reader-pair over from KD-113, and in the same class |
-| **KD-124** | `attribute()` in `scripts/change-price.mjs` and `mine()` inside `summarize()` in `scripts/lib/proof-history.mjs` are two spellings of ONE attribution rule — a branch match plus a time window — in two files that share no code | nobody is wrongly served: the new reader is advisory, prints a count and refuses nothing, and the difference between the two spellings is the deliberate one its own docblock names. The honest remedy edits a file this slice put out of scope |
-| **KD-125** | `attribute()` matches `row.branch === branch`, and `currentBranch()` spells a detached HEAD `""` where all three history writers spell it `null` — so on a detached HEAD every recorded run is attributed to nobody and each row reads `0 record(s)` | no producer: this is an advisory a human reads on a branch, and the block's own `branch` line already prints `(detached)`. One reader-pair over from KD-113, and in the same class |
 | **KD-126** | `test/the-spent-block-asserts-counts-the-records-do-not-support.test.mjs` (its header and its line-78 failure message) still tells a contributor that `proof-plan.mjs --history` prints the malformed count for these files. It does not — `--history` reads `plans`, `reviews` and `fleet`, never `qa-artifacts/suite-history.jsonl`, and sums ONE count across the three | the same false fact `6231a21` corrected in production, surviving in a second spelling in the test file that found it. Nobody outside the repo is served by it: it misleads only a contributor reading that assertion's message. Round 2 was the last round, so it is logged rather than fixed |
 | **KD-127** | the second case of `test/the-advisory-states-what-its-own-input-refutes.test.mjs` opens `if (!cited) return;`, so on green bytes it asserts nothing, and the class it guards is pinned only against the literal string `proof-plan.mjs --history` — a citation to a different command that reported the fact no better would pass | deliberate and documented by its author (the test is a refuter, and the refutation has been answered), but it is a test measuring nothing today. The honest remedy is a claims table keyed on what a command reports rather than on its name; not built, because it is a new mechanism and this slice's two rounds are spent |
 
@@ -2380,7 +2378,7 @@ programs deriving one label by different rules, agreeing everywhere except the e
 reading the four files rather than by detaching HEAD: the writers' expression is identical in all
 three, and `currentBranch()`'s own docblock states the other spelling.*
 
-### KD-122 — the retired citation survives in the test file that found it
+### KD-126 — the retired citation survives in the test file that found it
 
 `test/the-spent-block-asserts-counts-the-records-do-not-support.test.mjs`
 
@@ -2398,7 +2396,7 @@ Not fixed because the finding arrived in round 2, and `docs/KNOWN-DEFECTS.md` ca
 rounds and admits no third. It is a comment, in a test, in this repository: the routing line's
 second row, and not close to the first.
 
-### KD-123 — a refuter that self-disables once its refutation is answered
+### KD-127 — a refuter that self-disables once its refutation is answered
 
 `test/the-advisory-states-what-its-own-input-refutes.test.mjs`
 
