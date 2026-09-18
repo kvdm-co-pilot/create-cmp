@@ -63,6 +63,16 @@ to follow (name the exemplar), the clause/gate expectations, the verification co
 run, and what it must NOT touch (so parallel agents don't collide). State its definition of
 done as a gate it runs itself and iterates against — not "looks right."
 
+**A brief for a REVIEW carries one fact more: which round it is.** Only you hold it — a reviewer
+cannot see its own place in a sequence — and it decides both what that round has to read and what
+its record is worth to everything downstream. So name the number, say whether the round is a fresh
+read or a re-confirmation of bytes that moved under an earlier one, and hand over what it reads:
+`node scripts/change-price.mjs` prints which round is next, the literal command for it, and whether
+it is owed. `docs/KNOWN-DEFECTS.md`'s header is the rule both of those answer to; neither this line
+nor that program restates it. The reviewer writes the number down with `--round <n>`
+(`.claude/agents/staff-reviewer.md`) — leave it out of your brief and it cannot, the row joins the
+ones nothing can count, and the next round is priced owed for no better reason than that.
+
 ## Spec-first (this harness is specification-driven)
 New behavior begins as a spec clause (`specs/<feature>.spec.md`, Given/When/Then, stable id) —
 AI proposes, human confirms — *before* code. Durable tests cite the clause (`// SPEC: <ID>`).

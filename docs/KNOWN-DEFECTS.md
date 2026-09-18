@@ -181,6 +181,9 @@ you the same list without opening anything.
 | **KD-126** | `test/the-spent-block-asserts-counts-the-records-do-not-support.test.mjs` (its header and its line-78 failure message) still tells a contributor that `proof-plan.mjs --history` prints the malformed count for these files. It does not — `--history` reads `plans`, `reviews` and `fleet`, never `qa-artifacts/suite-history.jsonl`, and sums ONE count across the three | the same false fact `6231a21` corrected in production, surviving in a second spelling in the test file that found it. Nobody outside the repo is served by it: it misleads only a contributor reading that assertion's message. Round 2 was the last round, so it is logged rather than fixed |
 | **KD-127** | the second case of `test/the-advisory-states-what-its-own-input-refutes.test.mjs` opens `if (!cited) return;`, so on green bytes it asserts nothing, and the class it guards is pinned only against the literal string `proof-plan.mjs --history` — a citation to a different command that reported the fact no better would pass | deliberate and documented by its author (the test is a refuter, and the refutation has been answered), but it is a test measuring nothing today. The honest remedy is a claims table keyed on what a command reports rather than on its name; not built, because it is a new mechanism and this slice's two rounds are spent |
 | **KD-128** | five tool-schema facts are now stated in this repository and none can be re-read here: four about `SendMessage` in `agents/cmp-orchestrator.md` (no `run_in_background`; a send never blocks; no reply arrives inside the sending turn; the reply is delivered to a later one), and KD-120's answer ("**Both are** … confirmed from the harness's own tool schemas") | KD-120 one level down: that entry left open whether two tool NAMES are real, and both the answer and a claim about one's parameter LIST arrived from outside the tree. They may well be right; what is logged is that no gate here can ever red if the schema moves, so the shipped bullet and the closed entry both rest on a fact this repository cannot hold |
+| **KD-129** | `node scripts/change-price.mjs` now PRINTS which review round is next and what it reads — text a reader acts on, about this file's rule — and `test/the-review-rule-is-stated-twice.test.mjs` scans `.claude/agents/`, `skills/`, `agents/` and one printed string, so no `scripts/` text is read by it | nothing false is printed today: measured at zero six-word runs shared with the header across every file this slice touched, and the one printed sentence that had stopped being true of the tree was corrected here. What is logged is the hole, not a drift |
+| **KD-130** | `reviewDischarge` copies six named fields of a review record into `plan.reviewDischarged`, and `round`/`kind` are not among them — so the settled-plan history `--history` reads can say a review discharged the slice and never which round did | no reader consumes a round from there: the block that prices rounds reads `review-history.jsonl`, where both fields ARE written. The honest remedy edits the plan-event schema and its summariser, which is the file KD-124 already names |
+| **KD-131** | the same bytes ran FAIL and then PASS ninety seconds apart: `inspector/mcp/test/preview-service.test.mjs`'s *"a stale state with NOTHING pending says so"* failed inside a full `npm test` and passed alone (83/83) and on an immediate re-run, and `qa-artifacts/suite-history.jsonl` holds both verdicts against the SAME `observedHash` | no adopter runs this repository's inspector tests, and nothing in the failing path is imported by the slice that saw it. It is the same family as KD-56, which already owns the inspector's load-sensitive tests; what is new here is the measurement, and the FAIL record this branch leaves on disk |
 
 ---
 
@@ -2239,10 +2242,12 @@ invisible. The blind spots are what a future edit can walk into, not what is wro
 
 **What is wrong today is the reason given for one of them.** `readDefinition` strips fenced blocks
 under the comment *"Fenced blocks are examples and shell, not instructions to this agent."* Both
-fenced blocks in this repository's agent definitions are instructions: `agents/cmp-orchestrator.md`
-lines 152–156 are the `qa/plan.mjs --hold/--beat/--release` claim the orchestrator is told to make,
-and `.claude/agents/staff-reviewer.md` lines 117–120 are the `--record-review` command it is told
-not to hand-write. Neither names a tool, so the behaviour is right and only its justification is
+fenced blocks in this repository's agent definitions are instructions: the
+`qa/plan.mjs --hold/--beat/--release` block under *Progress must be visible while it happens* in
+`agents/cmp-orchestrator.md` is the claim the orchestrator is told to make, and the block under
+*Leave a record* in `.claude/agents/staff-reviewer.md` is the `--record-review` command it is told
+not to hand-write. (Both were cited by line number until 2026-09-19, when an edit to each file
+moved both — KD-70, in the log that logged it. Sections do not renumber.) Neither names a tool, so the behaviour is right and only its justification is
 false — and the justification is what the next person will reason from.
 
 *Logged 2026-09-18, review round 1. Measured by execution, not read.*
@@ -2440,6 +2445,93 @@ distinguishing them from this repository's derived claims, and nothing reds if t
 
 *Logged 2026-09-18, review round 1 of the fix; corrected round 2, when round 1's own fix made the
 first version of this entry false of the tree.*
+
+### KD-129 — the round block is acting text about the review rule, and the drift scan cannot read it
+
+`scripts/change-price.mjs` (PART 4) · `test/the-review-rule-is-stated-twice.test.mjs` (`actingTexts`)
+
+That test derives its own subject rather than listing it: every tracked file under
+`.claude/agents/`, `skills/` or `agents/` that names this file, plus `TIERS.review.how` taken from
+the program so a reworded one is still scanned. What it is protecting is text a reader ACTS ON at
+the moment of decision. As of this slice, `node scripts/change-price.mjs` prints which round is
+next, the command that round must read, and whether it is owed — text a reader acts on, about this
+file's rule — and no prefix in that derivation matches `scripts/`.
+
+**Why it does not block.** Nothing false is printed today, and that is measured rather than
+asserted: run the scan's own six-word-run comparison against the header over every file this slice
+touched (`scripts/change-price.mjs`, `scripts/proof-plan.mjs`'s printed `how`,
+`.claude/agents/staff-reviewer.md`, `agents/cmp-orchestrator.md`, the brief and the test) and the
+shared count is **zero**. The one printed sentence that HAD stopped being true of the tree — "nothing
+here records which of these rows was a round", false the moment `--record-review` grew `--round` —
+was corrected in this same slice rather than logged. What is logged is the HOLE: the drift this gate
+exists to catch can now happen one file over, silently, and the next person to reword the round
+block has nothing checking them.
+
+**Why logged and not fixed.** Widening `actingTexts()` is new mechanism inside a gate and outside
+the brief that commissioned this slice, and a wider refusal owes docs/GATE-RULES.md Rule 1 a
+calibrated kept plant of its own. It is also not a one-line widening: that test's header explains
+why `TIERS.review`'s comment block is deliberately outside the scan — a comment may quote a dead
+rule as history without being a second statement of the live one — and `scripts/` is full of exactly
+that shape. The honest remedy scans what a program PRINTS, as it already does for one string, which
+means driving each program's render rather than reading its source.
+
+*Logged 2026-09-19 by the slice that created the hole, before any review round.*
+
+### KD-130 — a discharged review's plan event does not say which round discharged it
+
+`scripts/proof-plan.mjs` (`reviewDischarge`, `planEvent`) · `scripts/lib/proof-history.mjs`
+
+`reviewDischarge` builds `plan.reviewDischarged` from six named fields of the review record — `at`,
+`treeHash`, `commit`, `tests`, `decisions`, `nothingFound` — and `--close` appends the whole plan to
+`proof-plan-history.jsonl`. `round` and `kind`, added to the record in this slice, are not among the
+six. So the kept plan history, which is what `--history` reads to answer what a settled slice cost,
+can say that a review discharged a slice and never say which round it was.
+
+**Why it does not block.** Nothing reads a round from there. The block that prices rounds reads
+`qa-artifacts/review-history.jsonl`, where `recordReview` writes both fields, and that is the file
+the pricing question needs; `--history` counts records, which is the honest unit for the question it
+answers. Nobody is wrongly served today — what is lost is a future question ("how many rounds did
+settled slices actually take?") that nothing asks yet.
+
+**Why logged and not fixed.** Carrying the fields forward means touching the plan-event shape and
+the summariser that reads it, which is `scripts/lib/proof-history.mjs` — the file KD-124 already
+names as holding the second spelling of the attribution rule. Adding a field to it while that is
+open would be a change bolted onto a seam this repository has already logged as needing a slice of
+its own.
+
+*Logged 2026-09-19 by the slice that created the gap, before any review round.*
+
+### KD-131 — one tree, two verdicts: a fixed-port preview-service test under full-suite load
+
+`inspector/mcp/test/preview-service.test.mjs:2922` · `qa-artifacts/suite-history.jsonl`
+
+Measured 2026-09-19 while gating the round-pricing slice. The full suite ran twice over bytes
+nothing had touched in between, and the kept records say it plainly — same `observedHash`
+(`e386597…`), `FAIL` at 22:10:52Z and `PASS` at 22:12:22Z. The failing assertion is
+`assert.match(page, /NOT refreshing/)`: the service was in the right state (`stale`, `pending:
+false`, `phase: "unrefreshed"` all asserted and passing on the line above), and what came back from
+`fetch` was a console page that did not carry the banner. Run alone, the file is 83/83.
+
+Two things in the test are load-shaped rather than logic-shaped: it binds a FIXED port (19737)
+rather than an ephemeral one, and it waits for `phase !== "idle"` on a 100 × 20 ms budget that a
+busy machine can exhaust. A fixed port makes "the page I fetched is the service I started" an
+assumption rather than a derivation, which is this repository's own
+`served-page-is-not-your-code` shape one process over.
+
+**Why it does not block.** No adopter runs create-cmp's inspector tests, and nothing in the failing
+path is imported by the slice that observed it — the change under gate was `scripts/`, agent
+definitions and docs. The second record over identical bytes IS the evidence that it is
+non-deterministic rather than a break: a deterministic consequence of a diff does not pass ninety
+seconds later on the same tree.
+
+**Why logged and not fixed.** `inspector/mcp/` is another slice's file, KD-56 already holds the
+class for it ("fails inside a full suite run and passes alone", and it names the owner), and the
+honest fix — an ephemeral port and a derived readiness wait — is a change to a test this slice has
+no business editing while gating something else. What this entry adds is the measurement KD-56 asks
+for and a warning to the next reader of this branch's suite history: the `FAIL` row is this, and it
+is followed by a `PASS` over the same hash.
+
+*Logged 2026-09-19 by the slice that ran the suite, before any review round.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is

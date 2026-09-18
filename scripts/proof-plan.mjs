@@ -24,7 +24,8 @@
 //   node scripts/proof-plan.mjs --open "<what this slice is>"
 //   node scripts/proof-plan.mjs                     what is owed right now
 //   node scripts/proof-plan.mjs --discharge         record that the device tier ran
-//   node scripts/proof-plan.mjs --record-review     write the review record (the reviewer's own output)
+//   node scripts/proof-plan.mjs --record-review --round <n> [--kind round|rerecord]
+//                                                   write the review record (the reviewer's own output)
 //   node scripts/proof-plan.mjs --discharge-review  record that a review of this tree happened
 //   node scripts/proof-plan.mjs --close             refuse if anything is still owed
 //   node scripts/proof-plan.mjs --history [--json]  what settled slices cost, from the kept records
@@ -126,7 +127,9 @@ const TIERS = Object.freeze({
     // (KD-12). A rule stated twice drifts in one, which this repo's own CLAUDE.md
     // says, and the second statement is always the one nobody updates.
     how:
-      "invoke the staff-reviewer on this diff (.claude/agents/staff-reviewer.md); it writes qa-artifacts/review-latest.json — or `node scripts/proof-plan.mjs --record-review --nothing-found` if it found nothing.\n" +
+      "invoke the staff-reviewer on this diff (.claude/agents/staff-reviewer.md); it writes qa-artifacts/review-latest.json — or `node scripts/proof-plan.mjs --record-review --round 1 --nothing-found` if it found nothing.\n" +
+      "      SAY WHICH ROUND IT IS: --round <n>, and --kind round|rerecord where the row is a re-confirmation rather than a read.\n" +
+      "      Omit them and the row cannot be counted, so `node scripts/change-price.mjs` prices the next round OWED on the ground that it cannot tell.\n" +
       "      HOW MANY ROUNDS, what blocks, where everything else goes, and how the last round records: the header of\n" +
       "      docs/KNOWN-DEFECTS.md. That is the rule's one statement. This line names it and stops.",
   },
@@ -143,11 +146,37 @@ function sh(cmd, args) {
  * an empty list is a tree that IS trunk and owes nothing, while `null` fails
  * open through `deriveTierNeed` and owes the tier, because an unanswerable
  * question costs a device run rather than a missed regression.
+ *
+ * `since` MOVES THE FLOOR AND NOTHING ELSE. With no argument this is exactly
+ * what it has always been — the merge-base with `origin/main`, three-dot — and
+ * that path is pinned by a test, because this function sits under a refusal
+ * (`obligation` → the proof gate) and a generalisation that quietly moved what
+ * a gate reads would be the defect, not the feature. Given a commit it answers
+ * "what has changed SINCE that commit", which is what
+ * `scripts/change-price.mjs` needs to price a second review round: the union
+ * with the working tree is the half that matters there, since round 1's fixes
+ * are uncommitted for most of the time they exist, and an empty delta is the
+ * one thing that makes a further round not owed.
+ *
+ * TWO DOTS THERE, THREE HERE, deliberately: the range is also PRINTED to the
+ * reader as the command to run (beside `git status --porcelain`, which is the
+ * other half of what this reads), so it must be the range that was read. For a
+ * commit that is an ancestor of HEAD the two spellings are the same answer. For
+ * one that is not — an orphan left behind by the rebase ADR-0014 rebinds a
+ * record across — two dots report that commit's content as changed too, which
+ * overstates the delta. Overstating it says OWED, and that is the direction
+ * this is allowed to be wrong in.
  */
-function changedPaths() {
-  const base = sh("git", ["merge-base", "HEAD", "origin/main"]);
-  if (base.status !== 0) return null;
-  const diff = sh("git", ["diff", "--name-only", `${base.stdout.trim()}...HEAD`]);
+function changedPaths(since = null) {
+  let range;
+  if (since === null) {
+    const base = sh("git", ["merge-base", "HEAD", "origin/main"]);
+    if (base.status !== 0) return null;
+    range = `${base.stdout.trim()}...HEAD`;
+  } else {
+    range = `${since}..HEAD`;
+  }
+  const diff = sh("git", ["diff", "--name-only", range]);
   if (diff.status !== 0) return null;
   const dirty = sh("git", ["status", "--porcelain"]);
   if (dirty.status !== 0) return null;
@@ -437,13 +466,48 @@ function renderReview(o, L) {
 }
 
 /**
+ * THE TWO KINDS OF THING A REVIEW RECORD CAN BE, named, because a row that does
+ * not say which is indistinguishable from the other.
+ *
+ * `round` is a reader that read a diff. `rerecord` is the same reader
+ * confirming the same finding against bytes that moved under it — the case
+ * docs/KNOWN-DEFECTS.md's header settles, and it is the header that settles it;
+ * this is a vocabulary, not a second statement of the rule.
+ *
+ * MEASURED IN THIS REPOSITORY'S OWN EVIDENCE, 2026-09-18: the 19:58 row of
+ * `qa-artifacts/review-history.jsonl` carries the words "this is a re-record
+ * after a rebase" INSIDE its free-text `tests` array, because there was no field
+ * to put it in. Nothing can count that, so `scripts/change-price.mjs` can only
+ * ever call its row count an upper bound on rounds.
+ */
+export const REVIEW_KINDS = Object.freeze(["round", "rerecord"]);
+
+/**
  * Write the reviewer's record, and keep it. WHAT was found comes from the caller
  * (only the reviewer knows it); WHICH TREE was read is computed here, so no caller
  * can assert that a review describes bytes it never saw. The latest record is what
  * a discharge reads; the history row is the same record with the branch it was
  * written on, so a review can be attributed to its slice after the plan is gone.
+ *
+ * `round` AND `kind` ARE OPTIONAL, AND ABSENT MEANS UNKNOWN — never zero, never
+ * "the first". Every record written before these existed is missing them and
+ * none is rewritten: backfilling would be a guess recorded as a fact, in the one
+ * file this product holds up as evidence. What reads them resolves unknown
+ * CONSERVATIVELY: `scripts/change-price.mjs` prices the next round OWED where it
+ * cannot tell, because an error there costs paperwork in one direction and a
+ * SKIPPED review in the other, and only one of those is recoverable.
+ *
+ * THE SCHEMA STRING DOES NOT MOVE, AND THAT IS THE DECISION RATHER THAN AN
+ * OVERSIGHT. `reviewDischarge` below refuses outright on a schema it does not
+ * recognise — "refusing rather than reading fields whose meaning is a guess" —
+ * so bumping to /2 would refuse every record already on disk, including one
+ * written minutes earlier by a slice in flight, over two fields that are
+ * additive and optional. A schema version exists to stop a reader misreading a
+ * field whose MEANING changed; nothing here changed meaning. A /1 reader that
+ * has never heard of `round` reads exactly the fields it knows, and they still
+ * say what they said.
  */
-export function recordReview({ tests = [], decisions = [], nothingFound = false }, { root = REPO_ROOT, now = new Date() } = {}) {
+export function recordReview({ tests = [], decisions = [], nothingFound = false, round = null, kind = null }, { root = REPO_ROOT, now = new Date() } = {}) {
   const git = (args) => spawnSync("git", args, { cwd: root, encoding: "utf8" });
   const head = git(["rev-parse", "HEAD"]);
   const branch = git(["branch", "--show-current"]);
@@ -459,6 +523,11 @@ export function recordReview({ tests = [], decisions = [], nothingFound = false 
     tests,
     decisions,
     nothingFound,
+    // Written only when the caller said so. A key present with a null value and
+    // a key absent read the same to everything downstream, and both mean
+    // unknown — but the absent one cannot be mistaken for a recorded null.
+    ...(round === null ? {} : { round }),
+    ...(kind === null ? {} : { kind }),
   };
   const latest = path.join(root, "qa-artifacts", "review-latest.json");
   fs.mkdirSync(path.dirname(latest), { recursive: true });
@@ -567,6 +636,24 @@ function main() {
     const tests = list(opt("--tests"));
     const decisions = list(opt("--decisions"));
     const nothingFound = flag("--nothing-found") !== -1;
+    // WHICH ROUND THIS IS, AND WHETHER IT IS ONE. Both optional, and a value
+    // that does not parse is REFUSED rather than written: this is the same
+    // refusal `--nothing-found` against findings already makes, for the same
+    // reason. A record carrying `kind: "rerecrd"` reads as unknown forever and
+    // looks like an answer, and the one thing this command will not do is write
+    // down something nobody can act on. Omit them and the row says nothing,
+    // which is honest; misspell them and it would say something false.
+    const roundArg = opt("--round");
+    const round = roundArg === null ? null : Number(roundArg);
+    if (roundArg !== null && (!Number.isInteger(round) || round < 1)) {
+      process.stderr.write(`--round takes a whole number from 1 — "${roundArg}" is not one. Which round a record is decides what the NEXT one has to read, so a guess here is worse than silence.\n`);
+      process.exit(2);
+    }
+    const kind = opt("--kind");
+    if (kind !== null && !REVIEW_KINDS.includes(kind)) {
+      process.stderr.write(`--kind takes ${REVIEW_KINDS.join(" or ")} — not "${kind}". What separates them, and what a re-record is for, is the header of docs/KNOWN-DEFECTS.md.\n`);
+      process.exit(2);
+    }
     if (!tests.length && !decisions.length && !nothingFound) {
       process.stderr.write(
         'a review record needs what the review produced: --tests "name; name" and/or --decisions "one line; one line", or --nothing-found if that is the honest result.\n' +
@@ -578,8 +665,14 @@ function main() {
       process.stderr.write("--nothing-found contradicts the findings passed with it — one record cannot say both\n");
       process.exit(2);
     }
-    const record = recordReview({ tests, decisions, nothingFound });
-    process.stdout.write(`review recorded — qa-artifacts/review-latest.json, tree ${record.observedHash.slice(0, 7)}\nNow: ${TIERS.review.cmd}\n`);
+    const record = recordReview({ tests, decisions, nothingFound, round, kind });
+    // WHAT THE ROW WILL SAY IT IS, back to its writer. A field nobody sees go in
+    // is a field nobody notices missing, and unknown is the state that costs a
+    // round downstream — so the absence is printed as loudly as the value.
+    const said = round === null && kind === null
+      ? "it does NOT say which round it is — `node scripts/change-price.mjs` will price the next round OWED because it cannot tell. Add --round <n> [--kind round|rerecord]"
+      : `round ${round ?? "unstated"}, kind ${kind ?? "unstated"}`;
+    process.stdout.write(`review recorded — qa-artifacts/review-latest.json, tree ${record.observedHash.slice(0, 7)}\n${said}\nNow: ${TIERS.review.cmd}\n`);
     process.exit(0);
   }
 
