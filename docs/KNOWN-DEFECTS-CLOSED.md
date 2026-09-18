@@ -9,6 +9,68 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it — **CLOSED 2026-09-19**
+
+`packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)
+
+`consumesNext` lets a declared boolean swallow the next token when it is exactly `true` or
+`false`, and its docstring gives the reason: "`flagBool` is tri-state by contract". Two places
+that value arrives where nothing is tri-state: `packages/harness` has no `flagBool` at all (every
+reader is truthiness, and `Boolean("false")` is `true`), and `flagBool` reads the value form of
+`x` but never of `no-x` while `consumesNext` consumes it either way.
+
+Re-opened by review round 1 of `refuse-unknown-args`, because `5c2cea6` moved it to **Closed**
+under a heading that describes KD-17 ("the flag lists could not reach a typo or a short flag"),
+and refusing an unrecognised argument cannot reach it: `--dry-run` and `--no-ios` are both
+*recognised*. Both halves reproduce verbatim on `5c2cea6`:
+
+```
+$ cd cwd && prooflane init --dry-run false ../pC --no-interview
+  project: …/pC   ✓ 50 files written   ! --dry-run: nothing was written.
+
+$ node -e 'parseArgs(["--no-ios","true","./my-app"])'  →  {"no-ios":"true"}
+  flagBool(flags, "ios", true)  →  true          ← the flag the user typed does nothing
+```
+
+**Its placement was wrong, and the reason it kept was the abolished exemption in a new costume.**
+The entry said "neither half is a regression … and an adopter is no worse served than before" —
+which is *pre-existing*, the criterion this file's header struck off the line on 2026-09-14,
+wearing the words "no worse than before" instead of the word "pre-existing". The header's own
+answer is that age decides who paid for a defect and never whether it blocks; the question is
+whether shipping it WRONGLY SERVES an adopter. Re-placed against that line on 2026-09-19 and
+measured on `8bd782a`, it is the first row twice over — *given a tree they did not ask for*, and
+*sent into a refusal* the wrong way round:
+
+```
+$ create-cmp upgrade --dry-run true --yes --target-dir <a two-line version catalog>
+  Apply these changes (backups written as *.bak-upgrade)? (auto-yes)
+  ✓ wrote gradle/libs.versions.toml (backup: gradle/libs.versions.toml.bak-upgrade)
+  Applied.
+
+$ prooflane init --new-profile false --dry-run --no-interview <a tree the cmp profile claims>
+  ✓ 51 files written          ← the claimed-tree refusal (install/init.mjs:950) never fired
+```
+
+An adopter who wrote `--dry-run true` had their version catalog rewritten, with the consent
+prompt skipped by the `--yes` on the same line — the flag that protects the tree was the one
+misread, and the flag that removes the last question was the one read correctly.
+
+**CLOSED at the parser, which is the only place that reaches every reader.** A declared boolean
+that consumes `true`/`false` now stores the BOOLEAN, at both doors and at the harness door's `=`
+branch, so the ~24 sites spelled `=== true` / `!== true` / `Boolean(...)` are right without one
+of them being edited. `flagBool` reads `x` and `no-x` through one tri-state helper (`--no-x
+false` is true; today's precedence — the affirmative name answers first — is unchanged and now
+pinned), the harness package has the same `flagBool` and its six boolean reads go through it, and
+a declared boolean still holding a string after all that (`--dry-run=maybe`, reachable only
+through the `=` form) is refused by name at both bins. The SPACE form holding anything else is
+deliberately not refused: that is KD-7's shape, and KD-150 logs what it costs.
+
+*Logged 2026-09-14 (review round 2 of `fix-flag-eats-target`); closed and re-opened 2026-09-14;
+closed 2026-09-19 by the slice that fixed it, with
+`test/a-dry-run-asked-for-in-words-writes-the-tree.test.mjs` and
+`test/a-declared-booleans-value-arrives-as-a-string.test.mjs` — 54 of the truth table's 162 rows,
+and all three end-to-end shapes, measured red on `8bd782a` first.*
+
 ### KD-117 — one measurement, two defect numbers: the doc credited KD-79 where the code credits KD-105 — **CLOSED 2026-09-18, in the round that found it**
 
 `docs/GATE-RULES.md` (Rule 4) vs `scripts/hooks/proof-gate.mjs` (`IN_WORD`, `GAP`)

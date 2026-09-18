@@ -80,13 +80,26 @@ function flagBoolNames() {
   return found;
 }
 
-/** Every flag name the shared installer modules read, whichever front door ran. */
+/**
+ * Every flag name the shared installer modules read, whichever front door ran.
+ *
+ * `flagBool(flags, "x")` IS A READ, and the scan has to see it or it goes blind
+ * exactly when the code gets better. When KD-16's fix routed the installer's six
+ * boolean reads through `flagBool`, the literal `flags["dry-run"]` /
+ * `flags["new-profile"]` / `flags["no-interview"]` spellings left the tree and
+ * this scan silently narrowed from six names to three — while still passing its
+ * own `length > 0` guard, which is what a vacuity floor cannot catch. The names
+ * it dropped are the three that BOTH doors declare boolean, i.e. the whole
+ * subject of the test below. Widened here rather than pinned by a list, for the
+ * same reason the original scan reads the source: a seventh read added tomorrow
+ * is covered on the day it is written.
+ */
 function sharedInstallerFlags() {
   const names = new Set();
   for (const file of mjsUnder(path.join(ROOT, "packages", "harness", "install"))) {
     const text = fs.readFileSync(file, "utf8");
-    for (const m of text.matchAll(/flags\[\s*"([^"]+)"\s*\]|flags\.([A-Za-z_$][\w$]*)/g)) {
-      names.add(m[1] ?? m[2]);
+    for (const m of text.matchAll(/flagBool\(\s*flags\s*,\s*"([^"]+)"|flags\[\s*"([^"]+)"\s*\]|flags\.([A-Za-z_$][\w$]*)/g)) {
+      names.add(m[1] ?? m[2] ?? m[3]);
     }
   }
   return [...names];

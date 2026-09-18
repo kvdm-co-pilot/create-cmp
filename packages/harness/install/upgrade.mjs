@@ -44,6 +44,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { colors, ok, warn, fail } from "./log.mjs";
+import { flagBool } from "./args.mjs";
 import { frontDoor, HARNESS_SRC, vendorPlan } from "./init.mjs";
 import { MANIFEST_REL_PATH } from "../src/lib/harness-manifest.mjs";
 import { LOCK_PATH } from "../src/lib/harness-lock.mjs";
@@ -163,7 +164,7 @@ export async function runHarnessUpgrade(flags, positional, opts = {}) {
   const cmd = frontDoor(opts.invocation);
   const targetDir = (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
   const root = path.resolve(targetDir);
-  const dryRun = Boolean(flags["dry-run"]);
+  const dryRun = flagBool(flags, "dry-run", false);
 
   process.stdout.write(`\n${colors.bold(cmd.upgrade)} — re-vendor this project's lane\n  project: ${colors.cyan(root)}\n\n`);
 
