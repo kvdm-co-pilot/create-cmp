@@ -18,6 +18,28 @@ All notable changes to this project are documented here. The format is based on
   `false` attached with `=` is refused by name; the space form is untouched, so
   `create-cmp --minimal my-app` still works.
 
+- **`create-cmp doctor` said "The walk is wired" about a status line that produces nothing.** Its
+  presence test was a substring — `command.includes("walk-status.mjs")` — and the status line the
+  template ships is `test -f qa/walk-status.mjs && node qa/walk-status.mjs --statusline || true`,
+  which contains that string and resolves against the SESSION's directory rather than the project's.
+  For any session whose cwd is not the project root (the monorepo `services/` layout the walk exists
+  to serve) the surface silently produces nothing, `|| true` guaranteeing the silence — and the
+  diagnostic whose whole purpose is to say whether the app is healthy reported that state at level
+  `ok`. Two populations: apps stamped through 0.26.2 (whose UserPromptSubmit hook is relative too),
+  and **every new stamp**, because the template's status line is still relative as it ships and
+  cannot be anchored (KD-90). Doctor now asks `anchorViolations` — the surface-aware detector that
+  already refuses to credit an anchor on a surface the variable never reaches — and reports a
+  **`warn` naming which surface is inert, why the failure is silent, and what still works**: the
+  anchored hook, and `node qa/walk-status.mjs` by hand. It offers no automatic heal, because one
+  half would rewrite a command the app owns and the other half has no correct rewrite to offer.
+
+- **A comment in the shipped walk said the status line gets no stdin. It does.** `walk-status.mjs`
+  asserted *"the statusline gets no stdin and must not wait on one"* while `src/lib/hooks.mjs` and
+  KD-90 said the opposite three files away. Settled from the official statusLine documentation and
+  corrected in the comment: a status line IS handed JSON on stdin carrying `workspace.project_dir`,
+  which is the root the relative command cannot find. No behaviour changed — only `--inject` ever
+  read stdin — but the false half was the one that would have sent whoever takes the real fix
+  looking for a mechanism that is already there (KD-181).
 
 - **A tree whose packages are not installed told a contributor their change broke three tests.**
   Measured 2026-09-18 in a fresh git worktree with `inspector/mcp`'s packages absent: `npm test`

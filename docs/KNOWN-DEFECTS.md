@@ -139,11 +139,11 @@ you the same list without opening anything.
 | **KD-82** | the ordering verdict is commit-graph ancestry where every other obligation here is trigger-path bytes | the refusal's remedy is the rebase you owe the merge anyway; it costs a rebase, never a run |
 | **KD-83** | "the ordinary owed-allow is byte-identical to before the ordering check" is verified by nothing | the cross-path comparison beside it is real; only the historical claim is unpinned |
 | **KD-84** | `declaredBudgetMs` has two implementations and the declared 10s has three spellings | all three agree today, and the unreadable-settings fallback errs small |
-| **KD-85** | every app stamped through 0.26.2 keeps three cwd-relative hook commands, and nothing retro-anchors them — not `doctor --fix`, which adds the walk wiring and never rewrites a hook the app already has | no act available here — those trees are other repositories; and no command an adopter runs would tell them |
+| **KD-85** | every app stamped through 0.26.2 keeps three cwd-relative hook commands, and nothing retro-anchors them — not `doctor --fix`, which adds the walk wiring and never rewrites a hook the app already has | **re-placed 2026-09-19**, against the line and not its age: the half that said *no command an adopter runs would tell them* is now false — `create-cmp doctor` names the walk's unanchored surfaces and prints the anchor. What is left is row 2: no commit here rewrites a file another repository owns, and the Stop hook's third command still goes unreported (it fails loudly) |
 | **KD-86** | the anchoring detector judges `.mjs/.cjs/.js/.sh` only, so a hook invoking `python qa/x.py` or a bare `qa/tool` reads clean | measured against the template: every command it ships is `node` or `test -f`, so the allow-list refuses nothing that exists today |
 | **KD-87** | the anchoring detector equates *single-quoted* with *not executed*, so `sh -c '…'` / `eval '…'` read clean; and it reads each match's prefix from the UNMASKED command, so a shell-inert `'${CLAUDE_PROJECT_DIR:-.}/…'` counts as anchored | both measured by execution and bounded by `test/hook-anchoring-differential.test.mjs`; no command in either shipped settings file is in the blind spot, and the gate reds the day one is |
 | **KD-88** | "every surface that carries a command" is spelled as a two-item list (`hooks[*][*].hooks[*].command` + `statusLine.command`) in both readers, and `settings.json` executes more than that — `apiKeyHelper`, `awsAuthRefresh`, `awsCredentialExport` | measured: a fourth hook EVENT and a second hook in an existing group are both caught BY NAME; only a non-`hooks`, non-`statusLine` key is invisible, and neither settings file has one |
-| **KD-90** | the `statusLine` third of the hook-anchoring fix is NOT fixed — `CLAUDE_PROJECT_DIR` is not exported to a statusLine command, so the anchor would be inert | measured against the docs, not guessed; the surface keeps its relative form rather than an anchor that reads as protection, and a behavioural test pins it still failing |
+| **KD-90** | the `statusLine` third of the hook-anchoring fix is NOT fixed — `CLAUDE_PROJECT_DIR` is not exported to a statusLine command, so the anchor would be inert | **re-placed 2026-09-19**: the old reason (*nothing regressed*) is age, which the header abolished. The surface IS inert and an adopter IS affected — what moves it to row 2 is that they are now TOLD, by `doctor`, in the one place that could tell them. The remedy needs a different mechanism (stdin `workspace.project_dir`, KD-181), not a different spelling |
 | **KD-91** | the differential's `invoking >= 3` vacuity floor names the statusLine, which its own antecedent now skips | five surfaces are counted, so the floor holds with margin; only the sentence is stale |
 | **KD-92** | the actionable subset all three anchoring gates call is calibrated by nothing — `unfixedHookAnchors` replaced by `return []` leaves every anchoring test green | measured: the detector is right today, and the PLANT test calibrates the honest total; only the filter under it is unpinned |
 | **KD-93** | surface-awareness landed in ONE of the two readers — the differential asks `unanchoredPaths` with no surface (whose default is "anchorable"), and both behavioural harnesses export `CLAUDE_PROJECT_DIR` to the statusLine | the shipped statusLine is relative, so no instrument answers differently today; it fires only if someone writes the anchor on that surface |
@@ -196,6 +196,8 @@ you the same list without opening anything.
 | **KD-164** | the reason given in BOTH new copies of the arg parser for not sharing one module — "the published root tarball carries no copy of this directory" — is refuted by `npm pack` on the root: all nine files of `packages/harness/install/` ship, `args.mjs` beside `src/lib/args.mjs` in one 389-file tarball, and `package.json`'s `files` names the directory outright | the DECISION is right for a reason the comment does not give: `prooflane-harness`'s own 94-file tarball carries `install/args.mjs` and no `src/`, so the harness alone still cannot import the root's copy. Nobody is mis-served; the next reader of either file is told a packaging fact this tree answers the other way |
 | **KD-165** | the same bytes carry two suite verdicts three minutes apart: `bf79f72` recorded FAIL 2122/2124 at 05:47 in a run of 268552ms and PASS 2123/2124 at 05:50 in one of 105713ms, both against `observedHash` b359f866 — the failing case is `test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs`, whose verdict rests on two wall-clock bounds per case | not the slice's code: nothing the KD-16 change touches is on that file's import graph, and it passes alone here in 7.4s. It is KD-131's class with a member OUTSIDE `inspector/mcp/` — a test of the proof gate's own refusal path — so KD-131's "no adopter runs this repository's inspector tests" no longer covers the class |
 | **KD-166** | "when is this product's output styled" has two spellings that disagree: `src/lib/log.mjs` re-exports picocolors, which colours when `CI` is set even through a pipe, while `packages/harness/install/log.mjs` gates on `process.stdout.isTTY` and never colours through one | measured green both ways today — all 20 test files that drive `bin/create-cmp.mjs` pass with `CI=true` (154/154) — so no live member. What is logged is that the class has now been answered TWICE per-file (`bf79f72` here, and `the-fleet-command-…` before it) rather than once at the source, and that an adopter's piped CI log carries escape codes from one door and not the other |
+| **KD-180** | doctor's new status-line verdict over-reports an ABSOLUTE path (`node /Users/x/app/qa/walk-status.mjs` reads as cwd-relative), and its `ok` is unreachable end-to-end while `ANCHORABLE_SURFACES.statusLine` is `false` | measured, both directions: nothing in this repo or its heal writes an absolute status line, so the over-report has no subject; the direction is the conservative one the detector chooses on purpose, and the under-report direction — an `ok` over a silent surface — is what this slice closed |
+| **KD-181** | this tree stated the statusLine's stdin BOTH ways, and the false one governed a live path: `walk-status.mjs` said *the statusline gets no stdin*, `hooks.mjs` and KD-90 said it carries `workspace.project_dir` | settled 2026-09-19 from the official statusLine documentation (out of tree, KD-128's class): the comment was false and is corrected here. So the status line IS fixable — via stdin, not via the env var — and what is logged is that this slice does not take it: whether `$(cat)` can block with no payload is undocumented, and a status line that hangs is worse than one that prints nothing |
 
 ---
 
@@ -1319,6 +1321,21 @@ authored alone. That is a new adopter-facing diagnosis with its own consent ques
 rewriting a file the app owns, so it is a slice, not a line — and it is the same change that would
 close KD-86's half of this.
 
+**RE-PLACED 2026-09-19, and half the recorded reason was not a reason.** It read *"no act available
+here — those trees are other repositories; and no command an adopter runs would tell them."* The
+first clause answers who can be REACHED from this repository; the second answers who is SERVED, and
+that is the header's row-1 question. The second is now false: `create-cmp doctor` reads the app's
+own `.claude/settings.json` and names each walk surface whose invocation will not resolve, with the
+exact anchor to write for a hook (`src/commands/doctor.mjs`, `cwdRelativeWalkSurfaces`). The
+population that was broken AND uninformed is now merely broken and informed, which is row 2.
+
+**What this slice did NOT do, stated so the entry is not read as closed.** (1) No heal. Rewriting a
+command an app authored still needs the consent question this entry names, and `--fix` still only
+adds. (2) **Only two of the three commands are reported.** The finding filters to the walk
+(`walk-status.mjs`), so a 0.26.2 app's `Stop` hook — `node qa/receipt-check.mjs --hook` — is still
+diagnosed by nothing here. That one fails LOUDLY, which is why it is the third and not the first:
+the silent pair is what an adopter could not otherwise find out.
+
 ### KD-86 — the anchoring detector reads four script extensions, and a hook could invoke something else
 
 `src/lib/hooks.mjs` (`SCRIPT_PATH`)
@@ -1437,6 +1454,25 @@ is actively WRONG for the monorepo case this whole slice exists to serve (it ret
 root, not the app directory, which for payment-blueprint's `services/` layout is the wrong
 directory). Note also that `project_dir` is launch-anchored — "where Claude Code was launched" —
 so it is not a synonym for the project root either.
+
+**RE-PLACED 2026-09-19. The recorded reason was age wearing a different word.** *"Nobody is wrongly
+served … the surface is exactly as it was before the slice; nothing regressed"* answers who
+introduced it, and the header abolished that criterion: an adopter whose session starts anywhere but
+the project root gets no status line, whenever the bug arrived. What actually keeps it in row 2 is
+new as of this slice and was not true when the entry was written: **they are told.** `create-cmp
+doctor` reported `ok` — "The walk is wired" — over exactly this surface until today, which is the
+row-1 shape (told something false, by the diagnostic, about the thing the diagnostic is for) and is
+fixed in the same commit as this re-placement.
+
+**Two corrections to this entry, neither of which changes its verdict.**
+
+1. *"The command has to … replay the payload into `qa/walk-status.mjs`, which still expects the
+   JSON"* — it does not. `readHookStdin` is called only under `--inject`; the `--statusline` path
+   never reads stdin at all (`packages/harness/src/walk-status.mjs`). A fix must extract the root
+   and may drop the payload entirely.
+2. The mechanism half is now settled rather than costed: a statusLine command **does** receive JSON
+   on stdin carrying `workspace.project_dir`, so this surface is fixable — see KD-181, which also
+   records what that answer cost and why this slice still does not take it.
 
 ### KD-91 — the differential's vacuity floor names a command that can no longer reach it
 
@@ -2605,6 +2641,75 @@ CAP SPENT only with a row stating round ≥ 2 — the two directions that would 
 with that clause the only arm nothing reaches.
 
 *Logged 2026-09-19, review round 1.*
+### KD-180 — doctor's status-line verdict over-reports an absolute path, and its `ok` cannot be reached from a project
+
+`src/commands/doctor.mjs` (`cwdRelativeWalkSurfaces`) · `src/lib/hooks.mjs` (`ANCHORABLE_SURFACES`, `SCRIPT_PATH`)
+
+Two properties of the check that stopped doctor scoring a silent status line as wired, both measured
+on this tree rather than reasoned:
+
+1. **An absolute path reads as cwd-relative.** `node /Users/x/app/qa/walk-status.mjs --statusline`
+   resolves from every directory there is; the check reports it anyway. Two causes compound:
+   `ANCHORABLE_SURFACES.statusLine === false` means no form written there is credited, and
+   `SCRIPT_PATH` cannot tell absolute from relative — its first segment cannot start with `/`, so
+   the match begins after the leading slash and the prefix is lost.
+2. **`ok` is therefore unreachable end-to-end** for any project whose status line invokes the walk,
+   which makes the warn unfalsifiable from a fixture directory. The two places the answer CAN still
+   vary are pinned instead, and that is the whole of the negative control: the pure finding reads
+   `ok` when handed `cwdRelative: []`, and the deriver returns `[]` for a project whose only walk
+   invocation is an anchored hook — so it is not a function that always accuses.
+
+**Nobody is wrongly served, which is why this is logged.** Nothing in this repository writes an
+absolute status line and `doctor --fix` cannot (it copies the template), so the over-report has no
+subject today; and over-reporting is the direction `src/lib/hooks.mjs` chooses on purpose, because
+the other direction is an `ok` over a broken surface — the defect this slice exists to close. The
+hook side keeps KD-86's blind spot unchanged: a single-segment `node walk-status.mjs` in a HOOK
+still reads clean, where the same shape on the status line no longer does.
+
+**Fires when:** an app hand-writes an absolute status line and is told to fix a surface that works;
+or `ANCHORABLE_SURFACES.statusLine` becomes `true`, at which point `ok` becomes reachable and the
+fixtures in `test/doctor-calls-a-silent-status-line-wired.test.mjs` answer differently.
+*Logged 2026-09-19, by the slice that introduced the check, against its own change.*
+
+### KD-181 — this tree stated the statusLine's stdin both ways, and the false one governed the live path
+
+`packages/harness/src/walk-status.mjs` + `template/qa/walk-status.mjs` (`readHookStdin`) · `src/lib/hooks.mjs` (`ANCHORABLE_SURFACES`) · KD-90
+
+Two statements, both in this repository, that cannot both be true:
+
+- `src/lib/hooks.mjs` and KD-90: *"A statusLine command receives the project root on STDIN instead,
+  as `workspace.project_dir`."*
+- `walk-status.mjs`, in a comment on the function that reads stdin: *"the statusline gets no stdin
+  and must not wait on one."*
+
+**Settled 2026-09-19 from the official Claude Code statusLine documentation — and the code comment
+was the false one.** It is corrected in this commit rather than deleted, because it is the fact
+whoever takes the real fix will need, and the version that was there would have sent them looking
+for a mechanism that already exists. No behaviour changed: `readHookStdin` is called only under
+`--inject`, and `--statusline` never read stdin either way.
+
+**The out-of-tree facts, marked as such, which is KD-128's whole point** — all from that
+documentation, read 2026-09-19, and nothing here reds if any of them moves:
+
+| | |
+|---|---|
+| a statusLine command receives JSON on stdin | documented; every official example reads it |
+| the payload carries `workspace.project_dir` (launch dir) and `workspace.current_dir` | documented schema |
+| `CLAUDE_PROJECT_DIR` is **not** set for a statusLine — only `COLUMNS` and `LINES` | documented; this is the half KD-90 already had right, and it is why the anchor is inert there |
+| the cwd of a statusLine command | **not documented** — which is precisely why a relative command is unreliable rather than merely unanchored |
+| whether stdin EOFs when no payload is sent | **not documented** — so *"`in=$(cat)` cannot block"* is an INFERENCE, not a fact |
+
+**So the honest framing, which KD-90 did not have: the mechanism exists.** The status line is
+fixable — via stdin, not via a spelling of the env var. What is logged is that this slice does not
+take it, and the reason is the last row of that table: a shipped template command that hangs would
+make every session's status line wait forever, which is worse than one that prints nothing, and no
+gate in this repository can red it. Taking it also means deliberately retiring two pins written to
+fail the day it is fixed (`test/hook-anchoring.test.mjs`'s statusLine case and the executed case in
+`test/inert-anchor-scored-as-protection.test.mjs`) — a deliberate act with its own proof, not a side
+effect of correcting a diagnostic.
+
+*Logged 2026-09-19, review round 1 of the doctor-wiring slice; the contradiction was found while
+checking the brief's premises, and settled by a reading outside this tree.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is

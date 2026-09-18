@@ -47,7 +47,14 @@ test("the engine template IS the wiring of record — both halves are readable",
   assert.ok(promptSubmit && promptSubmit.length > 0, "template declares no walk UserPromptSubmit hook");
 });
 
-test("a project with the real template settings reads as wired", () => {
+test("a project with the real template settings: both surfaces invoke the walk, and the status line is cwd-relative", () => {
+  // This expectation was EDITED when doctor stopped scoring a silent status line
+  // as wired. It used to assert only the four presence booleans, under the title
+  // "reads as wired" — and that is precisely the claim the template does not
+  // support: its statusLine is `node qa/walk-status.mjs`, relative, and KD-90
+  // records that it cannot be anchored. `cwdRelative` is asserted here, against
+  // the real shipped file, so the presence half can never again be read as the
+  // whole answer. See test/doctor-calls-a-silent-status-line-wired.test.mjs.
   const dir = project(fs.readFileSync(path.join(ROOT, "template/.claude/settings.json"), "utf8"));
   try {
     assert.deepEqual(gatherWalkInputs(dir), {
@@ -55,6 +62,7 @@ test("a project with the real template settings reads as wired", () => {
       settingsPresent: true,
       statusLine: true,
       promptHook: true,
+      cwdRelative: ["statusLine"],
     });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -89,11 +97,17 @@ test("--fix wires an unwired project, and the walk then reads as wired", () => {
     // it to be discovered.
     assert.equal(after.hooks.Stop[0].hooks[0].command, "node qa/receipt-check.mjs --hook");
 
-    // And the project now diagnoses clean.
-    assert.equal(
-      diagnoseProject({ toml: null, walk: gatherWalkInputs(dir) }).find((f) => f.id === "walk-wiring").level,
-      "ok"
-    );
+    // And the project now diagnoses as far as this heal can take it — which is
+    // NOT clean, and this expectation was edited to say so. The heal copies the
+    // engine template, whose statusLine is cwd-relative by necessity (KD-90), so
+    // a healed project is wired on both surfaces with one of them resolving only
+    // from the project root. Asserting "ok" here is what let doctor ship the
+    // claim it could not support; the honest post-heal state is a warn that names
+    // the status line.
+    const healed = diagnoseProject({ toml: null, walk: gatherWalkInputs(dir) }).find((f) => f.id === "walk-wiring");
+    assert.equal(healed.level, "warn");
+    assert.match(healed.title, /status line/);
+    assert.equal(healed.fix.auto, false, "offered a second automatic heal for something --fix cannot fix");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
