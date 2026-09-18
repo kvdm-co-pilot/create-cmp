@@ -20,7 +20,7 @@ import { flagBool } from "../lib/args.mjs";
 import { colors, ok } from "../lib/log.mjs";
 import { probe } from "../bootstrap/exec.mjs";
 import { doctor as toolchainDoctor } from "../doctor.mjs";
-import { ANCHORABLE_SURFACES, anchorViolations } from "../lib/hooks.mjs";
+import { ANCHORABLE_SURFACES, anchorViolations, PROJECT_DIR_ANCHOR } from "../lib/hooks.mjs";
 import { diagnoseProject } from "../lib/project-doctor.mjs";
 import { parseProperties, upsertProperty, parseVersions } from "../lib/toml.mjs";
 import { loadRegistry } from "../lib/registry.mjs";
@@ -144,6 +144,34 @@ function cwdRelativeWalkSurfaces(settings) {
 }
 
 /**
+ * Surfaces whose command CARRIES the anchor. Positive evidence, and that is the
+ * whole point of it: the sibling list is derived from a DETECTOR'S SILENCE, and a
+ * detector has blind spots (a path with no directory segment, KD-86; a
+ * single-quoted span, KD-87). On a surface it cannot see, "no violation" means
+ * "nothing was examined" — so reading health out of it prints reassurance about a
+ * command nobody checked, which is the defect this whole finding exists to stop,
+ * one surface over.
+ *
+ * A hook surface counts only when EVERY invocation of the walk on it is anchored.
+ * One unanchored invocation is a session that silently gets nothing, and a surface
+ * that works sometimes is not one a health check may call working.
+ */
+function anchoredWalkSurfaces(settings) {
+  const carries = (entry) => String(entry?.command ?? "").includes(PROJECT_DIR_ANCHOR);
+  const out = [];
+  if (ANCHORABLE_SURFACES.statusLine === true && invokesWalk(settings?.statusLine) && carries(settings.statusLine)) {
+    out.push("statusLine");
+  }
+  const groups = settings?.hooks?.UserPromptSubmit ?? [];
+  const invocations = groups.flatMap((g) => (g?.hooks ?? []).filter(invokesWalk));
+  // Keyed `hooks`, not by event name — read the declaration, do not restate it.
+  if (ANCHORABLE_SURFACES.hooks === true && invocations.length > 0 && invocations.every(carries)) {
+    out.push("UserPromptSubmit");
+  }
+  return out;
+}
+
+/**
  * Is the walk installed, does .claude/settings.json invoke it, and will those
  * invocations RESOLVE? The machinery and the wiring live in separately-owned files
  * (lane vs app config), so they can and do come apart — see the walk-wiring
@@ -154,14 +182,14 @@ export function gatherWalkInputs(projectDir) {
   if (!scriptPresent) return null; // not a walk-carrying lane — nothing to say
   const raw = readIfExists(path.join(projectDir, ".claude", "settings.json"));
   if (raw === null) {
-    return { scriptPresent, settingsPresent: false, statusLine: false, promptHook: false, cwdRelative: [] };
+    return { scriptPresent, settingsPresent: false, statusLine: false, promptHook: false, cwdRelative: [], anchored: [] };
   }
   let settings;
   try {
     settings = JSON.parse(raw);
   } catch {
     // Unparseable settings invoke nothing, which is exactly what we report.
-    return { scriptPresent, settingsPresent: true, statusLine: false, promptHook: false, cwdRelative: [] };
+    return { scriptPresent, settingsPresent: true, statusLine: false, promptHook: false, cwdRelative: [], anchored: [] };
   }
   return {
     scriptPresent,
@@ -171,6 +199,7 @@ export function gatherWalkInputs(projectDir) {
       (g?.hooks ?? []).some(invokesWalk)
     ),
     cwdRelative: cwdRelativeWalkSurfaces(settings),
+    anchored: anchoredWalkSurfaces(settings),
   };
 }
 

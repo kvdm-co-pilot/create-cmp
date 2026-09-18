@@ -63,6 +63,8 @@ test("a project with the real template settings: both surfaces invoke the walk, 
       statusLine: true,
       promptHook: true,
       cwdRelative: ["statusLine"],
+    // Positive evidence: the hook carries the anchor, the status line cannot.
+    anchored: ["UserPromptSubmit"],
     });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

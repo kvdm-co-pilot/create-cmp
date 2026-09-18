@@ -368,9 +368,14 @@ export function diagnoseProject(input) {
       // ANCHORABLE_SURFACES in src/lib/hooks.mjs and KD-90). So this finding
       // offers no automatic heal: one half would rewrite a command the app owns,
       // and the other half has no correct rewrite to offer at all.
+      // Named from POSITIVE evidence — the surface carries the anchor — never from
+      // the inert list's silence. A detector that cannot see a shape reports no
+      // violation for it, and calling that "still works" is the same false health
+      // claim this finding replaced, one surface over. Absent field: claim nothing.
+      const anchored = walk.anchored ?? [];
       const working = [
-        walk.statusLine && !inert.includes("statusLine") ? "statusLine" : null,
-        walk.promptHook && !inert.includes("UserPromptSubmit") ? "UserPromptSubmit" : null,
+        walk.statusLine && anchored.includes("statusLine") ? "statusLine" : null,
+        walk.promptHook && anchored.includes("UserPromptSubmit") ? "UserPromptSubmit" : null,
       ].filter(Boolean);
       const one = inert.length === 1;
       const hooks = inert.filter((s) => s !== "statusLine");
