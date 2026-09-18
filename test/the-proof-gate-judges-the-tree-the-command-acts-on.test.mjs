@@ -232,6 +232,11 @@ test("when the gate cannot tell which tree the command acts on, it REFUSES", () 
     ["a repository named out of band", "gh pr merge 1 --repo someone/create-cmp", /out of band/],
     ["the same, in the environment", "GH_REPO=someone/create-cmp gh pr merge 1", /out of band/],
     ["a directory changed by something other than cd", `pushd ${B} && gh pr merge 1`, /pushd/],
+    // The two halves of "this reader could not even find the commands". A shell
+    // would reject the first outright and read the second as the tail of
+    // something that began out of sight; either way the tree is not knowable.
+    ["a quotation the prefix never closes", `cd ${B} " && gh pr merge 1`, /never closes/],
+    ["a `)` whose opener this reader never saw", `cd ${B} ) && gh pr merge 1`, /no opener/],
     ["a device run whose tree is unreadable", `cd "$SLICE_DIR" && ${DEVICE}`, /cannot read literally/],
     // npm publishes a PACKAGE, and the three ways of naming one that is not the
     // directory the command runs in are the same defect wearing npm's flags.
@@ -287,6 +292,43 @@ test("gh pr create is still never blocked — it says it could not tell, and let
   const d = pre(`cd "$SLICE_DIR" && gh pr create --title x --body y`, A);
   assert.equal(d.action, "allow");
   assert.match(d.reason, /could not tell which tree/);
+});
+
+test("a cd the shell never performs does not move the tree the gate judges", () => {
+  // THE FAIL-OPEN HALF, REACHED THROUGH THE FIX. The reader above scans the whole
+  // prefix for a `cd` at what it takes to be a command position, and two of the
+  // things it takes for one are not: the body of a nested `sh -c`, which is
+  // ANOTHER PROCESS whose cwd dies with it, and a `cd` written inside a quoted
+  // word. Both resolve a tree this merge will not touch — and here that tree is
+  // the session's, which owes nothing, so the merge of a worktree owing BOTH
+  // at-close tiers is allowed in silence. That is KD-79's measured fail-open
+  // direction, with this gate's own parser as the mistaken reader.
+  for (const [how, command] of [
+    ["a nested sh -c's cd", `sh -c 'cd ${A} && git rev-parse HEAD' && gh pr merge 1 --rebase`],
+    ["a cd inside a quoted word", `echo "next; cd ${A}" && gh pr merge 1 --rebase`],
+  ]) {
+    const d = pre(command, B);
+    assert.notEqual(d.action, "silent", `${how}: the merge runs in ${B}, which owes both at-close tiers`);
+    assert.equal(d.action, "deny", `${how}: ${d.reason}`);
+    assert.match(d.reason, /the device tier is OWED/, how);
+  }
+});
+
+test("a cd the shell DOES perform is not silently ignored in favour of the session's tree", () => {
+  // The same reader's other half. `if`, `for` and `{ }` are command positions a
+  // POSIX shell honours — a brace group is not even a subshell — and a `cd`
+  // inside one is the command's own. Read as if it were not there, the gate
+  // falls back on the payload's cwd, which is precisely the assumption this
+  // slice exists to delete: "assume the session's" is the defect, not the
+  // fallback. Refusing is a fine answer here; judging A is not.
+  for (const [how, command] of [
+    ["an if-branch that runs", `if true; then cd ${B}; fi; gh pr merge 1 --rebase`],
+    ["a loop body", `for d in one; do cd ${B}; done; gh pr merge 1 --rebase`],
+    ["a brace group", `{ cd ${B}; }; gh pr merge 1 --rebase`],
+  ]) {
+    const d = pre(command, A);
+    assert.notEqual(d.action, "silent", `${how}: the merge runs in ${B}, and the gate judged the session's worktree instead`);
+  }
 });
 
 test("another repository is not this gate's business", () => {

@@ -565,8 +565,22 @@ function askOrigin(git, { local, deadline, behindBy, contains }) {
 /** A directory operand this gate will act on only when it is written literally — no variable, subshell, glob, `~` or embedded space. */
 const LITERAL_PATH = /^[^$`*?[\]~\s]+$/;
 
-/** The ways a shell changes directory, at a command position (the same "invocation, never a mention" rule as WATCHED). */
-const CHDIR = /(?:^|[;&|(\n]|-c\s+["'])\s*(cd|pushd|popd|chdir)(?=[\s;&|)]|$)([^;&|)\n]*)/g;
+/**
+ * The ways a shell changes directory, at a command position. No `-c ["']`
+ * boundary, unlike WATCHED: by the time this runs, every quoted span is blanked,
+ * so a `cd` inside `sh -c '…'` is not there to be read — which is correct, that
+ * `cd` belongs to another process and dies with it.
+ */
+const CHDIR = /(?:^|[;&|(\n])\s*(cd|pushd|popd|chdir)(?=[\s;&|)]|$)([^;&|)\n]*)/g;
+
+/**
+ * Shell forms whose control flow decides whether a `cd` ran at all, and which
+ * this reader does not follow. A brace group is the one that catches people out:
+ * `{ cd X; }` is NOT a subshell, so its `cd` persists — no paren to count, and a
+ * reader that only counts parens misses it and falls back to the session's tree,
+ * which is KD-79 itself.
+ */
+const COMPOUND = /(?:^|[\s;&|(){}])(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|select|function|\{|\}|source|eval|exec|\.)(?=[\s;&|(){}]|$)/;
 
 /** `gh` will act on a repository named out of band from ANY directory, so a command that names one has no tree to read. */
 const NAMED_REPO = /(?:^|\s)(?:--repo[=\s]|-R\s)|(?:^|\s)GH_REPO=/;
@@ -576,6 +590,74 @@ const NPM_RELOCATES = /(?:^|\s)(?:--prefix|--workspaces?|-w|-C)(?:[=\s]|$)/;
 
 /** npm flags whose NEXT token is a value, not the folder operand — so `npm publish --access public` is not read as publishing "public". */
 const NPM_TAKES_VALUE = new Set(["--access", "--tag", "--otp", "--registry", "--auth-type", "--userconfig", "--provenance-file"]);
+
+/**
+ * The command prefix with everything this reader must not read blanked to spaces
+ * — or `{ unknown }` when it cannot get that far.
+ *
+ * THE POINT OF MASKING FIRST. A `cd` is only a `cd` if the shell would perform
+ * it, and the difference is decided by quoting, by which process runs it, and by
+ * control flow — none of which a regex over raw text can see. Measured against
+ * `/bin/sh` as an oracle (test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs),
+ * the raw reader was wrong on ten shapes in BOTH directions: it read `cd`s the
+ * shell never performs (inside `echo "…"`, inside a heredoc, inside a nested
+ * `sh -c`, and one kept alive by an unbalanced `(` in a quoted word) and it
+ * dropped `cd`s the shell does perform (inside `if`/`for`/`{ }`, and one killed
+ * by an unbalanced `)` in a quoted word). Both directions end in a false ALLOW.
+ *
+ * So the spans that are not commands are blanked — LENGTH-PRESERVING, because
+ * the invocation's index is already measured against the raw string — and once
+ * they are, every paren left is structural and counting them is sound. What
+ * cannot be blanked is refused, which is the whole rule of this file: a tree
+ * this gate cannot determine is one it refuses to judge.
+ */
+function readablePrefix(prefix) {
+  let s = "";
+  for (let i = 0; i < prefix.length; ) {
+    const c = prefix[i];
+    if (c === "\\") {
+      s += i + 1 < prefix.length ? "  " : " ";
+      i += 2;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      // Single quotes take no escapes; double quotes do. Either way the span is
+      // not a command, so what is inside it is not read.
+      let j = i + 1;
+      while (j < prefix.length && prefix[j] !== c) j += c === '"' && prefix[j] === "\\" ? 2 : 1;
+      if (j >= prefix.length) return { unknown: "a quotation it never closes, so this reader cannot tell what in front of the command is a command" };
+      s += " ".repeat(j - i + 1);
+      i = j + 1;
+      continue;
+    }
+    s += c;
+    i += 1;
+  }
+
+  // A substitution runs in its own shell, so its `cd` never reaches this one.
+  // Matched by counting, which is only sound now that quoted parens are gone.
+  for (let open = s.indexOf("$("); open !== -1; open = s.indexOf("$(")) {
+    let depth = 0;
+    let j = open + 1;
+    for (; j < s.length; j += 1) {
+      if (s[j] === "(") depth += 1;
+      else if (s[j] === ")" && (depth -= 1) === 0) break;
+    }
+    if (j >= s.length) return { unknown: "a `$(` it never closes" };
+    s = `${s.slice(0, open)}${" ".repeat(j - open + 1)}${s.slice(j + 1)}`;
+  }
+
+  if (s.includes("`")) return { unknown: "a backquoted substitution, whose end this reader does not chase" };
+  if (s.includes("<<")) return { unknown: "a heredoc, whose body this reader does not read" };
+  if (COMPOUND.test(s)) return { unknown: "a compound command or a sourced script (if/for/while/case/{ }/source), whose control flow decides whether a `cd` ran at all" };
+
+  let depth = 0;
+  for (const ch of s) {
+    if (ch === "(") depth += 1;
+    else if (ch === ")" && (depth -= 1) < 0) return { unknown: "a `)` with no opener before it — the command sits inside something this reader did not see begin" };
+  }
+  return { text: s, depth };
+}
 
 /** The operand of a `cd`, when it is a directory this gate can name with certainty. */
 function literalDir(raw) {
@@ -611,18 +693,31 @@ export function commandCwd(kind, command, cwd) {
   if ((kind === "merge" || kind === "create") && NAMED_REPO.test(invoked)) {
     return { unknown: "it names its repository out of band (--repo / GH_REPO), which is not a directory on this machine" };
   }
-  // A SUBSHELL'S `cd` DIES WITH THE SUBSHELL. `x=$(cd /elsewhere && pwd) && gh
-  // pr merge` changes nothing for the merge, and reading it would hand the gate
-  // a tree the command never touches — which is KD-79 again, with the gate's own
-  // parser as the mistaken reader. So each `cd` is applied only when the depth it
-  // sits at is still open where the command is: deeper means its scope closed first.
-  const depthAt = (i) => (prefix.slice(0, i).match(/\(/g)?.length ?? 0) - (prefix.slice(0, i).match(/\)/g)?.length ?? 0);
-  const here = depthAt(prefix.length);
+  // WHAT IN FRONT OF THE COMMAND IS ACTUALLY A COMMAND. Everything that is not
+  // gets blanked first; what cannot be blanked is refused rather than guessed at.
+  const read = readablePrefix(prefix);
+  if (read.unknown) return { unknown: `what runs in front of it contains ${read.unknown}` };
+
+  // A SUBSHELL'S `cd` DIES WITH THE SUBSHELL. `(cd /elsewhere && true) && gh pr
+  // merge` changes nothing for the merge, and reading it would hand the gate a
+  // tree the command never touches — KD-79 again, with the gate's own parser as
+  // the mistaken reader. So a `cd` applies only when the depth it sits at is
+  // still open where the command is: deeper means its scope closed first.
+  const scope = read.text;
+  const depthAt = (i) => (scope.slice(0, i).match(/\(/g)?.length ?? 0) - (scope.slice(0, i).match(/\)/g)?.length ?? 0);
+  const here = read.depth;
   CHDIR.lastIndex = 0;
-  for (let m = CHDIR.exec(prefix); m; m = CHDIR.exec(prefix)) {
-    // At the VERB, not at the match — the match begins on the separator before
-    // it, and for `$(cd …` that separator IS the paren that opens the subshell.
+  for (let m = CHDIR.exec(scope); m; m = CHDIR.exec(scope)) {
+    // At the VERB, not at the match — the match begins on the separator before it.
     if (depthAt(m.index + m[0].indexOf(m[1])) > here) continue;
+    // `cd /x & wait; …` BACKGROUNDS the cd, which makes it a subshell with no
+    // paren to count: the parent's directory never moves. A single trailing `&`
+    // is that; `&&` is an ordinary chain. Read from the WHOLE command, not from
+    // the prefix — the prefix is cut at the invocation's own separator, so the
+    // `&&` that chains the last `cd` to it would show here as a lone `&` and
+    // every chained `cd` would be dropped as backgrounded. Masking is
+    // length-preserving precisely so this index still means what it says.
+    if (/^&(?!&)/.test(cmd.slice(m.index + m[0].length))) continue;
     if (m[1] !== "cd") return { unknown: `it changes directory with \`${m[1]}\`, whose destination this gate does not track` };
     const to = literalDir(m[2]);
     if (!to) return { unknown: `it begins with a \`cd\` this gate cannot read literally (${m[0].trim()})` };
