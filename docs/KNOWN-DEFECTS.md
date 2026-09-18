@@ -1290,8 +1290,6 @@ They agree today, both directions, and every disagreement errs toward a SMALLER 
 asking origin less and allowing-with-a-note more — never a late refusal. The import that would
 collapse them is one line in the timeout test. *Logged 2026-09-18, review round 1 of `ordering-precondition-before-a-device-run`.*
 
-## Closed
-
 ### KD-72 — the one file whose CONTENT is the evidence is outside the review trigger
 
 `scripts/observed-tree.mjs` → `REVIEW_TIER_TRIGGERS`, against
@@ -1343,3 +1341,5 @@ review to record it.
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
 taken, with the commit that did it.
+
+## Closed
