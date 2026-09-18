@@ -39,9 +39,19 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CREATE_CMP = path.join(ROOT, "bin", "create-cmp.mjs");
 const PROOFLANE = path.join(ROOT, "packages", "harness", "bin", "prooflane.mjs");
 
+// Styling is stripped before anything is asserted. These assertions are about
+// BEHAVIOUR — did it dry-run, did it reach consent, did it write — and the
+// command styles its own words: `Dry run` is yellow, so the reset sequence lands
+// between "Dry run" and " — nothing written" and a plain regex misses a message
+// that is right there. picocolors emits colour when CI is set and not when a
+// developer runs it at a pipe, so without this the suite is green on a laptop and
+// red on every runner, for a reason that is not the product. Measured 2026-09-19:
+// this test passed locally and failed on all three CI Node versions.
+const PLAIN = /\u001B\[[0-9;]*m/g;
+
 function run(bin, argv) {
   const r = spawnSync(process.execPath, [bin, ...argv], { cwd: ROOT, encoding: "utf8" });
-  return { code: r.status, out: `${r.stdout}${r.stderr}` };
+  return { code: r.status, out: `${r.stdout}${r.stderr}`.replace(PLAIN, "") };
 }
 
 /** Every file under a tree, with its bytes — the only honest "nothing changed". */

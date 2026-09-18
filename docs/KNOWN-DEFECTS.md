@@ -192,6 +192,8 @@ you the same list without opening anything.
 | **KD-151** | a contradictory line (`--ios false --no-ios false`, `--x --no-x`) is resolved by precedence and refused by nothing — the affirmative name answers and its `no-` twin is never consulted | no answer is right, so the honest act is to pin the one that has always been given rather than invent a refusal for a line nobody types; pinned by test, so a later change to `flagBool` has to mean it |
 | **KD-152** | `--version` and `--help` are the only declared booleans read by PRESENCE, so `--version false` still prints the version instead of meaning "not the version" | required by KD-15: at create-cmp's door the something-else is `create`, which writes — normalizing their value form made `create-cmp --version false --yes` scaffold an app while the user waited for a version string. A question is answered in whatever form it is asked |
 | **KD-153** | the refusal for a declared boolean still holding a string is unreachable at create-cmp's door — that parser never splits `=` (KD-14), so `--dry-run=maybe` is refused as an unknown flag NAME instead | the user is refused either way, by a sentence that names what they typed; the guard is there for the day KD-14 is closed, and pinned equal to prooflane's by the two-spellings test |
+| **KD-163** | the KD-15 guard's new value-form test drives `bin/create-cmp.mjs` with the REPOSITORY as its working directory, asserts only exit code and stdout, and sets no `timeout` — where the sibling test for the same defect class sandboxes the cwd, asserts it is still empty, and times out at 60s | cannot fire while the guard holds, and `myapp/` is gitignored so no gate reads what it would write. What is logged is a gate whose failure mode is a multi-minute untimed Gradle build inside `npm test` rather than an assertion |
+| **KD-164** | the reason given in BOTH new copies of the arg parser for not sharing one module — "the published root tarball carries no copy of this directory" — is refuted by `npm pack` on the root: all nine files of `packages/harness/install/` ship, `args.mjs` beside `src/lib/args.mjs` in one 389-file tarball, and `package.json`'s `files` names the directory outright | the DECISION is right for a reason the comment does not give: `prooflane-harness`'s own 94-file tarball carries `install/args.mjs` and no `src/`, so the harness alone still cannot import the root's copy. Nobody is mis-served; the next reader of either file is told a packaging fact this tree answers the other way |
 
 ---
 
@@ -2715,3 +2717,86 @@ would be a change someone made deliberately.
 
 *Logged 2026-09-19, review round 1 of the KD-40 closure. Found by a reviewer reading the sweep's
 allow-list rather than its verdict.*
+
+### KD-163 — the test guarding "a question does not scaffold" scaffolds into the repository when it fails
+
+`test/a-declared-booleans-value-arrives-as-a-string.test.mjs` (`run`, the KD-15 case)
+
+Its subject is KD-15's shape re-created by KD-16's fix: `--version false` normalizes to the
+boolean `false`, `if (flags.version)` stops being true, and the dispatcher falls through to
+`create` — which writes. The bins now read `"version" in flags`, and this test drives the three
+value forms through the real bin to prove it.
+
+It drives them with `cwd = ROOT`, which is this repository's working tree, and asserts only
+`r.code === 0` and what was printed. Its `run()` helper passes no `timeout`. So on the one
+regression it exists to catch, the assertion it reports is not reached until the fall-through has
+finished: measured 2026-09-19, `create-cmp` with a non-TTY stdin and no positional scaffolds into
+the directory it runs in —
+
+```
+$ cd <empty dir> && node bin/create-cmp.mjs --no-install --no-ios --no-firebase --minimal </dev/null
+  …  GREEN — build proven.   Done. cd ./myapp
+  → 1788 files, a real :composeApp:assembleDebug (31.4s), exit 0
+```
+
+and `verify` defaults to TRUE, so the unqualified fall-through this test would produce runs that
+build three times over, untimed, inside `npm test`.
+
+The convention it departs from is in the same suite and for the same class:
+`test/an-unrecognised-argument-is-obeyed-instead-of-refused.test.mjs`, *"a flag that asks for
+information does not perform an action"*, builds a `sandbox()` cwd, sets `timeout: 60_000`, and
+asserts `fs.readdirSync(box.cwd)` is `[]` with the message *"create-cmp --version wrote into the
+working directory instead of answering"*. That third assertion is the one that turns this class
+of failure into a sentence instead of a build.
+
+**Why it is logged and not fixed.** Nothing fires while the guard holds, and the guard is green
+and pinned; `myapp/` is gitignored (`.gitignore:57`, "Scratch scaffolds from engine test runs"),
+so nothing a fall-through wrote would reach `observed-tree.mjs` or move a gate. No adopter is
+reachable by it at all — the population is contributors running the suite on a tree where the
+version guard has already regressed. The remedy is the sibling's three lines: a temp cwd, a
+`timeout`, and `assert.deepEqual(fs.readdirSync(cwd), [])`.
+
+**Fires when:** the `"version" in flags` presence guard at either door regresses to truthiness.
+*Logged 2026-09-19, review round 1 of `fix-boolean-value-form-inverted-2`. Found by executing the
+fall-through rather than reading it.*
+
+### KD-164 — two copies of one parser, justified by a packaging fact `npm pack` refutes
+
+`packages/harness/install/args.mjs` (`flagBool` docblock),
+`test/a-declared-booleans-value-arrives-as-a-string.test.mjs` ("the two spellings … are the same
+function")
+
+Both say the same thing, and it is the whole stated reason the function is copied rather than
+imported:
+
+> neither package depends on the other, and the published root tarball carries no copy of this
+> directory (`docs/proposals/PACKAGE-SPLIT.md` holds that decision)
+
+Measured 2026-09-19, `npm pack --dry-run --json` at the repository root:
+
+```
+create-cmp-cli          389 files
+  src/lib/args.mjs
+  packages/harness/install/args.mjs      ← and eight more files of that directory
+```
+
+`package.json`'s `files` names `packages/harness/install` outright, and it has to: `bin/
+create-cmp.mjs` imports `../packages/harness/install/init.mjs` for `create-cmp harness init`. So
+the two copies ship in ONE tarball, which is the opposite of what the comment offers as the
+reason they must be two. `docs/proposals/PACKAGE-SPLIT.md` is cited for the decision and says
+nothing about tarballs or about that directory's publication.
+
+**The decision survives; the reason does not.** The fact that actually forbids the import is the
+other tarball: `prooflane-harness` packs 94 files, carries `install/args.mjs`, and carries no
+`src/` at all — so `install/args.mjs` importing `../../../src/lib/args.mjs` would resolve in this
+repository and crash for every adopter who installed the harness alone. That is a checkable fact
+about the tree, it is the one the copy rests on, and it is not the one written down.
+
+Nobody outside the repository is served by either sentence. What is logged is that the next
+reader of the copy is told a packaging fact this tree answers the other way — and that unlike
+KD-128, where the facts could not be re-read here, this one can: it is one `npm pack --dry-run`
+away, in both directions.
+
+**Fires when:** anyone reasons about whether the duplication can be collapsed.
+*Logged 2026-09-19, review round 1 of `fix-boolean-value-form-inverted-2`. Found by packing both
+packages rather than reading the comment.*
