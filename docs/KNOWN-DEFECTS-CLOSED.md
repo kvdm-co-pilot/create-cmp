@@ -9,6 +9,27 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-112 — one measurement, two defect numbers: the doc credited KD-79 where the code credits KD-105 — **CLOSED 2026-09-18, in the round that found it**
+
+`docs/GATE-RULES.md` (Rule 4) vs `scripts/hooks/proof-gate.mjs` (`IN_WORD`, `GAP`)
+
+Both sentences describe the same measurement — fifteen shapes of the construct sweep went from
+refused to READ when a word in the wrapper run was written `\S*`, `time . /x/s.sh; gh pr merge`
+among them, "the six-shape class whose fix had just closed". The code comment said that class is
+**KD-105**'s and the doc paragraph two files away said it is **KD-79**'s. KD-105 is the entry that
+carries the six shapes; KD-79 is the device-tier scheduler defect. They disagreed because one commit
+corrected the comment while rewriting the paragraph that carries the same citation and leaving its
+number alone.
+
+Nothing was decided on it — no verdict, tree or refusal reads either sentence — and the reviewer
+placed it as logged, in KD-28's shape, on the ground that "the citation names the entry that carries
+the measurement" is not a statement a program can decide. **Closed rather than logged because the
+remedy was one word and the round was already open:** `docs/GATE-RULES.md` now says KD-105, which is
+what the code says and what `KNOWN-DEFECTS-CLOSED.md` carries. The reviewer's argument against a
+mechanical guard stands and no guard was added; every `KD-NNN` in this repository that a checker
+could resolve already does. *Found in review round 2 of the slice that closed KD-107, and corrected
+in it.*
+
 ### KD-107 — the two readers agree in one direction, and the other direction is where the gate goes silent — **CLOSED 2026-09-18**
 
 `scripts/hooks/proof-gate.mjs` (`COMPOUND` vs `invocation`)
