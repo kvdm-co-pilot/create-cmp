@@ -184,6 +184,7 @@ you the same list without opening anything.
 | **KD-129** | `node scripts/change-price.mjs` now PRINTS which review round is next and what it reads — text a reader acts on, about this file's rule — and `test/the-review-rule-is-stated-twice.test.mjs` scans `.claude/agents/`, `skills/`, `agents/` and one printed string, so no `scripts/` text is read by it | nothing false is printed today: measured at zero six-word runs shared with the header across every file this slice touched, and the one printed sentence that had stopped being true of the tree was corrected here. What is logged is the hole, not a drift |
 | **KD-130** | `reviewDischarge` copies six named fields of a review record into `plan.reviewDischarged`, and `round`/`kind` are not among them — so the settled-plan history `--history` reads can say a review discharged the slice and never which round did | no reader consumes a round from there: the block that prices rounds reads `review-history.jsonl`, where both fields ARE written. The honest remedy edits the plan-event schema and its summariser, which is the file KD-124 already names |
 | **KD-131** | the same bytes ran FAIL and then PASS ninety seconds apart: `inspector/mcp/test/preview-service.test.mjs`'s *"a stale state with NOTHING pending says so"* failed inside a full `npm test` and passed alone (83/83) and on an immediate re-run, and `qa-artifacts/suite-history.jsonl` holds both verdicts against the SAME `observedHash` | no adopter runs this repository's inspector tests, and nothing in the failing path is imported by the slice that saw it. It is the same family as KD-56, which already owns the inspector's load-sensitive tests; what is new here is the measurement, and the FAIL record this branch leaves on disk |
+| **KD-134** | `scripts/ground-truth.mjs` reports the version spine as three names — `cli`, `plugin`, `marketplace` — while a bump must move FOUR surfaces: `package-lock.json` records the root version twice and is not among them | the suite refuses the drift by name (`test/workspace-lock-sync.test.mjs`) with the remedy printed, so nobody is wrongly served. What is logged is that the deriver `CLAUDE.md` names as the thing to ask INSTEAD of a document is silent about a surface that must move in lockstep — and it caught out this slice's own author, at the second amendment |
 
 ---
 
@@ -2577,3 +2578,28 @@ without it): fleet check PASS at rung L2 on `06c5aa1`, clean trunk, `treeWasDirt
 that a registry description is a property of published bytes and no commit here can change one —
 is the record, and it is the same shape as every other artifact this repo cannot reach from a
 commit.*
+
+### KD-134 — the version deriver names three surfaces where a bump must move four
+
+`scripts/ground-truth.mjs` · `package-lock.json`
+
+`CLAUDE.md` says to ask the programs, not a document, and names `ground-truth.mjs` for "counts and
+versions, never by hand". It reports the spine as `cli / plugin / marketplace`. A version bump must
+actually move **four** surfaces: those three plus `package-lock.json`, which records the root
+manifest's own version in two places.
+
+**Measured on this slice.** Bumping 0.26.4 → 0.26.5 across the three the deriver names left the
+suite red: `actual: '0.26.4', expected: '0.26.5'`. The author had read the deriver, moved exactly
+what it listed, and was still wrong.
+
+**Nobody is wrongly served, and that is why it is logged.** `test/workspace-lock-sync.test.mjs`
+refuses the drift by name with the remedy printed, so the lockfile cannot ship stale. The lock is
+also genuinely derived state, which is a fair reason for a *count* deriver not to list it as a
+package.
+
+**What is logged is narrower and worse:** "which surfaces must move together" is not derived
+anywhere, and the program that exists so nobody hand-counts this answers with three of four. A
+reader who trusts it exactly as `CLAUDE.md` instructs is handed an incomplete answer and finds out
+from a test. That is the drift `ground-truth.mjs` was written to abolish, in the deriver itself.
+
+*Logged 2026-09-19, review round 1 of the packaging slice — by the reviewer, about the author.*

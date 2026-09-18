@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+
 - **A tree whose packages are not installed told a contributor their change broke three tests.**
   Measured 2026-09-18 in a fresh git worktree with `inspector/mcp`'s packages absent: `npm test`
   reported three failures and only ONE of them looked like a missing install. Two were
@@ -188,6 +189,12 @@ All notable changes to this project are documented here. The format is based on
   forever. It is the non-vacuity check the surface list never had, and it earned that during
   wiring: dropping one character from the globbed directory name put both plugin manifests back
   outside the gate while every count assertion still passed.
+- **`create-cmp harness init|relock|upgrade` could not run from an npm install.** `bin/create-cmp.mjs`
+  imports `../packages/harness/install/*.mjs` and the published package never shipped that directory,
+  so all three died with `ERR_MODULE_NOT_FOUND` and a raw Node stack trace. Present in every release
+  from 0.24.0 through 0.26.4, for commands advertised in `--help`. The `prooflane` door was never
+  affected. A new check reads what a bin imports against what `files` ships, so the two lists cannot
+  drift apart again.
 
 ## [0.26.0] - 2026-09-16
 
