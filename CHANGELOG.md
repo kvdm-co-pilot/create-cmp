@@ -36,7 +36,7 @@ All notable changes to this project are documented here. The format is based on
   `llms.txt` (the surface written for agents) repeating two of them. A profile-bound reader now
   gates both forms the docs actually use — a table row and the prose that cites it — with the
   profile names coming from the deriver rather than a list. Measured before wiring: eight matches,
-  eight drifts, zero false positives. A bare "<n> steps" is deliberately NOT gated (KD-67): it
+  eight drifts, zero false positives. A bare "<n> steps" is deliberately NOT gated (KD-73): it
   refuses four strings on the same surfaces and two are honest prose, so the ambiguity is in the
   noun rather than in the claim.
 
