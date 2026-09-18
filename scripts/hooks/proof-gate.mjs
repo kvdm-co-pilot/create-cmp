@@ -116,6 +116,20 @@ const GAP = "[^\\S\\n]+";
  * wrapper takes before the command, and `timeout` is the only one here that has
  * one: its duration.
  *
+ * A LETTER IN `flags` IS A CLAIM ABOUT A REAL PROGRAM, and getting one wrong is
+ * the same defect one letter wide: a flag the program does NOT take a value for
+ * swallows the command name, and the word behind it lands in a command position
+ * the shell does not put one in. Review round 2 found two — `caffeinate -u`
+ * declares the user active and carries no value (`-t` carries the timeout), and
+ * `env -S`'s value IS the command line it splits, so there is no command after it
+ * — and `sudo -h` and the GNU `time -o`/`-f` came out with them, the first
+ * because plain `-h` is help and the second because `time` here is the shell's
+ * keyword, which takes only `-p`. The letters are asked of `/bin/sh` rather than
+ * of a remembered man page, in
+ * test/a-wrapper-flag-the-program-takes-no-value-for-eats-the-command-name.test.mjs,
+ * which reads the value-taking set off THIS table's own behaviour so a letter
+ * added tomorrow arrives with a row of its own.
+ *
  * **EVERY OTHER WORD ENDS THE RUN AND IS THE COMMAND.** That sentence is the
  * whole rule, and it is here because the version that guessed at it shipped both
  * of this file's historical mistakes at once. Given "a wrapper may carry up to
@@ -138,15 +152,15 @@ const GAP = "[^\\S\\n]+";
 const WRAPPER_ARITY = Object.freeze({
   "!": { flags: "", operand: null },
   builtin: { flags: "", operand: null },
-  caffeinate: { flags: "tuw", operand: null },
+  caffeinate: { flags: "tw", operand: null },
   command: { flags: "", operand: null },
-  env: { flags: "uCS", operand: null },
+  env: { flags: "uC", operand: null },
   eval: { flags: "", operand: null },
   exec: { flags: "a", operand: null },
   nice: { flags: "n", operand: null },
   nohup: { flags: "", operand: null },
-  sudo: { flags: "ughprtUC", operand: null },
-  time: { flags: "of", operand: null },
+  sudo: { flags: "ugprtUC", operand: null },
+  time: { flags: "", operand: null },
   timeout: { flags: "sk", operand: "\\d+(?:\\.\\d+)?[smhd]?" },
   xargs: { flags: "nILPsEad", operand: null },
 });

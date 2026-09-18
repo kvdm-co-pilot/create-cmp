@@ -402,7 +402,7 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   match begins at the start of the line instead of at that separator, and the prefix the directory
   reader is handed shrinks to nothing: fifteen shapes of the construct sweep went from refused to
   READ while this declaration was being unified, including `time . /x/s.sh; gh pr merge` — the
-  six-shape class KD-79's own fix had just closed. The clause is true of the wrapper run and NOT of
+  six-shape class KD-105's own fix had just closed. The clause is true of the wrapper run and NOT of
   the assignment and redirection alternatives beside it, which are still `\S*`; that asymmetry is
   logged as KD-110, with the sweep that went looking for a consequence and could not produce one. Both directions are swept against `/bin/sh` in
   `test/a-wrapper-word-walks-an-unproven-merge-past-the-gate.test.mjs`, which asks the shell whether
