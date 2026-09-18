@@ -376,23 +376,35 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   one place a quotation opens a command — then any run, in any order, of `VAR=value` assignments,
   redirections (`2>/dev/null`, `>out`, `2>&1`), and these wrapper words: `!`, `builtin`,
   `caffeinate`, `command`, `env`, `eval`, `exec`, `nice`, `nohup`, `sudo`, `time`, `timeout`,
-  `xargs`. Each wrapper may carry its own options and **at most two bare operands** — what
-  `timeout 300`, `timeout -s KILL 300`, `nice -n 10` and `sudo -u nobody` need.
+  `xargs`. Each wrapper carries its own options, the values of the options **that wrapper** is
+  declared to take separately (`sudo -u nobody`, `nice -n 10`, `timeout -s KILL`), and a bare
+  operand only where it has one — `timeout`'s duration, and nothing else on the list.
 
-  **Refused by name, rather than guessed at:** any other word ENDS the run and is read as the
-  command itself. So `watch -n 5 …`, `script`, `parallel`, `ssh host '…'`, `docker run …`,
-  `find … -exec`, a `-c` not spelled exactly `-c` (`bash -lc "…"`), and a brace group whose first
-  word is the gated command (`{ gh pr merge; }`) are not read through. The operand bound is the
-  same refusal in miniature: unbounded, the run walks across a whole second command and reads the
-  `gh pr merge` inside `time git commit -m "then gh pr merge"` as a merge. What is not read through
-  is a fail-open with no producer here and is logged (KD-109), not inferred silently.
+  **Refused by name, rather than guessed at: EVERY OTHER WORD ENDS THE RUN AND IS THE COMMAND.**
+  So `watch -n 5 …`, `script`, `parallel`, `ssh host '…'`, `docker run …`, `find … -exec`, a `-c`
+  not spelled exactly `-c` (`bash -lc "…"`), and a brace group whose first word is the gated command
+  (`{ gh pr merge; }`) are not read through. What is not read through is a fail-open with no
+  producer here and is logged (KD-109), not inferred silently.
 
-  **And no word in a prefix crosses a character that ends a command** — not `;`, `&`, `|`, `(`,
-  `)`, `<`, `>`, nor a newline. Without that clause the operand run swallows its own `;`, the match
-  begins at the start of the line instead of at that separator, and the prefix the directory reader
-  is handed shrinks to nothing: fifteen shapes of the construct sweep went from refused to READ
-  while this declaration was being unified, including `time . /x/s.sh; gh pr merge` — the six-shape
-  class KD-79's own fix had just closed. Both directions are swept against `/bin/sh` in
+  That sentence is the rule, and the arity is per wrapper rather than one number, because the
+  version that guessed shipped both of this gate's historical mistakes at once. Given "a wrapper may
+  carry up to two bare operands", `time echo gh pr merge` was classified as a MERGE — a command that
+  prints three words, which is the mention this hook refused on its first live run — and
+  `time git add . && cd X && gh pr merge` was REFUSED for `if/for/while/case/{ }/source`, none of
+  which is in it, because `.` had landed in a command position the shell does not put one in. That
+  second one is KD-64, reappearing one wrapper word to the left of where it was fixed. A union of
+  every wrapper's value-taking flags has the same failure one flag over: `time -p` takes no value,
+  `sudo -u` does, and a reader that merges the two tables reads `time -p echo gh pr merge` as a
+  merge.
+
+  **And no word in the WRAPPER RUN crosses a character that ends a command** — not `;`, `&`, `|`,
+  `(`, `)`, `<`, `>`, nor a newline. Without that clause a word in the run swallows its own `;`, the
+  match begins at the start of the line instead of at that separator, and the prefix the directory
+  reader is handed shrinks to nothing: fifteen shapes of the construct sweep went from refused to
+  READ while this declaration was being unified, including `time . /x/s.sh; gh pr merge` — the
+  six-shape class KD-79's own fix had just closed. The clause is true of the wrapper run and NOT of
+  the assignment and redirection alternatives beside it, which are still `\S*`; that asymmetry is
+  logged as KD-110, with the sweep that went looking for a consequence and could not produce one. Both directions are swept against `/bin/sh` in
   `test/a-wrapper-word-walks-an-unproven-merge-past-the-gate.test.mjs`, which asks the shell whether
   the gated program was really executed rather than asserting that it was.
 - **And it judges the tree the COMMAND acts on, never the session's.** `.claude/settings.json`
