@@ -173,6 +173,10 @@ you the same list without opening anything.
 | **KD-116** | `IN_WORD` and `GAP` — the two clauses that say a wrapper run does not cross a character that ends a command — are pinned by no test since the bare-operand run they guarded was removed: relaxing either to `\S`/`\s+` leaves the whole suite green | not a wrong clause, an unpinned one: both are right about the shell, nobody is served wrongly, and the honest remedy (the declaration's comment states which clauses are measured) was taken. A test with no consequence to assert would have to assert the regex's own source — the third spelling that KD-107 was |
 | **KD-118** | the letter sweep runs only the direction where the shell PRINTS, so a value-taking letter MISSING from `WRAPPER_ARITY` is invisible to it — the run ends a word early and the gated program is read as the flag's value. Two were found by hand at the re-record (`command time -o F gh pr merge`, `xargs -J R gh pr merge`; both really merge, both answered `null`) and both are FIXED; what is logged is that nothing would catch a third | fail-open at the classifier, no producer — zero hits for `command time`, `/usr/bin/time` or `xargs -J` in this tree. The fix is a second sweep, costed at 13 spawns done per-wrapper (676 done per-letter); not built because this slice's two rounds are spent and it is a new mechanism rather than a correction |
 | **KD-119** | KD numbers are allocated per BRANCH, so two branches in flight allocate the same ones: as found, this branch's KD-109..113 and `origin/main`'s KD-109..113 named ten unrelated defects under five numbers, and `scripts/hooks/proof-gate.mjs` cites three of them in comments no rebase conflict ever shows. The collision is FIXED — this branch renumbered to 114-119, above main's maximum, before any rebase | the log is prose and no program routes on a KD number; what stays logged is that nothing makes re-reading main's maximum routine, and that a deriver for it would have to fetch — which `proof-plan.mjs` deliberately never does, because a gate that fetched would move the baseline it judges |
+| **KD-120** | the tool check's oracle for "is this a tool" is the grant line it is checking, so a name invented or misspelled identically in `tools:` and in prose clears it — and "add it to `tools:`" is the remedy its own failure message prints | the benign direction: a grant for a tool that does not exist is inert, where prose naming a tool the agent lacks is still refused. No in-tree oracle exists and the design deliberately refuses to carry a list; what is open is whether `SendMessage` and `TaskStop`, both added by this branch under that remedy, are real names |
+| **KD-121** | six spellings of "use this tool" the check does not see — inside a fenced block, backticked with an argument (`` `SendMessage(a)` ``), split across a line break, not backticked at all, `mcp__x__y`, and a hump containing an acronym (`ReadPDF`) — and the comment justifying the fence strip ("examples and shell, not instructions") is false of BOTH fenced blocks in this repo's definitions | measured: every tool-shaped token anywhere in all three definitions is already visible to the checker, so no producer; the two fences hold commands the agent IS told to run, but neither names a tool |
+| **KD-122** | the check reads ONE spelling of `tools:` where the harness reads YAML: a list form parses to `{"- Read"}` and drops the rest, and an ABSENT `tools:` line — which means the subagent inherits EVERY tool — is read as granting none | both fail loud, never silent (they can only manufacture offences, not hide them), and no producer: all three definitions use the comma form and all three declare one |
+| **KD-123** | three prose facts this change states that the tree does not support: the new section cites the 5-minute rule as "below" when it is 44 lines above; its actionable remedy is scoped to `Agent` while `SendMessage` — granted by the same commit, and what RE-DELEGATE step 2 tells it to use — has the same stall shape; and the test's header attributes to SEVEN orchestrators a cold-substitute cost the commit measures at FOUR | the section's general rule ("nothing left to do but wait means you spawned it wrong") does cover the `SendMessage` path, so only the bullet is narrow; the count and the direction word are narration, and nothing routes on either |
 
 ---
 
@@ -2201,6 +2205,114 @@ it costs when it is missed. *Found 2026-09-18 by the third declared substitute r
 re-record of the slice that closed KD-107 — outside the four confirmations that re-record was
 bounded to, so it landed as a log entry rather than a fix. The author took the fix on the same pass,
 because a renumber is cheaper before a rebase than inside one.*
+
+### KD-120 — the tool check's oracle is the grant line it is checking, so an invented name clears it
+
+`test/an-agent-definition-names-a-tool-it-was-not-given.test.mjs`
+
+The check derives what a tool IS from two readings of the tree at run time: a backticked
+multi-hump shape, and the union of every `tools:` line. Neither can separate a real tool from a
+typo or an invention. Measured by planting a definition and calling the file's own exports:
+
+    tools: Read, SendMesage     prose: "Call `SendMesage` now."    →  0 offences
+
+So the remedy the failure message prints — *"add the name to that file's `tools:` line"* — clears
+the check whether or not the harness has such a tool, and the grant it adds is inert. This branch
+took that remedy twice, for `SendMessage` and `TaskStop`. Nothing in this repository can confirm
+either name exists; the check's own design refuses to carry the list that could, and there are no
+recorded tool payloads in `qa-artifacts/` to derive one from.
+
+**Why logged and not fixed.** An oracle needs either a hand-maintained list of tool names — the
+drift `scripts/ground-truth.mjs` exists to abolish, and the reason this check carries none — or a
+probe of a live session, which no test here has. The direction is also the benign one: a grant for
+a tool that does not exist gives the agent nothing, while the defect the check was written for,
+prose naming a tool the agent does not have, is still refused. What is open is not the check's
+shape but one fact about this branch: whether `SendMessage` and `TaskStop` are real names.
+
+*Logged 2026-09-18, review round 1 of the direct-lane fix that added the check.*
+
+### KD-121 — six spellings of "use this tool" the check does not see, and a false reason for one of them
+
+`test/an-agent-definition-names-a-tool-it-was-not-given.test.mjs` (`readDefinition`, `toolsNamedInProse`)
+
+Measured by feeding one planted contradiction — a definition granting `Read` whose prose tells the
+agent to use `SendMessage` — through the file's own exports in eleven spellings:
+
+    CAUGHT   comma `tools:` + plain backticked mention      MISSED   inside a fenced block
+    CAUGHT   YAML list `tools:` (for the wrong reason)      MISSED   `SendMessage(agent)` — backticked with an argument
+    CAUGHT   no `tools:` line (for the wrong reason)        MISSED   split across a line break inside one span
+    CAUGHT   `tools:` wrapped onto two lines                MISSED   named without backticks
+    CAUGHT   CRLF frontmatter (for the wrong reason)        MISSED   `mcp__ide__getDiagnostics`
+                                                            MISSED   granted and named with the SAME typo (KD-120)
+
+A seventh, unplanted: `MULTI_HUMP` requires every hump to be `[A-Z][a-z0-9]+`, so a tool name
+carrying an acronym (`ReadPDF`, `HTTPFetch`) is invisible to the shape derivation and visible only
+if some definition grants it.
+
+**No producer.** Swept in the other direction too: every multi-hump token appearing ANYWHERE in the
+bodies of all three definitions, however spelled, is already visible to the checker — zero
+invisible. The blind spots are what a future edit can walk into, not what is wrong today.
+
+**What is wrong today is the reason given for one of them.** `readDefinition` strips fenced blocks
+under the comment *"Fenced blocks are examples and shell, not instructions to this agent."* Both
+fenced blocks in this repository's agent definitions are instructions: `agents/cmp-orchestrator.md`
+lines 152–156 are the `qa/plan.mjs --hold/--beat/--release` claim the orchestrator is told to make,
+and `.claude/agents/staff-reviewer.md` lines 117–120 are the `--record-review` command it is told
+not to hand-write. Neither names a tool, so the behaviour is right and only its justification is
+false — and the justification is what the next person will reason from.
+
+*Logged 2026-09-18, review round 1. Measured by execution, not read.*
+
+### KD-122 — the check reads one spelling of `tools:`, where the harness reads YAML
+
+`test/an-agent-definition-names-a-tool-it-was-not-given.test.mjs` (`readDefinition`)
+
+`granted` is `/^tools:\s*(.+)$/m` split on commas. Two frontmatter shapes the harness accepts are
+read differently, both measured:
+
+    tools:                         →  granted = {"- Read"}       the `\s*` eats the newline, `.+` takes
+      - Read                                                     the first item, the rest are dropped
+      - SendMessage
+
+    (no `tools:` line at all)      →  granted = {}               which in Claude Code means the subagent
+                                                                 INHERITS every tool, not none
+
+This is the two-readers-disagree class (KD-113), one file over. Both failures point the same,
+survivable way: a wrong `granted` set can only manufacture offences, never hide one, so the check
+reds loudly on a definition that is correct rather than greening on one that is not — and the
+message it prints would send its reader looking for a contradiction that is not there.
+
+**No producer.** All three definitions in the tree use the comma form and all three declare one.
+
+*Logged 2026-09-18, review round 1.*
+
+### KD-123 — three prose facts in this change the tree does not support
+
+`agents/cmp-orchestrator.md` · `test/an-agent-definition-names-a-tool-it-was-not-given.test.mjs`
+
+1. **The cross-reference points the wrong way.** The new section reads "The *status you owe upward
+   past ~5 minutes* rule **below** means post a line and keep working." That rule is at line 146,
+   44 lines ABOVE the sentence citing it. An agent sent downward from there finds `## Parallelism`.
+
+2. **The actionable remedy is scoped to one tool.** The section's mechanism is `Agent` and its
+   `run_in_background` default. `SendMessage` is granted by the same commit and is what RE-DELEGATE
+   step 2, immediately above, tells the orchestrator to use — and a re-brief followed by an ended
+   turn stalls exactly the way the section exists to stop. The section's general rule ("if you have
+   nothing left to do but wait, you spawned it wrong") does cover that path; only the bullet naming
+   a parameter does not. Open, and unanswerable from this tree: whether `SendMessage` takes
+   `run_in_background` at all. No tool schema is recorded anywhere in the repository.
+
+3. **One population, two counts.** The test file's header says seven orchestrators "could not
+   resume a reviewer, and each ran a COLD substitute pass instead". Commit `71d4f43` measures FOUR
+   subagents reporting the missing grant and running cold substitutes, and attributes the seven
+   stalls to the backgrounding default — two causes with two populations, merged into one sentence
+   in the artifact that outlives the commit message. Same shape as KD-28.
+
+Nothing routes on a count, a direction word, or the width of a bullet, so nobody is served wrongly;
+what each costs is the next reader's time, and (2) costs it at the moment the same stall recurs one
+call over.
+
+*Logged 2026-09-18, review round 1.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
