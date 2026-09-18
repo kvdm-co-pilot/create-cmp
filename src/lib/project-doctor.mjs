@@ -330,12 +330,26 @@ export function diagnoseProject(input) {
   // that hand-edited settings.json can take the machinery on upgrade and lose the
   // wiring — and the failure mode is silence, which is precisely the problem the walk
   // exists to fix. Nothing else in the system can notice, so doctor does.
+  //
+  // PRESENT IS NOT WIRED, and this check said it was. A command is invoked from
+  // the SESSION's directory, so `node qa/walk-status.mjs` reaches the walk only
+  // when that directory happens to be this one — and `|| true` makes the miss
+  // silent. `walk.cwdRelative` (src/commands/doctor.mjs) names the surfaces that
+  // will not resolve; an `ok` handed to one of them is this file's own sentence
+  // above turned inside out, since the adopter is then told by the diagnostic
+  // that the silence cannot happen. Absence is reported ahead of inertness on
+  // purpose: absence is what `--fix` can heal, and a healed project re-diagnoses
+  // into the inert warning below rather than skipping it.
   if (walk !== null && walk.scriptPresent) {
     const missing = [
       !walk.statusLine ? "no statusLine" : null,
       !walk.promptHook ? "no UserPromptSubmit hook" : null,
     ].filter(Boolean);
-    if (missing.length === 0) {
+    const inert = walk.cwdRelative ?? [];
+    const named = (s) => (s === "statusLine" ? "the status line" : `the ${s} hook`);
+    const joined = (xs) => xs.map(named).join(" and ");
+    const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+    if (missing.length === 0 && inert.length === 0) {
       findings.push({
         id: "walk-wiring",
         level: "ok",
@@ -343,6 +357,54 @@ export function diagnoseProject(input) {
         detail:
           "qa/walk-status.mjs is installed and .claude/settings.json invokes it from both the " +
           "status line and UserPromptSubmit.",
+      });
+    } else if (missing.length === 0) {
+      // Both surfaces invoke the walk; at least one of them cannot reach it.
+      // What the remedy is differs by surface, and the difference is not a
+      // preference: `${CLAUDE_PROJECT_DIR:-.}` repairs a hook because Claude Code
+      // exports that variable to hook commands, and cannot repair a status line
+      // because it does not export it there (documented behaviour of the harness
+      // this template ships into — a fact this repository cannot re-derive; see
+      // ANCHORABLE_SURFACES in src/lib/hooks.mjs and KD-90). So this finding
+      // offers no automatic heal: one half would rewrite a command the app owns,
+      // and the other half has no correct rewrite to offer at all.
+      const working = [
+        walk.statusLine && !inert.includes("statusLine") ? "statusLine" : null,
+        walk.promptHook && !inert.includes("UserPromptSubmit") ? "UserPromptSubmit" : null,
+      ].filter(Boolean);
+      const one = inert.length === 1;
+      const hooks = inert.filter((s) => s !== "statusLine");
+      findings.push({
+        id: "walk-wiring",
+        level: "warn",
+        title: `The walk is wired, but ${joined(inert)} only run${one ? "s" : ""} when the session starts at the project root`,
+        detail:
+          `.claude/settings.json invokes qa/walk-status.mjs from both surfaces, but ${joined(inert)} ` +
+          `name${one ? "s" : ""} it by a path relative to the SESSION's directory rather than to this ` +
+          "project. A session opened anywhere else — the monorepo services/ layout the walk exists to " +
+          "serve — finds no script there, and `|| true` turns that into a clean exit with no output, so " +
+          "the surface shows nothing instead of reporting an error. " +
+          // What still works, derived rather than asserted: a warning that reads
+          // "your walk is broken" while two thirds of it runs would be its own
+          // false statement, in the surface this finding exists to make honest.
+          (working.length > 0
+            ? `${cap(joined(working))} ${working.length === 1 ? "is" : "are"} anchored and still ` +
+              `work${working.length === 1 ? "s" : ""} from any directory, and running ` +
+              "node qa/walk-status.mjs by hand always works."
+            : "Running node qa/walk-status.mjs by hand still works."),
+        fix: {
+          auto: false,
+          description:
+            (hooks.length > 0
+              ? `Anchor ${joined(hooks)} in .claude/settings.json as "\${CLAUDE_PROJECT_DIR:-.}/qa/walk-status.mjs" ` +
+                "(the form the current engine template ships); doctor never rewrites a command your app already owns. "
+              : "") +
+            (inert.includes("statusLine")
+              ? "The status line has no such remedy — CLAUDE_PROJECT_DIR is not set for a status line command, so " +
+                "writing the anchor there would read as a fix and change nothing. Until that surface is fixed " +
+                "upstream, start sessions at the project root, or read the walk with node qa/walk-status.mjs."
+              : ""),
+        },
       });
     } else {
       findings.push({

@@ -112,7 +112,12 @@ ordering is derived from artifacts, never scheduled. Retro-briefs for legacy fea
   the failure mode is silence — the exact thing this feature exists to end. Nothing in
   the walk can notice itself missing, so `create-cmp doctor` carries a `walk-wiring`
   finding (warn, `--fix`-healable from the engine template; it claims only unclaimed
-  slots and never rewrites the app's own hooks). Minimal mode is the mirror image: it
+  slots and never rewrites the app's own hooks). **Present is not wired**, and the same
+  finding says so: a surface whose command names `qa/walk-status.mjs` by a path relative
+  to the session's directory is reported too, at `warn` and with no automatic heal, because
+  the status line cannot be anchored (KD-90) and a hook the app authored is not this
+  command's to rewrite (KD-85). An `ok` there would be the walk's own failure mode —
+  silence — asserted as health by the one surface that could have noticed it. Minimal mode is the mirror image: it
   deletes the lane, so `minimalHookSettings` drops a lane-referencing `statusLine`
   too — the lane-reference rule applies to every settings surface that carries a
   command, not only to `hooks`.
