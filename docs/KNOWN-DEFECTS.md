@@ -169,6 +169,8 @@ you the same list without opening anything.
 | **KD-112** | the door has no bypass, so every way it can be wrong ends in a correctly installed tree that cannot run its suite at all — a named `PROOFLANE_SKIP_PREFLIGHT=1` would bound the class at one line | a product decision, handed up rather than taken: the population is empty today (KD-111 has no producer, and the one real divergence found in review is fixed), and an escape hatch is how a guard becomes optional |
 | **KD-113** | the two readers spell a NAMELESS workspace's name differently — npm synthesizes the directory basename (`noname`), the door falls back to the rel path (`ws/noname`) — and the landed invariant test uses that name as the set's identity | measured over twelve layouts, the only divergence left and the only one that is a LABEL rather than a member: coverage, refusal and remedy are identical. No producer — every package this repo declares names itself — and the first one that does not reds the invariant test for a reason that is not the defect it is about |
 | **KD-109** | the closed wrapper list KD-107 landed does not read through five further shapes — `bash -lc "gh pr merge"`, `{ gh pr merge; }`, `ssh host '…'`, `watch -n 5 …`, and a wrapper carrying more than two bare operands (`sudo -u me -g grp extra …`) | fail-open at the classifier, and the residue the closed list names out loud rather than guessing at (docs/GATE-RULES.md, Rule 4); no producer — a merge here is typed `gh pr merge --rebase --delete-branch`, bare or behind a `cd` |
+| **KD-109** | the closed wrapper list KD-107 landed does not read through five further shapes — `bash -lc "gh pr merge"`, `{ gh pr merge; }`, `ssh host '…'`, `watch -n 5 …`, and a wrapper carrying an operand its table entry does not declare (`sudo -u me -g grp extra …`) | fail-open at the classifier, and the residue the closed list names out loud rather than guessing at (docs/GATE-RULES.md, Rule 4); no producer — a merge here is typed `gh pr merge --rebase --delete-branch`, bare or behind a `cd` |
+| **KD-110** | "no word in a command prefix crosses a character that ends a command" is honoured by ONE of `COMMAND_PREFIX`'s three alternatives — the assignment and redirection alternatives are still `\S*`, and `A=a;b `, `A=a&&b `, `2>a;b ` all match the prefix across the separator | the comment is wider than the code, and the code is right by accident: leftmost-match still starts the invocation at or after any `cd`, so no shape resolves a different tree — swept for one and none found. Nobody is served wrongly today; the next reader of that comment is |
 
 ---
 
@@ -2014,30 +2016,68 @@ this slice's two rounds are spent and nobody is wrongly served by it.*
 `scripts/hooks/proof-gate.mjs` (`COMMAND_PREFIX`)
 
 KD-107's fix makes the accepted command-position prefix a CLOSED list: a separator, then any run of
-`VAR=value` assignments, redirections, and thirteen wrapper words each carrying its own options and
-at most two bare operands. A word the list does not know ends the run and is read as the command
-itself. That is the right direction for a reader over raw text — a run that walked across an unknown
-word would read the `gh pr merge` inside `time git commit -m "then gh pr merge"` as a merge — but it
-leaves a residue, and the residue is a fail-open, so it is named here rather than inferred from the
-regex. Measured 2026-09-18 by importing `classify` on this tree:
+`VAR=value` assignments, redirections, and thirteen wrapper words, each carrying its own options,
+the values of the options that wrapper declares it takes separately, and a bare operand only where
+it has one (`timeout`'s duration). **Every other word ends the run and is the command** — which is
+the rule, not a limitation: a reader that guessed at an unknown operand read `time echo gh pr merge`
+as a merge and refused `time git add . && cd X && gh pr merge` for a construct that was not in it.
+But the rule leaves a residue, and the residue is a fail-open, so it is named here rather than
+inferred from the regex. Measured 2026-09-18 by importing `classify` on this tree:
 
     bash -lc "gh pr merge 1"                 null   — the `-c` boundary is spelled `-c`, and `-lc` is not it
     { gh pr merge 1; }                       null   — `{` is a separator to COMPOUND, not to the raw reader
     ssh host "gh pr merge 1"                 null   — the command runs on another machine's shell
     watch -n 5 gh pr merge 1                 null   — `watch` is not on the list
-    sudo -u me -g grp extra gh pr merge 1    null   — flags then TWO bare operands; this is three
+    sudo -u me -g grp extra gh pr merge 1    null   — `-u me` and `-g grp` are read; `extra` ends the run
 
 **Direction: fail-open at the classifier**, the same class as KD-107 and without KD-107's producers:
 `!` and `timeout N` are things an agent types, and these are not. Every merge, publish and fleet
 check in this repository is typed bare or behind a `cd`, nothing here runs a gated act over `ssh` or
 under `watch`, and `sudo` in front of one would already be unusual. **The fix for the first four is
-one list entry each and the fifth is a quantifier**, which is exactly why they are not taken now: a
+one list entry each and the fifth is one letter in a table**, which is exactly why they are not taken now: a
 list widened without a shell to check it against is how KD-105 and KD-107 happened, and each of
 these wants its own row in the `/bin/sh` sweep, where the shell says whether the shape really
 invokes anything. `{ gh pr merge; }` is the one with a genuine argument against fixing it: making
 `{` a separator for the RAW reader turns `git commit -m "{gh pr merge}"` into a merge, because that
 reader runs before quoted spans are blanked — KD-64's mistake in a new costume. *Logged 2026-09-18,
 by the slice that closed KD-107, from the probe that measured its own fix.*
+
+### KD-110 — the clause that makes the declaration safe is in one of its three alternatives
+
+`scripts/hooks/proof-gate.mjs` (`COMMAND_PREFIX`)
+
+The declaration carries a comment that reads as a property of the whole thing: *a word inside a
+command prefix NEVER CROSSES A CHARACTER THAT ENDS A COMMAND*, with fifteen shapes of the construct
+sweep cited as what it cost to learn. `IN_WORD` and `GAP` honour it. The other two alternatives do
+not: an assignment is `[A-Za-z_][A-Za-z0-9_]*=\S*` and a redirection is `\d*[<>]+\S*`, and `\S`
+crosses every one of `; & | ( ) < >`. Measured 2026-09-18 against `^COMMAND_PREFIX$`:
+
+    time a;b      no match      — the clause holds where it was written
+    A=a;b         MATCHES       — the assignment's value crossed the `;`
+    A=a&&b        MATCHES
+    A=a|b         MATCHES
+    2>a;b         MATCHES
+    2>a&&b        MATCHES
+
+**Direction: none measured, and that is the entry.** The shapes were swept for the consequence the
+clause exists to prevent — a match that begins before a `cd` and drops it out of the prefix
+`commandCwd` reads — and there is not one, because a run that swallows a separator must still be
+followed by horizontal whitespace and then the gated program, and `cd`'s own operand is separated
+from it by a space that `\S*` cannot cross. `A=x;cd;gh pr merge`, `>x;gh pr merge` and
+`FOO=a\;cd /x && gh pr merge` all leave the `cd` inside the prefix or refuse. So the code is right,
+and it is right for a reason the comment does not state. **Why it is here and not a fix:** narrowing
+those two to `IN_WORD` is a one-word change with no failing test to justify it, and this file has
+now twice been the place where a list was edited without a shell to check it against. What is wrong
+today is the SENTENCE — it claims of three alternatives what is true of one — and the reader it
+misleads is the next person who adds a fourth. *Logged 2026-09-18, review round 1 of the slice that
+closed KD-107, from a probe built to break the clause and unable to.*
+
+**The sentence was scoped in the same round; the code asymmetry is what stays logged.** Both the
+declaration's comment and `docs/GATE-RULES.md` Rule 4 now say the clause is true of the WRAPPER RUN
+and not of the two alternatives beside it, and both name this entry. That was free and carried no
+risk. Narrowing the two alternatives to `IN_WORD` was not taken, on the entry's own argument: there
+is no failing test to justify it, and this file has twice been where a pattern was widened or
+narrowed without a shell to check it against.
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is

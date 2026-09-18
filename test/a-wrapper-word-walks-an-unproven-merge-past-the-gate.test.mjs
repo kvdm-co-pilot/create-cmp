@@ -272,7 +272,7 @@ test("the closed list is stated where a reader will find it, and it is the list 
   // the doc and compared, rather than trusted to stay true.
   const { COMMAND_WRAPPERS } = await import("../scripts/hooks/proof-gate.mjs");
   const rules = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../docs/GATE-RULES.md"), "utf8");
-  const stated = /these wrapper words:([\s\S]*?)\. Each wrapper may carry/.exec(rules);
+  const stated = /these wrapper words:([\s\S]*?)\. Each wrapper carries/.exec(rules);
   assert.ok(stated, "docs/GATE-RULES.md must state the accepted wrapper words under Rule 4");
   const named = [...stated[1].matchAll(/`([^`]+)`/g)].map((m) => m[1]);
   assert.deepEqual([...named].sort(), [...COMMAND_WRAPPERS].sort(), "the doc's list and the code's list are the same list");

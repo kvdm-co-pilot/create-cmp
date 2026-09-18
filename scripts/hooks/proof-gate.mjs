@@ -78,51 +78,19 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * The words that may stand in front of a command without being the command.
- * This list is CLOSED and it is stated in docs/GATE-RULES.md (Rule 4), so the
- * next reader is not left to infer it from a regex: `!`, `builtin`, `caffeinate`,
- * `command`, `env`, `eval`, `exec`, `nice`, `nohup`, `sudo`, `time`, `timeout`,
- * `xargs`. Everything else is NOT a wrapper — a word this reader does not
- * recognise ends the run and must be the command itself, so `time git commit -m
- * "then gh pr merge"` stays a commit rather than becoming a merge.
- *
- * Each wrapper may carry its own options and AT MOST TWO bare operands, which is
- * what `timeout 300`, `timeout -s KILL 300`, `nice -n 10` and `sudo -u nobody`
- * need and what stops the run from walking across a whole second command. The
- * bound is the fail-safe choice in both directions at once: unbounded operands
- * read the `gh pr merge` inside a commit message as a merge, and zero operands
- * let `timeout 300 gh pr merge` past the gate entirely.
- */
-export const COMMAND_WRAPPERS = Object.freeze([
-  "!",
-  "builtin",
-  "caffeinate",
-  "command",
-  "env",
-  "eval",
-  "exec",
-  "nice",
-  "nohup",
-  "sudo",
-  "time",
-  "timeout",
-  "xargs",
-]);
-
-/** Longest first, so `timeout` is not read as `time` with `out` for an operand. */
-const WRAPPER = `(?:${[...COMMAND_WRAPPERS].sort((a, b) => b.length - a.length).join("|")})`;
-
-/**
- * A word inside a command prefix NEVER CROSSES A CHARACTER THAT ENDS A COMMAND,
- * and that clause is load-bearing rather than tidy. Written as `\S*`, a
- * wrapper's operand run swallows the `;` that closes its own command and the
- * match then begins at the start of the line instead of at that separator —
- * which shrinks the prefix `commandCwd` reads to nothing and drops the `cd` or
- * the sourced script standing in front of it. Measured while this declaration
- * was being unified: fifteen shapes of
+ * A word inside a wrapper run NEVER CROSSES A CHARACTER THAT ENDS A COMMAND,
+ * and that clause is load-bearing rather than tidy. Written as `\S*`, a word in
+ * the run swallows the `;` that closes its own command and the match then begins
+ * at the start of the line instead of at that separator — which shrinks the
+ * prefix `commandCwd` reads to nothing and drops the `cd` or the sourced script
+ * standing in front of it. Measured while this declaration was being unified:
+ * fifteen shapes of
  * test/a-construct-this-reader-cannot-follow-is-refused-wherever-it-stands.test.mjs
  * went from refused to READ, including `time . /x/s.sh; gh pr merge` — the exact
- * six-shape class KD-79's fix had just closed.
+ * six-shape class KD-79's fix had just closed. The assignment and redirection
+ * alternatives below are still `\S*` and this clause is NOT true of them; that
+ * asymmetry is KD-110, logged with the sweep that looked for a consequence and
+ * could not produce one.
  */
 const IN_WORD = "[^\\s;&|()<>]";
 
@@ -135,6 +103,76 @@ const IN_WORD = "[^\\s;&|()<>]";
 const GAP = "[^\\S\\n]+";
 
 /**
+ * The words that may stand in front of a command without being the command, and
+ * WHAT EACH ONE IS ALLOWED TO CARRY. The list is CLOSED and it is stated in
+ * docs/GATE-RULES.md (Rule 4), so the next reader is not left to infer it from a
+ * regex.
+ *
+ * `flags` are the single-letter options THAT wrapper takes a separate value for
+ * — `sudo -u nobody`, `nice -n 10`, `timeout -s KILL`. A joined value (`-unobody`,
+ * `--user=nobody`) is one token and needs no entry. `operand` is a bare word the
+ * wrapper takes before the command, and `timeout` is the only one here that has
+ * one: its duration.
+ *
+ * **EVERY OTHER WORD ENDS THE RUN AND IS THE COMMAND.** That sentence is the
+ * whole rule, and it is here because the version that guessed at it shipped both
+ * of this file's historical mistakes at once. Given "a wrapper may carry up to
+ * two bare operands", the reader has no way to know what an operand MEANS, so it
+ * put a command position where the shell has none:
+ *
+ *     time echo gh pr merge            classified as a MERGE — the shell prints three words
+ *     time git add . && cd X && …      REFUSED for `if/for/while/case/{ }/source`,
+ *                                      none of which is in it, because `.` landed
+ *                                      in a command position it does not occupy
+ *
+ * The first is the mention this hook refused on its first live run; the second is
+ * KD-64, one wrapper word to the left of where it was fixed. Both are measured
+ * against `/bin/sh` in
+ * test/a-wrapper-turns-the-words-behind-it-into-a-command-they-are-not.test.mjs,
+ * which is also why the arity is per wrapper rather than one number: `sudo -u`
+ * takes a value and `time -p` does not, and a union of the two reads `time -p
+ * echo gh pr merge` as a merge.
+ */
+const WRAPPER_ARITY = Object.freeze({
+  "!": { flags: "", operand: null },
+  builtin: { flags: "", operand: null },
+  caffeinate: { flags: "tuw", operand: null },
+  command: { flags: "", operand: null },
+  env: { flags: "uCS", operand: null },
+  eval: { flags: "", operand: null },
+  exec: { flags: "a", operand: null },
+  nice: { flags: "n", operand: null },
+  nohup: { flags: "", operand: null },
+  sudo: { flags: "ughprtUC", operand: null },
+  time: { flags: "of", operand: null },
+  timeout: { flags: "sk", operand: "\\d+(?:\\.\\d+)?[smhd]?" },
+  xargs: { flags: "nILPsEad", operand: null },
+});
+
+/** The closed list itself, derived from the table so there is still exactly one source for it. */
+export const COMMAND_WRAPPERS = Object.freeze(Object.keys(WRAPPER_ARITY));
+
+const WRAPPER = `(?:${[...COMMAND_WRAPPERS].sort((a, b) => b.length - a.length).join("|")})`;
+
+/**
+ * A flag's value: one word that is not a flag, not an assignment and not a
+ * wrapper — so it can be read exactly one way. The assignment exclusion is not
+ * taste: without it `env -u A=1` parses both as a flag value and as the
+ * assignment alternative, every such pair doubles the number of parses, and a
+ * 428-character command took the hook past the 10s `PreToolUse` budget it
+ * declares — past which the verdict is never delivered, which is an allow
+ * (test/the-command-position-reader-can-spend-the-whole-gate-budget-on-one-command.test.mjs).
+ */
+const VALUE = `(?!${WRAPPER}(?=\\s|$))(?![A-Za-z_][A-Za-z0-9_]*=)[^-\\s;&|()<>]${IN_WORD}*`;
+
+/** One wrapper and the options and operand its own table entry allows it. */
+const wrapperTerm = (word) => {
+  const { flags, operand } = WRAPPER_ARITY[word];
+  const flagRun = flags ? `(?:${GAP}-(?:[${flags}](?=\\s)${GAP}${VALUE}|${IN_WORD}*))*` : `(?:${GAP}-${IN_WORD}*)*`;
+  return `${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${flagRun}${operand ? `(?:${GAP}${operand}(?=\\s|$))?` : ""}`;
+};
+
+/**
  * What may stand between a separator and the command: a run of wrappers,
  * `VAR=value` assignments and redirections, in any order. Exported as regex
  * SOURCE rather than a RegExp because both readers embed it in a larger pattern
@@ -142,7 +180,7 @@ const GAP = "[^\\S\\n]+";
  */
 export const COMMAND_PREFIX =
   "(?:" +
-  `${WRAPPER}(?:${GAP}-${IN_WORD}*)*(?:${GAP}(?!${WRAPPER}(?=\\s|$))[^-\\s;&|()<>]${IN_WORD}*){0,2}${GAP}` +
+  `(?:${[...COMMAND_WRAPPERS].sort((a, b) => b.length - a.length).map(wrapperTerm).join("|")})${GAP}` +
   `|[A-Za-z_][A-Za-z0-9_]*=\\S*${GAP}` +
   `|\\d*[<>]+\\S*${GAP}` +
   ")*";
