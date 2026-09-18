@@ -723,3 +723,113 @@ anything it cannot read, and imports only `node:` builtins so it can load on the
 `test/an-uninstalled-tree-fails-as-if-the-contributor-broke-it.test.mjs` holds all of it, including
 a fixture that proves npm's `pretest` really does abort the run before the test script leaves a
 marker.
+
+### KD-78 — the npm pages for two aliases said "8 gates" — **CLOSED 2026-09-18**
+
+`packages/aliases/create-kmp/package.json:4`, `packages/aliases/create-compose-multiplatform/package.json:4`
+
+Both descriptions read *"a machine-enforced verify lane (8 gates, evidence receipts)"*. The lane
+that holds an AI-driven change is `local` (17) or `ci` (18); the only profile that runs 8 is
+`smoke`, whose receipt `qa/receipt-check.mjs` refuses as done-evidence. **In the tree this is
+fixed** — the bare number is gone, and
+`test/a-published-npm-description-states-a-lane-size-that-names-no-profile.test.mjs` refuses the
+next one. What is NOT fixed, and cannot be from here, is what npmjs.com serves: a registry
+description is a property of *published bytes*, and it changes only when someone publishes. Until
+`create-kmp@0.1.6` and `create-compose-multiplatform@0.1.6` are published, the pages a stranger
+reads before installing still carry the false number, at the versions already live (`0.1.4`).
+
+This is logged rather than blocked because there is no act available in this repository that would
+close it — not because nobody is wrongly served. Somebody is, on two npm pages, right now. The
+remedy is an outward-facing human act (`docs/PUBLISHING.md`), and standing one up unasked is the
+thing this project does not do on its own.
+
+**Fires until:** both aliases are published at the versions this tree holds.
+*Logged 2026-09-18, review round 1 of the count-gate slice; the tree-side half was fixed in the
+same round.*
+
+**CLOSED by publishing, which is the only act that could close it.** `create-kmp@0.1.6`,
+`create-compose-multiplatform@0.1.6` and `create-mobile@0.1.2` are live; the registry's `latest`
+tag serves all three, and none of their descriptions contains the bare number. Verified against
+`https://registry.npmjs.org/<name>` directly rather than through `npm view`, because npm's local
+packument cache served the OLD versions for several minutes after the publishes succeeded — long
+enough that `npx <alias>@latest` failed `ETARGET` against a registry that already had the bytes.
+A cache reading stale is the `served-page-is-not-your-code` shape, one registry over.
+
+The release proof this publish required (`scripts/hooks/proof-gate.mjs` refuses `npm publish`
+without it): fleet check PASS at rung L2 on `06c5aa1`, clean trunk, `treeWasDirty: false`.
+
+*Closed 2026-09-18 by the publish itself. The entry is kept whole above because its reasoning —
+that a registry description is a property of published bytes and no commit here can change one —
+is the record, and it is the same shape as every other artifact this repo cannot reach from a
+commit.*
+
+### KD-40 — a minimal scaffold keeps the lock for a lane it just deleted
+
+`src/lib/minimal.mjs` (`subtractLane`), `packages/harness/src/lib/harness-region.mjs` (`isHarnessFile`)
+
+`subtractLane` deletes every machine-owned lane file outside the keep-set, walking
+`listHarnessFiles`, which yields only what `isHarnessFile` accepts: the two DECLARATIONS, the one
+GENERATED record, and otherwise `.mjs` alone. `qa/harness.lock.json` is none of those, so the
+stripper never sees it. Executed:
+
+```
+qa/harness.lock.json     NOT a harness file — --minimal never sees it
+qa/harness-source.json   IS a harness file (strippable)
+qa/harness-manifest.json IS a harness file (strippable)
+qa/verify.mjs            IS a harness file (strippable)
+```
+
+So a minimal scaffold keeps a lock whose `files` map names a hundred-odd paths that no longer exist
+and whose `fileCount` is wrong — a record that describes a lane the same command removed.
+
+**Reported from outside, with its cost measured.** The `payment-blueprint` session hit this: a
+`--minimal` re-scaffold stripped 66 lane files and left the lock, and `gitleaks` then flagged a
+SHA-256 content digest inside it as a `generic-api-key`. Its lane went red on an orphan written by
+nothing and read by nothing. That is the honest shape of the harm — not that the lock is wrong (no
+reader is left to be misled) but that it is an unexplained file full of high-entropy strings sitting
+in an adopter's repo, and a secret scanner is exactly the thing that will find it.
+
+**Not fixed here**, and the fix is a decision rather than a line: either the stripper learns about
+the lock (and `isHarnessFile`'s `.mjs`-or-declaration rule grows a third case), or `--minimal`
+stops being a lane-subtraction and becomes a lane-less install. The second is probably right and is
+a slice, not an edit.
+
+**Fires when:** anyone runs `create-cmp … --minimal` over a tree that has a lane. *Logged
+2026-09-15, reported by the payment-blueprint session and verified here by execution.*
+
+**CLOSED 2026-09-19 — NOT REPRODUCIBLE, and the entry above was false when it was written.**
+
+Everything from *"the lock it wrote describes a lane the same command removed"* onward is wrong.
+Measured by executing the real template twice: a fresh `--minimal` stamp locks **7** files reading
+`intact`, and re-stamping `--minimal --force` over a full 73-file tree locks the same 7. The cause
+is ordering that predates this entry: `applyMinimalMode` runs BEFORE `writeLaneLock`
+(`src/scaffold.mjs:484-493`, whose own comment says so, and `:301-317`), so the lock is rewritten
+over the kept subset every time. That ordering and `test/minimal-mode.test.mjs:83-91` both landed in
+`2ddce4f` on **2026-08-21** — three weeks before this was logged on 2026-09-15.
+
+**The gitleaks harm was real and mis-attributed.** A full stamp's lock holds **73** sha256 digests
+and a minimal one holds **7**, so `--minimal` REDUCES the high-entropy strings blamed on it. That
+finding is now its own entry, KD-160, where it belongs.
+
+**The `isHarnessFile` route this entry implies is refused on the merits, not on cost.**
+`packages/harness/src/lib/harness-lock.mjs:33-34`: *"The lock is deliberately NOT a .mjs file, so it
+is not part of the region it describes — a manifest inside its own manifest could never settle."*
+`writeHarnessLock` hashes the region and then writes the file, so a lock inside its own region would
+record its pre-write bytes and read `modified` the instant it was taken.
+
+**The residue, and it is harmless.** `isHarnessFile` does not recognise the lock, so `subtractLane`
+cannot see it — and a swept `qa/` shows it is a class of one: of 7 files outside the region in a
+full stamp, `--minimal` removes `approvals.json`, `comments.json` and `evidence/schema.json`, and
+the survivors are `qa/e2e/README.md`, `qa/e2e/smoke.yaml`, `qa/golden/home.json` (app content, kept
+by design) and the lock. Nothing reads a minimal tree's lock: `harden.mjs:200` reads one only on the
+`alreadyFull` branch, and `src/lib/harness-upgrade.mjs:62-69` excludes it as derived state.
+
+**Closed by a pin, not by an argument.** `test/a-minimal-lock-names-a-lane-the-tree-does-not-carry.test.mjs`
+asserts what is true and was refuter-tested: moving `writeLaneLock` before the `config.harness ===
+false` block makes it fail with *"the lock names 66 path(s) the tree does not carry"* — **66, the
+exact number this entry reported from payment-blueprint.** So the failure MODE it describes is real,
+the code already prevents it, and the prevention is now held in place.
+
+*Closed 2026-09-19. The lesson is the file's own: an entry written from reading, about behaviour
+nobody executed, drifts from the tree it describes. This is the third today.*
+
