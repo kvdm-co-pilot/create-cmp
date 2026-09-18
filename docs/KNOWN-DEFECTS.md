@@ -167,6 +167,7 @@ you the same list without opening anything.
 | **KD-109** | the third of KD-89's three failures never reproduced — and `applyConsoleCopy`'s bare `catch {}` still re-narrates ANY profile load error, a missing module included, as "this project declares no console copy" | the door refuses an uninstalled tree before any of the three runs, so the misattribution cannot reach a contributor whatever the third's trigger was; the fallback itself is deliberate — a page load must not crash on an unreadable profile |
 | **KD-110** | the preflight is npm's `pretest`, so it guards `npm test`, `prepublishOnly` and CI — and not `node --test <file>`, which is how a contributor or an agent narrows to one file | the defect KD-89 recorded is a FIRST impression of the documented command, and that command is refused by name; someone running one file directly has already chosen the narrower instrument |
 | **KD-111** | `installedFrom` is npm's layout — a Yarn PnP checkout has no `node_modules` at all, so every declared dependency reads missing and a working tree is refused | no producer: this repo declares npm (`package-lock.json`, npm `workspaces`, `npm ci` in CI) and no other lockfile is in the tree; the failure is a loud refusal naming a command, never a silent pass |
+| **KD-112** | the door has no bypass, so every way it can be wrong ends in a correctly installed tree that cannot run its suite at all — a named `PROOFLANE_SKIP_PREFLIGHT=1` would bound the class at one line | a product decision, handed up rather than taken: the population is empty today (KD-111 has no producer, and the one real divergence found in review is fixed), and an escape hatch is how a guard becomes optional |
 
 ---
 
@@ -1944,13 +1945,21 @@ states its reason. That is a change to the inspector's degradation contract, not
 The door is npm's `pretest` lifecycle, which is what lets one wiring reach `npm test`,
 `prepublishOnly` and `.github/workflows/ci.yml` without any of the three naming it. It does not
 reach `node --test <file>`. That is how a contributor or an agent narrows to one file while working,
-and it is how KD-89's three failures were read in the first place; on an uninstalled tree that path
-still produces the original misattribution, unchanged.
+and it is how KD-89's three failures were read in the first place; `.claude/skills/npm-publish`
+step 1 names a bare `node --test` too.
+
+**WHAT A READER MEETS THERE, measured rather than assumed** — an earlier draft of this entry said
+"the original misattribution, unchanged", which contradicts KD-109 in the same commit and a review
+caught it. On an uninstalled tree the two `ERR_MODULE_NOT_FOUND` failures are genuinely unchanged;
+`console-copy-delivery` PASSES (`# pass 1  # fail 0`), because the third failure never reproduced
+from that condition. So the direct path is not the three-failure experience KD-89 recorded — it is
+the two readable ones, plus this slice's own test files, whose messages now name an uninstalled tree
+as the first candidate rather than blaming the code in front of the reader.
 
 **Why it does not block.** What KD-89 recorded is a FIRST impression — a fresh clone running the
 command this repository documents — and that command is now refused by name before anything runs.
-Someone invoking the runner directly has already chosen the narrower instrument and is not being
-told anything false about it. **What the fix would be, when it is taken:** the runner has no
+Someone invoking the runner directly has already chosen the narrower instrument, and what they see
+explains itself. **What the fix would be, when it is taken:** the runner has no
 per-file preflight hook, so covering that path means either a guard inside each test file — the skip
 this slice measured its way out of — or a wrapper every direct run must be typed through, which is a
 change to how the repo is worked rather than a line in it.
@@ -1976,6 +1985,32 @@ for its own reason (`exports` maps with no `.` entry, and `import.meta.resolve`'
 being ignored unflagged), so this needs a real answer rather than a swap.
 
 *Logged 2026-09-18, by the slice that closed KD-89.*
+
+### KD-112 — the door has no bypass, and every way it can be wrong ends in a repo that cannot run its suite
+
+`scripts/suite-preflight.mjs` · **a product decision, not a defect**
+
+Raised by review, and it is a decision rather than a finding because no test can take it. Every
+known way this door can be wrong terminates in the same place: *a correctly installed tree that can
+never run `npm test` at all*. KD-111 (Yarn PnP) is one. The workspace-declaration divergence found
+in review was another, and it was real — `["ws/*", "!ws/b"]` made the door refuse over dependencies
+`npm ci` would never install, so the one command the refusal named could not clear it. That one is
+fixed, by declining any pattern shape this reader does not implement rather than guessing at it.
+
+The class is not closed by fixing an instance. A named escape hatch printed in the refusal itself —
+`PROOFLANE_SKIP_PREFLIGHT=1` — would bound it at one line, and it costs little that this door
+protects: skipping it returns you to exactly the pre-slice behaviour, which is a suite that runs and
+misattributes, not a gate that passes something unproven. That is the argument FOR. The argument
+against is this repo's standing one: an escape hatch is how a guard becomes optional, and the same
+variable would sit in a CI file within a year.
+
+**Why it is not taken here.** It is a call about how much a wrong door is allowed to cost, which is
+a product decision and not the author's — and the population it would serve is currently empty (no
+producer for KD-111, and the divergence is fixed). **Whoever takes it decides one thing:** whether
+the refusal carries a bypass at all. If yes, it belongs in the refusal TEXT, because a hatch nobody
+can find is the same as none.
+
+*Logged 2026-09-18, review round 1 of the slice that closed KD-89, handed up rather than decided.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is

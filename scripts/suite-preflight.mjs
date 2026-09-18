@@ -89,6 +89,30 @@ import { fileURLToPath } from "node:url";
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /**
+ * THE ONLY WORKSPACE PATTERN THIS READER IMPLEMENTS — a literal path, optionally
+ * with a trailing `/*`. Everything else declines (see `declaredPackages`).
+ *
+ * This is an ALLOW-LIST and not a list of metacharacters to reject, which is the
+ * same choice `declaredSuiteFiles` in scripts/suite-reporter.mjs already makes
+ * about the patterns it hands to a shell, and it is here because a deny-list was
+ * measured wrong. npm resolves workspaces with `@npmcli/map-workspaces`, which
+ * accepts negation, braces, `**` and character classes. The first version of
+ * this reader rejected only `*` in the wrong place, so:
+ *
+ *   ["ws/*", "!ws/b"]   npm installs `a` only; the door walked `a` AND `b` and
+ *                       refused over dependencies `npm ci` will never install —
+ *                       a correctly installed tree that can never run its suite,
+ *                       and the one command the refusal names cannot clear it
+ *   ["ws/{a,b}"]        npm installs both; the door walked NEITHER, silently,
+ *                       covering less than its own docstring promised
+ *
+ * A second reader of one declaration must agree with the first or decline. The
+ * declining direction is free — the suite runs exactly as it did before this
+ * file existed — and the disagreeing direction is unrecoverable.
+ */
+const LITERAL_PATH = /^[\w./-]+$/;
+
+/**
  * Would Node find `name` as a package, starting from `fromDir`? The resolver's
  * node_modules walk, and nothing above it: no `exports` map, no conditions, no
  * subpath. Those answer a different question (can this specifier be imported),
@@ -118,8 +142,8 @@ export function installedFrom(fromDir, name) {
  * a list in this file would be a second declaration of the same fact, and the
  * two would drift.
  *
- * Throws on a glob shape it does not implement, so the caller fails OPEN rather
- * than quietly covering less than it claims.
+ * Throws on any shape it does not implement, so the caller fails OPEN rather
+ * than quietly covering a different set than npm does.
  *
  * @param {string} [root]
  * @returns {Array<{rel: string, name: string, deps: string[]}>}
@@ -128,17 +152,23 @@ export function declaredPackages(root = REPO_ROOT) {
   const read = (rel) => JSON.parse(fs.readFileSync(path.join(root, rel, "package.json"), "utf8"));
   const manifest = read(".");
   const rels = ["."];
-  for (const pattern of manifest.workspaces ?? []) {
-    if (!pattern.includes("*")) {
+  const declared = manifest.workspaces;
+  // npm also accepts the yarn-style `{ "packages": [...] }` object. Not
+  // implemented, so it declines rather than reading `undefined` as "no
+  // workspaces" — which would silently cover only the root.
+  if (declared !== undefined && !Array.isArray(declared)) {
+    throw new Error(`workspaces is not an array: ${JSON.stringify(declared).slice(0, 80)}`);
+  }
+  for (const pattern of declared ?? []) {
+    if (typeof pattern !== "string") throw new Error(`workspace pattern is not a string: ${String(pattern)}`);
+    const literal = pattern.endsWith("/*") ? pattern.slice(0, -2) : pattern;
+    if (!LITERAL_PATH.test(literal)) throw new Error(`workspace pattern not implemented: ${pattern}`);
+    if (!pattern.endsWith("/*")) {
       rels.push(pattern);
       continue;
     }
-    if (!pattern.endsWith("/*") || pattern.slice(0, -2).includes("*")) {
-      throw new Error(`workspace pattern not implemented: ${pattern}`);
-    }
-    const base = pattern.slice(0, -2);
-    for (const entry of fs.readdirSync(path.join(root, base), { withFileTypes: true })) {
-      if (entry.isDirectory()) rels.push(path.posix.join(base, entry.name));
+    for (const entry of fs.readdirSync(path.join(root, literal), { withFileTypes: true })) {
+      if (entry.isDirectory()) rels.push(path.posix.join(literal, entry.name));
     }
   }
   const packages = [];
