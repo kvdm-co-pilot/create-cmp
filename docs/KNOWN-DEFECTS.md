@@ -162,6 +162,8 @@ you the same list without opening anything.
 | **KD-95** | the judged tree is checked for one of the two files the gate imports out of it — `observed-tree.mjs` is not | the direction is a refusal; only its words are a module resolver's instead of the gate's |
 | **KD-96** | the list operator that decides whether a `cd` runs — an `&&`/`\|\|` guard, a pipeline, a backgrounded list, `!` — is not read: 26 of 108 generated shapes resolve a tree the shell would not use | fail-open, and no producer: each needs a mixed `&&`/`;` list whose guard fails at runtime, a `cd` as a pipeline element, or a backgrounded AND-list in front of the gated command |
 | **KD-97** | a gated command inside `sh -c '…'` is refused when anything stands in front of it INSIDE the quote, and judged at the payload's cwd when nothing does | a refusal in the first shape, sentence now true of it, remedy in the command; the second lands on the right tree — a nested shell with no `cd` inherits the cwd |
+| **KD-99** | `{}` as an ARGUMENT is read as a brace group, because its own `{` is the separator its `}` needs — `find … -exec rm {} \; && gh pr merge` is refused | a refusal, only the agent is refused, the sentence names `{ }` and it IS in the command; no producer — no merge, publish or fleet-check here is typed behind a `find -exec`/`xargs -I` |
+| **KD-100** | the two readers still spell "a command position" differently, now the other way: `COMPOUND` knows `!`, `command`, `builtin` and redirections, `WATCHED` does not — so `timeout 300 gh pr merge` is not classified as a merge and the gate is SILENT | fail-open at the classifier, unchanged from `main` — `invocation()` is not edited by this slice; no producer: a merge here is typed `gh pr merge --rebase --delete-branch`, and `time`/`env`/`sudo`/`nohup`/`VAR=x` in front of one ARE classified |
 
 ---
 
@@ -1814,6 +1816,76 @@ invocation's index ON the quote and the prefix stops in front of it. Only the se
 The entry above states what the commits do.
 
 </details>
+
+### KD-99 — `{}` as an argument is read as a brace group, because its own `{` is the separator its `}` needs
+
+`scripts/hooks/proof-gate.mjs` (`COMPOUND`)
+
+The boundary this slice fixed twice asks that a keyword stand after a separator (plus the optional
+run of wrappers, assignments and redirections that `invocation()` spells out). The word `{}` passes
+that test against ITSELF: `[;&|(){}\n]` matches the `{`, and the `}` one character later is a listed
+keyword with a space after it. So a `{}` anywhere in front of a gated command is read as a brace
+group and the tree is refused as unreadable — the same class as `git add .` and `echo done`, which
+was fixed in `168187f`, surviving in the one spelling where the argument carries its own separator.
+
+Measured 2026-09-18 at `7bc38dd`, over 21 argument words × 4 carrier commands × 12 command positions
+(1008 pairs, each compared against the same command with a neutral word and both run by `/bin/sh` to
+confirm the row really is an argument): 48 differ from the neutral spelling, all 48 of them `{}`, all
+48 in the refusal direction. Two everyday shapes out of a 57-command battery:
+
+    find . -name '*.log' -exec rm {} \; && gh pr merge 1   REFUSED — "…contains a compound command…"
+    ls | xargs -I {} echo {} && gh pr merge 1              REFUSED — "…contains a compound command…"
+
+Both are refused at `91b4129`, at `168187f` and at `7bc38dd` alike, so no boundary this slice shipped
+is better or worse on it; the word is opaque to all three.
+
+**Direction: a refusal** — never an allow, and only the agent typing the command is refused. Unlike
+the false refusals that did block (`git add .`, KD-64's class), the sentence names `{ }` and `{ }` is
+in the command, so there is something in it to act on: run the `find` as its own call. **No
+producer:** a merge here is typed as `gh pr merge --rebase --delete-branch` with at most a leading
+`cd`, and nothing in this repository puts a `find -exec`/`xargs -I` in front of a gated command.
+**The fix is not another boundary clause:** `{`/`}` are keywords only when they are a whole word, so
+the reader would need to see that `{}` is one word — which is a tokenizer, not a wider regex, and the
+next spelling of this class (`{};`, `{}\;`) arrives with it. *Logged 2026-09-18, at the re-record of
+review round 2 (KD-79's slice); the placement call is the reviewer's and the header's second row.*
+
+### KD-100 — the two readers agree in one direction, and the other direction is where the gate goes silent
+
+`scripts/hooks/proof-gate.mjs` (`COMPOUND` vs `invocation`)
+
+KD-98 was *the two readers in this file do not mean the same thing by a command position*, and the
+fix gave `COMPOUND` a wrapper run of its own. It is a second literal spelling, not the shared
+declaration KD-98's entry proposed, and it is not the same list: `COMPOUND` carries
+`!|nohup|time|env|caffeinate|sudo|command|builtin` plus `\d*[<>]+\S*` redirections, `invocation()`
+carries `nohup|time|env|caffeinate|sudo` and nothing else. So the two still answer differently — now
+with `COMPOUND` the wider one, which is the safe direction FOR COMPOUND and the unsafe one for the
+reader that decides whether this gate runs at all.
+
+Measured 2026-09-18 at `7bc38dd`, by feeding the hook a real `PreToolUse` payload on this worktree:
+
+    gh pr merge 1 --rebase               deny
+    time gh pr merge 1 --rebase          deny
+    ! gh pr merge 1 --rebase             SILENT — classify() returns null, no gate runs
+    command gh pr merge 1 --rebase       SILENT
+    2>/dev/null gh pr merge 1 --rebase   SILENT
+    timeout 300 gh pr merge 1 --rebase   SILENT
+
+`classify()` returning null makes the hook `return` before any verdict, so these merge without the
+proof gate having an opinion — a fail-open at the door rather than in the tree-reading this slice is
+about. It is also why the comment above `COMPOUND` still cannot be read literally: it says *the same
+rule `WATCHED` uses*, which is what `168187f`'s comment said and what KD-98 was written about, and it
+is no truer now, only untrue in the opposite direction.
+
+**Direction: fail-open, and UNCHANGED FROM `main`** — `invocation()` is byte-identical on `main` and
+on this branch; nothing in this slice widened or narrowed it, and merging changes nothing about which
+commands reach the gate. **No producer:** every merge, publish and fleet-check in this repository is
+typed bare or behind a `cd`, and the four wrappers that a human or an agent plausibly writes in front
+of a long command — `time`, `env`, `sudo`, `nohup` — plus `VAR=x` assignments are all classified
+today. **The fix is one declaration, not two lists:** export the command-position prefix once and let
+both readers spell it from that, which is the invariant KD-98's closed entry already names and the
+only thing that stops this pair drifting a third time. *Logged 2026-09-18, at the re-record of review
+round 2 (KD-79's slice). The placement call is the reviewer's: it is a fail-open, and it blocks
+nothing only because merging is not what introduces it.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
