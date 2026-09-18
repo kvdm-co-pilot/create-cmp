@@ -173,7 +173,7 @@ you the same list without opening anything.
 | **KD-116** | `IN_WORD` and `GAP` — the two clauses that say a wrapper run does not cross a character that ends a command — are pinned by no test since the bare-operand run they guarded was removed: relaxing either to `\S`/`\s+` leaves the whole suite green | not a wrong clause, an unpinned one: both are right about the shell, nobody is served wrongly, and the honest remedy (the declaration's comment states which clauses are measured) was taken. A test with no consequence to assert would have to assert the regex's own source — the third spelling that KD-107 was |
 | **KD-118** | the letter sweep runs only the direction where the shell PRINTS, so a value-taking letter MISSING from `WRAPPER_ARITY` is invisible to it — the run ends a word early and the gated program is read as the flag's value. Two were found by hand at the re-record (`command time -o F gh pr merge`, `xargs -J R gh pr merge`; both really merge, both answered `null`) and both are FIXED; what is logged is that nothing would catch a third | fail-open at the classifier, no producer — zero hits for `command time`, `/usr/bin/time` or `xargs -J` in this tree. The fix is a second sweep, costed at 13 spawns done per-wrapper (676 done per-letter); not built because this slice's two rounds are spent and it is a new mechanism rather than a correction |
 | **KD-119** | KD numbers are allocated per BRANCH, so two branches in flight allocate the same ones: as found, this branch's KD-109..113 and `origin/main`'s KD-109..113 named ten unrelated defects under five numbers, and `scripts/hooks/proof-gate.mjs` cites three of them in comments no rebase conflict ever shows. The collision is FIXED — this branch renumbered to 114-119, above main's maximum, before any rebase | the log is prose and no program routes on a KD number; what stays logged is that nothing makes re-reading main's maximum routine, and that a deriver for it would have to fetch — which `proof-plan.mjs` deliberately never does, because a gate that fetched would move the baseline it judges |
-| **KD-120** | the tool check's oracle for "is this a tool" is the grant line it is checking, so a name invented or misspelled identically in `tools:` and in prose clears it — and "add it to `tools:`" is the remedy its own failure message prints | the benign direction: a grant for a tool that does not exist is inert, where prose naming a tool the agent lacks is still refused. No in-tree oracle exists and the design deliberately refuses to carry a list; what is open is whether `SendMessage` and `TaskStop`, both added by this branch under that remedy, are real names |
+| **KD-120** | the tool check's oracle for "is this a tool" is the grant line it is checking, so a name invented or misspelled identically in `tools:` and in prose clears it — and "add it to `tools:`" is the remedy its own failure message prints | the benign direction: a grant for a tool that does not exist is inert, where prose naming a tool the agent lacks is still refused. No in-tree oracle exists and the design deliberately refuses to carry a list; what WAS open — whether `SendMessage` and `TaskStop`, both added by that branch under that remedy, are real names — is answered: **both are**, confirmed 2026-09-18 from the harness's own tool schemas, i.e. from outside this tree. That the answer cannot be kept here is KD-128 |
 | **KD-121** | six spellings of "use this tool" the check does not see — inside a fenced block, backticked with an argument (`` `SendMessage(a)` ``), split across a line break, not backticked at all, `mcp__x__y`, and a hump containing an acronym (`ReadPDF`) — and the comment justifying the fence strip ("examples and shell, not instructions") is false of BOTH fenced blocks in this repo's definitions | measured: every tool-shaped token anywhere in all three definitions is already visible to the checker, so no producer; the two fences hold commands the agent IS told to run, but neither names a tool |
 | **KD-122** | the check reads ONE spelling of `tools:` where the harness reads YAML: a list form parses to `{"- Read"}` and drops the rest, and an ABSENT `tools:` line — which means the subagent inherits EVERY tool — is read as granting none | both fail loud, never silent (they can only manufacture offences, not hide them), and no producer: all three definitions use the comma form and all three declare one |
 | **KD-123** | **FIXED same day** — three prose facts the change stated that the tree did not support: the new section cites the 5-minute rule as "below" when it is 44 lines above; its actionable remedy is scoped to `Agent` while `SendMessage` — granted by the same commit, and what RE-DELEGATE step 2 tells it to use — has the same stall shape; and the test's header attributes to SEVEN orchestrators a cold-substitute cost the commit measures at FOUR | the section's general rule ("nothing left to do but wait means you spawned it wrong") does cover the `SendMessage` path, so only the bullet is narrow; the count and the direction word are narration, and nothing routes on either |
@@ -181,7 +181,7 @@ you the same list without opening anything.
 | **KD-125** | `attribute()` matches `row.branch === branch`, and `currentBranch()` spells a detached HEAD `""` where all three history writers spell it `null` — so on a detached HEAD every recorded run is attributed to nobody and each row reads `0 record(s)` | no producer: this is an advisory a human reads on a branch, and the block's own `branch` line already prints `(detached)`. One reader-pair over from KD-113, and in the same class |
 | **KD-126** | `test/the-spent-block-asserts-counts-the-records-do-not-support.test.mjs` (its header and its line-78 failure message) still tells a contributor that `proof-plan.mjs --history` prints the malformed count for these files. It does not — `--history` reads `plans`, `reviews` and `fleet`, never `qa-artifacts/suite-history.jsonl`, and sums ONE count across the three | the same false fact `6231a21` corrected in production, surviving in a second spelling in the test file that found it. Nobody outside the repo is served by it: it misleads only a contributor reading that assertion's message. Round 2 was the last round, so it is logged rather than fixed |
 | **KD-127** | the second case of `test/the-advisory-states-what-its-own-input-refutes.test.mjs` opens `if (!cited) return;`, so on green bytes it asserts nothing, and the class it guards is pinned only against the literal string `proof-plan.mjs --history` — a citation to a different command that reported the fact no better would pass | deliberate and documented by its author (the test is a refuter, and the refutation has been answered), but it is a test measuring nothing today. The honest remedy is a claims table keyed on what a command reports rather than on its name; not built, because it is a new mechanism and this slice's two rounds are spent |
-| **KD-128** | `agents/cmp-orchestrator.md` now states, bolded, that `SendMessage` "has no such parameter" and tells the agent to "subscribe with `notify_when_idle: true`" — two parameter-level facts read out of the harness's tool schemas, which this repository records nowhere and no gate here can re-read | KD-120 one level down: that entry left open whether `SendMessage` and `TaskStop` are real NAMES, and this adds a claim about one's parameter LIST plus a third unconfirmed identifier. The fact may well be right; what is logged is that it arrived from outside the tree with no marker saying so and no in-tree oracle that could ever red if it drifts |
+| **KD-128** | five tool-schema facts are now stated in this repository and none can be re-read here: four about `SendMessage` in `agents/cmp-orchestrator.md` (no `run_in_background`; a send never blocks; no reply arrives inside the sending turn; the reply is delivered to a later one), and KD-120's answer ("**Both are** … confirmed from the harness's own tool schemas") | KD-120 one level down: that entry left open whether two tool NAMES are real, and both the answer and a claim about one's parameter LIST arrived from outside the tree. They may well be right; what is logged is that no gate here can ever red if the schema moves, so the shipped bullet and the closed entry both rest on a fact this repository cannot hold |
 
 ---
 
@@ -2430,30 +2430,40 @@ The honest remedy is a claims table keyed on *what a command reports*, derived b
 rather than on the command's name. That is a new mechanism, not a correction, and this slice's
 two rounds are spent. Logged for whoever next touches the disclosure.
 
-### KD-128 — a tool-schema fact stated in a shipped agent definition, derived from outside this tree
+### KD-128 — five tool-schema facts this repository states and cannot re-read
 
-`agents/cmp-orchestrator.md`
+`agents/cmp-orchestrator.md` · `docs/KNOWN-DEFECTS.md` (KD-120)
 
-The `NEVER END A TURN WAITING ON YOUR OWN CHILD` section now asserts in bold that **`SendMessage`
-has no such parameter** (`run_in_background`) and offers `notify_when_idle: true` as a remedy.
-Both are readings of the harness's tool schemas. Nothing in this repository holds a tool schema,
-and `scripts/ground-truth.mjs` — the deriver this project uses precisely so that counts and names
-are never hand-stated — has no source to derive one from.
+The `NEVER END A TURN WAITING ON YOUR OWN CHILD` section asserts, in bold, that **`SendMessage`
+has no such parameter** (`run_in_background`), that **a send never blocks**, that **no reply
+arrives inside the turn that sent it**, and that the reply **is delivered to a later one**. KD-120's
+entry closes its open question the same way: `SendMessage` and `TaskStop` are real names, "confirmed
+2026-09-18 from the harness's own tool schemas". Every one of those five is a reading of a schema
+this repository does not hold. `scripts/ground-truth.mjs` — the deriver this project uses precisely
+so that counts and names are never hand-stated — has no source to derive one from, and there are no
+recorded tool payloads in `qa-artifacts/` either.
 
-This is KD-120 one level down. That entry left open whether `SendMessage` and `TaskStop`, added
-under the tool check's own printed remedy, are real names at all; this change adds a claim about
-one of their parameter LISTS, and a third identifier (`notify_when_idle`) that is equally
-unconfirmable here. The tool check cannot see any of it: `notify_when_idle: true` is not a bare
-backticked identifier, which is KD-121's blind spot, and even a bare one would be judged against
-the grant line rather than against the harness.
+This is KD-120 one level down. That entry left open whether two tool NAMES exist; this adds the
+answer, plus claims about one of their parameter LISTS and its delivery semantics, and the answer
+is now load-bearing — a shipped agent definition tells an orchestrator what to do on the strength
+of it. The tool check cannot see any of it: a `key: value` inside backticks is not a bare
+identifier, which is KD-121's blind spot, and even a bare one would be judged against the grant
+line rather than against the harness, which is KD-120's.
+
+A sixth, retracted, is what round 1 caught: the bullet's first attempt offered `notify_when_idle:
+true` as an alternative to working on in the same turn. It is gone from the tree — the parameter is
+main-conversation-only, so a subagent orchestrator could never have used it — and it is the
+measurement for why this entry exists: an unre-readable schema fact WAS wrong once, in this file,
+in this slice, and only a human reading the bullet against the schema caught it.
 
 **Why logged and not fixed.** The same missing oracle KD-120 names, and the same reason no fix is
 available: a hand-maintained schema list is the drift the deriver exists to abolish, and no test
-here can probe a live session. What is logged is narrower than "is it true" — it is that an
-out-of-tree fact was written into a shipped surface with no marker that it came from outside, so a
-later reader cannot tell it from the file's derived claims, and nothing reds if the schema moves.
+here can probe a live session. What is logged is narrower than "are they true" — it is that
+out-of-tree facts are now written into a shipped surface and into a closed entry with no marker
+distinguishing them from this repository's derived claims, and nothing reds if the schema moves.
 
-*Logged 2026-09-18, review round 3.*
+*Logged 2026-09-18, review round 1 of the fix; corrected round 2, when round 1's own fix made the
+first version of this entry false of the tree.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
