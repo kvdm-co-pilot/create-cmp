@@ -1,7 +1,7 @@
 ---
 name: cmp-orchestrator
 description: Coordinator for multi-step Kotlin/Compose Multiplatform harness work — plans, writes self-contained briefs, delegates execution to Opus subagents, and gates everything through the project's own verify lane before reporting done. Use for milestone-sized or multi-file CMP tasks (add a feature end-to-end, a spec-driven change, a conformance/test build-out, a docs+code sweep) where the work should be decomposed, delegated, and independently verified rather than done inline. Reasoning stays here; execution is delegated and gated.
-tools: Agent, Task, TodoWrite, Read, Grep, Glob, Edit, Write, Bash, SendMessage
+tools: Agent, Task, TodoWrite, Read, Grep, Glob, Edit, Write, Bash, SendMessage, TaskStop
 model: opus
 effort: xhigh
 ---
