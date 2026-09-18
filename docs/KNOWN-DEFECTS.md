@@ -119,7 +119,7 @@ you the same list without opening anything.
 | **KD-50** | the template ships create-cmp's own changelog as source comments in the adopter's app | true prose, wrong repository |
 | **KD-51** | a JS masker reads the template's Kotlin; a raw string mis-parses and truncates the scanned body | it reds, not greens — the `useEmulator` tripwire catches the stub — and neither file has a raw string |
 | **KD-52** | what the emulator scan's two token-level assertions do NOT decide | the inert clause is gone (`f474f17`); the rest is the floor of a shape scan, and no shape reaches it |
-| **KD-56** | `console-now-sse` failed once inside a full suite run during a live lane, and the fit test threw away why | unreproduced in 1 + 5 + 2 runs; the transport already polls behind its watch |
+| **KD-56** | `console-now-sse` fails inside a full suite run and passes alone — the message, captured 2026-09-18, is post-test async activity throwing `TypeError: Invalid URL`, not the frame timeout this entry guessed | the failure is the TEST leaving work running after it returns, not the transport; it is now reproducible and belongs to a slice that owns `inspector/mcp/` |
 | **KD-58** | the proof gate reads the publish command's words inside a quoted pattern or a heredoc as the act, and refuses | refuses, never allows — and only the agent is refused |
 | **KD-63** | the lane refusal reads `qa/.lane-in-progress` with none of the guards its other readers apply | one clause of the sentence degrades; the refusal, the project and ours/not-ours are unaffected |
 | **KD-64** | a sibling git worktree of this repository is described as ANOTHER project's lane | errs toward waiting, and the path it prints is true |
@@ -800,6 +800,32 @@ a name and no reason. Keeping the failing tests' output (or the whole log, under
 the change that turns the next occurrence into a diagnosis. Not an adopter-facing defect: it is a test
 of the live console's transport, which has the fallback that would make the real feature survive this.
 *Logged 2026-09-16, during the device tier of `published-bytes-drift`.*
+
+**THE MESSAGE, 2026-09-18 — and it is not what this entry guessed.** It recurred twice in one hour on
+the `gate-judges-the-tree-the-command-acts-on` branch, under a full `npm test` and not under a lane;
+the file passes 3/3 alone, immediately after, every time. Kept verbatim this time, which is the change
+this entry asked for:
+
+```
+Error: Test "a line appended to the stream arrives as the RENDERED row — the page interprets nothing"
+at inspector/mcp/test/console-now-sse.test.mjs:113:1 generated asynchronous activity after the test
+ended. This activity created the error "TypeError: Invalid URL" and would have caused the test to
+fail, but instead triggered an unhandledRejection event.
+```
+
+So it is **not a frame timeout**, which is what both readings above narrowed to, and not a starved
+event loop: it is work the test leaves running after it returns, which then throws `TypeError: Invalid
+URL`. Node's runner attributes post-test async activity to the test that spawned it, so the *reported*
+failure is a test that had already passed — which is why every isolated re-run is green and why this
+looked like load sensitivity for two days. The suspect is an un-awaited fetch or EventSource in the
+`:113` test whose URL is built from a server that the test's own teardown has already closed. **Whose
+defect: the test's, not the transport's** — nothing here says the console is wrong, and the two
+readings above stay correct about the transport. The fix is to await or abort that activity before the
+test returns, in a slice that owns `inspector/mcp/`.
+
+**This is now a producer, so it is no longer unreproduced.** It cost this branch two recorded suite
+verdicts and one of them stood as a `FAIL` the gate told its author not to re-run.
+*Re-placed 2026-09-18 with the message it was missing, by the slice that hit it.*
 
 ### KD-58 — the words of an act, quoted, are refused as the act
 
