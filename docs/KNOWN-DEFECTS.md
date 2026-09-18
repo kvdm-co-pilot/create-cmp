@@ -164,6 +164,18 @@ you the same list without opening anything.
 | **KD-97** | a gated command inside `sh -c '…'` is refused when anything stands in front of it INSIDE the quote, and judged at the payload's cwd when nothing does | a refusal in the first shape, sentence now true of it, remedy in the command; the second lands on the right tree — a nested shell with no `cd` inherits the cwd |
 | **KD-99** | `{}` as an ARGUMENT is read as a brace group, because its own `{` is the separator its `}` needs — `find … -exec rm {} \; && gh pr merge` is refused | a refusal, only the agent is refused, the sentence names `{ }` and it IS in the command; no producer — no merge, publish or fleet-check here is typed behind a `find -exec`/`xargs -I` |
 | **KD-100** | the two readers still spell "a command position" differently, now the other way: `COMPOUND` knows `!`, `command`, `builtin` and redirections, `WATCHED` does not — so `timeout 300 gh pr merge` is not classified as a merge and the gate is SILENT | fail-open at the classifier, unchanged from `main` — `invocation()` is not edited by this slice; no producer: a merge here is typed `gh pr merge --rebase --delete-branch`, and `time`/`env`/`sudo`/`nohup`/`VAR=x` in front of one ARE classified |
+| **KD-95** | a worktree under a path containing a space cannot be read from a `cd` or a fleet-check operand | no producer: every worktree of this repo lives under a space-free path, and the answer is a refusal |
+| **KD-96** | SessionStart still prints the tree the hook was LOADED from as "this tree" | a context line, not a gate — every PreToolUse verdict now judges the tree the command acts on |
+| **KD-97** | the judged worktree's own `proof-plan.mjs` decides, whatever commit or state it is in | both ways it can differ fail safe: that tree's own answer, or a refusal |
+| **KD-98** | an npm flag whose value the gate does not know is read as a folder operand, and the refusal names it | the direction is a refusal, and the seven flags a publish here actually uses are known |
+| **KD-99** | a directory git answered 128 ABOUT is read as "another repository" and gated in SILENCE | the two producers are `cd <tree>/.git` and a repo git refuses to open; neither is typed here |
+| **KD-100** | the tree probe's purse bounds its git calls, not the three filesystem calls in front of them | same unmeasurable shape as KD-66 — no portable way to plant a wedged mount |
+| **KD-101** | `npm publish .` is refused as publishing something "rather than the directory it runs in" | `.` IS that directory; only the sentence is wrong, and no publish here writes one |
+| **KD-102** | the judged tree is checked for one of the two files the gate imports out of it — `observed-tree.mjs` is not | the direction is a refusal; only its words are a module resolver's instead of the gate's |
+| **KD-103** | the list operator that decides whether a `cd` runs — an `&&`/`\|\|` guard, a pipeline, a backgrounded list, `!` — is not read: 26 of 108 generated shapes resolve a tree the shell would not use | fail-open, and no producer: each needs a mixed `&&`/`;` list whose guard fails at runtime, a `cd` as a pipeline element, or a backgrounded AND-list in front of the gated command |
+| **KD-104** | a gated command inside `sh -c '…'` is refused when anything stands in front of it INSIDE the quote, and judged at the payload's cwd when nothing does | a refusal in the first shape, sentence now true of it, remedy in the command; the second lands on the right tree — a nested shell with no `cd` inherits the cwd |
+| **KD-106** | `{}` as an ARGUMENT is read as a brace group, because its own `{` is the separator its `}` needs — `find … -exec rm {} \; && gh pr merge` is refused | a refusal, only the agent is refused, the sentence names `{ }` and it IS in the command; no producer — no merge, publish or fleet-check here is typed behind a `find -exec`/`xargs -I` |
+| **KD-107** | the two readers still spell "a command position" differently, now the other way: `COMPOUND` knows `!`, `command`, `builtin` and redirections, `WATCHED` does not — so `timeout 300 gh pr merge` is not classified as a merge and the gate is SILENT | fail-open at the classifier, unchanged from `main` — `invocation()` is not edited by this slice; no producer: a merge here is typed `gh pr merge --rebase --delete-branch`, and `time`/`env`/`sudo`/`nohup`/`VAR=x` in front of one ARE classified |
 
 ---
 
@@ -1580,6 +1592,7 @@ logging cannot cost a device run or a review round, which is what it is defendin
 does carry is one ~50s suite re-run, which a reviewer who logs late has to either run or hand to
 the author. The sentence is one gate too broad, not the policy.
 ### KD-88 — a worktree under a path with a space in it is a tree this gate refuses to name
+### KD-95 — a worktree under a path with a space in it is a tree this gate refuses to name
 
 `scripts/hooks/proof-gate.mjs` (`literalDir` / `LITERAL_PATH`, and the fleet-check operand reader)
 
@@ -1600,7 +1613,7 @@ this slice just closed, made by the gate itself. **Fires when:** a worktree of t
 out under a path containing a space and a gated command names it. *Logged 2026-09-18, in the slice
 that added the reader (KD-79).*
 
-### KD-89 — the schedule a session reads is still the tree the hook was loaded from
+### KD-96 — the schedule a session reads is still the tree the hook was loaded from
 
 `scripts/hooks/proof-gate.mjs` (`main`, the SessionStart branch)
 
@@ -1616,7 +1629,7 @@ Fixing it means resolving from the SessionStart payload's cwd and threading a ro
 is the gate. **Fires when:** a session's cwd is not the worktree the hook file was loaded from.
 *Logged 2026-09-18, in the slice that fixed the PreToolUse half (KD-79).*
 
-### KD-90 — the judged worktree's own scheduler decides, whatever commit or state it is in
+### KD-97 — the judged worktree's own scheduler decides, whatever commit or state it is in
 
 `scripts/hooks/proof-gate.mjs` (`planOf`)
 
@@ -1635,7 +1648,7 @@ would be judging the tree by bytes the tree does not have. Only the second case'
 than it could be. **Fires when:** a gated command acts on a worktree at a different commit, or on
 one whose scheduler is being edited. *Logged 2026-09-18, in the slice that added it (KD-79).*
 
-### KD-91 — an npm flag whose value this gate does not know is read as a folder, and the refusal says so
+### KD-98 — an npm flag whose value this gate does not know is read as a folder, and the refusal says so
 
 `scripts/hooks/proof-gate.mjs` (`NPM_TAKES_VALUE`, in `commandCwd`)
 
@@ -1654,7 +1667,7 @@ list. What is wrong is only the sentence, and only in a refusal that is otherwis
 **Fires when:** a publish uses a space-separated value for a flag outside those seven.
 *Logged 2026-09-18, in the slice that added the reader (KD-79).*
 
-### KD-92 — a directory git answered 128 ABOUT is read as another repository, and gated in silence
+### KD-99 — a directory git answered 128 ABOUT is read as another repository, and gated in silence
 
 `scripts/hooks/proof-gate.mjs` (`worktreeAt`)
 
@@ -1674,7 +1687,7 @@ gated command runs in `<worktree>/.git`, or in a worktree git declines to open. 
 nothing merges or publishes from inside `.git`, and this is a single-user machine.
 *Logged 2026-09-18, review round 1 of the slice that added the reader (KD-79).*
 
-### KD-93 — the tree probe's purse bounds its git calls, not the filesystem calls in front of them
+### KD-100 — the tree probe's purse bounds its git calls, not the filesystem calls in front of them
 
 `scripts/hooks/proof-gate.mjs` (`judgedTree`, `realpath`)
 
@@ -1688,21 +1701,21 @@ and there is no portable way to plant a wedged mount to measure it. **Fires when
 names a directory on an unresponsive filesystem. *Logged 2026-09-18, review round 1 of the slice
 that added the probe (KD-79).*
 
-### KD-94 — `npm publish .` is refused for publishing something other than the directory it runs in
+### KD-101 — `npm publish .` is refused for publishing something other than the directory it runs in
 
 `scripts/hooks/proof-gate.mjs` (`commandCwd`, the publish operand loop)
 
 Any bare token after `publish` is read as a folder-or-tarball operand and refused with *it
 publishes "X" rather than the directory it runs in, and this gate reads only directories*. For `.`,
 `./` and `$PWD`-free spellings of the current directory that sentence contradicts itself: `.` **is**
-the directory it runs in, and it is a directory this reader could resolve. KD-91 is the same
+the directory it runs in, and it is a directory this reader could resolve. KD-98 is the same
 refusal reached through a flag's value; this is the operand that needs no flag. The direction is a
 refusal, never an allow, and no publish in this repo writes one — `docs/PUBLISHING.md` and the
 npm-publish skill are `cd <package> && npm publish [--access public]` throughout. **Fires when:**
 someone types `npm publish .`. *Logged 2026-09-18, review round 1 of the slice that added the
 reader (KD-79).*
 
-### KD-95 — the judged tree is checked for one of the two files the gate imports out of it
+### KD-102 — the judged tree is checked for one of the two files the gate imports out of it
 
 `scripts/hooks/proof-gate.mjs` (`judgedTree`, `releaseContext`)
 
@@ -1723,7 +1736,7 @@ runs in a worktree of this repository carrying `scripts/proof-plan.mjs` and no
 files have shipped together since the tier was written. *Logged 2026-09-18, review round 1 of the
 slice that added the reader (KD-79).*
 
-### KD-96 — the list operator that decides whether a `cd` runs is not read
+### KD-103 — the list operator that decides whether a `cd` runs is not read
 
 `scripts/hooks/proof-gate.mjs` (`commandCwd`, `CHDIR`)
 
@@ -1759,7 +1772,7 @@ The code holds it for 82 of the 108 generated ones. The sentence reads as a guar
 gate, and what it measures is a sample; saying "24 shapes" and saying "the invariant" in one breath
 is what makes it read that way. *Logged 2026-09-18, review round 2 of the same slice.*
 
-### KD-97 — a gated command inside `sh -c '…'` is refused, where it used to be judged
+### KD-104 — a gated command inside `sh -c '…'` is refused, where it used to be judged
 
 **Re-placed in the round that found it.** The half of this that WRONGLY SERVED — the sentence — was
 fixed before merge, because it told the reader something false about the command they had typed. The
@@ -1817,7 +1830,7 @@ The entry above states what the commits do.
 
 </details>
 
-### KD-99 — `{}` as an argument is read as a brace group, because its own `{` is the separator its `}` needs
+### KD-106 — `{}` as an argument is read as a brace group, because its own `{` is the separator its `}` needs
 
 `scripts/hooks/proof-gate.mjs` (`COMPOUND`)
 
@@ -1849,13 +1862,13 @@ the reader would need to see that `{}` is one word — which is a tokenizer, not
 next spelling of this class (`{};`, `{}\;`) arrives with it. *Logged 2026-09-18, at the re-record of
 review round 2 (KD-79's slice); the placement call is the reviewer's and the header's second row.*
 
-### KD-100 — the two readers agree in one direction, and the other direction is where the gate goes silent
+### KD-107 — the two readers agree in one direction, and the other direction is where the gate goes silent
 
 `scripts/hooks/proof-gate.mjs` (`COMPOUND` vs `invocation`)
 
-KD-98 was *the two readers in this file do not mean the same thing by a command position*, and the
+KD-105 was *the two readers in this file do not mean the same thing by a command position*, and the
 fix gave `COMPOUND` a wrapper run of its own. It is a second literal spelling, not the shared
-declaration KD-98's entry proposed, and it is not the same list: `COMPOUND` carries
+declaration KD-105's entry proposed, and it is not the same list: `COMPOUND` carries
 `!|nohup|time|env|caffeinate|sudo|command|builtin` plus `\d*[<>]+\S*` redirections, `invocation()`
 carries `nohup|time|env|caffeinate|sudo` and nothing else. So the two still answer differently — now
 with `COMPOUND` the wider one, which is the safe direction FOR COMPOUND and the unsafe one for the
@@ -1873,7 +1886,7 @@ Measured 2026-09-18 at `7bc38dd`, by feeding the hook a real `PreToolUse` payloa
 `classify()` returning null makes the hook `return` before any verdict, so these merge without the
 proof gate having an opinion — a fail-open at the door rather than in the tree-reading this slice is
 about. It is also why the comment above `COMPOUND` still cannot be read literally: it says *the same
-rule `WATCHED` uses*, which is what `168187f`'s comment said and what KD-98 was written about, and it
+rule `WATCHED` uses*, which is what `168187f`'s comment said and what KD-105 was written about, and it
 is no truer now, only untrue in the opposite direction.
 
 **Direction: fail-open, and UNCHANGED FROM `main`** — `invocation()` is byte-identical on `main` and
@@ -1882,7 +1895,7 @@ commands reach the gate. **No producer:** every merge, publish and fleet-check i
 typed bare or behind a `cd`, and the four wrappers that a human or an agent plausibly writes in front
 of a long command — `time`, `env`, `sudo`, `nohup` — plus `VAR=x` assignments are all classified
 today. **The fix is one declaration, not two lists:** export the command-position prefix once and let
-both readers spell it from that, which is the invariant KD-98's closed entry already names and the
+both readers spell it from that, which is the invariant KD-105's closed entry already names and the
 only thing that stops this pair drifting a third time. *Logged 2026-09-18, at the re-record of review
 round 2 (KD-79's slice). The placement call is the reviewer's: it is a fail-open, and it blocks
 nothing only because merging is not what introduces it.*
