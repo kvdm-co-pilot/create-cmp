@@ -579,8 +579,17 @@ const CHDIR = /(?:^|[;&|(\n])\s*(cd|pushd|popd|chdir)(?=[\s;&|)]|$)([^;&|)\n]*)/
  * `{ cd X; }` is NOT a subshell, so its `cd` persists — no paren to count, and a
  * reader that only counts parens misses it and falls back to the session's tree,
  * which is KD-79 itself.
+ *
+ * AT A COMMAND POSITION — the same rule WATCHED uses, for the same measured
+ * reason. Spelled as "preceded by whitespace", this matched `done`, `for` and `.`
+ * wherever they stood as ARGUMENTS: `git add .`, `echo done`, `touch done`. It
+ * turned an everyday command in front of a merge into a refusal whose sentence
+ * named `if/for/while/case/{ }/source`, none of which was in the command, so
+ * there was nothing in it for the reader to change. A gate that refuses real work
+ * for a reason that is not true is the one failure this file cannot have, and it
+ * had it for exactly one commit.
  */
-const COMPOUND = /(?:^|[\s;&|(){}])(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|select|function|\{|\}|source|eval|exec|\.)(?=[\s;&|(){}]|$)/;
+const COMPOUND = /(?:^|[;&|(){}\n])\s*(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|select|function|\{|\}|source|eval|exec|\.)(?=[\s;&|(){}]|$)/;
 
 /** `gh` will act on a repository named out of band from ANY directory, so a command that names one has no tree to read. */
 const NAMED_REPO = /(?:^|\s)(?:--repo[=\s]|-R\s)|(?:^|\s)GH_REPO=/;
@@ -625,7 +634,14 @@ function readablePrefix(prefix) {
       // not a command, so what is inside it is not read.
       let j = i + 1;
       while (j < prefix.length && prefix[j] !== c) j += c === '"' && prefix[j] === "\\" ? 2 : 1;
-      if (j >= prefix.length) return { unknown: "a quotation it never closes, so this reader cannot tell what in front of the command is a command" };
+      // STILL OPEN WHERE THE COMMAND BEGINS, which is two different facts and one
+      // honest sentence. Either the quoting is unbalanced, or — far more often —
+      // the gated command is INSIDE the quotation: `sh -c "cd /x && gh pr merge"`
+      // runs in a nested shell whose directory this reader does not follow, and
+      // the prefix it was handed stops at the invocation, so the closing quote is
+      // not in it to be found. Saying "never closes" was false for that shape and
+      // it is the listed spelling of an invocation (test/proof-gate-hook.test.mjs).
+      if (j >= prefix.length) return { unknown: "a quotation still open where the command begins — the command is inside a quoted script (`sh -c \"…\"`) or the quoting is unbalanced, and this reader follows neither" };
       s += " ".repeat(j - i + 1);
       i = j + 1;
       continue;

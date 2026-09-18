@@ -160,6 +160,8 @@ you the same list without opening anything.
 | **KD-93** | the tree probe's purse bounds its git calls, not the three filesystem calls in front of them | same unmeasurable shape as KD-66 — no portable way to plant a wedged mount |
 | **KD-94** | `npm publish .` is refused as publishing something "rather than the directory it runs in" | `.` IS that directory; only the sentence is wrong, and no publish here writes one |
 | **KD-95** | the judged tree is checked for one of the two files the gate imports out of it — `observed-tree.mjs` is not | the direction is a refusal; only its words are a module resolver's instead of the gate's |
+| **KD-96** | the list operator that decides whether a `cd` runs — an `&&`/`\|\|` guard, a pipeline, a backgrounded list, `!` — is not read: 26 of 108 generated shapes resolve a tree the shell would not use | fail-open, and no producer: each needs a mixed `&&`/`;` list whose guard fails at runtime, a `cd` as a pipeline element, or a backgrounded AND-list in front of the gated command |
+| **KD-97** | a gated command written inside `sh -c '…'` is refused, where before this slice it was judged | a refusal, the sentence is now true of it, and the remedy — drop the wrapper — is in the command |
 
 ---
 
@@ -1718,6 +1720,83 @@ runs in a worktree of this repository carrying `scripts/proof-plan.mjs` and no
 `scripts/observed-tree.mjs` — a checkout from before that file existed. No producer today: the two
 files have shipped together since the tier was written. *Logged 2026-09-18, review round 1 of the
 slice that added the reader (KD-79).*
+
+### KD-96 — the list operator that decides whether a `cd` runs is not read
+
+`scripts/hooks/proof-gate.mjs` (`commandCwd`, `CHDIR`)
+
+Masking settled quoting, and paren-counting settles subshells. What is still unread is the LIST
+OPERATOR around the `cd` — which is the third thing that decides whether the shell performs it.
+Measured 2026-09-18 by a generated sweep (6 guards × 8 forms × 3 joiners = 144 shapes, 108 of which
+the shell ran to completion) against the same oracle as
+`test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs`, `/bin/sh` with the gated command
+replaced by `pwd -P`. Twenty-six resolve a directory the command will not run in, in four shapes:
+
+    false && cd X; gh pr merge          the guard fails, the cd never runs, the gate resolves X
+    true || cd X; gh pr merge           the same, the other way round
+    cd X | cat; gh pr merge             a pipeline element is a subshell; the parent never moves
+    cd X && sleep 0 &\ngh pr merge      the `&` backgrounds the whole AND-list, and the new `&`
+                                        check reads only the character after the cd's OWN operand,
+                                        where it finds `&&` and applies the cd
+    ! cd X; gh pr merge                 `!` is not one of CHDIR's separators, so this cd is DROPPED
+                                        and the payload's cwd is judged — KD-79's own direction
+
+**Direction: fail-open**, and the tree's own words for it are the harshest available (that test
+file's header: *a directory the gate resolves WRONGLY is the worst outcome available here*). **Fires
+when:** one of those five shapes stands in front of a gated command AND the resolved tree owes less
+than the real one. **No producer:** the first two need a mixed `&&`/`;` list whose guard happens to
+fail at runtime, the third needs a `cd` written as a pipeline element, the fourth a backgrounded
+AND-list with the gated command after it, the fifth a `!` on a `cd` — none is written anywhere in
+this repository, in its session logs, or by the surfaces that produce these commands, and a merge in
+this repo is typed as `gh pr merge --rebase --delete-branch` with at most a leading `cd`.
+
+*A second thing to decide with it, no edit proposed here:* Rule 4 now says the harness "runs 24
+shapes through a real shell, and holds the invariant that the gate resolves the directory the shell
+would run the command in **or resolves nothing at all**". The harness holds it — over its 24 shapes.
+The code holds it for 82 of the 108 generated ones. The sentence reads as a guarantee about the
+gate, and what it measures is a sample; saying "24 shapes" and saying "the invariant" in one breath
+is what makes it read that way. *Logged 2026-09-18, review round 2 of the same slice.*
+
+### KD-97 — a gated command inside `sh -c '…'` is refused, where it used to be judged
+
+**Re-placed in the round that found it.** The half of this that WRONGLY SERVED — the sentence — was
+fixed before merge, because it told the reader something false about the command they had typed. The
+refusal it named is deliberate and stays, and that is what the entry now describes. The original
+measurement is kept below it, unedited, because it is the evidence.
+
+`scripts/hooks/proof-gate.mjs` (`readablePrefix`) now says *a quotation still open where the command
+begins — the command is inside a quoted script (`sh -c "…"`) or the quoting is unbalanced, and this
+reader follows neither*, which is true of both shapes that reach it. What remains is only the
+refusal: `sh -c "node scripts/fleet-check.mjs"` was judged before this slice and is refused after it.
+That is the safe direction, the remedy is visible in the command (drop the wrapper), and reading it
+properly means deciding that a gated command inside a quoted wrapper belongs to that wrapper's shell
+— a reader this slice did not build, and one that would have to answer for that shell's own cwd.
+A test pins the refusal and its sentence.
+
+<details><summary>as first logged, round 2, before the sentence was fixed</summary>
+
+#### a gated command inside `sh -c '…'` is refused as a quotation that never closes
+
+`scripts/hooks/proof-gate.mjs` (`readablePrefix`)
+
+`readablePrefix` is handed `cmd.slice(0, at)` — the command CUT at the invocation — so a quotation
+that opens before the invocation and closes after it is unclosed in the slice and closed in the
+command. The fix's own backgrounded-`cd` branch reaches back to the WHOLE command for exactly this
+reason, and says so in its comment; the quote branch does not. Measured 2026-09-18, `072433d` against
+`91b4129`:
+
+    sh -c "node scripts/fleet-check.mjs"        judged the payload's cwd  →  refused
+    sh -c 'cd <tree> && gh pr merge 1'          resolved <tree>           →  refused
+
+both with *what runs in front of it contains a quotation it never closes*, which is false of the
+command the agent typed. The first shape is listed in `test/proof-gate-hook.test.mjs` as an
+invocation `classify` must catch, so it is a form somebody wrote; no test asserts a verdict for it.
+**Direction: a refusal**, and the remedy — drop the wrapper — is visible in the command even though
+the sentence does not name it. Reading it properly means deciding that a gated command inside a
+quoted wrapper belongs to that wrapper's shell, which is a reader this slice did not build.
+*Logged 2026-09-18, review round 2 of the slice that added the reader (KD-79).*
+
+</details>
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is

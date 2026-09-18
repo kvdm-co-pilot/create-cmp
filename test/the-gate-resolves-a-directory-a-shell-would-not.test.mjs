@@ -131,4 +131,45 @@ test("the oracle is an oracle: a shape whose cd the shell performs is not scored
   assert.equal(whereTheShellRuns(`{ cd ${X}; }; ${GATED}`), X, "a brace group is not a subshell");
 });
 
+// A SHELL KEYWORD IS ONLY A KEYWORD AT A COMMAND POSITION. `done` after `echo`
+// is a word; `.` after `git add` is a directory; `case` in `ls case` is a file.
+// A reader that refuses on the SPELLING refuses `git add . && gh pr merge` and
+// `echo done && gh pr merge` — everyday commands, with a sentence naming
+// if/for/while/case/{ }/source, none of which are there. That is the other
+// half of the table above and it needs its own property, because the one above
+// is satisfied by refusing: a refusal is always allowed to be right about the
+// directory, and never about the command it was reading.
+//
+// THE INVARIANT IS DIFFERENTIAL, so nothing here asserts a directory of its
+// own: changing a word the SHELL passes as an argument must not change what the
+// gate resolves. The shell is asked first, on both spellings, so the claim that
+// the word is an argument is measured and not assumed.
+const ARGUMENT_WORDS = ["if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac", "select", "function", "source", "eval", "exec", ".", "{", "}"];
+
+test("a word the shell passes as an ARGUMENT does not change the directory the gate resolves", () => {
+  const moved = [];
+  for (const word of ARGUMENT_WORDS) {
+    // Two spellings of one command, differing only in an operand of `echo`.
+    const spelled = `echo ${word} && cd ${X} && ${GATED}`;
+    const neutral = `echo word && cd ${X} && ${GATED}`;
+    assert.equal(
+      whereTheShellRuns(spelled),
+      whereTheShellRuns(neutral),
+      `the shell must run both spellings in the same directory, or this row is not about an argument: ${spelled}`,
+    );
+    const a = commandCwd("merge", spelled, HERE);
+    const b = commandCwd("merge", neutral, HERE);
+    if (a.unknown === b.unknown && a.dir === b.dir) continue;
+    moved.push(`echo ${word}\n    ${JSON.stringify(spelled)}\n    resolved: ${a.unknown ? `UNREADABLE — ${a.unknown}` : a.dir}\n    but \`echo word\` in the same place resolved: ${b.unknown ? `UNREADABLE — ${b.unknown}` : b.dir}`);
+  }
+  assert.deepEqual(
+    moved,
+    [],
+    `${moved.length} of ${ARGUMENT_WORDS.length} everyday words change the gate's reading of a command the shell reads identically.\n\n${moved.join("\n\n")}\n\n` +
+      "Each one is a command refused for a construct it does not contain — `git add . && gh pr merge`, `echo done && gh pr merge` — " +
+      "and the sentence the agent is given names if/for/while/case/{ }/source, so there is nothing in it to act on. " +
+      "A shell keyword is a keyword at a COMMAND POSITION and an argument anywhere else; the reader must ask which of the two it found.",
+  );
+});
+
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
