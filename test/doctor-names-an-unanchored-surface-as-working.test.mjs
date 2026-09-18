@@ -128,3 +128,59 @@ test("doctor claims a surface 'still works' only when that surface carries the a
       "that cwdRelativeWalkSurfaces already applies to the status line."
   );
 });
+
+// ROUND 2. The claim is positive evidence now — and the evidence is read from the
+// COMMAND, not from the walk path inside it: `carries` is
+// `command.includes(PROJECT_DIR_ANCHOR)`. An anchor anywhere in the string counts,
+// including one on a different path, one inside single-quoted narration, or the
+// `test -f` half of a command whose `node` half is still relative.
+//
+// That makes the surface's two answers CONTRADICT rather than merely overclaim:
+// the detector puts UserPromptSubmit in `cwdRelative` (it can see the bare
+// `qa/walk-status.mjs`) and `anchoredWalkSurfaces` puts it in `anchored`, so one
+// paragraph tells the adopter the hook "only runs when the session starts at the
+// project root" AND that it "is anchored and still works from any directory".
+//
+// The invariant needs no oracle, which is why it is written this way: the two
+// lists are two answers to one question about one surface, so a surface in both is
+// the program disagreeing with itself, whichever list is right. Asserting the
+// disjointness rather than the truth of either keeps this test from having to
+// re-decide what "anchored" means every time the detector learns a new shape.
+//
+// The producer is not exotic. The engine template's hook command carries the
+// anchor TWICE (`test -f "${…}/qa/walk-status.mjs" && node "${…}/qa/walk-status.mjs"`),
+// so a hand-upgrade from the pre-0.26.3 form that anchors the first occurrence and
+// stops is exactly the first fixture below.
+const HALF_ANCHORED = [
+  `test -f "${PROJECT_DIR_ANCHOR}/${SCRIPT}" && node ${SCRIPT} --inject || true`,
+  `test -f "${PROJECT_DIR_ANCHOR}/qa/other.mjs" && node ${SCRIPT} --inject || true`,
+  `printf '%s' '${PROJECT_DIR_ANCHOR}' ; node ${SCRIPT} --inject || true`,
+];
+
+test("no surface is reported inert and working at once", () => {
+  const both = [];
+  for (const command of HALF_ANCHORED) {
+    const dir = project(command);
+    try {
+      const { cwdRelative, anchored } = gatherWalkInputs(dir);
+      const overlap = anchored.filter((s) => cwdRelative.includes(s));
+      if (overlap.length > 0) {
+        both.push(
+          `  ${overlap.join(", ")} is in BOTH lists: ${command}\n` +
+            `      detail: ${walkWiring(dir).detail}`
+        );
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  assert.deepEqual(
+    both,
+    [],
+    "the same surface is reported as cwd-relative and as anchored-and-still-working, in one finding:\n" +
+      both.join("\n") +
+      "\n  `carries` tests the whole command for the anchor, where the detector tests the PATH. " +
+      "Credit the surface only for a walk invocation whose own path is anchored — or subtract the " +
+      "inert list from the working one, so the two answers cannot contradict."
+  );
+});

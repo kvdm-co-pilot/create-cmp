@@ -372,6 +372,15 @@ export function diagnoseProject(input) {
       // the inert list's silence. A detector that cannot see a shape reports no
       // violation for it, and calling that "still works" is the same false health
       // claim this finding replaced, one surface over. Absent field: claim nothing.
+      // …and never a surface the detector calls inert. `anchored` asks whether the
+      // COMMAND contains the anchor; `inert` asks whether the walk's own PATH
+      // resolves. They are two answers to one question, and they come apart on a
+      // real shape: the template anchors its hook twice, so a hand-upgrade that
+      // anchors `test -f` and leaves `node qa/walk-status.mjs` relative carries the
+      // anchor while resolving nowhere. Naming that surface in both halves of one
+      // paragraph is the program disagreeing with itself, whichever half is right.
+      // The conjunction defers to the surface-aware detector instead of re-deriving
+      // a path opinion here — a second opinion is how this finding went wrong once.
       const anchored = walk.anchored ?? [];
       const working = [
         walk.statusLine && anchored.includes("statusLine") ? "statusLine" : null,
