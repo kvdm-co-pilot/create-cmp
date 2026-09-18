@@ -9,6 +9,67 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-98 — `COMPOUND` and `WATCHED` do not mean the same thing by "a command position" — **CLOSED 2026-09-18, in the round that found it**
+
+`scripts/hooks/proof-gate.mjs` (`COMPOUND`, `invocation`)
+
+`168187f` narrowed `COMPOUND`'s boundary to `(?:^|[;&|(){}\n])\s*` and its comment says this is
+*the same rule WATCHED uses*. It is not the same rule. `WATCHED`'s `invocation()` spells a command
+position as a separator **plus an optional run of wrapper words and assignments** —
+`(?:nohup|time|env|caffeinate|sudo)(?:\s+-\S+)*\s+` and `[A-Za-z_][A-Za-z0-9_]*=\S*\s+` — because
+those are exactly the words a shell allows in front of a command without ending the command
+position. `COMPOUND` now accepts only the separator. So one reader in this file says `time X` is a
+command position and the other says it is not, which is the two-spellings-of-one-fact shape, and it
+drifted in the reader that was edited.
+
+The consequence is a fail-open, measured 2026-09-18 with the same oracle the slice's own test uses —
+`/bin/sh` with the gated command replaced by `pwd -P` — over 12 constructs × 10 command positions,
+120 of which the shell ran to completion. 114 refuse correctly. Six resolve the payload's cwd where
+the shell has moved:
+
+    time . <dir>/s.sh; gh pr merge 1        shell: <dir>    gate: the payload's cwd
+    ! . <dir>/s.sh; gh pr merge 1           shell: <dir>    gate: the payload's cwd
+    time source <dir>/s.sh; …               shell: <dir>    gate: the payload's cwd
+    ! source <dir>/s.sh; …                  shell: <dir>    gate: the payload's cwd
+    time eval cd <dir>; …                   shell: <dir>    gate: the payload's cwd
+    ! eval cd <dir>; …                      shell: <dir>    gate: the payload's cwd
+    FOO=bar . <dir>/s.sh; …                 shell: <dir>    gate: the payload's cwd
+    2>/dev/null . <dir>/s.sh; …             shell: <dir>    gate: the payload's cwd
+
+Only the three keyword-ONLY constructs leak: `if`/`for`/`while`/`case`/`{ }` after `time` or `!` are
+still refused, because their own internal `;`/`{` re-establishes a separator for `COMPOUND` to find.
+`. ./env.sh && gh pr merge`, with no prefix, is still refused — the unprefixed forms are unaffected.
+All eight shapes above were REFUSED at `91b4129` under the old whitespace boundary, so this is a
+regression the fix opened while closing the false positives it was for; the old boundary refused
+them for the wrong reason (it refused `git add .` too) and this is the sliver where the wrong reason
+happened to give the right answer.
+
+**Direction: fail-open** — the session's tree is judged in place of the command's, which is KD-79's
+own direction. **No producer:** nothing in this repository, its session logs, or the surfaces that
+produce these commands writes a wrapper word, a `!` or a `VAR=x` assignment in front of a sourced
+script or an `eval` before a gated command; a merge here is typed as `gh pr merge --rebase
+--delete-branch` with at most a leading `cd`. **The fix, when it is taken up, is one edit and not a
+parser:** give `COMPOUND` the prefix run `WATCHED` already declares, from one shared declaration, so
+the two cannot answer the question differently again — the invariant being *the two readers in this
+file agree on where a command begins*, which is what a landed harness should assert rather than any
+one of these eight shapes. *Logged 2026-09-18, at the re-record of review round 2 (KD-79's slice).*
+
+**Closed in the round that found it.** The direction decided it: this is a FAIL-OPEN, and it was
+opened by this slice's own previous commit rather than inherited — `91b4129` refused all eight of
+these shapes and `168187f` let them through. A defect that hands back a tree the command will not
+act on is the thing this slice exists to stop, so "no producer" buys a delay it does not need when
+the fix is the clause `invocation()` in the same file has always carried.
+
+`COMPOUND`'s boundary is now a separator plus that same optional run of wrappers, assignments and
+redirections, and the two readers agree about where a command begins.
+`test/a-construct-this-reader-cannot-follow-is-refused-wherever-it-stands.test.mjs` keeps them
+agreeing: 12 constructs x 12 command positions against `/bin/sh` as the oracle, asserting that every
+shape the shell runs is REFUSED — including the ones where the construct happens not to move the
+directory, because a reader that got those right did so by not following a branch it would not have
+followed the other way either. Both errors this boundary has made are mutation-pinned: widen it back
+to "preceded by whitespace" and the argument sweep goes red; narrow it to "preceded by a separator"
+and the construct sweep does.
+
 ### KD-79 — the scheduler says the device tier is OWED and the gate enforcing it says nothing is owed — **CLOSED 2026-09-18, in the slice that fixed it**
 
 `scripts/hooks/proof-gate.mjs` (`decide`, `kind === "device"`, `o.state === "none"`) vs

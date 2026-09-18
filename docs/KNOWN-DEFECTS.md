@@ -162,7 +162,6 @@ you the same list without opening anything.
 | **KD-95** | the judged tree is checked for one of the two files the gate imports out of it — `observed-tree.mjs` is not | the direction is a refusal; only its words are a module resolver's instead of the gate's |
 | **KD-96** | the list operator that decides whether a `cd` runs — an `&&`/`\|\|` guard, a pipeline, a backgrounded list, `!` — is not read: 26 of 108 generated shapes resolve a tree the shell would not use | fail-open, and no producer: each needs a mixed `&&`/`;` list whose guard fails at runtime, a `cd` as a pipeline element, or a backgrounded AND-list in front of the gated command |
 | **KD-97** | a gated command inside `sh -c '…'` is refused when anything stands in front of it INSIDE the quote, and judged at the payload's cwd when nothing does | a refusal in the first shape, sentence now true of it, remedy in the command; the second lands on the right tree — a nested shell with no `cd` inherits the cwd |
-| **KD-98** | `COMPOUND` and `WATCHED` disagree about what a command position is — `WATCHED` counts a wrapper word (`time`/`env`/`sudo`/`nohup`) or a `VAR=x` assignment as one, `COMPOUND` counts only a separator — so `time . ./s.sh`, `! source ./s.sh`, `FOO=1 eval cd X` in front of a gated command are no longer seen: 6 of 120 generated shapes | fail-open, opened by `168187f`; no producer — nothing here writes a wrapper word, a `!` or an assignment in front of a sourced script before a gated command |
 
 ---
 
@@ -1815,51 +1814,6 @@ invocation's index ON the quote and the prefix stops in front of it. Only the se
 The entry above states what the commits do.
 
 </details>
-
-### KD-98 — `COMPOUND` and `WATCHED` do not mean the same thing by "a command position"
-
-`scripts/hooks/proof-gate.mjs` (`COMPOUND`, `invocation`)
-
-`168187f` narrowed `COMPOUND`'s boundary to `(?:^|[;&|(){}\n])\s*` and its comment says this is
-*the same rule WATCHED uses*. It is not the same rule. `WATCHED`'s `invocation()` spells a command
-position as a separator **plus an optional run of wrapper words and assignments** —
-`(?:nohup|time|env|caffeinate|sudo)(?:\s+-\S+)*\s+` and `[A-Za-z_][A-Za-z0-9_]*=\S*\s+` — because
-those are exactly the words a shell allows in front of a command without ending the command
-position. `COMPOUND` now accepts only the separator. So one reader in this file says `time X` is a
-command position and the other says it is not, which is the two-spellings-of-one-fact shape, and it
-drifted in the reader that was edited.
-
-The consequence is a fail-open, measured 2026-09-18 with the same oracle the slice's own test uses —
-`/bin/sh` with the gated command replaced by `pwd -P` — over 12 constructs × 10 command positions,
-120 of which the shell ran to completion. 114 refuse correctly. Six resolve the payload's cwd where
-the shell has moved:
-
-    time . <dir>/s.sh; gh pr merge 1        shell: <dir>    gate: the payload's cwd
-    ! . <dir>/s.sh; gh pr merge 1           shell: <dir>    gate: the payload's cwd
-    time source <dir>/s.sh; …               shell: <dir>    gate: the payload's cwd
-    ! source <dir>/s.sh; …                  shell: <dir>    gate: the payload's cwd
-    time eval cd <dir>; …                   shell: <dir>    gate: the payload's cwd
-    ! eval cd <dir>; …                      shell: <dir>    gate: the payload's cwd
-    FOO=bar . <dir>/s.sh; …                 shell: <dir>    gate: the payload's cwd
-    2>/dev/null . <dir>/s.sh; …             shell: <dir>    gate: the payload's cwd
-
-Only the three keyword-ONLY constructs leak: `if`/`for`/`while`/`case`/`{ }` after `time` or `!` are
-still refused, because their own internal `;`/`{` re-establishes a separator for `COMPOUND` to find.
-`. ./env.sh && gh pr merge`, with no prefix, is still refused — the unprefixed forms are unaffected.
-All eight shapes above were REFUSED at `91b4129` under the old whitespace boundary, so this is a
-regression the fix opened while closing the false positives it was for; the old boundary refused
-them for the wrong reason (it refused `git add .` too) and this is the sliver where the wrong reason
-happened to give the right answer.
-
-**Direction: fail-open** — the session's tree is judged in place of the command's, which is KD-79's
-own direction. **No producer:** nothing in this repository, its session logs, or the surfaces that
-produce these commands writes a wrapper word, a `!` or a `VAR=x` assignment in front of a sourced
-script or an `eval` before a gated command; a merge here is typed as `gh pr merge --rebase
---delete-branch` with at most a leading `cd`. **The fix, when it is taken up, is one edit and not a
-parser:** give `COMPOUND` the prefix run `WATCHED` already declares, from one shared declaration, so
-the two cannot answer the question differently again — the invariant being *the two readers in this
-file agree on where a command begins*, which is what a landed harness should assert rather than any
-one of these eight shapes. *Logged 2026-09-18, at the re-record of review round 2 (KD-79's slice).*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
