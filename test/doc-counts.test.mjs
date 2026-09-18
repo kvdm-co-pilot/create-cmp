@@ -144,8 +144,9 @@ function drift(text, noun, allowed) {
  * stopped saying "N gates", which is the one phrase the gate reads, and then
  * every number behind it rotted. Measured 2026-09-18 across every surface on
  * the list: EIGHT profile-bound claims, eight of them wrong, none right. One
- * step was added to the shared spine and all six of §3's rows were left an
- * off-by-one.
+ * step was added to the shared spine; five of §3's six rows were left an
+ * off-by-one, and the sixth names a profile the deriver does not enumerate at
+ * all, so no gate can read it either way (KD-68).
  *
  * BOUND TO A PROFILE NAME, which is the whole of why it is safe to read the
  * word `steps` here at all. A bare "<n> steps" is polysemous and was measured

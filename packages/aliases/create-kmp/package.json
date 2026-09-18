@@ -1,7 +1,7 @@
 {
   "name": "create-kmp",
-  "version": "0.1.5",
-  "description": "Official alias for create-cmp-cli — the AI delivery harness for Kotlin/Compose Multiplatform: scaffold a green-building Android + iOS app (one Kotlin codebase) in minutes, then hold AI-driven changes to a machine-enforced verify lane (8 gates, evidence receipts) with a device-free preview loop so coding agents see what they build.",
+  "version": "0.1.6",
+  "description": "Official alias for create-cmp-cli — the AI delivery harness for Kotlin/Compose Multiplatform: scaffold a green-building Android + iOS app (one Kotlin codebase) in minutes, then hold AI-driven changes to a machine-enforced verify lane (evidence receipts) with a device-free preview loop so coding agents see what they build.",
   "type": "module",
   "bin": {
     "create-kmp": "bin/create-kmp.mjs"

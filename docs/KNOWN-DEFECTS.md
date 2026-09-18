@@ -133,6 +133,10 @@ you the same list without opening anything.
 | **KD-72** | the signed attestation can be rewritten without owing or reopening a review — `REVIEW_TIER_TRIGGERS` is a code allow-list and `docs/` is not on it, but that is where this one evidence-bearing file lives | the exemption is right for prose and wrong for this file; nothing is mis-served today, and the harm needs a future edit |
 | **KD-73** | a bare "<n> steps" is not gated, where "<n> steps at \`<profile>\`" now is | measured 50% false positives; the profile-bound form catches every drift there was |
 | **KD-74** | `nightly` is a lane profile `ground-truth.mjs` does not enumerate, so no gate can check its row | the row states no number now, so nothing false ships |
+| **KD-75** | the profile-bound lane reader refuses a SUBSET of a profile's steps, and any number in a table's second column | measured: three shapes, none of them written anywhere in the tree today |
+| **KD-76** | the same reader PASSES a wrong lane size written as a word, or with the profile named first | measured: three shapes, none written anywhere in the tree today |
+| **KD-77** | the CLI-command count is derived, gated, and calibrated by nothing — no surface states it | the reader is idle, not wrong; a future "<n> commands" is still refused |
+| **KD-78** | two npm pages still serve "8 gates" from bytes already published; the tree's copy is fixed | no act available here — a registry description changes only by publishing |
 
 ---
 
@@ -1012,6 +1016,7 @@ shape-conforming non-day is still refused, so the check cannot be deleted to mak
 
 **Fires when:** an attestation's `date` names a year between 0001 and 0099.
 *Logged 2026-09-18, in the round that reviewed the `needsText` / `isCalendarDay` fix.*
+
 ### KD-73 — a bare "<n> steps" claim is not gated, and cannot be without deleting honest prose
 
 `test/doc-counts.test.mjs` (`laneSizeClaims`)
@@ -1052,6 +1057,102 @@ cannot drift. The defect is the deriver's blind spot, not the doc's.
 that reuses `ci`'s step set — the two answers want different fixes, and the second may mean the
 row is already as true as it can be.
 *Logged 2026-09-18, found while gating the profile-bound lane size.*
+
+### KD-75 — the profile-bound lane reader cannot tell a whole lane from a slice of it
+
+`test/doc-counts.test.mjs` (`laneSizeClaims`)
+
+The reader is bound to a profile name, which is what makes reading the word `steps` safe at all
+(KD-73). It is not bound to the claim being about the WHOLE profile, and it treats any number in a
+table's second column as a step count. Three shapes, each run through the real function:
+
+| planted sentence | verdict |
+|---|---|
+| ``Of the 17 steps, 4 steps at `local` need a device`` | REFUSED — reads `4 steps at \`local\`` against 17 |
+| ``It takes about 3 at `local` minutes`` | REFUSED — the `<n> at \`profile\`` form has no unit |
+| ``\| \`local\` \| 12 \| median wall-clock minutes \|`` | REFUSED — any second column is read as Steps |
+
+Not blocking, and not the same call as KD-73: none of these shapes is written anywhere in the tree
+(measured tree-wide — twelve matches, every one a genuine lane size), and the second column of the
+only profile table that exists is headed **Steps**. The failure direction is also the safe one: it
+reds, never greens, and the refusal quotes the string it read, so a false positive costs a
+contributor one rephrase rather than a wrong number shipped.
+
+**Fires when:** someone documents a subset of a profile's steps in prose, or gives a profile table a
+second numeric column that is not a step count.
+*Logged 2026-09-18, raised in review of `slice-22-eleven-skills-twelve`.*
+
+### KD-76 — the same reader passes a wrong lane size written as a word, or profile-first
+
+`test/doc-counts.test.mjs` (`laneSizeClaims`)
+
+KD-75 is the over-refusal direction. This is the other one, and it is the direction that GREENS.
+The reader takes `\d+` only and one word order — `<n> [steps] at \`<profile>\`` or a table row —
+so three natural spellings of a *wrong*, profile-bound lane size are read as nothing. Each run
+through the real function, against the real deriver:
+
+| planted sentence | verdict |
+|---|---|
+| ``sixteen steps at `local` and nineteen at `release` `` | PASSES — the number is a word |
+| ``The `local` profile runs 16 steps`` | PASSES — the profile is named first |
+| ``the lane at `local` is 16 steps long`` | PASSES — a unit sits between the number and the profile |
+
+This is NOT KD-73, which is about a bare `<n> steps` that names no profile and so cannot be
+disambiguated. All three above name their profile, which is the exact condition the reader's own
+comment gives for why reading the word `steps` is safe — so they fall inside the stated rule and
+outside the code. The word-number case is not hypothetical style either: both gated plugin
+manifests write their own count as `Twelve skills`, and `claims()` reads spelled-out numbers
+precisely because of that. The two readers in this one file disagree about what a number is.
+
+Not blocking: no surface writes any of these shapes today (measured tree-wide — every lane size in
+the tree is a digit in the gated form), and the eight drifts this slice found were all caught.
+
+**Fires when:** someone writes a lane size in words, or puts the profile before the number.
+*Logged 2026-09-18, measured in review of `slice-22-eleven-skills-twelve`.*
+
+### KD-77 — one of the four derived counts is gated and calibrated by nothing
+
+`test/doc-counts.test.mjs` (`GATED_COUNTS` `CLI commands`, and the calibration below it)
+
+The calibration plants a wrong number "in every surface the gate lists and every count the gate
+covers", skipping a surface that states no such count (`if (!real) continue`). Measured across all
+seventeen surfaces: **no surface states a CLI-command count at all**, so that spec is planted
+nowhere and its reader is never exercised — `planted` comes back with entries for `skills`, `MCP
+tools` and `verify lane gates` only. The CHANGELOG entry for this slice says the plant "requires
+each one back refused ... every count it derives"; it is three of four. The front-door guard below
+cannot see it either: it checks that each of `README.md` and the two manifests was planted at
+least once, not that each derived COUNT was.
+
+Not blocking: the reader is idle rather than wrong. `GT.cliCommands.count` is still derived, and a
+future surface that writes "8 commands" is still refused — nothing false can ship through it
+today, because nothing goes through it.
+
+**Fires when:** `claims()` breaks for a noun no surface currently uses, and the calibration reports
+green over it.
+*Logged 2026-09-18, measured in review of `slice-22-eleven-skills-twelve`.*
+
+### KD-78 — the npm pages for two aliases still say "8 gates", and no commit can change that
+
+`packages/aliases/create-kmp/package.json:4`, `packages/aliases/create-compose-multiplatform/package.json:4`
+
+Both descriptions read *"a machine-enforced verify lane (8 gates, evidence receipts)"*. The lane
+that holds an AI-driven change is `local` (17) or `ci` (18); the only profile that runs 8 is
+`smoke`, whose receipt `qa/receipt-check.mjs` refuses as done-evidence. **In the tree this is
+fixed** — the bare number is gone, and
+`test/a-published-npm-description-states-a-lane-size-that-names-no-profile.test.mjs` refuses the
+next one. What is NOT fixed, and cannot be from here, is what npmjs.com serves: a registry
+description is a property of *published bytes*, and it changes only when someone publishes. Until
+`create-kmp@0.1.6` and `create-compose-multiplatform@0.1.6` are published, the pages a stranger
+reads before installing still carry the false number, at the versions already live (`0.1.4`).
+
+This is logged rather than blocked because there is no act available in this repository that would
+close it — not because nobody is wrongly served. Somebody is, on two npm pages, right now. The
+remedy is an outward-facing human act (`docs/PUBLISHING.md`), and standing one up unasked is the
+thing this project does not do on its own.
+
+**Fires until:** both aliases are published at the versions this tree holds.
+*Logged 2026-09-18, review round 1 of the count-gate slice; the tree-side half was fixed in the
+same round.*
 
 ## Closed
 
