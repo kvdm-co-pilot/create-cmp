@@ -174,7 +174,17 @@ test("the kept-plant row says the rule is `wires a gate`, NOT `every new test`",
   for (const n of [touched.note, untouched.note]) assert.match(n, /nothing here can tell a new GATE from a new TEST by path alone/);
 });
 
-test("three review records on a lane owing one is OVER; exactly two is not, and the condition is named", () => {
+test("review RECORDS are counted and never called OVER — a record is an upper bound on a round, not a round", () => {
+  // THIS TEST ASSERTED THE OPPOSITE UNTIL REVIEW ROUND 1 SHOWED IT WAS WRONG. It
+  // pinned `3 records → OVER by 1`, which is a false accusation of the very
+  // defect this program exists to detect: `proof-plan.mjs` REOPENS the review
+  // obligation whenever a trigger path moves after a record, and every
+  // `--record-review` appends a row, so records ≥ rounds always and the gap
+  // grows with each post-review fix. A slice that took exactly two legitimate
+  // rounds with one re-record in between holds THREE rows. Recovering rounds
+  // from records would take a second bookkeeping, which this program refuses to
+  // keep — so the count is reported as the upper bound it is, the rule about
+  // rounds is pointed at rather than applied, and the row says which is which.
   const spend = (n) =>
     spendOf({
       branch: BRANCH,
@@ -191,15 +201,20 @@ test("three review records on a lane owing one is OVER; exactly two is not, and 
     }).find((r) => r.what === "review");
 
   const three = spend(3);
-  assert.match(three.verdict, /^OVER by 1/, "a third round is over by one, against the two the rule allows");
-  assert.match(three.note, /KNOWN-DEFECTS/);
+  assert.equal(three.recorded, 3, "the count is reported — that half was never the defect");
+  assert.equal(/OVER/.test(three.verdict), false, `three records are not three rounds, and "${three.verdict}" must not accuse the operator of a third`);
+  assert.match(three.verdict, /records, not rounds/, "the verdict names the unit it is counting");
+  assert.match(three.note, /upper bound/i, "and says the number is an upper bound on rounds");
+  assert.match(three.note, /reopen/i, "for the reason that makes it one");
+  assert.match(three.note, /KNOWN-DEFECTS/, "the rule about rounds is pointed at, never restated");
 
+  // The cross-row invariant, on this row: a count above its own printed `owed`
+  // is not "within" either. This row cannot tell, and says so both ways.
   const two = spend(2);
-  assert.equal(two.verdict, "within", "two rounds are not called over — the rule allows a second");
-  assert.match(two.note, /more than trivial/, "and the condition on that second round is stated");
-  assert.match(two.note, /NOT called over/);
+  assert.equal(two.verdict, three.verdict, "one rule, not a branch per count");
+  assert.notEqual(two.verdict, "within");
 
-  assert.equal(spend(1).verdict, "within");
+  assert.equal(spend(1).verdict, "within", "at or under what it owed, the ordinary rule applies");
 });
 
 test("suite runs beyond commits-plus-dirty are OVER by the right number, and quote what that used to cost", () => {

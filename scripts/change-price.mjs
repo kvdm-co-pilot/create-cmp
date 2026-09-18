@@ -9,7 +9,8 @@
 // "untouched — the clause already says the correct behavior" and "none; receipt
 // is the record", and docs/PRINCIPLES.md §4, which prices the change stage at
 // ~90 s and carries the episode in its own words: "A doc-link fix cost twenty
-// minutes because a suite-scaled step sat in the per-change lane."
+// minutes because a suite-scaled step sat in the per-change lane and the receipt
+// bound the whole tree."
 //
 // MEASURED 2026-09-18: an operator drove SIX direct-lane bug fixes with
 // brief-lane ceremony — mutation-checking every new test, which is a rule in no
@@ -38,11 +39,14 @@
 // not a refusal after it.
 //
 // AN ADVISORY THAT BLUFFS IS WORSE THAN NONE. Where it does not know, it says so
-// and names what would settle it. §3's rule has two clauses, and a diff can
-// answer exactly one of them: whether anything already signed moved is visible
-// in the paths; whether the change carries decisions is not, and that half is
-// handed back to the human it belongs to with the two things that settle it
-// named.
+// and names what would settle it. §3's rule has two clauses, and a diff answers
+// AT MOST one of them. Whether the change carries decisions is never visible in
+// a diff, so that half is always handed back to the human it belongs to with the
+// two things that settle it named. Whether anything already signed moved is
+// usually visible in the paths — but not when what moved is one of the documents
+// NORTH-STAR §12 gives authority over, where the path is the same for a typo and
+// for a rewritten rule, so that half is handed back too rather than answered NO
+// over a diff holding the rulebook this program cites.
 //
 // IT WRITES NOTHING AND KEEPS NO BOOK OF ITS OWN. Every fact below is read from
 // what this repo already writes — the git diff, the commit subjects, the
@@ -53,8 +57,9 @@
 // NORTH-STAR §10 Q4, OUT LOUD. The conventional-commit vocabulary and the path
 // patterns below are a GRAMMAR — the half of Q4 that hides, because it names no
 // stack. They are facts about CREATE-CMP'S OWN GOVERNANCE LAYOUT: `docs/adr/`,
-// `docs/features/`, `docs/NORTH-STAR.md`, and a commit convention this
-// repository's own log follows. They live in create-cmp's `scripts/`, on the
+// `docs/features/`, the eight documents NORTH-STAR §12 gives authority over
+// (GOVERNING_DOCS below), and a commit convention this repository's own log
+// follows. They live in create-cmp's `scripts/`, on the
 // same shelf as DEVICE_TIER_TRIGGERS in `scripts/observed-tree.mjs`, and
 // `packages/harness/src/` — the core an adopter ships — learns nothing from this
 // file and imports nothing from it. An adopter's lane is unchanged by it.
@@ -89,6 +94,31 @@ function sh(cmd, args) {
  */
 export const DIRECT_TYPES = Object.freeze(["fix", "docs", "test", "chore", "refactor", "perf", "style", "build", "ci", "revert"]);
 
+/**
+ * THE EIGHT DOCUMENTS docs/NORTH-STAR.md §12 GIVES AUTHORITY OVER A RULE: its
+ * table minus the rows that are a proposal or a research file, plus NORTH-STAR
+ * itself, which is not a row in its own table — §12's first line is "This
+ * document governs". A hardcoded fact about create-cmp's own governance layout,
+ * on the same shelf as
+ * DEVICE_TIER_TRIGGERS in `scripts/observed-tree.mjs`, and read by
+ * `classifyPath` as a contract: every verdict this program prints cites one of
+ * these, so a diff that moves one is moving the rule the verdict rests on.
+ *
+ * WHAT IS DELIBERATELY NOT HERE. §12 also names `docs/proposals/PACKAGE-SPLIT.md`
+ * and `docs/proposals/AGNOSTIC-HARNESS-ARCHITECTURE.md`, and three research rows
+ * naming four files (`docs/research/VISION.md`, `GATEKEEPER-PRODUCT.md`,
+ * `AGENTIC-MOBILE-STUDIO.md`, `launch/discovery-plan.md`). Whether an edit to a
+ * proposal or an internal research file carries a decision a contributor could
+ * unmake is a human's call; these eight are not a call.
+ *
+ * THIS IS THE ONE THING IN THIS FILE THAT WANTS RE-CHECKING WHEN §12 CHANGES,
+ * because its failure is silent and points the wrong way: a document §12 gains
+ * that this list does not is read as prose and priced CHEAPER than it is, which
+ * is the one direction a program written against over-proof must not err in when
+ * the governance itself is what is being edited.
+ */
+export const GOVERNING_DOCS = Object.freeze(["docs/NORTH-STAR.md", "docs/CHANGE-FLOW-DESIGN.md", "docs/EVIDENCE-ECONOMICS-PLAN.md", "docs/GATE-RULES.md", "docs/GENESIS-FLOW-DESIGN.md", "docs/HARNESS-PLAN.md", "docs/PRINCIPLES.md", "docs/ROADMAP.md"]);
+
 const TYPE_RE = /^([a-zA-Z]+)(\([^)]*\))?!?:/;
 
 /** The conventional type of one subject, lowercased, or null when the subject declares none. */
@@ -106,13 +136,17 @@ export function commitType(subject) {
  * sentence: "Location is the opt-in — every doc in `docs/features/` is
  * governed". `docs/adr/template.md` is the empty form an ADR is written FROM, so
  * it carries no decision and is prose.
+ *
+ * The eight in GOVERNING_DOCS are the third: not signed by an approval, but
+ * named by §12 as keeping authority over a rule. Calling them prose priced a
+ * rewrite of §3's own entry-point table as a copy edit.
  */
 export function classifyPath(p) {
   const f = String(p ?? "").split(path.sep).join("/");
   if (f === "docs/adr/template.md") return "prose";
   if (f.startsWith("docs/adr/")) return "contract";
   if (f.startsWith("docs/features/")) return "contract";
-  if (f === "docs/NORTH-STAR.md") return "contract";
+  if (GOVERNING_DOCS.includes(f)) return "contract";
   return f.endsWith(".md") ? "prose" : "code";
 }
 
@@ -129,15 +163,22 @@ const listTypes = (counts) =>
     .join(", ");
 
 /**
- * WHICH ROW OF §3's TABLE a set of direct-lane commit types is. Precedence
- * rather than a lookup, because a slice mixing `fix` and `docs` is a bug fix
- * that also touched its own docs — the fix is what the change IS.
+ * WHICH ROW OF §3's TABLE a set of direct-lane commit types is — SPELLED AS §3
+ * SPELLS IT, with the citation that names the row. Precedence rather than a
+ * lookup, because a slice mixing `fix` and `docs` is a bug fix that also touched
+ * its own docs — the fix is what the change IS.
+ *
+ * `refactor`, `perf`, `style`, `test`, `ci` and `revert` reach the last line, and
+ * it returns NO ROW on purpose: §3's table names none for that shape, and the
+ * summary that stood here ("a change that decides nothing") was this file putting
+ * words in §3's mouth and citing the table for them. What routes those types is
+ * the blockquote above the table, so that is what gets cited.
  */
 function directRow(counts) {
-  if (counts.fix) return "Bug fix (spec right, code wrong) — contract untouched; the clause already says the correct behavior";
-  if (counts.docs) return "Copy/content edit";
-  if (counts.chore || counts.build) return "Version upgrade, or a change that decides nothing";
-  return "no decision to record and nothing signed in the diff";
+  if (counts.fix) return { row: "Bug fix (spec right, code wrong)", cite: 'docs/CHANGE-FLOW-DESIGN.md §3, row "Bug fix"' };
+  if (counts.docs) return { row: "Copy/content edit", cite: 'docs/CHANGE-FLOW-DESIGN.md §3, row "Copy/content edit"' };
+  if (counts.chore || counts.build) return { row: "Version upgrade", cite: 'docs/CHANGE-FLOW-DESIGN.md §3, row "Version upgrade"' };
+  return { row: null, cite: "docs/CHANGE-FLOW-DESIGN.md §3, the brief/direct blockquote — its table names no row for this shape" };
 }
 
 /**
@@ -189,7 +230,6 @@ export function laneOf(paths, subjects) {
   const contracts = paths.filter((p, i) => kinds[i] === "contract");
   const adr = contracts.filter((p) => String(p).startsWith("docs/adr/"));
   const features = contracts.filter((p) => String(p).startsWith("docs/features/"));
-  const northStar = paths.filter((p) => String(p) === "docs/NORTH-STAR.md");
 
   // 2 — an ADR is in the diff. §3's "Architecture change" row decides for us.
   if (adr.length) {
@@ -220,43 +260,36 @@ export function laneOf(paths, subjects) {
     };
   }
 
-  // 4 — NORTH-STAR. There is NO row for it in §3's table, and none is invented
-  // here; what decides is the RULE above the table, and its first clause is met
-  // by the document's own purpose.
-  if (northStar.length) {
-    return {
-      ...base,
-      lane: "brief",
-      row: null,
-      headline: "BRIEF — docs/NORTH-STAR.md is in the diff",
-      why: [
-        "§3's table has no row for the governing document, and this invents none.",
-        'What decides is the blockquote above the table — brief lane iff the change carries "decisions a future contributor could plausibly unmake" — and an edit to the document that exists to HOLD decisions is that clause by construction: it either records one or unmakes one.',
-      ],
-      cite: "docs/CHANGE-FLOW-DESIGN.md §3, the brief/direct blockquote, clause A",
-    };
-  }
+  // THERE IS NO RULE 4. One stood here and routed docs/NORTH-STAR.md to the
+  // brief lane, reasoning that an edit to the document that HOLDS decisions
+  // carries one by construction. It does not: a typo fix in a governing document
+  // and a rewritten rule are the same path, and pricing the first as a brief is
+  // the over-proof this program exists to stop. The eight §12 documents are
+  // `contract` to `classifyPath` instead, which blocks rule 5 and drops such a
+  // diff through to rule 7 — AMBIGUOUS, with clause B saying out loud that the
+  // path cannot tell. That is the honest verdict, and it costs fewer lines.
 
   const parsed = types ?? [];
   const offTable = parsed.filter((t) => t === null || !DIRECT_TYPES.includes(t));
 
-  // 5 — every commit declares a type that decides nothing, and nothing signed
-  // moved. Rules 2-4 already returned for every category `classifyPath` calls a
-  // contract, so the third condition cannot be false here today; it is written
-  // out anyway, because the day a fourth contract category is added is the day a
-  // silent fall-through here would route a signed change into the direct lane.
+  // 5 — every commit declares a type that decides nothing, and nothing signed or
+  // governing moved. The third condition is LIVE now that rule 4 is gone: rules 2
+  // and 3 return for an ADR and for a feature brief, but one of §12's eight
+  // reaches here and is stopped by `contracts.length === 0`. A `docs:` commit
+  // over docs/GATE-RULES.md is not a copy edit, and falls through to rule 7.
   if (commits > 0 && offTable.length === 0 && contracts.length === 0) {
-    const row = directRow(counts);
+    const { row, cite } = directRow(counts);
     return {
       ...base,
       lane: "direct",
       row,
-      headline: `DIRECT — ${row}`,
+      headline: row ? `DIRECT — ${row}` : "DIRECT — §3's table names no row for this shape",
       why: [
         `Every commit declares a type that decides nothing: ${listTypes(counts)}.`,
-        "And no path under docs/adr/, docs/features/ or docs/NORTH-STAR.md moved, so there is no blast radius into anything already signed.",
+        "And no path under docs/adr/, docs/features/, or the eight documents NORTH-STAR §12 gives authority over, moved — so there is no blast radius into anything already signed.",
+        ...(row ? [] : ["§3's table names no row for this shape, so the lane comes from the blockquote above it: the two sentences above ARE its two clauses, both answered no."]),
       ],
-      cite: "docs/CHANGE-FLOW-DESIGN.md §3, the entry-point table",
+      cite,
     };
   }
 
@@ -269,7 +302,7 @@ export function laneOf(paths, subjects) {
       headline: "DIRECT — Copy/content edit",
       why: [
         `Nothing is committed yet, and all ${paths.length} changed path(s) are prose that nothing has signed.`,
-        "§3's Contract column for this row: a clause edit only if the copy is specified; otherwise none.",
+        '§3\'s Contract column for this row: "clause edit only if the copy is specified; else none".',
       ],
       cite: 'docs/CHANGE-FLOW-DESIGN.md §3, row "Copy/content edit"',
     };
@@ -277,27 +310,42 @@ export function laneOf(paths, subjects) {
 
   // 7 — the honest answer. One clause of §3's rule is answered by the diff and
   // the other is not, so they are reported apart rather than averaged into a guess.
-  const reached =
-    commits === 0
-      ? "no commits yet and the diff contains code, so there is no declared type to read — commit with a conventional type, or say the lane in the restatement"
-      : `${listTypes(tally(offTable.map((t) => t ?? "(no conventional type)")))} — ${
-          offTable.includes("feat")
-            ? "a `feat` is §3's \"New feature\" row, which is the brief lane when it adds a new surface"
-            : "not a type §3's table routes to the direct lane"
-        }`;
+  const reached = [];
+  // Rules 2 and 3 returned for every contract that is an ADR or a feature brief,
+  // so a contract still here is one of §12's eight, and clause B below says so.
+  if (contracts.length) reached.push(`${contracts.join(", ")} is in this diff — a document NORTH-STAR §12 gives authority over a rule`);
+  if (commits === 0) reached.push("no commits yet and the diff contains code, so there is no declared type to read — commit with a conventional type, or say the lane in the restatement");
+  else if (offTable.length) {
+    const read = offTable.includes("feat") ? "a `feat` is §3's \"New feature\" row, which is the brief lane when it adds a new surface" : "not a type §3's table routes to the direct lane";
+    reached.push(`${listTypes(tally(offTable.map((t) => t ?? "(no conventional type)")))} — ${read}`);
+  }
+
+  // CLAUSE B IS DERIVED, NOT A FIXED NO. It answered a flat "NO, and this half IS
+  // decidable" over a diff that held docs/GATE-RULES.md — one of the documents
+  // this program takes its own authority from — because the three paths it
+  // listed were the only ones it looked at. A path does not say whether a
+  // governing edit was a typo or a new rule, so where one is present this says
+  // it cannot tell, and names the document.
+  const blastRadius = contracts.length
+    ? {
+        answer: `NOT DECIDABLE — ${contracts.join(", ")} is in this diff`,
+        detail: `${contracts.join(", ")}: docs/NORTH-STAR.md §12 gives it authority over a rule, and the rules cited by every verdict this program prints are in that table. Whether THIS edit carries a decision a contributor could unmake is not visible in the path — a typo fix and a rewritten clause move the same file — so it is handed back: the human's answer at the triage restatement settles it, and "The human can overrule in a word" (§3).`,
+      }
+    : {
+        answer: "NO — and this half IS decidable",
+        detail: `nothing under docs/adr/, docs/features/, or docs/NORTH-STAR.md and the seven other documents §12 gives authority over, is in this diff (${contracts.length} such path(s)). Were it otherwise this would have routed BRIEF above (an ADR, a feature brief) or said NOT DECIDABLE here (a §12 document).`,
+      };
   return {
     ...base,
     lane: "ambiguous",
     row: null,
-    headline: "AMBIGUOUS — one of §3's two clauses is answered by the diff, and the other is not",
-    why: [`Why it got here: ${reached}.`],
+    headline: contracts.length
+      ? "AMBIGUOUS — NEITHER of §3's two clauses is answered by the diff, and one of them is about this diff's own governing document"
+      : "AMBIGUOUS — one of §3's two clauses is answered by the diff, and the other is not",
+    why: [`Why it got here: ${reached.join("; ")}.`],
     cite: "docs/CHANGE-FLOW-DESIGN.md §3, the brief/direct blockquote",
     clauses: [
-      {
-        clause: "B — blast radius into contracts already signed",
-        answer: "NO, and this half IS decidable",
-        detail: `nothing under docs/adr/, docs/features/ or docs/NORTH-STAR.md is in this diff (${contracts.length} such path(s)). Were it otherwise, this would have routed as BRIEF before reaching here.`,
-      },
+      { clause: "B — blast radius into contracts already signed", ...blastRadius },
       {
         clause: "A — decisions a future contributor could plausibly unmake",
         answer: "NOT DECIDABLE from paths and commit subjects",
@@ -333,7 +381,11 @@ export const CEREMONY = Object.freeze([
   }),
   Object.freeze({
     item: "grill",
-    direct: 'NO — "The direct lane is never grilled … a bug fix, an emergency fix, or a spike, never"',
+    // QUOTED WHOLE, PARENTHESIS AND ALL. The elision here read "never grilled …
+    // a bug fix, an emergency fix, or a spike, never" and cut out the only thing
+    // §3 allows the direct lane — the one inline question — which is the half an
+    // agent reading this row actually needs.
+    direct: 'NO — "The direct lane is never grilled (one inline question at most, only when the restatement cannot be made unambiguous); a bug fix, an emergency fix, or a spike, never"',
     brief: "yes — the frontier, in numbered rounds of at most five, after the restatement and before the brief",
     cite: "docs/CHANGE-FLOW-DESIGN.md §3, docs/features/grill-me.md",
   }),
@@ -430,89 +482,101 @@ const stamp = (iso) => {
  * With no plan declared for this branch there is no `openedAt` at all, so the
  * count falls back to the branch alone and SAYS SO: a branch name gets reused,
  * and a count that quietly spans two slices is worse than one that names its limit.
+ *
+ * THREE POPULATIONS, NOT TWO. A row on this branch that cannot be DATED is not a
+ * row belonging to another slice, and `(stamp(r.ranAt) ?? -Infinity) >= from`
+ * gave both the same silent drop: "not mine" and "I could not tell" came out as
+ * one answer. The second is counted as `undated` and reported, because every row
+ * lost that way makes the spend look SMALLER, and understating spend is the one
+ * direction a program written against over-proof cannot afford to be wrong in.
  */
 export function attribute(history, { branch, openedAt = null }) {
-  if (!history?.exists) return { recorded: null, byBranchOnly: false };
+  if (!history?.exists) return { recorded: null, byBranchOnly: false, undated: 0 };
   const rows = (history.rows ?? []).filter((r) => r && r.branch === branch);
   const from = stamp(openedAt);
-  if (from === null) return { recorded: rows.length, byBranchOnly: true };
-  return { recorded: rows.filter((r) => (stamp(r.ranAt) ?? -Infinity) >= from).length, byBranchOnly: false };
+  if (from === null) return { recorded: rows.length, byBranchOnly: true, undated: 0 };
+  const dated = rows.filter((r) => stamp(r.ranAt) !== null);
+  return { recorded: dated.filter((r) => stamp(r.ranAt) >= from).length, byBranchOnly: false, undated: rows.length - dated.length };
 }
 
 /**
- * What the kept records show, against what this change owed.
+ * HOW MANY SUITE RUNS THE CADENCE ON DISK ASKS FOR. `proof-plan.mjs --open`
+ * writes `declared: {suite: "per-commit", …}` into the plan, from its own TIERS
+ * table. This READS that rather than restating it: a cadence stated twice drifts
+ * in one, and the copy that drifts is the one nobody updates. With no plan — or
+ * a plan written before `declared` existed — there is nothing to read, and
+ * per-commit is assumed. The row says which of the two it did, because an
+ * assumed number and a declared one are not the same claim.
+ */
+function suiteOwed(plan, commits, dirty) {
+  const declared = plan?.declared?.suite ?? null;
+  const perCommit = Math.max(1, (commits ?? 0) + (dirty ? 1 : 0));
+  if (declared === "per-commit") return { owed: perCommit, how: `owed count: cadence READ from the declared plan — per-commit, over ${commits ?? 0} commit(s)${dirty ? " plus one run for the bytes nobody has committed yet" : ""}.` };
+  if (declared) return { owed: 1, how: `owed count: cadence READ from the declared plan — ${declared}, so one run over the finished tree and not one per commit.` };
+  return { owed: perCommit, how: "owed count: no plan on this branch declares a suite cadence, so per-commit is ASSUMED — this is what a declared plan would have said, not what one did." };
+}
+
+/** Why the review row's count is not the unit docs/KNOWN-DEFECTS.md's rule is about. */
+const REVIEW_IS_RECORDS =
+  "records are not rounds, so this count is an UPPER BOUND on rounds and is never called over: proof-plan REOPENS the review obligation whenever a trigger path moves after a record, and every --record-review appends a row, " +
+  "so a slice that took exactly two rounds with one post-review fix in between holds three. The rule about ROUNDS — two, and no third — is docs/KNOWN-DEFECTS.md's header, and nothing here records which of these rows was a round.";
+
+/**
+ * ONE VERDICT RULE, APPLIED TO EVERY ROW. There were three, and they gave one
+ * shape two answers: `1 recorded / 0 owed` read `OVER by 1` on the device row
+ * and `within` on the review row, from the same table on the same input.
+ * `recorded` against `owed` decides it, and the two modifiers below are facts
+ * about the ROW'S UNIT rather than exceptions carved for a row:
  *
- * The suite's cadence is per-commit, so its owed count is the commits plus the
- * working tree when it is dirty — one run for the bytes nobody has committed
- * yet. The two at-close tiers owe one each, or none when `proof-plan` says none.
+ *   `reopened` — proof-plan has voided what was recorded: a trigger path moved
+ *     after it, so the spend is real and the evidence is gone. That is never
+ *     `within` at any count, which is what the device row used to print beside
+ *     an `extra` calling itself over-proof by definition.
+ *   `rounds` — the review row counts RECORDS against a rule about ROUNDS. It
+ *     reports the count and is never called OVER (REVIEW_IS_RECORDS says why),
+ *     and it is not called `within` above its owed either, because it cannot
+ *     tell — a verdict either way would be a number pretending to be the other.
+ */
+function verdictOf({ recorded, owed, reopened, rounds }) {
+  if (recorded === null) return "no record kept";
+  if (reopened) return "REOPENED — nothing recorded here is standing";
+  if (recorded <= owed) return "within";
+  return rounds ? `ABOVE the ${owed} owed — records, not rounds` : `OVER by ${recorded - owed}`;
+}
+
+const SUITE_OVER =
+  "what this looked like before anything recorded it, from scripts/suite-record.mjs's own header: 295 full-suite runs, 4.6 to 6.6 per merged change, 4.5 hours (docs/research/g2-measure/, 2026-09-07 to 09-17). A run over bytes a recorded run already covers is read, not repeated.";
+const DEVICE_REOPENED =
+  "proof-plan says REOPENED: a trigger path moved after the run, so the run describes a tree that no longer exists and now proves nothing. That is the 2026-09-08 failure, and it is over-proof by definition — the spend is real and the evidence is gone.";
+const REVIEW_REOPENED =
+  "proof-plan says REOPENED: a trigger path moved after the last record, so a fresh record is owed for the SAME round. That is the mechanism that makes this count records and not rounds, and here it is happening.";
+
+/**
+ * What the kept records show, against what this change owed — one row per tier,
+ * every row built by the one rule above, and every row carrying what it could
+ * NOT read: the lines that did not parse, and the rows it could not date.
  */
 export function spendOf({ branch, plan, device, review, commits, dirty, histories }) {
   const openedAt = plan?.openedAt ?? null;
-  const suite = attribute(histories.suite, { branch, openedAt });
-  const fleet = attribute(histories.fleet, { branch, openedAt });
-  const reviews = attribute(histories.reviews, { branch, openedAt });
-
-  const suiteOwed = Math.max(1, (commits ?? 0) + (dirty ? 1 : 0));
-  const deviceOwed = device === "none" ? 0 : 1;
-  const reviewOwed = review === "none" ? 0 : 1;
-
-  const rows = [];
-
-  rows.push({
-    what: "suite",
-    file: histories.suite.file,
-    recorded: suite.recorded,
-    owed: suiteOwed,
-    byBranchOnly: suite.byBranchOnly,
-    ...(suite.recorded === null
-      ? { verdict: "no record kept" }
-      : suite.recorded - suiteOwed > 0
-        ? {
-            verdict: `OVER by ${suite.recorded - suiteOwed}`,
-            note:
-              "what this looked like before anything recorded it, from scripts/suite-record.mjs's own header: 295 full-suite runs, 4.6 to 6.6 per merged change, 4.5 hours (docs/research/g2-measure/, 2026-09-07 to 09-17). A run over bytes a recorded run already covers is read, not repeated.",
-          }
-        : { verdict: "within" }),
-  });
-
-  const deviceRow = {
-    what: "device",
-    file: histories.fleet.file,
-    recorded: fleet.recorded,
-    owed: deviceOwed,
-    byBranchOnly: fleet.byBranchOnly,
-    ...(fleet.recorded === null
-      ? { verdict: "no record kept" }
-      : fleet.recorded - deviceOwed > 0
-        ? { verdict: `OVER by ${fleet.recorded - deviceOwed}`, note: `${fleet.recorded - deviceOwed} run(s) beyond the one this change owed, at ~3.5 min and an emulator each.` }
-        : { verdict: "within" }),
+  const suite = suiteOwed(plan, commits, dirty);
+  const tier = (what, kind, owed, { state = null, rounds = false, extra = [], note = null, over = null, reopened = null }) => {
+    const history = histories[kind];
+    const { recorded, byBranchOnly, undated } = attribute(history, { branch, openedAt });
+    const malformed = history.malformed ?? 0;
+    const voided = state === "reopened";
+    const excess = recorded === null ? 0 : recorded - owed;
+    const lines = [...extra];
+    if (malformed) lines.push(`${malformed} history line(s) did not parse and are not counted — the sentence proof-plan.mjs --history prints about the same file, and the count above is of what was left.`);
+    if (undated) lines.push(`${undated} row(s) on this branch carry no readable ranAt and are not counted either — "I could not tell" is not "not mine", and one expression was answering both.`);
+    if (voided) lines.push(reopened);
+    const verdict = verdictOf({ recorded, owed, reopened: voided, rounds });
+    return { what, file: history.file, recorded, owed, malformed, undated, byBranchOnly, verdict, note: note ?? (excess > 0 && over ? over(excess, owed) : null), extra: lines };
   };
-  if (device === "reopened") {
-    deviceRow.extra = [
-      "proof-plan says REOPENED: a trigger path moved after the run, so the run describes a tree that no longer exists and now proves nothing. That is the 2026-09-08 failure, and it is over-proof by definition — the spend is real and the evidence is gone.",
-    ];
-  }
-  rows.push(deviceRow);
-
-  rows.push({
-    what: "review",
-    file: histories.reviews.file,
-    recorded: reviews.recorded,
-    owed: reviewOwed,
-    byBranchOnly: reviews.byBranchOnly,
-    ...(reviews.recorded === null
-      ? { verdict: "no record kept" }
-      : reviews.recorded >= 3
-        ? { verdict: `OVER by ${reviews.recorded - 2}`, note: "docs/KNOWN-DEFECTS.md caps a slice at two rounds and admits no third." }
-        : reviews.recorded === 2
-          ? {
-              verdict: "within",
-              note: 'a second round is allowed when the fixes from round 1 were "more than trivial". The record does not say which, so this is NOT called over — and it is not endorsed either.',
-            }
-          : { verdict: "within" }),
-  });
-
-  return rows;
+  return [
+    tier("suite", "suite", suite.owed, { extra: [suite.how], over: () => SUITE_OVER }),
+    tier("device", "fleet", device === "none" ? 0 : 1, { state: device, over: (excess, owed) => `${excess} run(s) beyond the ${owed} this change owed, at ~3.5 min and an emulator each.`, reopened: DEVICE_REOPENED }),
+    tier("review", "reviews", review === "none" ? 0 : 1, { state: review, rounds: true, note: REVIEW_IS_RECORDS, reopened: REVIEW_REOPENED }),
+  ];
 }
 
 /**
@@ -646,14 +710,7 @@ export function render(m) {
     for (const r of m.spent) {
       const counts = r.recorded === null ? `no record kept — ${r.file} does not exist` : `${r.recorded} record(s) / ${r.owed} owed`;
       L.push(`      ${r.what.padEnd(ITEM)}${r.recorded === null ? counts : `${counts.padEnd(26)}${r.verdict}`}`);
-      if (r.byBranchOnly) {
-        L.push(
-          ...at(
-            10,
-            'attributed by branch alone — no plan is declared for this branch, so there is no opened-at to bound it by. Fix: node scripts/proof-plan.mjs --open "<what you are building>"',
-          ),
-        );
-      }
+      if (r.byBranchOnly) L.push(...at(10, 'attributed by branch alone — no plan is declared for this branch, so there is no opened-at to bound it by. Fix: node scripts/proof-plan.mjs --open "<what you are building>"'));
       if (r.note) L.push(...at(10, r.note));
       for (const e of r.extra ?? []) L.push(...at(10, e));
     }

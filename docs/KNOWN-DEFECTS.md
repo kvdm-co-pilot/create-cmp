@@ -177,6 +177,8 @@ you the same list without opening anything.
 | **KD-121** | six spellings of "use this tool" the check does not see — inside a fenced block, backticked with an argument (`` `SendMessage(a)` ``), split across a line break, not backticked at all, `mcp__x__y`, and a hump containing an acronym (`ReadPDF`) — and the comment justifying the fence strip ("examples and shell, not instructions") is false of BOTH fenced blocks in this repo's definitions | measured: every tool-shaped token anywhere in all three definitions is already visible to the checker, so no producer; the two fences hold commands the agent IS told to run, but neither names a tool |
 | **KD-122** | the check reads ONE spelling of `tools:` where the harness reads YAML: a list form parses to `{"- Read"}` and drops the rest, and an ABSENT `tools:` line — which means the subagent inherits EVERY tool — is read as granting none | both fail loud, never silent (they can only manufacture offences, not hide them), and no producer: all three definitions use the comma form and all three declare one |
 | **KD-123** | three prose facts this change states that the tree does not support: the new section cites the 5-minute rule as "below" when it is 44 lines above; its actionable remedy is scoped to `Agent` while `SendMessage` — granted by the same commit, and what RE-DELEGATE step 2 tells it to use — has the same stall shape; and the test's header attributes to SEVEN orchestrators a cold-substitute cost the commit measures at FOUR | the section's general rule ("nothing left to do but wait means you spawned it wrong") does cover the `SendMessage` path, so only the bullet is narrow; the count and the direction word are narration, and nothing routes on either |
+| **KD-124** | `attribute()` in `scripts/change-price.mjs` and `mine()` inside `summarize()` in `scripts/lib/proof-history.mjs` are two spellings of ONE attribution rule — a branch match plus a time window — in two files that share no code | nobody is wrongly served: the new reader is advisory, prints a count and refuses nothing, and the difference between the two spellings is the deliberate one its own docblock names. The honest remedy edits a file this slice put out of scope |
+| **KD-125** | `attribute()` matches `row.branch === branch`, and `currentBranch()` spells a detached HEAD `""` where all three history writers spell it `null` — so on a detached HEAD every recorded run is attributed to nobody and each row reads `0 record(s)` | no producer: this is an advisory a human reads on a branch, and the block's own `branch` line already prints `(detached)`. One reader-pair over from KD-113, and in the same class |
 
 ---
 
@@ -2313,6 +2315,66 @@ what each costs is the next reader's time, and (2) costs it at the moment the sa
 call over.
 
 *Logged 2026-09-18, review round 1.*
+### KD-124 — one attribution rule, spelled twice, in two files with no shared code
+
+`scripts/change-price.mjs` · `scripts/lib/proof-history.mjs`
+
+Found in review round 1 of the slice that added `change-price.mjs`. A recorded run belongs to a
+slice when it was written ON that slice's branch INSIDE that slice's lifetime. That rule is now
+written out twice, in two files, with nothing shared between them:
+
+    proof-history.mjs, mine() inside summarize():
+        row?.branch !== ev.plan.branch || at === null || at < from || at > to   → not this slice's
+    change-price.mjs, attribute():
+        r.branch === branch,  then  stamp(r.ranAt) >= stamp(plan.openedAt)      → this slice's
+
+The second is the first with the upper bound removed, because the plan it reads has not closed
+yet and there is no `closedAt` to bound with. `attribute()`'s own docblock says exactly that, and
+says the difference is deliberate — "That is deliberately not a SECOND attribution rule". The
+words are in one file; the code is in two.
+
+**Why it is logged and not fixed.** The honest remedy is one predicate living in
+`proof-history.mjs`, parameterised on the upper bound (absent while the slice is open), imported
+by the reader that needs it — and that edits a file this slice declared out of scope, which is
+where a fix stops being bounded by the finding. Nobody is wrongly served meanwhile: the new
+reader refuses nothing and writes nothing, so a divergence would mis-state a number in an
+advisory block rather than change a verdict. What makes it worth a line is that the drift is
+cheap and silent — the day `summarize()` learns something about attribution (a run with no
+`ranAt`, a branch renamed mid-slice), the second spelling does not learn it, and the two counts
+disagree with no test standing between them.
+
+*Logged 2026-09-18, review round 1 of the slice that added `scripts/change-price.mjs`. Verified by
+reading both functions, not by execution: they agree on every row either would count today, and
+the class is the duplication rather than a present disagreement.*
+
+### KD-125 — a detached HEAD is `""` to the reader and `null` to every writer, so every run reads as none
+
+`scripts/change-price.mjs` · `scripts/proof-plan.mjs` · `scripts/suite-reporter.mjs` · `scripts/fleet-check.mjs`
+
+`currentBranch()` states its own answer in its docblock — *"The branch this tree is on; `""` when
+detached, null when git cannot say"* — and the three programs that append a history row all spell
+that same state the other way:
+
+    proof-plan.mjs:466      branch: branch.status === 0 ? branch.stdout.trim() || null : null
+    suite-reporter.mjs:112  branch: branch.status === 0 ? branch.stdout.trim() || null : null
+    fleet-check.mjs:560     branch: branch.status === 0 ? branch.stdout.trim() || null : null
+
+`attribute()` in `change-price.mjs` keeps a row when `r.branch === branch`. On a detached HEAD the
+reader is holding `""` and every row is holding `null`, so the filter matches nothing and all
+three `spent` rows print `0 record(s)` against whatever they owed — a full history read as an
+empty one, in the half of the program written to notice a spend.
+
+**Why it is logged and not fixed.** There is no producer: this is an advisory a human runs on the
+branch they are working on, and the rendered block's own first line already prints `(detached)`
+for that state (`m.branch || "(detached)"`). What it does not do is carry that fact down into the
+counts, so the one reader who could reach this is told the state and not told what it did to the
+numbers underneath. The fix is one spelling shared by the reader and the writers, which means
+touching the writers — out of this slice's scope — and it is the same shape as KD-113: two
+programs deriving one label by different rules, agreeing everywhere except the empty case.
+
+*Logged 2026-09-18, review round 1 of the slice that added `scripts/change-price.mjs`. Verified by
+reading the four files rather than by detaching HEAD: the writers' expression is identical in all
+three, and `currentBranch()`'s own docblock states the other spelling.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
