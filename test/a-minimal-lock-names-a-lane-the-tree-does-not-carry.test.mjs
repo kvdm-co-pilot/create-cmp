@@ -1,17 +1,29 @@
-// SCRATCH COPY of the intended test/a-minimal-lock-names-a-lane-the-tree-does-not-carry.test.mjs
-// Identical assertions; only the three import specifiers are absolute, so it
-// can be executed without writing into a worktree. Run against the clean
-// 8bd782a checkout at .claude/worktrees/agent-kd40-lock.
+// A --MINIMAL TREE'S LOCK NAMES THE LANE IT SHIPS, NOT THE ONE IT DELETED.
+//
+// KD-40 claimed the opposite. It is not reproducible: `applyMinimalMode` runs
+// BEFORE `writeLaneLock` (src/scaffold.mjs), so the lock is rewritten over the
+// kept subset — 7 files, `intact` — on a fresh `--minimal` and on a `--minimal
+// --force` over a full 73-file tree alike. That ordering predates the entry by
+// three weeks (2ddce4f, 2026-08-21).
+//
+// This holds the prevention rather than the claim. Move `writeLaneLock` ahead of
+// the `config.harness === false` block and it reds with "the lock names 66
+// path(s) the tree does not carry" — 66 being the exact count KD-40 reported
+// from the adopter repository that found it.
+//
+// Its imports are RELATIVE, and that is load-bearing: the first draft of this
+// file carried absolute paths to the worktree it was written in, so it read the
+// code next door and stayed green against a planted regression. A test that
+// resolves outside its own tree proves nothing about that tree.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test, before, after } from "node:test";
 
-const SRC = "/Users/test/dev/create-cmp/.claude/worktrees/agent-kd40-lock";
-const { scaffold } = await import(`${SRC}/src/scaffold.mjs`);
-const { listHarnessFiles } = await import(`${SRC}/packages/harness/src/lib/harness-region.mjs`);
-const { checkHarnessIntegrity } = await import(`${SRC}/packages/harness/src/lib/harness-lock.mjs`);
+import { scaffold } from "../src/scaffold.mjs";
+import { listHarnessFiles } from "../packages/harness/src/lib/harness-region.mjs";
+import { checkHarnessIntegrity } from "../packages/harness/src/lib/harness-lock.mjs";
 
 const LOCK = "qa/harness.lock.json";
 
