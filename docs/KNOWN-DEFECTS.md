@@ -164,6 +164,7 @@ you the same list without opening anything.
 | **KD-104** | a gated command inside `sh -c '…'` is refused when anything stands in front of it INSIDE the quote, and judged at the payload's cwd when nothing does | a refusal in the first shape, sentence now true of it, remedy in the command; the second lands on the right tree — a nested shell with no `cd` inherits the cwd |
 | **KD-106** | `{}` as an ARGUMENT is read as a brace group, because its own `{` is the separator its `}` needs — `find … -exec rm {} \; && gh pr merge` is refused | a refusal, only the agent is refused, the sentence names `{ }` and it IS in the command; no producer — no merge, publish or fleet-check here is typed behind a `find -exec`/`xargs -I` |
 | **KD-107** | the two readers still spell "a command position" differently, now the other way: `COMPOUND` knows `!`, `command`, `builtin` and redirections, `WATCHED` does not — so `timeout 300 gh pr merge` is not classified as a merge and the gate is SILENT | fail-open at the classifier, unchanged from `main` — `invocation()` is not edited by this slice; no producer: a merge here is typed `gh pr merge --rebase --delete-branch`, and `time`/`env`/`sudo`/`nohup`/`VAR=x` in front of one ARE classified |
+| **KD-108** | a refusal quotes the MASKED scope, not what was typed, so a quoted `cd` destination vanishes from the sentence — `cd "$HOME" && gh pr merge` is refused with the evidence `(cd)` | the refusal and its direction are right; only the parenthetical is emptier than it reads, and the remedy is still the operand in front of the user |
 
 ---
 
@@ -1886,6 +1887,35 @@ both readers spell it from that, which is the invariant KD-105's closed entry al
 only thing that stops this pair drifting a third time. *Logged 2026-09-18, at the re-record of review
 round 2 (KD-79's slice). The placement call is the reviewer's: it is a fail-open, and it blocks
 nothing only because merging is not what introduces it.*
+
+### KD-108 — the refusal's evidence is read from the masked scope, so a quoted destination is not in it
+
+`scripts/hooks/proof-gate.mjs` (`commandCwd`, the `cd`-not-literal branch)
+
+`readablePrefix` blanks quoted regions length-preservingly, and the `CHDIR` loop then matches against
+that masked `scope`. The refusal it raises echoes `m[0].trim()` — which is text taken FROM the mask,
+so every character inside the quotes has already become a space. The operand is therefore absent from
+exactly the sentence whose job is to name it. Measured 2026-09-18 by importing `commandCwd` on this
+tree:
+
+    cd $HOME && gh pr merge                        (cd $HOME)   <- unquoted: the evidence is there
+    cd "$HOME" && gh pr merge                      (cd)
+    cd "${CLAUDE_PROJECT_DIR:-.}" && gh pr merge   (cd)
+    cd "$(pwd)" && gh pr merge                     (cd)
+    cd "a b" && gh pr merge                        (cd)
+
+So the reader is told *a `cd` this gate cannot read literally (cd)* and the parenthetical, which is
+the entry's whole contribution, carries nothing — while the unquoted spelling of the same refusal
+carries it. Nothing false is said and the decision is unaffected: all five are genuine refusals of a
+destination this gate does not compute, the direction is a refusal in every case, and only the agent
+is ever refused. The remedy also remains visible without the echo, because the operand is still in
+the command the reader just typed. **The fix is one word:** echo from `cmd` at the match's index
+rather than from `scope`, the masking being length-preserving precisely so that index still means
+what it says — the same property the `&`-backgrounding check two lines below it already relies on.
+**Fires when:** any gated command is typed behind a `cd` whose destination is quoted. This is the
+sentence, not the verdict; KD-95 covers the space case's refusal, and this covers what all of them
+say. *Logged 2026-09-18, at the re-record of review round 2 (KD-79's slice), found by probing the
+reader with the `${CLAUDE_PROJECT_DIR:-.}` construct the sibling slice put into the hook commands.*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
