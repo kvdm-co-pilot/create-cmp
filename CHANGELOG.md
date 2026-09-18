@@ -8,6 +8,70 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **Three hooks in every stamped app resolved their scripts against the wrong directory, and two of
+  them failed without a sound.** `template/.claude/settings.json` invoked `Stop`
+  (`node qa/receipt-check.mjs --hook`), `UserPromptSubmit` and `statusLine` (both
+  `test -f qa/walk-status.mjs && … || true`) as CWD-RELATIVE paths. Claude Code runs a hook in the
+  SESSION's working directory, which is not necessarily the one holding `settings.json` — so a
+  session opened one directory down lost the receipt gate with a `Cannot find module`, and lost the
+  walk's status line and prompt injection with **nothing at all**, because `|| true` turns a wrong
+  directory into a clean exit. The silent pair is the worse half: a Stop hook that errors gets
+  diagnosed, a status line that stops appearing gets shrugged at. **The two HOOK commands are now
+  anchored** as `"${CLAUDE_PROJECT_DIR:-.}/…"` — the form **this repo's own `.claude/settings.json`
+  already used in every one of its entries.** The template was lagging a practice the repo had
+  proved, which is precisely the spec-mirror drift the template exists to prevent.
+  payment-blueprint hit the loud half on 2026-09-02 and anchored its own copy on 2026-09-10; the
+  template was never fixed, so every app stamped since carries it (KD-85 — those trees are other
+  repositories and no commit here reaches them, and `doctor --fix` deliberately never rewrites a
+  hook an app already has).
+
+- **The `statusLine` is NOT fixed, and this entry said it was until the claim was checked.** All
+  three surfaces were anchored and described as fixed before anyone verified that the anchor
+  reaches all three. It does not. `CLAUDE_PROJECT_DIR` is documented as exported to HOOK commands —
+  the hooks reference additionally names stdio MCP servers and plugin LSP servers as the other
+  places Claude Code sets it, and `statusLine` is absent from the list that exists precisely to
+  enumerate the non-hook consumers; the statusline reference names only `COLUMNS` and `LINES` as
+  variables it sets. On a statusLine the anchor expands to nothing and `:-.` quietly restores the
+  exact behaviour it claims to repair. **An inert anchor is worse than none, because it reads as
+  protection** — the same shape as KD-87's "blessed but broken". So the statusLine keeps its
+  relative form, `ANCHORABLE_SURFACES` records where the mechanism actually applies, and a
+  behavioural test pins the surface still failing silently one directory down so the gap is a
+  decision rather than an oversight (KD-90). A statusLine receives the project root on STDIN as
+  `workspace.project_dir` — a different mechanism, not a different spelling, so it is its own
+  change.
+
+- **The detector had to tell an invocation from a mention, which is the whole difficulty.** Most of
+  the template's commands NAME lane paths on purpose — the SessionStart banner says *"done is
+  `node qa/verify.mjs`"*, advice addressed to an agent standing at the project root, and anchoring
+  it would be wrong. Every such mention sits inside a single-quoted shell string and every real
+  invocation does not, so `unanchoredPaths` (`src/lib/hooks.mjs`) masks single-quoted spans before
+  it looks, preserving indices so it can still read each match's real prefix. Measured on the
+  shipped template: three violations found, and zero false positives across the three narration
+  commands that name a lane path. The obvious worry about that masking is a phase shift — one stray
+  apostrophe re-pairs every quote after it, and a real invocation hides inside what the masker then
+  reads as narration. It cannot, and a review round replaced the reason this entry first gave: not
+  because `sessionStartCommand` refuses apostrophes (that guard covers only copy it builds, and the
+  template's hand-written commands are not), but because `sh` pairs single quotes by exactly the
+  masker's rule, so an odd apostrophe is a SYNTAX ERROR rather than a quiet substitution. Measured,
+  not reasoned. The converse — a single-quoted span that really is executed, via `sh -c` or `eval`
+  — is a genuine blind spot and is logged as KD-87 rather than glossed. A bare
+  `${CLAUDE_PROJECT_DIR}` is rejected too, because unset it expands to `/qa/…` at the filesystem
+  root — worse than the relative form it replaces. The `:-.` default is what makes this a pure
+  addition: with no environment variable the command degrades to exactly its old behaviour.
+
+- **Calibrated, and the calibration is kept.** GATE-RULES Rule 1 in the instrument rather than by
+  hand: `test/hook-anchoring.test.mjs` holds the template exactly as it shipped through 0.26.2 and
+  requires all three surfaces back by name — 1.6 ms, run by everyone, forever, instead of once by
+  one person at a terminal. A static detector alone would be a lint that believes itself, so four
+  behavioural tests run the SHIPPED commands through `sh -c` from a subdirectory: the relative form
+  fails there and passes at the project root (the control, without which a subdirectory failure
+  proves nothing about the cwd), the shipped form passes, the two guarded commands are pinned
+  failing *silently* — same exit code, no output — and the unset-variable case is shown degrading
+  to the old behaviour rather than to the filesystem root. The fix is gated at both of its
+  consumers as well as at its source: the STAMPED `.claude/settings.json`
+  (`test/harness-surfaces.test.mjs`) and what `doctor --fix` writes into a real project
+  (`test/doctor-walk-wiring.test.mjs`), since the heal is a second door into the same file.
+
 - **The marketplace said "Eleven skills" and the plugin shipped twelve — and the gate that exists
   to refuse exactly that was reading three of ten public surfaces.** `.claude-plugin/plugin.json`
   and the marketplace entry are the text an agent or a human reads BEFORE the install, before this

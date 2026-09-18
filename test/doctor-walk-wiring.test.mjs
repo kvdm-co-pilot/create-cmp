@@ -13,6 +13,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { applySafeFixes, gatherWalkInputs, templateWalkWiring } from "../src/commands/doctor.mjs";
+import { describeAnchorViolations, unfixedHookAnchors } from "../src/lib/hooks.mjs";
 import { diagnoseProject } from "../src/lib/project-doctor.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -70,6 +71,9 @@ test("no walk installed → nothing to say (null, not a false alarm)", () => {
 });
 
 test("--fix wires an unwired project, and the walk then reads as wired", () => {
+  // The Stop hook here is deliberately the UNANCHORED form the template shipped
+  // through 0.26.2 — i.e. a real app stamped before the anchoring fix, which is
+  // the population that actually exists. It is a fixture, not an endorsement.
   const dir = project('{"hooks":{"Stop":[{"matcher":"","hooks":[{"type":"command","command":"node qa/receipt-check.mjs --hook"}]}]}}');
   try {
     const { findings, fixed } = heal(dir);
@@ -79,7 +83,10 @@ test("--fix wires an unwired project, and the walk then reads as wired", () => {
     const after = readSettings(dir);
     assert.match(after.statusLine.command, /walk-status\.mjs/);
     assert.ok(after.hooks.UserPromptSubmit.some((g) => g.hooks.some((h) => /walk-status\.mjs/.test(h.command))));
-    // The app's own Stop hook is untouched — the heal adds, never rewrites.
+    // The app's own Stop hook is untouched — the heal adds, never rewrites. That
+    // is also the limit of this heal: it does NOT retro-anchor a legacy hook
+    // (KD-85), and pinning the string here says so out loud rather than leaving
+    // it to be discovered.
     assert.equal(after.hooks.Stop[0].hooks[0].command, "node qa/receipt-check.mjs --hook");
 
     // And the project now diagnoses clean.
@@ -97,6 +104,25 @@ test("--fix creates .claude/settings.json when the project has none", () => {
   try {
     assert.deepEqual(heal(dir).fixed, ["walk-wiring"]);
     assert.match(readSettings(dir).statusLine.command, /walk-status\.mjs/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("what --fix WRITES is anchored — the heal is a second door into a project's settings", () => {
+  // templateWalkWiring() copies the engine template verbatim, so the anchoring
+  // fix reaches a healed project for free. "For free" is exactly the kind of
+  // claim that stops being true silently, and `doctor --fix` writes into real
+  // apps without anyone re-reading the template, so it is gated here too.
+  const dir = project("{}");
+  try {
+    heal(dir);
+    const found = unfixedHookAnchors(readSettings(dir));
+    assert.deepEqual(
+      found,
+      [],
+      `doctor --fix wrote a command that will not resolve from a subdirectory:\n${describeAnchorViolations(found)}`
+    );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
