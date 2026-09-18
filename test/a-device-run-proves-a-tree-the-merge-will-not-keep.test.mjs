@@ -32,7 +32,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { ANSWER_RESERVE_MS, baseContext, decide, declaredBudgetMs, LANE_PROBE_TOTAL_MS, REMOTE_CALL_CAP_MS, REMOTE_CALL_FLOOR_MS, remoteBudgetMs } from "../scripts/hooks/proof-gate.mjs";
+import { ANSWER_RESERVE_MS, baseContext, decide, declaredBudgetMs, LANE_PROBE_TOTAL_MS, REMOTE_CALL_CAP_MS, REMOTE_CALL_FLOOR_MS, remoteBudgetMs, TREE_PROBE_TOTAL_MS } from "../scripts/hooks/proof-gate.mjs";
 import { isTrunk, TIERS } from "../scripts/proof-plan.mjs";
 
 const owed = { state: "owed", plan: { slice: "s", branch: "b" }, need: { reason: "r" }, branch: "b", review: { state: "none" } };
@@ -316,9 +316,15 @@ test("BELOW THE FLOOR ORIGIN IS NOT ASKED AT ALL — the local half still runs, 
 
 test("THE ARITHMETIC, READ OFF THE WIRING: the lane probe, the one question to origin, and the answer all fit in the declared budget", () => {
   const budget = declaredBudgetMs();
+  // Four terms now, and the newest one is spent FIRST: resolving which tree the
+  // command is about (KD-79) happens before the lane probe, before obligation()
+  // and before anything is asked of origin. A term left out of this sum is a
+  // bound nobody is holding to the budget, which is the whole failure this test
+  // exists to keep impossible.
+  const sum = TREE_PROBE_TOTAL_MS + LANE_PROBE_TOTAL_MS + REMOTE_CALL_CAP_MS + ANSWER_RESERVE_MS;
   assert.ok(
-    LANE_PROBE_TOTAL_MS + REMOTE_CALL_CAP_MS + ANSWER_RESERVE_MS <= budget,
-    `the gate's own bounds sum to ${LANE_PROBE_TOTAL_MS + REMOTE_CALL_CAP_MS + ANSWER_RESERVE_MS}ms against the ${budget}ms .claude/settings.json gives this hook. Past that it is killed and a decision it is holding is never delivered — a late refusal is a PERMITTED command. Lower REMOTE_CALL_CAP_MS (or raise the declared timeout, deliberately), never leave the sum above the budget.`,
+    sum <= budget,
+    `the gate's own bounds sum to ${sum}ms against the ${budget}ms .claude/settings.json gives this hook. Past that it is killed and a decision it is holding is never delivered — a late refusal is a PERMITTED command. Lower REMOTE_CALL_CAP_MS (or raise the declared timeout, deliberately), never leave the sum above the budget.`,
   );
   assert.ok(REMOTE_CALL_FLOOR_MS <= REMOTE_CALL_CAP_MS, "the floor is the cheapest answer worth waiting for; the cap is the dearest");
 
