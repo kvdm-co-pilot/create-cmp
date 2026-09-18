@@ -361,6 +361,40 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   A rule made executable and left for the reader to remember to run is the same defect one layer
   up — while the template this repo stamps had carried the equivalent PreToolUse hooks for
   adopters all along. The harness enforced on adopters what it did not enforce on itself.
+- **A command position is a separator plus the wrappers nobody remembers, and the list is CLOSED.**
+  Two readers in that hook ask where a command begins — the classifier that decides whether this
+  gate runs at all, and the one that decides whether a directory can be read — and for two commits
+  they answered from two different lists. KD-105 was the disagreement; KD-107 was the same
+  disagreement a commit later, with the classifier the NARROWER one, which is the fail-open
+  direction: `! gh pr merge`, `timeout 300 gh pr merge`, `command gh pr merge` and
+  `2>/dev/null gh pr merge` each reached the act with no gate having an opinion at all — not
+  allowed by a gate that looked, which is worse. There is one declaration now, `COMMAND_PREFIX`,
+  and a test reads it back out of both readers, because editing two lists to agree is what left
+  KD-107 behind.
+
+  **Accepted:** a separator — the start, `;` `&&` `||` `|` `(`, a newline, or `-c "` which is the
+  one place a quotation opens a command — then any run, in any order, of `VAR=value` assignments,
+  redirections (`2>/dev/null`, `>out`, `2>&1`), and these wrapper words: `!`, `builtin`,
+  `caffeinate`, `command`, `env`, `eval`, `exec`, `nice`, `nohup`, `sudo`, `time`, `timeout`,
+  `xargs`. Each wrapper may carry its own options and **at most two bare operands** — what
+  `timeout 300`, `timeout -s KILL 300`, `nice -n 10` and `sudo -u nobody` need.
+
+  **Refused by name, rather than guessed at:** any other word ENDS the run and is read as the
+  command itself. So `watch -n 5 …`, `script`, `parallel`, `ssh host '…'`, `docker run …`,
+  `find … -exec`, a `-c` not spelled exactly `-c` (`bash -lc "…"`), and a brace group whose first
+  word is the gated command (`{ gh pr merge; }`) are not read through. The operand bound is the
+  same refusal in miniature: unbounded, the run walks across a whole second command and reads the
+  `gh pr merge` inside `time git commit -m "then gh pr merge"` as a merge. What is not read through
+  is a fail-open with no producer here and is logged (KD-109), not inferred silently.
+
+  **And no word in a prefix crosses a character that ends a command** — not `;`, `&`, `|`, `(`,
+  `)`, `<`, `>`, nor a newline. Without that clause the operand run swallows its own `;`, the match
+  begins at the start of the line instead of at that separator, and the prefix the directory reader
+  is handed shrinks to nothing: fifteen shapes of the construct sweep went from refused to READ
+  while this declaration was being unified, including `time . /x/s.sh; gh pr merge` — the six-shape
+  class KD-79's own fix had just closed. Both directions are swept against `/bin/sh` in
+  `test/a-wrapper-word-walks-an-unproven-merge-past-the-gate.test.mjs`, which asks the shell whether
+  the gated program was really executed rather than asserting that it was.
 - **And it judges the tree the COMMAND acts on, never the session's.** `.claude/settings.json`
   spells the hook `node "${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs"`, so until
   2026-09-18 every verdict was about the SESSION's worktree whatever tree the command ran in — and

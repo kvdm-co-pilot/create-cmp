@@ -9,6 +9,67 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-107 — the two readers agree in one direction, and the other direction is where the gate goes silent — **CLOSED 2026-09-18**
+
+`scripts/hooks/proof-gate.mjs` (`COMPOUND` vs `invocation`)
+
+KD-105 was *the two readers in this file do not mean the same thing by a command position*, and the
+fix gave `COMPOUND` a wrapper run of its own. It is a second literal spelling, not the shared
+declaration KD-105's entry proposed, and it is not the same list: `COMPOUND` carries
+`!|nohup|time|env|caffeinate|sudo|command|builtin` plus `\d*[<>]+\S*` redirections, `invocation()`
+carries `nohup|time|env|caffeinate|sudo` and nothing else. So the two still answer differently — now
+with `COMPOUND` the wider one, which is the safe direction FOR COMPOUND and the unsafe one for the
+reader that decides whether this gate runs at all.
+
+Measured 2026-09-18 at `7bc38dd`, by feeding the hook a real `PreToolUse` payload on this worktree:
+
+    gh pr merge 1 --rebase               deny
+    time gh pr merge 1 --rebase          deny
+    ! gh pr merge 1 --rebase             SILENT — classify() returns null, no gate runs
+    command gh pr merge 1 --rebase       SILENT
+    2>/dev/null gh pr merge 1 --rebase   SILENT
+    timeout 300 gh pr merge 1 --rebase   SILENT
+
+`classify()` returning null makes the hook `return` before any verdict, so these merge without the
+proof gate having an opinion — a fail-open at the door rather than in the tree-reading this slice is
+about. It is also why the comment above `COMPOUND` still cannot be read literally: it says *the same
+rule `WATCHED` uses*, which is what `168187f`'s comment said and what KD-105 was written about, and it
+is no truer now, only untrue in the opposite direction.
+
+**Direction: fail-open, and UNCHANGED FROM `main`** — `invocation()` is byte-identical on `main` and
+on this branch; nothing in this slice widened or narrowed it, and merging changes nothing about which
+commands reach the gate. **No producer:** every merge, publish and fleet-check in this repository is
+typed bare or behind a `cd`, and the four wrappers that a human or an agent plausibly writes in front
+of a long command — `time`, `env`, `sudo`, `nohup` — plus `VAR=x` assignments are all classified
+today. **The fix is one declaration, not two lists:** export the command-position prefix once and let
+both readers spell it from that, which is the invariant KD-105's closed entry already names and the
+only thing that stops this pair drifting a third time. *Logged 2026-09-18, at the re-record of review
+round 2 (KD-79's slice). The placement call is the reviewer's: it is a fail-open, and it blocks
+nothing only because merging is not what introduces it.*
+
+Closed by `COMMAND_PREFIX` in `scripts/hooks/proof-gate.mjs` — one exported declaration of what may
+stand between a separator and a command, embedded by BOTH `invocation()` and `COMPOUND`, with a test
+that reads it back out of each so a third spelling cannot be added without failing. The accepted
+wrapper words are a closed list stated in `docs/GATE-RULES.md` (Rule 4) and bound to the code by the
+same test; what the list does not read through is named there and logged as KD-109 rather than
+inferred. The separator classes were deliberately NOT unified, and that is the one place the fix
+departs from the entry above: the two readers run at different moments — `invocation()` on raw text,
+`COMPOUND` after every quoted span has been blanked — so `-c "` is meaningful only to the first and
+`{`, `}` and a `case` pattern's `)` are structural only to the second. Unifying those would make
+`git commit -m "{gh pr merge}"` a merge, which is KD-64's mistake in a new costume.
+
+`test/a-wrapper-word-walks-an-unproven-merge-past-the-gate.test.mjs` holds it, with `/bin/sh` as the
+oracle in the same shape KD-79's slice landed: a stand-in `gh`, `npm` and `node` on PATH record
+their own argv, so "this shape really invokes a merge" is measured rather than asserted. 135 of 180
+shapes were silent when it was written. **The unification also weakened a refusal before it fixed
+anything, and the sweep KD-105's fix landed is what said so:** written with `\S*` for a wrapper's
+operands, the run swallowed its own `;` and the match began at the start of the line, so the prefix
+`commandCwd` reads shrank to nothing and fifteen shapes of
+`test/a-construct-this-reader-cannot-follow-is-refused-wherever-it-stands.test.mjs` went from
+refused to READ — including `time . /x/s.sh; gh pr merge`, the six-shape class KD-105's own fix had
+just closed. No word in a command prefix may cross a character that ends a command, newline
+included; that clause is in the declaration because a guard test refused the version without it.
+
 ### KD-105 — `COMPOUND` and `WATCHED` do not mean the same thing by "a command position" — **CLOSED 2026-09-18, in the round that found it**
 
 `scripts/hooks/proof-gate.mjs` (`COMPOUND`, `invocation`)

@@ -59,6 +59,112 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// A COMMAND POSITION — declared ONCE, because this file has now had the same
+// defect twice for having declared it twice.
+//
+// Two readers here need to know where a command begins: `invocation()`, which
+// decides whether this gate runs at all, and `COMPOUND`, which decides whether a
+// directory can be read. KD-105 was those two spelling it differently, and the
+// fix gave COMPOUND a second literal list — so KD-107 was the same defect a
+// commit later, with COMPOUND the WIDER one, which is the safe direction for the
+// reader that refuses and the fail-open direction for the reader that is the
+// door. Measured on 2026-09-18: `! gh pr merge`, `timeout 300 gh pr merge`,
+// `command gh pr merge` and `2>/dev/null gh pr merge` all returned null, and a
+// null makes the handler return before any verdict — an unproven merge with no
+// gate in the path at all. Editing both lists to agree is what left KD-107
+// behind; there is one list below, and a test asserts both readers are built
+// from it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The words that may stand in front of a command without being the command.
+ * This list is CLOSED and it is stated in docs/GATE-RULES.md (Rule 4), so the
+ * next reader is not left to infer it from a regex: `!`, `builtin`, `caffeinate`,
+ * `command`, `env`, `eval`, `exec`, `nice`, `nohup`, `sudo`, `time`, `timeout`,
+ * `xargs`. Everything else is NOT a wrapper — a word this reader does not
+ * recognise ends the run and must be the command itself, so `time git commit -m
+ * "then gh pr merge"` stays a commit rather than becoming a merge.
+ *
+ * Each wrapper may carry its own options and AT MOST TWO bare operands, which is
+ * what `timeout 300`, `timeout -s KILL 300`, `nice -n 10` and `sudo -u nobody`
+ * need and what stops the run from walking across a whole second command. The
+ * bound is the fail-safe choice in both directions at once: unbounded operands
+ * read the `gh pr merge` inside a commit message as a merge, and zero operands
+ * let `timeout 300 gh pr merge` past the gate entirely.
+ */
+export const COMMAND_WRAPPERS = Object.freeze([
+  "!",
+  "builtin",
+  "caffeinate",
+  "command",
+  "env",
+  "eval",
+  "exec",
+  "nice",
+  "nohup",
+  "sudo",
+  "time",
+  "timeout",
+  "xargs",
+]);
+
+/** Longest first, so `timeout` is not read as `time` with `out` for an operand. */
+const WRAPPER = `(?:${[...COMMAND_WRAPPERS].sort((a, b) => b.length - a.length).join("|")})`;
+
+/**
+ * A word inside a command prefix NEVER CROSSES A CHARACTER THAT ENDS A COMMAND,
+ * and that clause is load-bearing rather than tidy. Written as `\S*`, a
+ * wrapper's operand run swallows the `;` that closes its own command and the
+ * match then begins at the start of the line instead of at that separator —
+ * which shrinks the prefix `commandCwd` reads to nothing and drops the `cd` or
+ * the sourced script standing in front of it. Measured while this declaration
+ * was being unified: fifteen shapes of
+ * test/a-construct-this-reader-cannot-follow-is-refused-wherever-it-stands.test.mjs
+ * went from refused to READ, including `time . /x/s.sh; gh pr merge` — the exact
+ * six-shape class KD-79's fix had just closed.
+ */
+const IN_WORD = "[^\\s;&|()<>]";
+
+/**
+ * And the gaps inside a prefix are HORIZONTAL whitespace, for the same reason: a
+ * newline ends a command as surely as a `;` does, so a run that crossed one
+ * would read `eval cd /x` on its own line as the wrapper of the merge on the
+ * next. Measured in the same sweep, as the last shape standing.
+ */
+const GAP = "[^\\S\\n]+";
+
+/**
+ * What may stand between a separator and the command: a run of wrappers,
+ * `VAR=value` assignments and redirections, in any order. Exported as regex
+ * SOURCE rather than a RegExp because both readers embed it in a larger pattern
+ * — and a test reads it back out of both to prove neither grew a copy.
+ */
+export const COMMAND_PREFIX =
+  "(?:" +
+  `${WRAPPER}(?:${GAP}-${IN_WORD}*)*(?:${GAP}(?!${WRAPPER}(?=\\s|$))[^-\\s;&|()<>]${IN_WORD}*){0,2}${GAP}` +
+  `|[A-Za-z_][A-Za-z0-9_]*=\\S*${GAP}` +
+  `|\\d*[<>]+\\S*${GAP}` +
+  ")*";
+
+/**
+ * Where a command may BEGIN. The two readers run at different moments, so they
+ * honour one shared core and two deltas — and each delta is about the STAGE, not
+ * about taste, which is the difference between this asymmetry and the one above:
+ *
+ *   the classifier reads RAW text, so `-c "` is the one place a quotation opens
+ *   a command (`sh -c "node …"`), and a `{`, `}` or `)` inside a quoted word
+ *   would be read as structure that is not there — `git commit -m "{gh pr
+ *   merge}"` is a commit;
+ *
+ *   `commandCwd` reads MASKED text, where every quoted span is already blanked,
+ *   so `-c "` can no longer occur at all and a brace group or a `case` pattern's
+ *   `)` left standing is genuinely structural.
+ */
+const SEPARATORS = ";&|(\\n";
+const RAW_SEPARATOR = `(?:^|[${SEPARATORS}]|-c\\s+["'])`;
+const MASKED_SEPARATOR = `(?:^|[${SEPARATORS}){}])`;
+
 /**
  * The commands this gate has an opinion about. Anything else is none of its
  * business — and "anything else" includes MENTIONING these programs: the first
@@ -66,17 +172,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
  * the edit that would have fixed it, because it matched the name anywhere in
  * the string. So a match is an INVOCATION: the program at a command position —
  * the start, or after `;` `&&` `||` `|` `(` or a newline, or after `-c "` so
- * `sh -c "node …"` is seen — with `VAR=value` assignments and the usual
- * wrappers (`nohup`, `time`, `env`, `caffeinate`) in front, in any order.
+ * `sh -c "node …"` is seen — with `VAR=value` assignments, redirections and the
+ * wrappers above in front, in any order.
  * `cat scripts/fleet-check.mjs`, `grep "node scripts/fleet-check.mjs"` and
  * `git commit -m "then gh pr merge"` are not invocations; a quote is a
  * boundary only when it opens a `-c` script, which is the one place a quoted
  * string IS a command.
  */
-const invocation = (prog) =>
-  new RegExp(
-    `(?:^|[;&|(\\n]|-c\\s+["'])\\s*(?:(?:nohup|time|env|caffeinate|sudo)(?:\\s+-\\S+)*\\s+|[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*${prog}(?=\\s|$|["')])`,
-  );
+const invocation = (prog) => new RegExp(`${RAW_SEPARATOR}\\s*${COMMAND_PREFIX}${prog}(?=\\s|$|["')])`);
 
 export const WATCHED = Object.freeze({
   device: invocation("node\\s+(?:\\S*/)?fleet-check\\.mjs"),
@@ -580,8 +683,9 @@ const CHDIR = /(?:^|[;&|(\n])\s*(cd|pushd|popd|chdir)(?=[\s;&|)]|$)([^;&|)\n]*)/
  * reader that only counts parens misses it and falls back to the session's tree,
  * which is KD-79 itself.
  *
- * AT A COMMAND POSITION — the same rule WATCHED uses, including the part that is
- * easy to leave out, and both halves are measured. Spelled as "preceded by
+ * AT A COMMAND POSITION — `COMMAND_PREFIX` above, the one declaration this file
+ * has, and not a second copy of it. The boundary was wrong twice in two commits,
+ * once in each direction, and both halves are measured. Spelled as "preceded by
  * whitespace", this matched `done`, `for` and `.` wherever they stood as
  * ARGUMENTS: `git add .`, `echo done`, `touch done`. It turned an everyday
  * command in front of a merge into a refusal whose sentence named
@@ -589,14 +693,16 @@ const CHDIR = /(?:^|[;&|(\n])\s*(cd|pushd|popd|chdir)(?=[\s;&|)]|$)([^;&|)\n]*)/
  * nothing in it for the reader to change. Narrowed to "preceded by a separator"
  * it then let SIX shapes through, because a command position is a separator plus
  * an optional run of wrappers and assignments — `time . ./s.sh`, `! source
- * ./s.sh`, `FOO=bar . ./s.sh`, `2>/dev/null . ./s.sh` — which `invocation()`
- * above has always spelled out and this did not. That direction is the worse one:
- * a sourced script moves the shell and the gate answered for the session's tree.
- * Both errors, and every construct this refuses, are swept against `/bin/sh` in
+ * ./s.sh`, `FOO=bar . ./s.sh`, `2>/dev/null . ./s.sh`. The fix for THAT was a
+ * second literal list here, which is KD-107: it drifted from `invocation()`'s
+ * inside one slice, in the direction that costs a certification rather than a
+ * message. Both errors, and every construct this refuses, are swept against
+ * `/bin/sh` in
  * test/a-construct-this-reader-cannot-follow-is-refused-wherever-it-stands.test.mjs.
  */
-const COMPOUND =
-  /(?:^|[;&|(){}\n])\s*(?:(?:!|nohup|time|env|caffeinate|sudo|command|builtin)(?:\s+-\S+)*\s+|[A-Za-z_][A-Za-z0-9_]*=\S*\s+|\d*[<>]+\S*\s+)*(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|select|function|\{|\}|source|eval|exec|\.)(?=[\s;&|(){}]|$)/;
+export const COMPOUND = new RegExp(
+  `${MASKED_SEPARATOR}\\s*${COMMAND_PREFIX}(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|select|function|\\{|\\}|source|eval|exec|\\.)(?=[\\s;&|(){}]|$)`,
+);
 
 /** `gh` will act on a repository named out of band from ANY directory, so a command that names one has no tree to read. */
 const NAMED_REPO = /(?:^|\s)(?:--repo[=\s]|-R\s)|(?:^|\s)GH_REPO=/;
