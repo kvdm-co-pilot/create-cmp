@@ -96,7 +96,7 @@ is increasingly written by an agent:
   AI coding agents** and is building an agent-supervised development environment. The language
   itself is being tuned for the agentic era.
 - **And uniquely, the scaffold is part of the argument:** create-cmp generates a project that
-  is deterministic (frozen CI-verified template), self-verifying (8-gate verify lane, evidence
+  is deterministic (frozen CI-verified template), self-verifying (a profile-tiered verify lane, evidence
   receipts, Stop-hook enforcement), and agent-observable (headless previews of every real
   screen on save). No RN or Flutter scaffolder ships a machine-enforced definition of done.
 

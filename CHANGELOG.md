@@ -15,7 +15,7 @@ All notable changes to this project are documented here. The format is based on
   smaller half. `test/doc-counts.test.mjs` derives every count from `scripts/ground-truth.mjs` and
   refuses any public surface that contradicts it — but its `PUBLIC_SURFACES` was a hand-written
   list of three markdown files, and **the split it produced was total: every surface ON the list
-  stated the right number, and every count-stating surface off it was stale.** Six of them: both
+  stated the right number, and every count-stating surface off it was stale.** Seven of them: both
   plugin manifests at "Eleven skills", `AGENTS.md` and `docs/DOCUMENTATION.md` at "10 skills", and
   the `create-mobile` / `create-kmp` / `create-compose-multiplatform` READMEs — published npm front
   doors — at "10 skills". The sharpest case is that the same `plugin.json` was already read by this
