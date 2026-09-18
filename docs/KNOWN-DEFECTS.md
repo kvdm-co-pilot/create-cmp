@@ -137,6 +137,7 @@ you the same list without opening anything.
 | **KD-76** | the same reader PASSES a wrong lane size written as a word, or with the profile named first | measured: three shapes, none written anywhere in the tree today |
 | **KD-77** | the CLI-command count is derived, gated, and calibrated by nothing — no surface states it | the reader is idle, not wrong; a future "<n> commands" is still refused |
 | **KD-78** | two npm pages still serve "8 gates" from bytes already published; the tree's copy is fixed | no act available here — a registry description changes only by publishing |
+| **KD-79** | the proof gate refused an OWED device tier, naming a change set that cannot be this slice's | it refuses, never allows — but the tier it refuses is one `proof-plan.mjs` says is owed |
 
 ---
 
@@ -1153,6 +1154,53 @@ thing this project does not do on its own.
 **Fires until:** both aliases are published at the versions this tree holds.
 *Logged 2026-09-18, review round 1 of the count-gate slice; the tree-side half was fixed in the
 same round.*
+
+### KD-79 — the scheduler says the device tier is OWED and the gate enforcing it says nothing is owed
+
+`scripts/hooks/proof-gate.mjs` (`decide`, `kind === "device"`, `o.state === "none"`) vs
+`scripts/proof-plan.mjs`
+
+Measured 2026-09-18 on this branch, one command apart. `node scripts/proof-plan.mjs`:
+
+```
+device (fleet L2) OWED — discharge at slice close, NOT NOW
+    8 changed path(s) are not declared irrelevant to fleet L2:
+    .claude-plugin/marketplace.json, .claude-plugin/plugin.json, llms.txt, ….
+```
+
+`CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level L2`, refused by the
+PreToolUse hook before the runner started:
+
+```
+nothing is owed — every changed path is declared unable to affect fleet L2
+(docs/, test/, scripts/, .github/, *.md, inspector/mcp/, .claude/, packages/harness/src/console/).
+```
+
+Both read `obligation()` from the same module, so they cannot disagree on one input — and the
+hook's stated reason is impossible for this slice's change set. `.claude-plugin/` is not `.claude/`,
+`llms.txt` is not `*.md`, and `package.json`, `package-lock.json` and
+`packages/aliases/*/package.json` match no prefix on that list. Whatever set it judged, it was not
+this branch's. Two candidates, not distinguished here: the hook compared the WORKING TREE against
+HEAD, which is clean after a commit, so "every changed path is irrelevant" is vacuously true over
+an empty set — this repo's own recurring shape, a guard written against ABSENCE passing on
+VACUITY; or it resolved a sibling git worktree, whose uncommitted paths that day were exactly
+`docs/GATE-RULES.md`, `scripts/hooks/proof-gate.mjs` and one `test/` file — every one of them on
+the irrelevant list, which would explain the reason word for word (KD-64 is the same reader
+confusing sibling worktrees).
+
+**Not fixed here, deliberately.** `scripts/hooks/proof-gate.mjs` is owned by another slice that was
+in flight the same day, and editing a gate from under it is worse than the disagreement. Nor was
+the refusal worked around: a gate that refuses is obeyed, and this slice's device tier is left owed
+and undischarged rather than run behind the gate's back.
+
+**The direction is safe, and that is why this is logged rather than blocking**: it REFUSES a run
+that is owed, so nothing false is ever certified. The cost is a slice that cannot close its own
+last gate. The unsafe mirror image — allowing a run to discharge a tier the merge will not keep —
+is what the sibling slice is about, so both directions are known.
+
+**Fires when:** the tier is invoked from a worktree whose slice changes only paths one of the two
+readers can see.
+*Logged 2026-09-18, measured while closing the count-gate slice.*
 
 ## Closed
 
