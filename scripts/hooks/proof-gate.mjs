@@ -580,16 +580,23 @@ const CHDIR = /(?:^|[;&|(\n])\s*(cd|pushd|popd|chdir)(?=[\s;&|)]|$)([^;&|)\n]*)/
  * reader that only counts parens misses it and falls back to the session's tree,
  * which is KD-79 itself.
  *
- * AT A COMMAND POSITION — the same rule WATCHED uses, for the same measured
- * reason. Spelled as "preceded by whitespace", this matched `done`, `for` and `.`
- * wherever they stood as ARGUMENTS: `git add .`, `echo done`, `touch done`. It
- * turned an everyday command in front of a merge into a refusal whose sentence
- * named `if/for/while/case/{ }/source`, none of which was in the command, so
- * there was nothing in it for the reader to change. A gate that refuses real work
- * for a reason that is not true is the one failure this file cannot have, and it
- * had it for exactly one commit.
+ * AT A COMMAND POSITION — the same rule WATCHED uses, including the part that is
+ * easy to leave out, and both halves are measured. Spelled as "preceded by
+ * whitespace", this matched `done`, `for` and `.` wherever they stood as
+ * ARGUMENTS: `git add .`, `echo done`, `touch done`. It turned an everyday
+ * command in front of a merge into a refusal whose sentence named
+ * `if/for/while/case/{ }/source`, none of which was in the command, so there was
+ * nothing in it for the reader to change. Narrowed to "preceded by a separator"
+ * it then let SIX shapes through, because a command position is a separator plus
+ * an optional run of wrappers and assignments — `time . ./s.sh`, `! source
+ * ./s.sh`, `FOO=bar . ./s.sh`, `2>/dev/null . ./s.sh` — which `invocation()`
+ * above has always spelled out and this did not. That direction is the worse one:
+ * a sourced script moves the shell and the gate answered for the session's tree.
+ * Both errors, and every construct this refuses, are swept against `/bin/sh` in
+ * test/a-construct-this-reader-cannot-follow-is-refused-wherever-it-stands.test.mjs.
  */
-const COMPOUND = /(?:^|[;&|(){}\n])\s*(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|select|function|\{|\}|source|eval|exec|\.)(?=[\s;&|(){}]|$)/;
+const COMPOUND =
+  /(?:^|[;&|(){}\n])\s*(?:(?:!|nohup|time|env|caffeinate|sudo|command|builtin)(?:\s+-\S+)*\s+|[A-Za-z_][A-Za-z0-9_]*=\S*\s+|\d*[<>]+\S*\s+)*(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|select|function|\{|\}|source|eval|exec|\.)(?=[\s;&|(){}]|$)/;
 
 /** `gh` will act on a repository named out of band from ANY directory, so a command that names one has no tree to read. */
 const NAMED_REPO = /(?:^|\s)(?:--repo[=\s]|-R\s)|(?:^|\s)GH_REPO=/;
