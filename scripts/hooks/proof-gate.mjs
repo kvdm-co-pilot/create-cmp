@@ -116,19 +116,39 @@ const GAP = "[^\\S\\n]+";
  * wrapper takes before the command, and `timeout` is the only one here that has
  * one: its duration.
  *
- * A LETTER IN `flags` IS A CLAIM ABOUT A REAL PROGRAM, and getting one wrong is
- * the same defect one letter wide: a flag the program does NOT take a value for
- * swallows the command name, and the word behind it lands in a command position
- * the shell does not put one in. Review round 2 found two — `caffeinate -u`
- * declares the user active and carries no value (`-t` carries the timeout), and
- * `env -S`'s value IS the command line it splits, so there is no command after it
- * — and `sudo -h` and the GNU `time -o`/`-f` came out with them, the first
- * because plain `-h` is help and the second because `time` here is the shell's
- * keyword, which takes only `-p`. The letters are asked of `/bin/sh` rather than
- * of a remembered man page, in
- * test/a-wrapper-flag-the-program-takes-no-value-for-eats-the-command-name.test.mjs,
- * which reads the value-taking set off THIS table's own behaviour so a letter
- * added tomorrow arrives with a row of its own.
+ * A LETTER IN `flags` IS A CLAIM ABOUT A REAL PROGRAM, AND IT IS WRONG IN BOTH
+ * DIRECTIONS, which is why every letter here was asked of `/bin/sh` rather than
+ * of a remembered man page.
+ *
+ * A letter the program takes NO value for swallows the command name, and the word
+ * behind it lands in a command position the shell does not put one in: review
+ * round 2 measured `caffeinate -u` (it declares the user active; `-t` carries the
+ * timeout) and `env -S` (whose value IS the command line it splits, so no command
+ * stands after it) refusing a merge that was only PRINTED. `sudo -h` came out
+ * with them — plain `-h` is help, and `sudo -h host cmd` sudo refuses itself.
+ *
+ * A letter that is MISSING is the other direction and the expensive one: the run
+ * ends a word early, the gated program is read as the flag's value, and nothing
+ * reaches the gate at all. The re-record measured two, both with a stand-in `gh`
+ * that records whether it really ran:
+ *
+ *     command time -o F gh pr merge     /usr/bin/time ran it — the merge REALLY RAN
+ *     xargs -J R gh pr merge            xargs ran it — the merge REALLY RAN
+ *
+ * `command` is itself on this list, so the spelling that reaches `/usr/bin/time`
+ * rather than the shell's `time` keyword is one this declaration hands the user.
+ * Both are one letter. The residue of the `time` fork — bare `time -o f gh pr
+ * merge`, which the shell refuses outright — is classified as a merge and runs
+ * nothing, which is a message about a command that does nothing: the cheapest
+ * error available, and the direction GATE-RULES Rule 4 settles on. `-R` and `-S`
+ * are on xargs' own usage line as value-takers and are invalid on GNU xargs, so
+ * neither platform can read a command name through them.
+ *
+ * test/a-wrapper-flag-the-program-takes-no-value-for-eats-the-command-name.test.mjs
+ * sweeps the FIRST direction, reading the value-taking set off this table's own
+ * behaviour so a letter added tomorrow arrives with a row of its own. The second
+ * direction — a letter that is absent — is outside that sweep by construction and
+ * is swept by nothing: KD-113.
  *
  * **EVERY OTHER WORD ENDS THE RUN AND IS THE COMMAND.** That sentence is the
  * whole rule, and it is here because the version that guessed at it shipped both
@@ -160,9 +180,9 @@ const WRAPPER_ARITY = Object.freeze({
   nice: { flags: "n", operand: null },
   nohup: { flags: "", operand: null },
   sudo: { flags: "ugprtUC", operand: null },
-  time: { flags: "", operand: null },
+  time: { flags: "of", operand: null },
   timeout: { flags: "sk", operand: "\\d+(?:\\.\\d+)?[smhd]?" },
-  xargs: { flags: "nILPsEad", operand: null },
+  xargs: { flags: "nILPsEadJRS", operand: null },
 });
 
 /** The closed list itself, derived from the table so there is still exactly one source for it. */
