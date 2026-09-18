@@ -230,6 +230,13 @@ export function laneOf(paths, subjects) {
   const contracts = paths.filter((p, i) => kinds[i] === "contract");
   const adr = contracts.filter((p) => String(p).startsWith("docs/adr/"));
   const features = contracts.filter((p) => String(p).startsWith("docs/features/"));
+  // UNDER docs/adr/ AND NOT A CONTRACT — the empty form an ADR is written FROM,
+  // which `classifyPath` reads as prose because it carries no decision. The
+  // conclusion that follows is right, but the sentence that used to carry it
+  // ("no path under docs/adr/ … moved") is FALSE of a diff holding this file,
+  // and that sentence is the one a reader checks their own diff against. So
+  // where it is present it is NAMED, not denied.
+  const forms = paths.filter((p, i) => kinds[i] !== "contract" && String(p).startsWith("docs/adr/"));
 
   // 2 — an ADR is in the diff. §3's "Architecture change" row decides for us.
   if (adr.length) {
@@ -286,7 +293,7 @@ export function laneOf(paths, subjects) {
       headline: row ? `DIRECT — ${row}` : "DIRECT — §3's table names no row for this shape",
       why: [
         `Every commit declares a type that decides nothing: ${listTypes(counts)}.`,
-        "And no path under docs/adr/, docs/features/, or the eight documents NORTH-STAR §12 gives authority over, moved — so there is no blast radius into anything already signed.",
+        forms.length ? `And nothing already signed moved — ${forms.join(", ")} is under docs/adr/, but it is the empty form an ADR is written FROM and carries no decision to sign — so there is no blast radius.` : "And no path under docs/adr/, docs/features/, or the eight documents NORTH-STAR §12 gives authority over, moved — so there is no blast radius into anything already signed.",
         ...(row ? [] : ["§3's table names no row for this shape, so the lane comes from the blockquote above it: the two sentences above ARE its two clauses, both answered no."]),
       ],
       cite,
@@ -314,7 +321,12 @@ export function laneOf(paths, subjects) {
   // Rules 2 and 3 returned for every contract that is an ADR or a feature brief,
   // so a contract still here is one of §12's eight, and clause B below says so.
   if (contracts.length) reached.push(`${contracts.join(", ")} is in this diff — a document NORTH-STAR §12 gives authority over a rule`);
-  if (commits === 0) reached.push("no commits yet and the diff contains code, so there is no declared type to read — commit with a conventional type, or say the lane in the restatement");
+  // WHAT THE DIFF HOLDS IS COUNTED, NOT ASSERTED. This said "the diff contains
+  // code" on every shape that reached here, which was true only while rule 4
+  // routed the all-markdown governing-doc diffs away; deleting that rule dropped
+  // them in and the sentence went on claiming code over diffs with none. The
+  // tally is `classifyPath`'s three categories, counted over this diff's paths.
+  if (commits === 0) reached.push(`no commits yet, so there is no declared type to read, and the diff contains ${listTypes(tally(kinds))} — commit with a conventional type, or say the lane in the restatement`);
   else if (offTable.length) {
     const read = offTable.includes("feat") ? "a `feat` is §3's \"New feature\" row, which is the brief lane when it adds a new surface" : "not a type §3's table routes to the direct lane";
     reached.push(`${listTypes(tally(offTable.map((t) => t ?? "(no conventional type)")))} — ${read}`);
@@ -333,7 +345,7 @@ export function laneOf(paths, subjects) {
       }
     : {
         answer: "NO — and this half IS decidable",
-        detail: `nothing under docs/adr/, docs/features/, or docs/NORTH-STAR.md and the seven other documents §12 gives authority over, is in this diff (${contracts.length} such path(s)). Were it otherwise this would have routed BRIEF above (an ADR, a feature brief) or said NOT DECIDABLE here (a §12 document).`,
+        detail: `${forms.length ? `${forms.join(", ")} is under docs/adr/, but it is the empty form an ADR is written FROM and carries no decision to sign; nothing else here is signed either` : "nothing under docs/adr/, docs/features/, or docs/NORTH-STAR.md and the seven other documents §12 gives authority over, is in this diff"}. Were it otherwise this would have routed BRIEF above (an ADR, a feature brief) or said NOT DECIDABLE here (a §12 document).`,
       };
   return {
     ...base,
@@ -566,7 +578,13 @@ export function spendOf({ branch, plan, device, review, commits, dirty, historie
     const voided = state === "reopened";
     const excess = recorded === null ? 0 : recorded - owed;
     const lines = [...extra];
-    if (malformed) lines.push(`${malformed} history line(s) did not parse and are not counted — the sentence proof-plan.mjs --history prints about the same file, and the count above is of what was left.`);
+    // NO COMMAND IS CITED HERE, BECAUSE NONE REPORTS THIS. The pointer that
+    // stood here sent the reader to `proof-plan.mjs --history` for "the same
+    // file": that command reads plans, reviews and fleet — never
+    // qa-artifacts/suite-history.jsonl — and prints ONE malformed count summed
+    // over the three, so a reader checking a suite row's number against it is
+    // told 0. The file is named instead; the disclosure is the whole point.
+    if (malformed) lines.push(`${malformed} line(s) of ${history.file} did not parse and are not counted — the count above is of what was left.`);
     if (undated) lines.push(`${undated} row(s) on this branch carry no readable ranAt and are not counted either — "I could not tell" is not "not mine", and one expression was answering both.`);
     if (voided) lines.push(reopened);
     const verdict = verdictOf({ recorded, owed, reopened: voided, rounds });
