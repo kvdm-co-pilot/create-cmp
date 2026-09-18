@@ -580,3 +580,64 @@ the step and the time left from the lane's own `qa/.lane-in-progress` marker mea
 last full run — or says which of the two it could not find, never guessing.
 `test/a-lane-refusal-names-a-pid-and-not-a-project.test.mjs` holds it, with one test pointed at a
 REAL spawned lane process so the `lsof`/`/proc` read is not an unread instrument.
+
+### KD-89 — a partly-installed tree fails three tests, and two of them do not look like a missing install — **CLOSED 2026-09-18 by `scripts/suite-preflight.mjs`, wired as `pretest`**
+
+`package.json` (`workspaces`, `scripts.test`) · `scripts/suite-reporter.mjs`
+
+Measured 2026-09-18 in a fresh git worktree whose ROOT `node_modules` existed but whose
+`inspector/mcp/node_modules` did not. `npm test` reported three failures:
+
+```
+✖ inspector/mcp/test/bundle-freshness.test.mjs   ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'
+✖ inspector/mcp/test/server-tools.test.mjs
+✖ the console host delivers no profile console copy, so the Evidence tab links no step
+    to the section it governs        AssertionError: the host delivered stepGoverns={}
+```
+
+`npm ci` provisioning the workspace turned all three green, with the tree otherwise untouched.
+
+**The defect is not that an uninstalled tree fails — it is the SHAPE of two of the three failures.**
+`inspector/mcp` is a root workspace (`package.json`), so one root `npm ci` provisions it, and
+`.github/workflows/ci.yml` does exactly that deliberately ("ONE install, not two"). CI is therefore
+never in this state and no adopter ever is. A contributor in a worktree can be, and what they are
+shown is one honest module error and **one semantic assertion about console copy and `stepGoverns`**
+— a message that reads as a real product defect in code they may have just touched. The cost is a
+wrong diagnosis, not a wrong verdict, which is why it is here and not on the first row: nobody is
+served anything false by the shipped product, and the failure is loud rather than silent.
+
+It is recorded because it was expensive to disbelieve. The honest way to clear it was to run the
+three files on a clean `origin/main` FIRST and watch them fail there too — which proves "not mine"
+but still misattributes the cause to the repo. Only chasing `ERR_MODULE_NOT_FOUND` to an absent
+workspace directory got the real answer.
+
+**What the fix would be, when it is taken:** a preflight in the suite reporter that checks each
+declared workspace has a `node_modules` before the run and says *"workspaces are not installed — run
+`npm ci` at the repository root"* instead of letting the assertions speak. That is a change to how
+the suite bootstraps, which is a slice with its own failure modes (a preflight that itself goes
+wrong makes every run unrunnable), not a line in this one.
+
+**Closed by a door rather than a message, and the paragraph above got two things wrong.** `npm test`
+now runs `scripts/suite-preflight.mjs` as `pretest`: it refuses the run by name — which package,
+which dependencies, `npm ci` — and `node --test` never starts.
+
+The first correction is the PREDICATE. "Each declared workspace has a `node_modules`" is false for
+**10 of this repo's 12 declared packages** after a clean `npm ci`, because their dependencies hoist
+to the root; that check refuses a correct tree. Two resolver spellings fail the other way and were
+measured too: `import.meta.resolve(spec, parent)` ignores its second argument without
+`--experimental-import-meta-resolve` (it reported `esbuild`, `zod` and `@modelcontextprotocol/sdk`
+missing while installed), and `require.resolve("@modelcontextprotocol/sdk")` throws
+`MODULE_NOT_FOUND` from `inspector/mcp` where it IS installed, because that package has only subpath
+exports. What holds is the resolver's own directory walk and nothing above it.
+
+The second is the PLACE. A preflight *in the reporter* can annotate a run; it cannot stop one, and a
+skip is worse than the failure it replaces here: `recordRun` computes its verdict from `counts.fail`
+and `counts.cancelled`, so `counts.skipped` never reaches it and an uninstalled tree would have
+recorded **PASS**. A skip must also name its victims, and the third of the three never reproduced
+from the absent workspace alone — logged as KD-109, along with the `catch {}` in `applyConsoleCopy`
+that can turn any load error into that same assertion. The risk this entry named — a preflight that
+itself goes wrong making every run unrunnable — is answered by construction: the door fails OPEN on
+anything it cannot read, and imports only `node:` builtins so it can load on the tree it describes.
+`test/an-uninstalled-tree-fails-as-if-the-contributor-broke-it.test.mjs` holds all of it, including
+a fixture that proves npm's `pretest` really does abort the run before the test script leaves a
+marker.

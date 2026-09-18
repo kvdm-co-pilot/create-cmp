@@ -8,6 +8,47 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **A tree whose packages are not installed told a contributor their change broke three tests.**
+  Measured 2026-09-18 in a fresh git worktree with `inspector/mcp`'s packages absent: `npm test`
+  reported three failures and only ONE of them looked like a missing install. Two were
+  `ERR_MODULE_NOT_FOUND`, which a reader can follow; the third was an `AssertionError` about the
+  Evidence tab not linking a step to the section it governs — a claim about PRODUCT BEHAVIOUR,
+  arriving as the first thing someone sees about code they may have just touched. Nobody is wrongly
+  served by the shipped product (one root `npm ci` provisions every package and CI does exactly
+  that), so the cost is a wrong DIAGNOSIS, paid by the first outside person to clone this
+  repository. `npm test` now runs `scripts/suite-preflight.mjs` as `pretest`: it walks each
+  declared package's dependencies the way Node's resolver does and **refuses the run by name** —
+  which package, which dependencies, and `npm ci` — before the runner starts.
+
+- **That door refuses rather than skips, for a reason measured in this repo's own reporter.** A
+  skip that names its reason is usually the kinder outcome and is the wrong instrument here:
+  `recordRun` (`scripts/suite-reporter.mjs`) computes its verdict from `counts.fail` and
+  `counts.cancelled`, and `counts.skipped` is recorded without ever reaching it. Skipping the
+  affected tests would have made an uninstalled tree report **PASS**, with a suite record and a
+  history row saying so — a green verdict over tests that never ran, which is worse than a red one
+  that misattributes its cause. A skip must also ENUMERATE its victims, and one of the three never
+  reproduced from the absent workspace alone (KD-109); a door does not need to know who would have
+  been hurt, which is why it fits what is actually known.
+
+- **Every cheaper predicate calls an installed package missing, and each was measured rather than
+  reasoned.** "Every declared workspace has a `node_modules`" — the shape KD-89 itself proposed —
+  is false for 10 of this repo's 12 declared packages after a clean `npm ci`, because their
+  dependencies hoist to the root. `import.meta.resolve(spec, parent)` ignores its second argument
+  without `--experimental-import-meta-resolve`, so it answers about the wrong directory: it
+  reported `esbuild`, `zod` and `@modelcontextprotocol/sdk` all missing while installed. And
+  `require.resolve("@modelcontextprotocol/sdk")` throws `MODULE_NOT_FOUND` from `inspector/mcp`
+  where it IS installed, because the package has only subpath exports. Any of the three, used as a
+  skip condition, would have hidden real failures in packages it wrongly called uninstalled — the
+  exact risk this change exists to design against. The walk is the resolver's own directory lookup
+  and nothing above it, so it cannot disagree with what an import would do.
+
+- **The preflight fails OPEN, and imports only `node:` builtins.** KD-89 named the first risk in
+  the same breath as the fix — "a preflight that itself goes wrong makes every run unrunnable" — so
+  anything it cannot read or does not understand prints a note and exits 0, leaving the suite to do
+  exactly what it did before the file existed; a test pins that a tree whose workspace globs it
+  cannot parse still runs. The second is quieter: a preflight that needed what it checks for could
+  not load on the tree it exists to describe, so a second test pins its import graph.
+
 - **Three hooks in every stamped app resolved their scripts against the wrong directory, and two of
   them failed without a sound.** `template/.claude/settings.json` invoked `Stop`
   (`node qa/receipt-check.mjs --hook`), `UserPromptSubmit` and `statusLine` (both
