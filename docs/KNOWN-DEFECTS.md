@@ -156,6 +156,10 @@ you the same list without opening anything.
 | **KD-89** | SessionStart still prints the tree the hook was LOADED from as "this tree" | a context line, not a gate — every PreToolUse verdict now judges the tree the command acts on |
 | **KD-90** | the judged worktree's own `proof-plan.mjs` decides, whatever commit or state it is in | both ways it can differ fail safe: that tree's own answer, or a refusal |
 | **KD-91** | an npm flag whose value the gate does not know is read as a folder operand, and the refusal names it | the direction is a refusal, and the seven flags a publish here actually uses are known |
+| **KD-92** | a directory git answered 128 ABOUT is read as "another repository" and gated in SILENCE | the two producers are `cd <tree>/.git` and a repo git refuses to open; neither is typed here |
+| **KD-93** | the tree probe's purse bounds its git calls, not the three filesystem calls in front of them | same unmeasurable shape as KD-66 — no portable way to plant a wedged mount |
+| **KD-94** | `npm publish .` is refused as publishing something "rather than the directory it runs in" | `.` IS that directory; only the sentence is wrong, and no publish here writes one |
+| **KD-95** | the judged tree is checked for one of the two files the gate imports out of it — `observed-tree.mjs` is not | the direction is a refusal; only its words are a module resolver's instead of the gate's |
 
 ---
 
@@ -1645,6 +1649,75 @@ publish [--access public]` (`docs/PUBLISHING.md`, the npm-publish skill), and `-
 list. What is wrong is only the sentence, and only in a refusal that is otherwise correct to make.
 **Fires when:** a publish uses a space-separated value for a flag outside those seven.
 *Logged 2026-09-18, in the slice that added the reader (KD-79).*
+
+### KD-92 — a directory git answered 128 ABOUT is read as another repository, and gated in silence
+
+`scripts/hooks/proof-gate.mjs` (`worktreeAt`)
+
+`worktreeAt` asks `answered` first, as slice 5 requires, and then reads `!r.ok` as *this directory
+is not in a worktree of this repository* — which routes to `{ foreign }`, and foreign is SILENCE.
+But `rev-parse --show-toplevel --git-common-dir` exits 128 for more than one reason, and the exit
+code is the only thing read. Measured 2026-09-18, same git (2.50.1), same 128, two different facts:
+
+    a plain non-repo directory   fatal: not a git repository (or any of the parent directories)
+    a worktree's .git directory  fatal: this operation must be run in a work tree
+
+The second is a directory inside a tree this gate is supposed to judge, and it is gated in silence
+— the allow that leaves no message. `dubious ownership` and an unopenable object store land the
+same way. Distinguishing them means reading git's stderr, which `gitAt` deliberately routes to
+`ignore`, or asking a second question; both are more than this is worth today. **Fires when:** a
+gated command runs in `<worktree>/.git`, or in a worktree git declines to open. No producer here:
+nothing merges or publishes from inside `.git`, and this is a single-user machine.
+*Logged 2026-09-18, review round 1 of the slice that added the reader (KD-79).*
+
+### KD-93 — the tree probe's purse bounds its git calls, not the filesystem calls in front of them
+
+`scripts/hooks/proof-gate.mjs` (`judgedTree`, `realpath`)
+
+`TREE_PROBE_TOTAL_MS` is a deadline for `gitAt`, and it is now a term of the arithmetic invariant
+the hook's budget test reads off the wiring. It does not cover the `statSync` that checks the
+directory is there, the `existsSync` that checks the worktree carries a `scripts/proof-plan.mjs`,
+or the two `realpathSync` calls in `realpath` — all four run in the new path, all four are
+unbounded, and they run FIRST, inside a 10s PreToolUse timeout where a decision delivered late is
+a permitted command. This is KD-66's shape in a new path: node offers no bounded synchronous stat,
+and there is no portable way to plant a wedged mount to measure it. **Fires when:** a gated command
+names a directory on an unresponsive filesystem. *Logged 2026-09-18, review round 1 of the slice
+that added the probe (KD-79).*
+
+### KD-94 — `npm publish .` is refused for publishing something other than the directory it runs in
+
+`scripts/hooks/proof-gate.mjs` (`commandCwd`, the publish operand loop)
+
+Any bare token after `publish` is read as a folder-or-tarball operand and refused with *it
+publishes "X" rather than the directory it runs in, and this gate reads only directories*. For `.`,
+`./` and `$PWD`-free spellings of the current directory that sentence contradicts itself: `.` **is**
+the directory it runs in, and it is a directory this reader could resolve. KD-91 is the same
+refusal reached through a flag's value; this is the operand that needs no flag. The direction is a
+refusal, never an allow, and no publish in this repo writes one — `docs/PUBLISHING.md` and the
+npm-publish skill are `cd <package> && npm publish [--access public]` throughout. **Fires when:**
+someone types `npm publish .`. *Logged 2026-09-18, review round 1 of the slice that added the
+reader (KD-79).*
+
+### KD-95 — the judged tree is checked for one of the two files the gate imports out of it
+
+`scripts/hooks/proof-gate.mjs` (`judgedTree`, `releaseContext`)
+
+`judgedTree` ends by checking `scripts/proof-plan.mjs` is there, and says exactly why: *importing a
+file that is not there would come back as "could not answer" with a module resolver's words rather
+than this gate's*. The publish path then imports a SECOND file out of that same tree —
+`releaseContext(root)` takes `deviceTreeHash` from `<root>/scripts/observed-tree.mjs` — and nothing
+checks for it. Measured 2026-09-18 by calling it against a directory that has neither:
+
+    ERR_MODULE_NOT_FOUND | Cannot find module '<root>/scripts/observed-tree.mjs'
+    imported from .../scripts/hooks/proof-gate.mjs
+
+which `main`'s catch turns into `proof gate could not answer for "publish": <that> — refusing rather
+than allowing`. So the DIRECTION is right and nothing is allowed; what is wrong is that the
+guarantee the check exists to give covers one import and not the other. **Fires when:** a publish
+runs in a worktree of this repository carrying `scripts/proof-plan.mjs` and no
+`scripts/observed-tree.mjs` — a checkout from before that file existed. No producer today: the two
+files have shipped together since the tier was written. *Logged 2026-09-18, review round 1 of the
+slice that added the reader (KD-79).*
 
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is

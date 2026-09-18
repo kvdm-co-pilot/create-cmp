@@ -378,22 +378,37 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   in one place and every refusal names which form it wanted:
   1. the `cwd` in the hook payload — or, when there is none, the hook process's own, which is the
      directory the wiring's `:-.` already resolves this file against;
-  2. a `cd` at a command position before the invocation, written literally, not inside a subshell
-     that has already closed — chained `cd a && cd b` compose, and a subdirectory resolves to the
-     worktree that holds it, so `cd packages/harness && npm publish` reads the tree it is in;
+  2. a `cd` **the shell would actually perform**: a real command in the outer shell, written
+     literally, not backgrounded with `&`, and not inside a subshell that has already closed.
+     Chained `cd a && cd b` compose, and a subdirectory resolves to the worktree that holds it, so
+     `cd packages/harness && npm publish` reads the tree it is in;
   3. the path in `node <somewhere>/scripts/fleet-check.mjs`, which names the tree a run will prove
      whatever directory it was typed in;
   4. nothing else.
 
-  Everything outside that set REFUSES and says why: `pushd`, a `cd` whose destination is a
-  variable, a subshell, a glob, `~` or a path with a space in it, a directory that is not there,
-  `gh --repo`/`-R`/`GH_REPO` naming a repository out of band, `npm publish --prefix`/`-C`/`-w` or a
-  folder or tarball operand, and any git question about the directory that git did not answer. A
-  false refusal costs a minute and a message that says what to type; a false allow certifies
-  something untrue, which is the one thing this product exists to prevent. A tree that is not a
-  worktree of this repository is the one case that gets SILENCE rather than either — this gate has
-  no obligation of its own to state about another repository, and refusing there would block real
-  work for a reason that is not true (KD-64 is that mistake made the other way round).
+  **"A `cd` the shell would perform" is the load-bearing phrase, and it is measured, not asserted.**
+  A `cd` inside `echo "…"`, inside a heredoc, inside `$( )`, or inside a nested `sh -c '…'` is not
+  one — the shell never performs it, or performs it in a process whose directory dies with it — and
+  a `cd` inside `if`/`for`/`{ }` IS one, brace groups especially, since they are not subshells and
+  have no paren to count. A regex over raw text sees none of that. So everything that is not a
+  command is blanked first — quoted spans, substitutions — and only then are the remaining parens
+  counted, which is the one point at which counting them is sound. `/bin/sh` is the oracle:
+  `test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs` replaces the gated command with
+  `pwd -P`, runs 24 shapes through a real shell, and holds the invariant that the gate resolves the
+  directory the shell would run the command in **or resolves nothing at all**. Ten of those shapes
+  disagreed when that harness was written, in both directions, and both directions end in a false
+  ALLOW.
+
+  Everything outside the set REFUSES and says why: `pushd`; a `cd` whose destination is a variable,
+  a glob, `~` or a path with a space in it; a heredoc, a backquote, an unclosed quotation, a
+  compound command or a sourced script, or a `)` whose opener this reader never saw; a directory
+  that is not there; `gh --repo`/`-R`/`GH_REPO` naming a repository out of band; `npm publish
+  --prefix`/`-C`/`-w` or a folder or tarball operand; and any git question about the directory that
+  git did not answer. A false refusal costs a minute and a message that says what to type; a false
+  allow certifies something untrue, which is the one thing this product exists to prevent. A tree
+  that is not a worktree of this repository is the one case that gets SILENCE rather than either —
+  this gate has no obligation of its own to state about another repository, and refusing there would
+  block real work for a reason that is not true (KD-64 is that mistake made the other way round).
 - **And ORDERED: a device run proves a tree the merge has to keep.** The same hook refuses an
   invocation of `fleet-check.mjs` on a branch that does not contain `origin/main`. The merge brings
   trunk in and the bytes move — the tier REOPENS for any of them that is a device trigger path, and
