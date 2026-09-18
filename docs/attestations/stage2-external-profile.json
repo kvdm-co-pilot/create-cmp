@@ -1,19 +1,19 @@
 {
   "schema": "prooflane-attestation/1",
   "claim": "stage2-external-profile",
-  "date": "",
+  "date": "2026-09-18",
   "attestedBy": {
-    "name": "",
-    "role": ""
+    "name": "Karel van der Merwe",
+    "role": "author and maintainer"
   },
   "profile": {
     "id": "fuelled-api"
   },
   "authoredBy": {
-    "organisation": "",
+    "organisation": "kvdm-co-pilot",
     "team": "",
-    "contact": "",
-    "relationship": ""
+    "contact": "karelvdmmisc@gmail.com",
+    "relationship": "The profile was authored in the fuelled-api repository by the same person who maintains create-cmp, and all three commits that wrote it (b54e673, 76e725d, b47f4fd) carry Co-Authored-By: Claude Opus 5. This is therefore a real first adoption and a weak independence claim: the author and the attester are the same person, and an agent participated in the authoring. The fuelled-api repository has no git remote, so a reader cannot currently reach the artifact to check it. A reader should judge the distance accordingly."
   },
   "artifact": {
     "kind": "path",
