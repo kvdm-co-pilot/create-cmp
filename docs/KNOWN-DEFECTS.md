@@ -108,7 +108,6 @@ you the same list without opening anything.
 | **KD-32** | the plant driver spells cmp's source root and pack id as literals | both fail loud, and there is one pack |
 | **KD-37** | two fleet ids naming one directory are counted as two repos upgraded | the second pass is idempotent; both were named |
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
-| **KD-40** | `--minimal` strips the lane and leaves `qa/harness.lock.json` describing it | the lock is invisible to the stripper: not `.mjs`, not a declaration |
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 | **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
 | **KD-45** | no gate in this repo executes the template's Firebase or iOS paths | the device tier stamps `--no-ios --no-firebase`; shape is scanned, runtime is not |
@@ -185,6 +184,8 @@ you the same list without opening anything.
 | **KD-130** | `reviewDischarge` copies six named fields of a review record into `plan.reviewDischarged`, and `round`/`kind` are not among them — so the settled-plan history `--history` reads can say a review discharged the slice and never which round did | no reader consumes a round from there: the block that prices rounds reads `review-history.jsonl`, where both fields ARE written. The honest remedy edits the plan-event schema and its summariser, which is the file KD-124 already names |
 | **KD-131** | the same bytes ran FAIL and then PASS ninety seconds apart: `inspector/mcp/test/preview-service.test.mjs`'s *"a stale state with NOTHING pending says so"* failed inside a full `npm test` and passed alone (83/83) and on an immediate re-run, and `qa-artifacts/suite-history.jsonl` holds both verdicts against the SAME `observedHash` | no adopter runs this repository's inspector tests, and nothing in the failing path is imported by the slice that saw it. It is the same family as KD-56, which already owns the inspector's load-sensitive tests; what is new here is the measurement, and the FAIL record this branch leaves on disk |
 | **KD-134** | `scripts/ground-truth.mjs` reports the version spine as three names — `cli`, `plugin`, `marketplace` — while a bump must move FOUR surfaces: `package-lock.json` records the root version twice and is not among them | the suite refuses the drift by name (`test/workspace-lock-sync.test.mjs`) with the remedy printed, so nobody is wrongly served. What is logged is that the deriver `CLAUDE.md` names as the thing to ask INSTEAD of a document is silent about a surface that must move in lockstep — and it caught out this slice's own author, at the second amendment |
+| **KD-160** | every create-cmp tree commits `qa/harness.lock.json`, whose `files` map holds one sha256 per locked path — 73 digests in a full stamp, 7 in a `--minimal` one — and a secret scanner reads a 64-char hex string as a credential | measured after an adopter's gitleaks flagged one as `generic-api-key` and reddened their CI on a file they did not author. The digests are load-bearing (the lock is what says whether the machine-owned region was edited) so they cannot simply go; the remedies are an allowlist shipped with the template or documenting the shape, and both are product decisions rather than lines |
+| **KD-161** | the round block prices round 2 from whether the DELTA is empty, and a round 1 that logs its findings writes to `docs/KNOWN-DEFECTS.md` — so the delta is almost never empty and the one NOT-OWED case is almost never reachable | measured on its own first use: round 1 of the slice that added it found nothing blocking, made NO fixes, wrote two log entries, and the block priced round 2 OWED. The header's rule is about round 1's FIXES, not about any delta. Advisory only — a human read it, disagreed, and took the header's answer |
 
 ---
 
@@ -515,40 +516,6 @@ segment after `node_modules` to be the package itself (`prooflane-harness`, or `
 name) rather than any ancestor. **Fires when:** someone vendors this repo inside a dependency, or
 a future installer nests package roots differently. *Logged 2026-09-15, review round 2
 (re-record) of `fleet-upgrade`.*
-
-### KD-40 — a minimal scaffold keeps the lock for a lane it just deleted
-
-`src/lib/minimal.mjs` (`subtractLane`), `packages/harness/src/lib/harness-region.mjs` (`isHarnessFile`)
-
-`subtractLane` deletes every machine-owned lane file outside the keep-set, walking
-`listHarnessFiles`, which yields only what `isHarnessFile` accepts: the two DECLARATIONS, the one
-GENERATED record, and otherwise `.mjs` alone. `qa/harness.lock.json` is none of those, so the
-stripper never sees it. Executed:
-
-```
-qa/harness.lock.json     NOT a harness file — --minimal never sees it
-qa/harness-source.json   IS a harness file (strippable)
-qa/harness-manifest.json IS a harness file (strippable)
-qa/verify.mjs            IS a harness file (strippable)
-```
-
-So a minimal scaffold keeps a lock whose `files` map names a hundred-odd paths that no longer exist
-and whose `fileCount` is wrong — a record that describes a lane the same command removed.
-
-**Reported from outside, with its cost measured.** The `payment-blueprint` session hit this: a
-`--minimal` re-scaffold stripped 66 lane files and left the lock, and `gitleaks` then flagged a
-SHA-256 content digest inside it as a `generic-api-key`. Its lane went red on an orphan written by
-nothing and read by nothing. That is the honest shape of the harm — not that the lock is wrong (no
-reader is left to be misled) but that it is an unexplained file full of high-entropy strings sitting
-in an adopter's repo, and a secret scanner is exactly the thing that will find it.
-
-**Not fixed here**, and the fix is a decision rather than a line: either the stripper learns about
-the lock (and `isHarnessFile`'s `.mjs`-or-declaration rule grows a third case), or `--minimal`
-stops being a lane-subtraction and becomes a lane-less install. The second is probably right and is
-a slice, not an edit.
-
-**Fires when:** anyone runs `create-cmp … --minimal` over a tree that has a lane. *Logged
-2026-09-15, reported by the payment-blueprint session and verified here by execution.*
 
 ### KD-43 — the guard that says the suite is complete is collected by the suite
 
@@ -2538,41 +2505,34 @@ Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so 
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
 taken, with the commit that did it.
 
-## Closed
+### KD-160 — the lane lock commits one sha256 per file, and a secret scanner cannot tell that from a credential
 
-### KD-78 — the npm pages for two aliases said "8 gates" — **CLOSED 2026-09-18**
+`packages/harness/src/lib/harness-lock.mjs` · `qa/harness.lock.json` in every stamped tree
 
-`packages/aliases/create-kmp/package.json:4`, `packages/aliases/create-compose-multiplatform/package.json:4`
+The lock's `files` map carries a sha256 per locked path so the harness can say whether the
+machine-owned region was edited. Measured on real stamps: **a full tree's lock holds 73 digests, a
+`--minimal` tree's holds 7.** A 64-character hex string is exactly what a generic secret rule looks
+for, and an adopter's gitleaks flagged one as `generic-api-key` and turned their CI red on a file
+nothing in their repo authored.
 
-Both descriptions read *"a machine-enforced verify lane (8 gates, evidence receipts)"*. The lane
-that holds an AI-driven change is `local` (17) or `ci` (18); the only profile that runs 8 is
-`smoke`, whose receipt `qa/receipt-check.mjs` refuses as done-evidence. **In the tree this is
-fixed** — the bare number is gone, and
-`test/a-published-npm-description-states-a-lane-size-that-names-no-profile.test.mjs` refuses the
-next one. What is NOT fixed, and cannot be from here, is what npmjs.com serves: a registry
-description is a property of *published bytes*, and it changes only when someone publishes. Until
-`create-kmp@0.1.6` and `create-compose-multiplatform@0.1.6` are published, the pages a stranger
-reads before installing still carry the false number, at the versions already live (`0.1.4`).
+**Surfaced by KD-40, which attributed it to the wrong cause.** That entry blamed `--minimal` for
+leaving the lock behind; `--minimal` in fact *reduces* the digest count from 73 to 7, and every
+create-cmp tree carries them. The harm is real and it belongs to the lock itself.
 
-This is logged rather than blocked because there is no act available in this repository that would
-close it — not because nobody is wrongly served. Somebody is, on two npm pages, right now. The
-remedy is an outward-facing human act (`docs/PUBLISHING.md`), and standing one up unasked is the
-thing this project does not do on its own.
+**The scanner was the adopter's own.** This repository ships no gitleaks configuration —
+`gitleaks` appears only as a lane step name (`packages/harness/src/lib/profiles/cmp/ladder.mjs:16`)
+— so nothing here fired, and nothing here can fix their config either.
 
-**Fires until:** both aliases are published at the versions this tree holds.
-*Logged 2026-09-18, review round 1 of the count-gate slice; the tree-side half was fixed in the
-same round.*
+**Why logged and not fixed.** The digests are load-bearing: remove them and the lock stops being
+able to answer the one question it exists for. The candidate remedies — ship an allowlist fragment
+with the template, or document the shape so an adopter can allow it once — are product decisions
+about what create-cmp puts in someone else's repository, and that is not a call to take inside the
+slice that found it. What is NOT in doubt is that it fires: it already did, once, outside.
 
-**CLOSED by publishing, which is the only act that could close it.** `create-kmp@0.1.6`,
-`create-compose-multiplatform@0.1.6` and `create-mobile@0.1.2` are live; the registry's `latest`
-tag serves all three, and none of their descriptions contains the bare number. Verified against
-`https://registry.npmjs.org/<name>` directly rather than through `npm view`, because npm's local
-packument cache served the OLD versions for several minutes after the publishes succeeded — long
-enough that `npx <alias>@latest` failed `ETARGET` against a registry that already had the bytes.
-A cache reading stale is the `served-page-is-not-your-code` shape, one registry over.
+*Logged 2026-09-19, while closing KD-40 as not reproducible. The measurement is the useful part of
+an entry whose central claim was false.*
 
-The release proof this publish required (`scripts/hooks/proof-gate.mjs` refuses `npm publish`
-without it): fleet check PASS at rung L2 on `06c5aa1`, clean trunk, `treeWasDirty: false`.
+### KD-161 — the round block asks whether the delta is empty, where the rule asks whether there were FIXES
 
 *Closed 2026-09-18 by the publish itself. The entry is kept whole above because its reasoning —
 that a registry description is a property of published bytes and no commit here can change one —
@@ -2603,3 +2563,37 @@ reader who trusts it exactly as `CLAUDE.md` instructs is handed an incomplete an
 from a test. That is the drift `ground-truth.mjs` was written to abolish, in the deriver itself.
 
 *Logged 2026-09-19, review round 1 of the packaging slice — by the reviewer, about the author.*
+`scripts/change-price.mjs` (`nextRound`) · the rule is `docs/KNOWN-DEFECTS.md`'s header
+
+The header conditions round 2 on one thing: **round 1's fixes were more than trivial.** The block
+approximates that with "is the delta since round 1's record empty", and the two come apart in the
+case that happens almost every time.
+
+**Measured on the block's own first use.** Round 1 of the slice that added it (PR #163) found
+nothing blocking, landed no failing test and **made no fixes at all** — and then did what this
+file's header instructs every reviewer to do, which is log what it found. Two entries later the
+delta was non-empty, and the block priced round 2 **OWED**. By the rule it was not owed: there were
+no fixes to be trivial or otherwise.
+
+**Why this is close to the whole population.** A round that finds nothing and logs nothing is rare;
+a round that finds something and logs it is the normal case, and logging writes to this file. So
+the delta is non-empty after almost every round 1, and the single NOT-OWED case the block can reach
+is nearly unreachable in practice. The author of the slice predicted the same shape from the other
+side — that until `--round` is populated everywhere, unknown resolves to OWED — and named the risk
+as the "fleet L2 REQUIRED" wallpaper that `scripts/proof-plan.mjs`'s own header was born from.
+
+**Why logged and not fixed, and why nobody is wrongly served.** It is an advisory: it refuses
+nothing, exits 0, and in the measured case a human read it, disagreed with it and took the header's
+answer, which is exactly the authority the block claims for itself (*"this cannot know whether the
+fixes from round 1 were more than trivial, because nothing records it, and it does not guess"*).
+Its error is in the expensive direction — it over-prices, never under-prices — which is the
+direction this product chooses everywhere else.
+
+**What would actually fix it, for whoever takes it.** Not a triviality rule: that was tried and
+falsified before the slice was built (`adc947c` — a round-1 fix touching only review-irrelevant
+paths, whose round 2 found a blocking defect). The honest lever is to separate the reviewer's own
+log entries from the author's fixes in the delta, which needs the record to say which commits
+answered the round — a fact nothing captures today, and the same shape as the `round`/`kind` gap
+this slice just closed one level up.
+
+*Logged 2026-09-19, from the first real use of the program it is about.*
