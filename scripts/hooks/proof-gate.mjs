@@ -78,28 +78,30 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A word inside a wrapper run NEVER CROSSES A CHARACTER THAT ENDS A COMMAND,
- * and that clause is load-bearing rather than tidy. Written as `\S*`, a word in
- * the run swallows the `;` that closes its own command and the match then begins
- * at the start of the line instead of at that separator — which shrinks the
- * prefix `commandCwd` reads to nothing and drops the `cd` or the sourced script
- * standing in front of it. Measured while this declaration was being unified:
- * fifteen shapes of
+ * A word inside a wrapper run never crosses a character that ends a command, and
+ * the gaps inside the run are HORIZONTAL whitespace — a newline ends a command as
+ * surely as a `;` does. Both are true of the shell's own grammar, which is why
+ * they are written; NEITHER IS PINNED BY A TEST TODAY, and saying so is the point
+ * of this paragraph.
+ *
+ * They were load-bearing against the first cut of this declaration, which let a
+ * wrapper carry bare operands: written `\S*`, an operand swallowed the `;` that
+ * closed its own command, the match then began at the start of the line instead
+ * of at that separator, and the prefix `commandCwd` is handed shrank to nothing.
+ * Fifteen shapes of
  * test/a-construct-this-reader-cannot-follow-is-refused-wherever-it-stands.test.mjs
- * went from refused to READ, including `time . /x/s.sh; gh pr merge` — the exact
- * six-shape class KD-79's fix had just closed. The assignment and redirection
- * alternatives below are still `\S*` and this clause is NOT true of them; that
- * asymmetry is KD-110, logged with the sweep that looked for a consequence and
- * could not produce one.
+ * went from refused to READ, `time . /x/s.sh; gh pr merge` among them — the
+ * six-shape class KD-105's fix had just closed. Review round 1 removed the bare
+ * operand run (a wrapper now carries only what its own table entry declares), and
+ * with it gone, a mutation run relaxing either of these to `\S` and `\s+` leaves
+ * every test in this tree green. They are kept because they are right about the
+ * shell, not because anything currently measures them; that is KD-111.
+ *
+ * The assignment and redirection alternatives below are `\S*` and the first
+ * clause is NOT true of them — KD-110, logged with the sweep that went looking
+ * for a consequence and could not produce one.
  */
 const IN_WORD = "[^\\s;&|()<>]";
-
-/**
- * And the gaps inside a prefix are HORIZONTAL whitespace, for the same reason: a
- * newline ends a command as surely as a `;` does, so a run that crossed one
- * would read `eval cd /x` on its own line as the wrapper of the merge on the
- * next. Measured in the same sweep, as the last shape standing.
- */
 const GAP = "[^\\S\\n]+";
 
 /**
@@ -157,11 +159,15 @@ const WRAPPER = `(?:${[...COMMAND_WRAPPERS].sort((a, b) => b.length - a.length).
 /**
  * A flag's value: one word that is not a flag, not an assignment and not a
  * wrapper — so it can be read exactly one way. The assignment exclusion is not
- * taste: without it `env -u A=1` parses both as a flag value and as the
- * assignment alternative, every such pair doubles the number of parses, and a
- * 428-character command took the hook past the 10s `PreToolUse` budget it
- * declares — past which the verdict is never delivered, which is an allow
- * (test/the-command-position-reader-can-spend-the-whole-gate-budget-on-one-command.test.mjs).
+ * taste, and unlike the two clauses above it is measured: without it
+ * `sudo -u A=1` is readable both as the value of `-u` and as an iteration of the
+ * assignment alternative, every such pair doubles the parses the engine walks,
+ * and 20 of them hang a reader that answers in microseconds with the exclusion
+ * in place. The hook has a 10s `PreToolUse` budget and a verdict it does not
+ * deliver inside it is an allow, so this is a fail-open whose trigger is the
+ * length of the command being judged
+ * (test/the-command-position-reader-can-spend-the-whole-gate-budget-on-one-command.test.mjs,
+ * which carries one row per overlapping token shape).
  */
 const VALUE = `(?!${WRAPPER}(?=\\s|$))(?![A-Za-z_][A-Za-z0-9_]*=)[^-\\s;&|()<>]${IN_WORD}*`;
 

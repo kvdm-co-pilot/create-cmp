@@ -43,12 +43,21 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const HOOK = path.join(ROOT, "scripts", "hooks", "proof-gate.mjs");
 
 /**
- * The pair that overlaps: a wrapper word the list accepts, then an assignment
- * the same list accepts twice over — once as that wrapper's operand, once as an
- * iteration of its own. Nothing here is exotic; `env NODE_ENV=x` is the shape
- * the declaration exists to read.
+ * The pairs that overlap: a wrapper word the list accepts, then a token the same
+ * list can read TWICE OVER — and a token with two readings doubles the parses the
+ * engine walks before it can fail, once per pair. Nothing here is exotic; both are
+ * shapes the declaration exists to read.
+ *
+ * The first is the one this file was written for. The second is the one that was
+ * still live after it was fixed: an assignment-shaped FLAG VALUE (`sudo -u A=1`)
+ * is readable as the value of `-u` and as an iteration of the assignment
+ * alternative, and a mutation run found it by relaxing the exclusion that stops
+ * it and watching every test stay green. A table, so the next overlap is a row.
  */
-const pairs = (n) => "env NODE_ENV=x ".repeat(n);
+const SHAPES = {
+  "an assignment behind a wrapper": (n) => "env NODE_ENV=x ".repeat(n),
+  "an assignment-shaped flag value": (n) => "sudo -u A=1 ".repeat(n),
+};
 const MERGE = "gh pr merge 1 --rebase --delete-branch";
 
 /** The budget this hook's own wiring gives it, in ms — read from the wiring, never spelled here. */
@@ -75,18 +84,24 @@ test("classifying a command costs what its LENGTH costs — doubling the prefix 
   // leaves the ratio alone, so this asserts the SHAPE of the growth and never a
   // millisecond. A reader that is linear in the command's length answers with a
   // ratio near 2 for twice the length; 10 is a ceiling nothing linear approaches.
-  const short = `${pairs(10)}${MERGE}`;
-  const long = `${pairs(20)}${MERGE}`;
-  const tShort = costMs(short);
-  const tLong = costMs(long);
-  const ratio = tLong / Math.max(tShort, 0.01);
-  assert.ok(
-    ratio < 10,
-    `doubling a ${short.length}-character command to ${long.length} multiplied the classifier's work by ${ratio.toFixed(0)}x (${tShort.toFixed(2)}ms -> ${tLong.toFixed(2)}ms).\n\n` +
+  const grew = [];
+  for (const [how, pairs] of Object.entries(SHAPES)) {
+    const short = `${pairs(10)}${MERGE}`;
+    const long = `${pairs(20)}${MERGE}`;
+    const tShort = costMs(short);
+    const tLong = costMs(long);
+    const ratio = tLong / Math.max(tShort, 0.01);
+    if (ratio >= 10) grew.push(`${how}\n    doubling a ${short.length}-character command to ${long.length} multiplied the classifier's work by ${ratio.toFixed(0)}x (${tShort.toFixed(2)}ms -> ${tLong.toFixed(2)}ms)`);
+  }
+  assert.deepEqual(
+    grew,
+    [],
+    `${grew.length} of ${Object.keys(SHAPES).length} shapes cost more than their length.\n\n${grew.join("\n\n")}\n\n` +
       "That is exponential, not linear, and the cost is paid on EVERY Bash call this hook sees. " +
-      "The overlap is in COMMAND_PREFIX: a `VAR=value` token matches both the wrapper's bare-operand run and the assignment alternative, " +
-      "so each `<wrapper> <assignment>` pair doubles the parses the engine must walk before it can fail. " +
-      "Make the alternatives disjoint (an operand is not an assignment) or bound the run — the shared declaration is the right place, and there is only one of it.",
+      "The overlap is in COMMAND_PREFIX: some token in the prefix matches two of its alternatives, " +
+      "so each pair doubles the parses the engine must walk before it can fail. " +
+      "Make the alternatives disjoint — a wrapper's operand is not an assignment, and neither is a flag's value — " +
+      "rather than bounding the run: the shared declaration is the right place, and there is only one of it.",
   );
 });
 
@@ -97,27 +112,29 @@ test("the hook answers inside its declared budget whatever the command string sa
   // merge runs with no gate in the path — the same fail-open KD-107 was, reached
   // through the reader that replaced it rather than around it.
   const budgetMs = declaredBudgetMs();
-  const command = `${pairs(26)}${MERGE}`;
-  assert.ok(command.length < 600, "the string an agent would have to type is short enough to be typed");
+  for (const [how, pairs] of Object.entries(SHAPES)) {
+    const command = `${pairs(26)}${MERGE}`;
+    assert.ok(command.length < 600, `${how}: the string an agent would have to type is short enough to be typed`);
 
-  const started = Date.now();
-  const r = spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command } }),
-    encoding: "utf8",
-    timeout: budgetMs,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: ROOT },
-  });
-  const elapsed = Date.now() - started;
+    const started = Date.now();
+    const r = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command } }),
+      encoding: "utf8",
+      timeout: budgetMs,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: ROOT },
+    });
+    const elapsed = Date.now() - started;
 
-  assert.equal(
-    r.signal,
-    null,
-    `the hook had to be killed after ${elapsed}ms on a ${command.length}-character command. ` +
-      `Past its ${budgetMs}ms budget the decision it was holding is never delivered, and the merge it was reading runs unproven — ` +
-      "a fail-open at the door, reached by the length of the command rather than by its wrapper word.",
-  );
-  assert.ok(
-    elapsed < budgetMs,
-    `the hook answered in ${elapsed}ms, past the ${budgetMs}ms its own .claude/settings.json allows it, on a ${command.length}-character command.`,
-  );
+    assert.equal(
+      r.signal,
+      null,
+      `${how}: the hook had to be killed after ${elapsed}ms on a ${command.length}-character command. ` +
+        `Past its ${budgetMs}ms budget the decision it was holding is never delivered, and the merge it was reading runs unproven — ` +
+        "a fail-open at the door, reached by the length of the command rather than by its wrapper word.",
+    );
+    assert.ok(
+      elapsed < budgetMs,
+      `${how}: the hook answered in ${elapsed}ms, past the ${budgetMs}ms its own .claude/settings.json allows it, on a ${command.length}-character command.`,
+    );
+  }
 });
