@@ -361,6 +361,19 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   A rule made executable and left for the reader to remember to run is the same defect one layer
   up — while the template this repo stamps had carried the equivalent PreToolUse hooks for
   adopters all along. The harness enforced on adopters what it did not enforce on itself.
+- **And ORDERED: a device run proves a tree the merge has to keep.** The same hook refuses an
+  invocation of `fleet-check.mjs` on a branch that does not contain `origin/main`. The merge brings
+  trunk in and the bytes move — the tier REOPENS for any of them that is a device trigger path, and
+  the run that was just paid for described a tree that will not land. On 2026-09-16 that cost
+  **four emulator runs for one merge**: main's CI was
+  red, the fix merged under the release branch, and each rebase moved the tree the previous run had
+  proved. The rule — check main's CI first — was in project memory, where no program could read it.
+  The question is asked only when the run would otherwise be allowed, and the remote is read with
+  `git ls-remote`, never `git fetch`: every obligation here is derived from
+  `git merge-base HEAD origin/main`, so a gate that fetched would move the baseline it judges. When
+  it cannot see — no origin, no `origin/main`, a git call killed at its bound, no time left inside
+  the hook's declared timeout — it allows and says which half answered, because a precondition that
+  blocks real work for a reason that is not true costs more than the run it saves.
 - **A tree that is trunk owes nothing, and a plan belongs to its branch.** The same audit found a
   clean `main` reporting OWED: `deriveTierNeed` fails open on an empty list because the lane
   cannot see its diff — right there, wrong here, where git answered "nothing". And the previous

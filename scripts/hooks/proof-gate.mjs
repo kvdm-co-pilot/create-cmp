@@ -17,8 +17,11 @@
 //     fleet-check.mjs   REFUSED when nothing is owed, or when the tier is already
 //                       discharged for this exact tree — a second run over the same
 //                       bytes is the 2026-09-08 defect — or when no slice is declared,
-//                       because that run could discharge nothing. ALLOWED while owed,
-//                       with the schedule as the reason.
+//                       because that run could discharge nothing, or when this branch
+//                       does not contain origin/main, because the merge will bring it
+//                       in and the run would describe bytes that never land (2026-09-16:
+//                       four emulator runs for one merge). ALLOWED while owed, with the
+//                       schedule as the reason.
 //     gh pr merge       REFUSED while EITHER at-close tier is owed — the device tier, and
 //                       (ADR-0014) a review record describing this exact tree. The slice
 //                       closes at merge, so this is where "once, at slice close" is
@@ -118,7 +121,7 @@ export function decide(kind, o, tiers, ctx) {
               (ours ? "Wait for it, then run the tier once." : "Do not kill it — it is not this slice's. Wait for it, then run the tier once."),
           );
         }
-        return allow(`the device tier is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — a trigger path edited afterwards reopens the slice. Then: node scripts/proof-plan.mjs --discharge`);
+        return orderedRun(o, ctx?.base);
       default:
         return deny(`the proof plan is in an unknown state (${o.state}) — refusing rather than guessing`);
     }
@@ -183,6 +186,315 @@ export function decide(kind, o, tiers, ctx) {
     return notes.length ? allow(`reminder: ${notes.join(" — and ")}. Open the PR, finish everything else, run the at-close tiers last.`) : SILENT;
   }
   return SILENT;
+}
+
+/**
+ * The OWED/REOPENED verdict, once the ordering question has been asked (or not).
+ *
+ * The allow string when nothing is wrong is byte-identical to the one this gate
+ * printed before the ordering check existed, and a test calls `decide("device",
+ * owed, TIERS)` with NO ctx and compares the two: a precondition that quietly
+ * rewords the ordinary case would make every other test of this path a test of
+ * this one.
+ *
+ * Three ways this can speak, and the difference between the last two is the
+ * whole point of `baseContext` returning what it returns: REFUSE when the branch
+ * demonstrably does not contain trunk, ALLOW-AND-SAY-SO when the question could
+ * not be answered, and ALLOW-AND-SAY-SO when it was answered by this checkout's
+ * own ref rather than by origin. A gate that cannot see must not pass silently.
+ */
+function orderedRun(o, base) {
+  const owed = `the device tier is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — a trigger path edited afterwards reopens the slice. Then: node scripts/proof-plan.mjs --discharge`;
+  const why = `A device run proves a TREE, and the merge brings origin/main into that tree — the bytes move, and the tier REOPENS for any of them that is a device trigger path, so the run is bought a second time. Measured 2026-09-16: four emulator runs for one merge, each one owed by this program and none of them needed.`;
+  const fix = `git fetch origin && git rebase origin/main`;
+  if (!base) return allow(owed);
+
+  if (base.contained === false) {
+    const at = String(base.sha ?? "").slice(0, 7);
+    // Only the two branches below where the commit IS present and WAS compared
+    // print this, so a null `behind` is a count git did not produce — never an
+    // absence. The `unfetched` branch has its own sentence, and there the
+    // checkout genuinely does not have the commit.
+    const short = base.behind === null ? "how far behind HEAD is could not be counted" : `HEAD is ${base.behind} commit${base.behind === 1 ? "" : "s"} short of it`;
+    const how = base.unfetched
+      ? `origin/main has MOVED to ${at}, a commit this checkout does not even have`
+      : base.source === "remote"
+        ? `origin/main has MOVED to ${at} and ${short} — read from origin just now`
+        : `origin/main is at ${at} and ${short} — read from this checkout's own ref, which no call to origin could make less true (and if trunk was rewound, the same fetch below corrects the ref and clears this)`;
+    return deny(`the device tier is ${o.state.toUpperCase()}, but this branch does not contain origin/main: ${how}. ${why} Bring trunk in first, then run the tier once: ${fix}`);
+  }
+
+  if (base.contained === null) {
+    return allow(
+      `${owed}\n\nORDERING UNCHECKED: ${base.reason ?? "this gate could not ask where trunk is"}. Whether this branch contains origin/main is what makes a device run a proof of the tree the merge will keep — this gate could not tell, so it is not refusing. If trunk has moved, ${fix} before the run: ${why}`,
+    );
+  }
+
+  if (base.source !== "remote") {
+    return allow(
+      `${owed}\n\nORDERING read from the local ref (this checkout's own origin/main at ${String(base.sha ?? "").slice(0, 7)}), not from origin: ${base.reason ?? "origin was not asked"}. By that ref this branch contains trunk — but a ref is only as fresh as its last fetch, and a stale one is exactly the 2026-09-16 case. If in doubt: ${fix}`,
+    );
+  }
+  return allow(owed);
+}
+
+/**
+ * A device run proves a TREE the merge has to keep — and the budget the question
+ * is allowed to cost.
+ *
+ * MEASURED 2026-09-16: four emulator runs for one merge, every one of them owed
+ * by this program and none of them needed. main's CI was red, the fix merged
+ * under the release branch, the branch was rebased onto it — and each rebase
+ * moved the bytes the last run had described, so the tier REOPENED. The rule
+ * ("check main's CI first") was in project memory; the program could not see it.
+ * This is the program seeing it, at the one moment it matters.
+ *
+ * THE REMOTE IS READ WITH `git ls-remote`, NEVER `git fetch`:
+ *   (a) A GATE MUST NOT MOVE THE BASELINE IT JUDGES. Every obligation here is
+ *       derived from `git merge-base HEAD origin/main` (changedPaths(),
+ *       scripts/proof-plan.mjs). A fetching hook would advance
+ *       refs/remotes/origin/main and silently change what the NEXT obligation()
+ *       computes — the gate would alter the state it exists to read. `ls-remote`
+ *       writes nothing: no refs, no FETCH_HEAD, no packs.
+ *   (b) THIS RUNS INSIDE A KILL-TIMER. A SIGKILLed `git fetch` can leave a
+ *       partial pack or a refs/remotes/origin/main.lock behind; a SIGKILLed
+ *       `ls-remote` cannot leave anything.
+ *   (c) There is no speed argument either way. Measured 2026-09-17 against this
+ *       repo's real origin: ls-remote 1.01 / 1.19 / 1.34 s, `fetch --quiet
+ *       origin main` 0.94 / 1.02 / 1.03 s — both dominated by connection setup.
+ *       The tie breaks on safety.
+ * A remote sha this checkout does not have still answers the question: you
+ * cannot contain a commit you do not have, so "not present locally" IS "not
+ * contained", and it makes the more informative refusal.
+ *
+ * THE CHEAP LOCAL ANSWER COMES FIRST, AND THE REFUSAL PATH ASKS ORIGIN NOTHING.
+ * If the local ref already says HEAD does not contain it, the verdict is settled:
+ * asking origin could only move trunk further ahead. Origin is asked in exactly
+ * one case — the local ref says "contained" — because that is the only case where
+ * the answer can change, and a stale ref saying "contained" about a main that has
+ * moved IS the 2026-09-16 failure. The one false refusal this admits is a
+ * force-push that REWOUND main; trunk here never rewinds, the refusal names the
+ * sha it used, and the fetch-and-rebase it prints corrects the ref and clears it.
+ */
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
+/**
+ * Near enough to when Claude Code started this hook's kill-timer: node's own
+ * startup before this line is tens of ms.
+ */
+export const STARTED_MS = Date.now();
+
+/**
+ * What the gate keeps back for ANSWERING — node startup, obligation()'s own git,
+ * and emitting the decision. Measured on this tree 2026-09-17: the real hook
+ * answers a device payload in 0.16–0.19s. This is ~8x that.
+ */
+export const ANSWER_RESERVE_MS = 1500;
+
+/** No question put to origin is worth more than this. The three measured ls-remote answers were 1.01 / 1.19 / 1.34s; this is the slowest, roughly doubled. */
+export const REMOTE_CALL_CAP_MS = 2500;
+
+/** The fastest measured answer was 1.01s, so with less than this left there is nothing to buy: do not ask, and say the answer is the local ref's. */
+export const REMOTE_CALL_FLOOR_MS = 1000;
+
+/** Each local git call inside the check. They answer in ~10ms; this is the bound for the day one does not. */
+const LOCAL_CALL_CAP_MS = 1000;
+
+/**
+ * The budget this hook's own wiring declares for it, in ms.
+ *
+ * Past it the hook is KILLED and its decision is never delivered — and a
+ * PreToolUse decision that is never delivered is not a refusal, it is a
+ * PERMITTED command (see the shell() comment below, and the test named for it).
+ * So every bound in here is derived from this number rather than chosen, and a
+ * test pins the sum.
+ */
+export function declaredBudgetMs(root = REPO_ROOT) {
+  const fs = createRequire(import.meta.url)("node:fs");
+  let settings;
+  try {
+    settings = JSON.parse(fs.readFileSync(path.join(root, ".claude", "settings.json"), "utf8"));
+  } catch {
+    return 10000; // unreadable wiring: assume the number this repo declares today
+  }
+  const entry = (settings.hooks?.PreToolUse ?? []).flatMap((e) => e.hooks ?? []).find((h) => String(h.command ?? "").includes("scripts/hooks/proof-gate.mjs"));
+  // Claude Code's own default when a hook declares no timeout is 60s.
+  return (typeof entry?.timeout === "number" ? entry.timeout : 60) * 1000;
+}
+
+/** What is left for the whole ordering check, after what is already spent and what answering will cost. Can be zero or negative, and then nothing is asked. */
+export function remoteBudgetMs(elapsedMs = Date.now() - STARTED_MS) {
+  return Math.min(REMOTE_CALL_CAP_MS, declaredBudgetMs() - elapsedMs - ANSWER_RESERVE_MS);
+}
+
+/**
+ * WHY a call produced no exit code, as a phrase that is true of THAT cause —
+ * never a shared one. A single widened sentence would tell the empty-PATH case
+ * that git "was killed at its bound", which is itself a false statement, and the
+ * whole point of this pair of fields is that the gate says only true things
+ * about what it could not find out. Ordered by specificity: node's own three
+ * failures carry an `error` (with a `code` for two of them), anything that
+ * reached a process and died carries a `signal`.
+ */
+function whyNoAnswer(r, boundMs) {
+  if (r.error?.code === "ETIMEDOUT") return `git did not answer inside ${boundMs}ms and was killed at its bound`;
+  if (r.error?.code === "ENOBUFS") return "git produced more output than this gate will read, so it did not answer";
+  if (r.error) return `git could not be run (${r.error.code ?? r.error.message})`;
+  if (r.signal) return `git, killed by ${r.signal}, did not answer`;
+  return "git produced no exit code, so it did not answer";
+}
+
+/** `git`, bounded twice: every call has its own cap, and they all draw from one deadline so several slow ones cannot sum past the budget. */
+function gitAt(root, deadline) {
+  const { spawnSync } = createRequire(import.meta.url)("node:child_process");
+  return (args, capMs = LOCAL_CALL_CAP_MS) => {
+    const left = deadline - Date.now();
+    if (left <= 0) return { answered: false, ok: false, out: "", status: null, why: "the budget ran out before git could be asked" };
+    const boundMs = Math.min(capMs, left);
+    const r = spawnSync("git", args, {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: boundMs,
+      killSignal: "SIGKILL",
+      maxBuffer: 4 * 1024 * 1024,
+      env: {
+        ...process.env,
+        // Nothing here may block on a human, and nothing here may write: no
+        // credential prompt, no index lock refresh, and no lazy fetch of an
+        // object a partial clone does not have.
+        GIT_TERMINAL_PROMPT: "0",
+        GIT_OPTIONAL_LOCKS: "0",
+        GIT_NO_LAZY_FETCH: "1",
+      },
+    });
+    // ONE COMPLETE TEST, not an enumeration of deaths. `r.error` is set by node
+    // for EXACTLY three things — a spawn that never happened, node's own
+    // `timeout`, and `maxBuffer` — so a child that started and was then killed
+    // by anyone else (an OOM kill, a `pkill`, a segfault) comes back with
+    // `error` undefined and slips through any guard that names causes. Naming
+    // causes is precisely how the previous round left this one open. `status` is
+    // a number when and only when the child produced an exit code, which is the
+    // fact every caller here actually needs, and it cannot leave a fifth cause
+    // open. `why` then says which cause it was, for the agent, not for the
+    // branching.
+    const answered = typeof r.status === "number";
+    return { answered, ok: answered && r.status === 0, out: String(r.stdout ?? "").trim(), status: answered ? r.status : null, why: answered ? null : whyNoAnswer(r, boundMs) };
+  };
+}
+
+const SHA = /^[0-9a-f]{40}$/;
+const cannotSay = (reason) => ({ contained: null, behind: null, sha: null, source: null, reachedRemote: false, unfetched: false, reason });
+
+/**
+ * Does this branch contain trunk? `null` when the question does not apply.
+ *
+ * Four outcomes, and "does not apply" is not "could not answer":
+ *   null                            — trunk, or a detached HEAD. Silence.
+ *   { contained: null, reason }     — git could not answer. An ALLOW that says so.
+ *   { contained: false, … }         — REFUSE.
+ *   { contained: true, … }          — ALLOW, with a note unless origin itself said it.
+ *
+ * The branch is passed IN rather than read again: obligation() already has it on
+ * `o.branch`, from `git branch --show-current`, and a second reading spelled
+ * `rev-parse --abbrev-ref HEAD` would answer "HEAD" on a detached checkout where
+ * the first answers "" — a difference that passes locally and misbehaves in CI.
+ * A test pins both spellings against a real detached HEAD.
+ *
+ * `isTrunk` is handed in for the same reason and one more: the trunk rule stays
+ * defined exactly once, in scripts/proof-plan.mjs, instead of being restated
+ * here where the two copies would drift apart. And taking it as an argument is
+ * what lets this file go on importing NOTHING before a command has matched —
+ * the property its own header claims and test/proof-gate-hook.test.mjs:148
+ * measures — without reaching for a module loader on a refusal path to get it.
+ */
+export function baseContext(root = REPO_ROOT, { branch, isTrunk, budgetMs = remoteBudgetMs() } = {}) {
+  if (typeof isTrunk !== "function") return cannotSay("the branch rule was not supplied to this check");
+  if (isTrunk(branch)) return null;
+
+  // ONE PURSE FOR THE WHOLE CHECK. Nothing runs at all when it is already empty:
+  // that is an allow that says so, never a refusal — a refusal delivered after
+  // the kill-timer is a permitted command, and a refusal computed with no time
+  // to compute it is a guess.
+  if (!(budgetMs > 0)) return cannotSay(`there was no budget left to ask (the gate keeps ${ANSWER_RESERVE_MS}ms of its ${declaredBudgetMs()}ms back for delivering this decision)`);
+  const deadline = Date.now() + budgetMs;
+  const git = gitAt(root, deadline);
+
+  // A CALL THAT PRODUCED NO EXIT CODE IS NOT AN ANSWER — and, in particular, it
+  // is not this call's "no". So every one of these sites asks `answered` FIRST
+  // and only then reads `ok`: a git that was never spawned, that was killed at
+  // its bound, or that the OS took out was otherwise reported as a checkout with
+  // no origin at all. All of those are "could not answer", and `why` says which
+  // one it was — the purse running out, a call killed at its bound, a git that
+  // crashed and a git that is not on PATH are different facts, and this whole
+  // design turns on not collapsing "could not answer" into "answered no".
+  const origin = git(["remote", "get-url", "origin"]);
+  if (!origin.answered) return cannotSay(`${origin.why}, so this checkout could not be asked whether it has an origin remote`);
+  if (!origin.ok) return cannotSay("this checkout has no origin remote, so there is no trunk for it to be behind");
+
+  const ref = git(["rev-parse", "--verify", "--quiet", "refs/remotes/origin/main"]);
+  if (!ref.answered) return cannotSay(`${ref.why}, so refs/remotes/origin/main could not be read`);
+  if (!ref.ok || !SHA.test(ref.out)) return cannotSay("this checkout has no refs/remotes/origin/main to read");
+  const local = ref.out;
+
+  const behindBy = (sha) => {
+    // A count git never produced an exit code for — killed at its bound, killed
+    // from outside it, or never spawned — or one it declined to produce, is
+    // not a count and is not a zero: `null`, which the refusal renders as "could
+    // not be counted" (orderedRun) and never as an absence git did not report.
+    const n = git(["rev-list", "--count", `HEAD..${sha}`]);
+    return n.ok && /^\d+$/.test(n.out) ? Number(n.out) : null;
+  };
+  const contains = (sha) => {
+    // `--is-ancestor` exits 0 for yes and 1 for no; anything else is git failing
+    // to answer, which is not a no.
+    const r = git(["merge-base", "--is-ancestor", sha, "HEAD"]);
+    return r.status === 0 ? true : r.status === 1 ? false : null;
+  };
+
+  const localSays = contains(local);
+  if (localSays === null) return cannotSay("git could not compare this branch with origin/main");
+  if (localSays === false) {
+    return { contained: false, behind: behindBy(local), sha: local, source: "local", reachedRemote: false, unfetched: false, reason: null };
+  }
+
+  // The local ref says "contained", which is the one case origin can overturn.
+  // A purse too small for a call to origin still spends the local half — it
+  // costs tens of milliseconds and it is the valuable half; only the question to
+  // origin is dropped, and the allow says which of the two answered.
+  return askOrigin(git, { local, deadline, behindBy, contains });
+}
+
+/** The second half: the local ref says "contained", so origin is the only thing that can change the verdict. */
+function askOrigin(git, { local, deadline, behindBy, contains }) {
+  const settled = (over) => ({ contained: true, behind: 0, sha: local, source: "local", reachedRemote: false, unfetched: false, reason: null, ...over });
+
+  const left = deadline - Date.now();
+  if (left < REMOTE_CALL_FLOOR_MS) return settled({ reason: `${Math.max(0, left)}ms of the gate's budget was left and the fastest answer measured from this repo's origin was 1.01s, so origin was not asked` });
+
+  const probe = git(["ls-remote", "origin", "refs/heads/main"], Math.min(REMOTE_CALL_CAP_MS, left));
+  if (!probe.answered) return settled({ reason: probe.why });
+  if (!probe.ok) return settled({ reason: "origin could not be reached" });
+
+  const remote = String(probe.out.split(/\s+/)[0] ?? "");
+  if (!SHA.test(remote)) return settled({ reachedRemote: true, reason: "origin has no refs/heads/main" });
+  if (remote === local) return { contained: true, behind: 0, sha: remote, source: "remote", reachedRemote: true, unfetched: false, reason: null };
+
+  // ASKED BEFORE `ok`, because this is the one call whose non-answer would
+  // REFUSE: `!ok` here means "this checkout does not have that commit", and a
+  // call that produced no exit code — killed at its bound, killed by the OS,
+  // crashed, never spawned — means nothing of the kind. Read as a no it printed
+  // "a commit this checkout does not even have" about a commit the checkout
+  // demonstrably has — the false block this precondition's own contract forbids:
+  // a question git cannot answer must allow and say so.
+  const have = git(["cat-file", "-e", `${remote}^{commit}`]);
+  if (!have.answered) return cannotSay(`origin/main is ${remote.slice(0, 7)} and ${have.why}, so this checkout could not be asked whether it has that commit`);
+  if (!have.ok) return { contained: false, behind: null, sha: remote, source: "remote", reachedRemote: true, unfetched: true, reason: null };
+
+  const says = contains(remote);
+  if (says === null) return cannotSay(`origin/main is ${remote.slice(0, 7)} and git could not compare it with this branch`);
+  if (says) return { contained: true, behind: 0, sha: remote, source: "remote", reachedRemote: true, unfetched: false, reason: null };
+  return { contained: false, behind: behindBy(remote), sha: remote, source: "remote", reachedRemote: true, unfetched: false, reason: null };
 }
 
 /**
@@ -275,7 +587,10 @@ function runningLane() {
  * project this gate could not locate", and the refusal still fires on time.
  */
 const LANE_PROBE_CALL_MS = 1200;
-const LANE_PROBE_TOTAL_MS = 3000;
+// Exported because it is one term of an arithmetic invariant a test reads off
+// the wiring: the lane probe, plus the one question this gate may put to origin,
+// plus what it keeps back to answer, has to fit inside declaredBudgetMs().
+export const LANE_PROBE_TOTAL_MS = 3000;
 
 function shell({ callMs = LANE_PROBE_CALL_MS, totalMs = LANE_PROBE_TOTAL_MS } = {}) {
   const { execSync } = createRequire(import.meta.url)("node:child_process");
@@ -490,14 +805,22 @@ async function main() {
     if (!kind) return;
     // Matched. From here on, a failure is a refusal.
     try {
-      const { obligation, TIERS } = await import("../proof-plan.mjs");
-      const ctx =
-        kind === "publish"
-          ? await releaseContext()
-          : kind === "device"
-            ? { runningLane: runningLane(), repoRoot: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..") }
-            : undefined;
-      const d = decide(kind, obligation(), TIERS, ctx);
+      const { obligation, TIERS, isTrunk } = await import("../proof-plan.mjs");
+      const o = obligation();
+      let ctx;
+      if (kind === "publish") ctx = await releaseContext();
+      else if (kind === "device") {
+        // The lane probe stays EAGER for every device payload: it is what the
+        // timeout proof stalls inside, and making it conditional would retire
+        // that proof without anyone noticing.
+        ctx = { runningLane: runningLane(), repoRoot: REPO_ROOT };
+        // Where trunk is only matters when the run would otherwise go ahead. A
+        // run already refused — nothing owed, discharged, undeclared, or a lane
+        // in flight — needs no second reason, and the lane refusal is reported
+        // alone because it asks for something else entirely.
+        if (!ctx.runningLane && (o.state === "owed" || o.state === "reopened")) ctx.base = baseContext(REPO_ROOT, { branch: o.branch, isTrunk });
+      }
+      const d = decide(kind, o, TIERS, ctx);
       if (d.action === "silent") return;
       emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: d.action, permissionDecisionReason: d.reason } });
     } catch (e) {

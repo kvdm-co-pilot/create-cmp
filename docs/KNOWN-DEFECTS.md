@@ -138,6 +138,11 @@ you the same list without opening anything.
 | **KD-77** | the CLI-command count is derived, gated, and calibrated by nothing — no surface states it | the reader is idle, not wrong; a future "<n> commands" is still refused |
 | **KD-78** | two npm pages still serve "8 gates" from bytes already published; the tree's copy is fixed | no act available here — a registry description changes only by publishing |
 | **KD-79** | the proof gate refused an OWED device tier, naming a change set that cannot be this slice's | it refuses, never allows — but the tier it refuses is one `proof-plan.mjs` says is owed |
+| **KD-80** | the ordering precondition guards the device RUN; `gh pr merge --rebase` is where an unproven tree actually lands | the hand-rebase case reopens the tier and is refused at the merge gate already |
+| **KD-81** | a branch git could not name routes to "does not apply", so the check passes SILENTLY | no producer: the same git failure makes `obligation()` report `none`, which never reaches the check |
+| **KD-82** | the ordering verdict is commit-graph ancestry where every other obligation here is trigger-path bytes | the refusal's remedy is the rebase you owe the merge anyway; it costs a rebase, never a run |
+| **KD-83** | "the ordinary owed-allow is byte-identical to before the ordering check" is verified by nothing | the cross-path comparison beside it is real; only the historical claim is unpinned |
+| **KD-84** | `declaredBudgetMs` has two implementations and the declared 10s has three spellings | all three agree today, and the unreadable-settings fallback errs small |
 
 ---
 
@@ -1201,6 +1206,89 @@ is what the sibling slice is about, so both directions are known.
 **Fires when:** the tier is invoked from a worktree whose slice changes only paths one of the two
 readers can see.
 *Logged 2026-09-18, measured while closing the count-gate slice.*
+### KD-80 — the ordering precondition guards the device RUN, not the merge that moves the tree
+
+`scripts/hooks/proof-gate.mjs` (`decide`, kind `device` vs kind `merge`)
+
+The rule as written — "a device run proves a tree the merge has to keep" — is checked before the
+run and nowhere else. Discharge the tier on a branch that contains `origin/main`, let trunk move,
+then `gh pr merge --rebase`: GitHub rebases, the landed tree is not the tree that was proved, and
+the merge gate never asked. `deviceTreeHash` is computed over the local working tree, so it does
+not move when trunk does, and the tier does not read REOPENED.
+
+Narrow, and the narrowing is why it is here rather than fixed: the 2026-09-16 sequence the slice was
+bought to stop involves a rebase done BY HAND, which moves trigger bytes, reopens the tier and is
+refused at the merge gate already. Only the server-side rebase escapes, and only when trunk moved
+between the run and the merge. Fixing it means asking the same question at the merge gate, which is
+a second slice's worth of decisions (the merge gate's budget, and whether a merge should ever be
+refused for being behind). *Logged 2026-09-18, review round 1 of `ordering-precondition-before-a-device-run`.*
+
+### KD-81 — a branch git could not name is treated as trunk, and the check passes silently
+
+`scripts/hooks/proof-gate.mjs` (`baseContext`, first line) with `isTrunk` from `scripts/proof-plan.mjs`
+
+`currentBranch()` returns `null` when git cannot say, `""` on a detached HEAD, and `isTrunk` is
+`!branch || branch === "main"` — so both arrive as `true` and `baseContext` returns `null`, which
+`orderedRun` renders as the plain allow with no note at all. That is the one shape the check's own
+header forbids: "a gate that cannot see must not pass silently." The four-outcome contract has a
+place for it (`{ contained: null, reason }`, the allow that says so); `null` is "does not apply",
+and "git could not name the branch" is not that.
+
+No producer measured: the git failure that makes `currentBranch()` return `null` also makes
+`changedPaths()` return `[]`, and an empty diff is reported `state: "none", trunk: true`, which never
+reaches the ordering check. Sharing `isTrunk` with `proof-plan` is the right trade even so — one
+definition of trunk beats two — so the fix belongs at the call site in `main()`, not in `isTrunk`.
+*Logged 2026-09-18, review round 1 of `ordering-precondition-before-a-device-run`.*
+
+### KD-82 — the ordering verdict is ancestry; every other obligation in this repo is trigger-path bytes
+
+`scripts/hooks/proof-gate.mjs` (`baseContext` → `merge-base --is-ancestor`, and the `why` string in `orderedRun`)
+
+Two definitions of "the tree moved" now coexist: commit-graph ancestry here, and trigger-path bytes
+in `tierState`/`deriveTierNeed`, where the tier reopens only when `deviceTreeHash` — a hash of the
+DEVICE TRIGGER PATHS — moves. This precondition is the stricter of the two, so it can still refuse a
+run that would have been a valid proof: a trunk that moved only under `docs/` — the commonest way
+main moves in this repo — leaves every trigger byte identical after the rebase, so the tier would not
+reopen and the refused run describes the tree that lands after all. The refusal's own wording was
+made conditional in the same slice (it now says the tier reopens "for any of them that is a device
+trigger path"), so what remains is the verdict, not a sentence asserting a reopen it did not check.
+
+Nobody is stranded: the remedy the refusal prints is the rebase the merge needs anyway, so the cost
+of being wrong is one rebase rather than one emulator run, and the conservative direction is the safe
+one for a 3.5-minute tier. Deciding it on bytes would mean diffing `HEAD...origin/main` against
+`DEVICE_TIER_IRRELEVANT` inside a 10-second hook, which is a product decision about how clever this
+precondition should be. *Logged 2026-09-18, review round 1 of `ordering-precondition-before-a-device-run`.*
+
+### KD-83 — the "unchanged wording" claim is checked against the code that would change it
+
+`test/a-device-run-proves-a-tree-the-merge-will-not-keep.test.mjs` (`TODAYS_OWED_ALLOW`)
+
+`const TODAYS_OWED_ALLOW = decide("device", owed, TIERS).reason` is named "what this gate said
+before an ordering check existed" and compared against later `decide` calls. Both sides come out of
+the same function: reword the `owed` string in `orderedRun` and both move together, green. So the
+constraint the comment states — the ordinary owed-allow is byte-identical to the pre-slice one — is
+pinned by no bytes anywhere; `test/proof-gate-hook.test.mjs:74` pins only `/LAST gate/`.
+
+What the assertions DO measure is real and is the more valuable half: that the contained-and-answered
+path, the no-`ctx` path and the `base: null` path all produce the SAME string, i.e. that the
+precondition adds nothing to the ordinary case. Only the historical half is unpinned, and pinning it
+means a literal copy of a long sentence in a test — a second spelling with its own drift.
+*Logged 2026-09-18, review round 1 of `ordering-precondition-before-a-device-run`.*
+
+### KD-84 — `declaredBudgetMs` has two implementations, and the declared timeout has three spellings
+
+`scripts/hooks/proof-gate.mjs` (`declaredBudgetMs`) and `test/the-proof-gate-can-outlive-the-timeout-its-own-wiring-declares.test.mjs:36`
+
+The slice exported `declaredBudgetMs` so a test could read the hook's budget off the wiring — and
+left the older hand-rolled copy in the timeout test, which now reads the same `.claude/settings.json`
+through its own five lines. They differ where it matters least and drift where it matters most: the
+copy asserts the PreToolUse entry exists, the export falls back to Claude Code's 60s default; and
+the export's unreadable-settings branch hard-codes `10000`, a third spelling of the `"timeout": 10`
+in `.claude/settings.json` that nothing compares against it.
+
+They agree today, both directions, and every disagreement errs toward a SMALLER budget, which means
+asking origin less and allowing-with-a-note more — never a late refusal. The import that would
+collapse them is one line in the timeout test. *Logged 2026-09-18, review round 1 of `ordering-precondition-before-a-device-run`.*
 
 ## Closed
 
