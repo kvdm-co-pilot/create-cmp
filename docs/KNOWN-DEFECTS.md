@@ -199,6 +199,7 @@ you the same list without opening anything.
 | **KD-180** | doctor's new status-line verdict over-reports an ABSOLUTE path (`node /Users/x/app/qa/walk-status.mjs` reads as cwd-relative), and its `ok` is unreachable end-to-end while `ANCHORABLE_SURFACES.statusLine` is `false` | measured, both directions: nothing in this repo or its heal writes an absolute status line, so the over-report has no subject; the direction is the conservative one the detector chooses on purpose, and the under-report direction — an `ok` over a silent surface — is what this slice closed |
 | **KD-181** | this tree stated the statusLine's stdin BOTH ways, and the false one governed a live path: `walk-status.mjs` said *the statusline gets no stdin*, `hooks.mjs` and KD-90 said it carries `workspace.project_dir` | settled 2026-09-19 from the official statusLine documentation (out of tree, KD-128's class): the comment was false and is corrected here. So the status line IS fixable — via stdin, not via the env var — and what is logged is that this slice does not take it: whether `$(cat)` can block with no payload is undocumented, and a status line that hangs is worse than one that prints nothing |
 | **KD-182** | the comment explaining the new check calls `node qa/walk-status.mjs --statusline` "the pre-0.26.3" form, and it is what `template/.claude/settings.json` ships TODAY at 0.26.7 | the same slice's CHANGELOG states the population correctly ("**every new stamp**"), so nothing an adopter reads is wrong; what the false attribution can do is tell the next reader of that code that the shipped template is not among the affected |
+| **KD-183** | the hook verdict reports a command that really resolves as cwd-relative — `cd "${CLAUDE_PROJECT_DIR:-.}" && node qa/walk-status.mjs` runs the walk from any directory and is named as one that does not | measured by executing it from a foreign cwd: the over-report is the conservative direction the detector chooses on purpose (KD-180's first row, one surface over), the remedy it prints leaves a working hook working, and the opposite direction is now gated by `test/doctor-claims-working-for-a-surface-a-foreign-cwd-cannot-run.test.mjs` |
 
 ---
 
@@ -2670,6 +2671,42 @@ rather than separately because the remedy (drop the `??`) also edits
 `test/project-doctor.test.mjs`'s untouched `wired` fixture, which is a second slice's decision.
 
 *Logged 2026-09-19, review round 1 of the doctor-wiring slice.*
+
+### KD-183 — a hook that resolves by `cd` is reported as one that does not resolve
+
+`src/commands/doctor.mjs` (`cwdRelativeWalkSurfaces`) · `src/lib/hooks.mjs` (`SCRIPT_PATH`, `unanchoredPaths`)
+
+The anchoring detector reads one form of "this command resolves from any directory" — the path
+itself carrying `${CLAUDE_PROJECT_DIR:-.}`. A command that gets there another way is reported as
+inert. Measured by execution rather than argued, running each hook command through `/bin/sh` from a
+temporary directory that is not the project, with `CLAUDE_PROJECT_DIR` exported as a hook receives
+it, and watching for the walk's own output:
+
+| hook command | walk ran from elsewhere | doctor says |
+|---|---|---|
+| `cd "${CLAUDE_PROJECT_DIR:-.}" && node qa/walk-status.mjs --inject \|\| true` | **yes** | cwd-relative; "only runs when the session starts at the project root" |
+| `test -f "${CLAUDE_PROJECT_DIR:-.}/qa/walk-status.mjs" && node "${…}/qa/walk-status.mjs" --inject` | yes | anchored and still works |
+
+So an adopter whose hook is already correct is told to anchor it, and the remedy printed
+(`"${CLAUDE_PROJECT_DIR:-.}/qa/walk-status.mjs"`) leaves a working hook working.
+
+**Nobody is wrongly served, and the direction is deliberate.** This is KD-180's first row one
+surface over: over-reporting costs an adopter a re-read of a command that works, where the opposite
+direction — claiming health over a surface that prints nothing — is the defect the whole slice
+exists to close. `src/lib/hooks.mjs` says in as many words that it over-reports rather than
+under-reports on purpose.
+
+**It is also why the gate this round landed is one-directional.**
+`test/doctor-claims-working-for-a-surface-a-foreign-cwd-cannot-run.test.mjs` asserts only that
+doctor never CLAIMS a surface works when the shell says it does not; asserting the equality both
+ways would have made a conservative refusal into a test failure, and a test that can be quoted to
+argue for weakening a refusal is worth less than the refusal.
+
+**Fires when:** an app hand-writes a `cd`-anchored, `pushd`-anchored or absolute-path hook and is
+told by doctor that a surface which works does not.
+
+*Logged 2026-09-19, review round 2 (re-record) of the doctor-wiring slice, by the reviewer, from the
+same execution harness that produced the round's blocking test.*
 
 ### KD-180 — doctor's status-line verdict over-reports an absolute path, and its `ok` cannot be reached from a project
 
