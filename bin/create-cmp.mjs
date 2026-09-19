@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseArgs, unknownFlags } from "../src/lib/args.mjs";
+import { parseArgs, unknownFlags, unreadableBooleanValues } from "../src/lib/args.mjs";
 
 const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "harden", "attach", "harness", "help"]);
 
@@ -36,14 +36,23 @@ async function main() {
   // the dispatcher into `create`, scaffolding a whole app into ./myapp while the
   // user waited for a version string (KD-15). prooflane has always short-circuited
   // both; this is the same rule at the other door.
-  if (flags.version || flags.v) {
+  //
+  // THESE TWO ARE READ BY PRESENCE, and are the only declared booleans that
+  // are: `--version` is a QUESTION, so `--version false` is not an instruction
+  // to do something else, and the something else here is `create` — which
+  // writes. Normalizing the value form (KD-16) turned `"false"` into `false`
+  // and would have walked this branch's own KD-15 straight back in: measured
+  // before the guard, `create-cmp --version false --yes` fell through the
+  // dispatcher and scaffolded an app while the user waited for a version
+  // string. A question asked in any form is answered.
+  if ("version" in flags || "v" in flags) {
     const here = path.dirname(fileURLToPath(import.meta.url));
     const pkg = JSON.parse(fs.readFileSync(path.join(here, "..", "package.json"), "utf8"));
     process.stdout.write(`${pkg.name} ${pkg.version}\n`);
     process.exit(0);
   }
 
-  if (flags.help || flags.h || command === "help") {
+  if ("help" in flags || "h" in flags || command === "help") {
     printHelp();
     process.exit(0);
   }
@@ -59,6 +68,24 @@ async function main() {
     process.stderr.write(
       `create-cmp: ${named} ${unknown.length + shortish.length === 1 ? "is not an argument" : "are not arguments"} this command knows.\n` +
         `  run \`create-cmp --help\` for the ones it does. Nothing was written.\n`
+    );
+    process.exit(2);
+  }
+
+  // A RECOGNISED FLAG CARRYING A VALUE IT CANNOT MEAN. `parseArgs` turns a
+  // declared boolean's `true`/`false` into the boolean; whatever is left here is
+  // a third word attached with `=`, which the check above cannot see because the
+  // NAME is known. Refused rather than guessed at, for the reason the block
+  // above gives: the alternative is `--dry-run=maybe` silently meaning its
+  // opposite. Only the `=` form can reach this — `--dry-run maybe ../app` leaves
+  // `maybe` a positional on purpose, because an adopter may have a directory
+  // called `maybe` and KD-7 is what refusing it would re-create.
+  const unreadable = unreadableBooleanValues(flags);
+  if (unreadable.length) {
+    const named = unreadable.map((f) => `--${f}=${flags[f]}`).join(", ");
+    process.stderr.write(
+      `create-cmp: ${named} — ${unreadable.length === 1 ? "that flag takes" : "those flags take"} \`true\` or \`false\`, or no value at all.\n` +
+        `  run \`create-cmp --help\` for what each one means. Nothing was written.\n`
     );
     process.exit(2);
   }

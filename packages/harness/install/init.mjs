@@ -53,6 +53,7 @@ const EXT_TO_LANGUAGE = new Map();
 for (const [name, exts] of Object.entries(LINGUIST.languages)) for (const e of exts) if (!EXT_TO_LANGUAGE.has(e)) EXT_TO_LANGUAGE.set(e, name);
 
 import { colors, ok, warn, fail } from "./log.mjs";
+import { flagBool } from "./args.mjs";
 import { MENU_FIELDS, contractAt } from "../src/lib/profile-contract.mjs";
 import { askLadderMenu } from "./interview.mjs";
 import { loadShippedDeclarations, notPortable } from "./portability.mjs";
@@ -898,7 +899,7 @@ export async function runHarnessInit(flags, positional, opts = {}) {
   const cmd = frontDoor(opts.invocation);
   const targetDir = (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
   const root = path.resolve(targetDir);
-  const dryRun = Boolean(flags["dry-run"]);
+  const dryRun = flagBool(flags, "dry-run", false);
 
   process.stdout.write(
     `\n${colors.bold(cmd.init)} — the verify lane, for any stack\n` +
@@ -947,7 +948,7 @@ export async function runHarnessInit(flags, positional, opts = {}) {
   // here, and again inside the pure plan — costs nothing worth a shared
   // variable threaded through a signature other callers depend on.
   const claimedBy = await profileClaims(root);
-  if (claimedBy.length > 0 && !flags["new-profile"]) {
+  if (claimedBy.length > 0 && !flagBool(flags, "new-profile", false)) {
     const c = claimedBy;
     fail(
       c.length === 1
@@ -972,7 +973,7 @@ export async function runHarnessInit(flags, positional, opts = {}) {
   // must never happen unattended. `--no-interview` says what it does. Nobody
   // ever had the old spelling: create-cmp-cli 0.25.0 was published 2026-09-09
   // and the interview merged on the 12th.
-  const noInterviewReason = flags["no-interview"]
+  const noInterviewReason = flagBool(flags, "no-interview", false)
     ? "--no-interview"
     : dryRun
         ? "--dry-run"

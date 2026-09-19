@@ -96,6 +96,56 @@ export function consumesNext(key, next, booleans = BOOLEAN_FLAGS) {
 }
 
 /**
+ * A declared boolean's VALUE form, as the boolean it MEANS.
+ *
+ * `consumesNext` lets `--dry-run true` past because `flagBool` is tri-state by
+ * contract. What arrived at the readers was the STRING, and it was wrong in
+ * both directions at once (KD-16). Measured on `8bd782a`, 2026-09-19:
+ *
+ *   Boolean("false") === true
+ *     create-cmp my-app --no-firebase true   → firebase: true, scaffolded anyway
+ *     prooflane init --new-profile false <claimed tree>
+ *                                           → the claimed-tree refusal never fired
+ *   "true" !== true, and ~24 readers spell `=== true`
+ *     create-cmp upgrade --dry-run true --yes → "(auto-yes)", "✓ wrote
+ *                                              gradle/libs.versions.toml", "Applied."
+ *
+ * Normalizing HERE, at the parser, is what makes every one of those readers —
+ * `=== true`, `!== true`, `Boolean(...)`, bare truthiness — correct at both
+ * front doors without touching a single one of them. A fix at the read sites
+ * has to find all of them today and again tomorrow.
+ *
+ * ANYTHING ELSE IS LEFT EXACTLY AS IT ARRIVED. `--minimal my-app` must keep
+ * meaning a directory called `my-app`, and an adopter may legitimately have one
+ * called `no` — refusing the space form here is how KD-7 comes back.
+ */
+export function coerceDeclaredBoolean(key, value, booleans = BOOLEAN_FLAGS) {
+  if (!takesNoValue(key, booleans)) return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}
+
+/**
+ * Declared booleans that reached the flag set still holding a STRING.
+ *
+ * After `coerceDeclaredBoolean` a boolean can only still hold a string when its
+ * value was ATTACHED with `=`, which never consults `consumesNext`. This door's
+ * parser does not split on `=` at all (KD-14) — `--dry-run=maybe` becomes a flag
+ * literally named `dry-run=maybe` and is refused as unknown — so this reader
+ * finds nothing here today. It is the same function as the harness door's, where
+ * the shape IS reachable, and it is the guard that comes with the `=` form the
+ * day this parser grows one.
+ *
+ * `=`-only is the whole safety argument: an attached value has no positional to
+ * lose, where refusing the SPACE form would make `--dry-run maybe ../app` an
+ * error instead of a directory named `maybe` — KD-7's shape, re-created.
+ */
+export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
+  return Object.keys(flags).filter((k) => takesNoValue(k, booleans) && typeof flags[k] === "string");
+}
+
+/**
  * Parse argv into positionals + flags. `--flag value` captures the value, unless
  * `--flag` takes none — then `value` stays the user's positional.
  * @param {string[]} argv
@@ -120,7 +170,7 @@ export function parseArgs(argv) {
     if (a === "--") continue;
       const key = a.slice(2);
       if (consumesNext(key, argv[i + 1])) {
-        args.flags[key] = argv[i + 1];
+        args.flags[key] = coerceDeclaredBoolean(key, argv[i + 1]);
         i++;
       } else {
         args.flags[key] = true;
@@ -132,12 +182,37 @@ export function parseArgs(argv) {
   return args;
 }
 
+/** One name's value as a tri-state: true, false, or "this name said nothing". */
+function triState(value) {
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  return undefined;
+}
+
 /**
- * Tri-state boolean flag: `--name`/`--name true` → true, `--no-name`/`--name false`
- * → false, otherwise the default.
+ * Tri-state boolean flag. The whole truth table, both spellings:
+ *
+ *   --x        --x true    --no-x false   → true
+ *   --no-x     --x false   --no-x true    → false
+ *   absent                                → the default
+ *
+ * BOTH NAMES GO THROUGH ONE HELPER, which is the half of KD-16 that lived here
+ * rather than in the parser: the old body read the value form of `x` and never
+ * of `no-x`, while `consumesNext` consumed it either way — so `--no-ios true`
+ * resolved to the DEFAULT and the flag the user typed did nothing at all.
+ *
+ * THE STRINGS ARE STILL READ, though `parseArgs` no longer produces one: this
+ * is also called with flag objects assembled in code and in tests, and a helper
+ * that answered two of its own three inputs would be the next KD-16.
+ *
+ * PRECEDENCE IS THE AFFIRMATIVE NAME'S, unchanged from the body it replaces and
+ * now pinned by test: on a contradictory line — `--ios false --no-ios false`,
+ * which neither door refuses — `x` answers and `no-x` is never consulted.
  */
 export function flagBool(flags, name, dflt) {
-  if (flags[name] === true || flags[name] === "true") return true;
-  if (flags[`no-${name}`] === true || flags[name] === "false") return false;
+  const stated = triState(flags[name]);
+  if (stated !== undefined) return stated;
+  const negated = triState(flags[`no-${name}`]);
+  if (negated !== undefined) return !negated;
   return dflt;
 }

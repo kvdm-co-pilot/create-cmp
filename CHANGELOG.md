@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **A declared boolean's VALUE form was stored as a string and read as a boolean, in both
+  directions.** `create-cmp upgrade --dry-run true --yes` wrote `gradle/libs.versions.toml` and
+  skipped the consent prompt, because ~24 readers compare `=== true` and `"true" !== true`;
+  `create-cmp my-app --no-firebase true` scaffolded Firebase anyway, and
+  `prooflane init --new-profile false <tree>` bypassed the guard protecting an existing profile,
+  because `Boolean("false") === true`. Both parsers now store the boolean a declared flag means, so
+  every existing read site is correct without changing one. A value that is neither `true` nor
+  `false` attached with `=` is refused by name; the space form is untouched, so
+  `create-cmp --minimal my-app` still works.
+
 
 - **A tree whose packages are not installed told a contributor their change broke three tests.**
   Measured 2026-09-18 in a fresh git worktree with `inspector/mcp`'s packages absent: `npm test`

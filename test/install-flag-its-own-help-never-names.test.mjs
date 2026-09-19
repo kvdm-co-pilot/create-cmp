@@ -56,14 +56,25 @@ function documentedFlags() {
   return new Set([...body.matchAll(/--([a-z][a-z0-9-]*)/g)].map((m) => m[1]));
 }
 
-/** Every flag the install commands branch on, and where. */
+/**
+ * Every flag the install commands branch on, and where.
+ *
+ * `flagBool(flags, "x")` IS A BRANCH, and reading only the subscript spellings
+ * made this scan blind to the better one. KD-16's fix routed the installer's six
+ * boolean reads through `flagBool`, and the literal `flags["dry-run"]` /
+ * `flags["new-profile"]` / `flags["no-interview"]` left the tree with them: the
+ * scan dropped to three names — `--dry-run`, the flag this door's own output
+ * tells the user about by name, among the ones it stopped seeing. The floor in
+ * the test below caught it, which is what a floor is for; the answer is to read
+ * the third spelling, not to lower the floor.
+ */
 function branchedFlags() {
   const sources = trackedSources(REPO_ROOT, (rel) => !rel.startsWith("packages/harness/install/"));
   assert.ok(sources.size >= 3, `scanned ${sources.size} install modules — this test has lost sight of the commands it is for`);
   const out = new Map();
   for (const [, { rel, raw }] of sources) {
-    for (const m of codeOf(raw).matchAll(/\bflags\s*(?:\[\s*"([^"]+)"\s*\]|\.([A-Za-z_$][\w$]*))/g)) {
-      const flag = m[1] ?? m[2];
+    for (const m of codeOf(raw).matchAll(/flagBool\(\s*flags\s*,\s*"([^"]+)"|\bflags\s*(?:\[\s*"([^"]+)"\s*\]|\.([A-Za-z_$][\w$]*))/g)) {
+      const flag = m[1] ?? m[2] ?? m[3];
       out.set(flag, new Set([...(out.get(flag) ?? []), rel]));
     }
   }
