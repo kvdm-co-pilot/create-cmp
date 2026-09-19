@@ -194,6 +194,8 @@ you the same list without opening anything.
 | **KD-153** | the refusal for a declared boolean still holding a string is unreachable at create-cmp's door — that parser never splits `=` (KD-14), so `--dry-run=maybe` is refused as an unknown flag NAME instead | the user is refused either way, by a sentence that names what they typed; the guard is there for the day KD-14 is closed, and pinned equal to prooflane's by the two-spellings test |
 | **KD-163** | the KD-15 guard's new value-form test drives `bin/create-cmp.mjs` with the REPOSITORY as its working directory, asserts only exit code and stdout, and sets no `timeout` — where the sibling test for the same defect class sandboxes the cwd, asserts it is still empty, and times out at 60s | cannot fire while the guard holds, and `myapp/` is gitignored so no gate reads what it would write. What is logged is a gate whose failure mode is a multi-minute untimed Gradle build inside `npm test` rather than an assertion |
 | **KD-164** | the reason given in BOTH new copies of the arg parser for not sharing one module — "the published root tarball carries no copy of this directory" — is refuted by `npm pack` on the root: all nine files of `packages/harness/install/` ship, `args.mjs` beside `src/lib/args.mjs` in one 389-file tarball, and `package.json`'s `files` names the directory outright | the DECISION is right for a reason the comment does not give: `prooflane-harness`'s own 94-file tarball carries `install/args.mjs` and no `src/`, so the harness alone still cannot import the root's copy. Nobody is mis-served; the next reader of either file is told a packaging fact this tree answers the other way |
+| **KD-165** | the suite verdict recorded against the exact bytes this slice merges is FAIL — `test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs`'s second case failed inside a full run that took 268s where the same suite takes ~36s, and passes alone here in 7.4s | not the slice's code: that test imports `scripts/hooks/proof-gate.mjs` and nothing the KD-16 change touches. It is KD-131's class (same bytes, two verdicts) with a NEW member outside the inspector — a test of a refusal path, whose verdict rests on wall-clock budgets — and KD-131 scoped itself to the inspector |
+| **KD-166** | "when is this product's output styled" has two spellings that disagree: `src/lib/log.mjs` re-exports picocolors, which colours when `CI` is set even through a pipe, while `packages/harness/install/log.mjs` gates on `process.stdout.isTTY` and never colours through one | measured green both ways today — all 20 test files that drive `bin/create-cmp.mjs` pass with `CI=true` (154/154) — so no live member. What is logged is that the class has now been answered TWICE per-file (`bf79f72` here, and `the-fleet-command-…` before it) rather than once at the source, and that an adopter's piped CI log carries escape codes from one door and not the other |
 
 ---
 
@@ -2800,3 +2802,103 @@ away, in both directions.
 **Fires when:** anyone reasons about whether the duplication can be collapsed.
 *Logged 2026-09-19, review round 1 of `fix-boolean-value-form-inverted-2`. Found by packing both
 packages rather than reading the comment.*
+
+### KD-165 — the suite verdict recorded for the bytes that merge is FAIL, from a test whose verdict rests on wall-clock budgets
+
+`test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs` (second case),
+`qa-artifacts/suite-history.jsonl`
+
+`node scripts/proof-plan.mjs` on this branch reads out, for `bf79f72`:
+
+```
+suite   FAIL 2122/2124, 1 failing recorded 2026-09-19T05:47 for this exact tree
+        failing: "a git call that died outside the kill-timer is not an answer:
+                  crashing each one in turn must cost the check its verdict, never win one"
+```
+
+**It is not this slice's code.** That file imports `scripts/hooks/proof-gate.mjs`; nothing in the
+KD-16 change — neither parser, neither bin, none of the six installer read sites — is on its
+import graph. What the record also carries is the condition it failed under: `durationMs` is
+**268552** against **35489** and **36400** for the two full runs of the same branch ninety minutes
+earlier, a 7.4× slowdown of the whole suite.
+
+Executed here, 2026-09-19, on the same bytes:
+
+```
+$ node --test test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs
+  ✔ 2 pass, 0 fail, duration_ms 7722          (the case itself: 7423ms)
+$ 12 concurrent CPU burners, same command
+  ✔ 2 pass, 0 fail                             (the case itself: 4048ms)
+```
+
+So it did not reproduce at the load available here, and the entry claims no diagnosis it cannot
+show. What the test's own structure shows is where load reaches it: each of its six cases spawns
+git with `budgetMs: REMOTE_CALL_CAP_MS` and then asserts `elapsed < NO_CAP_WAS_WAITED_OUT_MS` —
+two wall-clock bounds per case, either of which a loaded machine crosses without the code under
+test being wrong. Its own failure message names the first of them and tells the reader to *"raise
+budgetMs at this call site, do not relax the bound"*.
+
+**Why logged and not fixed.** No adopter runs this repository's suite, and the check the test
+guards is not degraded — its refusal path is unchanged and green when the machine is not busy.
+Raising either bound is the one remedy the test explicitly refuses, and re-running the suite is
+not a fix, it is the measurement. This is KD-131's class exactly (the same bytes carrying a FAIL
+and a PASS), with one thing genuinely new: KD-131 and KD-56 both scope themselves to
+`inspector/mcp/`, and this member is a test of the **proof gate's own refusal path**, so the
+sentence "no adopter runs this repository's inspector tests" no longer covers the class.
+
+**Consequence for the merge, which belongs to the author and not here:** the recorded verdict for
+these bytes is FAIL, and `proof-plan.mjs` prints *"read it, do not re-run it"*. The suite has to
+come back green on the merging bytes before Prove can discharge, and the honest way is a run on
+an unloaded machine.
+
+**Fires when:** the suite runs on a machine busy enough to stretch it past ~4×, which on this
+project is a device lane, a Gradle build, or several agent sessions at once.
+*Logged 2026-09-19, review round 2 (re-record) of `fix-boolean-value-form-inverted-2`. Found by
+reading the plan's suite line rather than re-running it.*
+
+### KD-166 — two spellings of "when is this product's output styled", and the test suite pays for the disagreement one file at a time
+
+`src/lib/log.mjs` vs `packages/harness/install/log.mjs`; `bf79f72`'s fix in
+`test/a-dry-run-asked-for-in-words-writes-the-tree.test.mjs`
+
+One product, two front doors, two rules for colour:
+
+```
+src/lib/log.mjs                      export const colors = pc        // picocolors
+packages/harness/install/log.mjs     const enabled = !NO_COLOR && TERM !== "dumb"
+                                                     && Boolean(process.stdout.isTTY)
+```
+
+picocolors also enables colour when `CI` is set, *whether or not stdout is a terminal*. The
+harness's copy does not — its docblock says so outright: *"a log piped into a file or a CI
+transcript carries no escape codes"*. So the same run through a pipe is styled at one door and
+plain at the other.
+
+**What it cost, twice.** `bf79f72` is the second per-file answer to this in the suite. `create-cmp
+upgrade` prints `Dry run` in yellow, so under `CI=true` the reset lands mid-phrase and
+`/Dry run — nothing written/` misses a message that is right there: green on a laptop, red on all
+three CI Node versions. The fix strips styling in that file's `run()` helper — and
+`test/the-fleet-command-names-a-front-door-the-caller-did-not-use.test.mjs` already carried its
+own stripper for the same reason. Two files have the guard; **eighteen** other test files drive
+`bin/create-cmp.mjs` and assert on its output without one.
+
+Measured here, 2026-09-19, all twenty driven under the failing condition:
+
+```
+$ CI=true node --test <every test file that spawns bin/create-cmp.mjs>
+  ℹ tests 154   ℹ pass 154   ℹ fail 0
+```
+
+so the class has no live member today: the other eighteen either assert on unstyled words or
+match across the escape codes by accident.
+
+**Why logged and not fixed.** Nobody is wrongly served. The adopter-facing half is cosmetic —
+escape codes in a piped CI log from `create-cmp` and none from `prooflane` — and picocolors'
+CI detection is a deliberate behaviour of a dependency this product chose. The contributor-facing
+half has no live member to red. The honest remedies are both bigger than a review: one shared
+stripper in `test/helpers/`, or one shared answer to the colour question that both doors read.
+
+**Fires when:** the next assertion is written against a create-cmp word the command styles — it
+will be green for its author and red on every runner, which is the shape this already took twice.
+*Logged 2026-09-19, review round 2 (re-record) of `fix-boolean-value-form-inverted-2`. Found by
+running the bin-driving half of the suite with `CI=true` rather than reading the fix.*
