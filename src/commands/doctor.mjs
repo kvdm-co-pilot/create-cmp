@@ -20,6 +20,7 @@ import { flagBool } from "../lib/args.mjs";
 import { colors, ok } from "../lib/log.mjs";
 import { probe } from "../bootstrap/exec.mjs";
 import { doctor as toolchainDoctor } from "../doctor.mjs";
+import { ANCHORABLE_SURFACES, anchorViolations, PROJECT_DIR_ANCHOR } from "../lib/hooks.mjs";
 import { diagnoseProject } from "../lib/project-doctor.mjs";
 import { parseProperties, upsertProperty, parseVersions } from "../lib/toml.mjs";
 import { loadRegistry } from "../lib/registry.mjs";
@@ -105,23 +106,98 @@ function invokesWalk(entry) {
 }
 
 /**
- * Is the walk installed, and does .claude/settings.json invoke it? The machinery
- * and the wiring live in separately-owned files (lane vs app config), so they can
- * and do come apart — see the walk-wiring finding in project-doctor.mjs.
+ * The surfaces that invoke the walk with a command that resolves ONLY from the
+ * project root: `"statusLine"`, and the event name of any walk hook still written
+ * cwd-relative. `[]` means every invocation present will resolve from any cwd.
+ *
+ * Presence is not wiring, and `invokesWalk` above can only answer presence — it is
+ * a substring test, so the pre-0.26.3 `node qa/walk-status.mjs --statusline`
+ * satisfies it while resolving against the SESSION's directory rather than this
+ * one. That is the whole defect this exists to close: the walk fails by printing
+ * nothing (`|| true`), so an `ok` here is the only thing standing between an
+ * adopter and a surface that silently does nothing.
+ *
+ * Asked of `anchorViolations` (src/lib/hooks.mjs) rather than re-derived here,
+ * because that detector is SURFACE-AWARE: it credits `${CLAUDE_PROJECT_DIR:-.}` on
+ * a hook, where Claude Code sets the variable, and refuses to credit it on a
+ * statusLine, where it does not (`ANCHORABLE_SURFACES`). A second opinion written
+ * here is exactly how doctor would come to score an inert anchor as protection —
+ * the failure `test/inert-anchor-scored-as-protection.test.mjs` forbids one level
+ * down, in the detector this call reuses.
+ */
+function cwdRelativeWalkSurfaces(settings) {
+  const surfaces = anchorViolations(settings)
+    .filter((v) => v.paths.some((p) => p.endsWith("walk-status.mjs")))
+    .map((v) => v.event ?? v.kind);
+  // On a surface the anchor cannot reach, PRESENCE is the whole answer: no form
+  // is established to resolve there, so there is nothing for the detector to
+  // credit. Asked separately because `anchorViolations` only sees a path with a
+  // directory segment (SCRIPT_PATH, KD-86) — `node walk-status.mjs --statusline`
+  // names none and read `ok` here until this line, while being exactly as bound
+  // to the session's directory as the form that did not. Reading the declaration
+  // rather than restating it means the day `statusLine` becomes anchorable, this
+  // check stops making the claim on its own.
+  if (ANCHORABLE_SURFACES.statusLine !== true && invokesWalk(settings?.statusLine)) {
+    surfaces.push("statusLine");
+  }
+  return [...new Set(surfaces)];
+}
+
+/**
+ * Surfaces whose command CARRIES the anchor. Positive evidence, and that is the
+ * whole point of it: the sibling list is derived from a DETECTOR'S SILENCE, and a
+ * detector has blind spots (a path with no directory segment, KD-86; a
+ * single-quoted span, KD-87). On a surface it cannot see, "no violation" means
+ * "nothing was examined" — so reading health out of it prints reassurance about a
+ * command nobody checked, which is the defect this whole finding exists to stop,
+ * one surface over.
+ *
+ * A hook surface counts only when EVERY invocation of the walk on it is anchored.
+ * One unanchored invocation is a session that silently gets nothing, and a surface
+ * that works sometimes is not one a health check may call working.
+ */
+function anchoredWalkSurfaces(settings) {
+  const carries = (entry) => String(entry?.command ?? "").includes(PROJECT_DIR_ANCHOR);
+  // Carrying the anchor is not the same as the WALK's own path carrying it. The
+  // template anchors its hook twice, so a hand-upgrade that anchors the `test -f`
+  // and leaves `node qa/walk-status.mjs` relative contains the anchor and resolves
+  // nowhere — and an anchor on an unrelated path, or inside quoted narration, does
+  // the same. Whatever the detector calls cwd-relative is therefore subtracted
+  // here, so these two lists cannot both name one surface. A surface in both would
+  // be this program disagreeing with itself, whichever half is right.
+  const inert = cwdRelativeWalkSurfaces(settings);
+  const out = [];
+  if (ANCHORABLE_SURFACES.statusLine === true && invokesWalk(settings?.statusLine) && carries(settings.statusLine)) {
+    out.push("statusLine");
+  }
+  const groups = settings?.hooks?.UserPromptSubmit ?? [];
+  const invocations = groups.flatMap((g) => (g?.hooks ?? []).filter(invokesWalk));
+  // Keyed `hooks`, not by event name — read the declaration, do not restate it.
+  if (ANCHORABLE_SURFACES.hooks === true && invocations.length > 0 && invocations.every(carries)) {
+    out.push("UserPromptSubmit");
+  }
+  return out.filter((s) => !inert.includes(s));
+}
+
+/**
+ * Is the walk installed, does .claude/settings.json invoke it, and will those
+ * invocations RESOLVE? The machinery and the wiring live in separately-owned files
+ * (lane vs app config), so they can and do come apart — see the walk-wiring
+ * finding in project-doctor.mjs.
  */
 export function gatherWalkInputs(projectDir) {
   const scriptPresent = fs.existsSync(path.join(projectDir, "qa", "walk-status.mjs"));
   if (!scriptPresent) return null; // not a walk-carrying lane — nothing to say
   const raw = readIfExists(path.join(projectDir, ".claude", "settings.json"));
   if (raw === null) {
-    return { scriptPresent, settingsPresent: false, statusLine: false, promptHook: false };
+    return { scriptPresent, settingsPresent: false, statusLine: false, promptHook: false, cwdRelative: [], anchored: [] };
   }
   let settings;
   try {
     settings = JSON.parse(raw);
   } catch {
     // Unparseable settings invoke nothing, which is exactly what we report.
-    return { scriptPresent, settingsPresent: true, statusLine: false, promptHook: false };
+    return { scriptPresent, settingsPresent: true, statusLine: false, promptHook: false, cwdRelative: [], anchored: [] };
   }
   return {
     scriptPresent,
@@ -130,6 +206,8 @@ export function gatherWalkInputs(projectDir) {
     promptHook: (settings.hooks?.UserPromptSubmit ?? []).some((g) =>
       (g?.hooks ?? []).some(invokesWalk)
     ),
+    cwdRelative: cwdRelativeWalkSurfaces(settings),
+    anchored: anchoredWalkSurfaces(settings),
   };
 }
 
