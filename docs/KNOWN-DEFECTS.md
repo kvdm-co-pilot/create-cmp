@@ -219,6 +219,8 @@ you the same list without opening anything.
 | **KD-207** | `DEVICE_TIER_IRRELEVANT` declares `*.md` unable to OBLIGE a device run, and markdown under `template/` ships into the stamped app, so the same file's bytes can REOPEN a discharged slice | pre-existing in the same shape and unchanged in severity; the direction is the safe one — a shipped doc can cost a run, never hide one — and the fix is a product decision between two spellings, both with a cost |
 | **KD-208** | the hook's four bounds now sum to exactly its declared budget — `1000 + 3000 + 2500 + 3500 = 10000`, the 10 s `.claude/settings.json` declares — because answering a payload now includes a stamp | the arithmetic test asserts `sum <= budget` and passes, every bound has its own kill-timer so the sum is a worst case that needs all four to saturate, and the measured real answer is ~0.5 s; what is gone is the slack |
 | **KD-209** | `grep -r` here obeys the scanned tree's own `.gitignore`, so a scan of a stamped app silently omits `local.properties` — the file that carries this machine's SDK path | a fact about the tooling, not the tree, logged because it nearly cost a slice a defect: `find … -exec /usr/bin/grep -l …` lists both files, and that is how the three normalisers were shown complete |
+| **KD-210** | a Firebase run proves the template COMPILES, INITIALISES and REDIRECTS — no byte crosses the redirect | nothing in `commonMain` uses a Firebase client and the smoke walk is four screens, so the suite serves zero requests; the risk is a record read as "the redirect carried traffic" |
+| **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production |
 
 ---
 
@@ -3418,3 +3420,48 @@ normalisers in `scripts/stamped-output.mjs` were found to be complete.
 
 **Fires when:** any future audit of a generated tree uses `grep -r` and concludes a pattern is absent.
 *Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
+
+### KD-210 — a Firebase run would prove compile, init and redirect; nothing in the template crosses the redirect
+
+`template/composeApp/src/androidMain/kotlin/com/example/app/AppApplication.kt`
+(`configureFirebaseEmulators`) · `template/qa/e2e/smoke.yaml`
+
+What a covered run executes, exactly: the app is BUILT with the GitLive dependencies and the
+google-services plugin, `assembleRelease`/R8 runs over them, `FirebaseApp` initialises from the
+stamped placeholder `google-services.json`, and `configureFirebaseEmulators()` runs all four
+`useEmulator` calls — which is where both escaped redirect defects lived, and where the app now
+REFUSES to start if the redirect fails (`AppApplication.kt:86`, a thrown `IllegalStateException`
+rather than the `runCatching` that once swallowed it). What it does NOT prove is that traffic
+reaches the emulators: nothing in `commonMain` uses a Firebase client — `dev.gitlive` appears only
+in `androidMain/AppApplication.kt` and `iosMain/KoinHelper.kt`, verified on this tree — and
+`qa/e2e/smoke.yaml` walks first frame, the item list and two tab switches, so the suite would serve
+zero requests and would serve zero if it were never started.
+
+The emulator suite is worth running anyway: `useEmulator` is a promise about where traffic WOULD go,
+and the first flow that reads a document needs it. What must not happen is a record being read as
+*"the redirect carried traffic"*.
+
+**Fires when:** anyone reads a Firebase PASS as evidence that the app talked to the emulators.
+*Logged 2026-09-21 by the wave's Firebase fixer, from reading the template rather than from a run;
+folded here 2026-09-22 because it describes the template on this tree, not the held branch's
+machinery.*
+
+### KD-211 — the redirect host assumes the lane's device is an emulator
+
+`template/composeApp/build.gradle.kts:230` (`FIREBASE_EMULATOR_HOST`) ·
+`template/composeApp/src/androidDebug/res/xml/debug_network_security_config.xml`
+
+The stamped app redirects to `10.0.2.2`, the Android emulator's alias for the host's loopback, and a
+Firebase emulator suite binds `127.0.0.1` because that is where the alias leads. If the lane's device
+is not an emulator — `CMP_AVD` unset, a phone on USB — `10.0.2.2` is not the host, the startup
+redirect fails, and because the template refuses to start rather than fall through to production
+(KD-210) the failure is loud and the lane goes red at `e2eSmoke`.
+
+The half of this that can refuse a wrongly declared host lives in the run machinery on branch
+`wave/firebase` (`emulatorPlanFor`), which is not on this tree; what is on this tree is the
+assumption itself, in the two files above. Loud and never silent, and the direction is the safe one:
+a physical device cannot make a Firebase run pass against production.
+
+**Fires when:** someone runs the covered check with a physical device attached.
+*Logged 2026-09-21 by the wave's Firebase fixer; folded here 2026-09-22, re-aimed at the template
+files that carry the assumption on this tree.*
