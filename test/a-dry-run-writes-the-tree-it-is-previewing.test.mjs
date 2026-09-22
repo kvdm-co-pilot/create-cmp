@@ -90,10 +90,14 @@ function snapshot(dir) {
 
 const strip = (s) => String(s ?? "").replace(/\x1b\[[0-9;]*m/g, "");
 
-/** `create-cmp doctor --fix [--dry-run] --yes …`, hermetic: empty HOME, minimal PATH. */
-function doctorFix(dir, { dryRun }) {
+/**
+ * `create-cmp doctor --fix [--dry-run] --yes …`, hermetic: empty HOME, minimal PATH.
+ * `sdk` is ANDROID_HOME — the same directory for two runs being compared, since the
+ * heal's own message names the path it wrote.
+ */
+function doctorFix(dir, { dryRun, sdk = null }) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-dry-run-home-"));
-  const sdk = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-dry-run-sdk-"));
+  const ownSdk = sdk === null ? fs.mkdtempSync(path.join(os.tmpdir(), "cmp-dry-run-sdk-")) : null;
   try {
     const r = spawnSync(
       process.execPath,
@@ -112,7 +116,7 @@ function doctorFix(dir, { dryRun }) {
         env: {
           HOME: home,
           // A real SDK directory, so the local.properties heal has something to write.
-          ANDROID_HOME: sdk,
+          ANDROID_HOME: sdk ?? ownSdk,
           PATH: [path.dirname(process.execPath), "/usr/bin", "/bin"].join(path.delimiter),
           NO_COLOR: "1",
         },
@@ -127,7 +131,7 @@ function doctorFix(dir, { dryRun }) {
     return out;
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
-    fs.rmSync(sdk, { recursive: true, force: true });
+    if (ownSdk !== null) fs.rmSync(ownSdk, { recursive: true, force: true });
   }
 }
 
@@ -184,9 +188,10 @@ test("a dry run says what it WOULD have done, in the words the real run uses", (
   // each other, and a heal cannot go silent under the flag.
   const real = project();
   const dry = project();
+  const sdk = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-dry-run-sdk-"));
   try {
-    const realOut = doctorFix(real, { dryRun: false });
-    const dryOut = doctorFix(dry, { dryRun: true });
+    const realOut = doctorFix(real, { dryRun: false, sdk });
+    const dryOut = doctorFix(dry, { dryRun: true, sdk });
     assert.deepEqual(
       wouldWrite(dryOut),
       wrote(realOut),
@@ -196,6 +201,7 @@ test("a dry run says what it WOULD have done, in the words the real run uses", (
   } finally {
     fs.rmSync(real, { recursive: true, force: true });
     fs.rmSync(dry, { recursive: true, force: true });
+    fs.rmSync(sdk, { recursive: true, force: true });
   }
 });
 

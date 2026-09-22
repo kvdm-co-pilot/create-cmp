@@ -8,7 +8,9 @@
 //
 // --fix applies only SAFE heals (write local.properties from ANDROID_HOME, add
 // ksp.useKSP2=true, wire the walk into .claude/settings.json); everything else
-// prints the exact manual step.
+// prints the exact manual step. Every one of them writes through `healWriter`, so
+// --dry-run previews all of them and writes none — it used to reach the toolchain
+// installer alone, and a dry run wrote three files.
 //
 // ONE of those heals rewrites a command that is already there, and it is the only
 // one that asks first: `healShippedHookCommands` replaces a hook command that is
@@ -404,8 +406,53 @@ function scanInspectorSources(projectDir) {
   };
 }
 
-/** Apply the SAFE auto-heals for --fix. Returns ids of findings it fixed. */
-export function applySafeFixes(projectDir, findings, inputs) {
+/**
+ * THE ONE PLACE A PROJECT HEAL TOUCHES THE ADOPTER'S TREE, and the only thing
+ * `--dry-run` has to be remembered in.
+ *
+ * It was remembered in none of them. `--dry-run` reached the toolchain installer and
+ * stopped there, so `create-cmp doctor --fix --dry-run` wrote local.properties from
+ * ANDROID_HOME, ksp.useKSP2 into gradle.properties, and CREATED .claude/settings.json in
+ * a project that had none — measured, and the same class as KD-16's
+ * `upgrade --dry-run true` writing the version catalog. A dry run that changes the tree
+ * is the first row of the line docs/KNOWN-DEFECTS.md opens with, whenever it arrived.
+ *
+ * A check per heal would have been three checks and a fourth thing to remember, which is
+ * the shape that produced the defect. So the flag lives here, the heals describe their
+ * act and hand it over, and a dry run prints the same words the real run does — the two
+ * runs read against each other, and a heal cannot quietly go silent under the flag.
+ * `test/a-dry-run-writes-the-tree-it-is-previewing.test.mjs` refuses a heal in this file
+ * that reaches around this function.
+ *
+ * @param {{dryRun?: boolean}} opts
+ * @returns {((target:string, content:string, what:string) => boolean) & {wrote:number}}
+ *          `what` is a noun phrase completing "wrote …" / "would write …". The return
+ *          says whether the tree actually changed; `.wrote` counts the times it did.
+ */
+export function healWriter({ dryRun = false } = {}) {
+  const write = (target, content, what) => {
+    if (dryRun) {
+      process.stdout.write(`${colors.dim(`[dry-run] --fix: would write ${what}`)}\n`);
+      return false;
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
+    write.wrote += 1;
+    ok(`--fix: wrote ${what}`);
+    return true;
+  };
+  write.wrote = 0;
+  return write;
+}
+
+/**
+ * Apply the SAFE auto-heals for --fix. Returns ids of findings it healed — under
+ * `--dry-run`, the ids it WOULD have healed, since the report is the point of the flag.
+ * @param {Function} [write] the tree-touching mechanism (see `healWriter`). Defaults to
+ *        one that really writes, so a caller that never heard of the flag cannot get a
+ *        silent no-op instead of a heal.
+ */
+export function applySafeFixes(projectDir, findings, inputs, write = healWriter()) {
   const fixed = [];
   for (const f of findings) {
     if (!f.fix || !f.fix.auto || f.level === "ok") continue;
@@ -417,8 +464,7 @@ export function applySafeFixes(projectDir, findings, inputs) {
       const existing = readIfExists(target) ?? "";
       const { content, changed } = upsertProperty(existing, "sdk.dir", sdk);
       if (changed) {
-        fs.writeFileSync(target, content);
-        ok(`--fix: wrote sdk.dir=${sdk} to local.properties`);
+        write(target, content, `sdk.dir=${sdk} to local.properties`);
         fixed.push(f.id);
       }
     }
@@ -453,9 +499,11 @@ export function applySafeFixes(projectDir, findings, inputs) {
         }
       }
       if (changed) {
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.writeFileSync(target, `${JSON.stringify(settings, null, 2)}\n`);
-        ok("--fix: wired the walk into .claude/settings.json (statusLine + UserPromptSubmit)");
+        write(
+          target,
+          `${JSON.stringify(settings, null, 2)}\n`,
+          "the walk into .claude/settings.json (statusLine + UserPromptSubmit)"
+        );
         fixed.push(f.id);
       }
     }
@@ -465,8 +513,7 @@ export function applySafeFixes(projectDir, findings, inputs) {
       const existing = inputs.gradleProperties ?? "";
       const { content, changed } = upsertProperty(existing, "ksp.useKSP2", "true");
       if (changed) {
-        fs.writeFileSync(target, content);
-        ok(`--fix: set ksp.useKSP2=true in gradle.properties`);
+        write(target, content, "ksp.useKSP2=true into gradle.properties");
         fixed.push(f.id);
       }
     }
@@ -492,10 +539,13 @@ export function applySafeFixes(projectDir, findings, inputs) {
  * declines and says what it would have done, `--dry-run` writes nothing at all.
  *
  * @param {string} projectDir
- * @param {{assumeYes?:boolean, dryRun?:boolean, ask?:Function}} opts
+ * @param {{assumeYes?:boolean, dryRun?:boolean, ask?:Function, write?:Function}} opts
  * @returns {Promise<boolean>} did the file change?
  */
-export async function healShippedHookCommands(projectDir, { assumeYes = false, dryRun = false, ask = consent } = {}) {
+export async function healShippedHookCommands(
+  projectDir,
+  { assumeYes = false, dryRun = false, ask = consent, write = healWriter({ dryRun }) } = {}
+) {
   const target = path.join(projectDir, ".claude", "settings.json");
   const raw = readIfExists(target);
   if (raw === null) return false;
@@ -514,18 +564,21 @@ export async function healShippedHookCommands(projectDir, { assumeYes = false, d
   for (const r of plan.rewrites) {
     process.stdout.write(`  ${r.location}\n    ${colors.red(`- ${r.from}`)}\n    ${colors.green(`+ ${r.to}`)}\n`);
   }
-  if (dryRun) {
-    process.stdout.write(`  ${colors.dim("[dry-run] nothing written.")}\n`);
-    return false;
+  // The consent question is skipped under --dry-run rather than asked and ignored: a
+  // prompt whose answer cannot matter teaches an adopter that the prompt does not mean
+  // anything. The preview above, plus the writer's line below, is what the flag owes.
+  if (!dryRun) {
+    const approved = await ask(`  Rewrite ${n === 1 ? "it" : "them"} in ${target}?`, { assumeYes });
+    if (!approved) {
+      process.stdout.write(`  ${colors.dim(".claude/settings.json left exactly as it was.")}\n`);
+      return false;
+    }
   }
-  const approved = await ask(`  Rewrite ${n === 1 ? "it" : "them"} in ${target}?`, { assumeYes });
-  if (!approved) {
-    process.stdout.write(`  ${colors.dim(".claude/settings.json left exactly as it was.")}\n`);
-    return false;
-  }
-  fs.writeFileSync(target, plan.content);
-  ok(`--fix: anchored ${n} hook command${s} create-cmp shipped, in .claude/settings.json`);
-  return true;
+  return write(
+    target,
+    plan.content,
+    `the anchored form of ${n} hook command${s} create-cmp shipped, into .claude/settings.json`
+  );
 }
 
 function printFindings(findings) {
@@ -571,16 +624,22 @@ export async function runDoctor(flags, positional) {
     let findings = diagnoseProject(inputs);
 
     if (flags.fix === true) {
-      const fixed = applySafeFixes(projectDir, findings, inputs);
+      // ONE writer for every heal in this command, so `--dry-run` is answered in one
+      // place. `write.wrote` counts real writes: under the flag it stays 0, and the
+      // report below is therefore the diagnosis of the tree as it still stands — which
+      // is what a preview is for.
+      const write = healWriter({ dryRun: flags["dry-run"] === true });
+      const fixed = applySafeFixes(projectDir, findings, inputs, write);
       const rewrote = await healShippedHookCommands(projectDir, {
         assumeYes: flags.yes === true,
         dryRun: flags["dry-run"] === true,
+        write,
       });
-      if (fixed.length > 0 || rewrote) {
+      if (write.wrote > 0) {
         // Re-diagnose so the report reflects the healed state.
         inputs = gatherProjectInputs(projectDir);
         findings = diagnoseProject(inputs);
-      } else if (!findings.some((f) => f.id === "shipped-hooks")) {
+      } else if (fixed.length === 0 && !rewrote && !findings.some((f) => f.id === "shipped-hooks")) {
         // A heal that was offered and declined (or previewed) is not "nothing
         // auto-fixable" — saying so would contradict the lines just printed.
         process.stdout.write(`${colors.dim("--fix: nothing auto-fixable found.")}\n`);
