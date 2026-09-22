@@ -266,28 +266,43 @@ test("the two spellings of the shared functions are the same function", () => {
     const [a, b] = texts.map((t) => asCode(functionSource(t.text, name)));
     assert.equal(a, b, `${name} has drifted between ${texts[0].door.file} and ${texts[1].door.file}`);
   }
+
+  // `parseArgs` too, since KD-14 closed. The two used to differ by the `=`
+  // branch, which is why this comparison left them out; what is left between
+  // them is what each door calls its result — `_` at create-cmp, `positionals`
+  // at prooflane, both read by callers that cannot be renamed in one slice. So
+  // the RETURN is the one statement set aside, and everything that decides what
+  // a token means is compared as code.
+  const result = /return \{[^{}]*\}; \}$/;
+  const [a, b] = texts.map((t) => {
+    const code = asCode(functionSource(t.text, "parseArgs"));
+    assert.match(code, result, `parseArgs in ${t.door.file} no longer ends in the one return this comparison sets aside`);
+    return code.replace(result, "return RESULT; }");
+  });
+  assert.equal(a, b, `parseArgs has drifted between ${texts[0].door.file} and ${texts[1].door.file} — one line, two parses`);
 });
 
 test("the two spellings answer the same argv the same way", () => {
-  // The source comparison above cannot see `parseArgs` — the two differ by the
-  // `=` branch and by what they name their positionals — so the shared
-  // BEHAVIOUR is asserted over argv instead, on the flags both doors declare
+  // The source comparison above sees `parseArgs` with its return set aside; the
+  // two doors' BOOLEAN_FLAGS still differ, so the shared BEHAVIOUR is asserted
+  // over argv as well, on the flags both doors declare
   // boolean. A divergence here is `create-cmp harness init` and `prooflane
   // init` doing different things with one line, which is the fork
   // `a-flag-is-boolean-to-one-reader-and-not-to-the-other.test.mjs` exists for.
   //
-  // THE `=` FORM IS NOT IN THIS TABLE, and the first run of this test is why:
-  // it listed every shared boolean as a divergence, because `--dry-run=true` is
-  // a flag named `dry-run` to prooflane and a flag named `dry-run=true` to
-  // create-cmp. That is real and it is KD-14 — a door that never offered the
-  // form — not something this slice's coercion introduced or may quietly close.
-  // Each door's own `=` behaviour is pinned in the shape table above instead.
+  // THE `=` FORM IS IN THIS TABLE, and was not when it was written: its first
+  // run listed every shared boolean as a divergence, because `--dry-run=true`
+  // was a flag named `dry-run` to prooflane and a flag named `dry-run=true` to
+  // create-cmp. That was KD-14, and the slice that closed it put the rows back.
   const shared = [...CLI_BOOLEANS].filter((n) => HARNESS_BOOLEANS.has(n));
   assert.ok(shared.length >= 3, `the two doors share ${shared.length} boolean flags — the table is not testing much`);
 
+  const attached = (name) => [
+    [`--${name}=true`], [`--${name}=false`], [`--no-${name}=true`], [`--no-${name}=false`],
+  ];
   const disagreed = [];
   for (const name of shared) {
-    for (const row of [...TRUTH_TABLE.map((r) => r.argv(name)), [`--${name}`, "maybe"], [`--${name}`, "no"]]) {
+    for (const row of [...TRUTH_TABLE.map((r) => r.argv(name)), ...attached(name), [`--${name}`, "maybe"], [`--${name}`, "no"]]) {
       const argv = [...row, "./target"];
       const a = parseCliArgs(argv);
       const b = parseHarnessArgs(argv);
