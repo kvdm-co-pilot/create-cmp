@@ -47,17 +47,23 @@
 // is the HABIT, not the judgement: the record is bound to a tree, so it cannot
 // be recycled across changes, and what reviews produce can be counted over time.
 //
-// THE ORDERING RULE, AND WHY IT IS THE HONEST ANSWER. A device run proves a
-// TREE. Any later edit to a trigger path — a comment included, because nothing
-// here can tell a comment from a statement without parsing every language it
-// might meet — leaves the run describing a tree that no longer exists. Rather
-// than pretend some edits are safe, this makes the ordering explicit: the
-// device tier is the LAST gate, and a trigger path edited after a discharge
-// REOPENS the slice and says so. The agent that discharged and then edited docs
-// is told exactly that, instead of silently paying for a second run. Cheaper
-// than either alternative — a smarter hash that must understand every
-// ecosystem's syntax, or an exception list that decides comments are harmless
-// and is wrong the first time someone edits a string a test asserts on.
+// THE ORDERING RULE, AND WHY IT IS THE HONEST ANSWER. A device run proves an
+// APP — the one `create-cmp` stamps out of this tree. Any later edit that
+// changes those bytes, a comment in a shipped file included, leaves the run
+// describing an app that no longer exists, and the rule is explicit about it:
+// the device tier is the LAST gate, and a change to the stamped app after a
+// discharge REOPENS the slice and says which files moved.
+//
+// AND THE OTHER HALF, WHICH IS THE WHOLE POINT OF ASKING IT THIS WAY: an edit
+// that leaves the stamped app byte-identical costs NOTHING. This repo's own
+// engine sources (`src/`, `bin/`), its tests, its scripts and its docs all
+// RUN during a stamp or sit beside it, and none of their bytes land in the app.
+// Until 2026-09-22 they obliged a 3.5-minute emulator run all the same, because
+// the tier was scheduled by input paths — a proxy for the question, and wrong
+// in both directions (scripts/stamped-output.mjs has the measurements). Karel:
+// "it's a template; it does not need to rerun after every change; if we are
+// running it again without code changes to the template then something is
+// wrong."
 //
 // Exit 0 when nothing is owed, 1 when something is, 2 when the question could
 // not be answered — the same three outcomes `scripts/stage-gate.mjs` uses, and
@@ -71,14 +77,12 @@ import { fileURLToPath } from "node:url";
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
 import {
   observedTreeHash,
-  DEVICE_TIER_TRIGGERS,
   DEVICE_TIER_IRRELEVANT,
   REVIEW_TIER_TRIGGERS,
   REVIEW_TIER_IRRELEVANT,
   REVIEW_SKIP,
-  DEVICE_SKIP,
-  deviceTreeHash,
 } from "./observed-tree.mjs";
+import { stampedOutput, describeStampedDiff } from "./stamped-output.mjs";
 import { appendHistory, historyPath, readHistory, summarize, renderHistory, PLAN_EVENT_SCHEMA } from "./lib/proof-history.mjs";
 import { suiteStatus, describeSuiteStatus } from "./suite-record.mjs";
 
@@ -233,8 +237,13 @@ function write(plan) {
  * came next. A plan is bound to the branch it was opened on — a slice IS a
  * branch under trunk-based development — so a leftover is named as stale and
  * never silently reused.
+ *
+ * `fleetRecord` is handed in for the same reason `plan`, `paths` and `branch`
+ * are: a test that asserts what a fixture owes must not be answered by whatever
+ * device run this particular laptop happens to have on disk. Pass `null` for
+ * "no run is recorded here".
  */
-export function obligation(plan = read(), paths = changedPaths(), branch = currentBranch()) {
+export function obligation(plan = read(), paths = changedPaths(), branch = currentBranch(), { fleetRecord = readFleetRecord() } = {}) {
   const stale = plan && plan.branch !== branch ? plan : null;
   if (stale) plan = null;
   const base = { plan, stale, branch };
@@ -257,9 +266,28 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
   // costs a read of the diff rather than an unreviewed change.
   const reviewNeed = deriveTierNeed(paths, { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" });
 
-  const dev = tierState(need.required, plan, plan?.discharged, () => deviceTreeHash(REPO_ROOT));
-  const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }));
+  const dev = tierState(need.required, plan, plan?.discharged, readStamped, { key: "stampedHash", proves: (now) => fleetProof(now, fleetRecord) });
+  const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => ({ hash: observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }) }));
   return { ...dev, need, ...base, review: { ...rev, need: reviewNeed } };
+}
+
+/**
+ * The app this tree stamps — or WHY IT COULD NOT BE ASKED, which is a state and
+ * not a crash.
+ *
+ * A tree with no `bin/create-cmp.mjs`, a stamp that dies, a stamp that outruns
+ * its cap: none of those can say whether these bytes were proven, and an
+ * exception here would take the whole schedule down with it — including inside
+ * the PreToolUse hook, where "could not answer" refuses every command it
+ * classifies. So it degrades to OWED and says what happened: more proof, never
+ * less, which is the same direction `deriveTierNeed` fails in.
+ */
+function readStamped(root = REPO_ROOT) {
+  try {
+    return stampedOutput(root);
+  } catch (err) {
+    return { hash: null, files: null, unanswerable: err?.message ?? String(err) };
+  }
 }
 
 /**
@@ -267,20 +295,77 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
  *
  * Written once rather than twice on purpose: two copies of a state machine
  * drift in one of them, and the one that drifts is whichever is read less. The
- * hash is a thunk because it costs hundreds of file reads and is only ever
- * needed in the two states that compare against it.
+ * reading is a thunk because it is the expensive half — a stamp for the device
+ * tier, hundreds of file reads for the review — and `not required` never needs
+ * it.
  *
- * The last branch is the ORDERING RULE both tiers inherit: discharged, then a
- * trigger path moved, means the record describes a tree that no longer exists.
- * Saying REOPENED is the point — an agent that edits after the last gate should
- * be told it has reopened the slice, not silently charged for another run.
+ * THE TWO TIERS DIFFER IN ONE PARAMETER, and it is the honest difference
+ * between them: the device tier has an ARTIFACT to compare (`proves`, the run
+ * recorded against the app this tree stamps), and a review has none — a review
+ * is a reader on a diff, so the only thing that can attest one is the record
+ * this slice wrote.
+ *
+ * The last branch is the ORDERING RULE both tiers inherit: discharged, then the
+ * thing it was bound to moved, means the record describes something that no
+ * longer exists. Saying REOPENED is the point — an agent that edits after the
+ * last gate should be told it has reopened the slice, not silently charged for
+ * another run.
  */
-function tierState(required, plan, discharged, hash) {
+function tierState(required, plan, discharged, read, { key = "treeHash", proves = null } = {}) {
   if (!required) return { state: "none" };
-  if (!plan) return { state: "undeclared" };
-  const now = hash();
-  if (!discharged) return { state: "owed", now };
-  return { state: discharged.treeHash === now ? "discharged" : "reopened", now };
+  const reading = read();
+  const now = reading.hash;
+  // Asked, and unanswerable. OWED is the honest answer — a tier whose question
+  // cannot be put costs a run, never a missed regression — and the reason
+  // travels with it so the refusal names the real problem.
+  if (typeof now !== "string") return { state: "owed", now: null, reading, unanswerable: reading.unanswerable ?? "the tree could not be read" };
+  // THE EVIDENCE OUTRANKS THE BOOKKEEPING, and only for the bytes it describes.
+  // A device run of THESE EXACT BYTES is the answer to whether they were
+  // proved, whoever ran it and whatever slice it was attributed to — so a
+  // slice that changed nothing the app can see is discharged by the run that
+  // is already on disk, without an emulator and without a second command. The
+  // same reading refuses: a recorded run of these bytes that did NOT pass
+  // discharges nothing, however recently the plan was told otherwise.
+  const proof = proves ? proves(now) : null;
+  if (proof) return { state: proof.verdict === "PASS" ? "discharged" : "owed", now, reading, proof };
+  if (!plan) return { state: "undeclared", now, reading };
+  if (!discharged) return { state: "owed", now, reading };
+  const was = discharged[key];
+  // A discharge written before this criterion existed is bound to something
+  // else entirely (the old input-path hash). It is not compared and not
+  // reinterpreted: it counts as no discharge, and the reader is told why.
+  if (typeof was !== "string") return { state: "owed", now, reading, unbound: discharged };
+  return { state: was === now ? "discharged" : "reopened", now, reading, proof: was === now ? discharged : null };
+}
+
+/**
+ * The device run on disk, IF it describes the app this tree stamps.
+ *
+ * `null` for a record that describes another app, and for one that carries no
+ * `stampedOutputHash` at all — every record written before the tier was
+ * scheduled by the stamped app. Neither is reinterpreted and no hash is
+ * invented for either: an unbound record counts as no record, which costs a
+ * device run rather than a missed regression.
+ */
+export function fleetProof(now, record = readFleetRecord()) {
+  if (!record || typeof record.stampedOutputHash !== "string" || record.stampedOutputHash !== now) return null;
+  return {
+    at: record.ranAt ?? null,
+    verdict: record.verdict ?? null,
+    rung: record.rung ?? null,
+    stampedHash: record.stampedOutputHash,
+    stampedFiles: record.stampedOutputFiles ?? null,
+    from: "qa-artifacts/fleet-latest.json",
+  };
+}
+
+/** The device run's record, or null. Never throws — an absent record is a state, not a crash. */
+export function readFleetRecord(file = path.join(REPO_ROOT, "qa-artifacts", "fleet-latest.json")) {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -329,7 +414,20 @@ function localBranchExists(name) {
 
 /** One history row about a plan: what happened to it, when, and the plan as it stood. */
 function planEvent(event, plan, { via = null, onBranch = null, device = null, review = null, now = new Date() } = {}) {
-  return { schema: PLAN_EVENT_SCHEMA, event, via, at: now.toISOString(), onBranch, device, review, plan };
+  return { schema: PLAN_EVENT_SCHEMA, event, via, at: now.toISOString(), onBranch, device, review, plan: withoutManifest(plan) };
+}
+
+/**
+ * The plan as the HISTORY keeps it: everything except the stamped app's file
+ * manifest, which is hundreds of rows describing a tree that is gone by the
+ * time anyone reads the row. The count survives — "how big was the app this
+ * slice proved" is a question the history can still answer — and the digest
+ * survives, so two rows can still be compared.
+ */
+function withoutManifest(plan) {
+  if (!plan?.discharged?.stampedFiles) return plan;
+  const { stampedFiles, ...rest } = plan.discharged;
+  return { ...plan, discharged: { ...rest, stampedFileCount: Object.keys(stampedFiles).length } };
 }
 
 /**
@@ -398,18 +496,42 @@ export function render(o) {
       );
       break;
     case "owed":
+      // THREE WAYS A RUN CAN BE OWED, and they want different actions, so they
+      // are different sentences. Only the last of them is "go and run it".
+      if (o.unanswerable) {
+        line(
+          "OWED — the app this tree stamps could not be produced",
+          `${o.need.reason}.\n      ${o.unanswerable}. Nothing here can say whether these bytes were proven, and a question that\n      cannot be put is owed rather than waved through. Fix the stamp first — everything else about\n      this tier is downstream of it.`,
+        );
+      } else if (o.proof) {
+        line(
+          "OWED — the last run of these exact bytes did NOT pass",
+          `the run at ${o.proof.at} over this same app is ${o.proof.verdict ?? "unstated"}, not PASS (${o.proof.from}).\n      A failing run discharges nothing: the app is unchanged, so what failed then fails now. Fix it, then\n      run the tier again — ${t.cost}:\n        ${t.cmd}`,
+        );
+      } else if (o.unbound) {
+        line(
+          "OWED — the recorded run predates the stamped-app criterion",
+          `this slice's discharge carries no stampedHash, and no fleet record carries a stampedOutputHash for\n      these bytes. It is bound to the old input-path hash, which says nothing about the app this tree stamps,\n      so it counts as NO record — no hash is invented for it. Run the tier once — ${t.cost}:\n        ${t.cmd}\n      Then: node scripts/proof-plan.mjs --discharge`,
+        );
+      } else {
+        line(
+          "OWED — discharge at slice close, NOT NOW",
+          `${o.need.reason}.\n      What discharges it is the app this tree STAMPS: a PASS run recorded against these exact stamped bytes,\n      whichever slice bought it. This is the last gate. Run it when everything else is green and you are\n      about to open the PR — ${t.cost}:\n        ${t.cmd}\n      Then: node scripts/proof-plan.mjs --discharge`,
+        );
+      }
+      break;
+    case "discharged": {
+      const p = o.proof ?? o.plan?.discharged ?? {};
       line(
-        "OWED — discharge at slice close, NOT NOW",
-        `${o.need.reason}.\n      This is the last gate. Run it when everything else is green and you are about to open\n      the PR — ${t.cost}:\n        ${t.cmd}\n      Then: node scripts/proof-plan.mjs --discharge`,
+        "DISCHARGED",
+        `the stamped app is byte-identical to the one proven at ${p.at ?? "an unstated time"} — verdict ${p.verdict ?? "unstated"}, rung ${p.rung ?? "none"}${p.from ? `, read from ${p.from}` : ""}.\n      This tier is scheduled by what the tree STAMPS, not by which input paths moved: an edit the app never\n      sees — engine source, a test, a doc — costs nothing here.`,
       );
       break;
-    case "discharged":
-      line("DISCHARGED", `ran at ${o.plan.discharged.at} — verdict ${o.plan.discharged.verdict}, rung ${o.plan.discharged.rung ?? "none"}, and no trigger path has moved since`);
-      break;
+    }
     case "reopened":
       line(
-        "REOPENED — a trigger path moved after the device run",
-        `the run at ${o.plan.discharged.at} describes a tree that no longer exists (${o.plan.discharged.treeHash.slice(0, 7)} → ${o.now.slice(0, 7)}).\n      The device tier is the LAST gate: either revert what moved, or accept a second run.\n      This is the ordering mistake that cost three device runs in one session on 2026-09-08.`,
+        "REOPENED — the stamped app moved after the device run",
+        `${describeStampedDiff(o.plan.discharged.stampedFiles, o.reading?.files)}.\n      The run at ${o.plan.discharged.at} describes an app that no longer exists (${String(o.plan.discharged.stampedHash).slice(0, 7)} → ${o.now.slice(0, 7)}).\n      The device tier is the LAST gate: either revert what moved, or accept a second run.\n      This is the ordering mistake that cost three device runs in one session on 2026-09-08.`,
       );
       break;
   }
@@ -708,23 +830,33 @@ function main() {
     // Read the run rather than take the caller's word for it: a discharge that
     // trusts an argument is a claim, and this whole product exists to refuse
     // exactly that shape. The record fleet-check writes is the evidence.
-    let rec;
-    try {
-      rec = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "qa-artifacts", "fleet-latest.json"), "utf8"));
-    } catch {
+    const rec = readFleetRecord();
+    if (!rec) {
       process.stderr.write("no device run is recorded — run the fleet check first; a discharge is read from its record, never asserted\n");
       process.exit(2);
     }
-    const now = deviceTreeHash(REPO_ROOT);
-    if (rec.observedHash !== now) {
-      process.stderr.write(`the recorded device run does not describe this tree (${String(rec.observedHash).slice(0, 7)} → ${now.slice(0, 7)}) — it cannot discharge anything\n`);
+    const stamped = stampedOutput(REPO_ROOT);
+    const now = stamped.hash;
+    // A record from before the tier was scheduled by the stamped app cannot say
+    // whether these bytes were proven — it is bound to the old input-path hash.
+    // Refused as unanswerable (exit 2), never reinterpreted, and never
+    // back-filled with a hash nobody measured.
+    if (typeof rec.stampedOutputHash !== "string") {
+      process.stderr.write("the recorded device run carries no stampedOutputHash — it predates the stamped-app criterion and counts as no record. Run the fleet check on this tree; nothing here will invent a digest for a run nobody measured.\n");
+      process.exit(2);
+    }
+    if (rec.stampedOutputHash !== now) {
+      process.stderr.write(
+        `the recorded device run does not describe the app this tree stamps (${rec.stampedOutputHash.slice(0, 7)} → ${now.slice(0, 7)}) — it cannot discharge anything.\n` +
+          `${describeStampedDiff(rec.stampedOutputFiles, stamped.files)}\n`,
+      );
       process.exit(1);
     }
     if (rec.verdict !== "PASS") {
       process.stderr.write(`the recorded device run is ${rec.verdict}, not PASS — a failing run discharges nothing\n`);
       process.exit(1);
     }
-    plan.discharged = { at: rec.ranAt, treeHash: now, verdict: rec.verdict, rung: rec.rung ?? null };
+    plan.discharged = { at: rec.ranAt, stampedHash: now, stampedFiles: stamped.files, verdict: rec.verdict, rung: rec.rung ?? null };
     write(plan);
     process.stdout.write(`${render(obligation(plan))}\n`);
     process.exit(0);

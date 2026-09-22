@@ -115,7 +115,11 @@ before(() => {
   // A owes nothing: `docs/` is declared unable to affect either at-close tier.
   fs.mkdirSync(path.join(A, "docs"), { recursive: true });
   fs.writeFileSync(path.join(A, "docs", "only.md"), "prose, and nothing else\n");
-  // B owes the device tier: `packages/harness/src/` is a device trigger path.
+  // B owes the device tier: `packages/harness/src/` is not declared unable to
+  // reach a phone, and this synthetic tree carries no `bin/create-cmp.mjs`, so
+  // the stamped-app comparison that would settle it cannot be taken either —
+  // both roads lead to OWED, which is the direction an unanswerable question
+  // has to fail in.
   fs.mkdirSync(path.join(B, "packages", "harness", "src"), { recursive: true });
   fs.writeFileSync(path.join(B, "packages", "harness", "src", "x.mjs"), "export const x = 1;\n");
 
@@ -158,7 +162,7 @@ test("the premise KD-79 measured: two worktrees of one repository, and only one 
   const slice = schedule(B);
   assert.match(session.text, /device \(fleet L2\) NOT OWED/, `the session's worktree owes nothing — its only change is prose:\n${session.text}`);
   assert.equal(session.outstanding, false, `and so its scheduler exits clean:\n${session.text}`);
-  assert.match(slice.text, /device \(fleet L2\) OWED/, `the tree the command is about owes the tier — its change is a trigger path:\n${slice.text}`);
+  assert.match(slice.text, /device \(fleet L2\) OWED/, `the tree the command is about owes the tier — its change is not declared unable to reach a phone:\n${slice.text}`);
   assert.match(slice.text, /packages\/harness\/src\/x\.mjs/, "and it says which path obliges it");
   assert.equal(slice.outstanding, true, "so its scheduler exits 1");
 });

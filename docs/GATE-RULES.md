@@ -333,14 +333,33 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   emulator can be scoped differently; a slice that knows it will not never pays for one. This is
   the same move as Rule 3 — the predicate is the FIRST task — applied to cost instead of to
   termination.
-- **The expensive tier is the LAST gate, and after it the slice is frozen.** A trigger path edited
-  after a discharge REOPENS the slice and is told so by name. This is deliberately not solved by a
-  cleverer hash that tries to tell a comment from a statement: doing that correctly needs a parser
-  for every ecosystem the harness might meet, and doing it by exception list is wrong the first
-  time someone edits a string a test asserts on. The ordering rule is cheaper and it is honest.
-- **A discharge is READ, never asserted.** It comes from the run's own recorded verdict and tree
-  hash — a discharge that trusted its caller would be exactly the shape of claim this product
-  exists to refuse.
+- **The device tier is owed when the STAMPED APP moves, not when an input path moves.** What a
+  device run proves is that the app `create-cmp` stamps out of this tree runs on a phone, so that
+  app is what the run is bound to: `scripts/stamped-output.mjs` stamps it into a temp dir, hashes
+  every byte it wrote, and deletes it — 0.35s, measured, against the 3.5 minutes it schedules. It
+  used to be bound to input paths (`deviceTreeHash` over `template/` + `packages/harness/src/` +
+  `packages/receipts/src/`), which is a proxy and was wrong in both directions: an edit under
+  `packages/harness/src/` that never reached `template/qa/` reopened a discharged slice over a
+  byte-identical app, and a slice touching only `src/lib/args.mjs` owed a full emulator run for an
+  app it could not change. Karel, 2026-09-22: *"it's a template; it does not need to rerun after
+  every change; if we are running it again without code changes to the template then something is
+  wrong."* The path list that remains — `DEVICE_TIER_IRRELEVANT` — answers only whether anything
+  this slice touched could reach a phone at all, which is the cheap question asked first and the
+  one a machine with no device record can still answer.
+- **The expensive tier is the LAST gate, and after it the slice is frozen.** A change to the stamped
+  app after a discharge REOPENS the slice and is told so by name, with the count of files that moved
+  and the first of them. A comment in a file that SHIPS still reopens it: nothing here can tell a
+  comment from a statement without a parser for every ecosystem the harness might meet, and those
+  bytes really are part of the app. A comment in a file that does not ship costs nothing, and that
+  is not an exception list — it is the same comparison, answering honestly.
+- **A discharge is READ, never asserted, and the evidence outranks the bookkeeping.** It comes from
+  the run's own recorded verdict and stamped-app digest — a discharge that trusted its caller would
+  be exactly the shape of claim this product exists to refuse. A PASS run recorded against these
+  exact stamped bytes discharges the tier whichever slice bought it, so a slice that changed nothing
+  the app can see is never sent to an emulator by the line it reads; a recorded run of those same
+  bytes that did NOT pass refuses, whatever a plan already says. A record written before this
+  criterion carries no `stampedOutputHash` and counts as NO record — no digest is invented for a run
+  nobody measured.
 - **There are two at-close tiers, and the second is a review** (ADR-0014). A slice that changes
   anything but prose owes a review record bound to these exact bytes, and `gh pr merge` refuses
   until one exists. The gate checks that the record EXISTS and describes this tree; it never reads

@@ -11,7 +11,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 import { deviceTierRequired, parseSuite, parseFrameworkCheck, readFleetRecord, render } from "../scripts/fit-test.mjs";
-import { observedTreeHash, DEVICE_TIER_TRIGGERS } from "../scripts/observed-tree.mjs";
+import { observedTreeHash } from "../scripts/observed-tree.mjs";
 
 test("the device tier runs unless every changed path is declared unable to affect it", () => {
   // Declared IRRELEVANCE, not relevance. The allowlist shape this replaced could
@@ -44,26 +44,26 @@ test("the gate outputs are read, not retyped", () => {
   assert.equal(parseFrameworkCheck("framework check: FAIL — planted x").verdict, "FAIL");
 });
 
-/** A fleet record on disk, bound to a chosen content digest. */
-function recordFor(observedHash, extra = {}) {
+/** A fleet record on disk, bound to a chosen digest of the app it proved. */
+function recordFor(stampedOutputHash, extra = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fit-"));
   const p = path.join(dir, "fleet-latest.json");
   fs.writeFileSync(p, JSON.stringify({
     schema: "cmp-fleet-check/1", verdict: "PASS", rung: "L2", requiredLevel: "L2", failures: [],
-    observedHash, commit: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", treeWasDirty: false, laneVerdict: "PASS",
+    stampedOutputHash, commit: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", treeWasDirty: false, laneVerdict: "PASS",
     steps: [{ name: "e2eSmoke", verdict: "PASS", durationMs: 36500 }, { name: "androidChecks", verdict: "PASS", durationMs: 33700 }],
     ...extra,
   }));
   return { p, dir };
 }
 
-test("a record goes stale when the code feeding the tier changes", () => {
+test("a record goes stale when the app this tree stamps is not the one it proved", () => {
   const { p, dir } = recordFor("a".repeat(64));
   try {
     const r = readFleetRecord(p, "b".repeat(64));
     assert.equal(r.present, true);
     assert.equal(r.current, false, "different content must never read as this tree's proof");
-    assert.match(r.staleReason, /code feeding the device tier changed/);
+    assert.match(r.staleReason, /the app this tree stamps is not the one this run proved/);
     assert.match(render({ suite: null, frameworkCheck: null, device: { required: true, reason: "x" }, fleet: r }), /STALE/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -84,11 +84,19 @@ test("a record for THIS exact content is quoted, with its device steps", () => {
 });
 
 test("A RECORD SURVIVES THE COMMIT THAT CARRIES IT — the defect commit-keying could not avoid", () => {
-  // The fleet run happens BEFORE the commit that quotes it, so a commit-keyed
-  // record named its own parent and read STALE the instant it landed. A warning
-  // that is always on is one nobody reads. Content does not change when a commit
-  // is made, so the same bytes stay valid across it — proved by hashing a real
+  // A run happens BEFORE the commit that quotes it, so a commit-keyed record
+  // named its own parent and read STALE the instant it landed. A warning that is
+  // always on is one nobody reads. Content does not change when a commit is
+  // made, so the same bytes stay valid across it — proved by hashing a real
   // tree, committing into it, and hashing again.
+  //
+  // THE ROOTS ARE THE TEST'S OWN. `DEVICE_TIER_TRIGGERS` used to be handed in
+  // here, and the device tier no longer binds to any path list — it binds to the
+  // app the tree stamps, where the same property is asserted by
+  // test/a-change-the-stamped-app-never-sees-buys-a-device-run.test.mjs ("THE
+  // RECORD SURVIVES THE COMMIT THAT CARRIES IT"). What is left under test in
+  // THIS file is `observedTreeHash` itself, which the REVIEW tier still binds
+  // to, so the roots are named locally rather than borrowed from a tier.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "commit-survive-"));
   const git = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "ignore"] });
   try {
@@ -98,20 +106,21 @@ test("A RECORD SURVIVES THE COMMIT THAT CARRIES IT — the defect commit-keying 
     git("config", "user.email", "t@t");
     git("config", "user.name", "t");
 
-    const beforeCommit = observedTreeHash(root, DEVICE_TIER_TRIGGERS);
+    const ROOTS = ["template/"];
+    const beforeCommit = observedTreeHash(root, ROOTS);
     git("add", "-A");
     git("commit", "-qm", "the commit that carries the record");
-    assert.equal(observedTreeHash(root, DEVICE_TIER_TRIGGERS), beforeCommit, "committing changes no bytes, so the record must stay valid");
+    assert.equal(observedTreeHash(root, ROOTS), beforeCommit, "committing changes no bytes, so the record must stay valid");
 
     // And it still BITES: one edit under a trigger root invalidates it.
     fs.writeFileSync(path.join(root, "template", "qa", "verify.mjs"), "// lane, changed\n");
-    assert.notEqual(observedTreeHash(root, DEVICE_TIER_TRIGGERS), beforeCommit, "a change to code feeding the tier must invalidate the run that predates it");
+    assert.notEqual(observedTreeHash(root, ROOTS), beforeCommit, "a change to code feeding the tier must invalidate the run that predates it");
 
     // A change OUTSIDE the trigger roots does not — that is the whole point.
     fs.writeFileSync(path.join(root, "template", "qa", "verify.mjs"), "// lane\n");
     fs.mkdirSync(path.join(root, "docs"), { recursive: true });
     fs.writeFileSync(path.join(root, "docs", "notes.md"), "# unrelated\n");
-    assert.equal(observedTreeHash(root, DEVICE_TIER_TRIGGERS), beforeCommit, "a docs edit cannot invalidate a device run");
+    assert.equal(observedTreeHash(root, ROOTS), beforeCommit, "a docs edit cannot invalidate a device run");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

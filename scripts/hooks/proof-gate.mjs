@@ -319,8 +319,14 @@ export function decide(kind, o, tiers, ctx) {
       case "none":
         if (o.trunk) return allow(`nothing is owed per slice — this is trunk — so this can only be a RELEASE proof (npm-publish skill step 2): allowed. Then npm publish reads its record.`);
         return deny(`nothing is owed — ${o.need.reason}. A device run over this tree proves nothing this slice needs (GATE-RULES Rule 4: the tier runs once, at the close of a slice that changed something it can see).`);
-      case "discharged":
-        return deny(`already discharged for this exact tree at ${o.plan.discharged.at} (verdict ${o.plan.discharged.verdict}, rung ${o.plan.discharged.rung ?? "none"}). A second run over the same bytes is the 2026-09-08 defect; had a trigger path moved, the state would read REOPENED.`);
+      case "discharged": {
+        // Read from whatever attests THESE bytes — the run recorded on disk, or
+        // this slice's own discharge. `o.plan.discharged` is no longer always
+        // there: a tree whose stamped app is already proved reads DISCHARGED
+        // before any slice has written anything down.
+        const p = o.proof ?? o.plan?.discharged ?? {};
+        return deny(`already discharged for the app this tree stamps, at ${p.at ?? "an unstated time"} (verdict ${p.verdict ?? "unstated"}, rung ${p.rung ?? "none"}${p.from ? `, read from ${p.from}` : ""}). A second run over the same stamped bytes is the 2026-09-08 defect; had the stamped app moved, the state would read REOPENED.`);
+      }
       case "undeclared":
         return deny(`no slice is declared, so this run could discharge nothing — ${o.need.reason}. Declare first: ${DECLARE}. Then run the tier once, at close.`);
       case "owed":
@@ -354,7 +360,7 @@ export function decide(kind, o, tiers, ctx) {
         blocked.push(`the device tier is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`);
         break;
       case "undeclared":
-        blocked.push(`trigger paths changed with no slice declared — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
+        blocked.push(`paths that could reach a phone changed with no slice declared, and no recorded run describes the app this tree stamps — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
         break;
       default:
         break;
@@ -386,9 +392,18 @@ export function decide(kind, o, tiers, ctx) {
       const where = o.branch === "main" ? "main, but with commits or edits not yet on origin/main — publish only what is merged" : `${o.branch || "a detached HEAD"}, not main`;
       return deny(`publish only from a clean main — this is ${where}${o.state === "none" ? "" : `; the device tier is ${o.state.toUpperCase()} here`} (npm-publish skill step 1).`);
     }
+    // A tree whose app cannot be stamped cannot be compared to any record. A
+    // release refused for a reason it can name is the right outcome; a release
+    // allowed because the comparison silently could not run is not.
+    if (ctx && !ctx.now) return deny(`the app this tree stamps could not be produced (${ctx.unanswerable ?? "no reason recorded"}), so nothing can compare the fleet record to it. Publishing is refused rather than guessed — fix the stamp, then run ${cmd}.`);
     const r = ctx?.record;
     if (!r) return deny(`no fleet record — run ${cmd} first; a release proof is read from its record, never asserted (npm-publish skill step 2).`);
-    if (r.observedHash !== ctx.now) return deny(`the fleet record describes another tree (${String(r.observedHash).slice(0, 7)} → ${String(ctx.now).slice(0, 7)}) — run ${cmd} on this one.`);
+    // A record with no `stampedOutputHash` predates the stamped-app criterion:
+    // it is bound to the old input-path key and can say nothing about the app
+    // this tree stamps. Refused in its own words rather than through the
+    // comparison below, which would have printed "undefine → 3ed5e09".
+    if (typeof r.stampedOutputHash !== "string") return deny(`the fleet record carries no stampedOutputHash — it predates the stamped-app criterion and counts as no record. Run ${cmd} on this tree; no digest is invented for a run nobody measured.`);
+    if (r.stampedOutputHash !== ctx.now) return deny(`the fleet record describes another app (${r.stampedOutputHash.slice(0, 7)} → ${String(ctx.now).slice(0, 7)}) — this tree stamps something else. Run ${cmd} on this one.`);
     if (r.verdict !== "PASS") return deny(`the fleet record on this tree is ${r.verdict}, not PASS — the scratch app is the crime scene; do not bump the version.`);
     const rung = Number(String(r.rung ?? "").replace(/^L/, ""));
     if (!(rung >= 2)) return deny(`the fleet record on this tree is rung ${r.rung ?? "none"} — a release requires L2: attach an emulator and run ${cmd}.`);
@@ -420,8 +435,8 @@ export function decide(kind, o, tiers, ctx) {
  * own ref rather than by origin. A gate that cannot see must not pass silently.
  */
 function orderedRun(o, base) {
-  const owed = `the device tier is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — a trigger path edited afterwards reopens the slice. Then: node scripts/proof-plan.mjs --discharge`;
-  const why = `A device run proves a TREE, and the merge brings origin/main into that tree — the bytes move, and the tier REOPENS for any of them that is a device trigger path, so the run is bought a second time. Measured 2026-09-16: four emulator runs for one merge, each one owed by this program and none of them needed.`;
+  const owed = `the device tier is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — an edit that changes what this tree STAMPS reopens the slice afterwards. Then: node scripts/proof-plan.mjs --discharge`;
+  const why = `A device run proves an APP, and the merge brings origin/main into this tree — if that moves what the tree stamps, the tier REOPENS and the run is bought a second time. Measured 2026-09-16: four emulator runs for one merge, each one owed by this program and none of them needed.`;
   const fix = `git fetch origin && git rebase origin/main`;
   if (!base) return allow(owed);
 
@@ -502,10 +517,22 @@ export const STARTED_MS = Date.now();
 
 /**
  * What the gate keeps back for ANSWERING — node startup, obligation()'s own git,
- * and emitting the decision. Measured on this tree 2026-09-17: the real hook
- * answers a device payload in 0.16–0.19s. This is ~8x that.
+ * THE STAMP obligation() now takes, and emitting the decision.
+ *
+ * Measured on this tree 2026-09-17: the real hook answered a device payload in
+ * 0.16–0.19s. Since 2026-09-22 the device tier is scheduled by the app this
+ * tree stamps, so answering includes one stamp — 0.27 / 0.26 / 0.30s measured,
+ * bounded at `STAMP_CAP_MS` (3000ms) by scripts/stamped-output.mjs, which is
+ * the term this number had to grow to cover. Worst case: 3000 + ~200ms.
+ *
+ * THE FOUR BOUNDS NOW SUM TO EXACTLY THE DECLARED BUDGET (1000 + 3000 + 2500 +
+ * 3500 = 10000), which the arithmetic test in
+ * test/a-device-run-proves-a-tree-the-merge-will-not-keep.test.mjs still
+ * passes and which leaves NO slack: the next term added to this hook comes out
+ * of REMOTE_CALL_CAP_MS, out of the stamp's cap, or out of a deliberately
+ * raised timeout in .claude/settings.json — never out of nothing.
  */
-export const ANSWER_RESERVE_MS = 1500;
+export const ANSWER_RESERVE_MS = 3500;
 
 /** No question put to origin is worth more than this. The three measured ls-remote answers were 1.01 / 1.19 / 1.34s; this is the slowest, roughly doubled. */
 export const REMOTE_CALL_CAP_MS = 2500;
@@ -1444,21 +1471,30 @@ export function laneAt(pid, args, run = shell()) {
 }
 
 /**
- * The fleet record and the hash of the tree it would have to describe — for the
- * tree the publish will act on, hashed by THAT tree's own trigger lists, because
- * a record written by one worktree's `fleet-check` is only comparable with the
- * hash its own `observed-tree.mjs` takes.
+ * The fleet record and the digest of the app it would have to describe — the
+ * app the tree being published STAMPS, hashed by THAT tree's own
+ * `stamped-output.mjs`, because a record written by one worktree's
+ * `fleet-check` is only comparable with a stamp taken the way that worktree
+ * takes it.
  */
 export async function releaseContext(root = REPO_ROOT) {
   const fs = await import("node:fs");
-  const { deviceTreeHash } = root === REPO_ROOT ? await import("../observed-tree.mjs") : await import(pathToFileURL(path.join(root, "scripts", "observed-tree.mjs")).href);
+  const { stampedOutputHash } = root === REPO_ROOT ? await import("../stamped-output.mjs") : await import(pathToFileURL(path.join(root, "scripts", "stamped-output.mjs")).href);
   let record = null;
   try {
     record = JSON.parse(fs.readFileSync(path.join(root, "qa-artifacts", "fleet-latest.json"), "utf8"));
   } catch {
     record = null;
   }
-  return { record, now: deviceTreeHash(root) };
+  // The stamp can fail — a partial checkout, a `bin/` that is not there, a
+  // stamp that outruns its cap — and that is a STATE, not a crash: an exception
+  // here escapes into main(), where the hook exits 2 and refuses every command
+  // it classifies, with a message about node rather than about the release.
+  try {
+    return { record, now: stampedOutputHash(root) };
+  } catch (err) {
+    return { record, now: null, unanswerable: err?.message ?? String(err) };
+  }
 }
 
 function readStdin() {
