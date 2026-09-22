@@ -234,6 +234,7 @@ you the same list without opening anything.
 | **KD-222** | `hashStampedTree` records files and symlinks, so an EMPTY DIRECTORY is invisible to the device digest | measured; git cannot ship an empty directory in `template/`, so a stamp cannot produce one as a difference today |
 | **KD-223** | "the gate hashes THIS tree exactly as the release proof records it" now compares `stampedOutput` with itself, and its comment calls that "an INDEPENDENT stamp" | KD-67's three spellings really are gone, so there is nothing left for that test to catch; what is wrong is the sentence, and the pair that IS unguarded is a test nobody has written |
 | **KD-224** | the console's freshness test turned "a completed render cycle IS fresh on return" into "is fresh within 5 s", and widened its boot wait from `idle` to `idle \|\| unrefreshed` | `waitFor` throws on timeout so the assertion still refuses; it is a gate relaxed on the way past, in a change whose stated subject was elsewhere |
+| **KD-225** | two projects' lanes shared one emulator mid-run: create-cmp's fleet check (started 21:12 after the gate saw the other lane exit) lost its e2eSmoke at 21:14 — Maestro logged "Created execution plan" and nothing after, no per-flow report — while payment-blueprint's lane started a new Maestro run on the same `emulator-5554` at 21:14:29; the gate checks for a foreign lane only at START, and the per-serial device lease did not hold across the two projects | the run was FAIL, not a false PASS — fail-closed; the re-run in a quiet window is the remedy the gate itself names |
 
 ---
 
@@ -3797,3 +3798,13 @@ relaxed on the way past a different fix, which is the one thing a review round i
 **Fires when:** `_renderCycle()` starts returning before the state it computed is visible, which
 the old spelling would have failed on and this one waits out.
 *Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-225 — the device is leased per project, and two projects each held it
+
+`scripts/hooks/proof-gate.mjs` (the foreign-lane check, run once at command start) · `template/qa/lib/profiles/cmp/device-lease.mjs` (the machine-global per-serial lease a stamped lane takes)
+
+Measured 2026-09-22 during the wave's gate pass. `proof-gate` refused the first `fleet-check` because payment-blueprint's `verify.mjs --profile e2e` (pid 20681) was running — correct. It accepted the second, started 21:12 once that pid had exited. At 21:14:29 payment-blueprint's harness started another Maestro run on the same `emulator-5554` (`/Users/test/.maestro/tests/2026-09-22_211429` is ours — `FleetCheck/qa/e2e/smoke.yaml`; the log ends at "Created execution plan"; the 20:08 run is theirs, `com.payment.wasl`). Our `e2eSmoke` failed in 18.8 s with "Maestro failed (no per-flow report was written)"; `androidChecks` then took 437 s against a usual ~25 s. The fleet verdict was FAIL and the device tier stayed OWED — the gate was fail-closed, and nothing was wrongly served.
+
+**What is unpinned.** The gate's foreign-lane check is a point-in-time test at the START of our command; nothing holds the device for the run's duration. The lease the stamped lane takes (`device-lease.mjs`, "machine-global per-serial") is what should serialise two lanes on one serial, and it did not: either payment-blueprint's harness predates it (its tree was stamped from an older engine) or the two lanes' lease files are keyed differently. Not measured which. The template's own `PreToolUse` reminder says exactly why this matters — "the one device is scarce, slow, and fragile, so device proof is a checkpoint, never an inner loop."
+
+**Why it does not block.** Fail-closed both ways: our run recorded FAIL, the tier stayed owed, the remedy the gate prints (wait, then run the tier once) is the right one, and the re-run in a quiet window discharges over the same stamped bytes. **Fires when:** two autonomous sessions on one machine each run a device lane against the one booted emulator. The fix is a slice, not a line: the lease must be taken by `fleet-check` itself for the scratch app's serial, and the gate should read the lease rather than `ps`. *Logged 2026-09-22 by the lead, during the wave's gate pass.*
