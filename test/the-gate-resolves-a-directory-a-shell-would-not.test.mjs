@@ -44,7 +44,10 @@ const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "gate-cwd-orac
 const HERE = path.join(tmp, "here");
 const X = path.join(tmp, "x");
 const Y = path.join(tmp, "y");
-for (const d of [HERE, X, Y, path.join(HERE, "sub")]) fs.mkdirSync(d, { recursive: true });
+/** A directory with a space in its name, and one the shell reaches only through an escape (`x\1` is `x1`). */
+const SPACED = path.join(tmp, "my trees");
+const X1 = path.join(tmp, "x1");
+for (const d of [HERE, X, Y, path.join(HERE, "sub"), path.join(SPACED, "in"), X1]) fs.mkdirSync(d, { recursive: true });
 
 /**
  * Every shape is one of two things, and the table does not say which — that is
@@ -87,6 +90,20 @@ const SHAPES = [
   ["a cd followed by an unbalanced ) in a quoted word", `cd ${X} && echo "done)" && ${GATED}`],
   ["a cd followed by an unbalanced ( in a quoted word", `cd ${X} && echo "done(" && ${GATED}`],
   ["a closed subshell's cd, kept alive by an unbalanced ( in a quoted word", `(cd ${X} && true) && echo "(" && ${GATED}`],
+  // ── a cd operand the reader saw only PART of (KD-95) ─────────────────────
+  // The reader looked for the operand in the MASKED text, where every quoted
+  // span and every `$( )` is already blanks. Whatever was left standing beside
+  // the blanks was read as the whole path: `"/a b"/in` became `/in`, and a quoted
+  // tail on an unquoted head became the head alone — the payload's own tree,
+  // which is KD-79. An escape was blanked with the character after it, so `x\1`
+  // lost its `1`. The operand is read from the command as written, or not at all.
+  ["a quoted path, with a space in it", `cd "${SPACED}" && ${GATED}`],
+  ["the same, single-quoted", `cd '${SPACED}' && ${GATED}`],
+  ["a quoted path with no space in it", `cd "${X}" && ${GATED}`],
+  ["a quoted path the shell joins to an unquoted one", `cd "${SPACED}"/in && ${GATED}`],
+  ["an unquoted path the shell joins to a quoted one", `cd ${HERE}"/sub" && ${GATED}`],
+  ["a substitution the shell joins to a path", `cd $(pwd)/sub && ${GATED}`],
+  ["an escaped character at the end of a path", `cd ${X}\\1 && ${GATED}`],
 ];
 
 /** Where /bin/sh actually runs the gated command: the last line the probe printed, from a shell started in HERE. */
