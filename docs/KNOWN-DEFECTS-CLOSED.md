@@ -179,6 +179,105 @@ alternative and refuses exactly one instruction, this entry's, while exempting t
 a mention in a neighbouring sentence — a hole, because those headers are precisely where the next
 instruction of this kind gets written.
 
+### KD-95 — a worktree under a path with a space in it is a tree this gate refuses to name — **CLOSED 2026-09-22**
+
+`scripts/hooks/proof-gate.mjs` (`literalDir` / `LITERAL_PATH`, and the fleet-check operand reader)
+
+The gate reads the tree a command acts on from the command's own `cd` and from a
+`…/scripts/fleet-check.mjs` operand, and it reads both only when they are written literally —
+`LITERAL_PATH` excludes whitespace along with `$`, backticks, globs and `~`, and the operand reader
+is a `\S*` that cannot cross a space. So `cd "/Users/k/my trees/slice" && gh pr merge` is refused
+with "a `cd` this gate cannot read literally", and `node "/Users/k/my trees/scripts/fleet-check.mjs"`
+with "a form this gate cannot resolve to a file". Both are true sentences and both are refusals of
+work that is real.
+
+The quoted case is the one that could be read exactly — quotes delimit, so a space inside them is
+part of the path — and it is not, because the unquoted case next to it cannot be, and one relaxation
+without the other is the kind of half-rule that reads as a general guarantee. Nobody is wrongly
+served today: every worktree of this repository lives under a space-free path, and the alternative
+to refusing is resolving half a path and judging whatever tree happens to sit there — the defect
+this slice just closed, made by the gate itself. **Fires when:** a worktree of this repo is checked
+out under a path containing a space and a gated command names it. *Logged 2026-09-18, in the slice
+that added the reader (KD-79).*
+
+**CLOSED by `87ae6d4`, red at `af85171`.** A `cd` operand and a `…/scripts/fleet-check.mjs` operand
+are read from the command as written, so a wholly quoted path with a space in it resolves exactly,
+while everything the shell would expand, escape or assemble from pieces — a substitution, a glob, a
+`~`, an escape, a path built from adjacent pieces — stays refused. The oracle is `/bin/sh` itself:
+`test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs` gained seven rows, and
+`test/a-worktree-under-a-path-with-a-space-in-it-is-a-tree-the-gate-can-name.test.mjs` is the red
+one at `af85171`. `docs/GATE-RULES.md` moved in the same commit, and its "runs 24 shapes" sentence
+now names the table rather than a count.
+
+**Half of what this entry recorded was wrong, and the wrong half was the fail-open one.** It says
+`node "/Users/k/my trees/scripts/fleet-check.mjs"` was *refused* with "a form this gate cannot
+resolve to a file". It was not refused: measured on `4b81ee1` by calling the module's own
+`classify`, that command returns `null` — the hook printed nothing and the device run went ahead
+**ungated**. Silence, not refusal, which is the opposite direction from the one this entry argued
+was safe. The `cd` half is right about the refusal and wrong about its cause: `cd "/tmp" && gh pr
+merge` was refused too, with no space in it at all, because `readablePrefix` blanks every quoted
+span before `CHDIR` looks for the operand, so `LITERAL_PATH`'s whitespace exclusion was never
+reached.
+
+**What stayed open, named rather than guessed at:** two spellings of a fleet-check run are still
+silent (KD-190), the `cd` reader's command position is still a bare separator where
+`COMMAND_PREFIX` is not (KD-189), an unquoted brace expansion is still read as a literal path
+(KD-192), and the oracle's failure message still describes the gate's answer as the shell's
+(KD-193).
+
+### KD-119 — a KD number is allocated per branch, and two branches in flight allocate the same one — **CLOSED 2026-09-22**
+
+`docs/KNOWN-DEFECTS.md` (the open table and its entries), `scripts/hooks/proof-gate.mjs` (comments
+that cite a KD number)
+
+Measured 2026-09-18 at this slice's final re-record, between this branch and `origin/main` at
+`4b59451`. Both files number their new entries from the highest number they can see, and neither
+branch can see the other's. As found, FIVE numbers named two unrelated defects each:
+
+    this branch   KD-109  KD-110  KD-111  KD-112  KD-113   (109-111, 113 open; 112 closed)
+    origin/main   KD-109  KD-110  KD-111  KD-112  KD-113   (all open)
+
+`origin/main`'s KD-110 is the preflight guarding `npm test`; this branch's was `COMMAND_PREFIX`'s
+three alternatives. Its KD-113 is a nameless workspace spelled two ways; this branch's was the letter
+sweep's blind direction. The table rows and entry bodies collide in the same file, so a rebase puts
+both in front of whoever does it — the same surface as `b3670aa`, "the rebase kept both copies of
+this branch's own rows", one step earlier. **What a rebase does NOT put in front of anybody is the
+citation in code:** `scripts/hooks/proof-gate.mjs` cites KD numbers in three comments, and no
+conflict hunk ever shows them.
+
+**The collision itself is FIXED, in the commit that logged this:** this branch's five ids were
+renumbered to 114-119 — above `origin/main`'s maximum, in every file that carries one including the
+three code comments — BEFORE any rebase, because renumbering inside conflict hunks misses the entry
+sections that do not conflict. What stays logged is the absence of anything that makes that routine,
+and the fact that this entry's own body was rewritten by the renumber that fixed it: a blanket
+substitution moved the `origin/main` row of the table above as well as this branch's, which is the
+smallest possible demonstration that a KD number is a string in prose and nothing else.
+
+**Direction: a reader is sent to the wrong entry, and nothing else.** No program in this repo parses
+a KD number — grepped `scripts/` and `test/`, and `proof-plan.mjs`'s only mention of this file is a
+sentence naming it — so no gate, refusal or count routes on one. Nothing false reaches an adopter.
+The rule that avoids it is that the number comes from a place both branches can see — `origin/main`'s
+highest, re-read at logging time, not the branch's own — and it is a convention, not a program.
+Making it one is cheap to state and not free to get right: the deriver would have to fetch, which is
+the thing `scripts/proof-plan.mjs` deliberately never does because a gate that fetched would move
+the baseline it judges. So the convention stands, unenforced, and this entry is the record of what
+it costs when it is missed. *Found 2026-09-18 by the third declared substitute reader, at the final
+re-record of the slice that closed KD-107 — outside the four confirmations that re-record was
+bounded to, so it landed as a log entry rather than a fix. The author took the fix on the same pass,
+because a renumber is cheaper before a rebase than inside one.*
+
+**CLOSED by `3516dc7`.** `node scripts/kd-next.mjs` allocates the next number from every place that
+can hold one — the working tree, `origin/main` and every open PR head — prints what it read place by
+place, and names on stderr anything it could not reach. So the convention this entry recorded as
+"unenforced, and stated in prose" is a program now, and the header of `docs/KNOWN-DEFECTS.md` sends
+a reader to it. It does not fetch to get there: it reads `origin/main` as the local remote-tracking
+ref and the PR heads through `gh`, which is why the account it prints is part of the answer rather
+than a footnote.
+
+What it cannot see is a branch with no pull request — this wave's own shape — and that is logged as
+KD-191 rather than carried here. `test/a-kd-number-is-allocated-per-branch-so-two-branches-allocate-the-same-one.test.mjs`
+holds the program.
+
 ### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it — **CLOSED 2026-09-19**
 
 `packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)

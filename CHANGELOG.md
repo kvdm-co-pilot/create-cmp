@@ -295,6 +295,23 @@ All notable changes to this project are documented here. The format is based on
   `plugin.json`, and the marketplace's `metadata.version` plus every `plugins[*].version`) — says
   which of them lag, and prints it in the table and in `--json`.
 
+- **The proof gate refused a worktree whose path has a space in it, and said nothing at all about a
+  fleet check named through one.** `LITERAL_PATH` excluded whitespace along with `$`, backticks,
+  globs and `~`, and the device classifier's operand reader was a `\S*` that cannot cross a space,
+  so `cd "/Users/k/my trees/slice" && gh pr merge` was refused as a `cd` the gate cannot read
+  literally — and `node "/Users/k/my trees/scripts/fleet-check.mjs"` was not refused at all:
+  `classify()` returned `null`, the hook printed nothing, and the device run went ahead ungated. A
+  quoted operand is now read as the shell delimits it, so a wholly quoted path with a space in it
+  resolves exactly, while everything the shell would expand, escape or assemble from pieces stays
+  refused. The fuzz that checked the fix is committed with it: 49 disagreements with `/bin/sh`
+  before, 23 after, all 23 one class, logged as KD-189.
+
+- **A KD number was allocated from the highest number the branch could see, and two branches in
+  flight allocated the same ones.** `node scripts/kd-next.mjs` now derives it from the working tree,
+  `origin/main` and every open PR head at once, prints what it read place by place, and names on
+  stderr anything it could not reach. What it still cannot see is a local branch with no pull
+  request (KD-191), which is why it prints its sources rather than only its answer.
+
 ## [0.26.0] - 2026-09-16
 
 ### Fixed
