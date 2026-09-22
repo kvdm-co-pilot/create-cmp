@@ -432,6 +432,16 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
      whatever directory it was typed in;
   4. nothing else.
 
+  **"Literally" includes wholly quoted, and only wholly (KD-95).** Quotes delimit, so
+  `cd "/My Trees/slice"` and `node '/My Trees/slice/scripts/fleet-check.mjs'` name one path each and
+  it is the text between the quotes — a space there is part of the path and is read exactly. A space
+  that is ESCAPED instead (`/My\ Trees`), and a word the shell assembles from a quoted piece and an
+  unquoted one (`"/My Trees"/slice`), are not: what the gate would read back is not what the shell
+  builds, so both are refused. Inside the quotes the rule is unchanged and it is the stricter of the
+  two shells' — `$`, a backquote, a glob, `~` and a backslash are refused in single quotes too,
+  where the shell would not expand them, because one rule for both quote styles is a rule a reader
+  can hold.
+
   **"A `cd` the shell would perform" is the load-bearing phrase, and it is measured, not asserted.**
   A `cd` inside `echo "…"`, inside a heredoc, inside `$( )`, or inside a nested `sh -c '…'` is not
   one — the shell never performs it, or performs it in a process whose directory dies with it — and
@@ -440,13 +450,15 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   command is blanked first — quoted spans, substitutions — and only then are the remaining parens
   counted, which is the one point at which counting them is sound. `/bin/sh` is the oracle:
   `test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs` replaces the gated command with
-  `pwd -P`, runs 24 shapes through a real shell, and holds the invariant that the gate resolves the
-  directory the shell would run the command in **or resolves nothing at all**. Ten of those shapes
-  disagreed when that harness was written, in both directions, and both directions end in a false
-  ALLOW.
+  `pwd -P`, runs every shape in its table through a real shell, and holds the invariant that the
+  gate resolves the directory the shell would run the command in **or resolves nothing at all**. Ten
+  of the 24 shapes disagreed when that harness was written, in both directions, and both directions
+  end in a false ALLOW. Four more were added with KD-95, for operands the reader saw only part of:
+  it looked for the operand in the text whose quoted spans it had already blanked, so `cd "/a b"/in`
+  resolved `/in` and `cd /here"/sub"` resolved the payload's own cwd, which is KD-79.
 
   Everything outside the set REFUSES and says why: `pushd`; a `cd` whose destination is a variable,
-  a glob, `~` or a path with a space in it; a heredoc, a backquote, an unclosed quotation, a
+  a glob, `~`, an escape, or a path with an unquoted space in it; a heredoc, a backquote, an unclosed quotation, a
   compound command or a sourced script, or a `)` whose opener this reader never saw; a directory
   that is not there; `gh --repo`/`-R`/`GH_REPO` naming a repository out of band; `npm publish
   --prefix`/`-C`/`-w` or a folder or tarball operand; and any git question about the directory that

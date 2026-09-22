@@ -259,8 +259,36 @@ const MASKED_SEPARATOR = `(?:^|[${SEPARATORS}){}])`;
  */
 const invocation = (prog) => new RegExp(`${RAW_SEPARATOR}\\s*${COMMAND_PREFIX}${prog}(?=\\s|$|["')])`);
 
+/**
+ * One piece of a shell word: an unquoted character, a backslash escape, or a
+ * whole quoted span. The four alternatives begin with four disjoint characters,
+ * so a run of them has exactly one parse and costs what its length costs.
+ */
+const WORD_PIECE = `(?:[^\\s;&|()<>"'\\\\]|\\\\[^\\n]|"[^"\\n]*"|'[^'\\n]*')`;
+
+/**
+ * The fleet check's path as ONE shell word, however it is quoted or escaped,
+ * ending in `fleet-check.mjs` at a path-segment boundary — inside quotes or not.
+ *
+ * BROAD ON PURPOSE, and broader than what `commandCwd` will read (KD-95). This
+ * pattern decides whether the gate judges the run AT ALL, and the pattern it
+ * replaced was an optional run of non-space characters ending in a slash, which
+ * cannot cross a space: `node "/a b/scripts/fleet-check.mjs"` was not classified,
+ * so the hook said nothing and the run went ahead ungated — silence, the
+ * direction this gate exists to make impossible. Every spelling the shell would
+ * run is now SEEN; the ones whose path cannot be read exactly are then refused
+ * by the reader below, with the word it could not read.
+ */
+const FLEET_CHECK_WORD = `(?:${WORD_PIECE}*(?:/|"[^"\\n]*/"?|'[^'\\n]*/'?)|["'])?fleet-check\\.mjs`;
+
+/** The same word, captured, for the reader that must resolve it to a directory. */
+const FLEET_CHECK_OPERAND = new RegExp(`node\\s+(${FLEET_CHECK_WORD})`);
+
+/** What may stand where that word ENDS. Anything else and the shell's word is longer than the one read — `"…/fleet-check.mjs"x` runs a file this gate did not see. */
+const WORD_END = /^[\s;&|()<>"']/;
+
 export const WATCHED = Object.freeze({
-  device: invocation("node\\s+(?:\\S*/)?fleet-check\\.mjs"),
+  device: invocation(`node\\s+${FLEET_CHECK_WORD}`),
   merge: invocation("gh\\s+pr\\s+merge"),
   create: invocation("gh\\s+pr\\s+create"),
   publish: invocation("npm\\s+publish"),
@@ -719,6 +747,10 @@ function askOrigin(git, { local, deadline, behindBy, contains }) {
 //   the command a command that runs elsewhere usually says so. A leading `cd`
 //               is read when it is written literally, and `node
 //               <somewhere>/scripts/fleet-check.mjs` names its tree outright.
+//               Literally includes WHOLLY QUOTED (KD-95): quotes delimit, so
+//               `cd "/My Trees/slice"` names one path and it is the path
+//               between the quotes. What the shell would expand, escape or
+//               assemble from pieces is not literal and is refused, quoted or not.
 // Then git decides the rest, because no string comparison can: this repo keeps
 // its worktrees INSIDE the checkout (`.claude/worktrees/`), so the tree that
 // must be judged is routinely a subdirectory of the tree that must not be. Two
@@ -743,8 +775,23 @@ function askOrigin(git, { local, deadline, behindBy, contains }) {
 // parsing is allowed to be conservative rather than clever.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** A directory operand this gate will act on only when it is written literally — no variable, subshell, glob, `~` or embedded space. */
-const LITERAL_PATH = /^[^$`*?[\]~\s]+$/;
+/**
+ * A path this gate will act on only when it is written literally. Unquoted: no
+ * variable, substitution, glob, `~`, escape, quote or space. The quote and the
+ * backslash are on the list because the operand is read from the command AS
+ * WRITTEN, and an unquoted word carrying either is one the shell assembles —
+ * `"/a b"/in`, `x\1` — into something other than its text.
+ */
+const LITERAL_PATH = /^[^$`*?[\]~\s"'\\]+$/;
+
+/**
+ * The same rule between ONE pair of quotes, with one difference: a space. The
+ * quotes delimit the word, so a space inside them is part of the path and it
+ * can be read exactly (KD-95). Nothing else is relaxed — a quoted `$`, glob,
+ * `~` or backslash is still refused, in single quotes too, where the shell
+ * would not expand it: one rule for both quote styles, the stricter one.
+ */
+const QUOTED_PATH = /^(?:[^$`*?[\]~\s\\]| )+$/;
 
 /**
  * The ways a shell changes directory, at a command position. No `-c ["']`
@@ -866,15 +913,44 @@ function readablePrefix(prefix) {
   return { text: s, depth };
 }
 
+/**
+ * The value of ONE shell word, when this gate can read it exactly — or null.
+ * Exactly means: unquoted and `LITERAL_PATH`, or wholly inside one pair of
+ * quotes and `QUOTED_PATH`. A word the shell assembles from quoted and unquoted
+ * pieces is refused rather than reassembled; a quote character of the OTHER
+ * kind inside the quotes is literal there, and is kept (`"Karel's trees"`).
+ */
+function literalWord(raw) {
+  const s = String(raw ?? "").trim();
+  const quoted = /^"([^"]*)"$/.exec(s) ?? /^'([^']*)'$/.exec(s);
+  if (quoted) return QUOTED_PATH.test(quoted[1]) ? quoted[1] : null;
+  return LITERAL_PATH.test(s) ? s : null;
+}
+
 /** The operand of a `cd`, when it is a directory this gate can name with certainty. */
 function literalDir(raw) {
-  let s = String(raw ?? "").trim();
-  const quoted = /^(["'])(.*)\1$/.exec(s);
-  // A quoted operand is delimited and is read exactly; an unquoted one can still
-  // carry the closing quote of the `sh -c "…"` wrapper it was found inside.
-  s = quoted ? quoted[2].trim() : s.replace(/["']+$/, "").trim();
-  if (!s || s.startsWith("-")) return null; // `cd -`, `cd -P /x`: a destination this gate does not compute
-  return LITERAL_PATH.test(s) ? s : null;
+  const s = literalWord(raw);
+  // `cd -`, `cd -P /x`, and `cd "-"`, which the shell hands cd as the same `-`:
+  // a destination this gate does not compute.
+  return s && !s.startsWith("-") ? s : null;
+}
+
+/** The quote a word is still inside at its end, or null — so the closing quote after `fleet-check.mjs` is taken only when it is that word's own. */
+function unclosedQuote(word) {
+  let open = null;
+  for (let i = 0; i < word.length; i += 1) {
+    const c = word[i];
+    if (open === "'") {
+      if (c === "'") open = null;
+    } else if (c === "\\") {
+      i += 1;
+    } else if (open === '"') {
+      if (c === '"') open = null;
+    } else if (c === '"' || c === "'") {
+      open = c;
+    }
+  }
+  return open;
 }
 
 /**
@@ -926,19 +1002,43 @@ export function commandCwd(kind, command, cwd) {
     // length-preserving precisely so this index still means what it says.
     if (/^&(?!&)/.test(cmd.slice(m.index + m[0].length))) continue;
     if (m[1] !== "cd") return { unknown: `it changes directory with \`${m[1]}\`, whose destination this gate does not track` };
-    const to = literalDir(m[2]);
-    if (!to) return { unknown: `it begins with a \`cd\` this gate cannot read literally (${m[0].trim()})` };
+    // THE OPERAND AS WRITTEN, NOT AS MASKED (KD-95). The match was found in
+    // `scope`, where every quoted span and every `$( )` is already blanks — which
+    // is right for finding the `cd` and wrong for reading its operand: a quoted
+    // operand reached `literalDir` as blanks and was refused whatever it said,
+    // and a half-quoted one reached it as the half left standing, so `cd "/a
+    // b"/in` was read as `/in` and `cd /x"/y"` as `/x`. Masking preserves length,
+    // so the same span of the command as written is the operand the shell sees.
+    const end = m.index + m[0].length;
+    const operand = prefix.slice(end - m[2].length, end);
+    const to = literalDir(operand);
+    if (!to) return { unknown: `it begins with a \`cd\` this gate cannot read literally (cd ${operand.trim()})` };
     dir = path.resolve(dir, to);
   }
 
   if (kind === "device") {
     // The fleet check is a FILE, and a path to it names the tree the run will
     // prove more directly than any cwd does: `node /elsewhere/scripts/fleet-check.mjs`
-    // proves /elsewhere, whatever directory it was typed in.
-    const m = /node\s+(["']?)((?:\S*\/)?)fleet-check\.mjs/.exec(cmd.slice(at));
+    // proves /elsewhere, whatever directory it was typed in. The word is found by
+    // the classifier's own pattern, so every spelling it SAW is one read here —
+    // exactly, or refused with the word it could not read.
+    const rest = cmd.slice(at);
+    const m = FLEET_CHECK_OPERAND.exec(rest);
     if (!m) return { unknown: "the fleet check it invokes is written in a form this gate cannot resolve to a file" };
-    if (m[2] && !LITERAL_PATH.test(m[2])) return { unknown: `the fleet check it names sits under a path this gate cannot read literally (${m[2]})` };
-    if (m[2]) dir = path.resolve(dir, m[2], "..");
+    let word = m[1];
+    const open = unclosedQuote(word);
+    // `"/a b/scripts/fleet-check.mjs"` closes AFTER the file name; a `sh -c "node
+    // scripts/fleet-check.mjs"` wrapper's quote sits there too, and is not the word's.
+    let after = rest.slice(m.index + m[0].length);
+    if (open && after[0] === open) {
+      word += open;
+      after = after.slice(1);
+    }
+    if (after && !WORD_END.test(after)) return { unknown: `the fleet check it names sits under a path this gate cannot read literally (${word}${after.split(/[\s;&|()<>]/)[0]})` };
+    const file = literalWord(word);
+    if (file === null) return { unknown: `the fleet check it names sits under a path this gate cannot read literally (${word})` };
+    const under = file.slice(0, -"fleet-check.mjs".length);
+    if (under) dir = path.resolve(dir, under, "..");
   }
 
   if (kind === "publish") {
@@ -1035,7 +1135,7 @@ export function judgedTree(kind, command, cwd, { budgetMs = TREE_PROBE_TOTAL_MS,
 /** The judged tree's OWN scheduler — its plan file, its change set, its branch rule, its trigger lists. A worktree answers for itself. */
 const planOf = (root) => (root === REPO_ROOT ? import("../proof-plan.mjs") : import(pathToFileURL(path.join(root, "scripts", "proof-plan.mjs")).href));
 
-const HONOURED = "Three forms are read: the cwd this hook was given, a literal `cd /absolute/path && …` in front of the command (a subdirectory is fine — it resolves to the worktree that holds it), and `node /absolute/path/scripts/fleet-check.mjs`. Anything else is refused rather than guessed at (docs/GATE-RULES.md, Rule 4).";
+const HONOURED = "Three forms are read: the cwd this hook was given, a literal `cd /absolute/path && …` in front of the command (a subdirectory is fine — it resolves to the worktree that holds it), and `node /absolute/path/scripts/fleet-check.mjs`. A path with a space in it is read when the WHOLE path is quoted — `cd \"/My Trees/slice\"`, `node '/My Trees/slice/scripts/fleet-check.mjs'` — because quotes delimit; escaping the space instead does not, and neither does quoting part of the path. Anything else is refused rather than guessed at (docs/GATE-RULES.md, Rule 4).";
 
 const cannotTell = (why) =>
   `this gate could not tell which tree this command will act on: ${why}. It judges the tree the command RUNS IN, never the session's own — that assumption is KD-79, which refused an owed device run and refused a merge over another worktree's files — so a tree it cannot name is a tree it cannot check. ${HONOURED}`;
