@@ -70,6 +70,115 @@ being refused as an unknown flag NAME. Driven through the real `create-cmp upgra
 form holding something else is still deliberately not refused: that is KD-150, measured untouched
 by this change (`["--no-firebase","no","my-app"] → positionals ["no","my-app"]`).
 
+### KD-18 — the symlink gate reads two of the eight bins this repo publishes — **CLOSED 2026-09-22**
+
+`test/a-published-bin-does-nothing-when-npm-symlinks-it.test.mjs` (`declaredBins`)
+
+Its header says "EVERY bin every package.json declares". The scan reads the root manifest and
+`packages/*/package.json` — one level — so it sees `create-cmp` and `prooflane-harness` and misses
+the five alias bins under `packages/aliases/*/` (`prooflane`, `create-mobile`, `create-kmp`,
+`create-ktor`, `create-compose-multiplatform`) and `inspector/mcp`. `assert.ok(bins.length > 0)`
+passes on two, so the narrowing is silent. The missed set includes `prooflane`, which is the name an
+adopter actually `npx`es.
+
+Nothing is broken behind it: all eight were run directly and through a symlink on 2026-09-14 and
+every one produced identical bytes and status. Logged as a gate narrower than its own claim, not as
+a defect — the repair is to recurse `packages/` (or read `workspaces`) rather than to list two
+depths.
+
+**Fires when:** an alias bin gains an entry-point guard, or any other realpath-sensitive line.
+*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`.*
+
+**CLOSED by `1f33325`, red at `b2e67bc`.** The gate enumerates published packages through
+`ownedNames()` — the one list `scripts/ground-truth.mjs` derives and
+`test/a-version-number-cannot-name-two-different-trees.test.mjs` holds to every tracked publishable
+manifest — and links every bin NAME rather than every deduplicated target, so its reach is now
+asserted rather than counted: `assert.ok(bins.length > 0)` is gone.
+
+**The count in this entry was low. It is NINE bin names, not eight, and it ran two of them.** At
+`b2e67bc` the gate reds with the seven it never ran — `cmp-inspector-mcp` (`@create-cmp/inspector`),
+`create-cmp-cli`, `create-compose-multiplatform`, `create-kmp`, `create-ktor`, `create-mobile` and
+`prooflane` — and passes over nine at `1f33325`. What the entry got right is that nothing was broken
+behind it; what was broken was the gate's claim about itself. Refuters: a dead entry-point guard
+planted in `packages/aliases/prooflane/bin/cli.mjs`, in `create-ktor`'s and in
+`inspector/mcp/bin/server.mjs` each reds by name, and narrowing the enumeration back
+(`p.dir === "inspector/mcp"` skipped) reds the coverage assertion.
+
+Two of the newly read bins legitimately print nothing on stdout — the inspector is a stdio MCP
+server that announces itself on stderr (KD-188), and an alias whose dependency is absent says so on
+stderr and exits 1 — so the comparison reads stderr as well as stdout now, and a dead entry point is
+stated as what it actually looks like: exit 0 in silence.
+
+### KD-134 — the version deriver names three surfaces where a bump must move four — **CLOSED 2026-09-22**
+
+`scripts/ground-truth.mjs` · `package-lock.json`
+
+`CLAUDE.md` says to ask the programs, not a document, and names `ground-truth.mjs` for "counts and
+versions, never by hand". It reports the spine as `cli / plugin / marketplace`. A version bump must
+actually move **four** surfaces: those three plus `package-lock.json`, which records the root
+manifest's own version in two places.
+
+**Measured on this slice.** Bumping 0.26.4 → 0.26.5 across the three the deriver names left the
+suite red: `actual: '0.26.4', expected: '0.26.5'`. The author had read the deriver, moved exactly
+what it listed, and was still wrong.
+
+**Nobody is wrongly served, and that is why it is logged.** `test/workspace-lock-sync.test.mjs`
+refuses the drift by name with the remedy printed, so the lockfile cannot ship stale. The lock is
+also genuinely derived state, which is a fair reason for a *count* deriver not to list it as a
+package.
+
+**What is logged is narrower and worse:** "which surfaces must move together" is not derived
+anywhere, and the program that exists so nobody hand-counts this answers with three of four. A
+reader who trusts it exactly as `CLAUDE.md` instructs is handed an incomplete answer and finds out
+from a test. That is the drift `ground-truth.mjs` was written to abolish, in the deriver itself.
+
+*Logged 2026-09-19, review round 1 of the packaging slice — by the reviewer, about the author.*
+
+**CLOSED by `a2570ad`.** `scripts/ground-truth.mjs` derives a **version spine**: the six FIELDS a
+bump must move — `package.json`, the lock's `version` and its `packages[""].version`, `plugin.json`,
+and the marketplace's `metadata.version` plus every `plugins[*].version` — with which of them lag
+printed in the table and answered in `--json`. So the program `CLAUDE.md` sends a reader to now
+answers the question this entry says it was asked. Before it, both shipped-surface tests red: the
+`--json` answer "never mentions package-lock.json version, package-lock.json packages[""].version",
+and the printed table never mentioned the lock; after, 13 pass. Refuters: deleting the two lock
+surfaces from `versionSpine()` reds six tests including every fixture, and deleting the print line
+from `main()` reds the table test.
+
+The four FILES are this entry's; the FIELD list inside them is the closing slice's own reading, and
+`npm version` moves `package.json` and the lock for you — so what the spine is worth is worth
+exactly for the hand-edited bump this entry measured.
+
+### KD-31 — the contract vendored into every stamped app names a script no stamped app has — **CLOSED 2026-09-22**
+
+`template/qa/lib/profile-contract.mjs` (comment above `l2Execution`)
+
+"Run it with `node scripts/fleet-check.mjs --ladder-plant`." The template ships no `scripts/`
+directory; `fleet-check.mjs` lives in create-cmp and is not vendored. The contract's own header
+names "the author" — a person writing a profile, in their own tree — as one of its three consumers,
+and this is the one instruction it gives them that their tree cannot carry out. The file already
+carries one reference of the same shape (`node scripts/sync-harness.mjs`, `profile.mjs:26`), but
+that one says "in the create-cmp repo" beside it.
+
+Not blocking: a reader who tries gets `Cannot find module`, immediately, rather than a wrong answer.
+**Fires when:** a second-stack author follows it. *Logged 2026-09-14, review round 1 of
+`startup-plant`.*
+
+**CLOSED by `a1c3e16`, red at `330ba88`.** `template/qa/lib/profile-contract.mjs` says the run
+happens in the create-cmp repo, in the sentence that gives the instruction, and the CLASS closes
+with it: `test/a-vendored-instruction-names-a-script-no-stamped-app-has.test.mjs` scans every
+tracked file under `template/` for `node <path>` and refuses a path the template does not ship
+unless the SENTENCE the instruction sits in says the script lives in the create-cmp repo. Refuter:
+planting "run `node scripts/nope.mjs`" into `template/qa/verify.mjs` reds it.
+
+**It was sixteen instructions, not one, and the sibling this entry called correct is one of them.**
+The paragraph above reads `node scripts/sync-harness.mjs` at `profile.mjs:26` as already saying "in
+the create-cmp repo" beside it — it says it in the sentence BEFORE, which under the same-sentence
+rule is not beside it at all. Fifteen SINGLE SOURCE OF TRUTH headers were live for that reason; all
+sixteen now carry the repo in their own sentence. The paragraph reading was measured as the
+alternative and refuses exactly one instruction, this entry's, while exempting the other fifteen on
+a mention in a neighbouring sentence — a hole, because those headers are precisely where the next
+instruction of this kind gets written.
+
 ### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it — **CLOSED 2026-09-19**
 
 `packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)

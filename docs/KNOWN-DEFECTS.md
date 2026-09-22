@@ -95,14 +95,12 @@ you the same list without opening anything.
 | **KD-5** | `tokenDrift` SKIPs whenever the debug app is not running | environmental, indistinguishable from broken |
 | **KD-6** | `device` is not among the agnostic lint's runtime nouns | adding it fails ten core modules today |
 | **KD-8** | the dangling-citation lint reads `ADR-NNNN`, not `§` | nothing dangles; a checker risks false positives |
-| **KD-18** | the symlink gate reads 2 of the 8 bins this repo publishes | all eight pass today |
 | **KD-20** | the vendored lane's parsers refuse `--` as well | not npx-reachable |
 | **KD-21** | `KNOWN_FLAGS` is hand-written where `BOOLEAN_FLAGS` is derived | zero gaps measured, both directions |
 | **KD-24** | `--yes` refused at one door, accepted-and-ignored at the other | the flag is inert; the rest of the line still does what was asked |
 | **KD-25** | an interrupt that printed nothing would pass the suite | wording deliberately not pinned |
 | **KD-28** | the header's KD-7 measurement cites a count this log attaches to another defect | the argument does not rest on the number |
 | **KD-30** | the "second lane run left no receipt" guard reads the path the first run's receipt is at | unreachable; the stale receipt reads as the overclaim |
-| **KD-31** | the vendored contract tells its reader to run `scripts/fleet-check.mjs`, which no stamped app has | an import error, not a wrong result |
 | **KD-32** | the plant driver spells cmp's source root and pack id as literals | both fail loud, and there is one pack |
 | **KD-37** | two fleet ids naming one directory are counted as two repos upgraded | the second pass is idempotent; both were named |
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
@@ -181,7 +179,6 @@ you the same list without opening anything.
 | **KD-129** | `node scripts/change-price.mjs` now PRINTS which review round is next and what it reads — text a reader acts on, about this file's rule — and `test/the-review-rule-is-stated-twice.test.mjs` scans `.claude/agents/`, `skills/`, `agents/` and one printed string, so no `scripts/` text is read by it | nothing false is printed today: measured at zero six-word runs shared with the header across every file this slice touched, and the one printed sentence that had stopped being true of the tree was corrected here. What is logged is the hole, not a drift |
 | **KD-130** | `reviewDischarge` copies six named fields of a review record into `plan.reviewDischarged`, and `round`/`kind` are not among them — so the settled-plan history `--history` reads can say a review discharged the slice and never which round did | no reader consumes a round from there: the block that prices rounds reads `review-history.jsonl`, where both fields ARE written. The honest remedy edits the plan-event schema and its summariser, which is the file KD-124 already names |
 | **KD-131** | the same bytes ran FAIL and then PASS ninety seconds apart: `inspector/mcp/test/preview-service.test.mjs`'s *"a stale state with NOTHING pending says so"* failed inside a full `npm test` and passed alone (83/83) and on an immediate re-run, and `qa-artifacts/suite-history.jsonl` holds both verdicts against the SAME `observedHash` | no adopter runs this repository's inspector tests, and nothing in the failing path is imported by the slice that saw it. It is the same family as KD-56, which already owns the inspector's load-sensitive tests; what is new here is the measurement, and the FAIL record this branch leaves on disk |
-| **KD-134** | `scripts/ground-truth.mjs` reports the version spine as three names — `cli`, `plugin`, `marketplace` — while a bump must move FOUR surfaces: `package-lock.json` records the root version twice and is not among them | the suite refuses the drift by name (`test/workspace-lock-sync.test.mjs`) with the remedy printed, so nobody is wrongly served. What is logged is that the deriver `CLAUDE.md` names as the thing to ask INSTEAD of a document is silent about a surface that must move in lockstep — and it caught out this slice's own author, at the second amendment |
 | **KD-160** | every create-cmp tree commits `qa/harness.lock.json`, whose `files` map holds one sha256 per locked path — 73 digests in a full stamp, 7 in a `--minimal` one — and a secret scanner reads a 64-char hex string as a credential | measured after an adopter's gitleaks flagged one as `generic-api-key` and reddened their CI on a file they did not author. The digests are load-bearing (the lock is what says whether the machine-owned region was edited) so they cannot simply go; the remedies are an allowlist shipped with the template or documenting the shape, and both are product decisions rather than lines |
 | **KD-161** | the round block prices round 2 from whether the DELTA is empty, and a round 1 that logs its findings writes to `docs/KNOWN-DEFECTS.md` — so the delta is almost never empty and the one NOT-OWED case is almost never reachable | measured on its own first use: round 1 of the slice that added it found nothing blocking, made NO fixes, wrote two log entries, and the block priced round 2 OWED. The header's rule is about round 1's FIXES, not about any delta. Advisory only — a human read it, disagreed, and took the header's answer |
 | **KD-162** | the sweep proving the lock is a "class of one" allow-lists `qa/e2e/` and `qa/golden/` by PREFIX, so a machine-written file added under either is invisible to it | measured: today's three survivors under those prefixes really are app content and the lock really is the only other one, so the claim holds — what is unpinned is tomorrow's addition, not today's answer |
@@ -199,6 +196,10 @@ you the same list without opening anything.
 | **KD-182** | the comment explaining the new check calls `node qa/walk-status.mjs --statusline` "the pre-0.26.3" form, and it is what `template/.claude/settings.json` ships TODAY at 0.26.7 | the same slice's CHANGELOG states the population correctly ("**every new stamp**"), so nothing an adopter reads is wrong; what the false attribution can do is tell the next reader of that code that the shipped template is not among the affected |
 | **KD-183** | the hook verdict reports a command that really resolves as cwd-relative — `cd "${CLAUDE_PROJECT_DIR:-.}" && node qa/walk-status.mjs` runs the walk from any directory and is named as one that does not | measured by executing it from a foreign cwd: the over-report is the conservative direction the detector chooses on purpose (KD-180's first row, one surface over), the remedy it prints leaves a working hook working, and the opposite direction is now gated by `test/doctor-claims-working-for-a-surface-a-foreign-cwd-cannot-run.test.mjs` |
 | **KD-184** | `--=x` splits into the EMPTY flag name, and both doors refuse it as `--` — which is the one token both parsers DO accept, the npx end-of-options separator | refused, exit 2, nothing written; the sentence names something other than what was typed, and the doors converged on it rather than special-casing one |
+| **KD-185** | the inspector bundle's freshness hash reads THIS tree while its bundler resolves `prooflane-harness` through `node_modules` | needs a rebuild run from a worktree with no install of its own; CI installs at the root |
+| **KD-186** | the publish skill says `inspector/mcp` is `private: true`; it is published as `@create-cmp/inspector` | the instruction it supports (publish from the root) is right, its reason is false |
+| **KD-187** | in this repo a `create-*` alias runs the REGISTRY's create-cmp-cli, not the tree's | the aliases are pass-throughs and an adopter gets the latest; no gate can exercise one against this tree |
+| **KD-188** | `cmp-inspector-mcp --help` starts the MCP server and exits 0 having printed nothing on stdout | it announces itself on stderr; an MCP client never passes `--help` |
 
 ---
 
@@ -309,25 +310,6 @@ yet (KD-19), so a deriver landed today would need an exception for it on day one
 **Fires when:** the next flag is added to a command and not to `KNOWN_FLAGS`.
 *Logged 2026-09-14, review round 1 of `refuse-unknown-args`.*
 
-### KD-18 — the symlink gate reads two of the eight bins this repo publishes
-
-`test/a-published-bin-does-nothing-when-npm-symlinks-it.test.mjs` (`declaredBins`)
-
-Its header says "EVERY bin every package.json declares". The scan reads the root manifest and
-`packages/*/package.json` — one level — so it sees `create-cmp` and `prooflane-harness` and misses
-the five alias bins under `packages/aliases/*/` (`prooflane`, `create-mobile`, `create-kmp`,
-`create-ktor`, `create-compose-multiplatform`) and `inspector/mcp`. `assert.ok(bins.length > 0)`
-passes on two, so the narrowing is silent. The missed set includes `prooflane`, which is the name an
-adopter actually `npx`es.
-
-Nothing is broken behind it: all eight were run directly and through a symlink on 2026-09-14 and
-every one produced identical bytes and status. Logged as a gate narrower than its own claim, not as
-a defect — the repair is to recurse `packages/` (or read `workspaces`) rather than to list two
-depths.
-
-**Fires when:** an alias bin gains an entry-point guard, or any other realpath-sensitive line.
-*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`.*
-
 ### KD-24 — `--yes` is refused by one door of `harness init` and accepted-and-ignored by the other
 
 `packages/harness/install/args.mjs` vs `src/lib/args.mjs`, for the one shared installer
@@ -407,21 +389,6 @@ run that would have exonerated it never happened. Receipts carry `generatedAt`; 
 two.
 
 Not blocking: repo-only, and a human reads the line. *Logged 2026-09-14, review round 1 of
-`startup-plant`.*
-
-### KD-31 — the contract vendored into every stamped app names a script no stamped app has
-
-`template/qa/lib/profile-contract.mjs` (comment above `l2Execution`)
-
-"Run it with `node scripts/fleet-check.mjs --ladder-plant`." The template ships no `scripts/`
-directory; `fleet-check.mjs` lives in create-cmp and is not vendored. The contract's own header
-names "the author" — a person writing a profile, in their own tree — as one of its three consumers,
-and this is the one instruction it gives them that their tree cannot carry out. The file already
-carries one reference of the same shape (`node scripts/sync-harness.mjs`, `profile.mjs:26`), but
-that one says "in the create-cmp repo" beside it.
-
-Not blocking: a reader who tries gets `Cannot find module`, immediately, rather than a wrong answer.
-**Fires when:** a second-stack author follows it. *Logged 2026-09-14, review round 1 of
 `startup-plant`.*
 
 ### KD-32 — the plant driver spells this stack's tree shape where the seam says it must not
@@ -2815,31 +2782,6 @@ this slice just closed one level up.
 
 *Logged 2026-09-19, from the first real use of the program it is about.*
 
-### KD-134 — the version deriver names three surfaces where a bump must move four
-
-`scripts/ground-truth.mjs` · `package-lock.json`
-
-`CLAUDE.md` says to ask the programs, not a document, and names `ground-truth.mjs` for "counts and
-versions, never by hand". It reports the spine as `cli / plugin / marketplace`. A version bump must
-actually move **four** surfaces: those three plus `package-lock.json`, which records the root
-manifest's own version in two places.
-
-**Measured on this slice.** Bumping 0.26.4 → 0.26.5 across the three the deriver names left the
-suite red: `actual: '0.26.4', expected: '0.26.5'`. The author had read the deriver, moved exactly
-what it listed, and was still wrong.
-
-**Nobody is wrongly served, and that is why it is logged.** `test/workspace-lock-sync.test.mjs`
-refuses the drift by name with the remedy printed, so the lockfile cannot ship stale. The lock is
-also genuinely derived state, which is a fair reason for a *count* deriver not to list it as a
-package.
-
-**What is logged is narrower and worse:** "which surfaces must move together" is not derived
-anywhere, and the program that exists so nobody hand-counts this answers with three of four. A
-reader who trusts it exactly as `CLAUDE.md` instructs is handed an incomplete answer and finds out
-from a test. That is the drift `ground-truth.mjs` was written to abolish, in the deriver itself.
-
-*Logged 2026-09-19, review round 1 of the packaging slice — by the reviewer, about the author.*
-
 ### KD-162 — the class-of-one sweep assumes its conclusion for two directories
 
 `test/a-minimal-lock-names-a-lane-the-tree-does-not-carry.test.mjs` (third case)
@@ -3073,3 +3015,90 @@ converged the edge case rather than special-casing it at one door.
 **Fires when:** anyone types `--=` followed by anything.
 *Logged 2026-09-22, by the slice that closed KD-14 — its own finding, ruled logged rather than
 fixed in this wave.*
+
+### KD-185 — the bundle's freshness hash reads this tree; the bundler reads whichever tree node_modules points at
+
+`inspector/mcp/src/lib/build-id.mjs` (`sourceFiles`, `harnessLibDir`) · `inspector/mcp/src/lib/ladder-bridge.mjs:33-36`
+
+`sourceFiles()` walks `path.resolve(root, "..", "..", "packages", "harness", "src", <dir>)` — a
+RELATIVE path, always this checkout. The modules it is hashing on the bundle's behalf are imported
+by BARE specifier: `import { evidenceLadderFor } from "prooflane-harness/lib/evidence-ladder.mjs"`
+and six more, which esbuild resolves the way Node does, by walking `node_modules` upward from the
+importing file. In a git worktree with no `node_modules` of its own — which is every worktree in
+`.claude/worktrees/`, and the shape this wave ran in — that walk climbs out of the worktree and
+finds the MAIN checkout's `node_modules/prooflane-harness`, a symlink to the main checkout's
+`packages/harness`. A rebuild there records this tree's hash over the neighbour's bytes, and both
+freshness guards then call the artifact current.
+
+Measured 2026-09-22, the resolution half only: from the worktree at `.claude/worktrees/wave-publish`,
+`node packages/aliases/create-kmp/bin/create-kmp.mjs --help` printed 2270 bytes — the registry's
+`create-cmp-cli@0.24.0` reached through the main checkout's `node_modules` — where this tree's own
+`bin/create-cmp.mjs --help` prints 2951. The same worktree moved to `/private/tmp/...` resolves
+neither. **The esbuild half is NOT measured**: esbuild is not installed in that worktree and no
+rebuild was run, so "esbuild resolves it the same way Node does" is inference from its
+`packages: "bundle"` setting, not an observation.
+
+Not blocking: CI runs one root `npm ci`, which links the workspace `prooflane-harness` into the tree
+being built, and `scripts/suite-preflight.mjs` refuses an uninstalled tree before the suite starts.
+The exposure is a human or agent rebuilding the bundle from a worktree.
+
+**Fires when:** someone rebuilds `dist/server.mjs` in a worktree that was never installed — which
+the next person to touch `packages/harness/src/lib/` will be asked to do.
+*Logged 2026-09-22, by the slice that closed KD-18, KD-31 and KD-134, against its own hand-off.*
+
+### KD-186 — the publish skill calls a published package private
+
+`.claude/skills/npm-publish/SKILL.md:159-160`
+
+"Publish from the **repo root only** — subpackages like `inspector/mcp` are `private: true` and will
+fail with `EPRIVATE` (that error means wrong directory, not a config problem)."
+`inspector/mcp/package.json` carries no `private` field and does carry
+`"publishConfig": {"access": "public"}`; `@create-cmp/inspector@0.9.0` is one of the twelve names
+`node scripts/ground-truth.mjs` lists as owned, under `independent`. Running `npm publish` there
+publishes the inspector rather than failing.
+
+Not blocking: the instruction the sentence supports is correct — the CLI is published from the root
+— and a reader who follows it is in the right directory. What is false is the reason, and it is the
+kind a reader repeats.
+
+**Fires when:** someone reasons from "the subpackages are private" about what this repo ships, or
+tries to publish the inspector and is told by the skill it cannot be done.
+*Logged 2026-09-22, found while reading the release path for KD-134.*
+
+### KD-187 — in this repo the create-* aliases run the registry's CLI, not this tree's
+
+`packages/aliases/{create-kmp,create-mobile,create-compose-multiplatform}/package.json` ·
+`package-lock.json:1079`
+
+Each alias declares `"create-cmp-cli": ">=0.7.1"` and resolves it at runtime with
+`require.resolve("create-cmp-cli/package.json")`. The root package is not a workspace of itself, so
+`npm ci` installs that dependency from the REGISTRY: the lock records `node_modules/create-cmp-cli`
+at `0.24.0` while the tree holds `0.26.6`. Measured 2026-09-22 in an installed checkout:
+`create-kmp --help` prints 2270 bytes, `bin/create-cmp.mjs --help` prints 2951 — different CLIs, two
+versions apart.
+
+Not blocking, and arguably correct: an adopter's `npx create-kmp` resolves `>=0.7.1` to the latest
+published CLI, which is the intended pass-through. What is logged is that NO gate in this repo can
+exercise an alias against the bytes this repo is about to publish; anything an alias appears to
+prove here is a statement about an old release. The symlink gate KD-18 closed is unaffected — it
+compares each alias against ITSELF through a link, and both runs reach the same delegate.
+
+**Fires when:** a test is written that asserts an alias's behaviour and reads it as this tree's.
+*Logged 2026-09-22, in the slice that closed KD-18.*
+
+### KD-188 — `cmp-inspector-mcp --help` starts a server and exits silently
+
+`inspector/mcp/bin/server.mjs` (`main`, bottom of file)
+
+There is no argv handling: any argument at all starts the stdio MCP server, which writes
+`cmp-inspector MCP server running on stdio` to stderr and exits 0 when stdin closes. Measured
+2026-09-22 with the SDK present: `--help` → exit 0, 0 bytes of stdout, 42 of stderr, both directly
+and through a symlink.
+
+Not blocking: an MCP client never passes `--help`, and the one line it does print goes to the channel
+a stdio server may speak on. It is logged because a person who types `--help` at a bin gets a process
+that looks like it hung until stdin is closed, and because the symlink gate KD-18 closed now has to
+carry a sentence explaining why "prints nothing on stdout" is legitimate here.
+
+**Fires when:** a person, rather than an MCP client, runs the inspector bin with an argument.
+*Logged 2026-09-22, in the slice that closed KD-18.*

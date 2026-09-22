@@ -34,6 +34,17 @@ All notable changes to this project are documented here. The format is based on
   Every spelling of `--dry-run` on `create-cmp upgrade`, with or without `--yes`, now leaves the
   version catalog byte-identical, and is pinned end to end through the real command.
 
+- **The lane vendored into every stamped app told its reader to run a script no stamped app has.**
+  `template/qa/lib/profile-contract.mjs` said "Run it with `node scripts/fleet-check.mjs
+  --ladder-plant`"; the template ships no `scripts/` directory, so the one instruction the contract
+  gives the profile author it names as a reader ends in `Cannot find module` (KD-31). It now says it
+  runs in the create-cmp repo and why. The class is closed with it: a test scans every tracked file
+  under `template/` for `node <path>` and refuses a path the template does not ship unless the
+  SENTENCE the instruction is in says the script lives in the create-cmp repo. Fifteen other
+  instructions were live under that rule — SINGLE SOURCE OF TRUTH headers whose "edit the package
+  source, then run `node scripts/sync-harness.mjs`" named the repo only in the sentence before — and
+  each now carries it in its own sentence, so a reader who greps one line can see where it runs.
+
 - **A declared boolean's VALUE form was stored as a string and read as a boolean, in both
   directions.** `create-cmp upgrade --dry-run true --yes` wrote `gradle/libs.versions.toml` and
   skipped the consent prompt, because ~24 readers compare `=== true` and `"true" !== true`;
@@ -253,6 +264,36 @@ All notable changes to this project are documented here. The format is based on
   from 0.24.0 through 0.26.4, for commands advertised in `--help`. The `prooflane` door was never
   affected. A new check reads what a bin imports against what `files` ships, so the two lists cannot
   drift apart again.
+
+### Contributor tooling
+
+*Nothing in this list is reachable from an installed package: `package.json`'s `files` ships no
+`scripts/`, no `docs/` and no `test/`.*
+
+- **The gate that proves a published command still works when npm symlinks it read two of the nine
+  bins this repo publishes.** `test/a-published-bin-does-nothing-when-npm-symlinks-it.test.mjs`
+  claims "EVERY bin every package.json declares" and scanned the root manifest and `packages/*` one
+  level down, deduplicated by target: `create-cmp` and the harness's `prooflane`. Everything under
+  `packages/aliases/` — including `prooflane` and `create-kmp`, the names an adopter actually
+  `npx`es — and `cmp-inspector-mcp` at `inspector/mcp` were never run, and `assert.ok(bins.length >
+  0)` passed on two. It now enumerates packages through `ownedNames()`, the one list
+  `scripts/ground-truth.mjs` derives and
+  `test/a-version-number-cannot-name-two-different-trees.test.mjs` holds to every tracked
+  publishable manifest, and links every bin NAME rather than every target. Nothing was broken behind
+  the gate; what was broken was the gate's reach. Two of the newly read bins legitimately print
+  nothing on stdout — the inspector is a stdio MCP server that announces itself on stderr, and an
+  alias whose dependency is absent says so on stderr and exits 1 — so "this test can tell the two
+  apart" is now stated as what a dead entry-point guard actually looks like (exit 0 in silence) and
+  the comparison reads stderr as well as stdout.
+
+- **`node scripts/ground-truth.mjs` is where `CLAUDE.md` sends every agent for "counts and versions,
+  never by hand", and it named three of the four surfaces a version bump must move.** The missing
+  one is `package-lock.json`, which records the root manifest's version twice. Measured on the
+  packaging slice: the author read the deriver, moved exactly what it listed, and the suite still
+  came back `actual: '0.26.4', expected: '0.26.5'`. The deriver now derives a **version spine** —
+  the six FIELDS a bump moves (`package.json`, the lock's `version` and `packages[""].version`,
+  `plugin.json`, and the marketplace's `metadata.version` plus every `plugins[*].version`) — says
+  which of them lag, and prints it in the table and in `--json`.
 
 ## [0.26.0] - 2026-09-16
 
