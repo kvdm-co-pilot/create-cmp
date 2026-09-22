@@ -130,12 +130,12 @@ export function coerceDeclaredBoolean(key, value, booleans = BOOLEAN_FLAGS) {
  * Declared booleans that reached the flag set still holding a STRING.
  *
  * After `coerceDeclaredBoolean` a boolean can only still hold a string when its
- * value was ATTACHED with `=`, which never consults `consumesNext`. This door's
- * parser does not split on `=` at all (KD-14) — `--dry-run=maybe` becomes a flag
- * literally named `dry-run=maybe` and is refused as unknown — so this reader
- * finds nothing here today. It is the same function as the harness door's, where
- * the shape IS reachable, and it is the guard that comes with the `=` form the
- * day this parser grows one.
+ * value was ATTACHED with `=`, which never consults `consumesNext` —
+ * `create-cmp upgrade --dry-run=maybe`, which would otherwise run as a REAL
+ * upgrade because `"maybe"` is not `true`. Until `parseArgs` split `=` (KD-14)
+ * this door could not produce the shape and this reader found nothing here
+ * (KD-153); it is the same function as the harness door's, and now reachable at
+ * both.
  *
  * `=`-only is the whole safety argument: an attached value has no positional to
  * lose, where refusing the SPACE form would make `--dry-run maybe ../app` an
@@ -147,15 +147,24 @@ export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
 
 /**
  * Parse argv into positionals + flags. `--flag value` captures the value, unless
- * `--flag` takes none — then `value` stays the user's positional.
+ * `--flag` takes none — then `value` stays the user's positional. `--flag=value`
+ * attaches it, whatever the flag.
+ *
+ * THE SAME LOOP AS `packages/harness/install/args.mjs`'s, token for token, and
+ * pinned so by `test/a-declared-booleans-value-arrives-as-a-string.test.mjs`
+ * with only the return set aside — this door names its positionals `_`.
  * @param {string[]} argv
  * @returns {{_: string[], flags: Record<string, string|boolean>}}
  */
 export function parseArgs(argv) {
-  const args = { _: [], flags: {} };
-  for (let i = 0; i < argv.length; i++) {
+  const flags = {};
+  const positionals = [];
+  for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a.startsWith("--")) {
+    if (!a.startsWith("--")) {
+      positionals.push(a);
+      continue;
+    }
     // `--` IS NOT A FLAG NAME, it is the POSIX end-of-options separator, and npx
     // forwards it verbatim: `npm create <pkg> my-app -- --flag` is the shape
     // every create-* CLI teaches, and both doors advertise `npx …` in their own
@@ -168,18 +177,32 @@ export function parseArgs(argv) {
     // means `--dry-run` to be a FLAG, not a positional. Inert is what makes the
     // separator change nothing.
     if (a === "--") continue;
-      const key = a.slice(2);
-      if (consumesNext(key, argv[i + 1])) {
-        args.flags[key] = coerceDeclaredBoolean(key, argv[i + 1]);
-        i++;
-      } else {
-        args.flags[key] = true;
-      }
+
+    const body = a.slice(2);
+    const eq = body.indexOf("=");
+    if (eq !== -1) {
+      // `--name=value` IS SPLIT HERE, at the first `=`, as prooflane's door
+      // always has (KD-14). Before, `--dry-run=true` arrived as a flag literally
+      // named `dry-run=true` and was refused as unknown — `create-cmp upgrade
+      // --dry-run=true` exit 2, the same line a dry run at the other door.
+      //
+      // It never consults `consumesNext`: an attached value has no positional
+      // to lose, so it is the flag's whatever it says. A declared boolean still
+      // gets the coercion its space form gets (`--dry-run=false` is false), and
+      // anything else it carries stays a STRING, which the bin refuses by what
+      // was typed (`unreadableBooleanValues`, KD-153).
+      const key = body.slice(0, eq);
+      flags[key] = coerceDeclaredBoolean(key, body.slice(eq + 1));
+      continue;
+    }
+    if (consumesNext(body, argv[i + 1])) {
+      flags[body] = coerceDeclaredBoolean(body, argv[i + 1]);
+      i += 1;
     } else {
-      args._.push(a);
+      flags[body] = true;
     }
   }
-  return args;
+  return { _: positionals, flags };
 }
 
 /** One name's value as a tri-state: true, false, or "this name said nothing". */

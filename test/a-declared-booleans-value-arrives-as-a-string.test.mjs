@@ -189,9 +189,14 @@ test("the shape `parseArgs` returns is pinned, for every flag form either door a
     // A value flag is untouched by any of this.
     [["--profile", "svc", "../dir"], { flags: { profile: "svc" }, positionals: ["../dir"] }],
     [["--fleet", "./fleet.json"], { flags: { fleet: "./fleet.json" }, positionals: [] }],
-    // `=` is not split by this parser at all (KD-14), so the key carries it.
-    [["--profile=svc"], { flags: { "profile=svc": true }, positionals: [] }],
-    [["--dry-run=maybe"], { flags: { "dry-run=maybe": true }, positionals: [] }],
+    // `=` is split, at a value flag and a boolean, as at the other door. Until
+    // KD-14 closed this parser did not split it and the key carried the value.
+    [["--profile=svc"], { flags: { profile: "svc" }, positionals: [] }],
+    [["--dry-run=true"], { flags: { "dry-run": true }, positionals: [] }],
+    [["--dry-run=false"], { flags: { "dry-run": false }, positionals: [] }],
+    // The one shape a declared boolean can still hold a string in, refused at
+    // the bin (KD-153).
+    [["--dry-run=maybe"], { flags: { "dry-run": "maybe" }, positionals: [] }],
     // The npx separator is inert, and a repeated flag is last-one-wins.
     [["--", "--dry-run"], { flags: { "dry-run": true }, positionals: [] }],
     [["--dry-run", "true", "--dry-run", "false"], { flags: { "dry-run": false }, positionals: [] }],
@@ -257,9 +262,8 @@ test("the two spellings of the shared functions are the same function", () => {
   //
   // COMMENTS ARE EXCLUDED FROM THE COMPARISON, and that is not a weakening: the
   // two files measure the same defect from different sides — one cites the
-  // scaffold it wrote, the other the lane it installed — and `=` is reachable
-  // at one door and not the other. The CODE has to be identical; the reason it
-  // is there is each file's own to state.
+  // scaffold it wrote, the other the lane it installed. The CODE has to be
+  // identical; the reason it is there is each file's own to state.
   const texts = DOORS.map((d) => ({ door: d, text: fs.readFileSync(path.join(ROOT, d.file), "utf8") }));
   const SHARED = ["takesNoValue", "consumesNext", "coerceDeclaredBoolean", "unreadableBooleanValues", "triState", "flagBool", "unknownFlags"];
   for (const name of SHARED) {
