@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs bd77de1329d67ac0a8ba0f51d0b2ba6e14c16897e993a44e3c870fc396aaec45
+// cmp:bundle-inputs 6f6054b3c1d5e4819be2b4be97c761bbed269fcad6dedba1ac9c6a6ffb026a16
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -35454,10 +35454,12 @@ var CONTRACT = Object.freeze({
       // anything had happened, which is precisely the blindness that let a
       // Python adopter earn L2 for an app its suite only ever imported.
       //
-      // Run it with `node scripts/fleet-check.mjs --ladder-plant`. A profile
-      // that declares no startup plant of its own gets no such assurance and is
-      // told so by name rather than passing quietly — the break belongs to the
-      // stack, because only the stack knows what starting is.
+      // Run it in the create-cmp repo with `node scripts/fleet-check.mjs
+      // --ladder-plant`, which stamps a scratch app from that tree — no stamped
+      // app has a scripts/ directory to run it from. A profile that declares no
+      // startup plant of its own gets no such assurance and is told so by name
+      // rather than passing quietly — the break belongs to the stack, because
+      // only the stack knows what starting is.
       l2Execution: Object.freeze({
         required: false,
         mode: "any",
