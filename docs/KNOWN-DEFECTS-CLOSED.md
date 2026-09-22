@@ -9,6 +9,67 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-14 — `create-cmp`'s parser does not split `--flag=value` — **CLOSED 2026-09-22**
+
+`src/lib/args.mjs` (`parseArgs`)
+
+`prooflane`'s parser splits on `=`; this one never has. `create-cmp harness init --profile=svc`
+produces a flag literally named `profile=svc`, which this door now REFUSES by name — `create-cmp:
+--profile=svc is not an argument this command knows`, exit 2, nothing written (measured
+2026-09-19). The sentence here used to say the profile id falls back to the directory name, and
+that stopped being true when the unknown-argument refusal landed: the flag is unrecognised
+because its name carries the value. Not a regression and not promised — no help text in
+`bin/create-cmp.mjs` offers the `=` form, every example uses the space form — so a user reaches
+it only by habit from other CLIs, and now hears about it instead of being surprised later.
+
+Found while fixing KD-7, as a test I had written that asserted the `=` form in BOTH parsers.
+That test was reaching past its own slice; it now asserts `=` where `=` is parsed, and this
+entry holds the rest.
+
+**Worth doing with KD-4:** both are drift between the two front doors, and one slice should
+close them together.
+*Logged 2026-09-13.*
+
+**CLOSED by `4be6b36`.** `src/lib/args.mjs`'s `parseArgs` is prooflane's loop token for token now,
+so both doors split `--name=value` at the first `=`: the attached form of a declared boolean means
+what its space form means, a value flag works attached (`--target-dir=./app`, `--profile=svc`), a
+declared flag carrying a value it cannot mean is refused by what was typed, and an unknown name is
+refused by its name rather than by name-plus-value. Red first on `4b81ee1`, twice —
+`test/an-equals-sign-turns-a-known-flag-into-an-unknown-one.test.mjs` through the real
+`create-cmp upgrade` (`259e86e`, 6 of 6), and the source pin in
+`test/a-declared-booleans-value-arrives-as-a-string.test.mjs` that holds the two `parseArgs` equal
+as code, return value aside (`61efc60`).
+
+**What did NOT close with it.** KD-4 — the paragraph above says these two are one slice, and the
+`harness init` flag line that omits `--new-profile` was not touched, so KD-4 stays open. And the
+split brought one edge case of its own, logged as KD-184: `--=x` splits into the EMPTY flag name,
+which both doors now refuse as `--`, the one token they accept.
+
+### KD-153 — half the new refusal is unreachable, at the door that cannot produce the shape — **CLOSED 2026-09-22**
+
+`bin/create-cmp.mjs`, `src/lib/args.mjs` (`unreadableBooleanValues`)
+
+A declared boolean can only still hold a string when the value was attached with `=`, and
+create-cmp's parser has never split on `=` (KD-14): `--dry-run=maybe` becomes a flag literally
+named `dry-run=maybe` and is refused as an unknown argument. So at that door the new check runs
+over every invocation and can never find anything.
+
+It is there anyway because the two parsers are pinned equal by test, function for function, and
+because the day KD-14 is closed is the day the shape arrives. The user is refused either way,
+with a sentence naming what they typed; only the sentence differs. At prooflane's door, which
+does split `=`, the refusal is the reachable one and is driven by test through the real bin.
+
+**Fires when:** never, at this door, until `create-cmp`'s parser splits `=`.
+*Logged 2026-09-19, by the slice that closed KD-16.*
+
+**CLOSED by `4be6b36`, which is the day this entry named.** With `=` split at create-cmp's door,
+`--dry-run=maybe` and `--dry-run=` reach `unreadableBooleanValues` and are refused as a value the
+flag cannot mean — exit 2, the typed token named, the version catalog byte-identical — instead of
+being refused as an unknown flag NAME. Driven through the real `create-cmp upgrade` in
+`test/an-equals-sign-turns-a-known-flag-into-an-unknown-one.test.mjs`, red on `4b81ee1`. The SPACE
+form holding something else is still deliberately not refused: that is KD-150, measured untouched
+by this change (`["--no-firebase","no","my-app"] → positionals ["no","my-app"]`).
+
 ### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it — **CLOSED 2026-09-19**
 
 `packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)

@@ -95,7 +95,6 @@ you the same list without opening anything.
 | **KD-5** | `tokenDrift` SKIPs whenever the debug app is not running | environmental, indistinguishable from broken |
 | **KD-6** | `device` is not among the agnostic lint's runtime nouns | adding it fails ten core modules today |
 | **KD-8** | the dangling-citation lint reads `ADR-NNNN`, not `§` | nothing dangles; a checker risks false positives |
-| **KD-14** | `create-cmp`'s parser does not split `--flag=value` | never promised; pairs with KD-4 |
 | **KD-18** | the symlink gate reads 2 of the 8 bins this repo publishes | all eight pass today |
 | **KD-20** | the vendored lane's parsers refuse `--` as well | not npx-reachable |
 | **KD-21** | `KNOWN_FLAGS` is hand-written where `BOOLEAN_FLAGS` is derived | zero gaps measured, both directions |
@@ -191,7 +190,6 @@ you the same list without opening anything.
 | **KD-150** | a declared boolean's SPACE form holding anything but `true`/`false` still hands the token to the positionals, so `prooflane init --dry-run maybe ../app` installs into `./maybe` and `create-cmp --no-firebase no my-app` scaffolds into `./no` | deliberate, and the alternative is worse: refusing it makes `create-cmp --minimal my-app` an error and re-creates KD-7, the defect class this repo cares most about. An adopter may legitimately have a directory called `no` |
 | **KD-151** | a contradictory line (`--ios false --no-ios false`, `--x --no-x`) is resolved by precedence and refused by nothing — the affirmative name answers and its `no-` twin is never consulted | no answer is right, so the honest act is to pin the one that has always been given rather than invent a refusal for a line nobody types; pinned by test, so a later change to `flagBool` has to mean it |
 | **KD-152** | `--version` and `--help` are the only declared booleans read by PRESENCE, so `--version false` still prints the version instead of meaning "not the version" | required by KD-15: at create-cmp's door the something-else is `create`, which writes — normalizing their value form made `create-cmp --version false --yes` scaffold an app while the user waited for a version string. A question is answered in whatever form it is asked |
-| **KD-153** | the refusal for a declared boolean still holding a string is unreachable at create-cmp's door — that parser never splits `=` (KD-14), so `--dry-run=maybe` is refused as an unknown flag NAME instead | the user is refused either way, by a sentence that names what they typed; the guard is there for the day KD-14 is closed, and pinned equal to prooflane's by the two-spellings test |
 | **KD-163** | the KD-15 guard's new value-form test drives `bin/create-cmp.mjs` with the REPOSITORY as its working directory, asserts only exit code and stdout, and sets no `timeout` — where the sibling test for the same defect class sandboxes the cwd, asserts it is still empty, and times out at 60s | cannot fire while the guard holds, and `myapp/` is gitignored so no gate reads what it would write. What is logged is a gate whose failure mode is a multi-minute untimed Gradle build inside `npm test` rather than an assertion |
 | **KD-164** | the reason given in BOTH new copies of the arg parser for not sharing one module — "the published root tarball carries no copy of this directory" — is refuted by `npm pack` on the root: all nine files of `packages/harness/install/` ship, `args.mjs` beside `src/lib/args.mjs` in one 389-file tarball, and `package.json`'s `files` names the directory outright | the DECISION is right for a reason the comment does not give: `prooflane-harness`'s own 94-file tarball carries `install/args.mjs` and no `src/`, so the harness alone still cannot import the root's copy. Nobody is mis-served; the next reader of either file is told a packaging fact this tree answers the other way |
 | **KD-165** | the same bytes carry two suite verdicts three minutes apart: `bf79f72` recorded FAIL 2122/2124 at 05:47 in a run of 268552ms and PASS 2123/2124 at 05:50 in one of 105713ms, both against `observedHash` b359f866 — the failing case is `test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs`, whose verdict rests on two wall-clock bounds per case | not the slice's code: nothing the KD-16 change touches is on that file's import graph, and it passes alone here in 7.4s. It is KD-131's class with a member OUTSIDE `inspector/mcp/` — a test of the proof gate's own refusal path — so KD-131's "no adopter runs this repository's inspector tests" no longer covers the class |
@@ -200,6 +198,7 @@ you the same list without opening anything.
 | **KD-181** | this tree stated the statusLine's stdin BOTH ways, and the false one governed a live path: `walk-status.mjs` said *the statusline gets no stdin*, `hooks.mjs` and KD-90 said it carries `workspace.project_dir` | settled 2026-09-19 from the official statusLine documentation (out of tree, KD-128's class): the comment was false and is corrected here. So the status line IS fixable — via stdin, not via the env var — and what is logged is that this slice does not take it: whether `$(cat)` can block with no payload is undocumented, and a status line that hangs is worse than one that prints nothing |
 | **KD-182** | the comment explaining the new check calls `node qa/walk-status.mjs --statusline` "the pre-0.26.3" form, and it is what `template/.claude/settings.json` ships TODAY at 0.26.7 | the same slice's CHANGELOG states the population correctly ("**every new stamp**"), so nothing an adopter reads is wrong; what the false attribution can do is tell the next reader of that code that the shipped template is not among the affected |
 | **KD-183** | the hook verdict reports a command that really resolves as cwd-relative — `cd "${CLAUDE_PROJECT_DIR:-.}" && node qa/walk-status.mjs` runs the walk from any directory and is named as one that does not | measured by executing it from a foreign cwd: the over-report is the conservative direction the detector chooses on purpose (KD-180's first row, one surface over), the remedy it prints leaves a working hook working, and the opposite direction is now gated by `test/doctor-claims-working-for-a-surface-a-foreign-cwd-cannot-run.test.mjs` |
+| **KD-184** | `--=x` splits into the EMPTY flag name, and both doors refuse it as `--` — which is the one token both parsers DO accept, the npx end-of-options separator | refused, exit 2, nothing written; the sentence names something other than what was typed, and the doors converged on it rather than special-casing one |
 
 ---
 
@@ -271,27 +270,6 @@ table row, `Rule 4` neither), so a checker would be a slice with real false-posi
 is the one thing the helper's own header says gets a scanner deleted.
 
 **Fires when:** the next hand-typed `§` goes stale. *Logged 2026-09-11, review round 5.*
-
-### KD-14 — `create-cmp`'s parser does not split `--flag=value`
-
-`src/lib/args.mjs` (`parseArgs`)
-
-`prooflane`'s parser splits on `=`; this one never has. `create-cmp harness init --profile=svc`
-produces a flag literally named `profile=svc`, which this door now REFUSES by name — `create-cmp:
---profile=svc is not an argument this command knows`, exit 2, nothing written (measured
-2026-09-19). The sentence here used to say the profile id falls back to the directory name, and
-that stopped being true when the unknown-argument refusal landed: the flag is unrecognised
-because its name carries the value. Not a regression and not promised — no help text in
-`bin/create-cmp.mjs` offers the `=` form, every example uses the space form — so a user reaches
-it only by habit from other CLIs, and now hears about it instead of being surprised later.
-
-Found while fixing KD-7, as a test I had written that asserted the `=` form in BOTH parsers.
-That test was reaching past its own slice; it now asserts `=` where `=` is parsed, and this
-entry holds the rest.
-
-**Worth doing with KD-4:** both are drift between the two front doors, and one slice should
-close them together.
-*Logged 2026-09-13.*
 
 ### KD-20 — the vendored lane's two strict parsers refuse `--` as well
 
@@ -2573,23 +2551,6 @@ exact shape, re-created by KD-16's fix on the way past. Measured before the guar
 **Fires when:** anyone writes `--version` or `--help` with a value.
 *Logged 2026-09-19, by the slice that closed KD-16.*
 
-### KD-153 — half the new refusal is unreachable, at the door that cannot produce the shape
-
-`bin/create-cmp.mjs`, `src/lib/args.mjs` (`unreadableBooleanValues`)
-
-A declared boolean can only still hold a string when the value was attached with `=`, and
-create-cmp's parser has never split on `=` (KD-14): `--dry-run=maybe` becomes a flag literally
-named `dry-run=maybe` and is refused as an unknown argument. So at that door the new check runs
-over every invocation and can never find anything.
-
-It is there anyway because the two parsers are pinned equal by test, function for function, and
-because the day KD-14 is closed is the day the shape arrives. The user is refused either way,
-with a sentence naming what they typed; only the sentence differs. At prooflane's door, which
-does split `=`, the refusal is the reachable one and is driven by test through the real bin.
-
-**Fires when:** never, at this door, until `create-cmp`'s parser splits `=`.
-*Logged 2026-09-19, by the slice that closed KD-16.*
-
 ### KD-132 — a review-round measurement stated three times, and re-readable in none of them
 
 `scripts/change-price.mjs` (PART 4 header) · `test/nothing-says-which-review-round-is-next-or-what-it-must-read.test.mjs` (header) · `docs/features/price-the-next-review-round.md`
@@ -3087,3 +3048,28 @@ stripper in `test/helpers/`, or one shared answer to the colour question that bo
 will be green for its author and red on every runner, which is the shape this already took twice.
 *Logged 2026-09-19, review round 2 (re-record) of `fix-boolean-value-form-inverted-2`. Found by
 running the bin-driving half of the suite with `CI=true` rather than reading the fix.*
+
+### KD-184 — `--=x` is refused as `--`, the one token both doors accept
+
+`src/lib/args.mjs`, `packages/harness/install/args.mjs` (`parseArgs`, the `=` branch);
+`bin/create-cmp.mjs` (the unknown-argument refusal), `packages/harness/bin/prooflane.mjs`
+
+`--=x` splits into the EMPTY name with value `x`, the empty name is unknown, and both refusals name
+it as `--${name}`. Measured on `4be6b36`:
+
+```
+$ create-cmp upgrade --=x
+  create-cmp: -- is not an argument this command knows.  …Nothing was written.
+$ prooflane init --=x
+  ✗ prooflane: -- is not a flag this command knows  …Nothing was written.
+```
+
+`--` is exactly the token both parsers DO accept (the npx end-of-options separator, dropped as
+inert), so the sentence names something other than what was typed and calls it unknown. Refused,
+exit 2, nothing written — nobody is wrongly served; the sentence is wrong. Before `4be6b36`
+create-cmp named it `--=x`; the doors now agree on the worse sentence, because the settled design
+converged the edge case rather than special-casing it at one door.
+
+**Fires when:** anyone types `--=` followed by anything.
+*Logged 2026-09-22, by the slice that closed KD-14 — its own finding, ruled logged rather than
+fixed in this wave.*

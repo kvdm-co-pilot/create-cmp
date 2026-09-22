@@ -8,6 +8,32 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **A directory named by an unset shell variable became the directory you happened to be in.**
+  Every command resolves its project with `(typeof flags["target-dir"] === "string" &&
+  flags["target-dir"]) || positional || "."`, and all four of the shapes a script produces are
+  falsy there — so `--target-dir=$DIR`, `--target-dir "$DIR"`, `--target-dir $DIR` and
+  `init "$DIR"`, with `DIR` unset, all silently meant the current directory. Measured:
+  `create-cmp harness init --target-dir --no-interview` wrote 53 files into whatever directory the
+  script ran from, and `create-cmp upgrade --target-dir --yes` rewrote that directory's version
+  catalog with the consent prompt auto-answered. Both doors now refuse all four shapes before any
+  command runs — a value flag given no value, by name (*"--target-dir needs a value, and was given
+  none (an unset shell variable expands to nothing, quoted or not)"*), and an empty positional as
+  the empty argument it is — exit 2, nothing written. The rule is narrow where it can afford to be:
+  only a flag that names where files are written is refused when it is bare, so `--set` with no
+  value still means the latest set and `--profile` with none still means the directory's slug.
+
+- **`create-cmp` refused `--name=value` as an argument it did not know, and read it wrongly when it
+  did not refuse.** `prooflane` has always split `--flag=value`; `create-cmp`'s parser never did, so
+  `create-cmp upgrade --dry-run=true` exited 2 with *"--dry-run=true is not an argument this command
+  knows"* while the same line at `prooflane` was a dry run, and `--profile=svc ../app` swallowed
+  `../app` as the value of a flag named `profile=svc`. Both doors now split at the first `=`:
+  `--dry-run=true` and `--dry-run=false` mean what `--dry-run true` and `--dry-run false` mean, a
+  value flag works attached (`--target-dir=./app`, `--profile=svc`, `--fleet=./fleet.json`), a
+  declared flag carrying a value it cannot mean (`--dry-run=maybe`) is refused by what was typed
+  with nothing written, and an unknown name is refused by its name (`--verfiy=1` → `--verfiy`).
+  Every spelling of `--dry-run` on `create-cmp upgrade`, with or without `--yes`, now leaves the
+  version catalog byte-identical, and is pinned end to end through the real command.
+
 - **A declared boolean's VALUE form was stored as a string and read as a boolean, in both
   directions.** `create-cmp upgrade --dry-run true --yes` wrote `gradle/libs.versions.toml` and
   skipped the consent prompt, because ~24 readers compare `=== true` and `"true" !== true`;
