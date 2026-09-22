@@ -66,7 +66,7 @@
 // `docs/features/`, the eight documents NORTH-STAR §12 gives authority over
 // (GOVERNING_DOCS below), and a commit convention this repository's own log
 // follows. They live in create-cmp's `scripts/`, on the
-// same shelf as DEVICE_TIER_TRIGGERS in `scripts/observed-tree.mjs`, and
+// same shelf as DEVICE_TIER_IRRELEVANT in `scripts/observed-tree.mjs`, and
 // `packages/harness/src/` — the core an adopter ships — learns nothing from this
 // file and imports nothing from it. An adopter's lane is unchanged by it.
 import fs from "node:fs";
@@ -106,7 +106,7 @@ export const DIRECT_TYPES = Object.freeze(["fix", "docs", "test", "chore", "refa
  * itself, which is not a row in its own table — §12's first line is "This
  * document governs". A hardcoded fact about create-cmp's own governance layout,
  * on the same shelf as
- * DEVICE_TIER_TRIGGERS in `scripts/observed-tree.mjs`, and read by
+ * DEVICE_TIER_IRRELEVANT in `scripts/observed-tree.mjs`, and read by
  * `classifyPath` as a contract: every verdict this program prints cites one of
  * these, so a diff that moves one is moving the rule the verdict rests on.
  *
