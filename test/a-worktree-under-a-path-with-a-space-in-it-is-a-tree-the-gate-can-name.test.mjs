@@ -128,6 +128,10 @@ test("a fleet-check path the gate cannot read exactly is REFUSED — never passe
     ["an escaped space", `node ${escaped(SPACED)}/scripts/fleet-check.mjs`],
     ["a quoted piece joined to an unquoted one", `node "${tmp}/my trees"/slice/scripts/fleet-check.mjs`],
     ["a variable inside the quotes", `node "$ROOT/my trees/scripts/fleet-check.mjs"`],
+    // The quote closes after the file name and the WORD does not: the shell runs
+    // `…/fleet-check.mjsx`, which is not this file, from a tree that was read as
+    // if it were.
+    ["a word that continues past the closing quote", `node "${SPACED}/scripts/fleet-check.mjs"x`],
   ]) {
     assert.equal(classify(command), "device", `${how}: ${JSON.stringify(command)} runs the fleet check, so the hook must judge it`);
     const got = commandCwd("device", command, HERE);

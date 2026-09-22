@@ -227,7 +227,12 @@ test("when the gate cannot tell which tree the command acts on, it REFUSES", () 
   // and the reader of the refusal is the one who has to fix the command.
   const unreadable = [
     ["a cd this gate cannot read literally", `cd "$SLICE_DIR" && gh pr merge 1`, /cannot read literally/],
-    ["a cd into a path with a space in it", `cd "${tmp}/my worktrees/slice" && gh pr merge 1`, /cannot read literally/],
+    // KD-95's other half. QUOTED, this path is now read exactly — quotes
+    // delimit, so the space inside them is part of it
+    // (test/a-worktree-under-a-path-with-a-space-in-it-is-a-tree-the-gate-can-name.test.mjs).
+    // Escaped, it is a word the SHELL assembles, and the escape is not part of
+    // what the gate can read back: still refused, and it says which it wanted.
+    ["a cd into a path whose space is escaped rather than quoted", `cd ${tmp}/my\\ worktrees/slice && gh pr merge 1`, /cannot read literally/],
     ["a cd into a directory that is not there", `cd ${path.join(tmp, "no-such-worktree")} && gh pr merge 1`, /is not there/],
     ["a repository named out of band", "gh pr merge 1 --repo someone/create-cmp", /out of band/],
     ["the same, in the environment", "GH_REPO=someone/create-cmp gh pr merge 1", /out of band/],
