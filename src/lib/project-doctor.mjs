@@ -4,6 +4,8 @@
 // filesystem/env inputs and passes them in, so every check unit-tests without
 // touching disk.
 
+import { PROJECT_DIR_ANCHOR } from "./hooks.mjs";
+import { currentForms } from "./shipped-hooks.mjs";
 import { parseVersions, parseProperties } from "./toml.mjs";
 import { lockstepViolation } from "./upgrade.mjs";
 import { nearestSet } from "./registry.mjs";
@@ -37,9 +39,19 @@ export const DISK_WARN_BYTES = 3 * GIB;
  *        reference the live-inspector endpoint (`/inspect/` or `InspectorHttpServer`);
  *        null = scan skipped (no composeApp sources), [] = project has no inspector code.
  * @param {{scriptPresent:boolean, settingsPresent:boolean, statusLine:boolean,
- *          promptHook:boolean}|null} [input.walk] the walk's wiring: is
- *        qa/walk-status.mjs installed, and does .claude/settings.json actually
- *        INVOKE it (statusLine + UserPromptSubmit)? null = skip the check.
+ *          promptHook:boolean, cwdRelative:string[], anchored:string[],
+ *          unconfirmed:string[], healable:string[]}|null} [input.walk] the walk's
+ *        wiring: is qa/walk-status.mjs installed, does .claude/settings.json actually
+ *        INVOKE it (statusLine + UserPromptSubmit), and for each surface — judged
+ *        cwd-relative, recognised as a shipped form that runs anywhere, or neither?
+ *        null = skip the check.
+ * @param {{healable:Array<{surface:string, location:string, command:string,
+ *          successor:string, why:string}>,
+ *          unanchored:Array<{surface:string, location:string, command:string,
+ *          paths:string[], shipped:(string|null)}>}|null} [input.hooks] what
+ *        .claude/settings.json carries that create-cmp shipped and has replaced, and
+ *        what the app wrote that will not resolve from another directory.
+ *        null = no settings file, or one that could not be read.
  * @param {{pidAlive:boolean, url:(string|null)}|null} [input.consoleRecord] the studio
  *        console's tmp-dir registry record for this app, when one exists: is its
  *        process still alive, and at what URL? null = no record (never started, or
@@ -64,6 +76,7 @@ export function diagnoseProject(input) {
     inspectorHits = null,
     inspectorCatalog = null,
     walk = null,
+    hooks = null,
     consoleRecord = null,
   } = input;
 
@@ -346,10 +359,12 @@ export function diagnoseProject(input) {
       !walk.promptHook ? "no UserPromptSubmit hook" : null,
     ].filter(Boolean);
     const inert = walk.cwdRelative ?? [];
+    const unconfirmed = walk.unconfirmed ?? [];
+    const promptForm = currentForms("UserPromptSubmit")[0]?.command ?? null;
     const named = (s) => (s === "statusLine" ? "the status line" : `the ${s} hook`);
     const joined = (xs) => xs.map(named).join(" and ");
     const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
-    if (missing.length === 0 && inert.length === 0) {
+    if (missing.length === 0 && inert.length === 0 && unconfirmed.length === 0) {
       findings.push({
         id: "walk-wiring",
         level: "ok",
@@ -359,45 +374,53 @@ export function diagnoseProject(input) {
           "status line and UserPromptSubmit.",
       });
     } else if (missing.length === 0) {
-      // Both surfaces invoke the walk; at least one of them cannot reach it.
-      // What the remedy is differs by surface, and the difference is not a
-      // preference: `${CLAUDE_PROJECT_DIR:-.}` repairs a hook because Claude Code
-      // exports that variable to hook commands, and cannot repair a status line
-      // because it does not export it there (documented behaviour of the harness
-      // this template ships into — a fact this repository cannot re-derive; see
-      // ANCHORABLE_SURFACES in src/lib/hooks.mjs and KD-90). So this finding
-      // offers no automatic heal: one half would rewrite a command the app owns,
-      // and the other half has no correct rewrite to offer at all.
-      // Named from POSITIVE evidence — the surface carries the anchor — never from
-      // the inert list's silence. A detector that cannot see a shape reports no
-      // violation for it, and calling that "still works" is the same false health
-      // claim this finding replaced, one surface over. Absent field: claim nothing.
-      // …and never a surface the detector calls inert. `anchored` asks whether the
-      // COMMAND contains the anchor; `inert` asks whether the walk's own PATH
-      // resolves. They are two answers to one question, and they come apart on a
-      // real shape: the template anchors its hook twice, so a hand-upgrade that
-      // anchors `test -f` and leaves `node qa/walk-status.mjs` relative carries the
-      // anchor while resolving nowhere. Naming that surface in both halves of one
-      // paragraph is the program disagreeing with itself, whichever half is right.
-      // The conjunction defers to the surface-aware detector instead of re-deriving
-      // a path opinion here — a second opinion is how this finding went wrong once.
-      const anchored = walk.anchored ?? [];
-      const working = [
-        walk.statusLine && anchored.includes("statusLine") ? "statusLine" : null,
-        walk.promptHook && anchored.includes("UserPromptSubmit") ? "UserPromptSubmit" : null,
-      ].filter(Boolean);
+      // Both surfaces invoke the walk; at least one of them cannot reach it, or
+      // cannot be shown to. What the remedy is differs by surface, and the
+      // difference is not a preference: `${CLAUDE_PROJECT_DIR:-.}` repairs a hook
+      // because Claude Code exports that variable to hook commands, and cannot
+      // repair a status line because it does not export it there (documented
+      // behaviour of the harness this template ships into — a fact this repository
+      // cannot re-derive; see ANCHORABLE_SURFACES in src/lib/hooks.mjs and KD-90).
+      //
+      // THREE ANSWERS, NOT TWO, and the third is the point. `inert` is what the
+      // detector JUDGED cwd-relative. `working` is what doctor RECOGNISES: a
+      // command byte-for-byte identical to one create-cmp ships, whose own
+      // execution from a foreign directory is pinned in
+      // test/shipped-hooks-table.test.mjs. Everything else is `unconfirmed` — a
+      // command doctor has neither run nor recognised — and saying so is the whole
+      // repair here. Reading health out of a detector's silence is what printed
+      // "the UserPromptSubmit hook is anchored and still works from any directory"
+      // over a hook that produced nothing, three fixes running; the opposite
+      // reading would fail an adopter whose hand-written hook works (KD-183).
+      const working = (walk.anchored ?? []).filter((s) => (s === "statusLine" ? walk.statusLine : walk.promptHook));
+      const healable = (walk.healable ?? []).filter((s) => s !== "statusLine");
       const one = inert.length === 1;
-      const hooks = inert.filter((s) => s !== "statusLine");
+      const unconfirmedOne = unconfirmed.length === 1;
+      const hooks = inert.filter((s) => s !== "statusLine" && !healable.includes(s));
+      const unconfirmedHooks = unconfirmed.filter((s) => s !== "statusLine");
+      const inertTitle = `${joined(inert)} only run${one ? "s" : ""} when the session starts at the project root`;
+      const unconfirmedTitle = `doctor cannot confirm ${joined(unconfirmed)} run${unconfirmedOne ? "s" : ""} from any directory`;
       findings.push({
         id: "walk-wiring",
         level: "warn",
-        title: `The walk is wired, but ${joined(inert)} only run${one ? "s" : ""} when the session starts at the project root`,
+        title:
+          inert.length > 0
+            ? `The walk is wired, but ${inertTitle}${unconfirmed.length > 0 ? `, and ${unconfirmedTitle}` : ""}`
+            : `The walk is wired, but ${unconfirmedTitle}`,
         detail:
-          `.claude/settings.json invokes qa/walk-status.mjs from both surfaces, but ${joined(inert)} ` +
-          `name${one ? "s" : ""} it by a path relative to the SESSION's directory rather than to this ` +
-          "project. A session opened anywhere else — the monorepo services/ layout the walk exists to " +
-          "serve — finds no script there, and `|| true` turns that into a clean exit with no output, so " +
-          "the surface shows nothing instead of reporting an error. " +
+          (inert.length > 0
+            ? `.claude/settings.json invokes qa/walk-status.mjs from both surfaces, but ${joined(inert)} ` +
+              `name${one ? "s" : ""} it by a path relative to the SESSION's directory rather than to this ` +
+              "project. A session opened anywhere else — the monorepo services/ layout the walk exists to " +
+              "serve — finds no script there, and `|| true` turns that into a clean exit with no output, so " +
+              "the surface shows nothing instead of reporting an error. "
+            : "") +
+          (unconfirmed.length > 0
+            ? `${cap(joined(unconfirmed))} invoke${unconfirmedOne ? "s" : ""} the walk with a command ` +
+              `create-cmp does not ship, so doctor neither recognises ${unconfirmedOne ? "it" : "them"} nor ` +
+              `runs ${unconfirmedOne ? "it" : "them"}: whether the walk is reached from a directory other ` +
+              "than this one is a question only the shell can answer. "
+            : "") +
           // What still works, derived rather than asserted: a warning that reads
           // "your walk is broken" while two thirds of it runs would be its own
           // false statement, in the surface this finding exists to make honest.
@@ -407,13 +430,25 @@ export function diagnoseProject(input) {
               "node qa/walk-status.mjs by hand always works."
             : "Running node qa/walk-status.mjs by hand still works."),
         fix: {
+          // No automatic heal is offered FROM THIS FINDING even when one exists:
+          // what --fix can rewrite is a command create-cmp shipped, and the
+          // shipped-hooks finding below is where that is said, once, for every
+          // surface rather than only the walk's.
           auto: false,
           description:
+            (healable.length > 0
+              ? `Anchor ${joined(healable)}: it is the form create-cmp itself shipped before the template was ` +
+                "anchored, not one your app wrote, so `create-cmp doctor --fix` rewrites it for you. "
+              : "") +
             (hooks.length > 0
               ? `Anchor ${joined(hooks)} in .claude/settings.json as "\${CLAUDE_PROJECT_DIR:-.}/qa/walk-status.mjs" ` +
                 "(the form the current engine template ships); doctor never rewrites a command your app already owns. "
               : "") +
-            (inert.includes("statusLine")
+            (unconfirmedHooks.length > 0 && promptForm !== null
+              ? `If ${joined(unconfirmedHooks)} is meant to run from any directory, the command create-cmp ` +
+                `ships is: "command": ${JSON.stringify(promptForm)}. `
+              : "") +
+            (inert.includes("statusLine") || unconfirmed.includes("statusLine")
               ? "The status line has no such remedy — CLAUDE_PROJECT_DIR is not set for a status line command, so " +
                 "writing the anchor there would read as a fix and change nothing. Until that surface is fixed " +
                 "upstream, start sessions at the project root, or read the walk with node qa/walk-status.mjs."
@@ -437,6 +472,76 @@ export function diagnoseProject(input) {
           description:
             "Add the statusLine and UserPromptSubmit entries to .claude/settings.json " +
             "(copied from the engine template; existing hooks are left untouched).",
+        },
+      });
+    }
+  }
+
+  // --- hook commands: create-cmp's own, and the app's -------------------------
+  // Two different questions about the same file, and the difference is who wrote
+  // the command. A command byte-for-byte identical to one create-cmp stamped and
+  // has since replaced is create-cmp's to correct — that is the whole basis for
+  // `--fix` rewriting anything in a file the app owns, and it is why the list is a
+  // committed table of shipped bytes rather than a parser's opinion of a shape
+  // (src/lib/shipped-hooks.mjs). A command the app wrote is reported and left
+  // alone, with the exact form to paste: doctor's job there ends at telling them.
+  //
+  // The Stop hook is the reason this exists. Every app stamped through 0.26.2 has
+  // `node qa/receipt-check.mjs --hook`, which resolves only from the project root —
+  // and until this finding, nothing create-cmp could run so much as mentioned it
+  // (KD-85, "only two of the three commands are reported").
+  if (hooks !== null) {
+    const healable = hooks.healable ?? [];
+    const unanchored = hooks.unanchored ?? [];
+    // The surface as an adopter knows it, with the settings path that locates it:
+    // "the Stop hook" is what they recognise, `hooks.Stop[0].hooks[0]` is what they
+    // edit, and a report that gives one without the other costs them a search.
+    const where = (h) => `${h.surface === "statusLine" ? "the status line" : `the ${h.surface} hook`} (${h.location})`;
+    if (healable.length > 0) {
+      const one = healable.length === 1;
+      findings.push({
+        id: "shipped-hooks",
+        level: "warn",
+        title:
+          `${healable.length} hook command${one ? "" : "s"} in .claude/settings.json ${one ? "is a form" : "are forms"} ` +
+          "create-cmp itself shipped and has since replaced",
+        detail:
+          `${healable.map((h) => `${where(h)} runs \`${h.command}\`, which ${h.why}`).join("; ")}. ` +
+          `The form the current template ships differs by the anchor alone (${PROJECT_DIR_ANCHOR}), which ` +
+          "Claude Code sets for every hook command — so the rewrite runs the same script from the project " +
+          "root and the right one from every other directory, whatever version of the lane this app carries.",
+        fix: {
+          auto: true,
+          description:
+            "`create-cmp doctor --fix` rewrites exactly these commands to the form the current template " +
+            "ships, and changes no other byte of .claude/settings.json. It asks first, because the file is " +
+            "your app's: --yes approves, --dry-run previews.",
+        },
+      });
+    }
+    if (unanchored.length > 0) {
+      const one = unanchored.length === 1;
+      const first = unanchored[0];
+      findings.push({
+        id: "unanchored-hooks",
+        level: "warn",
+        title:
+          `${unanchored.length} hook command${one ? "" : "s"} in .claude/settings.json ` +
+          `name${one ? "s" : ""} a script by a path relative to the SESSION's directory`,
+        detail:
+          `${unanchored.map((u) => `${where(u)} runs ${u.paths.join(", ")} in \`${u.command}\``).join("; ")}. ` +
+          "Claude Code runs a hook with the cwd of the SESSION, not the directory holding " +
+          ".claude/settings.json, so a session opened in a subdirectory (the monorepo services/ layout) " +
+          `reaches no script at that path. ${one ? "This is not a command" : "These are not commands"} ` +
+          `create-cmp ships, so doctor does not rewrite ${one ? "it" : "them"}.`,
+        fix: {
+          auto: false,
+          description:
+            `Anchor each path in .claude/settings.json as "${PROJECT_DIR_ANCHOR}/<path>" — for ` +
+            `${where(first)}: "${PROJECT_DIR_ANCHOR}/${first.paths[0]}". ` +
+            (first.shipped !== null
+              ? `The command create-cmp ships on ${first.surface} is: "command": ${JSON.stringify(first.shipped)}`
+              : ""),
         },
       });
     }

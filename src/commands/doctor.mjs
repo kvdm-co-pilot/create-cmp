@@ -18,9 +18,15 @@ import { fileURLToPath } from "node:url";
 
 import { flagBool } from "../lib/args.mjs";
 import { colors, ok } from "../lib/log.mjs";
-import { probe } from "../bootstrap/exec.mjs";
+import { consent, probe } from "../bootstrap/exec.mjs";
 import { doctor as toolchainDoctor } from "../doctor.mjs";
-import { ANCHORABLE_SURFACES, anchorViolations, PROJECT_DIR_ANCHOR } from "../lib/hooks.mjs";
+import { anchorViolations, unfixedHookAnchors } from "../lib/hooks.mjs";
+import {
+  currentForms,
+  healableCommands,
+  planShippedHookHeal,
+  worksFromAnyDirectory,
+} from "../lib/shipped-hooks.mjs";
 import { diagnoseProject } from "../lib/project-doctor.mjs";
 import { parseProperties, upsertProperty, parseVersions } from "../lib/toml.mjs";
 import { loadRegistry } from "../lib/registry.mjs";
@@ -105,17 +111,26 @@ function invokesWalk(entry) {
   return String(entry?.command ?? "").includes("walk-status.mjs");
 }
 
+/** The walk invocations registered on a surface (hook entries, or the statusLine). */
+function walkInvocations(settings, surface) {
+  if (surface === "statusLine") return invokesWalk(settings?.statusLine) ? [settings.statusLine] : [];
+  return (settings?.hooks?.[surface] ?? []).flatMap((g) => (g?.hooks ?? []).filter(invokesWalk));
+}
+
+/** The two surfaces the walk is wired from, in the order an adopter reads them. */
+const WALK_SURFACES = ["UserPromptSubmit", "statusLine"];
+
 /**
  * The surfaces that invoke the walk with a command that resolves ONLY from the
- * project root: `"statusLine"`, and the event name of any walk hook still written
- * cwd-relative. `[]` means every invocation present will resolve from any cwd.
+ * project root. `[]` means no invocation present was JUDGED not to resolve — which
+ * is not the same as "every one of them does" (see `unconfirmedWalkSurfaces`).
  *
  * Presence is not wiring, and `invokesWalk` above can only answer presence — it is
- * a substring test, so the pre-0.26.3 `node qa/walk-status.mjs --statusline`
- * satisfies it while resolving against the SESSION's directory rather than this
- * one. That is the whole defect this exists to close: the walk fails by printing
- * nothing (`|| true`), so an `ok` here is the only thing standing between an
- * adopter and a surface that silently does nothing.
+ * a substring test, so `node qa/walk-status.mjs --statusline`, the form the template
+ * still ships on that surface, satisfies it while resolving against the SESSION's
+ * directory rather than this one. That is the whole defect this exists to close: the
+ * walk fails by printing nothing (`|| true`), so an `ok` here is the only thing
+ * standing between an adopter and a surface that silently does nothing.
  *
  * Asked of `anchorViolations` (src/lib/hooks.mjs) rather than re-derived here,
  * because that detector is SURFACE-AWARE: it credits `${CLAUDE_PROJECT_DIR:-.}` on
@@ -124,59 +139,77 @@ function invokesWalk(entry) {
  * here is exactly how doctor would come to score an inert anchor as protection —
  * the failure `test/inert-anchor-scored-as-protection.test.mjs` forbids one level
  * down, in the detector this call reuses.
+ *
+ * It may OVER-report (KD-180's absolute path, KD-183's `cd`-anchored hook) and it
+ * must never credit: nothing here reads health out of the detector's silence.
  */
 function cwdRelativeWalkSurfaces(settings) {
-  const surfaces = anchorViolations(settings)
-    .filter((v) => v.paths.some((p) => p.endsWith("walk-status.mjs")))
-    .map((v) => v.event ?? v.kind);
-  // On a surface the anchor cannot reach, PRESENCE is the whole answer: no form
-  // is established to resolve there, so there is nothing for the detector to
-  // credit. Asked separately because `anchorViolations` only sees a path with a
-  // directory segment (SCRIPT_PATH, KD-86) — `node walk-status.mjs --statusline`
-  // names none and read `ok` here until this line, while being exactly as bound
-  // to the session's directory as the form that did not. Reading the declaration
-  // rather than restating it means the day `statusLine` becomes anchorable, this
-  // check stops making the claim on its own.
-  if (ANCHORABLE_SURFACES.statusLine !== true && invokesWalk(settings?.statusLine)) {
-    surfaces.push("statusLine");
-  }
-  return [...new Set(surfaces)];
+  return [
+    ...new Set(
+      anchorViolations(settings)
+        .filter((v) => v.paths.some((p) => p.endsWith("walk-status.mjs")))
+        .map((v) => v.event ?? v.kind)
+    ),
+  ];
 }
 
 /**
- * Surfaces whose command CARRIES the anchor. Positive evidence, and that is the
- * whole point of it: the sibling list is derived from a DETECTOR'S SILENCE, and a
- * detector has blind spots (a path with no directory segment, KD-86; a
- * single-quoted span, KD-87). On a surface it cannot see, "no violation" means
- * "nothing was examined" — so reading health out of it prints reassurance about a
- * command nobody checked, which is the defect this whole finding exists to stop,
- * one surface over.
+ * Surfaces doctor may tell an adopter run from any directory — and the only evidence
+ * that earns that sentence is RECOGNITION: every walk invocation on the surface is
+ * byte-for-byte a command create-cmp ships, and that command has been executed from a
+ * foreign directory in test/shipped-hooks-table.test.mjs.
  *
- * A hook surface counts only when EVERY invocation of the walk on it is anchored.
- * One unanchored invocation is a session that silently gets nothing, and a surface
- * that works sometimes is not one a health check may call working.
+ * Every parse-derived route to this claim has been deleted, because this repository
+ * has now written three of them and each was wrong in a new spelling: the detector's
+ * silence credited a shape it cannot see (KD-86's bare basename, KD-87's `sh -c '…'`);
+ * the anchor's presence credited a command whose anchor was on another path; the
+ * detector's list subtracted from that carried the detector's blind spots straight
+ * back in. A parser has an opinion about a command; the shell has the answer, and a
+ * table of executed forms is the only way doctor holds one without running anything.
+ *
+ * A surface counts only when EVERY walk invocation on it is such a form. One that is
+ * not is a session that silently gets nothing, and a surface that works sometimes is
+ * not one a health check may call working.
  */
-function anchoredWalkSurfaces(settings) {
-  const carries = (entry) => String(entry?.command ?? "").includes(PROJECT_DIR_ANCHOR);
-  // Carrying the anchor is not the same as the WALK's own path carrying it. The
-  // template anchors its hook twice, so a hand-upgrade that anchors the `test -f`
-  // and leaves `node qa/walk-status.mjs` relative contains the anchor and resolves
-  // nowhere — and an anchor on an unrelated path, or inside quoted narration, does
-  // the same. Whatever the detector calls cwd-relative is therefore subtracted
-  // here, so these two lists cannot both name one surface. A surface in both would
-  // be this program disagreeing with itself, whichever half is right.
+function workingWalkSurfaces(settings) {
   const inert = cwdRelativeWalkSurfaces(settings);
-  const out = [];
-  if (ANCHORABLE_SURFACES.statusLine === true && invokesWalk(settings?.statusLine) && carries(settings.statusLine)) {
-    out.push("statusLine");
-  }
-  const groups = settings?.hooks?.UserPromptSubmit ?? [];
-  const invocations = groups.flatMap((g) => (g?.hooks ?? []).filter(invokesWalk));
-  // Keyed `hooks`, not by event name — read the declaration, do not restate it.
-  if (ANCHORABLE_SURFACES.hooks === true && invocations.length > 0 && invocations.every(carries)) {
-    out.push("UserPromptSubmit");
-  }
-  return out.filter((s) => !inert.includes(s));
+  return WALK_SURFACES.filter((surface) => {
+    const invocations = walkInvocations(settings, surface);
+    return (
+      invocations.length > 0 &&
+      invocations.every((entry) => worksFromAnyDirectory(surface, String(entry?.command ?? ""))) &&
+      // Defensive, and structural: these two lists answer one question about one
+      // surface, so a surface in both would be this program disagreeing with itself.
+      !inert.includes(surface)
+    );
+  });
+}
+
+/**
+ * Surfaces that invoke the walk with a command doctor can neither recognise nor fault:
+ * not a form create-cmp ships, and not one the detector judged cwd-relative. Doctor
+ * says so rather than picking a side — calling it broken would fail an adopter whose
+ * hand-written hook works (KD-183's shape), and calling it working is the defect this
+ * whole slice exists to close.
+ */
+function unconfirmedWalkSurfaces(settings) {
+  const inert = cwdRelativeWalkSurfaces(settings);
+  const working = workingWalkSurfaces(settings);
+  return WALK_SURFACES.filter(
+    (surface) =>
+      walkInvocations(settings, surface).length > 0 && !inert.includes(surface) && !working.includes(surface)
+  );
+}
+
+/** Walk surfaces whose command `doctor --fix` can rewrite (a superseded shipped form). */
+function healableWalkSurfaces(settings) {
+  return [
+    ...new Set(
+      healableCommands(settings)
+        .filter((h) => h.command.includes("walk-status.mjs"))
+        .map((h) => h.surface)
+    ),
+  ];
 }
 
 /**
@@ -207,8 +240,54 @@ export function gatherWalkInputs(projectDir) {
       (g?.hooks ?? []).some(invokesWalk)
     ),
     cwdRelative: cwdRelativeWalkSurfaces(settings),
-    anchored: anchoredWalkSurfaces(settings),
+    anchored: workingWalkSurfaces(settings),
+    unconfirmed: unconfirmedWalkSurfaces(settings),
+    healable: healableWalkSurfaces(settings),
   };
+}
+
+/**
+ * What .claude/settings.json carries that create-cmp put there and has since replaced
+ * (`healable` — what `--fix` rewrites), and what the app wrote itself that will not
+ * resolve from another directory (`unanchored` — reported with the form to paste, and
+ * never rewritten: it is the app's command).
+ *
+ * The walk's own UserPromptSubmit violations are left to the walk-wiring finding, which
+ * says more about them; everything else a hook runs — the Stop gate above all, which an
+ * app stamped through 0.26.2 still has unanchored and which nothing here used to
+ * mention (KD-85) — is reported here.
+ *
+ * @returns {{healable:Array, unanchored:Array}|null} null = no settings file, or one
+ *          this cannot read, which is a state the walk-wiring finding already reports.
+ */
+export function gatherHookInputs(projectDir) {
+  const raw = readIfExists(path.join(projectDir, ".claude", "settings.json"));
+  if (raw === null) return null;
+  let settings;
+  try {
+    settings = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const healable = healableCommands(settings);
+  const healableAt = new Set(healable.map((h) => h.location));
+  const unanchored = unfixedHookAnchors(settings)
+    .filter((v) => !healableAt.has(v.surface))
+    .filter((v) => !(v.event === "UserPromptSubmit" && v.paths.some((p) => p.endsWith("walk-status.mjs"))))
+    .map((v) => {
+      const shipped = currentForms(v.event);
+      return {
+        surface: v.event,
+        location: v.surface,
+        command: v.command,
+        paths: v.paths,
+        // The template's own command for that surface, when it has exactly one — the
+        // form to paste, for an adopter who edited create-cmp's hook rather than
+        // writing their own.
+        shipped: shipped.length === 1 ? shipped[0].command : null,
+      };
+    });
+  return { healable, unanchored };
 }
 
 /**
@@ -277,6 +356,7 @@ export function gatherProjectInputs(projectDir) {
     inspectorHits,
     inspectorCatalog,
     walk: gatherWalkInputs(projectDir),
+    hooks: gatherHookInputs(projectDir),
     consoleRecord: gatherConsoleInputs(projectDir),
   };
 }
@@ -381,6 +461,60 @@ export function applySafeFixes(projectDir, findings, inputs) {
   return fixed;
 }
 
+/**
+ * THE ONE HEAL THAT REWRITES A COMMAND, and the only one in this file that asks
+ * before writing.
+ *
+ * `applySafeFixes` above ADDS wiring and never touches a command that is already
+ * there — correct, because .claude/settings.json is the app's file, and the reason
+ * KD-85 recorded that every app stamped through 0.26.2 keeps its relative hooks with
+ * nothing here able to reach them. What makes a rewrite defensible is not a better
+ * parser: it is knowing, byte-for-byte, that the command in front of us is one
+ * create-cmp itself wrote and has since replaced, and that the replacement differs
+ * from it by the anchor alone (src/lib/shipped-hooks.mjs). Anything the app authored
+ * is left exactly as it is and reported with the form to paste.
+ *
+ * It is still a write into someone else's repository, so it is consent-gated the way
+ * every mutating act in this CLI is: `--yes` answers yes, a pipe with no `--yes`
+ * declines and says what it would have done, `--dry-run` writes nothing at all.
+ *
+ * @param {string} projectDir
+ * @param {{assumeYes?:boolean, dryRun?:boolean, ask?:Function}} opts
+ * @returns {Promise<boolean>} did the file change?
+ */
+export async function healShippedHookCommands(projectDir, { assumeYes = false, dryRun = false, ask = consent } = {}) {
+  const target = path.join(projectDir, ".claude", "settings.json");
+  const raw = readIfExists(target);
+  if (raw === null) return false;
+  const plan = planShippedHookHeal(raw);
+  // null = unreadable, or the in-place edit and JSON.parse disagreed about the
+  // result. Never overwrite settings we could not account for — that is the app's file.
+  if (plan === null || plan.rewrites.length === 0) return false;
+
+  const n = plan.rewrites.length;
+  const s = n === 1 ? "" : "s";
+  process.stdout.write(
+    `\n--fix: ${n} hook command${s} in .claude/settings.json ${n === 1 ? "is a form" : "are forms"} ` +
+      `create-cmp itself shipped and has since replaced.\n` +
+      `${colors.dim("      The rewrite changes those command strings and no other byte of the file.")}\n`
+  );
+  for (const r of plan.rewrites) {
+    process.stdout.write(`  ${r.location}\n    ${colors.red(`- ${r.from}`)}\n    ${colors.green(`+ ${r.to}`)}\n`);
+  }
+  if (dryRun) {
+    process.stdout.write(`  ${colors.dim("[dry-run] nothing written.")}\n`);
+    return false;
+  }
+  const approved = await ask(`  Rewrite ${n === 1 ? "it" : "them"} in ${target}?`, { assumeYes });
+  if (!approved) {
+    process.stdout.write(`  ${colors.dim(".claude/settings.json left exactly as it was.")}\n`);
+    return false;
+  }
+  fs.writeFileSync(target, plan.content);
+  ok(`--fix: anchored ${n} hook command${s} create-cmp shipped, in .claude/settings.json`);
+  return true;
+}
+
 function printFindings(findings) {
   for (const f of findings) {
     if (f.level === "ok") {
@@ -425,11 +559,17 @@ export async function runDoctor(flags, positional) {
 
     if (flags.fix === true) {
       const fixed = applySafeFixes(projectDir, findings, inputs);
-      if (fixed.length > 0) {
+      const rewrote = await healShippedHookCommands(projectDir, {
+        assumeYes: flags.yes === true,
+        dryRun: flags["dry-run"] === true,
+      });
+      if (fixed.length > 0 || rewrote) {
         // Re-diagnose so the report reflects the healed state.
         inputs = gatherProjectInputs(projectDir);
         findings = diagnoseProject(inputs);
-      } else {
+      } else if (!findings.some((f) => f.id === "shipped-hooks")) {
+        // A heal that was offered and declined (or previewed) is not "nothing
+        // auto-fixable" — saying so would contradict the lines just printed.
         process.stdout.write(`${colors.dim("--fix: nothing auto-fixable found.")}\n`);
       }
     }

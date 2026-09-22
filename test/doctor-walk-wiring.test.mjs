@@ -63,8 +63,15 @@ test("a project with the real template settings: both surfaces invoke the walk, 
       statusLine: true,
       promptHook: true,
       cwdRelative: ["statusLine"],
-    // Positive evidence: the hook carries the anchor, the status line cannot.
-    anchored: ["UserPromptSubmit"],
+      // Positive evidence, and of one kind only: the hook is byte-for-byte the
+      // command create-cmp ships, which test/shipped-hooks-table.test.mjs runs from
+      // a foreign directory. The status line is a shipped form too, and a relative
+      // one — shipped is not a synonym for working (KD-90).
+      anchored: ["UserPromptSubmit"],
+      // Nothing here is unrecognised, and nothing here is create-cmp's to rewrite:
+      // this IS the current template.
+      unconfirmed: [],
+      healable: [],
     });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -93,10 +100,16 @@ test("--fix wires an unwired project, and the walk then reads as wired", () => {
     const after = readSettings(dir);
     assert.match(after.statusLine.command, /walk-status\.mjs/);
     assert.ok(after.hooks.UserPromptSubmit.some((g) => g.hooks.some((h) => /walk-status\.mjs/.test(h.command))));
-    // The app's own Stop hook is untouched — the heal adds, never rewrites. That
-    // is also the limit of this heal: it does NOT retro-anchor a legacy hook
-    // (KD-85), and pinning the string here says so out loud rather than leaving
-    // it to be discovered.
+    // `applySafeFixes` ADDS wiring and never rewrites a command already there, and
+    // that is still true — pinned here, because it is the property that makes this
+    // heal safe to run against a file the app owns.
+    //
+    // It is no longer the limit of `doctor --fix`. The Stop hook in this fixture is
+    // the form create-cmp shipped through 0.26.2, and `healShippedHookCommands` —
+    // a second, consent-gated step in runDoctor, driven by a table of shipped bytes
+    // rather than by a parse — rewrites exactly that (KD-85, and
+    // test/doctor-fix-rewrites-only-the-hooks-create-cmp-shipped.test.mjs). What
+    // `heal()` below calls is the ADD half only, so the string stays relative here.
     assert.equal(after.hooks.Stop[0].hooks[0].command, "node qa/receipt-check.mjs --hook");
 
     // And the project now diagnoses as far as this heal can take it — which is
