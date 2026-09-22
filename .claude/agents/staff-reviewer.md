@@ -43,6 +43,9 @@ So:
 - **What blocks the merge, and where everything else goes, is the header of
   `docs/KNOWN-DEFECTS.md`.** Read it and apply it. This line names the rule and stops: every
   attempt to summarise it here has gone stale, twice on 2026-09-14 alone.
+  The entry's id comes from `node scripts/kd-next.mjs` (it reads the working tree, `origin/main`
+  and every open PR head, and says on stderr what it could not reach) — never from the highest
+  number this branch can see.
   READ ITS ONE-SCREEN TABLE BEFORE YOU REPORT — `## The open list, in one screen` — and a full
   entry only when a row looks like it might cover something you found. The file holds what earlier
   reviews deliberately did not block on, and its header carries the rule for placing a finding on
