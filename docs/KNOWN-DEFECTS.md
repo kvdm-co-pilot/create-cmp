@@ -140,7 +140,6 @@ you the same list without opening anything.
 | **KD-82** | the ordering verdict is commit-graph ancestry where every other obligation here is trigger-path bytes | the refusal's remedy is the rebase you owe the merge anyway; it costs a rebase, never a run |
 | **KD-83** | "the ordinary owed-allow is byte-identical to before the ordering check" is verified by nothing | the cross-path comparison beside it is real; only the historical claim is unpinned |
 | **KD-84** | `declaredBudgetMs` has two implementations and the declared 10s has three spellings | all three agree today, and the unreadable-settings fallback errs small |
-| **KD-85** | every app stamped through 0.26.2 keeps three cwd-relative hook commands, and nothing retro-anchors them — not `doctor --fix`, which adds the walk wiring and never rewrites a hook the app already has | **re-placed 2026-09-19**, against the line and not its age: the half that said *no command an adopter runs would tell them* is now false — `create-cmp doctor` names the walk's unanchored surfaces and prints the anchor. What is left is row 2: no commit here rewrites a file another repository owns, and the Stop hook's third command still goes unreported (it fails loudly) |
 | **KD-86** | the anchoring detector judges `.mjs/.cjs/.js/.sh` only, so a hook invoking `python qa/x.py` or a bare `qa/tool` reads clean | measured against the template: every command it ships is `node` or `test -f`, so the allow-list refuses nothing that exists today |
 | **KD-87** | the anchoring detector equates *single-quoted* with *not executed*, so `sh -c '…'` / `eval '…'` read clean; and it reads each match's prefix from the UNMASKED command, so a shell-inert `'${CLAUDE_PROJECT_DIR:-.}/…'` counts as anchored | both measured by execution and bounded by `test/hook-anchoring-differential.test.mjs`; no command in either shipped settings file is in the blind spot, and the gate reds the day one is |
 | **KD-88** | "every surface that carries a command" is spelled as a two-item list (`hooks[*][*].hooks[*].command` + `statusLine.command`) in both readers, and `settings.json` executes more than that — `apiKeyHelper`, `awsAuthRefresh`, `awsCredentialExport` | measured: a fourth hook EVENT and a second hook in an existing group are both caught BY NAME; only a non-`hooks`, non-`statusLine` key is invisible, and neither settings file has one |
@@ -207,6 +206,12 @@ you the same list without opening anything.
 | **KD-191** | `scripts/kd-next.mjs` cannot see a KD number allocated on a LOCAL branch with no pull request, which is this wave's own shape: six `wave/*` branches in flight, two open PRs | measured harmless today — all six wave branches are at 183, the same maximum `origin/main` and both PRs show — and the program says what it saw, so the gap is visible in its own output |
 | **KD-192** | an unquoted brace expansion in a `cd` operand is not refused: `cd /tmp/a{b,c} && gh pr merge` resolves `/tmp/a{b,c}` while the shell runs in `/tmp/ab` | cannot mislead unless a directory literally named `{b,c}` exists — otherwise the resolved path is not there and the gate refuses for that reason; measured both ways |
 | **KD-193** | the oracle test's failure message says *"the shell runs it in: the payload's cwd"* whenever the GATE resolved the payload's cwd, whatever the shell did — it printed exactly that for `cd /here"/sub"`, which the shell runs in `/here/sub` | a diagnostic only, on a failing row, in `test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs`; it misdescribes the oracle in the one moment a reader is trusting it |
+| **KD-194** | `create-cmp upgrade --harness` writes `.claude/settings.json` too — `decideFile` returns `applied` whenever the app's copy equals the base stamp — where KD-85 said `doctor --fix` was the one command that does | measured preserved-or-merged, never clobbered: an app's own hooks survive and the anchors land, and the one case the merge conflicts on is the case `doctor --fix` refuses. KD-85's sentence is corrected in its closure |
+| **KD-195** | the new `unanchored-hooks` finding reports every anchorable hook surface the detector faults, so KD-183's over-report can now be printed about a Stop, PreToolUse or SessionStart hook an app anchored by `cd` | the conservative direction, chosen on purpose: a `warn` that names the command and prints the anchored form, where the other direction is silence about a Stop gate that does not run; claiming health is impossible here by construction |
+| **KD-196** | `template/AGENTS.md` says `npx create-cmp-cli doctor --fix` "asks before any repair", and three of its four heals write with no prompt | nobody is wrongly served by the writes — they are the safe heals `--fix` exists for and the flag is the consent — so it is a docs/consent-model decision, not a defect in what the command does |
+| **KD-197** | the walk-wiring ADD heal writes `JSON.stringify(settings, null, 2)`, so an app's own indentation, escapes and key order are rewritten as a side effect of gaining a status line | the settings mean the same thing and the adopter asked for a write; what they did not ask for is the diff. Bounded: the add heal only runs when a surface is missing |
+| **KD-198** | the two new walk fields (`unconfirmed`, `healable`) keep KD-182's fail-open `?? []`, so an `ok` still requires the absence of three fields rather than the presence of evidence | no second producer exists — `gatherWalkInputs` sets all four on every return path and is the only caller — and the fix is the one KD-182 defers, now over four fields |
+| **KD-199** | two superseded commands in the shipped-hooks table are narration, and `healedForm` refuses to heal them because their successors describe a newer lane than the app may have | a decision, not an oversight: only a pair differing by the anchor alone is healed, which is identical at the project root whatever the lane version. Healing narration is two table fields plus lane-version detection |
 
 ---
 
@@ -1243,52 +1248,6 @@ exempt. That is a one-line change to a trigger path, which reopens the review ob
 construction, so it belongs to a slice that can pay for a round rather than to the slice that
 happened to notice it. Found while signing, under an explicit instruction not to reopen the
 review to record it.
-
-### KD-85 — apps stamped through 0.26.2 keep the unanchored hooks, and nothing this repo can run will fix them
-
-`template/.claude/settings.json` (fixed in 0.26.3) · `src/commands/doctor.mjs` (`applySafeFixes`)
-
-Through 0.26.2 the template shipped three cwd-relative hook commands — `Stop`
-(`node qa/receipt-check.mjs --hook`), `UserPromptSubmit` and `statusLine` (both
-`test -f qa/walk-status.mjs && … || true`). Claude Code runs a hook in the SESSION's working
-directory, so a session opened in a subdirectory loses the Stop gate loudly and loses the walk's
-status line and prompt injection **silently**, because `|| true` turns a wrong directory into a
-clean exit with no output. payment-blueprint hit the loud half on 2026-09-02 and anchored its own
-copy on 2026-09-10; the template was never fixed, so every app stamped in between carries it.
-
-**This slice anchors the template and gates it, and that reaches new stamps only.** Two reasons
-the existing population stays broken, and neither is age:
-
-1. Those trees are *other repositories*. No commit here edits them, which is the KD-78 shape — the
-   entry exists so the gap is recorded rather than mistaken for coverage.
-2. `create-cmp doctor --fix` is the one command that already writes into an app's
-   `.claude/settings.json`, and it deliberately **adds** the walk wiring without ever rewriting a
-   hook the app already has. That restraint is correct (it is the app's file), and it is also why
-   the heal cannot carry this fix. `test/doctor-walk-wiring.test.mjs` pins the legacy string
-   deliberately so the limit is stated rather than discovered. What the heal writes IS anchored,
-   because it copies the template — gated in the same file.
-
-**What the fix would be, when it is taken:** a `doctor` finding that reports unanchored commands
-(the detector is already exported — `anchorViolations` in `src/lib/hooks.mjs`), and a heal that
-rewrites only commands matching the shapes the template itself shipped, leaving anything an app
-authored alone. That is a new adopter-facing diagnosis with its own consent question about
-rewriting a file the app owns, so it is a slice, not a line — and it is the same change that would
-close KD-86's half of this.
-
-**RE-PLACED 2026-09-19, and half the recorded reason was not a reason.** It read *"no act available
-here — those trees are other repositories; and no command an adopter runs would tell them."* The
-first clause answers who can be REACHED from this repository; the second answers who is SERVED, and
-that is the header's row-1 question. The second is now false: `create-cmp doctor` reads the app's
-own `.claude/settings.json` and names each walk surface whose invocation will not resolve, with the
-exact anchor to write for a hook (`src/commands/doctor.mjs`, `cwdRelativeWalkSurfaces`). The
-population that was broken AND uninformed is now merely broken and informed, which is row 2.
-
-**What this slice did NOT do, stated so the entry is not read as closed.** (1) No heal. Rewriting a
-command an app authored still needs the consent question this entry names, and `--fix` still only
-adds. (2) **Only two of the three commands are reported.** The finding filters to the walk
-(`walk-status.mjs`), so a 0.26.2 app's `Stop` hook — `node qa/receipt-check.mjs --hook` — is still
-diagnosed by nothing here. That one fails LOUDLY, which is why it is the third and not the first:
-the silent pair is what an adopter could not otherwise find out.
 
 ### KD-86 — the anchoring detector reads four script extensions, and a hook could invoke something else
 
@@ -3153,3 +3112,152 @@ it is the moment a reader is trusting the oracle to tell them which of the two w
 
 **Fires when:** a row of that oracle fails.
 *Logged 2026-09-22, while adding rows to that table.*
+
+### KD-194 — `create-cmp upgrade --harness` writes `.claude/settings.json` too, by merge rather than by table
+
+`src/lib/harness-upgrade.mjs` (`EXCLUDED_PATTERNS`, `decideFile`) · KD-85, row 2
+
+KD-85 stated: *"`create-cmp doctor --fix` is the one command that already writes into an app's
+`.claude/settings.json`."* It is not. `create-cmp upgrade --harness` sweeps base ∪ new stamped trees,
+`.claude/settings.json` is in neither exclusion list, and `decideFile` returns `applied` (write the
+new engine's file) whenever the app's copy equals the base stamp. Measured:
+
+```
+isExcludedPath(".claude/settings.json") === false
+decideFile({relPath:".claude/settings.json", base:A, next:B, theirs:A}).bucket === "applied"
+```
+
+**What the sweep does to an app's own hooks — measured.** Driven through the same `decideFile` the
+planner calls per path (it really runs `git merge-file`), with base = the 0.26.2 template bytes,
+next = the template at HEAD, theirs = that 0.26.2 file with one app edit on top:
+
+| the app's `.claude/settings.json` | bucket | what lands |
+|---|---|---|
+| never touched | `applied` | replaced with the current template **exactly**; both anchors land |
+| its own extra PreToolUse hook added, create-cmp's commands untouched | `merged` | **the app's own hook survives** and both anchors land; the file is not the template |
+| create-cmp's Stop command replaced with the app's own | `conflicted` | **the app's file is not rewritten**; the engine's version lands beside it as `.cmp-new` |
+| the Stop hook anchored by hand, differently (`cd "${CLAUDE_PROJECT_DIR:-.}" && …`) | `conflicted` | same — not rewritten, sidecar only |
+
+So: **preserved or merged, never clobbered** — an app's own hooks survive, and the anchoring reaches
+every case except a conflict on the very command create-cmp changed, which is also the case
+`doctor --fix` refuses (a hand-edited command is not a shipped form). Two bounds on reading this as
+KD-85's second reach: it is a whole-tree refresh (every engine-owned file, not the hooks) that
+requires `create-cmp.json` and an explicit apply (`--harness` dry-runs by default), and what was
+measured is the decision function with real bytes, not the end-to-end command, which additionally
+stamps base and new from the app's recorded config. A minimal-mode app was not measured: its settings
+file was re-serialised at stamp time, so its three-way merge is a different question.
+
+`create-cmp harness upgrade` and `harness relock` really do not touch it —
+`packages/harness/install/*.mjs` writes only the harness region (`isHarnessFile`: `qa/**` `.mjs`, two
+declaration files, `qa/harness-source.json`), never `.claude/`.
+
+**Nobody is wrongly served:** both doors leave a correct file; they differ only in mechanism, and
+`doctor --fix` covers the case the merge conflicts on. What was wrong is KD-85's sentence, and the
+correction is written into KD-85's closure rather than carried here. What stays logged is the fact
+that sentence got wrong: there are TWO write paths into that file, and adding the table heal to the
+merge path would be a second write path into a file the merge already governs.
+
+**Fires when:** anyone reasons about which command can reach an app's `.claude/settings.json` from
+the doctor heal alone.
+*Logged 2026-09-22, by the slice that closed KD-85, while answering its brief's reach question —
+found by reading the sweep and executing its decision table.*
+
+### KD-195 — KD-183's over-report now reaches every hook surface, not only the walk's
+
+`src/commands/doctor.mjs` (`gatherHookInputs`) · `src/lib/hooks.mjs` (`unanchoredPaths`) · KD-183
+
+KD-183 records that a hook which resolves by `cd "${CLAUDE_PROJECT_DIR:-.}" && node qa/x.mjs` is
+reported as one that does not resolve, and bounds the population to the walk surfaces doctor read.
+The new `unanchored-hooks` finding reports **every** anchorable hook surface the detector faults, so
+the same over-report can now be printed about a Stop, PreToolUse or SessionStart hook an app wrote
+that way, or about an absolute path (KD-180's first row, same cause: `SCRIPT_PATH` cannot tell
+absolute from relative).
+
+**Nobody is wrongly served, and the direction is the one this repository chooses on purpose:** the
+finding is a `warn` that names the command and prints the anchored form; the cost is a re-read of a
+command that works, where the other direction is silence about a Stop gate that does not run. The
+counter-direction — claiming health — is impossible here by construction: `unanchored-hooks` never
+credits anything.
+
+**Fires when:** an app hand-anchors any hook by `cd`, or writes an absolute path into one, and runs
+`create-cmp doctor`.
+*Logged 2026-09-22 by the slice that widened the population, against its own change.*
+
+### KD-196 — the contract vendored into every app says `doctor --fix` asks before any repair, and three of its four heals do not
+
+`template/AGENTS.md` (line 42) · `src/commands/doctor.mjs` (`applySafeFixes`)
+
+> `npx create-cmp-cli doctor --fix` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog
+> drift); **asks before any repair**
+
+After the slice that closed KD-85, one heal asks (the shipped-hook rewrite). `local.properties`,
+`ksp.useKSP2` and the walk-wiring add still write on `--fix` with no prompt — the sentence was false
+when it was written and is now three-quarters false. The line is in the file every stamped app
+carries, so the reader it misleads is the agent working in an adopter's repo.
+
+**Nobody is wrongly served by the WRITES** — they are the safe heals `--fix` exists for, and the flag
+is the consent — so this is a docs/consent-model decision (make the sentence true, or make the other
+heals ask) rather than a defect in what the command does. Out of that slice's brief, which named the
+rewrite's consent only.
+
+**Fires when:** an agent in an adopter's repo reads the contract and expects to be asked.
+*Logged 2026-09-22, found while looking for the consent helper that slice's brief pointed at.*
+
+### KD-197 — the walk-wiring ADD heal re-serialises the whole settings file
+
+`src/commands/doctor.mjs` (`applySafeFixes`, `f.id === "walk-wiring"`)
+
+The add heal writes `JSON.stringify(settings, null, 2)`, so an app whose `.claude/settings.json`
+carries `—` escapes (the template's own SessionStart and PreToolUse commands do), four-space
+indentation, tabs, or key order of its own gets all of that rewritten as a side effect of having a
+status line added. The rewrite heal added beside it deliberately does the opposite — it edits the
+command's string token in the raw text and leaves every other byte — and the two now sit in the same
+command.
+
+**Nobody is wrongly served by the CONTENT** (the settings mean the same thing), and the adopter did
+ask for a write. What they did not ask for is the diff. Bounded today: the add heal only runs when a
+surface is missing.
+
+**Fires when:** `doctor --fix` adds the walk wiring to a settings file the app has formatted its own
+way.
+*Logged 2026-09-22, found while writing the in-place rewrite next to it.*
+
+### KD-198 — the new walk fields keep KD-182's fail-open `?? []`
+
+`src/lib/project-doctor.mjs` (walk-wiring branch) · KD-182
+
+KD-182's second paragraph records that `walk.cwdRelative ?? []` scores health from an absent field,
+with the remedy deferred because it would edit `test/project-doctor.test.mjs`'s untouched `wired`
+fixture. The KD-85 slice adds `walk.unconfirmed ?? []` and `walk.healable ?? []` in the same shape, on
+purpose: mixing conventions inside one branch would be worse than the convention, and the producer
+(`gatherWalkInputs`) sets all four on every return path and is the only caller. An `ok` therefore
+still requires the absence of three fields rather than the presence of evidence.
+
+**Nobody is wrongly served today** — no other producer exists — and the fix is the same one KD-182
+defers, now over four fields instead of one.
+
+**Fires when:** a second producer of the walk inputs is written and omits a field.
+*Logged 2026-09-22 by the slice that added the fields.*
+
+### KD-199 — two superseded hook forms are recorded and deliberately never healed
+
+`src/lib/shipped-hooks.mjs` (`healedForm`, the narration entries)
+
+The table records eleven commands. Two superseded ones are narration rather than invocation: the
+pre-`f77e1cf` SessionStart (*"done is `node qa/verify.mjs` with a committed receipt"*, where the
+current text says *"a receipt that attests this tree"*) and the pre-`f77e1cf` device-lease PreToolUse
+reminder (which names `qa/lib/device-lease.mjs`, a path that later moved under `qa/lib/profiles/cmp/`,
+and matches no `emulator`/`installDebug` command). `healedForm` refuses both, because their successors
+describe a **newer lane than the app may have**: rewriting them into an app stamped at 0.25 would have
+its agent told about a script that is not in its tree. Only a pair whose successor differs by the
+anchor alone is healed — a rewrite that is identical at the project root whatever the lane version,
+which the suite proves by executing both forms.
+
+This is a decision, not an oversight, and it reads narrower than the brief that produced it ("replace
+with that form's `current` successor"). Healing narration too is a field on two table entries plus a
+decision about lane-version detection — and the diagnosis would have to say what it is changing,
+because that rewrite changes what an agent is told rather than where a script is found.
+
+**Fires when:** an app stamped through 0.26.2 carries a superseded narration command and someone
+expects `doctor --fix` to bring it current.
+*Logged 2026-09-22, as the one place that slice chose the narrow reading of its brief.*

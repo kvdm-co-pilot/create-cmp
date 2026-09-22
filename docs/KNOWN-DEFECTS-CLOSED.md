@@ -278,6 +278,90 @@ What it cannot see is a branch with no pull request — this wave's own shape �
 KD-191 rather than carried here. `test/a-kd-number-is-allocated-per-branch-so-two-branches-allocate-the-same-one.test.mjs`
 holds the program.
 
+### KD-85 — apps stamped through 0.26.2 keep the unanchored hooks, and nothing this repo can run will fix them — **CLOSED 2026-09-22**
+
+`template/.claude/settings.json` (fixed in 0.26.3) · `src/commands/doctor.mjs` (`applySafeFixes`)
+
+Through 0.26.2 the template shipped three cwd-relative hook commands — `Stop`
+(`node qa/receipt-check.mjs --hook`), `UserPromptSubmit` and `statusLine` (both
+`test -f qa/walk-status.mjs && … || true`). Claude Code runs a hook in the SESSION's working
+directory, so a session opened in a subdirectory loses the Stop gate loudly and loses the walk's
+status line and prompt injection **silently**, because `|| true` turns a wrong directory into a
+clean exit with no output. payment-blueprint hit the loud half on 2026-09-02 and anchored its own
+copy on 2026-09-10; the template was never fixed, so every app stamped in between carries it.
+
+**This slice anchors the template and gates it, and that reaches new stamps only.** Two reasons
+the existing population stays broken, and neither is age:
+
+1. Those trees are *other repositories*. No commit here edits them, which is the KD-78 shape — the
+   entry exists so the gap is recorded rather than mistaken for coverage.
+2. `create-cmp doctor --fix` is the one command that already writes into an app's
+   `.claude/settings.json`, and it deliberately **adds** the walk wiring without ever rewriting a
+   hook the app already has. That restraint is correct (it is the app's file), and it is also why
+   the heal cannot carry this fix. `test/doctor-walk-wiring.test.mjs` pins the legacy string
+   deliberately so the limit is stated rather than discovered. What the heal writes IS anchored,
+   because it copies the template — gated in the same file.
+
+**What the fix would be, when it is taken:** a `doctor` finding that reports unanchored commands
+(the detector is already exported — `anchorViolations` in `src/lib/hooks.mjs`), and a heal that
+rewrites only commands matching the shapes the template itself shipped, leaving anything an app
+authored alone. That is a new adopter-facing diagnosis with its own consent question about
+rewriting a file the app owns, so it is a slice, not a line — and it is the same change that would
+close KD-86's half of this.
+
+**RE-PLACED 2026-09-19, and half the recorded reason was not a reason.** It read *"no act available
+here — those trees are other repositories; and no command an adopter runs would tell them."* The
+first clause answers who can be REACHED from this repository; the second answers who is SERVED, and
+that is the header's row-1 question. The second is now false: `create-cmp doctor` reads the app's
+own `.claude/settings.json` and names each walk surface whose invocation will not resolve, with the
+exact anchor to write for a hook (`src/commands/doctor.mjs`, `cwdRelativeWalkSurfaces`). The
+population that was broken AND uninformed is now merely broken and informed, which is row 2.
+
+**What this slice did NOT do, stated so the entry is not read as closed.** (1) No heal. Rewriting a
+command an app authored still needs the consent question this entry names, and `--fix` still only
+adds. (2) **Only two of the three commands are reported.** The finding filters to the walk
+(`walk-status.mjs`), so a 0.26.2 app's `Stop` hook — `node qa/receipt-check.mjs --hook` — is still
+diagnosed by nothing here. That one fails LOUDLY, which is why it is the third and not the first:
+the silent pair is what an adopter could not otherwise find out.
+
+**CLOSED by `63ba3f0`, red at `1581d00` (7 of 8 cases), finished at `f760f35`.** Both halves this
+entry said the fix would be. The DIAGNOSIS: `shipped-hooks` and `unanchored-hooks` name every
+anchorable hook surface that will not resolve, the Stop hook this entry recorded as diagnosed by
+nothing included. The HEAL: `create-cmp doctor --fix` rewrites a hook command **in place** — the
+command string changes and no other byte of `.claude/settings.json` does, so an app's own
+formatting, escapes and hand-written hooks survive verbatim. What may be rewritten is bounded by a
+committed table of every command the template has ever shipped (`src/lib/shipped-hooks.mjs`, every
+string taken from git history) and narrowed again to a pair that differs by the anchor alone, so the
+rewrite runs the same script whatever version of the lane the app carries. The consent question this
+entry named is asked: `--yes` approves, a non-interactive run declines and prints what it would have
+done, `--dry-run` previews and writes nothing. A command the app wrote is never rewritten — it is
+reported with the anchored form to paste. The status line is still never rewritten (KD-90).
+
+**The reach is TWO commands, not one, and this entry's row 2 is wrong about that.** It says
+`doctor --fix` "is the one command that already writes into an app's `.claude/settings.json`".
+`create-cmp upgrade --harness` also does: that file is in neither exclusion list of the sweep, and
+`decideFile` returns `applied` whenever the app's copy equals the base stamp. Measured through the
+same decision function the planner calls, with real bytes — an app that never touched the file gets
+the current template exactly, an app that added its own hook gets a three-way `merged` file in which
+**its own hook survives and both anchors land**, and an app that replaced or hand-anchored
+create-cmp's own command gets `conflicted`: its file is NOT rewritten and the engine's version lands
+beside it as `.cmp-new`. Preserved or merged, never clobbered — and the one case the merge refuses is
+the same case the table heal refuses, because a hand-edited command is not a shipped form. The two
+doors differ in mechanism and agree in outcome; the second one is logged as KD-194, with what was and
+was not measured.
+
+**What this closure does not reach, unchanged.** The population is still other repositories: no
+commit here edits them, and an app is repaired when somebody runs `create-cmp doctor --fix` or
+`create-cmp upgrade --harness` in it. That was always the remedy this entry named. KD-86's crediting
+half goes with it — a bare-basename hook can no longer be read as health, because credit now requires
+byte-recognition rather than the detector's silence — but KD-86 stays open for its detection half,
+and KD-87's blind spot is likewise improved and not closed. KD-90 (the status line is unanchorable),
+KD-180, KD-181 and KD-183 stay open as written, and KD-183's population is widened by KD-195.
+
+*Closed 2026-09-22. The dry-run defect found while closing it — `doctor --fix --dry-run` wrote
+`local.properties`, `gradle.properties` and a created `.claude/settings.json` — was ruled blocking
+and fixed in the same branch by `af1bfbe` rather than logged, so it has no entry here.*
+
 ### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it — **CLOSED 2026-09-19**
 
 `packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)

@@ -45,6 +45,49 @@ All notable changes to this project are documented here. The format is based on
   source, then run `node scripts/sync-harness.mjs`" named the repo only in the sentence before — and
   each now carries it in its own sentence, so a reader who greps one line can see where it runs.
 
+- **`create-cmp doctor` told an adopter a hook "is anchored and still works from any directory"
+  about a hook that produced nothing.** The sentence had been derived from the command's text three
+  times — the anchoring detector's silence, then the anchor's presence anywhere in the string, then
+  the detector's list subtracted from that — and the shell agreed with none of them: measured by
+  running each hook from another directory, three of five real spellings were claimed and silent (a
+  bare `node walk-status.mjs`, `sh -c '…'`, `eval '…'`, each with the template's own anchored
+  `test -f` prefix in front of it). Doctor now says it for one reason only: the command is
+  **byte-for-byte a command create-cmp ships**, and that command is executed from a foreign
+  directory by the suite. A hook it neither recognises nor faults is reported as exactly that —
+  *"doctor cannot confirm the UserPromptSubmit hook runs from any directory"* — with the shipped
+  command printed to compare against, rather than being called broken (a hand-written hook that
+  works is not a fault) or called working (the defect this closes).
+
+- **Every app stamped through 0.26.2 kept two hook commands that only run when the session starts at
+  the project root, and nothing create-cmp could run would name them, let alone fix them.**
+  `node qa/receipt-check.mjs --hook` (Stop) and
+  `test -f qa/walk-status.mjs && node qa/walk-status.mjs --inject || true` (UserPromptSubmit) resolve
+  against the SESSION's directory, so a session opened in a subdirectory loses the Stop gate loudly
+  and the walk's prompt injection **silently** (`|| true`). 0.26.3 anchored the template, which
+  reached new stamps only; `doctor --fix` added wiring and never rewrote a command, and the Stop hook
+  was not mentioned by any check at all. `create-cmp doctor` now names both, and
+  `create-cmp doctor --fix` **rewrites them in place** — the command strings change and no other byte
+  of `.claude/settings.json` does, so an app's own formatting, escapes and hand-written hooks survive
+  verbatim. What may be rewritten is bounded by a committed table of every command the template has
+  ever shipped (`src/lib/shipped-hooks.mjs`, every string taken from git history), and narrowed again
+  to a pair that differs by the anchor alone — so the rewrite runs the same script from the project
+  root and the right one from every other directory, whatever version of the lane the app carries. It
+  is a write to a file your app owns, so it asks first: `--yes` approves, a non-interactive run
+  declines and prints what it would have done, `--dry-run` previews and writes nothing. A command your
+  app wrote is never rewritten — it is reported with the anchored form to paste. The status line is
+  never rewritten: `CLAUDE_PROJECT_DIR` is not set for a status line, so there is no anchored form to
+  write (KD-90). The other door into that file, `create-cmp upgrade --harness`, reaches the same
+  result by three-way merge and is measured in KD-194: preserved or merged, never clobbered.
+
+- **`create-cmp doctor --fix --dry-run` wrote.** The flag was handed to the toolchain installer and to
+  nothing else, so a "preview" ran every project heal for real: it wrote `local.properties` from
+  `ANDROID_HOME`, `ksp.useKSP2=true` into `gradle.properties`, and **created** `.claude/settings.json`
+  in a project that had none — the same class as `upgrade --dry-run true` writing the version catalog.
+  Every heal now writes through one mechanism that the flag gates in a single place, so a dry run
+  changes no byte of your project and prints what it *would* write in the same words the real run uses
+  (`[dry-run] --fix: would write X` beside `✓ --fix: wrote X`). The rewrite heal does not ask for
+  consent under `--dry-run` either: a prompt whose answer cannot matter is worse than no prompt.
+
 - **A declared boolean's VALUE form was stored as a string and read as a boolean, in both
   directions.** `create-cmp upgrade --dry-run true --yes` wrote `gradle/libs.versions.toml` and
   skipped the consent prompt, because ~24 readers compare `=== true` and `"true" !== true`;
@@ -67,8 +110,10 @@ All notable changes to this project are documented here. The format is based on
   cannot be anchored (KD-90). Doctor now asks `anchorViolations` — the surface-aware detector that
   already refuses to credit an anchor on a surface the variable never reaches — and reports a
   **`warn` naming which surface is inert, why the failure is silent, and what still works**: the
-  anchored hook, and `node qa/walk-status.mjs` by hand. It offers no automatic heal, because one
-  half would rewrite a command the app owns and the other half has no correct rewrite to offer.
+  anchored hook, and `node qa/walk-status.mjs` by hand. It offers no automatic heal for the STATUS
+  LINE, because there is no correct rewrite to offer; the hook half IS healed as of this release,
+  where the command is one create-cmp itself shipped, and a command the app wrote is still only
+  reported.
 
 - **A comment in the shipped walk said the status line gets no stdin. It does.** `walk-status.mjs`
   asserted *"the statusline gets no stdin and must not wait on one"* while `src/lib/hooks.mjs` and
@@ -170,8 +215,9 @@ All notable changes to this project are documented here. The format is based on
   proved, which is precisely the spec-mirror drift the template exists to prevent.
   payment-blueprint hit the loud half on 2026-09-02 and anchored its own copy on 2026-09-10; the
   template was never fixed, so every app stamped since carries it (KD-85 — those trees are other
-  repositories and no commit here reaches them, and `doctor --fix` deliberately never rewrites a
-  hook an app already has).
+  repositories and no commit here reaches them; what reaches them is an adopter running
+  `create-cmp doctor --fix`, which as of this release rewrites the commands create-cmp itself
+  shipped and still never rewrites one an app wrote).
 
 - **The `statusLine` is NOT fixed, and this entry said it was until the claim was checked.** All
   three surfaces were anchored and described as fixed before anyone verified that the anchor
