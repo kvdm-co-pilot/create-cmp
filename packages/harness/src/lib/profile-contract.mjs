@@ -52,7 +52,7 @@
 //
 // SINGLE SOURCE OF TRUTH: packages/harness/src/lib/profile-contract.mjs in the
 // create-cmp repo. Vendored byte-identical into qa/lib/ — edit the package
-// source, then run `node scripts/sync-harness.mjs`.
+// source, then run `node scripts/sync-harness.mjs` in the create-cmp repo.
 
 /**
  * The most a `meaning` may be. Long enough for the L2 distinction, which is the
@@ -130,10 +130,12 @@ export const CONTRACT = Object.freeze({
       // anything had happened, which is precisely the blindness that let a
       // Python adopter earn L2 for an app its suite only ever imported.
       //
-      // Run it with `node scripts/fleet-check.mjs --ladder-plant`. A profile
-      // that declares no startup plant of its own gets no such assurance and is
-      // told so by name rather than passing quietly — the break belongs to the
-      // stack, because only the stack knows what starting is.
+      // Run it in the create-cmp repo with `node scripts/fleet-check.mjs
+      // --ladder-plant`, which stamps a scratch app from that tree — no stamped
+      // app has a scripts/ directory to run it from. A profile that declares no
+      // startup plant of its own gets no such assurance and is told so by name
+      // rather than passing quietly — the break belongs to the stack, because
+      // only the stack knows what starting is.
       l2Execution: Object.freeze({
         required: false,
         mode: "any",

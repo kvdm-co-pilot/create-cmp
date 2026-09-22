@@ -23,7 +23,7 @@
 //
 // SINGLE SOURCE OF TRUTH: packages/harness/src/profile.mjs in the create-cmp
 // repo. Vendored byte-identical into qa/ — edit the package source, then run
-// `node scripts/sync-harness.mjs`.
+// `node scripts/sync-harness.mjs` in the create-cmp repo.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
