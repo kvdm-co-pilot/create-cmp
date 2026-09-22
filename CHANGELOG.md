@@ -370,6 +370,28 @@ All notable changes to this project are documented here. The format is based on
   its shutdown request — the test half of KD-56; the production defect underneath it is KD-202 and is
   NOT fixed.
 
+- **The device tier is owed when the STAMPED APP's bytes move, not when an input path moves.** A
+  device run proves that the app `create-cmp` stamps runs on a phone, so that app is what the run is
+  bound to now: `scripts/stamped-output.mjs` stamps the fleet scratch app into a temp dir, hashes
+  every byte it wrote in path order and deletes it — 334 ms over 242 files, measured, against the
+  3.5 minutes it schedules — and `proof-plan` prints the basis (*"the stamped app is byte-identical to
+  the one proven at <time>"*, or *"the stamped app moved: N file(s) differ, first: <path>"*). The
+  proxy it replaces (`deviceTreeHash` over `DEVICE_TIER_TRIGGERS`) was wrong in both directions: an
+  edit under `packages/harness/src/` that never reached `template/qa/` REOPENED a discharged slice
+  over a byte-identical app, and a slice touching only `src/lib/args.mjs` owed a full emulator run for
+  an app it could not change. A PASS record over those exact bytes discharges the tier whichever slice
+  bought it; a FAIL record over them discharges nothing; a record with no `stampedOutputHash` counts
+  as no record at all, and no digest is invented for a run nobody measured. Three bytes that made a
+  stamped app depend on the laptop and the calendar are normalised with the reason named — the stamp
+  time, `local.properties`'s `sdk.dir`, and `- **Date:**` in a seeded ADR — since any one of them
+  would have left the tier reopened forever. `create-cmp`'s own output is byte-identical before and
+  after, which is the property the change is built on.
+
+- **A proof schedule that cannot be answered no longer takes the gate down with it.** A tree that
+  cannot be stamped — no `bin/`, or a stamp that dies or outruns its 3000 ms cap — is a STATE (device
+  tier OWED, with the reason printed) rather than an exception thrown out of `obligation()` into the
+  PreToolUse hook, which exited 2 and then refused **every** command it classifies.
+
 ## [0.26.0] - 2026-09-16
 
 ### Fixed

@@ -215,6 +215,10 @@ you the same list without opening anything.
 | **KD-203** | `opts.port \|\| DEFAULT_PORT` reads `port: 0` — the standard way to ask the OS for a free port — as the console's well-known port, and the bound port is assumed rather than read back | an adopter starting a console gets the default either way and the only caller passing `0` is a test today; it becomes a defect the moment anything runs two consoles |
 | **KD-204** | `stop()` fires `GET /shutdown` at `http://127.0.0.1:9601` unconditionally, `hot: false` and no daemon included, so every console sends a request to a fixed address anything may be listening on | harmless where nothing listens (the refusal is swallowed) and a real daemon is the intended recipient; with KD-202 and KD-203 it is the complete path from "a suite ran" to "a passed test is recorded as FAILED" |
 | **KD-205** | `contains()` / `behindBy()` drop `gitAt`'s `why`, so one call site of the ordering check cannot say which of four causes killed a git call — a gate-timer kill, a crash and an OOM kill all read as "git could not compare this branch with origin/main" | the verdict is correct either way: the check still allows and still says it could not answer. It costs a reader one fact, in the file whose whole subject is that distinction |
+| **KD-206** | the fleet scratch app is stamped `--no-ios --no-firebase`, so an edit to iOS-only or Firebase-only template code moves no byte of the stamped app and the device tier reads DISCHARGED | no proof is lost — under the old input-path rule the same edit reopened a tier whose run compiled neither (KD-45) — so what changed is that KD-45's gap is visible in the schedule instead of masked by a run that proves nothing about those files; `template/` is still a review trigger |
+| **KD-207** | `DEVICE_TIER_IRRELEVANT` declares `*.md` unable to OBLIGE a device run, and markdown under `template/` ships into the stamped app, so the same file's bytes can REOPEN a discharged slice | pre-existing in the same shape and unchanged in severity; the direction is the safe one — a shipped doc can cost a run, never hide one — and the fix is a product decision between two spellings, both with a cost |
+| **KD-208** | the hook's four bounds now sum to exactly its declared budget — `1000 + 3000 + 2500 + 3500 = 10000`, the 10 s `.claude/settings.json` declares — because answering a payload now includes a stamp | the arithmetic test asserts `sum <= budget` and passes, every bound has its own kill-timer so the sum is a worst case that needs all four to saturate, and the measured real answer is ~0.5 s; what is gone is the slack |
+| **KD-209** | `grep -r` here obeys the scanned tree's own `.gitignore`, so a scan of a stamped app silently omits `local.properties` — the file that carries this machine's SDK path | a fact about the tooling, not the tree, logged because it nearly cost a slice a defect: `find … -exec /usr/bin/grep -l …` lists both files, and that is how the three normalisers were shown complete |
 
 ---
 
@@ -1088,6 +1092,10 @@ between the run and the merge. Fixing it means asking the same question at the m
 a second slice's worth of decisions (the merge gate's budget, and whether a merge should ever be
 refused for being behind). *Logged 2026-09-18, review round 1 of `ordering-precondition-before-a-device-run`.*
 
+*2026-09-22: `deviceTreeHash` no longer exists — the device tier is scheduled by the bytes of the
+STAMPED APP (`scripts/stamped-output.mjs`) — and the sentence above holds word for word with that
+name in its place.*
+
 ### KD-81 — a branch git could not name is treated as trunk, and the check passes silently
 
 `scripts/hooks/proof-gate.mjs` (`baseContext`, first line) with `isTrunk` from `scripts/proof-plan.mjs`
@@ -1123,6 +1131,10 @@ of being wrong is one rebase rather than one emulator run, and the conservative 
 one for a 3.5-minute tier. Deciding it on bytes would mean diffing `HEAD...origin/main` against
 `DEVICE_TIER_IRRELEVANT` inside a 10-second hook, which is a product decision about how clever this
 precondition should be. *Logged 2026-09-18, review round 1 of `ordering-precondition-before-a-device-run`.*
+
+*2026-09-22: "trigger-path bytes" no longer exists — the tier is now the digest of the STAMPED APP
+(`scripts/stamped-output.mjs`) — which leaves this finding intact and its worked example stronger,
+since a trunk that moved only under `docs/` demonstrably leaves that app identical.*
 
 ### KD-83 — the "unchanged wording" claim is checked against the code that would change it
 
@@ -3325,3 +3337,74 @@ interpolate it the way the other sites do.
 **Why it does not block.** Nobody is wrongly served: the check still allows and still says it could
 not answer. It costs a reader one fact.
 *Logged 2026-09-22, found while making KD-165's test read the path taken.*
+
+### KD-206 — an iOS-only or Firebase-only template change now owes no device run, and never got a real one
+
+`scripts/stamped-output.mjs` (`FLEET_SCRATCH_APP.flags`) with KD-45
+
+The fleet scratch app is stamped `--no-ios --no-firebase`, so `template/iosApp/`,
+`composeApp/src/iosMain/` and every Firebase-only file are stripped out of it. The device tier is now
+scheduled by that app's bytes, so **an edit to iOS-only template code leaves the digest unchanged and
+the tier reads DISCHARGED**. Measured 2026-09-22 in a temp copy: appending a line to
+`template/iosApp/Podfile` moved no byte of the stamped app.
+
+Not blocking, and arguably the honest state: under the old input-path rule the same edit REOPENED the
+tier, and the run it obliged compiled neither iOS nor Firebase (KD-45) — it could not have failed for
+that change. No proof is lost; what changes is that KD-45's gap is now VISIBLE in the schedule instead
+of masked by a run that proves nothing about those files. The review tier still obliges (`template/`
+is a review trigger), so such a change still gets a reader. If the spec ever gains `--ios`, the digest
+covers those files with no further change.
+
+**Fires when:** someone reads "device DISCHARGED" on an iOS-only change as "iOS is proven".
+*Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
+
+### KD-207 — markdown that SHIPS can reopen the device tier but can never oblige it
+
+`scripts/observed-tree.mjs` (`DEVICE_TIER_IRRELEVANT`'s `*.md`) with `scripts/stamped-output.mjs`
+
+`DEVICE_TIER_IRRELEVANT` declares `*.md` unable to oblige a device run, matched on the repo path, so a
+change to `template/README.md` — which ships INTO the stamped app — cannot make the tier required. If
+some other path in the same slice does make it required, the same file's bytes then move the stamped
+digest and REOPEN a discharged slice. The two halves disagree for exactly the shipped-markdown set.
+
+Pre-existing in the same shape (the old device hash covered `template/` wholesale including its
+markdown, while `*.md` was declared irrelevant) and unchanged in severity by the slice that found it.
+The direction of the error is the safe one — a shipped doc can cost a run, never hide one — and the
+fix is a product decision: either `*.md` stops being declared irrelevant (every README typo in
+`template/` then obliges a run), or the oracle normalises markdown inside the app (a comment in a
+shipped `AGENTS.md` an agent executes would then be invisible to the tier).
+
+**Fires when:** a slice touches one non-markdown path and one `template/**/*.md`, discharges, and is
+reopened naming the markdown file.
+*Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
+
+### KD-208 — the four gate bounds now sum to exactly the hook's declared budget
+
+`scripts/hooks/proof-gate.mjs` (`ANSWER_RESERVE_MS`) with `.claude/settings.json`
+
+Answering a PreToolUse payload now includes a stamp, so `ANSWER_RESERVE_MS` went 1500 → 3500
+(measured stamp 0.27 / 0.26 / 0.30 s, capped at `STAMP_CAP_MS` = 3000). `TREE_PROBE_TOTAL_MS(1000) +
+LANE_PROBE_TOTAL_MS(3000) + REMOTE_CALL_CAP_MS(2500) + ANSWER_RESERVE_MS(3500) = 10000`, which is
+exactly the 10 s `.claude/settings.json` declares. The arithmetic test asserts `sum <= budget` and
+passes, and the end-to-end slow-process-table test still answers well inside the budget — but there is
+now **no slack**: the next bound added to this hook has to come out of `REMOTE_CALL_CAP_MS`, out of
+the stamp's cap, or out of a deliberately raised timeout.
+
+Not blocking: every bound is enforced by a kill-timer on its own subprocess, so the sum is a
+worst case that requires all four to saturate at once; the measured real answer is ~0.5 s.
+
+**Fires when:** a fifth bound is added without re-deriving this sum.
+*Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
+
+### KD-209 — `grep -r` in this environment obeys .gitignore, so a scan of a stamped app can miss the file that matters
+
+no source file — a fact about the tooling, recorded because it nearly cost a slice a defect
+
+While hunting for machine-derived bytes in a stamped app, `grep -rl "/Users/" <app>` did not list
+`local.properties`, which contains exactly that string: the shell's `grep` honours the app's own
+`.gitignore`. The same scan for today's date was therefore also incomplete. Re-run through
+`find <app> -type f -exec /usr/bin/grep -l ...` it lists both files, and that is how the three
+normalisers in `scripts/stamped-output.mjs` were found to be complete.
+
+**Fires when:** any future audit of a generated tree uses `grep -r` and concludes a pattern is absent.
+*Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
