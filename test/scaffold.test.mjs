@@ -4,6 +4,23 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { scaffold } from "../src/scaffold.mjs";
+import { offTheRunnerChannel } from "./helpers/runner-channel.mjs";
+
+/**
+ * `scaffold()` narrates the stamp on stdout (`› Validating config…`, `✓ Scaffold
+ * complete.`), which is right for the CLI and wrong for a test: in a test file,
+ * stdout is the RUNNER'S message channel, and a line whose third byte is a UTF-8
+ * continuation byte — which `›` and `✓` both are — makes the parent's frame
+ * parser read that text as a frame length and abort the whole file with
+ * `Error: Unable to deserialize cloned data due to invalid or unsupported
+ * version`. See test/helpers/runner-channel.mjs for the parser, the byte rule
+ * and the measurement; the run that provoked this was an `npm publish` this file
+ * aborted at `prepublishOnly` on 2026-09-19.
+ *
+ * So every call goes through here: the stamp's text stays off the channel, the
+ * reporter's own frames still go down it, and what the tests assert is unchanged.
+ */
+const stamp = (config, opts) => offTheRunnerChannel(() => scaffold(config, opts));
 
 // Build a tiny synthetic template (NOT the real one) exercising every pipeline
 // stage: token content + path replace, package-dir rename, feature markers,
@@ -102,7 +119,7 @@ test("full scaffold (iOS on): tokens, package rename, markers stripped, verify G
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-out-"));
   const config = baseConfig(out);
 
-  const { verdict } = await scaffold(config, { templateDir: tpl, verify: true });
+  const { verdict } = await stamp(config, { templateDir: tpl, verify: true });
 
   // package dir renamed
   const mainKt = path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/Main.kt");
@@ -161,7 +178,7 @@ test("scaffold with iOS + e2e disabled removes their files and bodies", async ()
     e2e: false,
   });
 
-  await scaffold(config, { templateDir: tpl, verify: true });
+  await stamp(config, { templateDir: tpl, verify: true });
 
   // ios feature paths removed
   assert.ok(!fs.existsSync(path.join(out, "iosApp")), "iosApp removed");
@@ -183,7 +200,7 @@ test("scaffold refuses invalid config", async () => {
   const tpl = makeTemplate();
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-out-"));
   const bad = baseConfig(out, { package: "NotValid" });
-  await assert.rejects(() => scaffold(bad, { templateDir: tpl, verify: false }), /Invalid config/);
+  await assert.rejects(() => stamp(bad, { templateDir: tpl, verify: false }), /Invalid config/);
   fs.rmSync(tpl, { recursive: true, force: true });
   fs.rmSync(out, { recursive: true, force: true });
 });
@@ -191,14 +208,14 @@ test("scaffold refuses invalid config", async () => {
 test("scaffold is idempotent on a fresh dir and refuses non-empty without force", async () => {
   const tpl = makeTemplate();
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-out-"));
-  await scaffold(baseConfig(out), { templateDir: tpl, verify: false });
+  await stamp(baseConfig(out), { templateDir: tpl, verify: false });
   // second run without force should reject (non-empty)
   await assert.rejects(
-    () => scaffold(baseConfig(out), { templateDir: tpl, verify: false }),
+    () => stamp(baseConfig(out), { templateDir: tpl, verify: false }),
     /not empty/
   );
   // with force it succeeds again
-  await scaffold(baseConfig(out), { templateDir: tpl, verify: false, force: true });
+  await stamp(baseConfig(out), { templateDir: tpl, verify: false, force: true });
   assert.ok(
     fs.existsSync(path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/Main.kt"))
   );
@@ -217,7 +234,7 @@ test("non-empty check: harmless entries (.claude, .DS_Store, .git) never force -
   fs.mkdirSync(path.join(out, ".git"), { recursive: true });
 
   // must scaffold WITHOUT force
-  await scaffold(baseConfig(out), { templateDir: tpl, verify: false });
+  await stamp(baseConfig(out), { templateDir: tpl, verify: false });
   assert.ok(
     fs.existsSync(path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/Main.kt")),
     "scaffolded despite harmless entries"
@@ -234,7 +251,7 @@ test("non-empty check: real content still refuses and NAMES the blocking entries
   fs.writeFileSync(path.join(out, "my-notes.txt"), "precious"); // real content
 
   await assert.rejects(
-    () => scaffold(baseConfig(out), { templateDir: tpl, verify: false }),
+    () => stamp(baseConfig(out), { templateDir: tpl, verify: false }),
     (err) => {
       assert.match(err.message, /not empty/);
       assert.match(err.message, /my-notes\.txt/, "blocking entry is named");
@@ -257,7 +274,7 @@ test("spec-of-record: create-cmp.json is persisted with the resolved config", as
     ],
   });
 
-  await scaffold(config, { templateDir: tpl, verify: false });
+  await stamp(config, { templateDir: tpl, verify: false });
 
   const recordPath = path.join(out, "create-cmp.json");
   assert.ok(fs.existsSync(recordPath), "create-cmp.json written to project root");

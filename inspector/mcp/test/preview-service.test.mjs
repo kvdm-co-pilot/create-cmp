@@ -2929,18 +2929,26 @@ test("service: a stale state with NOTHING pending says so — it never promises 
 
   const service = createPreviewService({
     projectDir,
-    port: 19737,
+    // KD-131: this bound 19737 and waited on a 100 x 20ms budget, and the file
+    // then carried a FAIL and a PASS over the SAME tree ninety seconds apart. A
+    // named port is a bet that nothing else holds it (freePort's own comment),
+    // and a counted wait is a bet about the machine, not about the service.
+    port: await freePort(),
     hot: false,
     runRender: async () => writeFakePreviews(previewsDir, ["shell"]),
   });
 
+  // Nothing in flight and nothing scheduled — "unrefreshed" is the idle phase
+  // reported under a stale state, so both spellings are settled.
+  const settled = (x) => x.pending === false && (x.phase === "idle" || x.phase === "unrefreshed");
+
   try {
     await service.start();
-    for (let i = 0; i < 100 && service.status().freshness.phase !== "idle"; i++) {
-      await new Promise((r) => setTimeout(r, 20));
-    }
+    await waitFor(() => settled(service.status().freshness), {
+      what: "the boot render to finish with nothing queued behind it",
+    });
     await service._renderCycle();
-    assert.equal(service.status().freshness.state, "fresh");
+    await waitFor(() => service.status().freshness.state === "fresh", { what: "the render just awaited to count as fresh" });
 
     // A change lands but no render is ever scheduled for it (the hand-off that got lost).
     service._noteSourceChangedForTest();
@@ -2949,7 +2957,43 @@ test("service: a stale state with NOTHING pending says so — it never promises 
     assert.equal(f.pending, false, "nothing is actually scheduled");
     assert.equal(f.phase, "unrefreshed", "and the phase says exactly that");
 
-    const page = await (await fetch(service.status().url)).text();
+    // WHAT THE PAGE WAS RENDERED FROM, not what the state was a moment earlier.
+    // The banner is derived per request, and this service is live: a watcher
+    // event or a debounce timer armed earlier can move the state between the
+    // assertions above and the moment the server answers — which is exactly the
+    // KD-131 FAIL, where `state`, `pending` and `phase` all passed on the line
+    // above and the page that came back carried a different banner. So the page
+    // is taken BETWEEN two readings of the state and kept only when both
+    // readings are the state this test is about; anything else re-establishes
+    // that state and takes the page again.
+    const unrefreshed = (x) => x.state === "stale" && x.pending === false && x.phase === "unrefreshed";
+    // ageMs moves every millisecond and says nothing about which banner is due.
+    const reading = (x) => JSON.stringify([x.state, x.phase, x.pending, x.detail, x.lastRenderAt, x.sourceChangedAt]);
+    let page = null;
+    let moved = 0;
+    const deadline = Date.now() + 15000;
+    for (;;) {
+      const before = service.status().freshness;
+      if (unrefreshed(before)) {
+        const body = await (await fetch(service.status().url)).text();
+        const after = service.status().freshness;
+        if (reading(before) === reading(after)) {
+          page = body;
+          break;
+        }
+      }
+      moved++;
+      if (Date.now() > deadline) break;
+      // Something asynchronous moved it. Put it back in the state under test.
+      await waitFor(() => settled(service.status().freshness), {
+        what: "the service to settle before the state under test is re-established",
+      });
+      service._noteSourceChangedForTest();
+    }
+    assert.ok(
+      page,
+      `no page was served while the service was stale with nothing pending (${moved} attempts): the state this test is about was never observable, which is a finding about the service, not a reason to assert about some other state`,
+    );
     assert.match(page, /NOT refreshing/, "the banner does not promise a refresh");
     assert.doesNotMatch(page, /A refresh is queued/, "it must not claim a queue it does not have");
   } finally {
