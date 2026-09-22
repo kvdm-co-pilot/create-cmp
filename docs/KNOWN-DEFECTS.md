@@ -229,6 +229,11 @@ you the same list without opening anything.
 | **KD-217** | `--fleet`'s empty form was traded for the generic sentence, and two docblocks in one file disagree about whether it was | both refuse, exit 2, nothing written; one fact has two spellings and the first is false |
 | **KD-218** | the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`, and there is no such flag | refused, exit 2, nothing written; the sentence names something the CLI does not have (KD-184's shape) |
 | **KD-219** | `attach.mjs`'s new comment says the empty `--citation-roots` value "never arrives any more", and this tree's own suite passes it in | the guard it weakens the reason for is still there and still correct; only the reason is false |
+| **KD-220** | a `npm publish` payload stamps the app TWICE — `obligation()` stamps when the device tier is required and `releaseContext()` stamps again — where `ANSWER_RESERVE_MS` is documented as covering one | measured 1.92 s against a 10 s budget (merge, one stamp: 1.09 s), and 1.1–1.8 s per stamp under 16 burners; the overrun direction is fail-open but has no producer today |
+| **KD-221** | the `local.properties` normaliser replaces the WHOLE file, so any byte of it beyond this machine's `sdk.dir` pointer is unwatched by the device digest | measured — appending `org.gradle.java.home=/nope` moves no digest — but `writeLocalProperties` writes only `sdk.dir` and `template/` ships no `local.properties`, so there is no producer; the narrower spelling costs one regex |
+| **KD-222** | `hashStampedTree` records files and symlinks, so an EMPTY DIRECTORY is invisible to the device digest | measured; git cannot ship an empty directory in `template/`, so a stamp cannot produce one as a difference today |
+| **KD-223** | "the gate hashes THIS tree exactly as the release proof records it" now compares `stampedOutput` with itself, and its comment calls that "an INDEPENDENT stamp" | KD-67's three spellings really are gone, so there is nothing left for that test to catch; what is wrong is the sentence, and the pair that IS unguarded is a test nobody has written |
+| **KD-224** | the console's freshness test turned "a completed render cycle IS fresh on return" into "is fresh within 5 s", and widened its boot wait from `idle` to `idle \|\| unrefreshed` | `waitFor` throws on timeout so the assertion still refuses; it is a gate relaxed on the way past, in a change whose stated subject was elsewhere |
 
 ---
 
@@ -3679,3 +3684,116 @@ correct — only the reason given for keeping it is false.
 
 **Fires when:** anyone reads the comment to decide whether the guard can go.
 *Logged 2026-09-22, round 1 of the doors review.*
+
+### KD-220 — the publish payload stamps the app twice, and the reserve is sized for one
+
+`scripts/hooks/proof-gate.mjs` (`verdict`, `releaseContext`, `ANSWER_RESERVE_MS`)
+
+`verdict()` calls `obligation()` for every classified kind, and `obligation()` stamps the app
+whenever the device tier is required (`readStamped` → `stampedOutput`). For a `publish` payload it
+then calls `releaseContext(root)`, which stamps again — unconditionally, and before `decide()`, so
+it happens even on a branch the first line of the publish rule is about to refuse. Measured on this
+tree 2026-09-22: `npm publish` 1.92 s, `gh pr merge --rebase` 1.09 s, the difference being one whole
+stamp. `ANSWER_RESERVE_MS` is documented as covering one — *"Worst case: 3000 + ~200ms"* — so the
+release path's worst case is 6200 ms of a 3500 ms reserve, and the arithmetic KD-208 is about no
+longer describes it.
+
+Not blocking: the whole hook answers in 1.9 s against a 10 s budget, and a stamp under 16 CPU
+burners measured 1142–1824 ms against its 3000 ms cap, so the four bounds cannot saturate together
+on any load this machine can produce. Worth saying plainly because the overrun direction is
+fail-OPEN — a PreToolUse decision never delivered is a permitted command — and because the cheap fix
+is to pass the stamp `obligation()` already took into `releaseContext` rather than taking a second.
+
+**Fires when:** the stamp gets slower (a bigger template, a colder disk) on a release payload,
+where a single reading is worth two everywhere else.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-221 — the local.properties normaliser blanks the whole file, not the machine pointer in it
+
+`scripts/stamped-output.mjs` (`NORMALISERS`, `MACHINE_POINTER`)
+
+`local.properties` carries this machine's Android SDK path, which is rightly not a byte of the app —
+so it is normalised. But the normaliser is `apply: () => MACHINE_POINTER`: it replaces the file's
+ENTIRE content with a fixed buffer, where the thing that is machine-dependent is the `sdk.dir=` line.
+Measured 2026-09-22 on a live stamp: appending `org.gradle.java.home=/nope` to a stamped app's
+`local.properties` moves no digest at all. The file's own docstring states the narrower intent ("a
+POINTER to a directory on this laptop"), and the module's rule three paragraphs up states the
+standard this falls short of: *"A normaliser that dropped a field carrying real information would be
+a hash that cannot see a change to the stamped app, which is the failure direction that matters."*
+
+Not blocking, and deliberately not fixed by the round that found it: `src/scaffold.mjs`'s
+`writeLocalProperties` writes `sdk.dir` and nothing else, and `template/` ships no
+`local.properties` — only `local.properties.example`, which is watched in full. There is no producer
+today, so no digest can be fooled by it.
+
+**Fires when:** anything the scaffold writes into `local.properties` stops being a path to this
+laptop's SDK. The fix is a line-scoped replace (`/^sdk\.dir=.*$/m`) instead of a whole-file one.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-222 — the device digest cannot see an empty directory
+
+`scripts/stamped-output.mjs` (`hashStampedTree`)
+
+The walk records a manifest row for a file and for a symlink; a directory is only recursed into. So
+a directory that contains nothing contributes nothing, and two stamped apps differing by exactly one
+empty directory hash the same. Measured 2026-09-22: creating
+`composeApp/src/brandNewSourceSet/` in a stamped app moves no digest, where every other mutation
+probed the same way — exec bit, dotfile content, added file, deleted file, new symlink, retargeted
+symlink, `create-cmp.json` field, ADR body — moves it.
+
+Not blocking: git cannot store an empty directory, so `template/` cannot ship one, and the scaffold's
+feature strip removes whole directories rather than emptying them. No tree change today can produce
+an app whose only difference is an empty directory, and an empty source set changes nothing Gradle
+resolves.
+
+**Fires when:** the scaffold starts creating a directory it does not immediately fill — a
+placeholder source set, an output dir, a `.gitkeep`-less scaffold hole. The fix is one manifest row
+for a directory the walk found empty.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-223 — the test that caught two spellings of one hash now compares one spelling with itself
+
+`test/proof-gate-hook.test.mjs` ("npm publish: the gate hashes THIS tree exactly as the release proof records it")
+
+The test exists because of KD-67: `fleet-check` recorded one hash, `proof-plan` compared a second and
+the publish gate computed a third, and a release proof that PASSED on main was refused twice by a
+gate no passing run could satisfy. Under the stamped-app criterion it now asserts
+`releaseContext().now === stampedOutput(ROOT).hash` — and `releaseContext` *is*
+`stampedOutputHash(root)`, imported from the same module, so both sides are one function called
+twice. What it asserts is that the stamp is reproducible, which
+`test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs` already owns outright. Its comment calls
+the right-hand side "an INDEPENDENT stamp … the same thing `fleet-check` hashes", which is not what
+it is; the meta-guard that made the old comparison non-trivial (`observedTreeHash(…,
+DEVICE_TIER_TRIGGERS) !== deviceTreeHash(…)`, i.e. "DEVICE_SKIP excludes something, so this test can
+tell the two apart") was deleted in the same edit.
+
+Not blocking, and it is not a gate edited into agreement: the three spellings really are gone — there
+is one function and every reader calls it — so this test has nothing left to catch. What is wrong is
+the sentence over it. The pair that genuinely must agree and is unguarded is `fleet-check`'s own
+stamp path (`run()` with inherited stdio into `cmp-fleet-check-*`, then `hashStampedTree`) against
+`stampScratchApp`'s (`spawnSync`, stdout ignored, into `cmp-stamped-output-*`); measured by hand
+2026-09-22 over 242 files, the two agree, and no test holds them to it.
+
+**Fires when:** the two stamp paths drift — a flag, a cwd, an stdio mode, a `--keep` — and the
+first symptom is a device tier that can never be discharged by a real fleet run.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-224 — a render-cycle assertion became a poll, and a boot wait widened, in a change about something else
+
+`inspector/mcp/test/preview-service.test.mjs` ("service: a stale state with NOTHING pending says so")
+
+The KD-131 fix is correct about its subject — the banner was fetched after the state was asserted,
+and it is now taken between two readings of the state and kept only when both agree. Two other
+things moved with it. `assert.equal(service.status().freshness.state, "fresh")`, immediately after an
+awaited `_renderCycle()`, became `await waitFor(() => … === "fresh")`: the property "a completed
+render cycle IS fresh on return" is now "is fresh within 5 s". And the boot wait, which was
+`phase !== "idle"`, became `settled = pending === false && (phase === "idle" || phase ===
+"unrefreshed")`.
+
+Not blocking: `waitFor` throws on timeout, so both assertions still refuse — what changed is what
+they refuse, not whether they do, and no adopter runs these tests. Logged because it is a gate
+relaxed on the way past a different fix, which is the one thing a review round is for.
+
+**Fires when:** `_renderCycle()` starts returning before the state it computed is visible, which
+the old spelling would have failed on and this one waits out.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
