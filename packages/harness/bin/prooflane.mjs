@@ -27,7 +27,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { colors, fail } from "../install/log.mjs";
-import { parseArgs, unknownFlags, unreadableBooleanValues } from "../install/args.mjs";
+import { parseArgs, unknownFlags, unreadableBooleanValues, emptyValues } from "../install/args.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(path.join(HERE, "..", "package.json"), "utf8"));
@@ -104,6 +104,25 @@ async function main() {
         `${unreadable.length === 1 ? "that flag takes" : "those flags take"} \`true\` or \`false\`, or no value at all`
     );
     process.stdout.write(`  run ${colors.cyan("prooflane --help")} for what each one means. Nothing was written.\n\n`);
+    return 2;
+  }
+
+  // A VALUE FLAG GIVEN AN EMPTY VALUE. `init`, `relock` and `upgrade` resolve
+  // their tree with `(typeof v === "string" && v) || positional || "."`, and
+  // `""` is falsy — so `--target-dir=` is the same as no `--target-dir` at all
+  // and the lane installs into the CWD. Measured 2026-09-22: `prooflane init
+  // --target-dir= --no-interview` from an empty directory wrote the lane into
+  // it. The line behind it is a script's `--target-dir=$DIR` with `DIR` unset: a
+  // directory WAS named, by a variable that expanded to nothing, and guessing
+  // the cwd from that is KD-7 — fifty-two files into the wrong repository.
+  const empty = emptyValues(flags);
+  if (!askedForHelp && empty.length) {
+    fail(
+      `prooflane: ${empty.map((f) => `--${f}`).join(", ")} ` +
+        `${empty.length === 1 ? "needs a value, and was given an empty one" : "need values, and were given empty ones"} ` +
+        `(an unset shell variable expands to nothing)`
+    );
+    process.stdout.write(`  run ${colors.cyan("prooflane --help")} for what each one takes. Nothing was written.\n\n`);
     return 2;
   }
 

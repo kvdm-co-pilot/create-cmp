@@ -134,6 +134,35 @@ export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
   return Object.keys(flags).filter((k) => takesNoValue(k, booleans) && typeof flags[k] === "string");
 }
 
+/**
+ * Value-taking flags given an EMPTY value — `--target-dir=`, `--profile ""`.
+ *
+ * `init`, `relock` and `upgrade` all resolve their tree with `(typeof v ===
+ * "string" && v) || positional || "."`, and `""` is falsy: an empty value is
+ * indistinguishable from the flag not being there, so the install goes to the
+ * CWD. Measured 2026-09-22 from an empty directory:
+ *
+ *   prooflane init --target-dir= --no-interview   → the lane's files into the cwd
+ *
+ * The line that produces it is a script's — `--target-dir=$DIR` or
+ * `--target-dir "$DIR"` with `DIR` unset — which is KD-7 (fifty-two files into
+ * the wrong repository, exit 0) reached by an empty value instead of a
+ * swallowed one.
+ *
+ * REPORTED HERE AND REFUSED AT THE BIN, like `unreadableBooleanValues`: the
+ * parser says what arrived, the door decides. `--fleet` has refused its own
+ * empty value since fleet upgrades landed (`fleet.mjs`, "--fleet needs the path
+ * to a fleet manifest") — this is that refusal for the class, before any
+ * command runs, at both doors.
+ *
+ * A DECLARED BOOLEAN IS NOT HERE: `--dry-run=` is refused by
+ * `unreadableBooleanValues` as a value it cannot mean, and the space form
+ * `--dry-run ""` leaves `""` a positional, which is the user's to own (KD-7).
+ */
+export function emptyValues(flags, booleans = BOOLEAN_FLAGS) {
+  return Object.keys(flags).filter((k) => !takesNoValue(k, booleans) && flags[k] === "");
+}
+
 /** One name's value as a tri-state: true, false, or "this name said nothing". */
 function triState(value) {
   if (value === true || value === "true") return true;

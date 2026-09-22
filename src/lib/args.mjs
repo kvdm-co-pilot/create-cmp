@@ -146,6 +146,38 @@ export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
 }
 
 /**
+ * Value-taking flags given an EMPTY value — `--target-dir=`, `--profile ""`.
+ *
+ * Every reader of a value flag is spelled `(typeof v === "string" && v) ||
+ * positional || "."`, and `""` is falsy, so an empty value is indistinguishable
+ * from the flag not being there and the command runs against the CWD. Measured
+ * 2026-09-22 from an empty directory:
+ *
+ *   create-cmp harness init --target-dir= --no-interview   51 files into the cwd
+ *   create-cmp upgrade --target-dir= --yes                 "✓ wrote
+ *     gradle/libs.versions.toml", "Applied." — the catalog in the cwd, rewritten
+ *     with the consent prompt auto-answered
+ *
+ * The line that produces it is a script's — `--target-dir=$DIR` or
+ * `--target-dir "$DIR"` with `DIR` unset — so it is KD-7's outcome (a tree
+ * nobody named) reached by an empty value instead of a swallowed one.
+ *
+ * REPORTED HERE AND REFUSED AT THE BIN, like `unreadableBooleanValues`: the
+ * parser says what arrived, the door decides. It is the CLASS and not one flag,
+ * because `--target-dir` is the one that writes fifty files and `--profile`,
+ * `--set`, `--name` and the rest all silently mean their default instead.
+ * `--fleet` refused its own empty value first (`install/fleet.mjs`), and this is
+ * that refusal for every value flag, before any command runs.
+ *
+ * A DECLARED BOOLEAN IS NOT HERE: `--dry-run=` is refused by
+ * `unreadableBooleanValues` as a value it cannot mean, and the space form
+ * `--dry-run ""` leaves `""` a positional, which is the user's to own (KD-7).
+ */
+export function emptyValues(flags, booleans = BOOLEAN_FLAGS) {
+  return Object.keys(flags).filter((k) => !takesNoValue(k, booleans) && flags[k] === "");
+}
+
+/**
  * Parse argv into positionals + flags. `--flag value` captures the value, unless
  * `--flag` takes none — then `value` stays the user's positional. `--flag=value`
  * attaches it, whatever the flag.

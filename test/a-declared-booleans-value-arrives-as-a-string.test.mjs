@@ -48,6 +48,7 @@ import {
   flagBool as cliFlagBool,
   coerceDeclaredBoolean as cliCoerce,
   unreadableBooleanValues as cliUnreadable,
+  emptyValues as cliEmpty,
   BOOLEAN_FLAGS as CLI_BOOLEANS,
 } from "../src/lib/args.mjs";
 import {
@@ -55,6 +56,7 @@ import {
   flagBool as harnessFlagBool,
   coerceDeclaredBoolean as harnessCoerce,
   unreadableBooleanValues as harnessUnreadable,
+  emptyValues as harnessEmpty,
   BOOLEAN_FLAGS as HARNESS_BOOLEANS,
 } from "../packages/harness/install/args.mjs";
 
@@ -69,6 +71,7 @@ const DOORS = [
     flagBool: cliFlagBool,
     coerce: cliCoerce,
     unreadable: cliUnreadable,
+    empty: cliEmpty,
     booleans: CLI_BOOLEANS,
   },
   {
@@ -78,6 +81,7 @@ const DOORS = [
     flagBool: harnessFlagBool,
     coerce: harnessCoerce,
     unreadable: harnessUnreadable,
+    empty: harnessEmpty,
     booleans: HARNESS_BOOLEANS,
   },
 ];
@@ -197,6 +201,10 @@ test("the shape `parseArgs` returns is pinned, for every flag form either door a
     // The one shape a declared boolean can still hold a string in, refused at
     // the bin (KD-153).
     [["--dry-run=maybe"], { flags: { "dry-run": "maybe" }, positionals: [] }],
+    // An EMPTY value is the string "", at either spelling — the shape a script
+    // produces from an unset variable, refused at the bin by `emptyValues`.
+    [["--target-dir="], { flags: { "target-dir": "" }, positionals: [] }],
+    [["--target-dir", ""], { flags: { "target-dir": "" }, positionals: [] }],
     // The npx separator is inert, and a repeated flag is last-one-wins.
     [["--", "--dry-run"], { flags: { "dry-run": true }, positionals: [] }],
     [["--dry-run", "true", "--dry-run", "false"], { flags: { "dry-run": false }, positionals: [] }],
@@ -217,6 +225,8 @@ test("the shape `parseArgs` returns is pinned, for every flag form either door a
     // The one shape a declared boolean can still hold a string in. Refused at
     // the bin, not here: the parser reports, the door decides.
     [["init", "--dry-run=maybe"], { flags: { "dry-run": "maybe" }, positionals: ["init"] }],
+    [["init", "--target-dir="], { flags: { "target-dir": "" }, positionals: ["init"] }],
+    [["init", "--target-dir", ""], { flags: { "target-dir": "" }, positionals: ["init"] }],
     [["init", "--", "--dry-run"], { flags: { "dry-run": true }, positionals: ["init"] }],
   ];
 
@@ -265,7 +275,7 @@ test("the two spellings of the shared functions are the same function", () => {
   // scaffold it wrote, the other the lane it installed. The CODE has to be
   // identical; the reason it is there is each file's own to state.
   const texts = DOORS.map((d) => ({ door: d, text: fs.readFileSync(path.join(ROOT, d.file), "utf8") }));
-  const SHARED = ["takesNoValue", "consumesNext", "coerceDeclaredBoolean", "unreadableBooleanValues", "triState", "flagBool", "unknownFlags"];
+  const SHARED = ["takesNoValue", "consumesNext", "coerceDeclaredBoolean", "unreadableBooleanValues", "emptyValues", "triState", "flagBool", "unknownFlags"];
   for (const name of SHARED) {
     const [a, b] = texts.map((t) => asCode(functionSource(t.text, name)));
     assert.equal(a, b, `${name} has drifted between ${texts[0].door.file} and ${texts[1].door.file}`);
@@ -334,6 +344,23 @@ test("`coerceDeclaredBoolean` touches declared booleans and nothing else", () =>
     assert.equal(door.coerce("target-dir", "false"), "false");
     // `no-x` is boolean by construction in both parsers, list or no list.
     assert.equal(door.coerce(`no-${name}`, "false"), false);
+  }
+});
+
+test("`emptyValues` names the value flags given an empty value, and nothing else", () => {
+  // The detector the bins refuse on. `""` is falsy, and every reader of a value
+  // flag is `(typeof v === "string" && v) || positional || "."` — so an empty
+  // value is the flag not being there, and the command runs against the CWD.
+  for (const door of DOORS) {
+    const [bool] = [...door.booleans].filter((n) => !n.startsWith("no-"));
+    assert.deepEqual(door.empty(door.parse(["--target-dir="]).flags), ["target-dir"], `${door.name}: --target-dir= is not reported empty`);
+    assert.deepEqual(door.empty(door.parse(["--target-dir", ""]).flags), ["target-dir"], `${door.name}: the space form of an empty value is not reported`);
+    assert.deepEqual(door.empty(door.parse(["--profile="]).flags), ["profile"], `${door.name}: it is the class, not one flag`);
+    assert.deepEqual(door.empty(door.parse(["--target-dir=./app"]).flags), [], `${door.name}: a flag WITH a value was reported empty`);
+    assert.deepEqual(door.empty(door.parse([`--${bool}=`]).flags), [], `${door.name}: a declared boolean is the other refusal's`);
+    assert.deepEqual(door.unreadable(door.parse([`--${bool}=`]).flags), [bool], `${door.name}: and that refusal still reaches it`);
+    assert.deepEqual(door.empty(door.parse([`--${bool}`, ""]).flags), [], `${door.name}: the space form after a boolean leaves "" a positional`);
+    assert.deepEqual(door.parse([`--${bool}`, ""]).positionals, [""], `${door.name}: "" stopped being the user's positional`);
   }
 });
 

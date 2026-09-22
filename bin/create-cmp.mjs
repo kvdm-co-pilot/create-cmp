@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseArgs, unknownFlags, unreadableBooleanValues } from "../src/lib/args.mjs";
+import { parseArgs, unknownFlags, unreadableBooleanValues, emptyValues } from "../src/lib/args.mjs";
 
 const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "harden", "attach", "harness", "help"]);
 
@@ -86,6 +86,27 @@ async function main() {
     process.stderr.write(
       `create-cmp: ${named} — ${unreadable.length === 1 ? "that flag takes" : "those flags take"} \`true\` or \`false\`, or no value at all.\n` +
         `  run \`create-cmp --help\` for what each one means. Nothing was written.\n`
+    );
+    process.exit(2);
+  }
+
+  // A VALUE FLAG GIVEN AN EMPTY VALUE. Every reader is spelled `(typeof v ===
+  // "string" && v) || positional || "."`, and `""` is falsy — so `--target-dir=`
+  // is the same as no `--target-dir` at all and the command runs against the
+  // CWD. Measured 2026-09-22: `create-cmp harness init --target-dir=
+  // --no-interview` wrote the lane into the directory it happened to run from,
+  // and `create-cmp upgrade --target-dir= --yes` rewrote that directory's
+  // version catalog with the consent prompt auto-answered. The line behind it is
+  // a script's `--target-dir=$DIR` with `DIR` unset: a directory WAS named, by a
+  // variable that expanded to nothing, and guessing the cwd from that is KD-7's
+  // outcome — a tree nobody named.
+  const empty = emptyValues(flags);
+  if (empty.length) {
+    const named = empty.map((f) => `--${f}`).join(", ");
+    process.stderr.write(
+      `create-cmp: ${named} ${empty.length === 1 ? "needs a value, and was given an empty one" : "need values, and were given empty ones"} ` +
+        `(an unset shell variable expands to nothing).\n` +
+        `  run \`create-cmp --help\` for what each one takes. Nothing was written.\n`
     );
     process.exit(2);
   }
