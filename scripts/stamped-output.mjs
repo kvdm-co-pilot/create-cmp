@@ -78,21 +78,48 @@ export function stampArgv(root, appDir) {
 }
 
 /**
- * THE ONE NON-DETERMINISTIC FIELD, normalised before hashing.
+ * WHAT THE STAMP WRITES THAT IS NOT A FUNCTION OF THE TREE — both of them,
+ * named, measured, and normalised before hashing. Each would otherwise make
+ * every stamp a different app, so the comparison could never be equal and the
+ * device tier would be OWED forever: the 3.5-minute run this schedule exists to
+ * buy once, bought on every query.
  *
- * `stampedAt` is the wall clock at stamp time (src/scaffold.mjs,
- * `writeSpecOfRecord`). Hashing it would make every stamp a different app, the
- * comparison below could never be equal, and the device tier would be OWED
- * forever — which is the 3.5-minute run this schedule exists to buy once.
+ * 1. `create-cmp.json`'s `stampedAt` — the wall clock at stamp time
+ *    (src/scaffold.mjs, `writeSpecOfRecord`).
+ * 2. `local.properties`'s `sdk.dir` — THIS MACHINE'S Android SDK, from
+ *    ANDROID_HOME, or ANDROID_SDK_ROOT, or the conventional install path, and
+ *    the file is not written at all when none of them exists
+ *    (`writeLocalProperties`). Measured 2026-09-22: two stamps of one unchanged
+ *    tree hashed differently across a change of ANDROID_HOME. `fleet-check`
+ *    runs with the device lane's SDK exported and `proof-plan` runs inside a
+ *    hook that may have none, so this is not a hypothetical divergence — it is
+ *    the likely one. It is a POINTER to a directory on this laptop, not a byte
+ *    of the app: Gradle resolves the SDK from the environment when the file is
+ *    absent, and every Android project gitignores it.
  *
- * Applied to CONTENT, by path, and to nothing else: a normaliser that dropped a
+ * Applied to CONTENT, by path, and to nothing else. A normaliser that dropped a
  * field carrying real information would be a hash that cannot see a change to
- * the stamped app, which is the failure direction that matters.
+ * the stamped app, which is the failure direction that matters — so the files
+ * stay IN the manifest carrying a value that says what they are, rather than
+ * being excluded and silently unwatched.
  */
 const NORMALISED_INSTANT = "1970-01-01T00:00:00.000Z";
+const MACHINE_POINTER = Buffer.from("# normalised by scripts/stamped-output.mjs: a pointer to this machine's Android SDK, not a byte of the app\n", "utf8");
 const NORMALISERS = Object.freeze({
   "create-cmp.json": (buf) => Buffer.from(buf.toString("utf8").replace(/("stampedAt"\s*:\s*")[^"]*(")/, `$1${NORMALISED_INSTANT}$2`)),
+  "local.properties": () => MACHINE_POINTER,
 });
+
+/**
+ * Files whose ABSENCE is as machine-dependent as their content, held at their
+ * normalised value whether the stamp wrote them or not.
+ *
+ * `local.properties` is the whole list: a machine with no Android SDK gets no
+ * file, a machine with one gets a path, and neither fact is about the app. One
+ * entry in the manifest either way, so the digest cannot move with the laptop
+ * and the file is never silently missing from the list a reader diffs.
+ */
+const ALWAYS_PRESENT = Object.freeze(["local.properties"]);
 
 /**
  * Every file of a stamped app, as relative POSIX path → content digest.
@@ -129,6 +156,7 @@ export function hashStampedTree(appDir) {
     }
   };
   walk(appDir);
+  for (const rel of ALWAYS_PRESENT) if (!(rel in files)) files[rel] = `-${sha(NORMALISERS[rel](Buffer.alloc(0)))}`;
   const rows = Object.keys(files)
     .sort()
     .map((rel) => `${rel}\n${files[rel]}`);
