@@ -42,7 +42,7 @@ const CREATE_CMP = path.join(ROOT, "bin", "create-cmp.mjs");
 
 // picocolors styles output when CI is set and not at a developer's pipe, and
 // `Dry run` is yellow — the reset lands inside the sentence being matched.
-const PLAIN = /\[[0-9;]*m/g;
+const PLAIN = /\u001B\[[0-9;]*m/g;
 
 const CATALOG = '[versions]\nkotlin = "2.0.0"\n';
 
