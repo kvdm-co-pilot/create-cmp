@@ -304,13 +304,6 @@ All notable changes to this project are documented here. The format is based on
   forever. It is the non-vacuity check the surface list never had, and it earned that during
   wiring: dropping one character from the globbed directory name put both plugin manifests back
   outside the gate while every count assertion still passed.
-- **`create-cmp harness init|relock|upgrade` could not run from an npm install.** `bin/create-cmp.mjs`
-  imports `../packages/harness/install/*.mjs` and the published package never shipped that directory,
-  so all three died with `ERR_MODULE_NOT_FOUND` and a raw Node stack trace. Present in every release
-  from 0.24.0 through 0.26.4, for commands advertised in `--help`. The `prooflane` door was never
-  affected. A new check reads what a bin imports against what `files` ships, so the two lists cannot
-  drift apart again.
-
 ### Contributor tooling
 
 *Nothing in this list is reachable from an installed package: `package.json`'s `files` ships no
@@ -391,6 +384,21 @@ All notable changes to this project are documented here. The format is based on
   cannot be stamped — no `bin/`, or a stamp that dies or outruns its 3000 ms cap — is a STATE (device
   tier OWED, with the reason printed) rather than an exception thrown out of `obligation()` into the
   PreToolUse hook, which exited 2 and then refused **every** command it classifies.
+
+## [0.26.5] - 2026-09-19
+
+### Fixed
+
+- **`create-cmp harness init|relock|upgrade` could not run from an npm install.** `bin/create-cmp.mjs`
+  imports `../packages/harness/install/*.mjs` and the published package never shipped that directory,
+  so all three died with `ERR_MODULE_NOT_FOUND` and a raw Node stack trace. Present in every release
+  from 0.24.0 through 0.26.4, for commands advertised in `--help`. The `prooflane` door was never
+  affected. A new check reads what a bin imports against what `files` ships, so the two lists cannot
+  drift apart again. A second check reads the other verb: `vendorPlan()` in
+  `packages/harness/install/init.mjs` is the single declaration of what `harness init` and
+  `upgrade --harness` COPY out of this package, and a source in that plan that `files` does not ship
+  fails more quietly than a missing import — no stack trace, no refusal, just a tree with one fewer
+  file in it and a `✓ N files written` that says N-1.
 
 ## [0.26.0] - 2026-09-16
 
@@ -3608,6 +3616,7 @@ Initial release.
   marketplace manifest.
 
 [unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...HEAD
+[0.26.5]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...v0.26.5
 [0.26.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.24.0...v0.25.0
 [0.20.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.19.0...v0.20.0
