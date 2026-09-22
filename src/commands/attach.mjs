@@ -233,8 +233,11 @@ export function manifestFromFlags(flags) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    // An empty value is "no override", never an empty list — the lane would
-    // refuse `citationRoots: []` and the user would have to decode why.
+    // A value that yields no roots is "no override", never an empty list — the
+    // lane would refuse `citationRoots: []` and the user would have to decode
+    // why. What reaches here is `--citation-roots ","` and its like: the EMPTY
+    // value never arrives any more, because the door refuses a value flag given
+    // none before any command runs (`emptyValues`, bin/create-cmp.mjs).
     if (roots.length) layout.citationRoots = roots;
   }
   const manifest = manifestFor(flags.profile, layout);

@@ -146,6 +146,29 @@ export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
 }
 
 /**
+ * The flags that name WHERE FILES ARE WRITTEN.
+ *
+ * A flag in here may never fall back to the working directory in silence, which
+ * is the one thing that separates it from every other value flag: `--set` with
+ * no value means the latest set, `--profile` with none means the directory's
+ * slug, and both are answers. `--target-dir` with none means "wherever this
+ * process happened to start", and the command then writes there.
+ *
+ * DERIVED, NOT DECLARED, by `test/an-empty-directory-flag-installs-into-the-
+ * working-directory.test.mjs`: it scans `src/commands/` and
+ * `packages/harness/install/` for the resolution idiom `(typeof flags["x"] ===
+ * "string" && flags["x"]) || positional || …` and refuses this set when the two
+ * disagree — eleven sites across ten files name `target-dir` today, and a
+ * twelfth naming something else fails that test until it is listed here.
+ *
+ * `--fleet` is deliberately NOT here. It names a MANIFEST, not a destination,
+ * and it already refuses both its empty and its bare form with a sentence that
+ * teaches the manifest format (`packages/harness/install/fleet.mjs`). Folding it
+ * in would trade that sentence for this one.
+ */
+export const DESTINATION_FLAGS = new Set(["target-dir"]);
+
+/**
  * Value-taking flags given an EMPTY value — `--target-dir=`, `--profile ""`.
  *
  * Every reader of a value flag is spelled `(typeof v === "string" && v) ||
@@ -169,12 +192,25 @@ export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
  * `--fleet` refused its own empty value first (`install/fleet.mjs`), and this is
  * that refusal for every value flag, before any command runs.
  *
+ * A DESTINATION FLAG WITH NO VALUE AT ALL COUNTS AS EMPTY, and only a
+ * destination flag does. `--target-dir $DIR` unquoted with `DIR` unset leaves
+ * the shell dropping the word entirely, so the flag is stored as the boolean
+ * `true`, `typeof true !== "string"`, and the same readers fall through to the
+ * cwd — the identical harm, one quoting style over, and the commoner mistake of
+ * the two. `--set` with no value means the latest set and `--profile` with none
+ * means the directory's slug: those are answers, and refusing them would be a
+ * gate firing where nothing is at stake.
+ *
  * A DECLARED BOOLEAN IS NOT HERE: `--dry-run=` is refused by
  * `unreadableBooleanValues` as a value it cannot mean, and the space form
  * `--dry-run ""` leaves `""` a positional, which is the user's to own (KD-7).
  */
-export function emptyValues(flags, booleans = BOOLEAN_FLAGS) {
-  return Object.keys(flags).filter((k) => !takesNoValue(k, booleans) && flags[k] === "");
+export function emptyValues(flags, booleans = BOOLEAN_FLAGS, destinations = DESTINATION_FLAGS) {
+  return Object.keys(flags).filter((k) => {
+    if (takesNoValue(k, booleans)) return false;
+    if (flags[k] === "") return true;
+    return flags[k] === true && destinations.has(k);
+  });
 }
 
 /**

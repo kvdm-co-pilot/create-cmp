@@ -135,6 +135,27 @@ export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
 }
 
 /**
+ * The flags that name WHERE FILES ARE WRITTEN.
+ *
+ * A flag in here may never fall back to the working directory in silence, which
+ * is what separates it from every other value flag: `--profile` with no value
+ * means the directory's slug, which is an answer. `--target-dir` with no value
+ * means "wherever this process happened to start", and `init` then writes the
+ * lane there — KD-7's outcome.
+ *
+ * DERIVED, NOT DECLARED, by the root repository's
+ * `test/an-empty-directory-flag-installs-into-the-working-directory.test.mjs`,
+ * which scans this directory and `src/commands/` for the resolution idiom
+ * `(typeof flags["x"] === "string" && flags["x"]) || positional || …` and
+ * refuses the set when the two disagree.
+ *
+ * `--fleet` is deliberately NOT here: it names a MANIFEST, and `fleet.mjs`
+ * already refuses both its empty and its bare form with a sentence that teaches
+ * the manifest format. Folding it in would trade that sentence for this one.
+ */
+export const DESTINATION_FLAGS = new Set(["target-dir"]);
+
+/**
  * Value-taking flags given an EMPTY value — `--target-dir=`, `--profile ""`.
  *
  * `init`, `relock` and `upgrade` all resolve their tree with `(typeof v ===
@@ -155,12 +176,25 @@ export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
  * to a fleet manifest") — this is that refusal for the class, before any
  * command runs, at both doors.
  *
+ * A DESTINATION FLAG WITH NO VALUE AT ALL COUNTS AS EMPTY, and only a
+ * destination flag does. `--target-dir $DIR` unquoted with `DIR` unset leaves
+ * the shell dropping the word entirely, so the flag is stored as the boolean
+ * `true`, `typeof true !== "string"`, and the same readers fall through to the
+ * cwd — the identical harm, one quoting style over, and the commoner mistake of
+ * the two. `--set` with no value means the latest set and `--profile` with none
+ * means the directory's slug: those are answers, and refusing them would be a
+ * gate firing where nothing is at stake.
+ *
  * A DECLARED BOOLEAN IS NOT HERE: `--dry-run=` is refused by
  * `unreadableBooleanValues` as a value it cannot mean, and the space form
  * `--dry-run ""` leaves `""` a positional, which is the user's to own (KD-7).
  */
-export function emptyValues(flags, booleans = BOOLEAN_FLAGS) {
-  return Object.keys(flags).filter((k) => !takesNoValue(k, booleans) && flags[k] === "");
+export function emptyValues(flags, booleans = BOOLEAN_FLAGS, destinations = DESTINATION_FLAGS) {
+  return Object.keys(flags).filter((k) => {
+    if (takesNoValue(k, booleans)) return false;
+    if (flags[k] === "") return true;
+    return flags[k] === true && destinations.has(k);
+  });
 }
 
 /** One name's value as a tri-state: true, false, or "this name said nothing". */

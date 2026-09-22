@@ -107,7 +107,7 @@ async function main() {
     return 2;
   }
 
-  // A VALUE FLAG GIVEN AN EMPTY VALUE. `init`, `relock` and `upgrade` resolve
+  // A VALUE FLAG GIVEN NO VALUE. `init`, `relock` and `upgrade` resolve
   // their tree with `(typeof v === "string" && v) || positional || "."`, and
   // `""` is falsy — so `--target-dir=` is the same as no `--target-dir` at all
   // and the lane installs into the CWD. Measured 2026-09-22: `prooflane init
@@ -115,14 +115,34 @@ async function main() {
   // it. The line behind it is a script's `--target-dir=$DIR` with `DIR` unset: a
   // directory WAS named, by a variable that expanded to nothing, and guessing
   // the cwd from that is KD-7 — fifty-two files into the wrong repository.
+  // Unquoted, the same script leaves the flag BARE (`--target-dir --dry-run`),
+  // which `emptyValues` counts as empty for the flags that name where files are
+  // written and for no others: `--profile` bare still means the directory slug.
   const empty = emptyValues(flags);
   if (!askedForHelp && empty.length) {
     fail(
       `prooflane: ${empty.map((f) => `--${f}`).join(", ")} ` +
-        `${empty.length === 1 ? "needs a value, and was given an empty one" : "need values, and were given empty ones"} ` +
-        `(an unset shell variable expands to nothing)`
+        `${empty.length === 1 ? "needs a value, and was given none" : "need values, and were given none"} ` +
+        `(an unset shell variable expands to nothing, quoted or not)`
     );
     process.stdout.write(`  run ${colors.cyan("prooflane --help")} for what each one takes. Nothing was written.\n\n`);
+    return 2;
+  }
+
+  // AN EMPTY POSITIONAL. The other half of the same readers is `|| positional
+  // ||`, and `""` is falsy there too: `prooflane init ""` installs into the cwd,
+  // which is `prooflane init "$DIR"` with `DIR` unset — the flag's mistake, one
+  // argument over. Refused at the door rather than in `init`, `relock` and
+  // `upgrade` separately, for the reason `install/args.mjs` gives about the
+  // value form: a fix at the read sites has to find all of them today and again
+  // tomorrow, and nothing this command takes positionally can mean `""`.
+  const blank = positionals.filter((p) => p === "");
+  if (!askedForHelp && blank.length) {
+    fail(
+      `prooflane: the directory to install into ${blank.length === 1 ? "was given as an empty argument" : "was given as empty arguments"} ` +
+        `(an unset shell variable expands to nothing, quoted or not)`
+    );
+    process.stdout.write(`  name it, or drop the argument to mean the current directory. Nothing was written.\n\n`);
     return 2;
   }
 

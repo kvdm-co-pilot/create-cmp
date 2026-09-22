@@ -90,23 +90,45 @@ async function main() {
     process.exit(2);
   }
 
-  // A VALUE FLAG GIVEN AN EMPTY VALUE. Every reader is spelled `(typeof v ===
-  // "string" && v) || positional || "."`, and `""` is falsy — so `--target-dir=`
-  // is the same as no `--target-dir` at all and the command runs against the
-  // CWD. Measured 2026-09-22: `create-cmp harness init --target-dir=
-  // --no-interview` wrote the lane into the directory it happened to run from,
-  // and `create-cmp upgrade --target-dir= --yes` rewrote that directory's
-  // version catalog with the consent prompt auto-answered. The line behind it is
-  // a script's `--target-dir=$DIR` with `DIR` unset: a directory WAS named, by a
-  // variable that expanded to nothing, and guessing the cwd from that is KD-7's
-  // outcome — a tree nobody named.
+  // A VALUE FLAG GIVEN NO VALUE. Every reader is spelled `(typeof v === "string"
+  // && v) || positional || "."`, and `""` is falsy — so `--target-dir=` is the
+  // same as no `--target-dir` at all and the command runs against the CWD.
+  // Measured 2026-09-22: `create-cmp harness init --target-dir= --no-interview`
+  // wrote the lane into the directory it happened to run from, and `create-cmp
+  // upgrade --target-dir= --yes` rewrote that directory's version catalog with
+  // the consent prompt auto-answered. The line behind it is a script's
+  // `--target-dir=$DIR` with `DIR` unset: a directory WAS named, by a variable
+  // that expanded to nothing, and guessing the cwd from that is KD-7's outcome —
+  // a tree nobody named. Unquoted, the same script leaves the flag BARE, which
+  // `emptyValues` counts as empty for the flags that name where files are
+  // written and for no others.
   const empty = emptyValues(flags);
   if (empty.length) {
     const named = empty.map((f) => `--${f}`).join(", ");
     process.stderr.write(
-      `create-cmp: ${named} ${empty.length === 1 ? "needs a value, and was given an empty one" : "need values, and were given empty ones"} ` +
-        `(an unset shell variable expands to nothing).\n` +
+      `create-cmp: ${named} ${empty.length === 1 ? "needs a value, and was given none" : "need values, and were given none"} ` +
+        `(an unset shell variable expands to nothing, quoted or not).\n` +
         `  run \`create-cmp --help\` for what each one takes. Nothing was written.\n`
+    );
+    process.exit(2);
+  }
+
+  // AN EMPTY POSITIONAL. The other half of every one of those readers is
+  // `|| positional ||`, and `""` is falsy there too: `create-cmp upgrade ""` and
+  // `create-cmp harness init "" --no-interview` resolve the project to the cwd,
+  // which is `prooflane init "$DIR"` with `DIR` unset — the flag's mistake, one
+  // argument over. Refused HERE rather than in each command for the reason
+  // `src/lib/args.mjs` gives about the value form: there are eleven readers of
+  // that idiom across ten files, and a fix at the read sites has to find all of
+  // them today and again tomorrow. Nothing at this door can mean `""` — not a
+  // subcommand, not a directory, not an app name — so the door can answer for
+  // all of them.
+  const blank = positionals.filter((p) => p === "");
+  if (blank.length) {
+    process.stderr.write(
+      `create-cmp: the directory to work in ${blank.length === 1 ? "was given as an empty argument" : "was given as empty arguments"} ` +
+        `(an unset shell variable expands to nothing, quoted or not).\n` +
+        `  name it, or drop the argument to mean the current directory. Nothing was written.\n`
     );
     process.exit(2);
   }
