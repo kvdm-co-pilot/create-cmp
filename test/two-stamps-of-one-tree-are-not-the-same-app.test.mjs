@@ -29,7 +29,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { stampedOutput, stampScratchApp, FLEET_SCRATCH_APP } from "../scripts/stamped-output.mjs";
+import { stampedOutput, stampScratchApp, hashStampedTree, FLEET_SCRATCH_APP } from "../scripts/stamped-output.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -155,5 +155,32 @@ test("THE DIGEST MUST NOT MOVE WITH THIS MACHINE'S ANDROID SDK — local.propert
     if (saved.root === undefined) delete process.env.ANDROID_SDK_ROOT;
     else process.env.ANDROID_SDK_ROOT = saved.root;
     fs.rmSync(elsewhere, { recursive: true, force: true });
+  }
+});
+
+test("THE SAME TREE STAMPED TOMORROW IS THE SAME APP — the seeded ADR carries the day it was written", () => {
+  // `src/lib/adr-seed.mjs` renders `- **Date:** <today>` into every ADR it
+  // seeds (`new Date().toISOString().slice(0, 10)`), so a tree proved on
+  // Monday stamps a different app on Tuesday — and the device tier would read
+  // REOPENED for a slice that changed nothing at all, naming a documentation
+  // file as the culprit. Two stamps seconds apart cannot see this; the clock
+  // is moved by hand instead of waiting for midnight.
+  const app = stampScratchApp(ROOT);
+  try {
+    const adrDir = path.join(app.appDir, "docs", "adr");
+    const seeded = fs.readdirSync(adrDir).filter((f) => /^\d{4}-.*\.md$/.test(f));
+    assert.ok(seeded.length, "the stamp seeds ADRs at all — if it stopped, this test is aimed at nothing");
+    const today = new Date().toISOString().slice(0, 10);
+    const dated = seeded.filter((f) => fs.readFileSync(path.join(adrDir, f), "utf8").includes(`- **Date:** ${today}`));
+    assert.ok(dated.length, `the premise: at least one ADR in the stamped app carries today's date (${today}). Found: ${seeded.join(", ")}`);
+
+    const before = hashStampedTree(app.appDir).hash;
+    for (const f of dated) {
+      const at = path.join(adrDir, f);
+      fs.writeFileSync(at, fs.readFileSync(at, "utf8").replace(`- **Date:** ${today}`, "- **Date:** 2019-03-04"));
+    }
+    assert.equal(hashStampedTree(app.appDir).hash, before, "the day an ADR was seeded moved the digest of the app. A slice that changed nothing would be sent to an emulator the first time it crossed midnight.");
+  } finally {
+    app.dispose();
   }
 });
