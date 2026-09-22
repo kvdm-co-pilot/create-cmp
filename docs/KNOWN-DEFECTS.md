@@ -572,6 +572,16 @@ local | ci | nightly | release), so the seam exists and nothing here needs inven
 repo's own evidence, only by an adopter. *Logged 2026-09-15, found while fixing the emulator
 redirect.*
 
+**2026-09-22 — the remedy above was rejected by the owner, and the replacement is output-keyed.**
+There is to be no nightly cadence for a static template: a second profile run on a clock proves the
+same bytes over and over and says nothing about the ones that moved. Firebase instead leaves
+stamp-time for an add step (`create-cmp add firebase`, the next slice), after which the Firebase
+proof is owed when the stamped-plus-added app's bytes move — the same output-keyed rule the device
+tier now uses (KD-206 and the `[Unreleased]` entry for it). The emulator-suite run machinery is
+already built and pushed on branch `wave/firebase`, held out of this wave and to be repointed at the
+add step rather than at a schedule. The iOS half of this entry stays parked and is still open as
+written. The decision is recorded in `docs/proposals/LIBRARIES-IN-SERVICES-OUT.md`.
+
 ### KD-46 — the iOS refusal names two causes its catch cannot see
 
 `template/composeApp/src/iosMain/kotlin/com/example/app/KoinHelper.kt`
