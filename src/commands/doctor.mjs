@@ -9,6 +9,14 @@
 // --fix applies only SAFE heals (write local.properties from ANDROID_HOME, add
 // ksp.useKSP2=true, wire the walk into .claude/settings.json); everything else
 // prints the exact manual step.
+//
+// ONE of those heals rewrites a command that is already there, and it is the only
+// one that asks first: `healShippedHookCommands` replaces a hook command that is
+// byte-for-byte a form create-cmp itself shipped and has since replaced (the
+// relative Stop and UserPromptSubmit hooks of every app stamped through 0.26.2,
+// KD-85). Consent-gated, in place, and never a command the app wrote — see the
+// function, and src/lib/shipped-hooks.mjs for what "a form create-cmp shipped" is
+// allowed to mean.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -281,10 +289,15 @@ export function gatherHookInputs(projectDir) {
         location: v.surface,
         command: v.command,
         paths: v.paths,
-        // The template's own command for that surface, when it has exactly one — the
-        // form to paste, for an adopter who edited create-cmp's hook rather than
-        // writing their own.
-        shipped: shipped.length === 1 ? shipped[0].command : null,
+        // The template's own command for that surface, when it has exactly one AND it
+        // runs one of the same scripts — the form to paste, for an adopter who edited
+        // create-cmp's hook rather than writing their own. Offering the SessionStart
+        // banner to someone whose SessionStart runs a script of their own would be
+        // noise, so the path has to match for it to be worth printing.
+        shipped:
+          shipped.length === 1 && v.paths.some((p) => shipped[0].command.includes(p))
+            ? shipped[0].command
+            : null,
       };
     });
   return { healable, unanchored };
@@ -496,7 +509,7 @@ export async function healShippedHookCommands(projectDir, { assumeYes = false, d
   process.stdout.write(
     `\n--fix: ${n} hook command${s} in .claude/settings.json ${n === 1 ? "is a form" : "are forms"} ` +
       `create-cmp itself shipped and has since replaced.\n` +
-      `${colors.dim("      The rewrite changes those command strings and no other byte of the file.")}\n`
+      `${colors.dim(`      The rewrite changes ${n === 1 ? "that command string" : "those command strings"} and no other byte of the file.`)}\n`
   );
   for (const r of plan.rewrites) {
     process.stdout.write(`  ${r.location}\n    ${colors.red(`- ${r.from}`)}\n    ${colors.green(`+ ${r.to}`)}\n`);

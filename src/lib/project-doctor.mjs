@@ -497,6 +497,7 @@ export function diagnoseProject(input) {
     // "the Stop hook" is what they recognise, `hooks.Stop[0].hooks[0]` is what they
     // edit, and a report that gives one without the other costs them a search.
     const where = (h) => `${h.surface === "statusLine" ? "the status line" : `the ${h.surface} hook`} (${h.location})`;
+    const sentence = (t) => t.charAt(0).toUpperCase() + t.slice(1);
     if (healable.length > 0) {
       const one = healable.length === 1;
       findings.push({
@@ -506,7 +507,7 @@ export function diagnoseProject(input) {
           `${healable.length} hook command${one ? "" : "s"} in .claude/settings.json ${one ? "is a form" : "are forms"} ` +
           "create-cmp itself shipped and has since replaced",
         detail:
-          `${healable.map((h) => `${where(h)} runs \`${h.command}\`, which ${h.why}`).join("; ")}. ` +
+          sentence(`${healable.map((h) => `${where(h)} runs \`${h.command}\`, which ${h.why}`).join("; ")}. `) +
           `The form the current template ships differs by the anchor alone (${PROJECT_DIR_ANCHOR}), which ` +
           "Claude Code sets for every hook command — so the rewrite runs the same script from the project " +
           "root and the right one from every other directory, whatever version of the lane this app carries.",
@@ -529,7 +530,7 @@ export function diagnoseProject(input) {
           `${unanchored.length} hook command${one ? "" : "s"} in .claude/settings.json ` +
           `name${one ? "s" : ""} a script by a path relative to the SESSION's directory`,
         detail:
-          `${unanchored.map((u) => `${where(u)} runs ${u.paths.join(", ")} in \`${u.command}\``).join("; ")}. ` +
+          sentence(`${unanchored.map((u) => `${where(u)} runs ${u.paths.join(", ")} in \`${u.command}\``).join("; ")}. `) +
           "Claude Code runs a hook with the cwd of the SESSION, not the directory holding " +
           ".claude/settings.json, so a session opened in a subdirectory (the monorepo services/ layout) " +
           `reaches no script at that path. ${one ? "This is not a command" : "These are not commands"} ` +
