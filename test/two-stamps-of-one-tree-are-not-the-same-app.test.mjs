@@ -25,6 +25,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -113,4 +114,46 @@ test("ONE spelling of what fleet-check stamps: the oracle's flags are the flags 
     );
   }
   assert.ok(src.includes("FLEET_SCRATCH_APP") || src.includes("stampArgv"), "fleet-check must build its stamp from the shared spec");
+});
+
+test("THE DIGEST MUST NOT MOVE WITH THIS MACHINE'S ANDROID SDK — local.properties is a pointer, not an app byte", () => {
+  // MEASURED 2026-09-22, and it is the failure mode that would make this whole
+  // schedule useless: `src/scaffold.mjs`'s `writeLocalProperties` writes
+  // `sdk.dir=<absolute path>` from ANDROID_HOME / ANDROID_SDK_ROOT, or from the
+  // conventional install path, or NOT AT ALL when neither exists. So the app a
+  // tree stamps depended on the environment of whoever stamped it —
+  // `fleet-check` runs with the device lane's ANDROID_HOME exported, and
+  // `proof-plan` runs inside a PreToolUse hook that may have none. Different
+  // digests, the record never matching, the device tier REOPENED forever: the
+  // 3.5-minute run bought again on every query.
+  //
+  // It is normalised, not excluded, and the file still appears in the manifest
+  // carrying a value that says what it is.
+  const saved = { home: process.env.ANDROID_HOME, root: process.env.ANDROID_SDK_ROOT, h: process.env.HOME };
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), "an-sdk-that-is-not-yours-"));
+  try {
+    delete process.env.ANDROID_HOME;
+    delete process.env.ANDROID_SDK_ROOT;
+    const conventional = stampedOutput(ROOT);
+
+    // An SDK at a different absolute path: the value changes.
+    process.env.ANDROID_HOME = elsewhere;
+    const moved = stampedOutput(ROOT);
+    assert.equal(moved.hash, conventional.hash, `the stamped app's digest moved with ANDROID_HOME (${conventional.files["local.properties"]} → ${moved.files["local.properties"]}). Every device record would then describe an app only the machine that stamped it can reproduce.`);
+
+    // A machine with no SDK anywhere: the file is not written at all, and its
+    // ABSENCE must not move the digest either.
+    delete process.env.ANDROID_HOME;
+    process.env.HOME = elsewhere;
+    const none = stampedOutput(ROOT);
+    assert.equal(none.hash, conventional.hash, "a machine with no Android SDK stamps the same app — the file's presence is a fact about the machine");
+    assert.ok(none.files["local.properties"], "and it is still named in the manifest, with a value that says what it is, rather than silently dropped");
+  } finally {
+    process.env.HOME = saved.h;
+    if (saved.home === undefined) delete process.env.ANDROID_HOME;
+    else process.env.ANDROID_HOME = saved.home;
+    if (saved.root === undefined) delete process.env.ANDROID_SDK_ROOT;
+    else process.env.ANDROID_SDK_ROOT = saved.root;
+    fs.rmSync(elsewhere, { recursive: true, force: true });
+  }
 });
