@@ -587,7 +587,7 @@ function verdictOf({ recorded, owed, reopened, rounds }) {
 const SUITE_OVER =
   "what this looked like before anything recorded it, from scripts/suite-record.mjs's own header: 295 full-suite runs, 4.6 to 6.6 per merged change, 4.5 hours (docs/research/g2-measure/, 2026-09-07 to 09-17). A run over bytes a recorded run already covers is read, not repeated.";
 const DEVICE_REOPENED =
-  "proof-plan says REOPENED: a trigger path moved after the run, so the run describes a tree that no longer exists and now proves nothing. That is the 2026-09-08 failure, and it is over-proof by definition — the spend is real and the evidence is gone.";
+  "proof-plan says REOPENED: the app this tree stamps moved after the run, so the run describes an app that no longer exists and now proves nothing. That is the 2026-09-08 failure, and it is over-proof by definition — the spend is real and the evidence is gone.";
 const REVIEW_REOPENED =
   "proof-plan says REOPENED: a trigger path moved after the last record, so a fresh record is owed for the SAME round. That is the mechanism that makes this count records and not rounds, and here it is happening.";
 

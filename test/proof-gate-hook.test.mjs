@@ -19,7 +19,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
-import { observedTreeHash, deviceTreeHash, DEVICE_TIER_TRIGGERS, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
+import { observedTreeHash, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
+import { stampedOutput } from "../scripts/stamped-output.mjs";
 import { TIERS, currentBranch } from "../scripts/proof-plan.mjs";
 
 const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/hooks/proof-gate.mjs");
@@ -85,13 +86,19 @@ test("device run: refused when nothing is owed, already discharged, or undeclare
 
 test("npm publish: the publish skill's first two steps as a program — clean trunk, and a PASS L2 record on THIS tree", () => {
   const now = "c".repeat(40);
-  const rec = (over = {}) => ({ observedHash: now, verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", ...over });
+  const rec = (over = {}) => ({ stampedOutputHash: now, verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", ...over });
   const onTrunk = o("none", { trunk: true, branch: "main" });
 
   assert.match(decide("publish", o("none", { branch: "feat/x" }), TIERS, { record: rec(), now }).reason, /clean main/, "not trunk");
   assert.match(decide("publish", o("owed", { branch: "feat/x" }), TIERS, { record: rec(), now }).reason, /OWED/, "and says what the branch still owes");
   assert.equal(decide("publish", onTrunk, TIERS, { record: null, now }).action, "deny", "no record");
-  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ observedHash: "d".repeat(40) }), now }).reason, /another tree/);
+  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ stampedOutputHash: "d".repeat(40) }), now }).reason, /another app/);
+  // A record from before the tier was bound to the stamped app says nothing
+  // about it, and is refused IN THOSE WORDS rather than through the comparison
+  // above, which would have printed "undefine → ccccccc".
+  const legacy = decide("publish", onTrunk, TIERS, { record: { verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", observedHash: now }, now });
+  assert.equal(legacy.action, "deny");
+  assert.match(legacy.reason, /no stampedOutputHash/);
   assert.match(decide("publish", onTrunk, TIERS, { record: rec({ verdict: "FAIL" }), now }).reason, /FAIL, not PASS/);
   assert.match(decide("publish", onTrunk, TIERS, { record: rec({ rung: "L1" }), now }).reason, /requires L2/);
   assert.match(decide("publish", onTrunk, TIERS, { record: rec({ rung: null }), now }).reason, /rung none/);
@@ -105,15 +112,14 @@ test("npm publish: the publish skill's first two steps as a program — clean tr
 test("npm publish: the gate hashes THIS tree exactly as the release proof records it", async () => {
   // The test above injects `now`, so it could never see the gate and the recorder disagree —
   // and they did: the gate hashed without DEVICE_SKIP, every passing proof was refused, and a
-  // release had to be published by hand. This calls the gate's real context builder.
+  // release had to be published by hand (a proof recorded 3ed5e09, the gate computed eb734f5).
+  // This calls the gate's real context builder, and compares it against an INDEPENDENT stamp of
+  // this tree — the same thing `fleet-check` hashes out of the app it is about to run a lane in.
+  // Two stamps that disagree is the same defect wearing the new key.
   const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  assert.notEqual(
-    observedTreeHash(ROOT, DEVICE_TIER_TRIGGERS),
-    deviceTreeHash(ROOT),
-    "DEVICE_SKIP excludes nothing in this tree, so this test cannot tell the two hashes apart",
-  );
   const { now } = await releaseContext();
-  assert.equal(now, deviceTreeHash(ROOT), "the publish gate and fleet-check's record hash the same tree differently");
+  assert.match(now, /^[0-9a-f]{64}$/, "the gate produced a digest at all");
+  assert.equal(now, stampedOutput(ROOT).hash, "the publish gate and fleet-check's record describe the same stamped app, or no passing run can satisfy the gate");
 });
 
 test("gh pr merge: refused while the tier is owed — the slice closes here, so this is where it is collected", () => {
@@ -234,7 +240,7 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
         branch,
         openedAt: at,
         declared: { device: "at-close", review: "at-close" },
-        discharged: { at, treeHash: deviceTreeHash(repoRoot), verdict: "PASS", rung: "L2" },
+        discharged: { at, stampedHash: stampedOutput(repoRoot).hash, stampedFiles: {}, verdict: "PASS", rung: "L2" },
         reviewDischarged: { at, treeHash: observedTreeHash(repoRoot, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }), tests: [], decisions: [], nothingFound: true },
       }, null, 2)}\n`,
     );

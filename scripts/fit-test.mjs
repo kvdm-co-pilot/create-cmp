@@ -21,7 +21,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
-import { deviceTreeHash, DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
+import { DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
+import { stampedOutputHash } from "./stamped-output.mjs";
 import { obligation, changedPaths } from "./proof-plan.mjs";
 import { suiteStatus } from "./suite-record.mjs";
 
@@ -76,19 +77,22 @@ export function readFleetRecord(recordPath = FLEET_RECORD, currentHash = null) {
   } catch {
     return { present: false };
   }
-  const now = currentHash ?? deviceTreeHash(REPO_ROOT);
-  // A record written before content-binding has no hash to compare. It is not
-  // trusted and not silently discarded: it is named as unverifiable, which is
-  // the honest third answer.
-  if (typeof record.observedHash !== "string") {
-    return { present: true, record, current: false, staleReason: "written before the record was content-bound — cannot be verified against this tree" };
+  const now = currentHash ?? stampedOutputHash(REPO_ROOT);
+  // A record that never hashed the app it proved has nothing to compare. It is
+  // not trusted and not silently discarded: it is named as unverifiable, which
+  // is the honest third answer. `observedHash` — the input-path key every
+  // record carried before 2026-09-22 — is deliberately NOT read as a fallback:
+  // it is bound to something else entirely, and reading it would be a guess
+  // wearing a digest's clothes.
+  if (typeof record.stampedOutputHash !== "string") {
+    return { present: true, record, current: false, staleReason: "written before the record was content-bound to the app it proved — cannot be verified against this tree" };
   }
-  const current = record.observedHash === now;
+  const current = record.stampedOutputHash === now;
   return {
     present: true,
     record,
     current,
-    staleReason: current ? null : `the code feeding the device tier changed since this run (${record.observedHash.slice(0, 7)} → ${now.slice(0, 7)})`,
+    staleReason: current ? null : `the app this tree stamps is not the one this run proved (${record.stampedOutputHash.slice(0, 7)} → ${now.slice(0, 7)})`,
   };
 }
 

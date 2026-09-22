@@ -30,7 +30,7 @@ const plan = (over = {}) => ({
   openedAt: "2026-09-17T10:00:00.000Z",
   base: null,
   declared: { suite: "per-commit", frameworkCheck: "per-commit", device: "at-close", review: "at-close" },
-  discharged: { at: "2026-09-17T10:40:00.000Z", treeHash: "f".repeat(64), verdict: "PASS", rung: "L2" },
+  discharged: { at: "2026-09-17T10:40:00.000Z", stampedHash: "f".repeat(64), verdict: "PASS", rung: "L2" },
   reviewDischarged: null,
   ...over,
 });

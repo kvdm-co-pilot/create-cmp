@@ -225,24 +225,44 @@ test("A RUN THAT NEVER RECORDED THE APP COUNTS AS NO RUN — no hash is fabricat
   }
 });
 
-test("a discharge is READ from the record, and a matching record discharges without an emulator", () => {
-  // The other half of the economy: once the app is proved, a slice that stamps
-  // the same app again discharges from the record it already has — no second
-  // run, and no human asserting that one happened.
+test("THE EVIDENCE OUTRANKS THE BOOKKEEPING: the run on disk discharges, and a FAILING one refuses", () => {
+  // The other half of the economy, and the half that decides what an agent
+  // DOES: what the reader is told at the moment of decision comes from the
+  // run's own record, not from whether a slice remembered to type
+  // `--discharge`. A slice whose app is byte-identical to a proved one must
+  // not be sent to an emulator by the line it reads — being right after one
+  // more command is not the same as being right.
   const repo = repoCopy();
   try {
     const proven = proveIt(repo);
     const p = path.join(repo.dir, "qa-artifacts", "proof-plan.json");
-    const plan = JSON.parse(fs.readFileSync(p, "utf8"));
-    plan.discharged = null; // the run happened; the plan has not been told yet
-    fs.writeFileSync(p, `${JSON.stringify(plan, null, 2)}\n`);
+    const untold = () => {
+      const plan = JSON.parse(fs.readFileSync(p, "utf8"));
+      plan.discharged = null; // the run happened; the plan has not been told yet
+      fs.writeFileSync(p, `${JSON.stringify(plan, null, 2)}\n`);
+    };
+    untold();
     append(repo, "src/lib/args.mjs", "\n// a comment this slice added\n");
 
-    assert.match(deviceBlock(planOutput(repo).out), /^OWED/, "before the discharge is read, the plan owes it");
+    const block = deviceBlock(planOutput(repo).out);
+    assert.match(block, /^DISCHARGED/, "a PASS run of these exact stamped bytes is on disk; the plan not having been told is bookkeeping, not evidence");
+    assert.match(block, /fleet-latest\.json/, "and the line says where it read that, because a discharge nobody can locate is a claim");
+
+    // Writing it down is still READ from the record, never asserted.
     const d = planOutput(repo, ["--discharge"]);
     assert.equal(d.status, 0, d.out);
-    assert.match(deviceBlock(d.out), /^DISCHARGED/);
-    assert.equal(JSON.parse(fs.readFileSync(p, "utf8")).discharged.stampedHash, proven.hash, "and what it wrote down is the run's own digest, not the caller's word for it");
+    assert.equal(JSON.parse(fs.readFileSync(p, "utf8")).discharged.stampedHash, proven.hash, "what it wrote down is the run's own digest, not the caller's word for it");
+
+    // And the refusal the same reading buys: a run of these EXACT bytes that
+    // did not pass discharges nothing, whatever the plan already says.
+    const rec = path.join(repo.dir, "qa-artifacts", "fleet-latest.json");
+    const failed = JSON.parse(fs.readFileSync(rec, "utf8"));
+    failed.verdict = "FAIL";
+    failed.failures = ["lane verdict is FAIL, not PASS"];
+    fs.writeFileSync(rec, `${JSON.stringify(failed, null, 2)}\n`);
+    const after = deviceBlock(planOutput(repo).out);
+    assert.match(after, /^OWED/, "the app is unchanged, so a FAILING run over it is the last word on these bytes — a plan that says discharged must not outrank it");
+    assert.match(after, /did NOT pass/);
   } finally {
     repo.dispose();
   }
