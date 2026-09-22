@@ -170,8 +170,12 @@ function npmNames() {
   };
 }
 
-/** Every name this repo owns, in one list — what `--registry` asks about. */
-function ownedNames(gt) {
+/**
+ * Every name this repo owns, in one list — what `--registry` asks about.
+ * Exported so a test that must visit every published package reads THIS list
+ * rather than growing its own directory convention (KD-18 was one that did).
+ */
+export function ownedNames(gt) {
   return [gt.npm.primary, ...gt.npm.independent, ...gt.npm.aliases];
 }
 

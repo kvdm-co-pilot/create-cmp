@@ -37,7 +37,27 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { groundTruth, ownedNames } from "../scripts/ground-truth.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * What the claim above covers, read from the ONE list of published packages
+ * this repo keeps (`ownedNames`, which test/a-version-number-cannot-name-two-
+ * different-trees.test.mjs holds to every tracked publishable manifest). Every
+ * package there that declares a `bin` owes every one of its bin names — npm
+ * links each name, so each is a way an adopter reaches the file.
+ */
+function requiredBins() {
+  const out = [];
+  for (const p of ownedNames(groundTruth())) {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, p.dir, "package.json"), "utf8"));
+    if (pkg.private || !pkg.bin) continue;
+    const names = typeof pkg.bin === "string" ? [pkg.name.replace(/^@[^/]+\//, "")] : Object.keys(pkg.bin);
+    for (const name of names) out.push(`${pkg.name}: ${name}`);
+  }
+  return out.sort();
+}
 
 /** Every `bin` target declared by the root package and every workspace. */
 function declaredBins() {
@@ -57,10 +77,10 @@ function declaredBins() {
     const entries = typeof bin === "string" ? [[pkg.name, bin]] : Object.entries(bin);
     for (const [name, rel] of entries) {
       const abs = path.resolve(path.dirname(manifest), rel);
-      if (!bins.has(abs)) bins.set(abs, name);
+      if (!bins.has(abs)) bins.set(abs, { name, pkg: pkg.name });
     }
   }
-  return [...bins].map(([target, name]) => ({ target, name }));
+  return [...bins].map(([target, { name, pkg }]) => ({ target, name, pkg }));
 }
 
 function run(file) {
@@ -73,7 +93,8 @@ test("a bin reached through a symlink behaves as it does reached directly", () =
   assert.ok(bins.length > 0, "no bins found — the scan is broken, not the tree");
 
   const dead = [];
-  for (const { target, name } of bins) {
+  const exercised = [];
+  for (const { target, name, pkg } of bins) {
     const direct = run(target);
     assert.ok(
       direct.stdout.length > 0,
@@ -97,7 +118,20 @@ test("a bin reached through a symlink behaves as it does reached directly", () =
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+    exercised.push(`${pkg}: ${name}`);
   }
+
+  // THE CLAIM'S OWN COVERAGE (KD-18). This file said "every bin" while its scan
+  // read the root and `packages/*` one level down: two of the eight packages
+  // that declare a bin, and `bins.length > 0` passed on that. Recorded as each
+  // bin is RUN, so a narrowed scan, a skip, or an early `continue` all read
+  // here as the names they dropped.
+  const missed = requiredBins().filter((b) => !exercised.includes(b));
+  assert.deepEqual(
+    missed,
+    [],
+    `this test claims every published bin, and never ran these through a symlink:\n  ${missed.join("\n  ")}`
+  );
 
   assert.deepEqual(
     dead,
