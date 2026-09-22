@@ -86,7 +86,17 @@ export function stampArgv(root, appDir) {
  *
  * 1. `create-cmp.json`'s `stampedAt` — the wall clock at stamp time
  *    (src/scaffold.mjs, `writeSpecOfRecord`).
- * 2. `local.properties`'s `sdk.dir` — THIS MACHINE'S Android SDK, from
+ * 2. `docs/adr/NNNN-*.md`'s `- **Date:**` line — the day the ADR was SEEDED
+ *    (src/lib/adr-seed.mjs, `new Date().toISOString().slice(0, 10)`). Without
+ *    this the app a tree stamps changes at midnight UTC with no byte of the
+ *    tree moving, and a slice that changed nothing reads REOPENED and is sent
+ *    to an emulator, with a documentation file named as the culprit. The rule
+ *    covers every ADR in the app rather than only the seeded ones, because
+ *    which ones were seeded is a fact about the config and not about the path —
+ *    so the cost is stated plainly: an edit to the Date LINE of an ADR the
+ *    template ships is invisible to this digest. Its title, status and body are
+ *    not.
+ * 3. `local.properties`'s `sdk.dir` — THIS MACHINE'S Android SDK, from
  *    ANDROID_HOME, or ANDROID_SDK_ROOT, or the conventional install path, and
  *    the file is not written at all when none of them exists
  *    (`writeLocalProperties`). Measured 2026-09-22: two stamps of one unchanged
@@ -104,11 +114,22 @@ export function stampArgv(root, appDir) {
  * being excluded and silently unwatched.
  */
 const NORMALISED_INSTANT = "1970-01-01T00:00:00.000Z";
+const NORMALISED_DAY = "1970-01-01";
 const MACHINE_POINTER = Buffer.from("# normalised by scripts/stamped-output.mjs: a pointer to this machine's Android SDK, not a byte of the app\n", "utf8");
-const NORMALISERS = Object.freeze({
-  "create-cmp.json": (buf) => Buffer.from(buf.toString("utf8").replace(/("stampedAt"\s*:\s*")[^"]*(")/, `$1${NORMALISED_INSTANT}$2`)),
-  "local.properties": () => MACHINE_POINTER,
-});
+const NORMALISERS = Object.freeze([
+  {
+    match: (rel) => rel === "create-cmp.json",
+    apply: (buf) => Buffer.from(buf.toString("utf8").replace(/("stampedAt"\s*:\s*")[^"]*(")/, `$1${NORMALISED_INSTANT}$2`)),
+  },
+  {
+    match: (rel) => /^docs\/adr\/\d{4}-.*\.md$/.test(rel),
+    apply: (buf) => Buffer.from(buf.toString("utf8").replace(/^(- \*\*Date:\*\* ).*$/m, `$1${NORMALISED_DAY}`)),
+  },
+  { match: (rel) => rel === "local.properties", apply: () => MACHINE_POINTER },
+]);
+
+/** The normaliser for a path, or null — first match wins, and there is never more than one. */
+const normaliserFor = (rel) => NORMALISERS.find((n) => n.match(rel)) ?? null;
 
 /**
  * Files whose ABSENCE is as machine-dependent as their content, held at their
@@ -150,13 +171,14 @@ export function hashStampedTree(appDir) {
       else if (e.isSymbolicLink()) files[rel] = `l${sha(Buffer.from(fs.readlinkSync(abs)))}`;
       else if (e.isFile()) {
         const raw = fs.readFileSync(abs);
-        const content = NORMALISERS[rel] ? NORMALISERS[rel](raw) : raw;
+        const n = normaliserFor(rel);
+        const content = n ? n.apply(raw) : raw;
         files[rel] = `${fs.lstatSync(abs).mode & 0o111 ? "x" : "-"}${sha(content)}`;
       }
     }
   };
   walk(appDir);
-  for (const rel of ALWAYS_PRESENT) if (!(rel in files)) files[rel] = `-${sha(NORMALISERS[rel](Buffer.alloc(0)))}`;
+  for (const rel of ALWAYS_PRESENT) if (!(rel in files)) files[rel] = `-${sha(normaliserFor(rel).apply(Buffer.alloc(0)))}`;
   const rows = Object.keys(files)
     .sort()
     .map((rel) => `${rel}\n${files[rel]}`);
