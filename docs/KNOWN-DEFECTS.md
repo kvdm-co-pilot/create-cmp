@@ -221,6 +221,11 @@ you the same list without opening anything.
 | **KD-209** | `grep -r` here obeys the scanned tree's own `.gitignore`, so a scan of a stamped app silently omits `local.properties` — the file that carries this machine's SDK path | a fact about the tooling, not the tree, logged because it nearly cost a slice a defect: `find … -exec /usr/bin/grep -l …` lists both files, and that is how the three normalisers were shown complete |
 | **KD-210** | a Firebase run proves the template COMPILES, INITIALISES and REDIRECTS — no byte crosses the redirect | nothing in `commonMain` uses a Firebase client and the smoke walk is four screens, so the suite serves zero requests; the risk is a record read as "the redirect carried traffic" |
 | **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production |
+| **KD-212** | the shipped-hooks table is derived from the template FILE's history, but minimal mode writes a SessionStart command that file never carried | no claim rests on it — a minimal stamp's command is fully single-quoted, so it is neither healable nor a violation, and doctor says nothing about it in either direction |
+| **KD-213** | the `--dry-run` gate counts four `fs` spellings where its own header names the class — `copyFileSync`, `renameSync`, `cpSync`, `fs.promises.*` and a destructured import all pass it | zero producers in the tree, and it cannot be written as a failing test: a widened gate is green on these bytes |
+| **KD-214** | `doctor --fix` dies with a raw EACCES stack and prints NO project diagnosis when a heal cannot write, discarding the report and leaving earlier heals half-applied | the refusal is honest and names its cause and its path, the file is left byte-for-byte unchanged, and the unwritable file is a state the adopter created |
+| **KD-215** | the heal makes the Stop gate fire from a foreign cwd, and the remedy it then prints names `node qa/verify.mjs` — a path that does not resolve from where that session stands | the verdict and the exit code are right from both directories; only the remedy's path is relative, and the text is pre-existing and unchanged |
+| **KD-216** | the new working-surface sentence says running the walk by hand "always works", inside the paragraph explaining that a session-relative path does not resolve from another directory | an adopter reads "by hand" as "from the project", nothing routes on the sentence, and the pre-existing fallback one line below uses the accurate word |
 
 ---
 
@@ -3465,3 +3470,141 @@ a physical device cannot make a Firebase run pass against production.
 **Fires when:** someone runs the covered check with a physical device attached.
 *Logged 2026-09-21 by the wave's Firebase fixer; folded here 2026-09-22, re-aimed at the template
 files that carry the assumption on this tree.*
+
+### KD-212 — the table is derived from the template FILE's history, and create-cmp writes a command that file never carried
+
+`src/lib/shipped-hooks.mjs` (header claim, `SHIPPED_COMMANDS`) · `src/lib/minimal.mjs:148` ·
+`test/shipped-hooks-table.test.mjs` ("every command this file has EVER carried is in the table")
+
+The module header says the table is "every command create-cmp's template has ever written into an
+app's `.claude/settings.json`, per surface". The guarding test reads exactly one source for that
+claim — `git log --follow -- template/.claude/settings.json`, every commit, every command — and the
+stamper does not only copy that file. `applyMinimalMode` rewrites the stamped copy and writes
+`sessionStartCommand(MINIMAL_SESSION_CONTEXT)` into it: a string generated at stamp time from a
+constant in `src/lib/minimal.mjs`, which `template/.claude/settings.json` has never carried at any
+commit and which therefore cannot appear in the walk the test performs. Every past value of
+`MINIMAL_SESSION_CONTEXT` sits in the same position. So the set of bytes create-cmp has put into an
+adopter's settings file is strictly larger than the set the table is proven complete over, and the
+one sentence stating the wider claim is guarded by nothing.
+
+**Nobody is wrongly served today, in either direction.** A minimal stamp's SessionStart command is a
+`printf` whose payload is entirely single-quoted, so the anchoring detector masks it and raises no
+violation; it has no successor, so it is not healable; and a minimal scaffold has no
+`qa/walk-status.mjs`, so `gatherWalkInputs` returns `null` and the walk-wiring finding never runs.
+Doctor recognises nothing about it and claims nothing about it — which is the correct answer, reached
+without the table. What is unpinned is the header's sentence, not any answer the tree gives.
+
+**Fires when:** a future heal, or a future "doctor recognises this form" claim, is scoped to
+`SHIPPED_COMMANDS` and meets a minimal-mode stamp — or when `MINIMAL_SESSION_CONTEXT` changes and the
+old command becomes a superseded form with nowhere to be recorded.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+### KD-213 — the `--dry-run` gate refuses four spellings of a write, where its own header names the class
+
+`test/a-dry-run-writes-the-tree-it-is-previewing.test.mjs` ("no project heal writes on its own") ·
+`src/commands/doctor.mjs` (`healWriter`)
+
+The slice's structural gate is the right shape: one writer, `healWriter`, owns every project heal, so
+`--dry-run` is answered in one place rather than remembered in three — which is the fix for the defect
+where three heals each ignored the flag. The test that enforces it, though, is an enumeration. It
+counts `fs.writeFileSync(`, `fs.mkdirSync(`, `fs.rmSync(` and `fs.appendFileSync(` in the file's
+non-comment lines and asserts the tuple `{1, 1, 0, 0}`. Its own header states the invariant one level
+up — *"a heal that calls `fs` itself is invisible to `--dry-run`, which is exactly how three heals
+came to ignore it"* — and that invariant is wider than the four strings. A heal added tomorrow that
+used `fs.copyFileSync`, `fs.renameSync`, `fs.cpSync`, `fs.unlinkSync`, `fs.truncateSync`,
+`fs.openSync` with `fs.writeSync`, `fs.promises.writeFile`, or `import { writeFileSync } from
+"node:fs"` would mutate the adopter's tree under the flag and leave the gate green.
+
+**Nobody is wrongly served today** — `src/commands/doctor.mjs` contains none of those calls, and the
+two it does contain are both inside `healWriter`, which the same test checks. It is logged rather than
+fixed because it cannot be landed as a failing test: a gate widened to the class is green on these
+bytes, and this file's rule is that a review's output is a test that fails for the reason it claims.
+The honest fix is a mechanism rather than a longer list — an allow-list of what `doctor.mjs` may
+import from `node:fs` at all, which is a change to the module, not to the gate.
+
+**Fires when:** the next project heal is written with any `fs` call other than the four, under
+`--fix --dry-run`.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+### KD-214 — a heal that cannot write takes the whole project diagnosis down with it
+
+`src/commands/doctor.mjs` (`healWriter`, `healShippedHookCommands`, `runDoctor` — no `try` around the
+heals) · KD-194 · KD-196 · KD-197
+
+Measured on this tree, with `.claude/settings.json` at mode `0444` and 0.26.2 content:
+`create-cmp doctor --fix --yes --no-install --no-ios --target-dir <tmp>` prints the rewrite preview,
+then
+
+```
+Fatal: Error: EACCES: permission denied, open '…/.claude/settings.json'
+    at write (…/src/commands/doctor.mjs:439:8)
+    at healShippedHookCommands (…/src/commands/doctor.mjs:577:10)
+    at async runDoctor (…/src/commands/doctor.mjs:633:23)
+```
+
+and exits 1. `printFindings` never runs, so every finding the adopter invoked doctor to read — the
+version-catalog checks, `local.properties`, disk headroom, the walk wiring, the unanchored hooks — is
+discarded by a failure in one optional heal. Any heal that already succeeded earlier in the same run
+(`local.properties`, `ksp.useKSP2`) stays applied, with the `✓ --fix: wrote …` line as the only record
+of it, and no re-diagnosis. The shape is pre-existing: `applySafeFixes` has always called the writer
+with no `try`. What this slice adds is a second, later writer on the same unguarded path, so the
+window in which a failed write throws away the report is wider than it was, and it now covers the one
+file the adopter is most likely to have made read-only.
+
+**Nobody is wrongly served by what is SAID.** The failure is loud, names its cause and its exact path,
+the settings file is left byte-for-byte unchanged, and nothing false is printed — the crash happens
+before the `✓ --fix: wrote …` line, not after it. An unwritable `.claude/settings.json` is also a state
+the adopter created. The cost is a diagnosis they have to re-run without `--fix` to get, which is a
+degraded result rather than a wrong one.
+
+**Fires when:** any project heal's target is read-only, on a read-only mount, or otherwise unwritable —
+most plausibly a `.claude/` checked out read-only or owned by another user.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+### KD-215 — the heal revives the Stop gate for foreign-cwd sessions, and its remedy is a path those sessions cannot resolve
+
+`template/qa/receipt-check.mjs` (the `--hook` refusal text) · `src/lib/shipped-hooks.mjs`
+(`stop-receipt-relative` → `stop-receipt-anchored`) · KD-85
+
+Reviving the Stop gate is the point of the heal, and it works: executed from a directory that is not
+the project, with `CLAUDE_PROJECT_DIR` exported the way Claude Code exports it,
+`node "${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs" --hook` produces the same refusal and the same
+exit 2 as it does from the project root — byte-identical message, verified both ways. The message it
+feeds back to the agent is *"Run `node qa/verify.mjs` (it checks every promise and writes the
+receipt), commit the receipt, or see README §Verification enforcement to bypass."* That path is
+relative, and the session being told it is, by construction, not at the project root — a session that
+was at the root had a working Stop hook before the heal and did not need it. So the one population the
+heal newly reaches is the one population for which the remedy's path does not resolve.
+
+**Nobody is handed a wrong verdict.** The gate refuses correctly, for the correct reason, with the
+correct exit code, from both directories; only the remedy's spelling assumes a cwd. An agent that runs
+the command and gets `ENOENT` learns where it is rather than something false. The text is also
+pre-existing and untouched by this change — it is logged here, rather than left to the file that owns
+it, because a fix's own new behaviour is in scope for the round that reviews it, and this heal is what
+makes the message reachable at all.
+
+**Fires when:** a session opened outside the project root ends a turn in an app whose Stop hook has
+been healed, and the receipt does not attest the tree.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+### KD-216 — "always works", in the paragraph explaining why it does not
+
+`src/lib/project-doctor.mjs` (walk-wiring warn branch, the `working.length > 0` detail) · KD-126 ·
+KD-182
+
+The new branch that credits a surface ends its detail with *"…and running `node qa/walk-status.mjs` by
+hand always works."* The paragraph it closes exists to say the opposite about that exact spelling: two
+sentences earlier it explains that a command naming the script by a path relative to the session's
+directory "finds no script there", and that `|| true` makes the miss silent. `always` is the word that
+is not true — the pre-existing fallback one line below, which this branch was written beside, says
+"still works", which is accurate. The finding therefore states the general rule it is teaching and
+then contradicts it in its own last clause, in the one report whose subject is that distinction.
+
+**Nobody is wrongly served.** An adopter reading a report about their project reads "by hand" as "from
+the project", which is where they are; nothing in the tree routes on the sentence, and the remedy
+lines above it are correct. It is the class KD-126 and KD-182 are in — a false fact surviving in a
+second spelling, in prose a contributor or an adopter reads and nothing checks.
+
+**Fires when:** a reader takes the sentence literally and runs the relative command from a
+subdirectory, having just been told by the same paragraph that it will not work there.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
