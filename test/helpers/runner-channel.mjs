@@ -69,10 +69,13 @@ function isRunnerFrame(chunk) {
  * @returns {Promise<T>} whatever `fn` returned
  */
 export async function offTheRunnerChannel(fn, { onText } = {}) {
-  const real = process.stdout.write.bind(process.stdout);
+  // The function ITSELF, not a bound copy: what is put back has to be what was
+  // taken, or a caller that saved `process.stdout.write` around this call gets a
+  // different function back and every nesting leaves another wrapper behind.
+  const real = process.stdout.write;
   const text = [];
   process.stdout.write = function patched(chunk, encoding, cb) {
-    if (isRunnerFrame(chunk)) return real(chunk, encoding, cb);
+    if (isRunnerFrame(chunk)) return real.call(process.stdout, chunk, encoding, cb);
     text.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
     const done = typeof encoding === "function" ? encoding : cb;
     if (typeof done === "function") process.nextTick(done);
