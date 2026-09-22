@@ -358,6 +358,18 @@ All notable changes to this project are documented here. The format is based on
   stderr anything it could not reach. What it still cannot see is a local branch with no pull
   request (KD-191), which is why it prints its sources rather than only its answer.
 
+- **Three suite flakes that reported a failure no tree had.** `test/scaffold.test.mjs` printed its own
+  progress lines onto the runner's message channel, where node's reporter parser reads text after a
+  frame as the next frame's length — a leading `›` makes that length negative and the whole FILE
+  aborts with *"Unable to deserialize cloned data"*, which is the abort that stopped an `npm publish`
+  at `prepublishOnly` on 2026-09-19 (the instance is fixed and the helper guarded; the class is logged
+  as KD-200). A preview-service test bound a fixed port and waited on a 100 × 20 ms budget, so a busy
+  machine could fetch a page from a state it had already left (KD-131). A proof-gate test decided two
+  of its cases on wall-clock bounds rather than on which path the run took (KD-165). And three console
+  tests asked for an ephemeral port and were handed the daemon's, which is where every console aims
+  its shutdown request — the test half of KD-56; the production defect underneath it is KD-202 and is
+  NOT fixed.
+
 ## [0.26.0] - 2026-09-16
 
 ### Fixed

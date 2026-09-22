@@ -362,6 +362,205 @@ KD-180, KD-181 and KD-183 stay open as written, and KD-183's population is widen
 `local.properties`, `gradle.properties` and a created `.claude/settings.json` — was ruled blocking
 and fixed in the same branch by `af1bfbe` rather than logged, so it has no entry here.*
 
+### KD-131 — one tree, two verdicts: a fixed-port preview-service test under full-suite load — **CLOSED 2026-09-22**
+
+`inspector/mcp/test/preview-service.test.mjs:2922` · `qa-artifacts/suite-history.jsonl`
+
+Measured 2026-09-19 while gating the round-pricing slice. The full suite ran twice over bytes
+nothing had touched in between, and the kept records say it plainly — same `observedHash`
+(`e386597…`), `FAIL` at 22:10:52Z and `PASS` at 22:12:22Z. The failing assertion is
+`assert.match(page, /NOT refreshing/)`: the service was in the right state (`stale`, `pending:
+false`, `phase: "unrefreshed"` all asserted and passing on the line above), and what came back from
+`fetch` was a console page that did not carry the banner. Run alone, the file is 83/83.
+
+Two things in the test are load-shaped rather than logic-shaped: it binds a FIXED port (19737)
+rather than an ephemeral one, and it waits for `phase !== "idle"` on a 100 × 20 ms budget that a
+busy machine can exhaust. A fixed port makes "the page I fetched is the service I started" an
+assumption rather than a derivation, which is this repository's own
+`served-page-is-not-your-code` shape one process over.
+
+**Why it does not block.** No adopter runs create-cmp's inspector tests, and nothing in the failing
+path is imported by the slice that observed it — the change under gate was `scripts/`, agent
+definitions and docs. The second record over identical bytes IS the evidence that it is
+non-deterministic rather than a break: a deterministic consequence of a diff does not pass ninety
+seconds later on the same tree.
+
+**Why logged and not fixed.** `inspector/mcp/` is another slice's file, KD-56 already holds the
+class for it ("fails inside a full suite run and passes alone", and it names the owner), and the
+honest fix — an ephemeral port and a derived readiness wait — is a change to a test this slice has
+no business editing while gating something else. What this entry adds is the measurement KD-56 asks
+for and a warning to the next reader of this branch's suite history: the `FAIL` row is this, and it
+is followed by a `PASS` over the same hash.
+
+*Logged 2026-09-19 by the slice that ran the suite, before any review round.*
+
+**CLOSED by `1201495`.** The fixed port 19737 and the 100 × 20 ms budget are both gone: the service
+takes an ephemeral port, the wait is derived rather than counted, and the page is fetched BETWEEN two
+equal readings of the freshness — so the banner is judged only against the state the page was actually
+served from, and "the page I fetched is the service I started" is a derivation instead of the
+assumption this entry named.
+
+Two things were ruled out on the way and are worth keeping. It was **not** a port collision:
+`status().url` reports the port the service really bound and the service probes upward on EADDRINUSE,
+so a collision cannot misroute the fetch — the fixed port was removed anyway, because it is a bet.
+And it is **not** CPU load alone: 40 runs of that test under 24 burners were all green, which matches
+KD-56's own note about this family. What explains the FAIL is the state moving between the assertions
+and the request, which the fix makes impossible to mistake.
+
+### KD-165 — one tree, two suite verdicts, three minutes apart — from a test whose verdict rests on wall-clock budgets — **CLOSED 2026-09-22**
+
+`test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs` (second case),
+`qa-artifacts/suite-history.jsonl`
+
+Both rows are against the SAME `observedHash` (`b359f866…`) and the same commit (`bf79f72`):
+
+```
+05:47:00Z  FAIL  2122/2124   268552 ms   failing: "a git call that died outside the kill-timer
+                                          is not an answer: crashing each one in turn must cost
+                                          the check its verdict, never win one"
+05:50:02Z  PASS  2123/2124   105713 ms   failing: []
+```
+
+The FAIL was what `node scripts/proof-plan.mjs` read out for this tree at the start of this
+review — *"read it, do not re-run it"* — and the PASS was appended while the review was running.
+Both are true of the same bytes, which is the whole entry.
+
+**It is not this slice's code.** That file imports `scripts/hooks/proof-gate.mjs`; nothing in the
+KD-16 change — neither parser, neither bin, none of the six installer read sites — is on its
+import graph. What separates the two runs is load: 268552 ms against 105713 ms, and against
+35489 ms and 36400 ms for the two full runs of this same branch ninety minutes earlier.
+
+Executed here, 2026-09-19, on the same bytes:
+
+```
+$ node --test test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs
+  ✔ 2 pass, 0 fail, duration_ms 7722          (the case itself: 7423 ms)
+$ 12 concurrent CPU burners, same command
+  ✔ 2 pass, 0 fail                             (the case itself: 4048 ms)
+```
+
+So it did not reproduce at the load available here, and this entry claims no diagnosis it cannot
+show. What the test's own structure shows is where load reaches it: each of its six cases spawns
+git with `budgetMs: REMOTE_CALL_CAP_MS` and then asserts `elapsed < NO_CAP_WAS_WAITED_OUT_MS` —
+two wall-clock bounds per case, either of which a loaded machine crosses without the code under
+test being wrong. Its own failure message names the first and tells the reader to *"raise
+budgetMs at this call site, do not relax the bound"*.
+
+**Why logged and not fixed.** No adopter runs this repository's suite, and the refusal the test
+guards is not degraded — it is green whenever the machine is not saturated. Raising either bound
+is the one remedy the test explicitly refuses. This is KD-131's class exactly (the same bytes
+carrying a FAIL and a PASS, both on disk), with one thing genuinely new: KD-131 and KD-56 both
+scope themselves to `inspector/mcp/`, and this member is a test of the **proof gate's own refusal
+path**, so the sentence *"no adopter runs this repository's inspector tests"* no longer covers
+the class.
+
+**What a reader of the record cannot tell.** `suite-history.jsonl` records the verdict, the
+duration and the tree, and nothing about the machine — so the only evidence that the FAIL was
+load and not a defect is the duration beside it, read by a human. A gate that consumed these rows
+would have to pick one of the two answers for one tree, and nothing tells it which.
+
+**Fires when:** the suite runs on a machine busy enough to stretch it past ~3×, which on this
+project is a device lane, a Gradle build, or several agent sessions at once.
+*Logged 2026-09-19, review round 2 (re-record) of `fix-boolean-value-form-inverted-2`. Found by
+reading the plan's suite line rather than re-running it — and corrected in the same round when
+the PASS landed underneath it.*
+
+**CLOSED by `d3ff9c0`.** The two wall-clock bounds per case are replaced by what the run RECORDED —
+the shim's own `reached` / `survived` marks and the gate's own `why` sentence — so each case is proven
+by which path the run took rather than by how fast the machine was. The one remedy the test itself
+refuses was not taken: the bound is not relaxed, the purse is raised to 60 s, which is what its own
+failure message names.
+
+Measured both ways. The UNCHANGED file under 32 burners: **1 RED in 12 runs** — `` `git …
+--is-ancestor …` died on SIGTERM but the whole check took 667ms ``. The rewritten file under the same
+32 burners: **12/12 green**, with per-case elapsed values of 636, 699, 802 and 846 ms — every one past
+the old 600 ms bound, and every one a run in which the gate was right.
+
+**What this entry logged about the RECORD is unchanged and still true.** `suite-history.jsonl` records
+the verdict, the duration and the tree and nothing about the machine, so no reader and no gate can
+tell load from defect for the next member of this class; this closure removes one member, not the
+class. One further member was found inside this test's own output and is logged as KD-205 — the
+ordering check's `contains()` / `behindBy()` call site drops the `why` that says which of four causes
+killed a git call.
+
+### KD-56 — one unreproduced failure, and the instrument that saw it discarded the reason — **CLOSED AT THE TEST 2026-09-22; the production half is KD-202**
+
+`node scripts/fit-test.mjs` ran `npm test` while `fleet-check` was compiling the scratch app and
+booting the emulator, and reported `1951/1952 — 1 FAILING ✖ inspector/mcp/test/console-now-sse.test.mjs`
+on `f2f7d24`. Nothing that followed reproduced it: that file alone five times with the emulator
+running, 5/5; the full suite idle, 1951/1951; the full suite with all eight cores saturated by `yes`,
+1951/1951. The slice touched neither the test nor `steps-bridge.mjs`/`preview-service.mjs`.
+
+Two readings of the source narrow it. The lane-silence bound is 30 minutes, so the fixture's
+`startedAt` cannot go stale inside a run. And `watchStepStream` polls once a second behind its
+`fs.watch` — written precisely because "fs.watch on macOS coalesces and can drop under load" — so a
+dropped FSEvents notification cannot outlast the test's 8 s frame deadline. What remains is a
+test-process event loop starved for most of 8 s, under a load CPU alone did not recreate (the real
+condition also had Gradle's and the emulator's disk I/O), or a failure that is not a frame timeout.
+
+**It is logged and not chased further because the message is gone**, and that is the finding worth
+keeping. `fit-test.mjs` runs the suite fresh and parses its stdout for the NAMES of failing tests — its
+own comment says a bare count is unactionable — and discards the rest, so the one run that failed left
+a name and no reason. Keeping the failing tests' output (or the whole log, under `qa-artifacts/`) is
+the change that turns the next occurrence into a diagnosis. Not an adopter-facing defect: it is a test
+of the live console's transport, which has the fallback that would make the real feature survive this.
+*Logged 2026-09-16, during the device tier of `published-bytes-drift`.*
+
+**THE MESSAGE, 2026-09-18 — and it is not what this entry guessed.** It recurred twice in one hour on
+the `gate-judges-the-tree-the-command-acts-on` branch, under a full `npm test` and not under a lane;
+the file passes 3/3 alone, immediately after, every time. Kept verbatim this time, which is the change
+this entry asked for:
+
+```
+Error: Test "a line appended to the stream arrives as the RENDERED row — the page interprets nothing"
+at inspector/mcp/test/console-now-sse.test.mjs:113:1 generated asynchronous activity after the test
+ended. This activity created the error "TypeError: Invalid URL" and would have caused the test to
+fail, but instead triggered an unhandledRejection event.
+```
+
+So it is **not a frame timeout**, which is what both readings above narrowed to, and not a starved
+event loop: it is work the test leaves running after it returns, which then throws `TypeError: Invalid
+URL`. Node's runner attributes post-test async activity to the test that spawned it, so the *reported*
+failure is a test that had already passed — which is why every isolated re-run is green and why this
+looked like load sensitivity for two days. The suspect is an un-awaited fetch or EventSource in the
+`:113` test whose URL is built from a server that the test's own teardown has already closed. **Whose
+defect: the test's, not the transport's** — nothing here says the console is wrong, and the two
+readings above stay correct about the transport. The fix is to await or abort that activity before the
+test returns, in a slice that owns `inspector/mcp/`.
+
+**This is now a producer, so it is no longer unreproduced.** It cost this branch two recorded suite
+verdicts and one of them stood as a `FAIL` the gate told its author not to re-run.
+*Re-placed 2026-09-18 with the message it was missing, by the slice that hit it.*
+
+**CLOSED AT THE TEST by `4413078`, and the production defect it was hiding is open as KD-202.** The
+symptom is out of the suite: the three services in `inspector/mcp/test/console-now-sse.test.mjs` that
+asked for `port: 0` — the standard way to ask the OS for a free port — were handed the console's
+well-known port instead (`opts.port || DEFAULT_PORT`, and `0 || 9600` is `9600`), and were measured
+binding **9601**, which is `DEFAULT_DAEMON_PORT`. Every console's `stop()` fires `GET /shutdown` at
+that address unconditionally, daemon or no daemon, so a test service was sitting exactly where the
+stray request goes. Those three now take an OS-assigned port that nothing else in the suite
+addresses.
+
+**The mechanism this entry asked for, measured rather than narrowed.**
+`inspector/mcp/src/lib/preview-service.mjs` builds ``new URL(req.url, `http://127.0.0.1:${port}`)``
+OUTSIDE its `try`, and `stop()` sets `port = null` after `server.close()` — which does not end a
+request already in flight. A request landing in that window is handled with a null port, the URL
+constructor throws `TypeError: Invalid URL`, and because the listener is `async` it becomes an
+unhandledRejection, which node's runner attributes to whichever test most recently finished. That is
+this entry's kept message verbatim, blaming the `:113` test that had already passed. Reproduced
+deterministically: start a service, connect a raw socket, send half a request, call `stop()`, send
+the rest.
+
+**So the suspicion this entry recorded was wrong in its subject.** It reads "an un-awaited fetch or
+EventSource in the `:113` test whose URL is built from a server that the test's own teardown has
+already closed" — nothing in that test is at fault, and *"whose defect: the test's, not the
+transport's"* is the wrong way round. The production half is NOT fixed here: it is shipped bytes plus
+a `dist/server.mjs` rebuild, which belongs to the slice that owns `inspector/mcp/`. It is logged as
+**KD-202**, with the two facts that put a request in that window logged beside it — **KD-203**
+(`port: 0` is read as the default) and **KD-204** (`stop()` always sends `GET /shutdown` to the
+daemon port). The change this entry asked of `fit-test.mjs` — keep the failing run's output — was
+not made either; what closed this was the message being kept by hand in 2026-09-18's re-placement.
+
 ### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it — **CLOSED 2026-09-19**
 
 `packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)

@@ -118,7 +118,6 @@ you the same list without opening anything.
 | **KD-50** | the template ships create-cmp's own changelog as source comments in the adopter's app | true prose, wrong repository |
 | **KD-51** | a JS masker reads the template's Kotlin; a raw string mis-parses and truncates the scanned body | it reds, not greens — the `useEmulator` tripwire catches the stub — and neither file has a raw string |
 | **KD-52** | what the emulator scan's two token-level assertions do NOT decide | the inert clause is gone (`f474f17`); the rest is the floor of a shape scan, and no shape reaches it |
-| **KD-56** | `console-now-sse` fails inside a full suite run and passes alone — the message, captured 2026-09-18, is post-test async activity throwing `TypeError: Invalid URL`, not the frame timeout this entry guessed | the failure is the TEST leaving work running after it returns, not the transport; it is now reproducible and belongs to a slice that owns `inspector/mcp/` |
 | **KD-58** | the proof gate reads the publish command's words inside a quoted pattern or a heredoc as the act, and refuses | refuses, never allows — and only the agent is refused |
 | **KD-63** | the lane refusal reads `qa/.lane-in-progress` with none of the guards its other readers apply | one clause of the sentence degrades; the refusal, the project and ours/not-ours are unaffected |
 | **KD-64** | a sibling git worktree of this repository is described as ANOTHER project's lane | errs toward waiting, and the path it prints is true |
@@ -179,7 +178,6 @@ you the same list without opening anything.
 | **KD-128** | five tool-schema facts are now stated in this repository and none can be re-read here: four about `SendMessage` in `agents/cmp-orchestrator.md` (no `run_in_background`; a send never blocks; no reply arrives inside the sending turn; the reply is delivered to a later one), and KD-120's answer ("**Both are** … confirmed from the harness's own tool schemas") | KD-120 one level down: that entry left open whether two tool NAMES are real, and both the answer and a claim about one's parameter LIST arrived from outside the tree. They may well be right; what is logged is that no gate here can ever red if the schema moves, so the shipped bullet and the closed entry both rest on a fact this repository cannot hold |
 | **KD-129** | `node scripts/change-price.mjs` now PRINTS which review round is next and what it reads — text a reader acts on, about this file's rule — and `test/the-review-rule-is-stated-twice.test.mjs` scans `.claude/agents/`, `skills/`, `agents/` and one printed string, so no `scripts/` text is read by it | nothing false is printed today: measured at zero six-word runs shared with the header across every file this slice touched, and the one printed sentence that had stopped being true of the tree was corrected here. What is logged is the hole, not a drift |
 | **KD-130** | `reviewDischarge` copies six named fields of a review record into `plan.reviewDischarged`, and `round`/`kind` are not among them — so the settled-plan history `--history` reads can say a review discharged the slice and never which round did | no reader consumes a round from there: the block that prices rounds reads `review-history.jsonl`, where both fields ARE written. The honest remedy edits the plan-event schema and its summariser, which is the file KD-124 already names |
-| **KD-131** | the same bytes ran FAIL and then PASS ninety seconds apart: `inspector/mcp/test/preview-service.test.mjs`'s *"a stale state with NOTHING pending says so"* failed inside a full `npm test` and passed alone (83/83) and on an immediate re-run, and `qa-artifacts/suite-history.jsonl` holds both verdicts against the SAME `observedHash` | no adopter runs this repository's inspector tests, and nothing in the failing path is imported by the slice that saw it. It is the same family as KD-56, which already owns the inspector's load-sensitive tests; what is new here is the measurement, and the FAIL record this branch leaves on disk |
 | **KD-160** | every create-cmp tree commits `qa/harness.lock.json`, whose `files` map holds one sha256 per locked path — 73 digests in a full stamp, 7 in a `--minimal` one — and a secret scanner reads a 64-char hex string as a credential | measured after an adopter's gitleaks flagged one as `generic-api-key` and reddened their CI on a file they did not author. The digests are load-bearing (the lock is what says whether the machine-owned region was edited) so they cannot simply go; the remedies are an allowlist shipped with the template or documenting the shape, and both are product decisions rather than lines |
 | **KD-161** | the round block prices round 2 from whether the DELTA is empty, and a round 1 that logs its findings writes to `docs/KNOWN-DEFECTS.md` — so the delta is almost never empty and the one NOT-OWED case is almost never reachable | measured on its own first use: round 1 of the slice that added it found nothing blocking, made NO fixes, wrote two log entries, and the block priced round 2 OWED. The header's rule is about round 1's FIXES, not about any delta. Advisory only — a human read it, disagreed, and took the header's answer |
 | **KD-162** | the sweep proving the lock is a "class of one" allow-lists `qa/e2e/` and `qa/golden/` by PREFIX, so a machine-written file added under either is invisible to it | measured: today's three survivors under those prefixes really are app content and the lock really is the only other one, so the claim holds — what is unpinned is tomorrow's addition, not today's answer |
@@ -190,7 +188,6 @@ you the same list without opening anything.
 | **KD-152** | `--version` and `--help` are the only declared booleans read by PRESENCE, so `--version false` still prints the version instead of meaning "not the version" | required by KD-15: at create-cmp's door the something-else is `create`, which writes — normalizing their value form made `create-cmp --version false --yes` scaffold an app while the user waited for a version string. A question is answered in whatever form it is asked |
 | **KD-163** | the KD-15 guard's new value-form test drives `bin/create-cmp.mjs` with the REPOSITORY as its working directory, asserts only exit code and stdout, and sets no `timeout` — where the sibling test for the same defect class sandboxes the cwd, asserts it is still empty, and times out at 60s | cannot fire while the guard holds, and `myapp/` is gitignored so no gate reads what it would write. What is logged is a gate whose failure mode is a multi-minute untimed Gradle build inside `npm test` rather than an assertion |
 | **KD-164** | the reason given in BOTH new copies of the arg parser for not sharing one module — "the published root tarball carries no copy of this directory" — is refuted by `npm pack` on the root: all nine files of `packages/harness/install/` ship, `args.mjs` beside `src/lib/args.mjs` in one 389-file tarball, and `package.json`'s `files` names the directory outright | the DECISION is right for a reason the comment does not give: `prooflane-harness`'s own 94-file tarball carries `install/args.mjs` and no `src/`, so the harness alone still cannot import the root's copy. Nobody is mis-served; the next reader of either file is told a packaging fact this tree answers the other way |
-| **KD-165** | the same bytes carry two suite verdicts three minutes apart: `bf79f72` recorded FAIL 2122/2124 at 05:47 in a run of 268552ms and PASS 2123/2124 at 05:50 in one of 105713ms, both against `observedHash` b359f866 — the failing case is `test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs`, whose verdict rests on two wall-clock bounds per case | not the slice's code: nothing the KD-16 change touches is on that file's import graph, and it passes alone here in 7.4s. It is KD-131's class with a member OUTSIDE `inspector/mcp/` — a test of the proof gate's own refusal path — so KD-131's "no adopter runs this repository's inspector tests" no longer covers the class |
 | **KD-166** | "when is this product's output styled" has two spellings that disagree: `src/lib/log.mjs` re-exports picocolors, which colours when `CI` is set even through a pipe, while `packages/harness/install/log.mjs` gates on `process.stdout.isTTY` and never colours through one | measured green both ways today — all 20 test files that drive `bin/create-cmp.mjs` pass with `CI=true` (154/154) — so no live member. What is logged is that the class has now been answered TWICE per-file (`bf79f72` here, and `the-fleet-command-…` before it) rather than once at the source, and that an adopter's piped CI log carries escape codes from one door and not the other |
 | **KD-180** | doctor's new status-line verdict over-reports an ABSOLUTE path (`node /Users/x/app/qa/walk-status.mjs` reads as cwd-relative), and its `ok` is unreachable end-to-end while `ANCHORABLE_SURFACES.statusLine` is `false` | measured, both directions: nothing in this repo or its heal writes an absolute status line, so the over-report has no subject; the direction is the conservative one the detector chooses on purpose, and the under-report direction — an `ok` over a silent surface — is what this slice closed |
 | **KD-181** | this tree stated the statusLine's stdin BOTH ways, and the false one governed a live path: `walk-status.mjs` said *the statusline gets no stdin*, `hooks.mjs` and KD-90 said it carries `workspace.project_dir` | settled 2026-09-19 from the official statusLine documentation (out of tree, KD-128's class): the comment was false and is corrected here. So the status line IS fixable — via stdin, not via the env var — and what is logged is that this slice does not take it: whether `$(cat)` can block with no payload is undocumented, and a status line that hangs is worse than one that prints nothing |
@@ -212,6 +209,12 @@ you the same list without opening anything.
 | **KD-197** | the walk-wiring ADD heal writes `JSON.stringify(settings, null, 2)`, so an app's own indentation, escapes and key order are rewritten as a side effect of gaining a status line | the settings mean the same thing and the adopter asked for a write; what they did not ask for is the diff. Bounded: the add heal only runs when a surface is missing |
 | **KD-198** | the two new walk fields (`unconfirmed`, `healable`) keep KD-182's fail-open `?? []`, so an `ok` still requires the absence of three fields rather than the presence of evidence | no second producer exists — `gatherWalkInputs` sets all four on every return path and is the only caller — and the fix is the one KD-182 defers, now over four fields |
 | **KD-199** | two superseded commands in the shipped-hooks table are narration, and `healedForm` refuses to heal them because their successors describe a newer lane than the app may have | a decision, not an oversight: only a pair differing by the anchor alone is healed, which is identical at the project root whatever the lane version. Healing narration is two table fields plus lane-version detection |
+| **KD-200** | text a test prints shares the runner's message channel, and node's parser reads it as a frame length: a third byte ≥ `0x80` (`›` `✓` `→` `—`) makes the size negative and aborts the FILE with *"Unable to deserialize cloned data"*, attributed to whichever file's stream was being parsed | the `scaffold.test.mjs` instance is fixed and the helper is guarded, but the class is not closed: a static over-approximation says 70 of 274 declared test files can reach such a write, and closing it needs either a `package.json` preload (the suite gate's own definition) or a per-file measurement |
+| **KD-201** | four test files silence a CLI call by replacing `process.stdout.write`, which is the channel the reporter writes its FRAMES to — a frame flushed inside that window is swallowed, the file exits 0, and the run reports fewer tests than it ran | measured: 4 tests run, 3 reported, nothing red. Not fixed because those four files were not that slice's subject and the wave allowed running only the files it named |
+| **KD-202** | `handleRequest` builds its `URL` from `port` OUTSIDE the try and `stop()` nulls `port` after `server.close()`, so a request in flight during shutdown throws `TypeError: Invalid URL` as an unhandledRejection — which node's runner blames on whichever test most recently PASSED | KD-56's message verbatim, reproduced deterministically; no adopter runs these tests and a real console is exiting anyway. Not fixed here: shipped bytes plus a `dist/server.mjs` rebuild belong to the slice that owns `inspector/mcp/` |
+| **KD-203** | `opts.port \|\| DEFAULT_PORT` reads `port: 0` — the standard way to ask the OS for a free port — as the console's well-known port, and the bound port is assumed rather than read back | an adopter starting a console gets the default either way and the only caller passing `0` is a test today; it becomes a defect the moment anything runs two consoles |
+| **KD-204** | `stop()` fires `GET /shutdown` at `http://127.0.0.1:9601` unconditionally, `hot: false` and no daemon included, so every console sends a request to a fixed address anything may be listening on | harmless where nothing listens (the refusal is swallowed) and a real daemon is the intended recipient; with KD-202 and KD-203 it is the complete path from "a suite ran" to "a passed test is recorded as FAILED" |
+| **KD-205** | `contains()` / `behindBy()` drop `gitAt`'s `why`, so one call site of the ordering check cannot say which of four causes killed a git call — a gate-timer kill, a crash and an OOM kill all read as "git could not compare this branch with origin/main" | the verdict is correct either way: the check still allows and still says it could not answer. It costs a reader one fact, in the file whose whole subject is that distinction |
 
 ---
 
@@ -709,55 +712,6 @@ thing. Closing them needs flow analysis, which is a parser, which is a dependenc
 decided not to grow for a lint (`test/helpers/js-source-scan.mjs`, header). *Logged 2026-09-15
 (review of `79eafd3`), re-placed 2026-09-15 after `f474f17` removed the inert clause and widened the
 rethrow assertion.*
-
-### KD-56 — one unreproduced failure, and the instrument that saw it discarded the reason
-
-`node scripts/fit-test.mjs` ran `npm test` while `fleet-check` was compiling the scratch app and
-booting the emulator, and reported `1951/1952 — 1 FAILING ✖ inspector/mcp/test/console-now-sse.test.mjs`
-on `f2f7d24`. Nothing that followed reproduced it: that file alone five times with the emulator
-running, 5/5; the full suite idle, 1951/1951; the full suite with all eight cores saturated by `yes`,
-1951/1951. The slice touched neither the test nor `steps-bridge.mjs`/`preview-service.mjs`.
-
-Two readings of the source narrow it. The lane-silence bound is 30 minutes, so the fixture's
-`startedAt` cannot go stale inside a run. And `watchStepStream` polls once a second behind its
-`fs.watch` — written precisely because "fs.watch on macOS coalesces and can drop under load" — so a
-dropped FSEvents notification cannot outlast the test's 8 s frame deadline. What remains is a
-test-process event loop starved for most of 8 s, under a load CPU alone did not recreate (the real
-condition also had Gradle's and the emulator's disk I/O), or a failure that is not a frame timeout.
-
-**It is logged and not chased further because the message is gone**, and that is the finding worth
-keeping. `fit-test.mjs` runs the suite fresh and parses its stdout for the NAMES of failing tests — its
-own comment says a bare count is unactionable — and discards the rest, so the one run that failed left
-a name and no reason. Keeping the failing tests' output (or the whole log, under `qa-artifacts/`) is
-the change that turns the next occurrence into a diagnosis. Not an adopter-facing defect: it is a test
-of the live console's transport, which has the fallback that would make the real feature survive this.
-*Logged 2026-09-16, during the device tier of `published-bytes-drift`.*
-
-**THE MESSAGE, 2026-09-18 — and it is not what this entry guessed.** It recurred twice in one hour on
-the `gate-judges-the-tree-the-command-acts-on` branch, under a full `npm test` and not under a lane;
-the file passes 3/3 alone, immediately after, every time. Kept verbatim this time, which is the change
-this entry asked for:
-
-```
-Error: Test "a line appended to the stream arrives as the RENDERED row — the page interprets nothing"
-at inspector/mcp/test/console-now-sse.test.mjs:113:1 generated asynchronous activity after the test
-ended. This activity created the error "TypeError: Invalid URL" and would have caused the test to
-fail, but instead triggered an unhandledRejection event.
-```
-
-So it is **not a frame timeout**, which is what both readings above narrowed to, and not a starved
-event loop: it is work the test leaves running after it returns, which then throws `TypeError: Invalid
-URL`. Node's runner attributes post-test async activity to the test that spawned it, so the *reported*
-failure is a test that had already passed — which is why every isolated re-run is green and why this
-looked like load sensitivity for two days. The suspect is an un-awaited fetch or EventSource in the
-`:113` test whose URL is built from a server that the test's own teardown has already closed. **Whose
-defect: the test's, not the transport's** — nothing here says the console is wrong, and the two
-readings above stay correct about the transport. The fix is to await or abort that activity before the
-test returns, in a slice that owns `inspector/mcp/`.
-
-**This is now a producer, so it is no longer unreproduced.** It cost this branch two recorded suite
-verdicts and one of them stood as a `FAIL` the gate told its author not to re-run.
-*Re-placed 2026-09-18 with the message it was missing, by the slice that hit it.*
 
 ### KD-58 — the words of an act, quoted, are refused as the act
 
@@ -2340,37 +2294,6 @@ its own.
 
 *Logged 2026-09-19 by the slice that created the gap, before any review round.*
 
-### KD-131 — one tree, two verdicts: a fixed-port preview-service test under full-suite load
-
-`inspector/mcp/test/preview-service.test.mjs:2922` · `qa-artifacts/suite-history.jsonl`
-
-Measured 2026-09-19 while gating the round-pricing slice. The full suite ran twice over bytes
-nothing had touched in between, and the kept records say it plainly — same `observedHash`
-(`e386597…`), `FAIL` at 22:10:52Z and `PASS` at 22:12:22Z. The failing assertion is
-`assert.match(page, /NOT refreshing/)`: the service was in the right state (`stale`, `pending:
-false`, `phase: "unrefreshed"` all asserted and passing on the line above), and what came back from
-`fetch` was a console page that did not carry the banner. Run alone, the file is 83/83.
-
-Two things in the test are load-shaped rather than logic-shaped: it binds a FIXED port (19737)
-rather than an ephemeral one, and it waits for `phase !== "idle"` on a 100 × 20 ms budget that a
-busy machine can exhaust. A fixed port makes "the page I fetched is the service I started" an
-assumption rather than a derivation, which is this repository's own
-`served-page-is-not-your-code` shape one process over.
-
-**Why it does not block.** No adopter runs create-cmp's inspector tests, and nothing in the failing
-path is imported by the slice that observed it — the change under gate was `scripts/`, agent
-definitions and docs. The second record over identical bytes IS the evidence that it is
-non-deterministic rather than a break: a deterministic consequence of a diff does not pass ninety
-seconds later on the same tree.
-
-**Why logged and not fixed.** `inspector/mcp/` is another slice's file, KD-56 already holds the
-class for it ("fails inside a full suite run and passes alone", and it names the owner), and the
-honest fix — an ephemeral port and a derived readiness wait — is a change to a test this slice has
-no business editing while gating something else. What this entry adds is the measurement KD-56 asks
-for and a warning to the next reader of this branch's suite history: the `FAIL` row is this, and it
-is followed by a `PASS` over the same hash.
-
-*Logged 2026-09-19 by the slice that ran the suite, before any review round.*
 ### KD-150 — a boolean's space form still takes the directory when the word is not `true` or `false`
 
 `src/lib/args.mjs`, `packages/harness/install/args.mjs` (`consumesNext`)
@@ -2790,64 +2713,6 @@ away, in both directions.
 *Logged 2026-09-19, review round 1 of `fix-boolean-value-form-inverted-2`. Found by packing both
 packages rather than reading the comment.*
 
-### KD-165 — one tree, two suite verdicts, three minutes apart — from a test whose verdict rests on wall-clock budgets
-
-`test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs` (second case),
-`qa-artifacts/suite-history.jsonl`
-
-Both rows are against the SAME `observedHash` (`b359f866…`) and the same commit (`bf79f72`):
-
-```
-05:47:00Z  FAIL  2122/2124   268552 ms   failing: "a git call that died outside the kill-timer
-                                          is not an answer: crashing each one in turn must cost
-                                          the check its verdict, never win one"
-05:50:02Z  PASS  2123/2124   105713 ms   failing: []
-```
-
-The FAIL was what `node scripts/proof-plan.mjs` read out for this tree at the start of this
-review — *"read it, do not re-run it"* — and the PASS was appended while the review was running.
-Both are true of the same bytes, which is the whole entry.
-
-**It is not this slice's code.** That file imports `scripts/hooks/proof-gate.mjs`; nothing in the
-KD-16 change — neither parser, neither bin, none of the six installer read sites — is on its
-import graph. What separates the two runs is load: 268552 ms against 105713 ms, and against
-35489 ms and 36400 ms for the two full runs of this same branch ninety minutes earlier.
-
-Executed here, 2026-09-19, on the same bytes:
-
-```
-$ node --test test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs
-  ✔ 2 pass, 0 fail, duration_ms 7722          (the case itself: 7423 ms)
-$ 12 concurrent CPU burners, same command
-  ✔ 2 pass, 0 fail                             (the case itself: 4048 ms)
-```
-
-So it did not reproduce at the load available here, and this entry claims no diagnosis it cannot
-show. What the test's own structure shows is where load reaches it: each of its six cases spawns
-git with `budgetMs: REMOTE_CALL_CAP_MS` and then asserts `elapsed < NO_CAP_WAS_WAITED_OUT_MS` —
-two wall-clock bounds per case, either of which a loaded machine crosses without the code under
-test being wrong. Its own failure message names the first and tells the reader to *"raise
-budgetMs at this call site, do not relax the bound"*.
-
-**Why logged and not fixed.** No adopter runs this repository's suite, and the refusal the test
-guards is not degraded — it is green whenever the machine is not saturated. Raising either bound
-is the one remedy the test explicitly refuses. This is KD-131's class exactly (the same bytes
-carrying a FAIL and a PASS, both on disk), with one thing genuinely new: KD-131 and KD-56 both
-scope themselves to `inspector/mcp/`, and this member is a test of the **proof gate's own refusal
-path**, so the sentence *"no adopter runs this repository's inspector tests"* no longer covers
-the class.
-
-**What a reader of the record cannot tell.** `suite-history.jsonl` records the verdict, the
-duration and the tree, and nothing about the machine — so the only evidence that the FAIL was
-load and not a defect is the duration beside it, read by a human. A gate that consumed these rows
-would have to pick one of the two answers for one tree, and nothing tells it which.
-
-**Fires when:** the suite runs on a machine busy enough to stretch it past ~3×, which on this
-project is a device lane, a Gradle build, or several agent sessions at once.
-*Logged 2026-09-19, review round 2 (re-record) of `fix-boolean-value-form-inverted-2`. Found by
-reading the plan's suite line rather than re-running it — and corrected in the same round when
-the PASS landed underneath it.*
-
 ### KD-166 — two spellings of "when is this product's output styled", and the test suite pays for the disagreement one file at a time
 
 `src/lib/log.mjs` vs `packages/harness/install/log.mjs`; `bf79f72`'s fix in
@@ -3261,3 +3126,202 @@ because that rewrite changes what an agent is told rather than where a script is
 **Fires when:** an app stamped through 0.26.2 carries a superseded narration command and someone
 expects `doctor --fix` to bring it current.
 *Logged 2026-09-22, as the one place that slice chose the narrow reading of its brief.*
+
+### KD-200 — ordinary text on a test's stdout aborts the file, and the third byte decides
+
+`node:internal/test_runner/runner:469` (`#processRawBuffer`) · `test/helpers/runner-channel.mjs`
+
+`node --test` reads each test file's child-process STDOUT as its message channel: each reporter event
+is `[0xFF 0x0F][4-byte BE length][payload]`, and bytes between frames are surfaced as `test:stdout`.
+Node 24.18.0's parser consumes a frame and then reads the next four bytes as a length **without
+re-scanning for the header**, so text that follows a frame in one `data` chunk is read as a length.
+What happens next is decided by that text's THIRD byte:
+
+| third byte | what the parser computes | outcome |
+|---|---|---|
+| `0x20`–`0x7F` (plain ASCII) | length ≥ 0x20000000 | "not all here yet" → breaks → recovers on the next chunk |
+| `≥ 0x80` (any UTF-8 lead or continuation byte: `›` `✓` `→` `—` `·` `✗` `…`) | `bufferHead[2] << 24` is **negative** in JS | the `rawBufferSize < fullMessageSize` guard is vacuously false and the deserializer is handed bytes that are not a frame |
+
+```
+Error: Unable to deserialize cloned data due to invalid or unsupported version.
+    at #processRawBuffer (node:internal/test_runner/runner:469:20)
+    at FileTest.parseMessage (node:internal/test_runner/runner:376:29)
+    at Socket.<anonymous> (node:internal/test_runner/runner:524:15)
+```
+
+It is thrown in the PARENT inside the child's `stdout` data handler, and `createProcessEventHandler`
+attributes it to the FileTest whose stream it was parsing — so a file is reported FAILING for
+something that is not in it. It is load-shaped because the coalescing is: an idle parent reads each
+write separately; a parent competing for a core reads one chunk holding a frame AND the text after it.
+This is the family that aborted `npm publish` at `prepublishOnly` on 2026-09-19 and put false FAILs on
+two branches the same night, and `docs/research/GO-LIVE-BOARD.md` §B's "moving between unrelated
+files" is explained by it — the member is whichever file's text happened to coalesce.
+
+Measured 2026-09-22, node v24.18.0, on `test/scaffold.test.mjs` unchanged: **15/15 green idle, 2 of 30
+RED under 16 CPU burners**, both with that error; a crafted one-chunk repro (frame + `"› …"`) is red
+every time and the same frame + `"skip …"` is green every time. The byte rule was checked against five
+leading strings.
+
+**The instance is fixed and the mechanism is guarded** (`4f7ce91`, `a663eae`) — but THE CLASS IS NOT
+CLOSED, and that guard guards the helper, not the members.
+
+**How many members.** Not exactly knowable without running each file. A static over-approximation —
+the import graph of the 274 declared test files, flagging any that can reach a
+`process.stdout.write` / `console.log` whose text STARTS with a non-ASCII glyph (treating `${…}` as one
+unit, because `src/lib/log.mjs` writes `` `${pc.cyan("›")} …` ``) — says **70 of 274**. The writing
+modules, by number of such writes: `src/lib/log.mjs` 87, `packages/harness/install/log.mjs` 63,
+`src/lib/verify.mjs` 46, `packages/harness/install/init.mjs` 36, `packages/harness/install/fleet.mjs`
+12, `scripts/fleet-check.mjs` 12, `src/commands/doctor.mjs` 8, `src/doctor.mjs` 8,
+`scripts/ground-truth.mjs` 7, then single digits. Reachability is not execution, so 70 is an upper
+bound on candidates and a lower bound on nothing; the honest statement is that the class is large and
+only one member is fixed.
+
+**What would actually close it.** One of: (a) a preload in the `test` script
+(`node --test --import ./test/...`) that, in a runner child, routes every non-frame stdout write to
+stderr — the runner surfaces stderr line by line and cannot choke on it; (b) a node version where
+`#processRawBuffer` re-scans for the header (worth an upstream report either way — this is a node bug,
+not ours); (c) per-file fixes, which needs the membership measurement above to be real. (a) is one
+line in `package.json`'s `test` script, which is the suite gate's own definition and was shared with
+five other fixers in this wave, and it cannot be validated without a full-suite run — so it is named
+here as a proposal rather than taken.
+
+**Fires when:** the suite runs on a machine busy enough that the parent reads a frame and the text
+after it in one chunk — a device lane, a Gradle build, several agent sessions, or `npm publish`'s own
+`prepublishOnly` while anything else runs.
+*Logged 2026-09-22 by the slice that fixed the `scaffold.test.mjs` instance.*
+
+### KD-201 — the `quiet()` helper drops reporter events, and the run reports fewer tests than it ran
+
+`test/a-fleet-upgrade-writes-to-a-tree-the-manifest-never-named.test.mjs:41`,
+`test/a-fleet-upgrade-lands-a-different-harness-in-each-repo.test.mjs:49`,
+`test/one-artifact-is-recorded-with-a-different-origin-in-each-repo.test.mjs:65`,
+`test/the-fleet-command-names-a-front-door-the-caller-did-not-use.test.mjs:49`
+
+Four files silence a CLI call by replacing `process.stdout.write` with `() => true` (or with a
+collector) for the duration of an AWAITED call. In a runner child, `process.stdout` is not a console —
+it is the channel the v8-serializer reporter writes its frames to, by calling `process.stdout.write`.
+Any frame flushed inside that window is swallowed, and nothing anywhere goes red: the stream stays
+well-formed, the file exits 0, and the parent simply never learns about that event.
+
+Measured 2026-09-22 with the `quiet()` body copied verbatim into a four-test file, one test holding a
+300 ms quiet window:
+
+```
+with quiet():     ℹ tests 3   ℹ pass 3   ℹ fail 0      (four tests ran)
+without:          ℹ tests 4   ℹ pass 4   ℹ fail 0
+```
+
+A test vanished from the record. Note the shape this predicts for `qa-artifacts/suite-history.jsonl`:
+a total that moves between runs over identical bytes — KD-165's own two rows are `2122/2124` and
+`2123/2124`, with one test unaccounted for in both. That is consistent with this, and this entry does
+not claim it IS this: the connection was not measured on the real suite.
+
+`test/helpers/runner-channel.mjs` is the shape that is safe — frames pass, text does not — and
+swapping the four `quiet()`s for it is a four-line change per file. Not done by the slice that found
+it: those four files were not its subject, and the wave allowed running only the files it named, so a
+change there could not be verified by running it.
+
+**Fires when:** a reporter event is flushed inside one of those four windows — which is a matter of
+timing, so the loss is silent and intermittent.
+*Logged 2026-09-22, found while building the helper that slice uses.*
+
+### KD-202 — a request that arrives after `stop()` is answered with a null port, and the runner blames a test that passed
+
+`inspector/mcp/src/lib/preview-service.mjs:2085` (`handleRequest`) and its `stop()`
+
+```js
+  async function handleRequest(req, res) {
+    const url = new URL(req.url, `http://127.0.0.1:${port}`);   // OUTSIDE the try
+```
+
+`stop()` sets `port = null` after `server.close()`. `server.close()` does not end a connection whose
+request is already in flight, so a request that lands in that window is handled with `port === null`,
+`new URL(req.url, "http://127.0.0.1:null")` throws `TypeError: Invalid URL`, and because the listener
+is `async` the throw is an **unhandledRejection**. Node's runner reports an unhandled rejection
+against whichever test in that process has most recently finished — as *"generated asynchronous
+activity after the test ended … created the error 'TypeError: Invalid URL'"*, which is KD-56's message
+verbatim, blaming a test at `:113` that had already passed.
+
+Reproduced deterministically 2026-09-22 (instrument, not a test): start a service, connect a raw
+socket, send half a request, call `service.stop()`, send the rest → `UNHANDLED REJECTION: TypeError:
+Invalid URL`.
+
+**Who sends such a request in a suite:** KD-203 and KD-204 — every console's `stop()` sends
+`GET /shutdown` to a WELL-KNOWN port, and services that asked for an ephemeral port were listening on
+exactly that port. The slice that closed KD-56 removed the exposure for
+`inspector/mcp/test/console-now-sse.test.mjs` by giving it real ephemeral ports; the defect itself is
+untouched.
+
+**Why it does not block.** No adopter runs these tests, and in a real console a stray request during
+shutdown produces one rejected promise in a process that is exiting. What it costs is suite records: a
+FAIL against a test that passed, on a tree that is fine.
+
+**The fix** is `const url = new URL(req.url, "http://127.0.0.1")` (the port carries no meaning for
+`pathname` / `searchParams`) or moving the line inside the try — plus a rebuild of
+`inspector/mcp/dist/server.mjs`, which is why a test-only slice did not do it: shipped bytes and a
+bundle rebuild belong to the slice that owns `inspector/mcp/`.
+
+**Fires when:** anything sends the console a request while it is stopping — which the suite does to
+itself.
+*Logged 2026-09-22, found by reading KD-56's kept message.*
+
+### KD-203 — `port: 0` asks for an ephemeral port and is given the well-known one
+
+`inspector/mcp/src/lib/preview-service.mjs:2752` (`await listen(opts.port || DEFAULT_PORT)`) and
+`:2617` (`port = p`)
+
+`0 || 9600` is `9600`. Three tests in `console-now-sse.test.mjs` passed `port: 0` — the standard way to
+ask the OS for a free port — and got the console's default, probing upward from it. Measured
+2026-09-22 on the machine that found it, where a real console holds 9600: the service bound **9601**,
+which is `DEFAULT_DAEMON_PORT`. Two lines make it right: `opts.port ?? DEFAULT_PORT`, and
+`port = srv.address().port` so the bound port is read back rather than assumed (with `0`, `p` is not
+the port).
+
+**Why it does not block.** An adopter starting a console gets the default port either way; the caller
+who says `0` is, today, only a test. It becomes a defect the moment anything runs two consoles.
+
+**Fires when:** any caller asks this service for an ephemeral port.
+*Logged 2026-09-22, while fixing KD-56.*
+
+### KD-204 — every `stop()` sends `GET /shutdown` to the daemon port, daemon or no daemon
+
+`inspector/mcp/src/lib/preview-service.mjs` (`stop()`), `daemonUrl` from `:715`
+
+`stop()` fires ``fetch(`${daemonUrl}/shutdown`)`` unconditionally — `hot: false`, no daemon ever
+started, still sent. Measured 2026-09-22 with a bystander HTTP server on the daemon port: it receives
+`GET /shutdown` from a `hot: false` console's stop. Since `daemonUrl` defaults to
+`http://127.0.0.1:9601`, every console in every process sends a request to a fixed address that
+anything may be listening on — the console of another test process, or a developer's own console.
+Combined with KD-202 and KD-203 this is the complete path from "a suite ran" to "a passed test is
+recorded as FAILED".
+
+**Why it does not block.** Harmless where nothing listens (the `.catch(() => {})` swallows the
+refusal), and a real daemon is the intended recipient. The guard is cheap: send it only when a daemon
+was actually started (`mode === "daemon"` / `daemonChild`).
+
+**Fires when:** any console stops while anything at all is listening on `127.0.0.1:9601`.
+*Logged 2026-09-22, measured while proving KD-56's mechanism.*
+
+### KD-205 — one call site of the ordering check cannot say which of its four causes happened
+
+`scripts/hooks/proof-gate.mjs` — `contains()` and `behindBy()` inside `baseContext`
+
+`gitAt` returns `{answered, ok, out, status, why}` and the design's own comment says *"`why` then says
+which cause it was, for the agent"*. Four of the five call sites carry it into the reason. The two that
+go through `contains()` / `behindBy()` do not: a `merge-base --is-ancestor` that produced no exit code
+becomes `cannotSay("git could not compare this branch with origin/main")`, with the cause dropped.
+Observed in the rewritten KD-165 test's own output:
+
+```
+[ok] `git … --is-ancestor …` died on SIGTERM after 91ms: git could not compare this branch with origin/main
+[ok] `git … rev-parse …`     died on SIGSEGV after 64ms: git, killed by SIGSEGV, did not answer, so refs/remotes/origin/main could not be read
+```
+
+So for that one call the agent cannot tell a gate-timer kill from a crash from an OOM kill, which is
+the distinction the whole file is about. The verdict is correct either way — this is about what the
+allow SAYS, not what it decides. The fix is to return the `why` from `contains()` / `behindBy()` and
+interpolate it the way the other sites do.
+
+**Why it does not block.** Nobody is wrongly served: the check still allows and still says it could
+not answer. It costs a reader one fact.
+*Logged 2026-09-22, found while making KD-165's test read the path taken.*
