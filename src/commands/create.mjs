@@ -165,7 +165,7 @@ async function interactiveConfig(positional, flags = {}) {
         type: "confirm",
         name: "harness",
         message: "Verification harness (verify lane, evidence receipts, machine-checked done)?",
-        initial: flags.minimal !== true, // --minimal pre-answers the interview question
+        initial: !flagBool(flags, "minimal", false), // --minimal pre-answers the interview question
       },
       { type: "confirm", name: "room", message: "Room local cache?", initial: true },
       { type: "confirm", name: "e2e", message: "E2E test harness (Maestro)?", initial: true },
@@ -226,7 +226,7 @@ export async function runCreate(flags, positional) {
   const { scaffold } = await import("../scaffold.mjs");
 
   const nonInteractive =
-    flags.yes === true ||
+    flagBool(flags, "yes", false) ||
     typeof flags.name === "string" ||
     typeof flags.package === "string" ||
     !process.stdin.isTTY;
@@ -240,8 +240,8 @@ export async function runCreate(flags, positional) {
   try {
     const { verdict } = await scaffold(config, {
       verify,
-      dryRunVerify: flags["dry-run-verify"] === true,
-      force: flags.force === true,
+      dryRunVerify: flagBool(flags, "dry-run-verify", false),
+      force: flagBool(flags, "force", false),
     });
 
     if (verify && verdict && !verdict.green) {

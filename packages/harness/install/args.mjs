@@ -150,8 +150,13 @@ export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
  * refuses the set when the two disagree.
  *
  * `--fleet` is deliberately NOT here: it names a MANIFEST, and `fleet.mjs`
- * already refuses both its empty and its bare form with a sentence that teaches
- * the manifest format. Folding it in would trade that sentence for this one.
+ * answers it with a sentence that teaches the manifest format. Listing it here
+ * would cost ONE of its two forms, not both — measured on this tree,
+ * `prooflane upgrade --fleet=` already says "--fleet needs a value, and was
+ * given none", because `emptyValues` refuses an empty value for every value flag
+ * before it consults this set, while `prooflane upgrade --fleet` still says
+ * "--fleet needs the path to a fleet manifest." and prints the manifest's shape.
+ * The BARE form is the one this set would take, and it is the one worth keeping.
  */
 export const DESTINATION_FLAGS = new Set(["target-dir"]);
 

@@ -602,10 +602,12 @@ function printFindings(findings) {
 export async function runDoctor(flags, positional) {
   // 1) Toolchain preflight — unchanged existing behavior.
   const toolchain = await toolchainDoctor({
-    assumeYes: flags.yes === true,
-    dryRun: flags["dry-run"] === true,
+    assumeYes: flagBool(flags, "yes", false),
+    dryRun: flagBool(flags, "dry-run", false),
     ios: flagBool(flags, "ios", true),
-    installMissing: flags["no-install"] !== true,
+    // The negative name is the only one this door documents, and `flagBool`
+    // reads the pair: `--no-install` is false, `--no-install false` is true.
+    installMissing: flagBool(flags, "install", true),
   });
 
   // 2) Project diagnosis — only when pointed at / run inside a Gradle project.
@@ -623,16 +625,16 @@ export async function runDoctor(flags, positional) {
     let inputs = gatherProjectInputs(projectDir);
     let findings = diagnoseProject(inputs);
 
-    if (flags.fix === true) {
+    if (flagBool(flags, "fix", false)) {
       // ONE writer for every heal in this command, so `--dry-run` is answered in one
       // place. `write.wrote` counts real writes: under the flag it stays 0, and the
       // report below is therefore the diagnosis of the tree as it still stands — which
       // is what a preview is for.
-      const write = healWriter({ dryRun: flags["dry-run"] === true });
+      const write = healWriter({ dryRun: flagBool(flags, "dry-run", false) });
       const fixed = applySafeFixes(projectDir, findings, inputs, write);
       const rewrote = await healShippedHookCommands(projectDir, {
-        assumeYes: flags.yes === true,
-        dryRun: flags["dry-run"] === true,
+        assumeYes: flagBool(flags, "yes", false),
+        dryRun: flagBool(flags, "dry-run", false),
         write,
       });
       if (write.wrote > 0) {
@@ -649,7 +651,7 @@ export async function runDoctor(flags, positional) {
     printFindings(findings);
     projectGreen = !findings.some((f) => f.level === "fail");
 
-    if (!flags.fix && findings.some((f) => f.fix?.auto && f.level !== "ok")) {
+    if (!flagBool(flags, "fix", false) && findings.some((f) => f.fix?.auto && f.level !== "ok")) {
       process.stdout.write(
         `\n${colors.cyan("Tip:")} re-run with ${colors.bold("--fix")} to apply the safe heals above automatically.\n`
       );

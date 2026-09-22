@@ -77,7 +77,7 @@ export async function runVerifyCommand(flags, positional) {
       `  commands: ${colors.dim(source)}\n\n`
   );
 
-  const dryRun = flags["dry-run"] === true;
+  const dryRun = flagBool(flags, "dry-run", false);
   const verdict = await runVerify({
     projectDir,
     manifest: { verify },

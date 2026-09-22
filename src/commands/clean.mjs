@@ -19,6 +19,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { colors, ok, warn } from "../lib/log.mjs";
+import { flagBool } from "../lib/args.mjs";
 import { probe, consent } from "../bootstrap/exec.mjs";
 import { selectStaleKonan, selectProjectCleanDirs } from "../lib/clean.mjs";
 import { formatBytes } from "../lib/project-doctor.mjs";
@@ -77,7 +78,7 @@ export async function runClean(flags, positional) {
   const targetDir =
     (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
   const projectDir = path.resolve(targetDir);
-  const dryRun = flags["dry-run"] === true;
+  const dryRun = flagBool(flags, "dry-run", false);
 
   process.stdout.write(`\n${colors.bold("create-cmp clean")} — cache & build-output hygiene\n\n`);
 
@@ -164,7 +165,7 @@ export async function runClean(flags, positional) {
   }
 
   const approved = await consent(`\nDelete the ${plan.length} item(s) above?`, {
-    assumeYes: flags.yes === true,
+    assumeYes: flagBool(flags, "yes", false),
   });
   if (!approved) {
     warn("Not approved — nothing deleted.");

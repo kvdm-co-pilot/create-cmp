@@ -362,19 +362,19 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
     // the very defect this write-back exists to fix: the next run would fetch
     // an obsolete merge base and re-litigate changes that already landed. Not
     // on a dry run — that promises to write nothing.
-    if (flags["dry-run"] !== true && writeBackEngineVersion(projectDir, currentVersion)) {
+    if (!flagBool(flags, "dry-run", false) && writeBackEngineVersion(projectDir, currentVersion)) {
       ok(`create-cmp.json engineVersion → ${colors.bold(currentVersion)}`);
     }
     return 0;
   }
 
-  if (flags["dry-run"] === true) {
+  if (flagBool(flags, "dry-run", false)) {
     process.stdout.write(`\n${colors.yellow("Dry run")} — nothing written. Re-run with --yes to apply.\n`);
     return 0;
   }
   const approved = await consent(
     `\nApply these changes (backups written as *${BACKUP_SUFFIX}; conflicts only get *${SIDECAR_SUFFIX} sidecars)?`,
-    { assumeYes: flags.yes === true }
+    { assumeYes: flagBool(flags, "yes", false) }
   );
   if (!approved) {
     process.stdout.write(`${colors.yellow("Not applied")} — dry run only. Re-run with --yes to apply.\n`);
@@ -472,7 +472,7 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
  * @param {string|undefined} positional optional target dir positional
  */
 export async function runUpgrade(flags, positional) {
-  if (flags.harness === true) {
+  if (flagBool(flags, "harness", false)) {
     return runHarnessUpgrade(flags, positional);
   }
   const targetDir =
@@ -576,13 +576,13 @@ export async function runUpgrade(flags, positional) {
     process.exit(0);
   }
 
-  if (flags["dry-run"] === true) {
+  if (flagBool(flags, "dry-run", false)) {
     process.stdout.write(`\n${colors.yellow("Dry run")} — nothing written. Re-run with --yes to apply.\n`);
     process.exit(0);
   }
 
   const approved = await consent(`\nApply these changes (backups written as *${BACKUP_SUFFIX})?`, {
-    assumeYes: flags.yes === true,
+    assumeYes: flagBool(flags, "yes", false),
   });
   if (!approved) {
     process.stdout.write(`${colors.yellow("Not applied")} — dry run only. Re-run with --yes to apply.\n`);

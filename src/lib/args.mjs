@@ -162,9 +162,19 @@ export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
  * twelfth naming something else fails that test until it is listed here.
  *
  * `--fleet` is deliberately NOT here. It names a MANIFEST, not a destination,
- * and it already refuses both its empty and its bare form with a sentence that
- * teaches the manifest format (`packages/harness/install/fleet.mjs`). Folding it
- * in would trade that sentence for this one.
+ * and `packages/harness/install/fleet.mjs` answers it with a sentence that
+ * teaches the manifest format. What listing it here would cost is ONE of its two
+ * forms, not both — measured on this tree:
+ *
+ *   upgrade --fleet=    →  "--fleet needs a value, and was given none"
+ *                          (`emptyValues` refuses an empty value for EVERY value
+ *                          flag before it ever consults this set, so the
+ *                          teaching sentence is already gone for this form)
+ *   upgrade --fleet     →  "--fleet needs the path to a fleet manifest." plus
+ *                          the manifest's shape — the form this set would take
+ *
+ * So the reason is narrow and it is that one: the BARE form keeps a sentence
+ * worth more than this one, and a fleet manifest is not a tree to write into.
  */
 export const DESTINATION_FLAGS = new Set(["target-dir"]);
 

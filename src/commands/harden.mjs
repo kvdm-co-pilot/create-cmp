@@ -36,6 +36,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { colors, ok, warn, fail, step } from "../lib/log.mjs";
+import { flagBool } from "../lib/args.mjs";
 import { consent } from "../bootstrap/exec.mjs";
 import { buildTokenMap } from "../lib/tokens.mjs";
 import {
@@ -221,7 +222,7 @@ export async function runHarden(flags, positional) {
     ok("Nothing to do — the tree already matches full mode.");
     process.exit(0);
   }
-  if (flags["dry-run"] === true) {
+  if (flagBool(flags, "dry-run", false)) {
     for (const e of plan.entries) {
       if (e.write !== null || e.remove || e.sidecar !== null) process.stdout.write(`    ${e.relPath}\n`);
     }
@@ -232,7 +233,7 @@ export async function runHarden(flags, positional) {
 
   const approved = await consent(
     `\nInstall the harness (existing files are backed up; edited files get *${SIDECAR_SUFFIX} sidecars, never clobbered)?`,
-    { assumeYes: flags.yes === true }
+    { assumeYes: flagBool(flags, "yes", false) }
   );
   if (!approved) {
     process.stdout.write(`${colors.yellow("Not applied")} — re-run with --yes to skip the prompt.\n`);
@@ -258,7 +259,7 @@ export async function runHarden(flags, positional) {
     `\nProve it: ${colors.bold("node qa/verify.mjs --profile scaffold")}` +
       colors.dim("  (runs now with --verify)\n")
   );
-  if (flags.verify === true) {
+  if (flagBool(flags, "verify", false)) {
     const v = spawnSync("node", ["qa/verify.mjs", "--profile", "scaffold"], {
       cwd: projectDir,
       stdio: "inherit",

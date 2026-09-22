@@ -22,10 +22,17 @@
 // The parser half of that is fixed and pinned; what is pinned HERE is the whole
 // matrix, through the real `bin/create-cmp.mjs`, with argv as separate tokens
 // (one shell string `"--dry-run true"` is one token, not two, and would test a
-// different line), in a project outside this repository. Every spelling of "dry
-// run" leaves the catalog byte-identical, with or without `--yes`; every
-// spelling of "not a dry run" with `--yes` applies — so the flag is READ, not
-// merely ignored into safety.
+// different line), in a project outside this repository.
+//
+// WHICH SPELLINGS, EXACTLY: the three affirmative ones — `--dry-run`,
+// `--dry-run true`, `--dry-run=true` — with and without `--yes`, each leaving
+// the catalog byte-identical, and `--dry-run false` / `--dry-run=false` with
+// `--yes` applying, so the flag is READ rather than ignored into safety. That is
+// five of the ten spellings `flagBool` resolves, and this header used to call it
+// "every spelling", which was false: the `--no-dry-run` pair it omitted is
+// exactly where `src/commands/` and the installer had split, and
+// `a-dry-run-asked-for-by-the-other-name-writes-the-catalog.test.mjs` covers all
+// ten by deriving them from the contract instead of listing them here.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

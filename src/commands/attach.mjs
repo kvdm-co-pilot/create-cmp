@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { colors, ok, warn, fail } from "../lib/log.mjs";
+import { flagBool } from "../lib/args.mjs";
 import { consent } from "../bootstrap/exec.mjs";
 import { sessionStartCommand } from "../lib/hooks.mjs";
 import { SIDECAR_SUFFIX } from "../lib/harness-upgrade.mjs";
@@ -307,7 +308,7 @@ async function manifestForAttach(projectDir, flags) {
     }
     return fromFlags.manifest;
   }
-  if (flags.yes === true) {
+  if (flagBool(flags, "yes", false)) {
     fail(
       `${MANIFEST_REL_PATH} is missing and --yes forbids asking. Pass --profile <id> ` +
         `[--specs <dir>] [--citation-roots a,b] [--receipt <path>], or run without --yes to be asked.`
@@ -361,11 +362,11 @@ export async function runAttach(flags, positional) {
     ok("\nNothing to do — attach surfaces are current.");
     process.exit(0);
   }
-  if (flags["dry-run"] === true) {
+  if (flagBool(flags, "dry-run", false)) {
     process.stdout.write(`\n${colors.yellow("Dry run")} — nothing written.\n`);
     process.exit(0);
   }
-  const approved = await consent("\nWrite the attach surfaces?", { assumeYes: flags.yes === true });
+  const approved = await consent("\nWrite the attach surfaces?", { assumeYes: flagBool(flags, "yes", false) });
   if (!approved) {
     process.stdout.write(`${colors.yellow("Not applied")} — re-run with --yes to skip the prompt.\n`);
     process.exit(0);
