@@ -29,6 +29,13 @@
 // invariant is behavioural and covers all of them: EVERY bin every package.json
 // declares must produce the same output and the same exit code when reached
 // through a link as when reached directly.
+//
+// "Every package.json" means every package this repo PUBLISHES — the list
+// scripts/ground-truth.mjs derives (`ownedNames`), not a directory convention
+// of this file's own. It had one (KD-18): the root and `packages/*`, which is
+// two of the eight packages that declare a bin; the aliases under
+// `packages/aliases/` — `prooflane` among them, the name adopters `npx` — and
+// the inspector at `inspector/mcp` were never run.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -59,60 +66,80 @@ function requiredBins() {
   return out.sort();
 }
 
-/** Every `bin` target declared by the root package and every workspace. */
+/**
+ * Every `bin` of every published package, one entry per NAME. Not deduplicated
+ * by target: `create-cmp` and `create-cmp-cli` are one file linked under two
+ * names, and npm writes both links.
+ */
 function declaredBins() {
-  const manifests = [path.join(ROOT, "package.json")];
-  const pkgDir = path.join(ROOT, "packages");
-  for (const entry of fs.readdirSync(pkgDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const m = path.join(pkgDir, entry.name, "package.json");
-    if (fs.existsSync(m)) manifests.push(m);
-  }
-
-  const bins = new Map(); // absolute target → the name npm would link it as
-  for (const manifest of manifests) {
+  const bins = [];
+  for (const p of ownedNames(groundTruth())) {
+    const manifest = path.join(ROOT, p.dir, "package.json");
     const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
-    const bin = pkg.bin;
-    if (!bin) continue;
-    const entries = typeof bin === "string" ? [[pkg.name, bin]] : Object.entries(bin);
+    if (pkg.private || !pkg.bin) continue;
+    const entries =
+      typeof pkg.bin === "string" ? [[pkg.name.replace(/^@[^/]+\//, ""), pkg.bin]] : Object.entries(pkg.bin);
     for (const [name, rel] of entries) {
-      const abs = path.resolve(path.dirname(manifest), rel);
-      if (!bins.has(abs)) bins.set(abs, { name, pkg: pkg.name });
+      bins.push({ target: path.resolve(path.dirname(manifest), rel), name, pkg: pkg.name });
     }
   }
-  return [...bins].map(([target, { name, pkg }]) => ({ target, name, pkg }));
+  return bins;
 }
 
-function run(file) {
-  const r = spawnSync(process.execPath, [file, "--help"], { encoding: "utf8" });
-  return { stdout: r.stdout ?? "", stderr: r.stderr ?? "", status: r.status };
+/**
+ * Run from a scratch directory, never the repo: the inspector's server reads
+ * its cwd to decide whether it was launched inside an app, and a bin under test
+ * should see no project at all. Bounded, because that bin is a server — it
+ * exits when stdin closes (measured), and one that stopped doing so should fail
+ * this test rather than hang the suite.
+ */
+function run(file, cwd) {
+  const r = spawnSync(process.execPath, [file, "--help"], { encoding: "utf8", cwd, timeout: 60_000 });
+  return { stdout: r.stdout ?? "", stderr: r.stderr ?? "", status: r.status, error: r.error?.code ?? null };
 }
+
+const said = (r) =>
+  `exit ${r.status}${r.error ? ` (${r.error})` : ""}, ${r.stdout.length} bytes of stdout, ${r.stderr.length} of stderr`;
 
 test("a bin reached through a symlink behaves as it does reached directly", () => {
   const bins = declaredBins();
-  assert.ok(bins.length > 0, "no bins found — the scan is broken, not the tree");
 
   const dead = [];
   const exercised = [];
   for (const { target, name, pkg } of bins) {
-    const direct = run(target);
-    assert.ok(
-      direct.stdout.length > 0,
-      `${name}: invoked directly it already prints nothing, so this test cannot tell the two apart`
-    );
-
-    // Exactly what `npm install` writes into node_modules/.bin.
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bin-symlink-"));
     try {
+      const direct = run(target, dir);
+      // WHAT "CAN TELL THE TWO APART" MEANS. A dead entry-point guard has one
+      // signature: exit 0, nothing on stdout, nothing on stderr. This used to
+      // demand stdout, which both bins it used to read happened to print, and
+      // which bins it reads now legitimately may not: the inspector is a stdio MCP
+      // server (its stdout is the protocol channel; it announces itself on
+      // stderr), and an alias whose dependency is not installed says so on
+      // stderr and exits 1. Either is distinguishable from a silent no-op,
+      // PROVIDED the comparison below reads stderr too — which it now does, so
+      // no channel a bin can speak on goes unread.
+      assert.ok(
+        direct.status !== 0 || direct.stdout.length > 0 || direct.stderr.length > 0,
+        `${name}: invoked directly it already exits 0 in silence (${said(direct)}), so this test cannot tell it ` +
+          `from a guard that skipped everything`
+      );
+
+      // Exactly what `npm install` writes into node_modules/.bin.
       const link = path.join(dir, name);
       fs.symlinkSync(target, link);
-      const linked = run(link);
-      if (linked.stdout !== direct.stdout || linked.status !== direct.status) {
+      const linked = run(link, dir);
+      if (
+        linked.stdout !== direct.stdout ||
+        linked.stderr !== direct.stderr ||
+        linked.status !== direct.status ||
+        linked.error !== direct.error
+      ) {
+        const silent = linked.status === 0 && !linked.stdout && !linked.stderr;
         dead.push(
-          `${name} (${path.relative(ROOT, target)}): direct → exit ${direct.status}, ` +
-            `${direct.stdout.length} bytes of stdout; through the symlink npm writes → ` +
-            `exit ${linked.status}, ${linked.stdout.length} bytes of stdout` +
-            (linked.stdout.length === 0 ? " — the command did NOTHING and reported success" : "")
+          `${pkg} → ${name} (${path.relative(ROOT, target)}): direct → ${said(direct)}; ` +
+            `through the symlink npm writes → ${said(linked)}` +
+            (silent ? " — the command did NOTHING and reported success" : "")
         );
       }
     } finally {
