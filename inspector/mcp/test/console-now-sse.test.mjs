@@ -38,6 +38,37 @@ function makeProject() {
 }
 
 /**
+ * A port the OS says is free, right now — because `port: 0` does NOT get one.
+ *
+ * `createPreviewService` resolves its port as `opts.port || DEFAULT_PORT`, and
+ * `0 || 9600` is 9600. These three tests asked for an ephemeral port and were
+ * given the console's WELL-KNOWN one, probing upward from it: measured
+ * 2026-09-22 on this machine, with a real console already holding 9600, the
+ * service bound **9601 — DEFAULT_DAEMON_PORT**, the address every console's
+ * `stop()` sends `GET /shutdown` to, unconditionally, hot or not (also measured:
+ * a bystander server on the daemon port receives it from a `hot: false` stop).
+ *
+ * That matters because of what a request arriving at the WRONG MOMENT does:
+ * `handleRequest` builds `new URL(req.url, \`http://127.0.0.1:${port}\`)` outside
+ * its try, and `stop()` sets `port = null`, so a request that lands after a stop
+ * throws `TypeError: Invalid URL` out of an async listener — an
+ * unhandledRejection, which node's runner reports against whichever test in that
+ * process had just finished. That is KD-56's message verbatim, blaming a test at
+ * line 113 that had already passed. An OS-assigned port in the dynamic range is
+ * one nothing else in the suite addresses.
+ *
+ * The one-line production fix (`??` for `||`, and reading the bound port back)
+ * belongs to a slice that owns inspector/mcp/ and can rebuild dist/.
+ */
+async function freePort() {
+  const srv = http.createServer();
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const { port } = srv.address();
+  await new Promise((r) => srv.close(r));
+  return port;
+}
+
+/**
  * One live text/event-stream connection, with a wait-for-N-frames helper.
  *
  * node:http with `agent: false` rather than fetch(): fetch pools its
@@ -89,7 +120,7 @@ function openStream(url) {
 test("every connect gets the CURRENT rows in full — a page reconnecting is never left guessing what it missed", async () => {
   const root = makeProject();
   fs.writeFileSync(path.join(root, "qa", ".lane-steps.ndjson"), `${START}\n${step(0, "PASS")}\n`);
-  const service = createPreviewService({ projectDir: root, port: 0, hot: false, runRender: async () => {} });
+  const service = createPreviewService({ projectDir: root, port: await freePort(), hot: false, runRender: async () => {} });
   const { url } = await service.start();
   const sse = openStream(url);
   try {
@@ -114,7 +145,7 @@ test("a line appended to the stream arrives as the RENDERED row — the page int
   const root = makeProject();
   const file = path.join(root, "qa", ".lane-steps.ndjson");
   fs.writeFileSync(file, `${START}\n`);
-  const service = createPreviewService({ projectDir: root, port: 0, hot: false, runRender: async () => {} });
+  const service = createPreviewService({ projectDir: root, port: await freePort(), hot: false, runRender: async () => {} });
   const { url } = await service.start();
   const sse = openStream(url);
   try {
@@ -146,7 +177,7 @@ test("a line appended to the stream arrives as the RENDERED row — the page int
 
 test("a project that never ran the lane broadcasts NOTHING — silence, not an empty run", async () => {
   const root = makeProject();
-  const service = createPreviewService({ projectDir: root, port: 0, hot: false, runRender: async () => {} });
+  const service = createPreviewService({ projectDir: root, port: await freePort(), hot: false, runRender: async () => {} });
   const { url } = await service.start();
   const sse = openStream(url);
   try {
