@@ -36,7 +36,7 @@
 // SINGLE SOURCE OF TRUTH: packages/harness/src/lib/harness-manifest.mjs in the
 // create-cmp repo. The copy in a generated project's qa/lib/ is vendored
 // byte-identical at scaffold time — edit the package source, then run
-// `node scripts/sync-harness.mjs`.
+// `node scripts/sync-harness.mjs` in the create-cmp repo.
 
 import fs from "node:fs";
 import path from "node:path";

@@ -40,7 +40,7 @@
 //
 // SINGLE SOURCE OF TRUTH: packages/harness/src/lib/evidence-html.mjs in the
 // create-cmp repo. Vendored byte-identical into qa/lib/ — edit the package
-// source, then run `node scripts/sync-harness.mjs`.
+// source, then run `node scripts/sync-harness.mjs` in the create-cmp repo.
 
 import { ladderStanding } from "./evidence-level.mjs";
 import { FRAMEWORK_RECORD_COMMAND, trustLine, trustState } from "./framework-record.mjs";

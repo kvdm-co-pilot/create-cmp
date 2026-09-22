@@ -31,7 +31,7 @@
 //
 // SINGLE SOURCE OF TRUTH: packages/harness/src/lib/spec-model.mjs in the
 // create-cmp repo. Vendored byte-identical into qa/lib/ — edit the package
-// source, then run `node scripts/sync-harness.mjs`.
+// source, then run `node scripts/sync-harness.mjs` in the create-cmp repo.
 
 import { resolveHarnessManifest } from "./harness-manifest.mjs";
 import { loadProfileSync } from "./profile-loader.mjs";
