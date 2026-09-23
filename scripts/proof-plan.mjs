@@ -83,6 +83,7 @@ import {
   REVIEW_SKIP,
 } from "./observed-tree.mjs";
 import { stampedOutput, describeStampedDiff } from "./stamped-output.mjs";
+import { rungMeets, normalizeLevel } from "./evidence-rung.mjs";
 import { appendHistory, historyPath, readHistory, summarize, renderHistory, PLAN_EVENT_SCHEMA } from "./lib/proof-history.mjs";
 import { suiteStatus, describeSuiteStatus } from "./suite-record.mjs";
 
@@ -112,10 +113,37 @@ const REVIEW_SCHEMA = "prooflane-review/1";
  * happens once, over everything the slice changed, instead of once per commit
  * over a tree nobody is going to ship.
  */
+/**
+ * THE RUNG THE DEVICE TIER DEMANDS, DECLARED ONCE.
+ *
+ * A fleet check is PASS at whatever level it was TOLD to require: `--min-level
+ * L1` runs the desktop lane, never attaches a device, and writes
+ * `{verdict: "PASS", rung: "L1"}`. So "PASS" is half a sentence, and a reader
+ * that stops there discharges the device tier with a run that never reached a
+ * device — measured 2026-09-22, review round 1 of the stamped-app schedule:
+ * a rung-L1 record over matching bytes printed DISCHARGED and `gh pr merge`
+ * went through with the tier's own question unasked.
+ *
+ * It was three spellings before this: the `--min-level L2` inside the command
+ * this tier prints, nothing at all where a record is accepted, and `rung >= 2`
+ * in the publish gate. Now the command is BUILT from this constant and every
+ * reader holds a record to `TIERS.device.requires` through `recordMeetsTier`,
+ * so moving the bar moves all of them or none.
+ */
+export const DEVICE_TIER_LEVEL = "L2";
+
 const TIERS = Object.freeze({
   suite: { when: "per-commit", cost: "~50s", cmd: "npm test" },
   frameworkCheck: { when: "per-commit", cost: "~4s", cmd: "node scripts/framework-check.mjs" },
-  device: { when: "at-close", cost: "~3.5min + an emulator", cmd: 'CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level L2' },
+  device: {
+    when: "at-close",
+    cost: "~3.5min + an emulator",
+    // What a record must REACH, and the command that produces one — the same
+    // constant, so an agent is never told to run a check whose output this tier
+    // would then refuse.
+    requires: DEVICE_TIER_LEVEL,
+    cmd: `CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level ${DEVICE_TIER_LEVEL}`,
+  },
   // `cmd` is the runnable half; `how` is the part no shell can express, because
   // what produces a review is an agent reading a diff, not a program. Both are
   // printed, so the line an agent reads at the moment of decision says who does
@@ -266,7 +294,13 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
   // costs a read of the diff rather than an unreviewed change.
   const reviewNeed = deriveTierNeed(paths, { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" });
 
-  const dev = tierState(need.required, plan, plan?.discharged, readStamped, { key: "stampedHash", proves: (now) => fleetProof(now, fleetRecord) });
+  const dev = tierState(need.required, plan, plan?.discharged, readStamped, {
+    key: "stampedHash",
+    proves: (now) => recordMeetsTier(fleetRecord, TIERS.device, now),
+    // A discharge is a record's copy, so it is judged as one — one rule, one
+    // function, whichever file the bytes are sitting in.
+    attests: (d, now) => recordMeetsTier(asRecord(d), TIERS.device, now),
+  });
   const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => ({ hash: observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }) }));
   return { ...dev, need, ...base, review: { ...rev, need: reviewNeed } };
 }
@@ -311,7 +345,7 @@ function readStamped(root = REPO_ROOT) {
  * last gate should be told it has reopened the slice, not silently charged for
  * another run.
  */
-function tierState(required, plan, discharged, read, { key = "treeHash", proves = null } = {}) {
+function tierState(required, plan, discharged, read, { key = "treeHash", proves = null, attests = null } = {}) {
   if (!required) return { state: "none" };
   const reading = read();
   const now = reading.hash;
@@ -320,42 +354,135 @@ function tierState(required, plan, discharged, read, { key = "treeHash", proves 
   // travels with it so the refusal names the real problem.
   if (typeof now !== "string") return { state: "owed", now: null, reading, unanswerable: reading.unanswerable ?? "the tree could not be read" };
   // THE EVIDENCE OUTRANKS THE BOOKKEEPING, and only for the bytes it describes.
-  // A device run of THESE EXACT BYTES is the answer to whether they were
-  // proved, whoever ran it and whatever slice it was attributed to — so a
-  // slice that changed nothing the app can see is discharged by the run that
-  // is already on disk, without an emulator and without a second command. The
-  // same reading refuses: a recorded run of these bytes that did NOT pass
-  // discharges nothing, however recently the plan was told otherwise.
-  const proof = proves ? proves(now) : null;
-  if (proof) return { state: proof.verdict === "PASS" ? "discharged" : "owed", now, reading, proof };
-  if (!plan) return { state: "undeclared", now, reading };
-  if (!discharged) return { state: "owed", now, reading };
+  // A device run of THESE EXACT BYTES, at the level this tier declares, is the
+  // answer to whether they were proved — whoever ran it and whatever slice it
+  // was attributed to — so a slice that changed nothing the app can see is
+  // discharged by the run already on disk, without an emulator and without a
+  // second command. `recordMeetsTier` is the whole of that question, rung
+  // included: a run that never reached a device is PASS at L1 and proves
+  // nothing this tier asks.
+  const m = proves ? proves(now) : null;
+  if (m?.ok) return { state: "discharged", now, reading, proof: m.proof };
+  // A record ABOUT these bytes that falls short is carried either way, because
+  // the reader needs to know that the record on disk was seen and why it did
+  // not help — "ran at L1, this tier requires L2" is an action; a bare OWED is
+  // an agent running the same L1 command again.
+  const shortfall = m && !m.ok && m.about ? m : null;
+  // A FAILING run over these exact bytes is new evidence and it outranks a
+  // plan that says otherwise: the app is unchanged, so what failed then fails
+  // now. A run at too LOW a rung is not evidence against anything — it simply
+  // cannot carry this tier — so it never voids a discharge that can.
+  if (shortfall?.code === "verdict") return { state: "owed", now, reading, shortfall };
+  if (!plan) return { state: "undeclared", now, reading, shortfall };
+  if (!discharged) return { state: "owed", now, reading, shortfall };
   const was = discharged[key];
   // A discharge written before this criterion existed is bound to something
   // else entirely (the old input-path hash). It is not compared and not
   // reinterpreted: it counts as no discharge, and the reader is told why.
-  if (typeof was !== "string") return { state: "owed", now, reading, unbound: discharged };
-  return { state: was === now ? "discharged" : "reopened", now, reading, proof: was === now ? discharged : null };
+  if (typeof was !== "string") return { state: "owed", now, reading, unbound: discharged, shortfall };
+  if (was !== now) return { state: "reopened", now, reading, shortfall, proof: null };
+  // THE DISCHARGE ITSELF IS HELD TO THE TIER, by the same function and for the
+  // same reason: it is a COPY of a record, so a plan written from a rung-L1 run
+  // — or from before any reader asked for a rung — carries what L1 carries,
+  // which is not what this tier asks. Without this the hole the review found
+  // would survive one `--discharge` older than the fix.
+  const carried = attests ? attests(discharged, now) : { ok: true, proof: discharged };
+  if (!carried.ok) return { state: "owed", now, reading, shortfall: shortfall ?? carried };
+  return { state: "discharged", now, reading, shortfall, proof: { ...carried.proof, from: "this slice's own discharge" } };
 }
 
 /**
- * The device run on disk, IF it describes the app this tree stamps.
+ * WHETHER A DEVICE RUN'S RECORD PROVES WHAT A TIER ASKS OF IT — the one place
+ * that question is answered, for every reader.
  *
- * `null` for a record that describes another app, and for one that carries no
- * `stampedOutputHash` at all — every record written before the tier was
- * scheduled by the stamped app. Neither is reinterpreted and no hash is
- * invented for either: an unbound record counts as no record, which costs a
- * device run rather than a missed regression.
+ * There were four readers and four different fractions of the question:
+ * `fleetProof` checked the digest, `tierState` added `verdict === "PASS"`,
+ * `--discharge` repeated both by hand, and only the publish gate ever asked for
+ * a RUNG (`rung >= 2`, spelled as a number). A fleet check is PASS at whatever
+ * level it was told to require, so the three that skipped the rung discharged
+ * the device tier with `--min-level L1` runs — the documented desktop-only
+ * invocation, which attaches no device at all.
+ *
+ * ORDER MATTERS, and each step answers in its own words, because the action a
+ * reader should take differs: a record about another app is not a broken stamp,
+ * a broken stamp is not an old record, and a run at L1 is not a failed run.
+ *
+ * `about` says whether the record describes THESE exact stamped bytes. It is
+ * how a caller knows the difference between "this record has nothing to say
+ * here" (fall through to whatever else attests the tree) and "this record is
+ * about this app and it does not carry the tier" (say so, and say which).
+ *
+ * `exit` follows the three outcomes this repo uses everywhere: 1 for checked
+ * and failed, 2 for could not check.
+ *
+ * @param {object|null} record `qa-artifacts/fleet-latest.json`, or null
+ * @param {{requires: string, cmd: string}} tier the tier the record must satisfy
+ * @param {string} now the digest of the app this tree stamps
+ * @returns {{ok: true, proof: object} | {ok: false, exit: 1|2, code: string, about: boolean, reason: string}}
  */
-export function fleetProof(now, record = readFleetRecord()) {
-  if (!record || typeof record.stampedOutputHash !== "string" || record.stampedOutputHash !== now) return null;
+export function recordMeetsTier(record, tier, now) {
+  const required = tier?.requires ?? null;
+  const rerun = `Run the tier once: ${tier?.cmd ?? "the fleet check"}`;
+  const no = (code, exit, reason, about = false) => ({ ok: false, exit, code, about, reason });
+
+  if (!record) return no("none", 2, "no device run is recorded — a discharge is read from its record, never asserted");
+  // ABSENT vs NULL is the difference between two records with nothing in common
+  // but a missing digest, and telling them apart is the difference between a
+  // reader who runs the check again and one who fixes the stamp first.
+  if (!Object.hasOwn(record, "stampedOutputHash")) {
+    return no("pre-criterion", 2, `the recorded device run carries no stampedOutputHash — it predates the stamped-app criterion and counts as no record. ${rerun}; nothing here will invent a digest for a run nobody measured.`);
+  }
+  if (record.stampedOutputHash === null) {
+    const why = typeof record.stampedOutputError === "string" && record.stampedOutputError ? `: ${record.stampedOutputError}` : " (the run recorded no reason)";
+    return no("stamp-failed", 2, `the recorded device run could not hash the app it stamped${why} — so it says nothing about these bytes, however recently it ran. FIX THE STAMP FIRST: another run records the same absent digest until it works.`);
+  }
+  if (typeof record.stampedOutputHash !== "string") {
+    return no("malformed", 2, `the recorded device run's stampedOutputHash is ${typeof record.stampedOutputHash}, not a digest — refusing rather than reading a field whose meaning is a guess. ${rerun}`);
+  }
+  if (record.stampedOutputHash !== now) {
+    return no("other-app", 1, `the recorded device run describes another app (${record.stampedOutputHash.slice(0, 7)} → ${String(now).slice(0, 7)}) — this tree stamps something else. ${rerun}`);
+  }
+
+  // From here the record is ABOUT the app this tree stamps, so whatever it says
+  // is this tier's answer rather than a record that simply does not apply.
+  if (record.verdict !== "PASS") {
+    return no("verdict", 1, `the recorded device run over these exact bytes is ${record.verdict ?? "unstated"}, not PASS — a failing run discharges nothing. ${rerun}`, true);
+  }
+  if (!rungMeets(record.rung, required)) {
+    return no(
+      "rung",
+      1,
+      `the recorded device run ran at ${normalizeLevel(record.rung) ?? `rung none (${record.rung ?? "unstated"})`}, and this tier requires ${required} — a fleet check is PASS at whatever level it was told to require, and --min-level L1 never attaches a device. Re-run at the level: ${tier?.cmd ?? "the fleet check"}`,
+      true,
+    );
+  }
   return {
-    at: record.ranAt ?? null,
-    verdict: record.verdict ?? null,
-    rung: record.rung ?? null,
-    stampedHash: record.stampedOutputHash,
-    stampedFiles: record.stampedOutputFiles ?? null,
-    from: "qa-artifacts/fleet-latest.json",
+    ok: true,
+    proof: {
+      at: record.ranAt ?? null,
+      verdict: record.verdict,
+      rung: normalizeLevel(record.rung),
+      requires: required,
+      stampedHash: record.stampedOutputHash,
+      stampedFiles: record.stampedOutputFiles ?? null,
+      from: "qa-artifacts/fleet-latest.json",
+    },
+  };
+}
+
+/**
+ * A plan's `discharged` block in the shape of the record it was copied from, so
+ * `recordMeetsTier` can judge it without a second spelling of the same rule.
+ * A discharge written before the criterion has no `stampedHash`, and reads here
+ * exactly as a record with no digest does — as no proof at all.
+ */
+function asRecord(discharged) {
+  return {
+    ...(Object.hasOwn(discharged ?? {}, "stampedHash") ? { stampedOutputHash: discharged.stampedHash } : {}),
+    stampedOutputFiles: discharged?.stampedFiles ?? null,
+    verdict: discharged?.verdict ?? null,
+    rung: discharged?.rung ?? null,
+    ranAt: discharged?.at ?? null,
   };
 }
 
@@ -496,17 +623,24 @@ export function render(o) {
       );
       break;
     case "owed":
-      // THREE WAYS A RUN CAN BE OWED, and they want different actions, so they
+      // FOUR WAYS A RUN CAN BE OWED, and they want different actions, so they
       // are different sentences. Only the last of them is "go and run it".
-      if (o.unanswerable) {
+      //
+      // The first is where a record on disk WAS read and did not carry the
+      // tier: too low a rung, a FAIL over these same bytes, a stamp that broke.
+      // `recordMeetsTier` has already said which in one sentence, and saying
+      // only "OWED" over it is what sends an agent to re-run the same
+      // insufficient command. (There is no separate FAIL branch here: a failing
+      // run is one of that function's answers, with its own words.)
+      if (o.shortfall) {
+        line(
+          `OWED — the run on record does not carry this tier (${o.shortfall.code})`,
+          `${o.shortfall.reason}\n      ${o.need.reason}.`,
+        );
+      } else if (o.unanswerable) {
         line(
           "OWED — the app this tree stamps could not be produced",
           `${o.need.reason}.\n      ${o.unanswerable}. Nothing here can say whether these bytes were proven, and a question that\n      cannot be put is owed rather than waved through. Fix the stamp first — everything else about\n      this tier is downstream of it.`,
-        );
-      } else if (o.proof) {
-        line(
-          "OWED — the last run of these exact bytes did NOT pass",
-          `the run at ${o.proof.at} over this same app is ${o.proof.verdict ?? "unstated"}, not PASS (${o.proof.from}).\n      A failing run discharges nothing: the app is unchanged, so what failed then fails now. Fix it, then\n      run the tier again — ${t.cost}:\n        ${t.cmd}`,
         );
       } else if (o.unbound) {
         line(
@@ -524,7 +658,7 @@ export function render(o) {
       const p = o.proof ?? o.plan?.discharged ?? {};
       line(
         "DISCHARGED",
-        `the stamped app is byte-identical to the one proven at ${p.at ?? "an unstated time"} — verdict ${p.verdict ?? "unstated"}, rung ${p.rung ?? "none"}${p.from ? `, read from ${p.from}` : ""}.\n      This tier is scheduled by what the tree STAMPS, not by which input paths moved: an edit the app never\n      sees — engine source, a test, a doc — costs nothing here.`,
+        `the stamped app is byte-identical to the one proven at ${p.at ?? "an unstated time"} — verdict ${p.verdict ?? "unstated"}, rung ${p.rung ?? "none"} against the ${t.requires} this tier requires${p.from ? `, read from ${p.from}` : ""}.\n      This tier is scheduled by what the tree STAMPS, not by which input paths moved: an edit the app never\n      sees — engine source, a test, a doc — costs nothing here.`,
       );
       break;
     }
@@ -831,32 +965,18 @@ function main() {
     // trusts an argument is a claim, and this whole product exists to refuse
     // exactly that shape. The record fleet-check writes is the evidence.
     const rec = readFleetRecord();
-    if (!rec) {
-      process.stderr.write("no device run is recorded — run the fleet check first; a discharge is read from its record, never asserted\n");
-      process.exit(2);
-    }
     const stamped = stampedOutput(REPO_ROOT);
     const now = stamped.hash;
-    // A record from before the tier was scheduled by the stamped app cannot say
-    // whether these bytes were proven — it is bound to the old input-path hash.
-    // Refused as unanswerable (exit 2), never reinterpreted, and never
-    // back-filled with a hash nobody measured.
-    if (typeof rec.stampedOutputHash !== "string") {
-      process.stderr.write("the recorded device run carries no stampedOutputHash — it predates the stamped-app criterion and counts as no record. Run the fleet check on this tree; nothing here will invent a digest for a run nobody measured.\n");
-      process.exit(2);
+    // ONE reading, the same one the schedule prints and the merge gate refuses
+    // on: digest, verdict AND rung. Reading the verdict without the rung is
+    // reading half a record — a fleet check is PASS at whatever level it was
+    // told to require, and `--min-level L1` attaches no device.
+    const m = recordMeetsTier(rec, TIERS.device, now);
+    if (!m.ok) {
+      process.stderr.write(`${m.reason}\n${m.code === "other-app" ? `${describeStampedDiff(rec.stampedOutputFiles, stamped.files)}\n` : ""}`);
+      process.exit(m.exit);
     }
-    if (rec.stampedOutputHash !== now) {
-      process.stderr.write(
-        `the recorded device run does not describe the app this tree stamps (${rec.stampedOutputHash.slice(0, 7)} → ${now.slice(0, 7)}) — it cannot discharge anything.\n` +
-          `${describeStampedDiff(rec.stampedOutputFiles, stamped.files)}\n`,
-      );
-      process.exit(1);
-    }
-    if (rec.verdict !== "PASS") {
-      process.stderr.write(`the recorded device run is ${rec.verdict}, not PASS — a failing run discharges nothing\n`);
-      process.exit(1);
-    }
-    plan.discharged = { at: rec.ranAt, stampedHash: now, stampedFiles: stamped.files, verdict: rec.verdict, rung: rec.rung ?? null };
+    plan.discharged = { at: m.proof.at, stampedHash: now, stampedFiles: stamped.files, verdict: m.proof.verdict, rung: m.proof.rung };
     write(plan);
     process.stdout.write(`${render(obligation(plan))}\n`);
     process.exit(0);

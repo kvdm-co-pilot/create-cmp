@@ -396,18 +396,17 @@ export function decide(kind, o, tiers, ctx) {
     // release refused for a reason it can name is the right outcome; a release
     // allowed because the comparison silently could not run is not.
     if (ctx && !ctx.now) return deny(`the app this tree stamps could not be produced (${ctx.unanswerable ?? "no reason recorded"}), so nothing can compare the fleet record to it. Publishing is refused rather than guessed — fix the stamp, then run ${cmd}.`);
-    const r = ctx?.record;
-    if (!r) return deny(`no fleet record — run ${cmd} first; a release proof is read from its record, never asserted (npm-publish skill step 2).`);
-    // A record with no `stampedOutputHash` predates the stamped-app criterion:
-    // it is bound to the old input-path key and can say nothing about the app
-    // this tree stamps. Refused in its own words rather than through the
-    // comparison below, which would have printed "undefine → 3ed5e09".
-    if (typeof r.stampedOutputHash !== "string") return deny(`the fleet record carries no stampedOutputHash — it predates the stamped-app criterion and counts as no record. Run ${cmd} on this tree; no digest is invented for a run nobody measured.`);
-    if (r.stampedOutputHash !== ctx.now) return deny(`the fleet record describes another app (${r.stampedOutputHash.slice(0, 7)} → ${String(ctx.now).slice(0, 7)}) — this tree stamps something else. Run ${cmd} on this one.`);
-    if (r.verdict !== "PASS") return deny(`the fleet record on this tree is ${r.verdict}, not PASS — the scratch app is the crime scene; do not bump the version.`);
-    const rung = Number(String(r.rung ?? "").replace(/^L/, ""));
-    if (!(rung >= 2)) return deny(`the fleet record on this tree is rung ${r.rung ?? "none"} — a release requires L2: attach an emulator and run ${cmd}.`);
-    return allow(`release proof on this tree: ${r.verdict} at ${r.rung}, ran ${r.ranAt}.`);
+    // THE SAME READING THE SCHEDULE USES, and it used to be a different one:
+    // this gate was the only reader that ever asked for a RUNG, and it asked in
+    // its own spelling (`rung >= 2`, a number parsed out of a string). The
+    // schedule asked for none, so one record could be a release proof here and
+    // a discharge there on different facts. `recordMeetsTier` is now the whole
+    // question — digest, verdict and rung against the tier's declared level —
+    // computed for the JUDGED tree by that tree's own module (releaseContext).
+    if (!ctx?.meets) return deny(`this gate could not put the fleet record to the device tier's requirement, so it cannot say whether this tree has a release proof. Refusing rather than guessing — run ${cmd} and try again.`);
+    if (!ctx.meets.ok) return deny(`${ctx.meets.reason} (npm-publish skill step 2).${ctx.meets.code === "verdict" ? " The scratch app is the crime scene; do not bump the version." : ""}`);
+    const p = ctx.meets.proof;
+    return allow(`release proof on this tree: ${p.verdict} at ${p.rung} (the tier requires ${p.requires}), ran ${p.at}.`);
   }
   if (kind === "create") {
     const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
@@ -1480,6 +1479,10 @@ export function laneAt(pid, args, run = shell()) {
 export async function releaseContext(root = REPO_ROOT) {
   const fs = await import("node:fs");
   const { stampedOutputHash } = root === REPO_ROOT ? await import("../stamped-output.mjs") : await import(pathToFileURL(path.join(root, "scripts", "stamped-output.mjs")).href);
+  // The judged tree's own rule and its own tier, never this one's: what a
+  // release requires is a fact about the tree being published (KD-79's lesson
+  // applied to the requirement rather than to the path).
+  const { recordMeetsTier, TIERS } = await planOf(root);
   let record = null;
   try {
     record = JSON.parse(fs.readFileSync(path.join(root, "qa-artifacts", "fleet-latest.json"), "utf8"));
@@ -1491,7 +1494,8 @@ export async function releaseContext(root = REPO_ROOT) {
   // here escapes into main(), where the hook exits 2 and refuses every command
   // it classifies, with a message about node rather than about the release.
   try {
-    return { record, now: stampedOutputHash(root) };
+    const now = stampedOutputHash(root);
+    return { record, now, meets: recordMeetsTier(record, TIERS.device, now) };
   } catch (err) {
     return { record, now: null, unanswerable: err?.message ?? String(err) };
   }

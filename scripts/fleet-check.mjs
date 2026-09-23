@@ -57,32 +57,15 @@ const PROFILES = new Set(["smoke", "scaffold", "local", "ci", "nightly", "releas
 const APP_NAME = FLEET_SCRATCH_APP.name;
 const APP_PACKAGE = FLEET_SCRATCH_APP.package;
 
-// ── Evidence rungs (§10 item 2's ladder: L0 scaffold / L1 desktop / L2 device / L3 release)
-export const LEVELS = ["L0", "L1", "L2", "L3"];
-
-/** Numeric ordering for rungs: negative when a < b, 0 when equal, positive when a > b. */
-export function compareLevels(a, b) {
-  const ia = LEVELS.indexOf(normalizeLevel(a));
-  const ib = LEVELS.indexOf(normalizeLevel(b));
-  if (ia === -1 || ib === -1) throw new Error(`unknown evidence level: ${ia === -1 ? a : b}`);
-  return ia - ib;
-}
-
-/**
- * "l2", "L2 (device)", or the receipt's own `{ rung: "L2", name, satisfiedBy }`
- * object → "L2"; unknown → null.
- *
- * The object form is what qa/lib/evidence-level.mjs actually returns and what
- * verify.mjs writes onto the receipt. Reading only the string form silently
- * degraded every real receipt to the strength fallback below — caught by the
- * 0.12.0 fleet check, which reported "receipt names no evidenceLevel" against a
- * receipt that named one perfectly well.
- */
-export function normalizeLevel(v) {
-  const raw = v && typeof v === "object" && !Array.isArray(v) ? v.rung : v;
-  const m = String(raw ?? "").match(/L[0-3]/i);
-  return m ? m[0].toUpperCase() : null;
-}
+// ── Evidence rungs (§10 item 2's ladder: L0 scaffold / L1 desktop / L2 device /
+// L3 release). The ladder itself lives in `scripts/evidence-rung.mjs` — a leaf
+// with no imports and no process handlers — because `scripts/proof-plan.mjs`
+// must hold a fleet record to the rung its tier declares, and importing THIS
+// module to get it would hand the PreToolUse hook the signal handlers below.
+// Re-exported here so every existing reader of `fleet-check`'s ladder is
+// unchanged, and there is still exactly one definition of it.
+import { compareLevels, normalizeLevel } from "./evidence-rung.mjs";
+export { LEVELS, compareLevels, normalizeLevel, rungMeets } from "./evidence-rung.mjs";
 
 /**
  * Fallback rung derivation for receipts predating the `evidenceLevel` field.
@@ -377,9 +360,11 @@ async function main() {
   // was proved. This digest is the device tier's whole schedule — proof-plan
   // discharges on it and the publish gate reads it (scripts/stamped-output.mjs).
   let stamped = null;
+  let stampedError = null;
   try {
     stamped = hashStampedTree(appDir);
   } catch (err) {
+    stampedError = err?.message ?? String(err);
     process.stderr.write(`\nfleet check: the stamped app could not be hashed (${err.message}) — this record will carry no stampedOutputHash and will therefore discharge nothing.\n`);
   }
 
@@ -477,7 +462,7 @@ async function main() {
   // earlier `failures.push` sat above it), and it is the worst one to get wrong
   // this way: it fails precisely when the shipped l2Execution claim is an
   // overclaim, which is the thing that should stop a release hardest.
-  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null, startedAt, stamped });
+  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null, startedAt, stamped, stampedError });
 
   if (failures.length) {
     process.stderr.write(`\nfleet check: FAIL\n`);
@@ -509,7 +494,7 @@ async function main() {
  * Lives under qa/evidence/, which inputs-hash excludes as lane output, so
  * recording a run never invalidates a receipt.
  */
-export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failures, avd, root = REPO_ROOT, startedAt = null, stamped = null }) {
+export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failures, avd, root = REPO_ROOT, startedAt = null, stamped = null, stampedError = null }) {
   const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
   const branch = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" });
   const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
@@ -535,10 +520,16 @@ export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failure
     // (scripts/stamped-output.mjs). The commit is kept beside it as provenance a
     // human can read, never as the key.
     //
-    // null when the app could not be hashed: readers treat an absent digest as
-    // no record at all, which is the conservative direction — it costs a run,
-    // never a missed regression.
+    // null when the app could not be hashed — and NULL IS NOT THE SAME AS
+    // ABSENT, which is the whole point of writing the reason beside it. A
+    // record with no such key predates the stamped-app criterion; this one was
+    // written by this fleet check, minutes ago, and its stamp broke. Readers
+    // refuse both (an absent digest proves nothing either way, which costs a
+    // run rather than a missed regression) and they say which is which, because
+    // "your record is old" sends an agent to run the check again and meet the
+    // same broken stamp.
     stampedOutputHash: stamped?.hash ?? null,
+    ...(stamped ? {} : { stampedOutputError: stampedError ?? "the run recorded no reason" }),
     // The manifest is what makes a refusal actionable ("3 file(s) differ,
     // first: …") instead of two digests a reader cannot act on. It rides on the
     // LATEST record only; the history row below drops it for a count, because

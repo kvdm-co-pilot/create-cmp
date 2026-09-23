@@ -262,7 +262,9 @@ test("THE EVIDENCE OUTRANKS THE BOOKKEEPING: the run on disk discharges, and a F
     fs.writeFileSync(rec, `${JSON.stringify(failed, null, 2)}\n`);
     const after = deviceBlock(planOutput(repo).out);
     assert.match(after, /^OWED/, "the app is unchanged, so a FAILING run over it is the last word on these bytes — a plan that says discharged must not outrank it");
-    assert.match(after, /did NOT pass/);
+    // The sentence is `recordMeetsTier`'s now — one reading for every reader —
+    // so what is pinned is that the line names the CAUSE, not its old wording.
+    assert.match(after, /FAIL, not PASS/);
   } finally {
     repo.dispose();
   }
