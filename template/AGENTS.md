@@ -39,7 +39,7 @@ prerequisite.
 | A gate failed and looks arbitrary | `node qa/refusal-demo.mjs` — stages canonical violations so each gate names the clause it protects |
 | Where are we / whose turn is it | `node qa/walk-status.mjs` — every open walk's stage card (Decide·Design·Contract·Build·Prove·Sign-off), whose turn, what arrived unplanned; `--statusline` is the one-liner |
 <!-- <<< cmp:feature harness -->
-| Build broken, toolchain suspect | `npx create-cmp-cli doctor --fix` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog drift); asks before any repair |
+| Build broken, toolchain suspect | `npx create-cmp-cli doctor --fix` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog drift) and applies the safe heals. It also rewrites the hook commands create-cmp itself shipped before 0.26.3 into their anchored form, so they run from any directory — and never a hook this app wrote, which it reports with the form to paste. That rewrite is the one project heal that asks first, and installing a missing tool asks too; `local.properties`, `ksp.useKSP2` and the walk wiring are written without a prompt. `--dry-run` previews every heal and writes nothing |
 | Dependency versions stale or mismatched | `npx create-cmp-cli upgrade --dry-run` — diff against the next proven-green set before touching anything |
 <!-- >>> cmp:feature harness -->
 | Ready to claim done | `node qa/verify.mjs` — the full lane, once, deliberately; commit the receipt it writes |

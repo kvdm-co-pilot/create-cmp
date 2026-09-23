@@ -219,6 +219,24 @@ you the same list without opening anything.
 | **KD-207** | `DEVICE_TIER_IRRELEVANT` declares `*.md` unable to OBLIGE a device run, and markdown under `template/` ships into the stamped app, so the same file's bytes can REOPEN a discharged slice | pre-existing in the same shape and unchanged in severity; the direction is the safe one — a shipped doc can cost a run, never hide one — and the fix is a product decision between two spellings, both with a cost |
 | **KD-208** | the hook's four bounds now sum to exactly its declared budget — `1000 + 3000 + 2500 + 3500 = 10000`, the 10 s `.claude/settings.json` declares — because answering a payload now includes a stamp | the arithmetic test asserts `sum <= budget` and passes, every bound has its own kill-timer so the sum is a worst case that needs all four to saturate, and the measured real answer is ~0.5 s; what is gone is the slack |
 | **KD-209** | `grep -r` here obeys the scanned tree's own `.gitignore`, so a scan of a stamped app silently omits `local.properties` — the file that carries this machine's SDK path | a fact about the tooling, not the tree, logged because it nearly cost a slice a defect: `find … -exec /usr/bin/grep -l …` lists both files, and that is how the three normalisers were shown complete |
+| **KD-210** | a Firebase run proves the template COMPILES, INITIALISES and REDIRECTS — no byte crosses the redirect | nothing in `commonMain` uses a Firebase client and the smoke walk is four screens, so the suite serves zero requests; the risk is a record read as "the redirect carried traffic" |
+| **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production |
+| **KD-212** | the shipped-hooks table is derived from the template FILE's history, but minimal mode writes a SessionStart command that file never carried | no claim rests on it — a minimal stamp's command is fully single-quoted, so it is neither healable nor a violation, and doctor says nothing about it in either direction |
+| **KD-213** | the `--dry-run` gate counts four `fs` spellings where its own header names the class — `copyFileSync`, `renameSync`, `cpSync`, `fs.promises.*` and a destructured import all pass it | zero producers in the tree, and it cannot be written as a failing test: a widened gate is green on these bytes |
+| **KD-214** | `doctor --fix` dies with a raw EACCES stack and prints NO project diagnosis when a heal cannot write, discarding the report and leaving earlier heals half-applied | the refusal is honest and names its cause and its path, the file is left byte-for-byte unchanged, and the unwritable file is a state the adopter created |
+| **KD-215** | the heal makes the Stop gate fire from a foreign cwd, and the remedy it then prints names `node qa/verify.mjs` — a path that does not resolve from where that session stands | the verdict and the exit code are right from both directories; only the remedy's path is relative, and the text is pre-existing and unchanged |
+| **KD-216** | the new working-surface sentence says running the walk by hand "always works", inside the paragraph explaining that a session-relative path does not resolve from another directory | an adopter reads "by hand" as "from the project", nothing routes on the sentence, and the pre-existing fallback one line below uses the accurate word |
+| **KD-218** | the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`, and there is no such flag | refused, exit 2, nothing written; the sentence names something the CLI does not have (KD-184's shape) |
+| **KD-219** | `attach.mjs`'s new comment says the empty `--citation-roots` value "never arrives any more", and this tree's own suite passes it in | the guard it weakens the reason for is still there and still correct; only the reason is false |
+| **KD-220** | a `npm publish` payload stamps the app TWICE — `obligation()` stamps when the device tier is required and `releaseContext()` stamps again — where `ANSWER_RESERVE_MS` is documented as covering one | measured 1.92 s against a 10 s budget (merge, one stamp: 1.09 s), and 1.1–1.8 s per stamp under 16 burners; the overrun direction is fail-open but has no producer today |
+| **KD-221** | the `local.properties` normaliser replaces the WHOLE file, so any byte of it beyond this machine's `sdk.dir` pointer is unwatched by the device digest | measured — appending `org.gradle.java.home=/nope` moves no digest — but `writeLocalProperties` writes only `sdk.dir` and `template/` ships no `local.properties`, so there is no producer; the narrower spelling costs one regex |
+| **KD-222** | `hashStampedTree` records files and symlinks, so an EMPTY DIRECTORY is invisible to the device digest | measured; git cannot ship an empty directory in `template/`, so a stamp cannot produce one as a difference today |
+| **KD-223** | "the gate hashes THIS tree exactly as the release proof records it" now compares `stampedOutput` with itself, and its comment calls that "an INDEPENDENT stamp" | KD-67's three spellings really are gone, so there is nothing left for that test to catch; what is wrong is the sentence, and the pair that IS unguarded is a test nobody has written |
+| **KD-224** | the console's freshness test turned "a completed render cycle IS fresh on return" into "is fresh within 5 s", and widened its boot wait from `idle` to `idle \|\| unrefreshed` | `waitFor` throws on timeout so the assertion still refuses; it is a gate relaxed on the way past, in a change whose stated subject was elsewhere |
+| **KD-225** | two projects' lanes shared one emulator mid-run: create-cmp's fleet check (started 21:12 after the gate saw the other lane exit) lost its e2eSmoke at 21:14 — Maestro logged "Created execution plan" and nothing after, no per-flow report — while payment-blueprint's lane started a new Maestro run on the same `emulator-5554` at 21:14:29; the gate checks for a foreign lane only at START, and the per-serial device lease did not hold across the two projects | the run was FAIL, not a false PASS — fail-closed; the re-run in a quiet window is the remedy the gate itself names |
+| **KD-226** | the fleet-check reader ends a shell word at a quote and the `cd` reader refuses one, so `node /A/scripts/fleet-check.mjs"x"` resolves tree `/A` while the shell runs `/A/scripts/fleet-check.mjsx` | the word the shell builds is not a file in any tree, so the classified run cannot execute whatever the gate decided; `scripts/` is not published |
+| **KD-227** | `docs/GATE-RULES.md` says the KD-95 slice added "Four more" oracle shapes; the table went from 24 rows to 31 | a count in a contributor-facing doc, in the same paragraph KD-104's note already asks to be re-read; the invariant the sentence describes is the one the harness holds |
+| **KD-228** | `formatSpine()` marks lagging fields with `spine.lagging.includes(s)` — object identity — so a spine that has been through `--json` prints no `✗` at all | nothing calls it on a parsed spine today, and the summary line still reads `NOT IN STEP`, so the surface cannot claim health it does not have |
 
 ---
 
@@ -571,6 +589,16 @@ local | ci | nightly | release), so the seam exists and nothing here needs inven
 **Fires when:** any defect in the template's Firebase or iOS code. It cannot be caught by this
 repo's own evidence, only by an adopter. *Logged 2026-09-15, found while fixing the emulator
 redirect.*
+
+**2026-09-22 — the remedy above was rejected by the owner, and the replacement is output-keyed.**
+There is to be no nightly cadence for a static template: a second profile run on a clock proves the
+same bytes over and over and says nothing about the ones that moved. Firebase instead leaves
+stamp-time for an add step (`create-cmp add firebase`, the next slice), after which the Firebase
+proof is owed when the stamped-plus-added app's bytes move — the same output-keyed rule the device
+tier now uses (KD-206 and the `[Unreleased]` entry for it). The emulator-suite run machinery is
+already built and pushed on branch `wave/firebase`, held out of this wave and to be repointed at the
+add step rather than at a schedule. The iOS half of this entry stays parked and is still open as
+written. The decision is recorded in `docs/proposals/LIBRARIES-IN-SERVICES-OUT.md`.
 
 ### KD-46 — the iOS refusal names two causes its catch cannot see
 
@@ -2942,6 +2970,18 @@ should decide whether an unreadable-but-seen device run is refused or reported.
 **Fires when:** a fleet check is invoked through a command substitution or behind a `node` flag.
 *Logged 2026-09-22, in the slice that closed KD-95.*
 
+**2026-09-22 — a third spelling, found by round 1 of the wave's review, and neither reason above
+reaches it.** Quoting the FILE NAME itself — `node /T/A/scripts/"fleet-check.mjs"` or
+`node /T/A/scripts/'fleet-check.mjs'` — is a wholly literal path with no substitution and no flag,
+and `classify()` returns `null` for both while the shell runs the real file: SILENCE, which is what
+KD-95 was. The cause is structural: every quoted alternative inside `FLEET_CHECK_WORD` has to end at
+a `/`, so a quoted span that closes on the file name matches nothing and any quoted span not ending
+at a separator is invisible. It is swept now rather than listed —
+`test/a-fleet-check-the-shell-really-runs-goes-unjudged-or-is-judged-against-another-tree.test.mjs`
+(`fb5715a`, on `wave/review-gates`) runs 690 real device-run spellings and pins these 84 rows as the
+exact known-silent set by REASON, so a silent spelling of any other shape fails the suite, and
+closing this one fails it too until the declaration is deleted.
+
 ### KD-191 — the allocator cannot see a branch that has no pull request
 
 `scripts/kd-next.mjs` (`nextKd`)
@@ -2976,6 +3016,18 @@ rows to write.
 
 **Fires when:** a `cd` operand carries a brace list AND the unexpanded spelling exists as a directory.
 *Logged 2026-09-22, in the slice that closed KD-95.*
+
+**2026-09-22 — the same shape one metacharacter over, found by round 1 of the wave's review.**
+`LITERAL_PATH` also admits `>` and `<`, which a shell reads as redirection operators rather than path
+characters: measured against `/bin/sh`, `cd /tmp/sweep/a>b;` in front of a gated command leaves the
+shell in `/tmp/sweep/here` (its `cd /tmp/sweep/a` failed, stdout sent to `b`) while the gate resolved
+`/tmp/sweep/a>b`. This entry's reason holds unchanged — the resolved path is reachable only if a
+directory literally named with the operator exists, and otherwise the gate refuses it for not being
+there — so it is recorded here rather than by widening `LITERAL_PATH`. It is pinned as the exact
+known-bad reason by
+`test/a-quoting-style-no-curated-row-covers-resolves-a-directory-the-shell-would-not.test.mjs`
+(`4ec50f0`, on `wave/review-gates`), so it can neither grow to another character class silently nor
+outlive its fix.
 
 ### KD-193 — the oracle's failure message describes the gate's answer as the shell's
 
@@ -3408,3 +3460,443 @@ normalisers in `scripts/stamped-output.mjs` were found to be complete.
 
 **Fires when:** any future audit of a generated tree uses `grep -r` and concludes a pattern is absent.
 *Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
+
+### KD-210 — a Firebase run would prove compile, init and redirect; nothing in the template crosses the redirect
+
+`template/composeApp/src/androidMain/kotlin/com/example/app/AppApplication.kt`
+(`configureFirebaseEmulators`) · `template/qa/e2e/smoke.yaml`
+
+What a covered run executes, exactly: the app is BUILT with the GitLive dependencies and the
+google-services plugin, `assembleRelease`/R8 runs over them, `FirebaseApp` initialises from the
+stamped placeholder `google-services.json`, and `configureFirebaseEmulators()` runs all four
+`useEmulator` calls — which is where both escaped redirect defects lived, and where the app now
+REFUSES to start if the redirect fails (`AppApplication.kt:86`, a thrown `IllegalStateException`
+rather than the `runCatching` that once swallowed it). What it does NOT prove is that traffic
+reaches the emulators: nothing in `commonMain` uses a Firebase client — `dev.gitlive` appears only
+in `androidMain/AppApplication.kt` and `iosMain/KoinHelper.kt`, verified on this tree — and
+`qa/e2e/smoke.yaml` walks first frame, the item list and two tab switches, so the suite would serve
+zero requests and would serve zero if it were never started.
+
+The emulator suite is worth running anyway: `useEmulator` is a promise about where traffic WOULD go,
+and the first flow that reads a document needs it. What must not happen is a record being read as
+*"the redirect carried traffic"*.
+
+**Fires when:** anyone reads a Firebase PASS as evidence that the app talked to the emulators.
+*Logged 2026-09-21 by the wave's Firebase fixer, from reading the template rather than from a run;
+folded here 2026-09-22 because it describes the template on this tree, not the held branch's
+machinery.*
+
+### KD-211 — the redirect host assumes the lane's device is an emulator
+
+`template/composeApp/build.gradle.kts:230` (`FIREBASE_EMULATOR_HOST`) ·
+`template/composeApp/src/androidDebug/res/xml/debug_network_security_config.xml`
+
+The stamped app redirects to `10.0.2.2`, the Android emulator's alias for the host's loopback, and a
+Firebase emulator suite binds `127.0.0.1` because that is where the alias leads. If the lane's device
+is not an emulator — `CMP_AVD` unset, a phone on USB — `10.0.2.2` is not the host, the startup
+redirect fails, and because the template refuses to start rather than fall through to production
+(KD-210) the failure is loud and the lane goes red at `e2eSmoke`.
+
+The half of this that can refuse a wrongly declared host lives in the run machinery on branch
+`wave/firebase` (`emulatorPlanFor`), which is not on this tree; what is on this tree is the
+assumption itself, in the two files above. Loud and never silent, and the direction is the safe one:
+a physical device cannot make a Firebase run pass against production.
+
+**Fires when:** someone runs the covered check with a physical device attached.
+*Logged 2026-09-21 by the wave's Firebase fixer; folded here 2026-09-22, re-aimed at the template
+files that carry the assumption on this tree.*
+
+### KD-212 — the table is derived from the template FILE's history, and create-cmp writes a command that file never carried
+
+`src/lib/shipped-hooks.mjs` (header claim, `SHIPPED_COMMANDS`) · `src/lib/minimal.mjs:148` ·
+`test/shipped-hooks-table.test.mjs` ("every command this file has EVER carried is in the table")
+
+The module header says the table is "every command create-cmp's template has ever written into an
+app's `.claude/settings.json`, per surface". The guarding test reads exactly one source for that
+claim — `git log --follow -- template/.claude/settings.json`, every commit, every command — and the
+stamper does not only copy that file. `applyMinimalMode` rewrites the stamped copy and writes
+`sessionStartCommand(MINIMAL_SESSION_CONTEXT)` into it: a string generated at stamp time from a
+constant in `src/lib/minimal.mjs`, which `template/.claude/settings.json` has never carried at any
+commit and which therefore cannot appear in the walk the test performs. Every past value of
+`MINIMAL_SESSION_CONTEXT` sits in the same position. So the set of bytes create-cmp has put into an
+adopter's settings file is strictly larger than the set the table is proven complete over, and the
+one sentence stating the wider claim is guarded by nothing.
+
+**Nobody is wrongly served today, in either direction.** A minimal stamp's SessionStart command is a
+`printf` whose payload is entirely single-quoted, so the anchoring detector masks it and raises no
+violation; it has no successor, so it is not healable; and a minimal scaffold has no
+`qa/walk-status.mjs`, so `gatherWalkInputs` returns `null` and the walk-wiring finding never runs.
+Doctor recognises nothing about it and claims nothing about it — which is the correct answer, reached
+without the table. What is unpinned is the header's sentence, not any answer the tree gives.
+
+**Fires when:** a future heal, or a future "doctor recognises this form" claim, is scoped to
+`SHIPPED_COMMANDS` and meets a minimal-mode stamp — or when `MINIMAL_SESSION_CONTEXT` changes and the
+old command becomes a superseded form with nowhere to be recorded.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+### KD-213 — the `--dry-run` gate refuses four spellings of a write, where its own header names the class
+
+`test/a-dry-run-writes-the-tree-it-is-previewing.test.mjs` ("no project heal writes on its own") ·
+`src/commands/doctor.mjs` (`healWriter`)
+
+The slice's structural gate is the right shape: one writer, `healWriter`, owns every project heal, so
+`--dry-run` is answered in one place rather than remembered in three — which is the fix for the defect
+where three heals each ignored the flag. The test that enforces it, though, is an enumeration. It
+counts `fs.writeFileSync(`, `fs.mkdirSync(`, `fs.rmSync(` and `fs.appendFileSync(` in the file's
+non-comment lines and asserts the tuple `{1, 1, 0, 0}`. Its own header states the invariant one level
+up — *"a heal that calls `fs` itself is invisible to `--dry-run`, which is exactly how three heals
+came to ignore it"* — and that invariant is wider than the four strings. A heal added tomorrow that
+used `fs.copyFileSync`, `fs.renameSync`, `fs.cpSync`, `fs.unlinkSync`, `fs.truncateSync`,
+`fs.openSync` with `fs.writeSync`, `fs.promises.writeFile`, or `import { writeFileSync } from
+"node:fs"` would mutate the adopter's tree under the flag and leave the gate green.
+
+**Nobody is wrongly served today** — `src/commands/doctor.mjs` contains none of those calls, and the
+two it does contain are both inside `healWriter`, which the same test checks. It is logged rather than
+fixed because it cannot be landed as a failing test: a gate widened to the class is green on these
+bytes, and this file's rule is that a review's output is a test that fails for the reason it claims.
+The honest fix is a mechanism rather than a longer list — an allow-list of what `doctor.mjs` may
+import from `node:fs` at all, which is a change to the module, not to the gate.
+
+**Fires when:** the next project heal is written with any `fs` call other than the four, under
+`--fix --dry-run`.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+### KD-214 — a heal that cannot write takes the whole project diagnosis down with it
+
+`src/commands/doctor.mjs` (`healWriter`, `healShippedHookCommands`, `runDoctor` — no `try` around the
+heals) · KD-194 · KD-196 · KD-197
+
+Measured on this tree, with `.claude/settings.json` at mode `0444` and 0.26.2 content:
+`create-cmp doctor --fix --yes --no-install --no-ios --target-dir <tmp>` prints the rewrite preview,
+then
+
+```
+Fatal: Error: EACCES: permission denied, open '…/.claude/settings.json'
+    at write (…/src/commands/doctor.mjs:439:8)
+    at healShippedHookCommands (…/src/commands/doctor.mjs:577:10)
+    at async runDoctor (…/src/commands/doctor.mjs:633:23)
+```
+
+and exits 1. `printFindings` never runs, so every finding the adopter invoked doctor to read — the
+version-catalog checks, `local.properties`, disk headroom, the walk wiring, the unanchored hooks — is
+discarded by a failure in one optional heal. Any heal that already succeeded earlier in the same run
+(`local.properties`, `ksp.useKSP2`) stays applied, with the `✓ --fix: wrote …` line as the only record
+of it, and no re-diagnosis. The shape is pre-existing: `applySafeFixes` has always called the writer
+with no `try`. What this slice adds is a second, later writer on the same unguarded path, so the
+window in which a failed write throws away the report is wider than it was, and it now covers the one
+file the adopter is most likely to have made read-only.
+
+**Nobody is wrongly served by what is SAID.** The failure is loud, names its cause and its exact path,
+the settings file is left byte-for-byte unchanged, and nothing false is printed — the crash happens
+before the `✓ --fix: wrote …` line, not after it. An unwritable `.claude/settings.json` is also a state
+the adopter created. The cost is a diagnosis they have to re-run without `--fix` to get, which is a
+degraded result rather than a wrong one.
+
+**Fires when:** any project heal's target is read-only, on a read-only mount, or otherwise unwritable —
+most plausibly a `.claude/` checked out read-only or owned by another user.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+### KD-215 — the heal revives the Stop gate for foreign-cwd sessions, and its remedy is a path those sessions cannot resolve
+
+`template/qa/receipt-check.mjs` (the `--hook` refusal text) · `src/lib/shipped-hooks.mjs`
+(`stop-receipt-relative` → `stop-receipt-anchored`) · KD-85
+
+Reviving the Stop gate is the point of the heal, and it works: executed from a directory that is not
+the project, with `CLAUDE_PROJECT_DIR` exported the way Claude Code exports it,
+`node "${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs" --hook` produces the same refusal and the same
+exit 2 as it does from the project root — byte-identical message, verified both ways. The message it
+feeds back to the agent is *"Run `node qa/verify.mjs` (it checks every promise and writes the
+receipt), commit the receipt, or see README §Verification enforcement to bypass."* That path is
+relative, and the session being told it is, by construction, not at the project root — a session that
+was at the root had a working Stop hook before the heal and did not need it. So the one population the
+heal newly reaches is the one population for which the remedy's path does not resolve.
+
+**Nobody is handed a wrong verdict.** The gate refuses correctly, for the correct reason, with the
+correct exit code, from both directories; only the remedy's spelling assumes a cwd. An agent that runs
+the command and gets `ENOENT` learns where it is rather than something false. The text is also
+pre-existing and untouched by this change — it is logged here, rather than left to the file that owns
+it, because a fix's own new behaviour is in scope for the round that reviews it, and this heal is what
+makes the message reachable at all.
+
+**Fires when:** a session opened outside the project root ends a turn in an app whose Stop hook has
+been healed, and the receipt does not attest the tree.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+### KD-216 — "always works", in the paragraph explaining why it does not
+
+`src/lib/project-doctor.mjs` (walk-wiring warn branch, the `working.length > 0` detail) · KD-126 ·
+KD-182
+
+The new branch that credits a surface ends its detail with *"…and running `node qa/walk-status.mjs` by
+hand always works."* The paragraph it closes exists to say the opposite about that exact spelling: two
+sentences earlier it explains that a command naming the script by a path relative to the session's
+directory "finds no script there", and that `|| true` makes the miss silent. `always` is the word that
+is not true — the pre-existing fallback one line below, which this branch was written beside, says
+"still works", which is accurate. The finding therefore states the general rule it is teaching and
+then contradicts it in its own last clause, in the one report whose subject is that distinction.
+
+**Nobody is wrongly served.** An adopter reading a report about their project reads "by hand" as "from
+the project", which is where they are; nothing in the tree routes on the sentence, and the remedy
+lines above it are correct. It is the class KD-126 and KD-182 are in — a false fact surviving in a
+second spelling, in prose a contributor or an adopter reads and nothing checks.
+
+**Fires when:** a reader takes the sentence literally and runs the relative command from a
+subdirectory, having just been told by the same paragraph that it will not work there.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+### KD-218 — the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`
+
+`bin/create-cmp.mjs`, `packages/harness/bin/prooflane.mjs` (the `unreadableBooleanValues` refusal);
+`takesNoValue` in both `args.mjs`
+
+`takesNoValue` returns true for **any** name beginning `no-`, and `unknownFlags` treats `no-x` as
+known whenever `x` is — a rule written for `flagBool`'s boolean twins. Together they make
+`--no-<value-flag>` a name both doors accept and then describe:
+
+```
+$ create-cmp harness init --no-target-dir=x
+  create-cmp: --no-target-dir=x — that flag takes `true` or `false`, or no value at all.
+$ prooflane init --no-profile=svc
+  ✗ prooflane: --no-profile=svc — that flag takes `true` or `false`, or no value at all
+```
+
+There is no `--no-target-dir` and no `--no-profile`; the refusal tells the user those flags exist
+and would take `true`. The bare form is worse but quieter: `prooflane init --no-profile svc` stores
+`no-profile: true`, leaves `svc` a positional, and installs the lane into `./svc`. Refused or
+accepted, nothing is written to a tree the user did not name — the sentence is wrong, the same
+shape as KD-184.
+
+**Fires when:** anyone writes `--no-` in front of a value flag.
+*Logged 2026-09-22, round 1 of the doors review.*
+
+### KD-219 — `attach.mjs`'s new comment says the empty value "never arrives any more", and the suite passes it in
+
+`src/commands/attach.mjs` (`manifestFromFlags`, the `citation-roots` comment)
+
+The comment the change put there reads *"the EMPTY value never arrives any more, because the door
+refuses a value flag given none before any command runs (`emptyValues`, bin/create-cmp.mjs)"*. True
+of argv through the bin; false of the function, which is exported and called with
+`{ profile: "Bad Id", "citation-roots": "" }` by `test/attach-manifest.test.mjs:83` in this same
+tree. The `roots.length` guard the comment was weakened around is still load-bearing and still
+correct — only the reason given for keeping it is false.
+
+**Fires when:** anyone reads the comment to decide whether the guard can go.
+*Logged 2026-09-22, round 1 of the doors review.*
+
+### KD-220 — the publish payload stamps the app twice, and the reserve is sized for one
+
+`scripts/hooks/proof-gate.mjs` (`verdict`, `releaseContext`, `ANSWER_RESERVE_MS`)
+
+`verdict()` calls `obligation()` for every classified kind, and `obligation()` stamps the app
+whenever the device tier is required (`readStamped` → `stampedOutput`). For a `publish` payload it
+then calls `releaseContext(root)`, which stamps again — unconditionally, and before `decide()`, so
+it happens even on a branch the first line of the publish rule is about to refuse. Measured on this
+tree 2026-09-22: `npm publish` 1.92 s, `gh pr merge --rebase` 1.09 s, the difference being one whole
+stamp. `ANSWER_RESERVE_MS` is documented as covering one — *"Worst case: 3000 + ~200ms"* — so the
+release path's worst case is 6200 ms of a 3500 ms reserve, and the arithmetic KD-208 is about no
+longer describes it.
+
+Not blocking: the whole hook answers in 1.9 s against a 10 s budget, and a stamp under 16 CPU
+burners measured 1142–1824 ms against its 3000 ms cap, so the four bounds cannot saturate together
+on any load this machine can produce. Worth saying plainly because the overrun direction is
+fail-OPEN — a PreToolUse decision never delivered is a permitted command — and because the cheap fix
+is to pass the stamp `obligation()` already took into `releaseContext` rather than taking a second.
+
+**Fires when:** the stamp gets slower (a bigger template, a colder disk) on a release payload,
+where a single reading is worth two everywhere else.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-221 — the local.properties normaliser blanks the whole file, not the machine pointer in it
+
+`scripts/stamped-output.mjs` (`NORMALISERS`, `MACHINE_POINTER`)
+
+`local.properties` carries this machine's Android SDK path, which is rightly not a byte of the app —
+so it is normalised. But the normaliser is `apply: () => MACHINE_POINTER`: it replaces the file's
+ENTIRE content with a fixed buffer, where the thing that is machine-dependent is the `sdk.dir=` line.
+Measured 2026-09-22 on a live stamp: appending `org.gradle.java.home=/nope` to a stamped app's
+`local.properties` moves no digest at all. The file's own docstring states the narrower intent ("a
+POINTER to a directory on this laptop"), and the module's rule three paragraphs up states the
+standard this falls short of: *"A normaliser that dropped a field carrying real information would be
+a hash that cannot see a change to the stamped app, which is the failure direction that matters."*
+
+Not blocking, and deliberately not fixed by the round that found it: `src/scaffold.mjs`'s
+`writeLocalProperties` writes `sdk.dir` and nothing else, and `template/` ships no
+`local.properties` — only `local.properties.example`, which is watched in full. There is no producer
+today, so no digest can be fooled by it.
+
+**Fires when:** anything the scaffold writes into `local.properties` stops being a path to this
+laptop's SDK. The fix is a line-scoped replace (`/^sdk\.dir=.*$/m`) instead of a whole-file one.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-222 — the device digest cannot see an empty directory
+
+`scripts/stamped-output.mjs` (`hashStampedTree`)
+
+The walk records a manifest row for a file and for a symlink; a directory is only recursed into. So
+a directory that contains nothing contributes nothing, and two stamped apps differing by exactly one
+empty directory hash the same. Measured 2026-09-22: creating
+`composeApp/src/brandNewSourceSet/` in a stamped app moves no digest, where every other mutation
+probed the same way — exec bit, dotfile content, added file, deleted file, new symlink, retargeted
+symlink, `create-cmp.json` field, ADR body — moves it.
+
+Not blocking: git cannot store an empty directory, so `template/` cannot ship one, and the scaffold's
+feature strip removes whole directories rather than emptying them. No tree change today can produce
+an app whose only difference is an empty directory, and an empty source set changes nothing Gradle
+resolves.
+
+**Fires when:** the scaffold starts creating a directory it does not immediately fill — a
+placeholder source set, an output dir, a `.gitkeep`-less scaffold hole. The fix is one manifest row
+for a directory the walk found empty.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-223 — the test that caught two spellings of one hash now compares one spelling with itself
+
+`test/proof-gate-hook.test.mjs` ("npm publish: the gate hashes THIS tree exactly as the release proof records it")
+
+The test exists because of KD-67: `fleet-check` recorded one hash, `proof-plan` compared a second and
+the publish gate computed a third, and a release proof that PASSED on main was refused twice by a
+gate no passing run could satisfy. Under the stamped-app criterion it now asserts
+`releaseContext().now === stampedOutput(ROOT).hash` — and `releaseContext` *is*
+`stampedOutputHash(root)`, imported from the same module, so both sides are one function called
+twice. What it asserts is that the stamp is reproducible, which
+`test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs` already owns outright. Its comment calls
+the right-hand side "an INDEPENDENT stamp … the same thing `fleet-check` hashes", which is not what
+it is; the meta-guard that made the old comparison non-trivial (`observedTreeHash(…,
+DEVICE_TIER_TRIGGERS) !== deviceTreeHash(…)`, i.e. "DEVICE_SKIP excludes something, so this test can
+tell the two apart") was deleted in the same edit.
+
+Not blocking, and it is not a gate edited into agreement: the three spellings really are gone — there
+is one function and every reader calls it — so this test has nothing left to catch. What is wrong is
+the sentence over it. The pair that genuinely must agree and is unguarded is `fleet-check`'s own
+stamp path (`run()` with inherited stdio into `cmp-fleet-check-*`, then `hashStampedTree`) against
+`stampScratchApp`'s (`spawnSync`, stdout ignored, into `cmp-stamped-output-*`); measured by hand
+2026-09-22 over 242 files, the two agree, and no test holds them to it.
+
+**Fires when:** the two stamp paths drift — a flag, a cwd, an stdio mode, a `--keep` — and the
+first symptom is a device tier that can never be discharged by a real fleet run.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-224 — a render-cycle assertion became a poll, and a boot wait widened, in a change about something else
+
+`inspector/mcp/test/preview-service.test.mjs` ("service: a stale state with NOTHING pending says so")
+
+The KD-131 fix is correct about its subject — the banner was fetched after the state was asserted,
+and it is now taken between two readings of the state and kept only when both agree. Two other
+things moved with it. `assert.equal(service.status().freshness.state, "fresh")`, immediately after an
+awaited `_renderCycle()`, became `await waitFor(() => … === "fresh")`: the property "a completed
+render cycle IS fresh on return" is now "is fresh within 5 s". And the boot wait, which was
+`phase !== "idle"`, became `settled = pending === false && (phase === "idle" || phase ===
+"unrefreshed")`.
+
+Not blocking: `waitFor` throws on timeout, so both assertions still refuse — what changed is what
+they refuse, not whether they do, and no adopter runs these tests. Logged because it is a gate
+relaxed on the way past a different fix, which is the one thing a review round is for.
+
+**Fires when:** `_renderCycle()` starts returning before the state it computed is visible, which
+the old spelling would have failed on and this one waits out.
+*Logged 2026-09-22, round 1 review of wave/review-proofs.*
+
+### KD-225 — the device is leased per project, and two projects each held it
+
+`scripts/hooks/proof-gate.mjs` (the foreign-lane check, run once at command start) · `template/qa/lib/profiles/cmp/device-lease.mjs` (the machine-global per-serial lease a stamped lane takes)
+
+Measured 2026-09-22 during the wave's gate pass. `proof-gate` refused the first `fleet-check` because payment-blueprint's `verify.mjs --profile e2e` (pid 20681) was running — correct. It accepted the second, started 21:12 once that pid had exited. At 21:14:29 payment-blueprint's harness started another Maestro run on the same `emulator-5554` (`/Users/test/.maestro/tests/2026-09-22_211429` is ours — `FleetCheck/qa/e2e/smoke.yaml`; the log ends at "Created execution plan"; the 20:08 run is theirs, `com.payment.wasl`). Our `e2eSmoke` failed in 18.8 s with "Maestro failed (no per-flow report was written)"; `androidChecks` then took 437 s against a usual ~25 s. The fleet verdict was FAIL and the device tier stayed OWED — the gate was fail-closed, and nothing was wrongly served.
+
+**What is unpinned.** The gate's foreign-lane check is a point-in-time test at the START of our command; nothing holds the device for the run's duration. The lease the stamped lane takes (`device-lease.mjs`, "machine-global per-serial") is what should serialise two lanes on one serial, and it did not: either payment-blueprint's harness predates it (its tree was stamped from an older engine) or the two lanes' lease files are keyed differently. Not measured which. The template's own `PreToolUse` reminder says exactly why this matters — "the one device is scarce, slow, and fragile, so device proof is a checkpoint, never an inner loop."
+
+**Why it does not block.** Fail-closed both ways: our run recorded FAIL, the tier stayed owed, the remedy the gate prints (wait, then run the tier once) is the right one, and the re-run in a quiet window discharges over the same stamped bytes. **Fires when:** two autonomous sessions on one machine each run a device lane against the one booted emulator. The fix is a slice, not a line: the lease must be taken by `fleet-check` itself for the scratch app's serial, and the gate should read the lease rather than `ps`. *Logged 2026-09-22 by the lead, during the wave's gate pass.*
+
+### KD-226 — the fleet-check reader ends a word at a quote; the `cd` reader refuses one
+
+`scripts/hooks/proof-gate.mjs` (`WORD_END`, `commandCwd`'s `device` branch) · KD-107's and KD-189's class, a third reader over
+
+The slice added `WORD_END` so that a word continuing past its closing quote is refused instead of
+resolved, and `test/a-worktree-under-a-path-with-a-space-in-it-is-a-tree-the-gate-can-name.test.mjs`
+pins that row. The quote characters are in `WORD_END` deliberately — an `sh -c` wrapper around a
+`node scripts/fleet-check.mjs` leaves its own closing quote sitting right after the file name, and
+that row is pinned too. But a quote after an *unquoted* head does not end a shell word, it continues
+it, so the mirror image of the pinned row is accepted. Measured against `/bin/sh`, 2026-09-22:
+
+```
+node /T/A/scripts/fleet-check.mjs"x"   shell word: /T/A/scripts/fleet-check.mjsx   gate: DIR /T/A
+node /T/A/scripts/fleet-check.mjs'x'   shell word: /T/A/scripts/fleet-check.mjsx   gate: DIR /T/A
+node "/T/A/scripts/fleet-check.mjs"x   shell word: /T/A/scripts/fleet-check.mjsx   gate: REFUSED   <- the pinned row
+```
+
+**The same tree's other reader refuses the identical construct.** A `cd` written as an unquoted head
+with a quoted tail comes back *"a `cd` this gate cannot read literally"*, because `LITERAL_PATH`
+excludes a quote from an unquoted word on exactly this reasoning ("an unquoted word carrying either
+is one the shell assembles"). Two readers in one file, one rule — *where does a shell word end* —
+and two answers. That is the class, and it is the class this file has already been bitten by twice.
+
+**Direction: resolves a tree the command will not act in** — the direction that file's own header
+calls "the worst outcome available here". **Fires when:** a `node <path>fleet-check.mjs` operand has
+an unquoted head and a quoted tail. **Nobody is wrongly served:** the word the shell actually builds
+is `…/fleet-check.mjsx`, which is not a file in any tree, so the run node performs is `Cannot find
+module` whatever verdict the gate reached — there is no spelling of this that makes a *real* fleet
+check run against an unjudged tree, because the concatenation can only ever extend
+`fleet-check.mjs`. And `scripts/` is not in the published tarball, so no adopter reaches this reader.
+
+**Not a one-line fix, which is why it is logged rather than patched.** Dropping the two quote
+characters from `WORD_END` reds the `sh -c` row: there, `unclosedQuote(word)` is `null` because the
+word itself contains no quote — the opening quote is before `node`, outside the slice `commandCwd`
+looks at. Telling the wrapper's quote from the word's needs the reader to carry "was a quote already
+open when `node` was reached", which `cmd.slice(at)` has thrown away. The honest fix is one
+declaration of word-ending shared by both readers, which is a slice.
+
+*Logged 2026-09-22, review round 1 of the review-gates area of the integrated wave.*
+
+### KD-227 — Rule 4's new sentence counts the oracle rows it added, and the count is wrong
+
+`docs/GATE-RULES.md` (Rule 4, the `/bin/sh`-as-oracle paragraph) · `test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs`
+
+The paragraph now reads: *"Ten of the 24 shapes disagreed when that harness was written… **Four more
+were added with KD-95**, for operands the reader saw only part of."* Counted off the two refs:
+
+```
+origin/main  SHAPES rows: 24
+HEAD         SHAPES rows: 31      -> seven added, not four
+```
+
+The seven are: quoted-with-space, the same single-quoted, quoted-with-no-space, quoted joined to
+unquoted, unquoted joined to quoted, a substitution joined to a path, and an escape at the end of a
+path.
+
+**Nobody is wrongly served and the argument does not rest on it** — the sentence's claim, that the
+gate resolves what the shell would or resolves nothing, is the property the harness holds, and it
+holds it over more rows than the doc credits. What the number does is the thing this repo has a
+standing objection to: a count in the one document a reader is sent to instead of counting. It sits
+in the same paragraph as the second half of **KD-104**, which already asks a human to decide whether
+"runs 24 shapes" and "holds the invariant" should be said in one breath; that half was partly
+answered here (the slice replaced "24 shapes" with "every shape in its table") and the new sentence
+re-introduced a hard number one clause later. Worth fixing with KD-104 rather than alone.
+
+*Logged 2026-09-22, review round 1 of the review-gates area of the integrated wave.*
+
+### KD-228 — the spine's lagging marker is object identity, and `--json` publishes an object that loses it
+
+`scripts/ground-truth.mjs` (`formatSpine`, `versionSpine`)
+
+`formatSpine` marks a lagging surface with `spine.lagging.includes(s)` — reference equality against
+the same array `versionSpine()` built. `groundTruth()` puts the whole spine on `--json`, and the
+header of `versionSpine` says it is the answer `CLAUDE.md` sends every agent to for "counts and
+versions, never by hand". A spine that has been serialised and read back — which is what `--json`
+exists for — has a `lagging` array of *copies*, so `includes` is false for every row. Measured
+2026-09-22 on a spine with one field forced to `0.26.9`:
+
+```
+live object:        X  .claude-plugin/plugin.json  version   0.26.9
+                       NOT IN STEP: 1 field(s) do not read 0.27.0
+after JSON round:      .claude-plugin/plugin.json  version   0.26.9    <- no marker
+                       NOT IN STEP: 1 field(s) do not read 0.27.0
+```
+
+**Latent, not live:** the only caller today is `main()`, on the object it just built, and all six
+test call sites pass a live `versionSpine(dir)`. **And the failure is not silent even then** — the
+summary line is computed from `spine.lagging.length`, which survives the round trip, so a reader is
+still told the spine is not in step; what they lose is *which field*. The fix is comparing
+`s.version !== spine.version` in the formatter, which is the same predicate `versionSpine` already
+uses to build `lagging` — i.e. the marker should be derived where it is printed rather than carried
+by reference.
+
+*Logged 2026-09-22, review round 1 of the review-gates area of the integrated wave.*

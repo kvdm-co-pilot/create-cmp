@@ -561,6 +561,45 @@ a `dist/server.mjs` rebuild, which belongs to the slice that owns `inspector/mcp
 daemon port). The change this entry asked of `fit-test.mjs` — keep the failing run's output — was
 not made either; what closed this was the message being kept by hand in 2026-09-18's re-placement.
 
+### KD-217 — `--fleet`'s empty form was traded for the generic sentence; two docblocks in the same file disagree about it — **CLOSED 2026-09-23**
+
+`src/lib/args.mjs`, `packages/harness/install/args.mjs` (the `DESTINATION_FLAGS` docblock vs. the
+`emptyValues` docblock immediately below it)
+
+Both copies say, of `DESTINATION_FLAGS`: *"`--fleet` is deliberately NOT here … it already refuses
+both its empty and its bare form with a sentence that teaches the manifest format. Folding it in
+would trade that sentence for this one."* `emptyValues` tests `flags[k] === ""` for **every** value
+flag before consulting `destinations`, so the empty form is already traded — keeping `--fleet` out
+of `DESTINATION_FLAGS` only preserves the **bare** form's sentence. The `emptyValues` docblock
+twelve lines down says the opposite (*"this is that refusal for every value flag, before any
+command runs"*), and the same slice's own test asserts the new behaviour
+(`an-empty-directory-flag-installs-into-the-working-directory.test.mjs:133`, *"every value flag the
+installer takes refuses an empty value by name — `--profile=`, `--fleet=`"*). Measured on
+`e21fc3d`:
+
+```
+$ prooflane upgrade --fleet=
+  ✗ prooflane: --fleet needs a value, and was given none …      exit 2
+$ prooflane upgrade --fleet
+  ✗ --fleet needs the path to a fleet manifest.  A fleet is a file you write… exit 2
+```
+
+Both refuse and write nothing, so nobody is wrongly served; one fact has two spellings in one file
+and the first is false.
+
+**Fires when:** anyone reads either docblock to decide what `DESTINATION_FLAGS` buys.
+*Logged 2026-09-22, round 1 of the doors review.*
+
+**CLOSED by `8a0b7fc`, confirmed by the round-2 reviewer.** Both `DESTINATION_FLAGS` docblocks —
+`src/lib/args.mjs` and `packages/harness/install/args.mjs` — no longer say that folding `--fleet` in
+"would trade that sentence for this one". They now say what the two measurements above show:
+`upgrade --fleet=` is already refused by `emptyValues` with the generic sentence, because that check
+runs for every value flag before the destination set is consulted, and only the BARE `--fleet` still
+reaches `fleet.mjs`'s sentence teaching the manifest format — which is the whole reason for keeping
+`--fleet` out of the set. One fact, one spelling, and it agrees with the `emptyValues` docblock below
+it. `8a0b7fc` is on `wave/review-doors` and is not yet an ancestor of the branch this closure was
+written on; it lands when that branch merges into the wave, ahead of this one.
+
 ### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it — **CLOSED 2026-09-19**
 
 `packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)

@@ -11,6 +11,7 @@ The rules that are programs, and which program — ask these, not a document:
 - the lane returns both ways: `node scripts/framework-check.mjs`
 - a stage's exit: `node scripts/stage-gate.mjs`
 - counts and versions: `node scripts/ground-truth.mjs`, never by hand
+- a defect's **number**: `node scripts/kd-next.mjs`, never the highest number this branch can see
 
 Trunk-based: branch → PR → `gh pr merge --rebase --delete-branch` → pull; one piece in flight.
 Docs move in the same commit as the change. Nothing here restates a rule — a rule stated twice

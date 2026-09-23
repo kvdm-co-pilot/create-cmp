@@ -31,8 +31,20 @@ All notable changes to this project are documented here. The format is based on
   value flag works attached (`--target-dir=./app`, `--profile=svc`, `--fleet=./fleet.json`), a
   declared flag carrying a value it cannot mean (`--dry-run=maybe`) is refused by what was typed
   with nothing written, and an unknown name is refused by its name (`--verfiy=1` → `--verfiy`).
-  Every spelling of `--dry-run` on `create-cmp upgrade`, with or without `--yes`, now leaves the
-  version catalog byte-identical, and is pinned end to end through the real command.
+  Every spelling that MEANS a dry run now leaves the version catalog byte-identical on
+  `create-cmp upgrade`, with or without `--yes`, and every spelling that means *not* a dry run —
+  `--dry-run false`, `--no-dry-run` — applies as asked. All ten spellings the tri-state contract
+  allows are driven end to end through the real command, and which of them means a dry run is asked
+  of the parser itself rather than written into the test.
+  **That sentence was not true when this entry was first written, and the release's own review
+  caught it.** The flag's OTHER name — `--no-dry-run false`, which means *do* a dry run — performed
+  the write at `upgrade`, `clean`, `verify`, `harden`, `attach` and `doctor` while `create-cmp harness
+  init` previewed: measured, `create-cmp upgrade --no-dry-run false --yes` rewrote
+  `gradle/libs.versions.toml` and printed *"Applied."*, with `--yes` auto-answering the one prompt that
+  would have caught it. Every declared boolean those commands read — `--dry-run`, `--yes`,
+  `--minimal`, `--force`, `--fix`, `--verify`, `--harness`, `--no-install`, `--dry-run-verify` — now
+  reads both of its names through one tri-state reader, and a scan refuses a one-name read coming
+  back.
 
 - **The lane vendored into every stamped app told its reader to run a script no stamped app has.**
   `template/qa/lib/profile-contract.mjs` said "Run it with `node scripts/fleet-check.mjs
@@ -87,6 +99,24 @@ All notable changes to this project are documented here. The format is based on
   changes no byte of your project and prints what it *would* write in the same words the real run uses
   (`[dry-run] --fix: would write X` beside `✓ --fix: wrote X`). The rewrite heal does not ask for
   consent under `--dry-run` either: a prompt whose answer cannot matter is worse than no prompt.
+
+- **`create-cmp verify` printed "GREEN — build proven." over a build nobody started, by two routes.**
+  A dry run — `create-cmp verify --dry-run`, and the scaffold's own gate under
+  `create-cmp --dry-run-verify` — printed the verdict table, "GREEN — build proven." and a
+  `::create-cmp-verdict::{"green":true}` marker, and only after all that the sentence saying nothing had
+  run, so the line a person reads first and the line an agent greps both said the opposite of the
+  truth. And a verify in which no step could run on this host — an iOS-only manifest on a machine that
+  cannot build iOS — printed the same GREEN and the same marker and exited 0, because a step skipped as
+  ineligible was counted as a pass. A dry run now prints what it would run and then one sentence —
+  *"Dry run — commands printed, nothing executed; the build is NOT proven."* — with no table, no GREEN
+  and no marker, and exits 0 because nothing failed. A verify in which nothing executed says
+  *"Nothing executed — … the build is NOT proven."* and exits 1, and a skipped step is never
+  `"green":true` in the marker.
+
+- **The AGENTS.md that `create-cmp attach` writes into an existing repo said `doctor --fix` "asks
+  before any repair".** In an attached repo it applies `local.properties` and `ksp.useKSP2` without
+  asking. The row now says that, that it asks before installing any tool, and that `--dry-run` writes
+  nothing.
 
 - **A declared boolean's VALUE form was stored as a string and read as a boolean, in both
   directions.** `create-cmp upgrade --dry-run true --yes` wrote `gradle/libs.versions.toml` and
@@ -304,13 +334,6 @@ All notable changes to this project are documented here. The format is based on
   forever. It is the non-vacuity check the surface list never had, and it earned that during
   wiring: dropping one character from the globbed directory name put both plugin manifests back
   outside the gate while every count assertion still passed.
-- **`create-cmp harness init|relock|upgrade` could not run from an npm install.** `bin/create-cmp.mjs`
-  imports `../packages/harness/install/*.mjs` and the published package never shipped that directory,
-  so all three died with `ERR_MODULE_NOT_FOUND` and a raw Node stack trace. Present in every release
-  from 0.24.0 through 0.26.4, for commands advertised in `--help`. The `prooflane` door was never
-  affected. A new check reads what a bin imports against what `files` ships, so the two lists cannot
-  drift apart again.
-
 ### Contributor tooling
 
 *Nothing in this list is reachable from an installed package: `package.json`'s `files` ships no
@@ -391,6 +414,21 @@ All notable changes to this project are documented here. The format is based on
   cannot be stamped — no `bin/`, or a stamp that dies or outruns its 3000 ms cap — is a STATE (device
   tier OWED, with the reason printed) rather than an exception thrown out of `obligation()` into the
   PreToolUse hook, which exited 2 and then refused **every** command it classifies.
+
+## [0.26.5] - 2026-09-19
+
+### Fixed
+
+- **`create-cmp harness init|relock|upgrade` could not run from an npm install.** `bin/create-cmp.mjs`
+  imports `../packages/harness/install/*.mjs` and the published package never shipped that directory,
+  so all three died with `ERR_MODULE_NOT_FOUND` and a raw Node stack trace. Present in every release
+  from 0.24.0 through 0.26.4, for commands advertised in `--help`. The `prooflane` door was never
+  affected. A new check reads what a bin imports against what `files` ships, so the two lists cannot
+  drift apart again. A second check reads the other verb: `vendorPlan()` in
+  `packages/harness/install/init.mjs` is the single declaration of what `harness init` and
+  `upgrade --harness` COPY out of this package, and a source in that plan that `files` does not ship
+  fails more quietly than a missing import — no stack trace, no refusal, just a tree with one fewer
+  file in it and a `✓ N files written` that says N-1.
 
 ## [0.26.0] - 2026-09-16
 
@@ -3608,6 +3646,7 @@ Initial release.
   marketplace manifest.
 
 [unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...HEAD
+[0.26.5]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...v0.26.5
 [0.26.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.24.0...v0.25.0
 [0.20.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.19.0...v0.20.0
