@@ -235,6 +235,9 @@ you the same list without opening anything.
 | **KD-223** | "the gate hashes THIS tree exactly as the release proof records it" now compares `stampedOutput` with itself, and its comment calls that "an INDEPENDENT stamp" | KD-67's three spellings really are gone, so there is nothing left for that test to catch; what is wrong is the sentence, and the pair that IS unguarded is a test nobody has written |
 | **KD-224** | the console's freshness test turned "a completed render cycle IS fresh on return" into "is fresh within 5 s", and widened its boot wait from `idle` to `idle \|\| unrefreshed` | `waitFor` throws on timeout so the assertion still refuses; it is a gate relaxed on the way past, in a change whose stated subject was elsewhere |
 | **KD-225** | two projects' lanes shared one emulator mid-run: create-cmp's fleet check (started 21:12 after the gate saw the other lane exit) lost its e2eSmoke at 21:14 — Maestro logged "Created execution plan" and nothing after, no per-flow report — while payment-blueprint's lane started a new Maestro run on the same `emulator-5554` at 21:14:29; the gate checks for a foreign lane only at START, and the per-serial device lease did not hold across the two projects | the run was FAIL, not a false PASS — fail-closed; the re-run in a quiet window is the remedy the gate itself names |
+| **KD-226** | the fleet-check reader ends a shell word at a quote and the `cd` reader refuses one, so `node /A/scripts/fleet-check.mjs"x"` resolves tree `/A` while the shell runs `/A/scripts/fleet-check.mjsx` | the word the shell builds is not a file in any tree, so the classified run cannot execute whatever the gate decided; `scripts/` is not published |
+| **KD-227** | `docs/GATE-RULES.md` says the KD-95 slice added "Four more" oracle shapes; the table went from 24 rows to 31 | a count in a contributor-facing doc, in the same paragraph KD-104's note already asks to be re-read; the invariant the sentence describes is the one the harness holds |
+| **KD-228** | `formatSpine()` marks lagging fields with `spine.lagging.includes(s)` — object identity — so a spine that has been through `--json` prints no `✗` at all | nothing calls it on a parsed spine today, and the summary line still reads `NOT IN STEP`, so the surface cannot claim health it does not have |
 
 ---
 
@@ -2968,6 +2971,18 @@ should decide whether an unreadable-but-seen device run is refused or reported.
 **Fires when:** a fleet check is invoked through a command substitution or behind a `node` flag.
 *Logged 2026-09-22, in the slice that closed KD-95.*
 
+**2026-09-22 — a third spelling, found by round 1 of the wave's review, and neither reason above
+reaches it.** Quoting the FILE NAME itself — `node /T/A/scripts/"fleet-check.mjs"` or
+`node /T/A/scripts/'fleet-check.mjs'` — is a wholly literal path with no substitution and no flag,
+and `classify()` returns `null` for both while the shell runs the real file: SILENCE, which is what
+KD-95 was. The cause is structural: every quoted alternative inside `FLEET_CHECK_WORD` has to end at
+a `/`, so a quoted span that closes on the file name matches nothing and any quoted span not ending
+at a separator is invisible. It is swept now rather than listed —
+`test/a-fleet-check-the-shell-really-runs-goes-unjudged-or-is-judged-against-another-tree.test.mjs`
+(`fb5715a`, on `wave/review-gates`) runs 690 real device-run spellings and pins these 84 rows as the
+exact known-silent set by REASON, so a silent spelling of any other shape fails the suite, and
+closing this one fails it too until the declaration is deleted.
+
 ### KD-191 — the allocator cannot see a branch that has no pull request
 
 `scripts/kd-next.mjs` (`nextKd`)
@@ -3002,6 +3017,18 @@ rows to write.
 
 **Fires when:** a `cd` operand carries a brace list AND the unexpanded spelling exists as a directory.
 *Logged 2026-09-22, in the slice that closed KD-95.*
+
+**2026-09-22 — the same shape one metacharacter over, found by round 1 of the wave's review.**
+`LITERAL_PATH` also admits `>` and `<`, which a shell reads as redirection operators rather than path
+characters: measured against `/bin/sh`, `cd /tmp/sweep/a>b;` in front of a gated command leaves the
+shell in `/tmp/sweep/here` (its `cd /tmp/sweep/a` failed, stdout sent to `b`) while the gate resolved
+`/tmp/sweep/a>b`. This entry's reason holds unchanged — the resolved path is reachable only if a
+directory literally named with the operator exists, and otherwise the gate refuses it for not being
+there — so it is recorded here rather than by widening `LITERAL_PATH`. It is pinned as the exact
+known-bad reason by
+`test/a-quoting-style-no-curated-row-covers-resolves-a-directory-the-shell-would-not.test.mjs`
+(`4ec50f0`, on `wave/review-gates`), so it can neither grow to another character class silently nor
+outlive its fix.
 
 ### KD-193 — the oracle's failure message describes the gate's answer as the shell's
 
@@ -3808,3 +3835,98 @@ Measured 2026-09-22 during the wave's gate pass. `proof-gate` refused the first 
 **What is unpinned.** The gate's foreign-lane check is a point-in-time test at the START of our command; nothing holds the device for the run's duration. The lease the stamped lane takes (`device-lease.mjs`, "machine-global per-serial") is what should serialise two lanes on one serial, and it did not: either payment-blueprint's harness predates it (its tree was stamped from an older engine) or the two lanes' lease files are keyed differently. Not measured which. The template's own `PreToolUse` reminder says exactly why this matters — "the one device is scarce, slow, and fragile, so device proof is a checkpoint, never an inner loop."
 
 **Why it does not block.** Fail-closed both ways: our run recorded FAIL, the tier stayed owed, the remedy the gate prints (wait, then run the tier once) is the right one, and the re-run in a quiet window discharges over the same stamped bytes. **Fires when:** two autonomous sessions on one machine each run a device lane against the one booted emulator. The fix is a slice, not a line: the lease must be taken by `fleet-check` itself for the scratch app's serial, and the gate should read the lease rather than `ps`. *Logged 2026-09-22 by the lead, during the wave's gate pass.*
+
+### KD-226 — the fleet-check reader ends a word at a quote; the `cd` reader refuses one
+
+`scripts/hooks/proof-gate.mjs` (`WORD_END`, `commandCwd`'s `device` branch) · KD-107's and KD-189's class, a third reader over
+
+The slice added `WORD_END` so that a word continuing past its closing quote is refused instead of
+resolved, and `test/a-worktree-under-a-path-with-a-space-in-it-is-a-tree-the-gate-can-name.test.mjs`
+pins that row. The quote characters are in `WORD_END` deliberately — an `sh -c` wrapper around a
+`node scripts/fleet-check.mjs` leaves its own closing quote sitting right after the file name, and
+that row is pinned too. But a quote after an *unquoted* head does not end a shell word, it continues
+it, so the mirror image of the pinned row is accepted. Measured against `/bin/sh`, 2026-09-22:
+
+```
+node /T/A/scripts/fleet-check.mjs"x"   shell word: /T/A/scripts/fleet-check.mjsx   gate: DIR /T/A
+node /T/A/scripts/fleet-check.mjs'x'   shell word: /T/A/scripts/fleet-check.mjsx   gate: DIR /T/A
+node "/T/A/scripts/fleet-check.mjs"x   shell word: /T/A/scripts/fleet-check.mjsx   gate: REFUSED   <- the pinned row
+```
+
+**The same tree's other reader refuses the identical construct.** A `cd` written as an unquoted head
+with a quoted tail comes back *"a `cd` this gate cannot read literally"*, because `LITERAL_PATH`
+excludes a quote from an unquoted word on exactly this reasoning ("an unquoted word carrying either
+is one the shell assembles"). Two readers in one file, one rule — *where does a shell word end* —
+and two answers. That is the class, and it is the class this file has already been bitten by twice.
+
+**Direction: resolves a tree the command will not act in** — the direction that file's own header
+calls "the worst outcome available here". **Fires when:** a `node <path>fleet-check.mjs` operand has
+an unquoted head and a quoted tail. **Nobody is wrongly served:** the word the shell actually builds
+is `…/fleet-check.mjsx`, which is not a file in any tree, so the run node performs is `Cannot find
+module` whatever verdict the gate reached — there is no spelling of this that makes a *real* fleet
+check run against an unjudged tree, because the concatenation can only ever extend
+`fleet-check.mjs`. And `scripts/` is not in the published tarball, so no adopter reaches this reader.
+
+**Not a one-line fix, which is why it is logged rather than patched.** Dropping the two quote
+characters from `WORD_END` reds the `sh -c` row: there, `unclosedQuote(word)` is `null` because the
+word itself contains no quote — the opening quote is before `node`, outside the slice `commandCwd`
+looks at. Telling the wrapper's quote from the word's needs the reader to carry "was a quote already
+open when `node` was reached", which `cmd.slice(at)` has thrown away. The honest fix is one
+declaration of word-ending shared by both readers, which is a slice.
+
+*Logged 2026-09-22, review round 1 of the review-gates area of the integrated wave.*
+
+### KD-227 — Rule 4's new sentence counts the oracle rows it added, and the count is wrong
+
+`docs/GATE-RULES.md` (Rule 4, the `/bin/sh`-as-oracle paragraph) · `test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs`
+
+The paragraph now reads: *"Ten of the 24 shapes disagreed when that harness was written… **Four more
+were added with KD-95**, for operands the reader saw only part of."* Counted off the two refs:
+
+```
+origin/main  SHAPES rows: 24
+HEAD         SHAPES rows: 31      -> seven added, not four
+```
+
+The seven are: quoted-with-space, the same single-quoted, quoted-with-no-space, quoted joined to
+unquoted, unquoted joined to quoted, a substitution joined to a path, and an escape at the end of a
+path.
+
+**Nobody is wrongly served and the argument does not rest on it** — the sentence's claim, that the
+gate resolves what the shell would or resolves nothing, is the property the harness holds, and it
+holds it over more rows than the doc credits. What the number does is the thing this repo has a
+standing objection to: a count in the one document a reader is sent to instead of counting. It sits
+in the same paragraph as the second half of **KD-104**, which already asks a human to decide whether
+"runs 24 shapes" and "holds the invariant" should be said in one breath; that half was partly
+answered here (the slice replaced "24 shapes" with "every shape in its table") and the new sentence
+re-introduced a hard number one clause later. Worth fixing with KD-104 rather than alone.
+
+*Logged 2026-09-22, review round 1 of the review-gates area of the integrated wave.*
+
+### KD-228 — the spine's lagging marker is object identity, and `--json` publishes an object that loses it
+
+`scripts/ground-truth.mjs` (`formatSpine`, `versionSpine`)
+
+`formatSpine` marks a lagging surface with `spine.lagging.includes(s)` — reference equality against
+the same array `versionSpine()` built. `groundTruth()` puts the whole spine on `--json`, and the
+header of `versionSpine` says it is the answer `CLAUDE.md` sends every agent to for "counts and
+versions, never by hand". A spine that has been serialised and read back — which is what `--json`
+exists for — has a `lagging` array of *copies*, so `includes` is false for every row. Measured
+2026-09-22 on a spine with one field forced to `0.26.9`:
+
+```
+live object:        X  .claude-plugin/plugin.json  version   0.26.9
+                       NOT IN STEP: 1 field(s) do not read 0.27.0
+after JSON round:      .claude-plugin/plugin.json  version   0.26.9    <- no marker
+                       NOT IN STEP: 1 field(s) do not read 0.27.0
+```
+
+**Latent, not live:** the only caller today is `main()`, on the object it just built, and all six
+test call sites pass a live `versionSpine(dir)`. **And the failure is not silent even then** — the
+summary line is computed from `spine.lagging.length`, which survives the round trip, so a reader is
+still told the spine is not in step; what they lose is *which field*. The fix is comparing
+`s.version !== spine.version` in the formatter, which is the same predicate `versionSpine` already
+uses to build `lagging` — i.e. the marker should be derived where it is printed rather than carried
+by reference.
+
+*Logged 2026-09-22, review round 1 of the review-gates area of the integrated wave.*
