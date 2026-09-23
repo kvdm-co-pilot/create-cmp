@@ -60,7 +60,7 @@ Both commands run from the repo root with nothing to install — \`npx\` fetches
 
 | Symptom | Run |
 |---|---|
-| Build broken, toolchain suspect | \`npx create-cmp-cli doctor --fix\` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog drift); asks before any repair |
+| Build broken, toolchain suspect | \`npx create-cmp-cli doctor --fix\` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog drift). It asks before installing any tool, and applies the two safe project heals (\`local.properties\` from \`ANDROID_HOME\`, \`ksp.useKSP2=true\`) without asking; add \`--dry-run\` to see what it would write and write nothing |
 | Dependency versions stale or mismatched | \`npx create-cmp-cli upgrade --dry-run\` — diff against the next proven-green set before touching anything |
 
 Famous build failures (kotlin↔KSP mismatch, the KSP2/iOS catch-22, \`SDK location not
