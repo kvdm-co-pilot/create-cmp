@@ -100,6 +100,24 @@ All notable changes to this project are documented here. The format is based on
   (`[dry-run] --fix: would write X` beside `✓ --fix: wrote X`). The rewrite heal does not ask for
   consent under `--dry-run` either: a prompt whose answer cannot matter is worse than no prompt.
 
+- **`create-cmp verify` printed "GREEN — build proven." over a build nobody started, by two routes.**
+  A dry run — `create-cmp verify --dry-run`, and the scaffold's own gate under
+  `create-cmp --dry-run-verify` — printed the verdict table, "GREEN — build proven." and a
+  `::create-cmp-verdict::{"green":true}` marker, and only after all that the sentence saying nothing had
+  run, so the line a person reads first and the line an agent greps both said the opposite of the
+  truth. And a verify in which no step could run on this host — an iOS-only manifest on a machine that
+  cannot build iOS — printed the same GREEN and the same marker and exited 0, because a step skipped as
+  ineligible was counted as a pass. A dry run now prints what it would run and then one sentence —
+  *"Dry run — commands printed, nothing executed; the build is NOT proven."* — with no table, no GREEN
+  and no marker, and exits 0 because nothing failed. A verify in which nothing executed says
+  *"Nothing executed — … the build is NOT proven."* and exits 1, and a skipped step is never
+  `"green":true` in the marker.
+
+- **The AGENTS.md that `create-cmp attach` writes into an existing repo said `doctor --fix` "asks
+  before any repair".** In an attached repo it applies `local.properties` and `ksp.useKSP2` without
+  asking. The row now says that, that it asks before installing any tool, and that `--dry-run` writes
+  nothing.
+
 - **A declared boolean's VALUE form was stored as a string and read as a boolean, in both
   directions.** `create-cmp upgrade --dry-run true --yes` wrote `gradle/libs.versions.toml` and
   skipped the consent prompt, because ~24 readers compare `=== true` and `"true" !== true`;
