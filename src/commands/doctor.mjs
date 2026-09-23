@@ -606,8 +606,9 @@ export async function runDoctor(flags, positional) {
     dryRun: flagBool(flags, "dry-run", false),
     ios: flagBool(flags, "ios", true),
     // The negative name is the only one this door documents, and `flagBool`
-    // reads the pair: `--no-install` is false, `--no-install false` is true.
-    installMissing: flagBool(flags, "install", true),
+    // reads the DECLARED name, negated: `--no-install` is false, `--no-install false` is true — never the
+    // undeclared `install`, which the parser would hand the next token as a value.
+    installMissing: !flagBool(flags, "no-install", false),
   });
 
   // 2) Project diagnosis — only when pointed at / run inside a Gradle project.
