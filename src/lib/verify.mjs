@@ -83,7 +83,11 @@ export async function runVerify({ projectDir, manifest, config, dryRun = false }
     if (code !== 0) green = false;
   }
 
-  return { green, results };
+  // `dryRun` travels WITH the verdict, because a dry run's `green` is not a
+  // verdict: every command it skipped was pushed as `code: 0`, so `green` is
+  // true for a build nobody started. The printer below reads this and says so
+  // instead of reporting proof.
+  return { green, results, dryRun };
 }
 
 /**
@@ -91,6 +95,20 @@ export async function runVerify({ projectDir, manifest, config, dryRun = false }
  * @param {{green:boolean, results:Array}} verdict
  */
 export function printVerifyVerdict(verdict) {
+  // A DRY RUN HAS NO VERDICT TO PRINT. It used to print the table, then
+  // "GREEN — build proven." and a `::create-cmp-verdict::{"green":true}` marker,
+  // and only after both of those the sentence saying nothing had run — the line
+  // an adopter reads first and the line an agent greps, both saying the opposite
+  // of the truth. Answered HERE, in the printer, because it has two callers
+  // (`create-cmp verify --dry-run` and the scaffold's gate under
+  // `--dry-run-verify`) and a rule kept at one call site is a rule the other
+  // does not keep. What would have run was already printed by `runVerify`.
+  if (verdict.dryRun) {
+    process.stdout.write(
+      `\n${colors.yellow("Dry run")} — commands printed, nothing executed; the build is NOT proven.\n`
+    );
+    return;
+  }
   process.stdout.write("\n");
   for (const r of verdict.results) {
     if (!r.ran) {
