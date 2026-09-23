@@ -33,6 +33,15 @@ All notable changes to this project are documented here. The format is based on
   with nothing written, and an unknown name is refused by its name (`--verfiy=1` → `--verfiy`).
   Every spelling of `--dry-run` on `create-cmp upgrade`, with or without `--yes`, now leaves the
   version catalog byte-identical, and is pinned end to end through the real command.
+  **That sentence was not true when this entry was first written, and the release's own review
+  caught it.** The flag's OTHER name — `--no-dry-run false`, which means *do* a dry run — performed
+  the write at `upgrade`, `clean`, `verify`, `harden`, `attach` and `doctor` while `create-cmp harness
+  init` previewed: measured, `create-cmp upgrade --no-dry-run false --yes` rewrote
+  `gradle/libs.versions.toml` and printed *"Applied."*, with `--yes` auto-answering the one prompt that
+  would have caught it. Every declared boolean those commands read — `--dry-run`, `--yes`,
+  `--minimal`, `--force`, `--fix`, `--verify`, `--harness`, `--no-install`, `--dry-run-verify` — now
+  reads both of its names through one tri-state reader, and a scan refuses a one-name read coming
+  back.
 
 - **The lane vendored into every stamped app told its reader to run a script no stamped app has.**
   `template/qa/lib/profile-contract.mjs` said "Run it with `node scripts/fleet-check.mjs
