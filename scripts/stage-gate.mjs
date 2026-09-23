@@ -100,7 +100,12 @@ function checkFleet() {
   const rec = readFleetRecord();
   if (!rec.present) return { ok: false, tail: "no device run recorded — run scripts/fleet-check.mjs" };
   if (!rec.current) return { ok: false, tail: `recorded run does not cover this code: ${rec.staleReason}` };
-  return { ok: rec.record.verdict === "PASS", tail: `rung ${rec.record.rung ?? "none"}, verdict ${rec.record.verdict}` };
+  // `current` means the record is ABOUT this tree's app, not that it carries the
+  // device tier — a `--min-level L1` PASS over these bytes is current and is not
+  // fleet L2. The answer is `recordMeetsTier`'s, the one every other reader of
+  // this record acts on; this reader used to compute it and pass on the verdict.
+  const tail = `rung ${rec.record.rung ?? "none"}, verdict ${rec.record.verdict}`;
+  return rec.meets?.ok === true ? { ok: true, tail } : { ok: false, tail: `${tail} — ${rec.meets?.reason ?? "does not carry the device tier"}` };
 }
 
 function evaluate(stage) {
