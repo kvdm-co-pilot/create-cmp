@@ -83,11 +83,19 @@ export async function runVerify({ projectDir, manifest, config, dryRun = false }
     if (code !== 0) green = false;
   }
 
+  // GREEN NEEDS SOMETHING TO HAVE RUN. `green` starts true and only a non-zero
+  // exit turns it false, and an ineligible step is pushed as `code: 0` — so a
+  // manifest whose every step is ineligible on this host (an iOS-only verify on
+  // a machine that cannot build iOS) used to end green over a build nobody
+  // started. `nothingRan` is that case, named, so the printer can say it.
+  const nothingRan = !dryRun && !results.some((r) => r.ran);
+  if (nothingRan) green = false;
+
   // `dryRun` travels WITH the verdict, because a dry run's `green` is not a
   // verdict: every command it skipped was pushed as `code: 0`, so `green` is
   // true for a build nobody started. The printer below reads this and says so
   // instead of reporting proof.
-  return { green, results, dryRun };
+  return { green, results, dryRun, nothingRan };
 }
 
 /**
@@ -120,9 +128,11 @@ export function printVerifyVerdict(verdict) {
     }
   }
   process.stdout.write(
-    verdict.green
-      ? `\n${colors.green("GREEN — build proven.")}\n`
-      : `\n${colors.red("FAIL — build did not go green.")}\n`
+    verdict.nothingRan
+      ? `\n${colors.red("Nothing executed")} — every verify step was skipped as not eligible on this host/config; the build is NOT proven.\n`
+      : verdict.green
+        ? `\n${colors.green("GREEN — build proven.")}\n`
+        : `\n${colors.red("FAIL — build did not go green.")}\n`
   );
 
   // Machine-readable verdict, one greppable line (field-report finding 2.3):
@@ -134,7 +144,8 @@ export function printVerifyVerdict(verdict) {
       green: verdict.green,
       results: verdict.results.map((r) => ({
         platform: r.platform,
-        green: r.code === 0,
+        // A step that did not run is not green, whatever code it was filed under.
+        green: r.ran === true && r.code === 0,
         ran: r.ran,
         durationMs: r.durationMs ?? null,
       })),

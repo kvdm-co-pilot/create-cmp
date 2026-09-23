@@ -35,6 +35,18 @@
 // the machine-readable verdict line an agent parses — while the sentence that
 // tells the truth is required to still be there.
 //
+// THE SAME CLAIM HAS A SECOND ROUTE THAT IS NOT A DRY RUN: a verify plan whose
+// every step is skipped as not eligible here — an iOS-only `verify` block on a
+// host or config where iOS cannot run. `runVerify` pushed each skip as
+// `code: 0, ran: false`, `green` stayed true, and the printer said "GREEN —
+// build proven." with a `"green":true` marker over zero executed steps. Not
+// reachable through `create-cmp verify` — `resolveVerifyCommands` only accepts a
+// manifest that names `verify.android`, which is always eligible — but
+// `src/verify.mjs` re-exports both functions as the documented north-star
+// module, so any caller of the library reaches it. GREEN is earned by a step that
+// RAN: zero executed steps is "not proven", with the reason, and a non-green
+// verdict every caller's exit code already reads.
+//
 // `clean --dry-run` is driven beside it because it is the same shape of command
 // and is cheap to run. `harden --dry-run` is not: reaching its dry-run branch
 // scaffolds two complete apps into temp directories to compute the plan. Read
@@ -170,6 +182,68 @@ test("the printer itself claims no verdict for a dry run — so `create --dry-ru
     assert.doesNotMatch(out, /GREEN|build proven|::create-cmp-verdict::/, `the shared printer claimed a verdict for a dry run:\n${out}`);
     assert.match(out, /Dry run/, `the shared printer did not say it was a dry run:\n${out}`);
     assert.ok(out.includes("echo this-must-not-run"), `the dry run did not print what it would have executed:\n${out}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a verify plan where every step was skipped is NOT proven — no GREEN, no `\"green\":true`, and it says why", () => {
+  // Driven through the library, in a child process with its own stdout: the
+  // manifest's only command is iOS, and `platforms.ios` is off, so it is not
+  // eligible on ANY host. The command would leave a marker file if it ran.
+  const dir = project("nothing-executed-");
+  try {
+    const lib = pathToFileURL(path.join(ROOT, "src", "lib", "verify.mjs")).href;
+    const program =
+      `const { runVerify, printVerifyVerdict } = await import(${JSON.stringify(lib)});\n` +
+      `const verdict = await runVerify({ projectDir: ${JSON.stringify(dir)}, ` +
+      `manifest: { verify: { ios: "touch ran-marker" } }, config: { platforms: { ios: false } } });\n` +
+      `printVerifyVerdict(verdict);\n` +
+      `process.stdout.write("VERDICT_GREEN=" + verdict.green + "\\n");\n`;
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", program], {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 60_000,
+    });
+    const out = `${r.stdout}${r.stderr}`.replace(PLAIN, "");
+    assert.equal(r.status, 0, `the library did not run:\n${out}`);
+    assert.equal(fs.existsSync(path.join(dir, "ran-marker")), false, "the ineligible step ran — this fixture proves nothing");
+
+    // `VERDICT_GREEN=` is this test's own probe line, not the product's output.
+    assert.doesNotMatch(out, /(?<!VERDICT_)GREEN|build proven/, `zero executed steps were reported as proof:\n${out}`);
+    assert.doesNotMatch(out, /"green":true/, `the machine verdict says green for zero executed steps:\n${out}`);
+    assert.match(out, /VERDICT_GREEN=false/, `the verdict every caller's exit code reads is still green:\n${out}`);
+    assert.match(out, /NOT proven/, `it did not say nothing was proven:\n${out}`);
+    assert.match(out, /not eligible/, `it did not say WHY nothing was proven:\n${out}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a step that RAN and passed is still GREEN — the rule is about executed steps, not about the word", () => {
+  // The control: a fix that simply stopped printing GREEN would pass the test
+  // above. One eligible step that runs and exits 0 must still be proof.
+  const dir = project("one-executed-");
+  try {
+    const lib = pathToFileURL(path.join(ROOT, "src", "lib", "verify.mjs")).href;
+    const program =
+      `const { runVerify, printVerifyVerdict } = await import(${JSON.stringify(lib)});\n` +
+      `const verdict = await runVerify({ projectDir: ${JSON.stringify(dir)}, ` +
+      `manifest: { verify: { android: "touch ran-marker", ios: "touch never" } }, config: { platforms: { ios: false } } });\n` +
+      `printVerifyVerdict(verdict);\n` +
+      `process.stdout.write("VERDICT_GREEN=" + verdict.green + "\\n");\n`;
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", program], {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 60_000,
+    });
+    const out = `${r.stdout}${r.stderr}`.replace(PLAIN, "");
+    assert.equal(fs.existsSync(path.join(dir, "ran-marker")), true, `the eligible step did not run:\n${out}`);
+    assert.match(out, /GREEN — build proven\./, `a step that ran and passed was not reported as proof:\n${out}`);
+    assert.match(out, /"green":true/, `the machine verdict lost a real green:\n${out}`);
+    assert.match(out, /VERDICT_GREEN=true/, out);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
