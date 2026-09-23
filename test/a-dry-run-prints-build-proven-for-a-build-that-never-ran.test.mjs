@@ -48,7 +48,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { parseArgs, flagBool } from "../src/lib/args.mjs";
 import { resolveVerifyCommands } from "../src/commands/verify.mjs";
@@ -142,6 +142,37 @@ test("`verify --dry-run` claims no verdict it did not earn, in every spelling th
     "a dry run printed proof of a build it never started — the line an adopter reads first says\n" +
       "GREEN and the line it says last says NOT proven:\n  " + claimed.join("\n  ")
   );
+});
+
+test("the printer itself claims no verdict for a dry run — so `create --dry-run-verify` cannot either", () => {
+  // `printVerifyVerdict` has a second caller: the scaffold's own gate, which
+  // `create-cmp --dry-run-verify` reaches with `dryRun: true` and then prints
+  // exactly as `verify` does (src/scaffold.mjs). Driving THAT through the bin
+  // stamps a whole app to reach one sentence, so the shared pair is driven
+  // instead, in a child process with its own stdout: whatever `runVerify` +
+  // `printVerifyVerdict` print for a dry run, every caller prints.
+  const dir = project("dry-run-printer-");
+  try {
+    const lib = pathToFileURL(path.join(ROOT, "src", "lib", "verify.mjs")).href;
+    const program =
+      `const { runVerify, printVerifyVerdict } = await import(${JSON.stringify(lib)});\n` +
+      `const verdict = await runVerify({ projectDir: ${JSON.stringify(dir)}, ` +
+      `manifest: { verify: { android: "echo this-must-not-run" } }, config: { platforms: { ios: false } }, dryRun: true });\n` +
+      `printVerifyVerdict(verdict);\n`;
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", program], {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 60_000,
+    });
+    const out = `${r.stdout}${r.stderr}`.replace(PLAIN, "");
+    assert.equal(r.status, 0, `the printer did not run:\n${out}`);
+    assert.doesNotMatch(out, /GREEN|build proven|::create-cmp-verdict::/, `the shared printer claimed a verdict for a dry run:\n${out}`);
+    assert.match(out, /Dry run/, `the shared printer did not say it was a dry run:\n${out}`);
+    assert.ok(out.includes("echo this-must-not-run"), `the dry run did not print what it would have executed:\n${out}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("`clean --dry-run` claims nothing either — the same shape, checked at the sibling command", () => {
