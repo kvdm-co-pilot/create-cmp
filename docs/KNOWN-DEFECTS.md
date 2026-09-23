@@ -226,7 +226,6 @@ you the same list without opening anything.
 | **KD-214** | `doctor --fix` dies with a raw EACCES stack and prints NO project diagnosis when a heal cannot write, discarding the report and leaving earlier heals half-applied | the refusal is honest and names its cause and its path, the file is left byte-for-byte unchanged, and the unwritable file is a state the adopter created |
 | **KD-215** | the heal makes the Stop gate fire from a foreign cwd, and the remedy it then prints names `node qa/verify.mjs` — a path that does not resolve from where that session stands | the verdict and the exit code are right from both directories; only the remedy's path is relative, and the text is pre-existing and unchanged |
 | **KD-216** | the new working-surface sentence says running the walk by hand "always works", inside the paragraph explaining that a session-relative path does not resolve from another directory | an adopter reads "by hand" as "from the project", nothing routes on the sentence, and the pre-existing fallback one line below uses the accurate word |
-| **KD-217** | `--fleet`'s empty form was traded for the generic sentence, and two docblocks in one file disagree about whether it was | both refuse, exit 2, nothing written; one fact has two spellings and the first is false |
 | **KD-218** | the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`, and there is no such flag | refused, exit 2, nothing written; the sentence names something the CLI does not have (KD-184's shape) |
 | **KD-219** | `attach.mjs`'s new comment says the empty `--citation-roots` value "never arrives any more", and this tree's own suite passes it in | the guard it weakens the reason for is still there and still correct; only the reason is false |
 | **KD-220** | a `npm publish` payload stamps the app TWICE — `obligation()` stamps when the device tier is required and `releaseContext()` stamps again — where `ANSWER_RESERVE_MS` is documented as covering one | measured 1.92 s against a 10 s budget (merge, one stamp: 1.09 s), and 1.1–1.8 s per stamp under 16 burners; the overrun direction is fail-open but has no producer today |
@@ -3644,35 +3643,6 @@ second spelling, in prose a contributor or an adopter reads and nothing checks.
 **Fires when:** a reader takes the sentence literally and runs the relative command from a
 subdirectory, having just been told by the same paragraph that it will not work there.
 *Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
-
-### KD-217 — `--fleet`'s empty form was traded for the generic sentence; two docblocks in the same file disagree about it
-
-`src/lib/args.mjs`, `packages/harness/install/args.mjs` (the `DESTINATION_FLAGS` docblock vs. the
-`emptyValues` docblock immediately below it)
-
-Both copies say, of `DESTINATION_FLAGS`: *"`--fleet` is deliberately NOT here … it already refuses
-both its empty and its bare form with a sentence that teaches the manifest format. Folding it in
-would trade that sentence for this one."* `emptyValues` tests `flags[k] === ""` for **every** value
-flag before consulting `destinations`, so the empty form is already traded — keeping `--fleet` out
-of `DESTINATION_FLAGS` only preserves the **bare** form's sentence. The `emptyValues` docblock
-twelve lines down says the opposite (*"this is that refusal for every value flag, before any
-command runs"*), and the same slice's own test asserts the new behaviour
-(`an-empty-directory-flag-installs-into-the-working-directory.test.mjs:133`, *"every value flag the
-installer takes refuses an empty value by name — `--profile=`, `--fleet=`"*). Measured on
-`e21fc3d`:
-
-```
-$ prooflane upgrade --fleet=
-  ✗ prooflane: --fleet needs a value, and was given none …      exit 2
-$ prooflane upgrade --fleet
-  ✗ --fleet needs the path to a fleet manifest.  A fleet is a file you write… exit 2
-```
-
-Both refuse and write nothing, so nobody is wrongly served; one fact has two spellings in one file
-and the first is false.
-
-**Fires when:** anyone reads either docblock to decide what `DESTINATION_FLAGS` buys.
-*Logged 2026-09-22, round 1 of the doors review.*
 
 ### KD-218 — the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`
 
