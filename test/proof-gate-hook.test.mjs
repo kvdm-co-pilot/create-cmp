@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
 import { observedTreeHash, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
 import { stampedOutput } from "../scripts/stamped-output.mjs";
-import { TIERS, currentBranch } from "../scripts/proof-plan.mjs";
+import { TIERS, currentBranch, recordMeetsTier } from "../scripts/proof-plan.mjs";
 
 const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/hooks/proof-gate.mjs");
 const FC = "scripts/fleet-check.mjs";
@@ -88,25 +88,41 @@ test("npm publish: the publish skill's first two steps as a program — clean tr
   const now = "c".repeat(40);
   const rec = (over = {}) => ({ stampedOutputHash: now, verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", ...over });
   const onTrunk = o("none", { trunk: true, branch: "main" });
+  // THE CONTEXT IS BUILT THE WAY THE GATE BUILDS IT: `releaseContext` puts the
+  // record to `recordMeetsTier` — the one reading the schedule, the discharge
+  // and this gate now share — and hands `decide` the answer. Fixtures that
+  // spelled the comparison themselves are what let this gate ask for a rung
+  // while the schedule asked for none.
+  const ctx = (record) => ({ record, now, meets: recordMeetsTier(record, TIERS.device, now) });
 
-  assert.match(decide("publish", o("none", { branch: "feat/x" }), TIERS, { record: rec(), now }).reason, /clean main/, "not trunk");
-  assert.match(decide("publish", o("owed", { branch: "feat/x" }), TIERS, { record: rec(), now }).reason, /OWED/, "and says what the branch still owes");
-  assert.equal(decide("publish", onTrunk, TIERS, { record: null, now }).action, "deny", "no record");
-  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ stampedOutputHash: "d".repeat(40) }), now }).reason, /another app/);
+  assert.match(decide("publish", o("none", { branch: "feat/x" }), TIERS, ctx(rec())).reason, /clean main/, "not trunk");
+  assert.match(decide("publish", o("owed", { branch: "feat/x" }), TIERS, ctx(rec())).reason, /OWED/, "and says what the branch still owes");
+  assert.equal(decide("publish", onTrunk, TIERS, ctx(null)).action, "deny", "no record");
+  assert.match(decide("publish", onTrunk, TIERS, ctx(rec({ stampedOutputHash: "d".repeat(40) }))).reason, /another app/);
   // A record from before the tier was bound to the stamped app says nothing
   // about it, and is refused IN THOSE WORDS rather than through the comparison
   // above, which would have printed "undefine → ccccccc".
-  const legacy = decide("publish", onTrunk, TIERS, { record: { verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", observedHash: now }, now });
+  const legacy = decide("publish", onTrunk, TIERS, ctx({ verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", observedHash: now }));
   assert.equal(legacy.action, "deny");
   assert.match(legacy.reason, /no stampedOutputHash/);
-  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ verdict: "FAIL" }), now }).reason, /FAIL, not PASS/);
-  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ rung: "L1" }), now }).reason, /requires L2/);
-  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ rung: null }), now }).reason, /rung none/);
+  assert.match(decide("publish", onTrunk, TIERS, ctx(rec({ verdict: "FAIL" }))).reason, /FAIL, not PASS/);
+  assert.match(decide("publish", onTrunk, TIERS, ctx(rec({ rung: "L1" }))).reason, /requires L2/);
+  assert.match(decide("publish", onTrunk, TIERS, ctx(rec({ rung: null }))).reason, /rung none/);
+  // A run that never reached a device is PASS at L1: the rung is the whole
+  // difference between a release proof and a desktop one, and this gate was the
+  // only reader that ever asked for it.
+  assert.equal(decide("publish", onTrunk, TIERS, ctx(rec({ rung: "L1", avd: null }))).action, "deny");
 
-  const ok = decide("publish", onTrunk, TIERS, { record: rec(), now });
+  const ok = decide("publish", onTrunk, TIERS, ctx(rec()));
   assert.equal(ok.action, "allow");
   assert.match(ok.reason, /PASS at L2/);
-  assert.equal(decide("publish", onTrunk, TIERS, { record: rec({ rung: "L3" }), now }).action, "allow", "a higher rung is not a lower one");
+  assert.equal(decide("publish", onTrunk, TIERS, ctx(rec({ rung: "L3" }))).action, "allow", "a higher rung is not a lower one");
+
+  // AND A GATE THAT COULD NOT PUT THE QUESTION MUST NOT PASS SILENTLY: a ctx
+  // with a record and no reading of it is refused, never read by hand here.
+  const unchecked = decide("publish", onTrunk, TIERS, { record: rec(), now });
+  assert.equal(unchecked.action, "deny", "no `meets` means the comparison never ran — allowing would be a release published on an unread record");
+  assert.match(unchecked.reason, /could not put the fleet record/);
 });
 
 test("npm publish: the gate hashes THIS tree exactly as the release proof records it", async () => {

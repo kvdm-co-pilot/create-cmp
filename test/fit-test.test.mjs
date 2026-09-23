@@ -63,7 +63,9 @@ test("a record goes stale when the app this tree stamps is not the one it proved
     const r = readFleetRecord(p, "b".repeat(64));
     assert.equal(r.present, true);
     assert.equal(r.current, false, "different content must never read as this tree's proof");
-    assert.match(r.staleReason, /the app this tree stamps is not the one this run proved/);
+    // The sentence is `recordMeetsTier`'s — the one reading every fleet-record
+    // reader now shares — so what is pinned is the CAUSE it names.
+    assert.match(r.staleReason, /describes another app/);
     assert.match(render({ suite: null, frameworkCheck: null, device: { required: true, reason: "x" }, fleet: r }), /STALE/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -133,7 +135,7 @@ test("a record written before content-binding is named unverifiable, not trusted
     fs.writeFileSync(p, JSON.stringify({ verdict: "PASS", rung: "L2", requiredLevel: "L2", commit: "abc", steps: [] }));
     const r = readFleetRecord(p, "d".repeat(64));
     assert.equal(r.current, false);
-    assert.match(r.staleReason, /before the record was content-bound/);
+    assert.match(r.staleReason, /predates the stamped-app criterion/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
