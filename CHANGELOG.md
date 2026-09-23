@@ -31,8 +31,11 @@ All notable changes to this project are documented here. The format is based on
   value flag works attached (`--target-dir=./app`, `--profile=svc`, `--fleet=./fleet.json`), a
   declared flag carrying a value it cannot mean (`--dry-run=maybe`) is refused by what was typed
   with nothing written, and an unknown name is refused by its name (`--verfiy=1` → `--verfiy`).
-  Every spelling of `--dry-run` on `create-cmp upgrade`, with or without `--yes`, now leaves the
-  version catalog byte-identical, and is pinned end to end through the real command.
+  Every spelling that MEANS a dry run now leaves the version catalog byte-identical on
+  `create-cmp upgrade`, with or without `--yes`, and every spelling that means *not* a dry run —
+  `--dry-run false`, `--no-dry-run` — applies as asked. All ten spellings the tri-state contract
+  allows are driven end to end through the real command, and which of them means a dry run is asked
+  of the parser itself rather than written into the test.
   **That sentence was not true when this entry was first written, and the release's own review
   caught it.** The flag's OTHER name — `--no-dry-run false`, which means *do* a dry run — performed
   the write at `upgrade`, `clean`, `verify`, `harden`, `attach` and `doctor` while `create-cmp harness
