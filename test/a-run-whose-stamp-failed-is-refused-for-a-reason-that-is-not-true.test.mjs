@@ -159,3 +159,36 @@ test("a PASS record at the tier's own level, over these exact bytes, still prove
   assert.equal(m.proof.rung, TIERS.device.requires);
   assert.equal(m.proof.stampedHash, stamped.hash);
 });
+
+test("THE FIT TEST IS A READER TOO — its Q6 block may not tick a run below the tier, nor call a broken stamp old", async () => {
+  // `scripts/fit-test.mjs` prints NORTH-STAR §10 Q6 — "proof at altitude" —
+  // ready to paste into a PR, under a row labelled `fleet L2`. It read the
+  // fleet record with its own comparison: digest only. So a `--min-level L1`
+  // run over these bytes printed "ran against this exact code ✓" under
+  // `fleet L2`, which is the discharge hole in the one surface a reviewer is
+  // handed as evidence; and a record whose stamp failed was "written before the
+  // record was content-bound", the same wrong sentence as every other reader.
+  const { readFleetRecord, render } = await import("../scripts/fit-test.mjs");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fit-reader-"));
+  const H = "e".repeat(64);
+  const rowFor = (record) => {
+    const p = path.join(dir, "fleet-latest.json");
+    fs.writeFileSync(p, JSON.stringify(record));
+    const fleet = readFleetRecord(p, H);
+    return { fleet, out: render({ suite: null, frameworkCheck: null, device: { required: true, reason: "a template file changed" }, owed: { state: "owed" }, fleet }) };
+  };
+  try {
+    const low = rowFor(recordFor(H, { rung: "L1", requiredLevel: "L1", avd: null }));
+    assert.doesNotMatch(low.out, /ran against this exact code ✓/, `a desktop-only run is ticked under "fleet L2" in the block pasted into a PR as proof:\n${low.out}`);
+    assert.match(low.out, new RegExp(`requires ${TIERS.device.requires}`), `and the row says why it does not count:\n${low.out}`);
+
+    const broken = rowFor(recordFor(null, { stampedOutputError: "the scratch stamp did not produce an app — it exited 1" }));
+    assert.doesNotMatch(broken.fleet.staleReason ?? "", /content-bound|predates/, `a record written by this fleet check, whose stamp failed, is called old:\n${broken.fleet.staleReason}`);
+    assert.match(broken.fleet.staleReason ?? "", /stamp/i);
+
+    // The control: a run AT the tier's level over these bytes is still ticked.
+    assert.match(rowFor(recordFor(H)).out, /ran against this exact code ✓/, "a proof that carries the tier is still quoted as one");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
