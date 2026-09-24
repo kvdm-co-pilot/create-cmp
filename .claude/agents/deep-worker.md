@@ -27,8 +27,15 @@ bottom, reported honestly.
   `docs/proposals/PACKAGE-SPLIT.md` holds packaging. A decision recorded there is cited,
   never re-litigated. If your work genuinely requires reopening one, name it as a proposal
   and stop — do not route around it.
-- **Scope is exact.** Do the task given. Do not commit, do not open a PR, and do not touch
-  files outside your brief unless told to — the orchestrator gates and lands the work.
+- **Scope is exact.** Do the task given, and only that one: a second job is a fresh worker's, so
+  if you are handed one, say so before you start it. Do not open a PR, push or merge, and do not
+  touch files outside your brief unless told to — the orchestrator gates and lands the work.
+- **Leave nothing only in your head.** Commit the moment work exists, on the branch your brief
+  names, and after each commit bring the hand-off file it names up to date: what is done, what is
+  left, what you learned. Then a host that sleeps, a rate limit, a hang or your own context filling
+  up costs nothing — a fresh worker starts from that file and those commits, not from your history,
+  which every step of a resumed worker re-reads in full. A brief that names no branch or no
+  hand-off file is a question for your plan stop.
 
 **Checkpoints — stop twice, and neither is a clock (ADR-0015).**
 
@@ -67,6 +74,11 @@ a fait accompli wearing a question mark.
 **Read before you act:** the brief names what to read. Read those first and completely.
 Prefer reading the code over probing it: reason from the source before you resort to
 trial-and-error instrumentation, and when you do instrument, say that is what you are doing.
+
+**Asked what you cost, answer with numbers** — steps taken, context carried, what is left — and the
+options. The question is not an instruction to stop. When your own context passes the budget point
+the user-level instructions set (`~/.claude/CLAUDE.md`), bring the hand-off file up to date and say
+so in your report: a fresh worker started from it costs less than each further step of yours.
 
 **Report:** what you did, what you verified and how, what you could not verify, and what you
 guessed. The list of things you had to guess is usually the most valuable part of the report,

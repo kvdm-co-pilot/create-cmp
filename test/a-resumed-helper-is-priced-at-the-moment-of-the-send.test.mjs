@@ -316,6 +316,34 @@ test("the plugin ships the hook and this repo wires it — each declared command
   }
 });
 
+test("the guidance points at what exists — every script an agent definition cites, and the hook it names — and never restates the threshold", () => {
+  // The shipped orchestrator told agents to resume first for ten weeks; the
+  // rewrite points at the program instead. A pointer is only worth something
+  // if what it names is there, and the number it prices at lives in ONE place.
+  const defs = ["agents", path.join(".claude", "agents")].flatMap((dir) =>
+    fs.readdirSync(path.join(ROOT, dir)).filter((n) => n.endsWith(".md")).map((n) => path.join(dir, n)),
+  );
+  assert.ok(defs.length >= 3, `found ${defs.length} agent definitions`);
+  const missing = [];
+  const restated = [];
+  const t = RESUME_PRICE_THRESHOLD;
+  const spellings = [String(t), t.toLocaleString("en-US"), `${t / 1000}k`, `${t / 1000},000`];
+  for (const rel of defs) {
+    const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+    for (const [, cited] of text.matchAll(/\b(scripts\/[A-Za-z0-9_./-]+\.mjs)\b/g)) {
+      if (!fs.existsSync(path.join(ROOT, cited))) missing.push(`${rel} cites ${cited}`);
+    }
+    for (const sp of spellings) if (text.includes(sp)) restated.push(`${rel} says "${sp}"`);
+  }
+  assert.deepEqual(missing, [], "a cited script that does not exist");
+  assert.deepEqual(restated, [], "the threshold is declared once, in scripts/hooks/resume-price.mjs; guidance points at the hook");
+
+  const orchestrator = fs.readFileSync(path.join(ROOT, "agents", "cmp-orchestrator.md"), "utf8");
+  assert.match(orchestrator, /`resume-price` hook/, "the shipped orchestrator names the hook that prices a resume");
+  const plugin = JSON.parse(fs.readFileSync(path.join(ROOT, ".claude-plugin", "plugin.json"), "utf8"));
+  assert.ok(fs.readFileSync(path.join(ROOT, plugin.hooks), "utf8").includes("scripts/hooks/resume-price.mjs"), "and the plugin ships a hook by that name");
+});
+
 test("no output ever carries a permission decision — the advisory never allows, asks, defers or denies", () => {
   // `permissionDecision: "allow"` skips the user's permission prompt
   // (code.claude.com/docs/en/hooks.md, "PreToolUse decision control"); an

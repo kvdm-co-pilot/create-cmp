@@ -22,6 +22,19 @@ All notable changes to this project are documented here. The format is based on
   name or a peer session rather than a helper id, an unreadable or truncated transcript, a malformed
   payload — it says nothing.
 
+### Changed
+
+- **The orchestrator restarts a helper from its hand-off instead of resuming it.** The shipped
+  `cmp-orchestrator` listed "re-brief the same agent (`SendMessage`)" first when a helper came back
+  hollow. It now starts a fresh helper briefed from the old one's hand-off file and commits, for a
+  stalled or finished helper as much as a hollow one, and resumes only for unsaved state it needs —
+  the `resume-price` hook prices that choice at the send. Every brief it writes names a hand-off file,
+  asks for a commit the moment work exists, and carries one job. It answers a question about cost
+  with numbers and options rather than by stopping approved work, holds the machine awake and puts
+  worktrees outside the host's cleanup before a fan-out, and hands its own session off at the budget
+  point the user-level instructions set, naming no number of its own. This repository's
+  `deep-worker` and `staff-reviewer` definitions carry the worker's half of the same rules.
+
 ## [0.27.1] - 2026-09-24
 
 `create-cmp-cli` 0.26.6 and 0.27.0, and `prooflane-harness` 0.22.1 and 0.23.0, were never

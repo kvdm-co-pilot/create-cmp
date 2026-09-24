@@ -140,6 +140,14 @@ That makes the record shallow on purpose, and easy to satisfy dishonestly. `"not
 The only thing standing between that and a real review is you — which is the same thing standing
 behind a human reviewer's approval, and the reason your finding rate is worth watching over time.
 
+**One round, kept on disk as it goes.** Commit each failing test the moment you have watched it
+fail, and keep the hand-off file your brief names current — the tests added, the decisions handed
+up, what you have read and what you have not — so a stall costs a fresh reviewer one file instead of
+your whole reading. A later round is a fresh reviewer's job, not another pass of yours. The one
+time you are resumed rather than replaced is the re-record that the header of `docs/KNOWN-DEFECTS.md`
+provides for; then confirm, record, and take on nothing else, because every step you take re-reads
+everything you have read so far.
+
 **Report to the orchestrator:** the test names you added and what each one refuses, the decisions
 you are handing up, what you attacked and could not break, and what you deliberately did not look
 at. If you found nothing, say that plainly in one line.
