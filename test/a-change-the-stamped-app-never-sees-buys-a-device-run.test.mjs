@@ -31,7 +31,7 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { stampedOutput } from "../scripts/stamped-output.mjs";
+import { stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BRANCH = "slice/under-test";
@@ -80,6 +80,8 @@ function proveIt(repo, { at = "2026-09-22T09:00:00.000Z" } = {}) {
     failures: [],
     avd: "Medium_Phone_API_35",
     stampedOutputHash: stamped.hash,
+    // The rule fleet-check writes beside the digest; without it a record reads as rule 1 (scripts/stamped-output.mjs).
+    stampedOutputRule: STAMPED_OUTPUT_RULE,
     stampedOutputFiles: stamped.files,
     commit: null,
     treeWasDirty: false,
@@ -93,7 +95,7 @@ function proveIt(repo, { at = "2026-09-22T09:00:00.000Z" } = {}) {
     openedAt: at,
     base: null,
     declared: { suite: "per-commit", frameworkCheck: "per-commit", device: "at-close", review: "at-close" },
-    discharged: { at, stampedHash: stamped.hash, stampedFiles: stamped.files, verdict: "PASS", rung: "L2" },
+    discharged: { at, stampedHash: stamped.hash, stampedFiles: stamped.files, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" },
     reviewDischarged: null,
   });
   return stamped;

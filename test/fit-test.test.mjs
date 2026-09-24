@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 
 import { deviceTierRequired, parseSuite, parseFrameworkCheck, readFleetRecord, render } from "../scripts/fit-test.mjs";
 import { observedTreeHash } from "../scripts/observed-tree.mjs";
+import { STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 
 test("the device tier runs unless every changed path is declared unable to affect it", () => {
   // Declared IRRELEVANCE, not relevance. The allowlist shape this replaced could
@@ -50,7 +51,7 @@ function recordFor(stampedOutputHash, extra = {}) {
   const p = path.join(dir, "fleet-latest.json");
   fs.writeFileSync(p, JSON.stringify({
     schema: "cmp-fleet-check/1", verdict: "PASS", rung: "L2", requiredLevel: "L2", failures: [],
-    stampedOutputHash, commit: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", treeWasDirty: false, laneVerdict: "PASS",
+    stampedOutputHash, stampedOutputRule: STAMPED_OUTPUT_RULE, commit: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", treeWasDirty: false, laneVerdict: "PASS",
     steps: [{ name: "e2eSmoke", verdict: "PASS", durationMs: 36500 }, { name: "androidChecks", verdict: "PASS", durationMs: 33700 }],
     ...extra,
   }));

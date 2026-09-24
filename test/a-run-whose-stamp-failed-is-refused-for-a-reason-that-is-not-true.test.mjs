@@ -30,7 +30,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { TIERS, recordMeetsTier } from "../scripts/proof-plan.mjs";
-import { stampedOutput } from "../scripts/stamped-output.mjs";
+import { stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BRANCH = "slice/under-test";
@@ -47,6 +47,8 @@ const recordFor = (hash, over = {}) => ({
   failures: [],
   avd: "Medium_Phone_API_35",
   stampedOutputHash: hash,
+  // The rule fleet-check writes beside the digest; without it a record reads as rule 1 (scripts/stamped-output.mjs).
+  stampedOutputRule: STAMPED_OUTPUT_RULE,
   stampedOutputFiles: {},
   commit: null,
   treeWasDirty: false,

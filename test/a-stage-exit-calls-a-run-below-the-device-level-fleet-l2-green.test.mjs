@@ -29,7 +29,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
-import { stampedOutput } from "../scripts/stamped-output.mjs";
+import { stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -64,6 +64,10 @@ test("a stage exit calls the fleet criterion green exactly when the record carri
         requiredLevel: rung ?? "L1",
         failures: [],
         stampedOutputHash: stamped.hash,
+        // Without the rule this record reads as rule 1, every rung answers
+        // `other-rule`, and the equality below holds for a reason that is not
+        // the rung — the fixture carries what fleet-check writes.
+        stampedOutputRule: STAMPED_OUTPUT_RULE,
         stampedOutputFiles: stamped.files,
       };
       fs.writeFileSync(recordFile, `${JSON.stringify(record, null, 2)}\n`);

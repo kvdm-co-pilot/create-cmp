@@ -297,6 +297,7 @@ node scripts/proof-plan.mjs                                    # what is owed, a
 node scripts/proof-plan.mjs --discharge                        # after the run, read from its record
 node scripts/proof-plan.mjs --record-review --round <n>        # the reviewer's own output, bound to this tree
 node scripts/proof-plan.mjs --discharge-review                 # after the review, read from its record
+node scripts/proof-plan.mjs --rekey                            # an old-rule record: re-derive its digest (a stamp, no L2 run)
 node scripts/proof-plan.mjs --close                            # refuses if anything is owed
 node scripts/proof-plan.mjs --history                          # what settled slices cost, read from the kept records
 ```
@@ -365,7 +366,10 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   the app can see is never sent to an emulator by the line it reads; a recorded run of those same
   bytes that did NOT pass refuses, whatever a plan already says. A record written before this
   criterion carries no `stampedOutputHash` and counts as NO record — no digest is invented for a run
-  nobody measured.
+  nobody measured. A record whose digest was taken under an older digest rule is not "another app"
+  either: it is not compared at all until `--rekey` has re-stamped the commit it ran on, reproduced
+  its recorded digest under that rule, and written the current rule's digest beside it — accepted
+  for that one run only, and the fleet record itself is never edited.
 - **There are two at-close tiers, and the second is a review** (ADR-0014). A slice that changes
   anything but prose owes a review record bound to these exact bytes, and `gh pr merge` refuses
   until one exists. The gate checks that the record EXISTS and describes this tree; it never reads

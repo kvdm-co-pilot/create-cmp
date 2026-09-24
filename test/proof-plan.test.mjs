@@ -25,6 +25,7 @@ import { obligation, TIERS, isTrunk, close, outstanding, reviewDischarge, REVIEW
 import { render } from "../scripts/fit-test.mjs";
 import { filesFor, REVIEW_TIER_TRIGGERS, REVIEW_TIER_IRRELEVANT, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
 import { deriveTierNeed, deriveAffectedFilter } from "../packages/harness/src/lib/affected-tests.mjs";
+import { STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -104,7 +105,7 @@ test("a discharge is READ from the run's record, never asserted — and a stale 
   // product exists to refuse (G1). The state machine's own half of that is here:
   // a recorded discharge only counts while it still describes this tree.
   const hash = "a".repeat(64);
-  const discharged = slice({ discharged: { at: "2026-09-08T10:30:00.000Z", stampedHash: hash, stampedFiles: {}, verdict: "PASS", rung: "L2" } });
+  const discharged = slice({ discharged: { at: "2026-09-08T10:30:00.000Z", stampedHash: hash, stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" } });
 
   const o = owes(discharged, TRIGGER);
   // The live tree hash will not equal a fabricated one, so this is the reopened
@@ -118,7 +119,7 @@ test("REOPENED: discharged, then a trigger path moves — the slice reopens inst
   // This is the exact 2026-09-08 sequence, encoded. The device tier is the LAST
   // gate; the mistake was editing a trigger file after discharging, which is a
   // sequencing error and is reported as one rather than as a second bill.
-  const o = owes(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", stampedHash: "b".repeat(64), stampedFiles: {}, verdict: "PASS", rung: "L2" } }), TRIGGER);
+  const o = owes(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", stampedHash: "b".repeat(64), stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" } }), TRIGGER);
   assert.equal(o.state, "reopened");
   assert.ok(o.plan.discharged, "and it still remembers the run it had, so a reader can see what moved");
 });
@@ -129,7 +130,7 @@ test("a discharged slice over an UNCHANGED tree stays discharged — the tier is
   // slice cost nothing. Keyed to the live tree hash so the assertion is about
   // this repository rather than about a fixture.
   const live = owes(slice(), TRIGGER).now;
-  const o = owes(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", stampedHash: live, stampedFiles: {}, verdict: "PASS", rung: "L2" } }), TRIGGER);
+  const o = owes(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", stampedHash: live, stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" } }), TRIGGER);
   assert.equal(o.state, "discharged");
 });
 

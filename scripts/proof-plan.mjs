@@ -27,6 +27,8 @@
 //   node scripts/proof-plan.mjs --record-review --round <n> [--kind round|rerecord]
 //                                                   write the review record (the reviewer's own output)
 //   node scripts/proof-plan.mjs --discharge-review  record that a review of this tree happened
+//   node scripts/proof-plan.mjs --rekey             re-derive an OLD-rule fleet record's digest under
+//                                                   the current rule (a stamp of its commit, no L2 run)
 //   node scripts/proof-plan.mjs --close             refuse if anything is still owed
 //   node scripts/proof-plan.mjs --history [--json]  what settled slices cost, from the kept records
 //
@@ -69,6 +71,7 @@
 // not be answered — the same three outcomes `scripts/stage-gate.mjs` uses, and
 // for the same reason: "I could not check" is not "I checked and it is broken".
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
@@ -82,7 +85,15 @@ import {
   REVIEW_TIER_IRRELEVANT,
   REVIEW_SKIP,
 } from "./observed-tree.mjs";
-import { stampedOutput, describeStampedDiff } from "./stamped-output.mjs";
+import {
+  stampedOutput,
+  describeStampedDiff,
+  stampScratchApp,
+  hashStampedTree,
+  ruleOfRecord,
+  STAMPED_OUTPUT_RULE,
+  STAMPED_OUTPUT_RULES,
+} from "./stamped-output.mjs";
 import { rungMeets, normalizeLevel } from "./evidence-rung.mjs";
 import { appendHistory, historyPath, readHistory, summarize, renderHistory, PLAN_EVENT_SCHEMA } from "./lib/proof-history.mjs";
 import { suiteStatus, describeSuiteStatus } from "./suite-record.mjs";
@@ -101,6 +112,19 @@ const SCHEMA = "prooflane-proof-plan/1";
  */
 const REVIEW_PATH = path.join(REPO_ROOT, "qa-artifacts", "review-latest.json");
 const REVIEW_SCHEMA = "prooflane-review/1";
+
+/**
+ * Where `--rekey` leaves what it re-derived, and the shape it is in.
+ *
+ * BESIDE the fleet record, never IN it: `qa-artifacts/fleet-latest.json` is
+ * what an L2 run measured, and a program that rewrote its digest afterwards
+ * would be a record whose central field nobody measured. The rekey says what it
+ * did and how it knows — the commit it re-stamped, the old rule's digest it
+ * reproduced first, and the new rule's digest of the same stamp — and every
+ * reader accepts it only for the ONE run it names (`rekeyNamesRun`).
+ */
+const REKEY_PATH = path.join(REPO_ROOT, "qa-artifacts", "fleet-rekey-latest.json");
+const REKEY_SCHEMA = "prooflane-fleet-rekey/1";
 
 /**
  * The tiers this repo can run, and WHEN each is due. This is the declaration
@@ -322,6 +346,8 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
     // A discharge is a record's copy, so it is judged as one — one rule, one
     // function, whichever file the bytes are sitting in.
     attests: (d, now) => recordMeetsTier(asRecord(d), TIERS.device, now),
+    // A discharge with no rule was written before the digest had one: rule 1.
+    sameRule: (d) => (Object.hasOwn(d, "stampedRule") ? d.stampedRule : 1) === STAMPED_OUTPUT_RULE,
   });
   const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => ({ hash: observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }) }));
   return { ...dev, need, ...base, review: { ...rev, need: reviewNeed } };
@@ -367,7 +393,7 @@ function readStamped(root = REPO_ROOT) {
  * last gate should be told it has reopened the slice, not silently charged for
  * another run.
  */
-function tierState(required, plan, discharged, read, { key = "treeHash", proves = null, attests = null } = {}) {
+function tierState(required, plan, discharged, read, { key = "treeHash", proves = null, attests = null, sameRule = null } = {}) {
   if (!required) return { state: "none" };
   const reading = read();
   const now = reading.hash;
@@ -389,7 +415,11 @@ function tierState(required, plan, discharged, read, { key = "treeHash", proves 
   // the reader needs to know that the record on disk was seen and why it did
   // not help — "ran at L1, this tier requires L2" is an action; a bare OWED is
   // an agent running the same L1 command again.
-  const shortfall = m && !m.ok && m.about ? m : null;
+  //
+  // `other-rule` travels too, although it is not ABOUT these bytes: it is the
+  // one answer whose action is not an L2 run at all but `--rekey`, and a bare
+  // OWED would send an agent to buy the run a stamp could have settled.
+  const shortfall = m && !m.ok && (m.about || m.code === "other-rule") ? m : null;
   // A FAILING run over these exact bytes is new evidence and it outranks a
   // plan that says otherwise: the app is unchanged, so what failed then fails
   // now. A run at too LOW a rung is not evidence against anything — it simply
@@ -402,6 +432,12 @@ function tierState(required, plan, discharged, read, { key = "treeHash", proves 
   // else entirely (the old input-path hash). It is not compared and not
   // reinterpreted: it counts as no discharge, and the reader is told why.
   if (typeof was !== "string") return { state: "owed", now, reading, unbound: discharged, shortfall };
+  // A discharge copied under ANOTHER digest rule is not compared either: its
+  // hash and `now` were taken by different rules, so "they differ" would be
+  // REOPENED for an app that may not have moved. It counts as no discharge;
+  // the record it was copied from is what `--rekey` re-derives, and once that
+  // is done the record discharges the tier through `proves` above.
+  if (sameRule && !sameRule(discharged)) return { state: "owed", now, reading, shortfall };
   if (was !== now) return { state: "reopened", now, reading, shortfall, proof: null };
   // THE DISCHARGE ITSELF IS HELD TO THE TIER, by the same function and for the
   // same reason: it is a COPY of a record, so a plan written from a rung-L1 run
@@ -437,12 +473,24 @@ function tierState(required, plan, discharged, read, { key = "treeHash", proves 
  * `exit` follows the three outcomes this repo uses everywhere: 1 for checked
  * and failed, 2 for could not check.
  *
+ * THE DIGEST RULE (scripts/stamped-output.mjs, STAMPED_OUTPUT_RULE) is asked
+ * before the digest is compared: two rules' digests of one app differ, so a
+ * record taken under another rule is not "another app" — it is a question
+ * this function cannot put yet (`other-rule`, exit 2). It is answered by
+ * `node scripts/proof-plan.mjs --rekey`, which re-stamps the record's commit
+ * and writes the current rule's digest BESIDE the record; that rekey is read
+ * here, lazily and only when the rules differ, and accepted only when it names
+ * this exact run — same `ranAt`, same commit, the record's own digest as its
+ * starting point, and the record's rule to this tree's. Anything else is not
+ * about this record and is ignored, never half-applied.
+ *
  * @param {object|null} record `qa-artifacts/fleet-latest.json`, or null
  * @param {{requires: string, cmd: string}} tier the tier the record must satisfy
  * @param {string} now the digest of the app this tree stamps
+ * @param {{rekey?: object|null|(() => object|null)}} [opts] the rekey record, or a thunk for it — read from qa-artifacts/ by default
  * @returns {{ok: true, proof: object} | {ok: false, exit: 1|2, code: string, about: boolean, reason: string}}
  */
-export function recordMeetsTier(record, tier, now) {
+export function recordMeetsTier(record, tier, now, { rekey = () => readRekeyRecord() } = {}) {
   const required = tier?.requires ?? null;
   const rerun = `Run the tier once: ${tier?.cmd ?? "the fleet check"}`;
   const no = (code, exit, reason, about = false) => ({ ok: false, exit, code, about, reason });
@@ -461,8 +509,35 @@ export function recordMeetsTier(record, tier, now) {
   if (typeof record.stampedOutputHash !== "string") {
     return no("malformed", 2, `the recorded device run's stampedOutputHash is ${typeof record.stampedOutputHash}, not a digest — refusing rather than reading a field whose meaning is a guess. ${rerun}`);
   }
-  if (record.stampedOutputHash !== now) {
-    return no("other-app", 1, `the recorded device run describes another app (${record.stampedOutputHash.slice(0, 7)} → ${String(now).slice(0, 7)}) — this tree stamps something else. ${rerun}`);
+  // WHICH RULE the digest was taken under, before it is compared with one
+  // taken under this tree's.
+  const recordRule = ruleOfRecord(record);
+  let hash = record.stampedOutputHash;
+  let files = record.stampedOutputFiles ?? null;
+  let rekeyed = null;
+  if (recordRule !== STAMPED_OUTPUT_RULE) {
+    const rk = typeof rekey === "function" ? rekey() : rekey;
+    if (!rekeyNamesRun(rk, record)) {
+      const other = rk && typeof rk === "object" ? ` (qa-artifacts/fleet-rekey-latest.json is there, and names ${typeof rk.ranAt === "string" ? `the run at ${rk.ranAt}` : "no run"} — not this one)` : "";
+      return no(
+        "other-rule",
+        2,
+        `the recorded L2 run's digest was taken under stamped-output rule ${JSON.stringify(recordRule)}, and this tree computes rule ${STAMPED_OUTPUT_RULE} — two rules' digests of one app differ, so nothing here can yet say whether it describes these bytes${other}. ` +
+          `Run \`node scripts/proof-plan.mjs --rekey\` INSTEAD of the L2 run: it re-stamps the commit the run was recorded at, proves that stamp reproduces the recorded digest under rule ${JSON.stringify(recordRule)}, and writes the rule-${STAMPED_OUTPUT_RULE} digest beside the record — seconds, and no L2 run. If the rekeyed app is still not this tree's, the L2 run is owed then, and this line will say so.`,
+      );
+    }
+    rekeyed = { rule: recordRule, hash: record.stampedOutputHash, at: rk.rekeyedAt ?? null };
+    hash = rk.toHash;
+    files = rk.toFiles ?? null;
+  }
+  if (hash !== now) {
+    return {
+      ...no("other-app", 1, `the recorded L2 run describes another app (${hash.slice(0, 7)} → ${String(now).slice(0, 7)}${rekeyed ? `, its digest re-derived under rule ${STAMPED_OUTPUT_RULE} by --rekey` : ""}) — this tree stamps something else. ${rerun}`),
+      // The manifest that was compared, so a caller that names WHICH files
+      // moved diffs like with like — a rekeyed record's own manifest is the
+      // old rule's.
+      files,
+    };
   }
 
   // From here the record is ABOUT the app this tree stamps, so whatever it says
@@ -485,11 +560,49 @@ export function recordMeetsTier(record, tier, now) {
       verdict: record.verdict,
       rung: normalizeLevel(record.rung),
       requires: required,
-      stampedHash: record.stampedOutputHash,
-      stampedFiles: record.stampedOutputFiles ?? null,
-      from: "qa-artifacts/fleet-latest.json",
+      stampedHash: hash,
+      stampedFiles: files,
+      stampedRule: STAMPED_OUTPUT_RULE,
+      ...(rekeyed ? { rekeyedFrom: rekeyed } : {}),
+      from: rekeyed ? "qa-artifacts/fleet-latest.json, its digest re-derived by qa-artifacts/fleet-rekey-latest.json" : "qa-artifacts/fleet-latest.json",
     },
   };
+}
+
+/**
+ * Whether a rekey record re-derives THIS fleet record — every field that
+ * identifies the run, or it says nothing about it.
+ *
+ * `ranAt` and `commit` name the run; `fromHash` and `fromRule` say the rekey
+ * started from this record's own digest (which `--rekey` reproduced before it
+ * wrote anything); `toRule` says it was re-derived to the rule this tree
+ * computes. A rekey of the run before, of the same run under a third rule, or
+ * of a record that was since overwritten by a new run, matches none of them.
+ */
+export function rekeyNamesRun(rk, record) {
+  if (!rk || typeof rk !== "object" || !record || typeof record !== "object") return false;
+  return (
+    rk.schema === REKEY_SCHEMA &&
+    typeof rk.ranAt === "string" &&
+    rk.ranAt === record.ranAt &&
+    typeof rk.commit === "string" &&
+    rk.commit === record.commit &&
+    typeof rk.fromHash === "string" &&
+    rk.fromHash === record.stampedOutputHash &&
+    rk.fromRule === ruleOfRecord(record) &&
+    rk.toRule === STAMPED_OUTPUT_RULE &&
+    typeof rk.toHash === "string" &&
+    /^[0-9a-f]{64}$/.test(rk.toHash)
+  );
+}
+
+/** The rekey record `--rekey` wrote, or null. Never throws — read only when a record's rule differs. */
+export function readRekeyRecord(file = REKEY_PATH) {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -501,6 +614,9 @@ export function recordMeetsTier(record, tier, now) {
 function asRecord(discharged) {
   return {
     ...(Object.hasOwn(discharged ?? {}, "stampedHash") ? { stampedOutputHash: discharged.stampedHash } : {}),
+    // A discharge written before the digest had a rule carries none, and reads
+    // as the record it was copied from did: rule 1.
+    ...(Object.hasOwn(discharged ?? {}, "stampedRule") ? { stampedOutputRule: discharged.stampedRule } : {}),
     stampedOutputFiles: discharged?.stampedFiles ?? null,
     verdict: discharged?.verdict ?? null,
     rung: discharged?.rung ?? null,
@@ -514,6 +630,125 @@ export function readFleetRecord(file = path.join(REPO_ROOT, "qa-artifacts", "fle
     return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch {
     return null;
+  }
+}
+
+/**
+ * What a rekey's stamp may cost. NOT `STAMP_CAP_MS`: that cap exists because
+ * `obligation()` stamps inside a hook with a 10s budget, and `--rekey` is a
+ * command an agent runs on purpose, once, over a tree it has just unpacked.
+ * A rekey killed at 3s on a busy laptop is a refusal for a reason that is not
+ * true.
+ */
+const REKEY_STAMP_TIMEOUT_MS = 120_000;
+
+/**
+ * `git archive <commit> | tar -x` into `dir`, as two processes with the bytes
+ * held between them — no shell, so nothing in a commit string is ever parsed
+ * by one (it is also checked to be a full hex sha before this is called).
+ */
+function extractCommit(root, commit, dir) {
+  const tarball = spawnSync("git", ["archive", "--format=tar", commit], { cwd: root, maxBuffer: 1024 * 1024 * 1024 });
+  if (tarball.status !== 0) return `git archive ${commit} exited ${tarball.status ?? tarball.signal}: ${String(tarball.stderr ?? "").trim().split("\n").slice(-1)[0] || "no stderr"}`;
+  const untar = spawnSync("tar", ["-x", "-f", "-", "-C", dir], { input: tarball.stdout, maxBuffer: 64 * 1024 * 1024 });
+  if (untar.status !== 0) return `tar -x exited ${untar.status ?? untar.signal}: ${String(untar.stderr ?? "").trim().split("\n").slice(-1)[0] || "no stderr"}`;
+  return null;
+}
+
+/**
+ * RE-DERIVE AN OLD-RULE FLEET RECORD'S DIGEST UNDER THE CURRENT RULE — from
+ * the commit it ran on, and never by editing it.
+ *
+ * WHY THIS EXISTS: raising STAMPED_OUTPUT_RULE (scripts/stamped-output.mjs)
+ * makes every PASS record on every laptop incomparable with the tree beside
+ * it. The honest options were an L2 run per laptop to re-prove apps that did
+ * not move, or a translation that shows its work. This is the second, and its
+ * work is: unpack the record's commit OUTSIDE the repository, stamp it with
+ * that commit's own `create-cmp`, hash the stamp under the record's rule and
+ * REFUSE unless that reproduces the recorded digest exactly — only then is the
+ * same stamp hashed under the current rule and written to
+ * `qa-artifacts/fleet-rekey-latest.json`. The reproduction is the proof that
+ * the stamp is the app the run proved; without it the new digest would be a
+ * claim about some other app.
+ *
+ * REFUSED, each for its own reason and before anything is stamped: no record,
+ * no digest on it, a record already under the current rule (nothing to do), a
+ * rule this module cannot compute, a verdict other than PASS or a rung below
+ * the tier (a rekey would re-label a run that discharges nothing), no commit
+ * (nothing to re-stamp), a run over a dirty tree (the commit is not the tree it
+ * proved — `treeWasDirty` must be explicitly false), no `ranAt` (the rekey is
+ * keyed by it), or a commit this checkout does not have.
+ *
+ * It appends no history row (the orchestrator's answer 7, 2026-09-24): the
+ * history counts what proving COST, and a rekey proves nothing new.
+ *
+ * @returns {{ok: true, rekey: object, message: string} | {ok: false, exit: 1|2, message: string}}
+ */
+export function rekey({ root = REPO_ROOT, record = readFleetRecord(), out = REKEY_PATH, now = new Date(), stampTimeoutMs = REKEY_STAMP_TIMEOUT_MS } = {}) {
+  const refuse = (exit, why) => ({ ok: false, exit, message: `--rekey refused: ${why}\n` });
+  const runIt = `run the L2 run instead: ${TIERS.device.cmd}`;
+  if (!record) return refuse(2, `no L2 run is recorded (qa-artifacts/fleet-latest.json) — there is no digest to re-derive. ${runIt}`);
+  if (typeof record.stampedOutputHash !== "string") return refuse(2, `the recorded run carries no stampedOutputHash (${record.stampedOutputHash === null ? "its stamp failed" : "it predates the stamped-app criterion"}) — a rekey starts from a digest the run measured, and there is none. ${runIt}`);
+  const fromRule = ruleOfRecord(record);
+  if (fromRule === STAMPED_OUTPUT_RULE) return refuse(1, `the recorded run's digest is already under rule ${STAMPED_OUTPUT_RULE}, the rule this tree computes — there is nothing to rekey. \`node scripts/proof-plan.mjs\` reads it as it is.`);
+  if (!STAMPED_OUTPUT_RULES.includes(fromRule)) return refuse(2, `the recorded run's digest is under rule ${JSON.stringify(fromRule)}, which this module cannot compute (it computes ${STAMPED_OUTPUT_RULES.join(", ")}) — so it cannot be reproduced, and nothing is re-derived without reproducing it first. ${runIt}`);
+  if (record.verdict !== "PASS") return refuse(1, `the recorded run is ${record.verdict ?? "unstated"}, not PASS — a failing run discharges nothing under any rule, and a rekey would only re-label it. ${runIt}`);
+  if (!rungMeets(record.rung, TIERS.device.requires)) return refuse(1, `the recorded run ran at ${normalizeLevel(record.rung) ?? "rung none"}, below the ${TIERS.device.requires} this tier requires — a rekey would re-label a run that cannot carry the tier. ${runIt}`);
+  if (typeof record.commit !== "string" || !/^[0-9a-f]{40}$/.test(record.commit)) return refuse(2, `the recorded run names no commit (${JSON.stringify(record.commit ?? null)}) — there is nothing to re-stamp, so its app cannot be reproduced. ${runIt}`);
+  if (record.treeWasDirty !== false) return refuse(1, `the recorded run was over a ${record.treeWasDirty === true ? "DIRTY" : "possibly dirty (treeWasDirty is not recorded as false)"} tree — commit ${record.commit.slice(0, 7)} is not the tree it proved, so re-stamping it proves nothing about that run. ${runIt}`);
+  if (typeof record.ranAt !== "string" || !record.ranAt) return refuse(2, `the recorded run carries no ranAt — a rekey is accepted only for the run it names, and this one cannot be named. ${runIt}`);
+  const has = spawnSync("git", ["cat-file", "-e", `${record.commit}^{commit}`], { cwd: root, stdio: "ignore" });
+  if (has.status !== 0) return refuse(2, `this checkout does not have commit ${record.commit.slice(0, 7)} — \`git fetch\` it, then --rekey again. Nothing was stamped.`);
+
+  // OUTSIDE the repository, always: a stamp that wrote into the tree would
+  // change the tree it is measuring.
+  const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "cmp-rekey-")));
+  const tree = path.join(scratch, "tree");
+  let app = null;
+  try {
+    fs.mkdirSync(tree);
+    const unpacked = extractCommit(root, record.commit, tree);
+    if (unpacked) return refuse(2, `could not unpack commit ${record.commit.slice(0, 7)} (${unpacked}). Nothing was written.`);
+    // The commit's own create-cmp stamps its own app, with this checkout's
+    // installed dependencies — node_modules is not in a commit.
+    const modules = path.join(root, "node_modules");
+    if (fs.existsSync(modules)) fs.symlinkSync(fs.realpathSync(modules), path.join(tree, "node_modules"), "dir");
+    try {
+      app = stampScratchApp(tree, { timeoutMs: stampTimeoutMs });
+    } catch (err) {
+      return refuse(2, `re-stamping commit ${record.commit.slice(0, 7)} failed: ${err?.message ?? err}. Nothing was written.`);
+    }
+    const from = hashStampedTree(app.appDir, { rule: fromRule });
+    if (from.hash !== record.stampedOutputHash) {
+      return refuse(
+        1,
+        `re-stamping commit ${record.commit.slice(0, 7)} does NOT reproduce the recorded digest under rule ${fromRule} (${from.hash.slice(0, 7)}, the record says ${record.stampedOutputHash.slice(0, 7)}) — ${describeStampedDiff(record.stampedOutputFiles, from.files)}. The stamp is not the app the run proved, so no digest is re-derived from it. ${runIt}`,
+      );
+    }
+    const to = hashStampedTree(app.appDir, { rule: STAMPED_OUTPUT_RULE });
+    const rk = {
+      schema: REKEY_SCHEMA,
+      ranAt: record.ranAt,
+      commit: record.commit,
+      fromRule,
+      fromHash: record.stampedOutputHash,
+      toRule: STAMPED_OUTPUT_RULE,
+      toHash: to.hash,
+      toFiles: to.files,
+      rekeyedAt: now.toISOString(),
+    };
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, `${JSON.stringify(rk, null, 2)}\n`);
+    return {
+      ok: true,
+      rekey: rk,
+      message:
+        `rekeyed the L2 run at ${record.ranAt} (commit ${record.commit.slice(0, 7)}): re-stamped, reproduced rule ${fromRule} ${record.stampedOutputHash.slice(0, 7)}, ` +
+        `rule ${STAMPED_OUTPUT_RULE} ${to.hash.slice(0, 7)} — written to ${path.relative(root, out) || out}. The fleet record is unchanged.\n`,
+    };
+  } finally {
+    app?.dispose();
+    fs.rmSync(scratch, { recursive: true, force: true });
   }
 }
 
@@ -660,7 +895,17 @@ export function render(o) {
       // only "OWED" over it is what sends an agent to re-run the same
       // insufficient command. (There is no separate FAIL branch here: a failing
       // run is one of that function's answers, with its own words.)
-      if (o.shortfall) {
+      //
+      // Before all four: a record under ANOTHER DIGEST RULE. What it owes is
+      // not an L2 run but a stamp — `--rekey` — and the line says that first,
+      // because the run it would otherwise send an agent to is 3.5 minutes
+      // spent re-proving an app that may not have moved.
+      if (o.shortfall?.code === "other-rule") {
+        line(
+          "OWED — the run on record is keyed under another digest rule: REKEY it, do not re-run it",
+          `${o.shortfall.reason}\n      ${o.need.reason}.\n      Now: node scripts/proof-plan.mjs --rekey`,
+        );
+      } else if (o.shortfall) {
         line(
           `OWED — the run on record does not carry this tier (${o.shortfall.code})`,
           `${o.shortfall.reason}\n      ${o.need.reason}.`,
@@ -980,6 +1225,19 @@ function main() {
     process.exit(0);
   }
 
+  if (flag("--rekey") !== -1) {
+    // A stamp of the recorded commit, never an L2 run and never an edit of the
+    // fleet record — see `rekey`. What it prints after is the schedule as it
+    // now reads, so the agent sees at once whether the rekeyed run carries it.
+    const r = rekey();
+    if (!r.ok) {
+      process.stderr.write(r.message);
+      process.exit(r.exit);
+    }
+    process.stdout.write(`${r.message}\n${render({ ...obligation(), suite: suiteStatus() })}\n`);
+    process.exit(0);
+  }
+
   if (flag("--discharge") !== -1) {
     const plan = read();
     const branch = currentBranch();
@@ -1001,10 +1259,20 @@ function main() {
     // told to require, and `--min-level L1` attaches no device.
     const m = recordMeetsTier(rec, TIERS.device, now);
     if (!m.ok) {
-      process.stderr.write(`${m.reason}\n${m.code === "other-app" ? `${describeStampedDiff(rec.stampedOutputFiles, stamped.files)}\n` : ""}`);
+      process.stderr.write(`${m.reason}\n${m.code === "other-app" ? `${describeStampedDiff(m.files ?? rec.stampedOutputFiles, stamped.files)}\n` : ""}`);
       process.exit(m.exit);
     }
-    plan.discharged = { at: m.proof.at, stampedHash: now, stampedFiles: stamped.files, verdict: m.proof.verdict, rung: m.proof.rung };
+    // `stampedRule` rides with the digest for the reason the record's does:
+    // a discharge is only comparable with a digest taken under its rule.
+    plan.discharged = {
+      at: m.proof.at,
+      stampedHash: now,
+      stampedFiles: stamped.files,
+      stampedRule: stamped.rule,
+      verdict: m.proof.verdict,
+      rung: m.proof.rung,
+      ...(m.proof.rekeyedFrom ? { rekeyedFrom: m.proof.rekeyedFrom } : {}),
+    };
     write(plan);
     process.stdout.write(`${render(obligation(plan))}\n`);
     process.exit(0);
@@ -1026,4 +1294,4 @@ function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
-export { TIERS, CHEAP_TIER_DUE, read, changedPaths, currentBranch, isTrunk, REVIEW_SCHEMA, REVIEW_PATH };
+export { TIERS, CHEAP_TIER_DUE, read, changedPaths, currentBranch, isTrunk, REVIEW_SCHEMA, REVIEW_PATH, REKEY_SCHEMA, REKEY_PATH };

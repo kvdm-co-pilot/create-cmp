@@ -43,7 +43,7 @@ import { fileURLToPath } from "node:url";
 
 import { TIERS } from "../scripts/proof-plan.mjs";
 import { LEVELS } from "../scripts/fleet-check.mjs";
-import { stampedOutput } from "../scripts/stamped-output.mjs";
+import { stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BRANCH = "slice/under-test";
@@ -96,6 +96,8 @@ function recordAt(repo, stamped, rung) {
     failures: [],
     avd: rung === REQUIRED ? "Medium_Phone_API_35" : null,
     stampedOutputHash: stamped.hash,
+    // The rule fleet-check writes beside the digest; without it a record reads as rule 1 (scripts/stamped-output.mjs).
+    stampedOutputRule: STAMPED_OUTPUT_RULE,
     stampedOutputFiles: stamped.files,
     commit: null,
     treeWasDirty: false,

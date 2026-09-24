@@ -305,6 +305,19 @@ const SILENT = Object.freeze({ action: "silent" });
 const DECLARE = 'node scripts/proof-plan.mjs --open "<what you are building>" (on a branch — trunk is not a slice)';
 
 /**
+ * The one extra sentence an OLD-RULE record earns, and nothing else: no new
+ * refusal (the orchestrator's answer 5, 2026-09-24). When the only reason the
+ * run on record does not carry the tier is that its digest was taken under
+ * another stamped-output rule, what settles it is a stamp — `--rekey` — not an
+ * L2 run, and the text an agent reads at the moment of decision says so
+ * first. Read from `o.shortfall.code`, which `recordMeetsTier` wrote; this
+ * hook never stamps and never rekeys, it reads what the schedule already said.
+ */
+const REKEY = "node scripts/proof-plan.mjs --rekey";
+const rekeyFirst = (o) => o?.shortfall?.code === "other-rule";
+const REKEY_INSTEAD = `the run on record is keyed under another digest rule, so run ${REKEY} INSTEAD of the L2 run — a stamp of the commit it ran on, seconds, no L2 run — and read node scripts/proof-plan.mjs again; only if it still reads OWED is the L2 run owed`;
+
+/**
  * The decision, pure: a watched command kind and what the slice owes
  * (`obligation()` from scripts/proof-plan.mjs) in, a verdict out.
  *
@@ -330,7 +343,7 @@ export function decide(kind, o, tiers, ctx) {
       case "undeclared":
         return deny(`no slice is declared, so this run could discharge nothing — ${o.need.reason}. Declare first: ${DECLARE}. Then run the tier once, at close.`);
       case "owed":
-      case "reopened":
+      case "reopened": {
         // A lane already driving the one device makes a second run worse than
         // wasted: it has wedged Maestro before its first flow. This was a line in
         // a memory file ("check pgrep first") — now it is checked. And the refusal
@@ -343,7 +356,9 @@ export function decide(kind, o, tiers, ctx) {
               (ours ? "Wait for it, then run the tier once." : "Do not kill it — it is not this slice's. Wait for it, then run the tier once."),
           );
         }
-        return orderedRun(o, ctx?.base);
+        const d = orderedRun(o, ctx?.base);
+        return rekeyFirst(o) ? { ...d, reason: `${REKEY_INSTEAD}.\n\n${d.reason}` } : d;
+      }
       default:
         return deny(`the proof plan is in an unknown state (${o.state}) — refusing rather than guessing`);
     }
@@ -357,7 +372,11 @@ export function decide(kind, o, tiers, ctx) {
     switch (o.state) {
       case "owed":
       case "reopened":
-        blocked.push(`the device tier is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`);
+        blocked.push(
+          rekeyFirst(o)
+            ? `the device tier is ${o.state.toUpperCase()} for this slice and the slice closes at merge — ${REKEY_INSTEAD}. If it does: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`
+            : `the device tier is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`,
+        );
         break;
       case "undeclared":
         blocked.push(`paths that could reach a phone changed with no slice declared, and no recorded run describes the app this tree stamps — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
@@ -411,7 +430,7 @@ export function decide(kind, o, tiers, ctx) {
   if (kind === "create") {
     const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
     const notes = [];
-    if (open(o.state)) notes.push(`the device tier is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${cmd}, then node scripts/proof-plan.mjs --discharge)`);
+    if (open(o.state)) notes.push(`the device tier is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${rekeyFirst(o) ? `${REKEY_INSTEAD}; else ` : ""}${cmd}, then node scripts/proof-plan.mjs --discharge)`);
     if (open(o.review?.state)) notes.push(`a review is ${o.review.state.toUpperCase()}; gh pr merge will refuse until a review of these bytes is recorded (${tiers?.review?.cmd ?? "node scripts/proof-plan.mjs --discharge-review"})`);
     return notes.length ? allow(`reminder: ${notes.join(" — and ")}. Open the PR, finish everything else, run the at-close tiers last.`) : SILENT;
   }
