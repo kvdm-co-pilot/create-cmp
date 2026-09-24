@@ -58,5 +58,6 @@
   "agents": [
     "./agents/cmp-orchestrator.md"
   ],
+  "hooks": "./scripts/hooks/plugin-hooks.json",
   "mcpServers": "./.mcp.json"
 }

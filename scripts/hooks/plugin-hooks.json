@@ -1,0 +1,17 @@
+{
+  "description": "resume-price: prices a SendMessage that would resume a helper carrying more context than a fresh one starts with. Advisory; it refuses nothing (scripts/hooks/resume-price.mjs).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/resume-price.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
