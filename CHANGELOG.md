@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-09-24
+
 `create-cmp-cli` 0.26.6 and 0.27.0, and `prooflane-harness` 0.22.1 and 0.23.0, were never
 published; their changes are in this section. 0.26.7 through 0.26.9, and `prooflane-harness`
 0.22.2, exist only on the branch `doctor-claims-wiring-it-has-not-established`; their fixes
@@ -3652,7 +3654,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...HEAD
+[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.1...HEAD
+[0.27.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.5...v0.27.1
 [0.26.5]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...v0.26.5
 [0.26.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.24.0...v0.25.0
