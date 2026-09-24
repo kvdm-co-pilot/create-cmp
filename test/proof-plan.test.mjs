@@ -325,7 +325,7 @@ test("close() and the exit code hold BOTH at-close tiers — a slice cannot clos
   assert.equal(close(withReview("reopened")).closed, false);
   assert.equal(close(withReview("undeclared")).closed, false);
   assert.equal(close({ state: "none", plan: null, stale: null, review: { state: "discharged" } }).closed, true);
-  assert.deepEqual(outstanding({ state: "owed", review: { state: "reopened" } }), ["device (OWED)", "review (REOPENED)"]);
+  assert.deepEqual(outstanding({ state: "owed", review: { state: "reopened" } }), ["L2 run (OWED)", "review (REOPENED)"]);
   assert.deepEqual(outstanding({ state: "discharged", review: { state: "none" } }), []);
 });
 

@@ -124,7 +124,7 @@ function planOutput(repo, args = []) {
 }
 
 function deviceBlock(out) {
-  const m = out.match(/\n {2}device \([^)]*\) +([\s\S]*?)(?=\n {2}review +|$)/);
+  const m = out.match(/\n {2}L2 run +([\s\S]*?)(?=\n {2}review +|$)/);
   assert.ok(m, `no device block in:\n${out}`);
   return m[1];
 }

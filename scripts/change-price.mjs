@@ -467,7 +467,7 @@ export const CEREMONY = Object.freeze([
     brief: "the same — the tier schedule is not a function of the lane",
     cite: "docs/GATE-RULES.md Rule 4, scripts/proof-plan.mjs",
     note: (ctx) =>
-      `right now it says device ${String(ctx.device ?? "unknown").toUpperCase()}, review ${String(ctx.review ?? "unknown").toUpperCase()}.` +
+      `right now it says L2 run ${String(ctx.device ?? "unknown").toUpperCase()}, review ${String(ctx.review ?? "unknown").toUpperCase()}.` +
       (ctx.review === "none" ? ` The review is NOT OWED on this diff — proof-plan's reason: ${ctx.reviewReason ?? "not handed over"}.` : "") +
       " The schedule itself is that program's and is not restated here.",
   }),
@@ -1040,7 +1040,8 @@ export function render(m) {
     L.push("  spent — what the kept records show, attributed to this branch");
     for (const r of m.spent) {
       const counts = r.recorded === null ? `no record kept — ${r.file} does not exist` : `${r.recorded} record(s) / ${r.owed} owed`;
-      L.push(`      ${r.what.padEnd(ITEM)}${r.recorded === null ? counts : `${counts.padEnd(26)}${r.verdict}`}`);
+      // `what` stays the data key ("device"); the printed name is the tier's.
+      L.push(`      ${(r.what === "device" ? "L2 run" : r.what).padEnd(ITEM)}${r.recorded === null ? counts : `${counts.padEnd(26)}${r.verdict}`}`);
       if (r.byBranchOnly) L.push(...at(10, 'attributed by branch alone — no plan is declared for this branch, so there is no opened-at to bound it by. Fix: node scripts/proof-plan.mjs --open "<what you are building>"'));
       if (r.note) L.push(...at(10, r.note));
       for (const e of r.extra ?? []) L.push(...at(10, e));

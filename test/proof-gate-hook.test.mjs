@@ -344,7 +344,7 @@ test("the merge refusal says the gate never reads what a review FOUND — existe
 test("both at-close tiers refuse in ONE answer — an agent is not sent round the loop twice", () => {
   const d = decide("merge", withReview("owed", "owed"), TIERS);
   assert.equal(d.action, "deny");
-  assert.match(d.reason, /the device tier is OWED/);
+  assert.match(d.reason, /the L2 run is OWED/);
   assert.match(d.reason, /a review is OWED/);
   // And an undeclared slice is told once, not twice: both tiers are undeclared
   // for the same reason — there is no plan — so one instruction covers them.

@@ -232,7 +232,7 @@ after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 test("the hook judges a worktree under a spaced path when the command quotes it — both readers, both verdicts", () => {
   const judged = (d, how) => {
     assert.doesNotMatch(d.reason, /could not tell which tree/, `${how}: ${d.reason}`);
-    assert.match(d.reason, /the device tier is OWED/, `${how}: ${d.reason}`);
+    assert.match(d.reason, /the L2 run is OWED/, `${how}: ${d.reason}`);
     assert.ok(d.reason.includes(`JUDGED TREE: ${B}`), `${how}: the decision must name the tree it judged — ${d.reason}`);
   };
   const cdDevice = pre(`cd "${B}" && ${DEVICE}`, A);
@@ -246,7 +246,7 @@ test("the hook judges a worktree under a spaced path when the command quotes it 
 
   const merge = pre(`cd '${B}' && ${GATED}`, A);
   assert.equal(merge.action, "deny", merge.reason);
-  assert.match(merge.reason, /the device tier is OWED/, "refused for what the slice owes, not for how its path was spelled");
+  assert.match(merge.reason, /the L2 run is OWED/, "refused for what the slice owes, not for how its path was spelled");
 });
 
 test("the hook still refuses the spellings of that path it cannot read exactly", () => {

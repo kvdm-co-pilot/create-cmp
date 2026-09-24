@@ -331,7 +331,7 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
   // `deviceTierNeed`, not `deriveTierNeed` over the list directly: markdown
   // under `template/` ships into the stamped app, so it is asked about and the
   // digest judges it (KD-207, scripts/observed-tree.mjs DEVICE_TIER_SHIPPED).
-  const need = deviceTierNeed(paths, { tierName: "fleet L2" });
+  const need = deviceTierNeed(paths, { tierName: "the L2 run" });
   // A review is owed on a broader set than a device run: `scripts/` and `test/`
   // cannot reach a phone and are declared irrelevant to the device tier, but a
   // rewritten gate or a test that quietly stops refusing something is exactly
@@ -847,7 +847,9 @@ export function openPlan({ name, branch, base = null }, { planPath = PLAN_PATH, 
 export function outstanding(o) {
   const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
   const out = [];
-  if (open(o.state)) out.push(`device (${o.state.toUpperCase()})`);
+  // "L2 run" is the PRINTED name (Karel, 2026-09-24); the tier's data key is
+  // still `device` — TIERS.device, a plan's `declared.device` — see KD-6.
+  if (open(o.state)) out.push(`L2 run (${o.state.toUpperCase()})`);
   if (open(o.review?.state)) out.push(`review (${o.review.state.toUpperCase()})`);
   return out;
 }
@@ -874,7 +876,7 @@ export function render(o) {
     if (name === "suite" && o.suite) L.push(`      ${describeSuiteStatus(o.suite)}`);
   }
 
-  const line = (verdict, detail) => L.push(`  ${"device (fleet L2)".padEnd(16)} ${verdict}\n      ${detail}`);
+  const line = (verdict, detail) => L.push(`  ${"L2 run".padEnd(16)} ${verdict}\n      ${detail}`);
   switch (o.state) {
     case "none":
       line("NOT OWED", o.need.reason);
@@ -882,7 +884,7 @@ export function render(o) {
     case "undeclared":
       line(
         "OWED — but no slice is declared",
-        `${o.need.reason}.\n      ${isTrunk(o.branch) ? "You are on trunk — branch first (git switch -c <name>), then declare the slice" : "Declare the slice first"}: node scripts/proof-plan.mjs --open "<what you are building>".\n      Declaring up front is the point — a slice that knows it will need an emulator can be\n      scoped differently, and one that knows it will not never pays for one.`,
+        `${o.need.reason}.\n      ${isTrunk(o.branch) ? "You are on trunk — branch first (git switch -c <name>), then declare the slice" : "Declare the slice first"}: node scripts/proof-plan.mjs --open "<what you are building>".\n      Declaring up front is the point — a slice that knows it will need an L2 run can be\n      scoped differently, and one that knows it will not never pays for one.`,
       );
       break;
     case "owed":
@@ -937,8 +939,8 @@ export function render(o) {
     }
     case "reopened":
       line(
-        "REOPENED — the stamped app moved after the device run",
-        `${describeStampedDiff(o.plan.discharged.stampedFiles, o.reading?.files)}.\n      The run at ${o.plan.discharged.at} describes an app that no longer exists (${String(o.plan.discharged.stampedHash).slice(0, 7)} → ${o.now.slice(0, 7)}).\n      The device tier is the LAST gate: either revert what moved, or accept a second run.\n      This is the ordering mistake that cost three device runs in one session on 2026-09-08.`,
+        "REOPENED — the stamped app moved after the L2 run",
+        `${describeStampedDiff(o.plan.discharged.stampedFiles, o.reading?.files)}.\n      The run at ${o.plan.discharged.at} describes an app that no longer exists (${String(o.plan.discharged.stampedHash).slice(0, 7)} → ${o.now.slice(0, 7)}).\n      The L2 run is the LAST gate: either revert what moved, or accept a second run.\n      This is the ordering mistake that cost three L2 runs in one session on 2026-09-08.`,
       );
       break;
   }

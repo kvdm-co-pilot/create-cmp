@@ -160,9 +160,9 @@ after(() => {
 test("the premise KD-79 measured: two worktrees of one repository, and only one of them owes the device tier", () => {
   const session = schedule(A);
   const slice = schedule(B);
-  assert.match(session.text, /device \(fleet L2\) NOT OWED/, `the session's worktree owes nothing — its only change is prose:\n${session.text}`);
+  assert.match(session.text, /L2 run +NOT OWED/, `the session's worktree owes nothing — its only change is prose:\n${session.text}`);
   assert.equal(session.outstanding, false, `and so its scheduler exits clean:\n${session.text}`);
-  assert.match(slice.text, /device \(fleet L2\) OWED/, `the tree the command is about owes the tier — its change is not declared unable to reach a phone:\n${slice.text}`);
+  assert.match(slice.text, /L2 run +OWED/, `the tree the command is about owes the tier — its change is not declared unable to reach a phone:\n${slice.text}`);
   assert.match(slice.text, /packages\/harness\/src\/x\.mjs/, "and it says which path obliges it");
   assert.equal(slice.outstanding, true, "so its scheduler exits 1");
 });
@@ -179,7 +179,7 @@ test("a device run is judged by the tree it will run in — the refusal KD-79 co
     const d = pre(command, cwd);
     assert.doesNotMatch(d.reason, /nothing is owed/, `${how}: the tier IS owed in the tree this run would prove`);
     assert.equal(d.action, "allow", `${how}: ${d.reason}`);
-    assert.match(d.reason, /the device tier is OWED/, how);
+    assert.match(d.reason, /the L2 run is OWED/, how);
     // And it says WHICH tree it judged. KD-79's refusals were unplaceable —
     // they named a change set the reader could not locate — so a verdict about
     // a tree other than the gate's own has to name it, which is also what makes
@@ -194,7 +194,7 @@ test("a merge is refused for what the tree it merges owes — the fail-open half
   // went through. That is the direction this gate exists to make impossible.
   const d = pre(`cd ${B} && gh pr merge 1 --rebase --delete-branch`, A);
   assert.equal(d.action, "deny", d.reason);
-  assert.match(d.reason, /the device tier is OWED/);
+  assert.match(d.reason, /the L2 run is OWED/);
   assert.match(d.reason, /a review is OWED/);
 });
 
@@ -204,7 +204,7 @@ test("a cd inside a subshell that has already closed changes nothing, and is not
   // never touches — KD-79 again, with this file's own reader as the mistaken one.
   const d = pre(`REF=$(cd ${A} && git rev-parse HEAD) && gh pr merge 1 --rebase`, B);
   assert.equal(d.action, "deny", d.reason);
-  assert.match(d.reason, /the device tier is OWED/, "the merge still runs in the slice worktree, which owes both tiers");
+  assert.match(d.reason, /the L2 run is OWED/, "the merge still runs in the slice worktree, which owes both tiers");
   // And the same `cd` at the depth the command is at DOES apply.
   assert.equal(pre(`(cd ${A} && gh pr merge 1 --rebase)`, B).action, "silent", "inside the same subshell, the cd is the command's own");
 });
@@ -274,7 +274,7 @@ test("the forms this gate DOES honour resolve, and chain", () => {
   // useful if what it does understand covers the way the work is actually done.
   const owed = (d, how) => {
     assert.equal(d.action, "allow", `${how}: ${d.reason}`);
-    assert.match(d.reason, /the device tier is OWED/, how);
+    assert.match(d.reason, /the L2 run is OWED/, how);
     assert.ok(d.reason.includes(`JUDGED TREE: ${B}`), `${how}: ${d.reason}`);
   };
   owed(pre(`cd ${path.dirname(B)} && cd slice && ${DEVICE}`, A), "two cds compose");
@@ -296,7 +296,7 @@ test("a `-R` that is not gh's repository flag leaves the tree perfectly readable
   const d = pre(`cp -R ${A}/docs /tmp/kd79-not-a-real-copy && gh pr merge 1 --rebase`, B);
   assert.doesNotMatch(d.reason, /out of band/, d.reason);
   assert.equal(d.action, "deny", d.reason);
-  assert.match(d.reason, /the device tier is OWED/, "and it is refused for what the tree actually owes");
+  assert.match(d.reason, /the L2 run is OWED/, "and it is refused for what the tree actually owes");
 });
 
 test("gh pr create is still never blocked — it says it could not tell, and lets the PR be opened", () => {
@@ -325,7 +325,7 @@ test("a cd the shell never performs does not move the tree the gate judges", () 
     const d = pre(command, B);
     assert.notEqual(d.action, "silent", `${how}: the merge runs in ${B}, which owes both at-close tiers`);
     assert.equal(d.action, "deny", `${how}: ${d.reason}`);
-    assert.match(d.reason, /the device tier is OWED/, how);
+    assert.match(d.reason, /the L2 run is OWED/, how);
   }
 });
 

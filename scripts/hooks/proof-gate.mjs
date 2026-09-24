@@ -331,7 +331,7 @@ export function decide(kind, o, tiers, ctx) {
     switch (o.state) {
       case "none":
         if (o.trunk) return allow(`nothing is owed per slice — this is trunk — so this can only be a RELEASE proof (npm-publish skill step 2): allowed. Then npm publish reads its record.`);
-        return deny(`nothing is owed — ${o.need.reason}. A device run over this tree proves nothing this slice needs (GATE-RULES Rule 4: the tier runs once, at the close of a slice that changed something it can see).`);
+        return deny(`nothing is owed — ${o.need.reason}. An L2 run over this tree proves nothing this slice needs (GATE-RULES Rule 4: the tier runs once, at the close of a slice that changed something it can see).`);
       case "discharged": {
         // Read from whatever attests THESE bytes — the run recorded on disk, or
         // this slice's own discharge. `o.plan.discharged` is no longer always
@@ -352,7 +352,7 @@ export function decide(kind, o, tiers, ctx) {
         if (ctx?.runningLane) {
           const { ours, text } = describeLane(ctx.runningLane, { repoRoot: ctx.repoRoot ?? null });
           return deny(
-            `a verify lane is already running: ${text}. A concurrent device run collides with it (wedged adbd, false reds). ` +
+            `a verify lane is already running: ${text}. A concurrent L2 run collides with it (on the cmp profile: a wedged adbd, false reds). ` +
               (ours ? "Wait for it, then run the tier once." : "Do not kill it — it is not this slice's. Wait for it, then run the tier once."),
           );
         }
@@ -374,12 +374,12 @@ export function decide(kind, o, tiers, ctx) {
       case "reopened":
         blocked.push(
           rekeyFirst(o)
-            ? `the device tier is ${o.state.toUpperCase()} for this slice and the slice closes at merge — ${REKEY_INSTEAD}. If it does: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`
-            : `the device tier is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`,
+            ? `the L2 run is ${o.state.toUpperCase()} for this slice and the slice closes at merge — ${REKEY_INSTEAD}. If it does: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`
+            : `the L2 run is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`,
         );
         break;
       case "undeclared":
-        blocked.push(`paths that could reach a phone changed with no slice declared, and no recorded run describes the app this tree stamps — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
+        blocked.push(`paths that could reach what the stamped tree executes changed with no slice declared, and no recorded run describes the app this tree stamps — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
         break;
       default:
         break;
@@ -409,7 +409,7 @@ export function decide(kind, o, tiers, ctx) {
     // fleet record that is PASS at L2 on these exact bytes. Read, never asserted.
     if (!o.trunk) {
       const where = o.branch === "main" ? "main, but with commits or edits not yet on origin/main — publish only what is merged" : `${o.branch || "a detached HEAD"}, not main`;
-      return deny(`publish only from a clean main — this is ${where}${o.state === "none" ? "" : `; the device tier is ${o.state.toUpperCase()} here`} (npm-publish skill step 1).`);
+      return deny(`publish only from a clean main — this is ${where}${o.state === "none" ? "" : `; the L2 run is ${o.state.toUpperCase()} here`} (npm-publish skill step 1).`);
     }
     // A tree whose app cannot be stamped cannot be compared to any record. A
     // release refused for a reason it can name is the right outcome; a release
@@ -422,7 +422,7 @@ export function decide(kind, o, tiers, ctx) {
     // a discharge there on different facts. `recordMeetsTier` is now the whole
     // question — digest, verdict and rung against the tier's declared level —
     // computed for the JUDGED tree by that tree's own module (releaseContext).
-    if (!ctx?.meets) return deny(`this gate could not put the fleet record to the device tier's requirement, so it cannot say whether this tree has a release proof. Refusing rather than guessing — run ${cmd} and try again.`);
+    if (!ctx?.meets) return deny(`this gate could not put the fleet record to the L2 run's requirement, so it cannot say whether this tree has a release proof. Refusing rather than guessing — run ${cmd} and try again.`);
     if (!ctx.meets.ok) return deny(`${ctx.meets.reason} (npm-publish skill step 2).${ctx.meets.code === "verdict" ? " The scratch app is the crime scene; do not bump the version." : ""}`);
     const p = ctx.meets.proof;
     return allow(`release proof on this tree: ${p.verdict} at ${p.rung} (the tier requires ${p.requires}), ran ${p.at}.`);
@@ -430,7 +430,7 @@ export function decide(kind, o, tiers, ctx) {
   if (kind === "create") {
     const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
     const notes = [];
-    if (open(o.state)) notes.push(`the device tier is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${rekeyFirst(o) ? `${REKEY_INSTEAD}; else ` : ""}${cmd}, then node scripts/proof-plan.mjs --discharge)`);
+    if (open(o.state)) notes.push(`the L2 run is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${rekeyFirst(o) ? `${REKEY_INSTEAD}; else ` : ""}${cmd}, then node scripts/proof-plan.mjs --discharge)`);
     if (open(o.review?.state)) notes.push(`a review is ${o.review.state.toUpperCase()}; gh pr merge will refuse until a review of these bytes is recorded (${tiers?.review?.cmd ?? "node scripts/proof-plan.mjs --discharge-review"})`);
     return notes.length ? allow(`reminder: ${notes.join(" — and ")}. Open the PR, finish everything else, run the at-close tiers last.`) : SILENT;
   }
@@ -453,8 +453,8 @@ export function decide(kind, o, tiers, ctx) {
  * own ref rather than by origin. A gate that cannot see must not pass silently.
  */
 function orderedRun(o, base) {
-  const owed = `the device tier is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — an edit that changes what this tree STAMPS reopens the slice afterwards. Then: node scripts/proof-plan.mjs --discharge`;
-  const why = `A device run proves an APP, and the merge brings origin/main into this tree — if that moves what the tree stamps, the tier REOPENS and the run is bought a second time. Measured 2026-09-16: four emulator runs for one merge, each one owed by this program and none of them needed.`;
+  const owed = `the L2 run is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — an edit that changes what this tree STAMPS reopens the slice afterwards. Then: node scripts/proof-plan.mjs --discharge`;
+  const why = `An L2 run proves an APP, and the merge brings origin/main into this tree — if that moves what the tree stamps, the tier REOPENS and the run is bought a second time. Measured 2026-09-16: four emulator runs for one merge, each one owed by this program and none of them needed.`;
   const fix = `git fetch origin && git rebase origin/main`;
   if (!base) return allow(owed);
 
@@ -470,12 +470,12 @@ function orderedRun(o, base) {
       : base.source === "remote"
         ? `origin/main has MOVED to ${at} and ${short} — read from origin just now`
         : `origin/main is at ${at} and ${short} — read from this checkout's own ref, which no call to origin could make less true (and if trunk was rewound, the same fetch below corrects the ref and clears this)`;
-    return deny(`the device tier is ${o.state.toUpperCase()}, but this branch does not contain origin/main: ${how}. ${why} Bring trunk in first, then run the tier once: ${fix}`);
+    return deny(`the L2 run is ${o.state.toUpperCase()}, but this branch does not contain origin/main: ${how}. ${why} Bring trunk in first, then run the tier once: ${fix}`);
   }
 
   if (base.contained === null) {
     return allow(
-      `${owed}\n\nORDERING UNCHECKED: ${base.reason ?? "this gate could not ask where trunk is"}. Whether this branch contains origin/main is what makes a device run a proof of the tree the merge will keep — this gate could not tell, so it is not refusing. If trunk has moved, ${fix} before the run: ${why}`,
+      `${owed}\n\nORDERING UNCHECKED: ${base.reason ?? "this gate could not ask where trunk is"}. Whether this branch contains origin/main is what makes an L2 run a proof of the tree the merge will keep — this gate could not tell, so it is not refusing. If trunk has moved, ${fix} before the run: ${why}`,
     );
   }
 

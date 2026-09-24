@@ -107,9 +107,9 @@ function planOutput(repo, args = []) {
   return { status: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 }
 
-/** The `device (fleet L2)` block of that output, verdict line plus its detail. */
+/** The `L2 run` block of that output, verdict line plus its detail. */
 function deviceBlock(out) {
-  const m = out.match(/\n {2}device \(fleet L2\) +([\s\S]*?)(?=\n {2}review +|$)/);
+  const m = out.match(/\n {2}L2 run +([\s\S]*?)(?=\n {2}review +|$)/);
   assert.ok(m, `no device block in:\n${out}`);
   return m[1];
 }

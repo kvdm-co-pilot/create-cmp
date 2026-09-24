@@ -9,6 +9,39 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-207 — markdown that SHIPS can reopen the device tier but can never oblige it — **CLOSED 2026-09-24**
+
+`scripts/observed-tree.mjs` (`DEVICE_TIER_IRRELEVANT`'s `*.md`) with `scripts/stamped-output.mjs`
+
+`DEVICE_TIER_IRRELEVANT` declares `*.md` unable to oblige a device run, matched on the repo path, so a
+change to `template/README.md` — which ships INTO the stamped app — cannot make the tier required. If
+some other path in the same slice does make it required, the same file's bytes then move the stamped
+digest and REOPEN a discharged slice. The two halves disagree for exactly the shipped-markdown set.
+
+Pre-existing in the same shape (the old device hash covered `template/` wholesale including its
+markdown, while `*.md` was declared irrelevant) and unchanged in severity by the slice that found it.
+The direction of the error is the safe one — a shipped doc can cost a run, never hide one — and the
+fix is a product decision: either `*.md` stops being declared irrelevant (every README typo in
+`template/` then obliges a run), or the oracle normalises markdown inside the app (a comment in a
+shipped `AGENTS.md` an agent executes would then be invisible to the tier).
+
+**Fires when:** a slice touches one non-markdown path and one `template/**/*.md`, discharges, and is
+reopened naming the markdown file.
+*Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
+
+**CLOSED by `fcd1f58` (branch `wave/l2-digest`), the first of the two spellings this entry named, with the
+cost of the second removed.** `*.md` still declares this repo's own prose unable to oblige the tier, and it
+no longer reaches `template/`: `DEVICE_TIER_SHIPPED` in `scripts/observed-tree.mjs` puts every path under
+`template/` back, through `deviceTierNeed`, the one derivation `proof-plan` and `fit-test` now share. Every
+such edit is then ASKED about, and the stamped digest answers: under digest rule 2
+(`scripts/stamped-output.mjs`) prose the cmp profile's L2 run never opens — `AGENTS.md`, `CLAUDE.md`,
+`.claude/**/*.md`, each with its not-read proof — holds the digest, so a matching record discharges it for
+the price of one stamp. A spec is read by the lane and moves it. Both directions are driven in
+`test/what-the-l2-run-never-reads-does-not-move-the-stamped-digest.test.mjs`: `template/specs/home.spec.md` →
+required, digest moved, OWED; `template/AGENTS.md` → required, digest held, DISCHARGED by the record.
+The shipped `README.md` is NOT held — `qa/verify.mjs` rewrites its badge on every run — so the README
+typo this entry priced still costs an L2 run: that file is read by the run, and the price is the honest one.
+
 ### KD-14 — `create-cmp`'s parser does not split `--flag=value` — **CLOSED 2026-09-22**
 
 `src/lib/args.mjs` (`parseArgs`)

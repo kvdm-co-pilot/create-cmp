@@ -216,7 +216,6 @@ you the same list without opening anything.
 | **KD-204** | `stop()` fires `GET /shutdown` at `http://127.0.0.1:9601` unconditionally, `hot: false` and no daemon included, so every console sends a request to a fixed address anything may be listening on | harmless where nothing listens (the refusal is swallowed) and a real daemon is the intended recipient; with KD-202 and KD-203 it is the complete path from "a suite ran" to "a passed test is recorded as FAILED" |
 | **KD-205** | `contains()` / `behindBy()` drop `gitAt`'s `why`, so one call site of the ordering check cannot say which of four causes killed a git call — a gate-timer kill, a crash and an OOM kill all read as "git could not compare this branch with origin/main" | the verdict is correct either way: the check still allows and still says it could not answer. It costs a reader one fact, in the file whose whole subject is that distinction |
 | **KD-206** | the fleet scratch app is stamped `--no-ios --no-firebase`, so an edit to iOS-only or Firebase-only template code moves no byte of the stamped app and the device tier reads DISCHARGED | no proof is lost — under the old input-path rule the same edit reopened a tier whose run compiled neither (KD-45) — so what changed is that KD-45's gap is visible in the schedule instead of masked by a run that proves nothing about those files; `template/` is still a review trigger |
-| **KD-207** | `DEVICE_TIER_IRRELEVANT` declares `*.md` unable to OBLIGE a device run, and markdown under `template/` ships into the stamped app, so the same file's bytes can REOPEN a discharged slice | pre-existing in the same shape and unchanged in severity; the direction is the safe one — a shipped doc can cost a run, never hide one — and the fix is a product decision between two spellings, both with a cost |
 | **KD-208** | the hook's four bounds now sum to exactly its declared budget — `1000 + 3000 + 2500 + 3500 = 10000`, the 10 s `.claude/settings.json` declares — because answering a payload now includes a stamp | the arithmetic test asserts `sum <= budget` and passes, every bound has its own kill-timer so the sum is a worst case that needs all four to saturate, and the measured real answer is ~0.5 s; what is gone is the slack |
 | **KD-209** | `grep -r` here obeys the scanned tree's own `.gitignore`, so a scan of a stamped app silently omits `local.properties` — the file that carries this machine's SDK path | a fact about the tooling, not the tree, logged because it nearly cost a slice a defect: `find … -exec /usr/bin/grep -l …` lists both files, and that is how the three normalisers were shown complete |
 | **KD-210** | a Firebase run proves the template COMPILES, INITIALISES and REDIRECTS — no byte crosses the redirect | nothing in `commonMain` uses a Firebase client and the smoke walk is four screens, so the suite serves zero requests; the risk is a record read as "the redirect carried traffic" |
@@ -291,6 +290,8 @@ framework-check, affected-tests, evidence-badge, evidence-html, flight-recorder,
 
 **Fires when:** someone sweeps those ten. The exception list is asserted to only ever shrink.
 *Logged 2026-09-11, measured earlier the same day.*
+
+Since 2026-09-24 the runtime tier PRINTS as `L2 run` (proof-plan, its hook, change-price); its internal key is still `device` — `TIERS.device`, a plan's `declared.device`, change-price's `what: "device"` — because renaming data orphans every plan and record already on disk.
 
 ### KD-8 — the dangling-citation lint covers `ADR-NNNN`, and the instance that provoked it was a `§`
 
@@ -3408,26 +3409,6 @@ is a review trigger), so such a change still gets a reader. If the spec ever gai
 covers those files with no further change.
 
 **Fires when:** someone reads "device DISCHARGED" on an iOS-only change as "iOS is proven".
-*Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
-
-### KD-207 — markdown that SHIPS can reopen the device tier but can never oblige it
-
-`scripts/observed-tree.mjs` (`DEVICE_TIER_IRRELEVANT`'s `*.md`) with `scripts/stamped-output.mjs`
-
-`DEVICE_TIER_IRRELEVANT` declares `*.md` unable to oblige a device run, matched on the repo path, so a
-change to `template/README.md` — which ships INTO the stamped app — cannot make the tier required. If
-some other path in the same slice does make it required, the same file's bytes then move the stamped
-digest and REOPEN a discharged slice. The two halves disagree for exactly the shipped-markdown set.
-
-Pre-existing in the same shape (the old device hash covered `template/` wholesale including its
-markdown, while `*.md` was declared irrelevant) and unchanged in severity by the slice that found it.
-The direction of the error is the safe one — a shipped doc can cost a run, never hide one — and the
-fix is a product decision: either `*.md` stops being declared irrelevant (every README typo in
-`template/` then obliges a run), or the oracle normalises markdown inside the app (a comment in a
-shipped `AGENTS.md` an agent executes would then be invisible to the tier).
-
-**Fires when:** a slice touches one non-markdown path and one `template/**/*.md`, discharges, and is
-reopened naming the markdown file.
 *Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
 
 ### KD-208 — the four gate bounds now sum to exactly the hook's declared budget
