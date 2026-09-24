@@ -66,6 +66,14 @@ command is the test files the task touched, by name, once at its end; the whole 
 due when `node scripts/proof-plan.mjs` prints them due (GATE-RULES Rule 4), never per fix or
 per commit, and a brief that orders them per task buys the same run once per agent.
 
+Every brief also names **a hand-off file** and requires **a commit the moment work exists** — each
+red test, each fix, each finished piece — with the hand-off file brought up to date after it: what
+is done, what is left, what was learned. That is what makes a restart free. A helper that stalls,
+hangs or fills its context has then lost nothing a fresh one cannot read from disk.
+
+And every brief is **one job**. A second job is a new helper, not another pass on the old one: the
+old one would carry the first job's whole history through every step of the second.
+
 **A brief for a REVIEW carries one fact more: which round it is.** Only you hold it — a reviewer
 cannot see its own place in a sequence — and it decides both what that round has to read and what
 its record is worth to everything downstream. So name the number, say whether the round is a fresh
@@ -166,6 +174,9 @@ obvious afterwards. So:
   the status is "still running, no output yet." Do not wait for completion to say so.
 - **Never report progress you have not verified against the tree.** A hollow "done" reads
   exactly like a real one; `git status` is the difference.
+- **A question about cost is a question, not a stop order.** Answer it with numbers — what each
+  helper has spent and carries, what is left — and the options: let it finish, restart it fresh
+  from its hand-off, stop it. Stopping approved work takes an explicit instruction to stop.
 - **Claim the tree while you hold it**, so "is it working or wedged?" is a file read rather
   than filesystem archaeology:
   ```bash
@@ -179,17 +190,36 @@ obvious afterwards. So:
   correct advice at a tree that is mid-edit and would not compile. It never lifts a refusal,
   and it never explains a red receipt.
 
-## RE-DELEGATE, DON'T ABSORB
+## RE-DELEGATE, DON'T ABSORB — AND RESTART, DON'T RESUME
 When a subagent returns a **hollow / no-op report** — a plan with no file edits, "I dispatched a
 background agent", large token spend with an unchanged `git status` — do NOT pick up the
 mechanical work yourself. That leak of execution into your reasoning context is the exact thing
 this pattern exists to prevent. Instead:
 1. **Verify against state, never prose.** After every subagent report, check `git status` /
    the tree / the gate. A hollow "done" reads exactly like a real one until you look.
-2. **Re-brief** the same agent (`SendMessage`) or spawn a fresh one with a corrective directive:
-   "do the work YOURSELF, directly, with tools — no dispatching." `TaskStop` runaway chains.
+2. **Start a fresh helper**, briefed from the old one's hand-off file and commits, with a
+   corrective directive: "do the work YOURSELF, directly, with tools — no dispatching." `TaskStop`
+   runaway chains. Resume the old one with `SendMessage` only when it holds unsaved state you need
+   that cannot be recovered from disk.
 3. Only absorb the work yourself after re-delegation has genuinely failed twice AND the task is
    small.
+
+**Fresh is the default for every helper you are done with, not only a hollow one.** A helper that
+**stalled** (the host slept, a rate limit, a hang) or **finished** has its work on disk, if its brief
+asked for commits and a hand-off file. Resuming it instead is the expensive move: a resumed helper
+carries its whole history, and every step it takes re-reads all of it, while a fresh one briefed
+from the same commits and hand-off starts small. Measured on this repo on 2026-09-23, resumes cost
+about half of one session's 19.8M tokens; one fixer carrying ~428k spent 4.0M over 18 steps.
+
+The plugin's `resume-price` hook prices that choice when you send: above its threshold it adds a
+note saying what the helper carries and what a fresh one would start at. It refuses nothing, so the
+decision stays yours — and a helper that holds unsaved state you need is still worth resuming. So is
+a reviewer asked to re-record, whose own reading is that state; the rule it follows is the header of
+`docs/KNOWN-DEFECTS.md`, and this line only points at it.
+
+**Your own session is a helper too.** Hand it off at the budget point the user-level instructions
+set (`~/.claude/CLAUDE.md`), by bringing a hand-off file up to date for a fresh orchestrator to start
+from. This file names no number, so it cannot disagree with that one.
 
 ## NEVER END A TURN WAITING ON YOUR OWN CHILD
 **You are not woken when a subagent you spawned finishes.** The top-level session is; you are
@@ -208,7 +238,7 @@ anything you are about to act on. So:
   else with the turn rather than ending it.
 - **`SendMessage` has no such parameter — a send never blocks, and no reply arrives inside the
   turn that sent it.** So the remedy above does not transfer: there is nothing to pass `false`.
-  Re-brief, then keep working in the same turn; the reply is delivered to a later one. Ending the
+  Send, then keep working in the same turn; the reply is delivered to a later one. Ending the
   turn on a send strands it exactly as backgrounding does.
 - The "status you owe upward past ~5 minutes" rule above means post a line and **keep working**.
   It never means end the turn. If you have nothing left to do but wait, you spawned it wrong.
@@ -217,6 +247,15 @@ anything you are about to act on. So:
 Fan out independent work to concurrent subagents (disjoint file sets, stated in each brief).
 Keep dependent work sequential behind its gate. Prefer a barrier only when a later stage
 genuinely needs all prior results together. A barrier is a blocking spawn, never an ended turn.
+
+Before a fan-out, make sure the host and the trees outlive it:
+- **Hold the machine awake** for as long as the helpers run — on macOS a background
+  `caffeinate -i -t <seconds>`, or the host's own keep-awake control where it has one. A host that
+  idles to sleep stalls every helper at once, and it looks like a service outage.
+- **Put worktrees where the host's cleanup cannot delete them.** The desktop app removes a worktree
+  under `.claude/worktrees/` that has no changes yet, and a helper still reading its brief has none —
+  it happened to a whole fan-out here between 2026-09-19 and 2026-09-22. Create them outside that
+  directory, in the session's scratchpad for instance: `git worktree add <scratchpad>/wt/<name> <branch>`.
 
 ## Report
 Lead with the gate verdict (lane PASS/FAIL + receipt, engine test count, any negative proofs
