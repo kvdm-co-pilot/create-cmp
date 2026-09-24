@@ -9,6 +9,36 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-229 — the tier was renamed `L2 run`, and the cadence lint does not know the new name — **CLOSED 2026-09-24**
+
+`scripts/lib/cadence.mjs` (`CADENCE_PHRASES`), read by `test/policy-home.test.mjs` over every tracked
+document and by `scripts/hooks/proof-gate.mjs` over memory files at SessionStart
+
+The first-job slice (ddf86b3..6ec08c4) changed the tier's printed name from `device (fleet L2)` to
+`L2 run` in `proof-plan.mjs`, the hook and `change-price.mjs`. That is the text an agent reads, so
+these are the words it will quote. The lint that stops the cadence being restated matches only
+`device`, `emulator` and `fleet L2`. Measured by calling `restatements()` on six lines: the old
+name followed by a per-commit cadence, the device noun followed by one, and the old name's
+REQUIRED schedule row each read as ONE restatement; the new name followed by a per-commit cadence,
+the new name followed by an every-PR cadence, and the new name's REQUIRED schedule row each read as
+ZERO. (The lines themselves are not quoted here: this file is one of the documents the lint reads.)
+
+**Why it does not block:** the module's own header limits it to the phrasings that were found. The
+rule is enforced by the hook and `proof-plan.mjs`, not by this lint, and nothing in the tree or in
+a memory file restates the cadence in the new words today. The fix is one alternation (`L2 run`)
+in the three patterns, with those lines added as plants to the policy-home test.
+
+*Logged 2026-09-24, review round 1 of the first-job slice (L2 digest rule 2 + --rekey + cadence).*
+
+**CLOSED by the alternation this entry named, in the commit that moved it here.** Every pattern in
+`CADENCE_PHRASES` that knew `device` or `fleet L2` knows `L2 run` too — four, where the entry counted
+three: the per-PR / per-commit pattern, both directions of the keyed-to-commits-PRs-or-steps pattern, and the REQUIRED row, which
+still passes a backtick-quoted line. `test/policy-home.test.mjs`'s plant pins five restatements in
+the new words — the ones measured above among them — and two lines that must stay clean: the new name
+with no cadence, and the REQUIRED row quoted in backticks. Re-scanned with the new patterns, every
+tracked document `test/policy-home.test.mjs` reads (132) and this machine's memory files: the only
+hits were this entry's own quotations, which the paragraph above now describes instead.
+
 ### KD-207 — markdown that SHIPS can reopen the device tier but can never oblige it — **CLOSED 2026-09-24**
 
 `scripts/observed-tree.mjs` (`DEVICE_TIER_IRRELEVANT`'s `*.md`) with `scripts/stamped-output.mjs`

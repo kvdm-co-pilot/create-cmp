@@ -43,6 +43,16 @@ test("the plant: the phrasings that were cut are recognised, and the home's own 
   assert.equal(restatements("gated as §11.1: fleet L2 per PR, suite + framework-check per commit").length, 1);
   assert.equal(restatements("the device tier runs after every commit that touches the harness").length, 1);
   assert.equal(restatements("   fleet L2          REQUIRED — 1 changed path").length, 1);
+  // The tier's printed name since 2026-09-24 is `L2 run` (KD-229): the same
+  // cadence in the words an agent now reads is the same restatement, by every
+  // pattern that knows the old words.
+  assert.equal(restatements("L2 run green per PR").length, 1);
+  assert.equal(restatements("run the L2 run per commit").length, 1);
+  assert.equal(restatements("the L2 run is due every PR").length, 1);
+  assert.equal(restatements("every step ends with an L2 run").length, 1);
+  assert.equal(restatements("   L2 run          REQUIRED — 1 changed path").length, 1);
+  assert.equal(restatements("the L2 run is owed once, over the finished slice").length, 0, "the new name is not a cadence on its own");
+  assert.equal(restatements("`L2 run REQUIRED` is the line an agent read").length, 0, "a backtick-quoted line is the episode, not the rule — in the new words too");
   // What the home says, and what history is allowed to say.
   assert.equal(restatements("the device tier runs once, at the end of that slice — never per commit").length, 0, "the rule itself names the wrong cadence to forbid it; that is not a restatement");
   assert.equal(restatements("suite + framework-check per commit").length, 0, "this lint is about the device tier's cadence; the cheap tiers' own cadence is TIERS in scripts/proof-plan.mjs (at-close since 2026-09-24), and a history row quoting the old one is not a device-tier restatement");

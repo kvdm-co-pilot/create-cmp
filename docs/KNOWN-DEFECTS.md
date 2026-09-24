@@ -236,7 +236,6 @@ you the same list without opening anything.
 | **KD-226** | the fleet-check reader ends a shell word at a quote and the `cd` reader refuses one, so `node /A/scripts/fleet-check.mjs"x"` resolves tree `/A` while the shell runs `/A/scripts/fleet-check.mjsx` | the word the shell builds is not a file in any tree, so the classified run cannot execute whatever the gate decided; `scripts/` is not published |
 | **KD-227** | `docs/GATE-RULES.md` says the KD-95 slice added "Four more" oracle shapes; the table went from 24 rows to 31 | a count in a contributor-facing doc, in the same paragraph KD-104's note already asks to be re-read; the invariant the sentence describes is the one the harness holds |
 | **KD-228** | `formatSpine()` marks lagging fields with `spine.lagging.includes(s)` — object identity — so a spine that has been through `--json` prints no `✗` at all | nothing calls it on a parsed spine today, and the summary line still reads `NOT IN STEP`, so the surface cannot claim health it does not have |
-| **KD-229** | the tier now PRINTS as `L2 run`, and the cadence lint (`scripts/lib/cadence.mjs`) knows it only as `device`/`emulator`/`fleet L2`, so `run the L2 run per commit` and `L2 run REQUIRED` read as zero restatements where the old spellings read as one | the lint states its own limited scope ("a restatement worded afresh walks past"), the policy is held by the hook at the moment of decision, and no tracked line or memory file restates it in the new words today |
 | **KD-230** | rule 2 hides the CONTENT of `AGENTS.md`, `CLAUDE.md` and `.claude/**/*.md` from the digest because of a one-time grep (the not-read proof in `UNOBSERVED_BY_PROFILE`'s comment), and no test repeats that grep. A later lane step that opens one of them would make edits to it invisible to the digest after the one run its own code change buys | cannot fire today: re-measured this round, no non-comment reference to any of the three in `template/qa/**/*.mjs`, `*.json`, `*.kts` or `*.sh` |
 
 ---
@@ -3883,32 +3882,6 @@ uses to build `lagging` — i.e. the marker should be derived where it is printe
 by reference.
 
 *Logged 2026-09-22, review round 1 of the review-gates area of the integrated wave.*
-
-### KD-229 — the tier was renamed `L2 run`, and the cadence lint does not know the new name
-
-`scripts/lib/cadence.mjs` (`CADENCE_PHRASES`), read by `test/policy-home.test.mjs` over every tracked
-document and by `scripts/hooks/proof-gate.mjs` over memory files at SessionStart
-
-The first-job slice (ddf86b3..6ec08c4) changed the tier's printed name from `device (fleet L2)` to
-`L2 run` in `proof-plan.mjs`, the hook and `change-price.mjs`. That is the text an agent reads, so
-these are the words it will quote. The lint that stops the cadence being restated matches only
-`device`, `emulator` and `fleet L2`. Measured by calling `restatements()`:
-
-```
-1 | run the fleet L2 per commit
-1 | run the device tier per commit
-0 | run the L2 run per commit
-0 | the L2 run is due every PR
-0 | L2 run REQUIRED
-1 | fleet L2 REQUIRED
-```
-
-**Why it does not block:** the module's own header limits it to the phrasings that were found. The
-rule is enforced by the hook and `proof-plan.mjs`, not by this lint, and nothing in the tree or in
-a memory file restates the cadence in the new words today. The fix is one alternation (`L2 run`)
-in the three patterns, with the plant lines above added to the policy-home test.
-
-*Logged 2026-09-24, review round 1 of the first-job slice (L2 digest rule 2 + --rekey + cadence).*
 
 ### KD-230 — the not-read proof behind rule 2's unobserved list is a measurement nothing repeats
 
