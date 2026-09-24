@@ -884,7 +884,12 @@ export function render(o) {
     case "undeclared":
       line(
         "OWED — but no slice is declared",
-        `${o.need.reason}.\n      ${isTrunk(o.branch) ? "You are on trunk — branch first (git switch -c <name>), then declare the slice" : "Declare the slice first"}: node scripts/proof-plan.mjs --open "<what you are building>".\n      Declaring up front is the point — a slice that knows it will need an L2 run can be\n      scoped differently, and one that knows it will not never pays for one.`,
+        `${o.need.reason}.\n      ${isTrunk(o.branch) ? "You are on trunk — branch first (git switch -c <name>), then declare the slice" : "Declare the slice first"}: node scripts/proof-plan.mjs --open "<what you are building>".\n      Declaring up front is the point — a slice that knows it will need an L2 run can be\n      scoped differently, and one that knows it will not never pays for one.${
+          // The same sentence the OWED branch leads with: an old-rule record
+          // may settle this with a stamp, and an undeclared slice is exactly
+          // the one about to be told to buy a run.
+          o.shortfall?.code === "other-rule" ? `\n      And before any L2 run: ${o.shortfall.reason}\n      Now: node scripts/proof-plan.mjs --rekey` : ""
+        }`,
       );
       break;
     case "owed":

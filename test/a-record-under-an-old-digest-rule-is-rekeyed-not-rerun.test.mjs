@@ -129,6 +129,11 @@ test("the schedule says REKEY, not run: OWED names --rekey, and an old-rule disc
   const text = render(o);
   assert.match(text, /REKEY it, do not re-run it/);
   assert.match(text, /Now: node scripts\/proof-plan\.mjs --rekey/);
+  // With no slice declared the line is "OWED — but no slice is declared", and it
+  // still names the stamp before the run (measured end to end 2026-09-24: it did not).
+  const undeclared = obligation(null, paths, BRANCH, { fleetRecord: oldRecord() });
+  assert.equal(undeclared.state, "undeclared");
+  assert.match(render(undeclared), /And before any L2 run: [\s\S]*Now: node scripts\/proof-plan\.mjs --rekey/);
 
   // A discharge copied from an old-rule record carries no stampedRule. Its hash
   // is not compared with a rule-2 digest — "they differ" would be REOPENED for
