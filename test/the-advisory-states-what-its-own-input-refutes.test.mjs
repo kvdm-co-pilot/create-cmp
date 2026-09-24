@@ -112,8 +112,6 @@ test("the malformed-line disclosure cites a command that reports nothing about t
     plan: null,
     device: "none",
     review: "none",
-    commits: 1,
-    dirty: false,
     histories: { suite: history("suite", 3), fleet: history("fleet", 0), reviews: history("review", 0) },
   }).find((r) => r.what === "suite");
 

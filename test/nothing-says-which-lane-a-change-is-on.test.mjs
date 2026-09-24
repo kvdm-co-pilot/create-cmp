@@ -30,7 +30,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { laneOf, owesFor, spendOf, CEREMONY, DIRECT_TYPES } from "../scripts/change-price.mjs";
+import { laneOf, owesFor, spendOf, price, CEREMONY, DIRECT_TYPES } from "../scripts/change-price.mjs";
 import { TIERS } from "../scripts/proof-plan.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -195,8 +195,6 @@ test("review RECORDS are counted and never called OVER — a record is an upper 
       plan: PLAN,
       device: "none",
       review: "owed",
-      commits: 1,
-      dirty: false,
       histories: {
         suite: kept([]),
         fleet: kept([]),
@@ -226,14 +224,19 @@ test("a change owes ONE suite run whatever its commit count, read from proof-pla
   // copy of the cadence. The rule is once, over the finished batch (TIERS in
   // scripts/proof-plan.mjs); a price of four for three commits and a dirty tree
   // told an agent that four runs were owed, and it ran them.
-  const spend = (recorded, { commits, dirty, plan = PLAN }) =>
+  //
+  // THE ROW IS HANDED NO COMMIT COUNT. `spendOf` read `commits` and `dirty` only
+  // to multiply the price, and stopped reading them when the cadence became
+  // at-close — so a call that still hands them in varies nothing the function
+  // reads (test/option-keys-the-callee-never-reads.test.mjs refuses one). The
+  // rows below vary what `spendOf` does read; "whatever its commit count" is
+  // asserted at the end, in `price()`, which is where the count still exists.
+  const spend = (recorded, { plan = PLAN } = {}) =>
     spendOf({
       branch: BRANCH,
       plan,
       device: "none",
       review: "none",
-      commits,
-      dirty,
       histories: {
         suite: kept(Array.from({ length: recorded }, (_, i) => ran(`2026-09-18T1${i}:00:00.000Z`))),
         fleet: kept([]),
@@ -241,26 +244,41 @@ test("a change owes ONE suite run whatever its commit count, read from proof-pla
       },
     }).find((r) => r.what === "suite");
 
-  const over = spend(7, { commits: 3, dirty: true });
-  assert.equal(over.owed, 1, "three commits and a dirty tree still owe ONE run — over the finished batch");
+  const over = spend(7);
+  assert.equal(over.owed, 1, "ONE run is owed — over the finished batch");
   assert.match(over.verdict, /^OVER by 6$/);
   assert.match(over.note, /295 full-suite runs/, "the measured baseline is quoted from suite-record.mjs's header");
   assert.ok(over.extra.some((l) => l.includes(TIERS.suite.due)), "the row prints the cadence it read, from TIERS and not a copy");
 
-  assert.equal(spend(1, { commits: 3, dirty: true }).verdict, "within");
-  assert.equal(spend(2, { commits: 3, dirty: true }).verdict, "OVER by 1", "a second run over the same batch is the habit this row exists to show");
-  assert.equal(spend(1, { commits: 0, dirty: false }).owed, 1, "a change always owes one run");
+  assert.equal(spend(1).verdict, "within");
+  assert.equal(spend(2).verdict, "OVER by 1", "a second run over the same batch is the habit this row exists to show");
 
   // A PLAN OPENED BEFORE THE CHANGE still carries `declared.suite: "per-commit"`.
   // It is not read for the count — TIERS is the one table — and it is NAMED, so
   // a reader who opens the plan and finds "per-commit" there knows why the row
   // disagrees with it.
   const oldPlan = { ...PLAN, declared: { suite: "per-commit", frameworkCheck: "per-commit", device: "at-close", review: "at-close" } };
-  const fromOld = spend(0, { commits: 5, dirty: true, plan: oldPlan });
+  const fromOld = spend(0, { plan: oldPlan });
   assert.equal(fromOld.owed, 1, "a stale per-commit copy does not multiply the price");
   assert.ok(fromOld.extra.some((l) => /still declares suite "per-commit"/.test(l) && /stale/.test(l)), `the stale copy is named: ${fromOld.extra.join(" | ")}`);
-  const fromCurrent = spend(0, { commits: 5, dirty: true, plan: { ...PLAN, declared: { suite: TIERS.suite.when } } });
+  const fromCurrent = spend(0, { plan: { ...PLAN, declared: { suite: TIERS.suite.when } } });
   assert.equal(fromCurrent.extra.some((l) => /still declares/.test(l)), false, "a plan that agrees with TIERS is not called stale");
+
+  // WHATEVER THE COMMIT COUNT, where the count exists: `price()` derives it from
+  // the commit subjects and hands the suite row none of it. A price that ever
+  // scaled with commits again — through any argument — reddens here.
+  const o = { state: "none", review: { state: "none" }, plan: PLAN };
+  const histories = { suite: kept([]), fleet: kept([]), reviews: kept([]) };
+  for (const [subjects, dirty] of [
+    [[], false],
+    [["fix(a): one", "fix(a): two", "fix(a): three"], true],
+    [["fix(a): one", "fix(a): two", "fix(a): three", "fix(a): four", "fix(a): five"], true],
+  ]) {
+    const m = price({ branch: BRANCH, paths: ["scripts/a-module.mjs"], subjects, dirty, o, histories });
+    assert.equal(m.diff.commits, subjects.length, "the premise: the commit count reached price()");
+    const suite = m.spent.find((r) => r.what === "suite");
+    assert.equal(suite?.owed, 1, `${subjects.length} commit(s)${dirty ? " and a dirty tree" : ", clean"} owe ONE suite run, not ${suite?.owed}`);
+  }
 
   // A record from before this slice opened is not this slice's spend — the
   // proof-history attribution rule, with the upper bound absent because the
@@ -270,8 +288,6 @@ test("a change owes ONE suite run whatever its commit count, read from proof-pla
     plan: PLAN,
     device: "none",
     review: "none",
-    commits: 1,
-    dirty: false,
     histories: { suite: kept([ran("2026-09-17T09:00:00.000Z"), ran("2026-09-18T11:00:00.000Z")]), fleet: kept([]), reviews: kept([]) },
   }).find((r) => r.what === "suite");
   assert.equal(earlier.recorded, 1, "the run from before openedAt belongs to whatever came before");
@@ -282,8 +298,6 @@ test("a change owes ONE suite run whatever its commit count, read from proof-pla
     plan: PLAN,
     device: "none",
     review: "none",
-    commits: 1,
-    dirty: false,
     histories: { suite: { file: "qa-artifacts/suite-history.jsonl", exists: false, rows: [], malformed: 0 }, fleet: kept([]), reviews: kept([]) },
   }).find((r) => r.what === "suite");
   assert.equal(absent.recorded, null);

@@ -54,8 +54,8 @@ const ran = (at) => ({ branch: BRANCH, ranAt: at });
 /** A history file that exists, as `observe()` hands it over — `malformed` included, as `readHistory` returns it. */
 const kept = (rows, malformed = 0) => ({ file: "qa-artifacts/x-history.jsonl", exists: true, rows, malformed });
 
-const spend = ({ device = "none", review = "none", commits = 1, dirty = false, suite = kept([]), fleet = kept([]), reviews = kept([]) }) =>
-  spendOf({ branch: BRANCH, plan: PLAN, device, review, commits, dirty, histories: { suite, fleet, reviews } });
+const spend = ({ device = "none", review = "none", suite = kept([]), fleet = kept([]), reviews = kept([]) }) =>
+  spendOf({ branch: BRANCH, plan: PLAN, device, review, histories: { suite, fleet, reviews } });
 
 const rowFor = (what, opts) => spend(opts).find((r) => r.what === what);
 
