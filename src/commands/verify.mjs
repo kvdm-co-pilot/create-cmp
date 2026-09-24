@@ -77,18 +77,15 @@ export async function runVerifyCommand(flags, positional) {
       `  commands: ${colors.dim(source)}\n\n`
   );
 
-  const dryRun = flags["dry-run"] === true;
+  const dryRun = flagBool(flags, "dry-run", false);
   const verdict = await runVerify({
     projectDir,
     manifest: { verify },
     config: { platforms: { ios } },
     dryRun,
   });
+  // The printer says a dry run is a dry run and claims no verdict for it; the
+  // exit says the same thing — nothing failed, because nothing ran.
   printVerifyVerdict(verdict);
-  if (dryRun) {
-    process.stdout.write(
-      `${colors.yellow("Dry run")} — commands printed, nothing executed; the build is NOT proven.\n`
-    );
-  }
-  process.exit(verdict.green ? 0 : 1);
+  process.exit(dryRun || verdict.green ? 0 : 1);
 }

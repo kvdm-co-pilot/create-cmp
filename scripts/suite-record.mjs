@@ -108,7 +108,15 @@ export function suiteStatus({ record = readSuiteRecord(), now = suiteTreeHash(),
   return { state: "fresh", record, now };
 }
 
-/** The one-line account a reader prints. */
+/**
+ * The one-line account a reader prints.
+ *
+ * A STATEMENT OF FACT, NOT AN ORDER. Every non-fresh line used to end "— run
+ * npm test", and `proof-plan.mjs` prints this line mid-slice, where it read as
+ * "run it now" — after every fix. WHEN the suite is due is the tier's `due`
+ * sentence, printed directly above this line (TIERS in scripts/proof-plan.mjs);
+ * this line says only whether a recorded run already covers these bytes.
+ */
 export function describeSuiteStatus(s) {
   const r = s.record;
   const counts = r?.counts ? `${r.counts.pass}/${r.counts.tests}${r.counts.fail ? `, ${r.counts.fail} failing` : ""}` : "";
@@ -116,16 +124,16 @@ export function describeSuiteStatus(s) {
     case "fresh":
       return `${r.verdict} ${counts} recorded ${String(r.ranAt).slice(0, 16)} for this exact tree — read it, do not re-run it`;
     case "stale":
-      return `the recorded run (${r.verdict} ${counts}, ${String(r.ranAt).slice(0, 16)}) describes another tree — run npm test`;
+      return `the recorded run (${r.verdict} ${counts}, ${String(r.ranAt).slice(0, 16)}) describes another tree, so no recorded run covers these bytes`;
     case "moved":
-      return "the tree changed while the last run was in flight, so its record describes no tree — run npm test";
+      return "the tree changed while the last run was in flight, so its record describes no tree";
     case "other-node":
-      return `recorded on Node ${r.node}, this is ${process.version} — the counts are Node-dependent; run npm test`;
+      return `recorded on Node ${r.node}, this is ${process.version} — the counts are Node-dependent, so it does not cover this Node`;
     case "narrowed":
-      return `the last run was narrowed (${(r.narrowedBy ?? []).join("; ") || "not the declared suite"}), so it speaks for no tree — run npm test`;
+      return `the last run was narrowed (${(r.narrowedBy ?? []).join("; ") || "not the declared suite"}), so it speaks for no tree`;
     case "incomplete":
-      return `the last run did not finish (${r.verdict}) — run npm test`;
+      return `the last run did not finish (${r.verdict}), so it covers no bytes`;
     default:
-      return "no run is recorded for this tree — run npm test";
+      return "no run is recorded for this tree";
   }
 }

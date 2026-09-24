@@ -9,6 +9,722 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-229 — the tier was renamed `L2 run`, and the cadence lint does not know the new name — **CLOSED 2026-09-24**
+
+`scripts/lib/cadence.mjs` (`CADENCE_PHRASES`), read by `test/policy-home.test.mjs` over every tracked
+document and by `scripts/hooks/proof-gate.mjs` over memory files at SessionStart
+
+The first-job slice (ddf86b3..6ec08c4) changed the tier's printed name from `device (fleet L2)` to
+`L2 run` in `proof-plan.mjs`, the hook and `change-price.mjs`. That is the text an agent reads, so
+these are the words it will quote. The lint that stops the cadence being restated matches only
+`device`, `emulator` and `fleet L2`. Measured by calling `restatements()` on six lines: the old
+name followed by a per-commit cadence, the device noun followed by one, and the old name's
+REQUIRED schedule row each read as ONE restatement; the new name followed by a per-commit cadence,
+the new name followed by an every-PR cadence, and the new name's REQUIRED schedule row each read as
+ZERO. (The lines themselves are not quoted here: this file is one of the documents the lint reads.)
+
+**Why it does not block:** the module's own header limits it to the phrasings that were found. The
+rule is enforced by the hook and `proof-plan.mjs`, not by this lint, and nothing in the tree or in
+a memory file restates the cadence in the new words today. The fix is one alternation (`L2 run`)
+in the three patterns, with those lines added as plants to the policy-home test.
+
+*Logged 2026-09-24, review round 1 of the first-job slice (L2 digest rule 2 + --rekey + cadence).*
+
+**CLOSED by the alternation this entry named, in the commit that moved it here.** Every pattern in
+`CADENCE_PHRASES` that knew `device` or `fleet L2` knows `L2 run` too — four, where the entry counted
+three: the per-PR / per-commit pattern, both directions of the keyed-to-commits-PRs-or-steps pattern, and the REQUIRED row, which
+still passes a backtick-quoted line. `test/policy-home.test.mjs`'s plant pins five restatements in
+the new words — the ones measured above among them — and two lines that must stay clean: the new name
+with no cadence, and the REQUIRED row quoted in backticks. Re-scanned with the new patterns, every
+tracked document `test/policy-home.test.mjs` reads (132) and this machine's memory files: the only
+hits were this entry's own quotations, which the paragraph above now describes instead.
+
+### KD-207 — markdown that SHIPS can reopen the device tier but can never oblige it — **CLOSED 2026-09-24**
+
+`scripts/observed-tree.mjs` (`DEVICE_TIER_IRRELEVANT`'s `*.md`) with `scripts/stamped-output.mjs`
+
+`DEVICE_TIER_IRRELEVANT` declares `*.md` unable to oblige a device run, matched on the repo path, so a
+change to `template/README.md` — which ships INTO the stamped app — cannot make the tier required. If
+some other path in the same slice does make it required, the same file's bytes then move the stamped
+digest and REOPEN a discharged slice. The two halves disagree for exactly the shipped-markdown set.
+
+Pre-existing in the same shape (the old device hash covered `template/` wholesale including its
+markdown, while `*.md` was declared irrelevant) and unchanged in severity by the slice that found it.
+The direction of the error is the safe one — a shipped doc can cost a run, never hide one — and the
+fix is a product decision: either `*.md` stops being declared irrelevant (every README typo in
+`template/` then obliges a run), or the oracle normalises markdown inside the app (a comment in a
+shipped `AGENTS.md` an agent executes would then be invisible to the tier).
+
+**Fires when:** a slice touches one non-markdown path and one `template/**/*.md`, discharges, and is
+reopened naming the markdown file.
+*Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
+
+**CLOSED by `fcd1f58` (branch `wave/l2-digest`), the first of the two spellings this entry named, with the
+cost of the second removed.** `*.md` still declares this repo's own prose unable to oblige the tier, and it
+no longer reaches `template/`: `DEVICE_TIER_SHIPPED` in `scripts/observed-tree.mjs` puts every path under
+`template/` back, through `deviceTierNeed`, the one derivation `proof-plan` and `fit-test` now share. Every
+such edit is then ASKED about, and the stamped digest answers: under digest rule 2
+(`scripts/stamped-output.mjs`) prose the cmp profile's L2 run never opens — `AGENTS.md`, `CLAUDE.md`,
+`.claude/**/*.md`, each with its not-read proof — holds the digest, so a matching record discharges it for
+the price of one stamp. A spec is read by the lane and moves it. Both directions are driven in
+`test/what-the-l2-run-never-reads-does-not-move-the-stamped-digest.test.mjs`: `template/specs/home.spec.md` →
+required, digest moved, OWED; `template/AGENTS.md` → required, digest held, DISCHARGED by the record.
+The shipped `README.md` is NOT held — `qa/verify.mjs` rewrites its badge on every run — so the README
+typo this entry priced still costs an L2 run: that file is read by the run, and the price is the honest one.
+
+### KD-14 — `create-cmp`'s parser does not split `--flag=value` — **CLOSED 2026-09-22**
+
+`src/lib/args.mjs` (`parseArgs`)
+
+`prooflane`'s parser splits on `=`; this one never has. `create-cmp harness init --profile=svc`
+produces a flag literally named `profile=svc`, which this door now REFUSES by name — `create-cmp:
+--profile=svc is not an argument this command knows`, exit 2, nothing written (measured
+2026-09-19). The sentence here used to say the profile id falls back to the directory name, and
+that stopped being true when the unknown-argument refusal landed: the flag is unrecognised
+because its name carries the value. Not a regression and not promised — no help text in
+`bin/create-cmp.mjs` offers the `=` form, every example uses the space form — so a user reaches
+it only by habit from other CLIs, and now hears about it instead of being surprised later.
+
+Found while fixing KD-7, as a test I had written that asserted the `=` form in BOTH parsers.
+That test was reaching past its own slice; it now asserts `=` where `=` is parsed, and this
+entry holds the rest.
+
+**Worth doing with KD-4:** both are drift between the two front doors, and one slice should
+close them together.
+*Logged 2026-09-13.*
+
+**CLOSED by `4be6b36`.** `src/lib/args.mjs`'s `parseArgs` is prooflane's loop token for token now,
+so both doors split `--name=value` at the first `=`: the attached form of a declared boolean means
+what its space form means, a value flag works attached (`--target-dir=./app`, `--profile=svc`), a
+declared flag carrying a value it cannot mean is refused by what was typed, and an unknown name is
+refused by its name rather than by name-plus-value. Red first on `4b81ee1`, twice —
+`test/an-equals-sign-turns-a-known-flag-into-an-unknown-one.test.mjs` through the real
+`create-cmp upgrade` (`259e86e`, 6 of 6), and the source pin in
+`test/a-declared-booleans-value-arrives-as-a-string.test.mjs` that holds the two `parseArgs` equal
+as code, return value aside (`61efc60`).
+
+**What did NOT close with it.** KD-4 — the paragraph above says these two are one slice, and the
+`harness init` flag line that omits `--new-profile` was not touched, so KD-4 stays open. And the
+split brought one edge case of its own, logged as KD-184: `--=x` splits into the EMPTY flag name,
+which both doors now refuse as `--`, the one token they accept.
+
+### KD-153 — half the new refusal is unreachable, at the door that cannot produce the shape — **CLOSED 2026-09-22**
+
+`bin/create-cmp.mjs`, `src/lib/args.mjs` (`unreadableBooleanValues`)
+
+A declared boolean can only still hold a string when the value was attached with `=`, and
+create-cmp's parser has never split on `=` (KD-14): `--dry-run=maybe` becomes a flag literally
+named `dry-run=maybe` and is refused as an unknown argument. So at that door the new check runs
+over every invocation and can never find anything.
+
+It is there anyway because the two parsers are pinned equal by test, function for function, and
+because the day KD-14 is closed is the day the shape arrives. The user is refused either way,
+with a sentence naming what they typed; only the sentence differs. At prooflane's door, which
+does split `=`, the refusal is the reachable one and is driven by test through the real bin.
+
+**Fires when:** never, at this door, until `create-cmp`'s parser splits `=`.
+*Logged 2026-09-19, by the slice that closed KD-16.*
+
+**CLOSED by `4be6b36`, which is the day this entry named.** With `=` split at create-cmp's door,
+`--dry-run=maybe` and `--dry-run=` reach `unreadableBooleanValues` and are refused as a value the
+flag cannot mean — exit 2, the typed token named, the version catalog byte-identical — instead of
+being refused as an unknown flag NAME. Driven through the real `create-cmp upgrade` in
+`test/an-equals-sign-turns-a-known-flag-into-an-unknown-one.test.mjs`, red on `4b81ee1`. The SPACE
+form holding something else is still deliberately not refused: that is KD-150, measured untouched
+by this change (`["--no-firebase","no","my-app"] → positionals ["no","my-app"]`).
+
+### KD-18 — the symlink gate reads two of the eight bins this repo publishes — **CLOSED 2026-09-22**
+
+`test/a-published-bin-does-nothing-when-npm-symlinks-it.test.mjs` (`declaredBins`)
+
+Its header says "EVERY bin every package.json declares". The scan reads the root manifest and
+`packages/*/package.json` — one level — so it sees `create-cmp` and `prooflane-harness` and misses
+the five alias bins under `packages/aliases/*/` (`prooflane`, `create-mobile`, `create-kmp`,
+`create-ktor`, `create-compose-multiplatform`) and `inspector/mcp`. `assert.ok(bins.length > 0)`
+passes on two, so the narrowing is silent. The missed set includes `prooflane`, which is the name an
+adopter actually `npx`es.
+
+Nothing is broken behind it: all eight were run directly and through a symlink on 2026-09-14 and
+every one produced identical bytes and status. Logged as a gate narrower than its own claim, not as
+a defect — the repair is to recurse `packages/` (or read `workspaces`) rather than to list two
+depths.
+
+**Fires when:** an alias bin gains an entry-point guard, or any other realpath-sensitive line.
+*Logged 2026-09-14, review round 2 of `fix-flag-eats-target`.*
+
+**CLOSED by `1f33325`, red at `b2e67bc`.** The gate enumerates published packages through
+`ownedNames()` — the one list `scripts/ground-truth.mjs` derives and
+`test/a-version-number-cannot-name-two-different-trees.test.mjs` holds to every tracked publishable
+manifest — and links every bin NAME rather than every deduplicated target, so its reach is now
+asserted rather than counted: `assert.ok(bins.length > 0)` is gone.
+
+**The count in this entry was low. It is NINE bin names, not eight, and it ran two of them.** At
+`b2e67bc` the gate reds with the seven it never ran — `cmp-inspector-mcp` (`@create-cmp/inspector`),
+`create-cmp-cli`, `create-compose-multiplatform`, `create-kmp`, `create-ktor`, `create-mobile` and
+`prooflane` — and passes over nine at `1f33325`. What the entry got right is that nothing was broken
+behind it; what was broken was the gate's claim about itself. Refuters: a dead entry-point guard
+planted in `packages/aliases/prooflane/bin/cli.mjs`, in `create-ktor`'s and in
+`inspector/mcp/bin/server.mjs` each reds by name, and narrowing the enumeration back
+(`p.dir === "inspector/mcp"` skipped) reds the coverage assertion.
+
+Two of the newly read bins legitimately print nothing on stdout — the inspector is a stdio MCP
+server that announces itself on stderr (KD-188), and an alias whose dependency is absent says so on
+stderr and exits 1 — so the comparison reads stderr as well as stdout now, and a dead entry point is
+stated as what it actually looks like: exit 0 in silence.
+
+### KD-134 — the version deriver names three surfaces where a bump must move four — **CLOSED 2026-09-22**
+
+`scripts/ground-truth.mjs` · `package-lock.json`
+
+`CLAUDE.md` says to ask the programs, not a document, and names `ground-truth.mjs` for "counts and
+versions, never by hand". It reports the spine as `cli / plugin / marketplace`. A version bump must
+actually move **four** surfaces: those three plus `package-lock.json`, which records the root
+manifest's own version in two places.
+
+**Measured on this slice.** Bumping 0.26.4 → 0.26.5 across the three the deriver names left the
+suite red: `actual: '0.26.4', expected: '0.26.5'`. The author had read the deriver, moved exactly
+what it listed, and was still wrong.
+
+**Nobody is wrongly served, and that is why it is logged.** `test/workspace-lock-sync.test.mjs`
+refuses the drift by name with the remedy printed, so the lockfile cannot ship stale. The lock is
+also genuinely derived state, which is a fair reason for a *count* deriver not to list it as a
+package.
+
+**What is logged is narrower and worse:** "which surfaces must move together" is not derived
+anywhere, and the program that exists so nobody hand-counts this answers with three of four. A
+reader who trusts it exactly as `CLAUDE.md` instructs is handed an incomplete answer and finds out
+from a test. That is the drift `ground-truth.mjs` was written to abolish, in the deriver itself.
+
+*Logged 2026-09-19, review round 1 of the packaging slice — by the reviewer, about the author.*
+
+**CLOSED by `a2570ad`.** `scripts/ground-truth.mjs` derives a **version spine**: the six FIELDS a
+bump must move — `package.json`, the lock's `version` and its `packages[""].version`, `plugin.json`,
+and the marketplace's `metadata.version` plus every `plugins[*].version` — with which of them lag
+printed in the table and answered in `--json`. So the program `CLAUDE.md` sends a reader to now
+answers the question this entry says it was asked. Before it, both shipped-surface tests red: the
+`--json` answer "never mentions package-lock.json version, package-lock.json packages[""].version",
+and the printed table never mentioned the lock; after, 13 pass. Refuters: deleting the two lock
+surfaces from `versionSpine()` reds six tests including every fixture, and deleting the print line
+from `main()` reds the table test.
+
+The four FILES are this entry's; the FIELD list inside them is the closing slice's own reading, and
+`npm version` moves `package.json` and the lock for you — so what the spine is worth is worth
+exactly for the hand-edited bump this entry measured.
+
+### KD-31 — the contract vendored into every stamped app names a script no stamped app has — **CLOSED 2026-09-22**
+
+`template/qa/lib/profile-contract.mjs` (comment above `l2Execution`)
+
+"Run it with `node scripts/fleet-check.mjs --ladder-plant`." The template ships no `scripts/`
+directory; `fleet-check.mjs` lives in create-cmp and is not vendored. The contract's own header
+names "the author" — a person writing a profile, in their own tree — as one of its three consumers,
+and this is the one instruction it gives them that their tree cannot carry out. The file already
+carries one reference of the same shape (`node scripts/sync-harness.mjs`, `profile.mjs:26`), but
+that one says "in the create-cmp repo" beside it.
+
+Not blocking: a reader who tries gets `Cannot find module`, immediately, rather than a wrong answer.
+**Fires when:** a second-stack author follows it. *Logged 2026-09-14, review round 1 of
+`startup-plant`.*
+
+**CLOSED by `a1c3e16`, red at `330ba88`.** `template/qa/lib/profile-contract.mjs` says the run
+happens in the create-cmp repo, in the sentence that gives the instruction, and the CLASS closes
+with it: `test/a-vendored-instruction-names-a-script-no-stamped-app-has.test.mjs` scans every
+tracked file under `template/` for `node <path>` and refuses a path the template does not ship
+unless the SENTENCE the instruction sits in says the script lives in the create-cmp repo. Refuter:
+planting "run `node scripts/nope.mjs`" into `template/qa/verify.mjs` reds it.
+
+**It was sixteen instructions, not one, and the sibling this entry called correct is one of them.**
+The paragraph above reads `node scripts/sync-harness.mjs` at `profile.mjs:26` as already saying "in
+the create-cmp repo" beside it — it says it in the sentence BEFORE, which under the same-sentence
+rule is not beside it at all. Fifteen SINGLE SOURCE OF TRUTH headers were live for that reason; all
+sixteen now carry the repo in their own sentence. The paragraph reading was measured as the
+alternative and refuses exactly one instruction, this entry's, while exempting the other fifteen on
+a mention in a neighbouring sentence — a hole, because those headers are precisely where the next
+instruction of this kind gets written.
+
+### KD-95 — a worktree under a path with a space in it is a tree this gate refuses to name — **CLOSED 2026-09-22**
+
+`scripts/hooks/proof-gate.mjs` (`literalDir` / `LITERAL_PATH`, and the fleet-check operand reader)
+
+The gate reads the tree a command acts on from the command's own `cd` and from a
+`…/scripts/fleet-check.mjs` operand, and it reads both only when they are written literally —
+`LITERAL_PATH` excludes whitespace along with `$`, backticks, globs and `~`, and the operand reader
+is a `\S*` that cannot cross a space. So `cd "/Users/k/my trees/slice" && gh pr merge` is refused
+with "a `cd` this gate cannot read literally", and `node "/Users/k/my trees/scripts/fleet-check.mjs"`
+with "a form this gate cannot resolve to a file". Both are true sentences and both are refusals of
+work that is real.
+
+The quoted case is the one that could be read exactly — quotes delimit, so a space inside them is
+part of the path — and it is not, because the unquoted case next to it cannot be, and one relaxation
+without the other is the kind of half-rule that reads as a general guarantee. Nobody is wrongly
+served today: every worktree of this repository lives under a space-free path, and the alternative
+to refusing is resolving half a path and judging whatever tree happens to sit there — the defect
+this slice just closed, made by the gate itself. **Fires when:** a worktree of this repo is checked
+out under a path containing a space and a gated command names it. *Logged 2026-09-18, in the slice
+that added the reader (KD-79).*
+
+**CLOSED by `87ae6d4`, red at `af85171`.** A `cd` operand and a `…/scripts/fleet-check.mjs` operand
+are read from the command as written, so a wholly quoted path with a space in it resolves exactly,
+while everything the shell would expand, escape or assemble from pieces — a substitution, a glob, a
+`~`, an escape, a path built from adjacent pieces — stays refused. The oracle is `/bin/sh` itself:
+`test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs` gained seven rows, and
+`test/a-worktree-under-a-path-with-a-space-in-it-is-a-tree-the-gate-can-name.test.mjs` is the red
+one at `af85171`. `docs/GATE-RULES.md` moved in the same commit, and its "runs 24 shapes" sentence
+now names the table rather than a count.
+
+**Half of what this entry recorded was wrong, and the wrong half was the fail-open one.** It says
+`node "/Users/k/my trees/scripts/fleet-check.mjs"` was *refused* with "a form this gate cannot
+resolve to a file". It was not refused: measured on `4b81ee1` by calling the module's own
+`classify`, that command returns `null` — the hook printed nothing and the device run went ahead
+**ungated**. Silence, not refusal, which is the opposite direction from the one this entry argued
+was safe. The `cd` half is right about the refusal and wrong about its cause: `cd "/tmp" && gh pr
+merge` was refused too, with no space in it at all, because `readablePrefix` blanks every quoted
+span before `CHDIR` looks for the operand, so `LITERAL_PATH`'s whitespace exclusion was never
+reached.
+
+**What stayed open, named rather than guessed at:** two spellings of a fleet-check run are still
+silent (KD-190), the `cd` reader's command position is still a bare separator where
+`COMMAND_PREFIX` is not (KD-189), an unquoted brace expansion is still read as a literal path
+(KD-192), and the oracle's failure message still describes the gate's answer as the shell's
+(KD-193).
+
+### KD-119 — a KD number is allocated per branch, and two branches in flight allocate the same one — **CLOSED 2026-09-22**
+
+`docs/KNOWN-DEFECTS.md` (the open table and its entries), `scripts/hooks/proof-gate.mjs` (comments
+that cite a KD number)
+
+Measured 2026-09-18 at this slice's final re-record, between this branch and `origin/main` at
+`4b59451`. Both files number their new entries from the highest number they can see, and neither
+branch can see the other's. As found, FIVE numbers named two unrelated defects each:
+
+    this branch   KD-109  KD-110  KD-111  KD-112  KD-113   (109-111, 113 open; 112 closed)
+    origin/main   KD-109  KD-110  KD-111  KD-112  KD-113   (all open)
+
+`origin/main`'s KD-110 is the preflight guarding `npm test`; this branch's was `COMMAND_PREFIX`'s
+three alternatives. Its KD-113 is a nameless workspace spelled two ways; this branch's was the letter
+sweep's blind direction. The table rows and entry bodies collide in the same file, so a rebase puts
+both in front of whoever does it — the same surface as `b3670aa`, "the rebase kept both copies of
+this branch's own rows", one step earlier. **What a rebase does NOT put in front of anybody is the
+citation in code:** `scripts/hooks/proof-gate.mjs` cites KD numbers in three comments, and no
+conflict hunk ever shows them.
+
+**The collision itself is FIXED, in the commit that logged this:** this branch's five ids were
+renumbered to 114-119 — above `origin/main`'s maximum, in every file that carries one including the
+three code comments — BEFORE any rebase, because renumbering inside conflict hunks misses the entry
+sections that do not conflict. What stays logged is the absence of anything that makes that routine,
+and the fact that this entry's own body was rewritten by the renumber that fixed it: a blanket
+substitution moved the `origin/main` row of the table above as well as this branch's, which is the
+smallest possible demonstration that a KD number is a string in prose and nothing else.
+
+**Direction: a reader is sent to the wrong entry, and nothing else.** No program in this repo parses
+a KD number — grepped `scripts/` and `test/`, and `proof-plan.mjs`'s only mention of this file is a
+sentence naming it — so no gate, refusal or count routes on one. Nothing false reaches an adopter.
+The rule that avoids it is that the number comes from a place both branches can see — `origin/main`'s
+highest, re-read at logging time, not the branch's own — and it is a convention, not a program.
+Making it one is cheap to state and not free to get right: the deriver would have to fetch, which is
+the thing `scripts/proof-plan.mjs` deliberately never does because a gate that fetched would move
+the baseline it judges. So the convention stands, unenforced, and this entry is the record of what
+it costs when it is missed. *Found 2026-09-18 by the third declared substitute reader, at the final
+re-record of the slice that closed KD-107 — outside the four confirmations that re-record was
+bounded to, so it landed as a log entry rather than a fix. The author took the fix on the same pass,
+because a renumber is cheaper before a rebase than inside one.*
+
+**CLOSED by `3516dc7`.** `node scripts/kd-next.mjs` allocates the next number from every place that
+can hold one — the working tree, `origin/main` and every open PR head — prints what it read place by
+place, and names on stderr anything it could not reach. So the convention this entry recorded as
+"unenforced, and stated in prose" is a program now, and the header of `docs/KNOWN-DEFECTS.md` sends
+a reader to it. It does not fetch to get there: it reads `origin/main` as the local remote-tracking
+ref and the PR heads through `gh`, which is why the account it prints is part of the answer rather
+than a footnote.
+
+What it cannot see is a branch with no pull request — this wave's own shape — and that is logged as
+KD-191 rather than carried here. `test/a-kd-number-is-allocated-per-branch-so-two-branches-allocate-the-same-one.test.mjs`
+holds the program.
+
+### KD-85 — apps stamped through 0.26.2 keep the unanchored hooks, and nothing this repo can run will fix them — **CLOSED 2026-09-22**
+
+`template/.claude/settings.json` (fixed in 0.26.3) · `src/commands/doctor.mjs` (`applySafeFixes`)
+
+Through 0.26.2 the template shipped three cwd-relative hook commands — `Stop`
+(`node qa/receipt-check.mjs --hook`), `UserPromptSubmit` and `statusLine` (both
+`test -f qa/walk-status.mjs && … || true`). Claude Code runs a hook in the SESSION's working
+directory, so a session opened in a subdirectory loses the Stop gate loudly and loses the walk's
+status line and prompt injection **silently**, because `|| true` turns a wrong directory into a
+clean exit with no output. payment-blueprint hit the loud half on 2026-09-02 and anchored its own
+copy on 2026-09-10; the template was never fixed, so every app stamped in between carries it.
+
+**This slice anchors the template and gates it, and that reaches new stamps only.** Two reasons
+the existing population stays broken, and neither is age:
+
+1. Those trees are *other repositories*. No commit here edits them, which is the KD-78 shape — the
+   entry exists so the gap is recorded rather than mistaken for coverage.
+2. `create-cmp doctor --fix` is the one command that already writes into an app's
+   `.claude/settings.json`, and it deliberately **adds** the walk wiring without ever rewriting a
+   hook the app already has. That restraint is correct (it is the app's file), and it is also why
+   the heal cannot carry this fix. `test/doctor-walk-wiring.test.mjs` pins the legacy string
+   deliberately so the limit is stated rather than discovered. What the heal writes IS anchored,
+   because it copies the template — gated in the same file.
+
+**What the fix would be, when it is taken:** a `doctor` finding that reports unanchored commands
+(the detector is already exported — `anchorViolations` in `src/lib/hooks.mjs`), and a heal that
+rewrites only commands matching the shapes the template itself shipped, leaving anything an app
+authored alone. That is a new adopter-facing diagnosis with its own consent question about
+rewriting a file the app owns, so it is a slice, not a line — and it is the same change that would
+close KD-86's half of this.
+
+**RE-PLACED 2026-09-19, and half the recorded reason was not a reason.** It read *"no act available
+here — those trees are other repositories; and no command an adopter runs would tell them."* The
+first clause answers who can be REACHED from this repository; the second answers who is SERVED, and
+that is the header's row-1 question. The second is now false: `create-cmp doctor` reads the app's
+own `.claude/settings.json` and names each walk surface whose invocation will not resolve, with the
+exact anchor to write for a hook (`src/commands/doctor.mjs`, `cwdRelativeWalkSurfaces`). The
+population that was broken AND uninformed is now merely broken and informed, which is row 2.
+
+**What this slice did NOT do, stated so the entry is not read as closed.** (1) No heal. Rewriting a
+command an app authored still needs the consent question this entry names, and `--fix` still only
+adds. (2) **Only two of the three commands are reported.** The finding filters to the walk
+(`walk-status.mjs`), so a 0.26.2 app's `Stop` hook — `node qa/receipt-check.mjs --hook` — is still
+diagnosed by nothing here. That one fails LOUDLY, which is why it is the third and not the first:
+the silent pair is what an adopter could not otherwise find out.
+
+**CLOSED by `63ba3f0`, red at `1581d00` (7 of 8 cases), finished at `f760f35`.** Both halves this
+entry said the fix would be. The DIAGNOSIS: `shipped-hooks` and `unanchored-hooks` name every
+anchorable hook surface that will not resolve, the Stop hook this entry recorded as diagnosed by
+nothing included. The HEAL: `create-cmp doctor --fix` rewrites a hook command **in place** — the
+command string changes and no other byte of `.claude/settings.json` does, so an app's own
+formatting, escapes and hand-written hooks survive verbatim. What may be rewritten is bounded by a
+committed table of every command the template has ever shipped (`src/lib/shipped-hooks.mjs`, every
+string taken from git history) and narrowed again to a pair that differs by the anchor alone, so the
+rewrite runs the same script whatever version of the lane the app carries. The consent question this
+entry named is asked: `--yes` approves, a non-interactive run declines and prints what it would have
+done, `--dry-run` previews and writes nothing. A command the app wrote is never rewritten — it is
+reported with the anchored form to paste. The status line is still never rewritten (KD-90).
+
+**The reach is TWO commands, not one, and this entry's row 2 is wrong about that.** It says
+`doctor --fix` "is the one command that already writes into an app's `.claude/settings.json`".
+`create-cmp upgrade --harness` also does: that file is in neither exclusion list of the sweep, and
+`decideFile` returns `applied` whenever the app's copy equals the base stamp. Measured through the
+same decision function the planner calls, with real bytes — an app that never touched the file gets
+the current template exactly, an app that added its own hook gets a three-way `merged` file in which
+**its own hook survives and both anchors land**, and an app that replaced or hand-anchored
+create-cmp's own command gets `conflicted`: its file is NOT rewritten and the engine's version lands
+beside it as `.cmp-new`. Preserved or merged, never clobbered — and the one case the merge refuses is
+the same case the table heal refuses, because a hand-edited command is not a shipped form. The two
+doors differ in mechanism and agree in outcome; the second one is logged as KD-194, with what was and
+was not measured.
+
+**What this closure does not reach, unchanged.** The population is still other repositories: no
+commit here edits them, and an app is repaired when somebody runs `create-cmp doctor --fix` or
+`create-cmp upgrade --harness` in it. That was always the remedy this entry named. KD-86's crediting
+half goes with it — a bare-basename hook can no longer be read as health, because credit now requires
+byte-recognition rather than the detector's silence — but KD-86 stays open for its detection half,
+and KD-87's blind spot is likewise improved and not closed. KD-90 (the status line is unanchorable),
+KD-180, KD-181 and KD-183 stay open as written, and KD-183's population is widened by KD-195.
+
+*Closed 2026-09-22. The dry-run defect found while closing it — `doctor --fix --dry-run` wrote
+`local.properties`, `gradle.properties` and a created `.claude/settings.json` — was ruled blocking
+and fixed in the same branch by `af1bfbe` rather than logged, so it has no entry here.*
+
+### KD-131 — one tree, two verdicts: a fixed-port preview-service test under full-suite load — **CLOSED 2026-09-22**
+
+`inspector/mcp/test/preview-service.test.mjs:2922` · `qa-artifacts/suite-history.jsonl`
+
+Measured 2026-09-19 while gating the round-pricing slice. The full suite ran twice over bytes
+nothing had touched in between, and the kept records say it plainly — same `observedHash`
+(`e386597…`), `FAIL` at 22:10:52Z and `PASS` at 22:12:22Z. The failing assertion is
+`assert.match(page, /NOT refreshing/)`: the service was in the right state (`stale`, `pending:
+false`, `phase: "unrefreshed"` all asserted and passing on the line above), and what came back from
+`fetch` was a console page that did not carry the banner. Run alone, the file is 83/83.
+
+Two things in the test are load-shaped rather than logic-shaped: it binds a FIXED port (19737)
+rather than an ephemeral one, and it waits for `phase !== "idle"` on a 100 × 20 ms budget that a
+busy machine can exhaust. A fixed port makes "the page I fetched is the service I started" an
+assumption rather than a derivation, which is this repository's own
+`served-page-is-not-your-code` shape one process over.
+
+**Why it does not block.** No adopter runs create-cmp's inspector tests, and nothing in the failing
+path is imported by the slice that observed it — the change under gate was `scripts/`, agent
+definitions and docs. The second record over identical bytes IS the evidence that it is
+non-deterministic rather than a break: a deterministic consequence of a diff does not pass ninety
+seconds later on the same tree.
+
+**Why logged and not fixed.** `inspector/mcp/` is another slice's file, KD-56 already holds the
+class for it ("fails inside a full suite run and passes alone", and it names the owner), and the
+honest fix — an ephemeral port and a derived readiness wait — is a change to a test this slice has
+no business editing while gating something else. What this entry adds is the measurement KD-56 asks
+for and a warning to the next reader of this branch's suite history: the `FAIL` row is this, and it
+is followed by a `PASS` over the same hash.
+
+*Logged 2026-09-19 by the slice that ran the suite, before any review round.*
+
+**CLOSED by `1201495`.** The fixed port 19737 and the 100 × 20 ms budget are both gone: the service
+takes an ephemeral port, the wait is derived rather than counted, and the page is fetched BETWEEN two
+equal readings of the freshness — so the banner is judged only against the state the page was actually
+served from, and "the page I fetched is the service I started" is a derivation instead of the
+assumption this entry named.
+
+Two things were ruled out on the way and are worth keeping. It was **not** a port collision:
+`status().url` reports the port the service really bound and the service probes upward on EADDRINUSE,
+so a collision cannot misroute the fetch — the fixed port was removed anyway, because it is a bet.
+And it is **not** CPU load alone: 40 runs of that test under 24 burners were all green, which matches
+KD-56's own note about this family. What explains the FAIL is the state moving between the assertions
+and the request, which the fix makes impossible to mistake.
+
+### KD-165 — one tree, two suite verdicts, three minutes apart — from a test whose verdict rests on wall-clock budgets — **CLOSED 2026-09-22**
+
+`test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs` (second case),
+`qa-artifacts/suite-history.jsonl`
+
+Both rows are against the SAME `observedHash` (`b359f866…`) and the same commit (`bf79f72`):
+
+```
+05:47:00Z  FAIL  2122/2124   268552 ms   failing: "a git call that died outside the kill-timer
+                                          is not an answer: crashing each one in turn must cost
+                                          the check its verdict, never win one"
+05:50:02Z  PASS  2123/2124   105713 ms   failing: []
+```
+
+The FAIL was what `node scripts/proof-plan.mjs` read out for this tree at the start of this
+review — *"read it, do not re-run it"* — and the PASS was appended while the review was running.
+Both are true of the same bytes, which is the whole entry.
+
+**It is not this slice's code.** That file imports `scripts/hooks/proof-gate.mjs`; nothing in the
+KD-16 change — neither parser, neither bin, none of the six installer read sites — is on its
+import graph. What separates the two runs is load: 268552 ms against 105713 ms, and against
+35489 ms and 36400 ms for the two full runs of this same branch ninety minutes earlier.
+
+Executed here, 2026-09-19, on the same bytes:
+
+```
+$ node --test test/a-git-call-that-died-outside-the-kill-timer-is-read-as-an-answer.test.mjs
+  ✔ 2 pass, 0 fail, duration_ms 7722          (the case itself: 7423 ms)
+$ 12 concurrent CPU burners, same command
+  ✔ 2 pass, 0 fail                             (the case itself: 4048 ms)
+```
+
+So it did not reproduce at the load available here, and this entry claims no diagnosis it cannot
+show. What the test's own structure shows is where load reaches it: each of its six cases spawns
+git with `budgetMs: REMOTE_CALL_CAP_MS` and then asserts `elapsed < NO_CAP_WAS_WAITED_OUT_MS` —
+two wall-clock bounds per case, either of which a loaded machine crosses without the code under
+test being wrong. Its own failure message names the first and tells the reader to *"raise
+budgetMs at this call site, do not relax the bound"*.
+
+**Why logged and not fixed.** No adopter runs this repository's suite, and the refusal the test
+guards is not degraded — it is green whenever the machine is not saturated. Raising either bound
+is the one remedy the test explicitly refuses. This is KD-131's class exactly (the same bytes
+carrying a FAIL and a PASS, both on disk), with one thing genuinely new: KD-131 and KD-56 both
+scope themselves to `inspector/mcp/`, and this member is a test of the **proof gate's own refusal
+path**, so the sentence *"no adopter runs this repository's inspector tests"* no longer covers
+the class.
+
+**What a reader of the record cannot tell.** `suite-history.jsonl` records the verdict, the
+duration and the tree, and nothing about the machine — so the only evidence that the FAIL was
+load and not a defect is the duration beside it, read by a human. A gate that consumed these rows
+would have to pick one of the two answers for one tree, and nothing tells it which.
+
+**Fires when:** the suite runs on a machine busy enough to stretch it past ~3×, which on this
+project is a device lane, a Gradle build, or several agent sessions at once.
+*Logged 2026-09-19, review round 2 (re-record) of `fix-boolean-value-form-inverted-2`. Found by
+reading the plan's suite line rather than re-running it — and corrected in the same round when
+the PASS landed underneath it.*
+
+**CLOSED by `d3ff9c0`.** The two wall-clock bounds per case are replaced by what the run RECORDED —
+the shim's own `reached` / `survived` marks and the gate's own `why` sentence — so each case is proven
+by which path the run took rather than by how fast the machine was. The one remedy the test itself
+refuses was not taken: the bound is not relaxed, the purse is raised to 60 s, which is what its own
+failure message names.
+
+Measured both ways. The UNCHANGED file under 32 burners: **1 RED in 12 runs** — `` `git …
+--is-ancestor …` died on SIGTERM but the whole check took 667ms ``. The rewritten file under the same
+32 burners: **12/12 green**, with per-case elapsed values of 636, 699, 802 and 846 ms — every one past
+the old 600 ms bound, and every one a run in which the gate was right.
+
+**What this entry logged about the RECORD is unchanged and still true.** `suite-history.jsonl` records
+the verdict, the duration and the tree and nothing about the machine, so no reader and no gate can
+tell load from defect for the next member of this class; this closure removes one member, not the
+class. One further member was found inside this test's own output and is logged as KD-205 — the
+ordering check's `contains()` / `behindBy()` call site drops the `why` that says which of four causes
+killed a git call.
+
+### KD-56 — one unreproduced failure, and the instrument that saw it discarded the reason — **CLOSED AT THE TEST 2026-09-22; the production half is KD-202**
+
+`node scripts/fit-test.mjs` ran `npm test` while `fleet-check` was compiling the scratch app and
+booting the emulator, and reported `1951/1952 — 1 FAILING ✖ inspector/mcp/test/console-now-sse.test.mjs`
+on `f2f7d24`. Nothing that followed reproduced it: that file alone five times with the emulator
+running, 5/5; the full suite idle, 1951/1951; the full suite with all eight cores saturated by `yes`,
+1951/1951. The slice touched neither the test nor `steps-bridge.mjs`/`preview-service.mjs`.
+
+Two readings of the source narrow it. The lane-silence bound is 30 minutes, so the fixture's
+`startedAt` cannot go stale inside a run. And `watchStepStream` polls once a second behind its
+`fs.watch` — written precisely because "fs.watch on macOS coalesces and can drop under load" — so a
+dropped FSEvents notification cannot outlast the test's 8 s frame deadline. What remains is a
+test-process event loop starved for most of 8 s, under a load CPU alone did not recreate (the real
+condition also had Gradle's and the emulator's disk I/O), or a failure that is not a frame timeout.
+
+**It is logged and not chased further because the message is gone**, and that is the finding worth
+keeping. `fit-test.mjs` runs the suite fresh and parses its stdout for the NAMES of failing tests — its
+own comment says a bare count is unactionable — and discards the rest, so the one run that failed left
+a name and no reason. Keeping the failing tests' output (or the whole log, under `qa-artifacts/`) is
+the change that turns the next occurrence into a diagnosis. Not an adopter-facing defect: it is a test
+of the live console's transport, which has the fallback that would make the real feature survive this.
+*Logged 2026-09-16, during the device tier of `published-bytes-drift`.*
+
+**THE MESSAGE, 2026-09-18 — and it is not what this entry guessed.** It recurred twice in one hour on
+the `gate-judges-the-tree-the-command-acts-on` branch, under a full `npm test` and not under a lane;
+the file passes 3/3 alone, immediately after, every time. Kept verbatim this time, which is the change
+this entry asked for:
+
+```
+Error: Test "a line appended to the stream arrives as the RENDERED row — the page interprets nothing"
+at inspector/mcp/test/console-now-sse.test.mjs:113:1 generated asynchronous activity after the test
+ended. This activity created the error "TypeError: Invalid URL" and would have caused the test to
+fail, but instead triggered an unhandledRejection event.
+```
+
+So it is **not a frame timeout**, which is what both readings above narrowed to, and not a starved
+event loop: it is work the test leaves running after it returns, which then throws `TypeError: Invalid
+URL`. Node's runner attributes post-test async activity to the test that spawned it, so the *reported*
+failure is a test that had already passed — which is why every isolated re-run is green and why this
+looked like load sensitivity for two days. The suspect is an un-awaited fetch or EventSource in the
+`:113` test whose URL is built from a server that the test's own teardown has already closed. **Whose
+defect: the test's, not the transport's** — nothing here says the console is wrong, and the two
+readings above stay correct about the transport. The fix is to await or abort that activity before the
+test returns, in a slice that owns `inspector/mcp/`.
+
+**This is now a producer, so it is no longer unreproduced.** It cost this branch two recorded suite
+verdicts and one of them stood as a `FAIL` the gate told its author not to re-run.
+*Re-placed 2026-09-18 with the message it was missing, by the slice that hit it.*
+
+**CLOSED AT THE TEST by `4413078`, and the production defect it was hiding is open as KD-202.** The
+symptom is out of the suite: the three services in `inspector/mcp/test/console-now-sse.test.mjs` that
+asked for `port: 0` — the standard way to ask the OS for a free port — were handed the console's
+well-known port instead (`opts.port || DEFAULT_PORT`, and `0 || 9600` is `9600`), and were measured
+binding **9601**, which is `DEFAULT_DAEMON_PORT`. Every console's `stop()` fires `GET /shutdown` at
+that address unconditionally, daemon or no daemon, so a test service was sitting exactly where the
+stray request goes. Those three now take an OS-assigned port that nothing else in the suite
+addresses.
+
+**The mechanism this entry asked for, measured rather than narrowed.**
+`inspector/mcp/src/lib/preview-service.mjs` builds ``new URL(req.url, `http://127.0.0.1:${port}`)``
+OUTSIDE its `try`, and `stop()` sets `port = null` after `server.close()` — which does not end a
+request already in flight. A request landing in that window is handled with a null port, the URL
+constructor throws `TypeError: Invalid URL`, and because the listener is `async` it becomes an
+unhandledRejection, which node's runner attributes to whichever test most recently finished. That is
+this entry's kept message verbatim, blaming the `:113` test that had already passed. Reproduced
+deterministically: start a service, connect a raw socket, send half a request, call `stop()`, send
+the rest.
+
+**So the suspicion this entry recorded was wrong in its subject.** It reads "an un-awaited fetch or
+EventSource in the `:113` test whose URL is built from a server that the test's own teardown has
+already closed" — nothing in that test is at fault, and *"whose defect: the test's, not the
+transport's"* is the wrong way round. The production half is NOT fixed here: it is shipped bytes plus
+a `dist/server.mjs` rebuild, which belongs to the slice that owns `inspector/mcp/`. It is logged as
+**KD-202**, with the two facts that put a request in that window logged beside it — **KD-203**
+(`port: 0` is read as the default) and **KD-204** (`stop()` always sends `GET /shutdown` to the
+daemon port). The change this entry asked of `fit-test.mjs` — keep the failing run's output — was
+not made either; what closed this was the message being kept by hand in 2026-09-18's re-placement.
+
+### KD-217 — `--fleet`'s empty form was traded for the generic sentence; two docblocks in the same file disagree about it — **CLOSED 2026-09-23**
+
+`src/lib/args.mjs`, `packages/harness/install/args.mjs` (the `DESTINATION_FLAGS` docblock vs. the
+`emptyValues` docblock immediately below it)
+
+Both copies say, of `DESTINATION_FLAGS`: *"`--fleet` is deliberately NOT here … it already refuses
+both its empty and its bare form with a sentence that teaches the manifest format. Folding it in
+would trade that sentence for this one."* `emptyValues` tests `flags[k] === ""` for **every** value
+flag before consulting `destinations`, so the empty form is already traded — keeping `--fleet` out
+of `DESTINATION_FLAGS` only preserves the **bare** form's sentence. The `emptyValues` docblock
+twelve lines down says the opposite (*"this is that refusal for every value flag, before any
+command runs"*), and the same slice's own test asserts the new behaviour
+(`an-empty-directory-flag-installs-into-the-working-directory.test.mjs:133`, *"every value flag the
+installer takes refuses an empty value by name — `--profile=`, `--fleet=`"*). Measured on
+`e21fc3d`:
+
+```
+$ prooflane upgrade --fleet=
+  ✗ prooflane: --fleet needs a value, and was given none …      exit 2
+$ prooflane upgrade --fleet
+  ✗ --fleet needs the path to a fleet manifest.  A fleet is a file you write… exit 2
+```
+
+Both refuse and write nothing, so nobody is wrongly served; one fact has two spellings in one file
+and the first is false.
+
+**Fires when:** anyone reads either docblock to decide what `DESTINATION_FLAGS` buys.
+*Logged 2026-09-22, round 1 of the doors review.*
+
+**CLOSED by `8a0b7fc`, confirmed by the round-2 reviewer.** Both `DESTINATION_FLAGS` docblocks —
+`src/lib/args.mjs` and `packages/harness/install/args.mjs` — no longer say that folding `--fleet` in
+"would trade that sentence for this one". They now say what the two measurements above show:
+`upgrade --fleet=` is already refused by `emptyValues` with the generic sentence, because that check
+runs for every value flag before the destination set is consulted, and only the BARE `--fleet` still
+reaches `fleet.mjs`'s sentence teaching the manifest format — which is the whole reason for keeping
+`--fleet` out of the set. One fact, one spelling, and it agrees with the `emptyValues` docblock below
+it. `8a0b7fc` is on `wave/review-doors` and is not yet an ancestor of the branch this closure was
+written on; it lands when that branch merges into the wave, ahead of this one.
+
+### KD-16 — a boolean flag's value form is consumed by a reader that cannot read it — **CLOSED 2026-09-19**
+
+`packages/harness/install/args.mjs`, `src/lib/args.mjs` (`consumesNext`, `flagBool`)
+
+`consumesNext` lets a declared boolean swallow the next token when it is exactly `true` or
+`false`, and its docstring gives the reason: "`flagBool` is tri-state by contract". Two places
+that value arrives where nothing is tri-state: `packages/harness` has no `flagBool` at all (every
+reader is truthiness, and `Boolean("false")` is `true`), and `flagBool` reads the value form of
+`x` but never of `no-x` while `consumesNext` consumes it either way.
+
+Re-opened by review round 1 of `refuse-unknown-args`, because `5c2cea6` moved it to **Closed**
+under a heading that describes KD-17 ("the flag lists could not reach a typo or a short flag"),
+and refusing an unrecognised argument cannot reach it: `--dry-run` and `--no-ios` are both
+*recognised*. Both halves reproduce verbatim on `5c2cea6`:
+
+```
+$ cd cwd && prooflane init --dry-run false ../pC --no-interview
+  project: …/pC   ✓ 50 files written   ! --dry-run: nothing was written.
+
+$ node -e 'parseArgs(["--no-ios","true","./my-app"])'  →  {"no-ios":"true"}
+  flagBool(flags, "ios", true)  →  true          ← the flag the user typed does nothing
+```
+
+**Its placement was wrong, and the reason it kept was the abolished exemption in a new costume.**
+The entry said "neither half is a regression … and an adopter is no worse served than before" —
+which is *pre-existing*, the criterion this file's header struck off the line on 2026-09-14,
+wearing the words "no worse than before" instead of the word "pre-existing". The header's own
+answer is that age decides who paid for a defect and never whether it blocks; the question is
+whether shipping it WRONGLY SERVES an adopter. Re-placed against that line on 2026-09-19 and
+measured on `8bd782a`, it is the first row twice over — *given a tree they did not ask for*, and
+*sent into a refusal* the wrong way round:
+
+```
+$ create-cmp upgrade --dry-run true --yes --target-dir <a two-line version catalog>
+  Apply these changes (backups written as *.bak-upgrade)? (auto-yes)
+  ✓ wrote gradle/libs.versions.toml (backup: gradle/libs.versions.toml.bak-upgrade)
+  Applied.
+
+$ prooflane init --new-profile false --dry-run --no-interview <a tree the cmp profile claims>
+  ✓ 51 files written          ← the claimed-tree refusal (install/init.mjs:950) never fired
+```
+
+An adopter who wrote `--dry-run true` had their version catalog rewritten, with the consent
+prompt skipped by the `--yes` on the same line — the flag that protects the tree was the one
+misread, and the flag that removes the last question was the one read correctly.
+
+**CLOSED at the parser, which is the only place that reaches every reader.** A declared boolean
+that consumes `true`/`false` now stores the BOOLEAN, at both doors and at the harness door's `=`
+branch, so the ~24 sites spelled `=== true` / `!== true` / `Boolean(...)` are right without one
+of them being edited. `flagBool` reads `x` and `no-x` through one tri-state helper (`--no-x
+false` is true; today's precedence — the affirmative name answers first — is unchanged and now
+pinned), the harness package has the same `flagBool` and its six boolean reads go through it, and
+a declared boolean still holding a string after all that (`--dry-run=maybe`, reachable only
+through the `=` form) is refused by name at both bins. The SPACE form holding anything else is
+deliberately not refused: that is KD-7's shape, and KD-150 logs what it costs.
+
+*Logged 2026-09-14 (review round 2 of `fix-flag-eats-target`); closed and re-opened 2026-09-14;
+closed 2026-09-19 by the slice that fixed it, with
+`test/a-dry-run-asked-for-in-words-writes-the-tree.test.mjs` and
+`test/a-declared-booleans-value-arrives-as-a-string.test.mjs` — 54 of the truth table's 162 rows,
+and all three end-to-end shapes, measured red on `8bd782a` first.*
+
 ### KD-117 — one measurement, two defect numbers: the doc credited KD-79 where the code credits KD-105 — **CLOSED 2026-09-18, in the round that found it**
 
 `docs/GATE-RULES.md` (Rule 4) vs `scripts/hooks/proof-gate.mjs` (`IN_WORD`, `GAP`)

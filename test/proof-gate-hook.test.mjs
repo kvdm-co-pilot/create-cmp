@@ -19,8 +19,9 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
-import { observedTreeHash, deviceTreeHash, DEVICE_TIER_TRIGGERS, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
-import { TIERS, currentBranch } from "../scripts/proof-plan.mjs";
+import { observedTreeHash, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
+import { stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
+import { TIERS, currentBranch, recordMeetsTier } from "../scripts/proof-plan.mjs";
 
 const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/hooks/proof-gate.mjs");
 const FC = "scripts/fleet-check.mjs";
@@ -85,35 +86,56 @@ test("device run: refused when nothing is owed, already discharged, or undeclare
 
 test("npm publish: the publish skill's first two steps as a program — clean trunk, and a PASS L2 record on THIS tree", () => {
   const now = "c".repeat(40);
-  const rec = (over = {}) => ({ observedHash: now, verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", ...over });
+  const rec = (over = {}) => ({ stampedOutputHash: now, stampedOutputRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", ...over });
   const onTrunk = o("none", { trunk: true, branch: "main" });
+  // THE CONTEXT IS BUILT THE WAY THE GATE BUILDS IT: `releaseContext` puts the
+  // record to `recordMeetsTier` — the one reading the schedule, the discharge
+  // and this gate now share — and hands `decide` the answer. Fixtures that
+  // spelled the comparison themselves are what let this gate ask for a rung
+  // while the schedule asked for none.
+  const ctx = (record) => ({ record, now, meets: recordMeetsTier(record, TIERS.device, now) });
 
-  assert.match(decide("publish", o("none", { branch: "feat/x" }), TIERS, { record: rec(), now }).reason, /clean main/, "not trunk");
-  assert.match(decide("publish", o("owed", { branch: "feat/x" }), TIERS, { record: rec(), now }).reason, /OWED/, "and says what the branch still owes");
-  assert.equal(decide("publish", onTrunk, TIERS, { record: null, now }).action, "deny", "no record");
-  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ observedHash: "d".repeat(40) }), now }).reason, /another tree/);
-  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ verdict: "FAIL" }), now }).reason, /FAIL, not PASS/);
-  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ rung: "L1" }), now }).reason, /requires L2/);
-  assert.match(decide("publish", onTrunk, TIERS, { record: rec({ rung: null }), now }).reason, /rung none/);
+  assert.match(decide("publish", o("none", { branch: "feat/x" }), TIERS, ctx(rec())).reason, /clean main/, "not trunk");
+  assert.match(decide("publish", o("owed", { branch: "feat/x" }), TIERS, ctx(rec())).reason, /OWED/, "and says what the branch still owes");
+  assert.equal(decide("publish", onTrunk, TIERS, ctx(null)).action, "deny", "no record");
+  assert.match(decide("publish", onTrunk, TIERS, ctx(rec({ stampedOutputHash: "d".repeat(40) }))).reason, /another app/);
+  // A record from before the tier was bound to the stamped app says nothing
+  // about it, and is refused IN THOSE WORDS rather than through the comparison
+  // above, which would have printed "undefine → ccccccc".
+  const legacy = decide("publish", onTrunk, TIERS, ctx({ verdict: "PASS", rung: "L2", ranAt: "2026-09-08T08:06:34.401Z", observedHash: now }));
+  assert.equal(legacy.action, "deny");
+  assert.match(legacy.reason, /no stampedOutputHash/);
+  assert.match(decide("publish", onTrunk, TIERS, ctx(rec({ verdict: "FAIL" }))).reason, /FAIL, not PASS/);
+  assert.match(decide("publish", onTrunk, TIERS, ctx(rec({ rung: "L1" }))).reason, /requires L2/);
+  assert.match(decide("publish", onTrunk, TIERS, ctx(rec({ rung: null }))).reason, /rung none/);
+  // A run that never reached a device is PASS at L1: the rung is the whole
+  // difference between a release proof and a desktop one, and this gate was the
+  // only reader that ever asked for it.
+  assert.equal(decide("publish", onTrunk, TIERS, ctx(rec({ rung: "L1", avd: null }))).action, "deny");
 
-  const ok = decide("publish", onTrunk, TIERS, { record: rec(), now });
+  const ok = decide("publish", onTrunk, TIERS, ctx(rec()));
   assert.equal(ok.action, "allow");
   assert.match(ok.reason, /PASS at L2/);
-  assert.equal(decide("publish", onTrunk, TIERS, { record: rec({ rung: "L3" }), now }).action, "allow", "a higher rung is not a lower one");
+  assert.equal(decide("publish", onTrunk, TIERS, ctx(rec({ rung: "L3" }))).action, "allow", "a higher rung is not a lower one");
+
+  // AND A GATE THAT COULD NOT PUT THE QUESTION MUST NOT PASS SILENTLY: a ctx
+  // with a record and no reading of it is refused, never read by hand here.
+  const unchecked = decide("publish", onTrunk, TIERS, { record: rec(), now });
+  assert.equal(unchecked.action, "deny", "no `meets` means the comparison never ran — allowing would be a release published on an unread record");
+  assert.match(unchecked.reason, /could not put the fleet record/);
 });
 
 test("npm publish: the gate hashes THIS tree exactly as the release proof records it", async () => {
   // The test above injects `now`, so it could never see the gate and the recorder disagree —
   // and they did: the gate hashed without DEVICE_SKIP, every passing proof was refused, and a
-  // release had to be published by hand. This calls the gate's real context builder.
+  // release had to be published by hand (a proof recorded 3ed5e09, the gate computed eb734f5).
+  // This calls the gate's real context builder, and compares it against an INDEPENDENT stamp of
+  // this tree — the same thing `fleet-check` hashes out of the app it is about to run a lane in.
+  // Two stamps that disagree is the same defect wearing the new key.
   const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  assert.notEqual(
-    observedTreeHash(ROOT, DEVICE_TIER_TRIGGERS),
-    deviceTreeHash(ROOT),
-    "DEVICE_SKIP excludes nothing in this tree, so this test cannot tell the two hashes apart",
-  );
   const { now } = await releaseContext();
-  assert.equal(now, deviceTreeHash(ROOT), "the publish gate and fleet-check's record hash the same tree differently");
+  assert.match(now, /^[0-9a-f]{64}$/, "the gate produced a digest at all");
+  assert.equal(now, stampedOutput(ROOT).hash, "the publish gate and fleet-check's record describe the same stamped app, or no passing run can satisfy the gate");
 });
 
 test("gh pr merge: refused while the tier is owed — the slice closes here, so this is where it is collected", () => {
@@ -186,7 +208,9 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
   // plan is open on the live tree during the suite (these tests never write
   // one)" — and that assumption is false in exactly the situation Rule 4
   // creates. A slice IS open on the live tree while someone works on it, the
-  // rule says to run the suite per commit, and `close()` removes a plan only
+  // suite runs while it is open (per commit, as the rule then said; TIERS in
+  // scripts/proof-plan.mjs has said once, at close, since 2026-09-24 — and a
+  // slice still runs it before the merge), and `close()` removes a plan only
   // when it is settled. So the deletion landed at the worst possible moment:
   // after the device run was paid for and discharged, right before the merge.
   // The state then read "OWED — no slice declared", the merge hook refused, and
@@ -234,7 +258,7 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
         branch,
         openedAt: at,
         declared: { device: "at-close", review: "at-close" },
-        discharged: { at, treeHash: deviceTreeHash(repoRoot), verdict: "PASS", rung: "L2" },
+        discharged: { at, stampedHash: stampedOutput(repoRoot).hash, stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" },
         reviewDischarged: { at, treeHash: observedTreeHash(repoRoot, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }), tests: [], decisions: [], nothingFound: true },
       }, null, 2)}\n`,
     );
@@ -320,7 +344,7 @@ test("the merge refusal says the gate never reads what a review FOUND — existe
 test("both at-close tiers refuse in ONE answer — an agent is not sent round the loop twice", () => {
   const d = decide("merge", withReview("owed", "owed"), TIERS);
   assert.equal(d.action, "deny");
-  assert.match(d.reason, /the device tier is OWED/);
+  assert.match(d.reason, /the L2 run is OWED/);
   assert.match(d.reason, /a review is OWED/);
   // And an undeclared slice is told once, not twice: both tiers are undeclared
   // for the same reason — there is no plan — so one instruction covers them.

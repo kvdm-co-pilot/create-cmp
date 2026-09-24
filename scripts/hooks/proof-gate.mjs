@@ -259,8 +259,36 @@ const MASKED_SEPARATOR = `(?:^|[${SEPARATORS}){}])`;
  */
 const invocation = (prog) => new RegExp(`${RAW_SEPARATOR}\\s*${COMMAND_PREFIX}${prog}(?=\\s|$|["')])`);
 
+/**
+ * One piece of a shell word: an unquoted character, a backslash escape, or a
+ * whole quoted span. The four alternatives begin with four disjoint characters,
+ * so a run of them has exactly one parse and costs what its length costs.
+ */
+const WORD_PIECE = `(?:[^\\s;&|()<>"'\\\\]|\\\\[^\\n]|"[^"\\n]*"|'[^'\\n]*')`;
+
+/**
+ * The fleet check's path as ONE shell word, however it is quoted or escaped,
+ * ending in `fleet-check.mjs` at a path-segment boundary — inside quotes or not.
+ *
+ * BROAD ON PURPOSE, and broader than what `commandCwd` will read (KD-95). This
+ * pattern decides whether the gate judges the run AT ALL, and the pattern it
+ * replaced was an optional run of non-space characters ending in a slash, which
+ * cannot cross a space: `node "/a b/scripts/fleet-check.mjs"` was not classified,
+ * so the hook said nothing and the run went ahead ungated — silence, the
+ * direction this gate exists to make impossible. Every spelling the shell would
+ * run is now SEEN; the ones whose path cannot be read exactly are then refused
+ * by the reader below, with the word it could not read.
+ */
+const FLEET_CHECK_WORD = `(?:${WORD_PIECE}*(?:/|"[^"\\n]*/"?|'[^'\\n]*/'?)|["'])?fleet-check\\.mjs`;
+
+/** The same word, captured, for the reader that must resolve it to a directory. */
+const FLEET_CHECK_OPERAND = new RegExp(`node\\s+(${FLEET_CHECK_WORD})`);
+
+/** What may stand where that word ENDS. Anything else and the shell's word is longer than the one read — `"…/fleet-check.mjs"x` runs a file this gate did not see. */
+const WORD_END = /^[\s;&|()<>"']/;
+
 export const WATCHED = Object.freeze({
-  device: invocation("node\\s+(?:\\S*/)?fleet-check\\.mjs"),
+  device: invocation(`node\\s+${FLEET_CHECK_WORD}`),
   merge: invocation("gh\\s+pr\\s+merge"),
   create: invocation("gh\\s+pr\\s+create"),
   publish: invocation("npm\\s+publish"),
@@ -277,6 +305,19 @@ const SILENT = Object.freeze({ action: "silent" });
 const DECLARE = 'node scripts/proof-plan.mjs --open "<what you are building>" (on a branch — trunk is not a slice)';
 
 /**
+ * The one extra sentence an OLD-RULE record earns, and nothing else: no new
+ * refusal (the orchestrator's answer 5, 2026-09-24). When the only reason the
+ * run on record does not carry the tier is that its digest was taken under
+ * another stamped-output rule, what settles it is a stamp — `--rekey` — not an
+ * L2 run, and the text an agent reads at the moment of decision says so
+ * first. Read from `o.shortfall.code`, which `recordMeetsTier` wrote; this
+ * hook never stamps and never rekeys, it reads what the schedule already said.
+ */
+const REKEY = "node scripts/proof-plan.mjs --rekey";
+const rekeyFirst = (o) => o?.shortfall?.code === "other-rule";
+const REKEY_INSTEAD = `the run on record is keyed under another digest rule, so run ${REKEY} INSTEAD of the L2 run — a stamp of the commit it ran on, seconds, no L2 run — and read node scripts/proof-plan.mjs again; only if it still reads OWED is the L2 run owed`;
+
+/**
  * The decision, pure: a watched command kind and what the slice owes
  * (`obligation()` from scripts/proof-plan.mjs) in, a verdict out.
  *
@@ -290,13 +331,19 @@ export function decide(kind, o, tiers, ctx) {
     switch (o.state) {
       case "none":
         if (o.trunk) return allow(`nothing is owed per slice — this is trunk — so this can only be a RELEASE proof (npm-publish skill step 2): allowed. Then npm publish reads its record.`);
-        return deny(`nothing is owed — ${o.need.reason}. A device run over this tree proves nothing this slice needs (GATE-RULES Rule 4: the tier runs once, at the close of a slice that changed something it can see).`);
-      case "discharged":
-        return deny(`already discharged for this exact tree at ${o.plan.discharged.at} (verdict ${o.plan.discharged.verdict}, rung ${o.plan.discharged.rung ?? "none"}). A second run over the same bytes is the 2026-09-08 defect; had a trigger path moved, the state would read REOPENED.`);
+        return deny(`nothing is owed — ${o.need.reason}. An L2 run over this tree proves nothing this slice needs (GATE-RULES Rule 4: the tier runs once, at the close of a slice that changed something it can see).`);
+      case "discharged": {
+        // Read from whatever attests THESE bytes — the run recorded on disk, or
+        // this slice's own discharge. `o.plan.discharged` is no longer always
+        // there: a tree whose stamped app is already proved reads DISCHARGED
+        // before any slice has written anything down.
+        const p = o.proof ?? o.plan?.discharged ?? {};
+        return deny(`already discharged for the app this tree stamps, at ${p.at ?? "an unstated time"} (verdict ${p.verdict ?? "unstated"}, rung ${p.rung ?? "none"}${p.from ? `, read from ${p.from}` : ""}). A second run over the same stamped bytes is the 2026-09-08 defect; had the stamped app moved, the state would read REOPENED.`);
+      }
       case "undeclared":
         return deny(`no slice is declared, so this run could discharge nothing — ${o.need.reason}. Declare first: ${DECLARE}. Then run the tier once, at close.`);
       case "owed":
-      case "reopened":
+      case "reopened": {
         // A lane already driving the one device makes a second run worse than
         // wasted: it has wedged Maestro before its first flow. This was a line in
         // a memory file ("check pgrep first") — now it is checked. And the refusal
@@ -305,11 +352,13 @@ export function decide(kind, o, tiers, ctx) {
         if (ctx?.runningLane) {
           const { ours, text } = describeLane(ctx.runningLane, { repoRoot: ctx.repoRoot ?? null });
           return deny(
-            `a verify lane is already running: ${text}. A concurrent device run collides with it (wedged adbd, false reds). ` +
+            `a verify lane is already running: ${text}. A concurrent L2 run collides with it (on the cmp profile: a wedged adbd, false reds). ` +
               (ours ? "Wait for it, then run the tier once." : "Do not kill it — it is not this slice's. Wait for it, then run the tier once."),
           );
         }
-        return orderedRun(o, ctx?.base);
+        const d = orderedRun(o, ctx?.base);
+        return rekeyFirst(o) ? { ...d, reason: `${REKEY_INSTEAD}.\n\n${d.reason}` } : d;
+      }
       default:
         return deny(`the proof plan is in an unknown state (${o.state}) — refusing rather than guessing`);
     }
@@ -323,10 +372,14 @@ export function decide(kind, o, tiers, ctx) {
     switch (o.state) {
       case "owed":
       case "reopened":
-        blocked.push(`the device tier is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`);
+        blocked.push(
+          rekeyFirst(o)
+            ? `the L2 run is ${o.state.toUpperCase()} for this slice and the slice closes at merge — ${REKEY_INSTEAD}. If it does: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`
+            : `the L2 run is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`,
+        );
         break;
       case "undeclared":
-        blocked.push(`trigger paths changed with no slice declared — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
+        blocked.push(`paths that could reach what the stamped tree executes changed with no slice declared, and no recorded run describes the app this tree stamps — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
         break;
       default:
         break;
@@ -356,20 +409,28 @@ export function decide(kind, o, tiers, ctx) {
     // fleet record that is PASS at L2 on these exact bytes. Read, never asserted.
     if (!o.trunk) {
       const where = o.branch === "main" ? "main, but with commits or edits not yet on origin/main — publish only what is merged" : `${o.branch || "a detached HEAD"}, not main`;
-      return deny(`publish only from a clean main — this is ${where}${o.state === "none" ? "" : `; the device tier is ${o.state.toUpperCase()} here`} (npm-publish skill step 1).`);
+      return deny(`publish only from a clean main — this is ${where}${o.state === "none" ? "" : `; the L2 run is ${o.state.toUpperCase()} here`} (npm-publish skill step 1).`);
     }
-    const r = ctx?.record;
-    if (!r) return deny(`no fleet record — run ${cmd} first; a release proof is read from its record, never asserted (npm-publish skill step 2).`);
-    if (r.observedHash !== ctx.now) return deny(`the fleet record describes another tree (${String(r.observedHash).slice(0, 7)} → ${String(ctx.now).slice(0, 7)}) — run ${cmd} on this one.`);
-    if (r.verdict !== "PASS") return deny(`the fleet record on this tree is ${r.verdict}, not PASS — the scratch app is the crime scene; do not bump the version.`);
-    const rung = Number(String(r.rung ?? "").replace(/^L/, ""));
-    if (!(rung >= 2)) return deny(`the fleet record on this tree is rung ${r.rung ?? "none"} — a release requires L2: attach an emulator and run ${cmd}.`);
-    return allow(`release proof on this tree: ${r.verdict} at ${r.rung}, ran ${r.ranAt}.`);
+    // A tree whose app cannot be stamped cannot be compared to any record. A
+    // release refused for a reason it can name is the right outcome; a release
+    // allowed because the comparison silently could not run is not.
+    if (ctx && !ctx.now) return deny(`the app this tree stamps could not be produced (${ctx.unanswerable ?? "no reason recorded"}), so nothing can compare the fleet record to it. Publishing is refused rather than guessed — fix the stamp, then run ${cmd}.`);
+    // THE SAME READING THE SCHEDULE USES, and it used to be a different one:
+    // this gate was the only reader that ever asked for a RUNG, and it asked in
+    // its own spelling (`rung >= 2`, a number parsed out of a string). The
+    // schedule asked for none, so one record could be a release proof here and
+    // a discharge there on different facts. `recordMeetsTier` is now the whole
+    // question — digest, verdict and rung against the tier's declared level —
+    // computed for the JUDGED tree by that tree's own module (releaseContext).
+    if (!ctx?.meets) return deny(`this gate could not put the fleet record to the L2 run's requirement, so it cannot say whether this tree has a release proof. Refusing rather than guessing — run ${cmd} and try again.`);
+    if (!ctx.meets.ok) return deny(`${ctx.meets.reason} (npm-publish skill step 2).${ctx.meets.code === "verdict" ? " The scratch app is the crime scene; do not bump the version." : ""}`);
+    const p = ctx.meets.proof;
+    return allow(`release proof on this tree: ${p.verdict} at ${p.rung} (the tier requires ${p.requires}), ran ${p.at}.`);
   }
   if (kind === "create") {
     const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
     const notes = [];
-    if (open(o.state)) notes.push(`the device tier is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${cmd}, then node scripts/proof-plan.mjs --discharge)`);
+    if (open(o.state)) notes.push(`the L2 run is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${rekeyFirst(o) ? `${REKEY_INSTEAD}; else ` : ""}${cmd}, then node scripts/proof-plan.mjs --discharge)`);
     if (open(o.review?.state)) notes.push(`a review is ${o.review.state.toUpperCase()}; gh pr merge will refuse until a review of these bytes is recorded (${tiers?.review?.cmd ?? "node scripts/proof-plan.mjs --discharge-review"})`);
     return notes.length ? allow(`reminder: ${notes.join(" — and ")}. Open the PR, finish everything else, run the at-close tiers last.`) : SILENT;
   }
@@ -392,8 +453,8 @@ export function decide(kind, o, tiers, ctx) {
  * own ref rather than by origin. A gate that cannot see must not pass silently.
  */
 function orderedRun(o, base) {
-  const owed = `the device tier is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — a trigger path edited afterwards reopens the slice. Then: node scripts/proof-plan.mjs --discharge`;
-  const why = `A device run proves a TREE, and the merge brings origin/main into that tree — the bytes move, and the tier REOPENS for any of them that is a device trigger path, so the run is bought a second time. Measured 2026-09-16: four emulator runs for one merge, each one owed by this program and none of them needed.`;
+  const owed = `the L2 run is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — an edit that changes what this tree STAMPS reopens the slice afterwards. Then: node scripts/proof-plan.mjs --discharge`;
+  const why = `An L2 run proves an APP, and the merge brings origin/main into this tree — if that moves what the tree stamps, the tier REOPENS and the run is bought a second time. Measured 2026-09-16: four emulator runs for one merge, each one owed by this program and none of them needed.`;
   const fix = `git fetch origin && git rebase origin/main`;
   if (!base) return allow(owed);
 
@@ -409,12 +470,12 @@ function orderedRun(o, base) {
       : base.source === "remote"
         ? `origin/main has MOVED to ${at} and ${short} — read from origin just now`
         : `origin/main is at ${at} and ${short} — read from this checkout's own ref, which no call to origin could make less true (and if trunk was rewound, the same fetch below corrects the ref and clears this)`;
-    return deny(`the device tier is ${o.state.toUpperCase()}, but this branch does not contain origin/main: ${how}. ${why} Bring trunk in first, then run the tier once: ${fix}`);
+    return deny(`the L2 run is ${o.state.toUpperCase()}, but this branch does not contain origin/main: ${how}. ${why} Bring trunk in first, then run the tier once: ${fix}`);
   }
 
   if (base.contained === null) {
     return allow(
-      `${owed}\n\nORDERING UNCHECKED: ${base.reason ?? "this gate could not ask where trunk is"}. Whether this branch contains origin/main is what makes a device run a proof of the tree the merge will keep — this gate could not tell, so it is not refusing. If trunk has moved, ${fix} before the run: ${why}`,
+      `${owed}\n\nORDERING UNCHECKED: ${base.reason ?? "this gate could not ask where trunk is"}. Whether this branch contains origin/main is what makes an L2 run a proof of the tree the merge will keep — this gate could not tell, so it is not refusing. If trunk has moved, ${fix} before the run: ${why}`,
     );
   }
 
@@ -474,10 +535,22 @@ export const STARTED_MS = Date.now();
 
 /**
  * What the gate keeps back for ANSWERING — node startup, obligation()'s own git,
- * and emitting the decision. Measured on this tree 2026-09-17: the real hook
- * answers a device payload in 0.16–0.19s. This is ~8x that.
+ * THE STAMP obligation() now takes, and emitting the decision.
+ *
+ * Measured on this tree 2026-09-17: the real hook answered a device payload in
+ * 0.16–0.19s. Since 2026-09-22 the device tier is scheduled by the app this
+ * tree stamps, so answering includes one stamp — 0.27 / 0.26 / 0.30s measured,
+ * bounded at `STAMP_CAP_MS` (3000ms) by scripts/stamped-output.mjs, which is
+ * the term this number had to grow to cover. Worst case: 3000 + ~200ms.
+ *
+ * THE FOUR BOUNDS NOW SUM TO EXACTLY THE DECLARED BUDGET (1000 + 3000 + 2500 +
+ * 3500 = 10000), which the arithmetic test in
+ * test/a-device-run-proves-a-tree-the-merge-will-not-keep.test.mjs still
+ * passes and which leaves NO slack: the next term added to this hook comes out
+ * of REMOTE_CALL_CAP_MS, out of the stamp's cap, or out of a deliberately
+ * raised timeout in .claude/settings.json — never out of nothing.
  */
-export const ANSWER_RESERVE_MS = 1500;
+export const ANSWER_RESERVE_MS = 3500;
 
 /** No question put to origin is worth more than this. The three measured ls-remote answers were 1.01 / 1.19 / 1.34s; this is the slowest, roughly doubled. */
 export const REMOTE_CALL_CAP_MS = 2500;
@@ -719,6 +792,10 @@ function askOrigin(git, { local, deadline, behindBy, contains }) {
 //   the command a command that runs elsewhere usually says so. A leading `cd`
 //               is read when it is written literally, and `node
 //               <somewhere>/scripts/fleet-check.mjs` names its tree outright.
+//               Literally includes WHOLLY QUOTED (KD-95): quotes delimit, so
+//               `cd "/My Trees/slice"` names one path and it is the path
+//               between the quotes. What the shell would expand, escape or
+//               assemble from pieces is not literal and is refused, quoted or not.
 // Then git decides the rest, because no string comparison can: this repo keeps
 // its worktrees INSIDE the checkout (`.claude/worktrees/`), so the tree that
 // must be judged is routinely a subdirectory of the tree that must not be. Two
@@ -743,8 +820,23 @@ function askOrigin(git, { local, deadline, behindBy, contains }) {
 // parsing is allowed to be conservative rather than clever.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** A directory operand this gate will act on only when it is written literally — no variable, subshell, glob, `~` or embedded space. */
-const LITERAL_PATH = /^[^$`*?[\]~\s]+$/;
+/**
+ * A path this gate will act on only when it is written literally. Unquoted: no
+ * variable, substitution, glob, `~`, escape, quote or space. The quote and the
+ * backslash are on the list because the operand is read from the command AS
+ * WRITTEN, and an unquoted word carrying either is one the shell assembles —
+ * `"/a b"/in`, `x\1` — into something other than its text.
+ */
+const LITERAL_PATH = /^[^$`*?[\]~\s"'\\]+$/;
+
+/**
+ * The same rule between ONE pair of quotes, with one difference: a space. The
+ * quotes delimit the word, so a space inside them is part of the path and it
+ * can be read exactly (KD-95). Nothing else is relaxed — a quoted `$`, glob,
+ * `~` or backslash is still refused, in single quotes too, where the shell
+ * would not expand it: one rule for both quote styles, the stricter one.
+ */
+const QUOTED_PATH = /^(?:[^$`*?[\]~\s\\]| )+$/;
 
 /**
  * The ways a shell changes directory, at a command position. No `-c ["']`
@@ -866,15 +958,44 @@ function readablePrefix(prefix) {
   return { text: s, depth };
 }
 
+/**
+ * The value of ONE shell word, when this gate can read it exactly — or null.
+ * Exactly means: unquoted and `LITERAL_PATH`, or wholly inside one pair of
+ * quotes and `QUOTED_PATH`. A word the shell assembles from quoted and unquoted
+ * pieces is refused rather than reassembled; a quote character of the OTHER
+ * kind inside the quotes is literal there, and is kept (`"Karel's trees"`).
+ */
+function literalWord(raw) {
+  const s = String(raw ?? "").trim();
+  const quoted = /^"([^"]*)"$/.exec(s) ?? /^'([^']*)'$/.exec(s);
+  if (quoted) return QUOTED_PATH.test(quoted[1]) ? quoted[1] : null;
+  return LITERAL_PATH.test(s) ? s : null;
+}
+
 /** The operand of a `cd`, when it is a directory this gate can name with certainty. */
 function literalDir(raw) {
-  let s = String(raw ?? "").trim();
-  const quoted = /^(["'])(.*)\1$/.exec(s);
-  // A quoted operand is delimited and is read exactly; an unquoted one can still
-  // carry the closing quote of the `sh -c "…"` wrapper it was found inside.
-  s = quoted ? quoted[2].trim() : s.replace(/["']+$/, "").trim();
-  if (!s || s.startsWith("-")) return null; // `cd -`, `cd -P /x`: a destination this gate does not compute
-  return LITERAL_PATH.test(s) ? s : null;
+  const s = literalWord(raw);
+  // `cd -`, `cd -P /x`, and `cd "-"`, which the shell hands cd as the same `-`:
+  // a destination this gate does not compute.
+  return s && !s.startsWith("-") ? s : null;
+}
+
+/** The quote a word is still inside at its end, or null — so the closing quote after `fleet-check.mjs` is taken only when it is that word's own. */
+function unclosedQuote(word) {
+  let open = null;
+  for (let i = 0; i < word.length; i += 1) {
+    const c = word[i];
+    if (open === "'") {
+      if (c === "'") open = null;
+    } else if (c === "\\") {
+      i += 1;
+    } else if (open === '"') {
+      if (c === '"') open = null;
+    } else if (c === '"' || c === "'") {
+      open = c;
+    }
+  }
+  return open;
 }
 
 /**
@@ -926,19 +1047,43 @@ export function commandCwd(kind, command, cwd) {
     // length-preserving precisely so this index still means what it says.
     if (/^&(?!&)/.test(cmd.slice(m.index + m[0].length))) continue;
     if (m[1] !== "cd") return { unknown: `it changes directory with \`${m[1]}\`, whose destination this gate does not track` };
-    const to = literalDir(m[2]);
-    if (!to) return { unknown: `it begins with a \`cd\` this gate cannot read literally (${m[0].trim()})` };
+    // THE OPERAND AS WRITTEN, NOT AS MASKED (KD-95). The match was found in
+    // `scope`, where every quoted span and every `$( )` is already blanks — which
+    // is right for finding the `cd` and wrong for reading its operand: a quoted
+    // operand reached `literalDir` as blanks and was refused whatever it said,
+    // and a half-quoted one reached it as the half left standing, so `cd "/a
+    // b"/in` was read as `/in` and `cd /x"/y"` as `/x`. Masking preserves length,
+    // so the same span of the command as written is the operand the shell sees.
+    const end = m.index + m[0].length;
+    const operand = prefix.slice(end - m[2].length, end);
+    const to = literalDir(operand);
+    if (!to) return { unknown: `it begins with a \`cd\` this gate cannot read literally (cd ${operand.trim()})` };
     dir = path.resolve(dir, to);
   }
 
   if (kind === "device") {
     // The fleet check is a FILE, and a path to it names the tree the run will
     // prove more directly than any cwd does: `node /elsewhere/scripts/fleet-check.mjs`
-    // proves /elsewhere, whatever directory it was typed in.
-    const m = /node\s+(["']?)((?:\S*\/)?)fleet-check\.mjs/.exec(cmd.slice(at));
+    // proves /elsewhere, whatever directory it was typed in. The word is found by
+    // the classifier's own pattern, so every spelling it SAW is one read here —
+    // exactly, or refused with the word it could not read.
+    const rest = cmd.slice(at);
+    const m = FLEET_CHECK_OPERAND.exec(rest);
     if (!m) return { unknown: "the fleet check it invokes is written in a form this gate cannot resolve to a file" };
-    if (m[2] && !LITERAL_PATH.test(m[2])) return { unknown: `the fleet check it names sits under a path this gate cannot read literally (${m[2]})` };
-    if (m[2]) dir = path.resolve(dir, m[2], "..");
+    let word = m[1];
+    const open = unclosedQuote(word);
+    // `"/a b/scripts/fleet-check.mjs"` closes AFTER the file name; a `sh -c "node
+    // scripts/fleet-check.mjs"` wrapper's quote sits there too, and is not the word's.
+    let after = rest.slice(m.index + m[0].length);
+    if (open && after[0] === open) {
+      word += open;
+      after = after.slice(1);
+    }
+    if (after && !WORD_END.test(after)) return { unknown: `the fleet check it names sits under a path this gate cannot read literally (${word}${after.split(/[\s;&|()<>]/)[0]})` };
+    const file = literalWord(word);
+    if (file === null) return { unknown: `the fleet check it names sits under a path this gate cannot read literally (${word})` };
+    const under = file.slice(0, -"fleet-check.mjs".length);
+    if (under) dir = path.resolve(dir, under, "..");
   }
 
   if (kind === "publish") {
@@ -1035,7 +1180,7 @@ export function judgedTree(kind, command, cwd, { budgetMs = TREE_PROBE_TOTAL_MS,
 /** The judged tree's OWN scheduler — its plan file, its change set, its branch rule, its trigger lists. A worktree answers for itself. */
 const planOf = (root) => (root === REPO_ROOT ? import("../proof-plan.mjs") : import(pathToFileURL(path.join(root, "scripts", "proof-plan.mjs")).href));
 
-const HONOURED = "Three forms are read: the cwd this hook was given, a literal `cd /absolute/path && …` in front of the command (a subdirectory is fine — it resolves to the worktree that holds it), and `node /absolute/path/scripts/fleet-check.mjs`. Anything else is refused rather than guessed at (docs/GATE-RULES.md, Rule 4).";
+const HONOURED = "Three forms are read: the cwd this hook was given, a literal `cd /absolute/path && …` in front of the command (a subdirectory is fine — it resolves to the worktree that holds it), and `node /absolute/path/scripts/fleet-check.mjs`. A path with a space in it is read when the WHOLE path is quoted — `cd \"/My Trees/slice\"`, `node '/My Trees/slice/scripts/fleet-check.mjs'` — because quotes delimit; escaping the space instead does not, and neither does quoting part of the path. Anything else is refused rather than guessed at (docs/GATE-RULES.md, Rule 4).";
 
 const cannotTell = (why) =>
   `this gate could not tell which tree this command will act on: ${why}. It judges the tree the command RUNS IN, never the session's own — that assumption is KD-79, which refused an owed device run and refused a merge over another worktree's files — so a tree it cannot name is a tree it cannot check. ${HONOURED}`;
@@ -1344,21 +1489,35 @@ export function laneAt(pid, args, run = shell()) {
 }
 
 /**
- * The fleet record and the hash of the tree it would have to describe — for the
- * tree the publish will act on, hashed by THAT tree's own trigger lists, because
- * a record written by one worktree's `fleet-check` is only comparable with the
- * hash its own `observed-tree.mjs` takes.
+ * The fleet record and the digest of the app it would have to describe — the
+ * app the tree being published STAMPS, hashed by THAT tree's own
+ * `stamped-output.mjs`, because a record written by one worktree's
+ * `fleet-check` is only comparable with a stamp taken the way that worktree
+ * takes it.
  */
 export async function releaseContext(root = REPO_ROOT) {
   const fs = await import("node:fs");
-  const { deviceTreeHash } = root === REPO_ROOT ? await import("../observed-tree.mjs") : await import(pathToFileURL(path.join(root, "scripts", "observed-tree.mjs")).href);
+  const { stampedOutputHash } = root === REPO_ROOT ? await import("../stamped-output.mjs") : await import(pathToFileURL(path.join(root, "scripts", "stamped-output.mjs")).href);
+  // The judged tree's own rule and its own tier, never this one's: what a
+  // release requires is a fact about the tree being published (KD-79's lesson
+  // applied to the requirement rather than to the path).
+  const { recordMeetsTier, TIERS } = await planOf(root);
   let record = null;
   try {
     record = JSON.parse(fs.readFileSync(path.join(root, "qa-artifacts", "fleet-latest.json"), "utf8"));
   } catch {
     record = null;
   }
-  return { record, now: deviceTreeHash(root) };
+  // The stamp can fail — a partial checkout, a `bin/` that is not there, a
+  // stamp that outruns its cap — and that is a STATE, not a crash: an exception
+  // here escapes into main(), where the hook exits 2 and refuses every command
+  // it classifies, with a message about node rather than about the release.
+  try {
+    const now = stampedOutputHash(root);
+    return { record, now, meets: recordMeetsTier(record, TIERS.device, now) };
+  } catch (err) {
+    return { record, now: null, unanswerable: err?.message ?? String(err) };
+  }
 }
 
 function readStdin() {

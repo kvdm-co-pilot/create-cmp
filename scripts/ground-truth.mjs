@@ -38,6 +38,68 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "out", "tmp"]);
 const json = (rel) => JSON.parse(read(rel));
 
+/**
+ * THE VERSION SPINE: every FIELD a release bump has to move, and what each
+ * holds right now.
+ *
+ * WHY A FIELD LIST AND NOT A PACKAGE LIST (KD-134). This file already reported
+ * a spine — `cli / plugin / marketplace` — and `CLAUDE.md` sends every agent
+ * here for "counts and versions, never by hand". A bump must move FOUR files:
+ * those three and `package-lock.json`, which records the root manifest's own
+ * version in two places. Measured on the packaging slice: the author read this
+ * deriver, moved exactly what it named, and the suite still came back
+ * `actual: '0.26.4', expected: '0.26.5'`. Nobody shipped a wrong tree — the
+ * lock is refused by name in test/workspace-lock-sync.test.mjs — but the one
+ * program written so that nobody hand-counts this answered with three of four.
+ *
+ * The lock is derived state, which is a fair reason not to list it as a
+ * PACKAGE and no reason at all not to list it as a SURFACE — derived state
+ * still has to be re-derived, and the measurement above is what it costs when
+ * a reader is not told so.
+ *
+ * `plugins[*]`, every entry rather than `plugins[0]`: a marketplace may list
+ * more than one plugin, and the one left behind is the lag this is for.
+ */
+export function versionSpine(root = ROOT) {
+  const at = (rel) => JSON.parse(fs.readFileSync(path.join(root, rel), "utf8"));
+  const pkg = at("package.json");
+  const lock = at("package-lock.json");
+  const plugin = at(".claude-plugin/plugin.json");
+  const marketplace = at(".claude-plugin/marketplace.json");
+  const surfaces = [
+    { file: "package.json", field: "version", version: pkg.version ?? null },
+    { file: "package-lock.json", field: "version", version: lock.version ?? null },
+    { file: "package-lock.json", field: 'packages[""].version', version: lock.packages?.[""]?.version ?? null },
+    { file: ".claude-plugin/plugin.json", field: "version", version: plugin.version ?? null },
+    { file: ".claude-plugin/marketplace.json", field: "metadata.version", version: marketplace.metadata?.version ?? null },
+    ...(marketplace.plugins ?? []).map((p, i) => ({
+      file: ".claude-plugin/marketplace.json",
+      field: `plugins[${i}].version`,
+      version: p.version ?? null,
+    })),
+  ];
+  // The root manifest leads: it is what `npm version` writes and what the
+  // registry serves the CLI under. A field it cannot even read (null) is
+  // LAGGING, not skipped — absence is the worst form of trailing.
+  const lagging = surfaces.filter((s) => s.version !== pkg.version);
+  return { version: pkg.version ?? null, surfaces, lagging, inStep: lagging.length === 0 };
+}
+
+/** The spine as a human reads it — used by the table below, and pinnable alone. */
+export function formatSpine(spine) {
+  const where = (s) => `${s.file}  ${s.field}`;
+  const width = Math.max(...spine.surfaces.map((s) => where(s).length)) + 2;
+  const lines = spine.surfaces.map(
+    (s) => `  ${spine.lagging.includes(s) ? "✗" : " "} ${where(s).padEnd(width)}${s.version ?? "— no such field"}`,
+  );
+  lines.push(
+    spine.inStep
+      ? `  in step: all ${spine.surfaces.length} fields read ${spine.version}`
+      : `  NOT IN STEP: ${spine.lagging.length} field(s) do not read ${spine.version} — a bump moves every line above`,
+  );
+  return lines;
+}
+
 /** Package versions, each from its own manifest — the version spine. */
 function versions() {
   return {
@@ -170,8 +232,12 @@ function npmNames() {
   };
 }
 
-/** Every name this repo owns, in one list — what `--registry` asks about. */
-function ownedNames(gt) {
+/**
+ * Every name this repo owns, in one list — what `--registry` asks about.
+ * Exported so a test that must visit every published package reads THIS list
+ * rather than growing its own directory convention (KD-18 was one that did).
+ */
+export function ownedNames(gt) {
   return [gt.npm.primary, ...gt.npm.independent, ...gt.npm.aliases];
 }
 
@@ -475,6 +541,7 @@ export function groundTruth() {
     mcpTools: mcpTools(),
     cliCommands: cliCommands(),
     verifyProfiles: verifyProfiles(),
+    spine: versionSpine(),
     npm: npmNames(),
   };
 }
@@ -659,6 +726,8 @@ async function main() {
   console.log("\ncreate-cmp — derived ground truth\n");
   console.log("versions");
   for (const [k, v] of Object.entries(gt.versions)) row(k, v);
+  console.log("\nversion spine (every field a release bump moves)");
+  for (const line of formatSpine(gt.spine)) console.log(line);
   console.log("\ncounts");
   row("skills", `${gt.skills.count}${gt.skills.inSync ? "" : "  ⚠ declared/disk MISMATCH"}`);
   row("mcp tools", gt.mcpTools.count);

@@ -36,7 +36,7 @@
 // SINGLE SOURCE OF TRUTH: packages/harness/src/lib/framework-check.mjs in the
 // create-cmp repo. The copy in a generated project's qa/lib/ is vendored
 // byte-identical at scaffold time — edit the package source, then run
-// `node scripts/sync-harness.mjs`.
+// `node scripts/sync-harness.mjs` in the create-cmp repo.
 
 // The core's fallback grammar, for the ONE thing this file reads out of a flow:
 // the citation marker. Importing it rather than re-declaring the pattern is the

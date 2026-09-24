@@ -6,8 +6,255 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+`create-cmp-cli` 0.26.6 and 0.27.0, and `prooflane-harness` 0.22.1 and 0.23.0, were never
+published; their changes are in this section. 0.26.7 through 0.26.9, and `prooflane-harness`
+0.22.2, exist only on the branch `doctor-claims-wiring-it-has-not-established`; their fixes
+reached this section as different commits.
+
 ### Fixed
 
+- **A directory named by an unset shell variable became the directory you happened to be in.**
+  Every command resolves its project with `(typeof flags["target-dir"] === "string" &&
+  flags["target-dir"]) || positional || "."`, and all four of the shapes a script produces are
+  falsy there — so `--target-dir=$DIR`, `--target-dir "$DIR"`, `--target-dir $DIR` and
+  `init "$DIR"`, with `DIR` unset, all silently meant the current directory. Measured:
+  `create-cmp harness init --target-dir --no-interview` wrote 53 files into whatever directory the
+  script ran from, and `create-cmp upgrade --target-dir --yes` rewrote that directory's version
+  catalog with the consent prompt auto-answered. Both doors now refuse all four shapes before any
+  command runs — a value flag given no value, by name (*"--target-dir needs a value, and was given
+  none (an unset shell variable expands to nothing, quoted or not)"*), and an empty positional as
+  the empty argument it is — exit 2, nothing written. The rule is narrow where it can afford to be:
+  only a flag that names where files are written is refused when it is bare, so `--set` with no
+  value still means the latest set and `--profile` with none still means the directory's slug.
+
+- **`create-cmp` refused `--name=value` as an argument it did not know, and read it wrongly when it
+  did not refuse.** `prooflane` has always split `--flag=value`; `create-cmp`'s parser never did, so
+  `create-cmp upgrade --dry-run=true` exited 2 with *"--dry-run=true is not an argument this command
+  knows"* while the same line at `prooflane` was a dry run, and `--profile=svc ../app` swallowed
+  `../app` as the value of a flag named `profile=svc`. Both doors now split at the first `=`:
+  `--dry-run=true` and `--dry-run=false` mean what `--dry-run true` and `--dry-run false` mean, a
+  value flag works attached (`--target-dir=./app`, `--profile=svc`, `--fleet=./fleet.json`), a
+  declared flag carrying a value it cannot mean (`--dry-run=maybe`) is refused by what was typed
+  with nothing written, and an unknown name is refused by its name (`--verfiy=1` → `--verfiy`).
+  Every spelling that MEANS a dry run now leaves the version catalog byte-identical on
+  `create-cmp upgrade`, with or without `--yes`, and every spelling that means *not* a dry run —
+  `--dry-run false`, `--no-dry-run` — applies as asked. All ten spellings the tri-state contract
+  allows are driven end to end through the real command, and which of them means a dry run is asked
+  of the parser itself rather than written into the test.
+  **That sentence was not true when this entry was first written, and the release's own review
+  caught it.** The flag's OTHER name — `--no-dry-run false`, which means *do* a dry run — performed
+  the write at `upgrade`, `clean`, `verify`, `harden`, `attach` and `doctor` while `create-cmp harness
+  init` previewed: measured, `create-cmp upgrade --no-dry-run false --yes` rewrote
+  `gradle/libs.versions.toml` and printed *"Applied."*, with `--yes` auto-answering the one prompt that
+  would have caught it. Every declared boolean those commands read — `--dry-run`, `--yes`,
+  `--minimal`, `--force`, `--fix`, `--verify`, `--harness`, `--no-install`, `--dry-run-verify` — now
+  reads both of its names through one tri-state reader, and a scan refuses a one-name read coming
+  back.
+
+- **The lane vendored into every stamped app told its reader to run a script no stamped app has.**
+  `template/qa/lib/profile-contract.mjs` said "Run it with `node scripts/fleet-check.mjs
+  --ladder-plant`"; the template ships no `scripts/` directory, so the one instruction the contract
+  gives the profile author it names as a reader ends in `Cannot find module` (KD-31). It now says it
+  runs in the create-cmp repo and why. The class is closed with it: a test scans every tracked file
+  under `template/` for `node <path>` and refuses a path the template does not ship unless the
+  SENTENCE the instruction is in says the script lives in the create-cmp repo. Fifteen other
+  instructions were live under that rule — SINGLE SOURCE OF TRUTH headers whose "edit the package
+  source, then run `node scripts/sync-harness.mjs`" named the repo only in the sentence before — and
+  each now carries it in its own sentence, so a reader who greps one line can see where it runs.
+
+- **`create-cmp doctor` told an adopter a hook "is anchored and still works from any directory"
+  about a hook that produced nothing.** The sentence had been derived from the command's text three
+  times — the anchoring detector's silence, then the anchor's presence anywhere in the string, then
+  the detector's list subtracted from that — and the shell agreed with none of them: measured by
+  running each hook from another directory, three of five real spellings were claimed and silent (a
+  bare `node walk-status.mjs`, `sh -c '…'`, `eval '…'`, each with the template's own anchored
+  `test -f` prefix in front of it). Doctor now says it for one reason only: the command is
+  **byte-for-byte a command create-cmp ships**, and that command is executed from a foreign
+  directory by the suite. A hook it neither recognises nor faults is reported as exactly that —
+  *"doctor cannot confirm the UserPromptSubmit hook runs from any directory"* — with the shipped
+  command printed to compare against, rather than being called broken (a hand-written hook that
+  works is not a fault) or called working (the defect this closes).
+
+- **Every app stamped through 0.26.2 kept two hook commands that only run when the session starts at
+  the project root, and nothing create-cmp could run would name them, let alone fix them.**
+  `node qa/receipt-check.mjs --hook` (Stop) and
+  `test -f qa/walk-status.mjs && node qa/walk-status.mjs --inject || true` (UserPromptSubmit) resolve
+  against the SESSION's directory, so a session opened in a subdirectory loses the Stop gate loudly
+  and the walk's prompt injection **silently** (`|| true`). 0.26.3 anchored the template, which
+  reached new stamps only; `doctor --fix` added wiring and never rewrote a command, and the Stop hook
+  was not mentioned by any check at all. `create-cmp doctor` now names both, and
+  `create-cmp doctor --fix` **rewrites them in place** — the command strings change and no other byte
+  of `.claude/settings.json` does, so an app's own formatting, escapes and hand-written hooks survive
+  verbatim. What may be rewritten is bounded by a committed table of every command the template has
+  ever shipped (`src/lib/shipped-hooks.mjs`, every string taken from git history), and narrowed again
+  to a pair that differs by the anchor alone — so the rewrite runs the same script from the project
+  root and the right one from every other directory, whatever version of the lane the app carries. It
+  is a write to a file your app owns, so it asks first: `--yes` approves, a non-interactive run
+  declines and prints what it would have done, `--dry-run` previews and writes nothing. A command your
+  app wrote is never rewritten — it is reported with the anchored form to paste. The status line is
+  never rewritten: `CLAUDE_PROJECT_DIR` is not set for a status line, so there is no anchored form to
+  write (KD-90). The other door into that file, `create-cmp upgrade --harness`, reaches the same
+  result by three-way merge and is measured in KD-194: preserved or merged, never clobbered.
+
+- **`create-cmp doctor --fix --dry-run` wrote.** The flag was handed to the toolchain installer and to
+  nothing else, so a "preview" ran every project heal for real: it wrote `local.properties` from
+  `ANDROID_HOME`, `ksp.useKSP2=true` into `gradle.properties`, and **created** `.claude/settings.json`
+  in a project that had none — the same class as `upgrade --dry-run true` writing the version catalog.
+  Every heal now writes through one mechanism that the flag gates in a single place, so a dry run
+  changes no byte of your project and prints what it *would* write in the same words the real run uses
+  (`[dry-run] --fix: would write X` beside `✓ --fix: wrote X`). The rewrite heal does not ask for
+  consent under `--dry-run` either: a prompt whose answer cannot matter is worse than no prompt.
+
+- **`create-cmp verify` printed "GREEN — build proven." over a build nobody started, by two routes.**
+  A dry run — `create-cmp verify --dry-run`, and the scaffold's own gate under
+  `create-cmp --dry-run-verify` — printed the verdict table, "GREEN — build proven." and a
+  `::create-cmp-verdict::{"green":true}` marker, and only after all that the sentence saying nothing had
+  run, so the line a person reads first and the line an agent greps both said the opposite of the
+  truth. And a verify in which no step could run on this host — an iOS-only manifest on a machine that
+  cannot build iOS — printed the same GREEN and the same marker and exited 0, because a step skipped as
+  ineligible was counted as a pass. A dry run now prints what it would run and then one sentence —
+  *"Dry run — commands printed, nothing executed; the build is NOT proven."* — with no table, no GREEN
+  and no marker, and exits 0 because nothing failed. A verify in which nothing executed says
+  *"Nothing executed — … the build is NOT proven."* and exits 1, and a skipped step is never
+  `"green":true` in the marker.
+
+- **The AGENTS.md that `create-cmp attach` writes into an existing repo said `doctor --fix` "asks
+  before any repair".** In an attached repo it applies `local.properties` and `ksp.useKSP2` without
+  asking. The row now says that, that it asks before installing any tool, and that `--dry-run` writes
+  nothing.
+
+- **A declared boolean's VALUE form was stored as a string and read as a boolean, in both
+  directions.** `create-cmp upgrade --dry-run true --yes` wrote `gradle/libs.versions.toml` and
+  skipped the consent prompt, because ~24 readers compare `=== true` and `"true" !== true`;
+  `create-cmp my-app --no-firebase true` scaffolded Firebase anyway, and
+  `prooflane init --new-profile false <tree>` bypassed the guard protecting an existing profile,
+  because `Boolean("false") === true`. Both parsers now store the boolean a declared flag means, so
+  every existing read site is correct without changing one. A value that is neither `true` nor
+  `false` attached with `=` is refused by name; the space form is untouched, so
+  `create-cmp --minimal my-app` still works.
+
+- **`create-cmp doctor` said "The walk is wired" about a status line that produces nothing.** Its
+  presence test was a substring — `command.includes("walk-status.mjs")` — and the status line the
+  template ships is `test -f qa/walk-status.mjs && node qa/walk-status.mjs --statusline || true`,
+  which contains that string and resolves against the SESSION's directory rather than the project's.
+  For any session whose cwd is not the project root (the monorepo `services/` layout the walk exists
+  to serve) the surface silently produces nothing, `|| true` guaranteeing the silence — and the
+  diagnostic whose whole purpose is to say whether the app is healthy reported that state at level
+  `ok`. Two populations: apps stamped through 0.26.2 (whose UserPromptSubmit hook is relative too),
+  and **every new stamp**, because the template's status line is still relative as it ships and
+  cannot be anchored (KD-90). Doctor now asks `anchorViolations` — the surface-aware detector that
+  already refuses to credit an anchor on a surface the variable never reaches — and reports a
+  **`warn` naming which surface is inert, why the failure is silent, and what still works**: the
+  anchored hook, and `node qa/walk-status.mjs` by hand. It offers no automatic heal for the STATUS
+  LINE, because there is no correct rewrite to offer; the hook half IS healed as of this release,
+  where the command is one create-cmp itself shipped, and a command the app wrote is still only
+  reported.
+
+- **A comment in the shipped walk said the status line gets no stdin. It does.** `walk-status.mjs`
+  asserted *"the statusline gets no stdin and must not wait on one"* while `src/lib/hooks.mjs` and
+  KD-90 said the opposite three files away. Settled from the official statusLine documentation and
+  corrected in the comment: a status line IS handed JSON on stdin carrying `workspace.project_dir`,
+  which is the root the relative command cannot find. No behaviour changed — only `--inject` ever
+  read stdin — but the false half was the one that would have sent whoever takes the real fix
+  looking for a mechanism that is already there (KD-181).
+
+### Contributor tooling
+
+*Nothing in this list is reachable from an installed package: `package.json`'s `files` ships no
+`scripts/`, no `docs/` and no `test/`.*
+
+- **The gate that proves a published command still works when npm symlinks it read two of the nine
+  bins this repo publishes.** `test/a-published-bin-does-nothing-when-npm-symlinks-it.test.mjs`
+  claims "EVERY bin every package.json declares" and scanned the root manifest and `packages/*` one
+  level down, deduplicated by target: `create-cmp` and the harness's `prooflane`. Everything under
+  `packages/aliases/` — including `prooflane` and `create-kmp`, the names an adopter actually
+  `npx`es — and `cmp-inspector-mcp` at `inspector/mcp` were never run, and `assert.ok(bins.length >
+  0)` passed on two. It now enumerates packages through `ownedNames()`, the one list
+  `scripts/ground-truth.mjs` derives and
+  `test/a-version-number-cannot-name-two-different-trees.test.mjs` holds to every tracked
+  publishable manifest, and links every bin NAME rather than every target. Nothing was broken behind
+  the gate; what was broken was the gate's reach. Two of the newly read bins legitimately print
+  nothing on stdout — the inspector is a stdio MCP server that announces itself on stderr, and an
+  alias whose dependency is absent says so on stderr and exits 1 — so "this test can tell the two
+  apart" is now stated as what a dead entry-point guard actually looks like (exit 0 in silence) and
+  the comparison reads stderr as well as stdout.
+
+- **`node scripts/ground-truth.mjs` is where `CLAUDE.md` sends every agent for "counts and versions,
+  never by hand", and it named three of the four surfaces a version bump must move.** The missing
+  one is `package-lock.json`, which records the root manifest's version twice. Measured on the
+  packaging slice: the author read the deriver, moved exactly what it listed, and the suite still
+  came back `actual: '0.26.4', expected: '0.26.5'`. The deriver now derives a **version spine** —
+  the six FIELDS a bump moves (`package.json`, the lock's `version` and `packages[""].version`,
+  `plugin.json`, and the marketplace's `metadata.version` plus every `plugins[*].version`) — says
+  which of them lag, and prints it in the table and in `--json`.
+
+- **The proof gate refused a worktree whose path has a space in it, and said nothing at all about a
+  fleet check named through one.** `LITERAL_PATH` excluded whitespace along with `$`, backticks,
+  globs and `~`, and the device classifier's operand reader was a `\S*` that cannot cross a space,
+  so `cd "/Users/k/my trees/slice" && gh pr merge` was refused as a `cd` the gate cannot read
+  literally — and `node "/Users/k/my trees/scripts/fleet-check.mjs"` was not refused at all:
+  `classify()` returned `null`, the hook printed nothing, and the device run went ahead ungated. A
+  quoted operand is now read as the shell delimits it, so a wholly quoted path with a space in it
+  resolves exactly, while everything the shell would expand, escape or assemble from pieces stays
+  refused. The fuzz that checked the fix is committed with it: 49 disagreements with `/bin/sh`
+  before, 23 after, all 23 one class, logged as KD-189.
+
+- **A KD number was allocated from the highest number the branch could see, and two branches in
+  flight allocated the same ones.** `node scripts/kd-next.mjs` now derives it from the working tree,
+  `origin/main` and every open PR head at once, prints what it read place by place, and names on
+  stderr anything it could not reach. What it still cannot see is a local branch with no pull
+  request (KD-191), which is why it prints its sources rather than only its answer.
+
+- **Three suite flakes that reported a failure no tree had.** `test/scaffold.test.mjs` printed its own
+  progress lines onto the runner's message channel, where node's reporter parser reads text after a
+  frame as the next frame's length — a leading `›` makes that length negative and the whole FILE
+  aborts with *"Unable to deserialize cloned data"*, which is the abort that stopped an `npm publish`
+  at `prepublishOnly` on 2026-09-19 (the instance is fixed and the helper guarded; the class is logged
+  as KD-200). A preview-service test bound a fixed port and waited on a 100 × 20 ms budget, so a busy
+  machine could fetch a page from a state it had already left (KD-131). A proof-gate test decided two
+  of its cases on wall-clock bounds rather than on which path the run took (KD-165). And three console
+  tests asked for an ephemeral port and were handed the daemon's, which is where every console aims
+  its shutdown request — the test half of KD-56; the production defect underneath it is KD-202 and is
+  NOT fixed.
+
+- **The device tier is owed when the STAMPED APP's bytes move, not when an input path moves.** A
+  device run proves that the app `create-cmp` stamps runs on a phone, so that app is what the run is
+  bound to now: `scripts/stamped-output.mjs` stamps the fleet scratch app into a temp dir, hashes
+  every byte it wrote in path order and deletes it — 334 ms over 242 files, measured, against the
+  3.5 minutes it schedules — and `proof-plan` prints the basis (*"the stamped app is byte-identical to
+  the one proven at <time>"*, or *"the stamped app moved: N file(s) differ, first: <path>"*). The
+  proxy it replaces (`deviceTreeHash` over `DEVICE_TIER_TRIGGERS`) was wrong in both directions: an
+  edit under `packages/harness/src/` that never reached `template/qa/` REOPENED a discharged slice
+  over a byte-identical app, and a slice touching only `src/lib/args.mjs` owed a full emulator run for
+  an app it could not change. A PASS record over those exact bytes discharges the tier whichever slice
+  bought it; a FAIL record over them discharges nothing; a record with no `stampedOutputHash` counts
+  as no record at all, and no digest is invented for a run nobody measured. Three bytes that made a
+  stamped app depend on the laptop and the calendar are normalised with the reason named — the stamp
+  time, `local.properties`'s `sdk.dir`, and `- **Date:**` in a seeded ADR — since any one of them
+  would have left the tier reopened forever. `create-cmp`'s own output is byte-identical before and
+  after, which is the property the change is built on.
+
+- **A proof schedule that cannot be answered no longer takes the gate down with it.** A tree that
+  cannot be stamped — no `bin/`, or a stamp that dies or outruns its 3000 ms cap — is a STATE (device
+  tier OWED, with the reason printed) rather than an exception thrown out of `obligation()` into the
+  PreToolUse hook, which exited 2 and then refused **every** command it classifies.
+
+## [0.26.5] - 2026-09-19
+
+0.26.1 through 0.26.4 were never published; their changes first reached npm in this release.
+
+### Fixed
+
+- **`create-cmp harness init|relock|upgrade` could not run from an npm install.** `bin/create-cmp.mjs`
+  imports `../packages/harness/install/*.mjs` and the published package never shipped that directory,
+  so all three died with `ERR_MODULE_NOT_FOUND` and a raw Node stack trace. Present in every release
+  from 0.24.0 through 0.26.4, for commands advertised in `--help`. The `prooflane` door was never
+  affected. A new check reads what a bin imports against what `files` ships, so the two lists cannot
+  drift apart again. A second check reads the other verb: `vendorPlan()` in
+  `packages/harness/install/init.mjs` is the single declaration of what `harness init` and
+  `upgrade --harness` COPY out of this package, and a source in that plan that `files` does not ship
+  fails more quietly than a missing import — no stack trace, no refusal, just a tree with one fewer
+  file in it and a `✓ N files written` that says N-1.
 
 - **A tree whose packages are not installed told a contributor their change broke three tests.**
   Measured 2026-09-18 in a fresh git worktree with `inspector/mcp`'s packages absent: `npm test`
@@ -87,6 +334,45 @@ All notable changes to this project are documented here. The format is based on
   cannot parse still runs. The second is quieter: a preflight that needed what it checks for could
   not load on the tree it exists to describe, so a second test pins its import graph.
 
+- **The marketplace said "Eleven skills" and the plugin shipped twelve — and the gate that exists
+  to refuse exactly that was reading three of ten public surfaces.** `.claude-plugin/plugin.json`
+  and the marketplace entry are the text an agent or a human reads BEFORE the install, before this
+  repo is ever fetched, and both understated what they were offering. The count itself was the
+  smaller half. `test/doc-counts.test.mjs` derives every count from `scripts/ground-truth.mjs` and
+  refuses any public surface that contradicts it — but its `PUBLIC_SURFACES` was a hand-written
+  list of three markdown files, and **the split it produced was total: every surface ON the list
+  stated the right number, and every count-stating surface off it was stale.** Seven of them: both
+  plugin manifests at "Eleven skills", `AGENTS.md` and `docs/DOCUMENTATION.md` at "10 skills", and
+  the `create-mobile` / `create-kmp` / `create-compose-multiplatform` READMEs — published npm front
+  doors — at "10 skills". The sharpest case is that the same `plugin.json` was already read by this
+  gate for its `skills` LIST and never for its own PROSE.
+
+  The list is now derived where the category is closed (`.claude-plugin/*.json`; every `README.md`
+  under `packages/`) and named only where it is not, so the next manifest and the next alias cannot
+  escape the same way. It is deliberately not the whole tree: `docs/proposals/`, `docs/adr/`,
+  `docs/history/`, `docs/HARNESS-PLAN.md` and `inspector/mcp/README.md` ("15+ of the 28 tools had
+  ZERO calls") legitimately record PAST trees, and a scanner that cannot tell a record from a claim
+  deletes honest prose.
+
+- **The lane's size was stated eight times on public surfaces and was wrong all eight times**,
+  because the docs stopped using the one phrase the gate reads. `docs/USAGE.md` §3 opens by
+  explaining that *"how many steps run depends on `--profile`, so 'N gates' is never a fixed
+  number"* — correct, and then every number behind it rotted: one step was added to the shared
+  spine and all of `scaffold`/`local`/`ci`/`smoke`/`release` were left an off-by-one, with
+  `llms.txt` (the surface written for agents) repeating two of them. A profile-bound reader now
+  gates both forms the docs actually use — a table row and the prose that cites it — with the
+  profile names coming from the deriver rather than a list. Measured before wiring: eight matches,
+  eight drifts, zero false positives. A bare "<n> steps" is deliberately NOT gated (KD-73): it
+  refuses four strings on the same surfaces and two are honest prose, so the ambiguity is in the
+  noun rather than in the claim.
+
+- **Both readers are calibrated, and the calibration is kept.** GATE-RULES Rule 1 in the
+  instrument rather than by hand: one test plants a wrong number into every surface the gate lists
+  and every count it derives, and requires each one back refused — 8.7 ms, run by everyone,
+  forever. It is the non-vacuity check the surface list never had, and it earned that during
+  wiring: dropping one character from the globbed directory name put both plugin manifests back
+  outside the gate while every count assertion still passed.
+
 - **Three hooks in every stamped app resolved their scripts against the wrong directory, and two of
   them failed without a sound.** `template/.claude/settings.json` invoked `Stop`
   (`node qa/receipt-check.mjs --hook`), `UserPromptSubmit` and `statusLine` (both
@@ -150,51 +436,6 @@ All notable changes to this project are documented here. The format is based on
   consumers as well as at its source: the STAMPED `.claude/settings.json`
   (`test/harness-surfaces.test.mjs`) and what `doctor --fix` writes into a real project
   (`test/doctor-walk-wiring.test.mjs`), since the heal is a second door into the same file.
-
-- **The marketplace said "Eleven skills" and the plugin shipped twelve — and the gate that exists
-  to refuse exactly that was reading three of ten public surfaces.** `.claude-plugin/plugin.json`
-  and the marketplace entry are the text an agent or a human reads BEFORE the install, before this
-  repo is ever fetched, and both understated what they were offering. The count itself was the
-  smaller half. `test/doc-counts.test.mjs` derives every count from `scripts/ground-truth.mjs` and
-  refuses any public surface that contradicts it — but its `PUBLIC_SURFACES` was a hand-written
-  list of three markdown files, and **the split it produced was total: every surface ON the list
-  stated the right number, and every count-stating surface off it was stale.** Seven of them: both
-  plugin manifests at "Eleven skills", `AGENTS.md` and `docs/DOCUMENTATION.md` at "10 skills", and
-  the `create-mobile` / `create-kmp` / `create-compose-multiplatform` READMEs — published npm front
-  doors — at "10 skills". The sharpest case is that the same `plugin.json` was already read by this
-  gate for its `skills` LIST and never for its own PROSE.
-
-  The list is now derived where the category is closed (`.claude-plugin/*.json`; every `README.md`
-  under `packages/`) and named only where it is not, so the next manifest and the next alias cannot
-  escape the same way. It is deliberately not the whole tree: `docs/proposals/`, `docs/adr/`,
-  `docs/history/`, `docs/HARNESS-PLAN.md` and `inspector/mcp/README.md` ("15+ of the 28 tools had
-  ZERO calls") legitimately record PAST trees, and a scanner that cannot tell a record from a claim
-  deletes honest prose.
-
-- **The lane's size was stated eight times on public surfaces and was wrong all eight times**,
-  because the docs stopped using the one phrase the gate reads. `docs/USAGE.md` §3 opens by
-  explaining that *"how many steps run depends on `--profile`, so 'N gates' is never a fixed
-  number"* — correct, and then every number behind it rotted: one step was added to the shared
-  spine and all of `scaffold`/`local`/`ci`/`smoke`/`release` were left an off-by-one, with
-  `llms.txt` (the surface written for agents) repeating two of them. A profile-bound reader now
-  gates both forms the docs actually use — a table row and the prose that cites it — with the
-  profile names coming from the deriver rather than a list. Measured before wiring: eight matches,
-  eight drifts, zero false positives. A bare "<n> steps" is deliberately NOT gated (KD-73): it
-  refuses four strings on the same surfaces and two are honest prose, so the ambiguity is in the
-  noun rather than in the claim.
-
-- **Both readers are calibrated, and the calibration is kept.** GATE-RULES Rule 1 in the
-  instrument rather than by hand: one test plants a wrong number into every surface the gate lists
-  and every count it derives, and requires each one back refused — 8.7 ms, run by everyone,
-  forever. It is the non-vacuity check the surface list never had, and it earned that during
-  wiring: dropping one character from the globbed directory name put both plugin manifests back
-  outside the gate while every count assertion still passed.
-- **`create-cmp harness init|relock|upgrade` could not run from an npm install.** `bin/create-cmp.mjs`
-  imports `../packages/harness/install/*.mjs` and the published package never shipped that directory,
-  so all three died with `ERR_MODULE_NOT_FOUND` and a raw Node stack trace. Present in every release
-  from 0.24.0 through 0.26.4, for commands advertised in `--help`. The `prooflane` door was never
-  affected. A new check reads what a bin imports against what `files` ships, so the two lists cannot
-  drift apart again.
 
 ## [0.26.0] - 2026-09-16
 
@@ -3412,6 +3653,7 @@ Initial release.
   marketplace manifest.
 
 [unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...HEAD
+[0.26.5]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...v0.26.5
 [0.26.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.24.0...v0.25.0
 [0.20.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.19.0...v0.20.0

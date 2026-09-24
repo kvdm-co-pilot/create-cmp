@@ -297,6 +297,7 @@ node scripts/proof-plan.mjs                                    # what is owed, a
 node scripts/proof-plan.mjs --discharge                        # after the run, read from its record
 node scripts/proof-plan.mjs --record-review --round <n>        # the reviewer's own output, bound to this tree
 node scripts/proof-plan.mjs --discharge-review                 # after the review, read from its record
+node scripts/proof-plan.mjs --rekey                            # an old-rule record: re-derive its digest (a stamp, no L2 run)
 node scripts/proof-plan.mjs --close                            # refuses if anything is owed
 node scripts/proof-plan.mjs --history                          # what settled slices cost, read from the kept records
 ```
@@ -333,14 +334,42 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   emulator can be scoped differently; a slice that knows it will not never pays for one. This is
   the same move as Rule 3 — the predicate is the FIRST task — applied to cost instead of to
   termination.
-- **The expensive tier is the LAST gate, and after it the slice is frozen.** A trigger path edited
-  after a discharge REOPENS the slice and is told so by name. This is deliberately not solved by a
-  cleverer hash that tries to tell a comment from a statement: doing that correctly needs a parser
-  for every ecosystem the harness might meet, and doing it by exception list is wrong the first
-  time someone edits a string a test asserts on. The ordering rule is cheaper and it is honest.
-- **A discharge is READ, never asserted.** It comes from the run's own recorded verdict and tree
-  hash — a discharge that trusted its caller would be exactly the shape of claim this product
-  exists to refuse.
+- **The device tier is owed when the STAMPED APP moves, not when an input path moves.** What a
+  device run proves is that the app `create-cmp` stamps out of this tree runs on a phone, so that
+  app is what the run is bound to: `scripts/stamped-output.mjs` stamps it into a temp dir, hashes
+  what the L2 run executes or reads, and deletes it — 0.35s, measured, against the 3.5 minutes it
+  schedules. Every file it wrote is listed; under digest rule 2 the CONTENT of the few files the
+  profile's L2 run never opens, and of the release numbers the stamp writes, is held (the list and
+  its not-read proof are in that file, and a record names the rule its digest was taken under). It
+  used to be bound to input paths (`deviceTreeHash` over `template/` + `packages/harness/src/` +
+  `packages/receipts/src/`), which is a proxy and was wrong in both directions: an edit under
+  `packages/harness/src/` that never reached `template/qa/` reopened a discharged slice over a
+  byte-identical app, and a slice touching only `src/lib/args.mjs` owed a full emulator run for an
+  app it could not change. Karel, 2026-09-22: *"it's a template; it does not need to rerun after
+  every change; if we are running it again without code changes to the template then something is
+  wrong."* The path list that remains — `DEVICE_TIER_IRRELEVANT` — answers only whether anything
+  this slice touched could reach a phone at all, which is the cheap question asked first and the
+  one a machine with no device record can still answer.
+- **The expensive tier is the LAST gate, and after it the slice is frozen.** A change to the stamped
+  app after a discharge REOPENS the slice and is told so by name, with the count of files that moved
+  and the first of them. A comment in a file that SHIPS and that the L2 run reads still reopens it:
+  nothing here can tell a comment from a statement without a parser for every ecosystem the harness
+  might meet, and those bytes really are part of the app. A comment in a file that does not ship
+  costs nothing, and that is not an exception list — it is the same comparison, answering honestly.
+  The one declared list is per profile and names files no program in that profile's L2 run opens,
+  each with the line that proves it; markdown under `template/` is asked about like any shipped
+  byte (KD-207), and the digest answers.
+- **A discharge is READ, never asserted, and the evidence outranks the bookkeeping.** It comes from
+  the run's own recorded verdict and stamped-app digest — a discharge that trusted its caller would
+  be exactly the shape of claim this product exists to refuse. A PASS run recorded against these
+  exact stamped bytes discharges the tier whichever slice bought it, so a slice that changed nothing
+  the app can see is never sent to an emulator by the line it reads; a recorded run of those same
+  bytes that did NOT pass refuses, whatever a plan already says. A record written before this
+  criterion carries no `stampedOutputHash` and counts as NO record — no digest is invented for a run
+  nobody measured. A record whose digest was taken under an older digest rule is not "another app"
+  either: it is not compared at all until `--rekey` has re-stamped the commit it ran on, reproduced
+  its recorded digest under that rule, and written the current rule's digest beside it — accepted
+  for that one run only, and the fleet record itself is never edited.
 - **There are two at-close tiers, and the second is a review** (ADR-0014). A slice that changes
   anything but prose owes a review record bound to these exact bytes, and `gh pr merge` refuses
   until one exists. The gate checks that the record EXISTS and describes this tree; it never reads
@@ -432,6 +461,16 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
      whatever directory it was typed in;
   4. nothing else.
 
+  **"Literally" includes wholly quoted, and only wholly (KD-95).** Quotes delimit, so
+  `cd "/My Trees/slice"` and `node '/My Trees/slice/scripts/fleet-check.mjs'` name one path each and
+  it is the text between the quotes — a space there is part of the path and is read exactly. A space
+  that is ESCAPED instead (`/My\ Trees`), and a word the shell assembles from a quoted piece and an
+  unquoted one (`"/My Trees"/slice`), are not: what the gate would read back is not what the shell
+  builds, so both are refused. Inside the quotes the rule is unchanged and it is the stricter of the
+  two shells' — `$`, a backquote, a glob, `~` and a backslash are refused in single quotes too,
+  where the shell would not expand them, because one rule for both quote styles is a rule a reader
+  can hold.
+
   **"A `cd` the shell would perform" is the load-bearing phrase, and it is measured, not asserted.**
   A `cd` inside `echo "…"`, inside a heredoc, inside `$( )`, or inside a nested `sh -c '…'` is not
   one — the shell never performs it, or performs it in a process whose directory dies with it — and
@@ -440,13 +479,15 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   command is blanked first — quoted spans, substitutions — and only then are the remaining parens
   counted, which is the one point at which counting them is sound. `/bin/sh` is the oracle:
   `test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs` replaces the gated command with
-  `pwd -P`, runs 24 shapes through a real shell, and holds the invariant that the gate resolves the
-  directory the shell would run the command in **or resolves nothing at all**. Ten of those shapes
-  disagreed when that harness was written, in both directions, and both directions end in a false
-  ALLOW.
+  `pwd -P`, runs every shape in its table through a real shell, and holds the invariant that the
+  gate resolves the directory the shell would run the command in **or resolves nothing at all**. Ten
+  of the 24 shapes disagreed when that harness was written, in both directions, and both directions
+  end in a false ALLOW. Four more were added with KD-95, for operands the reader saw only part of:
+  it looked for the operand in the text whose quoted spans it had already blanked, so `cd "/a b"/in`
+  resolved `/in` and `cd /here"/sub"` resolved the payload's own cwd, which is KD-79.
 
   Everything outside the set REFUSES and says why: `pushd`; a `cd` whose destination is a variable,
-  a glob, `~` or a path with a space in it; a heredoc, a backquote, an unclosed quotation, a
+  a glob, `~`, an escape, or a path with an unquoted space in it; a heredoc, a backquote, an unclosed quotation, a
   compound command or a sourced script, or a `)` whose opener this reader never saw; a directory
   that is not there; `gh --repo`/`-R`/`GH_REPO` naming a repository out of band; `npm publish
   --prefix`/`-C`/`-w` or a folder or tarball operand; and any git question about the directory that

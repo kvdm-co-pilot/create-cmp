@@ -20,9 +20,9 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
-import { deviceTreeHash, DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
-import { obligation, changedPaths } from "./proof-plan.mjs";
+import { deviceTierNeed } from "./observed-tree.mjs";
+import { stampedOutputHash } from "./stamped-output.mjs";
+import { obligation, changedPaths, recordMeetsTier, TIERS } from "./proof-plan.mjs";
 import { suiteStatus } from "./suite-record.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -33,8 +33,10 @@ function sh(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...opts });
 }
 
+// The same question proof-plan asks, through the same function, so this row
+// and the schedule cannot disagree about a spec edit under template/ (KD-207).
 export function deviceTierRequired(paths) {
-  return deriveTierNeed(paths, { irrelevantRoots: DEVICE_TIER_IRRELEVANT, tierName: "fleet L2" });
+  return deviceTierNeed(paths, { tierName: "fleet L2" });
 }
 
 /** `ℹ tests 1525 / ℹ pass 1525 / ℹ fail 0` out of the node test runner. */
@@ -76,20 +78,22 @@ export function readFleetRecord(recordPath = FLEET_RECORD, currentHash = null) {
   } catch {
     return { present: false };
   }
-  const now = currentHash ?? deviceTreeHash(REPO_ROOT);
-  // A record written before content-binding has no hash to compare. It is not
-  // trusted and not silently discarded: it is named as unverifiable, which is
-  // the honest third answer.
-  if (typeof record.observedHash !== "string") {
-    return { present: true, record, current: false, staleReason: "written before the record was content-bound — cannot be verified against this tree" };
-  }
-  const current = record.observedHash === now;
-  return {
-    present: true,
-    record,
-    current,
-    staleReason: current ? null : `the code feeding the device tier changed since this run (${record.observedHash.slice(0, 7)} → ${now.slice(0, 7)})`,
-  };
+  const now = currentHash ?? stampedOutputHash(REPO_ROOT);
+  // THE SAME READING THE SCHEDULE, THE DISCHARGE AND THE PUBLISH GATE USE.
+  // This reader had its own — the digest and nothing else — so a `--min-level
+  // L1` run over these bytes printed "ran against this exact code ✓" under a
+  // row labelled `fleet L2`, in the block this file exists to have pasted into
+  // a PR as proof. And a record with no digest was always "written before the
+  // record was content-bound", which is false of one whose stamp failed
+  // minutes ago. `recordMeetsTier` says which, in its own words.
+  //
+  // `current` keeps its one meaning — this record is ABOUT the app this tree
+  // stamps — and `meets` says whether it CARRIES the tier. Two facts, both
+  // printed, because "the right app, at the wrong level" and "another app"
+  // want different things from the reader.
+  const meets = recordMeetsTier(record, TIERS.device, now);
+  const current = meets.ok || meets.about === true;
+  return { present: true, record, current, meets, staleReason: current ? null : meets.reason };
 }
 
 /**
@@ -152,7 +156,16 @@ function render(d) {
     const r = d.fleet.record;
     const dev = r.steps.filter((s) => ["e2eSmoke", "androidChecks"].includes(s.name));
     L.push(`                     ${r.verdict} · rung ${r.rung ?? "none"} (required >=${r.requiredLevel})${dev.length ? ` · ${dev.map((s) => `${s.name} ${(s.durationMs / 1000).toFixed(1)}s`).join(", ")}` : ""}`);
-    L.push(`                     ${d.fleet.current ? "ran against this exact code ✓" : `STALE — ${d.fleet.staleReason}`}${r.treeWasDirty ? " · tree was dirty when it ran" : ""}`);
+    // A tick only for a record that CARRIES the tier. One that is about this
+    // app and falls short — too low a rung, a FAIL — says so beside the record
+    // it just printed, rather than ticking the digest and leaving the reader to
+    // notice "rung L1" two words earlier.
+    const standing = !d.fleet.current
+      ? `STALE — ${d.fleet.staleReason}`
+      : d.fleet.meets && !d.fleet.meets.ok
+        ? `THIS APP, BUT IT DOES NOT CARRY THE TIER — ${d.fleet.meets.reason}`
+        : "ran against this exact code ✓";
+    L.push(`                     ${standing}${r.treeWasDirty ? " · tree was dirty when it ran" : ""}`);
   } else if (d.device.required) {
     // HOW LOUD depends on WHEN, and that is the whole fix. Mid-slice an absent
     // record is the expected state and saying NO RECORD there is what made an

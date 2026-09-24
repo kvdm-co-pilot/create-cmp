@@ -69,15 +69,15 @@ test("a flag that genuinely takes a value still takes it", () => {
   }
 });
 
-test("a trailing boolean, and prooflane's `--flag=value`, are unchanged", () => {
-  // The `=` form is asserted for prooflane ONLY, because only prooflane parses
-  // it. create-cmp's parser has never split on `=` — `--profile=svc` becomes a
-  // flag literally named `profile=svc` — and its help has never offered the
-  // form. That is a real gap and it is KD-14, not this slice: widening a test
-  // until it covers a second defect is how a bounded fix stops being one.
-  const eq = parseHarnessArgs(["--profile=svc", "../dir"]);
-  assert.equal(eq.flags.profile, "svc", "prooflane: --flag=value broke");
-  assert.deepEqual(eq.positionals, ["../dir"]);
+test("a trailing boolean, and `--flag=value`, are unchanged", () => {
+  // The `=` form was asserted for prooflane only while only prooflane parsed
+  // it; create-cmp's parser turned `--profile=svc` into a flag literally named
+  // `profile=svc` until KD-14 closed. It is asserted at both doors now.
+  for (const cli of CLIS) {
+    const eq = cli.parse(["--profile=svc", "../dir"]);
+    assert.equal(eq.flags.profile, "svc", `${cli.name}: --flag=value broke`);
+    assert.deepEqual(eq.positionals, ["../dir"]);
+  }
 
   for (const cli of CLIS) {
     const [firstBoolean] = [...cli.booleans];

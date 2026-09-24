@@ -40,7 +40,7 @@
 // SINGLE SOURCE OF TRUTH: packages/harness/src/lib/harness-region.mjs in the
 // create-cmp repo. The copy in a generated project's qa/lib/ is vendored
 // byte-identical at scaffold time — edit the package source, then run
-// `node scripts/sync-harness.mjs`.
+// `node scripts/sync-harness.mjs` in the create-cmp repo.
 
 import { createHash } from "node:crypto";
 import fs from "node:fs";

@@ -1,34 +1,64 @@
-// What the device run could have been affected by, as a content digest.
+// What a proof could have been affected by, as a content digest.
 //
-// The fleet record first keyed its validity to `git rev-parse HEAD`, and that
-// can never work: the run happens BEFORE the commit that carries it, so the
-// recorded commit is always the parent and every record reads STALE the moment
-// it lands. A warning that is always on is a warning nobody reads — worse than
-// none, because it looks like coverage.
+// A record first keyed its validity to `git rev-parse HEAD`, and that can never
+// work: the run happens BEFORE the commit that carries it, so the recorded
+// commit is always the parent and every record reads STALE the moment it lands.
+// A warning that is always on is a warning nobody reads — worse than none,
+// because it looks like coverage.
 //
-// A commit is a LABEL. What actually decides whether yesterday's device run
-// still speaks for today's code is the CONTENT of the paths that feed it, which
-// is the same reasoning inputs-hash.mjs applies to a receipt: bind to the bytes,
-// not to a name for them. Committing does not change bytes, so a record stays
-// valid across the commit it is quoted in — and editing one byte under a
-// trigger root invalidates it immediately, committed or not.
+// A commit is a LABEL. What actually decides whether yesterday's proof still
+// speaks for today's code is CONTENT, which is the same reasoning
+// inputs-hash.mjs applies to a receipt: bind to the bytes, not to a name for
+// them. Committing does not change bytes, so a record stays valid across the
+// commit it is quoted in.
+//
+// THE DEVICE TIER NO LONGER HASHES ANYTHING HERE, and that deletion is what
+// this file carries. It used to: `DEVICE_TIER_TRIGGERS` named `template/` +
+// `packages/harness/src/` + `packages/receipts/src/`, `DEVICE_SKIP` carved the
+// console back out, and `deviceTreeHash` was the key a device run's validity
+// was bound to. All three are a PROXY for the only question a device run
+// answers — does the app this tree STAMPS differ from the app the run proved —
+// and the proxy was wrong in both directions: an edit under
+// `packages/harness/src/` that never reached `template/qa/` reopened a
+// discharged slice over a byte-identical app, and a slice that touched only
+// `src/lib/args.mjs` owed a 3.5-minute run for an app it could not change. The
+// question is now asked directly, by stamping the app and hashing it
+// (`scripts/stamped-output.mjs`, ~0.35s), and a proxy nobody consults is a
+// second spelling of a rule — which drifts in whichever half is read less.
+//
+// What remains here for the device tier is `DEVICE_TIER_IRRELEVANT`, which
+// answers a different question and says so where it is declared. The REVIEW
+// tier still binds to paths, because a review is a READER on a diff rather than
+// a claim about an artifact, and there is no artifact to hash.
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
-/**
- * The content a device run's validity depends on, for THIS repo — the template
- * plus the package sources it is built from. create-cmp is the engine, not a
- * stamped app, so this is what `fleet-check` actually exercises.
- */
-export const DEVICE_TIER_TRIGGERS = Object.freeze(["template/", "packages/harness/src/", "packages/receipts/src/"]);
+import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
 
 /**
- * What CANNOT affect a device run here. Declared as irrelevance rather than
- * relevance on purpose (see deriveTierNeed): anything unclassified obliges the
- * tier, so forgetting to list a new directory costs a device run, never a
- * missed regression. Markdown cannot change what executes on a phone; this
+ * What CANNOT OBLIGE a device run here — and that is the whole of what this
+ * list now does.
+ *
+ * IT IS NOT THE TIER'S KEY. What DISCHARGES the tier is the app this tree
+ * stamps (`scripts/stamped-output.mjs`): a PASS run recorded against those
+ * exact bytes. This is the cheap half, asked first, and it answers a question
+ * the stamped app cannot — whether anything THIS SLICE changed could reach a
+ * phone at all. A docs-only branch on a machine with no device record owes
+ * nothing, and not because a record says so: because nothing it touched can
+ * reach the question.
+ *
+ * Declared as irrelevance rather than relevance on purpose (see
+ * deriveTierNeed): anything unclassified obliges the tier, so forgetting to
+ * list a new directory costs one stamped-app comparison — 0.35s, which then
+ * discharges it — rather than a missed regression. That error is far cheaper
+ * than it was: before the tier was scheduled by the stamped app, a directory
+ * missing from this list cost a 3.5-minute emulator run.
+ *
+ * This repo's own markdown cannot change what the stamped tree executes; this
  * repo's own tests, scripts and CI config do not ship into the stamped app.
+ * Markdown UNDER `template/` is the exception, and `*.md` does not reach it —
+ * see DEVICE_TIER_SHIPPED and `deviceTierNeed` below (KD-207).
  */
 export const DEVICE_TIER_IRRELEVANT = Object.freeze([
   "docs/",
@@ -71,9 +101,62 @@ export const DEVICE_TIER_IRRELEVANT = Object.freeze([
   // Stated plainly because this entry unblocks the merge of the slice that
   // found it: the reasoning is structural and checkable — `REGION_DIRS` in
   // scripts/sync-harness.mjs, and `ls template/qa/**/console*` returning
-  // nothing — not a judgement about risk.
+  // nothing — not a judgement about risk. Since the tier was scheduled by the
+  // stamped app, the comparison reaches that verdict by itself (a console
+  // rebuild moves no byte of the app), so this entry saves the stamp rather
+  // than saving a device run.
   "packages/harness/src/console/",
 ]);
+
+/**
+ * WHAT SHIPS INTO THE STAMPED APP, where a SUFFIX in DEVICE_TIER_IRRELEVANT
+ * does not reach.
+ *
+ * KD-207: `*.md` declared every markdown file unable to oblige the runtime
+ * tier, matched on the repo path, and markdown under `template/` ships INTO
+ * the stamped app — `template/specs/*.md` is what the lane's spec-coverage,
+ * e2e-coverage and approvals steps read. So a spec edit could never make the
+ * tier required, and when something else did, the same bytes reopened it: the
+ * two halves disagreed for exactly the shipped-markdown set, and a slice that
+ * changed ONLY a spec was waved through with a digest nobody asked.
+ *
+ * Closed by making every path under these roots RELEVANT — the tier is then
+ * required, and the stamped digest (scripts/stamped-output.mjs) JUDGES it: a
+ * spec edit moves the digest and is owed; a `template/AGENTS.md` edit is prose
+ * the cmp profile's L2 run never opens (UNOBSERVED_BY_PROFILE), so the digest
+ * is equal and a matching record discharges it for the price of one stamp.
+ * Being wrong toward "required" costs ~0.35s here; being wrong toward
+ * "irrelevant" cost a spec change its L2 run.
+ */
+export const DEVICE_TIER_SHIPPED = Object.freeze(["template/"]);
+
+/**
+ * Must the runtime tier be asked about these paths — `deriveTierNeed` over
+ * DEVICE_TIER_IRRELEVANT, with every path under DEVICE_TIER_SHIPPED put back.
+ *
+ * One function, for every reader that asks (`proof-plan`'s obligation and
+ * `fit-test`'s row), so the two cannot disagree about one spec edit. A path
+ * the declaration already obliges is not repeated; a shipped path it called
+ * irrelevant is added to `obliging` and named in the reason, so a reader sees
+ * WHY a markdown file made the tier required.
+ *
+ * @param {string[]|null} paths changed relpaths, or null when git could not say
+ * @param {{tierName?: string}} [opts]
+ * @returns {{required: boolean, reason: string, obliging: string[]}}
+ */
+export function deviceTierNeed(paths, { tierName = "the L2 run" } = {}) {
+  const need = deriveTierNeed(paths, { irrelevantRoots: DEVICE_TIER_IRRELEVANT, tierName });
+  if (!Array.isArray(paths)) return need;
+  const posix = paths.filter((p) => typeof p === "string" && p.length > 0).map((p) => p.split(path.sep).join("/"));
+  const shipped = posix.filter((p) => DEVICE_TIER_SHIPPED.some((r) => p.startsWith(r)) && !need.obliging.includes(p));
+  if (!shipped.length) return need;
+  const named = `${shipped.length} changed path(s) under ${DEVICE_TIER_SHIPPED.join(", ")} ship into the stamped app, and no suffix rule reaches them: ${shipped.slice(0, 3).join(", ")}${shipped.length > 3 ? ", …" : ""}`;
+  return {
+    required: true,
+    reason: need.required ? `${need.reason}; and ${named}` : named,
+    obliging: [...need.obliging, ...shipped],
+  };
+}
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "build", "dist", "out"]);
 
@@ -244,9 +327,10 @@ export const REVIEW_TIER_TRIGGERS = Object.freeze([
 /**
  * Markdown never enters the review hash.
  *
- * The device tier hashes the markdown under `template/` and accepts that a
- * comment reopens the slice — it has to, because it cannot tell a comment from
- * a statement without a parser for every ecosystem it might meet. Here the
+ * The device tier's oracle hashes the markdown a stamped app CONTAINS and
+ * accepts that a comment in it reopens the slice — it has to, because it cannot
+ * tell a comment from a statement without a parser for every ecosystem it might
+ * meet, and those bytes really are part of the app. Here the
  * question is decidable from the path alone: markdown is already declared
  * unable to OBLIGE a review, so letting it INVALIDATE one would make the two
  * halves disagree, and would charge a re-read of the diff for a typo in a
@@ -255,31 +339,16 @@ export const REVIEW_TIER_TRIGGERS = Object.freeze([
  */
 export const REVIEW_SKIP = (relPath) => relPath.endsWith(".md");
 
-/**
- * What the DEVICE hash must not see. The oblige and reopen halves have to agree:
- * `DEVICE_TIER_IRRELEVANT` stops a path obliging a run, and without the same
- * exclusion here the hash still moves when that path changes, so the run is
- * reopened by a file that could never have obliged it. The review tier already
- * had this (REVIEW_SKIP); the device tier did not, because until 2026-09-10
- * nothing under its trigger roots was irrelevant.
- *
- * `console/` is the whole of it: `packages/harness/src/` is a trigger root
- * because most of it becomes `template/qa/`, and sync-harness.mjs's REGION_DIRS
- * copies `src` and `src/lib` only — the console ships to no phone.
- */
-export const DEVICE_SKIP = (relPath) => relPath.startsWith("packages/harness/src/console/");
-
-/**
- * The device tier's hash of a tree — the one spelling of it.
- *
- * There were three. `fleet-check` recorded `observedTreeHash(root, DEVICE_TIER_TRIGGERS,
- * { skip: DEVICE_SKIP })`, `proof-plan --discharge` compared the same, and the publish gate in
- * `hooks/proof-gate.mjs` computed it WITHOUT the skip — so it hashed the console files the record
- * deliberately leaves out, and the two could never be equal. Measured on 2026-09-17: a release
- * proof PASSED at L2 on `main`, recorded `3ed5e09`, and the gate computed `eb734f5` for the same
- * bytes and refused `npm publish` — twice, on two proofs. A gate that no passing run can satisfy.
- * Its test had injected `now` by hand, so it never compared the two.
- */
-export function deviceTreeHash(root) {
-  return observedTreeHash(root, DEVICE_TIER_TRIGGERS, { skip: DEVICE_SKIP });
-}
+// THE DEVICE HASH USED TO LIVE HERE, in three spellings that had to agree and
+// once did not: `fleet-check` recorded `observedTreeHash(root,
+// DEVICE_TIER_TRIGGERS, { skip: DEVICE_SKIP })`, `proof-plan --discharge`
+// compared the same, and the publish gate computed it WITHOUT the skip. Measured
+// 2026-09-17: a release proof PASSED at L2 on `main` and recorded `3ed5e09`, the
+// gate computed `eb734f5` over the same bytes and refused `npm publish` — twice,
+// on two proofs. A gate no passing run could satisfy.
+//
+// There is now ONE spelling, and it is not a path list: the app this tree
+// stamps, hashed by `scripts/stamped-output.mjs`, which every reader calls. The
+// console skip that defect turned on went with it — `packages/harness/src/console/`
+// never reaches `template/qa/`, so it cannot reach a stamped app, and nothing
+// has to declare that twice any more.

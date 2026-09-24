@@ -27,7 +27,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { colors, fail } from "../install/log.mjs";
-import { parseArgs, unknownFlags } from "../install/args.mjs";
+import { parseArgs, unknownFlags, unreadableBooleanValues, emptyValues } from "../install/args.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(path.join(HERE, "..", "package.json"), "utf8"));
@@ -62,13 +62,19 @@ async function main() {
   const argv = process.argv.slice(2);
   const { flags, positionals } = parseArgs(argv);
 
-  if (flags.version || flags.v) {
+  // READ BY PRESENCE, and the only two flags here that are. `--version` and
+  // `--help` are QUESTIONS: `--version false` does not mean "do the other thing
+  // instead", so once `parseArgs` started handing the value form through as a
+  // real boolean (KD-16) these had to stop reading it, or the answer to a
+  // question asked awkwardly became `usage`, exit 2 — and at the other door,
+  // which shares this shape, a scaffold (KD-15).
+  if ("version" in flags || "v" in flags) {
     process.stdout.write(`${PKG.name} ${PKG.version}\n`);
     return 0;
   }
 
   const command = positionals[0];
-  const askedForHelp = Boolean(flags.help || flags.h) || command === "help";
+  const askedForHelp = "help" in flags || "h" in flags || command === "help";
 
   // REFUSE WHAT WE CANNOT ACCOUNT FOR, before anything runs. `unknown command`
   // already does this one branch down; an unknown FLAG was parsed as best it
@@ -80,6 +86,63 @@ async function main() {
   if (!askedForHelp && unknown.length) {
     fail(`prooflane: ${unknown.map((f) => `--${f}`).join(", ")} ${unknown.length === 1 ? "is not a flag" : "are not flags"} this command knows`);
     process.stdout.write(`  run ${colors.cyan("prooflane --help")} for the flags it does know. Nothing was written.\n\n`);
+    return 2;
+  }
+
+  // A RECOGNISED FLAG CARRYING A VALUE IT CANNOT MEAN. `parseArgs` turns a
+  // declared boolean's `true`/`false` into the boolean, at both the space form
+  // and the `=` form; what is left holding a string is `--dry-run=maybe`, whose
+  // NAME is known, so the check above cannot see it. It used to run as a dry run
+  // (a non-empty string is truthy) and after the coercion would run as a real
+  // install — neither of them what was typed. Only the `=` form reaches this:
+  // `--dry-run maybe ../app` leaves `maybe` a positional on purpose, because
+  // refusing THAT is how KD-7 comes back.
+  const unreadable = unreadableBooleanValues(flags);
+  if (!askedForHelp && unreadable.length) {
+    fail(
+      `prooflane: ${unreadable.map((f) => `--${f}=${flags[f]}`).join(", ")} — ` +
+        `${unreadable.length === 1 ? "that flag takes" : "those flags take"} \`true\` or \`false\`, or no value at all`
+    );
+    process.stdout.write(`  run ${colors.cyan("prooflane --help")} for what each one means. Nothing was written.\n\n`);
+    return 2;
+  }
+
+  // A VALUE FLAG GIVEN NO VALUE. `init`, `relock` and `upgrade` resolve
+  // their tree with `(typeof v === "string" && v) || positional || "."`, and
+  // `""` is falsy — so `--target-dir=` is the same as no `--target-dir` at all
+  // and the lane installs into the CWD. Measured 2026-09-22: `prooflane init
+  // --target-dir= --no-interview` from an empty directory wrote the lane into
+  // it. The line behind it is a script's `--target-dir=$DIR` with `DIR` unset: a
+  // directory WAS named, by a variable that expanded to nothing, and guessing
+  // the cwd from that is KD-7 — fifty-two files into the wrong repository.
+  // Unquoted, the same script leaves the flag BARE (`--target-dir --dry-run`),
+  // which `emptyValues` counts as empty for the flags that name where files are
+  // written and for no others: `--profile` bare still means the directory slug.
+  const empty = emptyValues(flags);
+  if (!askedForHelp && empty.length) {
+    fail(
+      `prooflane: ${empty.map((f) => `--${f}`).join(", ")} ` +
+        `${empty.length === 1 ? "needs a value, and was given none" : "need values, and were given none"} ` +
+        `(an unset shell variable expands to nothing, quoted or not)`
+    );
+    process.stdout.write(`  run ${colors.cyan("prooflane --help")} for what each one takes. Nothing was written.\n\n`);
+    return 2;
+  }
+
+  // AN EMPTY POSITIONAL. The other half of the same readers is `|| positional
+  // ||`, and `""` is falsy there too: `prooflane init ""` installs into the cwd,
+  // which is `prooflane init "$DIR"` with `DIR` unset — the flag's mistake, one
+  // argument over. Refused at the door rather than in `init`, `relock` and
+  // `upgrade` separately, for the reason `install/args.mjs` gives about the
+  // value form: a fix at the read sites has to find all of them today and again
+  // tomorrow, and nothing this command takes positionally can mean `""`.
+  const blank = positionals.filter((p) => p === "");
+  if (!askedForHelp && blank.length) {
+    fail(
+      `prooflane: the directory to install into ${blank.length === 1 ? "was given as an empty argument" : "was given as empty arguments"} ` +
+        `(an unset shell variable expands to nothing, quoted or not)`
+    );
+    process.stdout.write(`  name it, or drop the argument to mean the current directory. Nothing was written.\n\n`);
     return 2;
   }
 

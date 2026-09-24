@@ -47,7 +47,14 @@ test("the engine template IS the wiring of record — both halves are readable",
   assert.ok(promptSubmit && promptSubmit.length > 0, "template declares no walk UserPromptSubmit hook");
 });
 
-test("a project with the real template settings reads as wired", () => {
+test("a project with the real template settings: both surfaces invoke the walk, and the status line is cwd-relative", () => {
+  // This expectation was EDITED when doctor stopped scoring a silent status line
+  // as wired. It used to assert only the four presence booleans, under the title
+  // "reads as wired" — and that is precisely the claim the template does not
+  // support: its statusLine is `node qa/walk-status.mjs`, relative, and KD-90
+  // records that it cannot be anchored. `cwdRelative` is asserted here, against
+  // the real shipped file, so the presence half can never again be read as the
+  // whole answer. See test/doctor-calls-a-silent-status-line-wired.test.mjs.
   const dir = project(fs.readFileSync(path.join(ROOT, "template/.claude/settings.json"), "utf8"));
   try {
     assert.deepEqual(gatherWalkInputs(dir), {
@@ -55,6 +62,16 @@ test("a project with the real template settings reads as wired", () => {
       settingsPresent: true,
       statusLine: true,
       promptHook: true,
+      cwdRelative: ["statusLine"],
+      // Positive evidence, and of one kind only: the hook is byte-for-byte the
+      // command create-cmp ships, which test/shipped-hooks-table.test.mjs runs from
+      // a foreign directory. The status line is a shipped form too, and a relative
+      // one — shipped is not a synonym for working (KD-90).
+      anchored: ["UserPromptSubmit"],
+      // Nothing here is unrecognised, and nothing here is create-cmp's to rewrite:
+      // this IS the current template.
+      unconfirmed: [],
+      healable: [],
     });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -83,17 +100,29 @@ test("--fix wires an unwired project, and the walk then reads as wired", () => {
     const after = readSettings(dir);
     assert.match(after.statusLine.command, /walk-status\.mjs/);
     assert.ok(after.hooks.UserPromptSubmit.some((g) => g.hooks.some((h) => /walk-status\.mjs/.test(h.command))));
-    // The app's own Stop hook is untouched — the heal adds, never rewrites. That
-    // is also the limit of this heal: it does NOT retro-anchor a legacy hook
-    // (KD-85), and pinning the string here says so out loud rather than leaving
-    // it to be discovered.
+    // `applySafeFixes` ADDS wiring and never rewrites a command already there, and
+    // that is still true — pinned here, because it is the property that makes this
+    // heal safe to run against a file the app owns.
+    //
+    // It is no longer the limit of `doctor --fix`. The Stop hook in this fixture is
+    // the form create-cmp shipped through 0.26.2, and `healShippedHookCommands` —
+    // a second, consent-gated step in runDoctor, driven by a table of shipped bytes
+    // rather than by a parse — rewrites exactly that (KD-85, and
+    // test/doctor-fix-rewrites-only-the-hooks-create-cmp-shipped.test.mjs). What
+    // `heal()` below calls is the ADD half only, so the string stays relative here.
     assert.equal(after.hooks.Stop[0].hooks[0].command, "node qa/receipt-check.mjs --hook");
 
-    // And the project now diagnoses clean.
-    assert.equal(
-      diagnoseProject({ toml: null, walk: gatherWalkInputs(dir) }).find((f) => f.id === "walk-wiring").level,
-      "ok"
-    );
+    // And the project now diagnoses as far as this heal can take it — which is
+    // NOT clean, and this expectation was edited to say so. The heal copies the
+    // engine template, whose statusLine is cwd-relative by necessity (KD-90), so
+    // a healed project is wired on both surfaces with one of them resolving only
+    // from the project root. Asserting "ok" here is what let doctor ship the
+    // claim it could not support; the honest post-heal state is a warn that names
+    // the status line.
+    const healed = diagnoseProject({ toml: null, walk: gatherWalkInputs(dir) }).find((f) => f.id === "walk-wiring");
+    assert.equal(healed.level, "warn");
+    assert.match(healed.title, /status line/);
+    assert.equal(healed.fix.auto, false, "offered a second automatic heal for something --fix cannot fix");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

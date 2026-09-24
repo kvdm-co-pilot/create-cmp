@@ -65,7 +65,7 @@
 //
 // SINGLE SOURCE OF TRUTH: packages/harness/src/lib/plant-calibration.mjs in the
 // create-cmp repo. Vendored byte-identical into qa/lib/ — edit the package
-// source, then run `node scripts/sync-harness.mjs`.
+// source, then run `node scripts/sync-harness.mjs` in the create-cmp repo.
 
 /**
  * The plant material only a profile can supply, and the instrument cannot make

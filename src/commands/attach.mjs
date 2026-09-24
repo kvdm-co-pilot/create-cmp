@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { colors, ok, warn, fail } from "../lib/log.mjs";
+import { flagBool } from "../lib/args.mjs";
 import { consent } from "../bootstrap/exec.mjs";
 import { sessionStartCommand } from "../lib/hooks.mjs";
 import { SIDECAR_SUFFIX } from "../lib/harness-upgrade.mjs";
@@ -59,7 +60,7 @@ Both commands run from the repo root with nothing to install — \`npx\` fetches
 
 | Symptom | Run |
 |---|---|
-| Build broken, toolchain suspect | \`npx create-cmp-cli doctor --fix\` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog drift); asks before any repair |
+| Build broken, toolchain suspect | \`npx create-cmp-cli doctor --fix\` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog drift). It asks before installing any tool, and applies the two safe project heals (\`local.properties\` from \`ANDROID_HOME\`, \`ksp.useKSP2=true\`) without asking; add \`--dry-run\` to see what it would write and write nothing |
 | Dependency versions stale or mismatched | \`npx create-cmp-cli upgrade --dry-run\` — diff against the next proven-green set before touching anything |
 
 Famous build failures (kotlin↔KSP mismatch, the KSP2/iOS catch-22, \`SDK location not
@@ -233,8 +234,11 @@ export function manifestFromFlags(flags) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    // An empty value is "no override", never an empty list — the lane would
-    // refuse `citationRoots: []` and the user would have to decode why.
+    // A value that yields no roots is "no override", never an empty list — the
+    // lane would refuse `citationRoots: []` and the user would have to decode
+    // why. What reaches here is `--citation-roots ","` and its like: the EMPTY
+    // value never arrives any more, because the door refuses a value flag given
+    // none before any command runs (`emptyValues`, bin/create-cmp.mjs).
     if (roots.length) layout.citationRoots = roots;
   }
   const manifest = manifestFor(flags.profile, layout);
@@ -304,7 +308,7 @@ async function manifestForAttach(projectDir, flags) {
     }
     return fromFlags.manifest;
   }
-  if (flags.yes === true) {
+  if (flagBool(flags, "yes", false)) {
     fail(
       `${MANIFEST_REL_PATH} is missing and --yes forbids asking. Pass --profile <id> ` +
         `[--specs <dir>] [--citation-roots a,b] [--receipt <path>], or run without --yes to be asked.`
@@ -358,11 +362,11 @@ export async function runAttach(flags, positional) {
     ok("\nNothing to do — attach surfaces are current.");
     process.exit(0);
   }
-  if (flags["dry-run"] === true) {
+  if (flagBool(flags, "dry-run", false)) {
     process.stdout.write(`\n${colors.yellow("Dry run")} — nothing written.\n`);
     process.exit(0);
   }
-  const approved = await consent("\nWrite the attach surfaces?", { assumeYes: flags.yes === true });
+  const approved = await consent("\nWrite the attach surfaces?", { assumeYes: flagBool(flags, "yes", false) });
   if (!approved) {
     process.stdout.write(`${colors.yellow("Not applied")} — re-run with --yes to skip the prompt.\n`);
     process.exit(0);

@@ -54,7 +54,7 @@
 //
 // SINGLE SOURCE OF TRUTH: packages/harness/src/lib/evidence-ladder.mjs in the
 // create-cmp repo. Vendored byte-identical into qa/lib/ — edit the package
-// source, then run `node scripts/sync-harness.mjs`.
+// source, then run `node scripts/sync-harness.mjs` in the create-cmp repo.
 
 // The contract is DATA — no imports of its own, no I/O — so reading it here
 // costs a resolver's worth of nothing and buys the thing that makes it real:

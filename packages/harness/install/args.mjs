@@ -89,6 +89,153 @@ export function consumesNext(key, next, booleans = BOOLEAN_FLAGS) {
   return next === "true" || next === "false";
 }
 
+/**
+ * A declared boolean's VALUE form, as the boolean it MEANS.
+ *
+ * `consumesNext` lets `--dry-run true` past because the tri-state contract
+ * promises it. What arrived at the readers was the STRING, and every reader in
+ * this package was truthiness — `Boolean("false")` is `true` (KD-16). Measured
+ * on `8bd782a`, 2026-09-19, against a tree the `cmp` profile claims:
+ *
+ *   prooflane init --new-profile false --dry-run --no-interview <claimed tree>
+ *     → "51 files written", exit 0. The claimed-tree refusal at init.mjs:950
+ *       never fired: `--new-profile false` said "no" and was read as "yes".
+ *
+ * Normalizing HERE, at the parser, makes every reader — truthiness, `=== true`,
+ * `!== true` — correct without touching one of them, at whichever front door
+ * the adopter came through.
+ *
+ * ANYTHING ELSE IS LEFT EXACTLY AS IT ARRIVED. `--dry-run maybe ../app` must
+ * keep meaning a directory, not an error: refusing the space form here is how
+ * KD-7 comes back.
+ */
+export function coerceDeclaredBoolean(key, value, booleans = BOOLEAN_FLAGS) {
+  if (!takesNoValue(key, booleans)) return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}
+
+/**
+ * Declared booleans that reached the flag set still holding a STRING.
+ *
+ * After `coerceDeclaredBoolean` there is exactly one way to be here: a value
+ * ATTACHED with `=`, which is split off above without ever consulting
+ * `consumesNext` — `prooflane init --dry-run=maybe`, which used to run as a dry
+ * run because a non-empty string is truthy, and after the coercion would run as
+ * a REAL install because it is not `true`. Neither is what was typed.
+ *
+ * `=`-only is the whole safety argument: an attached value has no positional to
+ * lose, where refusing the SPACE form would turn `--dry-run maybe ../app` into
+ * an error instead of a directory named `maybe` — KD-7's shape, re-created by
+ * its own guard.
+ */
+export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
+  return Object.keys(flags).filter((k) => takesNoValue(k, booleans) && typeof flags[k] === "string");
+}
+
+/**
+ * The flags that name WHERE FILES ARE WRITTEN.
+ *
+ * A flag in here may never fall back to the working directory in silence, which
+ * is what separates it from every other value flag: `--profile` with no value
+ * means the directory's slug, which is an answer. `--target-dir` with no value
+ * means "wherever this process happened to start", and `init` then writes the
+ * lane there — KD-7's outcome.
+ *
+ * DERIVED, NOT DECLARED, by the root repository's
+ * `test/an-empty-directory-flag-installs-into-the-working-directory.test.mjs`,
+ * which scans this directory and `src/commands/` for the resolution idiom
+ * `(typeof flags["x"] === "string" && flags["x"]) || positional || …` and
+ * refuses the set when the two disagree.
+ *
+ * `--fleet` is deliberately NOT here: it names a MANIFEST, and `fleet.mjs`
+ * answers it with a sentence that teaches the manifest format. Listing it here
+ * would cost ONE of its two forms, not both — measured on this tree,
+ * `prooflane upgrade --fleet=` already says "--fleet needs a value, and was
+ * given none", because `emptyValues` refuses an empty value for every value flag
+ * before it consults this set, while `prooflane upgrade --fleet` still says
+ * "--fleet needs the path to a fleet manifest." and prints the manifest's shape.
+ * The BARE form is the one this set would take, and it is the one worth keeping.
+ */
+export const DESTINATION_FLAGS = new Set(["target-dir"]);
+
+/**
+ * Value-taking flags given an EMPTY value — `--target-dir=`, `--profile ""`.
+ *
+ * `init`, `relock` and `upgrade` all resolve their tree with `(typeof v ===
+ * "string" && v) || positional || "."`, and `""` is falsy: an empty value is
+ * indistinguishable from the flag not being there, so the install goes to the
+ * CWD. Measured 2026-09-22 from an empty directory:
+ *
+ *   prooflane init --target-dir= --no-interview   → the lane's files into the cwd
+ *
+ * The line that produces it is a script's — `--target-dir=$DIR` or
+ * `--target-dir "$DIR"` with `DIR` unset — which is KD-7 (fifty-two files into
+ * the wrong repository, exit 0) reached by an empty value instead of a
+ * swallowed one.
+ *
+ * REPORTED HERE AND REFUSED AT THE BIN, like `unreadableBooleanValues`: the
+ * parser says what arrived, the door decides. `--fleet` has refused its own
+ * empty value since fleet upgrades landed (`fleet.mjs`, "--fleet needs the path
+ * to a fleet manifest") — this is that refusal for the class, before any
+ * command runs, at both doors.
+ *
+ * A DESTINATION FLAG WITH NO VALUE AT ALL COUNTS AS EMPTY, and only a
+ * destination flag does. `--target-dir $DIR` unquoted with `DIR` unset leaves
+ * the shell dropping the word entirely, so the flag is stored as the boolean
+ * `true`, `typeof true !== "string"`, and the same readers fall through to the
+ * cwd — the identical harm, one quoting style over, and the commoner mistake of
+ * the two. `--set` with no value means the latest set and `--profile` with none
+ * means the directory's slug: those are answers, and refusing them would be a
+ * gate firing where nothing is at stake.
+ *
+ * A DECLARED BOOLEAN IS NOT HERE: `--dry-run=` is refused by
+ * `unreadableBooleanValues` as a value it cannot mean, and the space form
+ * `--dry-run ""` leaves `""` a positional, which is the user's to own (KD-7).
+ */
+export function emptyValues(flags, booleans = BOOLEAN_FLAGS, destinations = DESTINATION_FLAGS) {
+  return Object.keys(flags).filter((k) => {
+    if (takesNoValue(k, booleans)) return false;
+    if (flags[k] === "") return true;
+    return flags[k] === true && destinations.has(k);
+  });
+}
+
+/** One name's value as a tri-state: true, false, or "this name said nothing". */
+function triState(value) {
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  return undefined;
+}
+
+/**
+ * Tri-state boolean flag. The whole truth table, both spellings:
+ *
+ *   --x        --x true    --no-x false   → true
+ *   --no-x     --x false   --no-x true    → false
+ *   absent                                → the default
+ *
+ * THIS PACKAGE HAD NO SUCH READER AT ALL, which was the other half of KD-16:
+ * `consumesNext` consumed `--dry-run false` on the strength of a contract that
+ * only the other door implemented, and every reader here was `Boolean(...)`.
+ * The six that matter now call this — init's dry run, its claimed-tree refusal
+ * and its interview, and the dry run of relock, upgrade and fleet.
+ *
+ * It is the SAME function as `src/lib/args.mjs`'s, pinned equal by
+ * `test/a-declared-booleans-value-arrives-as-a-string.test.mjs` rather than
+ * shared through an import: neither package depends on the other, and the
+ * published root tarball carries no copy of this directory
+ * (`docs/proposals/PACKAGE-SPLIT.md` holds that decision).
+ */
+export function flagBool(flags, name, dflt) {
+  const stated = triState(flags[name]);
+  if (stated !== undefined) return stated;
+  const negated = triState(flags[`no-${name}`]);
+  if (negated !== undefined) return !negated;
+  return dflt;
+}
+
 export function parseArgs(argv) {
   const flags = {};
   const positionals = [];
@@ -114,11 +261,15 @@ export function parseArgs(argv) {
     const body = a.slice(2);
     const eq = body.indexOf("=");
     if (eq !== -1) {
-      flags[body.slice(0, eq)] = body.slice(eq + 1);
+      // The `=` form splits BEFORE `consumesNext` is asked anything, so it is a
+      // second door into the same flag set and it needs the same coercion —
+      // `--dry-run=false` is the identical promise to `--dry-run false`.
+      const key = body.slice(0, eq);
+      flags[key] = coerceDeclaredBoolean(key, body.slice(eq + 1));
       continue;
     }
     if (consumesNext(body, argv[i + 1])) {
-      flags[body] = argv[i + 1];
+      flags[body] = coerceDeclaredBoolean(body, argv[i + 1]);
       i += 1;
     } else {
       flags[body] = true;

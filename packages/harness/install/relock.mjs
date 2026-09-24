@@ -52,6 +52,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { colors, ok, warn, fail } from "./log.mjs";
+import { flagBool } from "./args.mjs";
 import { frontDoor } from "./init.mjs";
 import {
   HARNESS_DECLARATIONS,
@@ -158,7 +159,7 @@ export async function runHarnessRelock(flags, positional, opts = {}) {
   const cmd = frontDoor(opts.invocation);
   const targetDir = (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
   const root = path.resolve(targetDir);
-  const dryRun = Boolean(flags["dry-run"]);
+  const dryRun = flagBool(flags, "dry-run", false);
 
   process.stdout.write(
     `\n${colors.bold(cmd.relock)} — re-take the lock over the files you own\n` +

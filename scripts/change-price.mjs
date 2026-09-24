@@ -66,7 +66,7 @@
 // `docs/features/`, the eight documents NORTH-STAR §12 gives authority over
 // (GOVERNING_DOCS below), and a commit convention this repository's own log
 // follows. They live in create-cmp's `scripts/`, on the
-// same shelf as DEVICE_TIER_TRIGGERS in `scripts/observed-tree.mjs`, and
+// same shelf as DEVICE_TIER_IRRELEVANT in `scripts/observed-tree.mjs`, and
 // `packages/harness/src/` — the core an adopter ships — learns nothing from this
 // file and imports nothing from it. An adopter's lane is unchanged by it.
 import fs from "node:fs";
@@ -78,7 +78,7 @@ import { fileURLToPath } from "node:url";
 // The branch is read through `currentBranch()` and never spelled here: the two
 // spellings disagree on a detached HEAD, which is where CI runs
 // (test/the-current-branch-is-read-two-ways.test.mjs).
-import { obligation, changedPaths, currentBranch, read, REVIEW_KINDS } from "./proof-plan.mjs";
+import { obligation, changedPaths, currentBranch, read, REVIEW_KINDS, TIERS } from "./proof-plan.mjs";
 import { historyPath, readHistory } from "./lib/proof-history.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -106,7 +106,7 @@ export const DIRECT_TYPES = Object.freeze(["fix", "docs", "test", "chore", "refa
  * itself, which is not a row in its own table — §12's first line is "This
  * document governs". A hardcoded fact about create-cmp's own governance layout,
  * on the same shelf as
- * DEVICE_TIER_TRIGGERS in `scripts/observed-tree.mjs`, and read by
+ * DEVICE_TIER_IRRELEVANT in `scripts/observed-tree.mjs`, and read by
  * `classifyPath` as a contract: every verdict this program prints cites one of
  * these, so a diff that moves one is moving the rule the verdict rests on.
  *
@@ -434,6 +434,16 @@ export const CEREMONY = Object.freeze([
     direct: 'one round on the diff. Whether a second is owed is a judgement about round 1\'s fixes ("more than trivial"), and there is no third',
     brief: "the same — the lane does not change how many rounds a slice gets",
     cite: "docs/KNOWN-DEFECTS.md (its header is the rule of record; this points at it rather than restating it)",
+    // WHERE PROOF-PLAN SAYS THE DIFF OWES NO REVIEW, THE ROW SAYS SO. It printed
+    // "one round on the diff" over a docs-only change, and an agent reading the
+    // ceremony at the moment of deciding bought a review the gate never asks
+    // for. Whether a review is owed at all is proof-plan's answer
+    // (REVIEW_TIER_IRRELEVANT, scripts/observed-tree.mjs); it is quoted with its
+    // reason, never re-derived here from the paths.
+    notOwed: (ctx) =>
+      ctx.review === "none"
+        ? `NOT OWED — \`node scripts/proof-plan.mjs\` says this diff owes no review: ${ctx.reviewReason ?? "its reason was not handed over"}`
+        : null,
     note: () =>
       "this cannot know whether the fixes from round 1 were more than trivial, because nothing records it, and it does not guess. " +
       "What it CAN read is in the `round` block below: which round is next, the literal command that round has to read, and whether it is owed — where the records cannot settle that, the block says OWED rather than picking.",
@@ -457,7 +467,9 @@ export const CEREMONY = Object.freeze([
     brief: "the same — the tier schedule is not a function of the lane",
     cite: "docs/GATE-RULES.md Rule 4, scripts/proof-plan.mjs",
     note: (ctx) =>
-      `right now it says device ${String(ctx.device ?? "unknown").toUpperCase()}, review ${String(ctx.review ?? "unknown").toUpperCase()}. The schedule itself is that program's and is not restated here.`,
+      `right now it says L2 run ${String(ctx.device ?? "unknown").toUpperCase()}, review ${String(ctx.review ?? "unknown").toUpperCase()}.` +
+      (ctx.review === "none" ? ` The review is NOT OWED on this diff — proof-plan's reason: ${ctx.reviewReason ?? "not handed over"}.` : "") +
+      " The schedule itself is that program's and is not restated here.",
   }),
   Object.freeze({
     item: "budget",
@@ -471,12 +483,17 @@ export const CEREMONY = Object.freeze([
 export function owesFor(lane, ctx = {}) {
   const columns = lane === "direct" || lane === "brief" ? [lane] : lane === "ambiguous" ? ["direct", "brief"] : [];
   if (!columns.length) return [];
-  return CEREMONY.map((row) => ({
-    item: row.item,
-    cite: row.cite,
-    owed: Object.fromEntries(columns.map((c) => [c, row[c]])),
-    note: row.note ? row.note(ctx) : null,
-  }));
+  return CEREMONY.map((row) => {
+    // A row that is not owed on THIS diff says so in every column, and drops the
+    // note that explains how to price it — there is nothing to price.
+    const not = row.notOwed ? row.notOwed(ctx) : null;
+    return {
+      item: row.item,
+      cite: row.cite,
+      owed: Object.fromEntries(columns.map((c) => [c, not ?? row[c]])),
+      note: not ? null : row.note ? row.note(ctx) : null,
+    };
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -529,20 +546,32 @@ export function attribute(history, { branch, openedAt = null }) {
 }
 
 /**
- * HOW MANY SUITE RUNS THE CADENCE ON DISK ASKS FOR. `proof-plan.mjs --open`
- * writes `declared: {suite: "per-commit", …}` into the plan, from its own TIERS
- * table. This READS that rather than restating it: a cadence stated twice drifts
- * in one, and the copy that drifts is the one nobody updates. With no plan — or
- * a plan written before `declared` existed — there is nothing to read, and
- * per-commit is assumed. The row says which of the two it did, because an
- * assumed number and a declared one are not the same claim.
+ * HOW MANY SUITE RUNS A CHANGE OWES: ONE. The cadence is READ from
+ * `scripts/proof-plan.mjs`'s TIERS — the one table — and not from the plan on
+ * disk. `--open` copies TIERS' cadences into the plan as `declared`, and that
+ * copy is a snapshot: every plan opened before 2026-09-24 says `per-commit`,
+ * which this row used to multiply by the commit count, pricing four runs where
+ * the rule owes one. A cadence stated twice drifts in one, and the copy that
+ * drifts is the one nobody updates, so the copy is not read for the count. Where
+ * it differs from TIERS it is NAMED, so a reader who opens the plan and finds
+ * "per-commit" there is told which of the two this priced and why.
+ *
+ * `at-close` means once over the finished batch, so the count is 1 whatever the
+ * commit count. A cadence this function does not know is priced the same way —
+ * the direction that runs the suite less often — and says so.
  */
-function suiteOwed(plan, commits, dirty) {
+function suiteOwed(plan) {
+  const cadence = TIERS.suite.when;
   const declared = plan?.declared?.suite ?? null;
-  const perCommit = Math.max(1, (commits ?? 0) + (dirty ? 1 : 0));
-  if (declared === "per-commit") return { owed: perCommit, how: `owed count: cadence READ from the declared plan — per-commit, over ${commits ?? 0} commit(s)${dirty ? " plus one run for the bytes nobody has committed yet" : ""}.` };
-  if (declared) return { owed: 1, how: `owed count: cadence READ from the declared plan — ${declared}, so one run over the finished tree and not one per commit.` };
-  return { owed: perCommit, how: "owed count: no plan on this branch declares a suite cadence, so per-commit is ASSUMED — this is what a declared plan would have said, not what one did." };
+  const known = cadence === "at-close";
+  const how = known
+    ? `owed count: ONE run — the cadence is read from TIERS in scripts/proof-plan.mjs: ${cadence}, due ${TIERS.suite.due}.`
+    : `owed count: ONE run — TIERS in scripts/proof-plan.mjs declares "${cadence}", which this row does not know how to price, so it prices the least it could mean.`;
+  const stale =
+    declared && declared !== cadence
+      ? `this branch's plan still declares suite "${declared}" — a copy \`--open\` wrote from an older TIERS. It is NOT what this priced: TIERS is the one table, and the plan's copy is stale.`
+      : null;
+  return { owed: 1, how, stale };
 }
 
 /**
@@ -587,7 +616,7 @@ function verdictOf({ recorded, owed, reopened, rounds }) {
 const SUITE_OVER =
   "what this looked like before anything recorded it, from scripts/suite-record.mjs's own header: 295 full-suite runs, 4.6 to 6.6 per merged change, 4.5 hours (docs/research/g2-measure/, 2026-09-07 to 09-17). A run over bytes a recorded run already covers is read, not repeated.";
 const DEVICE_REOPENED =
-  "proof-plan says REOPENED: a trigger path moved after the run, so the run describes a tree that no longer exists and now proves nothing. That is the 2026-09-08 failure, and it is over-proof by definition — the spend is real and the evidence is gone.";
+  "proof-plan says REOPENED: the app this tree stamps moved after the run, so the run describes an app that no longer exists and now proves nothing. That is the 2026-09-08 failure, and it is over-proof by definition — the spend is real and the evidence is gone.";
 const REVIEW_REOPENED =
   "proof-plan says REOPENED: a trigger path moved after the last record, so a fresh record is owed for the SAME round. That is the mechanism that makes this count records and not rounds, and here it is happening.";
 
@@ -596,9 +625,9 @@ const REVIEW_REOPENED =
  * every row built by the one rule above, and every row carrying what it could
  * NOT read: the lines that did not parse, and the rows it could not date.
  */
-export function spendOf({ branch, plan, device, review, commits, dirty, histories }) {
+export function spendOf({ branch, plan, device, review, histories }) {
   const openedAt = plan?.openedAt ?? null;
-  const suite = suiteOwed(plan, commits, dirty);
+  const suite = suiteOwed(plan);
   const tier = (what, kind, owed, { state = null, rounds = false, extra = [], note = null, over = null, reopened = null }) => {
     const history = histories[kind];
     const { recorded, byBranchOnly, undated } = attribute(history, { branch, openedAt });
@@ -619,7 +648,7 @@ export function spendOf({ branch, plan, device, review, commits, dirty, historie
     return { what, file: history.file, recorded, owed, malformed, undated, byBranchOnly, verdict, note: note ?? (excess > 0 && over ? over(excess, owed) : null), extra: lines };
   };
   return [
-    tier("suite", "suite", suite.owed, { extra: [suite.how], over: () => SUITE_OVER }),
+    tier("suite", "suite", suite.owed, { extra: [suite.how, ...(suite.stale ? [suite.stale] : [])], over: () => SUITE_OVER }),
     tier("device", "fleet", device === "none" ? 0 : 1, { state: device, over: (excess, owed) => `${excess} run(s) beyond the ${owed} this change owed, at ~3.5 min and an emulator each.`, reopened: DEVICE_REOPENED }),
     tier("review", "reviews", review === "none" ? 0 : 1, { state: review, rounds: true, note: REVIEW_IS_RECORDS, reopened: REVIEW_REOPENED }),
   ];
@@ -917,7 +946,7 @@ export function price({ branch, paths, subjects, dirty, o, histories, deltas = {
     slice,
     diff: { paths: paths === null ? null : paths.length, commits, dirty, types },
     lane,
-    owes: priceable ? owesFor(lane.lane, { paths: paths ?? [], device, review }) : [],
+    owes: priceable ? owesFor(lane.lane, { paths: paths ?? [], device, review, reviewReason: o?.review?.need?.reason ?? null }) : [],
     round: priceable
       ? nextRound({
           reviewState: review,
@@ -927,7 +956,7 @@ export function price({ branch, paths, subjects, dirty, o, histories, deltas = {
           mergeBase,
         })
       : null,
-    spent: priceable ? spendOf({ branch, plan, device, review, commits: commits ?? 0, dirty: Boolean(dirty), histories }) : [],
+    spent: priceable ? spendOf({ branch, plan, device, review, histories }) : [],
   };
 }
 
@@ -1011,7 +1040,8 @@ export function render(m) {
     L.push("  spent — what the kept records show, attributed to this branch");
     for (const r of m.spent) {
       const counts = r.recorded === null ? `no record kept — ${r.file} does not exist` : `${r.recorded} record(s) / ${r.owed} owed`;
-      L.push(`      ${r.what.padEnd(ITEM)}${r.recorded === null ? counts : `${counts.padEnd(26)}${r.verdict}`}`);
+      // `what` stays the data key ("device"); the printed name is the tier's.
+      L.push(`      ${(r.what === "device" ? "L2 run" : r.what).padEnd(ITEM)}${r.recorded === null ? counts : `${counts.padEnd(26)}${r.verdict}`}`);
       if (r.byBranchOnly) L.push(...at(10, 'attributed by branch alone — no plan is declared for this branch, so there is no opened-at to bound it by. Fix: node scripts/proof-plan.mjs --open "<what you are building>"'));
       if (r.note) L.push(...at(10, r.note));
       for (const e of r.extra ?? []) L.push(...at(10, e));

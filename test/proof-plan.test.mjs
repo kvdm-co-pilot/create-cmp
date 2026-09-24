@@ -25,6 +25,7 @@ import { obligation, TIERS, isTrunk, close, outstanding, reviewDischarge, REVIEW
 import { render } from "../scripts/fit-test.mjs";
 import { filesFor, REVIEW_TIER_TRIGGERS, REVIEW_TIER_IRRELEVANT, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
 import { deriveTierNeed, deriveAffectedFilter } from "../packages/harness/src/lib/affected-tests.mjs";
+import { STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -46,26 +47,38 @@ const slice = (over = {}) => ({
 const DOCS_ONLY = ["docs/NORTH-STAR.md", "test/foo.test.mjs", "scripts/bar.mjs"];
 const TRIGGER = ["packages/harness/src/lib/evidence-level.mjs"];
 
-test("the device tier is declared at-close — the schedule is data, not a habit", () => {
-  // The two cheap tiers run continuously because they cost seconds and catch
-  // the most; the expensive one runs once. If this ever reads "per-commit" the
-  // whole rule has been undone by a one-word edit, so it is pinned.
+/**
+ * NO DEVICE RUN IS RECORDED HERE. The device tier is discharged by a PASS run
+ * bound to the app this tree stamps, and that record is real, machine-local
+ * state: without this, every fixture below would be answered by whatever
+ * `fleet-check` last ran on this laptop, and the same assertions would pass or
+ * fail depending on it. Handed in, exactly like `plan`, `paths` and `branch`.
+ */
+const NO_RUN = { fleetRecord: null };
+const owes = (plan, paths, branch = BRANCH) => obligation(plan, paths, branch, NO_RUN);
+
+test("every tier is declared at-close — the schedule is data, not a habit", () => {
+  // The expensive tier runs once, at the end of a slice. If it ever reads
+  // "per-commit" the whole rule has been undone by a one-word edit, so it is
+  // pinned. The two cheap tiers said "per-commit" until 2026-09-24, and an agent
+  // ran the suite after every fix because the plan told it to; they are pinned
+  // at-close for the same reason (Karel, 2026-09-24: once, at close).
   assert.equal(TIERS.device.when, "at-close", "the device tier runs once, at the end of a slice");
-  assert.equal(TIERS.suite.when, "per-commit");
-  assert.equal(TIERS.frameworkCheck.when, "per-commit");
+  assert.equal(TIERS.suite.when, "at-close", "the suite runs once, over the finished batch");
+  assert.equal(TIERS.frameworkCheck.when, "at-close", "framework-check runs once, over the finished batch");
 });
 
 test("a docs-only change owes NOTHING — the derivation that was already right stays right", () => {
   // This half was never broken: deriveTierNeed correctly declared docs, tests
   // and scripts unable to affect a device. Asserted so that adding the WHEN
   // dimension cannot regress the WHETHER one.
-  const o = obligation(slice(), DOCS_ONLY, BRANCH);
+  const o = owes(slice(), DOCS_ONLY);
   assert.equal(o.state, "none");
   assert.equal(o.need.required, false);
 });
 
 test("THE REGRESSION: a harness-source change mid-slice is OWED and NOT DUE, and never says REQUIRED", () => {
-  const o = obligation(slice(), TRIGGER, BRANCH);
+  const o = owes(slice(), TRIGGER);
   assert.equal(o.need.required, true, "the derivation still says the tier cannot be skipped");
   assert.equal(o.state, "owed", "but it is owed at slice close, not now");
 
@@ -83,7 +96,7 @@ test("an undeclared slice is told to declare one — the point is knowing BEFORE
   // knows up front it will need an emulator can be scoped differently; one that
   // knows it will not never pays for one. So an obligation with no declared
   // slice is not silently treated as owed-now — it asks for the declaration.
-  const o = obligation(null, TRIGGER, BRANCH);
+  const o = owes(null, TRIGGER);
   assert.equal(o.state, "undeclared");
 });
 
@@ -92,9 +105,9 @@ test("a discharge is READ from the run's record, never asserted — and a stale 
   // product exists to refuse (G1). The state machine's own half of that is here:
   // a recorded discharge only counts while it still describes this tree.
   const hash = "a".repeat(64);
-  const discharged = slice({ discharged: { at: "2026-09-08T10:30:00.000Z", treeHash: hash, verdict: "PASS", rung: "L2" } });
+  const discharged = slice({ discharged: { at: "2026-09-08T10:30:00.000Z", stampedHash: hash, stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" } });
 
-  const o = obligation(discharged, TRIGGER, BRANCH);
+  const o = owes(discharged, TRIGGER);
   // The live tree hash will not equal a fabricated one, so this is the reopened
   // branch — which is the assertion: a discharge keyed to different bytes does
   // not carry over.
@@ -106,7 +119,7 @@ test("REOPENED: discharged, then a trigger path moves — the slice reopens inst
   // This is the exact 2026-09-08 sequence, encoded. The device tier is the LAST
   // gate; the mistake was editing a trigger file after discharging, which is a
   // sequencing error and is reported as one rather than as a second bill.
-  const o = obligation(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", treeHash: "b".repeat(64), verdict: "PASS", rung: "L2" } }), TRIGGER, BRANCH);
+  const o = owes(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", stampedHash: "b".repeat(64), stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" } }), TRIGGER);
   assert.equal(o.state, "reopened");
   assert.ok(o.plan.discharged, "and it still remembers the run it had, so a reader can see what moved");
 });
@@ -116,8 +129,8 @@ test("a discharged slice over an UNCHANGED tree stays discharged — the tier is
   // discharged and nothing device-relevant has moved, further commits in the
   // slice cost nothing. Keyed to the live tree hash so the assertion is about
   // this repository rather than about a fixture.
-  const live = obligation(slice(), TRIGGER, BRANCH).now;
-  const o = obligation(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", treeHash: live, verdict: "PASS", rung: "L2" } }), TRIGGER, BRANCH);
+  const live = owes(slice(), TRIGGER).now;
+  const o = owes(slice({ discharged: { at: "2026-09-08T10:30:00.000Z", stampedHash: live, stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" } }), TRIGGER);
   assert.equal(o.state, "discharged");
 });
 
@@ -151,12 +164,12 @@ test("a tree that IS trunk owes nothing — the 2026-09-08 audit found a clean m
   // this tree is origin/main, and whatever it owed was collected when its slice
   // merged. The day after Rule 4 landed, a clean main printed OWED and told the
   // reader to run an emulator over a tree that had changed by zero bytes.
-  const o = obligation(null, [], "main");
+  const o = owes(null, [], "main");
   assert.equal(o.state, "none");
   assert.equal(o.need.required, false);
   assert.match(o.need.reason, /trunk/);
   assert.equal(o.trunk, true, "and says so as data, because the hook treats trunk-none differently from docs-only-none");
-  assert.equal(obligation(null, DOCS_ONLY, BRANCH).trunk, undefined, "a docs-only branch is not trunk");
+  assert.equal(owes(null, DOCS_ONLY).trunk, undefined, "a docs-only branch is not trunk");
 });
 
 test("close(): refuses while anything is owed, and only removes a plan when there is one to remove", () => {
@@ -170,7 +183,7 @@ test("close(): refuses while anything is owed, and only removes a plan when ther
 });
 
 test("but a diff git could NOT determine still fails open — 'could not tell' is not 'nothing changed'", () => {
-  const o = obligation(slice(), null, BRANCH);
+  const o = owes(slice(), null);
   assert.equal(o.state, "owed");
   assert.match(o.need.reason, /cannot tell/);
 });
@@ -178,12 +191,12 @@ test("but a diff git could NOT determine still fails open — 'could not tell' i
 test("a plan is bound to its branch: the last slice's plan does not carry over, and is named as stale", () => {
   // The same audit found PR #84's plan still on disk after the merge, applying
   // itself to whatever came next. A leftover is reported, never reused.
-  const o = obligation(slice({ branch: "feat/the-previous-slice" }), TRIGGER, BRANCH);
+  const o = owes(slice({ branch: "feat/the-previous-slice" }), TRIGGER);
   assert.equal(o.state, "undeclared", "a stale plan is no plan");
   assert.equal(o.stale.slice, "a slice under test", "and the reader is told which one is lying around");
   assert.equal(o.plan, null);
   // A plan written before branches were recorded has no branch at all — stale too.
-  assert.equal(obligation(slice({ branch: undefined }), TRIGGER, BRANCH).state, "undeclared");
+  assert.equal(owes(slice({ branch: undefined }), TRIGGER).state, "undeclared");
 });
 
 test("trunk is not a slice — --open refuses on main and on a detached HEAD", () => {
@@ -223,7 +236,7 @@ test("A REVIEW IS OWED WHERE A DEVICE RUN IS NOT — the trigger set is broader 
   // affect fleet L2 and that is right — nothing in it reaches a phone. It is
   // also where this repo's gates live, so a change there is exactly the change
   // that wants a second reader. One derivation cannot answer both questions.
-  const o = obligation(slice(), REVIEW_TRIGGER, BRANCH);
+  const o = owes(slice(), REVIEW_TRIGGER);
   assert.equal(o.state, "none", "no emulator: scripts/ cannot change what runs on a device");
   assert.equal(o.review.state, "owed", "but a reader: scripts/ is where the refusals live");
   assert.match(o.review.need.reason, /not declared irrelevant to a review/);
@@ -231,14 +244,14 @@ test("A REVIEW IS OWED WHERE A DEVICE RUN IS NOT — the trigger set is broader 
 });
 
 test("A DOCS-ONLY SLICE OWES NO REVIEW — ADR-0014's exemption, as a program rather than a sentence", () => {
-  const o = obligation(slice(), PROSE_ONLY, BRANCH);
+  const o = owes(slice(), PROSE_ONLY);
   assert.equal(o.review.state, "none");
   assert.equal(o.review.need.required, false);
   assert.match(o.review.need.reason, /every changed path is declared unable to affect a review/);
   // And the honest cost of drawing the line where a program can see it: a SKILL
   // is an instruction an agent executes, and it is still markdown. ADR-0014
   // names the trigger set as the lever if that proves wrong.
-  assert.equal(obligation(slice(), ["skills/cmp-audit/SKILL.md"], BRANCH).review.state, "none");
+  assert.equal(owes(slice(), ["skills/cmp-audit/SKILL.md"]).review.state, "none");
 });
 
 test("a review discharges nothing without a record — read from the reviewer's own output, never asserted", () => {
@@ -288,20 +301,20 @@ test("REOPENED: reviewed, then a trigger path moves — the review inherits the 
   // The same sequence that cost three device runs on 2026-09-08, applied to the
   // reader: a review describes a tree, and an edit after it leaves the record
   // describing a tree that no longer exists.
-  const o = obligation(slice({ reviewDischarged: reviewed() }), REVIEW_TRIGGER, BRANCH);
+  const o = owes(slice({ reviewDischarged: reviewed() }), REVIEW_TRIGGER);
   assert.equal(o.review.state, "reopened");
   assert.notEqual(o.review.now, reviewed().treeHash);
   assert.ok(o.plan.reviewDischarged, "and it still remembers the review it had, so a reader can see what moved");
 });
 
 test("a reviewed slice over an UNCHANGED tree stays discharged — the read is bought once", () => {
-  const live = obligation(slice(), REVIEW_TRIGGER, BRANCH).review.now;
-  const o = obligation(slice({ reviewDischarged: reviewed({ treeHash: live }) }), REVIEW_TRIGGER, BRANCH);
+  const live = owes(slice(), REVIEW_TRIGGER).review.now;
+  const o = owes(slice({ reviewDischarged: reviewed({ treeHash: live }) }), REVIEW_TRIGGER);
   assert.equal(o.review.state, "discharged");
 });
 
 test("a plan written before reviews existed owes one — an absent field is an unmet obligation, not an exemption", () => {
-  const o = obligation(slice(), REVIEW_TRIGGER, BRANCH);
+  const o = owes(slice(), REVIEW_TRIGGER);
   assert.equal(o.plan.reviewDischarged, undefined, "the fixture is a pre-ADR-0014 plan");
   assert.equal(o.review.state, "owed");
 });
@@ -312,15 +325,15 @@ test("close() and the exit code hold BOTH at-close tiers — a slice cannot clos
   assert.equal(close(withReview("reopened")).closed, false);
   assert.equal(close(withReview("undeclared")).closed, false);
   assert.equal(close({ state: "none", plan: null, stale: null, review: { state: "discharged" } }).closed, true);
-  assert.deepEqual(outstanding({ state: "owed", review: { state: "reopened" } }), ["device (OWED)", "review (REOPENED)"]);
+  assert.deepEqual(outstanding({ state: "owed", review: { state: "reopened" } }), ["L2 run (OWED)", "review (REOPENED)"]);
   assert.deepEqual(outstanding({ state: "discharged", review: { state: "none" } }), []);
 });
 
 test("every obligation carries a review block — including trunk, where nothing is owed", () => {
   // The hook reads o.review; an obligation that sometimes omitted it would fail
   // open at exactly the moment the answer mattered.
-  for (const paths of [PROSE_ONLY, REVIEW_TRIGGER, null]) assert.ok(obligation(slice(), paths, BRANCH).review, JSON.stringify(paths));
-  const trunk = obligation(null, [], "main");
+  for (const paths of [PROSE_ONLY, REVIEW_TRIGGER, null]) assert.ok(owes(slice(), paths).review, JSON.stringify(paths));
+  const trunk = owes(null, [], "main");
   assert.equal(trunk.review.state, "none");
   assert.equal(trunk.review.trunk, true);
 });

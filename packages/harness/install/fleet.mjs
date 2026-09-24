@@ -33,6 +33,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { colors, fail, ok, warn } from "./log.mjs";
+import { flagBool } from "./args.mjs";
 import { frontDoor } from "./init.mjs";
 import { runHarnessUpgrade, runningHarness } from "./upgrade.mjs";
 
@@ -219,7 +220,7 @@ export async function runFleetUpgrade(flags, positional, opts = {}) {
     return 2;
   }
 
-  const dryRun = Boolean(flags["dry-run"]);
+  const dryRun = flagBool(flags, "dry-run", false);
   process.stdout.write(
     `\n${colors.bold(`${cmd.upgrade} --fleet`)} — re-vendor every lane the manifest names\n` +
       `  manifest: ${colors.cyan(manifestPath)}\n` +

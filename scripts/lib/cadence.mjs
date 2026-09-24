@@ -9,11 +9,16 @@
 // HONEST SCOPE. These are the phrasings that were found, not every phrasing
 // possible; a restatement worded afresh walks past. The policy is held by the
 // hook at the moment of decision; this only stops the sweep undoing itself.
+//
+// THE TIER'S PRINTED NAME IS ONE OF THE PHRASINGS. Since 2026-09-24 proof-plan,
+// its hook and change-price print the runtime tier as `L2 run`, so that is the
+// name an agent quotes back; each pattern that knows `device` or `fleet L2`
+// knows it too (KD-229, closed).
 export const CADENCE_PHRASES = Object.freeze([
-  [/(?:fleet L2|min-level L2)`?[^.;\n]{0,12}\b(?:green\s+)?(?:\*\*)?(?:once\s+)?per (?:PR|commit)/i, "the per-PR / per-commit fleet cadence"],
-  [/\b(?:device|emulator|fleet L2)[^.;\n]{0,40}\b(?:per|every|each) (?:commit|PR|step)\b/i, "a device run keyed to commits, PRs or steps"],
-  [/\b(?:per|every|each) (?:commit|PR|step)\b[^.;\n]{0,40}\b(?:device (?:run|tier|proof)|fleet L2)/i, "a device run keyed to commits, PRs or steps"],
-  [/(?<!`)fleet L2\s+REQUIRED/, "the line an agent acted on three times"],
+  [/(?:fleet L2|min-level L2|L2 run)`?[^.;\n]{0,12}\b(?:green\s+)?(?:\*\*)?(?:once\s+)?per (?:PR|commit)/i, "the per-PR / per-commit fleet cadence"],
+  [/\b(?:device|emulator|fleet L2|L2 run)[^.;\n]{0,40}\b(?:per|every|each) (?:commit|PR|step)\b/i, "a device run keyed to commits, PRs or steps"],
+  [/\b(?:per|every|each) (?:commit|PR|step)\b[^.;\n]{0,40}\b(?:device (?:run|tier|proof)|fleet L2|L2 run)/i, "a device run keyed to commits, PRs or steps"],
+  [/(?<!`)(?:fleet L2|L2 run)\s+REQUIRED/, "the line an agent acted on three times"],
 ]);
 
 /** One hit per line: a line is a restatement or it is not, however many phrasings it trips. */

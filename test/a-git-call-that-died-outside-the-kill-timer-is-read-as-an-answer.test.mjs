@@ -57,7 +57,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { baseContext, decide, REMOTE_CALL_CAP_MS } from "../scripts/hooks/proof-gate.mjs";
+import { baseContext, decide } from "../scripts/hooks/proof-gate.mjs";
 import { isTrunk, TIERS } from "../scripts/proof-plan.mjs";
 
 const owed = { state: "owed", plan: { slice: "s", branch: "slice" }, need: { reason: "r" }, branch: "slice", review: { state: "none" } };
@@ -109,12 +109,33 @@ const REAL_GIT = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" })
  * produced. `exec` is not used and must not be — the point is that the SHELL
  * dies, i.e. that the child node waited on terminated by signal, with node's own
  * kill-timer never involved. Every other call is the real git.
+ *
+ * THE SHIM KEEPS ITS OWN RECORD, and that record is what says which path the run
+ * took (KD-165). It writes `reached` before signalling itself, and `survived`
+ * after — a line that can only appear if the signal did NOT end the process, in
+ * which case whatever ended the call was the gate's own 1000ms kill-timer, i.e.
+ * round 1's case and not this one. So:
+ *
+ *   reached, no survived   the call ran and died on OUR signal — the case under test
+ *   no reached             the call was never made (a purse that ran dry, an
+ *                          earlier call that died first): nothing was exercised
+ *   survived               the signal did not kill it; the timer is what ended it
+ *
+ * This replaces a wall-clock bound (`elapsed < 600ms`) that a loaded machine
+ * crossed while the code under test was behaving perfectly — one tree, a FAIL
+ * and a PASS three minutes apart, KD-165.
  */
 function diesOn(dir, token, signal) {
   const bin = path.join(dir, `bin-${token.replace(/\W/g, "")}`);
   fs.mkdirSync(bin, { recursive: true });
+  const marks = path.join(bin, "marks");
+  fs.rmSync(marks, { force: true });
   const shim = path.join(bin, "git");
-  fs.writeFileSync(shim, `#!/bin/sh\nfor a in "$@"; do\n  if [ "$a" = "${token}" ]; then kill -${signal} $$; sleep 5; fi\ndone\nexec ${REAL_GIT} "$@"\n`, { mode: 0o755 });
+  fs.writeFileSync(
+    shim,
+    `#!/bin/sh\nfor a in "$@"; do\n  if [ "$a" = "${token}" ]; then echo reached >> "${marks}"; kill -${signal} $$; echo survived >> "${marks}"; sleep 5; fi\ndone\nexec ${REAL_GIT} "$@"\n`,
+    { mode: 0o755 },
+  );
   // WARMED, on an argument that matches no token and so is the real git: macOS
   // charges ~500ms to the FIRST exec of a newly written executable, and that
   // half-second is spent inside the very kill-timer under test. Cold, a call
@@ -122,7 +143,14 @@ function diesOn(dir, token, signal) {
   // case, already covered, and would make these cases pass for the wrong reason
   // the moment the timer path is the one that is fixed.
   spawnSync(shim, ["--version"], { encoding: "utf8", timeout: 10000 });
-  return bin;
+  const read = () => {
+    try {
+      return fs.readFileSync(marks, "utf8").split("\n").filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+  return { bin, read };
 }
 
 /** Every git call the ordering check makes, by the argument that identifies it, and a way it can die that is not this gate's timer. */
@@ -135,14 +163,25 @@ const CALLS = [
 ];
 
 /**
- * The smallest cap anywhere inside the check is a local call's, 1000ms, and in
- * this world every call that answers does so in ~10ms. So a WHOLE check that
- * finished well inside one cap cannot have waited one out — which is what makes
- * these deaths the gate's-timer-was-not-involved case and not round 1's. Stated
- * as its own number rather than imported, because the check's caps are its
- * business and this bound only has to be comfortably under the smallest of them.
+ * The gate's own timer says so in words. `whyNoAnswer` gives each cause a
+ * sentence that is true of THAT cause, and the two below are the ones that mean
+ * "this run did not exercise the case": a call the gate killed at its bound is
+ * round 1's case, and a purse that ran dry never reached the death at all.
+ * Reading them is how this file knows which path a run took without timing it.
  */
-const NO_CAP_WAS_WAITED_OUT_MS = 600;
+const THE_GATES_OWN_TIMER = /killed at its bound/;
+const NEVER_ASKED = /budget ran out before git could be asked|origin was not asked/;
+
+/**
+ * One purse for the whole check, and it is DELIBERATELY LARGE (the gate's own
+ * default is a fraction of this). The purse is not what this file measures — the
+ * caps inside the check are unchanged by it, since every call is bounded by
+ * `min(capMs, whatever is left)` — and a purse sized for a quiet machine is the
+ * one thing here that a busy machine can empty, which turns "the death was never
+ * reached" into a failure about load. The test's own remedy line has always said
+ * so: *raise budgetMs at this call site, do not relax the bound.*
+ */
+const A_PURSE_NO_LOAD_CAN_EMPTY_MS = 60_000;
 
 const ASSERTS_ABSENCE = /has no origin remote|has no refs\/|does not even have/;
 const ADMITS_IT_DID_NOT_ANSWER = /did not answer|could not|ran out|not be reached/;
@@ -162,7 +201,7 @@ test("a git call that died outside the kill-timer is not an answer: crashing eac
   try {
     // THE CONTROL. Every call answering, so the true verdict in this world is
     // "contained", from origin itself — nothing below may refuse.
-    const control = baseContext(w.work, { branch: "slice", isTrunk, budgetMs: REMOTE_CALL_CAP_MS });
+    const control = baseContext(w.work, { branch: "slice", isTrunk, budgetMs: A_PURSE_NO_LOAD_CAN_EMPTY_MS });
     assert.deepEqual(
       { contained: control.contained, source: control.source, reachedRemote: control.reachedRemote },
       { contained: true, source: "remote", reachedRemote: true },
@@ -182,16 +221,37 @@ test("a git call that died outside the kill-timer is not an answer: crashing eac
     };
 
     for (const [call, signal] of CALLS) {
-      process.env.PATH = `${diesOn(w.dir, call, signal)}${path.delimiter}${saved}`;
+      const shim = diesOn(w.dir, call, signal);
+      process.env.PATH = `${shim.bin}${path.delimiter}${saved}`;
       const t0 = Date.now();
-      const base = baseContext(w.work, { branch: "slice", isTrunk, budgetMs: REMOTE_CALL_CAP_MS });
+      const base = baseContext(w.work, { branch: "slice", isTrunk, budgetMs: A_PURSE_NO_LOAD_CAN_EMPTY_MS });
       const elapsed = Date.now() - t0;
       process.env.PATH = saved;
-      // The check must not have sat out a timeout: if it did, the death under
-      // test was the kill-timer's after all and round 1's test already owns it.
-      // The whole check finishing inside ONE local cap is the strongest form of
-      // that available from out here — no single call can have reached its own.
-      assert.ok(elapsed < NO_CAP_WAS_WAITED_OUT_MS, `\`git … ${call} …\` died on SIG${signal} but the whole check took ${elapsed}ms — long enough that a call may have waited out its own cap, which is round 1's case and not this one`);
+
+      // WHICH PATH THIS RUN TOOK, read from what the shim and the gate each
+      // RECORDED — never from how long the machine took (KD-165: the same tree
+      // carried a FAIL and a PASS three minutes apart, separated by nothing but
+      // load, on a `elapsed < 600ms` bound). Both facts below are the run's own:
+      const marks = shim.read();
+      const reason = String(base.reason ?? "");
+      assert.ok(
+        marks.includes("reached"),
+        `\`git … ${call} …\` was never called (the shim left no mark in ${elapsed}ms), so this case exercised nothing: raise budgetMs at this call site, do not relax what it asserts. The check said: ${reason || JSON.stringify(base)}`,
+      );
+      assert.ok(
+        !marks.includes("survived"),
+        `\`git … ${call} …\` was signalled SIG${signal} and did NOT die of it, so whatever ended that call was the gate's own kill-timer — which is round 1's case and is already owned by test/a-git-call-the-gate-killed-is-read-as-an-answer.test.mjs, not this file`,
+      );
+      assert.doesNotMatch(
+        reason,
+        THE_GATES_OWN_TIMER,
+        `\`git … ${call} …\` died on SIG${signal}, but the gate reports the death as its own timer's, so this case is round 1's and proves nothing here: ${reason}`,
+      );
+      assert.doesNotMatch(
+        reason,
+        NEVER_ASKED,
+        `the check ran out of purse before it reached \`git … ${call} …\`, so the death under test was never in the path: raise budgetMs at this call site, do not relax what it asserts: ${reason}`,
+      );
       judge(`\`git … ${call} …\` died on SIG${signal} after ${elapsed}ms`, base);
     }
 
@@ -199,7 +259,7 @@ test("a git call that died outside the kill-timer is not an answer: crashing eac
     // because no process. It can only reach the first call, and that is enough
     // to show the sentence is about the checkout and not about git.
     process.env.PATH = path.join(w.dir, "no-git-here");
-    const unspawnable = baseContext(w.work, { branch: "slice", isTrunk, budgetMs: REMOTE_CALL_CAP_MS });
+    const unspawnable = baseContext(w.work, { branch: "slice", isTrunk, budgetMs: A_PURSE_NO_LOAD_CAN_EMPTY_MS });
     process.env.PATH = saved;
     judge("`git` could not be spawned at all (empty PATH)", unspawnable, " about a checkout whose origin this test just pushed to");
 

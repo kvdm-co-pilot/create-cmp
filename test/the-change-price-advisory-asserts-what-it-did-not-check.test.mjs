@@ -111,8 +111,6 @@ test("a history line that did not parse leaves the count, and the count is still
     plan: PLAN,
     device: "owed",
     review: "owed",
-    commits: 1,
-    dirty: false,
     histories: {
       suite: hist([ran("2026-09-18T11:00:00.000Z"), ran("2026-09-18T12:00:00.000Z")], 2),
       fleet: hist([ran("2026-09-18T11:00:00.000Z")], 1),
@@ -141,8 +139,6 @@ test("a tier that owed no run and recorded one is called OVER on the device row 
     plan: PLAN,
     device: "none",
     review: "none",
-    commits: 1,
-    dirty: false,
     histories: {
       suite: hist([]),
       fleet: hist([ran("2026-09-18T11:00:00.000Z")]),

@@ -41,7 +41,7 @@ import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { deviceTreeHash } from "./observed-tree.mjs";
+import { FLEET_SCRATCH_APP, stampArgv, hashStampedTree, STAMPED_OUTPUT_RULE } from "./stamped-output.mjs";
 import { appendHistory, historyPath } from "./lib/proof-history.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -52,35 +52,20 @@ import { readLadder } from "../packages/harness/src/lib/evidence-level.mjs";
 const REPO_ROOT = path.resolve(__dirname, "..");
 
 const PROFILES = new Set(["smoke", "scaffold", "local", "ci", "nightly", "release"]);
-const APP_NAME = "FleetCheck";
-const APP_PACKAGE = "com.fleet.check";
+// Named from the spec, never beside it: scripts/stamped-output.mjs stamps the
+// same app to answer whether this tree still stamps what the last run proved.
+const APP_NAME = FLEET_SCRATCH_APP.name;
+const APP_PACKAGE = FLEET_SCRATCH_APP.package;
 
-// ── Evidence rungs (§10 item 2's ladder: L0 scaffold / L1 desktop / L2 device / L3 release)
-export const LEVELS = ["L0", "L1", "L2", "L3"];
-
-/** Numeric ordering for rungs: negative when a < b, 0 when equal, positive when a > b. */
-export function compareLevels(a, b) {
-  const ia = LEVELS.indexOf(normalizeLevel(a));
-  const ib = LEVELS.indexOf(normalizeLevel(b));
-  if (ia === -1 || ib === -1) throw new Error(`unknown evidence level: ${ia === -1 ? a : b}`);
-  return ia - ib;
-}
-
-/**
- * "l2", "L2 (device)", or the receipt's own `{ rung: "L2", name, satisfiedBy }`
- * object → "L2"; unknown → null.
- *
- * The object form is what qa/lib/evidence-level.mjs actually returns and what
- * verify.mjs writes onto the receipt. Reading only the string form silently
- * degraded every real receipt to the strength fallback below — caught by the
- * 0.12.0 fleet check, which reported "receipt names no evidenceLevel" against a
- * receipt that named one perfectly well.
- */
-export function normalizeLevel(v) {
-  const raw = v && typeof v === "object" && !Array.isArray(v) ? v.rung : v;
-  const m = String(raw ?? "").match(/L[0-3]/i);
-  return m ? m[0].toUpperCase() : null;
-}
+// ── Evidence rungs (§10 item 2's ladder: L0 scaffold / L1 desktop / L2 device /
+// L3 release). The ladder itself lives in `scripts/evidence-rung.mjs` — a leaf
+// with no imports and no process handlers — because `scripts/proof-plan.mjs`
+// must hold a fleet record to the rung its tier declares, and importing THIS
+// module to get it would hand the PreToolUse hook the signal handlers below.
+// Re-exported here so every existing reader of `fleet-check`'s ladder is
+// unchanged, and there is still exactly one definition of it.
+import { compareLevels, normalizeLevel } from "./evidence-rung.mjs";
+export { LEVELS, compareLevels, normalizeLevel, rungMeets } from "./evidence-rung.mjs";
 
 /**
  * Fallback rung derivation for receipts predating the `evidenceLevel` field.
@@ -147,7 +132,7 @@ function deviceAttached() {
 
 const USAGE = `node scripts/fleet-check.mjs [--profile <p>] [--min-level <L>] [--keep]
 
-Stamps a scratch app (${APP_NAME}, ${APP_PACKAGE}, --no-ios --no-firebase) from
+Stamps a scratch app (${APP_NAME}, ${APP_PACKAGE}, ${FLEET_SCRATCH_APP.flags.join(" ")}) from
 the CURRENT tree into a temp dir, runs the app's own verify lane inside it, and
 asserts the evidence receipt: verdict PASS at rung >= --min-level. This is the
 engine's pre-release proof that its output actually runs — see the release
@@ -355,26 +340,32 @@ async function main() {
   const scratchRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-fleet-check-"));
   const appDir = path.join(scratchRoot, APP_NAME);
   process.stdout.write(`\n── stamping scratch app → ${appDir}\n`);
-  const stampStatus = await run(
-    process.execPath,
-    [
-      path.join(REPO_ROOT, "bin", "create-cmp.mjs"),
-      appDir,
-      "--yes",
-      "--name", APP_NAME,
-      "--package", APP_PACKAGE,
-      "--no-ios",
-      "--no-firebase",
-      "--no-verify",
-    ],
-    { cwd: REPO_ROOT }
-  );
+  // The flags come from the SPEC, never from a list spelled here: what the
+  // device tier is scheduled by is a hash of this exact app, taken by
+  // scripts/stamped-output.mjs from the same spec. Two lists would let the
+  // record and the oracle describe different apps while both looked right.
+  const stampStatus = await run(process.execPath, stampArgv(REPO_ROOT, appDir), { cwd: REPO_ROOT });
   if (stampStatus !== 0 || !fs.existsSync(path.join(appDir, "qa", "verify.mjs"))) {
     process.stderr.write(
       `\nfleet check: FAIL — the stamp itself did not produce a runnable app.\n` +
       `Scratch dir kept for inspection: ${scratchRoot}\n`
     );
     process.exit(1);
+  }
+
+  // WHAT THIS RUN IS ABOUT TO PROVE, as bytes — hashed HERE, from the pristine
+  // app, and never later: by the time the record is written this tree has a
+  // lane's build output, a receipt and (under --ladder-plant) a deliberately
+  // broken entry point in it, so what it hashed then would not be the app that
+  // was proved. This digest is the device tier's whole schedule — proof-plan
+  // discharges on it and the publish gate reads it (scripts/stamped-output.mjs).
+  let stamped = null;
+  let stampedError = null;
+  try {
+    stamped = hashStampedTree(appDir);
+  } catch (err) {
+    stampedError = err?.message ?? String(err);
+    process.stderr.write(`\nfleet check: the stamped app could not be hashed (${err.message}) — this record will carry no stampedOutputHash and will therefore discharge nothing.\n`);
   }
 
   // 2. Run the app's OWN lane inside the scratch app. Env is inherited whole —
@@ -471,7 +462,7 @@ async function main() {
   // earlier `failures.push` sat above it), and it is the worst one to get wrong
   // this way: it fails precisely when the shipped l2Execution claim is an
   // overclaim, which is the thing that should stop a release hardest.
-  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null, startedAt });
+  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null, startedAt, stamped, stampedError });
 
   if (failures.length) {
     process.stderr.write(`\nfleet check: FAIL\n`);
@@ -503,7 +494,7 @@ async function main() {
  * Lives under qa/evidence/, which inputs-hash excludes as lane output, so
  * recording a run never invalidates a receipt.
  */
-export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failures, avd, root = REPO_ROOT, startedAt = null }) {
+export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failures, avd, root = REPO_ROOT, startedAt = null, stamped = null, stampedError = null }) {
   const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
   const branch = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" });
   const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
@@ -519,11 +510,38 @@ export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failure
     requiredLevel: minLevel,
     failures,
     avd,
-    // WHICH TREE this ran against — as CONTENT, because a commit cannot work:
-    // the run precedes the commit that carries it, so a commit-keyed record
-    // reads stale the moment it lands (see observed-tree.mjs). The commit is
-    // kept beside it as provenance a human can read, never as the key.
-    observedHash: deviceTreeHash(root),
+    // WHICH APP this ran against — the bytes `create-cmp` stamped, not the
+    // inputs that produced them and not a commit. A commit cannot work: the run
+    // precedes the commit that carries it, so a commit-keyed record reads stale
+    // the moment it lands. INPUT PATHS worked and were wrong in both directions
+    // — an edit under `packages/harness/src/` that never reached `template/`
+    // reopened the tier over a byte-identical app, and a slice that touched only
+    // `src/lib/args.mjs` owed a 3.5-minute run for an app it could not change
+    // (scripts/stamped-output.mjs). The commit is kept beside it as provenance a
+    // human can read, never as the key.
+    //
+    // null when the app could not be hashed — and NULL IS NOT THE SAME AS
+    // ABSENT, which is the whole point of writing the reason beside it. A
+    // record with no such key predates the stamped-app criterion; this one was
+    // written by this fleet check, minutes ago, and its stamp broke. Readers
+    // refuse both (an absent digest proves nothing either way, which costs a
+    // run rather than a missed regression) and they say which is which, because
+    // "your record is old" sends an agent to run the check again and meet the
+    // same broken stamp.
+    stampedOutputHash: stamped?.hash ?? null,
+    ...(stamped ? {} : { stampedOutputError: stampedError ?? "the run recorded no reason" }),
+    // WHICH RULE that digest was taken under (scripts/stamped-output.mjs,
+    // STAMPED_OUTPUT_RULE). A digest is only comparable with one taken under
+    // the same rule, and a record without this field was written before the
+    // rule had a number — rule 1. Readers refuse to compare across rules and
+    // name `node scripts/proof-plan.mjs --rekey` instead of another run.
+    stampedOutputRule: STAMPED_OUTPUT_RULE,
+    // The manifest is what makes a refusal actionable ("3 file(s) differ,
+    // first: …") instead of two digests a reader cannot act on. It rides on the
+    // LATEST record only; the history row below drops it for a count, because
+    // the history answers what proving cost and the tree a settled row
+    // described is gone.
+    stampedOutputFiles: stamped?.files ?? null,
     commit: head.status === 0 ? head.stdout.trim() : null,
     treeWasDirty: dirty.status !== 0 || (dirty.stdout ?? "").trim() !== "",
     laneVerdict: receipt?.verdict ?? null,
@@ -556,6 +574,12 @@ export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failure
   // gate reads keeps exactly the shape those gates were written against.
   appendHistory(historyPath(root, "fleet"), {
     ...record,
+    // The manifest is hundreds of rows and would multiply this file by twenty,
+    // to describe a tree that no longer exists by the time anyone reads the
+    // row. The COUNT survives, because "how big was the app we proved" is a
+    // question the history can still answer.
+    stampedOutputFiles: undefined,
+    stampedOutputFileCount: stamped?.files ? Object.keys(stamped.files).length : null,
     startedAt,
     branch: branch.status === 0 ? branch.stdout.trim() || null : null,
   });

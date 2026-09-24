@@ -96,16 +96,153 @@ export function consumesNext(key, next, booleans = BOOLEAN_FLAGS) {
 }
 
 /**
+ * A declared boolean's VALUE form, as the boolean it MEANS.
+ *
+ * `consumesNext` lets `--dry-run true` past because `flagBool` is tri-state by
+ * contract. What arrived at the readers was the STRING, and it was wrong in
+ * both directions at once (KD-16). Measured on `8bd782a`, 2026-09-19:
+ *
+ *   Boolean("false") === true
+ *     create-cmp my-app --no-firebase true   → firebase: true, scaffolded anyway
+ *     prooflane init --new-profile false <claimed tree>
+ *                                           → the claimed-tree refusal never fired
+ *   "true" !== true, and ~24 readers spell `=== true`
+ *     create-cmp upgrade --dry-run true --yes → "(auto-yes)", "✓ wrote
+ *                                              gradle/libs.versions.toml", "Applied."
+ *
+ * Normalizing HERE, at the parser, is what makes every one of those readers —
+ * `=== true`, `!== true`, `Boolean(...)`, bare truthiness — correct at both
+ * front doors without touching a single one of them. A fix at the read sites
+ * has to find all of them today and again tomorrow.
+ *
+ * ANYTHING ELSE IS LEFT EXACTLY AS IT ARRIVED. `--minimal my-app` must keep
+ * meaning a directory called `my-app`, and an adopter may legitimately have one
+ * called `no` — refusing the space form here is how KD-7 comes back.
+ */
+export function coerceDeclaredBoolean(key, value, booleans = BOOLEAN_FLAGS) {
+  if (!takesNoValue(key, booleans)) return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}
+
+/**
+ * Declared booleans that reached the flag set still holding a STRING.
+ *
+ * After `coerceDeclaredBoolean` a boolean can only still hold a string when its
+ * value was ATTACHED with `=`, which never consults `consumesNext` —
+ * `create-cmp upgrade --dry-run=maybe`, which would otherwise run as a REAL
+ * upgrade because `"maybe"` is not `true`. Until `parseArgs` split `=` (KD-14)
+ * this door could not produce the shape and this reader found nothing here
+ * (KD-153); it is the same function as the harness door's, and now reachable at
+ * both.
+ *
+ * `=`-only is the whole safety argument: an attached value has no positional to
+ * lose, where refusing the SPACE form would make `--dry-run maybe ../app` an
+ * error instead of a directory named `maybe` — KD-7's shape, re-created.
+ */
+export function unreadableBooleanValues(flags, booleans = BOOLEAN_FLAGS) {
+  return Object.keys(flags).filter((k) => takesNoValue(k, booleans) && typeof flags[k] === "string");
+}
+
+/**
+ * The flags that name WHERE FILES ARE WRITTEN.
+ *
+ * A flag in here may never fall back to the working directory in silence, which
+ * is the one thing that separates it from every other value flag: `--set` with
+ * no value means the latest set, `--profile` with none means the directory's
+ * slug, and both are answers. `--target-dir` with none means "wherever this
+ * process happened to start", and the command then writes there.
+ *
+ * DERIVED, NOT DECLARED, by `test/an-empty-directory-flag-installs-into-the-
+ * working-directory.test.mjs`: it scans `src/commands/` and
+ * `packages/harness/install/` for the resolution idiom `(typeof flags["x"] ===
+ * "string" && flags["x"]) || positional || …` and refuses this set when the two
+ * disagree — eleven sites across ten files name `target-dir` today, and a
+ * twelfth naming something else fails that test until it is listed here.
+ *
+ * `--fleet` is deliberately NOT here. It names a MANIFEST, not a destination,
+ * and `packages/harness/install/fleet.mjs` answers it with a sentence that
+ * teaches the manifest format. What listing it here would cost is ONE of its two
+ * forms, not both — measured on this tree:
+ *
+ *   upgrade --fleet=    →  "--fleet needs a value, and was given none"
+ *                          (`emptyValues` refuses an empty value for EVERY value
+ *                          flag before it ever consults this set, so the
+ *                          teaching sentence is already gone for this form)
+ *   upgrade --fleet     →  "--fleet needs the path to a fleet manifest." plus
+ *                          the manifest's shape — the form this set would take
+ *
+ * So the reason is narrow and it is that one: the BARE form keeps a sentence
+ * worth more than this one, and a fleet manifest is not a tree to write into.
+ */
+export const DESTINATION_FLAGS = new Set(["target-dir"]);
+
+/**
+ * Value-taking flags given an EMPTY value — `--target-dir=`, `--profile ""`.
+ *
+ * Every reader of a value flag is spelled `(typeof v === "string" && v) ||
+ * positional || "."`, and `""` is falsy, so an empty value is indistinguishable
+ * from the flag not being there and the command runs against the CWD. Measured
+ * 2026-09-22 from an empty directory:
+ *
+ *   create-cmp harness init --target-dir= --no-interview   51 files into the cwd
+ *   create-cmp upgrade --target-dir= --yes                 "✓ wrote
+ *     gradle/libs.versions.toml", "Applied." — the catalog in the cwd, rewritten
+ *     with the consent prompt auto-answered
+ *
+ * The line that produces it is a script's — `--target-dir=$DIR` or
+ * `--target-dir "$DIR"` with `DIR` unset — so it is KD-7's outcome (a tree
+ * nobody named) reached by an empty value instead of a swallowed one.
+ *
+ * REPORTED HERE AND REFUSED AT THE BIN, like `unreadableBooleanValues`: the
+ * parser says what arrived, the door decides. It is the CLASS and not one flag,
+ * because `--target-dir` is the one that writes fifty files and `--profile`,
+ * `--set`, `--name` and the rest all silently mean their default instead.
+ * `--fleet` refused its own empty value first (`install/fleet.mjs`), and this is
+ * that refusal for every value flag, before any command runs.
+ *
+ * A DESTINATION FLAG WITH NO VALUE AT ALL COUNTS AS EMPTY, and only a
+ * destination flag does. `--target-dir $DIR` unquoted with `DIR` unset leaves
+ * the shell dropping the word entirely, so the flag is stored as the boolean
+ * `true`, `typeof true !== "string"`, and the same readers fall through to the
+ * cwd — the identical harm, one quoting style over, and the commoner mistake of
+ * the two. `--set` with no value means the latest set and `--profile` with none
+ * means the directory's slug: those are answers, and refusing them would be a
+ * gate firing where nothing is at stake.
+ *
+ * A DECLARED BOOLEAN IS NOT HERE: `--dry-run=` is refused by
+ * `unreadableBooleanValues` as a value it cannot mean, and the space form
+ * `--dry-run ""` leaves `""` a positional, which is the user's to own (KD-7).
+ */
+export function emptyValues(flags, booleans = BOOLEAN_FLAGS, destinations = DESTINATION_FLAGS) {
+  return Object.keys(flags).filter((k) => {
+    if (takesNoValue(k, booleans)) return false;
+    if (flags[k] === "") return true;
+    return flags[k] === true && destinations.has(k);
+  });
+}
+
+/**
  * Parse argv into positionals + flags. `--flag value` captures the value, unless
- * `--flag` takes none — then `value` stays the user's positional.
+ * `--flag` takes none — then `value` stays the user's positional. `--flag=value`
+ * attaches it, whatever the flag.
+ *
+ * THE SAME LOOP AS `packages/harness/install/args.mjs`'s, token for token, and
+ * pinned so by `test/a-declared-booleans-value-arrives-as-a-string.test.mjs`
+ * with only the return set aside — this door names its positionals `_`.
  * @param {string[]} argv
  * @returns {{_: string[], flags: Record<string, string|boolean>}}
  */
 export function parseArgs(argv) {
-  const args = { _: [], flags: {} };
-  for (let i = 0; i < argv.length; i++) {
+  const flags = {};
+  const positionals = [];
+  for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a.startsWith("--")) {
+    if (!a.startsWith("--")) {
+      positionals.push(a);
+      continue;
+    }
     // `--` IS NOT A FLAG NAME, it is the POSIX end-of-options separator, and npx
     // forwards it verbatim: `npm create <pkg> my-app -- --flag` is the shape
     // every create-* CLI teaches, and both doors advertise `npx …` in their own
@@ -118,26 +255,65 @@ export function parseArgs(argv) {
     // means `--dry-run` to be a FLAG, not a positional. Inert is what makes the
     // separator change nothing.
     if (a === "--") continue;
-      const key = a.slice(2);
-      if (consumesNext(key, argv[i + 1])) {
-        args.flags[key] = argv[i + 1];
-        i++;
-      } else {
-        args.flags[key] = true;
-      }
+
+    const body = a.slice(2);
+    const eq = body.indexOf("=");
+    if (eq !== -1) {
+      // `--name=value` IS SPLIT HERE, at the first `=`, as prooflane's door
+      // always has (KD-14). Before, `--dry-run=true` arrived as a flag literally
+      // named `dry-run=true` and was refused as unknown — `create-cmp upgrade
+      // --dry-run=true` exit 2, the same line a dry run at the other door.
+      //
+      // It never consults `consumesNext`: an attached value has no positional
+      // to lose, so it is the flag's whatever it says. A declared boolean still
+      // gets the coercion its space form gets (`--dry-run=false` is false), and
+      // anything else it carries stays a STRING, which the bin refuses by what
+      // was typed (`unreadableBooleanValues`, KD-153).
+      const key = body.slice(0, eq);
+      flags[key] = coerceDeclaredBoolean(key, body.slice(eq + 1));
+      continue;
+    }
+    if (consumesNext(body, argv[i + 1])) {
+      flags[body] = coerceDeclaredBoolean(body, argv[i + 1]);
+      i += 1;
     } else {
-      args._.push(a);
+      flags[body] = true;
     }
   }
-  return args;
+  return { _: positionals, flags };
+}
+
+/** One name's value as a tri-state: true, false, or "this name said nothing". */
+function triState(value) {
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  return undefined;
 }
 
 /**
- * Tri-state boolean flag: `--name`/`--name true` → true, `--no-name`/`--name false`
- * → false, otherwise the default.
+ * Tri-state boolean flag. The whole truth table, both spellings:
+ *
+ *   --x        --x true    --no-x false   → true
+ *   --no-x     --x false   --no-x true    → false
+ *   absent                                → the default
+ *
+ * BOTH NAMES GO THROUGH ONE HELPER, which is the half of KD-16 that lived here
+ * rather than in the parser: the old body read the value form of `x` and never
+ * of `no-x`, while `consumesNext` consumed it either way — so `--no-ios true`
+ * resolved to the DEFAULT and the flag the user typed did nothing at all.
+ *
+ * THE STRINGS ARE STILL READ, though `parseArgs` no longer produces one: this
+ * is also called with flag objects assembled in code and in tests, and a helper
+ * that answered two of its own three inputs would be the next KD-16.
+ *
+ * PRECEDENCE IS THE AFFIRMATIVE NAME'S, unchanged from the body it replaces and
+ * now pinned by test: on a contradictory line — `--ios false --no-ios false`,
+ * which neither door refuses — `x` answers and `no-x` is never consulted.
  */
 export function flagBool(flags, name, dflt) {
-  if (flags[name] === true || flags[name] === "true") return true;
-  if (flags[`no-${name}`] === true || flags[name] === "false") return false;
+  const stated = triState(flags[name]);
+  if (stated !== undefined) return stated;
+  const negated = triState(flags[`no-${name}`]);
+  if (negated !== undefined) return !negated;
   return dflt;
 }
