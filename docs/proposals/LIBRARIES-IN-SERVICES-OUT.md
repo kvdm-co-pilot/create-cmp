@@ -1,6 +1,7 @@
 # Libraries in, services out — the default template after the wave
 
-**Status:** decided by the owner 2026-09-22, in conversation; not yet built. Three slices, in this
+**Status:** decided by the owner 2026-09-22, in conversation, and its open questions answered
+2026-09-24; not yet built. Three slices, in this
 order, each one thing. This document records the decisions and their reasons so the slices are
 briefed from settled ground rather than from a chat transcript.
 
@@ -43,8 +44,9 @@ last PASS record — not when an input path moves. 334 ms over 242 files. A chan
 
 **Shape:** `create-cmp add firebase`, a deterministic program (this repo's rule: the agent authors, a
 program refuses — a skill that hand-edits Gradle is the opposite). `cmp-firebase-connect` wraps it
-and does the console work it already does today. `--firebase` at stamp time is refused with a
-pointer. `region` moves to the add step.
+and does the console work it already does today. `--firebase` at stamp time is refused at once, with
+no deprecation release, and the refusal names `create-cmp add firebase`. `region` moves to the add
+step.
 
 **Measured footprint (2026-09-22, main @ 2bae414):** 16 template files branch on Firebase (both
 `build.gradle.kts`, `settings.gradle.kts`, `libs.versions.toml`, proguard rules, the debug
@@ -57,8 +59,9 @@ step needs, and it exists.
 
 **What it buys:** a faster default (no google-services plugin, no Firebase BOM / GitLive wrappers /
 Play Services tree, no extra R8 rules, no placeholder configs); every path in the default is the
-proven path; no placeholder state, because the add step can require the real config up front; a
-shorter, truer plugin description.
+proven path; no placeholder that reads as a real config, because the add step uses the adopter's real
+`google-services.json` and, without one, writes a mock config that says it is a mock; a shorter,
+truer plugin description.
 
 **What it costs:** an add step edits a tree the adopter may already have changed — additive edits
 (catalog entries, plugin lines, new files, a Koin module, the repository switch), idempotent, refusing
@@ -73,9 +76,10 @@ is that second proof, repointed. Its honest limit stands: nothing in `commonMain
 redirect, so the run proves compile + init + the four `useEmulator` calls, which is where both
 escaped defects lived.
 
-**Open questions for the brief (owner's):** refuse `--firebase` immediately or deprecate one
-release; require a real `google-services.json` before writing anything (recommended) or accept a
-placeholder.
+**Decided by the owner 2026-09-24** (the two questions this section left open): `--firebase` is
+refused immediately, not deprecated for a release, and the refusal names `create-cmp add firebase`.
+The add step uses the adopter's real `google-services.json`; without one it writes a mock config and
+says it is a mock. It never writes a placeholder that reads as a real config.
 
 **Not now:** a general "add anything" mechanism. Firebase is the only service the template carries;
 the second service (push, analytics, crash reporting) is the moment to generalise.
@@ -91,8 +95,8 @@ library should be optional, make it a toggle first, as one proven slice.
 and the Kotlin↔KSP lockstep doctor polices. For "make me a todo app", dropping it is the difference
 between a first build an agent waits through and one it doesn't. Ktor stays; it costs seconds.
 
-**Full harness in both presets** (owner's recommendation to confirm): the harness is what the agent
-should notice; only app-side toggles differ.
+**Full harness in both presets** (the owner's recommendation, confirmed 2026-09-24): the harness is
+what the agent should notice; only app-side toggles differ.
 
 **How it is chosen:** the `cmp-new` fit check picks it from the ask (todo app → minimal; app with
 backend sync → full). No new choice is put in front of the agent — that is the failure mode of
@@ -105,7 +109,7 @@ device badge stays on the default and the front door says so.
 
 ## Sequence
 
-1. **The wave** (this branch) — live adopter harms; ships as 0.27.0.
+1. **The wave** (this branch) — live adopter harms; ships as 0.27.1.
 2. **Firebase out** — `create-cmp add firebase`; closes KD-45's Firebase half by the repointed proof.
 3. **Minimal preset** — over a template that by then has only libraries in it.
 
