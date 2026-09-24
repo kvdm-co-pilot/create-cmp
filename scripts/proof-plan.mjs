@@ -104,14 +104,24 @@ const REVIEW_SCHEMA = "prooflane-review/1";
 
 /**
  * The tiers this repo can run, and WHEN each is due. This is the declaration
- * the rule used to live in prose: the fast ones run continuously because they
- * cost seconds and catch the most, and the device tier runs ONCE, at the end of
- * a slice, because it costs minutes and can only answer a question about a
- * finished tree.
+ * the rule used to live in prose. EVERY tier is `at-close`: the suite and
+ * framework-check run once, over the finished batch, before the PR, and the
+ * device tier runs once, at the end of a slice, because it costs minutes and can
+ * only answer a question about a finished tree.
  *
  * `at-close` is not a weaker claim than `per-commit`. The same run happens; it
  * happens once, over everything the slice changed, instead of once per commit
- * over a tree nobody is going to ship.
+ * over a tree nobody is going to ship. The two cheap tiers said `per-commit`
+ * until 2026-09-24, and an agent reading that at the moment of decision ran the
+ * whole suite after every fix — the measured cost is in scripts/suite-record.mjs's
+ * header (295 runs, 4.6 to 6.6 per merged change). Karel, 2026-09-24: once, at
+ * close. What the merge REQUIRES is unchanged by this: no merge gate here reads
+ * a suite run, and none did before.
+ *
+ * WHAT MOVED, AND WHAT DID NOT. Only `when` and the printed `due` sentence
+ * changed. `render()` used to skip a tier whose `when` was `at-close`, which
+ * was a stand-in for "has its own block below" — so the flip alone would have
+ * hidden the suite and framework-check rows. It now skips by NAME (OWN_BLOCK).
  */
 /**
  * THE RUNG THE DEVICE TIER DEMANDS, DECLARED ONCE.
@@ -132,9 +142,18 @@ const REVIEW_SCHEMA = "prooflane-review/1";
  */
 export const DEVICE_TIER_LEVEL = "L2";
 
+/**
+ * WHEN THE TWO CHEAP TIERS ARE DUE, AS THE SENTENCE AN AGENT READS. Printed under
+ * each of them by `render()`, and read by `scripts/change-price.mjs` rather than
+ * copied, so there is one statement of it. It says what NOT to do because the
+ * habit it replaces — a suite run after every fix — is the one an agent falls
+ * into without being told.
+ */
+const CHEAP_TIER_DUE = "once, over the finished batch, before the PR — never per fix or per commit";
+
 const TIERS = Object.freeze({
-  suite: { when: "per-commit", cost: "~50s", cmd: "npm test" },
-  frameworkCheck: { when: "per-commit", cost: "~4s", cmd: "node scripts/framework-check.mjs" },
+  suite: { when: "at-close", due: CHEAP_TIER_DUE, cost: "~50s", cmd: "npm test" },
+  frameworkCheck: { when: "at-close", due: CHEAP_TIER_DUE, cost: "~4s", cmd: "node scripts/framework-check.mjs" },
   device: {
     when: "at-close",
     cost: "~3.5min + an emulator",
@@ -595,6 +614,9 @@ export function outstanding(o) {
   return out;
 }
 
+/** The tiers `render()` prints in a block of their own, and so skips in the cheap-tier loop. */
+const OWN_BLOCK = new Set(["device", "review"]);
+
 export function render(o) {
   const L = [];
   const t = TIERS.device;
@@ -604,8 +626,11 @@ export function render(o) {
   if (o.stale) L.push(`  (a plan from slice "${o.stale.slice}" on branch ${o.stale.branch ?? "unknown"} is still on disk and does not apply here — --close removes it)\n`);
 
   for (const [name, tier] of Object.entries(TIERS)) {
-    if (tier.when === "at-close") continue;
+    // BY NAME, NOT BY `when`. These two have their own blocks below; the suite
+    // and framework-check are `at-close` too, and a `when` test would hide them.
+    if (OWN_BLOCK.has(name)) continue;
     L.push(`  ${name.padEnd(16)} ${tier.when.padEnd(12)} ${tier.cost.padEnd(22)} ${tier.cmd}`);
+    if (tier.due) L.push(`      due ${tier.due}`);
     // Whether the suite has ALREADY run over these bytes — the line a reviewer or
     // an author reads before spending a minute re-deriving it (scripts/suite-record.mjs).
     if (name === "suite" && o.suite) L.push(`      ${describeSuiteStatus(o.suite)}`);
@@ -998,4 +1023,4 @@ function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
-export { TIERS, read, changedPaths, currentBranch, isTrunk, REVIEW_SCHEMA, REVIEW_PATH };
+export { TIERS, CHEAP_TIER_DUE, read, changedPaths, currentBranch, isTrunk, REVIEW_SCHEMA, REVIEW_PATH };

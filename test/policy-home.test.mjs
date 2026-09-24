@@ -45,7 +45,7 @@ test("the plant: the phrasings that were cut are recognised, and the home's own 
   assert.equal(restatements("   fleet L2          REQUIRED — 1 changed path").length, 1);
   // What the home says, and what history is allowed to say.
   assert.equal(restatements("the device tier runs once, at the end of that slice — never per commit").length, 0, "the rule itself names the wrong cadence to forbid it; that is not a restatement");
-  assert.equal(restatements("suite + framework-check per commit").length, 0, "the cheap tiers ARE per commit");
+  assert.equal(restatements("suite + framework-check per commit").length, 0, "this lint is about the device tier's cadence; the cheap tiers' own cadence is TIERS in scripts/proof-plan.mjs (at-close since 2026-09-24), and a history row quoting the old one is not a device-tier restatement");
   assert.equal(restatements("gated once at the end: full suite 698/698").length, 0);
   assert.equal(restatements("`fit-test.mjs` printed `fleet L2 REQUIRED` on any commit touching the harness").length, 0, "a backtick-quoted line is the episode, not the rule");
   assert.equal(restatements("the first all-steps-real on-device evidence pack").length, 0);

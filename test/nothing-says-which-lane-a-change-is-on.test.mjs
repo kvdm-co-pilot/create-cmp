@@ -31,11 +31,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { laneOf, owesFor, spendOf, CEREMONY, DIRECT_TYPES } from "../scripts/change-price.mjs";
+import { TIERS } from "../scripts/proof-plan.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** The ceremony text for one item on one lane. */
-const owed = (lane, item) => owesFor(lane, { paths: [], device: "none", review: "none" }).find((r) => r.item === item);
+// `review: "owed"` — the review row's ceremony is what these tests read; on a
+// diff proof-plan says owes no review, the row says NOT OWED instead
+// (test/a-docs-only-change-is-told-it-owes-a-review-round.test.mjs).
+const owed = (lane, item) => owesFor(lane, { paths: [], device: "none", review: "owed" }).find((r) => r.item === item);
 
 /** A history file that exists and holds these rows, as `observe()` hands them over. */
 const kept = (rows) => ({ file: "qa-artifacts/x-history.jsonl", exists: true, rows, malformed: 0 });
@@ -217,11 +221,15 @@ test("review RECORDS are counted and never called OVER — a record is an upper 
   assert.equal(spend(1).verdict, "within", "at or under what it owed, the ordinary rule applies");
 });
 
-test("suite runs beyond commits-plus-dirty are OVER by the right number, and quote what that used to cost", () => {
-  const spend = (recorded, { commits, dirty }) =>
+test("a change owes ONE suite run whatever its commit count, read from proof-plan's TIERS — and more is OVER", () => {
+  // IT PRICED ONE RUN PER COMMIT UNTIL 2026-09-24, from a plan's `declared`
+  // copy of the cadence. The rule is once, over the finished batch (TIERS in
+  // scripts/proof-plan.mjs); a price of four for three commits and a dirty tree
+  // told an agent that four runs were owed, and it ran them.
+  const spend = (recorded, { commits, dirty, plan = PLAN }) =>
     spendOf({
       branch: BRANCH,
-      plan: PLAN,
+      plan,
       device: "none",
       review: "none",
       commits,
@@ -234,12 +242,25 @@ test("suite runs beyond commits-plus-dirty are OVER by the right number, and quo
     }).find((r) => r.what === "suite");
 
   const over = spend(7, { commits: 3, dirty: true });
-  assert.equal(over.owed, 4, "three commits and a dirty tree owe four runs");
-  assert.match(over.verdict, /^OVER by 3$/);
+  assert.equal(over.owed, 1, "three commits and a dirty tree still owe ONE run — over the finished batch");
+  assert.match(over.verdict, /^OVER by 6$/);
   assert.match(over.note, /295 full-suite runs/, "the measured baseline is quoted from suite-record.mjs's header");
+  assert.ok(over.extra.some((l) => l.includes(TIERS.suite.due)), "the row prints the cadence it read, from TIERS and not a copy");
 
-  assert.equal(spend(4, { commits: 3, dirty: true }).verdict, "within");
-  assert.equal(spend(1, { commits: 0, dirty: false }).owed, 1, "a change always owes at least one run");
+  assert.equal(spend(1, { commits: 3, dirty: true }).verdict, "within");
+  assert.equal(spend(2, { commits: 3, dirty: true }).verdict, "OVER by 1", "a second run over the same batch is the habit this row exists to show");
+  assert.equal(spend(1, { commits: 0, dirty: false }).owed, 1, "a change always owes one run");
+
+  // A PLAN OPENED BEFORE THE CHANGE still carries `declared.suite: "per-commit"`.
+  // It is not read for the count — TIERS is the one table — and it is NAMED, so
+  // a reader who opens the plan and finds "per-commit" there knows why the row
+  // disagrees with it.
+  const oldPlan = { ...PLAN, declared: { suite: "per-commit", frameworkCheck: "per-commit", device: "at-close", review: "at-close" } };
+  const fromOld = spend(0, { commits: 5, dirty: true, plan: oldPlan });
+  assert.equal(fromOld.owed, 1, "a stale per-commit copy does not multiply the price");
+  assert.ok(fromOld.extra.some((l) => /still declares suite "per-commit"/.test(l) && /stale/.test(l)), `the stale copy is named: ${fromOld.extra.join(" | ")}`);
+  const fromCurrent = spend(0, { commits: 5, dirty: true, plan: { ...PLAN, declared: { suite: TIERS.suite.when } } });
+  assert.equal(fromCurrent.extra.some((l) => /still declares/.test(l)), false, "a plan that agrees with TIERS is not called stale");
 
   // A record from before this slice opened is not this slice's spend — the
   // proof-history attribution rule, with the upper bound absent because the

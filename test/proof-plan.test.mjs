@@ -56,13 +56,15 @@ const TRIGGER = ["packages/harness/src/lib/evidence-level.mjs"];
 const NO_RUN = { fleetRecord: null };
 const owes = (plan, paths, branch = BRANCH) => obligation(plan, paths, branch, NO_RUN);
 
-test("the device tier is declared at-close — the schedule is data, not a habit", () => {
-  // The two cheap tiers run continuously because they cost seconds and catch
-  // the most; the expensive one runs once. If this ever reads "per-commit" the
-  // whole rule has been undone by a one-word edit, so it is pinned.
+test("every tier is declared at-close — the schedule is data, not a habit", () => {
+  // The expensive tier runs once, at the end of a slice. If it ever reads
+  // "per-commit" the whole rule has been undone by a one-word edit, so it is
+  // pinned. The two cheap tiers said "per-commit" until 2026-09-24, and an agent
+  // ran the suite after every fix because the plan told it to; they are pinned
+  // at-close for the same reason (Karel, 2026-09-24: once, at close).
   assert.equal(TIERS.device.when, "at-close", "the device tier runs once, at the end of a slice");
-  assert.equal(TIERS.suite.when, "per-commit");
-  assert.equal(TIERS.frameworkCheck.when, "per-commit");
+  assert.equal(TIERS.suite.when, "at-close", "the suite runs once, over the finished batch");
+  assert.equal(TIERS.frameworkCheck.when, "at-close", "framework-check runs once, over the finished batch");
 });
 
 test("a docs-only change owes NOTHING — the derivation that was already right stays right", () => {

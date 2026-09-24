@@ -590,8 +590,9 @@ A "no" to 4, 5 or 7 stops the PR. A change that cannot answer 1 is not built.
    never by reading the code.
 5. **Receipt meaning.** Does this change what a receipt claims, its schema, or its
    comparability? If yes, an ADR first.
-6. **Proof at altitude.** *(DERIVED — `scripts/fit-test.mjs`.)* Suite and
-   `scripts/framework-check.mjs` on every commit. The device tier as `scripts/proof-plan.mjs` schedules it — owed, not yet due, discharged, or
+6. **Proof at altitude.** *(DERIVED — `scripts/fit-test.mjs`.)* The suite,
+   `scripts/framework-check.mjs` and the device tier, each when `node scripts/proof-plan.mjs` says it is
+   due (GATE-RULES Rule 4) — the device tier owed, not yet due, discharged, or
    reopened — never a trigger that fired. `fleet-check` records
    every run (PASS *and* FAIL) to `qa-artifacts/fleet-latest.json` with the commit it ran
    against, because until 2026-09-06 the scratch app was deleted and "fleet L2 PASS" was a
@@ -626,7 +627,7 @@ loop: −1 lane per signing round · residue: <named, or none>
 | 2026-09-02 | Evidence economics: the loop is made cheap, visible, honest — `ERROR` verdict, per-step deadlines, stages, reopen scoped to what moved, spine/pack split |
 | 2026-09-03 | PRINCIPLES and GATE-RULES adopted; the lock region covers the lane's own tests and the declarations it reads; the evidence ladder is the profile's |
 | 2026-09-04 | Rule 0 ships to adopters as an instrument; agent liveness; the orchestrator has standing to refuse on cost; signatures batch |
-| 2026-09-04 | **The harness becomes stack-agnostic by inverting one dependency.** (1) Governance is mechanic-in-core, model-in-profile. (2) The `cmp` profile is isolated completely, studio included; the console lives in the harness as neutral section types; no profile-owned tabs. (3) No default profile — absent manifest refused; derived for stamped apps, interviewed for foreign repos. (4) Stage 0 starts, gated: the device tier once at slice close (§7 — amended 2026-09-08; at the time, once per PR), suite + framework-check per commit, de-fork count in every PR. |
+| 2026-09-04 | **The harness becomes stack-agnostic by inverting one dependency.** (1) Governance is mechanic-in-core, model-in-profile. (2) The `cmp` profile is isolated completely, studio included; the console lives in the harness as neutral section types; no profile-owned tabs. (3) No default profile — absent manifest refused; derived for stamped apps, interviewed for foreign repos. (4) Stage 0 starts, gated: the device tier once at slice close (§7 — amended 2026-09-08; at the time, once per PR), suite + framework-check per commit (amended 2026-09-24, Karel: once, at close), de-fork count in every PR. |
 | 2026-09-04 | **The cross-stack rule is amended.** The earlier rule (no cross-stack port without a pinned-issue trigger) is kept for the *eyes*: no renderer or inspector for another stack is written without countable demand. It no longer applies to the *harness*, whose agnosticism is a dependency-direction fix triggered by the in-house second stack. This document is where that amendment is recorded. |
 | 2026-09-04 | Trunk-based development: merge each PR the moment its gate is green, before the next is branched |
 | 2026-09-05 | **Stage 0 moved declarations; it never moved GRAMMAR — and grammar is what decides verdicts.** Names, paths, tier names and step names went to the profile while the rules deciding whether a citation *counts* stayed in the spine, matching Kotlin and JavaScript alone. A wrong directory name produces a refusal; a wrong grammar produces a **silently wrong verdict**: on Python, Go or Rust every citation was discarded, every clause read as uncited, and the message pointed at the spec file. The profile now declares `grammar` (marker, test declaration, type declaration, binding window); the core's patterns become an explicitly-named fallback; and the scan REPORTS when it saw markers and bound none, because the defect was never the wrong default but the *silent* one. Measured by the first Python adoption, 2026-09-05. |
