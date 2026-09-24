@@ -34,6 +34,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
+import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
+
 /**
  * What CANNOT OBLIGE a device run here — and that is the whole of what this
  * list now does.
@@ -53,8 +55,10 @@ import { createHash } from "node:crypto";
  * than it was: before the tier was scheduled by the stamped app, a directory
  * missing from this list cost a 3.5-minute emulator run.
  *
- * Markdown cannot change what executes on a phone; this repo's own tests,
- * scripts and CI config do not ship into the stamped app.
+ * This repo's own markdown cannot change what the stamped tree executes; this
+ * repo's own tests, scripts and CI config do not ship into the stamped app.
+ * Markdown UNDER `template/` is the exception, and `*.md` does not reach it —
+ * see DEVICE_TIER_SHIPPED and `deviceTierNeed` below (KD-207).
  */
 export const DEVICE_TIER_IRRELEVANT = Object.freeze([
   "docs/",
@@ -103,6 +107,56 @@ export const DEVICE_TIER_IRRELEVANT = Object.freeze([
   // than saving a device run.
   "packages/harness/src/console/",
 ]);
+
+/**
+ * WHAT SHIPS INTO THE STAMPED APP, where a SUFFIX in DEVICE_TIER_IRRELEVANT
+ * does not reach.
+ *
+ * KD-207: `*.md` declared every markdown file unable to oblige the runtime
+ * tier, matched on the repo path, and markdown under `template/` ships INTO
+ * the stamped app — `template/specs/*.md` is what the lane's spec-coverage,
+ * e2e-coverage and approvals steps read. So a spec edit could never make the
+ * tier required, and when something else did, the same bytes reopened it: the
+ * two halves disagreed for exactly the shipped-markdown set, and a slice that
+ * changed ONLY a spec was waved through with a digest nobody asked.
+ *
+ * Closed by making every path under these roots RELEVANT — the tier is then
+ * required, and the stamped digest (scripts/stamped-output.mjs) JUDGES it: a
+ * spec edit moves the digest and is owed; a `template/AGENTS.md` edit is prose
+ * the cmp profile's L2 run never opens (UNOBSERVED_BY_PROFILE), so the digest
+ * is equal and a matching record discharges it for the price of one stamp.
+ * Being wrong toward "required" costs ~0.35s here; being wrong toward
+ * "irrelevant" cost a spec change its L2 run.
+ */
+export const DEVICE_TIER_SHIPPED = Object.freeze(["template/"]);
+
+/**
+ * Must the runtime tier be asked about these paths — `deriveTierNeed` over
+ * DEVICE_TIER_IRRELEVANT, with every path under DEVICE_TIER_SHIPPED put back.
+ *
+ * One function, for every reader that asks (`proof-plan`'s obligation and
+ * `fit-test`'s row), so the two cannot disagree about one spec edit. A path
+ * the declaration already obliges is not repeated; a shipped path it called
+ * irrelevant is added to `obliging` and named in the reason, so a reader sees
+ * WHY a markdown file made the tier required.
+ *
+ * @param {string[]|null} paths changed relpaths, or null when git could not say
+ * @param {{tierName?: string}} [opts]
+ * @returns {{required: boolean, reason: string, obliging: string[]}}
+ */
+export function deviceTierNeed(paths, { tierName = "the L2 run" } = {}) {
+  const need = deriveTierNeed(paths, { irrelevantRoots: DEVICE_TIER_IRRELEVANT, tierName });
+  if (!Array.isArray(paths)) return need;
+  const posix = paths.filter((p) => typeof p === "string" && p.length > 0).map((p) => p.split(path.sep).join("/"));
+  const shipped = posix.filter((p) => DEVICE_TIER_SHIPPED.some((r) => p.startsWith(r)) && !need.obliging.includes(p));
+  if (!shipped.length) return need;
+  const named = `${shipped.length} changed path(s) under ${DEVICE_TIER_SHIPPED.join(", ")} ship into the stamped app, and no suffix rule reaches them: ${shipped.slice(0, 3).join(", ")}${shipped.length > 3 ? ", …" : ""}`;
+  return {
+    required: true,
+    reason: need.required ? `${need.reason}; and ${named}` : named,
+    obliging: [...need.obliging, ...shipped],
+  };
+}
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "build", "dist", "out"]);
 

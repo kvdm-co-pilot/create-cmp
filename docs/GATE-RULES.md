@@ -336,7 +336,10 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
 - **The device tier is owed when the STAMPED APP moves, not when an input path moves.** What a
   device run proves is that the app `create-cmp` stamps out of this tree runs on a phone, so that
   app is what the run is bound to: `scripts/stamped-output.mjs` stamps it into a temp dir, hashes
-  every byte it wrote, and deletes it — 0.35s, measured, against the 3.5 minutes it schedules. It
+  what the L2 run executes or reads, and deletes it — 0.35s, measured, against the 3.5 minutes it
+  schedules. Every file it wrote is listed; under digest rule 2 the CONTENT of the few files the
+  profile's L2 run never opens, and of the release numbers the stamp writes, is held (the list and
+  its not-read proof are in that file, and a record names the rule its digest was taken under). It
   used to be bound to input paths (`deviceTreeHash` over `template/` + `packages/harness/src/` +
   `packages/receipts/src/`), which is a proxy and was wrong in both directions: an edit under
   `packages/harness/src/` that never reached `template/qa/` reopened a discharged slice over a
@@ -348,10 +351,13 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   one a machine with no device record can still answer.
 - **The expensive tier is the LAST gate, and after it the slice is frozen.** A change to the stamped
   app after a discharge REOPENS the slice and is told so by name, with the count of files that moved
-  and the first of them. A comment in a file that SHIPS still reopens it: nothing here can tell a
-  comment from a statement without a parser for every ecosystem the harness might meet, and those
-  bytes really are part of the app. A comment in a file that does not ship costs nothing, and that
-  is not an exception list — it is the same comparison, answering honestly.
+  and the first of them. A comment in a file that SHIPS and that the L2 run reads still reopens it:
+  nothing here can tell a comment from a statement without a parser for every ecosystem the harness
+  might meet, and those bytes really are part of the app. A comment in a file that does not ship
+  costs nothing, and that is not an exception list — it is the same comparison, answering honestly.
+  The one declared list is per profile and names files no program in that profile's L2 run opens,
+  each with the line that proves it; markdown under `template/` is asked about like any shipped
+  byte (KD-207), and the digest answers.
 - **A discharge is READ, never asserted, and the evidence outranks the bookkeeping.** It comes from
   the run's own recorded verdict and stamped-app digest — a discharge that trusted its caller would
   be exactly the shape of claim this product exists to refuse. A PASS run recorded against these

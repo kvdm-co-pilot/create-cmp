@@ -20,8 +20,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
-import { DEVICE_TIER_IRRELEVANT } from "./observed-tree.mjs";
+import { deviceTierNeed } from "./observed-tree.mjs";
 import { stampedOutputHash } from "./stamped-output.mjs";
 import { obligation, changedPaths, recordMeetsTier, TIERS } from "./proof-plan.mjs";
 import { suiteStatus } from "./suite-record.mjs";
@@ -34,8 +33,10 @@ function sh(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...opts });
 }
 
+// The same question proof-plan asks, through the same function, so this row
+// and the schedule cannot disagree about a spec edit under template/ (KD-207).
 export function deviceTierRequired(paths) {
-  return deriveTierNeed(paths, { irrelevantRoots: DEVICE_TIER_IRRELEVANT, tierName: "fleet L2" });
+  return deviceTierNeed(paths, { tierName: "fleet L2" });
 }
 
 /** `ℹ tests 1525 / ℹ pass 1525 / ℹ fail 0` out of the node test runner. */

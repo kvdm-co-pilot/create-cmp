@@ -77,7 +77,7 @@ import { fileURLToPath } from "node:url";
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
 import {
   observedTreeHash,
-  DEVICE_TIER_IRRELEVANT,
+  deviceTierNeed,
   REVIEW_TIER_TRIGGERS,
   REVIEW_TIER_IRRELEVANT,
   REVIEW_SKIP,
@@ -304,7 +304,10 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
     const none = { required: false, obliging: [], reason };
     return { state: "none", trunk: true, ...base, need: none, review: { state: "none", trunk: true, need: none } };
   }
-  const need = deriveTierNeed(paths, { irrelevantRoots: DEVICE_TIER_IRRELEVANT, tierName: "fleet L2" });
+  // `deviceTierNeed`, not `deriveTierNeed` over the list directly: markdown
+  // under `template/` ships into the stamped app, so it is asked about and the
+  // digest judges it (KD-207, scripts/observed-tree.mjs DEVICE_TIER_SHIPPED).
+  const need = deviceTierNeed(paths, { tierName: "fleet L2" });
   // A review is owed on a broader set than a device run: `scripts/` and `test/`
   // cannot reach a phone and are declared irrelevant to the device tier, but a
   // rewritten gate or a test that quietly stops refusing something is exactly

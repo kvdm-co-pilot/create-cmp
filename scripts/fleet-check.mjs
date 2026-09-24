@@ -41,7 +41,7 @@ import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { FLEET_SCRATCH_APP, stampArgv, hashStampedTree } from "./stamped-output.mjs";
+import { FLEET_SCRATCH_APP, stampArgv, hashStampedTree, STAMPED_OUTPUT_RULE } from "./stamped-output.mjs";
 import { appendHistory, historyPath } from "./lib/proof-history.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -530,6 +530,12 @@ export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failure
     // same broken stamp.
     stampedOutputHash: stamped?.hash ?? null,
     ...(stamped ? {} : { stampedOutputError: stampedError ?? "the run recorded no reason" }),
+    // WHICH RULE that digest was taken under (scripts/stamped-output.mjs,
+    // STAMPED_OUTPUT_RULE). A digest is only comparable with one taken under
+    // the same rule, and a record without this field was written before the
+    // rule had a number — rule 1. Readers refuse to compare across rules and
+    // name `node scripts/proof-plan.mjs --rekey` instead of another run.
+    stampedOutputRule: STAMPED_OUTPUT_RULE,
     // The manifest is what makes a refusal actionable ("3 file(s) differ,
     // first: …") instead of two digests a reader cannot act on. It rides on the
     // LATEST record only; the history row below drops it for a count, because
