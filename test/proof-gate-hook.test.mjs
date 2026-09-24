@@ -208,7 +208,9 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
   // plan is open on the live tree during the suite (these tests never write
   // one)" — and that assumption is false in exactly the situation Rule 4
   // creates. A slice IS open on the live tree while someone works on it, the
-  // rule says to run the suite per commit, and `close()` removes a plan only
+  // suite runs while it is open (per commit, as the rule then said; TIERS in
+  // scripts/proof-plan.mjs has said once, at close, since 2026-09-24 — and a
+  // slice still runs it before the merge), and `close()` removes a plan only
   // when it is settled. So the deletion landed at the worst possible moment:
   // after the device run was paid for and discharged, right before the merge.
   // The state then read "OWED — no slice declared", the merge hook refused, and

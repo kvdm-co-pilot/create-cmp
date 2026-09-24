@@ -69,8 +69,13 @@ fails — do not skip ahead.
 ```bash
 git status --porcelain          # must be empty — no uncommitted changes
 git branch --show-current       # must be `main`
-node --test                     # must be all-green; this also runs as prepublishOnly
+node scripts/proof-plan.mjs     # read the line under `suite`
+npm test                        # ONLY if that line says no recorded run covers these bytes
 ```
+
+A green run recorded over these exact bytes, on this Node, is the suite's answer for this tree —
+read it, do not buy it again. `npm publish` still runs `npm test` as `prepublishOnly`
+(package.json); that is the release's own last check and stays.
 
 ### 2. Fleet check — prove the engine's output actually runs
 

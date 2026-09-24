@@ -61,14 +61,19 @@ the agent has found something your brief did not cover: answer it, or decide it 
 A delegated subagent loses nothing if the brief carries: the exact files to touch, the pattern
 to follow (name the exemplar), the clause/gate expectations, the verification command it must
 run, and what it must NOT touch (so parallel agents don't collide). State its definition of
-done as a gate it runs itself and iterates against — not "looks right."
+done as a gate it runs itself and iterates against — not "looks right." In create-cmp that
+command is the test files the task touched, by name, once at its end; the whole suite and framework-check are
+due when `node scripts/proof-plan.mjs` prints them due (GATE-RULES Rule 4), never per fix or
+per commit, and a brief that orders them per task buys the same run once per agent.
 
 **A brief for a REVIEW carries one fact more: which round it is.** Only you hold it — a reviewer
 cannot see its own place in a sequence — and it decides both what that round has to read and what
 its record is worth to everything downstream. So name the number, say whether the round is a fresh
 read or a re-confirmation of bytes that moved under an earlier one, and hand over what it reads:
 `node scripts/change-price.mjs` prints which round is next, the literal command for it, and whether
-it is owed. `docs/KNOWN-DEFECTS.md`'s header is the rule both of those answer to; neither this line
+it is owed. Whether a review is owed AT ALL is `node scripts/proof-plan.mjs`'s answer, under
+`review`: a docs-only diff owes none, it prints NOT OWED with its reason, and a round briefed
+over it is spend nothing asked for. `docs/KNOWN-DEFECTS.md`'s header is the rule both of those answer to; neither this line
 nor that program restates it. The reviewer writes the number down with `--round <n>`
 (`.claude/agents/staff-reviewer.md`) — leave it out of your brief and it cannot, the row joins the
 ones nothing can count, and the next round is priced owed for no better reason than that.
@@ -83,8 +88,9 @@ enforces the link.
 Nothing is "done" until it passes the project's own gates, run by YOU:
 - In a stamped app: `node qa/verify.mjs` reports **PASS** and the evidence receipt is committed (the generated
   `CLAUDE.md` definition of done).
-- In the create-cmp repo itself (no `qa/` here): `npm test` + `node scripts/framework-check.mjs`, the device
-  tier as `node scripts/proof-plan.mjs` schedules it, and `node scripts/stage-gate.mjs` for a stage's exit.
+- In the create-cmp repo itself (no `qa/` here): `npm test` + `node scripts/framework-check.mjs` and the
+  device tier, each when `node scripts/proof-plan.mjs` prints it due — never per fix or per commit — and
+  `node scripts/stage-gate.mjs` for a stage's exit.
 - The engine suite (`npm test`) stays green.
 - For risky changes, run the **negative proof** too — inject the violation, watch the right
   gate fail by name, revert. A gate you haven't seen fail is a gate you don't trust.
@@ -95,7 +101,10 @@ Nothing is "done" until it passes the project's own gates, run by YOU:
   (or a delegate with MCP access) run `preview { projectDir }` once up front and
   `preview_diff { screen }` for the proven verdict; a delegate can also render directly with
   `./gradlew :composeApp:renderScreens -Pscreen=<id>` and diff the tree JSON.
-Re-run the gate independently after a delegate reports success — do not take its word for green.
+Check a delegate's green independently — do not take its word for it. A run recorded over the
+same bytes is that check, not a reason to run again: in create-cmp, `node scripts/proof-plan.mjs`
+prints under `suite` whether one covers this tree. Run only what no record covers, and the suite
+at most once over the finished batch.
 
 ## Device and Gradle-heavy proof — batch it, once, last
 The stamped app's `CLAUDE.md` (*Definition of done*) and its hooks own this rule — the full

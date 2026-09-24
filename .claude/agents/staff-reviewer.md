@@ -103,8 +103,9 @@ worth more than the finding it produced. Put it in `test/`, wired to the suite, 
 
 **Do not re-run a green suite to see that it is green.** `node scripts/proof-plan.mjs` prints, under
 `suite`, whether `npm test` has already run over these exact bytes on this Node and what it found.
-If it says so, that is your baseline. Run the tests you write, and the whole suite only once your
-tests have changed the tree.
+If it says so, that is your baseline. Run the tests you write, by file. The whole suite is not
+yours to run: it is due once, over the finished batch, when that same program prints it due —
+never per fix, per commit or per round — and Prove runs it.
 
 **Where you sit:** the exit of Build, before Prove. Prove runs the suite, so the tests you write
 are what enforce your review; you need no gate of your own and this project is not adding one for

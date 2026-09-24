@@ -179,7 +179,8 @@ regressions in CI with no emulator at all — generate it alongside:
 
 1. The lane's `goldenTrees` step owns this layer: per-screen normalized golden trees live in
    `qa/golden/` and are **committed** (human-readable JSON, reviewable in any diff).
-2. In CI / after any change: `node qa/verify.mjs` diffs the current render against each
+2. In CI, and wherever your app's `CLAUDE.md` *Definition of done* runs the lane (a checkpoint
+   over the finished work, not after each edit): `node qa/verify.mjs` diffs the current render against each
    golden. Empty diffs = pass. A diff entry like `clickable-changed` is a button silently
    losing its handler — a class of regression the Appium suite only catches if it happens
    to tap that button.
