@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Resuming a helper is priced at the moment you send to it** (`docs/proposals/RESUME-COSTS-MORE-THAN-RESTART.md`).
+  A helper resumed with `SendMessage` re-reads its whole history on every step it takes, and one
+  session on this repo spent about half of 19.8M tokens that way while a fresh helper briefed from
+  the same commits and hand-off file starts at ~37k. The plugin now ships `resume-price`, a
+  `PreToolUse` hook on `SendMessage` (`.claude-plugin/plugin.json` → `scripts/hooks/plugin-hooks.json`
+  → `scripts/hooks/resume-price.mjs`). When the helper addressed by id carries more than 150,000
+  tokens — read from the last assistant turn of its own transcript, backwards from the end of the
+  file — it adds one note for the sender: the carried size, that each resumed step re-reads it, what
+  a fresh helper costs instead, and that resuming pays only for unsaved state you need. It is
+  advisory in the `change-price` sense: it adds context and carries no permission decision, so it
+  never allows, asks or denies, and it exits 0 on every path. Where it cannot compute a price — a
+  name or a peer session rather than a helper id, an unreadable or truncated transcript, a malformed
+  payload — it says nothing.
+
 ## [0.27.1] - 2026-09-24
 
 `create-cmp-cli` 0.26.6 and 0.27.0, and `prooflane-harness` 0.22.1 and 0.23.0, were never
