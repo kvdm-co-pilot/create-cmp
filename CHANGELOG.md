@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+`create-cmp-cli` 0.26.6 and 0.27.0, and `prooflane-harness` 0.22.1 and 0.23.0, were never
+published; their changes are in this section. 0.26.7 through 0.26.9, and `prooflane-harness`
+0.22.2, exist only on the branch `doctor-claims-wiring-it-has-not-established`; their fixes
+reached this section as different commits.
+
 ### Fixed
 
 - **A directory named by an unset shell variable became the directory you happened to be in.**
@@ -153,84 +158,6 @@ All notable changes to this project are documented here. The format is based on
   read stdin — but the false half was the one that would have sent whoever takes the real fix
   looking for a mechanism that is already there (KD-181).
 
-- **A tree whose packages are not installed told a contributor their change broke three tests.**
-  Measured 2026-09-18 in a fresh git worktree with `inspector/mcp`'s packages absent: `npm test`
-  reported three failures and only ONE of them looked like a missing install. Two were
-  `ERR_MODULE_NOT_FOUND`, which a reader can follow; the third was an `AssertionError` about the
-  Evidence tab not linking a step to the section it governs — a claim about PRODUCT BEHAVIOUR,
-  arriving as the first thing someone sees about code they may have just touched. Nobody is wrongly
-  served by the shipped product (one root `npm ci` provisions every package and CI does exactly
-  that), so the cost is a wrong DIAGNOSIS, paid by the first outside person to clone this
-  repository. `npm test` now runs `scripts/suite-preflight.mjs` as `pretest`: it walks each
-  declared package's dependencies the way Node's resolver does and **refuses the run by name** —
-  which package, which dependencies, and `npm ci` — before the runner starts.
-
-- **That door refuses rather than skips, for a reason measured in this repo's own reporter.** A
-  skip that names its reason is usually the kinder outcome and is the wrong instrument here:
-  `recordRun` (`scripts/suite-reporter.mjs`) computes its verdict from `counts.fail` and
-  `counts.cancelled`, and `counts.skipped` is recorded without ever reaching it. Skipping the
-  affected tests would have made an uninstalled tree report **PASS**, with a suite record and a
-  history row saying so — a green verdict over tests that never ran, which is worse than a red one
-  that misattributes its cause. A skip must also ENUMERATE its victims, and one of the three never
-  reproduced from the absent workspace alone (KD-109); a door does not need to know who would have
-  been hurt, which is why it fits what is actually known.
-
-- **Every cheaper predicate calls an installed package missing, and each was measured rather than
-  reasoned.** "Every declared workspace has a `node_modules`" — the shape KD-89 itself proposed —
-  is false for 10 of this repo's 12 declared packages after a clean `npm ci`, because their
-  dependencies hoist to the root. `import.meta.resolve(spec, parent)` ignores its second argument
-  without `--experimental-import-meta-resolve`, so it answers about the wrong directory: it
-  reported `esbuild`, `zod` and `@modelcontextprotocol/sdk` all missing while installed. And
-  `require.resolve("@modelcontextprotocol/sdk")` throws `MODULE_NOT_FOUND` from `inspector/mcp`
-  where it IS installed, because the package has only subpath exports. Any of the three, used as a
-  skip condition, would have hidden real failures in packages it wrongly called uninstalled — the
-  exact risk this change exists to design against. The walk is the resolver's own directory lookup
-  and nothing above it, so it cannot disagree with what an import would do.
-
-- **Two readers of one `workspaces` declaration disagreed, and the disagreement was the refusing
-  direction.** Found by review, landed as a failing test. npm resolves workspaces with
-  `@npmcli/map-workspaces`, which accepts negation, braces, `**` and character classes; the
-  preflight's first reader rejected only a misplaced `*`. So `["ws/*", "!ws/b"]` — a shape npm
-  accepts — made the door walk the package **npm had excluded** and refuse over dependencies
-  `npm ci` will never install: a correctly installed tree that can never run its suite, where the
-  single command the refusal names cannot clear it (measured end to end: `npm install` exit 0,
-  `npm ci` exit 0, `npm test` exit 1 both times, same text). `["ws/{a,b}"]` failed the other way,
-  walking **neither** package silently, which contradicted the function's own promise to decline
-  what it cannot implement. Both are now one rule: an **allow-list** — a literal path, optionally
-  with a trailing `/*` — mirroring the allow-list `declaredSuiteFiles` already applies to the
-  patterns it hands a shell. Anything else declines and the suite runs untouched. The test writes
-  the invariant rather than the `!`: *the door's package set is npm's own, or the door declines*,
-  with `npm pkg get name --workspaces` as the oracle per fixture so a hard-coded expectation cannot
-  become a third spelling of the same fact.
-
-  **A re-record found the same defect one axis over, and it is fixed too.** Constraining the
-  *pattern* says nothing about the *expansion*, and the expansion was `readdirSync` +
-  `isDirectory()` standing in for npm's globber — wrong in both directions at once. Measured:
-  `ws/.hidden/` is not a workspace to npm and the door counted it (the refusing direction again,
-  and again unclearable by `npm ci`); a symlinked `ws/linked` IS a workspace to npm and the door
-  dropped it, because `isDirectory()` is false for a symlink. The loop no longer judges: it skips
-  dot-entries, as npm's globber does, and leaves everything else to the `package.json` check the
-  next loop already performs — which is the same rule KD-44 named one module over, *do not
-  re-implement the other reader's globber*.
-
-- **The door's SCOPE was calibrated by nothing, and the file that closes KD-89 committed KD-89's own
-  defect.** Both found by review. Three mutations of the walk — dropping `devDependencies`, dropping
-  the root package, reporting only the first missing dependency — each left all eight new tests
-  green, because the fixture declared one `dependencies` entry in one workspace; it now carries a
-  root dependency, a second missing entry and a devDependency, and the refusal is asserted to name
-  every one. Separately, run through a direct `node --test` on an uninstalled tree, the new test
-  file's own loudest message read *"the predicate is wrong"* when the predicate was right and the
-  tree was simply uninstalled — the exact misattribution this slice exists to end, inside the file
-  that ends it. All three messages now name an uninstalled tree as the first candidate, with the
-  command, and say that `npm test` would have refused before reaching them.
-
-- **The preflight fails OPEN, and imports only `node:` builtins.** KD-89 named the first risk in
-  the same breath as the fix — "a preflight that itself goes wrong makes every run unrunnable" — so
-  anything it cannot read or does not understand prints a note and exits 0, leaving the suite to do
-  exactly what it did before the file existed; a test pins that a tree whose workspace globs it
-  cannot parse still runs. The second is quieter: a preflight that needed what it checks for could
-  not load on the tree it exists to describe, so a second test pins its import graph.
-
 - **Three hooks in every stamped app resolved their scripts against the wrong directory, and two of
   them failed without a sound.** `template/.claude/settings.json` invoked `Stop`
   (`node qa/receipt-check.mjs --hook`), `UserPromptSubmit` and `statusLine` (both
@@ -296,44 +223,6 @@ All notable changes to this project are documented here. The format is based on
   (`test/harness-surfaces.test.mjs`) and what `doctor --fix` writes into a real project
   (`test/doctor-walk-wiring.test.mjs`), since the heal is a second door into the same file.
 
-- **The marketplace said "Eleven skills" and the plugin shipped twelve — and the gate that exists
-  to refuse exactly that was reading three of ten public surfaces.** `.claude-plugin/plugin.json`
-  and the marketplace entry are the text an agent or a human reads BEFORE the install, before this
-  repo is ever fetched, and both understated what they were offering. The count itself was the
-  smaller half. `test/doc-counts.test.mjs` derives every count from `scripts/ground-truth.mjs` and
-  refuses any public surface that contradicts it — but its `PUBLIC_SURFACES` was a hand-written
-  list of three markdown files, and **the split it produced was total: every surface ON the list
-  stated the right number, and every count-stating surface off it was stale.** Seven of them: both
-  plugin manifests at "Eleven skills", `AGENTS.md` and `docs/DOCUMENTATION.md` at "10 skills", and
-  the `create-mobile` / `create-kmp` / `create-compose-multiplatform` READMEs — published npm front
-  doors — at "10 skills". The sharpest case is that the same `plugin.json` was already read by this
-  gate for its `skills` LIST and never for its own PROSE.
-
-  The list is now derived where the category is closed (`.claude-plugin/*.json`; every `README.md`
-  under `packages/`) and named only where it is not, so the next manifest and the next alias cannot
-  escape the same way. It is deliberately not the whole tree: `docs/proposals/`, `docs/adr/`,
-  `docs/history/`, `docs/HARNESS-PLAN.md` and `inspector/mcp/README.md` ("15+ of the 28 tools had
-  ZERO calls") legitimately record PAST trees, and a scanner that cannot tell a record from a claim
-  deletes honest prose.
-
-- **The lane's size was stated eight times on public surfaces and was wrong all eight times**,
-  because the docs stopped using the one phrase the gate reads. `docs/USAGE.md` §3 opens by
-  explaining that *"how many steps run depends on `--profile`, so 'N gates' is never a fixed
-  number"* — correct, and then every number behind it rotted: one step was added to the shared
-  spine and all of `scaffold`/`local`/`ci`/`smoke`/`release` were left an off-by-one, with
-  `llms.txt` (the surface written for agents) repeating two of them. A profile-bound reader now
-  gates both forms the docs actually use — a table row and the prose that cites it — with the
-  profile names coming from the deriver rather than a list. Measured before wiring: eight matches,
-  eight drifts, zero false positives. A bare "<n> steps" is deliberately NOT gated (KD-73): it
-  refuses four strings on the same surfaces and two are honest prose, so the ambiguity is in the
-  noun rather than in the claim.
-
-- **Both readers are calibrated, and the calibration is kept.** GATE-RULES Rule 1 in the
-  instrument rather than by hand: one test plants a wrong number into every surface the gate lists
-  and every count it derives, and requires each one back refused — 8.7 ms, run by everyone,
-  forever. It is the non-vacuity check the surface list never had, and it earned that during
-  wiring: dropping one character from the globbed directory name put both plugin manifests back
-  outside the gate while every count assertion still passed.
 ### Contributor tooling
 
 *Nothing in this list is reachable from an installed package: `package.json`'s `files` ships no
@@ -417,6 +306,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [0.26.5] - 2026-09-19
 
+0.26.1 through 0.26.4 were never published; their changes first reached npm in this release.
+
 ### Fixed
 
 - **`create-cmp harness init|relock|upgrade` could not run from an npm install.** `bin/create-cmp.mjs`
@@ -429,6 +320,123 @@ All notable changes to this project are documented here. The format is based on
   `upgrade --harness` COPY out of this package, and a source in that plan that `files` does not ship
   fails more quietly than a missing import — no stack trace, no refusal, just a tree with one fewer
   file in it and a `✓ N files written` that says N-1.
+
+- **A tree whose packages are not installed told a contributor their change broke three tests.**
+  Measured 2026-09-18 in a fresh git worktree with `inspector/mcp`'s packages absent: `npm test`
+  reported three failures and only ONE of them looked like a missing install. Two were
+  `ERR_MODULE_NOT_FOUND`, which a reader can follow; the third was an `AssertionError` about the
+  Evidence tab not linking a step to the section it governs — a claim about PRODUCT BEHAVIOUR,
+  arriving as the first thing someone sees about code they may have just touched. Nobody is wrongly
+  served by the shipped product (one root `npm ci` provisions every package and CI does exactly
+  that), so the cost is a wrong DIAGNOSIS, paid by the first outside person to clone this
+  repository. `npm test` now runs `scripts/suite-preflight.mjs` as `pretest`: it walks each
+  declared package's dependencies the way Node's resolver does and **refuses the run by name** —
+  which package, which dependencies, and `npm ci` — before the runner starts.
+
+- **That door refuses rather than skips, for a reason measured in this repo's own reporter.** A
+  skip that names its reason is usually the kinder outcome and is the wrong instrument here:
+  `recordRun` (`scripts/suite-reporter.mjs`) computes its verdict from `counts.fail` and
+  `counts.cancelled`, and `counts.skipped` is recorded without ever reaching it. Skipping the
+  affected tests would have made an uninstalled tree report **PASS**, with a suite record and a
+  history row saying so — a green verdict over tests that never ran, which is worse than a red one
+  that misattributes its cause. A skip must also ENUMERATE its victims, and one of the three never
+  reproduced from the absent workspace alone (KD-109); a door does not need to know who would have
+  been hurt, which is why it fits what is actually known.
+
+- **Every cheaper predicate calls an installed package missing, and each was measured rather than
+  reasoned.** "Every declared workspace has a `node_modules`" — the shape KD-89 itself proposed —
+  is false for 10 of this repo's 12 declared packages after a clean `npm ci`, because their
+  dependencies hoist to the root. `import.meta.resolve(spec, parent)` ignores its second argument
+  without `--experimental-import-meta-resolve`, so it answers about the wrong directory: it
+  reported `esbuild`, `zod` and `@modelcontextprotocol/sdk` all missing while installed. And
+  `require.resolve("@modelcontextprotocol/sdk")` throws `MODULE_NOT_FOUND` from `inspector/mcp`
+  where it IS installed, because the package has only subpath exports. Any of the three, used as a
+  skip condition, would have hidden real failures in packages it wrongly called uninstalled — the
+  exact risk this change exists to design against. The walk is the resolver's own directory lookup
+  and nothing above it, so it cannot disagree with what an import would do.
+
+- **Two readers of one `workspaces` declaration disagreed, and the disagreement was the refusing
+  direction.** Found by review, landed as a failing test. npm resolves workspaces with
+  `@npmcli/map-workspaces`, which accepts negation, braces, `**` and character classes; the
+  preflight's first reader rejected only a misplaced `*`. So `["ws/*", "!ws/b"]` — a shape npm
+  accepts — made the door walk the package **npm had excluded** and refuse over dependencies
+  `npm ci` will never install: a correctly installed tree that can never run its suite, where the
+  single command the refusal names cannot clear it (measured end to end: `npm install` exit 0,
+  `npm ci` exit 0, `npm test` exit 1 both times, same text). `["ws/{a,b}"]` failed the other way,
+  walking **neither** package silently, which contradicted the function's own promise to decline
+  what it cannot implement. Both are now one rule: an **allow-list** — a literal path, optionally
+  with a trailing `/*` — mirroring the allow-list `declaredSuiteFiles` already applies to the
+  patterns it hands a shell. Anything else declines and the suite runs untouched. The test writes
+  the invariant rather than the `!`: *the door's package set is npm's own, or the door declines*,
+  with `npm pkg get name --workspaces` as the oracle per fixture so a hard-coded expectation cannot
+  become a third spelling of the same fact.
+
+  **A re-record found the same defect one axis over, and it is fixed too.** Constraining the
+  *pattern* says nothing about the *expansion*, and the expansion was `readdirSync` +
+  `isDirectory()` standing in for npm's globber — wrong in both directions at once. Measured:
+  `ws/.hidden/` is not a workspace to npm and the door counted it (the refusing direction again,
+  and again unclearable by `npm ci`); a symlinked `ws/linked` IS a workspace to npm and the door
+  dropped it, because `isDirectory()` is false for a symlink. The loop no longer judges: it skips
+  dot-entries, as npm's globber does, and leaves everything else to the `package.json` check the
+  next loop already performs — which is the same rule KD-44 named one module over, *do not
+  re-implement the other reader's globber*.
+
+- **The door's SCOPE was calibrated by nothing, and the file that closes KD-89 committed KD-89's own
+  defect.** Both found by review. Three mutations of the walk — dropping `devDependencies`, dropping
+  the root package, reporting only the first missing dependency — each left all eight new tests
+  green, because the fixture declared one `dependencies` entry in one workspace; it now carries a
+  root dependency, a second missing entry and a devDependency, and the refusal is asserted to name
+  every one. Separately, run through a direct `node --test` on an uninstalled tree, the new test
+  file's own loudest message read *"the predicate is wrong"* when the predicate was right and the
+  tree was simply uninstalled — the exact misattribution this slice exists to end, inside the file
+  that ends it. All three messages now name an uninstalled tree as the first candidate, with the
+  command, and say that `npm test` would have refused before reaching them.
+
+- **The preflight fails OPEN, and imports only `node:` builtins.** KD-89 named the first risk in
+  the same breath as the fix — "a preflight that itself goes wrong makes every run unrunnable" — so
+  anything it cannot read or does not understand prints a note and exits 0, leaving the suite to do
+  exactly what it did before the file existed; a test pins that a tree whose workspace globs it
+  cannot parse still runs. The second is quieter: a preflight that needed what it checks for could
+  not load on the tree it exists to describe, so a second test pins its import graph.
+
+- **The marketplace said "Eleven skills" and the plugin shipped twelve — and the gate that exists
+  to refuse exactly that was reading three of ten public surfaces.** `.claude-plugin/plugin.json`
+  and the marketplace entry are the text an agent or a human reads BEFORE the install, before this
+  repo is ever fetched, and both understated what they were offering. The count itself was the
+  smaller half. `test/doc-counts.test.mjs` derives every count from `scripts/ground-truth.mjs` and
+  refuses any public surface that contradicts it — but its `PUBLIC_SURFACES` was a hand-written
+  list of three markdown files, and **the split it produced was total: every surface ON the list
+  stated the right number, and every count-stating surface off it was stale.** Seven of them: both
+  plugin manifests at "Eleven skills", `AGENTS.md` and `docs/DOCUMENTATION.md` at "10 skills", and
+  the `create-mobile` / `create-kmp` / `create-compose-multiplatform` READMEs — published npm front
+  doors — at "10 skills". The sharpest case is that the same `plugin.json` was already read by this
+  gate for its `skills` LIST and never for its own PROSE.
+
+  The list is now derived where the category is closed (`.claude-plugin/*.json`; every `README.md`
+  under `packages/`) and named only where it is not, so the next manifest and the next alias cannot
+  escape the same way. It is deliberately not the whole tree: `docs/proposals/`, `docs/adr/`,
+  `docs/history/`, `docs/HARNESS-PLAN.md` and `inspector/mcp/README.md` ("15+ of the 28 tools had
+  ZERO calls") legitimately record PAST trees, and a scanner that cannot tell a record from a claim
+  deletes honest prose.
+
+- **The lane's size was stated eight times on public surfaces and was wrong all eight times**,
+  because the docs stopped using the one phrase the gate reads. `docs/USAGE.md` §3 opens by
+  explaining that *"how many steps run depends on `--profile`, so 'N gates' is never a fixed
+  number"* — correct, and then every number behind it rotted: one step was added to the shared
+  spine and all of `scaffold`/`local`/`ci`/`smoke`/`release` were left an off-by-one, with
+  `llms.txt` (the surface written for agents) repeating two of them. A profile-bound reader now
+  gates both forms the docs actually use — a table row and the prose that cites it — with the
+  profile names coming from the deriver rather than a list. Measured before wiring: eight matches,
+  eight drifts, zero false positives. A bare "<n> steps" is deliberately NOT gated (KD-73): it
+  refuses four strings on the same surfaces and two are honest prose, so the ambiguity is in the
+  noun rather than in the claim.
+
+- **Both readers are calibrated, and the calibration is kept.** GATE-RULES Rule 1 in the
+  instrument rather than by hand: one test plants a wrong number into every surface the gate lists
+  and every count it derives, and requires each one back refused — 8.7 ms, run by everyone,
+  forever. It is the non-vacuity check the surface list never had, and it earned that during
+  wiring: dropping one character from the globbed directory name put both plugin manifests back
+  outside the gate while every count assertion still passed.
 
 ## [0.26.0] - 2026-09-16
 
