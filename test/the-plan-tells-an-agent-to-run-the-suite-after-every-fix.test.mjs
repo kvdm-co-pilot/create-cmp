@@ -15,7 +15,7 @@
 //      that stood in for "has a block of its own"; the flip alone would have
 //      hidden both rows, which is the opposite of telling the agent anything.
 //      So the rows are asserted present, with the due sentence under each, and
-//      the device and review blocks are asserted to appear exactly once;
+//      the L2 run and review blocks are asserted to appear exactly once;
 //   3. the STATUS LINE — no state of the suite record ends in an order to run
 //      it. Whether a record covers these bytes is a fact; when the suite is due
 //      is the tier's sentence, one line above.
@@ -51,7 +51,7 @@ test("both cheap tiers are declared at-close and carry ONE due sentence, which s
   assert.match(CHEAP_TIER_DUE, /never per fix or per commit$/);
 });
 
-test("the printed plan shows both cheap rows with the due sentence, and still shows device and review exactly once", () => {
+test("the printed plan shows both cheap rows with the due sentence, and still shows the L2 run and review exactly once", () => {
   const o = obligation(PLAN, DOCS_ONLY, BRANCH, { fleetRecord: null });
   const out = render({ ...o, suite: { state: "absent", record: null, now: null } });
   const lines = out.split("\n");
@@ -64,7 +64,8 @@ test("the printed plan shows both cheap rows with the due sentence, and still sh
   assert.equal(/per-commit/.test(out), false, `the plan an agent reads mid-slice still says per-commit:\n${out}`);
 
   // Skipped by NAME in the cheap-tier loop, rendered by their own blocks — once.
-  assert.equal(lines.filter((l) => l.startsWith("  device (fleet L2)")).length, 1, "the device block appears once");
+  // The runtime tier's block prints as `L2 run` (its data key is still `device`).
+  assert.equal(lines.filter((l) => l.startsWith(`  ${"L2 run".padEnd(16)} `)).length, 1, "the L2 run block appears once");
   assert.equal(lines.filter((l) => l.startsWith(`  ${"review".padEnd(16)} `)).length, 1, "the review block appears once");
 });
 
