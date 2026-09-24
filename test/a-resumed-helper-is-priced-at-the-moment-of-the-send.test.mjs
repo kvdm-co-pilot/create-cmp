@@ -282,35 +282,50 @@ test("a multi-megabyte transcript is read from its tail, a line split across chu
   }
 });
 
-test("the plugin ships the hook and this repo wires it — each declared command runs the script from outside the repo", () => {
+test("the plugin is the ONE wiring — its command runs the script from outside the repo, and this repo's settings wire no second copy", () => {
   const plugin = JSON.parse(fs.readFileSync(path.join(ROOT, ".claude-plugin", "plugin.json"), "utf8"));
   assert.equal(typeof plugin.hooks, "string", "plugin.json declares its hooks file");
   assert.ok(plugin.hooks.startsWith("./"), "a plugin component path is relative to the plugin root and starts with ./");
   const pluginHooks = JSON.parse(fs.readFileSync(path.join(ROOT, plugin.hooks), "utf8"));
-  const settings = JSON.parse(fs.readFileSync(path.join(ROOT, ".claude", "settings.json"), "utf8"));
-  const sendMessageCommands = (cfg) =>
-    (cfg.hooks?.PreToolUse ?? []).filter((g) => g.matcher === "SendMessage").flatMap((g) => g.hooks.map((h) => h.command));
-
-  const shipped = sendMessageCommands(pluginHooks);
-  const wired = sendMessageCommands(settings);
+  const shipped = (pluginHooks.hooks?.PreToolUse ?? [])
+    .filter((g) => g.matcher === "SendMessage")
+    .flatMap((g) => g.hooks.map((h) => h.command));
   assert.deepEqual(shipped, ['node "${CLAUDE_PLUGIN_ROOT}/scripts/hooks/resume-price.mjs"']);
-  assert.deepEqual(wired, ['node "${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/resume-price.mjs"']);
 
-  // Executed, not read: each command, through a shell, from a directory that is
-  // not the repo, with the variable Claude Code sets for it.
+  // This repo enables its own plugin, so it gets the hook the way every adopter
+  // does. A copy in .claude/settings.json would run BESIDE the plugin's and put
+  // two identical notes on every priced send. Every command in every event and
+  // under every matcher is checked, so a second wiring cannot come back under a
+  // wider matcher; and the scan must see the proof gate's commands, or an empty
+  // list would pass it over nothing.
+  const settings = JSON.parse(fs.readFileSync(path.join(ROOT, ".claude", "settings.json"), "utf8"));
+  const everyCommand = Object.values(settings.hooks ?? {}).flatMap((groups) => groups.flatMap((g) => (g.hooks ?? []).map((h) => h.command)));
+  assert.ok(
+    everyCommand.some((c) => c.includes("scripts/hooks/proof-gate.mjs")),
+    `the settings scan saw none of the proof gate's wiring, so it measured nothing: ${JSON.stringify(everyCommand)}`,
+  );
+  assert.deepEqual(
+    everyCommand.filter((c) => c.includes("resume-price")),
+    [],
+    ".claude/settings.json wires resume-price a second time — the plugin already runs it here",
+  );
+
+  // Executed, not read: the plugin's command, through a shell, from a directory
+  // that is not the repo, with the variable Claude Code sets for it.
   const s = session();
   try {
     s.helper("awired", [assistant("awired", usage(1, 200_000, 1))]);
     const input = JSON.stringify(payload(s.transcriptPath, "awired"));
-    for (const [command, env] of [
-      [shipped[0], { CLAUDE_PLUGIN_ROOT: ROOT }],
-      [wired[0], { CLAUDE_PROJECT_DIR: ROOT }],
-    ]) {
-      const res = spawnSync("sh", ["-c", command], { input, cwd: os.tmpdir(), env: { ...process.env, ...env }, encoding: "utf8", timeout: 20_000 });
-      assert.equal(res.status, 0, `${command}: ${res.stderr}`);
-      SEEN.push(res.stdout);
-      assert.match(JSON.parse(res.stdout).hookSpecificOutput.additionalContext, /200,002 tokens/, command);
-    }
+    const res = spawnSync("sh", ["-c", shipped[0]], {
+      input,
+      cwd: os.tmpdir(),
+      env: { ...process.env, CLAUDE_PLUGIN_ROOT: ROOT },
+      encoding: "utf8",
+      timeout: 20_000,
+    });
+    assert.equal(res.status, 0, `${shipped[0]}: ${res.stderr}`);
+    SEEN.push(res.stdout);
+    assert.match(JSON.parse(res.stdout).hookSpecificOutput.additionalContext, /200,002 tokens/, shipped[0]);
   } finally {
     s.done();
   }

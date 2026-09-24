@@ -27,8 +27,10 @@ fresh one"* — resume listed first.
 
 ### 1. A program at the moment of decision — `resume-price` (advisory, refuses nothing)
 
-- A `PreToolUse` hook matching `SendMessage`, shipped with the plugin (plugin `hooks/`) and wired in
-  this repo's `.claude/settings.json` too.
+- A `PreToolUse` hook matching `SendMessage`, shipped with the plugin (plugin `hooks/`). This repo
+  gets it through the plugin it enables, as every adopter does — not through a second copy in
+  `.claude/settings.json`, which would run beside the plugin's and print the note twice (decided
+  2026-09-24, at build).
 - It reads the target helper's transcript — `<session transcript dir>/subagents/agent-<id>.jsonl`,
   where `<id>` is `tool_input.to` — takes the last assistant turn's
   `input + cache_read_input_tokens + cache_creation_input_tokens` as the context the helper carries,

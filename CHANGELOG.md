@@ -20,7 +20,9 @@ All notable changes to this project are documented here. The format is based on
   advisory in the `change-price` sense: it adds context and carries no permission decision, so it
   never allows, asks or denies, and it exits 0 on every path. Where it cannot compute a price — a
   name or a peer session rather than a helper id, an unreadable or truncated transcript, a malformed
-  payload — it says nothing.
+  payload — it says nothing. This repository gets the hook the way an adopter does, through the
+  plugin it enables, and wires no second copy in `.claude/settings.json`, which would print the note
+  twice.
 
 ### Changed
 

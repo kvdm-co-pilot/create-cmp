@@ -69,10 +69,12 @@
 // Not the default `hooks/hooks.json`: a new top-level directory is a path that
 // obliges a review and can reopen none (test/proof-plan.test.mjs, "EVERY PATH
 // THAT OBLIGES A REVIEW IS A PATH THAT CAN REOPEN ONE"), while `.claude-plugin/`
-// and `scripts/` are both review roots already. Wired in this repo's
-// `.claude/settings.json` too, with the anchored `${CLAUDE_PROJECT_DIR}` form the
-// proof gate uses. It imports nothing outside node's standard library, so the
-// plugin copy runs from any adopter's tree.
+// and `scripts/` are both review roots already. The plugin is the ONE wiring:
+// this repository enables its own plugin, so it gets the hook the way every
+// adopter does. A second copy in `.claude/settings.json` would run beside the
+// plugin's and print the note twice on every priced send; the test pins that
+// there is none. It imports nothing outside node's standard library, so it runs
+// from any adopter's tree.
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
