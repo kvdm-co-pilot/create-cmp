@@ -477,8 +477,11 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
           `Firebase console and download its google-services.json.`,
       );
     }
+    // Replaced when it is the mock, or when it is the config an earlier run was handed: a config
+    // re-downloaded for the same app (after adding a SHA, say) is how cmp-firebase-connect updates
+    // it. One this step never recorded being given is the adopter's, and is not replaced.
     if (haveConfig === text) present.push(GOOGLE_SERVICES_REL);
-    else if (haveConfig !== null && !haveConfig.includes(MOCK_TELL)) {
+    else if (haveConfig !== null && !haveConfig.includes(MOCK_TELL) && recordedConfig !== "provided") {
       refuse(
         `${GOOGLE_SERVICES_REL} already exists and is not the mock this step writes, so it is not replaced by ` +
           `${input.googleServices}. Move one of them aside, then run this again.`,
