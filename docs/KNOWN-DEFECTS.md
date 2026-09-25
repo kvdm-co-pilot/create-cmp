@@ -218,7 +218,6 @@ you the same list without opening anything.
 | **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production |
 | **KD-212** | the shipped-hooks table is derived from the template FILE's history, but minimal mode writes a SessionStart command that file never carried | no claim rests on it — a minimal stamp's command is fully single-quoted, so it is neither healable nor a violation, and doctor says nothing about it in either direction |
 | **KD-213** | the `--dry-run` gate counts four `fs` spellings where its own header names the class — `copyFileSync`, `renameSync`, `cpSync`, `fs.promises.*` and a destructured import all pass it | zero producers in the tree, and it cannot be written as a failing test: a widened gate is green on these bytes |
-| **KD-215** | the heal makes the Stop gate fire from a foreign cwd, and the remedy it then prints names `node qa/verify.mjs` — a path that does not resolve from where that session stands | the verdict and the exit code are right from both directories; only the remedy's path is relative, and the text is pre-existing and unchanged |
 | **KD-218** | the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`, and there is no such flag | refused, exit 2, nothing written; the sentence names something the CLI does not have (KD-184's shape) |
 | **KD-219** | `attach.mjs`'s new comment says the empty `--citation-roots` value "never arrives any more", and this tree's own suite passes it in | the guard it weakens the reason for is still there and still correct; only the reason is false |
 | **KD-220** | a `npm publish` payload stamps the app TWICE — `obligation()` stamps when the device tier is required and `releaseContext()` stamps again — where `ANSWER_RESERVE_MS` is documented as covering one | measured 1.92 s against a 10 s budget (merge, one stamp: 1.09 s), and 1.1–1.8 s per stamp under 16 burners; the overrun direction is fail-open but has no producer today |
@@ -3497,32 +3496,6 @@ import from `node:fs` at all, which is a change to the module, not to the gate.
 
 **Fires when:** the next project heal is written with any `fs` call other than the four, under
 `--fix --dry-run`.
-*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
-
-### KD-215 — the heal revives the Stop gate for foreign-cwd sessions, and its remedy is a path those sessions cannot resolve
-
-`template/qa/receipt-check.mjs` (the `--hook` refusal text) · `src/lib/shipped-hooks.mjs`
-(`stop-receipt-relative` → `stop-receipt-anchored`) · KD-85
-
-Reviving the Stop gate is the point of the heal, and it works: executed from a directory that is not
-the project, with `CLAUDE_PROJECT_DIR` exported the way Claude Code exports it,
-`node "${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs" --hook` produces the same refusal and the same
-exit 2 as it does from the project root — byte-identical message, verified both ways. The message it
-feeds back to the agent is *"Run `node qa/verify.mjs` (it checks every promise and writes the
-receipt), commit the receipt, or see README §Verification enforcement to bypass."* That path is
-relative, and the session being told it is, by construction, not at the project root — a session that
-was at the root had a working Stop hook before the heal and did not need it. So the one population the
-heal newly reaches is the one population for which the remedy's path does not resolve.
-
-**Nobody is handed a wrong verdict.** The gate refuses correctly, for the correct reason, with the
-correct exit code, from both directories; only the remedy's spelling assumes a cwd. An agent that runs
-the command and gets `ENOENT` learns where it is rather than something false. The text is also
-pre-existing and untouched by this change — it is logged here, rather than left to the file that owns
-it, because a fix's own new behaviour is in scope for the round that reviews it, and this heal is what
-makes the message reachable at all.
-
-**Fires when:** a session opened outside the project root ends a turn in an app whose Stop hook has
-been healed, and the receipt does not attest the tree.
 *Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
 
 ### KD-218 — the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`

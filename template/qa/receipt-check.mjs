@@ -221,6 +221,26 @@ function evaluate() {
 
 const result = evaluate();
 
+/**
+ * The lane command, spelled so it resolves from where THIS process stands. The
+ * anchored Stop hook runs this file from any directory, and a session opened
+ * outside the project is exactly the one a relative `node qa/verify.mjs` fails
+ * for (KD-215). At the project root the words are unchanged, byte for byte.
+ */
+function laneCommand() {
+  const here = (p) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  if (here(process.cwd()) === here(ROOT)) return "node qa/verify.mjs";
+  // Double quotes unless the path carries a character they would not protect.
+  const dir = /["$`\\!]/.test(ROOT) ? `'${ROOT.replace(/'/g, "'\\''")}'` : `"${ROOT}"`;
+  return `cd ${dir} && node qa/verify.mjs`;
+}
+
 if (asHook) {
   const hookInput = readStdinJson();
   if (hookInput.stop_hook_active === true) {
@@ -252,7 +272,7 @@ if (asHook) {
         `wait for it to finish and commit its receipt. Do NOT start a second one; two lanes fight over the same build directory.`
       : hold?.held
         ? describeHold(hold)
-        : "Run `node qa/verify.mjs` (it checks every promise and writes the receipt), " +
+        : `Run \`${laneCommand()}\` (it checks every promise and writes the receipt), ` +
           "commit the receipt, or see README §Verification enforcement to bypass.";
     process.stderr.write(
       `■ Prove — not done: the promises are not yet checked against this tree. ${result.reason}. ${act}\n`,
