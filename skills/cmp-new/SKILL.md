@@ -488,8 +488,8 @@ state, themselves.
 Tell the human: the target directory, the engine's GREEN/FAIL verdict, the shape and why
 (`lean`: "no Room — what the app stores lives in memory until it adds persistence"), which lane
 they took (express or guided) and — if guided — what is now approved (`node qa/approve.mjs --status`).
-Then the next manual steps: drop in `google-services.json` / `GoogleService-Info.plist`
-(intentionally not templated), then `./gradlew :composeApp:installDebug` (Android) and, on
+Then the next manual steps: `./gradlew :composeApp:installDebug` (Android) and, on
 macOS, the iOS build. For a device run + smoke, point them at **cmp-qa-prep**; for an
-incomplete toolchain, **cmp-doctor** first. If they took the express lane, remind them the
+incomplete toolchain, **cmp-doctor** first. The app has no Firebase; if they need it,
+**cmp-firebase-connect** runs `create-cmp add firebase` with their own config. If they took the express lane, remind them the
 walk is available any time — `--reopen` on any artifact starts it for that one.
