@@ -227,7 +227,6 @@ you the same list without opening anything.
 | **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
 | **KD-241** | doctor's `healWriter` writes straight onto the target with `fs.writeFileSync`, which truncates first, so a full disk or a kill mid-write can leave a truncated file where the app's own was | not observed; a thrown write is still reported as "could not write" (KD-214), but the original bytes are not restored. The atomic form is write-temp-then-rename |
-| **KD-242** | a `--minimal` app that runs `add firebase` and then `harden` may fail the architecture-doc freshness check: `add firebase` skips regenerating the doc when `qa/lib/arch-doc.mjs` is absent, and minimal subtraction removes machine-owned `qa/` scripts outside the preview keep-set | unmeasured in every part; if it fires, it is a red check the adopter can clear by regenerating, never a false green |
 | **KD-243** | the Firebase overlay's Podfile lines pin `FirebaseCore`, `FirebaseAuth` and `FirebaseFirestore` at `~> 11.0`, while the GitLive Kotlin version is taken from the registry at add time | only an iOS build reads the pods, and no L2 run compiles one (KD-206); a GitLive release that needs a newer Firebase iOS fails at pod resolution, loudly |
 | **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | judged harmless by reading in the batch that found it; no test stamps that history |
 
@@ -3695,21 +3694,6 @@ own file was.
 **Why it does not block:** it has not been observed, and it needs a failure inside one small write.
 A write that throws is still reported as "could not write" (KD-214), but the original bytes are not
 restored. The atomic form is to write a temporary file beside the target and rename it.
-
-*Logged 2026-09-25 (0.28.0 batch).*
-
-### KD-242 — `--minimal`, then `add firebase`, then `harden` may leave the architecture doc stale
-
-`src/lib/add-firebase.mjs:591-593`, `src/lib/minimal.mjs:14-16,23-24`
-
-`add firebase` regenerates `docs/ARCHITECTURE.md` with the app's own `qa/lib/arch-doc.mjs`, and
-skips when that file is absent. Minimal subtraction deletes machine-owned `qa/` scripts outside the
-preview entry points' keep-set, and `harden` installs them back. If the generator is outside the
-keep-set, the doc misses the Firebase change and the freshness check fails after `harden`.
-
-**Why it does not block:** no part of this has been measured, including whether the generator is
-outside the keep-set. If it fires, it is a red check the adopter clears by regenerating the doc,
-never a false green.
 
 *Logged 2026-09-25 (0.28.0 batch).*
 
