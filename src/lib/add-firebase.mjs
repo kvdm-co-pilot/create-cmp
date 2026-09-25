@@ -103,10 +103,44 @@ function readText(projectDir, rel) {
 }
 
 /**
+ * The region an app's record holds: under `firebase` where this step wrote it, at the top level
+ * where create-cmp 0.27 and earlier did, and the stamp-time default where it holds neither.
+ * @param {object} record parsed create-cmp.json
+ */
+export function recordedFirebaseRegion(record) {
+  return record?.firebase?.region ?? record?.region ?? DEFAULT_REGION;
+}
+
+/**
+ * The `create-cmp add firebase` choices an app's record holds, or `null` when it says the app has
+ * no Firebase. THE one reader of them: this step re-reads its own record through it, and `upgrade
+ * --harness` reproduces an app's Firebase through it (harness-upgrade.mjs re-exports it), so the
+ * two cannot read one record two ways.
+ *
+ * Both kinds of app answer here: one stamped with Firebase by create-cmp 0.27 or earlier (its
+ * record keeps `region` at the top level) and one that ran this step (which records it under
+ * `firebase`). Either way the CURRENT engine gives that app its Firebase through this step, so that
+ * is what an upgrade must compare the app against — the default stamp alone would read every
+ * Firebase line the adopter never touched as something the engine deleted.
+ * @param {object} record parsed create-cmp.json
+ * @returns {object|null}
+ */
+export function firebaseFromSpecRecord(record) {
+  const fb = record?.firebase;
+  if (!fb || fb.enabled !== true) return null;
+  const out = { region: recordedFirebaseRegion(record) };
+  for (const k of ["auth", "firestore", "storage", "functions", "fcm"]) {
+    if (fb[k] !== undefined) out[k] = fb[k];
+  }
+  return out;
+}
+
+/**
  * The Firebase choices, validated. Absent values take the app's recorded choice (a re-run) and
  * then the defaults the stamp-time option had.
  * @param {object} input {region, auth, firestore, storage, functions, fcm}
- * @param {object|null} recorded create-cmp.json's `firebase` record, when the step already ran
+ * @param {object|null} recorded what firebaseFromSpecRecord reads from create-cmp.json, when the
+ *   step already ran
  */
 export function firebaseOptions(input = {}, recorded = null) {
   const pick = (key, dflt) => (input[key] !== undefined ? input[key] : recorded?.[key] !== undefined ? recorded[key] : dflt);
@@ -345,7 +379,8 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
     }
   }
 
-  const options = firebaseOptions(input, ours ? record.firebase : null);
+  const recorded = ours ? firebaseFromSpecRecord(record) : null;
+  const options = firebaseOptions(input, recorded);
   const packagePath = record.package.replace(/\./g, "/");
   const applicationId = applicationIdOf(appBuild, record.package);
   const ios = fs.existsSync(path.join(projectDir, "iosApp"));
