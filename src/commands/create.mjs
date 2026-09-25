@@ -1,6 +1,7 @@
 // `create-cmp create` (the DEFAULT command) — scaffold a new project.
 // Moved verbatim from bin/create-cmp.mjs when the bin became a thin
-// dispatcher; behavior and flags are unchanged.
+// dispatcher. Since then one thing left it: Firebase, which is added to a
+// stamped app by `create-cmp add firebase` (see firebaseStampFlags below).
 
 import { flagBool } from "../lib/args.mjs";
 
@@ -25,6 +26,43 @@ function flagBoolWithAlias(flags, name, aliasName, dflt) {
   }
 
   return dflt;
+}
+
+// --- Firebase left stamp-time ------------------------------------------------
+
+/**
+ * The stamp-time spellings of Firebase on this line, split by what each one said.
+ *
+ * Firebase is a service, and the default stamp takes no service (docs/proposals/
+ * LIBRARIES-IN-SERVICES-OUT.md, Decision 2), so a flag that ASKS for it is refused
+ * at once — no deprecation release, the owner's call of 2026-09-24 — and the
+ * refusal names the door it moved to. A flag that DECLINES it asks for what the
+ * stamp already is, so it is honoured with a one-line note rather than turned
+ * into an error in every script that spelled the old default out.
+ *
+ * All of them stay declared (args.mjs): an unknown `--firebase` would eat the
+ * directory after it, which is KD-7's harm under a new name.
+ * @returns {{requested: string[], declined: string[]}}
+ */
+export function firebaseStampFlags(flags) {
+  const said = [
+    ["firebase", flagBool(flags, "firebase", undefined)],
+    ["firestore", flagBool(flags, "firestore", undefined)],
+    ["storage", flagBool(flags, "storage", undefined)],
+    ["functions", flagBool(flags, "functions", undefined)],
+    ["fcm", flagBool(flags, "fcm", undefined)],
+  ];
+  const requested = said.filter(([, v]) => v === true).map(([n]) => `--${n}`);
+  const declined = said.filter(([, v]) => v === false).map(([n]) => `--no-${n}`);
+  if (flags.region !== undefined) requested.push("--region");
+  if (flags["no-region"] !== undefined) declined.push("--no-region");
+  // `--auth none` asks for no Firebase Auth, which a stamp with no Firebase already is.
+  if (flags.auth !== undefined) {
+    if (flags.auth === "none") declined.push("--auth none");
+    else requested.push("--auth");
+  }
+  if (flags["no-auth"] !== undefined) declined.push("--no-auth");
+  return { requested, declined };
 }
 
 // --- name helpers ------------------------------------------------------------
@@ -61,7 +99,6 @@ function buildConfigFromFlags(flags, positional) {
   const name = typeof flags.name === "string" ? flags.name : "MyApp";
   const pkg = typeof flags.package === "string" ? flags.package : `com.${slugFromName(name)}.app`;
   const ios = flagBool(flags, "ios", true);
-  const firebase = flagBool(flags, "firebase", true);
   const targetDir =
     (typeof flags["target-dir"] === "string" && flags["target-dir"]) ||
     positional ||
@@ -71,7 +108,6 @@ function buildConfigFromFlags(flags, positional) {
     appName: name,
     package: pkg,
     iosBundleId: typeof flags["bundle-id"] === "string" ? flags["bundle-id"] : pkg,
-    region: typeof flags.region === "string" ? flags.region : "us-central1",
     themePrefix:
       typeof flags["theme-prefix"] === "string" ? flags["theme-prefix"] : pascalFromName(name),
     // `--minimal` is the Act 1 door (LADDER §2): same app, tests, previews and
@@ -79,14 +115,6 @@ function buildConfigFromFlags(flags, positional) {
     // `create-cmp harden` installs the subtraction back.
     harness: !flagBool(flags, "minimal", false),
     platforms: { android: true, ios },
-    firebase: {
-      enabled: firebase,
-      auth: typeof flags.auth === "string" ? flags.auth : "both",
-      firestore: flagBool(flags, "firestore", firebase),
-      storage: flagBool(flags, "storage", firebase),
-      functions: flagBool(flags, "functions", firebase),
-      fcm: flagBool(flags, "fcm", firebase),
-    },
     room: flagBool(flags, "room", true),
     e2e: flagBoolWithAlias(flags, "e2e", "appium", true),
     inspector: flagBool(flags, "inspector", true),
@@ -125,39 +153,9 @@ async function interactiveConfig(positional, flags = {}) {
         initial: (prev) => `com.${slugFromName(prev)}.app`,
       },
       { type: "confirm", name: "ios", message: "Enable iOS target?", initial: true },
-      { type: "text", name: "region", message: "Firebase region", initial: "us-central1" },
-      { type: "confirm", name: "firebase", message: "Wire Firebase (GitLive)?", initial: true },
     ],
     { onCancel }
   );
-
-  let auth = "none";
-  let firestore = false, storage = false, functions = false, fcm = false;
-  if (base.firebase) {
-    const fb = await prompts(
-      [
-        {
-          type: "select",
-          name: "auth",
-          message: "Auth type",
-          choices: [
-            { title: "Email + Phone (both)", value: "both" },
-            { title: "Email only", value: "email" },
-            { title: "Phone/OTP only", value: "phone" },
-            { title: "None", value: "none" },
-          ],
-          initial: 0,
-        },
-        { type: "confirm", name: "firestore", message: "Firestore?", initial: true },
-        { type: "confirm", name: "storage", message: "Storage?", initial: true },
-        { type: "confirm", name: "functions", message: "Cloud Functions?", initial: true },
-        { type: "confirm", name: "fcm", message: "FCM (push)?", initial: true },
-      ],
-      { onCancel }
-    );
-    auth = fb.auth; firestore = fb.firestore; storage = fb.storage;
-    functions = fb.functions; fcm = fb.fcm;
-  }
 
   const extras = await prompts(
     [
@@ -201,11 +199,9 @@ async function interactiveConfig(positional, flags = {}) {
     appName: base.appName,
     package: base.package,
     iosBundleId: base.package,
-    region: base.region,
     themePrefix: pascalFromName(base.appName),
     harness: extras.harness,
     platforms: { android: true, ios: base.ios },
-    firebase: { enabled: base.firebase, auth, firestore, storage, functions, fcm },
     room: extras.room,
     e2e: extras.e2e,
     inspector: extras.inspector,
@@ -223,6 +219,24 @@ async function interactiveConfig(positional, flags = {}) {
  * @param {string|undefined} positional first non-subcommand positional (target dir)
  */
 export async function runCreate(flags, positional) {
+  // Before anything is asked or written: a line that asks for Firebase is refused
+  // by name, and one that declines it is told it no longer needs to.
+  const { requested, declined } = firebaseStampFlags(flags);
+  if (requested.length) {
+    process.stderr.write(
+      `create-cmp: ${requested.join(", ")} — Firebase is not a stamp option any more. Stamp the app without it, ` +
+        `then add it with \`create-cmp add firebase <dir>\`, which takes --region, --auth and the service flags.\n` +
+        `  Nothing was written.\n`
+    );
+    process.exit(2);
+  }
+  if (declined.length) {
+    process.stderr.write(
+      `note: ${declined.join(", ")} ${declined.length === 1 ? "is" : "are"} no longer needed — a stamp carries no Firebase ` +
+        `(\`create-cmp add firebase\` adds it later).\n`
+    );
+  }
+
   const { scaffold } = await import("../scaffold.mjs");
 
   const nonInteractive =

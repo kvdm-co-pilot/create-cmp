@@ -2,17 +2,15 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/create-cmp/create-cmp/options.schema.json",
   "title": "create-cmp engine config",
-  "description": "The config object built by the CLI/plugin front door and consumed by the scaffold engine.",
+  "description": "The config object built by the CLI/plugin front door and consumed by the scaffold engine. Firebase is not in it: `firebase` and `region` left with Firebase itself, for `create-cmp add firebase`, and the engine refuses a config that still carries them by that name.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "appName",
     "package",
     "iosBundleId",
-    "region",
     "themePrefix",
     "platforms",
-    "firebase",
     "room",
     "e2e",
     "inspector",
@@ -37,12 +35,6 @@
       "description": "iOS bundle id, e.g. com.acme.app.",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*(\\.[A-Za-z0-9][A-Za-z0-9-]*)+$"
     },
-    "region": {
-      "type": "string",
-      "description": "Firebase region, e.g. us-central1.",
-      "minLength": 1,
-      "pattern": "^[a-z]+(-[a-z]+[0-9]+)?$|^[a-z-]+[0-9]+$"
-    },
     "themePrefix": {
       "type": "string",
       "description": "PascalCase theme symbol prefix, e.g. Acme.",
@@ -61,22 +53,6 @@
         "ios": { "type": "boolean" }
       }
     },
-    "firebase": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["enabled"],
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "auth": {
-          "type": "string",
-          "enum": ["email", "phone", "both", "none"]
-        },
-        "firestore": { "type": "boolean" },
-        "storage": { "type": "boolean" },
-        "functions": { "type": "boolean" },
-        "fcm": { "type": "boolean" }
-      }
-    },
     "harness": {
       "type": "boolean",
       "description": "The verification harness (the mode split, LADDER R3). true/absent = full mode: verify lane + receipts + specs + approvals + generators + Stop hook. false = minimal mode (`--minimal`): the same app, tests, previews, inspector, and advisory hooks, without the lane or governance — `create-cmp harden` installs the subtraction back. Absent means full so every pre-mode config keeps meaning what it meant."
@@ -92,7 +68,7 @@
     },
     "devClient": {
       "type": "boolean",
-      "description": "Desktop dev-client: a jvm(\"desktop\") target running the shared commonMain UI in a phone-sized JVM window with Compose Hot Reload attached (./gradlew :composeApp:hotRunDesktop --auto). Firebase is never initialized on desktop; platform seams get JVM fakes/impls in desktopMain."
+      "description": "Desktop dev-client: a jvm(\"desktop\") target running the shared commonMain UI in a phone-sized JVM window with Compose Hot Reload attached (./gradlew :composeApp:hotRunDesktop --auto). Platform seams get JVM fakes/impls in desktopMain."
     },
     "tabs": {
       "type": "array",

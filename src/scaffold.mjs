@@ -49,13 +49,38 @@ export function loadSchema(opts = {}) {
 }
 
 /**
+ * The keys a config carried while Firebase was a stamp option. They are refused
+ * BY NAME rather than by the schema's generic "is not an allowed property": the
+ * plugin door and any saved config reach the engine without passing the CLI's
+ * flag refusal, and they deserve the same answer it gives.
+ */
+export const STAMP_TIME_FIREBASE_KEYS = ["firebase", "region"];
+
+/**
  * Validate the engine config. Throws a descriptive error on failure.
+ *
+ * `opts.legacyFirebase` is for ONE caller: `upgrade --harness`, stamping the
+ * template an app was stamped from when that template still carried Firebase
+ * as an option. There the two keys describe the old tree and are what the
+ * old template's markers and `__REGION__` need, so they are set aside from
+ * validation instead of refused. Nothing else passes it.
  * @param {object} config
  * @param {object} [opts]
  */
 export function validateConfig(config, opts = {}) {
+  const carried = STAMP_TIME_FIREBASE_KEYS.filter((k) => config && typeof config === "object" && k in config);
+  if (carried.length && !opts.legacyFirebase) {
+    const err = new Error(
+      `Invalid config: ${carried.map((k) => `\`${k}\``).join(" and ")} ${carried.length === 1 ? "is" : "are"} no longer ` +
+        `stamp options — Firebase is added to a stamped app with \`create-cmp add firebase\` ` +
+        `(which takes --region). Remove ${carried.length === 1 ? "it" : "them"} from the config and stamp again.`
+    );
+    err.validationErrors = carried.map((k) => ({ path: k, message: "moved to `create-cmp add firebase`" }));
+    throw err;
+  }
   const schema = loadSchema(opts);
-  const { errors } = validate(config, schema);
+  const checked = carried.length ? Object.fromEntries(Object.entries(config).filter(([k]) => !carried.includes(k))) : config;
+  const { errors } = validate(checked, schema);
   // The schema pattern proves the SHAPE of the package id; this proves its
   // segments are legal Java identifiers. Merged into one list so a config with
   // both problems reports both at once.
@@ -331,10 +356,8 @@ function writeSpecOfRecord(projectDir, config) {
     package: config.package,
     bundleId: config.iosBundleId,
     themePrefix: config.themePrefix,
-    region: config.region,
     harness: config.harness !== false,
     platforms: config.platforms,
-    firebase: config.firebase,
     room: config.room,
     e2e: config.e2e,
     inspector: config.inspector,
@@ -358,6 +381,7 @@ function writeSpecOfRecord(projectDir, config) {
  * @param {boolean} [opts.verify=true]
  * @param {boolean} [opts.dryRunVerify=false]
  * @param {boolean} [opts.force=false] allow non-empty targetDir
+ * @param {boolean} [opts.legacyFirebase=false] upgrade --harness only — see validateConfig
  * @returns {Promise<{projectDir:string, verdict:(object|null), manifest:object}>}
  */
 export async function scaffold(config, opts = {}) {
@@ -366,7 +390,7 @@ export async function scaffold(config, opts = {}) {
 
   // (a) validate
   step("Validating config…");
-  validateConfig(config, { schemaPath: opts.schemaPath });
+  validateConfig(config, { schemaPath: opts.schemaPath, legacyFirebase: opts.legacyFirebase === true });
 
   if (!fs.existsSync(templateDir)) {
     throw new Error(`template directory not found at ${templateDir}`);
