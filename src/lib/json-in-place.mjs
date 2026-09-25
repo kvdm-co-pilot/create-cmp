@@ -139,12 +139,13 @@ export function editJsonInPlace(raw, edits) {
 }
 
 /**
- * `JSON.stringify(v)` output with each key's colon spelled `sep`. In that output the only
- * colons outside strings are key separators, so a scan that skips strings (and the
- * character after each backslash inside them) finds exactly those.
+ * `JSON.stringify(v)` output with each key's colon spelled `keySep` and each comma between
+ * items spelled `itemSep`. In that output the only colons and commas outside strings are
+ * those separators, so a scan that skips strings (and the character after each backslash
+ * inside them) finds exactly those.
  */
-function withKeySep(json, sep) {
-  if (sep === ":" || json === undefined) return json;
+function withSeps(json, keySep, itemSep) {
+  if ((keySep === ":" && itemSep === ",") || json === undefined) return json;
   let out = "";
   let inString = false;
   for (let i = 0; i < json.length; i += 1) {
@@ -156,7 +157,7 @@ function withKeySep(json, sep) {
     } else if (c === '"') {
       inString = true;
       out += c;
-    } else out += c === ":" ? sep : c;
+    } else out += c === ":" ? keySep : c === "," ? itemSep : c;
   }
   return out;
 }
@@ -219,8 +220,8 @@ export function tryEditJsonInPlace(raw, edits) {
   };
   /** A value as the file would spell it: laid out at `indent` in `unit` steps, or on one line. */
   const text = (v, { indent = "", unit = unitOfFile, compact = false } = {}) => {
-    // On one line, the colons inside the value are spelled like the file's own (KD-240).
-    let s = multiline && !compact ? JSON.stringify(v, null, unit).split("\n").join(eol + indent) : withKeySep(JSON.stringify(v), keySep);
+    // On one line, the colons and commas inside the value are spelled like the file's own (KD-240).
+    let s = multiline && !compact ? JSON.stringify(v, null, unit).split("\n").join(eol + indent) : withSeps(JSON.stringify(v), keySep, itemSep);
     if (escapes) s = s.replace(/[\u007f-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
     return s;
   };
@@ -229,6 +230,14 @@ export function tryEditJsonInPlace(raw, edits) {
       for (const m of v.members ?? []) if (typeof m.key === "string") return raw.slice(m.keyEnd, m.valueStart);
     }
     return multiline ? ": " : ":";
+  })();
+  /** The file's own comma between two items on one line, as `keySep` is its colon (KD-240). */
+  const itemSep = (() => {
+    for (const v of values) {
+      const [a, b] = v.members ?? [];
+      if (a && b && !raw.slice(a.end, b.start).includes("\n")) return raw.slice(a.end, b.start);
+    }
+    return multiline ? ", " : ",";
   })();
 
   // Group the insertions by the container they go into, so two members added to one
@@ -279,7 +288,7 @@ export function tryEditJsonInPlace(raw, edits) {
       const inner = base + unit;
       const body = multiline
         ? items.map((it) => eol + inner + entry(it, inner)).join(",") + eol + base
-        : items.map((it) => entry(it, "", true)).join(",");
+        : items.map((it) => entry(it, "", true)).join(itemSep);
       splices.push({ start: node.start, end: node.end, text: open + body + close });
       continue;
     }
