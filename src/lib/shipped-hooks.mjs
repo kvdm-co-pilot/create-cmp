@@ -394,9 +394,12 @@ function sameJson(a, b) {
  * Plan the heal over a settings.json TEXT: which commands it rewrites, and the new
  * text — identical to `raw` outside the replaced string tokens. null when the text
  * is not JSON, or when the in-place edit and JSON.parse disagree about the result
- * (a duplicate key, say), in which case nothing is written.
+ * (a duplicate key, say), in which case nothing is written. `skipped` names each shipped
+ * form it leaves where it stands, and why — the words `--fix` declines with and the
+ * finding's by-hand offer both print, so neither states the rule a second time.
  * @param {string} raw
- * @returns {{rewrites: Array<{surface:string, location:string, from:string, to:string, why:string}>, content:string}|null}
+ * @returns {{rewrites: Array<{surface:string, location:string, from:string, to:string, why:string}>,
+ *           skipped: Array<{surface:string, location:string, from:string, reason:string}>, content:string}|null}
  */
 export function planShippedHookHeal(raw) {
   let settings;
@@ -414,26 +417,85 @@ export function planShippedHookHeal(raw) {
   for (const t of located) seen.set(t.at.location, (seen.get(t.at.location) ?? 0) + 1);
 
   const rewrites = [];
+  const skipped = [];
   const expected = structuredClone(settings);
   let content = "";
   let cursor = 0;
   for (const t of located) {
-    if (seen.get(t.at.location) !== 1) continue; // a duplicate key: which one runs is JSON.parse's call, not ours
     const form = shippedForm(t.at.surface, t.value);
     const to = healedForm(form);
     if (to === null) continue;
+    if (seen.get(t.at.location) !== 1) {
+      // a duplicate key: which one runs is JSON.parse's call, not ours
+      if (!skipped.some((k) => k.location === t.at.location)) {
+        skipped.push({ surface: t.at.surface, location: t.at.location, from: t.value, reason: HEAL_SKIPS.duplicate });
+      }
+      continue;
+    }
     content += raw.slice(cursor, t.start) + JSON.stringify(to);
     cursor = t.end;
     setAt(expected, t.path, to);
     rewrites.push({ surface: t.at.surface, location: t.at.location, from: t.value, to, why: form.why ?? "" });
   }
   content += raw.slice(cursor);
-  if (rewrites.length === 0) return { rewrites, content: raw };
+  if (rewrites.length === 0) return { rewrites, skipped, content: raw };
   let reparsed;
   try {
     reparsed = JSON.parse(content);
   } catch {
     return null;
   }
-  return sameJson(reparsed, expected) ? { rewrites, content } : null;
+  return sameJson(reparsed, expected) ? { rewrites, skipped, content } : null;
+}
+
+/**
+ * Why the heal leaves a shipped form where it stands, in words that complete
+ * "--fix: not writing … — ". Here, beside the planner, and nowhere else.
+ */
+export const HEAL_SKIPS = {
+  duplicate:
+    "that location is written more than once in the file (a key on its path is duplicated), and which copy " +
+    "runs is JSON.parse's call, not doctor's",
+  unplanned:
+    "an edit of the file's own bytes cannot be matched to what JSON.parse reads from it (a key on the path is " +
+    "duplicated, say), and a file doctor cannot account for is never rewritten",
+};
+
+/**
+ * THE ONE JUDGEMENT of which shipped forms `--fix` rewrites, for both of its readers:
+ * the finding that offers the heal (`gatherHookInputs`) and the heal that performs it
+ * (`healShippedHookCommands`). The diagnosis sees commands through JSON.parse and the
+ * heal edits the text, and an offer judged by one while the write was judged by the
+ * other printed `fix (--fix):` over a file `--fix` then left untouched (KD-237's class).
+ * So every command JSON.parse calls healable lands in exactly one list here: `healed`,
+ * which the plan rewrites, or `skipped`, which it does not, with the plan's reason.
+ * @param {string} raw
+ * @returns {{plan: ReturnType<typeof planShippedHookHeal>,
+ *           healed: ReturnType<typeof healableCommands>,
+ *           skipped: Array<ReturnType<typeof healableCommands>[number] & {reason:string}>}|null}
+ *          null = not JSON.
+ */
+export function shippedHookHealVerdict(raw) {
+  let settings;
+  try {
+    settings = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  let plan;
+  try {
+    plan = planShippedHookHeal(raw);
+  } catch {
+    // A planner that cannot plan heals nothing: the diagnosis must not die of it.
+    plan = null;
+  }
+  const rewritten = new Set((plan?.rewrites ?? []).map((r) => r.location));
+  const healable = healableCommands(settings);
+  return {
+    plan,
+    healed: healable.filter((h) => rewritten.has(h.location)),
+    skipped: healable
+      .filter((h) => !rewritten.has(h.location))
+      .map((h) => ({ ...h, reason: plan?.skipped.find((k) => k.location === h.location)?.reason ?? HEAL_SKIPS.unplanned })),
+  };
 }
