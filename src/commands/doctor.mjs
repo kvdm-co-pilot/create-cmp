@@ -34,7 +34,7 @@ import { anchorViolations, unfixedHookAnchors } from "../lib/hooks.mjs";
 import {
   currentForms,
   healableCommands,
-  planShippedHookHeal,
+  shippedHookHealVerdict,
   worksFromAnyDirectory,
 } from "../lib/shipped-hooks.mjs";
 import { diagnoseProject } from "../lib/project-doctor.mjs";
@@ -327,20 +327,21 @@ export function gatherWalkInputs(projectDir) {
  * app stamped through 0.26.2 still has unanchored and which nothing here used to
  * mention (KD-85) — is reported here.
  *
- * @returns {{healable:Array, unanchored:Array}|null} null = no settings file, or one
+ * `healable` is what `--fix` WILL rewrite and `byHand` what it will not, with the heal's
+ * reason: both are the heal's own verdict (`shippedHookHealVerdict`), never a second
+ * reading of the file, so the finding offers `--fix` only where `--fix` writes.
+ *
+ * @returns {{healable:Array, byHand:Array, unanchored:Array}|null} null = no settings file, or one
  *          this cannot read, which is a state the walk-wiring finding already reports.
  */
 export function gatherHookInputs(projectDir) {
   const raw = readIfExists(path.join(projectDir, ".claude", "settings.json"));
   if (raw === null) return null;
-  let settings;
-  try {
-    settings = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  const healable = healableCommands(settings);
-  const healableAt = new Set(healable.map((h) => h.location));
+  const verdict = shippedHookHealVerdict(raw);
+  if (verdict === null) return null;
+  const settings = JSON.parse(raw);
+  const { healed: healable, skipped: byHand } = verdict;
+  const healableAt = new Set([...healable, ...byHand].map((h) => h.location));
   const unanchored = unfixedHookAnchors(settings)
     .filter((v) => !healableAt.has(v.surface))
     .filter((v) => !(v.event === "UserPromptSubmit" && v.paths.some((p) => p.endsWith("walk-status.mjs"))))
@@ -362,7 +363,7 @@ export function gatherHookInputs(projectDir) {
             : null,
       };
     });
-  return { healable, unanchored };
+  return { healable, byHand, unanchored };
 }
 
 /**
@@ -746,7 +747,17 @@ export async function healShippedHookCommands(
   const target = path.join(projectDir, ".claude", "settings.json");
   const raw = readIfExists(target);
   if (raw === null) return false;
-  const plan = planShippedHookHeal(raw);
+  const verdict = shippedHookHealVerdict(raw);
+  if (verdict === null) return false;
+  // A shipped form the heal leaves where it stands is named, with the reason, the way the
+  // walk heal names its decline: the finding sent the adopter here by hand for it, and a
+  // --fix that passes over it without a word reads as one that forgot it.
+  for (const k of verdict.skipped) {
+    const what = `the anchored form of the ${k.surface === "statusLine" ? "status line" : `${k.surface} hook`} command (${k.location})`;
+    if (typeof write.decline === "function") write.decline(target, what, k.reason);
+    else process.stdout.write(`--fix: not writing ${what} — ${k.reason}\n    ${target}\n`);
+  }
+  const plan = verdict.plan;
   // null = unreadable, or the in-place edit and JSON.parse disagreed about the
   // result. Never overwrite settings we could not account for — that is the app's file.
   if (plan === null || plan.rewrites.length === 0) return false;

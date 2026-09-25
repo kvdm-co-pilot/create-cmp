@@ -48,9 +48,12 @@ export const DISK_WARN_BYTES = 3 * GIB;
  *        null = skip the check.
  * @param {{healable:Array<{surface:string, location:string, command:string,
  *          successor:string, why:string}>,
+ *          byHand?:Array<{surface:string, location:string, command:string,
+ *          successor:string, why:string, reason:string}>,
  *          unanchored:Array<{surface:string, location:string, command:string,
  *          paths:string[], shipped:(string|null)}>}|null} [input.hooks] what
- *        .claude/settings.json carries that create-cmp shipped and has replaced, and
+ *        .claude/settings.json carries that create-cmp shipped and has replaced —
+ *        `healable` where `--fix` rewrites it, `byHand` where the heal leaves it, and why — and
  *        what the app wrote that will not resolve from another directory.
  *        null = no settings file, or one that could not be read.
  * @param {{pidAlive:boolean, url:(string|null)}|null} [input.consoleRecord] the studio
@@ -537,6 +540,7 @@ export function diagnoseProject(input) {
   // (KD-85, "only two of the three commands are reported").
   if (hooks !== null) {
     const healable = hooks.healable ?? [];
+    const byHand = hooks.byHand ?? [];
     const unanchored = hooks.unanchored ?? [];
     // The surface as an adopter knows it, with the settings path that locates it:
     // "the Stop hook" is what they recognise, `hooks.Stop[0].hooks[0]` is what they
@@ -562,6 +566,29 @@ export function diagnoseProject(input) {
             "`create-cmp doctor --fix` rewrites exactly these commands to the form the current template " +
             "ships, and changes no other byte of .claude/settings.json. It asks first, because the file is " +
             "your app's: --yes approves, --dry-run previews.",
+        },
+      });
+    }
+    if (byHand.length > 0) {
+      const one = byHand.length === 1;
+      findings.push({
+        id: "shipped-hooks-by-hand",
+        level: "warn",
+        title:
+          `${byHand.length} hook command${one ? "" : "s"} in .claude/settings.json ${one ? "is a form" : "are forms"} ` +
+          "create-cmp itself shipped and has since replaced, which doctor --fix does not rewrite where it stands",
+        detail:
+          sentence(`${byHand.map((h) => `${where(h)} runs \`${h.command}\`, which ${h.why}`).join("; ")}. `) +
+          `The form the current template ships differs by the anchor alone (${PROJECT_DIR_ANCHOR}).`,
+        // The offer is the heal's own judgement, never a second one (KD-237): `byHand` is
+        // what planShippedHookHeal leaves, with its reason, via shippedHookHealVerdict.
+        fix: {
+          auto: false,
+          description:
+            `doctor --fix does not rewrite ${byHand.map((h) => `${h.location}: ${h.reason}`).join("; ")}. ` +
+            `By hand: set ${one ? "that command" : "each command"} to the form the current template ships — ` +
+            `${byHand.map((h) => `${h.location} as "command": ${JSON.stringify(h.successor)}`).join("; ")} — ` +
+            "or keep one copy of each key written twice, then run create-cmp doctor --fix.",
         },
       });
     }
