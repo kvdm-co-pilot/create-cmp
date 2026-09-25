@@ -58,6 +58,55 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-202 — a request that arrives after `stop()` is answered with a null port, and the runner blames a test that passed — **CLOSED 2026-09-25**
+
+`inspector/mcp/src/lib/preview-service.mjs:2085` (`handleRequest`) and its `stop()`
+
+```js
+  async function handleRequest(req, res) {
+    const url = new URL(req.url, `http://127.0.0.1:${port}`);   // OUTSIDE the try
+```
+
+`stop()` sets `port = null` after `server.close()`. `server.close()` does not end a connection whose
+request is already in flight, so a request that lands in that window is handled with `port === null`,
+`new URL(req.url, "http://127.0.0.1:null")` throws `TypeError: Invalid URL`, and because the listener
+is `async` the throw is an **unhandledRejection**. Node's runner reports an unhandled rejection
+against whichever test in that process has most recently finished — as *"generated asynchronous
+activity after the test ended … created the error 'TypeError: Invalid URL'"*, which is KD-56's message
+verbatim, blaming a test at `:113` that had already passed.
+
+Reproduced deterministically 2026-09-22 (instrument, not a test): start a service, connect a raw
+socket, send half a request, call `service.stop()`, send the rest → `UNHANDLED REJECTION: TypeError:
+Invalid URL`.
+
+**Who sends such a request in a suite:** KD-203 and KD-204 — every console's `stop()` sends
+`GET /shutdown` to a WELL-KNOWN port, and services that asked for an ephemeral port were listening on
+exactly that port. The slice that closed KD-56 removed the exposure for
+`inspector/mcp/test/console-now-sse.test.mjs` by giving it real ephemeral ports; the defect itself is
+untouched.
+
+**Why it does not block.** No adopter runs these tests, and in a real console a stray request during
+shutdown produces one rejected promise in a process that is exiting. What it costs is suite records: a
+FAIL against a test that passed, on a tree that is fine.
+
+**The fix** is `const url = new URL(req.url, "http://127.0.0.1")` (the port carries no meaning for
+`pathname` / `searchParams`) or moving the line inside the try — plus a rebuild of
+`inspector/mcp/dist/server.mjs`, which is why a test-only slice did not do it: shipped bytes and a
+bundle rebuild belong to the slice that owns `inspector/mcp/`.
+
+**Fires when:** anything sends the console a request while it is stopping — which the suite does to
+itself.
+*Logged 2026-09-22, found by reading KD-56's kept message.*
+
+**CLOSED by the fix this entry named, in the commit that moved it here.** `handleRequest` builds its
+URL inside the `try`, on the base `http://127.0.0.1`: every read of it is `pathname` or
+`searchParams`, and the port means nothing to either. `stop()` still nulls `port`, which `status()`
+reports, but the handler no longer reads it, so a request that finishes arriving after the stop is
+answered or fails into the handler's own `catch` — never an unhandled rejection.
+`inspector/mcp/test/console-stop.test.mjs` runs this entry's recipe — half a request on a raw
+socket, `stop()`, then the rest — and asserts no unhandled rejection. `inspector/mcp/dist/server.mjs`
+is not rebuilt in this commit; the bundle is rebuilt once, at verification.
+
 ### KD-188 — `cmp-inspector-mcp --help` starts a server and exits silently — **CLOSED 2026-09-25**
 
 `inspector/mcp/bin/server.mjs` (`main`, bottom of file)
