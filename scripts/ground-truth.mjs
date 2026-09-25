@@ -127,6 +127,21 @@ function skills() {
   return { count: declared.length, declared: [...declared].sort(), onDisk, inSync: JSON.stringify([...declared].sort()) === JSON.stringify(onDisk) };
 }
 
+/**
+ * Agents, the same two ways: what the plugin DECLARES and the `agents/*.md` on
+ * DISK. An agent file on disk but undeclared never loads; a declared one missing
+ * from disk breaks the install. Named by file, without the extension.
+ */
+function agents() {
+  const declared = json(".claude-plugin/plugin.json").agents.map((a) => path.basename(a, ".md"));
+  const onDisk = fs
+    .readdirSync(path.join(ROOT, "agents"), { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith(".md"))
+    .map((e) => path.basename(e.name, ".md"))
+    .sort();
+  return { count: declared.length, declared: [...declared].sort(), onDisk, inSync: JSON.stringify([...declared].sort()) === JSON.stringify(onDisk) };
+}
+
 /** MCP tools — counted from the registrations themselves, not from a list. */
 function mcpTools() {
   const src = read("inspector/mcp/bin/server.mjs");
@@ -538,6 +553,7 @@ export function groundTruth() {
     generatedFrom: "scripts/ground-truth.mjs — derived, never hand-written",
     versions: versions(),
     skills: skills(),
+    agents: agents(),
     mcpTools: mcpTools(),
     cliCommands: cliCommands(),
     verifyProfiles: verifyProfiles(),
@@ -606,6 +622,7 @@ upgrading its generator. Do not "fix" them to match.
 | Thing | Count | Detail |
 |---|---|---|
 | Plugin skills | **${gt.skills.count}** | ${gt.skills.declared.join(", ")} |
+| Plugin agents | **${gt.agents.count}** | ${gt.agents.declared.join(", ")} |
 | \`cmp-inspector\` MCP tools | **${gt.mcpTools.count}** | ${gt.mcpTools.names.join(", ")} |
 | CLI commands | **${gt.cliCommands.count}** | ${gt.cliCommands.names.join(", ")} |
 
@@ -730,6 +747,7 @@ async function main() {
   for (const line of formatSpine(gt.spine)) console.log(line);
   console.log("\ncounts");
   row("skills", `${gt.skills.count}${gt.skills.inSync ? "" : "  ⚠ declared/disk MISMATCH"}`);
+  row("agents", `${gt.agents.count}${gt.agents.inSync ? "" : "  ⚠ declared/disk MISMATCH"}`);
   row("mcp tools", gt.mcpTools.count);
   row("cli commands", gt.cliCommands.count);
   console.log("\nverify lane (steps per profile)");

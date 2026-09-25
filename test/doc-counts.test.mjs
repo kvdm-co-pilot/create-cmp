@@ -357,6 +357,14 @@ test("the plugin's declared skills match the skills on disk", () => {
   );
 });
 
+test("the plugin's declared agents match the agents on disk", () => {
+  assert.ok(
+    GT.agents.inSync,
+    `plugin.json declares [${GT.agents.declared.join(", ")}] but agents/ holds ` +
+      `[${GT.agents.onDisk.join(", ")}] — an agent on disk but undeclared never loads.`,
+  );
+});
+
 test("the version spine moves in lockstep", () => {
   // The CLI, the plugin, and the plugin's marketplace entry are ONE release —
   // this repo IS the plugin source, so a split here ships a plugin that
