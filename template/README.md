@@ -58,7 +58,7 @@ only — release builds contain no inspector code.
 `iosApp.xcworkspace` in Xcode and run. (First time: `brew install xcodegen`.)
 <!-- <<< cmp:feature ios -->
 
-**Firebase:** not part of this scaffold. `npx create-cmp add firebase` adds it — the GitLive SDK,
+**Firebase:** not part of this scaffold. `npx create-cmp-cli add firebase` adds it — the GitLive SDK,
 the debug-build emulator redirect, and your real `google-services.json` (or a mock config that
 says it is one). From Claude Code, the `cmp-firebase-connect` skill drives it end to end.
 

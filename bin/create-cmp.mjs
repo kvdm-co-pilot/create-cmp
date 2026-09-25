@@ -6,13 +6,13 @@
 // and the deterministic engine in src/. Two front doors (this CLI + the
 // Claude Code plugin) share that one engine.
 //
-//   npx create-cmp [target-dir] [flags]        # scaffold (default command)
-//   npx create-cmp create  [target-dir] [flags]
-//   npx create-cmp doctor  [flags]             # toolchain + project diagnosis
-//   npx create-cmp upgrade [flags]             # migrate to a proven-green version set
-//   npx create-cmp clean   [flags]             # konan/Gradle cache & build-output hygiene
-//   npx create-cmp verify  [flags]             # green-build gate on an existing project
-//   npx create-cmp add firebase [flags]        # add Firebase to a stamped app
+//   npx create-cmp-cli [target-dir] [flags]        # scaffold (default command)
+//   npx create-cmp-cli create  [target-dir] [flags]
+//   npx create-cmp-cli doctor  [flags]             # toolchain + project diagnosis
+//   npx create-cmp-cli upgrade [flags]             # migrate to a proven-green version set
+//   npx create-cmp-cli clean   [flags]             # konan/Gradle cache & build-output hygiene
+//   npx create-cmp-cli verify  [flags]             # green-build gate on an existing project
+//   npx create-cmp-cli add firebase [flags]        # add Firebase to a stamped app
 
 import fs from "node:fs";
 import path from "node:path";
@@ -247,18 +247,18 @@ function printHelp() {
       `Scaffolds a green-building app in minutes; every generated project carries a spec-driven\n` +
       `verify lane, evidence receipts, and mechanical enforcement of "done".\n\n` +
       `Usage:\n` +
-      `  npx create-cmp [target-dir] [flags]    scaffold a new app (default command)\n` +
-      `  npx create-cmp create [target-dir]     same, explicit\n` +
-      `  npx create-cmp doctor                  toolchain doctor + project diagnosis (any KMP project)\n` +
-      `  npx create-cmp upgrade                 migrate to the next proven-green version set\n` +
-      `  npx create-cmp upgrade --harness       refresh engine-owned files of a stamped app (3-way merge)\n` +
-      `  npx create-cmp clean                   ~/.konan + Gradle build-output hygiene (consent-gated)\n` +
-      `  npx create-cmp verify                  run the green-build gate on an existing project\n` +
-      `  npx create-cmp harden                  install the full harness into a --minimal scaffold\n` +
-      `  npx create-cmp attach                  wire the agent contract into an EXISTING Compose/KMP repo\n` +
-      `  npx create-cmp add firebase [dir]      add Firebase to a stamped app (GitLive SDK + emulator wiring)\n` +
-      `  npx create-cmp harness init            install the verify lane into a repo of ANY stack\n` +
-      `  npx create-cmp harness relock          re-take the lock after editing YOUR profile or declarations\n\n` +
+      `  npx create-cmp-cli [target-dir] [flags]    scaffold a new app (default command)\n` +
+      `  npx create-cmp-cli create [target-dir]     same, explicit\n` +
+      `  npx create-cmp-cli doctor                  toolchain doctor + project diagnosis (any KMP project)\n` +
+      `  npx create-cmp-cli upgrade                 migrate to the next proven-green version set\n` +
+      `  npx create-cmp-cli upgrade --harness       refresh engine-owned files of a stamped app (3-way merge)\n` +
+      `  npx create-cmp-cli clean                   ~/.konan + Gradle build-output hygiene (consent-gated)\n` +
+      `  npx create-cmp-cli verify                  run the green-build gate on an existing project\n` +
+      `  npx create-cmp-cli harden                  install the full harness into a --minimal scaffold\n` +
+      `  npx create-cmp-cli attach                  wire the agent contract into an EXISTING Compose/KMP repo\n` +
+      `  npx create-cmp-cli add firebase [dir]      add Firebase to a stamped app (GitLive SDK + emulator wiring)\n` +
+      `  npx create-cmp-cli harness init            install the verify lane into a repo of ANY stack\n` +
+      `  npx create-cmp-cli harness relock          re-take the lock after editing YOUR profile or declarations\n\n` +
       `create (scaffold) flags:\n` +
       `  --name --package --bundle-id --theme-prefix\n` +
       `  --minimal   (light scaffold: app + tests + previews, no verify lane/receipts —\n` +
