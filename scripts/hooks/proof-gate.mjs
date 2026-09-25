@@ -317,6 +317,21 @@ const REKEY = "node scripts/proof-plan.mjs --rekey";
 const rekeyFirst = (o) => o?.shortfall?.code === "other-rule";
 const REKEY_INSTEAD = `the run on record is keyed under another digest rule, so run ${REKEY} INSTEAD of the L2 run — a stamp of the commit it ran on, seconds, no L2 run — and read node scripts/proof-plan.mjs again; only if it still reads OWED is the L2 run owed`;
 
+const isOpen = (s) => s === "owed" || s === "reopened";
+
+/**
+ * Which at-close L2 runs this command could be paying for: the default one, the
+ * Firebase one (KD-45), or both. The Firebase run counts only where the L2 run's
+ * own state would let a run go ahead or refuse it as waste — never on trunk
+ * (a release proof), and never beside an undeclared or unknown state, whose
+ * refusals ask for something else first.
+ */
+function openRuns(o) {
+  const device = isOpen(o?.state);
+  const firebase = !o?.trunk && isOpen(o?.firebase?.state) && (device || o.state === "none" || o.state === "discharged");
+  return { device, firebase };
+}
+
 /**
  * The decision, pure: a watched command kind and what the slice owes
  * (`obligation()` from scripts/proof-plan.mjs) in, a verdict out.
@@ -327,7 +342,36 @@ const REKEY_INSTEAD = `the run on record is keyed under another digest rule, so 
  */
 export function decide(kind, o, tiers, ctx) {
   const cmd = tiers?.device?.cmd ?? "the fleet check";
+  // THE FIREBASE L2 RUN (KD-45): the same L2 run with the template's Firebase
+  // code compiled in and executing, keyed on its own digest. The two can
+  // disagree, and the one case that MUST be got right is the L2 run DISCHARGED
+  // while the Firebase run is still owed: the ordinary "a second run over the
+  // same bytes" refusal would then refuse the only run that can discharge the
+  // Firebase tier, and nothing here would ever execute the template's Firebase
+  // code. No flag is parsed (G6): the gate cannot tell which of the two commands
+  // it is looking at, so it lets the run through while EITHER is open and names
+  // the command for each; a default run while only Firebase is owed wastes one
+  // run and discharges nothing, because the digests differ.
+  const fb = o.firebase;
+  const fbCmd = tiers?.firebase?.cmd ?? "the fleet check with --with-firebase";
   if (kind === "device") {
+    const runs = openRuns(o);
+    if (runs.device || runs.firebase) {
+      // A lane already driving the one device makes a second run worse than
+      // wasted: it has wedged Maestro before its first flow. This was a line in
+      // a memory file ("check pgrep first") — now it is checked. And the refusal
+      // says WHOSE lane it is and how long it has left (KD-27): the two cases
+      // want opposite actions, and a bare PID left the wrong one tempting.
+      if (ctx?.runningLane) {
+        const { ours, text } = describeLane(ctx.runningLane, { repoRoot: ctx.repoRoot ?? null });
+        return deny(
+          `a verify lane is already running: ${text}. A concurrent L2 run collides with it (on the cmp profile: a wedged adbd, false reds). ` +
+            (ours ? "Wait for it, then run the tier once." : "Do not kill it — it is not this slice's. Wait for it, then run the tier once."),
+        );
+      }
+      const d = orderedRun(o, runs, { cmd, fbCmd }, ctx?.base);
+      return runs.device && rekeyFirst(o) ? { ...d, reason: `${REKEY_INSTEAD}.\n\n${d.reason}` } : d;
+    }
     switch (o.state) {
       case "none":
         if (o.trunk) return allow(`nothing is owed per slice — this is trunk — so this can only be a RELEASE proof (npm-publish skill step 2): allowed. Then npm publish reads its record.`);
@@ -342,23 +386,6 @@ export function decide(kind, o, tiers, ctx) {
       }
       case "undeclared":
         return deny(`no slice is declared, so this run could discharge nothing — ${o.need.reason}. Declare first: ${DECLARE}. Then run the tier once, at close.`);
-      case "owed":
-      case "reopened": {
-        // A lane already driving the one device makes a second run worse than
-        // wasted: it has wedged Maestro before its first flow. This was a line in
-        // a memory file ("check pgrep first") — now it is checked. And the refusal
-        // says WHOSE lane it is and how long it has left (KD-27): the two cases
-        // want opposite actions, and a bare PID left the wrong one tempting.
-        if (ctx?.runningLane) {
-          const { ours, text } = describeLane(ctx.runningLane, { repoRoot: ctx.repoRoot ?? null });
-          return deny(
-            `a verify lane is already running: ${text}. A concurrent L2 run collides with it (on the cmp profile: a wedged adbd, false reds). ` +
-              (ours ? "Wait for it, then run the tier once." : "Do not kill it — it is not this slice's. Wait for it, then run the tier once."),
-          );
-        }
-        const d = orderedRun(o, ctx?.base);
-        return rekeyFirst(o) ? { ...d, reason: `${REKEY_INSTEAD}.\n\n${d.reason}` } : d;
-      }
       default:
         return deny(`the proof plan is in an unknown state (${o.state}) — refusing rather than guessing`);
     }
@@ -383,6 +410,11 @@ export function decide(kind, o, tiers, ctx) {
         break;
       default:
         break;
+    }
+    if (isOpen(fb?.state)) {
+      blocked.push(
+        `the Firebase L2 run is ${fb.state.toUpperCase()} for this slice and the slice closes at merge — ${fb.need.reason}. The template's Firebase code executes nowhere else in this repository (KD-45), and the ordinary L2 run stamps it out. Run it once: ${fbCmd} — then node scripts/proof-plan.mjs --discharge, then merge.`,
+      );
     }
     const r = o.review;
     switch (r?.state) {
@@ -431,6 +463,9 @@ export function decide(kind, o, tiers, ctx) {
     const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
     const notes = [];
     if (open(o.state)) notes.push(`the L2 run is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${rekeyFirst(o) ? `${REKEY_INSTEAD}; else ` : ""}${cmd}, then node scripts/proof-plan.mjs --discharge)`);
+    // Owed or reopened only: the merge holds for nothing else on this tier, and
+    // a reminder that promised a refusal the merge does not make would be a lie.
+    if (isOpen(fb?.state)) notes.push(`the Firebase L2 run is ${fb.state.toUpperCase()}; gh pr merge will refuse until a run with Firebase compiled in is recorded against these bytes (${fbCmd}, then node scripts/proof-plan.mjs --discharge)`);
     if (open(o.review?.state)) notes.push(`a review is ${o.review.state.toUpperCase()}; gh pr merge will refuse until a review of these bytes is recorded (${tiers?.review?.cmd ?? "node scripts/proof-plan.mjs --discharge-review"})`);
     return notes.length ? allow(`reminder: ${notes.join(" — and ")}. Open the PR, finish everything else, run the at-close tiers last.`) : SILENT;
   }
@@ -452,8 +487,20 @@ export function decide(kind, o, tiers, ctx) {
  * not be answered, and ALLOW-AND-SAY-SO when it was answered by this checkout's
  * own ref rather than by origin. A gate that cannot see must not pass silently.
  */
-function orderedRun(o, base) {
-  const owed = `the L2 run is ${o.state.toUpperCase()} and this is the LAST gate: run it only when npm test and framework-check are green and you are about to open the PR — an edit that changes what this tree STAMPS reopens the slice afterwards. Then: node scripts/proof-plan.mjs --discharge`;
+function orderedRun(o, runs, { cmd, fbCmd }, base) {
+  const fb = o.firebase;
+  const both = runs.device && runs.firebase;
+  const what = both
+    ? `the L2 run is ${o.state.toUpperCase()} and the Firebase L2 run is ${fb.state.toUpperCase()}`
+    : runs.firebase
+      ? `the Firebase L2 run is ${fb.state.toUpperCase()}`
+      : `the L2 run is ${o.state.toUpperCase()}`;
+  const last = `this is the LAST gate: ${both ? "run them" : "run it"} only when npm test and framework-check are green and you are about to open the PR — an edit that changes what this tree STAMPS reopens the slice afterwards.`;
+  const owed = both
+    ? `${what} and ${last} Two runs, sequentially, never concurrently — a second L2 run started beside the first collides with it: ${cmd} — then, once it has finished, ${fbCmd} — then node scripts/proof-plan.mjs --discharge, which discharges both`
+    : runs.firebase
+      ? `${what} — ${fb.need.reason}. The app the ordinary L2 run stamps has Firebase compiled out, so no record of it attests this (KD-45), and ${last} Run it with the flag: ${fbCmd} — then node scripts/proof-plan.mjs --discharge`
+      : `${what} and ${last} Run: ${cmd} — then node scripts/proof-plan.mjs --discharge`;
   const why = `An L2 run proves an APP, and the merge brings origin/main into this tree — if that moves what the tree stamps, the tier REOPENS and the run is bought a second time. Measured 2026-09-16: four emulator runs for one merge, each one owed by this program and none of them needed.`;
   const fix = `git fetch origin && git rebase origin/main`;
   if (!base) return allow(owed);
@@ -470,7 +517,7 @@ function orderedRun(o, base) {
       : base.source === "remote"
         ? `origin/main has MOVED to ${at} and ${short} — read from origin just now`
         : `origin/main is at ${at} and ${short} — read from this checkout's own ref, which no call to origin could make less true (and if trunk was rewound, the same fetch below corrects the ref and clears this)`;
-    return deny(`the L2 run is ${o.state.toUpperCase()}, but this branch does not contain origin/main: ${how}. ${why} Bring trunk in first, then run the tier once: ${fix}`);
+    return deny(`${what}, but this branch does not contain origin/main: ${how}. ${why} Bring trunk in first, then run the tier once: ${fix}`);
   }
 
   if (base.contained === null) {
@@ -1215,7 +1262,10 @@ async function verdict(kind, command, cwd) {
     // already refused — nothing owed, discharged, undeclared, or a lane in
     // flight — needs no second reason, and the lane refusal is reported alone
     // because it asks for something else entirely.
-    if (!ctx.runningLane && (o.state === "owed" || o.state === "reopened")) ctx.base = baseContext(root, { branch: o.branch, isTrunk });
+    if (!ctx.runningLane) {
+      const runs = openRuns(o);
+      if (runs.device || runs.firebase) ctx.base = baseContext(root, { branch: o.branch, isTrunk });
+    }
   }
   const d = decide(kind, o, TIERS, ctx);
   if (root === REPO_ROOT || d.action === "silent") return d;
