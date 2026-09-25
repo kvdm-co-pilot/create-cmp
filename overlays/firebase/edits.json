@@ -1,0 +1,79 @@
+{
+  "description": "The edits `create-cmp add firebase` makes to a stamped app, beyond the whole files under files/ and the blocks under append/ (an `appends` entry names a line whose presence means the block is already there — the stamp of create-cmp 0.27 and earlier carried two of them unmarked). Read by src/lib/add-firebase.mjs, and by test/the-emulator-redirect-cannot-fail-quietly.test.mjs for the two lines that call the emulator redirect. Paths use the template's literal com/example/app segment; the step maps it to the app's package. An anchor is one whole line, compared trimmed, and must occur exactly once; `present` is the text whose presence means the edit is already made.",
+  "catalog": {
+    "versionsFromRegistry": ["google-services", "firebase-gitlive"],
+    "comment": "# Firebase GitLive KMP SDK (added by `create-cmp add firebase`)",
+    "libraries": {
+      "firebase-auth": "{ module = \"dev.gitlive:firebase-auth\", version.ref = \"firebase-gitlive\" }",
+      "firebase-firestore": "{ module = \"dev.gitlive:firebase-firestore\", version.ref = \"firebase-gitlive\" }",
+      "firebase-functions": "{ module = \"dev.gitlive:firebase-functions\", version.ref = \"firebase-gitlive\" }",
+      "firebase-storage": "{ module = \"dev.gitlive:firebase-storage\", version.ref = \"firebase-gitlive\" }",
+      "firebase-messaging": "{ module = \"dev.gitlive:firebase-messaging\", version.ref = \"firebase-gitlive\" }",
+      "firebase-config": "{ module = \"dev.gitlive:firebase-config\", version.ref = \"firebase-gitlive\" }"
+    },
+    "plugins": {
+      "google-services": "{ id = \"com.google.gms.google-services\", version.ref = \"google-services\" }"
+    }
+  },
+  "appends": {
+    "settings.gradle.kts": { "present": "https://jitpack.io" },
+    "composeApp/proguard-rules.pro": { "present": "-keep class dev.gitlive.firebase.** { *; }" }
+  },
+  "inserts": [
+    {
+      "file": "build.gradle.kts",
+      "after": "alias(libs.plugins.android.application) apply false",
+      "present": "alias(libs.plugins.google.services)",
+      "lines": ["alias(libs.plugins.google.services) apply false"]
+    },
+    {
+      "file": "composeApp/build.gradle.kts",
+      "after": "alias(libs.plugins.android.application)",
+      "present": "alias(libs.plugins.google.services)",
+      "lines": ["alias(libs.plugins.google.services)"]
+    },
+    {
+      "file": "composeApp/src/androidMain/kotlin/com/example/app/AppApplication.kt",
+      "before": "startKoin {",
+      "present": "configureFirebaseEmulators()",
+      "lines": ["configureFirebaseEmulators()"]
+    },
+    {
+      "file": "composeApp/src/iosMain/kotlin/com/example/app/KoinHelper.kt",
+      "before": "startKoin {",
+      "present": "configureFirebaseEmulators()",
+      "lines": ["configureFirebaseEmulators()"]
+    },
+    {
+      "file": "iosApp/iosApp/iOSApp.swift",
+      "after": "import ComposeApp",
+      "present": "import FirebaseCore",
+      "lines": ["import FirebaseCore"]
+    },
+    {
+      "file": "iosApp/iosApp/iOSApp.swift",
+      "before": "KoinHelperKt.doInitKoin()",
+      "present": "FirebaseApp.configure()",
+      "lines": [
+        "// Firebase native init (reads GoogleService-Info.plist). MUST run before doInitKoin(),",
+        "// which points the GitLive clients at the local emulators in a debug build.",
+        "FirebaseApp.configure()"
+      ]
+    },
+    {
+      "file": "iosApp/Podfile",
+      "after": "target 'iosApp' do",
+      "present": "pod 'FirebaseCore'",
+      "lines": [
+        "  # The native Firebase iOS SDKs the GitLive bindings link against (GitLive 2.x -> Firebase iOS 11.x).",
+        "  pod 'FirebaseCore',          '~> 11.0'",
+        "  pod 'FirebaseAuth',          '~> 11.0'",
+        "  pod 'FirebaseFirestore',     '~> 11.0'",
+        "  pod 'FirebaseFunctions',     '~> 11.0'",
+        "  pod 'FirebaseStorage',       '~> 11.0'",
+        "  pod 'FirebaseMessaging',     '~> 11.0'",
+        "  pod 'FirebaseRemoteConfig',  '~> 11.0'"
+      ]
+    }
+  ]
+}
