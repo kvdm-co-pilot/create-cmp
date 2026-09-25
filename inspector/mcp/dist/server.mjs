@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 9533fa63ae3a6b5be94ef7b27701be67627283df5b9bbe99fda9df3b33e572a8
+// cmp:bundle-inputs ef8bb0aa10d5c42434afa8cbb3882988d98f12d9b9eccfd31e5b878de391f2ee
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -40688,7 +40688,7 @@ function createPreviewService(opts) {
     }
     if (!theirs) log(`daemon on ${daemonUrl} reports no previewsDir (older build) \u2014 reusing it unverified`);
     noteDaemonReload(health);
-    return true;
+    return theirs ? "verified" : "unverified";
   }
   function noteSrcChange() {
     if (mode !== "daemon") return;
@@ -40738,7 +40738,6 @@ function createPreviewService(opts) {
     );
   });
   function adoptDaemonChild(child) {
-    daemonOurs = true;
     stampRenderMarker(projectDir);
     child.stdout?.on("data", noteDaemonOutput);
     child.stderr?.on("data", noteDaemonOutput);
@@ -40753,11 +40752,13 @@ function createPreviewService(opts) {
         }
       }
       daemonChild = null;
+      daemonOurs = false;
     });
   }
   async function ensureDaemon() {
-    if (await daemonHealthy()) {
-      enterDaemonMode("reusing already-running daemon");
+    const found = await daemonHealthy();
+    if (found) {
+      enterDaemonMode("reusing already-running daemon", found === "verified");
       return;
     }
     try {
@@ -40771,15 +40772,16 @@ function createPreviewService(opts) {
     while (Date.now() < daemonBootDeadline) {
       await new Promise((r) => setTimeout(r, 2e3));
       if (!daemonChild) return;
-      if (await daemonHealthy()) {
-        enterDaemonMode("daemon booted");
+      const booted = await daemonHealthy();
+      if (booted) {
+        enterDaemonMode("daemon booted", daemonChild !== null || booted === "verified");
         return;
       }
     }
     log("daemon did not become healthy in time \u2014 staying on the gradle path");
   }
-  function enterDaemonMode(why) {
-    daemonOurs = true;
+  function enterDaemonMode(why, ours) {
+    daemonOurs = ours;
     mode = "daemon";
     log(`${why} \u2014 warm renders via ${daemonUrl}`);
     watchClasses();
@@ -41843,7 +41845,7 @@ async function gitChangedFiles(cwd) {
     return [];
   }
 }
-var SERVER_VERSION = true ? "0.9.0" : JSON.parse(readFileSync4(new URL("../package.json", import.meta.url), "utf8")).version;
+var SERVER_VERSION = true ? "0.9.1" : JSON.parse(readFileSync4(new URL("../package.json", import.meta.url), "utf8")).version;
 var server = new McpServer({
   name: "cmp-inspector",
   version: SERVER_VERSION,
