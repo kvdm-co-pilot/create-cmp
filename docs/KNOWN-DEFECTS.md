@@ -227,6 +227,8 @@ you the same list without opening anything.
 | **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
 | **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | measured 2026-09-25: not harmless, but loud: one spurious conflict sidecar (`composeApp/build.gradle.kts`) and exit 1, nothing removed or duplicated; a second sidecar (`libs.versions.toml`) seen in the test comes from its synthesised 0.27 catalog and does not occur with the real 0.27.2 one |
+| **KD-247** | `add firebase` writes the Podfile's Firebase pods and a comment naming the GitLive version the registry paired them with (KD-243), and `upgrade` moves `firebase-gitlive` in the catalog and never the Podfile | cannot fire yet: every shipped set pairs Firebase iOS 11.x, which `~> 11.1` still resolves; the comment goes stale on the first GitLive bump, and the pins break at the first set that pairs across a Firebase iOS major |
+| **KD-248** | `harden --dry-run` lists every file it would write and not `docs/ARCHITECTURE.md`, which the apply now regenerates (KD-242) | the write is the doc's generated sections, the ones the lane's archDoc step owns; the preview is short one line, not wrong about a file the adopter owns |
 
 ---
 
@@ -3718,3 +3720,32 @@ fails for a reason no app has.
 writes a `*.cmp-new` sidecar for a human, and changes nothing in the app. It is never a silent strip.
 
 *Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-247 — `upgrade` moves GitLive and leaves the Podfile's Firebase pairing behind
+
+`src/lib/add-firebase.mjs` (`firebaseIosPodFor`, the `__FIREBASE_IOS_POD__` tokens) vs `src/lib/upgrade.mjs`
+
+Found in round 1 of the 0.28.1 slice. KD-243 made `add firebase` write
+`pod 'FirebaseCore', '~> <major>.<minor>'` from the registry set's `firebaseIos` pairing, with a
+Podfile comment naming it ("GitLive 2.1.0 is built against Firebase iOS 11.1.0"). `upgrade`
+rewrites `[versions]` — `firebase-gitlive` included — and nothing under `src/` other than
+`add-firebase.mjs` reads the Podfile or `firebaseIos` (grep, 2026-09-25). So an app that added
+Firebase on one set and upgrades to a set with another GitLive version keeps the first set's pods
+and a comment that names a GitLive version the catalog no longer pins.
+
+Placed on the line: nobody is wrongly served today — the shipped sets pair 11.1.0 and 11.8.0, both
+inside `~> 11.1`, so the pods resolve. It fires when a promoted set pairs a GitLive version built
+against Firebase iOS 12: the upgraded app then asks CocoaPods for `~> 11.x` against bindings linked
+at 12. The repair is `upgrade` carrying the pairing (or refusing across a major), the way
+`promote-set` now does.
+
+### KD-248 — `harden --dry-run` does not list the architecture doc the apply regenerates
+
+`src/commands/harden.mjs` (`runHarden`'s dry-run listing vs `hardenProject`'s `regenerateArchDoc`)
+
+Found in round 1 of the 0.28.1 slice. KD-242 added `regenerateArchDoc(projectDir)` to the apply
+path; the dry-run listing is built from the merge plan and the seed plan only, so it prints every
+file the apply writes except `docs/ARCHITECTURE.md`, and the apply then reports
+"regenerated docs/ARCHITECTURE.md". The write touches only the `cmp:generated` sections, which the
+lane's archDoc step owns and would fail on anyway — so the adopter is not handed a change to text
+they own. Logged, not blocked: the preview is one line short, not wrong.
