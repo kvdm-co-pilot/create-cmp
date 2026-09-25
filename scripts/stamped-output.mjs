@@ -71,7 +71,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 export const FLEET_SCRATCH_APP = Object.freeze({
   name: "FleetCheck",
   package: "com.fleet.check",
-  flags: Object.freeze(["--yes", "--name", "FleetCheck", "--package", "com.fleet.check", "--no-ios", "--no-firebase", "--no-verify"]),
+  flags: Object.freeze(["--yes", "--name", "FleetCheck", "--package", "com.fleet.check", "--no-ios", "--no-verify"]),
 });
 
 /**
