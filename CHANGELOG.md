@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **The Firebase L2 run.** `node scripts/fleet-check.mjs --with-firebase` runs the fleet scratch app
+  after `create-cmp add firebase` inside the Firebase Emulator Suite, on the app's own `demo-`
+  project. `node scripts/proof-plan.mjs` owes it exactly when the stamp-plus-add app's bytes move,
+  never on a calendar. It proves compile, init and the four `useEmulator` redirects at startup. No
+  request crosses the redirect (KD-210).
+
 ## [0.28.1] - 2026-09-26
 
 Doctor offers only the fixes it performs, the Firebase add step pairs its iOS pods with the

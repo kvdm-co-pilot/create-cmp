@@ -113,7 +113,7 @@ you the same list without opening anything.
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 | **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
-| **KD-45** | no gate in this repo executes the Firebase or iOS paths | Firebase: CI compiles the default stamp plus `add firebase` on every PR, and nothing runs it; iOS: the L2 run stamps `--no-ios`; the iOS stamp compiled once on CI (run 36181162894, dispatch-only, 0.28.0 tree) and has never run |
+| **KD-45** | no gate in this repo executes the Firebase or iOS paths | Firebase: an L2 run executes the add step's output at startup, owed when its bytes move (`--with-firebase`), none recorded yet; no traffic crosses the redirect (KD-210); iOS: the L2 run stamps `--no-ios`; the iOS stamp compiled once on CI (run 36181162894, dispatch-only, 0.28.0 tree) and has never run |
 | **KD-46** | the iOS refusal names two causes its `catch` cannot see | half fixed in `79eafd3` (the cause is carried now); Obj-C raises abort before any Kotlin frame, and the app stops either way |
 | **KD-48** | `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin | the shipped Xcode project has only `Debug`/`Release`, which map correctly |
 | **KD-49** | a nested `node --test` exits 0 whatever its tests did, when `NODE_TEST_CONTEXT` is inherited | nothing in the suite spawns one except the harness that measured it, which scrubs the env |
@@ -211,8 +211,8 @@ you the same list without opening anything.
 | **KD-206** | the fleet scratch app is stamped `--no-ios`, so an edit to iOS-only template code moves no byte of the stamped app and the device tier reads DISCHARGED; Firebase lives in `overlays/firebase/`, which no stamp copies, so an overlay edit moves the default digest by nothing and the Firebase L2 run's digest by what it changes | no proof is lost — the L2 run never compiled either (KD-45) — so KD-45's gap is visible in the schedule instead of masked by a run that proves nothing about those files; an overlay edit owes the Firebase L2 run (KD-45); CI still compiles it on every PR; `template/` is still a review trigger |
 | **KD-208** | the hook's four bounds now sum to exactly its declared budget — `1000 + 3000 + 2500 + 3500 = 10000`, the 10 s `.claude/settings.json` declares — because answering a payload now includes a stamp | the arithmetic test asserts `sum <= budget` and passes, every bound has its own kill-timer so the sum is a worst case that needs all four to saturate, and the measured real answer is ~0.5 s; what is gone is the slack; the add step shares the stamp's cap (stamp + add + two hashes 0.25–0.34 s measured), so no bound was added |
 | **KD-209** | `grep -r` here obeys the scanned tree's own `.gitignore`, so a scan of a stamped app silently omits `local.properties` — the file that carries this machine's SDK path | a fact about the tooling, not the tree, logged because it nearly cost a slice a defect: `find … -exec /usr/bin/grep -l …` lists both files, and that is how the three normalisers were shown complete |
-| **KD-210** | a Firebase run proves the template COMPILES, INITIALISES and REDIRECTS — no byte crosses the redirect | nothing in `commonMain` uses a Firebase client and the smoke walk is four screens, so the suite serves zero requests; the risk is a record read as "the redirect carried traffic" |
-| **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production |
+| **KD-210** | a Firebase run proves the template COMPILES, INITIALISES and REDIRECTS — no byte crosses the redirect | nothing in `commonMain` uses a Firebase client and the smoke walk is four screens, so the suite serves zero requests; the risk is a record read as "the redirect carried traffic"; the record states it (`coverage.trafficThroughRedirect: false`) |
+| **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production; `fleet-check --with-firebase` refuses a non-emulator host or an unset `CMP_AVD` before starting |
 | **KD-212** | the shipped-hooks table is derived from the template FILE's history, but minimal mode writes a SessionStart command that file never carried | no claim rests on it — a minimal stamp's command is fully single-quoted, so it is neither healable nor a violation, and doctor says nothing about it in either direction |
 | **KD-213** | the `--dry-run` gate counts four `fs` spellings where its own header names the class — `copyFileSync`, `renameSync`, `cpSync`, `fs.promises.*` and a destructured import all pass it | zero producers in the tree, and it cannot be written as a failing test: a widened gate is green on these bytes |
 | **KD-218** | both doors accept `--no-<value-flag>` as a boolean name: `prooflane init --no-profile svc` stores `no-profile: true` and installs into `./svc` (the `=` form's refusal no longer calls it a true/false flag, 2026-09-25) | the project is a token the user typed, and nothing else is written; what the parsers accept is KD-7's territory and a decision, not a wording fix |
@@ -609,6 +609,24 @@ the same app, linked the KMP framework and built the Xcode project for the iOS s
 iOS compile has backed. What it is not: a gate (the job runs only on dispatch), a proof of this
 tree (its pods were the `~> 11.0` pin that KD-243 replaced in 0.28.1), or a run. Nothing executes
 the iOS app, so its runtime and the iOS side of the Firebase emulator redirect stay unproven.
+
+**2026-09-26 — the Firebase half: an L2 run executes it, owed when its bytes move.**
+`node scripts/fleet-check.mjs --with-firebase` stamps the scratch app, runs `create-cmp add firebase
+--no-verify` on it with the argv the schedule hashes (`addFirebaseArgv`), and runs the app's own lane
+inside `firebase emulators:exec`. It uses the app's own `demo-` project, so there is no real project
+and no login. It serves the ports the stamped tree declares and tears the suite down on every exit
+path. Its record is PASS only with `e2eSmoke` PASS by name, and the tier takes it only at rung L2.
+That step installs the DEBUG build, whose `USE_FIREBASE_EMULATORS` is true, so the app started only
+if `FirebaseApp` initialised from the mock config and `configureFirebaseEmulators()` returned from its
+four `useEmulator` calls; that function throws otherwise, and the app refuses to start. `proof-plan`
+owes it as the "Firebase L2 run" exactly when the stamp-plus-add digest moves. The run writes
+`qa-artifacts/fleet-firebase-latest.json`, never `fleet-latest.json`, and keeps its runs in a history
+kind of their own (`fleet-firebase`), which `proof-plan --history` counts apart from the default
+device runs. Proven, once a run is recorded: compile (debug and release/R8), init, and the four
+redirects at startup, on an Android emulator. Not proven: traffic (KD-210), a physical device
+(KD-211), iOS (above). First recorded run: **none yet** — it runs on trunk once this slice merges,
+and a docs-only follow-up fills this line. This Firebase half closes only on a PASS record; until
+then it stays open.
 
 ### KD-46 — the iOS refusal names two causes its catch cannot see
 
@@ -3286,6 +3304,13 @@ and the first flow that reads a document needs it. What must not happen is a rec
 folded here 2026-09-22 because it describes the template on this tree, not the held branch's
 machinery.*
 
+**2026-09-26 — the record says it.** The Firebase L2 run now exists (KD-45). Its record carries
+`coverage.trafficThroughRedirect: false` with this entry's reason, so a PASS is not readable as
+traffic. Still open as written. Proving traffic would take a Firebase call on a path the lane walks,
+for example an anonymous sign-in or one document read in the debug build, or an instrumented test.
+That is an overlay change every adopter's debug build would carry, roughly one more lane step
+(~30–60 s, estimated), and a product decision. It is not in this slice.
+
 ### KD-211 — the redirect host assumes the lane's device is an emulator
 
 `overlays/firebase/append/composeApp/build.gradle.kts` (`FIREBASE_EMULATOR_HOST`) ·
@@ -3305,6 +3330,13 @@ a physical device cannot make a Firebase run pass against production.
 **Fires when:** someone runs the covered check with a physical device attached.
 *Logged 2026-09-21 by the wave's Firebase fixer; folded here 2026-09-22, re-aimed at the template
 files that carry the assumption on this tree.*
+
+**2026-09-26 — the refusal is on this tree.** `fleet-check --with-firebase` reads the redirect host
+from the stamped tree (`readDeclaredRedirect`, `emulatorPlanFor` in `scripts/lib/fleet-firebase.mjs`).
+It refuses when `CMP_AVD` is unset, before stamping anything, and when the host is not `10.0.2.2`,
+before the suite or the lane starts, because only an emulator makes `10.0.2.2` the host. Which device
+the lane drives when `CMP_AVD` is set AND a phone is attached is not verified here. An adopter's own
+lane on a physical device still fails loud at `e2eSmoke`, as written.
 
 ### KD-212 — the table is derived from the template FILE's history, and create-cmp writes a command that file never carried
 
