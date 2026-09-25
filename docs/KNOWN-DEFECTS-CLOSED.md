@@ -58,6 +58,37 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-196 — the contract vendored into every app says `doctor --fix` asks before any repair, and three of its four heals do not — **CLOSED 2026-09-25**
+
+`template/AGENTS.md` (line 42) · `src/commands/doctor.mjs` (`applySafeFixes`)
+
+> `npx create-cmp-cli doctor --fix` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog
+> drift); **asks before any repair**
+
+After the slice that closed KD-85, one heal asks (the shipped-hook rewrite). `local.properties`,
+`ksp.useKSP2` and the walk-wiring add still write on `--fix` with no prompt — the sentence was false
+when it was written and is now three-quarters false. The line is in the file every stamped app
+carries, so the reader it misleads is the agent working in an adopter's repo.
+
+**Nobody is wrongly served by the WRITES** — they are the safe heals `--fix` exists for, and the flag
+is the consent — so this is a docs/consent-model decision (make the sentence true, or make the other
+heals ask) rather than a defect in what the command does. Out of that slice's brief, which named the
+rewrite's consent only.
+
+**Fires when:** an agent in an adopter's repo reads the contract and expects to be asked.
+*Logged 2026-09-22, found while looking for the consent helper that slice's brief pointed at.*
+
+**CLOSED by making the sentence true, in the two commits that did it; this entry moved when that
+was checked against the code.** `8b81e88` rewrote the row in `template/AGENTS.md`: the shipped-hook
+rewrite is the one PROJECT heal that asks first, installing a missing tool asks too (`runInstall` in
+`src/bootstrap/exec.mjs`, "Run install: `…`?"), and `local.properties`, `ksp.useKSP2` and the walk
+wiring are written without a prompt — which is what `applySafeFixes` and `healShippedHookCommands`
+in `src/commands/doctor.mjs` do. `deac423` did the same for the copy `create-cmp attach` writes into
+an existing repo (`attachAgentsMd` in `src/commands/attach.mjs`), which names the two heals that can
+fire there: an attached repo carries no `qa/walk-status.mjs`, so the walk-wiring finding never
+reaches it. No shipped surface still says `doctor --fix` "asks before any repair". The consent
+model was left as it is — the flag is the consent for the safe heals — so no heal was made to ask.
+
 ### KD-229 — the tier was renamed `L2 run`, and the cadence lint does not know the new name — **CLOSED 2026-09-24**
 
 `scripts/lib/cadence.mjs` (`CADENCE_PHRASES`), read by `test/policy-home.test.mjs` over every tracked

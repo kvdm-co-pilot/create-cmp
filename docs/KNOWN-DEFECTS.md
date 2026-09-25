@@ -203,7 +203,6 @@ you the same list without opening anything.
 | **KD-193** | the oracle test's failure message says *"the shell runs it in: the payload's cwd"* whenever the GATE resolved the payload's cwd, whatever the shell did — it printed exactly that for `cd /here"/sub"`, which the shell runs in `/here/sub` | a diagnostic only, on a failing row, in `test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs`; it misdescribes the oracle in the one moment a reader is trusting it |
 | **KD-194** | `create-cmp upgrade --harness` writes `.claude/settings.json` too — `decideFile` returns `applied` whenever the app's copy equals the base stamp — where KD-85 said `doctor --fix` was the one command that does | measured preserved-or-merged, never clobbered: an app's own hooks survive and the anchors land, and the one case the merge conflicts on is the case `doctor --fix` refuses. KD-85's sentence is corrected in its closure |
 | **KD-195** | the new `unanchored-hooks` finding reports every anchorable hook surface the detector faults, so KD-183's over-report can now be printed about a Stop, PreToolUse or SessionStart hook an app anchored by `cd` | the conservative direction, chosen on purpose: a `warn` that names the command and prints the anchored form, where the other direction is silence about a Stop gate that does not run; claiming health is impossible here by construction |
-| **KD-196** | `template/AGENTS.md` says `npx create-cmp-cli doctor --fix` "asks before any repair", and three of its four heals write with no prompt | nobody is wrongly served by the writes — they are the safe heals `--fix` exists for and the flag is the consent — so it is a docs/consent-model decision, not a defect in what the command does |
 | **KD-197** | the walk-wiring ADD heal writes `JSON.stringify(settings, null, 2)`, so an app's own indentation, escapes and key order are rewritten as a side effect of gaining a status line | the settings mean the same thing and the adopter asked for a write; what they did not ask for is the diff. Bounded: the add heal only runs when a surface is missing |
 | **KD-198** | the two new walk fields (`unconfirmed`, `healable`) keep KD-182's fail-open `?? []`, so an `ok` still requires the absence of three fields rather than the presence of evidence | no second producer exists — `gatherWalkInputs` sets all four on every return path and is the only caller — and the fix is the one KD-182 defers, now over four fields |
 | **KD-199** | two superseded commands in the shipped-hooks table are narration, and `healedForm` refuses to heal them because their successors describe a newer lane than the app may have | a decision, not an oversight: only a pair differing by the anchor alone is healed, which is identical at the project root whatever the lane version. Healing narration is two table fields plus lane-version detection |
@@ -3099,26 +3098,6 @@ credits anything.
 **Fires when:** an app hand-anchors any hook by `cd`, or writes an absolute path into one, and runs
 `create-cmp doctor`.
 *Logged 2026-09-22 by the slice that widened the population, against its own change.*
-
-### KD-196 — the contract vendored into every app says `doctor --fix` asks before any repair, and three of its four heals do not
-
-`template/AGENTS.md` (line 42) · `src/commands/doctor.mjs` (`applySafeFixes`)
-
-> `npx create-cmp-cli doctor --fix` — diagnoses machine AND project (kotlin↔ksp lockstep, catalog
-> drift); **asks before any repair**
-
-After the slice that closed KD-85, one heal asks (the shipped-hook rewrite). `local.properties`,
-`ksp.useKSP2` and the walk-wiring add still write on `--fix` with no prompt — the sentence was false
-when it was written and is now three-quarters false. The line is in the file every stamped app
-carries, so the reader it misleads is the agent working in an adopter's repo.
-
-**Nobody is wrongly served by the WRITES** — they are the safe heals `--fix` exists for, and the flag
-is the consent — so this is a docs/consent-model decision (make the sentence true, or make the other
-heals ask) rather than a defect in what the command does. Out of that slice's brief, which named the
-rewrite's consent only.
-
-**Fires when:** an agent in an adopter's repo reads the contract and expects to be asked.
-*Logged 2026-09-22, found while looking for the consent helper that slice's brief pointed at.*
 
 ### KD-197 — the walk-wiring ADD heal re-serialises the whole settings file
 
