@@ -117,6 +117,7 @@ test("ONE spelling of what fleet-check stamps: the oracle's flags are the flags 
     );
   }
   assert.ok(src.includes("FLEET_SCRATCH_APP") || src.includes("stampArgv"), "fleet-check must build its stamp from the shared spec");
+  assert.ok(src.includes("addFirebaseArgv("), "fleet-check --with-firebase must spell its add with addFirebaseArgv, the argv stampedApps hashes — or the Firebase record and the oracle describe different apps");
 });
 
 test("THE DIGEST MUST NOT MOVE WITH THIS MACHINE'S ANDROID SDK — local.properties is a pointer, not an app byte", () => {
