@@ -1354,9 +1354,9 @@ function main() {
   }
 
   if (flag("--history") !== -1) {
-    const kept = Object.fromEntries(["plans", "reviews", "fleet"].map((k) => [k, readHistory(historyPath(REPO_ROOT, k))]));
-    const summary = summarize({ plans: kept.plans.rows, reviews: kept.reviews.rows, fleet: kept.fleet.rows });
-    const malformed = kept.plans.malformed + kept.reviews.malformed + kept.fleet.malformed;
+    const kept = Object.fromEntries(["plans", "reviews", "fleet", "fleet-firebase"].map((k) => [k, readHistory(historyPath(REPO_ROOT, k))]));
+    const summary = summarize({ plans: kept.plans.rows, reviews: kept.reviews.rows, fleet: kept.fleet.rows, firebase: kept["fleet-firebase"].rows });
+    const malformed = kept.plans.malformed + kept.reviews.malformed + kept.fleet.malformed + kept["fleet-firebase"].malformed;
     process.stdout.write(flag("--json") !== -1 ? `${JSON.stringify({ ...summary, malformed }, null, 2)}\n` : `${renderHistory(summary, { malformed })}\n`);
     process.exit(0);
   }
