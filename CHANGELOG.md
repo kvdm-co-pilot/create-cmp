@@ -6,6 +6,68 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-09-26
+
+Doctor offers only the fixes it performs, the Firebase add step pairs its iOS pods with the
+GitLive version, the plugin ships an implementation agent, and the shipped orchestrator delegates
+by five cost practices.
+
+### Changed
+
+- **`plugin-refresh` is no longer a plugin skill.** Every command in it ran a script only
+  create-cmp has, so it moves to `.claude/skills/plugin-refresh/` as create-cmp's maintainer-only
+  release-loop skill. The plugin ships 11 skills. To check for a stale marketplace copy, an
+  adopter runs cmp-doctor's "Marketplace copy staleness" check.
+- **The plugin ships a second agent, `create-cmp:executor`.** It is the default for delegated
+  implementation: one approved unit of work carried from its brief to commits, then ended, on Opus
+  at `effort: high` with `maxTurns: 60`. It commits per step with a hand-off line, takes no plan
+  stop when its brief is the approved plan, reads files by section, and reports test failures only.
+  `scripts/ground-truth.mjs` derives the plugin's agents the way it derives its skills.
+- **The shipped `agents/cmp-orchestrator.md` delegates by five practices:**
+  - One unit of work per helper, and implementation goes to `create-cmp:executor`.
+  - Every planner writes its plan to a file and ends, whether planning is its whole job or its
+    plan stop comes before implementing. A fresh executor starts from that path.
+  - A helper is resumed only when it holds unsaved state you need, its context is small and its
+    cache is still warm. Otherwise a fresh one starts from its commits and hand-off.
+  - Effort follows the kind of work, and is set in the helper definition's frontmatter.
+  - Test output shows failures only.
+
+### Fixed
+
+- `add firebase`:
+  - The iOS pods follow the GitLive version. Each registry set records a `firebaseIos`
+    pairing, sourced from GitLive's own catalog. `add firebase` refuses an iOS app whose set has
+    no pairing, and `promote-set` carries the pairing or refuses (KD-243).
+  - `harden` regenerates the architecture doc with the generator it installs, so a `--minimal`
+    app that added Firebase hardens to a fresh doc (KD-242).
+- `doctor`:
+  - It offers `--fix` only where `--fix` writes, for the walk wiring (KD-237) and for the
+    shipped hooks. A location `--fix` skips gets by-hand words instead, and `--fix` names every
+    skip.
+  - A heal write is atomic: a temporary file beside the target, then a rename. It keeps live and
+    dangling symlinks, and lands where the system reads the link or is refused (KD-241).
+  - Editing JSON in place reads the file's escapes and its one-line separators (colon and
+    comma) exactly (KD-240).
+- The agent hold's remedy runs from any directory, in the template and in `prooflane-harness`
+  (KD-235).
+- The iOS-off ADR no longer credits an interview that a `--no-ios` command line never had
+  (KD-236).
+- `cmp-new` points at `options.schema.json` for the config shape, not a `CONTRACT.md` that
+  never existed (KD-239).
+- `docs/ARCHITECTURE.md` names `npx create-cmp-cli`, the package this project publishes (KD-238).
+
+### Known defects
+
+- Closed: KD-235 to KD-243, KD-245, KD-246, and KD-248 (measured false).
+- Amended:
+  - KD-244, with its measurement: one spurious conflict sidecar, left for a decision.
+  - KD-45: the iOS stamp compiled once on CI (run 36181162894, dispatch-only). Its runtime is
+    unproven.
+- Logged: KD-247, KD-249, KD-250 and KD-251.
+
+Packages: `create-cmp-cli` 0.28.1, `prooflane-harness` 0.23.3, `create-compose-multiplatform`
+0.1.8, `create-kmp` 0.1.8, `create-mobile` 0.1.4. `@create-cmp/inspector` is unchanged.
+
 ## [0.28.0] - 2026-09-25
 
 The default app carries libraries only: no service, no account, no credential file. This is a
@@ -3769,7 +3831,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.2...HEAD
+[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.1...HEAD
+[0.28.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.2...v0.28.0
 [0.27.2]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.5...v0.27.1
