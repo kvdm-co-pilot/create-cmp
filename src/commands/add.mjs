@@ -58,6 +58,23 @@ export async function runAdd(flags, what, positional) {
     process.exit(2);
   }
 
+  // A VALUE FLAG GIVEN NO VALUE arrives as `true` (src/lib/args.mjs), and every read below is
+  // `typeof … === "string" ? … : undefined` — so a bare flag is no flag, and the step writes the
+  // default: `--google-services $GS` with GS unset wrote the MOCK config over the line's "use my
+  // real one". The bin refuses `--x=` for every value flag; the bare form only for a destination,
+  // because `--set` bare is an answer. None of these has a bare meaning, so the bare form is
+  // refused here, by name, before anything is read or written.
+  const bare = FIREBASE_VALUE_FLAGS.filter((n) => flags[n] === true);
+  if (bare.length) {
+    process.stderr.write(
+      `create-cmp add firebase: ${bare.map((n) => `--${n}`).join(", ")} ` +
+        `${bare.length === 1 ? "needs a value, and was given none" : "need values, and were given none"} ` +
+        `(an unset shell variable expands to nothing, quoted or not).\n` +
+        `  run \`create-cmp --help\` for what each one takes. Nothing was written.\n`,
+    );
+    process.exit(2);
+  }
+
   const targetDir =
     (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
   const projectDir = path.resolve(targetDir);
