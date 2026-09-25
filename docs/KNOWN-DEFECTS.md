@@ -237,6 +237,10 @@ you the same list without opening anything.
 | **KD-227** | `docs/GATE-RULES.md` says the KD-95 slice added "Four more" oracle shapes; the table went from 24 rows to 31 | a count in a contributor-facing doc, in the same paragraph KD-104's note already asks to be re-read; the invariant the sentence describes is the one the harness holds |
 | **KD-228** | `formatSpine()` marks lagging fields with `spine.lagging.includes(s)` — object identity — so a spine that has been through `--json` prints no `✗` at all | nothing calls it on a parsed spine today, and the summary line still reads `NOT IN STEP`, so the surface cannot claim health it does not have |
 | **KD-230** | rule 2 hides the CONTENT of `AGENTS.md`, `CLAUDE.md` and `.claude/**/*.md` from the digest because of a one-time grep (the not-read proof in `UNOBSERVED_BY_PROFILE`'s comment), and no test repeats that grep. A later lane step that opens one of them would make edits to it invisible to the digest after the one run its own code change buys | cannot fire today: re-measured this round, no non-comment reference to any of the three in `template/qa/**/*.mjs`, `*.json`, `*.kts` or `*.sh` |
+| **KD-231** | the shipped orchestrator tells an adopter to hand its session off "at the budget point the user-level instructions set (`~/.claude/CLAUDE.md`)", and the only such file that sets one is the maintainer's | inert, not false in effect: an adopter with no budget point hands off as before this slice. Whether the shipped definition should carry a number of its own is a product decision |
+| **KD-232** | "this repository enables its own plugin" is stated in the hook, its test, the proposal and the CHANGELOG, and no file in this tree enables it — the maintainer's user and local settings do, so a fresh clone runs no `resume-price` | contributors, not adopters, and the hook is advisory; the proposal also still says "plugin `hooks/`" and "Not built." |
+| **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
+| **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
 
 ---
 
@@ -3901,3 +3905,89 @@ that repeats the proof: stamp the app, and fail if any file NOT on the unobserve
 unobserved path outside a comment. That test stops the list and the lane from drifting apart.
 
 *Logged 2026-09-24, review round 1 of the first-job slice (L2 digest rule 2 + --rekey + cadence).*
+
+### KD-231 — the shipped orchestrator's hand-off point is the maintainer's private file
+
+`agents/cmp-orchestrator.md:220-222` (shipped through `.claude-plugin/plugin.json` `agents`), and
+`.claude/agents/deep-worker.md:79-81`
+
+The rewrite tells the orchestrator to hand its own session off "at the budget point the user-level
+instructions set (`~/.claude/CLAUDE.md`)". It adds "This file names no number, so it cannot disagree
+with that one". That holds on the maintainer's machine, where `~/.claude/CLAUDE.md` has a "Session
+budget" section. An adopter who installs the plugin has no such section, so the line points at a
+number that does not exist. The same problem in `deep-worker.md` only affects contributors to this
+repository.
+
+**Why it does not block:** the line does nothing for an adopter. Without a budget point, their
+orchestrator hands off the way it did before this slice. Nobody is refused or given a wrong result.
+**Decision it asks for:** should the shipped orchestrator carry a default hand-off point of its own?
+If it should, it is the one statement an adopter has, so it is not a restatement. The other choice
+is to drop the pointer from the shipped definition.
+
+*Logged 2026-09-25, review round 1 of the resume-price slice.*
+
+### KD-232 — "this repository enables its own plugin", and no file in this repository does
+
+`scripts/hooks/resume-price.mjs:73`, `test/a-resumed-helper-is-priced-at-the-moment-of-the-send.test.mjs:295`,
+`docs/proposals/RESUME-COSTS-MORE-THAN-RESTART.md:30-31`, `CHANGELOG.md` [Unreleased] Added
+
+`e5f909c` removed the `.claude/settings.json` wiring so the note would not print twice. Its commit
+message is accurate: the plugin is enabled "(user and local scope)". The prose in the tree says
+something different: *this repository* enables its plugin, "the way every adopter does". In fact
+`.claude/settings.json` has no `enabledPlugins`. The enablement lives in the maintainer's
+`~/.claude/settings.json` and the untracked `settings.local.json`. A fresh clone of this
+repository gets no `resume-price` note, and nothing in the tree can show whether it does. The proposal's bullet
+also still says the hook ships as "plugin `hooks/`". It ships at `scripts/hooks/plugin-hooks.json`,
+and the file's own comment says why. The proposal's Status line still reads "Not built."
+
+**Why it does not block:** the note is advisory, and the only people who miss it are contributors
+running without the plugin. The adopter path, through the plugin, is the one that was validated.
+**Decision it asks for:** the approved brief said "wired in this repo's `.claude/settings.json` too".
+The build reversed that, and the reversal was written into the brief as "decided 2026-09-24, at build".
+Keep the reversal and correct the prose? Or enable the plugin in the project's
+`.claude/settings.json`, so the sentence becomes true of the tree?
+
+*Logged 2026-09-25, review round 1 of the resume-price slice.*
+
+### KD-233 — the fresh-helper figure is called a floor, and it is not one
+
+`scripts/hooks/resume-price.mjs:86-93` (`FRESH_HELPER_TOKENS`)
+
+The comment says the 37,019 comparison "is to a floor, as the carried figure is". This round measured
+the first assistant turn's prompt (input + cache read + cache creation) in the helper transcripts on
+the maintainer's machine, grouped by `agentType` from each `agent-<id>.meta.json`:
+
+| agentType | n | first-turn prompt, median (range) |
+|---|---|---|
+| `deep-worker` | 83 | 11,377 (8,205–17,890) |
+| `staff-reviewer` | 103 | 11,617 (9,009–13,420) |
+| `general-purpose` | 363 | 50,444 (17,929–62,002) |
+| `Explore` | 28 | 31,315 (14,641–39,912) |
+
+For the helpers this repository restarts, 37k is roughly three times the real start. For
+`general-purpose` it is below the median. Either way it is not a floor.
+
+**Why it does not block:** the note tells an adopter "a fresh helper … starts at ~37k". That is within
+the measured range for `general-purpose`, which is what an adopter's orchestrator spawns, and in every
+case it is far below the threshold. The advice points the same way whatever the helper type. What
+the log records is the word "floor" and a single sample standing in for several distributions.
+
+*Logged 2026-09-25, review round 1 of the resume-price slice.*
+
+### KD-234 — a send to a running helper would be priced as a resume
+
+`scripts/hooks/resume-price.mjs` (`respond`, `advisory`)
+
+The hook prices every `SendMessage` addressed by id to a helper in this session. The payload does not
+say whether the helper has stopped, and neither does its transcript. If the harness delivers a send
+to a helper that is still running, the note says "each step of this resume costs …" and "Resume
+only if it holds unsaved state you need". In that case there is no resume. The helper's steps happen
+whatever the sender does, and the advice could lead the sender to stop a healthy helper.
+
+**Why it does not block:** this has not been seen. Every `SendMessage` result in the slice's own
+session reads `"Resuming agent …"`. Whether a running helper can receive a send is a fact about
+the tool's schema, and this tree cannot hold one (KD-128). If it can, one remedy is to stay silent
+while the helper's transcript was written within the last few seconds. That needs a threshold,
+which is a new calibration question.
+
+*Logged 2026-09-25, review round 1 of the resume-price slice.*
