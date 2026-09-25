@@ -2082,8 +2082,13 @@ export function createPreviewService(opts) {
   }
 
   async function handleRequest(req, res) {
-    const url = new URL(req.url, `http://127.0.0.1:${port}`);
     try {
+      // Inside the try, and on a base that never reads `port` (KD-202): `stop()` nulls
+      // `port` after `server.close()`, which does not end a request already in flight,
+      // so `http://127.0.0.1:null` threw `TypeError: Invalid URL` out of this async
+      // listener as an unhandled rejection. Only `pathname` and `searchParams` are read,
+      // and the port carries no meaning for either.
+      const url = new URL(req.url, "http://127.0.0.1");
       if (url.pathname === "/") {
         const [approvals, designSystem, comments, lastReceipt] = await Promise.all([
           approvalStatusSnapshot(),

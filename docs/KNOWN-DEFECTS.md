@@ -204,7 +204,6 @@ you the same list without opening anything.
 | **KD-199** | two superseded commands in the shipped-hooks table are narration, and `healedForm` refuses to heal them because their successors describe a newer lane than the app may have | a decision, not an oversight: only a pair differing by the anchor alone is healed, which is identical at the project root whatever the lane version. Healing narration is two table fields plus lane-version detection |
 | **KD-200** | text a test prints shares the runner's message channel, and node's parser reads it as a frame length: a third byte ≥ `0x80` (`›` `✓` `→` `—`) makes the size negative and aborts the FILE with *"Unable to deserialize cloned data"*, attributed to whichever file's stream was being parsed | the `scaffold.test.mjs` instance is fixed and the helper is guarded, but the class is not closed: a static over-approximation says 70 of 274 declared test files can reach such a write, and closing it needs either a `package.json` preload (the suite gate's own definition) or a per-file measurement |
 | **KD-201** | four test files silence a CLI call by replacing `process.stdout.write`, which is the channel the reporter writes its FRAMES to — a frame flushed inside that window is swallowed, the file exits 0, and the run reports fewer tests than it ran | measured: 4 tests run, 3 reported, nothing red. Not fixed because those four files were not that slice's subject and the wave allowed running only the files it named |
-| **KD-202** | `handleRequest` builds its `URL` from `port` OUTSIDE the try and `stop()` nulls `port` after `server.close()`, so a request in flight during shutdown throws `TypeError: Invalid URL` as an unhandledRejection — which node's runner blames on whichever test most recently PASSED | KD-56's message verbatim, reproduced deterministically; no adopter runs these tests and a real console is exiting anyway. Not fixed here: shipped bytes plus a `dist/server.mjs` rebuild belong to the slice that owns `inspector/mcp/` |
 | **KD-203** | `opts.port \|\| DEFAULT_PORT` reads `port: 0` — the standard way to ask the OS for a free port — as the console's well-known port, and the bound port is assumed rather than read back | an adopter starting a console gets the default either way and the only caller passing `0` is a test today; it becomes a defect the moment anything runs two consoles |
 | **KD-204** | `stop()` fires `GET /shutdown` at `http://127.0.0.1:9601` unconditionally, `hot: false` and no daemon included, so every console sends a request to a fixed address anything may be listening on | harmless where nothing listens (the refusal is swallowed) and a real daemon is the intended recipient; with KD-202 and KD-203 it is the complete path from "a suite ran" to "a passed test is recorded as FAILED" |
 | **KD-205** | `contains()` / `behindBy()` drop `gitAt`'s `why`, so one call site of the ordering check cannot say which of four causes killed a git call — a gate-timer kill, a crash and an OOM kill all read as "git could not compare this branch with origin/main" | the verdict is correct either way: the check still allows and still says it could not answer. It costs a reader one fact, in the file whose whole subject is that distinction |
@@ -3171,46 +3170,6 @@ change there could not be verified by running it.
 **Fires when:** a reporter event is flushed inside one of those four windows — which is a matter of
 timing, so the loss is silent and intermittent.
 *Logged 2026-09-22, found while building the helper that slice uses.*
-
-### KD-202 — a request that arrives after `stop()` is answered with a null port, and the runner blames a test that passed
-
-`inspector/mcp/src/lib/preview-service.mjs:2085` (`handleRequest`) and its `stop()`
-
-```js
-  async function handleRequest(req, res) {
-    const url = new URL(req.url, `http://127.0.0.1:${port}`);   // OUTSIDE the try
-```
-
-`stop()` sets `port = null` after `server.close()`. `server.close()` does not end a connection whose
-request is already in flight, so a request that lands in that window is handled with `port === null`,
-`new URL(req.url, "http://127.0.0.1:null")` throws `TypeError: Invalid URL`, and because the listener
-is `async` the throw is an **unhandledRejection**. Node's runner reports an unhandled rejection
-against whichever test in that process has most recently finished — as *"generated asynchronous
-activity after the test ended … created the error 'TypeError: Invalid URL'"*, which is KD-56's message
-verbatim, blaming a test at `:113` that had already passed.
-
-Reproduced deterministically 2026-09-22 (instrument, not a test): start a service, connect a raw
-socket, send half a request, call `service.stop()`, send the rest → `UNHANDLED REJECTION: TypeError:
-Invalid URL`.
-
-**Who sends such a request in a suite:** KD-203 and KD-204 — every console's `stop()` sends
-`GET /shutdown` to a WELL-KNOWN port, and services that asked for an ephemeral port were listening on
-exactly that port. The slice that closed KD-56 removed the exposure for
-`inspector/mcp/test/console-now-sse.test.mjs` by giving it real ephemeral ports; the defect itself is
-untouched.
-
-**Why it does not block.** No adopter runs these tests, and in a real console a stray request during
-shutdown produces one rejected promise in a process that is exiting. What it costs is suite records: a
-FAIL against a test that passed, on a tree that is fine.
-
-**The fix** is `const url = new URL(req.url, "http://127.0.0.1")` (the port carries no meaning for
-`pathname` / `searchParams`) or moving the line inside the try — plus a rebuild of
-`inspector/mcp/dist/server.mjs`, which is why a test-only slice did not do it: shipped bytes and a
-bundle rebuild belong to the slice that owns `inspector/mcp/`.
-
-**Fires when:** anything sends the console a request while it is stopping — which the suite does to
-itself.
-*Logged 2026-09-22, found by reading KD-56's kept message.*
 
 ### KD-203 — `port: 0` asks for an ephemeral port and is given the well-known one
 

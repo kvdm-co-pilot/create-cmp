@@ -1,0 +1,80 @@
+// WHAT A CONSOLE DOES AROUND ITS OWN STOP — the three defects that together took a
+// suite from "a test passed" to "a passed test is recorded as FAILED" (KD-56's
+// kept message; KD-202, KD-203, KD-204).
+//
+// The real service over real HTTP and raw sockets: the defects live in the timing
+// between `server.close()` and a request already on the wire, which a call on the
+// service object cannot reach.
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import http from "node:http";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+
+import { createPreviewService } from "../src/lib/preview-service.mjs";
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function makeProject() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-console-stop-"));
+  fs.mkdirSync(path.join(root, "qa", "evidence"), { recursive: true });
+  return root;
+}
+
+/** A port the OS says is free right now. */
+async function freePort() {
+  const srv = http.createServer();
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const { port } = srv.address();
+  await new Promise((r) => srv.close(r));
+  return port;
+}
+
+test("a request in flight when stop() runs never becomes an unhandled rejection (KD-202)", async () => {
+  // The recipe that reproduced it: a raw socket sends HALF a request, the console
+  // stops, the socket sends the rest. `server.close()` does not end a connection
+  // whose request is already arriving, so the handler runs after `port` was nulled
+  // — and built `http://127.0.0.1:null` outside its try.
+  const root = makeProject();
+  const rejections = [];
+  const onRejection = (reason) => rejections.push(reason);
+  process.on("unhandledRejection", onRejection);
+  const service = createPreviewService({ projectDir: root, port: await freePort(), hot: false, runRender: async () => {} });
+  let socket = null;
+  let stopped = false;
+  try {
+    const { url } = await service.start();
+    socket = net.connect(Number(new URL(url).port), "127.0.0.1");
+    await new Promise((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("error", reject);
+    });
+    const answered = new Promise((resolve) => {
+      let got = "";
+      socket.on("data", (b) => (got += b.toString()));
+      socket.on("close", () => resolve(got));
+      socket.on("error", () => resolve(got));
+      setTimeout(() => resolve(got), 3000);
+    });
+    socket.write("GET /status HTTP/1.1\r\nHost: 127.0.0.1\r\n");
+    await sleep(100);
+    service.stop();
+    stopped = true;
+    socket.write("Connection: close\r\n\r\n"); // the rest of the request
+    await answered;
+    await sleep(100); // an async listener's rejection surfaces on a later tick
+    assert.deepEqual(
+      rejections.map((r) => String(r?.stack ?? r)),
+      [],
+      "a request that arrived during stop() threw out of the async request listener"
+    );
+  } finally {
+    process.off("unhandledRejection", onRejection);
+    if (socket) socket.destroy();
+    if (!stopped) service.stop();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
