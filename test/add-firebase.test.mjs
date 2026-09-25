@@ -218,6 +218,58 @@ test("--google-services: the adopter's real config is used as given, and one for
   }
 });
 
+test("--google-services replaces the config an earlier run was given, for the same app — and no other real config", async () => {
+  // The owner's decision (2026-09-25): cmp-firebase-connect re-downloads google-services.json after
+  // adding a SHA and hands it to this step again. The record says the step was given the one in
+  // place, so the new one for the same app replaces it. A config the step found already there is
+  // the adopter's, and is still refused.
+  const provided = await stampApp({ ios: false });
+  const existing = await stampApp({ ios: false });
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-gs-again-"));
+  const real = (pkg, version) =>
+    JSON.stringify({
+      project_info: { project_number: "123", project_id: "acme-prod" },
+      client: [{ client_info: { mobilesdk_app_id: "1:123:android:abc", android_client_info: { package_name: pkg } } }],
+      configuration_version: version,
+    });
+  const GS = "composeApp/google-services.json";
+  try {
+    fs.writeFileSync(path.join(scratch, "v1.json"), real("com.acme.demo", "1"));
+    fs.writeFileSync(path.join(scratch, "v2.json"), real("com.acme.demo", "2"));
+    fs.writeFileSync(path.join(scratch, "other.json"), real("com.other.app", "2"));
+
+    const first = cli("add", "firebase", provided, "--no-verify", "--google-services", path.join(scratch, "v1.json"));
+    assert.equal(first.status, 0, first.stderr + first.stdout);
+    const before = snapshot(provided);
+    const again = cli("add", "firebase", provided, "--no-verify", "--google-services", path.join(scratch, "v2.json"));
+    assert.equal(again.status, 0, again.stderr + again.stdout);
+    assert.equal(read(provided, GS), real("com.acme.demo", "2"), "the re-downloaded config, byte for byte");
+    assert.equal(JSON.parse(read(provided, "create-cmp.json")).firebase.config, "provided");
+    const after = snapshot(provided);
+    assert.deepEqual([...after.keys()].filter((rel) => after.get(rel) !== before.get(rel)), [GS], "only the config moved");
+
+    const wrongApp = cli("add", "firebase", provided, "--no-verify", "--google-services", path.join(scratch, "other.json"));
+    assert.equal(wrongApp.status, 1, "a config for another app still does not replace it");
+    assert.match(wrongApp.stderr, /com\.other\.app/);
+    assert.deepEqual(snapshot(provided), after);
+
+    fs.writeFileSync(path.join(existing, GS), real("com.acme.demo", "1"));
+    const found = cli("add", "firebase", existing, "--no-verify");
+    assert.equal(found.status, 0, found.stderr + found.stdout);
+    assert.equal(JSON.parse(read(existing, "create-cmp.json")).firebase.config, "existing");
+    const held = snapshot(existing);
+    const refused = cli("add", "firebase", existing, "--no-verify", "--google-services", path.join(scratch, "v2.json"));
+    assert.equal(refused.status, 1, "a config this step was never given is not replaced");
+    assert.match(refused.stderr, /already exists and is not the mock this step writes/);
+    assert.match(refused.stderr, /Nothing was written/);
+    assert.deepEqual(snapshot(existing), held);
+  } finally {
+    cleanup(provided);
+    cleanup(existing);
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
 /**
  * Each unrecognised shape the step must refuse rather than guess at. `plant` makes the shape in a
  * fresh stamp; the refusal must name `says`, exit 1, and leave every byte where the plant left it.
