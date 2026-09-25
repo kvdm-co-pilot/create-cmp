@@ -37,7 +37,12 @@ platform seams get JVM implementations in `composeApp/src/desktopMain`:
 | Seam | Desktop implementation |
 |---|---|
 | `NetworkMonitor` | Always-online stub (`NetworkMonitor.desktop.kt`) |
+<!-- >>> cmp:feature room -->
 | Room database | Real Room via `BundledSQLiteDriver`, stored in the OS temp dir (`DatabaseBuilder.desktop.kt`) |
+<!-- <<< cmp:feature room -->
+<!-- >>> cmp:feature !room -->
+| On-device store | None — this app keeps no local database on any platform, so there is nothing to fake |
+<!-- <<< cmp:feature !room -->
 | Firebase | **Never initialized** — none in the default scaffold, and after `create-cmp add firebase` the dev-client still never initializes or contacts it |
 | `ItemRepository` (example feature) | The same in-memory `ItemRepositoryImpl` every platform binds |
 
