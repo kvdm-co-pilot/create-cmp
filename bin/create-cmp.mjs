@@ -12,6 +12,7 @@
 //   npx create-cmp upgrade [flags]             # migrate to a proven-green version set
 //   npx create-cmp clean   [flags]             # konan/Gradle cache & build-output hygiene
 //   npx create-cmp verify  [flags]             # green-build gate on an existing project
+//   npx create-cmp add firebase [flags]        # add Firebase to a stamped app
 
 import fs from "node:fs";
 import path from "node:path";
@@ -19,7 +20,7 @@ import { fileURLToPath } from "node:url";
 
 import { parseArgs, unknownFlags, unreadableBooleanValues, emptyValues } from "../src/lib/args.mjs";
 
-const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "harden", "attach", "harness", "help"]);
+const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "harden", "attach", "add", "harness", "help"]);
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -164,6 +165,14 @@ async function main() {
       await runAttach(flags, rest[0]);
       return;
     }
+    // `add` names the service it adds — `create-cmp add firebase ./app` — so the directory is the
+    // SECOND positional. Firebase is the only service, and it left stamp-time for this door
+    // (docs/proposals/LIBRARIES-IN-SERVICES-OUT.md, Decision 2).
+    case "add": {
+      const { runAdd } = await import("../src/commands/add.mjs");
+      await runAdd(flags, rest[0], rest[1]);
+      return;
+    }
     // `harness` takes a subcommand because it is stack-neutral and will grow
     // siblings (`upgrade`, `doctor`) that must not collide with the Compose
     // verbs above. It is also the form that survived the rename it predicted:
@@ -227,18 +236,20 @@ function printHelp() {
       `  npx create-cmp verify                  run the green-build gate on an existing project\n` +
       `  npx create-cmp harden                  install the full harness into a --minimal scaffold\n` +
       `  npx create-cmp attach                  wire the agent contract into an EXISTING Compose/KMP repo\n` +
+      `  npx create-cmp add firebase [dir]      add Firebase to a stamped app (GitLive SDK + emulator wiring)\n` +
       `  npx create-cmp harness init            install the verify lane into a repo of ANY stack\n` +
       `  npx create-cmp harness relock          re-take the lock after editing YOUR profile or declarations\n\n` +
       `create (scaffold) flags:\n` +
-      `  --name --package --bundle-id --region --theme-prefix\n` +
+      `  --name --package --bundle-id --theme-prefix\n` +
       `  --minimal   (light scaffold: app + tests + previews, no verify lane/receipts —\n` +
       `               \`harden\` installs the full harness later, idempotently)\n` +
-      `  --ios/--no-ios  --firebase/--no-firebase  --auth <email|phone|both|none>\n` +
-      `  --room/--no-room  --e2e/--no-e2e  --inspector/--no-inspector\n` +
+      `  --ios/--no-ios  --room/--no-room  --e2e/--no-e2e  --inspector/--no-inspector\n` +
       `  --dev-client/--no-dev-client   (desktop JVM window + Compose Hot Reload)\n` +
       `  (--appium/--no-appium accepted as deprecated aliases for --e2e/--no-e2e)\n` +
       `  --tabs Home:home,Profile:person\n` +
-      `  --target-dir  --verify/--no-verify  --yes  --force  --dry-run-verify\n\n` +
+      `  --target-dir  --verify/--no-verify  --yes  --force  --dry-run-verify\n` +
+      `  (Firebase is not a stamp option: --firebase, --region, --auth and the service flags are\n` +
+      `   refused here and name \`create-cmp add firebase\`; their --no- forms are accepted, and moot)\n\n` +
       `doctor flags:  --yes  --dry-run  --no-ios  --no-install  --target-dir <dir>  --fix\n` +
       `upgrade flags: --target-dir <dir>  --set <id>  --dry-run  --yes  --verify\n` +
       `  --harness mode flags: --target-dir <dir>  --base-dir <extracted-template>  --dry-run  --yes\n` +
@@ -247,6 +258,10 @@ function printHelp() {
       `verify flags:  --target-dir <dir>  --no-ios  --dry-run\n` +
       `harden flags:  --target-dir <dir>  --dry-run  --yes  --verify (run the lane after install)\n` +
       `attach flags:  --target-dir <dir>  --dry-run  --yes\n` +
+      `add firebase flags: --target-dir <dir>  --region <r>  --auth <email|phone|both|none>\n` +
+      `                    --firestore/--no-firestore  --storage/--no-storage  --functions/--no-functions  --fcm/--no-fcm\n` +
+      `                    --google-services <path> (your real config; without it a MOCK that says so is written)\n` +
+      `                    --dry-run  --verify/--no-verify  --dry-run-verify\n` +
       `harness init flags:   --profile <id>  --target-dir <dir>  --dry-run\n` +
       `                      --no-interview  (skip the ladder questions and record NO answers —\n` +
       `                      not the same as taking the defaults, which this command never does)\n` +

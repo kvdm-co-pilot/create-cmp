@@ -15,6 +15,7 @@
     "src",
     "template",
     "!template/.gradle",
+    "overlays",
     "packages/harness/package.json",
     "packages/harness/src",
     "packages/harness/install",
