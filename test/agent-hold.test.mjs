@@ -134,6 +134,26 @@ test("describeHold gives the reader an action, and says nothing when nobody hold
   assert.equal(describeHold(assessHold(null, T0)), null);
 });
 
+// KD-235 — the hold's remedy named a bare `node qa/plan.mjs --release`, which
+// only resolves from the project root. KD-215 fixed the Stop gate's own remedy
+// for a session whose cwd is elsewhere; this line was missed. The stamped copy
+// is the one resolved here, because its layout (qa/lib under the root) is what
+// the command has to find from a foreign cwd.
+test("describeHold's remedy names a plan.mjs that exists from a foreign cwd", async () => {
+  const stamped = await import("../template/qa/lib/agent-hold.mjs");
+  const foreign = tmp();
+  const line = stamped.describeHold(assessHold(hold(), T0 + 120_000), { cwd: foreign });
+  const cmd = line.match(/`([^`]*node [^`]*plan\.mjs --release)`/)?.[1];
+  assert.ok(cmd, `no plan.mjs --release command in: ${line}`);
+  const cd = cmd.match(/^cd "([^"]+)" && /);
+  const base = cd ? cd[1] : foreign;
+  const script = cmd.match(/node (\S+) --release$/)[1];
+  assert.ok(fs.existsSync(path.resolve(base, script)), `${cmd} does not resolve from ${foreign}`);
+
+  const atRoot = stamped.describeHold(assessHold(hold(), T0 + 120_000), { cwd: path.resolve(base) });
+  assert.match(atRoot, /`node qa\/plan\.mjs --release`/, "from the root itself the short spelling stays");
+});
+
 test("holder and note are clipped — an alarm line stays readable", () => {
   const root = tmp();
   claimHold(root, { holder: "x".repeat(500), note: "y".repeat(500), now: T0 });

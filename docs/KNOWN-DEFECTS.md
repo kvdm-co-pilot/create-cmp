@@ -226,7 +226,6 @@ you the same list without opening anything.
 | **KD-232** | "this repository enables its own plugin" is stated in the hook, its test, the proposal and the CHANGELOG, and no file in this tree enables it — the maintainer's user and local settings do, so a fresh clone runs no `resume-price` | contributors, not adopters, and the hook is advisory; the proposal also still says "plugin `hooks/`" and "Not built." |
 | **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
-| **KD-235** | `agent-hold.mjs`'s "held" message names `node qa/plan.mjs --release`, a path relative to the project root, so a session whose cwd is elsewhere is handed a remedy it cannot run — KD-215's class, missed in this file | the hold itself is right, and the remedy fails loud (node cannot find the module); only the next step is wrong, and only from a foreign cwd |
 | **KD-236** | the iOS-off ADR says iOS was switched off "during the cmp-new interview", which is false for `--no-ios` on the command line; the room-off ADR's sentence was corrected in the 0.28.0 batch and this one was not | the decision the ADR records is right; only its provenance clause is wrong, in a file the app owns and edits |
 | **KD-237** | the walk-wiring "installed but not wired up" finding always carries `fix: { auto: true }`, so doctor prints `fix (--fix):` over a settings file that `--fix` then declines as unreadable or of a shape it does not read | since this batch the decline is printed with its reason, so nothing is written and nothing is claimed healed; what is wrong is the offer |
 | **KD-238** | `docs/ARCHITECTURE.md:12` labels the CLI `npx create-cmp`, a third party's npm name (ADR-0006); ours is `create-cmp-cli` | a label in a contributor-facing diagram, not an install step; the correction is one word |
@@ -3690,19 +3689,6 @@ while the helper's transcript was written within the last few seconds. That need
 which is a new calibration question.
 
 *Logged 2026-09-25, review round 1 of the resume-price slice.*
-
-### KD-235 — the hold names a remedy a foreign-cwd session cannot run
-
-`template/qa/lib/agent-hold.mjs:196`
-
-The "held" message ends: "`node qa/plan.mjs --release` if it is gone." The path is relative to the
-project root. A session whose cwd is elsewhere, which is the case KD-215 fixed for the Stop gate's
-remedy, runs it and gets "Cannot find module". This is KD-215's class, and this file was missed.
-
-**Why it does not block:** the hold is right, and the remedy fails loud rather than doing something
-else. The fix is KD-215's: a path that resolves from any cwd.
-
-*Logged 2026-09-25 (0.28.0 batch).*
 
 ### KD-236 — the iOS-off ADR credits an interview that a command line never had
 
