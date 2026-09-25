@@ -96,7 +96,7 @@ const appDir = path.join(scratchRoot, APP_NAME);
 const s0 = t();
 const stamp = spawnSync(
   process.execPath,
-  [path.join(REPO_ROOT, "bin", "create-cmp.mjs"), appDir, "--yes", "--name", APP_NAME, "--package", APP_PACKAGE, "--no-ios", "--no-firebase", "--no-verify"],
+  [path.join(REPO_ROOT, "bin", "create-cmp.mjs"), appDir, "--yes", "--name", APP_NAME, "--package", APP_PACKAGE, "--no-ios", "--no-verify"],
   { cwd: REPO_ROOT, encoding: "utf8", timeout: BOUND_MS },
 );
 const stampMs = t() - s0;

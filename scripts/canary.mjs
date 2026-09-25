@@ -22,6 +22,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+
+import { loadRegistry } from "../src/lib/registry.mjs";
+import { registryVersionsFor } from "../src/lib/add-firebase.mjs";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -127,9 +130,25 @@ function daysSince(lastUpdated) {
   return Math.round((Date.now() - d.getTime()) / 86400000);
 }
 
+/**
+ * The pins `create-cmp add firebase` would write into an app on the template's
+ * set. Firebase left the template for that step, so its catalog no longer
+ * carries `firebase-gitlive`; the step takes it from the registry set matching
+ * the app's Kotlin, and that is the pin this canary must compare against —
+ * reading it as absent would report the frozen set "behind" on a key it pins.
+ */
+function addStepPins(pinned) {
+  try {
+    return registryVersionsFor(pinned.kotlin, ["firebase-gitlive", "google-services"], loadRegistry()).versions;
+  } catch {
+    return {};
+  }
+}
+
 // ── Report ──────────────────────────────────────────────────────────────────
 export async function buildReport() {
-  const pinned = readVersions(CATALOG);
+  const catalogPins = readVersions(CATALOG);
+  const pinned = { ...addStepPins(catalogPins), ...catalogPins };
   const deps = [];
   for (const dep of DEPS) {
     const current = pinned[dep.key] ?? null;

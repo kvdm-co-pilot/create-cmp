@@ -28,6 +28,7 @@ import { spawnSync } from "node:child_process";
 import { scaffold } from "../src/scaffold.mjs";
 import { planUpgrade } from "../src/lib/upgrade.mjs";
 import { loadRegistry, getSet } from "../src/lib/registry.mjs";
+import { planAddFirebase, applyAddFirebasePlan } from "../src/lib/add-firebase.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -71,10 +72,8 @@ await scaffold({
   appName: "Canary",
   package: "com.canary.app",
   iosBundleId: "com.canary.app",
-  region: "us-central1",
   themePrefix: "Canary",
   platforms: { android: true, ios: !androidOnly },
-  firebase: { enabled: true, auth: "both", firestore: true, storage: true, functions: true, fcm: true },
   room: true,
   e2e: true,
   inspector: true,
@@ -82,6 +81,10 @@ await scaffold({
   tabs: [{ label: "Home", icon: "home" }, { label: "Profile", icon: "person" }],
   targetDir: outDir,
 }, { verify: false });
+// Full-featured includes the one service: Firebase left stamp-time for `create-cmp add firebase`,
+// so the canary gets it the way an adopter does. Its GitLive version comes from the CURRENT set;
+// the candidate's own firebase-gitlive / google-services pins are applied by the rewrite below.
+applyAddFirebasePlan(outDir, planAddFirebase(outDir, {}));
 
 // ── Apply the candidate set (reuses the real `upgrade` rewrite engine) ───────
 const tomlPath = path.join(outDir, "gradle", "libs.versions.toml");
