@@ -40,7 +40,8 @@ export const DISK_WARN_BYTES = 3 * GIB;
  *        null = scan skipped (no composeApp sources), [] = project has no inspector code.
  * @param {{scriptPresent:boolean, settingsPresent:boolean, statusLine:boolean,
  *          promptHook:boolean, cwdRelative:string[], anchored:string[],
- *          unconfirmed:string[], healable:string[], unreadable?:string}|null} [input.walk] the walk's
+ *          unconfirmed:string[], healable:string[], unreadable?:string,
+ *          unparseable?:string}|null} [input.walk] the walk's
  *        wiring: is qa/walk-status.mjs installed, does .claude/settings.json actually
  *        INVOKE it (statusLine + UserPromptSubmit), and for each surface — judged
  *        cwd-relative, recognised as a shipped form that runs anywhere, or neither?
@@ -490,12 +491,33 @@ export function diagnoseProject(input) {
             : "there is no .claude/settings.json to invoke it from.") +
           " Nothing will show which stage a feature is at, or tell the agent where it is — " +
           "the walk runs nowhere. Running node qa/walk-status.mjs by hand still works.",
-        fix: {
-          auto: true,
-          description:
-            "Add the statusLine and UserPromptSubmit entries to .claude/settings.json " +
-            "(copied from the engine template; existing hooks are left untouched).",
-        },
+        // The offer is the heal's own judgement, never a second one (KD-237):
+        // `unparseable` / `unreadable` come from readWalkSettings in src/commands/doctor.mjs,
+        // the call whose answer makes `--fix` decline. Offering `--fix` over a file it will
+        // not write promised a heal one line above the refusal of it.
+        fix:
+          typeof walk.unparseable === "string"
+            ? {
+                auto: false,
+                description:
+                  `doctor --fix does not write a .claude/settings.json it cannot parse (${walk.unparseable}). ` +
+                  "By hand: make it valid JSON, then add the statusLine and UserPromptSubmit entries from the " +
+                  "engine template's .claude/settings.json — or run create-cmp doctor --fix once it parses.",
+              }
+            : typeof walk.unreadable === "string"
+              ? {
+                  auto: false,
+                  description:
+                    `doctor --fix does not write a .claude/settings.json whose shape it does not read (${walk.unreadable}). ` +
+                    "By hand: give that entry the shape the engine template's .claude/settings.json uses, then add " +
+                    "the statusLine and UserPromptSubmit entries from it — or run create-cmp doctor --fix once doctor reads the file.",
+                }
+              : {
+                  auto: true,
+                  description:
+                    "Add the statusLine and UserPromptSubmit entries to .claude/settings.json " +
+                    "(copied from the engine template; existing hooks are left untouched).",
+                },
       });
     }
   }
