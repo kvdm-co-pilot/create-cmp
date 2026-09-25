@@ -81,6 +81,14 @@ gives `{ sha256, fileCount, files }` (a per-file digest map) with no lock to
 compare against. A corrupt or truncated lock reads as `unlocked`, never as
 intact.
 
+**A secret scanner may flag `qa/harness.lock.json`.** Every value in the lock's `files` map (one
+per lane file) and its top-level `sha256` (the whole region) is a lowercase 64-character hex
+sha256 digest — the shape a generic secret rule (gitleaks' `generic-api-key`, for one) reads as a
+key. They are not credentials, and they are load-bearing: without them the lock cannot name the
+file that changed. Allowlist the path rather than the values, which change with every upgrade and
+relock — for gitleaks, `paths = ['''qa/harness\.lock\.json''']` under `[allowlist]` in
+`.gitleaks.toml`. The receipts under `qa/evidence/` carry digests of the same shape.
+
 ## The rest of the package
 
 `src/verify.mjs` is the lane's CLI entry (what a vendored copy runs as

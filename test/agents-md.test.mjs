@@ -124,3 +124,16 @@ test("upstream references are full URLs — stamped projects carry no docs/error
     "AGENTS.md links docs/errors/ relatively, but stamped projects do not carry it — use the upstream URL"
   );
 });
+
+test("every rendering says a secret-scanner hit on the lock is a sha256 digest, and how to allowlist it (KD-160)", () => {
+  // Every stamp that carries a lane carries `qa/harness.lock.json` — a --minimal one
+  // too, with fewer digests — and an adopter's gitleaks once read one as a
+  // `generic-api-key` and reddened their CI. The format stays: the digests are what
+  // the lock is for. What an adopter is owed is to recognise the hit and to allow it.
+  for (const mode of MODES) {
+    const body = render(...mode.disabled).replace(/\s+/g, " ");
+    assert.match(body, /secret scanner that flags `qa\/harness\.lock\.json`/, `[${mode.name}] the lock's scanner hit is not explained`);
+    assert.match(body, /sha256 digests, not a credential/, `[${mode.name}] the digest shape is not named`);
+    assert.match(body, /Allowlist the path, not the values/, `[${mode.name}] no word on how to allow it`);
+  }
+});
