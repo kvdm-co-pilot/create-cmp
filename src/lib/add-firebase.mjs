@@ -65,6 +65,9 @@ const APP_BUILD_REL = "composeApp/build.gradle.kts";
 const CATALOG_REL = "gradle/libs.versions.toml";
 const SPEC_REL = "create-cmp.json";
 
+/** Why a Firebase region cannot move once the step ran — the owner's decision, 2026-09-25. */
+const REGION_IS_FIXED = "The region is set when Firebase is added; changing it is not supported by this step.";
+
 /** A refusal: the message names what was found and what to do. Nothing has been written. */
 export class AddFirebaseRefusal extends Error {
   constructor(message) {
@@ -297,6 +300,19 @@ export function isLegacyFirebaseConfig(text) {
   return /^package [A-Za-z0-9_.]+\.data\.remote\n\n\/\/ Region for Cloud Functions \/ callables\. Keep schedulers, callables, Firestore in the\n\/\/ SAME region — cross-region 2nd-gen wiring fails\.\nconst val FIREBASE_FUNCTIONS_REGION = "[^"\n]*"\n?$/.test(text);
 }
 
+/**
+ * The region `have` was written for, when it is this step's own file — the overlay's `raw` bytes
+ * with every token but the region filled in — rendered for some region; `null` when it is not.
+ */
+function ownFileRegion(raw, tokens, have) {
+  if (!raw.includes("__REGION__")) return null;
+  const HOLE = "\u0000";
+  const shape = replaceTokens(raw, tokens.map(([token, value]) => [token, token === "__REGION__" ? HOLE : value]));
+  const esc = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const m = new RegExp(`^${shape.split(HOLE).map(esc).join("([a-z0-9-]+)")}$`).exec(have);
+  return m && new Set(m.slice(1)).size === 1 ? m[1] : null;
+}
+
 // ── config files ────────────────────────────────────────────────────────────
 
 function googleServicesPackages(text, where) {
@@ -381,6 +397,12 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
 
   const recorded = ours ? firebaseFromSpecRecord(record) : null;
   const options = firebaseOptions(input, recorded);
+  if (recorded && options.region !== recorded.region) {
+    refuse(
+      `--region ${options.region}, and this app's Firebase is in ${recorded.region}. ${REGION_IS_FIXED}\n` +
+        `  Run it without --region to keep ${recorded.region}.`,
+    );
+  }
   const packagePath = record.package.replace(/\./g, "/");
   const applicationId = applicationIdOf(appBuild, record.package);
   const ios = fs.existsSync(path.join(projectDir, "iosApp"));
@@ -445,13 +467,22 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
   for (const relOverlay of listOverlayFiles(filesDir)) {
     if (isIosPath(relOverlay) && !ios) continue;
     const rel = toAppPath(relOverlay, packagePath);
-    const content = replaceTokens(fs.readFileSync(path.join(filesDir, relOverlay), "utf8"), tokens);
+    const raw = fs.readFileSync(path.join(filesDir, relOverlay), "utf8");
+    const content = replaceTokens(raw, tokens);
     const have = readText(projectDir, rel);
     if (have === content) {
       present.push(rel);
       continue;
     }
     if (have !== null && !isLegacyFirebaseConfig(have)) {
+      const theirs = ownFileRegion(raw, tokens, have);
+      if (theirs !== null) {
+        refuse(
+          `${rel} is the file this step wrote for region ${theirs}, and this run asks for ${options.region}` +
+            `${recorded ? ` (what ${SPEC_REL} records)` : ""}. ${REGION_IS_FIXED}\n` +
+            `  ${SPEC_REL} and ${rel} must name the same region for this step to run.`,
+        );
+      }
       refuse(
         `${rel} already exists, and its bytes are not the ones this step writes. It is not overwritten.\n` +
           `  Move it aside (or delete it if it is left over from an earlier attempt), then run this again.`,
