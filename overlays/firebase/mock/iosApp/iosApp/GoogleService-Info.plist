@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MOCK, written by `create-cmp add firebase` because no real config was given. It names no Firebase
+  project: `demo-` is the Firebase emulator suite's prefix for a project that exists nowhere else.
+  Replace it with your app's real file from the Firebase console (Project settings → your iOS app →
+  download), or let the cmp-firebase-connect skill do it.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>MOCK-written-by-create-cmp-add-firebase-not-a-real-key</string>
+	<key>GCM_SENDER_ID</key>
+	<string>000000000000</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>__IOS_BUNDLE_ID__</string>
+	<key>PROJECT_ID</key>
+	<string>demo-mock-not-real</string>
+	<key>STORAGE_BUCKET</key>
+	<string>demo-mock-not-real.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:000000000000:ios:0000000000000000000000</string>
+</dict>
+</plist>

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "demo-mock-not-real",
+    "storage_bucket": "demo-mock-not-real.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "android_client_info": {
+          "package_name": "__APPLICATION_ID__"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "MOCK-written-by-create-cmp-add-firebase-not-a-real-key"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
