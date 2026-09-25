@@ -9,6 +9,24 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-252 — a stamp-failed test's scratch cleanup races git on CI — **CLOSED 2026-09-26**
+
+`test/a-run-whose-stamp-failed-is-refused-for-a-reason-that-is-not-true.test.mjs` (its `fs.rmSync`
+cleanups)
+
+Found on PR #175's CI, 2026-09-26: "and the program says the same thing: --discharge on a
+stamp-failed record names the stamp" failed with `ENOTEMPTY: directory not empty, rmdir
+'/tmp/stamp-failed-…/.git/objects'`, so Node 20 and 24 were cancelled with it. The re-run passed on
+all three, and the file passes locally. A recursive remove that meets a directory still being
+written — most likely a git process the test spawned, finishing after the test returned — fails
+this way.
+
+**Why it does not block:** no product path is involved and nobody is served wrongly; it costs a CI
+re-run when it fires. The likely repair is `maxRetries` on those `rmSync` calls, or waiting for the
+spawned git to exit before cleanup.
+
+**Closed 2026-09-26, on the `fix/kd-250-251-252` branch.** The file's three scratch cleanups (`test/a-run-whose-stamp-failed-is-refused-for-a-reason-that-is-not-true.test.mjs:124`, `:151`, `:194`, the only `rmSync` calls in it) now pass `maxRetries: 5, retryDelay: 100`, which Node documents as retrying a recursive remove that meets `ENOTEMPTY` (or `EBUSY`, `EMFILE`, `ENFILE`, `EPERM`) with a linear backoff, instead of throwing on the first. Measured: the file passes 6/6 locally on Node 24.18.0 with the change. Not measured: the race itself, which reproduces locally neither in the entry's measurement nor in this run, so the fix rests on Node's documented retry and not on an observed failure turned green; the other repair the entry named, waiting for the spawned git to exit, was not built.
+
 ### KD-248 — `harden --dry-run` does not list the architecture doc the apply regenerates — **CLOSED 2026-09-25**
 
 `src/commands/harden.mjs` (`runHarden`'s dry-run listing vs `hardenProject`'s `regenerateArchDoc`)
