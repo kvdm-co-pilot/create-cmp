@@ -12,6 +12,8 @@
 // new proven-green set (the new default `create-cmp upgrade` target). A red build
 // leaves registry.json untouched and names the failing task + log path. Same
 // discipline as the harness itself: a set is "green" only when a build proves it.
+// A candidate must carry `firebaseIos` pairing its own `firebase-gitlive` (KD-243); one that does not
+// is refused before the build, naming what to record (scripts/lib/promoted-set.mjs).
 //
 // Usage:
 //   node scripts/promote-set.mjs <candidateId> [--android-only] [--keep] [--out <dir>]
@@ -29,6 +31,7 @@ import { scaffold } from "../src/scaffold.mjs";
 import { planUpgrade } from "../src/lib/upgrade.mjs";
 import { loadRegistry, getSet } from "../src/lib/registry.mjs";
 import { planAddFirebase, applyAddFirebasePlan } from "../src/lib/add-firebase.mjs";
+import { firebaseIosPairingProblem, promotedSet } from "./lib/promoted-set.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -62,6 +65,9 @@ if (!candidate) {
 }
 const registry = loadRegistry(REGISTRY_PATH);
 if (getSet(registry, candidateId)) die(`"${candidateId}" is already a proven-green set in registry.json.`);
+// The Firebase iOS pairing is promoted with the set or not at all — refused here, before the build.
+const pairingProblem = firebaseIosPairingProblem(candidate);
+if (pairingProblem) die(pairingProblem);
 
 // ── Scaffold a full-featured app on the current default set ──────────────────
 const outDir = outDirArg ? path.resolve(outDirArg) : fs.mkdtempSync(path.join(os.tmpdir(), `cmp-promote-${candidateId}-`));
@@ -154,19 +160,10 @@ if (!green) {
 // ── Promote: append the full candidate set into the registry ─────────────────
 log(`\n✔ GREEN — built in ${durationSec}s. Promoting ${candidateId} to proven-green.`);
 const registryDoc = JSON.parse(fs.readFileSync(REGISTRY_PATH, "utf8"));
-registryDoc.sets.push({
-  id: candidate.id,
-  label: candidate.label,
-  status: "proven-green",
-  versions: candidate.versions,
-  ...(candidate.androidSdk ? { androidSdk: candidate.androidSdk } : {}),
-  ...(candidate.gradleProperties ? { gradleProperties: candidate.gradleProperties } : {}),
-  ...(candidate.gradleWrapper ? { gradleWrapper: candidate.gradleWrapper } : {}),
-  notes: [
-    ...(candidate.notes || []),
-    `Promoted by promote-set.mjs ${new Date().toISOString().slice(0, 10)}: green on ${tasks.join(", ")} (${durationSec}s). Evidence: qa-artifacts/canary/${candidateId}.json`,
-  ],
-});
+registryDoc.sets.push(promotedSet(
+  candidate,
+  `Promoted by promote-set.mjs ${new Date().toISOString().slice(0, 10)}: green on ${tasks.join(", ")} (${durationSec}s). Evidence: qa-artifacts/canary/${candidateId}.json`,
+));
 assertValidRegistry(registryDoc); // fail loudly before writing a broken registry
 fs.writeFileSync(REGISTRY_PATH, JSON.stringify(registryDoc, null, 2) + "\n");
 

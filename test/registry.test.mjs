@@ -11,6 +11,8 @@ import {
   getSet,
   nearestSet,
 } from "../src/lib/registry.mjs";
+import { firebaseIosPairingProblem, promotedSet } from "../scripts/lib/promoted-set.mjs";
+import { firebaseIosPodFor } from "../src/lib/add-firebase.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REGISTRY_PATH = path.join(__dirname, "..", "src", "versions", "registry.json");
@@ -157,6 +159,61 @@ test("every shipped proven-green set declares androidSdk (compileSdk is managed,
       `${set.id} must declare androidSdk.compileSdk — otherwise upgrade leaves compileSdk stale`,
     );
   }
+});
+
+// --- promote-set.mjs: the Firebase iOS pairing is promoted with the set, or not at all -------
+
+/** A candidate as scripts/canary.mjs + a maintainer would stage it: the newest set, re-pinned. */
+function candidateFrom(gitlive, pair) {
+  const c = structuredClone(latestSet(loadRegistry()));
+  Object.assign(c, { id: "2099.01", label: "fixture candidate", status: "candidate", baseline: c.id });
+  c.versions["firebase-gitlive"] = gitlive;
+  if (pair === undefined) delete c.firebaseIos;
+  else c.firebaseIos = pair;
+  return c;
+}
+
+test("promote-set carries a candidate's own Firebase iOS pairing into the promoted set (KD-243)", () => {
+  const url = "https://github.com/GitLiveApp/firebase-kotlin-sdk/blob/v9.9.9/gradle/libs.versions.toml";
+  const pair = { gitlive: "9.9.9", version: "12.3.0", source: `${url} — firebase-cocoapods` };
+  const candidate = candidateFrom("9.9.9", pair);
+  assert.equal(firebaseIosPairingProblem(candidate), null);
+  const set = promotedSet(candidate, "promoted by the fixture");
+  assert.deepEqual(set.firebaseIos, pair, "the pairing travels with the set");
+  assert.equal(firebaseIosPodFor(set).constraint, "~> 12.3", "add firebase accepts the promoted set for iOS");
+  const reg = structuredClone(loadRegistry());
+  reg.sets.push(set);
+  validateRegistry(reg);
+  assert.equal(set.status, "proven-green");
+  assert.equal(set.notes.at(-1), "promoted by the fixture");
+});
+
+test("promote-set refuses a candidate whose Firebase iOS pairing is missing, stale or unsourced — never carries one across (KD-243)", () => {
+  const url = "https://github.com/GitLiveApp/firebase-kotlin-sdk/blob/v9.9.9/gradle/libs.versions.toml";
+  const shipped = latestSet(loadRegistry()).firebaseIos; // a real pairing, for another GitLive version
+  for (const [why, pair] of [
+    ["none recorded", undefined],
+    ["the previous set's pairing", shipped],
+    ["no whole version", { gitlive: "9.9.9", version: "12.3", source: url }],
+    ["source not GitLive's catalog at the tag", { gitlive: "9.9.9", version: "12.3.0", source: "a blog post" }],
+  ]) {
+    const candidate = candidateFrom("9.9.9", pair);
+    const problem = firebaseIosPairingProblem(candidate);
+    assert.ok(problem, `${why}: refused`);
+    assert.match(problem, /src\/versions\/candidates\.json/, `${why}: names where to record it`);
+    assert.match(problem, /firebase-cocoapods/, `${why}: names the key it is sourced from`);
+    assert.ok(problem.includes(url), `${why}: names GitLive's catalog at the candidate's tag`);
+    assert.throws(() => promotedSet(candidate, "n"), (e) => e.message === problem, `${why}: no set is built`);
+  }
+  assert.match(firebaseIosPairingProblem(candidateFrom("", undefined)), /pins no firebase-gitlive/);
+});
+
+test("promote-set refuses before the build: the pairing check precedes the scaffold", () => {
+  const src = fs.readFileSync(path.join(__dirname, "..", "scripts", "promote-set.mjs"), "utf8");
+  const check = src.indexOf("die(pairingProblem)");
+  assert.ok(check !== -1, "promote-set.mjs dies on a pairing problem");
+  assert.ok(check < src.indexOf("await scaffold("), "and does so before scaffolding and building");
+  assert.match(src, /registryDoc\.sets\.push\(promotedSet\(/, "the promoted set is built by promotedSet");
 });
 
 // --- helpers ------------------------------------------------------------------------
