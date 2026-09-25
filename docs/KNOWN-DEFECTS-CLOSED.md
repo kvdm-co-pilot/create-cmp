@@ -9,6 +9,21 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-246 — the Stage 3 gate's header quotes a bar the road lowered — **CLOSED 2026-09-25**
+
+`scripts/stage3-gate.mjs:3-4`, `docs/NORTH-STAR.md:419`
+
+The header quotes §9 as "10 repos upgraded by one command". The road dropped the bar to 2 on
+2026-09-09, and the gate reads the figure out of NORTH-STAR rather than holding it. The sibling
+comment in `scripts/stage-gate.mjs` ("seven of its ten rows") is already gone.
+
+**Why it does not block:** it is a comment in an unpublished script, and the predicate reads the live
+figure.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** The header of `scripts/stage3-gate.mjs:3-6` no longer quotes a count: it gives §9's criterion as "N repos upgraded by one command", says N is read out of `docs/NORTH-STAR.md` and never held in the file, and states the trigger as "more than N repos" (the road's trigger had also moved, to "more than 2"). The two other comments that stated the bar as ten went the same way: `:31` ("§9's N repos") and `:126-127` ("It does not run N lanes … one lane run per repo"). The "ten" left in the file is illustration, not the bar: an operator holding ten repos (`:63`) and the attack list (`:156-195`, "Ten paths is not ten repos"). The predicate is unchanged; `test/stage3-fleet-size.test.mjs`, `test/one-command-upgrades-a-declared-fleet.test.mjs` and `test/two-fleet-readers-diverge-on-a-field-the-corpus-never-varies.test.mjs` pass (12/0).
+
 ### KD-245 — "KD-67" names two defects — **CLOSED 2026-09-25**
 
 `docs/KNOWN-DEFECTS.md` (KD-223's entry and row), `test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs:107`,

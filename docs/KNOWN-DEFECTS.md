@@ -232,7 +232,6 @@ you the same list without opening anything.
 | **KD-242** | a `--minimal` app that runs `add firebase` and then `harden` may fail the architecture-doc freshness check: `add firebase` skips regenerating the doc when `qa/lib/arch-doc.mjs` is absent, and minimal subtraction removes machine-owned `qa/` scripts outside the preview keep-set | unmeasured in every part; if it fires, it is a red check the adopter can clear by regenerating, never a false green |
 | **KD-243** | the Firebase overlay's Podfile lines pin `FirebaseCore`, `FirebaseAuth` and `FirebaseFirestore` at `~> 11.0`, while the GitLive Kotlin version is taken from the registry at add time | only an iOS build reads the pods, and no L2 run compiles one (KD-206); a GitLive release that needs a newer Firebase iOS fails at pod resolution, loudly |
 | **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | judged harmless by reading in the batch that found it; no test stamps that history |
-| **KD-246** | `scripts/stage3-gate.mjs:3-4` quotes §9 as "10 repos upgraded by one command"; the road has said 2 since 2026-09-09 | a comment in an unpublished script whose predicate reads the live figure out of NORTH-STAR; `stage-gate.mjs`'s "seven of its ten rows" is already gone |
 
 ---
 
@@ -3768,18 +3767,5 @@ Firebase, so its base is the old template with Firebase ON, which that app never
 
 **Why it does not block:** judged harmless by reading, in the batch that found it. No test stamps
 that history, so the judgement is unmeasured.
-
-*Logged 2026-09-25 (0.28.0 batch).*
-
-### KD-246 — the Stage 3 gate's header quotes a bar the road lowered
-
-`scripts/stage3-gate.mjs:3-4`, `docs/NORTH-STAR.md:419`
-
-The header quotes §9 as "10 repos upgraded by one command". The road dropped the bar to 2 on
-2026-09-09, and the gate reads the figure out of NORTH-STAR rather than holding it. The sibling
-comment in `scripts/stage-gate.mjs` ("seven of its ten rows") is already gone.
-
-**Why it does not block:** it is a comment in an unpublished script, and the predicate reads the live
-figure.
 
 *Logged 2026-09-25 (0.28.0 batch).*
