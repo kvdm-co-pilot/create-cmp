@@ -135,7 +135,8 @@ pattern (`androidRelease/…/InspectorInit.kt`).
 ### 3.4 Deferred (documented, not built)
 
 - **Network interceptor:** no `HttpClient` is instantiated anywhere yet (ktor is
-  declared but unused; Firebase is the real remote). The seam is documented —
+  declared but unused; the default stamp has no remote, and Firebase is one only
+  once `create-cmp add firebase` adds it). The seam is documented —
   ring-buffer interceptor at client creation + `/inspect/network` — and waits
   for a real client. Do not build speculative plumbing.
 - **Perf receipts (M4):** heap/frame stats on `/inspect/health` and an opt-in
