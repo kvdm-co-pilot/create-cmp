@@ -501,7 +501,8 @@ function scanInspectorSources(projectDir) {
  * is atomic) and is renamed over it; on any failure the temporary file is unlinked, the
  * original keeps its bytes, and the refusal is reported as above. What the truncating
  * write did implicitly is kept explicitly: a symlinked target keeps its link, live or
- * dangling (the file written is the one it points at), the file keeps its mode, and a file this user may
+ * dangling (the file written is the one the system reads through it, and a link the system
+ * would not read as a regular file is refused), the file keeps its mode, and a file this user may
  * not write is still refused (EACCES) rather than replaced, since a rename needs only
  * the directory's permission. The atomic write is inline, not a helper, so every fs call
  * that mutates the tree stays inside this body where the dry-run gate can see it.
@@ -518,6 +519,14 @@ function scanInspectorSources(projectDir) {
  *          auto-fixable" print over a finding still offering one.
  */
 export function healWriter({ dryRun = false } = {}) {
+  /** A write that did not happen, in words, on `.failed`; the heal returns false (KD-214). */
+  const refuse = (target, what, reason) => {
+    write.failed.push({ what, target, reason });
+    process.stdout.write(
+      `${colors.red("✗")} --fix: could not write ${what} — ${reason}\n    ${colors.dim(target)}\n`
+    );
+    return false;
+  };
   const write = (target, content, what) => {
     if (dryRun) {
       process.stdout.write(`${colors.dim(`[dry-run] --fix: would write ${what}`)}\n`);
@@ -527,21 +536,43 @@ export function healWriter({ dryRun = false } = {}) {
       fs.mkdirSync(path.dirname(target), { recursive: true });
       // Never truncate the target (KD-241): write a temporary file beside it, then rename
       // it over. See "A WRITE NEVER TRUNCATES" above for what this keeps and why it is here.
+      // Resolve the target the way the system reads it, never as text: `linked/../x`, where
+      // `linked` is a link to a directory, names `x` beside THAT directory's target, and link
+      // text ending in "/" names a directory. Node's JS `realpathSync` and `path.resolve`
+      // collapse `..` lexically (and hang, or write a stray file); `.native` asks the system.
+      // Even that is not the kernel's reading on macOS, whose realpath(3) drops a trailing
+      // "/" the kernel refuses (ENOTDIR), so the file the system reads through the target
+      // (`statSync`) is the oracle, and the rename goes ahead only onto that same file.
       let real = target;
       let mode;
       try {
-        real = fs.realpathSync(target);
-        mode = fs.statSync(real).mode & 0o7777;
+        const st = fs.statSync(target);
+        real = fs.realpathSync.native(target);
+        const at = fs.statSync(real);
+        if (!st.isFile()) return refuse(target, what, `the system reads it as ${real}, which is not a regular file`);
+        if (at.dev !== st.dev || at.ino !== st.ino) {
+          return refuse(target, what, `the system reads it as a file other than ${real}, where the write would land`);
+        }
+        mode = st.mode & 0o7777;
       } catch (err) {
         if (err?.code !== "ENOENT") throw err;
         // No file yet, or a link whose chain ends where nothing is (a dangling link), which
-        // realpathSync refuses. Follow the chain by hand, each hop against its link's real
-        // directory, so the write lands where the last link points and every link stays one.
-        // A destination directory that is missing is not made: the write below is refused
-        // and reported (KD-214). Past 40 hops the system names the refusal (ELOOP).
+        // realpath refuses. Follow the chain one hop at a time as the system would: the link's
+        // text is appended to its directory as a string (`path.join`/`path.resolve` would
+        // normalise its `..` as text), the parent of that is resolved by the system, and the
+        // last name is kept. So the write lands where the last link points and every link
+        // stays one. A destination directory that is missing is not made: resolving it is
+        // refused and reported (KD-214). Past 40 hops the system names the refusal (ELOOP).
         for (let hops = 0; fs.lstatSync(real, { throwIfNoEntry: false })?.isSymbolicLink(); hops += 1) {
           if (hops === 40) fs.statSync(real);
-          real = path.resolve(fs.realpathSync(path.dirname(real)), fs.readlinkSync(real));
+          const text = fs.readlinkSync(real);
+          const hop = path.isAbsolute(text) ? text : `${fs.realpathSync.native(path.dirname(real))}/${text}`;
+          const name = path.basename(hop);
+          if (hop.endsWith("/") || name === "." || name === "..") {
+            return refuse(target, what, `a link on the way names ${text}, which the system reads as a directory, not a file`);
+          }
+          // Neither part carries a `..` any more, so joining them normalises nothing.
+          real = path.join(fs.realpathSync.native(path.dirname(hop)), name);
         }
       }
       if (mode !== undefined) fs.accessSync(real, fs.constants.W_OK);
@@ -563,12 +594,7 @@ export function healWriter({ dryRun = false } = {}) {
       }
     } catch (err) {
       if (typeof err?.syscall !== "string") throw err;
-      const reason = writeRefusalInWords(err);
-      write.failed.push({ what, target, reason });
-      process.stdout.write(
-        `${colors.red("✗")} --fix: could not write ${what} — ${reason}\n    ${colors.dim(target)}\n`
-      );
-      return false;
+      return refuse(target, what, writeRefusalInWords(err));
     }
     write.wrote += 1;
     write.applied.push(what);
