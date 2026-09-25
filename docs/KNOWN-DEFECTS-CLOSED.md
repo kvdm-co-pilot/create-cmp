@@ -58,6 +58,35 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-216 — "always works", in the paragraph explaining why it does not — **CLOSED 2026-09-25**
+
+`src/lib/project-doctor.mjs` (walk-wiring warn branch, the `working.length > 0` detail) · KD-126 ·
+KD-182
+
+The new branch that credits a surface ends its detail with *"…and running `node qa/walk-status.mjs` by
+hand always works."* The paragraph it closes exists to say the opposite about that exact spelling: two
+sentences earlier it explains that a command naming the script by a path relative to the session's
+directory "finds no script there", and that `|| true` makes the miss silent. `always` is the word that
+is not true — the pre-existing fallback one line below, which this branch was written beside, says
+"still works", which is accurate. The finding therefore states the general rule it is teaching and
+then contradicts it in its own last clause, in the one report whose subject is that distinction.
+
+**Nobody is wrongly served.** An adopter reading a report about their project reads "by hand" as "from
+the project", which is where they are; nothing in the tree routes on the sentence, and the remedy
+lines above it are correct. It is the class KD-126 and KD-182 are in — a false fact surviving in a
+second spelling, in prose a contributor or an adopter reads and nothing checks.
+
+**Fires when:** a reader takes the sentence literally and runs the relative command from a
+subdirectory, having just been told by the same paragraph that it will not work there.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+**CLOSED by the one word, in the commit that moved it here.** The clause now reads *"…and running
+`node qa/walk-status.mjs` by hand from the project root still works"* — the place the relative path
+resolves from, in the wording of the fallback one line below. The other two by-hand sentences in the
+finding were already accurate and are unchanged. `test/doctor-claims-working-for-a-surface-a-foreign-cwd-cannot-run.test.mjs`
+pins it against the same oracle as the rest of that file: the shell, run from another directory,
+does not run the by-hand form, and the detail no longer promises that it always does.
+
 ### KD-196 — the contract vendored into every app says `doctor --fix` asks before any repair, and three of its four heals do not — **CLOSED 2026-09-25**
 
 `template/AGENTS.md` (line 42) · `src/commands/doctor.mjs` (`applySafeFixes`)

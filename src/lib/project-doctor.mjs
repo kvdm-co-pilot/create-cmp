@@ -427,7 +427,9 @@ export function diagnoseProject(input) {
           (working.length > 0
             ? `${cap(joined(working))} ${working.length === 1 ? "is" : "are"} anchored and still ` +
               `work${working.length === 1 ? "s" : ""} from any directory, and running ` +
-              "node qa/walk-status.mjs by hand always works."
+              // "From the project root", not "always": the sentences above exist to say
+              // that this relative path finds no script from any other directory (KD-216).
+              "node qa/walk-status.mjs by hand from the project root still works."
             : "Running node qa/walk-status.mjs by hand still works."),
         fix: {
           // No automatic heal is offered FROM THIS FINDING even when one exists:

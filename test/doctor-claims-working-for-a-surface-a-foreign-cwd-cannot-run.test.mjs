@@ -168,3 +168,30 @@ test("the claim is still made for the wiring the engine template ships", () => {
     fs.rmSync(elsewhere, { recursive: true, force: true });
   }
 });
+
+test("the by-hand clause says where the relative path runs from, not that it always does (KD-216)", () => {
+  // The same paragraph explains that `node qa/walk-status.mjs`, relative to the
+  // session's directory, finds no script from anywhere else. Its last clause used
+  // to promise that exact spelling "always works" by hand. The oracle is the one
+  // above — the shell, run from another directory — applied to the by-hand form.
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-foreign-cwd-"));
+  const dir = project(SHIPPED);
+  try {
+    const detail = String(walkWiring(dir)?.detail ?? "");
+    assert.match(detail, /by hand/, "the fixture no longer reaches the branch that names what still works");
+    assert.equal(
+      runsFromElsewhere(`node ${SCRIPT}`, dir, elsewhere),
+      false,
+      "the by-hand form ran from another directory — this test's premise is gone"
+    );
+    assert.doesNotMatch(detail, /by hand[^.]*\balways\b/, `doctor promises the relative by-hand form always works:\n  ${detail}`);
+    assert.match(
+      detail,
+      /by hand from the project root/,
+      `the by-hand clause no longer says where it works:\n  ${detail}`
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(elsewhere, { recursive: true, force: true });
+  }
+});

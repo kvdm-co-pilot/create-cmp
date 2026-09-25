@@ -221,7 +221,6 @@ you the same list without opening anything.
 | **KD-213** | the `--dry-run` gate counts four `fs` spellings where its own header names the class — `copyFileSync`, `renameSync`, `cpSync`, `fs.promises.*` and a destructured import all pass it | zero producers in the tree, and it cannot be written as a failing test: a widened gate is green on these bytes |
 | **KD-214** | `doctor --fix` dies with a raw EACCES stack and prints NO project diagnosis when a heal cannot write, discarding the report and leaving earlier heals half-applied | the refusal is honest and names its cause and its path, the file is left byte-for-byte unchanged, and the unwritable file is a state the adopter created |
 | **KD-215** | the heal makes the Stop gate fire from a foreign cwd, and the remedy it then prints names `node qa/verify.mjs` — a path that does not resolve from where that session stands | the verdict and the exit code are right from both directories; only the remedy's path is relative, and the text is pre-existing and unchanged |
-| **KD-216** | the new working-surface sentence says running the walk by hand "always works", inside the paragraph explaining that a session-relative path does not resolve from another directory | an adopter reads "by hand" as "from the project", nothing routes on the sentence, and the pre-existing fallback one line below uses the accurate word |
 | **KD-218** | the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`, and there is no such flag | refused, exit 2, nothing written; the sentence names something the CLI does not have (KD-184's shape) |
 | **KD-219** | `attach.mjs`'s new comment says the empty `--citation-roots` value "never arrives any more", and this tree's own suite passes it in | the guard it weakens the reason for is still there and still correct; only the reason is false |
 | **KD-220** | a `npm publish` payload stamps the app TWICE — `obligation()` stamps when the device tier is required and `releaseContext()` stamps again — where `ANSWER_RESERVE_MS` is documented as covering one | measured 1.92 s against a 10 s budget (merge, one stamp: 1.09 s), and 1.1–1.8 s per stamp under 16 burners; the overrun direction is fail-open but has no producer today |
@@ -3574,28 +3573,6 @@ makes the message reachable at all.
 
 **Fires when:** a session opened outside the project root ends a turn in an app whose Stop hook has
 been healed, and the receipt does not attest the tree.
-*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
-
-### KD-216 — "always works", in the paragraph explaining why it does not
-
-`src/lib/project-doctor.mjs` (walk-wiring warn branch, the `working.length > 0` detail) · KD-126 ·
-KD-182
-
-The new branch that credits a surface ends its detail with *"…and running `node qa/walk-status.mjs` by
-hand always works."* The paragraph it closes exists to say the opposite about that exact spelling: two
-sentences earlier it explains that a command naming the script by a path relative to the session's
-directory "finds no script there", and that `|| true` makes the miss silent. `always` is the word that
-is not true — the pre-existing fallback one line below, which this branch was written beside, says
-"still works", which is accurate. The finding therefore states the general rule it is teaching and
-then contradicts it in its own last clause, in the one report whose subject is that distinction.
-
-**Nobody is wrongly served.** An adopter reading a report about their project reads "by hand" as "from
-the project", which is where they are; nothing in the tree routes on the sentence, and the remedy
-lines above it are correct. It is the class KD-126 and KD-182 are in — a false fact surviving in a
-second spelling, in prose a contributor or an adopter reads and nothing checks.
-
-**Fires when:** a reader takes the sentence literally and runs the relative command from a
-subdirectory, having just been told by the same paragraph that it will not work there.
 *Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
 
 ### KD-218 — the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`
