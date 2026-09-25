@@ -37,8 +37,8 @@ bottom, reported honestly.
   up costs nothing — a fresh worker starts from that file and those commits, not from your history,
   which every step of a resumed worker re-reads in full. A brief that names no branch or no
   hand-off file is a question for your plan stop. For the orchestrator: resume a stopped helper
-  only while its context is small and it holds unsaved work, preferably within 5 minutes while its
-  cache is warm; otherwise brief a fresh one from its commits and hand-off file
+  only while its context is small, it holds unsaved work and its cache is still warm (within about
+  5 minutes); otherwise brief a fresh one from its commits and hand-off file
   (https://code.claude.com/docs/en/sub-agents#resume-subagents).
 
 **Checkpoints — stop twice, and neither is a clock (ADR-0015).**
