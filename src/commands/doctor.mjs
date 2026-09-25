@@ -224,6 +224,32 @@ function healableWalkSurfaces(settings) {
 }
 
 /**
+ * What in a parsed .claude/settings.json the walk's readers cannot read, in words that
+ * complete "settings.json has a shape doctor does not read: …" — or null when they can.
+ * ONE check for both readers of the file: the diagnosis (`gatherWalkInputs`) threw a
+ * TypeError on exactly the shapes the heal (`applySafeFixes`) had its own guards for, so
+ * the guards could never be reached through `doctor`.
+ */
+export function walkSettingsShapeProblem(settings) {
+  if (settings === null || typeof settings !== "object" || Array.isArray(settings)) {
+    return `its top level is ${jsonKind(settings)}, not an object`;
+  }
+  const hooks = settings.hooks;
+  if (hooks === undefined || hooks === null) return null;
+  if (typeof hooks !== "object" || Array.isArray(hooks)) return `"hooks" is ${jsonKind(hooks)}, not an object of events`;
+  const groups = hooks.UserPromptSubmit;
+  if (groups === undefined || groups === null) return null;
+  if (!Array.isArray(groups)) return `"hooks.UserPromptSubmit" is ${jsonKind(groups)}, not an array of hook groups`;
+  for (const [n, g] of groups.entries()) {
+    const inner = g?.hooks;
+    if (inner !== undefined && inner !== null && !Array.isArray(inner)) {
+      return `"hooks.UserPromptSubmit[${n}].hooks" is ${jsonKind(inner)}, not an array of hooks`;
+    }
+  }
+  return null;
+}
+
+/**
  * Is the walk installed, does .claude/settings.json invoke it, and will those
  * invocations RESOLVE? The machinery and the wiring live in separately-owned files
  * (lane vs app config), so they can and do come apart — see the walk-wiring
@@ -242,6 +268,14 @@ export function gatherWalkInputs(projectDir) {
   } catch {
     // Unparseable settings invoke nothing, which is exactly what we report.
     return { scriptPresent, settingsPresent: true, statusLine: false, promptHook: false, cwdRelative: [], anchored: [] };
+  }
+  const unreadable = walkSettingsShapeProblem(settings);
+  if (unreadable !== null) {
+    // A shape the readers below would throw on. What doctor cannot read counts as
+    // invoking nothing — the status line still counts when the top level is an object
+    // — and the shape itself is reported as its own finding (project-doctor.mjs).
+    const statusLine = typeof settings === "object" && settings !== null && !Array.isArray(settings) && invokesWalk(settings.statusLine);
+    return { scriptPresent, settingsPresent: true, statusLine, promptHook: false, cwdRelative: [], anchored: [], unreadable };
   }
   return {
     scriptPresent,
@@ -554,8 +588,9 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
           decline(target, what, `it is not JSON doctor can read (${String(err?.message ?? err).split("\n")[0]}), and a file doctor cannot read is never overwritten`);
           continue;
         }
-        if (settings === null || typeof settings !== "object" || Array.isArray(settings)) {
-          decline(target, what, `its top level is ${jsonKind(settings)}, not an object`);
+        const unreadable = walkSettingsShapeProblem(settings);
+        if (unreadable !== null) {
+          decline(target, what, unreadable);
           continue;
         }
       }
@@ -577,17 +612,10 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
         if (!(Array.isArray(existing) && existing.some((g) => (g?.hooks ?? []).some(invokesWalk)))) {
           if (hooks === undefined) edits.push({ at: [], add: "hooks", value: { UserPromptSubmit: promptSubmit } });
           else if (hooks === null) edits.push({ at: ["hooks"], set: { UserPromptSubmit: promptSubmit } });
-          else if (typeof hooks !== "object" || Array.isArray(hooks)) {
-            // Not a shape we can account for.
-            decline(target, what, `"hooks" is ${jsonKind(hooks)}, not an object of events`);
-            continue;
-          } else if (existing === undefined) edits.push({ at: ["hooks"], add: "UserPromptSubmit", value: promptSubmit });
+          // `walkSettingsShapeProblem` above has already declined every other shape.
+          else if (existing === undefined) edits.push({ at: ["hooks"], add: "UserPromptSubmit", value: promptSubmit });
           else if (existing === null) edits.push({ at: ["hooks", "UserPromptSubmit"], set: promptSubmit });
-          else if (Array.isArray(existing)) edits.push({ at: ["hooks", "UserPromptSubmit"], push: promptSubmit });
-          else {
-            decline(target, what, `"hooks.UserPromptSubmit" is ${jsonKind(existing)}, not an array of hook groups`);
-            continue;
-          }
+          else edits.push({ at: ["hooks", "UserPromptSubmit"], push: promptSubmit });
         }
       }
       if (edits.length > 0) {
