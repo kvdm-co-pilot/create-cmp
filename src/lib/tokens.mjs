@@ -1,6 +1,6 @@
 // Token derivation + replacement for file CONTENTS and PATHS.
 //
-// Per CONTRACT.md, the engine replaces these placeholder tokens:
+// The engine replaces these placeholder tokens:
 //   __APP_NAME__ · __PACKAGE__ · __PACKAGE_PATH__ · __IOS_BUNDLE_ID__ · __THEME_PREFIX__
 // and __REGION__ only for a config that carries `region` — a template from before
 // Firebase left stamp-time, stamped by `upgrade --harness` as an app's merge base.

@@ -132,9 +132,10 @@ when neither is set; otherwise it is a plain `fix:` that says what to do by hand
 (`src/lib/project-doctor.mjs:498-520`). `test/doctor-offers-fix-only-where-fix-writes.test.mjs`
 runs `doctor` on an unparseable file, a `hooks` array and a top-level array (no `--fix` offered,
 the by-hand words printed) and on a readable file (still offered). It fails 3 of 4 on the tree
-before this commit. Not covered, because the judgement there is the in-place editor's, which
-runs only at write time: a readable file that `tryEditJsonInPlace` declines (a duplicate key, a
-first member on the bracket's line) is still offered `--fix` and then declined by name.
+before this commit. A readable file that `tryEditJsonInPlace` declines (a duplicate key) is not a residual: `--fix`
+falls back to rewriting the whole file and says so (`src/commands/doctor.mjs:705`, from `1397047`),
+so the offer holds there too. Measured with `doctor --fix` on a duplicate-key file (rewritten whole)
+and a first member on the bracket’s line (edited in place).
 
 ### KD-246 — the Stage 3 gate's header quotes a bar the road lowered — **CLOSED 2026-09-25**
 
@@ -180,7 +181,10 @@ validates the shape. The dangling pointer costs the agent one failed read.
 
 *Logged 2026-09-25 (0.28.0 batch).*
 
-**Closed 2026-09-25, on the release-0.28.1 branch.** `skills/cmp-new/SKILL.md:162-163` now reads "Build exactly the shape the engine's `options.schema.json` defines — it is the options reference, and the schema the engine validates this object against". That is what is true: `src/scaffold.mjs:47` validates against `options.schema.json`, the npm package ships it (`package.json` `files`), and `docs/USAGE.md:171` names it "the authoritative shape". `docs/USAGE.md` is not named in the skill, because the agent running `cmp-new` sits in the adopter's tree, where create-cmp's `docs/` is not; the skill's `:214` already says "the engine's `--help` / `options.schema.json`". No `CONTRACT.md` was created. Not covered here, and the same dangling name: `src/lib/toggle.mjs:4` ("Marker syntax (CONTRACT.md)"), `src/lib/tokens.mjs:3` ("Per CONTRACT.md") and `docs/DOCUMENTATION.md:116`, which lists a `CONTRACT.md` row. No test: the change is one sentence of skill prose, and a gate that every path a skill cites exists would be a new gate.
+**Closed 2026-09-25, on the release-0.28.1 branch.** `skills/cmp-new/SKILL.md:162-163` now reads "Build exactly the shape the engine's `options.schema.json` defines — it is the options reference, and the schema the engine validates this object against". That is what is true: `src/scaffold.mjs:47` validates against `options.schema.json`, the npm package ships it (`package.json` `files`), and `docs/USAGE.md:171` names it "the authoritative shape". `docs/USAGE.md` is not named in the skill, because the agent running `cmp-new` sits in the adopter's tree, where create-cmp's `docs/` is not; the skill's `:214` already says "the engine's `--help` / `options.schema.json`". No `CONTRACT.md` was created. The same name in two engine comments that ship in the npm package, `src/lib/toggle.mjs:4` and
+`src/lib/tokens.mjs:3`, is gone too: each comment states the syntax it cited. `docs/DOCUMENTATION.md:116`
+keeps its `CONTRACT.md` row, correctly: it lists the file among the maintainer-local docs `.gitignore`
+keeps out of a clone. No test: the change is one sentence of skill prose, and a gate that every path a skill cites exists would be a new gate.
 
 ### KD-238 — the architecture diagram names a third party's package — **CLOSED 2026-09-25**
 
