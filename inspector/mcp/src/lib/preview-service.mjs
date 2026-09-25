@@ -700,7 +700,7 @@ function applyConsoleCopy(projectDir) {
  * @param {object} opts
  * @param {string} opts.projectDir              create-cmp app root (has composeApp/)
  * @param {string} [opts.appName]               gallery heading (default: dir basename)
- * @param {number} [opts.port]                  first port to try (default 9600, +1 up to 10x)
+ * @param {number} [opts.port]                  first port to try (default 9600, +1 up to 10x); 0 = one the OS picks
  * @param {(dir:string)=>Promise<void>} [opts.runRender]  render runner (default: gradlew)
  * @param {(msg:string)=>void} [opts.log]
  */
@@ -2619,8 +2619,10 @@ export function createPreviewService(opts) {
         });
         srv.listen(p, "127.0.0.1", () => {
           server = srv;
-          port = p;
-          resolvePromise(p);
+          // The port the OS BOUND, read back rather than assumed (KD-203): asked for
+          // `0`, `p` is not the port — the OS picked one.
+          port = srv.address().port;
+          resolvePromise(port);
         });
       };
       tryPort(startPort);
@@ -2754,7 +2756,9 @@ export function createPreviewService(opts) {
         // so the human sees SOMETHING at once and current state seconds later.
         loadPreviews();
       }
-      await listen(opts.port || DEFAULT_PORT);
+      // `??`, not `||` (KD-203): `0` is the standard way to ask the OS for a free port,
+      // and `0 || DEFAULT_PORT` handed that caller the console's well-known one.
+      await listen(opts.port ?? DEFAULT_PORT);
       // Claim the project only once we are actually listening — a service that failed
       // to bind must never leave a record that blocks the next honest attempt.
       writeConsoleRegistry(projectDir, port);

@@ -58,6 +58,32 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-203 — `port: 0` asks for an ephemeral port and is given the well-known one — **CLOSED 2026-09-25**
+
+`inspector/mcp/src/lib/preview-service.mjs:2752` (`await listen(opts.port || DEFAULT_PORT)`) and
+`:2617` (`port = p`)
+
+`0 || 9600` is `9600`. Three tests in `console-now-sse.test.mjs` passed `port: 0` — the standard way to
+ask the OS for a free port — and got the console's default, probing upward from it. Measured
+2026-09-22 on the machine that found it, where a real console holds 9600: the service bound **9601**,
+which is `DEFAULT_DAEMON_PORT`. Two lines make it right: `opts.port ?? DEFAULT_PORT`, and
+`port = srv.address().port` so the bound port is read back rather than assumed (with `0`, `p` is not
+the port).
+
+**Why it does not block.** An adopter starting a console gets the default port either way; the caller
+who says `0` is, today, only a test. It becomes a defect the moment anything runs two consoles.
+
+**Fires when:** any caller asks this service for an ephemeral port.
+*Logged 2026-09-22, while fixing KD-56.*
+
+**CLOSED by the two lines this entry named, in the commit that moved it here.** `start()` calls
+`listen(opts.port ?? DEFAULT_PORT)`, so `0` reaches `listen` and asks the OS for a port; `undefined`
+and `null` still mean the default. `listen` records `srv.address().port` — the port actually bound —
+and resolves with it, so the status URL and the console registry name the port that answers. The
+upward probe on `EADDRINUSE` is unchanged, since `0` never collides. `inspector/mcp/test/console-stop.test.mjs`
+starts a console at `port: 0` and asserts that it reports a port that is neither 9600 nor 9601 and
+that answers `/status` there. `inspector/mcp/dist/server.mjs` is not rebuilt in this commit.
+
 ### KD-202 — a request that arrives after `stop()` is answered with a null port, and the runner blames a test that passed — **CLOSED 2026-09-25**
 
 `inspector/mcp/src/lib/preview-service.mjs:2085` (`handleRequest`) and its `stop()`
