@@ -56,14 +56,15 @@ Desktop platform seams live in `composeApp/src/desktopMain/kotlin/<package>/`:
 |---|---|
 | `NetworkMonitor` | Always-online stub |
 | Room | Real Room (BundledSQLiteDriver) writing to the OS temp dir — disposable cache |
-| Firebase | **Never initialized** — zero Firebase code, config, or network on desktop |
+| Firebase | **Never initialized** — none in the default stamp; after `create-cmp add firebase`, still zero Firebase calls, config, or network on desktop |
 | Example `ItemRepository` | The same in-memory `ItemRepositoryImpl` all platforms bind |
 
 `di/DesktopModule.kt` mirrors `AppApplication` (Android) / `KoinHelper` (iOS). **The rule to
 teach:** when the app gains a real remote-backed repository, bind an in-memory fake for it in
 `DesktopModule.kt` so the dev-client keeps running without a backend. GitLive Firebase does
-publish JVM artifacts (so the target compiles with Firebase enabled), but the dev-client
-deliberately never calls them — desktop is an offline dev surface, not a fourth platform.
+publish JVM artifacts (so the target still compiles after `create-cmp add firebase` puts the SDK
+in commonMain), but the dev-client deliberately never calls them — desktop is an offline dev
+surface, not a fourth platform.
 
 ## 3. Same module, three jobs
 

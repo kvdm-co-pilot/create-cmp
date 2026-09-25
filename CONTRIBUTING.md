@@ -29,7 +29,7 @@ To try a real stamp:
 
 ```bash
 node bin/create-cmp.mjs --name "Demo App" --package com.example.demo \
-  --no-ios --no-firebase --target-dir /tmp/demo --yes
+  --no-ios --target-dir /tmp/demo --yes
 ```
 
 ## Ground rules

@@ -36,7 +36,8 @@ the MCP). Same deterministic Node engine behind both.
 
 **The frozen version set** (moved as one unit by `upgrade`; never bump a piece in isolation):
 the authoritative pins live in [`VERSIONS.md`](./VERSIONS.md) and `src/versions/registry.json` —
-Kotlin/KSP in lockstep, Compose MP, Room, AGP, Koin, Ktor, Nav Compose, GitLive Firebase, with
+Kotlin/KSP in lockstep, Compose MP, Room, AGP, Koin, Ktor, Nav Compose (and the GitLive Firebase
+version `add firebase` writes for the app's Kotlin), with
 `ksp.useKSP2=true` (the Room-on-iOS/native catch-22). This doc deliberately quotes no numbers.
 
 > **Scope now:** Android + host-JVM are the active targets. iOS template support is intact and
@@ -134,11 +135,12 @@ a Compose/KMP repo create-cmp never touched.
 
 | Command | Purpose | Key flags |
 |---|---|---|
-| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --region --theme-prefix --target-dir <dir>` · `--minimal` (light mode — see "The two modes" below) · `--ios/--no-ios` · `--firebase/--no-firebase --auth <email\|phone\|both\|none>` (sub-toggles, default = `--firebase`'s value: `--firestore/--no-firestore --storage/--no-storage --functions/--no-functions --fcm/--no-fcm`) · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
+| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --theme-prefix --target-dir <dir>` · `--minimal` (light mode — see "The two modes" below) · `--ios/--no-ios` · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
 | `doctor` | Toolchain preflight **+** project diagnosis (kotlin↔ksp lockstep, drift vs the proven set, the KSP2/iOS catch-22, `sdk.dir`, `~/.konan` bloat, disk, an inspector-stays-debug-only check, the walk's wiring, and hook commands that resolve only from the project root — including the two every app stamped through 0.26.2 carries, which `--fix` rewrites to the form the current template ships after asking). See also [docs/errors/](errors/README.md) — one page per build failure `doctor` diagnoses, with the exact error text and the manual fix. | `--fix` (safe heals) · `--yes --no-install --no-ios --target-dir <dir>` |
 | `upgrade` | Migrate `gradle/libs.versions.toml` to the next **proven-green** version set: diff table → surgical in-place edits (comments/format preserved) with `.bak-upgrade` backups → optional verify. Lockstep guardrail refuses a broken kotlin↔ksp pairing. | `--target-dir <dir> --set <id> --dry-run --yes --verify` |
 | `clean` | Cache & build-output hygiene: stale `~/.konan` toolchains + project `build/`/`.gradle/` (sizes shown, consent-gated); global Gradle caches are size-reported only. | `--target-dir <dir> --dry-run --yes` |
 | `verify` | Run the green-build gate (Android; iOS on macOS when `iosApp/` exists) against an existing project. | `--target-dir <dir> --no-ios --dry-run` |
+| `add firebase [dir]` | Add Firebase to a stamped app — it is not a stamp option (`create --firebase`, `--region`, `--auth` and the service flags are refused and name this command). GitLive SDK at the registry's version for the app's Kotlin, the google-services plugin, a debug-build emulator redirect per platform with the ports declared once, and your real `google-services.json` — or a mock whose values say it is one. Plans every edit first and writes all or none; refuses by name on a shape it does not recognise; a second run writes nothing. The iOS half is applied when `iosApp/` exists and is **unproven** (it says so). Ends with the verify lane. | `--region <r> --auth <email\|phone\|both\|none> --no-firestore --no-storage --no-functions --no-fcm` (recorded in `create-cmp.json` for the console work) · `--google-services <path>` · `--target-dir <dir> --dry-run --no-verify` |
 | `harden` | Install the full harness into a `--minimal` scaffold, in place: the verify lane, `specs/`, approvals + comments ledgers, generators + skills, the Stop hook, the pre-push gate, and the lane CI workflow. The same three-way walk as `upgrade --harness` (base = the minimal stamp, new = the full stamp), so it is additive, idempotent, and never clobbers — a file you edited keeps your bytes and the full-mode content lands beside it as `*.cmp-new`. App-state seeds (`qa/approvals.json`, `qa/evidence/`) are copied only if absent. Ends by pointing at the proof: `node qa/verify.mjs --profile scaffold`. | `--target-dir <dir> --dry-run --yes --verify` (run the lane after installing) |
 | `attach` | Wire the agent contract into an **existing, non-create-cmp** Compose/KMP repo: the AGENTS.md symptom table and advisory session hooks — and an honest report of what it can NOT wire mechanically (previews, the lane). Never clobbers: an existing file gets a `*.cmp-new` sidecar. See `docs/features/attach-mode.md` for the staging. | `--target-dir <dir> --dry-run --yes` |
 
@@ -194,7 +196,7 @@ intent — the descriptions carry rich triggers.
 | **cmp-new** | Start a new mobile app (Android + iOS) by interview — fires on framework-undecided "create a mobile app" requests (honest CMP-vs-RN/Flutter fit check first) as well as explicit CMP/KMP asks and comparisons like "React Native vs KMP". | Interviews (incl. intent) → `create --verify` → the genesis walk: express-approve or shape design/architecture/components/exemplar together (§6). |
 | **cmp-doctor** | Set up or fix the toolchain / diagnose any KMP build. | `doctor` (+ `--fix`). |
 | **cmp-upgrade** | Bump Kotlin/CMP/KSP/Room/AGP safely. | `upgrade` (diff → apply → verify). |
-| **cmp-firebase-connect** | Wire a fresh app to its **own** Firebase (the #1 post-scaffold manual step). | Firebase CLI: login → project create/reuse → app register → real `google-services.json` replaces the placeholder → green build proves it. Consent-gated per cloud write. |
+| **cmp-firebase-connect** | Add Firebase to an app and wire it to its **own** Firebase project. | `create-cmp add firebase` (if the app has none yet) → Firebase CLI: login → project create/reuse → app register → real `google-services.json` replaces the mock → green build proves it. Consent-gated per cloud write. |
 | **cmp-dev-client** | Run the shared UI in a desktop window with Compose Hot Reload. | `:composeApp:hotRunDesktop --auto` / `:composeApp:run`. |
 | **cmp-inspect** | See/drive a running Compose UI as JSON; check tokens, drift, a11y; the verified dev loop. | The `cmp-inspector` MCP (§5). |
 | **cmp-preview** | Live previews of REAL screens, zero commands. | `preview {projectDir}` → live gallery URL; watches sources, re-renders on save; structural summaries for the agent. |
@@ -471,18 +473,19 @@ mirroring the Approvals tab's read-only-for-humans design. See
 `PlaceholderScreen` stub) → **GREEN build verdict** → the genesis walk (§6): express-approve the
 defaults, or shape design language/architecture/components and stamp the human's own first
 feature as the exemplar. Output ships `.gitignore`, a CI `verify.yml`, the Maestro E2E harness,
-the inspector, and the desktop dev-client. Next: `cmp-firebase-connect`, then run it.
+the inspector, and the desktop dev-client — and no service. Next: run it (and `cmp-firebase-connect` if it needs Firebase).
 
 ### B. Connect your own backend
 
-`cmp-firebase-connect` → Firebase CLI creates/reuses a project, registers the app, drops the **real**
-`google-services.json` over the placeholder; a green `assembleDebug` proves it. (Auth sign-in
+`cmp-firebase-connect` → `create-cmp add firebase` adds the SDK and its wiring (with a mock config that
+says it is one), then the Firebase CLI creates/reuses a project, registers the app and drops the
+**real** `google-services.json` over the mock; a green `assembleDebug` proves it. (Auth sign-in
 providers + the Storage bucket are console-only — the skill says so.)
 
 ### C. The dev-client loop (fast UI iteration, no emulator)
 
 `./gradlew :composeApp:hotRunDesktop --auto` → the shared UI runs in a phone-sized JVM window;
-editing Compose and saving hot-reloads it. Firebase never initializes on desktop (offline DI fakes).
+editing Compose and saving hot-reloads it. Firebase, once added, never initializes on desktop (offline DI fakes).
 The same JVM target hosts the inspector's headless tier-0 renders.
 
 ### D. The verified dev loop (THE core workflow) — *prompt → watch → prove*

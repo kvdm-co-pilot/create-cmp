@@ -103,7 +103,7 @@ into two requests rather than a fourth round.
   interrogated — obvious answer, no downstream consequence — is interrogation theatre.
   Cut it. Five sharp questions beat twelve thorough ones.
 - **Config is not grill material.** At genesis, the interview's option table (package id,
-  Firebase, Room, tabs…) has defaults for a reason. The grill asks about the *app*; the
+  Room, tabs…) has defaults for a reason. The grill asks about the *app*; the
   interview collects the *config*. Do not merge them into a twenty-question genesis.
 - **Not sooner, not later.** After the triage restatement (the human must see the lane
   before the questions) and before the brief is drafted (a brief written on unsettled ground

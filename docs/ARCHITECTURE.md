@@ -23,7 +23,7 @@ reproducible — the property ad-hoc CMP setups lack.
 
 A generic CMP skeleton with **one example feature wired end-to-end** (data → domain → presentation →
 DI) and a data-driven bottom-nav shell. Ships a pinned, mutually-agreeing version set (Kotlin, KSP,
-Compose Multiplatform, Room, AGP, Koin, Ktor, GitLive Firebase, Navigation Compose) including
+Compose Multiplatform, Room, AGP, Koin, Ktor, Navigation Compose) including
 `ksp.useKSP2=true` for the iOS Room/native path, plus the full iOS shell (XcodeGen `project.yml`,
 CocoaPods `Podfile`, `Info.plist`, `iOSApp.swift`, `ContentView.swift`) and the Android shell
 (`AndroidManifest`, edge-to-edge `MainActivity`, Koin/Room `Application`).
@@ -36,11 +36,16 @@ Identifiers are placeholders the engine substitutes:
 | `__PACKAGE__` | reverse-DNS package id |
 | `__PACKAGE_PATH__` | slash form for directory layout |
 | `__IOS_BUNDLE_ID__` | iOS bundle id |
-| `__REGION__` | Firebase region |
 | `__THEME_PREFIX__` | PascalCase symbol prefix |
 
 Optional regions are wrapped in `// >>> cmp:feature <name>` / `// <<< cmp:feature <name>` markers
 (supporting negation `!name` and nesting) so the engine can strip them when a feature is off.
+
+The template carries libraries and no service. Firebase — the one service it ever carried — lives
+in `overlays/firebase/`, beside `template/` and never inside it, so no stamp can copy it:
+`create-cmp add firebase` (`src/lib/add-firebase.mjs`) plans its edits to an already-stamped app
+from there — new files, one marked block appended per file, anchored one-line insertions, catalog
+entries at the registry's GitLive version for the app's Kotlin — and writes all of them or none.
 
 ## Layer 2 — the engine
 
