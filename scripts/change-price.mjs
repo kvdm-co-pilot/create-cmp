@@ -467,7 +467,7 @@ export const CEREMONY = Object.freeze([
     brief: "the same — the tier schedule is not a function of the lane",
     cite: "docs/GATE-RULES.md Rule 4, scripts/proof-plan.mjs",
     note: (ctx) =>
-      `right now it says L2 run ${String(ctx.device ?? "unknown").toUpperCase()}, review ${String(ctx.review ?? "unknown").toUpperCase()}.` +
+      `right now it says L2 run ${String(ctx.device ?? "unknown").toUpperCase()}, Firebase L2 run ${String(ctx.firebase ?? "unknown").toUpperCase()}, review ${String(ctx.review ?? "unknown").toUpperCase()}.` +
       (ctx.review === "none" ? ` The review is NOT OWED on this diff — proof-plan's reason: ${ctx.reviewReason ?? "not handed over"}.` : "") +
       " The schedule itself is that program's and is not restated here.",
   }),
@@ -617,6 +617,8 @@ const SUITE_OVER =
   "what this looked like before anything recorded it, from scripts/suite-record.mjs's own header: 295 full-suite runs, 4.6 to 6.6 per merged change, 4.5 hours (docs/research/g2-measure/, 2026-09-07 to 09-17). A run over bytes a recorded run already covers is read, not repeated.";
 const DEVICE_REOPENED =
   "proof-plan says REOPENED: the app this tree stamps moved after the run, so the run describes an app that no longer exists and now proves nothing. That is the 2026-09-08 failure, and it is over-proof by definition — the spend is real and the evidence is gone.";
+const FIREBASE_REOPENED =
+  "proof-plan says REOPENED: the app this tree stamps with Firebase added moved after its run, so the run describes an app that no longer exists and now proves nothing — over-proof by the same definition as the L2 run's.";
 const REVIEW_REOPENED =
   "proof-plan says REOPENED: a trigger path moved after the last record, so a fresh record is owed for the SAME round. That is the mechanism that makes this count records and not rounds, and here it is happening.";
 
@@ -625,7 +627,7 @@ const REVIEW_REOPENED =
  * every row built by the one rule above, and every row carrying what it could
  * NOT read: the lines that did not parse, and the rows it could not date.
  */
-export function spendOf({ branch, plan, device, review, histories }) {
+export function spendOf({ branch, plan, device, review, firebase = "unknown", histories }) {
   const openedAt = plan?.openedAt ?? null;
   const suite = suiteOwed(plan);
   const tier = (what, kind, owed, { state = null, rounds = false, extra = [], note = null, over = null, reopened = null }) => {
@@ -650,6 +652,14 @@ export function spendOf({ branch, plan, device, review, histories }) {
   return [
     tier("suite", "suite", suite.owed, { extra: [suite.how, ...(suite.stale ? [suite.stale] : [])], over: () => SUITE_OVER }),
     tier("device", "fleet", device === "none" ? 0 : 1, { state: device, over: (excess, owed) => `${excess} run(s) beyond the ${owed} this change owed, at ~3.5 min and an emulator each.`, reopened: DEVICE_REOPENED }),
+    // THE FIREBASE L2 RUN, counted from its own history kind so a Firebase run
+    // is never a default device run twice over. Built only when that history was
+    // handed in: observe() always hands it (SPEND_KINDS), and a pure caller that
+    // predates the kind gets the rows it asked for rather than a throw — or a
+    // "does not exist" about a file nobody looked for.
+    ...(histories["fleet-firebase"]
+      ? [tier("firebase", "fleet-firebase", firebase === "none" ? 0 : 1, { state: firebase, over: (excess, owed) => `${excess} run(s) beyond the ${owed} this change owed, at ${TIERS.firebase.cost} each.`, reopened: FIREBASE_REOPENED })]
+      : []),
     tier("review", "reviews", review === "none" ? 0 : 1, { state: review, rounds: true, note: REVIEW_IS_RECORDS, reopened: REVIEW_REOPENED }),
   ];
 }
@@ -660,7 +670,7 @@ export function spendOf({ branch, plan, device, review, histories }) {
  */
 export const SPEND_LIMIT =
   "nothing in this repository records a grill, a brief round, a mutation check or a hand-run plant. " +
-  "So this half CANNOT see the ceremony the 2026-09-18 episode actually over-paid: it sees three tiers that write records, and those were not the problem. " +
+  "So this half CANNOT see the ceremony the 2026-09-18 episode actually over-paid: it sees four tiers that write records, and those were not the problem. " +
   "The only defence against the rest is the owes block above, read BEFORE the work.";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -892,6 +902,9 @@ export function nextRound({ reviewState, attributed = { recorded: null, rows: []
 // THE MODEL, AND THE TWO WAYS IT IS PRINTED
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** The history kinds the spent block counts — `fleet-firebase` is the Firebase L2 run's own. */
+export const SPEND_KINDS = Object.freeze(["suite", "fleet", "fleet-firebase", "reviews"]);
+
 /** Everything this program reads, gathered in one place so the rest is pure. */
 export function observe({ root = REPO_ROOT } = {}) {
   const paths = changedPaths();
@@ -906,7 +919,7 @@ export function observe({ root = REPO_ROOT } = {}) {
   const branch = currentBranch();
   const o = obligation(read(), paths, branch);
   const histories = Object.fromEntries(
-    ["suite", "fleet", "reviews"].map((kind) => {
+    SPEND_KINDS.map((kind) => {
       const file = historyPath(root, kind);
       return [kind, { file: path.relative(root, file), exists: fs.existsSync(file), ...readHistory(file) }];
     }),
@@ -928,6 +941,7 @@ export function price({ branch, paths, subjects, dirty, o, histories, deltas = {
   const { types, commits, ...lane } = laneOf(paths, subjects);
   const device = o?.state ?? "unknown";
   const review = o?.review?.state ?? "unknown";
+  const firebase = o?.firebase?.state ?? "unknown";
   const plan = o?.plan ?? null;
   const stale = o?.stale ?? null;
   const slice = plan
@@ -946,7 +960,7 @@ export function price({ branch, paths, subjects, dirty, o, histories, deltas = {
     slice,
     diff: { paths: paths === null ? null : paths.length, commits, dirty, types },
     lane,
-    owes: priceable ? owesFor(lane.lane, { paths: paths ?? [], device, review, reviewReason: o?.review?.need?.reason ?? null }) : [],
+    owes: priceable ? owesFor(lane.lane, { paths: paths ?? [], device, review, firebase, reviewReason: o?.review?.need?.reason ?? null }) : [],
     round: priceable
       ? nextRound({
           reviewState: review,
@@ -956,7 +970,7 @@ export function price({ branch, paths, subjects, dirty, o, histories, deltas = {
           mergeBase,
         })
       : null,
-    spent: priceable ? spendOf({ branch, plan, device, review, histories }) : [],
+    spent: priceable ? spendOf({ branch, plan, device, review, firebase, histories }) : [],
   };
 }
 
@@ -1041,7 +1055,7 @@ export function render(m) {
     for (const r of m.spent) {
       const counts = r.recorded === null ? `no record kept — ${r.file} does not exist` : `${r.recorded} record(s) / ${r.owed} owed`;
       // `what` stays the data key ("device"); the printed name is the tier's.
-      L.push(`      ${(r.what === "device" ? "L2 run" : r.what).padEnd(ITEM)}${r.recorded === null ? counts : `${counts.padEnd(26)}${r.verdict}`}`);
+      L.push(`      ${({ device: "L2 run", firebase: "Firebase L2 run" }[r.what] ?? r.what).padEnd(ITEM)}${r.recorded === null ? counts : `${counts.padEnd(26)}${r.verdict}`}`);
       if (r.byBranchOnly) L.push(...at(10, 'attributed by branch alone — no plan is declared for this branch, so there is no opened-at to bound it by. Fix: node scripts/proof-plan.mjs --open "<what you are building>"'));
       if (r.note) L.push(...at(10, r.note));
       for (const e of r.extra ?? []) L.push(...at(10, e));
