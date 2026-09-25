@@ -9,6 +9,20 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-239 — `cmp-new` points at a `docs/CONTRACT.md` that does not exist — **CLOSED 2026-09-25**
+
+`skills/cmp-new/SKILL.md:162`
+
+"Build exactly the shape from `docs/CONTRACT.md` (validated by `options.schema.json`)". No
+`CONTRACT.md` is tracked anywhere in this tree, in `docs/` or in `template/`.
+
+**Why it does not block:** the same sentence names `options.schema.json`, which exists and is what
+validates the shape. The dangling pointer costs the agent one failed read.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** `skills/cmp-new/SKILL.md:162-163` now reads "Build exactly the shape the engine's `options.schema.json` defines — it is the options reference, and the schema the engine validates this object against". That is what is true: `src/scaffold.mjs:47` validates against `options.schema.json`, the npm package ships it (`package.json` `files`), and `docs/USAGE.md:171` names it "the authoritative shape". `docs/USAGE.md` is not named in the skill, because the agent running `cmp-new` sits in the adopter's tree, where create-cmp's `docs/` is not; the skill's `:214` already says "the engine's `--help` / `options.schema.json`". No `CONTRACT.md` was created. Not covered here, and the same dangling name: `src/lib/toggle.mjs:4` ("Marker syntax (CONTRACT.md)"), `src/lib/tokens.mjs:3` ("Per CONTRACT.md") and `docs/DOCUMENTATION.md:116`, which lists a `CONTRACT.md` row. No test: the change is one sentence of skill prose, and a gate that every path a skill cites exists would be a new gate.
+
 ### KD-238 — the architecture diagram names a third party's package — **CLOSED 2026-09-25**
 
 `docs/ARCHITECTURE.md:12`
