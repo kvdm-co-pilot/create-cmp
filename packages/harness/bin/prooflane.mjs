@@ -27,7 +27,14 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { colors, fail } from "../install/log.mjs";
-import { parseArgs, unknownFlags, unreadableBooleanValues, emptyValues } from "../install/args.mjs";
+import {
+  BOOLEAN_FLAGS,
+  parseArgs,
+  unknownFlags,
+  unreadableBooleanValues,
+  emptyValues,
+  takesNoValue,
+} from "../install/args.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(path.join(HERE, "..", "package.json"), "utf8"));
@@ -99,10 +106,20 @@ async function main() {
   // refusing THAT is how KD-7 comes back.
   const unreadable = unreadableBooleanValues(flags);
   if (!askedForHelp && unreadable.length) {
-    fail(
-      `prooflane: ${unreadable.map((f) => `--${f}=${flags[f]}`).join(", ")} — ` +
-        `${unreadable.length === 1 ? "that flag takes" : "those flags take"} \`true\` or \`false\`, or no value at all`
-    );
+    // `--no-<value flag>` lands here too — `no-` reads as boolean by construction —
+    // and it is no flag at all, so it is refused as that, by name (KD-218). Only the
+    // WORDS differ: what the parser accepts, and that this refuses, are unchanged.
+    const negatedValue = unreadable.filter((f) => f.startsWith("no-") && !BOOLEAN_FLAGS.has(f) && !takesNoValue(f.slice(3)));
+    const booleans = unreadable.filter((f) => !negatedValue.includes(f));
+    if (booleans.length) {
+      fail(
+        `prooflane: ${booleans.map((f) => `--${f}=${flags[f]}`).join(", ")} — ` +
+          `${booleans.length === 1 ? "that flag takes" : "those flags take"} \`true\` or \`false\`, or no value at all`
+      );
+    }
+    for (const f of negatedValue) {
+      fail(`prooflane: --${f}=${flags[f]} — there is no \`--${f}\`: \`--${f.slice(3)}\` takes a value, and has no \`--no-\` form`);
+    }
     process.stdout.write(`  run ${colors.cyan("prooflane --help")} for what each one means. Nothing was written.\n\n`);
     return 2;
   }

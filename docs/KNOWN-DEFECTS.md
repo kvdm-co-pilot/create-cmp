@@ -217,7 +217,7 @@ you the same list without opening anything.
 | **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production |
 | **KD-212** | the shipped-hooks table is derived from the template FILE's history, but minimal mode writes a SessionStart command that file never carried | no claim rests on it — a minimal stamp's command is fully single-quoted, so it is neither healable nor a violation, and doctor says nothing about it in either direction |
 | **KD-213** | the `--dry-run` gate counts four `fs` spellings where its own header names the class — `copyFileSync`, `renameSync`, `cpSync`, `fs.promises.*` and a destructured import all pass it | zero producers in the tree, and it cannot be written as a failing test: a widened gate is green on these bytes |
-| **KD-218** | the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`, and there is no such flag | refused, exit 2, nothing written; the sentence names something the CLI does not have (KD-184's shape) |
+| **KD-218** | both doors accept `--no-<value-flag>` as a boolean name: `prooflane init --no-profile svc` stores `no-profile: true` and installs into `./svc` (the `=` form's refusal no longer calls it a true/false flag, 2026-09-25) | the project is a token the user typed, and nothing else is written; what the parsers accept is KD-7's territory and a decision, not a wording fix |
 | **KD-219** | `attach.mjs`'s new comment says the empty `--citation-roots` value "never arrives any more", and this tree's own suite passes it in | the guard it weakens the reason for is still there and still correct; only the reason is false |
 | **KD-220** | a `npm publish` payload stamps the app TWICE — `obligation()` stamps when the device tier is required and `releaseContext()` stamps again — where `ANSWER_RESERVE_MS` is documented as covering one | measured 1.92 s against a 10 s budget (merge, one stamp: 1.09 s), and 1.1–1.8 s per stamp under 16 burners; the overrun direction is fail-open but has no producer today |
 | **KD-221** | the `local.properties` normaliser replaces the WHOLE file, so any byte of it beyond this machine's `sdk.dir` pointer is unwatched by the device digest | measured — appending `org.gradle.java.home=/nope` moves no digest — but `writeLocalProperties` writes only `sdk.dir` and `template/` ships no `local.properties`, so there is no producer; the narrower spelling costs one regex |
@@ -3501,6 +3501,17 @@ shape as KD-184.
 
 **Fires when:** anyone writes `--no-` in front of a value flag.
 *Logged 2026-09-22, round 1 of the doors review.*
+
+**AMENDED 2026-09-25 — the words are fixed; the name is still accepted.** Both refusals now split
+`--no-<value flag>` out of the booleans and say so: *"--no-target-dir=x — there is no
+`--no-target-dir`: `--target-dir` takes a value, and has no `--no-` form."* A declared boolean's
+refusal keeps its words byte for byte, and a line carrying both gets both sentences
+(`test/a-refusal-names-a-no-form-a-value-flag-does-not-have.test.mjs`). What is left is the other
+half of this entry, and it is not a wording fix: `takesNoValue` still reads every `no-` name as
+boolean and `unknownFlags` still knows `no-x` whenever it knows `x`, so the bare form
+`--no-profile svc` is accepted and `svc` becomes the project. Refusing it changes what both parsers
+accept — KD-7's territory, where refusing a space-form token is how a user's directory gets eaten —
+so it stays open for that decision.
 
 ### KD-219 — `attach.mjs`'s new comment says the empty value "never arrives any more", and the suite passes it in
 

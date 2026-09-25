@@ -18,7 +18,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseArgs, unknownFlags, unreadableBooleanValues, emptyValues } from "../src/lib/args.mjs";
+import {
+  BOOLEAN_FLAGS,
+  parseArgs,
+  unknownFlags,
+  unreadableBooleanValues,
+  emptyValues,
+  takesNoValue,
+} from "../src/lib/args.mjs";
 
 const COMMANDS = new Set(["create", "doctor", "upgrade", "clean", "verify", "harden", "attach", "add", "harness", "help"]);
 
@@ -83,9 +90,22 @@ async function main() {
   // called `maybe` and KD-7 is what refusing it would re-create.
   const unreadable = unreadableBooleanValues(flags);
   if (unreadable.length) {
-    const named = unreadable.map((f) => `--${f}=${flags[f]}`).join(", ");
+    // `--no-<value flag>` lands here too, because `no-` reads as boolean by
+    // construction — and it is not a flag that takes `true` or `false`. It is no
+    // flag at all, so it is refused as that, by name (KD-218). Only the WORDS
+    // differ: what the parser accepts, and that this refuses, are unchanged.
+    const negatedValue = unreadable.filter((f) => f.startsWith("no-") && !BOOLEAN_FLAGS.has(f) && !takesNoValue(f.slice(3)));
+    const booleans = unreadable.filter((f) => !negatedValue.includes(f));
+    const lines = [];
+    if (booleans.length) {
+      const named = booleans.map((f) => `--${f}=${flags[f]}`).join(", ");
+      lines.push(`${named} — ${booleans.length === 1 ? "that flag takes" : "those flags take"} \`true\` or \`false\`, or no value at all.`);
+    }
+    for (const f of negatedValue) {
+      lines.push(`--${f}=${flags[f]} — there is no \`--${f}\`: \`--${f.slice(3)}\` takes a value, and has no \`--no-\` form.`);
+    }
     process.stderr.write(
-      `create-cmp: ${named} — ${unreadable.length === 1 ? "that flag takes" : "those flags take"} \`true\` or \`false\`, or no value at all.\n` +
+      lines.map((l) => `create-cmp: ${l}\n`).join("") +
         `  run \`create-cmp --help\` for what each one means. Nothing was written.\n`
     );
     process.exit(2);
