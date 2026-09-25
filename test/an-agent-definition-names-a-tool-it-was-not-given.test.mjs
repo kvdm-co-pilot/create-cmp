@@ -5,8 +5,8 @@
 // never listed `SendMessage`. The contradiction shipped for ten weeks and cost
 // nothing, because nobody drove that path — then on 2026-09-18 FOUR orchestrators
 // took it in one day, could not resume a reviewer, and each ran a COLD substitute
-// pass instead, which is precisely what docs/KNOWN-DEFECTS.md's header forbids for
-// a re-record: the point is that the same reader confirms against the merging bytes.
+// pass instead. Who carries out a re-record is docs/KNOWN-DEFECTS.md's header; this
+// comment only points at it.
 //
 // WHY THIS CHECK CARRIES NO LIST OF TOOL NAMES. The harness's tool surface changes
 // faster than any list in this repository could track, and a hand-maintained copy is

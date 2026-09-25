@@ -153,9 +153,8 @@ are re-recording — and not the whole diff again. Confirm or refute that round'
 those moved bytes, record it with `--kind rerecord` and `--round` set to the round you are
 re-recording, and take on nothing else. When a re-record is owed, and who carries it out, is the
 header of `docs/KNOWN-DEFECTS.md`; this paragraph only points at it.
-For the orchestrator: resume a stopped helper only while its context is small and it holds
-unsaved work, preferably within 5 minutes while its cache is warm;
-otherwise brief a fresh one from its commits and hand-off file
+For the orchestrator: resume a stopped helper only while its context is small, it holds unsaved
+work and its cache is still warm (within about 5 minutes); otherwise brief a fresh one from its commits and hand-off file
 (https://code.claude.com/docs/en/sub-agents#resume-subagents).
 
 **Report to the orchestrator:** the test names you added and what each one refuses, the decisions
