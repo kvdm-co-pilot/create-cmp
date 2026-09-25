@@ -58,6 +58,46 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-215 — the heal revives the Stop gate for foreign-cwd sessions, and its remedy is a path those sessions cannot resolve — **CLOSED 2026-09-25**
+
+`template/qa/receipt-check.mjs` (the `--hook` refusal text) · `src/lib/shipped-hooks.mjs`
+(`stop-receipt-relative` → `stop-receipt-anchored`) · KD-85
+
+Reviving the Stop gate is the point of the heal, and it works: executed from a directory that is not
+the project, with `CLAUDE_PROJECT_DIR` exported the way Claude Code exports it,
+`node "${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs" --hook` produces the same refusal and the same
+exit 2 as it does from the project root — byte-identical message, verified both ways. The message it
+feeds back to the agent is *"Run `node qa/verify.mjs` (it checks every promise and writes the
+receipt), commit the receipt, or see README §Verification enforcement to bypass."* That path is
+relative, and the session being told it is, by construction, not at the project root — a session that
+was at the root had a working Stop hook before the heal and did not need it. So the one population the
+heal newly reaches is the one population for which the remedy's path does not resolve.
+
+**Nobody is handed a wrong verdict.** The gate refuses correctly, for the correct reason, with the
+correct exit code, from both directories; only the remedy's spelling assumes a cwd. An agent that runs
+the command and gets `ENOENT` learns where it is rather than something false. The text is also
+pre-existing and untouched by this change — it is logged here, rather than left to the file that owns
+it, because a fix's own new behaviour is in scope for the round that reviews it, and this heal is what
+makes the message reachable at all.
+
+**Fires when:** a session opened outside the project root ends a turn in an app whose Stop hook has
+been healed, and the receipt does not attest the tree.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+**CLOSED by spelling the remedy from where the hook runs, in the commit that moved it here.**
+`receipt-check.mjs` (`packages/harness/src/` and its byte-identical `template/qa/` copy) compares its
+own project root with the process's cwd, both through `realpath`. At the root the instruction is
+unchanged, byte for byte; anywhere else it reads *"Run `cd "<root>" && node qa/verify.mjs` …"*, with
+the path single-quoted instead when it carries a character double quotes do not protect (`"`, `$`,
+a backtick, `\`, `!`). `test/the-stop-hook-remedy-names-a-path-a-foreign-cwd-cannot-resolve.test.mjs`
+takes the command out of the refusal and runs it with `sh -c` from where the session stands: from the
+root the words are the old ones, from a foreign directory the bare form fails and the new one reaches
+the lane, and a root with `$` in its name is still reached. `test/harness-surfaces.test.mjs`'s
+lane-in-flight case now runs the hook at the project root, which its two assertions on the bare form
+had assumed without saying. Out of this entry's scope and unchanged: the `reason` strings from
+`evaluate()` (e.g. *"no receipt — run `node qa/verify.mjs`"*) still spell the relative form, in the
+same message, ahead of the corrected instruction.
+
 ### KD-214 — a heal that cannot write takes the whole project diagnosis down with it — **CLOSED 2026-09-25**
 
 `src/commands/doctor.mjs` (`healWriter`, `healShippedHookCommands`, `runDoctor` — no `try` around the

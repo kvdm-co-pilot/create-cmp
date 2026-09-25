@@ -558,6 +558,9 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
     });
 
     await t.test("receipt-check with a lane IN FLIGHT still refuses, but says WAIT — never 'run the lane' at a running lane", () => {
+      // Run AT the project root: from anywhere else the instruction is spelled
+      // `cd "<root>" && node qa/verify.mjs` (KD-215), and the two assertions on the
+      // bare form below would pass or fail on the runner's cwd instead of the marker.
       const receiptPath = path.join(out, "qa/evidence/latest.json");
       const markerPath = path.join(out, "qa/.lane-in-progress");
       fs.mkdirSync(path.dirname(markerPath), { recursive: true });
@@ -565,7 +568,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
         fs.writeFileSync(receiptPath, JSON.stringify({ schema: "cmp-evidence/1", profile: "local", verdict: "FAIL", inputs: { hash: "a".repeat(64) }, steps: [] }));
         fs.writeFileSync(markerPath, JSON.stringify({ pid: process.pid, step: "releaseBuild", index: 9, total: 16, stepStartedAt: new Date().toISOString() }));
         try {
-          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8", cwd: out });
           assert.fail("a running lane has produced no receipt — the hook must still block");
         } catch (err) {
           assert.equal(err.status, 2, "still refused");
@@ -578,7 +581,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
         const old = Date.now() / 1000 - 60 * 60;
         fs.utimesSync(markerPath, old, old);
         try {
-          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8" });
+          execFileSync(process.execPath, [path.join(out, "qa/receipt-check.mjs"), "--hook"], { input: "{}", encoding: "utf8", cwd: out });
           assert.fail("expected refusal");
         } catch (err) {
           assert.equal(err.status, 2);
