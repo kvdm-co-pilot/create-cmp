@@ -40,7 +40,7 @@ export const DISK_WARN_BYTES = 3 * GIB;
  *        null = scan skipped (no composeApp sources), [] = project has no inspector code.
  * @param {{scriptPresent:boolean, settingsPresent:boolean, statusLine:boolean,
  *          promptHook:boolean, cwdRelative:string[], anchored:string[],
- *          unconfirmed:string[], healable:string[]}|null} [input.walk] the walk's
+ *          unconfirmed:string[], healable:string[], unreadable?:string}|null} [input.walk] the walk's
  *        wiring: is qa/walk-status.mjs installed, does .claude/settings.json actually
  *        INVOKE it (statusLine + UserPromptSubmit), and for each surface — judged
  *        cwd-relative, recognised as a shipped form that runs anywhere, or neither?
@@ -353,6 +353,27 @@ export function diagnoseProject(input) {
   // that the silence cannot happen. Absence is reported ahead of inertness on
   // purpose: absence is what `--fix` can heal, and a healed project re-diagnoses
   // into the inert warning below rather than skipping it.
+  // A settings.json that parses, in a shape the walk's readers do not read (`walk.unreadable`,
+  // from walkSettingsShapeProblem in src/commands/doctor.mjs), is said once, here, rather
+  // than taking the diagnosis down with a TypeError as it did.
+  if (walk?.scriptPresent && typeof walk.unreadable === "string") {
+    findings.push({
+      id: "settings-shape",
+      level: "warn",
+      title: `.claude/settings.json has a shape doctor does not read: ${walk.unreadable}`,
+      detail:
+        "doctor reads the walk's wiring from .claude/settings.json in the shape the engine template writes: an " +
+        "object whose hooks map each event to an array of groups, each group with an array of hooks. What it " +
+        "cannot read it does not count as invoking the walk, so the walk-wiring finding is about what doctor " +
+        "could read, not a claim about what Claude Code makes of this file.",
+      fix: {
+        auto: false,
+        description:
+          "Give that entry the shape template/.claude/settings.json uses. doctor --fix does not rewrite a file " +
+          "whose shape it cannot account for.",
+      },
+    });
+  }
   if (walk !== null && walk.scriptPresent) {
     const missing = [
       !walk.statusLine ? "no statusLine" : null,
