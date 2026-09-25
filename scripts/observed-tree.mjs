@@ -308,6 +308,10 @@ export const REVIEW_TIER_TRIGGERS = Object.freeze([
   "template/.claude/",
   "template/.github/",
   "template/.githooks/",
+  // What `create-cmp add firebase` writes into an adopter's app. It ships in the
+  // package beside template/ and no stamp copies it, so the L2 run's stamped
+  // digest never moves for it (KD-206) — a review is the tier that reads it.
+  "overlays/",
   "inspector/",
   "skills/",
   "agents/",
