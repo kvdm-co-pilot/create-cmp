@@ -24,10 +24,8 @@ function baseConfig(targetDir, overrides = {}) {
     // Deliberately NOT com.example.app — exercises the delete-before-rename fix.
     package: "com.acme.demo",
     iosBundleId: "com.acme.demo",
-    region: "us-central1",
     themePrefix: "Acme",
     platforms: { android: true, ios: true },
-    firebase: { enabled: true, auth: "both", firestore: true, storage: true, functions: true, fcm: true },
     room: true,
     e2e: true,
     inspector: true,
@@ -86,13 +84,26 @@ test("--no-room: Room sources deleted and zero androidx.room/AppDatabase referen
   fs.rmSync(out, { recursive: true, force: true });
 });
 
-test("--no-firebase: config files deleted and zero dev.gitlive references remain", async () => {
-  const out = await stamp({ firebase: { enabled: false } });
+test("the default stamp carries no Firebase — not the marked code, and not what shipped unmarked", async () => {
+  // Firebase left stamp-time for `create-cmp add firebase`. Every feature on, iOS included, is
+  // the widest stamp there is, and it must carry none of it.
+  const out = await stamp({});
 
   assert.ok(!fs.existsSync(path.join(out, "composeApp", "google-services.json")));
   assert.ok(!fs.existsSync(path.join(out, "iosApp", "iosApp", "GoogleService-Info.plist")));
+  assert.ok(!fs.existsSync(path.join(out, "composeApp/src/commonMain/kotlin/com/acme/demo/data/remote/FirebaseConfig.kt")));
   assert.deepEqual(grepSources(out, /dev\.gitlive/), [], "no GitLive reference may survive");
-  assert.deepEqual(grepSources(out, /USE_FIREBASE_EMULATORS/), [], "no emulator BuildConfig wiring may survive");
+  assert.deepEqual(grepSources(out, /USE_FIREBASE_EMULATORS|configureFirebaseEmulators|FirebaseApp|google\.services/), [], "no Firebase wiring may survive");
+  assert.deepEqual(grepSources(out, /__REGION__/), [], "the region token left with the option");
+
+  // Three things shipped UNMARKED in every stamp until Firebase left, --no-firebase included, so
+  // no marker could strip them. grepSources skips the catalog on purpose; these are read directly.
+  const catalog = fs.readFileSync(path.join(out, "gradle", "libs.versions.toml"), "utf8");
+  assert.doesNotMatch(catalog, /gitlive|google-services|firebase/i, "the catalog declares no Firebase coordinate");
+  const r8 = fs.readFileSync(path.join(out, "composeApp", "proguard-rules.pro"), "utf8");
+  assert.doesNotMatch(r8, /firebase|gitlive/i, "no Firebase R8 rules");
+  const settings = fs.readFileSync(path.join(out, "settings.gradle.kts"), "utf8");
+  assert.doesNotMatch(settings, /jitpack/, "no jitpack repository — GitLive was its only client");
 
   fs.rmSync(out, { recursive: true, force: true });
 });

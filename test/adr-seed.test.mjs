@@ -3,8 +3,8 @@
 // under test:
 //   1. A config that matches every interview default seeds NOTHING beyond
 //      the shipped four ADRs.
-//   2. A config that deviates (--no-room, --no-ios, a non-"both" auth
-//      choice) seeds one real, numbered ADR per deviation — numbered AFTER
+//   2. A config that deviates (--minimal, --no-room, --no-ios) seeds one
+//      real, numbered ADR per deviation — numbered AFTER
 //      the shipped four, containing the actual decision (not boilerplate),
 //      and picked up by the stamped project's own adr-index walker so
 //      `node qa/arch-doc.mjs --check` stays green on the fresh app.
@@ -26,10 +26,8 @@ function baseConfig(targetDir, overrides = {}) {
     appName: "Acme",
     package: "com.acme.demo",
     iosBundleId: "com.acme.demo",
-    region: "us-central1",
     themePrefix: "Acme",
     platforms: { android: true, ios: true },
-    firebase: { enabled: true, auth: "both", firestore: true, storage: true, functions: true, fcm: true },
     room: true,
     e2e: true,
     inspector: true,
@@ -91,16 +89,23 @@ test("adr-seed: --no-room seeds a numbered persistence ADR with real decision te
   }
 });
 
-test("adr-seed: --no-ios + non-default auth seed two ADRs in the documented order (persistence, platform, auth)", async () => {
-  const out = await stamp({ platforms: { android: true, ios: false }, firebase: { enabled: true, auth: "email" } });
+test("adr-seed: --no-ios seeds the platform ADR, and an auth choice seeds nothing — auth left stamp-time with Firebase", async () => {
+  const out = await stamp({ platforms: { android: true, ios: false } });
   try {
-    const files = adrFiles(out);
-    const seeded = files.filter((f) => /^000[5-9]/.test(f));
-    assert.deepEqual(seeded, ["0005-android-only-launch-scope-ios-deferred.md", "0006-auth-scope-email.md"]);
-    const authAdr = fs.readFileSync(path.join(out, "docs/adr", "0006-auth-scope-email.md"), "utf8");
-    assert.match(authAdr, /email/);
+    const seeded = adrFiles(out).filter((f) => /^000[5-9]/.test(f));
+    assert.deepEqual(seeded, ["0005-android-only-launch-scope-ios-deferred.md"]);
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
+  }
+  // Auth is chosen at `create-cmp add firebase`, after the stamp, where this hook never runs — so
+  // no rule reads it, even from a config object that still carries it.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-adrseed-auth-"));
+  try {
+    fs.mkdirSync(path.join(dir, "docs/adr"), { recursive: true });
+    const { seeded } = seedConfigAdrs(dir, { ...baseConfig(dir), firebase: { enabled: true, auth: "email" } });
+    assert.deepEqual(seeded, [], "an auth choice seeded an ADR — the auth-scope rule is back");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

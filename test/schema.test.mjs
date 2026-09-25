@@ -15,10 +15,8 @@ function validConfig() {
     appName: "Acme",
     package: "com.acme.app",
     iosBundleId: "com.acme.app",
-    region: "us-central1",
     themePrefix: "Acme",
     platforms: { android: true, ios: true },
-    firebase: { enabled: true, auth: "both", firestore: true, storage: true, functions: true, fcm: true },
     room: true,
     e2e: true,
     inspector: true,
@@ -33,10 +31,18 @@ test("valid config passes", () => {
   assert.equal(valid, true, JSON.stringify(errors));
 });
 
-test("region africa-south1 passes", () => {
-  const c = validConfig();
-  c.region = "africa-south1";
-  assert.equal(validate(c, schema).valid, true);
+test("firebase and region are not config any more — they left with Firebase, for `create-cmp add firebase`", () => {
+  // The engine refuses them BY NAME before the schema is consulted (validateConfig); the schema
+  // itself no longer declares them, so nothing requires them and nothing can pass them through.
+  assert.ok(!("firebase" in schema.properties) && !("region" in schema.properties));
+  assert.ok(!schema.required.includes("firebase") && !schema.required.includes("region"));
+  for (const [key, value] of [["firebase", { enabled: true }], ["region", "africa-south1"]]) {
+    const c = validConfig();
+    c[key] = value;
+    const { valid, errors } = validate(c, schema);
+    assert.equal(valid, false, `${key} must not validate`);
+    assert.ok(errors.some((e) => e.path === key && /not an allowed property/.test(e.message)));
+  }
 });
 
 test("missing required field fails", () => {
@@ -56,12 +62,6 @@ test("bad package pattern fails", () => {
 test("android must be true (const)", () => {
   const c = validConfig();
   c.platforms.android = false;
-  assert.equal(validate(c, schema).valid, false);
-});
-
-test("auth enum rejects bogus value", () => {
-  const c = validConfig();
-  c.firebase.auth = "magic-link";
   assert.equal(validate(c, schema).valid, false);
 });
 

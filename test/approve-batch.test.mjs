@@ -40,7 +40,7 @@ function stampedApp() {
   const dir = path.join(base, "BatchApp");
   const r = spawnSync(
     process.execPath,
-    [path.join(REPO_ROOT, "bin", "create-cmp.mjs"), dir, "--yes", "--name", "BatchApp", "--package", "com.example.batchapp", "--no-ios", "--no-firebase", "--no-verify"],
+    [path.join(REPO_ROOT, "bin", "create-cmp.mjs"), dir, "--yes", "--name", "BatchApp", "--package", "com.example.batchapp", "--no-ios", "--no-verify"],
     { cwd: REPO_ROOT, encoding: "utf8", timeout: 60_000 },
   );
   if (r.status !== 0) throw new Error(`stamp failed: ${r.stdout}${r.stderr}`);

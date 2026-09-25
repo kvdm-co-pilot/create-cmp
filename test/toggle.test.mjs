@@ -175,6 +175,16 @@ test("disabledFeaturesFromConfig: inspector off (or absent) disables the inspect
   assert.ok(absent.has("inspector"), "absent inspector key = disabled (schema requires it explicitly)");
 });
 
+test("disabledFeaturesFromConfig: firebase is disabled only by a config that SAYS so", () => {
+  // The current template has no firebase feature and a current config no `firebase` key. The one
+  // config that carries it is `upgrade --harness` stamping an OLDER template as a merge base, and
+  // there the record decides — absent must not strip that template's Firebase from an app that had it.
+  const base = { platforms: { android: true, ios: true }, room: true, e2e: true, inspector: true, devClient: true };
+  assert.ok(!disabledFeaturesFromConfig(base).has("firebase"), "no key: nothing to disable");
+  assert.ok(!disabledFeaturesFromConfig({ ...base, firebase: { enabled: true } }).has("firebase"));
+  assert.ok(disabledFeaturesFromConfig({ ...base, firebase: { enabled: false } }).has("firebase"));
+});
+
 test("deleteDisabledFeaturePaths removes manifest paths for disabled features", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-toggle-"));
   fs.mkdirSync(path.join(dir, "iosApp"), { recursive: true });
