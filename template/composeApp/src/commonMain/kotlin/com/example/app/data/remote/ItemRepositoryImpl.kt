@@ -9,7 +9,13 @@ import kotlinx.coroutines.delay
 // Example data source for the `home` feature. This is intentionally dependency-light
 // (no Firebase / no Room coupling) so the scaffold builds in every feature combination.
 //
+// >>> cmp:feature room
 // Real apps swap this for a Firestore/Ktor source and add a Room cache (see data/local).
+// <<< cmp:feature room
+// >>> cmp:feature !room
+// Real apps swap this for a Firestore/Ktor source. This app keeps no on-device cache, so
+// every read goes to that source.
+// <<< cmp:feature !room
 // The Clean Architecture seam is the ItemRepository interface in the domain layer.
 //
 // The repository is the ONLY exception-translation point: I/O runs inside
