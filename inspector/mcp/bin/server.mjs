@@ -1206,7 +1206,28 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 // wire up stdio transport
 // ---------------------------------------------------------------------------
 
+/**
+ * What `--help` prints. A person, not an MCP client, is the only caller that passes
+ * an argument, and every argument used to start the server: `--help` answered with
+ * nothing on stdout and a process that looked hung until stdin closed (KD-188).
+ * Constant text, so the bin says the same thing reached directly or through the
+ * symlink npm writes.
+ */
+const USAGE =
+  `cmp-inspector-mcp ${SERVER_VERSION} — the cmp-inspector MCP server\n\n` +
+  "  It speaks MCP (JSON-RPC) on stdin/stdout and logs on stderr. An MCP client starts it;\n" +
+  "  run by hand, it waits for one on stdin until stdin closes.\n\n" +
+  "  To use it, install the create-cmp Claude Code plugin, which registers it — or see\n" +
+  '  "Registering the server with Claude Code" in this package\'s README.md.\n\n' +
+  "  --help, -h   print this and exit\n";
+
 async function main() {
+  if (process.argv.slice(2).some((a) => a === "--help" || a === "-h")) {
+    // Exit once the text is flushed — a write to a pipe need not have landed when the
+    // call returns — and keep nothing up for a question that has been answered.
+    process.stdout.write(USAGE, () => process.exit(0));
+    return;
+  }
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // stderr is safe for logs; stdout is the JSON-RPC channel.

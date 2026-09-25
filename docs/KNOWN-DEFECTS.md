@@ -193,7 +193,6 @@ you the same list without opening anything.
 | **KD-185** | the inspector bundle's freshness hash reads THIS tree while its bundler resolves `prooflane-harness` through `node_modules` | needs a rebuild run from a worktree with no install of its own; CI installs at the root |
 | **KD-186** | the publish skill says `inspector/mcp` is `private: true`; it is published as `@create-cmp/inspector` | the instruction it supports (publish from the root) is right, its reason is false |
 | **KD-187** | in this repo a `create-*` alias runs the REGISTRY's create-cmp-cli, not the tree's | the aliases are pass-throughs and an adopter gets the latest; no gate can exercise one against this tree |
-| **KD-188** | `cmp-inspector-mcp --help` starts the MCP server and exits 0 having printed nothing on stdout | it announces itself on stderr; an MCP client never passes `--help` |
 | **KD-189** | the proof gate's `CHDIR` reader calls a command position "a separator", while `COMMAND_PREFIX` calls it "a separator plus wrappers, assignments and redirections" — so `X=1 cd /slice && gh pr merge`, `2>/dev/null cd …`, `command cd …`, `builtin cd …` and `time cd …` are `cd`s the shell PERFORMS and this reader drops, falling back to the payload's cwd | KD-107's class, a third reader over: the fallback direction is KD-79 itself, a merge judged against the session's tree. Measured against `/bin/sh` on five prefixes; unchanged by the slice that closed KD-95, which touched the operand and not the position |
 | **KD-190** | the device classifier still cannot see two spellings of a fleet-check run — `node $(git rev-parse --show-toplevel)/scripts/fleet-check.mjs` and `node --no-warnings scripts/fleet-check.mjs` — so both are SILENT rather than refused | the same fail-open KD-95's fleet half was, in the two shapes that slice did not widen to: a substitution is not a literal path, and a flag before the operand is a different grammar |
 | **KD-191** | `scripts/kd-next.mjs` cannot see a KD number allocated on a LOCAL branch with no pull request, which is this wave's own shape: six `wave/*` branches in flight, two open PRs | measured harmless today — all six wave branches are at 183, the same maximum `origin/main` and both PRs show — and the program says what it saw, so the gap is visible in its own output |
@@ -2833,23 +2832,6 @@ prove here is a statement about an old release. The symlink gate KD-18 closed is
 compares each alias against ITSELF through a link, and both runs reach the same delegate.
 
 **Fires when:** a test is written that asserts an alias's behaviour and reads it as this tree's.
-*Logged 2026-09-22, in the slice that closed KD-18.*
-
-### KD-188 — `cmp-inspector-mcp --help` starts a server and exits silently
-
-`inspector/mcp/bin/server.mjs` (`main`, bottom of file)
-
-There is no argv handling: any argument at all starts the stdio MCP server, which writes
-`cmp-inspector MCP server running on stdio` to stderr and exits 0 when stdin closes. Measured
-2026-09-22 with the SDK present: `--help` → exit 0, 0 bytes of stdout, 42 of stderr, both directly
-and through a symlink.
-
-Not blocking: an MCP client never passes `--help`, and the one line it does print goes to the channel
-a stdio server may speak on. It is logged because a person who types `--help` at a bin gets a process
-that looks like it hung until stdin is closed, and because the symlink gate KD-18 closed now has to
-carry a sentence explaining why "prints nothing on stdout" is legitimate here.
-
-**Fires when:** a person, rather than an MCP client, runs the inspector bin with an argument.
 *Logged 2026-09-22, in the slice that closed KD-18.*
 
 ### KD-189 — a `cd` the shell performs, behind a word the reader does not count as a command position

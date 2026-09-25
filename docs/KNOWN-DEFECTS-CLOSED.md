@@ -58,6 +58,34 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-188 — `cmp-inspector-mcp --help` starts a server and exits silently — **CLOSED 2026-09-25**
+
+`inspector/mcp/bin/server.mjs` (`main`, bottom of file)
+
+There is no argv handling: any argument at all starts the stdio MCP server, which writes
+`cmp-inspector MCP server running on stdio` to stderr and exits 0 when stdin closes. Measured
+2026-09-22 with the SDK present: `--help` → exit 0, 0 bytes of stdout, 42 of stderr, both directly
+and through a symlink.
+
+Not blocking: an MCP client never passes `--help`, and the one line it does print goes to the channel
+a stdio server may speak on. It is logged because a person who types `--help` at a bin gets a process
+that looks like it hung until stdin is closed, and because the symlink gate KD-18 closed now has to
+carry a sentence explaining why "prints nothing on stdout" is legitimate here.
+
+**Fires when:** a person, rather than an MCP client, runs the inspector bin with an argument.
+*Logged 2026-09-22, in the slice that closed KD-18.*
+
+**CLOSED by answering the question, in the commit that moved it here.** `main()` in
+`inspector/mcp/bin/server.mjs` now checks for `--help` or `-h` before it opens the transport. It
+prints a constant usage text to stdout — the bin's name and version, that an MCP client starts it and
+it speaks on stdin/stdout, and where registration is described — and exits 0 once the write has
+flushed. Every other argument still starts the server, as before: an MCP client passes none, and
+refusing unknown arguments was not what this entry asked. `inspector/mcp/test/server-help.test.mjs`
+pins both flags and a control that the bare bin is still the stdio server. The symlink gate's
+comparison of the direct and linked runs sees the same bytes either way, since the text does not
+depend on the invoked path. `inspector/mcp/dist/server.mjs` is NOT rebuilt in this commit: the bundle
+is rebuilt once, at verification, and until then `bundle-freshness` reports it stale.
+
 ### KD-160 — the lane lock commits one sha256 per file, and a secret scanner cannot tell that from a credential — **CLOSED 2026-09-25**
 
 `packages/harness/src/lib/harness-lock.mjs` · `qa/harness.lock.json` in every stamped tree
