@@ -67,15 +67,20 @@ that checkpoint exists to end (in create-cmp, ADR-0015). The strongest lever on 
 agent's contract; it is the quality of the brief you wrote.
 
 Expect two stops from any long task, and answer them fast — an agent waiting on you is the cheapest
-state it can be in. At the **plan** stop, check the approach, not the prose. At a **departure** stop,
-the agent has found something your brief did not cover: answer it, or decide it belongs to the
-human you report to.
+state it can be in. At the **plan** stop, read the plan file and check the approach, not the prose.
+At a **departure** stop, the agent has found something your brief did not cover: answer it, or
+decide it belongs to the human you report to.
 
-**A plan is written to a file, and then the helper that wrote it ends.** When planning or design is
-the job, its deliverable is that file, and implementation is a fresh helper briefed from it, not the
-planner carried on: the exploration behind a plan is history an implementer would re-read at every
-step. The plan stop above is a check-in inside one job, and whether that helper is resumed follows
-the resume rule below.
+**Every plan is written to a file, and then the helper that wrote it ends.** This holds for every
+planner, not only a helper whose whole job is the plan: a helper that reaches its plan stop before
+implementing writes its plan to the file its brief names, and ends there too. The plan stop is where
+the plan reaches disk, not a check-in you resume. You read the file, and implementation is a fresh
+helper (`create-cmp:executor`) briefed with that path, not the planner carried on: the exploration
+behind a plan is history an implementer would re-read at every step, and a plan held only in a
+helper's context is lost with it. Measured in create-cmp on 2026-09-25: three planners stopped at a
+plan held in their context, were lost to network errors, and the fresh helpers that replaced them
+re-read everything, at 14.7M tokens. So every brief that may produce a plan names the file it goes
+to, and a brief that is itself the approved plan owes no plan stop at all.
 
 ## Every brief must be SELF-CONTAINED
 A delegated subagent loses nothing if the brief carries: the exact files to touch, the pattern
@@ -234,7 +239,10 @@ this pattern exists to prevent. Instead:
 
 **Resume or fresh: one rule for every helper that stopped or finished, not only a hollow one.**
 Resume it (`SendMessage` to its ID or name) only when it holds unsaved state you need **and** its
-context is small. Otherwise start a fresh helper, briefed from its commits and its hand-off file. A
+context is small **and** its cache is still warm, within about five minutes of its last step; past
+that, a resume pays for its whole context again uncached. Otherwise start a fresh helper, briefed
+from its commits and its hand-off file. A planner that reached its plan stop holds no such state:
+its plan is on disk. A
 resumed helper keeps its full history — every earlier tool call, result and line of reasoning
 (https://code.claude.com/docs/en/sub-agents#resume-subagents) — and every step it takes re-reads all
 of it, while a fresh one starts small. The rule stands on the brief's demand above: a helper that
