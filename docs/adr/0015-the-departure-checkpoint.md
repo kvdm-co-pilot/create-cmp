@@ -2,6 +2,7 @@
 
 - **Status:** accepted — 2026-09-09, Karel van der Merwe (signed by his instruction in session — *"build the midway checkpoint too (I'm worried by the fact that you stopped here not our intention)"*; designed by the architect under his standing delegation to resolve as product owner and lead architect)
 - **Implementation:** landed with this ADR — the *Checkpoints* section of `.claude/agents/deep-worker.md` and the briefing duty in `agents/cmp-orchestrator.md`. No gate, no hook, no artifact: this is a contract about work in flight, and nothing about it decides what merges.
+- **Amended 2026-09-26** by Karel's decision of that day, on the measured cost of create-cmp's session of 2026-09-25. The two checkpoints stand; **one sentence of the Decision is no longer true** — that both stops resume with context intact. A plan now goes to a file and its writer ends; a departure stop is resumed only while the helper is small and its cache warm. See *Amended 2026-09-26 — the plan goes to a file, its writer ends, and a resume is bounded*.
 - **Date:** 2026-09-09
 
 ## Context
@@ -26,11 +27,53 @@ The obvious mechanism is a timer — check in every N minutes. It is the wrong o
 
 **2 — At every departure, event-driven.** When the work requires something the brief did not authorise — a different path, a gate in the way, a decision the brief left open, a file outside scope — the agent **stops and reports the departure instead of deciding it**. Not a note in the final report; a stop, at the moment, before the time is spent.
 
-Both resume with context intact rather than restarting, so the cost of a checkpoint is one message, not one run.
+Both resume with context intact rather than restarting, so the cost of a checkpoint is one message, not one run. *(Amended 2026-09-26: no longer true of the plan stop, whose writer now ends with the plan on disk, and bounded for a departure stop — see below.)*
 
 **This is a briefing contract, not a gate.** Nothing about it decides what merges, so it needs no plant, no record and no hook. Its only enforcement is that the orchestrator does not have a result until the checkpoint clears — and the orchestrator is the one who wanted the answer.
 
 **The brief must make departure detectable.** An agent can only notice it is departing if it was told what was settled. A brief that names what is decided, what is deliberately open, and what is out of scope gives the agent a list to check itself against; a vague brief makes the departure check unenforceable by construction. That duty is the orchestrator's, and it is now written into its definition.
+
+## Amended 2026-09-26 — the plan goes to a file, its writer ends, and a resume is bounded
+
+**Karel's decision of 2026-09-26.** A plan goes to a file and its writer **ends**; a fresh executor
+starts from that path. A stopped helper is resumed only while its context is small and its cache is
+warm — about five minutes; otherwise a fresh helper starts from its commits and its hand-off file.
+This applies to **every** planner, not only to a helper briefed to do nothing but plan.
+
+**Why — measured, not argued.** create-cmp's session of 2026-09-25 processed 143.6M tokens.
+**Long-lived executors cost 64% of them**: a helper kept alive carries its whole history, and every
+step it takes re-reads all of it. **In-context plan stops lost 14.7M**: three planners stopped at a
+plan held only in their context, were lost to network errors, and their replacements re-read
+everything. The sentence this amends assumed that a stopped context survives the wait and costs
+nothing to hold. It did neither.
+
+**What changes.**
+
+- **The plan stop.** The planner does not wait to be resumed. It writes the approach and the
+  questions its brief did not settle to the file the brief names, and ends. The orchestrator reviews
+  that file, and a fresh executor — the plugin's `create-cmp:executor` — is briefed with its path.
+  The checkpoint is still one round trip and still unconditional per piece of work; it is held by
+  the planner, and the executor starts after it clears. A plan on disk survives what a plan in a
+  context does not.
+- **The departure stop.** Still a stop at the moment, before the time is spent. Resuming the helper
+  that stopped is now bounded: only while its context is small and its cache warm, about five
+  minutes. Past that, a fresh helper starts from the stopped one's commits and hand-off file — which
+  is why a helper commits as it goes and keeps that file current, so abandoning its context costs
+  nothing. `agents/cmp-orchestrator.md` (*Re-delegate, don't absorb — and restart, don't resume*)
+  already made fresh the default for a helper that stalled or finished; this extends it to one stopped at a checkpoint.
+- **The Decision's sentence** *"Both resume with context intact rather than restarting, so the cost
+  of a checkpoint is one message, not one run"* is therefore no longer true of the plan stop and
+  bounded for the departure stop. It is kept above as the record and marked there.
+
+**What stands.** Two checkpoints, and neither is a clock. The plan checkpoint is unconditional and
+the departure checkpoint event-driven. The brief must say what is settled, what is deliberately open
+and what is out of scope. And this is still a briefing contract, not a gate: the plan file is a
+hand-off between helpers, not an artifact anything reads to decide what merges, and this amendment
+adds no plant, no record and no hook.
+
+**What would make the amendment wrong.** If a plan file carries the steps but not what the planner
+learned, the fresh executor re-reads what the planner already read, and the 14.7M comes back by a
+different road. The plan must hold the findings its steps depend on, not only the steps.
 
 ## Consequences
 
@@ -60,3 +103,5 @@ Both resume with context intact rather than restarting, so the cost of a checkpo
 - ADR-0014 — the reader at Build's exit; this is its complement, covering the time before that exit
 - `skills/grill-me` — the same instinct at the decide layer: settle what is load-bearing before the work, not after
 - `agents/cmp-orchestrator.md` — "every brief must be SELF-CONTAINED", now also: every brief must say what is settled
+- `agents/executor.md` in the plugin (`create-cmp:executor`) — the fresh helper that starts from a plan's path (amended 2026-09-26)
+- `.claude/agents/deep-worker.md` — the planner's side of the amendment: the plan goes to a file, then the planner ends; a resume is bounded
