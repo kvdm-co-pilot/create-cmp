@@ -228,7 +228,7 @@ you the same list without opening anything.
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
 | **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | measured 2026-09-25: not harmless, but loud: one spurious conflict sidecar (`composeApp/build.gradle.kts`) and exit 1, nothing removed or duplicated; a second sidecar (`libs.versions.toml`) seen in the test comes from its synthesised 0.27 catalog and does not occur with the real 0.27.2 one |
 | **KD-247** | `add firebase` writes the Podfile's Firebase pods and a comment naming the GitLive version the registry paired them with (KD-243), and `upgrade` moves `firebase-gitlive` in the catalog and never the Podfile | cannot fire yet: every shipped set pairs Firebase iOS 11.x, which `~> 11.1` still resolves; the comment goes stale on the first GitLive bump, and the pins break at the first set that pairs across a Firebase iOS major |
-| **KD-248** | `harden --dry-run` lists every file it would write and not `docs/ARCHITECTURE.md`, which the apply now regenerates (KD-242) | the write is the doc's generated sections, the ones the lane's archDoc step owns; the preview is short one line, not wrong about a file the adopter owns |
+| **KD-249** | `planShippedHookHeal` throws a `TypeError` on a settings file whose duplicated `hooks` key hides an old shipped Stop form, instead of returning a skip | guarded: its one caller, `shippedHookHealVerdict`, catches the throw and heals nothing, so doctor neither crashes nor offers a fix there; a new caller of the planner would inherit it |
 
 ---
 
@@ -3739,13 +3739,20 @@ against Firebase iOS 12: the upgraded app then asks CocoaPods for `~> 11.x` agai
 at 12. The repair is `upgrade` carrying the pairing (or refusing across a major), the way
 `promote-set` now does.
 
-### KD-248 — `harden --dry-run` does not list the architecture doc the apply regenerates
+### KD-249 — `planShippedHookHeal` throws where it should skip
 
-`src/commands/harden.mjs` (`runHarden`'s dry-run listing vs `hardenProject`'s `regenerateArchDoc`)
+`src/lib/shipped-hooks.mjs` (`planShippedHookHeal`; the catch in `shippedHookHealVerdict`, ~:488)
 
-Found in round 1 of the 0.28.1 slice. KD-242 added `regenerateArchDoc(projectDir)` to the apply
-path; the dry-run listing is built from the merge plan and the seed plan only, so it prints every
-file the apply writes except `docs/ARCHITECTURE.md`, and the apply then reports
-"regenerated docs/ARCHITECTURE.md". The write touches only the `cmp:generated` sections, which the
-lane's archDoc step owns and would fail on anyway — so the adopter is not handed a change to text
-they own. Logged, not blocked: the preview is one line short, not wrong.
+Found while fixing round 1 of the 0.28.1 slice. A settings file whose `hooks` key is written twice,
+with the dropped copy holding an old shipped Stop form
+(`{"hooks":{"Stop":[<old form>]},"hooks":{"UserPromptSubmit":[]}}`), makes `planShippedHookHeal`
+throw a `TypeError` rather than return the skip it returns for a duplicated key elsewhere. Reproduced
+by a direct call, not end to end. Before this slice `doctor --fix` reached the throw unguarded; the
+offer fix made `shippedHookHealVerdict` the planner’s only caller (grep, 2026-09-25), and it catches
+the throw and treats the file as healing nothing.
+
+**Why it does not block:** no path reaches the throw unguarded now, and the file it needs is one
+that only `JSON.parse`’s last-key-wins reading makes sense of. The planner itself still throws, so
+a new caller would inherit it; the repair is the planner returning a skip for that shape.
+
+*Logged 2026-09-25 (0.28.1 batch, round 1 fix).*
