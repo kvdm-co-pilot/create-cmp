@@ -65,14 +65,14 @@
       "after": "target 'iosApp' do",
       "present": "pod 'FirebaseCore'",
       "lines": [
-        "  # The native Firebase iOS SDKs the GitLive bindings link against (GitLive 2.x -> Firebase iOS 11.x).",
-        "  pod 'FirebaseCore',          '~> 11.0'",
-        "  pod 'FirebaseAuth',          '~> 11.0'",
-        "  pod 'FirebaseFirestore',     '~> 11.0'",
-        "  pod 'FirebaseFunctions',     '~> 11.0'",
-        "  pod 'FirebaseStorage',       '~> 11.0'",
-        "  pod 'FirebaseMessaging',     '~> 11.0'",
-        "  pod 'FirebaseRemoteConfig',  '~> 11.0'"
+        "  # The native Firebase iOS SDKs the GitLive bindings link against: GitLive __FIREBASE_GITLIVE__ is built against Firebase iOS __FIREBASE_IOS__ (create-cmp's version registry).",
+        "  pod 'FirebaseCore',          '__FIREBASE_IOS_POD__'",
+        "  pod 'FirebaseAuth',          '__FIREBASE_IOS_POD__'",
+        "  pod 'FirebaseFirestore',     '__FIREBASE_IOS_POD__'",
+        "  pod 'FirebaseFunctions',     '__FIREBASE_IOS_POD__'",
+        "  pod 'FirebaseStorage',       '__FIREBASE_IOS_POD__'",
+        "  pod 'FirebaseMessaging',     '__FIREBASE_IOS_POD__'",
+        "  pod 'FirebaseRemoteConfig',  '__FIREBASE_IOS_POD__'"
       ]
     }
   ]

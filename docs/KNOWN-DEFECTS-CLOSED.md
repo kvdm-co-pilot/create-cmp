@@ -9,6 +9,34 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-243 — Firebase iOS is pinned while GitLive floats — **CLOSED 2026-09-25**
+
+`overlays/firebase/edits.json:69-71` (the Podfile lines), `:4` (`versionsFromRegistry`)
+
+The overlay writes `pod 'FirebaseCore'`, `'FirebaseAuth'` and `'FirebaseFirestore'` at `'~> 11.0'`.
+The GitLive Kotlin version (`firebase-gitlive`) is taken from the registry at add time. A GitLive
+release built against a newer Firebase iOS would get pods one major version behind it.
+
+**Why it does not block:** only an iOS build reads the pods, and no L2 run compiles one (KD-206). A
+mismatch fails at pod resolution or link time, loudly.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** The registry is a local pinned file
+(`src/versions/registry.json`), so the pairing now sits next to `firebase-gitlive` in each set, as
+`firebaseIos` (`:27`, `:73`, `:119`), with GitLive's own catalog as the source: `firebase-cocoapods`
+in `GitLiveApp/firebase-kotlin-sdk` `gradle/libs.versions.toml` is `11.1.0` at tag `v2.1.0` and
+`11.8.0` at `v2.4.0`, and `firebase-app/build.gradle.kts` builds its `pod("FirebaseCore")` at that
+version at both tags (fetched 2026-09-25). The overlay's Podfile lines carry tokens
+(`overlays/firebase/edits.json:68-75`); `firebaseIosPodFor` (`src/lib/add-firebase.mjs:200`) writes
+`~> <major>.<minor>` of the paired version and refuses, naming the file and the GitLive tag to read,
+when the set's GitLive has no pairing or a pairing for another version (`:438`, `:475`). Measured
+through the CLI: a Kotlin 2.2.20 app gets GitLive 2.1.0 and `pod 'FirebaseCore', '~> 11.1'`, where it
+got `'~> 11.0'` before. `test/the-firebase-ios-pods-follow-the-gitlive-version.test.mjs` fails
+3/3 without the change and passes 3/3 with it. Still open: `scripts/promote-set.mjs` copies no
+`firebaseIos` from a candidate, so a newly promoted set fails that test and is refused for an iOS
+app until the pairing is recorded, loudly rather than with a guessed pin.
+
 ### KD-242 — `--minimal`, then `add firebase`, then `harden` may leave the architecture doc stale — **CLOSED 2026-09-25**
 
 `src/lib/add-firebase.mjs:591-593`, `src/lib/minimal.mjs:14-16,23-24`
