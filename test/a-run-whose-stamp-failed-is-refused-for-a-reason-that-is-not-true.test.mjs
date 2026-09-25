@@ -121,7 +121,7 @@ test("and the program says the same thing: --discharge on a stamp-failed record 
     assert.doesNotMatch(out, /predates/, `and does not call a record written by this fleet check old:\n${out}`);
     assert.equal(JSON.parse(fs.readFileSync(path.join(tmp, "qa-artifacts", "proof-plan.json"), "utf8")).discharged, null, "and nothing is written down");
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
 
@@ -148,7 +148,7 @@ test("the record fleet-check writes when its stamp throws carries WHY, so the re
     assert.match(rec.stampedOutputError, /ENOENT/, "and the record carries why, in its own words");
     assert.match(recordMeetsTier(rec, TIERS.device, "a".repeat(64)).reason, /ENOENT/, "which is what a reader quotes back");
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
 
@@ -191,6 +191,6 @@ test("THE FIT TEST IS A READER TOO — its Q6 block may not tick a run below the
     // The control: a run AT the tier's level over these bytes is still ticked.
     assert.match(rowFor(recordFor(H)).out, /ran against this exact code ✓/, "a proof that carries the tier is still quoted as one");
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
