@@ -19,7 +19,8 @@ description: >-
   trade-offs against React Native/Flutter, and let the user genuinely choose. If the working
   directory already contains an app matching the request, confirm new-vs-existing before
   scaffolding. Once CMP is the choice: runs a short interview (platforms, app name, package,
-  Room, E2E tests (Maestro), bottom-nav tabs), then stamps a frozen
+  E2E tests (Maestro), bottom-nav tabs), reads the app's shape from the ask (lean — no Room, so
+  the faster first build — unless it syncs with a backend or works offline), then stamps a frozen
   version-locked template via the deterministic create-cmp engine (navigation/insets
   pre-solved, Clean Architecture wired) and generates the requested tab screens. Proves a
   GREEN build before reporting success, then hands over the device-free live preview loop for
@@ -99,7 +100,7 @@ Then: one compact round of config questions; don't interrogate. Accept sensible 
 | `package` | Reverse-DNS package id (e.g. `com.acme.app`)? | derived from appName |
 | `iosBundleId` | iOS bundle id? | same as `package` |
 | `platforms.ios` | Include iOS (Android is always on)? | `true` |
-| `room` | Room local cache? | `true` |
+| `room` | Not asked — set by the shape below (`lean` → off, `full` → on). A preference the user states wins. | from the shape |
 | `e2e` | E2E test harness (Maestro flows in `qa/e2e/`; key renamed from `appium` in 0.3.0)? | `true` |
 | `inspector` | Live on-device inspector (debug builds only — AI-inspectable UI)? | `true` |
 | `devClient` | Desktop dev-client window with Compose Hot Reload? | `true` |
@@ -116,12 +117,34 @@ flags); the **cmp-firebase-connect** skill runs that step and the console work. 
 refuses `--firebase`, `--region`, `--auth` and the service flags, and a config carrying
 `firebase` or `region`, and names that command.
 
-### Intent — the root brief (feeds `specs/intent.md` and two of the flags above)
+### The app's shape — read from the ask, never asked
+
+Two shapes, one template (`docs/proposals/LIBRARIES-IN-SERVICES-OUT.md`, Decision 3). Pick one
+from what the user already said; do not put it to them as a question — a new choice in front of
+the user is the failure this rule exists to avoid.
+
+- **`--preset lean`** — the ask names no backend to sync with and no offline use of fetched data.
+  "Make me a todo app" is the example. Room is off, so the first build has no KSP step and the
+  user waits through less of it.
+- **`--preset full`** (the default) — the ask names a backend, sync, accounts shared across
+  devices, or offline reading of data that came from a server. Room is on as the offline cache.
+
+Only Room differs. Ktor, Koin, Navigation, the harness, the inspector, the dev client, the
+preview loop and E2E are in both — the shape is not the harness mode, which is `--minimal`.
+If an answer later in this round names sync or offline use, the shape is
+`full`. If the user states a Room preference outright, pass `--room` or `--no-room` with the
+preset: a stated flag wins over the preset.
+
+What lean costs, and you say so in the report (§9): the app has no on-device database, so what a
+user creates lives in memory until the app adds persistence. The stamp seeds
+`docs/adr/NNNN-no-local-room-persistence.md`, which records that and what adding Room back takes.
+
+### Intent — the root brief (feeds `specs/intent.md` and two of the choices above)
 
 Ask these in the same round as the table above — one conversation, not two interviews. The
 answers seed the intent brief written once the scaffold exists (§4), and they sharpen two
-flags: a "first screens" answer naming distinct areas becomes the tab list, and an explicit
-"no persistence needed" is the one case worth turning `room` off for.
+choices: a "first screens" answer naming distinct areas becomes the tab list, and the Purpose
+answer is what the shape above is read from.
 
 | Ask | Feeds |
 |---|---|
@@ -149,6 +172,8 @@ Build exactly the shape from `docs/CONTRACT.md` (validated by `options.schema.js
 }
 ```
 
+That object is the `full` shape; the `lean` shape is the same object with `"room": false`.
+
 ## 3. Shell out to the engine
 
 Invoke the bundled engine — never reimplement scaffolding. From the plugin/repo root, the
@@ -161,7 +186,8 @@ node <repo>/bin/create-cmp.mjs \
   --package com.acme.app \
   --bundle-id com.acme.app \
   --theme-prefix Acme \
-  --ios --room --e2e --inspector --dev-client \
+  --preset lean \
+  --ios --e2e --inspector --dev-client \
   --tabs "Home:home,Profile:person" \
   --target-dir ./acme \
   --verify \
@@ -177,7 +203,10 @@ Notes:
 - Pass `--verify` so the engine runs its north-star gate: the first Gradle build
   (`./gradlew :composeApp:assembleDebug`, plus the iOS build on macOS when iOS is enabled)
   with a **GREEN/FAIL** verdict. Do not claim success without it.
-- For toggles that are off, pass the negative flag (`--no-ios`, `--no-room`, `--no-e2e`,
+- Pass the shape (§1) as `--preset lean` or `--preset full`; the example above is `lean`. Do not add `--room` or `--no-room` on
+  top unless the user stated it — a stated flag overrides the preset, so a copied `--room` turns
+  `lean` back into `full` without a word.
+- For other toggles that are off, pass the negative flag (`--no-ios`, `--no-e2e`,
   `--no-inspector`, `--no-dev-client`).
 - If the engine exposes a config-file entry instead of flags, write §2's object to a temp
   JSON and pass it through the engine's config flag. Reconcile exact flag spellings with
@@ -294,7 +323,7 @@ narrating a diagram:
    go through `npx create-cmp-cli upgrade`, never a one-off bump.
 3. **System context (§3) — the integration questions.** "What does this app talk to?" gets
    answered here for real, using the interview's choices, not re-litigating them. *Local
-   DB?* — Room is wired (on-device SSOT), or absent if `--no-room` was chosen; point at the
+   DB?* — Room is wired (on-device SSOT) in the `full` shape, or absent in `lean`; point at the
    seeded `docs/adr/NNNN-no-local-room-persistence.md` (see point 7) as the record.
    *Backend and other integrations?* — none is stamped; if the app needs Firebase, say that
    `create-cmp add firebase` (via **cmp-firebase-connect**) adds it next. And the debug
@@ -456,8 +485,9 @@ state, themselves.
 
 ## 9. Report
 
-Tell the human: the target directory, the engine's GREEN/FAIL verdict, which lane they took
-(express or guided) and — if guided — what is now approved (`node qa/approve.mjs --status`).
+Tell the human: the target directory, the engine's GREEN/FAIL verdict, the shape and why
+(`lean`: "no Room — what the app stores lives in memory until it adds persistence"), which lane
+they took (express or guided) and — if guided — what is now approved (`node qa/approve.mjs --status`).
 Then the next manual steps: drop in `google-services.json` / `GoogleService-Info.plist`
 (intentionally not templated), then `./gradlew :composeApp:installDebug` (Android) and, on
 macOS, the iOS build. For a device run + smoke, point them at **cmp-qa-prep**; for an
