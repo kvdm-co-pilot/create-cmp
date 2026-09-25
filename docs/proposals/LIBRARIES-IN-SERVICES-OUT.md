@@ -1,7 +1,8 @@
 # Libraries in, services out — the default template after the wave
 
 **Status:** decided by the owner 2026-09-22, in conversation, and its open questions answered
-2026-09-24; not yet built. Three slices, in this
+2026-09-24. Decision 2 built 2026-09-25 on branch `firebase-out`, with the corrections and the one
+deviation recorded under it; Decision 3 not yet built. Three slices, in this
 order, each one thing. This document records the decisions and their reasons so the slices are
 briefed from settled ground rather than from a chat transcript.
 
@@ -84,6 +85,31 @@ says it is a mock. It never writes a placeholder that reads as a real config.
 **Not now:** a general "add anything" mechanism. Firebase is the only service the template carries;
 the second service (push, analytics, crash reporting) is the moment to generalise.
 
+**Built 2026-09-25 (branch `firebase-out`) — two corrections to the footprint above, and one
+deviation from the proof above that is the owner's to accept.**
+
+- *Correction: there is no repository switch.* `ItemRepositoryImpl.kt` is one in-memory
+  implementation with no Firebase or Room coupling, and has been since the initial commit
+  (`b3be307`). The "seam the add step needs" named above does not exist, and the add step does not
+  touch a repository: nothing in `commonMain` uses a Firebase client (KD-210).
+- *Correction: there is no Firebase Koin module.* The wiring was `androidMain/AppApplication.kt`'s
+  `configureFirebaseEmulators`, `iosMain/KoinHelper.kt`, `iOSApp.swift`, the Podfile, both Gradle
+  files, the version catalog and `FirebaseConfig.kt` (a region constant) — and four items that
+  shipped UNMARKED in every stamp, `--no-firebase` included: the Firebase R8 rules, the catalog's
+  GitLive and google-services entries, jitpack, and `FirebaseConfig.kt` itself. All of it left the
+  template. The add step's edits are therefore new files, one marked block appended to the end of
+  a file, anchored one-line insertions and catalog entries (`overlays/firebase/`,
+  `src/lib/add-firebase.mjs`) — never an edit inside the adopter's own blocks.
+- *Deviation: the runtime proof is deferred to its own slice.* The proof above has two parts. The
+  first holds: the default stamp's L2 run is unchanged in kind. The second — the `wave/firebase`
+  emulator-suite run, repointed at "stamp + add firebase" — was NOT built here, for three reasons:
+  that branch is 113 commits behind main and its obligation is keyed on template PATHS (Firebase no
+  longer has any), and KD-208 records that the proof-gate hook's time budget is fully spent, so a
+  second stamp in the hook's answer has nowhere to come from. What this slice proves instead is
+  COMPILE, on every PR: CI stamps the default, builds it, runs `add firebase` on the same app and
+  builds again. KD-45's Firebase half is amended to say exactly that; init and the four
+  `useEmulator` calls stay unexecuted until the repointed run lands.
+
 ## Decision 3 — a minimal preset over existing toggles
 
 **Constraint that decides the cost:** a preset flips options that already exist (`room`, `e2e`,
@@ -110,7 +136,8 @@ device badge stays on the default and the front door says so.
 ## Sequence
 
 1. **The wave** (this branch) — live adopter harms; ships as 0.27.1.
-2. **Firebase out** — `create-cmp add firebase`; closes KD-45's Firebase half by the repointed proof.
+2. **Firebase out** — `create-cmp add firebase`. Built with a compile-tier proof in CI; the
+   repointed runtime proof that closes KD-45's Firebase half is its own slice (see Decision 2).
 3. **Minimal preset** — over a template that by then has only libraries in it.
 
 Two front-door changes under one review would be two things in one slice; kept apart, each stays
