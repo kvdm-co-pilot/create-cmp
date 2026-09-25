@@ -36,7 +36,7 @@ function makeTemplate() {
   w(
     "manifest.json",
     JSON.stringify({
-      placeholders: ["__APP_NAME__", "__PACKAGE__", "__PACKAGE_PATH__", "__IOS_BUNDLE_ID__", "__REGION__", "__THEME_PREFIX__"],
+      placeholders: ["__APP_NAME__", "__PACKAGE__", "__PACKAGE_PATH__", "__IOS_BUNDLE_ID__", "__THEME_PREFIX__"],
       packageSourceRoots: [
         "composeApp/src/commonMain/kotlin",
         "composeApp/src/commonTest/kotlin",
@@ -44,7 +44,6 @@ function makeTemplate() {
       ],
       features: {
         ios: { enabledByDefault: true, paths: ["iosApp", "composeApp/src/iosMain"] },
-        firebase: { enabledByDefault: true, paths: [] },
         room: { enabledByDefault: true, paths: [] },
         e2e: { enabledByDefault: true, paths: ["qa"] },
       },
@@ -58,7 +57,7 @@ function makeTemplate() {
   // literal `com/example/app` segment for the engine to rename. (CONTRACT §tokens)
   w(
     "composeApp/src/commonMain/kotlin/com/example/app/Main.kt",
-    "package __PACKAGE__\nclass __THEME_PREFIX__Theme // region __REGION__\n"
+    "package __PACKAGE__\nclass __THEME_PREFIX__Theme // bundle __IOS_BUNDLE_ID__\n"
   );
   // iosMain source (will be removed when ios disabled)
   w("composeApp/src/iosMain/kotlin/com/example/app/IosMain.kt", "package __PACKAGE__\n");
@@ -100,10 +99,8 @@ function baseConfig(targetDir, overrides = {}) {
     appName: "Acme",
     package: "com.acme.demo",
     iosBundleId: "com.acme.demo",
-    region: "us-central1",
     themePrefix: "Acme",
     platforms: { android: true, ios: true },
-    firebase: { enabled: true, auth: "both", firestore: true, storage: true, functions: true, fcm: true },
     room: true,
     e2e: true,
     inspector: true,
@@ -127,7 +124,7 @@ test("full scaffold (iOS on): tokens, package rename, markers stripped, verify G
   const main = fs.readFileSync(mainKt, "utf8");
   assert.match(main, /package com\.acme\.demo/);
   assert.match(main, /class AcmeTheme/);
-  assert.match(main, /region us-central1/);
+  assert.match(main, /bundle com\.acme\.demo/);
   assert.ok(!main.includes("example"));
 
   // path-token file renamed
@@ -291,4 +288,27 @@ test("spec-of-record: create-cmp.json is persisted with the resolved config", as
   assert.ok(record.stampedAt.includes("T"), "ISO stampedAt");
   fs.rmSync(tpl, { recursive: true, force: true });
   fs.rmSync(out, { recursive: true, force: true });
+});
+
+test("a config that still carries firebase or region is refused BY NAME, and nothing is written", async () => {
+  // Firebase left stamp-time. The plugin door and a saved config reach the engine without the
+  // CLI's flag refusal, so the engine gives the same answer: the keys, and the door they moved to.
+  const tpl = makeTemplate();
+  for (const extra of [
+    { firebase: { enabled: true } },
+    { firebase: { enabled: false } },
+    { region: "us-central1" },
+    { firebase: { enabled: true }, region: "europe-west1" },
+  ]) {
+    const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "cmp-out-")), "app");
+    await assert.rejects(
+      stamp(baseConfig(out, extra), { templateDir: tpl, verify: false }),
+      (err) => {
+        assert.match(err.message, /create-cmp add firebase/, "the refusal names the door Firebase moved to");
+        for (const key of Object.keys(extra)) assert.match(err.message, new RegExp(`\\\`${key}\\\``), `the refusal names ${key}`);
+        return true;
+      },
+    );
+    assert.ok(!fs.existsSync(out), `nothing was written for ${JSON.stringify(extra)}`);
+  }
 });

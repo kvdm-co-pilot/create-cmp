@@ -18,6 +18,9 @@ import {
   applyHarnessPlan,
   configFromSpecRecord,
   decideFile,
+  firebaseFromSpecRecord,
+  legacyFirebaseKeys,
+  templateCarriesStampTimeFirebase,
   decideRegionFile,
   isExcludedPath,
   matchesPattern,
@@ -493,6 +496,9 @@ test("configFromSpecRecord: record keys map to config keys (name→appName, bund
   assert.equal(cfg.package, "com.demo.app");
   assert.equal(cfg.targetDir, "/tmp/somewhere");
   assert.equal(cfg.devClient, true);
+  // The record's Firebase is reproduced by the add step (firebaseFromSpecRecord), never handed to
+  // the engine: the schema no longer has either key, and the engine refuses a config carrying them.
+  assert.ok(!("firebase" in cfg) && !("region" in cfg), "firebase/region must not reach the engine config");
 });
 
 test("configFromSpecRecord: fields the record predates default to feature-absent", () => {
@@ -504,8 +510,53 @@ test("configFromSpecRecord: fields the record predates default to feature-absent
   assert.equal(cfg.room, false);
   assert.equal(cfg.e2e, false);
   assert.equal(cfg.inspector, false);
-  assert.equal(cfg.firebase.enabled, false);
+  assert.ok(!("firebase" in cfg));
   assert.ok(Array.isArray(cfg.tabs) && cfg.tabs.length > 0);
+});
+
+test("firebaseFromSpecRecord: both record shapes that mean Firebase is on, and every one that does not", () => {
+  // create-cmp 0.27 and earlier: stamped with Firebase, region at the top level.
+  assert.deepEqual(
+    firebaseFromSpecRecord({
+      region: "europe-west2",
+      firebase: { enabled: true, auth: "email", firestore: true, storage: false, functions: true, fcm: true },
+    }),
+    { region: "europe-west2", auth: "email", firestore: true, storage: false, functions: true, fcm: true },
+  );
+  // `create-cmp add firebase`: everything under `firebase`, region included.
+  assert.deepEqual(
+    firebaseFromSpecRecord({ firebase: { enabled: true, region: "asia-south1", auth: "both", config: "mock" } }),
+    { region: "asia-south1", auth: "both" },
+  );
+  for (const record of [{}, { firebase: { enabled: false } }, { region: "us-central1" }, { firebase: {} }]) {
+    assert.equal(firebaseFromSpecRecord(record), null, JSON.stringify(record));
+  }
+});
+
+test("legacyFirebaseKeys: what an older template needs to be stamped as the app's base", () => {
+  assert.deepEqual(legacyFirebaseKeys({ region: "europe-west2", firebase: { enabled: true, auth: "both" } }), {
+    firebase: { enabled: true },
+    region: "europe-west2",
+  });
+  assert.deepEqual(legacyFirebaseKeys({}), { firebase: { enabled: false }, region: "us-central1" });
+});
+
+test("templateCarriesStampTimeFirebase: read from the template's own manifest", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-legacy-manifest-"));
+  try {
+    fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ features: { firebase: { paths: [] } } }));
+    assert.equal(templateCarriesStampTimeFirebase(dir), true);
+    fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ features: { room: { paths: [] } } }));
+    assert.equal(templateCarriesStampTimeFirebase(dir), false);
+    assert.equal(templateCarriesStampTimeFirebase(path.join(dir, "missing")), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  assert.equal(
+    templateCarriesStampTimeFirebase(path.join(__dirname, "..", "template")),
+    false,
+    "this engine's own template no longer carries Firebase as a stamp option",
+  );
 });
 
 // --- CLI refusal (no create-cmp.json) --------------------------------------------

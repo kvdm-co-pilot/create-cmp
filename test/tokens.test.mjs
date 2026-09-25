@@ -11,7 +11,6 @@ const config = {
   appName: "Acme",
   package: "com.acme.app",
   iosBundleId: "com.acme.app",
-  region: "us-central1",
   themePrefix: "Acme",
 };
 
@@ -20,7 +19,7 @@ test("buildTokenMap derives __PACKAGE_PATH__ from package", () => {
   assert.equal(map.__PACKAGE__, "com.acme.app");
   assert.equal(map.__PACKAGE_PATH__, "com/acme/app");
   assert.equal(map.__APP_NAME__, "Acme");
-  assert.equal(map.__REGION__, "us-central1");
+  assert.ok(!("__REGION__" in map), "a current config has no region, so the map carries no __REGION__ — never the string \"undefined\"");
   assert.equal(map.__THEME_PREFIX__, "Acme");
 });
 
@@ -33,11 +32,11 @@ test("__PACKAGE_PATH__ is applied before __PACKAGE__ (ordering)", () => {
 
 test("replaceTokens replaces all placeholder occurrences in content", () => {
   const map = buildTokenMap(config);
-  const input = `package __PACKAGE__\nclass __THEME_PREFIX__Theme\n// region __REGION__\nname=__APP_NAME__`;
+  const input = `package __PACKAGE__\nclass __THEME_PREFIX__Theme\n// bundle __IOS_BUNDLE_ID__\nname=__APP_NAME__`;
   const out = replaceTokens(input, map);
   assert.equal(
     out,
-    `package com.acme.app\nclass AcmeTheme\n// region us-central1\nname=Acme`
+    `package com.acme.app\nclass AcmeTheme\n// bundle com.acme.app\nname=Acme`
   );
   assert.ok(!out.includes("__"), "no leftover placeholder markers");
 });
@@ -64,4 +63,12 @@ test("isBinaryPath flags binary extensions, not source", () => {
   assert.equal(isBinaryPath("Main.kt"), false);
   assert.equal(isBinaryPath("build.gradle.kts"), false);
   assert.equal(isBinaryPath("Dockerfile"), false);
+});
+
+test("a config that carries region — an older template stamped as a merge base — still maps __REGION__", () => {
+  // `upgrade --harness` stamps the template an app was stamped from; until Firebase left
+  // stamp-time that template's FirebaseConfig.kt carried __REGION__, and the app's recorded
+  // region is what it held.
+  const map = Object.fromEntries(buildTokenMap({ ...config, region: "europe-west2" }));
+  assert.equal(map.__REGION__, "europe-west2");
 });
