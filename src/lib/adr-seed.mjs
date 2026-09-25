@@ -92,11 +92,12 @@ const DECISION_RULES = [
     title: () => "No local Room persistence",
     render: () => ({
       context:
-        "The interview default ships a Room on-device cache as the local single source of " +
+        "The default stamp ships a Room on-device cache as the local single source of " +
         "truth (`data/local/AppDatabase.kt`, `ItemDao.kt`) so screens keep rendering the last " +
         "known data offline (`docs/ARCHITECTURE.md` §1's offline reliability goal, §3, §7 " +
-        "Persistence policy). This app's scaffold config explicitly turned that off " +
-        "(`room: false`) during the cmp-new interview — a deliberate choice that the local-" +
+        "Persistence policy). This app was stamped with that turned off (`room: false` in " +
+        "`create-cmp.json`, answered at the stamp's interview or stated on its command line " +
+        "as `--no-room` or `--preset lean`) — a deliberate choice that the local-" +
         "persistence layer, its expect/actual wiring, and its DI registration are not part of " +
         "this app's shape.",
       decision:
