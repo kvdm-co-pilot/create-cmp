@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
 import { observedTreeHash, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
 import { stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
-import { TIERS, currentBranch, recordMeetsTier } from "../scripts/proof-plan.mjs";
+import { TIERS, currentBranch, obligation, recordMeetsTier } from "../scripts/proof-plan.mjs";
 
 const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/hooks/proof-gate.mjs");
 const FC = "scripts/fleet-check.mjs";
@@ -161,6 +161,126 @@ test("no decision ever says REQUIRED — that is the word an agent acted on thre
     for (const s of ["none", "undeclared", "owed", "discharged", "reopened"]) {
       const d = decide(kind, o(s), TIERS, { record: null, now: "x" });
       assert.ok(!/REQUIRED/.test(d.reason ?? ""), `${kind}/${s}: ${d.reason}`);
+    }
+  }
+});
+
+// THE FIREBASE L2 RUN (KD-45) is a tier of its own: the same L2 run with the
+// template's Firebase code compiled in and executing, keyed on its own digest.
+// Its state and the L2 run's can disagree, and the case that MUST be got right
+// is the L2 run DISCHARGED while the Firebase run is still owed: the ordinary
+// "a second run over the same bytes" refusal would refuse the only run that can
+// discharge it, and nothing here would ever execute the template's Firebase code.
+const fbT = (state) => ({ state, need: { required: state !== "none", reason: "1 changed path(s) are not declared irrelevant to the Firebase L2 run: packages/harness/src/x.mjs", obliging: [] } });
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** The default command, named as a command of its own — not as the prefix of the Firebase one, which it is. */
+const DEFAULT_ALONE = new RegExp(`${esc(TIERS.device.cmd)}(?! --with-firebase)`);
+
+test("device run: the gate lets the Firebase L2 run happen — it names the command for each open tier, and refuses only when neither is open", () => {
+  assert.match(TIERS.firebase.cmd, /--with-firebase/, "the Firebase tier's command is the one with the flag");
+
+  // L2 run closed, Firebase open: allowed, and told to use the flag.
+  for (const dev of ["discharged", "none"]) {
+    for (const fb of ["owed", "reopened"]) {
+      const d = decide("device", o(dev, { firebase: fbT(fb) }), TIERS);
+      assert.equal(d.action, "allow", `L2 ${dev} + Firebase ${fb} must allow the only run that can discharge the Firebase tier: ${d.reason}`);
+      assert.ok(d.reason.includes(TIERS.firebase.cmd), `names the Firebase command: ${d.reason}`);
+      assert.match(d.reason, new RegExp(`Firebase L2 run is ${fb.toUpperCase()}`), "names the state it decided on");
+      assert.doesNotMatch(d.reason, DEFAULT_ALONE, "and does not offer the default run, which discharges nothing here");
+      assert.doesNotMatch(d.reason, /sequentially/, "one run is owed, not two");
+    }
+  }
+
+  // L2 run open, Firebase closed: allowed, and the command it names lacks the flag.
+  for (const dev of ["owed", "reopened"]) {
+    for (const fb of ["discharged", "none"]) {
+      const d = decide("device", o(dev, { firebase: fbT(fb) }), TIERS);
+      assert.equal(d.action, "allow", `L2 ${dev} + Firebase ${fb}`);
+      assert.match(d.reason, /LAST gate/);
+      assert.match(d.reason, DEFAULT_ALONE, `names the default command: ${d.reason}`);
+      assert.doesNotMatch(d.reason, /--with-firebase/, `the command it names lacks --with-firebase: ${d.reason}`);
+    }
+  }
+
+  // Both open: allowed, both commands, one after the other.
+  for (const dev of ["owed", "reopened"]) {
+    for (const fb of ["owed", "reopened"]) {
+      const d = decide("device", o(dev, { firebase: fbT(fb) }), TIERS);
+      assert.equal(d.action, "allow", `L2 ${dev} + Firebase ${fb}`);
+      assert.match(d.reason, DEFAULT_ALONE, `names the default command: ${d.reason}`);
+      assert.ok(d.reason.includes(TIERS.firebase.cmd), `and the Firebase one: ${d.reason}`);
+      assert.match(d.reason, /sequentially, never concurrently/);
+    }
+  }
+
+  // Neither open: refused, in today's words exactly.
+  for (const [dev, fb] of [["discharged", "discharged"], ["none", "none"], ["discharged", "none"], ["none", "discharged"], ["undeclared", "none"]]) {
+    const d = decide("device", o(dev, { firebase: fbT(fb) }), TIERS);
+    assert.equal(d.action, "deny", `L2 ${dev} + Firebase ${fb}`);
+    assert.deepEqual(d, decide("device", o(dev), TIERS), `L2 ${dev} + Firebase ${fb} refuses with today's reason`);
+  }
+});
+
+test("device run: a Firebase run is held to the same preconditions as the L2 run — no concurrent lane, and a branch that contains trunk", () => {
+  const fbOnly = o("discharged", { firebase: fbT("owed") });
+  const lane = decide("device", fbOnly, TIERS, { runningLane: { pid: 1, project: "/elsewhere/x", marker: null }, repoRoot: "/here" });
+  assert.equal(lane.action, "deny", `a lane in flight refuses the Firebase run too: ${lane.reason}`);
+  assert.match(lane.reason, /already running/);
+
+  const behind = { contained: false, behind: 3, sha: "0123456789abcdef0123456789abcdef01234567", source: "remote", reachedRemote: true, unfetched: false, reason: null };
+  const d = decide("device", fbOnly, TIERS, { base: behind });
+  assert.equal(d.action, "deny", `a branch that does not contain trunk refuses the Firebase run too: ${d.reason}`);
+  assert.match(d.reason, /Firebase L2 run is OWED, but this branch does not contain origin\/main/);
+  assert.doesNotMatch(d.reason, /the L2 run is DISCHARGED, but/, "and names the run it refused, not the one already discharged");
+});
+
+test("D1: on trunk — branchless or main — the Firebase release run is allowed, as the default release proof is", () => {
+  // The slice merges, then the Firebase run happens on a detached worktree at
+  // the new main. The gate must let it through as a release proof.
+  const CMD = "CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level L2 --with-firebase --ladder-plant";
+  assert.equal(classify(CMD), "device", "the gate sees the run");
+  for (const branch of [null, "main"]) {
+    const t = obligation(null, [], branch, { fleetRecord: null, firebaseRecord: null });
+    assert.equal(t.trunk, true, `${branch ?? "branchless"} with nothing changed is trunk`);
+    assert.equal(t.firebase.state, "none");
+    const d = decide("device", t, TIERS);
+    assert.equal(d.action, "allow", `${branch ?? "branchless"}: ${d.reason}`);
+    assert.match(d.reason, /RELEASE/);
+  }
+});
+
+test("gh pr merge: the Firebase L2 run is collected beside the L2 run and the review, in ONE answer", () => {
+  const review = { state: "owed", need: { required: true, reason: "1 changed path(s) oblige a review: scripts/x.mjs", obliging: [] } };
+  const all = decide("merge", o("owed", { firebase: fbT("owed"), review }), TIERS);
+  assert.equal(all.action, "deny");
+  const lines = all.reason.split("\n\n");
+  assert.equal(lines.length, 3, `three tiers, three lines, one answer: ${all.reason}`);
+  assert.match(lines[0], /^the L2 run is OWED/);
+  assert.match(lines[1], /^the Firebase L2 run is OWED/);
+  assert.ok(lines[1].includes(TIERS.firebase.cmd), "quotes the exact Firebase command");
+  assert.match(lines[2], /^a review is OWED/);
+
+  for (const fb of ["owed", "reopened"]) {
+    const only = decide("merge", o("discharged", { firebase: fbT(fb) }), TIERS);
+    assert.equal(only.action, "deny", `the Firebase run ${fb} alone holds the merge`);
+    assert.match(only.reason, new RegExp(`Firebase L2 run is ${fb.toUpperCase()}`));
+    assert.match(only.reason, /--discharge, then merge/);
+  }
+  for (const fb of ["discharged", "none"]) assert.equal(decide("merge", o("discharged", { firebase: fbT(fb) }), TIERS).action, "silent", `Firebase ${fb}`);
+
+  const create = decide("create", o("discharged", { firebase: fbT("owed") }), TIERS);
+  assert.equal(create.action, "allow", "reminded at gh pr create, never blocked");
+  assert.ok(create.reason.includes(TIERS.firebase.cmd));
+});
+
+test("no decision about the Firebase L2 run says REQUIRED either", () => {
+  const states = ["none", "undeclared", "owed", "discharged", "reopened"];
+  for (const kind of ["device", "merge", "create", "publish"]) {
+    for (const dev of states) {
+      for (const fb of states) {
+        const d = decide(kind, o(dev, { firebase: fbT(fb) }), TIERS, { record: null, now: "x" });
+        assert.ok(!/REQUIRED/.test(d.reason ?? ""), `${kind}/${dev}/${fb}: ${d.reason}`);
+      }
     }
   }
 });
