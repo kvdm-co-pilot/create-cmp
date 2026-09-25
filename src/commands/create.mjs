@@ -4,6 +4,7 @@
 // stamped app by `create-cmp add firebase` (see firebaseStampFlags below).
 
 import { flagBool } from "../lib/args.mjs";
+import { FIREBASE_VALUE_FLAGS, FIREBASE_SERVICE_FLAGS } from "./add.mjs";
 
 // --- deprecated-flag compat -------------------------------------------------
 
@@ -42,26 +43,25 @@ function flagBoolWithAlias(flags, name, aliasName, dflt) {
  *
  * All of them stay declared (args.mjs): an unknown `--firebase` would eat the
  * directory after it, which is KD-7's harm under a new name.
+ *
+ * THE LIST IS `add firebase`'s OWN (FIREBASE_VALUE_FLAGS, FIREBASE_SERVICE_FLAGS in
+ * src/commands/add.mjs), plus `--firebase` itself. It was hand-written here once, and
+ * `--google-services` — which only that door reads — stamped an app with no Firebase
+ * and threw the named config away without a word.
  * @returns {{requested: string[], declined: string[]}}
  */
 export function firebaseStampFlags(flags) {
-  const said = [
-    ["firebase", flagBool(flags, "firebase", undefined)],
-    ["firestore", flagBool(flags, "firestore", undefined)],
-    ["storage", flagBool(flags, "storage", undefined)],
-    ["functions", flagBool(flags, "functions", undefined)],
-    ["fcm", flagBool(flags, "fcm", undefined)],
-  ];
+  const said = ["firebase", ...FIREBASE_SERVICE_FLAGS].map((n) => [n, flagBool(flags, n, undefined)]);
   const requested = said.filter(([, v]) => v === true).map(([n]) => `--${n}`);
   const declined = said.filter(([, v]) => v === false).map(([n]) => `--no-${n}`);
-  if (flags.region !== undefined) requested.push("--region");
-  if (flags["no-region"] !== undefined) declined.push("--no-region");
-  // `--auth none` asks for no Firebase Auth, which a stamp with no Firebase already is.
-  if (flags.auth !== undefined) {
-    if (flags.auth === "none") declined.push("--auth none");
-    else requested.push("--auth");
+  for (const n of FIREBASE_VALUE_FLAGS) {
+    if (flags[n] !== undefined) {
+      // `--auth none` asks for no Firebase Auth, which a stamp with no Firebase already is.
+      if (n === "auth" && flags[n] === "none") declined.push("--auth none");
+      else requested.push(`--${n}`);
+    }
+    if (flags[`no-${n}`] !== undefined) declined.push(`--no-${n}`);
   }
-  if (flags["no-auth"] !== undefined) declined.push("--no-auth");
   return { requested, declined };
 }
 
@@ -287,7 +287,8 @@ export async function runCreate(flags, positional) {
   if (requested.length) {
     process.stderr.write(
       `create-cmp: ${requested.join(", ")} — Firebase is not a stamp option any more. Stamp the app without it, ` +
-        `then add it with \`create-cmp add firebase <dir>\`, which takes --region, --auth and the service flags.\n` +
+        `then add it with \`create-cmp add firebase <dir>\`, which takes ${FIREBASE_VALUE_FLAGS.map((n) => `--${n}`).join(", ")} ` +
+        `and the service flags.\n` +
         `  Nothing was written.\n`
     );
     process.exit(2);

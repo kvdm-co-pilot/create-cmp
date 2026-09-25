@@ -32,6 +32,18 @@ import { resolveVerifyCommands } from "./verify.mjs";
 export const ADDABLE = ["firebase"];
 
 /**
+ * The flags only this door reads — Firebase's own, as opposed to the directory and the verify
+ * lane's switches every command shares. Declared HERE because this is where they are read, and
+ * the stamp refuses every one of them from this list (`firebaseStampFlags`, src/commands/create.mjs):
+ * KNOWN_FLAGS is one set for every command, so a flag this door grows and the stamp does not
+ * refuse is ACCEPTED by `create` and thrown away there — `--google-services` was, until this list.
+ * `test/a-flag-only-add-firebase-reads-is-accepted-by-the-stamp.test.mjs` derives the same set
+ * from this file's reads and fails when a new read is missing here.
+ */
+export const FIREBASE_VALUE_FLAGS = Object.freeze(["region", "auth", "google-services"]);
+export const FIREBASE_SERVICE_FLAGS = Object.freeze(["firestore", "storage", "functions", "fcm"]);
+
+/**
  * @param {Record<string,string|boolean>} flags
  * @param {string|undefined} what the service named after `add`
  * @param {string|undefined} positional the app directory
