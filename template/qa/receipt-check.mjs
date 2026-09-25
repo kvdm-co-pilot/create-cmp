@@ -30,6 +30,33 @@ import { readLadder } from "./lib/evidence-level.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+/**
+ * The lane command, spelled so it resolves from where THIS process stands. The
+ * anchored Stop hook runs this file from any directory, and a session opened
+ * outside the project is exactly the one a relative `node qa/verify.mjs` fails
+ * for (KD-215). At the project root the words are unchanged, byte for byte.
+ *
+ * ONE SPELLING FOR EVERY MENTION. KD-215 fixed the hook's trailing "Run `…`"
+ * and left every refusal reason naming its own bare `node qa/verify.mjs` on the
+ * same stderr line — the instance fixed, the class not. Each reason below and
+ * the hook's instruction read LANE_COMMAND, so no mention can drift from it.
+ */
+function laneCommand() {
+  const here = (p) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  if (here(process.cwd()) === here(ROOT)) return "node qa/verify.mjs";
+  // Double quotes unless the path carries a character they would not protect.
+  const dir = /["$`\\!]/.test(ROOT) ? `'${ROOT.replace(/'/g, "'\\''")}'` : `"${ROOT}"`;
+  return `cd ${dir} && node qa/verify.mjs`;
+}
+
+const LANE_COMMAND = laneCommand();
+
 const args = process.argv.slice(2);
 const asHook = args.includes("--hook");
 const asJson = args.includes("--json");
@@ -82,7 +109,7 @@ function readStdinJson() {
 function evaluate() {
   const receipt = readReceipt(ROOT);
   if (receipt === null) {
-    return { valid: false, reason: "no receipt — run `node qa/verify.mjs`", profile: undefined };
+    return { valid: false, reason: `no receipt — run \`${LANE_COMMAND}\``, profile: undefined };
   }
   // A fast-mode receipt (verify --fast) is an inner-loop signal, never done
   // evidence — refused here before the hash is even recomputed, so a session
@@ -90,7 +117,7 @@ function evaluate() {
   if (receipt.mode === "fast") {
     return {
       valid: false,
-      reason: "the last verify run was --fast (inner-loop only); run the full lane (`node qa/verify.mjs`) before finishing",
+      reason: `the last verify run was --fast (inner-loop only); run the full lane (\`${LANE_COMMAND}\`) before finishing`,
       profile: receipt.profile,
     };
   }
@@ -100,7 +127,7 @@ function evaluate() {
   if (receipt.stage === "nightly" || receipt.profile === "nightly") {
     return {
       valid: false,
-      reason: "the last verify run was the nightly stage (it proves the harness, not this change); run the change-stage lane (`node qa/verify.mjs`) before finishing",
+      reason: `the last verify run was the nightly stage (it proves the harness, not this change); run the change-stage lane (\`${LANE_COMMAND}\`) before finishing`,
       profile: receipt.profile,
     };
   }
@@ -109,7 +136,7 @@ function evaluate() {
   if (receipt.stage === "smoke" || receipt.profile === "smoke") {
     return {
       valid: false,
-      reason: "the last verify run was the smoke profile (the framework check — no build, no tests; it proves the instrument, not this change); run the change-stage lane (`node qa/verify.mjs`) before finishing",
+      reason: `the last verify run was the smoke profile (the framework check — no build, no tests; it proves the instrument, not this change); run the change-stage lane (\`${LANE_COMMAND}\`) before finishing`,
       profile: receipt.profile,
     };
   }
@@ -178,7 +205,7 @@ function evaluate() {
       valid: false,
       reason:
         `a tier did not run — ${envSkipped.map((s) => `${s.name}: ${String(s.reason ?? "").split("\n")[0]}`).join("; ")}. ` +
-        "Those steps skipped for an environmental reason, not because this project lacks them; fix the cause and run `node qa/verify.mjs` again before finishing",
+        `Those steps skipped for an environmental reason, not because this project lacks them; fix the cause and run \`${LANE_COMMAND}\` again before finishing`,
       profile: receipt.profile,
     };
   }
@@ -221,26 +248,6 @@ function evaluate() {
 
 const result = evaluate();
 
-/**
- * The lane command, spelled so it resolves from where THIS process stands. The
- * anchored Stop hook runs this file from any directory, and a session opened
- * outside the project is exactly the one a relative `node qa/verify.mjs` fails
- * for (KD-215). At the project root the words are unchanged, byte for byte.
- */
-function laneCommand() {
-  const here = (p) => {
-    try {
-      return fs.realpathSync(p);
-    } catch {
-      return path.resolve(p);
-    }
-  };
-  if (here(process.cwd()) === here(ROOT)) return "node qa/verify.mjs";
-  // Double quotes unless the path carries a character they would not protect.
-  const dir = /["$`\\!]/.test(ROOT) ? `'${ROOT.replace(/'/g, "'\\''")}'` : `"${ROOT}"`;
-  return `cd ${dir} && node qa/verify.mjs`;
-}
-
 if (asHook) {
   const hookInput = readStdinJson();
   if (hookInput.stop_hook_active === true) {
@@ -272,7 +279,7 @@ if (asHook) {
         `wait for it to finish and commit its receipt. Do NOT start a second one; two lanes fight over the same build directory.`
       : hold?.held
         ? describeHold(hold)
-        : `Run \`${laneCommand()}\` (it checks every promise and writes the receipt), ` +
+        : `Run \`${LANE_COMMAND}\` (it checks every promise and writes the receipt), ` +
           "commit the receipt, or see README §Verification enforcement to bypass.";
     process.stderr.write(
       `■ Prove — not done: the promises are not yet checked against this tree. ${result.reason}. ${act}\n`,
