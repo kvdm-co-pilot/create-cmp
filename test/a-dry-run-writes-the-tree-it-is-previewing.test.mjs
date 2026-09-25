@@ -214,19 +214,38 @@ test("no project heal writes on its own — the flag is honoured in one place or
     .split("\n")
     .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
     .join("\n");
-  const mutators = ["fs.writeFileSync(", "fs.mkdirSync(", "fs.rmSync(", "fs.appendFileSync("];
-  const counts = Object.fromEntries(mutators.map((m) => [m, code.split(m).length - 1]));
+  // Every fs call that can change the tree — sync, callback or promises form. KD-241's atomic
+  // write brought rename, chmod and unlink into healWriter; this list names them so the next
+  // heal cannot reach for one of them around the writer either.
+  const MUTATING =
+    /\bfs\.(?:promises\.)?((?:writeFile|appendFile|write|writev|mkdir|mkdtemp|rm|rmdir|unlink|rename|copyFile|cp|truncate|ftruncate|symlink|link|chmod|lchmod|fchmod|chown|lchown|fchown|utimes|lutimes|futimes|open|createWriteStream)(?:Sync)?)\(/g;
+  const calls = (text) => {
+    const n = {};
+    for (const m of text.matchAll(MUTATING)) n[`fs.${m[1]}(`] = (n[`fs.${m[1]}(`] ?? 0) + 1;
+    return n;
+  };
   const writerStart = code.indexOf("function healWriter");
   assert.notEqual(writerStart, -1, "src/commands/doctor.mjs has no healWriter — the one mechanism is gone");
   const writerEnd = code.indexOf("\n}", writerStart);
   const writer = code.slice(writerStart, writerEnd);
+  const inFile = calls(code);
+  const inWriter = calls(writer);
+  const outside = Object.keys(inFile).filter((m) => inFile[m] !== (inWriter[m] ?? 0));
   assert.deepEqual(
-    counts,
-    { "fs.writeFileSync(": 1, "fs.mkdirSync(": 1, "fs.rmSync(": 0, "fs.appendFileSync(": 0 },
-    "a project heal in src/commands/doctor.mjs mutates the tree outside healWriter. Route it through the " +
+    outside,
+    [],
+    `src/commands/doctor.mjs mutates the tree outside healWriter with ${outside.join(", ")}. Route it through the ` +
       "writer: a heal that calls fs itself is invisible to --dry-run, which is how this defect happened."
   );
-  for (const m of ["fs.writeFileSync(", "fs.mkdirSync("]) {
-    assert.ok(writer.includes(m), `${m} is not inside healWriter, so --dry-run does not gate it`);
-  }
+  assert.deepEqual(
+    inFile,
+    { "fs.mkdirSync(": 1, "fs.writeFileSync(": 1, "fs.chmodSync(": 1, "fs.renameSync(": 1, "fs.unlinkSync(": 1 },
+    "healWriter's own mutations changed. Each one must stay behind its dry-run switch; update this list only " +
+      "with a reason (KD-241 added chmod, rename and unlink for the atomic write)."
+  );
+  assert.equal(
+    /from\s+["']node:fs\/promises["']|require\(\s*["'](?:node:)?fs/.test(code),
+    false,
+    "doctor.mjs reaches fs by a second name, which this gate cannot see — use the one `fs` import"
+  );
 });

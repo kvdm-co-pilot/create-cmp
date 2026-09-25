@@ -9,6 +9,22 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-241 — a heal write is not atomic — **CLOSED 2026-09-25**
+
+`src/commands/doctor.mjs:482-491` (`healWriter`)
+
+`healWriter` writes with `fs.writeFileSync(target, content)`. That truncates the target before it
+writes. A full disk or a kill mid-write can leave a truncated `.claude/settings.json` where the app's
+own file was.
+
+**Why it does not block:** it has not been observed, and it needs a failure inside one small write.
+A write that throws is still reported as "could not write" (KD-214), but the original bytes are not
+restored. The atomic form is to write a temporary file beside the target and rename it.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** `healWriter` no longer writes onto the target: its own body (`src/commands/doctor.mjs:519`, write at :543-545) writes the content to a temporary file in the target's directory, keeps the target's mode, and `renameSync`s it over the target (following a symlink to the file it names); on any failure it `unlinkSync`s the temporary file and rethrows, so the original bytes stay and KD-214 still reports "could not write". A file this user may not write is still refused with EACCES before any write (:537), since a rename needs only the directory's permission. `test/a-heal-write-never-truncates-the-file-it-replaces.test.mjs` proves it (a write that fails part-way, a rename that fails, and a success that keeps mode and symlink): 1/3 before the fix, 3/3 after; `test/a-heal-that-cannot-write-takes-the-diagnosis-down.test.mjs` stays green. The dry-run gate `test/a-dry-run-writes-the-tree-it-is-previewing.test.mjs:208` was strengthened, not loosened: every mutating `fs` call (sync, callback or promises form, rename/chmod/unlink included) must sit inside `healWriter`'s body, and a stray `fs.renameSync(` planted outside it was seen to fail the gate by name. Residual, not built: a dangling symlink target is replaced by a file rather than written through, and a hard-linked target is split from its other links.
+
 ### KD-243 — Firebase iOS is pinned while GitLive floats — **CLOSED 2026-09-25**
 
 `overlays/firebase/edits.json:69-71` (the Podfile lines), `:4` (`versionsFromRegistry`)
