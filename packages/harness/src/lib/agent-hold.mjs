@@ -50,6 +50,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * Ephemeral, gitignored, and excluded from the receipt's hashed input surface
@@ -188,13 +189,35 @@ export function assessHold(hold, now = Date.now()) {
  * since when, what they said they were doing, and what the reader should do —
  * "specific and actionable", which the alarm it replaces was not.
  */
-export function describeHold(assessment) {
+export function describeHold(assessment, { root = ROOT, cwd = process.cwd() } = {}) {
   if (!assessment?.held) return null;
   const what = assessment.note ? ` (${assessment.note})` : "";
   return (
     `${assessment.holder} has held this tree for ${formatAge(assessment.heldMs)}${what} — staleness is expected while it works. ` +
-    `Wait for it rather than starting a lane on a half-edited tree; \`node qa/plan.mjs --release\` if it is gone.`
+    `Wait for it rather than starting a lane on a half-edited tree; \`${fromRoot(root, cwd, "node qa/plan.mjs --release")}\` if it is gone.`
   );
+}
+
+/** This file sits at qa/lib/, so the project root is two directories up. */
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/**
+ * A root-relative command spelled so it runs from ANY cwd — KD-235, the class
+ * KD-215 fixed for the Stop gate's remedy (receipt-check.mjs laneCommand()).
+ * From the root itself the short spelling stays; from anywhere else it is
+ * prefixed with a `cd` to the root, quoted the same way.
+ */
+function fromRoot(root, cwd, command) {
+  const here = (p) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  if (here(cwd) === here(root)) return command;
+  const dir = /["$`\\!]/.test(root) ? `'${root.replace(/'/g, "'\\''")}'` : `"${root}"`;
+  return `cd ${dir} && ${command}`;
 }
 
 /**

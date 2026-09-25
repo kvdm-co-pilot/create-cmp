@@ -9,6 +9,21 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-235 — the hold names a remedy a foreign-cwd session cannot run — **CLOSED 2026-09-25**
+
+`template/qa/lib/agent-hold.mjs:196`
+
+The "held" message ends: "`node qa/plan.mjs --release` if it is gone." The path is relative to the
+project root. A session whose cwd is elsewhere, which is the case KD-215 fixed for the Stop gate's
+remedy, runs it and gets "Cannot find module". This is KD-215's class, and this file was missed.
+
+**Why it does not block:** the hold is right, and the remedy fails loud rather than doing something
+else. The fix is KD-215's: a path that resolves from any cwd.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** `describeHold()` (`packages/harness/src/lib/agent-hold.mjs:192`, vendored byte-identical to `template/qa/lib/agent-hold.mjs` by `scripts/sync-harness.mjs`) now spells its remedy through `fromRoot()` (`:210`), which is KD-215's `laneCommand()` from `receipt-check.mjs` applied to this line: from the project root the short `node qa/plan.mjs --release` stays, and from anywhere else it becomes `cd "<root>" && node qa/plan.mjs --release`. The root is derived from the file's own place under `qa/lib/` (`:202`), so the two callers (`plan.mjs`, `receipt-check.mjs`) did not change. `test/agent-hold.test.mjs` "describeHold's remedy names a plan.mjs that exists from a foreign cwd" resolves the command from a temp directory against the stamped copy and asserts the file exists; it failed before the fix ("node qa/plan.mjs --release does not resolve from …").
+
 ### KD-50 — the template ships create-cmp's changelog as the adopter's source comments — **CLOSED 2026-09-25**
 
 `.../iosMain/.../KoinHelper.kt` · `.../androidMain/.../AppApplication.kt`
