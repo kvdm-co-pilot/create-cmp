@@ -21,8 +21,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { deviceTierNeed } from "./observed-tree.mjs";
-import { stampedOutputHash } from "./stamped-output.mjs";
-import { obligation, changedPaths, recordMeetsTier, TIERS } from "./proof-plan.mjs";
+import { stampedOutputHash, FIREBASE_FLEET_RECORD } from "./stamped-output.mjs";
+import { obligation, changedPaths, recordMeetsTier, readFirebaseRecord, TIERS } from "./proof-plan.mjs";
 import { suiteStatus } from "./suite-record.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -122,7 +122,7 @@ function collect({ run }) {
   const fc = run ? parseFrameworkCheck(sh("node", ["scripts/framework-check.mjs"]).stdout ?? "") : null;
   const paths = changedPaths();
   const device = deviceTierRequired(paths);
-  return { suite, frameworkCheck: fc, device, owed: obligation(undefined, paths), fleet: readFleetRecord(), changed: paths?.length ?? null };
+  return { suite, frameworkCheck: fc, device, owed: obligation(undefined, paths), fleet: readFleetRecord(), firebaseFleet: readFirebaseRecord(), changed: paths?.length ?? null };
 }
 
 function render(d) {
@@ -178,6 +178,7 @@ function render(d) {
         : "                     NO RECORD — a device run is due and none is recorded for this tree",
     );
   }
+  firebaseRow(d, L);
 
   L.push("\n7. Mobile");
   if (d.fleet.present) {
@@ -190,6 +191,57 @@ function render(d) {
   }
   L.push("\nstill yours: 1 goal · 2 derived-or-claimed · 3 mechanism · 4 stack knowledge · 5 receipt meaning · residue");
   return L.join("\n");
+}
+
+/**
+ * THE FIREBASE L2 RUN'S ROW, printed from the schedule and never re-derived.
+ *
+ * It is its own tier — its own digest, its own record (FIREBASE_FLEET_RECORD),
+ * scripts/proof-plan.mjs TIERS.firebase — so a block that printed only the
+ * default `fleet L2` row would paste into a PR as if the default run were the
+ * whole of L2. The state and its reason are `o.firebase` as `obligation()`
+ * returned it. The record line quotes the run the discharge carries where
+ * there is one, and otherwise the record on disk — and beside any state but
+ * DISCHARGED it says that record does not carry the tier, because `tierState`
+ * discharges from a record that does, whatever the plan says. A record the
+ * schedule could not judge (the Firebase stamp failed) is not called either.
+ */
+function firebaseRow(d, L) {
+  const pad = "                     ";
+  const f = d.owed?.firebase;
+  if (!f) {
+    L.push("   fleet L2 + firebase not read — no schedule was handed over, so nothing here can say whether it is owed");
+    return;
+  }
+  const word = {
+    none: "not required",
+    undeclared: "OWED — no slice declared",
+    owed: f.shortfall
+      ? `OWED — the run on record does not carry this tier (${f.shortfall.code})`
+      : f.unanswerable
+        ? "OWED — the app this tree stamps with Firebase added could not be produced"
+        : "OWED — at slice close, NOT NOW",
+    discharged: "DISCHARGED",
+    reopened: "REOPENED — the Firebase app moved after its L2 run",
+  }[f.state] ?? String(f.state).toUpperCase();
+  L.push(`   fleet L2 + firebase ${word} — ${f.need?.reason ?? "proof-plan handed over no reason"}`);
+  if (f.shortfall?.reason) L.push(`${pad}${f.shortfall.reason}`);
+  if (f.unanswerable) L.push(`${pad}${f.unanswerable}`);
+  const p = f.state === "discharged" ? f.proof : null;
+  const r = p ? { ranAt: p.at, verdict: p.verdict, rung: p.rung, from: p.from } : d.firebaseFleet ? { ...d.firebaseFleet, from: FIREBASE_FLEET_RECORD } : null;
+  if (!r) {
+    if (f.state !== "none") L.push(`${pad}no Firebase run recorded — ${FIREBASE_FLEET_RECORD} is absent`);
+    return;
+  }
+  const standing =
+    f.state === "discharged"
+      ? "carries this tier ✓"
+      : f.state === "none"
+        ? "not asked of this tree"
+        : f.unanswerable
+          ? "whether it describes this tree cannot be asked — see above"
+          : "it does not carry this tree's Firebase tier";
+  L.push(`${pad}${r.verdict ?? "no verdict"} · ran ${r.ranAt ?? "at an unstated time"} · rung ${r.rung ?? "none"} · ${r.from ?? "an unnamed record"} — ${standing}`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
