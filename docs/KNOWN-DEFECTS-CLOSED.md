@@ -9,6 +9,23 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-250 — the plugin's agent name satisfies the create-cmp-only marking — **CLOSED 2026-09-26**
+
+`test/a-shipped-agent-points-at-a-file-only-create-cmp-has.test.mjs` (the `/create-cmp/.test(para)` skip)
+
+Found reading 24474f7..51ad59e (the 0.28.1 additions). The KD-231 gate lets a paragraph name
+create-cmp's own files when the paragraph "says create-cmp", and tests that with a bare substring.
+`create-cmp:executor` is the plugin's namespace, not a statement of whose file something is, yet it
+matches. Measured by stripping `create-cmp:<name>` and re-running the paragraph split over both
+shipped agents: exactly one paragraph loses its exemption — `agents/cmp-orchestrator.md`'s
+"Model tiering" block, a single paragraph because its bullets have no blank lines between them —
+and it names none of the create-cmp-only patterns today.
+
+**Why it does not block:** nothing false ships now; the gate is blind over that paragraph for the
+next edit. The repair is one line: test the paragraph with `create-cmp:[\w-]+` removed.
+
+**Closed 2026-09-26, on the `fix/kd-250-251-252` branch.** The gate now tests the paragraph for `create-cmp` only after removing every `create-cmp:<name>` (`para.replace(/create-cmp:[\w-]+/g, "")`, `test/a-shipped-agent-points-at-a-file-only-create-cmp-has.test.mjs:65`), so the plugin's namespace in an agent name no longer marks a paragraph as create-cmp's. Measured: with `scripts/proof-plan.mjs` planted in the orchestrator's "Model tiering" paragraph, the old test passed 2/2 (blind), and the new one failed by name — `agents/cmp-orchestrator.md: names "scripts/proof-plan.mjs" in a paragraph that never says it is create-cmp's: ## Model tiering — delegate execution, keep judgment`; with the plant reverted, the new test passes 2/2.
+
 ### KD-252 — a stamp-failed test's scratch cleanup races git on CI — **CLOSED 2026-09-26**
 
 `test/a-run-whose-stamp-failed-is-refused-for-a-reason-that-is-not-true.test.mjs` (its `fs.rmSync`

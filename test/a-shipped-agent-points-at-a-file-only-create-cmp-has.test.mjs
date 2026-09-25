@@ -61,7 +61,8 @@ test("a shipped agent or skill names create-cmp's own files only where it says t
       if (m) offenders.push(`${rel}: names ${JSON.stringify(m[0])}, which no adopter has`);
     }
     for (const para of text.split(/\n\s*\n/)) {
-      if (/create-cmp/.test(para)) continue;
+      // `create-cmp:executor` is the plugin's namespace, not a statement of whose file a thing is (KD-250).
+      if (/create-cmp/.test(para.replace(/create-cmp:[\w-]+/g, ""))) continue;
       for (const re of CREATE_CMP_ONLY) {
         const m = para.match(re);
         if (m) offenders.push(`${rel}: names ${JSON.stringify(m[0])} in a paragraph that never says it is create-cmp's:\n      ${para.trim().split("\n")[0].slice(0, 140)}`);
