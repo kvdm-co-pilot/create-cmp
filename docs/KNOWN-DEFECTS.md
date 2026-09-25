@@ -175,7 +175,6 @@ you the same list without opening anything.
 | **KD-128** | five tool-schema facts are now stated in this repository and none can be re-read here: four about `SendMessage` in `agents/cmp-orchestrator.md` (no `run_in_background`; a send never blocks; no reply arrives inside the sending turn; the reply is delivered to a later one), and KD-120's answer ("**Both are** … confirmed from the harness's own tool schemas") | KD-120 one level down: that entry left open whether two tool NAMES are real, and both the answer and a claim about one's parameter LIST arrived from outside the tree. They may well be right; what is logged is that no gate here can ever red if the schema moves, so the shipped bullet and the closed entry both rest on a fact this repository cannot hold |
 | **KD-129** | `node scripts/change-price.mjs` now PRINTS which review round is next and what it reads — text a reader acts on, about this file's rule — and `test/the-review-rule-is-stated-twice.test.mjs` scans `.claude/agents/`, `skills/`, `agents/` and one printed string, so no `scripts/` text is read by it | nothing false is printed today: measured at zero six-word runs shared with the header across every file this slice touched, and the one printed sentence that had stopped being true of the tree was corrected here. What is logged is the hole, not a drift |
 | **KD-130** | `reviewDischarge` copies six named fields of a review record into `plan.reviewDischarged`, and `round`/`kind` are not among them — so the settled-plan history `--history` reads can say a review discharged the slice and never which round did | no reader consumes a round from there: the block that prices rounds reads `review-history.jsonl`, where both fields ARE written. The honest remedy edits the plan-event schema and its summariser, which is the file KD-124 already names |
-| **KD-160** | every create-cmp tree commits `qa/harness.lock.json`, whose `files` map holds one sha256 per locked path — 73 digests in a full stamp, 7 in a `--minimal` one — and a secret scanner reads a 64-char hex string as a credential | measured after an adopter's gitleaks flagged one as `generic-api-key` and reddened their CI on a file they did not author. The digests are load-bearing (the lock is what says whether the machine-owned region was edited) so they cannot simply go; the remedies are an allowlist shipped with the template or documenting the shape, and both are product decisions rather than lines |
 | **KD-161** | the round block prices round 2 from whether the DELTA is empty, and a round 1 that logs its findings writes to `docs/KNOWN-DEFECTS.md` — so the delta is almost never empty and the one NOT-OWED case is almost never reachable | measured on its own first use: round 1 of the slice that added it found nothing blocking, made NO fixes, wrote two log entries, and the block priced round 2 OWED. The header's rule is about round 1's FIXES, not about any delta. Advisory only — a human read it, disagreed, and took the header's answer |
 | **KD-162** | the sweep proving the lock is a "class of one" allow-lists `qa/e2e/` and `qa/golden/` by PREFIX, so a machine-written file added under either is invisible to it | measured: today's three survivors under those prefixes really are app content and the lock really is the only other one, so the claim holds — what is unpinned is tomorrow's addition, not today's answer |
 | **KD-132** | the review-round measurement *"round 1 took 6.9 minutes and round 2 took 3.6"* is stated in three places — `scripts/change-price.mjs`'s PART 4 header, the new round test's header and `docs/features/price-the-next-review-round.md` — and none of them says what was timed; the instrument was an agent's wall clock from spawn to report, which is outside this tree | nothing routes on the numbers and the design they support rests on the rule of record, not on them. What a reader CAN compute here is the gap between that slice's two review-history rows (20:16:05.182Z → 20:21:21.355Z, 5.3 min), which is a different quantity and matches neither figure — so the claim can be believed but never checked. KD-128 one file over |
@@ -2552,33 +2551,6 @@ checking the brief's premises, and settled by a reading outside this tree.*
 Closed entries live in [`KNOWN-DEFECTS-CLOSED.md`](KNOWN-DEFECTS-CLOSED.md), so this file stays the size a
 reviewer can read every round. An entry moves there when the thing is fixed or the decision is
 taken, with the commit that did it.
-
-### KD-160 — the lane lock commits one sha256 per file, and a secret scanner cannot tell that from a credential
-
-`packages/harness/src/lib/harness-lock.mjs` · `qa/harness.lock.json` in every stamped tree
-
-The lock's `files` map carries a sha256 per locked path so the harness can say whether the
-machine-owned region was edited. Measured on real stamps: **a full tree's lock holds 73 digests, a
-`--minimal` tree's holds 7.** A 64-character hex string is exactly what a generic secret rule looks
-for, and an adopter's gitleaks flagged one as `generic-api-key` and turned their CI red on a file
-nothing in their repo authored.
-
-**Surfaced by KD-40, which attributed it to the wrong cause.** That entry blamed `--minimal` for
-leaving the lock behind; `--minimal` in fact *reduces* the digest count from 73 to 7, and every
-create-cmp tree carries them. The harm is real and it belongs to the lock itself.
-
-**The scanner was the adopter's own.** This repository ships no gitleaks configuration —
-`gitleaks` appears only as a lane step name (`packages/harness/src/lib/profiles/cmp/ladder.mjs:16`)
-— so nothing here fired, and nothing here can fix their config either.
-
-**Why logged and not fixed.** The digests are load-bearing: remove them and the lock stops being
-able to answer the one question it exists for. The candidate remedies — ship an allowlist fragment
-with the template, or document the shape so an adopter can allow it once — are product decisions
-about what create-cmp puts in someone else's repository, and that is not a call to take inside the
-slice that found it. What is NOT in doubt is that it fires: it already did, once, outside.
-
-*Logged 2026-09-19, while closing KD-40 as not reproducible. The measurement is the useful part of
-an entry whose central claim was false.*
 
 ### KD-161 — the round block asks whether the delta is empty, where the rule asks whether there were FIXES
 

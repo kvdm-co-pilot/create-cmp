@@ -50,6 +50,17 @@ found`, `No space left on device`): `doctor` diagnoses all of them offline; the 
 write-ups live upstream at
 <https://github.com/kvdm-co-pilot/create-cmp/tree/main/docs/errors>.
 
+A secret scanner that flags `qa/harness.lock.json` (gitleaks' `generic-api-key`, or any rule for a
+64-character hex string) has found sha256 digests, not a credential: each value in the lock's
+`files` map is the digest of one lane file, and its top-level `sha256` the digest of them all,
+which is how the lane knows its own code was not edited. Allowlist the path, not the values — they
+change with every harness upgrade or relock. For gitleaks, that is
+`paths = ['''qa/harness\.lock\.json''']` under `[allowlist]` in `.gitleaks.toml`.
+<!-- >>> cmp:feature harness -->
+The receipts committed under `qa/evidence/` carry digests of the same shape; allowlist them the
+same way.
+<!-- <<< cmp:feature harness -->
+
 <!-- >>> cmp:feature harness -->
 One rule before you edit anything: the `.mjs` files directly under `qa/` and `qa/lib/`
 are **machine-owned** harness code — byte-identical in every create-cmp app and

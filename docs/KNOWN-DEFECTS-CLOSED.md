@@ -58,6 +58,46 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-160 — the lane lock commits one sha256 per file, and a secret scanner cannot tell that from a credential — **CLOSED 2026-09-25**
+
+`packages/harness/src/lib/harness-lock.mjs` · `qa/harness.lock.json` in every stamped tree
+
+The lock's `files` map carries a sha256 per locked path so the harness can say whether the
+machine-owned region was edited. Measured on real stamps: **a full tree's lock holds 73 digests, a
+`--minimal` tree's holds 7.** A 64-character hex string is exactly what a generic secret rule looks
+for, and an adopter's gitleaks flagged one as `generic-api-key` and turned their CI red on a file
+nothing in their repo authored.
+
+**Surfaced by KD-40, which attributed it to the wrong cause.** That entry blamed `--minimal` for
+leaving the lock behind; `--minimal` in fact *reduces* the digest count from 73 to 7, and every
+create-cmp tree carries them. The harm is real and it belongs to the lock itself.
+
+**The scanner was the adopter's own.** This repository ships no gitleaks configuration —
+`gitleaks` appears only as a lane step name (`packages/harness/src/lib/profiles/cmp/ladder.mjs:16`)
+— so nothing here fired, and nothing here can fix their config either.
+
+**Why logged and not fixed.** The digests are load-bearing: remove them and the lock stops being
+able to answer the one question it exists for. The candidate remedies — ship an allowlist fragment
+with the template, or document the shape so an adopter can allow it once — are product decisions
+about what create-cmp puts in someone else's repository, and that is not a call to take inside the
+slice that found it. What is NOT in doubt is that it fires: it already did, once, outside.
+
+*Logged 2026-09-19, while closing KD-40 as not reproducible. The measurement is the useful part of
+an entry whose central claim was false.*
+
+**CLOSED by the second remedy this entry named — the format stays, and the shape is
+documented where an adopter meets it — in the commit that moved it here.** The decision: the lock
+keeps one sha256 per locked path, since the digests are what lets it name the file that changed, and
+create-cmp ships no scanner config into someone else's repository. What an adopter is owed is to
+recognise the hit and to allow it once. `template/AGENTS.md` now says, outside every feature region
+so a `--minimal` stamp carries it too, that a scanner flagging `qa/harness.lock.json` has found sha256
+digests and not a credential, what each one is a digest of, and to allowlist the path rather than the
+values, which change with every upgrade and relock. It gives the gitleaks form (`paths` under
+`[allowlist]` in `.gitleaks.toml`). The full rendering adds that committed receipts under
+`qa/evidence/` carry the same shape. `packages/harness/README.md` says the same for a repo `prooflane
+init` locked. `test/agents-md.test.mjs` pins the paragraph in every rendering. The gitleaks snippet is
+the v8 global-allowlist form and was not run against gitleaks in this commit.
+
 ### KD-197 — the walk-wiring ADD heal re-serialises the whole settings file — **CLOSED 2026-09-25**
 
 `src/commands/doctor.mjs` (`applySafeFixes`, `f.id === "walk-wiring"`)
