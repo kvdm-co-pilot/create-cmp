@@ -9,6 +9,25 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-251 — a warm-cache resume rule and a resume-the-reviewer re-record rule — **CLOSED 2026-09-26**
+
+`agents/cmp-orchestrator.md` ("Resume or fresh" and the `resume-price` paragraph after it);
+this file's header ("the LAST round re-records after its own fix — resume that reviewer")
+
+Found reading 24474f7..51ad59e. 47ad12e made a resume require a warm cache, "within about five
+minutes of its last step". The orchestrator's next paragraph still says a reviewer asked to
+re-record "holds the kind of state that rule means", and this file's header says to resume that
+reviewer rather than start a cold one. A re-record comes after the author's fix commit and usually
+a suite run, so the reviewer's cache is past five minutes by then, and under the amended rule it is
+started fresh.
+
+**Why it does not block:** the re-record sentence is create-cmp's own process and no adopter is
+served wrongly by it. **Decision asked:** does the re-record exception survive a cold cache (the
+reviewer's reading is worth its uncached re-read), or does a re-record become a fresh reader
+confirming one finding against the moved bytes? Either way, one of the two texts changes.
+
+**Closed 2026-09-26, on the `fix/kd-250-251-252` branch — Karel's decision of 2026-09-26.** A reviewer whose cache has gone cold is not resumed to re-record; a FRESH reviewer reads only the delta (the bytes that moved since the recorded round) and records with `--kind rerecord` under the same round number, and a reviewer is resumed only while its cache is warm, per ADR-0015 as amended 2026-09-26. The decision is stated in two places, once each: this file's header ("THE RECORD STAYS BOUND TO THE TREE", the rule of record for when a re-record is owed and who does it) and `.claude/agents/staff-reviewer.md` ("Briefed for a re-record?", what that reviewer does, pointing at the header for when). `agents/cmp-orchestrator.md`'s `resume-price` paragraph no longer claims a re-recording reviewer "holds the kind of state that rule means" and only points at the header, and `scripts/proof-plan.mjs`'s `REVIEW_KINDS` comment no longer calls a re-record "the same reader" (a comment; no program printed the old rule). Measured: `test/the-review-rule-is-stated-twice.test.mjs` (no acting text shares a six-word run with the header) and the KD-231 gate pass after the edits. Not changed, and not in this entry's texts: `test/an-agent-definition-names-a-tool-it-was-not-given.test.mjs:7-9`'s comment still says the header forbids a cold substitute for a re-record.
+
 ### KD-250 — the plugin's agent name satisfies the create-cmp-only marking — **CLOSED 2026-09-26**
 
 `test/a-shipped-agent-points-at-a-file-only-create-cmp-has.test.mjs` (the `/create-cmp/.test(para)` skip)

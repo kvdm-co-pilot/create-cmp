@@ -253,9 +253,8 @@ rate limit, a hang) or a finish that a fresh one cannot read from disk. Measured
 
 The plugin's `resume-price` hook prices that choice when you send: above its threshold it adds a
 note saying what the helper carries and what a fresh one would start at. It refuses nothing, so the
-decision stays yours, under the rule above. A reviewer asked to re-record holds the kind of state
-that rule means, its own reading; in create-cmp, the rule it follows is the header of
-`docs/KNOWN-DEFECTS.md`, and this line only points at it.
+decision stays yours, under the rule above. Whether a reviewer asked to re-record is resumed or
+replaced is, in create-cmp, the header of `docs/KNOWN-DEFECTS.md`'s call; this line only points at it.
 
 **Your own session is a helper too.** Hand it off when a fresh orchestrator started from the hand-off
 costs less than your next steps; if your instructions set a budget point, use that. To hand off,

@@ -60,9 +60,13 @@ the line still installs where the user pointed — that, and not its age, is why
 **THE RECORD STAYS BOUND TO THE TREE, and that is not in tension with the cap.** ADR-0014
 binds a review record to the bytes it describes so it cannot be recycled across changes;
 discharging a review of tree A while merging tree B would be the thing this product exists to
-refuse. So the LAST round re-records after its own fix — resume that reviewer, do not start a
-cold one. Re-recording is not another round: the same reader confirms the same finding against
-the bytes that merge, and it costs one message rather than a fresh read of the diff.
+refuse. So the LAST round re-records after its own fix. Who does it is Karel's decision of
+2026-09-26 (KD-251): that round's reviewer is resumed only while its cache is still warm, as
+ADR-0015 amended that day allows, and a reviewer whose cache has gone cold is not resumed:
+instead, a FRESH reviewer reads only the delta — the bytes that moved since the recorded round —
+and records with `--kind rerecord` under that same round number. Re-recording is not another
+round: it confirms or refutes the recorded finding against the bytes that merge, and reads
+the delta, not the diff.
 
 **Reading this file before reporting is part of a review.** A finding already logged here is
 not reported again — that is the whole point, and the measured reason: on the `interview-menu`
@@ -229,7 +233,6 @@ you the same list without opening anything.
 | **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | measured 2026-09-25: not harmless, but loud: one spurious conflict sidecar (`composeApp/build.gradle.kts`) and exit 1, nothing removed or duplicated; a second sidecar (`libs.versions.toml`) seen in the test comes from its synthesised 0.27 catalog and does not occur with the real 0.27.2 one |
 | **KD-247** | `add firebase` writes the Podfile's Firebase pods and a comment naming the GitLive version the registry paired them with (KD-243), and `upgrade` moves `firebase-gitlive` in the catalog and never the Podfile | cannot fire yet: every shipped set pairs Firebase iOS 11.x, which `~> 11.1` still resolves; the comment goes stale on the first GitLive bump, and the pins break at the first set that pairs across a Firebase iOS major |
 | **KD-249** | `planShippedHookHeal` throws a `TypeError` on a settings file whose duplicated `hooks` key hides an old shipped Stop form, instead of returning a skip | guarded: its one caller, `shippedHookHealVerdict`, catches the throw and heals nothing, so doctor neither crashes nor offers a fix there; a new caller of the planner would inherit it |
-| **KD-251** | the amended resume rule (resume only while the cache is warm, ~5 minutes) and create-cmp's re-record rule ("resume that reviewer, do not start a cold one") point opposite ways for a re-record, which follows a fix and a suite run | create-cmp's own process, not an adopter's; a decision, handed up |
 
 ---
 
@@ -3757,20 +3760,3 @@ that only `JSON.parse`’s last-key-wins reading makes sense of. The planner its
 a new caller would inherit it; the repair is the planner returning a skip for that shape.
 
 *Logged 2026-09-25 (0.28.1 batch, round 1 fix).*
-
-### KD-251 — a warm-cache resume rule and a resume-the-reviewer re-record rule
-
-`agents/cmp-orchestrator.md` ("Resume or fresh" and the `resume-price` paragraph after it);
-this file's header ("the LAST round re-records after its own fix — resume that reviewer")
-
-Found reading 24474f7..51ad59e. 47ad12e made a resume require a warm cache, "within about five
-minutes of its last step". The orchestrator's next paragraph still says a reviewer asked to
-re-record "holds the kind of state that rule means", and this file's header says to resume that
-reviewer rather than start a cold one. A re-record comes after the author's fix commit and usually
-a suite run, so the reviewer's cache is past five minutes by then, and under the amended rule it is
-started fresh.
-
-**Why it does not block:** the re-record sentence is create-cmp's own process and no adopter is
-served wrongly by it. **Decision asked:** does the re-record exception survive a cold cache (the
-reviewer's reading is worth its uncached re-read), or does a re-record become a fresh reader
-confirming one finding against the moved bytes? Either way, one of the two texts changes.
