@@ -226,10 +226,16 @@ test("a failed, killed or never-started add loses ONLY the Firebase half, and sa
       reason: /exited 1.*injected: the overlay refused/,
     },
     {
-      // A real hang, killed by the timeout stampedApps hands the add: what is
-      // LEFT of the cap, so the whole call ends near the cap and not near twice it.
+      // A real hang, killed by the timeout stampedApps hands the add — what is
+      // LEFT of the cap, so the whole call ends at the cap, not a stamp past it.
       name: "the add hangs",
-      opts: { timeoutMs: 1500, spawnAdd: (cmd, _args, o) => spawnSync(cmd, ["-e", "setTimeout(() => {}, 60000)"], o) },
+      opts: {
+        timeoutMs: 1500,
+        spawnAdd: (cmd, _args, o) => {
+          assert.ok(o.timeout < 1500, `the add was handed ${o.timeout}ms — a cap of its own, not what the stamp left of the 1500ms`);
+          return spawnSync(cmd, ["-e", "setTimeout(() => {}, 60000)"], o);
+        },
+      },
       reason: /did not finish inside \d+ms of the 1500ms cap/,
       maxMs: 1500 + 750,
     },

@@ -94,6 +94,28 @@ export function stampArgv(root, appDir) {
 }
 
 /**
+ * The argv that adds Firebase to the stamped scratch app in `appDir` — ONE
+ * spelling of it, for the reason `FLEET_SCRATCH_APP` is one spelling: the
+ * Firebase tier's criterion is that the app `stampedApps` hashes is the app the
+ * Firebase L2 run proved, and two argv lists that drift apart would have the
+ * record and the oracle describing different apps while both looked right.
+ *
+ * `--no-verify` for the reason the stamp has it: the lane is the run's own next
+ * step, and an add that verified itself here would cost minutes for a hash.
+ */
+export function addFirebaseArgv(root, appDir) {
+  return [path.join(root, "bin", "create-cmp.mjs"), "add", "firebase", appDir, "--no-verify"];
+}
+
+/**
+ * Where the Firebase L2 run leaves its record, relative to the repo root — a
+ * file of its own beside `qa-artifacts/fleet-latest.json`, because each record
+ * binds exactly one digest and `fleet-latest.json` stays what the publish gate
+ * reads.
+ */
+export const FIREBASE_FLEET_RECORD = "qa-artifacts/fleet-firebase-latest.json";
+
+/**
  * WHICH RULE A DIGEST IS TAKEN UNDER — the one every NEW digest uses.
  *
  * A digest is only comparable with a digest taken under the same rule, so the
@@ -481,6 +503,73 @@ export function stampedOutput(root = REPO_ROOT, { rule = STAMPED_OUTPUT_RULE, ..
 /** Just the digest, for the readers that only compare. */
 export function stampedOutputHash(root = REPO_ROOT, opts = {}) {
   return stampedOutput(root, opts).hash;
+}
+
+/**
+ * ONE STAMP, TWO DIGESTS: the app this tree stamps, and the same app after
+ * `create-cmp add firebase` — the two apps the default and the Firebase L2
+ * runs prove, each keyed on its own output bytes.
+ *
+ * ONE DEADLINE (KD-208). The stamp and the add share `timeoutMs`: the add is
+ * given what the stamp and the first hash left of it, never a cap of its own.
+ * This runs inside the PreToolUse hook, whose four bounds already sum to
+ * exactly the declared budget; `ANSWER_RESERVE_MS` covers one stamp's cap, so
+ * a second cap here would be a fifth bound nobody holds to that budget.
+ * Measured 2026-09-26: 0.25–0.34s for both digests, ~9x under the cap.
+ *
+ * A failed, killed or never-started add makes ONLY the Firebase half
+ * unanswerable — `{hash: null, files: null, unanswerable}`, the reason naming
+ * the cause — which `tierState` (scripts/proof-plan.mjs) reads as OWED, never
+ * as discharged. The default half is the digest `stampedOutput()` answers, and
+ * a stamp that fails throws exactly as it does there.
+ *
+ * `spawnAdd` (spawnSync's signature) and `now` exist for the test that has to
+ * make the add fail, hang, or find the cap spent without breaking the overlay.
+ *
+ * @param {string} root repo root
+ * @param {{rule?: number, timeoutMs?: number, spawnAdd?: typeof spawnSync, now?: () => number}} [opts]
+ * @returns {{default: {hash: string, files: Record<string, string>, rule: number},
+ *   firebase: {hash: string, files: Record<string, string>, rule: number} | {hash: null, files: null, unanswerable: string},
+ *   ms: number}}
+ */
+export function stampedApps(root = REPO_ROOT, { rule = STAMPED_OUTPUT_RULE, timeoutMs = STAMP_CAP_MS, spawnAdd = spawnSync, now = Date.now } = {}) {
+  const startedMs = now();
+  const app = stampScratchApp(root, { timeoutMs });
+  try {
+    const { hash, files } = hashStampedTree(app.appDir, { rule });
+    return { default: { hash, files, rule }, firebase: addAndHash(root, app.appDir, { rule, timeoutMs, startedMs, spawnAdd, now }), ms: now() - startedMs };
+  } finally {
+    app.dispose();
+  }
+}
+
+function addAndHash(root, appDir, { rule, timeoutMs, startedMs, spawnAdd, now }) {
+  const unanswerable = (why) => ({ hash: null, files: null, unanswerable: `the Firebase app could not be stamped — ${why}` });
+  const leftMs = timeoutMs - (now() - startedMs);
+  // spawnSync reads `timeout: 0` as NO timeout, so a spent cap must not reach it.
+  if (!(leftMs > 0)) return unanswerable(`the stamp's ${timeoutMs}ms cap was spent before the add could start`);
+  let r;
+  try {
+    r = spawnAdd(process.execPath, addFirebaseArgv(root, appDir), {
+      cwd: root,
+      stdio: ["ignore", "ignore", "pipe"],
+      encoding: "utf8",
+      timeout: leftMs,
+      killSignal: "SIGKILL",
+    });
+  } catch (err) {
+    return unanswerable(`the add could not be spawned: ${err?.message ?? String(err)}`);
+  }
+  const stderr = String(r?.stderr ?? "").trim().split("\n").slice(-3).join(" / ") || "no stderr";
+  if (r?.error?.code === "ETIMEDOUT") return unanswerable(`the add did not finish inside ${leftMs}ms of the ${timeoutMs}ms cap it shares with the stamp, and was killed`);
+  if (r?.error) return unanswerable(`the add could not be spawned: ${r.error.code ?? r.error.message}`);
+  if (r?.status !== 0) return unanswerable(`the add exited ${r?.status ?? r?.signal}: ${stderr}`);
+  try {
+    const { hash, files } = hashStampedTree(appDir, { rule });
+    return { hash, files, rule };
+  } catch (err) {
+    return unanswerable(`the app the add left could not be hashed: ${err?.message ?? String(err)}`);
+  }
 }
 
 /**

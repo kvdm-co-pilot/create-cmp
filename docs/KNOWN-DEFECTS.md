@@ -209,7 +209,7 @@ you the same list without opening anything.
 | **KD-201** | four test files silence a CLI call by replacing `process.stdout.write`, which is the channel the reporter writes its FRAMES to — a frame flushed inside that window is swallowed, the file exits 0, and the run reports fewer tests than it ran | measured: 4 tests run, 3 reported, nothing red. Not fixed because those four files were not that slice's subject and the wave allowed running only the files it named |
 | **KD-205** | `contains()` / `behindBy()` drop `gitAt`'s `why`, so one call site of the ordering check cannot say which of four causes killed a git call — a gate-timer kill, a crash and an OOM kill all read as "git could not compare this branch with origin/main" | the verdict is correct either way: the check still allows and still says it could not answer. It costs a reader one fact, in the file whose whole subject is that distinction |
 | **KD-206** | the fleet scratch app is stamped `--no-ios`, so an edit to iOS-only template code moves no byte of the stamped app and the device tier reads DISCHARGED; Firebase lives in `overlays/firebase/`, which no stamp copies, so an overlay edit moves none either | no proof is lost — the L2 run never compiled either (KD-45) — so KD-45's gap is visible in the schedule instead of masked by a run that proves nothing about those files; CI's stamp + `add firebase` + assembleDebug compiles every overlay edit on the PR; `template/` is still a review trigger |
-| **KD-208** | the hook's four bounds now sum to exactly its declared budget — `1000 + 3000 + 2500 + 3500 = 10000`, the 10 s `.claude/settings.json` declares — because answering a payload now includes a stamp | the arithmetic test asserts `sum <= budget` and passes, every bound has its own kill-timer so the sum is a worst case that needs all four to saturate, and the measured real answer is ~0.5 s; what is gone is the slack |
+| **KD-208** | the hook's four bounds now sum to exactly its declared budget — `1000 + 3000 + 2500 + 3500 = 10000`, the 10 s `.claude/settings.json` declares — because answering a payload now includes a stamp | the arithmetic test asserts `sum <= budget` and passes, every bound has its own kill-timer so the sum is a worst case that needs all four to saturate, and the measured real answer is ~0.5 s; what is gone is the slack; the add step shares the stamp's cap (stamp + add + two hashes 0.25–0.34 s measured), so no bound was added |
 | **KD-209** | `grep -r` here obeys the scanned tree's own `.gitignore`, so a scan of a stamped app silently omits `local.properties` — the file that carries this machine's SDK path | a fact about the tooling, not the tree, logged because it nearly cost a slice a defect: `find … -exec /usr/bin/grep -l …` lists both files, and that is how the three normalisers were shown complete |
 | **KD-210** | a Firebase run proves the template COMPILES, INITIALISES and REDIRECTS — no byte crosses the redirect | nothing in `commonMain` uses a Firebase client and the smoke walk is four screens, so the suite serves zero requests; the risk is a record read as "the redirect carried traffic" |
 | **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production |
@@ -3229,6 +3229,15 @@ worst case that requires all four to saturate at once; the measured real answer 
 
 **Fires when:** a fifth bound is added without re-deriving this sum.
 *Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
+
+**2026-09-26 — the add step shares the stamp's cap; there is no fifth bound.** The schedule's one
+stamp now also runs `create-cmp add firebase --no-verify` on the same scratch app and hashes it
+again (`stampedApps`, `scripts/stamped-output.mjs`), so the Firebase L2 run is keyed on output
+bytes. Measured on 2026-09-26 (3 rounds, node 24.18.0): the stamp took 161–233 ms, the add 58–66 ms
+and each hash 14–25 ms, which is 0.25–0.34 s for both digests. The add runs under the stamp's own
+deadline (`STAMP_CAP_MS` minus what the stamp spent), so `ANSWER_RESERVE_MS` still covers it and the
+bounds still sum to 10000. If the cap is spent first, the Firebase half is unanswerable and its tier
+reads OWED, naming why. It is never DISCHARGED, and the default half is unaffected.
 
 ### KD-209 — `grep -r` in this environment obeys .gitignore, so a scan of a stamped app can miss the file that matters
 
