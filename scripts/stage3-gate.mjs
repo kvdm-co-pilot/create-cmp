@@ -1,8 +1,9 @@
 // STAGE 3's EXIT, AS A COMMAND.
 //
-// §9 states it as: "10 repos upgraded by one command; receipts comparable
-// within pack." Its trigger — "first evidence prospect with more than 10
-// repos" — has not fired, so THIS GATE IS EXPECTED TO BE RED, and the shape of
+// §9 states it as "N repos upgraded by one command; receipts comparable within
+// pack", and N is read out of docs/NORTH-STAR.md, never held here (THE COUNT IS
+// §9's, below). Its trigger — the first evidence prospect with more than N
+// repos — has not fired, so THIS GATE IS EXPECTED TO BE RED, and the shape of
 // its red matters more than the fact of it: `scripts/stage-gate.mjs` already
 // records the honest assessment ("countable, so a predicate is cheap. Nothing
 // to count yet"), and both halves have to survive into the predicate. Cheap,
@@ -27,7 +28,7 @@
 //
 // Stage 3's fleet is many REPOS. Nothing in this file reads, writes or implies
 // anything about the device-tier record, and the collision is a real hazard —
-// "fleet L2 green" (one app, on a phone) and "fleet upgraded" (ten repos, on
+// "fleet L2 green" (one app, on a phone) and "fleet upgraded" (§9's N repos, on
 // disk) are unrelated claims that a reader skimming a report will fuse. The
 // older name is not renamed here; naming the hazard is what this comment is
 // for.
@@ -123,8 +124,8 @@
 //
 // ── WHAT THIS PREDICATE DOES NOT CLAIM ──────────────────────────────────────
 //
-// It does not run ten lanes. §9's sentence is "upgraded", and proving each
-// upgraded lane still reaches green is ten lane runs — minutes to hours, a
+// It does not run N lanes. §9's sentence is "upgraded", and proving each
+// upgraded lane still reaches green is one lane run per repo — minutes to hours, a
 // cost that chooses a nightly stage under Rule 1, not a stage gate. So this
 // gate proves the bytes arrived and the new lock describes them; it does not
 // prove the fleet is still green afterwards. Said plainly here rather than
