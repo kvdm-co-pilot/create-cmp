@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 6f6054b3c1d5e4819be2b4be97c761bbed269fcad6dedba1ac9c6a6ffb026a16
+// cmp:bundle-inputs 9533fa63ae3a6b5be94ef7b27701be67627283df5b9bbe99fda9df3b33e572a8
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -40273,6 +40273,7 @@ function createPreviewService(opts) {
   let lastSelfLedgerWriteAt = 0;
   let mode = "gradle";
   let daemonChild = null;
+  let daemonOurs = false;
   let daemonBootDeadline = null;
   let pollTimer = null;
   let debounceTimer = null;
@@ -40737,6 +40738,7 @@ function createPreviewService(opts) {
     );
   });
   function adoptDaemonChild(child) {
+    daemonOurs = true;
     stampRenderMarker(projectDir);
     child.stdout?.on("data", noteDaemonOutput);
     child.stderr?.on("data", noteDaemonOutput);
@@ -40777,6 +40779,7 @@ function createPreviewService(opts) {
     log("daemon did not become healthy in time \u2014 staying on the gradle path");
   }
   function enterDaemonMode(why) {
+    daemonOurs = true;
     mode = "daemon";
     log(`${why} \u2014 warm renders via ${daemonUrl}`);
     watchClasses();
@@ -41185,8 +41188,8 @@ function createPreviewService(opts) {
     });
   }
   async function handleRequest(req, res) {
-    const url2 = new URL(req.url, `http://127.0.0.1:${port}`);
     try {
+      const url2 = new URL(req.url, "http://127.0.0.1");
       if (url2.pathname === "/") {
         const [approvals, designSystem, comments, lastReceipt] = await Promise.all([
           approvalStatusSnapshot(),
@@ -41609,8 +41612,8 @@ function createPreviewService(opts) {
         });
         srv.listen(p, "127.0.0.1", () => {
           server2 = srv;
-          port = p;
-          resolvePromise(p);
+          port = srv.address().port;
+          resolvePromise(port);
         });
       };
       tryPort(startPort);
@@ -41703,7 +41706,7 @@ function createPreviewService(opts) {
       if (capabilities.screens && fs22.existsSync(path24.join(previewsDir, "manifest.json"))) {
         loadPreviews();
       }
-      await listen(opts.port || DEFAULT_PORT2);
+      await listen(opts.port ?? DEFAULT_PORT2);
       writeConsoleRegistry(projectDir, port);
       watchGovernance();
       watchStepTail();
@@ -41733,7 +41736,7 @@ function createPreviewService(opts) {
       clearTimeout(renewQuiesceTimer);
       for (const w of selfWatchers) w.close();
       selfWatchers = [];
-      fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {
+      if (daemonOurs) fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {
       });
       if (daemonChild) daemonChild.kill("SIGTERM");
       clearRenderMarker(projectDir);
@@ -42446,7 +42449,21 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
     process.exit(0);
   });
 }
+var USAGE = `cmp-inspector-mcp ${SERVER_VERSION} \u2014 the cmp-inspector MCP server
+
+  It speaks MCP (JSON-RPC) on stdin/stdout and logs on stderr. An MCP client starts it;
+  run by hand, it waits for one on stdin until stdin closes.
+
+  To use it, install the create-cmp Claude Code plugin, which registers it \u2014 or see
+  "Registering the server with Claude Code" in this package's README.md.
+
+  --help, -h   print this and exit
+`;
 async function main() {
+  if (process.argv.slice(2).some((a) => a === "--help" || a === "-h")) {
+    process.stdout.write(USAGE, () => process.exit(0));
+    return;
+  }
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.stderr.write("cmp-inspector MCP server running on stdio\n");
