@@ -58,6 +58,36 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-204 — every `stop()` sends `GET /shutdown` to the daemon port, daemon or no daemon — **CLOSED 2026-09-25**
+
+`inspector/mcp/src/lib/preview-service.mjs` (`stop()`), `daemonUrl` from `:715`
+
+`stop()` fires ``fetch(`${daemonUrl}/shutdown`)`` unconditionally — `hot: false`, no daemon ever
+started, still sent. Measured 2026-09-22 with a bystander HTTP server on the daemon port: it receives
+`GET /shutdown` from a `hot: false` console's stop. Since `daemonUrl` defaults to
+`http://127.0.0.1:9601`, every console in every process sends a request to a fixed address that
+anything may be listening on — the console of another test process, or a developer's own console.
+Combined with KD-202 and KD-203 this is the complete path from "a suite ran" to "a passed test is
+recorded as FAILED".
+
+**Why it does not block.** Harmless where nothing listens (the `.catch(() => {})` swallows the
+refusal), and a real daemon is the intended recipient. The guard is cheap: send it only when a daemon
+was actually started (`mode === "daemon"` / `daemonChild`).
+
+**Fires when:** any console stops while anything at all is listening on `127.0.0.1:9601`.
+*Logged 2026-09-22, measured while proving KD-56's mechanism.*
+
+**CLOSED by the guard this entry named, in the commit that moved it here.** A `daemonOurs` flag is
+set where this console STARTS a daemon (`adoptDaemonChild`, which the spawn and any injected spawn
+go through) and where it CONFIRMS one (`enterDaemonMode`, reached only after `daemonHealthy` found
+it healthy and serving this project's `previewsDir`, or reporting none — the existing adoption rule).
+`stop()` sends `GET /shutdown` only when the flag is set. A `hot: false` console, or a hot one whose
+daemon never booted or belonged to another project, sends nothing. `inspector/mcp/test/console-stop.test.mjs`
+puts a recording server at `daemonUrl`: a `hot: false` console's stop sends it nothing, and a
+console that adopted it as its daemon still sends `/shutdown` — the teardown the request exists for.
+The comment on `freePort` in `console-now-sse.test.mjs`, which described KD-202..204 as current,
+now says they are fixed. `inspector/mcp/dist/server.mjs` is not rebuilt in this commit.
+
 ### KD-203 — `port: 0` asks for an ephemeral port and is given the well-known one — **CLOSED 2026-09-25**
 
 `inspector/mcp/src/lib/preview-service.mjs:2752` (`await listen(opts.port || DEFAULT_PORT)`) and

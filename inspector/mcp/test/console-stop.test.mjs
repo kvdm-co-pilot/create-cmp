@@ -105,3 +105,67 @@ test("`port: 0` binds a port the OS picked, and the console reports the port it 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+/** An HTTP server that records every path it is sent, answering as a daemon would. */
+async function bystander(health = () => ({})) {
+  const seen = [];
+  const srv = http.createServer((req, res) => {
+    seen.push(req.url);
+    const pathname = new URL(req.url, "http://127.0.0.1").pathname;
+    const body = pathname === "/health" ? health() : pathname === "/render" ? { rendered: [], ms: 0 } : {};
+    res.writeHead(200, { "content-type": "application/json", connection: "close" });
+    res.end(JSON.stringify(body));
+  });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  return {
+    seen,
+    url: `http://127.0.0.1:${srv.address().port}`,
+    close: () => new Promise((r) => srv.close(r)),
+  };
+}
+
+async function until(predicate, ms, what) {
+  const deadline = Date.now() + ms;
+  while (!predicate() && Date.now() < deadline) await sleep(25);
+  assert.ok(predicate(), `timed out waiting for ${what}`);
+}
+
+test("a console that started no daemon sends no /shutdown to whatever holds the daemon port (KD-204)", async () => {
+  // Measured before the fix: a bystander on the daemon port received `GET /shutdown`
+  // from a `hot: false` console's stop — every console, in every process, sent one to
+  // a fixed address anything may be listening on.
+  const root = makeProject();
+  const other = await bystander();
+  const service = createPreviewService({ projectDir: root, port: 0, hot: false, daemonUrl: other.url, runRender: async () => {} });
+  try {
+    await service.start();
+    service.stop();
+    await sleep(400); // the request was fire-and-forget; give one every chance to land
+    assert.deepEqual(other.seen, [], `a console that never started or confirmed a daemon sent: ${other.seen.join(", ")}`);
+  } finally {
+    await other.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the control: a daemon this console confirmed is still sent /shutdown on stop", async () => {
+  // A healthy daemon serving THIS project's previews is adopted (daemonHealthy), and
+  // stopping the console asks it to exit — the teardown the request exists for.
+  const root = makeProject();
+  fs.mkdirSync(path.join(root, "composeApp", "src"), { recursive: true });
+  const previewsDir = path.join(path.resolve(root), "composeApp", "build", "previews");
+  const daemon = await bystander(() => ({ previewsDir }));
+  const service = createPreviewService({ projectDir: root, port: 0, hot: true, daemonUrl: daemon.url, runRender: async () => {} });
+  let stopped = false;
+  try {
+    await service.start();
+    await until(() => service.status().daemon?.active === true, 8000, "the console to adopt the daemon");
+    service.stop();
+    stopped = true;
+    await until(() => daemon.seen.some((p) => p.startsWith("/shutdown")), 3000, "GET /shutdown at the confirmed daemon");
+  } finally {
+    if (!stopped) service.stop();
+    await daemon.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

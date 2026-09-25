@@ -38,27 +38,23 @@ function makeProject() {
 }
 
 /**
- * A port the OS says is free, right now — because `port: 0` does NOT get one.
+ * A port the OS says is free, right now.
  *
- * `createPreviewService` resolves its port as `opts.port || DEFAULT_PORT`, and
- * `0 || 9600` is 9600. These three tests asked for an ephemeral port and were
- * given the console's WELL-KNOWN one, probing upward from it: measured
- * 2026-09-22 on this machine, with a real console already holding 9600, the
- * service bound **9601 — DEFAULT_DAEMON_PORT**, the address every console's
- * `stop()` sends `GET /shutdown` to, unconditionally, hot or not (also measured:
- * a bystander server on the daemon port receives it from a `hot: false` stop).
+ * `port: 0` did NOT get one when this was written: `createPreviewService`
+ * resolved its port as `opts.port || DEFAULT_PORT`, and `0 || 9600` is 9600.
+ * These three tests asked for an ephemeral port and were given the console's
+ * WELL-KNOWN one, probing upward from it: measured 2026-09-22 on this machine,
+ * with a real console already holding 9600, the service bound **9601 —
+ * DEFAULT_DAEMON_PORT**, the address every console's `stop()` then sent
+ * `GET /shutdown` to, hot or not. A request arriving at the wrong moment threw
+ * `TypeError: Invalid URL` out of the async request listener — KD-56's message
+ * verbatim, blaming a test that had already passed.
  *
- * That matters because of what a request arriving at the WRONG MOMENT does:
- * `handleRequest` builds `new URL(req.url, \`http://127.0.0.1:${port}\`)` outside
- * its try, and `stop()` sets `port = null`, so a request that lands after a stop
- * throws `TypeError: Invalid URL` out of an async listener — an
- * unhandledRejection, which node's runner reports against whichever test in that
- * process had just finished. That is KD-56's message verbatim, blaming a test at
- * line 113 that had already passed. An OS-assigned port in the dynamic range is
- * one nothing else in the suite addresses.
- *
- * The one-line production fix (`??` for `||`, and reading the bound port back)
- * belongs to a slice that owns inspector/mcp/ and can rebuild dist/.
+ * All three are fixed in the service now — `??` and a port read back (KD-203),
+ * the shutdown sent only to a daemon this console started or confirmed (KD-204),
+ * and the URL built inside the handler's try on a base with no port (KD-202);
+ * test/console-stop.test.mjs pins them. This helper stays: a port the OS picked
+ * is still one nothing else in the suite addresses.
  */
 async function freePort() {
   const srv = http.createServer();
