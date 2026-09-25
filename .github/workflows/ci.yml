@@ -58,7 +58,7 @@ jobs:
         run: npm test
 
   stamp-android:
-    name: stamp + Android assembleDebug
+    name: stamp + Android assembleDebug, then add firebase + assembleDebug
     runs-on: ubuntu-latest # JDK + Android SDK preinstalled; licenses accepted
     needs: test # don't burn a Gradle build on a broken engine
     steps:
@@ -89,12 +89,27 @@ jobs:
           set -o pipefail
           cd "$RUNNER_TEMP/ci-smoke"
           ./gradlew :composeApp:assembleDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/android-build.log"
-      - name: Upload build log
+      # Firebase left stamp-time for `create-cmp add firebase`. This is its proof at the compile
+      # tier: the add step on the SAME app the default stamp just built, then the build again —
+      # the GitLive modules, the google-services plugin over the mock config it writes, the
+      # appended BuildConfig block and FirebaseEmulators.kt all compile, or this job is red.
+      # Runtime (init + the four useEmulator calls) is not proven here.
+      - name: Add Firebase to the stamped project (verify off — the build below IS the verification)
+        run: node bin/create-cmp.mjs add firebase "$RUNNER_TEMP/ci-smoke" --no-verify
+      - name: Build the project with Firebase added (Android)
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/ci-smoke"
+          ./gradlew :composeApp:assembleDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/android-firebase-build.log"
+      - name: Upload build logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: stamp-android-build-log
-          path: ${{ runner.temp }}/android-build.log
+          path: |
+            ${{ runner.temp }}/android-build.log
+            ${{ runner.temp }}/android-firebase-build.log
           if-no-files-found: ignore
 
   stamp-ios:
@@ -135,6 +150,12 @@ jobs:
           node bin/create-cmp.mjs "$RUNNER_TEMP/ci-smoke-ios"
           --name CiSmoke --package com.ci.smoke
           --no-verify --yes
+      # The leg builds the app WITH Firebase added, which is the shape the stamp used to
+      # produce by default: the iOS half of `add firebase` (FirebaseEmulators.kt, the Swift
+      # configure call, the Podfile pods, a mock GoogleService-Info.plist) is what this
+      # parked job would prove when it runs.
+      - name: Add Firebase to the stamped project
+        run: node bin/create-cmp.mjs add firebase "$RUNNER_TEMP/ci-smoke-ios" --no-verify
       # Exact proven path from template/manifest.json `verify.iosLink` + `verify.ios`:
       # XcodeGen -> pod install (LANG=en_US.UTF-8 or CocoaPods trips on encoding)
       # -> xcodebuild constrained to arm64 + a concrete simulator UDID (the KMP
