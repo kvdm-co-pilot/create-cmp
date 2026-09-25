@@ -18,14 +18,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from "node:fs";
+import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { obligation, TIERS, isTrunk, close, outstanding, reviewDischarge, REVIEW_SCHEMA } from "../scripts/proof-plan.mjs";
+// The Firebase tier's names through the namespace, so a missing export fails ITS tests and not the whole file.
+import * as PP from "../scripts/proof-plan.mjs";
 import { render } from "../scripts/fit-test.mjs";
 import { filesFor, REVIEW_TIER_TRIGGERS, REVIEW_TIER_IRRELEVANT, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
 import { deriveTierNeed, deriveAffectedFilter } from "../packages/harness/src/lib/affected-tests.mjs";
-import { STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
+import { STAMPED_OUTPUT_RULE, FIREBASE_FLEET_RECORD } from "../scripts/stamped-output.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -365,4 +369,115 @@ test("EVERY PATH THAT OBLIGES A REVIEW IS A PATH THAT CAN REOPEN ONE — the two
   const hashed = new Set(filesFor(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }));
   const holes = tracked.filter((p) => deriveTierNeed([p], { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" }).required && !hashed.has(p));
   assert.deepEqual(holes, [], `these paths oblige a review but cannot reopen one — add a root to REVIEW_TIER_TRIGGERS or declare them in REVIEW_TIER_IRRELEVANT:\n${holes.join("\n")}`);
+});
+
+// ---------------------------------------------------------------------------
+// THE FIREBASE L2 RUN (GATE-RULES Rule 4, KD-206). A third at-close tier,
+// keyed on the app `add firebase --no-verify` leaves, and discharged only by
+// the record `fleet-check --with-firebase` writes.
+// ---------------------------------------------------------------------------
+
+const H = "d".repeat(64);
+const F = "f".repeat(64);
+const run = (hash, over = {}) => ({ schema: "cmp-fleet-check/1", ranAt: "2026-09-26T10:00:00.000Z", verdict: "PASS", rung: "L2", stampedOutputHash: hash, stampedOutputRule: STAMPED_OUTPUT_RULE, stampedOutputFiles: {}, ...over });
+const APPS = { default: { hash: H, files: {}, rule: STAMPED_OUTPUT_RULE }, firebase: { hash: F, files: {}, rule: STAMPED_OUTPUT_RULE } };
+
+test("the Firebase tier is declared at-close, at the default tier's level, and its command asks for Firebase", () => {
+  const t = PP.TIERS.firebase;
+  assert.ok(t, "TIERS.firebase exists");
+  assert.equal(t.when, "at-close");
+  assert.equal(t.requires, TIERS.device.requires, "one bar for both L2 runs");
+  assert.match(t.cmd, /--with-firebase/);
+  assert.ok(t.cmd.includes(`--min-level ${t.requires}`), "the command is built to reach the level the tier requires");
+});
+
+test("trunk carries a Firebase block too — a reader never meets an undefined tier where a release proof is allowed", () => {
+  const trunk = owes(null, [], "main");
+  assert.equal(trunk.firebase?.state, "none");
+  assert.equal(trunk.firebase?.trunk, true);
+  assert.equal(trunk.firebase?.need?.required, false);
+  assert.equal(owes(slice(), DOCS_ONLY).firebase?.state, "none", "a docs-only slice owes no Firebase run either");
+});
+
+test("a Firebase record must SAY it served Firebase, and then meets the tier as any record does", () => {
+  const meets = PP.firebaseRecordMeets;
+  assert.equal(typeof meets, "function");
+  const bare = meets(run(F), F);
+  assert.equal(bare.ok, false, "a record over these bytes without coverage.firebase is a default-shaped run");
+  assert.match(bare.reason, /coverage\.firebase/);
+  assert.equal(meets(run(F, { coverage: { firebase: "yes" } }), F).ok, false, "true, not truthy");
+  const ok = meets(run(F, { coverage: { firebase: true } }), F);
+  assert.equal(ok.ok, true, JSON.stringify(ok));
+  assert.ok(ok.proof.from.includes(FIREBASE_FLEET_RECORD), "and the proof says which file it read");
+  assert.equal(meets(run(H, { coverage: { firebase: true } }), F).ok, false, "a record of another app is another app");
+  assert.equal(meets(run(F, { coverage: { firebase: true }, rung: "L1" }), F).ok, false, "and the rung is held as it is for the default tier");
+  assert.equal(meets(null, F).ok, false);
+});
+
+test("outstanding() and close() hold the Firebase tier — a slice cannot close with it open", () => {
+  assert.deepEqual(outstanding({ state: "discharged", review: { state: "none" }, firebase: { state: "owed" } }), ["Firebase L2 run (OWED)"]);
+  assert.deepEqual(outstanding({ state: "owed", review: { state: "reopened" }, firebase: { state: "reopened" } }), ["L2 run (OWED)", "review (REOPENED)", "Firebase L2 run (REOPENED)"]);
+  assert.deepEqual(outstanding({ state: "none", review: { state: "none" }, firebase: { state: "discharged" } }), []);
+
+  // Scratch paths: a close that wrongly succeeded must not touch this repo's plan or history.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-close-"));
+  try {
+    const planPath = path.join(dir, "proof-plan.json");
+    const historyFile = path.join(dir, "plans.jsonl");
+    fs.writeFileSync(planPath, "{}\n");
+    const at = (fb) => ({ state: "discharged", plan: slice({ firebaseDischarged: { stampedHash: F, stampedFiles: { a: "b" } } }), stale: null, review: { state: "none" }, firebase: { state: fb } });
+    for (const s of ["owed", "reopened", "undeclared"]) assert.equal(close(at(s), { planPath, historyFile }).closed, false, s);
+    assert.ok(fs.existsSync(planPath), "a refused close removes nothing");
+    const r = close(at("discharged"), { planPath, historyFile });
+    assert.equal(r.closed, true);
+    const row = JSON.parse(fs.readFileSync(historyFile, "utf8").trim().split("\n").pop());
+    assert.equal(row.firebase, "discharged", "the history row records the Firebase tier's state at close");
+    assert.equal(row.plan.firebaseDischarged.stampedFiles, undefined, "and keeps its manifest out of the history, as it does the default's");
+    assert.equal(row.plan.firebaseDischarged.stampedFileCount, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("render(): the Firebase block comes after the review, and its label is not the L2 run's", () => {
+  const out = PP.render({ state: "none", branch: BRANCH, need: { reason: "d" }, review: { state: "none", need: { reason: "r" } }, firebase: { state: "owed", need: { reason: "f" } } });
+  const review = out.indexOf("\n  review ");
+  const fb = out.indexOf("\n  Firebase L2 run ");
+  assert.ok(review > 0 && fb > review, `Firebase block after review:\n${out}`);
+  assert.equal(out.match(/\n {2}L2 run /g)?.length, 1, "exactly one line starts with the L2 run's label — the device tier's own");
+  assert.match(out.slice(fb), /--with-firebase/, "an OWED line names the command that discharges it");
+});
+
+test("--discharge writes firebaseDischarged ONLY from a record that meets the Firebase tier", () => {
+  const d = PP.discharge;
+  assert.equal(typeof d, "function");
+  const base = { apps: APPS, fleetRecord: run(H), firebaseRequired: true };
+
+  const good = d(slice(), { ...base, firebaseRecord: run(F, { coverage: { firebase: true } }) });
+  assert.equal(good.exit, 0);
+  assert.equal(good.plan.discharged.stampedHash, H, "the default tier from its own record");
+  assert.equal(good.plan.firebaseDischarged?.stampedHash, F, "the Firebase tier from ITS record");
+  assert.equal(good.plan.firebaseDischarged.rung, "L2");
+
+  for (const [why, over] of [
+    ["no coverage.firebase", { firebaseRecord: run(F) }],
+    ["another app", { firebaseRecord: run(H, { coverage: { firebase: true } }) }],
+    ["no record", { firebaseRecord: null }],
+    ["a failing run", { firebaseRecord: run(F, { coverage: { firebase: true }, verdict: "FAIL" }) }],
+    ["the tier not required", { firebaseRecord: run(F, { coverage: { firebase: true } }), firebaseRequired: false }],
+    ["an unanswerable Firebase half", { firebaseRecord: run(F, { coverage: { firebase: true } }), apps: { ...APPS, firebase: { hash: null, files: null, unanswerable: "the add exited 1" } } }],
+  ]) {
+    const r = d(slice(), { ...base, ...over });
+    assert.equal(r.plan.firebaseDischarged ?? null, null, `${why}: no Firebase discharge`);
+    assert.equal(r.exit, 0, `${why}: the exit is the default tier's, and it discharged`);
+    assert.equal(r.plan.discharged.stampedHash, H, `${why}: the default tier is unaffected`);
+  }
+  const said = d(slice(), { ...base, firebaseRecord: run(F) }).notes.join("\n");
+  assert.match(said, /coverage\.firebase/, "and it says why it wrote nothing for Firebase");
+
+  // The default tier's refusal keeps its exit; the Firebase record is still judged on its own.
+  const noDefault = d(slice(), { ...base, fleetRecord: null, firebaseRecord: run(F, { coverage: { firebase: true } }) });
+  assert.equal(noDefault.exit, 2, "no default record: exit 2, as before");
+  assert.equal(noDefault.plan.discharged, null);
+  assert.equal(noDefault.plan.firebaseDischarged?.stampedHash, F);
 });
