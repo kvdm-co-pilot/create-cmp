@@ -428,6 +428,7 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
 
   // google-services.json: the adopter's real file, or a mock that says so.
   let config;
+  const recordedConfig = ours ? record.firebase?.config : undefined;
   const haveConfig = readText(projectDir, GOOGLE_SERVICES_REL);
   if (typeof input.googleServices === "string") {
     const src = path.resolve(input.googleServices);
@@ -461,7 +462,9 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
       );
     }
     present.push(GOOGLE_SERVICES_REL);
-    config = haveConfig.includes(MOCK_TELL) ? "mock" : "existing";
+    // Not the mock: the adopter's. Whether the step was handed it (`provided`) or found it already
+    // there (`existing`) is not in the tree, so a re-run keeps what the first run recorded.
+    config = haveConfig.includes(MOCK_TELL) ? "mock" : recordedConfig === "provided" ? "provided" : "existing";
   } else {
     const mock = replaceTokens(fs.readFileSync(path.join(overlayDir, "mock", GOOGLE_SERVICES_REL), "utf8"), tokens);
     planned.set(GOOGLE_SERVICES_REL, mock);
