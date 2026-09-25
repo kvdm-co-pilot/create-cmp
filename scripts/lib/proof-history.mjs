@@ -26,6 +26,9 @@ export const HISTORY_FILES = Object.freeze({
   plans: "proof-plan-history.jsonl",
   reviews: "review-history.jsonl",
   fleet: "fleet-history.jsonl",
+  // The Firebase L2 run (`fleet-check --with-firebase`): its own kind, so a
+  // Firebase run is never counted as a default device run.
+  "fleet-firebase": "fleet-firebase-history.jsonl",
   suite: "suite-history.jsonl",
 });
 
@@ -103,11 +106,15 @@ const median = (xs) => {
  * unattributed (a release proof on trunk, a slice still open) — so the three
  * always add up to the history.
  *
- * @param {{plans: object[], reviews: object[], fleet: object[]}} rows
+ * Firebase L2 runs (`firebase`, the `fleet-firebase` kind) are attributed the
+ * same way and counted as their OWN kind — never folded into `fleet`.
+ *
+ * @param {{plans: object[], reviews: object[], fleet: object[], firebase?: object[]}} rows
  */
-export function summarize({ plans = [], reviews = [], fleet = [] }) {
+export function summarize({ plans = [], reviews = [], fleet = [], firebase = [] }) {
   const slices = [];
-  const claimed = { fleet: new Set(), reviews: new Set() };
+  const claimed = { fleet: new Set(), reviews: new Set(), firebase: new Set() };
+  const run = (r) => ({ verdict: r.verdict, rung: r.rung ?? null, durationMs: ms(r.startedAt) === null ? null : ms(r.ranAt) - ms(r.startedAt) });
   for (const ev of plans) {
     if (ev?.schema !== PLAN_EVENT_SCHEMA || !ev.plan) continue;
     const from = ms(ev.plan.openedAt);
@@ -121,6 +128,7 @@ export function summarize({ plans = [], reviews = [], fleet = [] }) {
     };
     const runs = fleet.filter((r, i) => mine(r, i, "fleet"));
     const reads = reviews.filter((r, i) => mine(r, i, "reviews"));
+    const firebaseRuns = firebase.filter((r, i) => mine(r, i, "firebase"));
     slices.push({
       slice: ev.plan.slice,
       branch: ev.plan.branch,
@@ -129,7 +137,8 @@ export function summarize({ plans = [], reviews = [], fleet = [] }) {
       event: ev.event,
       via: ev.via ?? null,
       durationMs: to - from,
-      device: runs.map((r) => ({ verdict: r.verdict, rung: r.rung ?? null, durationMs: ms(r.startedAt) === null ? null : ms(r.ranAt) - ms(r.startedAt) })),
+      device: runs.map(run),
+      firebase: firebaseRuns.map(run),
       reviews: reads.map((r) => ({
         tests: Array.isArray(r.tests) ? r.tests.length : 0,
         decisions: Array.isArray(r.decisions) ? r.decisions.length : 0,
@@ -144,6 +153,7 @@ export function summarize({ plans = [], reviews = [], fleet = [] }) {
   const others = slices.filter((s) => s.event !== "closed");
   const allRuns = closed.flatMap((s) => s.device);
   const allReads = closed.flatMap((s) => s.reviews);
+  const allFirebase = closed.flatMap((s) => s.firebase);
   return {
     slices,
     totals: {
@@ -161,6 +171,10 @@ export function summarize({ plans = [], reviews = [], fleet = [] }) {
       deviceRunsInOtherSlices: others.reduce((a, s) => a + s.device.length, 0),
       reviewsInOtherSlices: others.reduce((a, s) => a + s.reviews.length, 0),
       unattributedDeviceRuns: fleet.length - claimed.fleet.size,
+      firebaseRuns: allFirebase.length,
+      firebasePass: allFirebase.filter((r) => r.verdict === "PASS").length,
+      firebaseRunsInOtherSlices: others.reduce((a, s) => a + s.firebase.length, 0),
+      unattributedFirebaseRuns: firebase.length - claimed.firebase.size,
       unattributedReviews: reviews.length - claimed.reviews.size,
     },
   };
@@ -178,7 +192,8 @@ export function renderHistory(summary, { malformed = 0 } = {}) {
     const found = s.reviews.map((r) => (r.nothingFound ? "nothing" : `${r.tests}t/${r.decisions}d`)).join(", ") || "none";
     const runs = s.device.map((r) => `${r.verdict}${r.durationMs === null ? "" : ` ${minutes(r.durationMs)}`}`).join(", ") || "none";
     L.push(`  ${s.event === "closed" ? "" : `(${s.event}) `}${s.slice}`);
-    L.push(`      ${s.branch} · ${s.openedAt.slice(0, 16)} → ${s.endedAt.slice(0, 16)} · ${minutes(s.durationMs)} · device ${runs} · reviews ${found}`);
+    const fb = (s.firebase ?? []).map((r) => `${r.verdict}${r.durationMs === null ? "" : ` ${minutes(r.durationMs)}`}`).join(", ");
+    L.push(`      ${s.branch} · ${s.openedAt.slice(0, 16)} → ${s.endedAt.slice(0, 16)} · ${minutes(s.durationMs)} · device ${runs}${fb ? ` · Firebase L2 ${fb}` : ""} · reviews ${found}`);
   }
   if (t.closed) {
     L.push("");
@@ -188,11 +203,12 @@ export function renderHistory(summary, { malformed = 0 } = {}) {
         `reviews ${(t.reviews / t.closed).toFixed(1)} per slice — ${t.reviewsWithTests} wrote a test (${t.reviewTests} tests), ${t.reviewDecisions} decision(s) handed up, ${t.reviewsNothingFound} found nothing`,
     );
   }
+  if (t.firebaseRuns) L.push(`  ${t.firebaseRuns} Firebase L2 run(s) in closed slices (${t.firebasePass} PASS), counted apart from the device runs`);
   if (t.deviceRunsInOtherSlices || t.reviewsInOtherSlices) {
     L.push(`  inside ${t.notClosed} slice(s) that never closed (replaced, or cleared): ${t.deviceRunsInOtherSlices} device run(s), ${t.reviewsInOtherSlices} review(s)`);
   }
-  if (t.unattributedDeviceRuns || t.unattributedReviews) {
-    L.push(`  not inside any settled slice: ${t.unattributedDeviceRuns} device run(s), ${t.unattributedReviews} review(s) — trunk release proofs, or a slice still open`);
+  if (t.unattributedDeviceRuns || t.unattributedReviews || t.unattributedFirebaseRuns) {
+    L.push(`  not inside any settled slice: ${t.unattributedDeviceRuns} device run(s), ${t.unattributedFirebaseRuns} Firebase L2 run(s), ${t.unattributedReviews} review(s) — trunk release proofs, or a slice still open`);
   }
   if (malformed) L.push(`  ${malformed} history line(s) did not parse and are not counted`);
   return L.join("\n");

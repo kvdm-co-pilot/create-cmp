@@ -41,8 +41,17 @@ import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { FLEET_SCRATCH_APP, stampArgv, hashStampedTree, STAMPED_OUTPUT_RULE } from "./stamped-output.mjs";
+import { FLEET_SCRATCH_APP, stampArgv, addFirebaseArgv, FIREBASE_FLEET_RECORD, hashStampedTree, STAMPED_OUTPUT_RULE } from "./stamped-output.mjs";
 import { appendHistory, historyPath } from "./lib/proof-history.mjs";
+import {
+  WITH_FIREBASE_FLAG,
+  firebasePreflight,
+  readDeclaredRedirect,
+  emulatorPlanFor,
+  coverageFor,
+  defaultCoverage,
+  runLaneUnderEmulators,
+} from "./lib/fleet-firebase.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { assessLadderPlant, describeLadderPlant } from "../packages/harness/src/lib/ladder-plant.mjs";
@@ -56,6 +65,28 @@ const PROFILES = new Set(["smoke", "scaffold", "local", "ci", "nightly", "releas
 // same app to answer whether this tree still stamps what the last run proved.
 const APP_NAME = FLEET_SCRATCH_APP.name;
 const APP_PACKAGE = FLEET_SCRATCH_APP.package;
+/** The default run's record, relative to the repo root — what the publish gate reads. */
+const FLEET_RECORD = "qa-artifacts/fleet-latest.json";
+
+/**
+ * What `create-cmp add firebase` must leave for the run to be a Firebase run at
+ * all: the Android redirect (`FirebaseEmulators.kt`, which throws when a
+ * redirect fails, so the app refuses to start) and the spec-of-record saying
+ * Firebase is enabled. Empty when both are there.
+ */
+export function firebaseAddMissing(appDir, pkg = APP_PACKAGE) {
+  const missing = [];
+  const kt = path.join("composeApp", "src", "androidMain", "kotlin", ...pkg.split("."), "FirebaseEmulators.kt");
+  if (!fs.existsSync(path.join(appDir, kt))) missing.push(`no ${kt}`);
+  let spec = null;
+  try {
+    spec = JSON.parse(fs.readFileSync(path.join(appDir, "create-cmp.json"), "utf8"));
+  } catch (err) {
+    missing.push(`create-cmp.json unreadable (${err.code ?? err.message})`);
+  }
+  if (spec && spec.firebase?.enabled !== true) missing.push("create-cmp.json does not record firebase.enabled");
+  return missing;
+}
 
 // ── Evidence rungs (§10 item 2's ladder: L0 scaffold / L1 desktop / L2 device /
 // L3 release). The ladder itself lives in `scripts/evidence-rung.mjs` — a leaf
@@ -130,7 +161,7 @@ function deviceAttached() {
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
-const USAGE = `node scripts/fleet-check.mjs [--profile <p>] [--min-level <L>] [--keep]
+const USAGE = `node scripts/fleet-check.mjs [--profile <p>] [--min-level <L>] [--with-firebase] [--ladder-plant] [--keep]
 
 Stamps a scratch app (${APP_NAME}, ${APP_PACKAGE}, ${FLEET_SCRATCH_APP.flags.join(" ")}) from
 the CURRENT tree into a temp dir, runs the app's own verify lane inside it, and
@@ -151,6 +182,16 @@ skill (.claude/skills/npm-publish/SKILL.md).
                            again. Requires an l2Execution step to go RED and every
                            l1Required step to stay GREEN — the proof that "L2" means
                            the program ran, and not that a suite imported it.
+  --with-firebase          the Firebase L2 run (KD-45): after the stamp, run
+                           \`create-cmp add firebase --no-verify\` on the scratch app
+                           and run its lane inside the Firebase Emulator Suite, on
+                           the app's own demo- project (no real project, no login),
+                           serving the ports the stamped app declares. Needs the
+                           Firebase CLI and \`java\` on PATH and CMP_AVD set (the app
+                           reaches the suite at 10.0.2.2, which only an Android
+                           emulator resolves); refuses before stamping without them.
+                           PASS also requires e2eSmoke PASS by name. Writes
+                           ${FIREBASE_FLEET_RECORD}, never fleet-latest.json.
   --keep                   retain the scratch app dir even on success (on
                            failure it is always kept and its path printed)
   --help                   this text
@@ -159,12 +200,13 @@ Exit 0 = fleet check PASS; exit 1 = FAIL; exit 2 = usage error.
 `;
 
 function parseArgs(argv) {
-  const args = { profile: "local", minLevel: null, keep: false, help: false, ladderPlant: false };
+  const args = { profile: "local", minLevel: null, keep: false, help: false, ladderPlant: false, withFirebase: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--help" || a === "-h") args.help = true;
     else if (a === "--keep") args.keep = true;
     else if (a === "--ladder-plant") args.ladderPlant = true;
+    else if (a === WITH_FIREBASE_FLAG) args.withFirebase = true;
     else if (a === "--profile") args.profile = argv[++i];
     else if (a === "--min-level") args.minLevel = argv[++i];
     else throw new Error(`unknown flag: ${a}`);
@@ -202,13 +244,38 @@ export function terminateChildren(signal = "SIGTERM") {
   }
   return live.size;
 }
+/**
+ * Emulator suites this run started, while they are up (scripts/lib/fleet-firebase.mjs).
+ *
+ * They are NOT in `live`: the Firebase CLI starts its Firestore emulator as a
+ * DETACHED JVM, so killing the CLI orphans a process holding a port. Each entry
+ * knows how to ask its own process group to shut down and how long to wait, and
+ * the signal path below awaits that before exiting.
+ */
+const suites = new Set();
 for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"]) {
   process.on(sig, () => {
     const n = terminateChildren(sig);
     if (n) process.stderr.write(`fleet-check: ${sig} — forwarded to ${n} child process(es)\n`);
-    process.exit(sig === "SIGINT" ? 130 : 143);
+    const code = sig === "SIGINT" ? 130 : 143;
+    if (!suites.size) process.exit(code);
+    process.stderr.write(`fleet-check: ${sig} — asking the Firebase Emulator Suite to shut down before exiting\n`);
+    Promise.allSettled([...suites].map((t) => t.interrupt(sig))).then(() => process.exit(code));
   });
 }
+// LAST RESORT, and synchronous because an exit handler cannot await: any way
+// this process ends with a suite still up — an uncaught throw, an explicit
+// exit — the detached group is asked to stop. The CLI then tears its emulators
+// down on its own, after we are gone.
+process.on("exit", () => {
+  for (const t of suites) {
+    try {
+      t.abandon();
+    } catch {
+      /* already gone */
+    }
+  }
+});
 const run = runCommand;
 
 /**
@@ -313,6 +380,17 @@ async function main() {
   }
 
   // Preflights — fail loud and early, before minutes of Gradle.
+  //
+  // The Firebase one FIRST, and before anything is stamped: a refusal costs
+  // nothing, writes no record (the tier stays owed), and the run never degrades
+  // into one without the add — which would record a Firebase proof it never ran.
+  if (args.withFirebase) {
+    const pre = firebasePreflight();
+    if (!pre.ok) {
+      process.stderr.write(pre.message);
+      process.exit(1);
+    }
+  }
   if (!javaAvailable()) {
     process.stderr.write(
       "fleet check: no Java found — the scratch app's verify lane runs Gradle.\n" +
@@ -332,7 +410,8 @@ async function main() {
 
   process.stdout.write(
     `fleet check: profile=${args.profile} min-level=${minLevel}` +
-    `${args.minLevel ? "" : attached ? " (auto: device attached)" : " (default)"}\n`
+    `${args.minLevel ? "" : attached ? " (auto: device attached)" : " (default)"}` +
+    `${args.withFirebase ? ` ${WITH_FIREBASE_FLAG} (record: ${FIREBASE_FLEET_RECORD})` : ""}\n`
   );
 
   // 1. Stamp the scratch app from the CURRENT tree (no --verify: the lane run
@@ -353,12 +432,32 @@ async function main() {
     process.exit(1);
   }
 
+  // 1b. THE ADD, under --with-firebase: the Firebase L2 run proves the app
+  //     `create-cmp add firebase` leaves, spelled by the ONE argv the schedule
+  //     hashes (addFirebaseArgv, which `stampedApps` spawns) — so the record's
+  //     digest and the oracle's describe the same app.
+  if (args.withFirebase) {
+    process.stdout.write(`\n── adding Firebase to the scratch app (create-cmp add firebase --no-verify)\n`);
+    const addStatus = await run(process.execPath, addFirebaseArgv(REPO_ROOT, appDir), { cwd: REPO_ROOT });
+    const missing = firebaseAddMissing(appDir);
+    if (addStatus !== 0 || missing.length) {
+      process.stderr.write(
+        `\nfleet check: FAIL — \`create-cmp add firebase\` exited ${addStatus} and did not leave a Firebase app: ` +
+        `${missing.length ? missing.join("; ") : "its output above says why"}.\n` +
+        `Scratch dir kept for inspection: ${scratchRoot}\n`
+      );
+      process.exit(1);
+    }
+  }
+
   // WHAT THIS RUN IS ABOUT TO PROVE, as bytes — hashed HERE, from the pristine
   // app, and never later: by the time the record is written this tree has a
   // lane's build output, a receipt and (under --ladder-plant) a deliberately
   // broken entry point in it, so what it hashed then would not be the app that
   // was proved. This digest is the device tier's whole schedule — proof-plan
   // discharges on it and the publish gate reads it (scripts/stamped-output.mjs).
+  // Under --with-firebase it is the pristine POST-ADD app, hashed by the same
+  // function at the same rule `stampedApps` uses for the Firebase tier.
   let stamped = null;
   let stampedError = null;
   try {
@@ -368,13 +467,46 @@ async function main() {
     process.stderr.write(`\nfleet check: the stamped app could not be hashed (${err.message}) — this record will carry no stampedOutputHash and will therefore discharge nothing.\n`);
   }
 
+  // 2a. THE EMULATOR SUITE, under --with-firebase. What it serves is read FROM
+  //     THE STAMPED TREE — host, ports, project — never spelled here (KD-47); a
+  //     tree whose redirect is not 10.0.2.2 on a demo- project is refused before
+  //     anything starts (KD-211).
+  let emulators = null;
+  if (args.withFirebase) {
+    try {
+      const plan = emulatorPlanFor(readDeclaredRedirect(appDir));
+      emulators = { plan, workDir: path.join(scratchRoot, "firebase-emulators") };
+      const served = plan.served.map((e) => `${e.service} ${plan.host}:${e.port}`).join(", ");
+      process.stdout.write(
+        `\n── Firebase Emulator Suite: ${served} on project ${plan.project}` +
+          `${plan.unserved.length ? `\n   not served: ${plan.unserved.map((u) => `${u.service} (${u.reason})`).join("; ")}` : ""}\n` +
+          `   from ${plan.declaredIn}; the app reaches this host at ${plan.appHost}\n`,
+      );
+    } catch (err) {
+      process.stderr.write(`\nfleet check: FAIL — ${err.message}\nScratch dir kept for inspection: ${scratchRoot}\n`);
+      process.exit(1);
+    }
+  }
+
   // 2. Run the app's OWN lane inside the scratch app. Env is inherited whole —
   //    JAVA_HOME/ANDROID_HOME come from the caller, never from this script.
-  process.stdout.write(`\n── running verify lane (--profile ${args.profile}) in the scratch app\n`);
-  await run(process.execPath, [path.join(appDir, "qa", "verify.mjs"), "--profile", args.profile], {
-    cwd: appDir,
-    env: { ...process.env },
-  });
+  const failures = [];
+  const laneArgv = [path.join(appDir, "qa", "verify.mjs"), "--profile", args.profile];
+  process.stdout.write(
+    `\n── running verify lane (--profile ${args.profile}) in the scratch app${emulators ? ", inside the Firebase Emulator Suite" : ""}\n`,
+  );
+  if (emulators) {
+    const lane = await runLaneUnderEmulators({
+      plan: emulators.plan,
+      workDir: emulators.workDir,
+      appDir,
+      laneArgv: [process.execPath, ...laneArgv],
+      registry: suites,
+    });
+    failures.push(...lane.failures);
+  } else {
+    await run(process.execPath, laneArgv, { cwd: appDir, env: { ...process.env } });
+  }
   // Lane exit status is advisory here — the receipt is the artifact we assert.
 
   // 3. Assert the receipt.
@@ -382,6 +514,7 @@ async function main() {
   if (!fs.existsSync(receiptPath)) {
     process.stderr.write(
       `\nfleet check: FAIL — the lane left no receipt at qa/evidence/latest.json.\n` +
+      failures.map((f) => `  - ${f}\n`).join("") +
       `Scratch dir kept for inspection: ${scratchRoot}\n`
     );
     process.exit(1);
@@ -395,7 +528,6 @@ async function main() {
   // legitimate — but only while the pack is visible in the comparison, the
   // output and the record. It was in none of the three.
   const packId = typeof receipt.pack?.id === "string" ? receipt.pack.id : null;
-  const failures = [];
   if (receipt.verdict !== "PASS") failures.push(`lane verdict is ${receipt.verdict}, not PASS`);
   if (rung === null) {
     // The receipt asserts no rung at all (FAILed lane, or a --fast run). There
@@ -414,6 +546,22 @@ async function main() {
       `\n  ${"note:"} the receipt names no pack, so this rung is not comparable to any other repo's.\n` +
       `        The lane earned it; nothing can say it earned the SAME thing (NORTH-STAR §8.9).\n`,
     );
+  }
+
+  // THE FIREBASE RUN'S OWN CLAIM: e2eSmoke is the step that installs and starts
+  // the DEBUG build, where USE_FIREBASE_EMULATORS is true — so it is the only
+  // step whose PASS says the app started with Firebase initialised and
+  // redirected. Required BY NAME: a green verdict at L2 without it proved no
+  // Firebase startup at all.
+  let e2eSmoke = null;
+  if (emulators) {
+    e2eSmoke = (receipt.steps ?? []).find((x) => x.name === "e2eSmoke") ?? null;
+    if (e2eSmoke?.verdict !== "PASS") {
+      failures.push(
+        `e2eSmoke is ${e2eSmoke ? e2eSmoke.verdict : "absent from the receipt"}, not PASS — it is the step that starts the DEBUG build, ` +
+          "where the Firebase redirect runs, so this run proved no Firebase startup",
+      );
+    }
   }
 
   // 4. Report: compact step table + rung + summary.
@@ -462,7 +610,11 @@ async function main() {
   // earlier `failures.push` sat above it), and it is the worst one to get wrong
   // this way: it fails precisely when the shipped l2Execution claim is an
   // overclaim, which is the thing that should stop a release hardest.
-  writeFleetRecord({ receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null, startedAt, stamped, stampedError });
+  const coverage = emulators ? coverageFor({ plan: emulators.plan, e2eSmoke }) : defaultCoverage();
+  writeFleetRecord({
+    receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null, startedAt, stamped, stampedError,
+    coverage, file: args.withFirebase ? FIREBASE_FLEET_RECORD : FLEET_RECORD,
+  });
 
   if (failures.length) {
     process.stderr.write(`\nfleet check: FAIL\n`);
@@ -494,7 +646,11 @@ async function main() {
  * Lives under qa/evidence/, which inputs-hash excludes as lane output, so
  * recording a run never invalidates a receipt.
  */
-export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failures, avd, root = REPO_ROOT, startedAt = null, stamped = null, stampedError = null }) {
+export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failures, avd, root = REPO_ROOT, startedAt = null, stamped = null, stampedError = null, coverage = null, file = FLEET_RECORD }) {
+  // ONE pairing of record and history: the Firebase L2 run has a file and a
+  // history kind of its own, so it never overwrites the record the publish gate
+  // reads and is never counted as a default device run (proof-history.mjs).
+  const firebaseRun = file === FIREBASE_FLEET_RECORD;
   const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
   const branch = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" });
   const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
@@ -510,6 +666,12 @@ export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failure
     requiredLevel: minLevel,
     failures,
     avd,
+    // WHAT THIS RUN COVERED, and what it did not (scripts/lib/fleet-firebase.mjs):
+    // the default run says it never executed Firebase and names the run that
+    // does; the Firebase run names the suite it served and says no request
+    // crossed the redirect (KD-210). proof-plan discharges the Firebase tier
+    // only on `coverage.firebase === true`.
+    coverage: coverage ?? (firebaseRun ? null : defaultCoverage()),
     // WHICH APP this ran against — the bytes `create-cmp` stamped, not the
     // inputs that produced them and not a commit. A commit cannot work: the run
     // precedes the commit that carries it, so a commit-keyed record reads stale
@@ -561,10 +723,10 @@ export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failure
   // stamped app, and inventing a lane directory here would imply it has a lane.
   // The record is local evidence that stops a human typing a number they did
   // not measure; what travels to a reviewer is the fit-test block, not the file.
-  const dir = path.join(root, "qa-artifacts");
+  const out = path.join(root, file);
   try {
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "fleet-latest.json"), `${JSON.stringify(record, null, 2)}\n`);
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, `${JSON.stringify(record, null, 2)}\n`);
   } catch {
     // Never let bookkeeping fail a gate.
   }
@@ -572,7 +734,7 @@ export function writeFleetRecord({ receipt, rung, pack = null, minLevel, failure
   // proof", the history answers what proving cost (scripts/lib/proof-history.mjs).
   // `startedAt` and `branch` ride on the history row only, so the record every
   // gate reads keeps exactly the shape those gates were written against.
-  appendHistory(historyPath(root, "fleet"), {
+  appendHistory(historyPath(root, firebaseRun ? "fleet-firebase" : "fleet"), {
     ...record,
     // The manifest is hundreds of rows and would multiply this file by twenty,
     // to describe a tree that no longer exists by the time anyone reads the
