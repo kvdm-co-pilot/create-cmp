@@ -135,18 +135,33 @@ function at(obj, p) {
  *          means: write nothing, the file is the app's and it could not be accounted for.
  */
 export function editJsonInPlace(raw, edits) {
+  return tryEditJsonInPlace(raw, edits).content ?? null;
+}
+
+/** A key path as a reader would name it. */
+function where(p) {
+  return p.length === 0 ? "the top level" : JSON.stringify(p.join("."));
+}
+
+/**
+ * `editJsonInPlace`, saying WHY when it declines — a caller that writes nothing on a
+ * decline owes its user the reason, and only the editor knows it.
+ * @returns {{content:string}|{reason:string}} `reason` completes "the file could not be edited in place: …"
+ */
+export function tryEditJsonInPlace(raw, edits) {
   let parsed;
   let values;
   try {
     parsed = JSON.parse(raw);
     values = jsonValues(raw);
-  } catch {
-    return null;
+  } catch (err) {
+    return { reason: `it is not JSON (${String(err?.message ?? err).split("\n")[0]})` };
   }
   const byPath = new Map();
   for (const v of values) {
     const k = JSON.stringify(v.path);
-    if (byPath.has(k)) return null; // a duplicate key: which one counts is JSON.parse's call, not ours
+    // A duplicate key: which one counts is JSON.parse's call, not ours.
+    if (byPath.has(k)) return { reason: `the key ${where(v.path)} appears twice, and which one counts is JSON.parse's call` };
     byPath.set(k, v);
   }
 
@@ -196,9 +211,9 @@ export function editJsonInPlace(raw, edits) {
   const additions = new Map(); // container path key -> { node, items: [{key?, value}] }
   for (const e of edits) {
     const node = byPath.get(JSON.stringify(e.at));
-    if (!node) return null;
+    if (!node) return { reason: `${where(e.at)} is not in the file` };
     if ("set" in e) {
-      if (e.at.length === 0) return null;
+      if (e.at.length === 0) return { reason: "the whole file cannot be replaced in place" };
       const parent = byPath.get(JSON.stringify(e.at.slice(0, -1)));
       splices.push({
         start: node.start,
@@ -209,11 +224,11 @@ export function editJsonInPlace(raw, edits) {
       continue;
     }
     const isAdd = "add" in e;
-    if (node.kind !== (isAdd ? "object" : "array")) return null;
+    if (node.kind !== (isAdd ? "object" : "array")) return { reason: `${where(e.at)} is not an ${isAdd ? "object" : "array"}` };
     const target = at(expected, e.at);
     const slot = additions.get(JSON.stringify(e.at)) ?? { node, items: [] };
     if (isAdd) {
-      if (Object.hasOwn(target, e.add)) return null;
+      if (Object.hasOwn(target, e.add)) return { reason: `${where([...e.at, e.add])} is already there` };
       target[e.add] = structuredClone(e.value);
       slot.items.push({ key: e.add, value: e.value });
     } else {
@@ -250,14 +265,20 @@ export function editJsonInPlace(raw, edits) {
     } else {
       // Members on the bracket's own line: keep them there, in the file's own separator.
       const between = node.members.length > 1 ? raw.slice(node.members[0].end, node.members[1].start) : multiline ? ", " : ",";
-      if (between.includes("\n")) return null;
-      insert = items.map((it) => `${between}${entry(it, "", true)}`).join("");
+      if (between.includes("\n")) {
+        // Only the FIRST member shares the bracket's line (`{ "a": 1,\n  "b": 2\n}`): the
+        // rest are one per line, so an added member continues their layout.
+        const indent = lineIndent(last.start);
+        insert = items.map((it) => `,${eol}${indent}${entry(it, indent)}`).join("");
+      } else insert = items.map((it) => `${between}${entry(it, "", true)}`).join("");
     }
     splices.push({ start: last.end, end: last.end, text: insert });
   }
 
   splices.sort((a, b) => a.start - b.start);
-  for (let k = 1; k < splices.length; k += 1) if (splices[k].start < splices[k - 1].end) return null;
+  for (let k = 1; k < splices.length; k += 1) {
+    if (splices[k].start < splices[k - 1].end) return { reason: "two of the edits overlap" };
+  }
   let content = "";
   let cursor = 0;
   for (const s of splices) {
@@ -270,7 +291,24 @@ export function editJsonInPlace(raw, edits) {
   try {
     reparsed = JSON.parse(content);
   } catch {
-    return null;
+    return { reason: "the edited text would not parse" };
   }
-  return sameJson(reparsed, expected) ? content : null;
+  return sameJson(reparsed, expected)
+    ? { content }
+    : { reason: "the edited text would not parse to what the edit describes" };
+}
+
+/**
+ * The value `edits` (the shapes `editJsonInPlace` takes) describe, applied to a parsed
+ * value rather than to text — what a caller writes whole when the text could not be
+ * edited in place. The input is not modified.
+ */
+export function applyJsonEdits(value, edits) {
+  const out = structuredClone(value);
+  for (const e of edits) {
+    if ("set" in e) at(out, e.at.slice(0, -1))[e.at[e.at.length - 1]] = structuredClone(e.set);
+    else if ("add" in e) at(out, e.at)[e.add] = structuredClone(e.value);
+    else at(out, e.at).push(...structuredClone(e.push));
+  }
+  return out;
 }

@@ -38,7 +38,7 @@ import {
   worksFromAnyDirectory,
 } from "../lib/shipped-hooks.mjs";
 import { diagnoseProject } from "../lib/project-doctor.mjs";
-import { editJsonInPlace } from "../lib/json-in-place.mjs";
+import { applyJsonEdits, tryEditJsonInPlace } from "../lib/json-in-place.mjs";
 import { parseProperties, upsertProperty, parseVersions } from "../lib/toml.mjs";
 import { loadRegistry } from "../lib/registry.mjs";
 import { listFiles } from "../lib/fsutil.mjs";
@@ -440,6 +440,10 @@ function scanInspectorSources(projectDir) {
  *          `what` is a noun phrase completing "wrote …" / "would write …". The return
  *          says whether the tree actually changed; `.wrote` counts the times it did,
  *          `.applied` names them, and `.failed` holds every write the system refused.
+ *          `.decline(target, what, reason)` is the other half: a heal that chose to write
+ *          nothing says so and why, and `.declined` holds it — a heal offered as
+ *          `fix (--fix)` and then skipped without a word is what made "nothing
+ *          auto-fixable" print over a finding still offering one.
  */
 export function healWriter({ dryRun = false } = {}) {
   const write = (target, content, what) => {
@@ -467,6 +471,11 @@ export function healWriter({ dryRun = false } = {}) {
   write.wrote = 0;
   write.applied = [];
   write.failed = [];
+  write.declined = [];
+  write.decline = (target, what, reason) => {
+    write.declined.push({ what, target, reason });
+    process.stdout.write(`${colors.yellow("!")} --fix: not writing ${what} — ${reason}\n    ${colors.dim(target)}\n`);
+  };
   return write;
 }
 
@@ -488,6 +497,13 @@ export function writeRefusalInWords(err) {
   return code && !first.includes(code) ? `${first} (${code})` : first;
 }
 
+/** A JSON value's kind, as a sentence names it. */
+function jsonKind(v) {
+  if (v === null) return "null";
+  if (Array.isArray(v)) return "an array";
+  return typeof v === "object" ? "an object" : `a ${typeof v}`;
+}
+
 /**
  * Apply the SAFE auto-heals for --fix. Returns ids of findings it healed — under
  * `--dry-run`, the ids it WOULD have healed, since the report is the point of the flag.
@@ -506,6 +522,12 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
     write(target, content, what);
     if (refusals() === before) fixed.push(id);
   };
+  // A heal that writes nothing on purpose names itself and its reason; a writer that
+  // keeps no `.declined` (a caller's own) still gets the words on stdout.
+  const decline = (target, what, reason) => {
+    if (typeof write.decline === "function") write.decline(target, what, reason);
+    else process.stdout.write(`--fix: not writing ${what} — ${reason}\n    ${target}\n`);
+  };
   for (const f of findings) {
     if (!f.fix || !f.fix.auto || f.level === "ok") continue;
 
@@ -521,16 +543,21 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
     if (f.id === "walk-wiring") {
       const { statusLine, promptSubmit } = templateWalkWiring();
       const target = path.join(projectDir, ".claude", "settings.json");
+      const what = "the walk into .claude/settings.json (statusLine + UserPromptSubmit)";
       const raw = readIfExists(target);
       let settings = {};
       if (raw !== null) {
         try {
           settings = JSON.parse(raw);
-        } catch {
+        } catch (err) {
           // Never overwrite settings we could not read — that is the app's file.
+          decline(target, what, `it is not JSON doctor can read (${String(err?.message ?? err).split("\n")[0]}), and a file doctor cannot read is never overwritten`);
           continue;
         }
-        if (settings === null || typeof settings !== "object" || Array.isArray(settings)) continue;
+        if (settings === null || typeof settings !== "object" || Array.isArray(settings)) {
+          decline(target, what, `its top level is ${jsonKind(settings)}, not an object`);
+          continue;
+        }
       }
       // What to ADD, as edits to the app's own text rather than a re-serialised copy of
       // it (KD-197): `JSON.stringify(settings, null, 2)` rewrote an app's indentation,
@@ -550,23 +577,43 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
         if (!(Array.isArray(existing) && existing.some((g) => (g?.hooks ?? []).some(invokesWalk)))) {
           if (hooks === undefined) edits.push({ at: [], add: "hooks", value: { UserPromptSubmit: promptSubmit } });
           else if (hooks === null) edits.push({ at: ["hooks"], set: { UserPromptSubmit: promptSubmit } });
-          else if (typeof hooks !== "object" || Array.isArray(hooks)) continue; // not a shape we can account for
-          else if (existing === undefined) edits.push({ at: ["hooks"], add: "UserPromptSubmit", value: promptSubmit });
+          else if (typeof hooks !== "object" || Array.isArray(hooks)) {
+            // Not a shape we can account for.
+            decline(target, what, `"hooks" is ${jsonKind(hooks)}, not an object of events`);
+            continue;
+          } else if (existing === undefined) edits.push({ at: ["hooks"], add: "UserPromptSubmit", value: promptSubmit });
           else if (existing === null) edits.push({ at: ["hooks", "UserPromptSubmit"], set: promptSubmit });
           else if (Array.isArray(existing)) edits.push({ at: ["hooks", "UserPromptSubmit"], push: promptSubmit });
-          else continue;
+          else {
+            decline(target, what, `"hooks.UserPromptSubmit" is ${jsonKind(existing)}, not an array of hook groups`);
+            continue;
+          }
         }
       }
       if (edits.length > 0) {
         // A file that is not there has no bytes to keep, so it is written in the
-        // template's own shape; one that is there is edited where it stands, and an
-        // edit that cannot be accounted for against JSON.parse writes nothing.
-        const content =
-          raw === null
-            ? `${JSON.stringify({ ...(statusLine ? { statusLine } : {}), ...(promptSubmit ? { hooks: { UserPromptSubmit: promptSubmit } } : {}) }, null, 2)}\n`
-            : editJsonInPlace(raw, edits);
-        if (content === null) continue;
-        heal(f.id, target, content, "the walk into .claude/settings.json (statusLine + UserPromptSubmit)");
+        // template's own shape; one that is there is edited where it stands.
+        if (raw === null) {
+          const content = `${JSON.stringify({ ...(statusLine ? { statusLine } : {}), ...(promptSubmit ? { hooks: { UserPromptSubmit: promptSubmit } } : {}) }, null, 2)}\n`;
+          heal(f.id, target, content, what);
+          continue;
+        }
+        const edited = tryEditJsonInPlace(raw, edits);
+        if (edited.content !== undefined) {
+          heal(f.id, target, edited.content, what);
+          continue;
+        }
+        // A file that parsed, of a shape this heal accounts for, that the in-place editor
+        // still declines (a duplicate key, say) is healed the way it was before KD-197:
+        // re-serialised whole from what JSON.parse read. That changes bytes the app wrote,
+        // so the line that reports the write says so, and why.
+        heal(
+          f.id,
+          target,
+          `${JSON.stringify(applyJsonEdits(settings, edits), null, 2)}\n`,
+          `${what}, rewriting the whole file, because it could not be edited in place: ${edited.reason}. ` +
+            "It is re-serialised from what JSON.parse reads, so its own formatting, and the value of any duplicate key JSON.parse ignores, is not kept"
+        );
       }
     }
 
@@ -711,10 +758,12 @@ export async function runDoctor(flags, positional) {
         fixed.length === 0 &&
         !rewrote &&
         healsRefused.length === 0 &&
+        write.declined.length === 0 &&
         !findings.some((f) => f.id === "shipped-hooks")
       ) {
-        // A heal that was offered and declined (or previewed) is not "nothing
-        // auto-fixable" — saying so would contradict the lines just printed.
+        // A heal that was offered and declined (or previewed, or named as one it will
+        // not write) is not "nothing auto-fixable" — saying so would contradict the
+        // lines just printed.
         process.stdout.write(`${colors.dim("--fix: nothing auto-fixable found.")}\n`);
       }
     }
