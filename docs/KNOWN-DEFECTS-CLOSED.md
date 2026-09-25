@@ -97,15 +97,17 @@ slightly wrong, on a path whose purpose is keeping that style (KD-197).
 
 **Closed 2026-09-25, on the release-0.28.1 branch.** (a) The escape style now counts only a real
 `\uXXXX` escape, whose backslash follows an even run of backslashes, zero included:
-`/(?<!\\)(?:\\\\)*\\u[0-9a-fA-F]{4}/` (`src/lib/json-in-place.mjs:197`). (b) A value rendered on
-one line goes through `withKeySep` (`:146`), which spells each key colon in `JSON.stringify`'s output
-as the file's own key separator. It skips strings, so a colon inside a string value is left alone
-(`:223`). That covers a one-line file and a member added on the bracket's line in a multi-line file.
-`test/json-in-place-reads-the-files-style.test.mjs` checks both, and JSON.parse of every result
-deep-equals the edit's value. Its two defect tests fail on the tree before this commit. Its two
-controls pass on both trees: a real escape, and an escaped backslash before a real escape. Not
-changed, because the entry names only the colon: the comma inside an inserted one-line value is
-still `JSON.stringify`'s `,`, even in a file that writes `, `.
+`/(?<!\\)(?:\\\\)*\\u[0-9a-fA-F]{4}/` (`src/lib/json-in-place.mjs:198`). (b) A value rendered on
+one line goes through `withSeps` (`:147`), which spells each key colon in `JSON.stringify`'s output
+as the file's own key separator, and each comma between items as the file's own item separator
+(`itemSep`, `:235`, read from the first two members that share a line). It skips strings, so a colon
+or a comma inside a string value is left alone (`:224`); items inserted into an empty container on
+one line are joined the same way (`:291`). That covers a one-line file and a member added on the
+bracket's line in a multi-line file. `test/json-in-place-reads-the-files-style.test.mjs` checks all
+three, and JSON.parse of every result deep-equals the edit's value. Its escape and colon tests fail
+on the tree before the first fixing commit, and its comma test on the tree before the second (4/5
+pass there, 5/5 after). Its two controls pass on both trees: a real escape, and an escaped
+backslash before a real escape.
 
 ### KD-237 — doctor offers `--fix` on a settings file `--fix` declines — **CLOSED 2026-09-25**
 

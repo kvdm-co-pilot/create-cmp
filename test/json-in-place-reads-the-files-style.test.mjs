@@ -6,7 +6,8 @@
 //      matches a string holding a literal backslash followed by `u` and four hex digits
 //      (`"C:\\ucafe"`), so such a file had its inserted non-ASCII escaped;
 //  (b) a value rendered on one line was `JSON.stringify(v)`, so the colons inside it had
-//      no space after them whatever the file's own key separator was.
+//      no space after them whatever the file's own key separator was, and its commas none
+//      whatever the file's own item separator was.
 // In every case the edit's meaning is unchanged: JSON.parse of the result deep-equals the
 // value the edit describes.
 
@@ -54,4 +55,25 @@ test("in a one-line file with no space after its colons, an inserted value has n
   const value = { type: "command", command: "node a: b.mjs" };
   const out = edited('{"a":1}', [{ at: [], add: "statusLine", value }], { a: 1, statusLine: value });
   assert.match(out, /"statusLine":\{"type":"command",\s*"command":"node a: b\.mjs"\}/, out);
+});
+
+// KD-240 (b), the comma: the class is every separator inside a value rendered on one line.
+test("in a one-line file, the commas inside an inserted value follow the file's item separator", () => {
+  const value = { type: "command", command: "node a,b.mjs", nested: [1, 2, { k: 1, j: 2 }] };
+  const spaced = edited(
+    '{"a": 1, "b": {}}',
+    [
+      { at: [], add: "statusLine", value },
+      { at: ["b"], add: "x", value: 1 },
+      { at: ["b"], add: "y", value: 2 },
+    ],
+    { a: 1, b: { x: 1, y: 2 }, statusLine: value }
+  );
+  assert.equal(
+    spaced,
+    '{"a": 1, "b": {"x": 1, "y": 2}, "statusLine": {"type": "command", "command": "node a,b.mjs", "nested": [1, 2, {"k": 1, "j": 2}]}}',
+    `an inserted value's inner commas ignore the file's ", ":\n${spaced}`
+  );
+  const tight = edited('{"a":1,"b":2}', [{ at: [], add: "statusLine", value }], { a: 1, b: 2, statusLine: value });
+  assert.equal(tight, '{"a":1,"b":2,"statusLine":{"type":"command","command":"node a,b.mjs","nested":[1,2,{"k":1,"j":2}]}}');
 });
