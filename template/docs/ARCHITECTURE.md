@@ -59,12 +59,12 @@ app").
 
 ```
    User ──taps/reads──▶ This app (Android APK · iOS framework)
-                              │           │            │
-                        Firebase       Room       NetworkMonitor
-                     (GitLive SDK:  (on-device    (platform connectivity,
-                      auth/firestore/ SSOT —        StateFlow<Boolean>)
-                      functions/    AppDatabase,
-                      storage)      ItemDao)
+                                    │            │
+                                  Room       NetworkMonitor
+                               (on-device    (platform connectivity,
+                                SSOT —        StateFlow<Boolean>)
+                                AppDatabase,
+                                ItemDao)
 
    Development-time only — never in a release build or on a user's device:
       Debug inspector HTTP server            QA harness
@@ -75,7 +75,6 @@ app").
 
 | Integration | What | Where in the tree | Notes |
 |---|---|---|---|
-| Firebase | Auth / Firestore / Functions / Storage via the GitLive KMP SDK | `data/remote/FirebaseConfig.kt`, wired at `initKoin()`/`AppApplication`/`KoinHelper` | Emulator-backed in debug builds (`configureFirebaseEmulators()`); `google-services.json` ships as a placeholder — wire the real project before shipping. |
 | Room | On-device SSOT — `AppDatabase`, `ItemDao` | `data/local/*.kt` | Registered in DI on every platform (`single<AppDatabase>`); the exemplar's `ItemRepositoryImpl` does not yet read/write it — see §1's offline row. |
 | NetworkMonitor | Platform connectivity as `StateFlow<Boolean>` | `core/connectivity/NetworkMonitor.kt` (expect) + one `actual` per platform | Registered in DI (`single { NetworkMonitor(...) }`); not yet consumed by a repository — available, not wired. |
 | Debug inspector HTTP server | Loopback-only (`ServerSocket`, never the LAN) structural/crash/DB inspection endpoint for the AI verification loop | `composeApp/src/androidDebug/kotlin/.../inspector/*.kt` | **Never compiled into `androidRelease`** — a separate no-op twin ships there (source-set placement, not a runtime flag). |
@@ -138,7 +137,7 @@ release target. See project ADR
 │                app-internal [enforced: ARCH-02]                    │
 ├──────────────────────────────────────────────────────────────────┤
 │ data           local/  (Room: AppDatabase, ItemDao)                │
-│                remote/ (repository implementations, FirebaseConfig)│
+│                remote/ (repository implementations)                │
 │                never reaches into presentation or di               │
 │                [enforced: ARCH-09]                                 │
 ├──────────────────────────────────────────────────────────────────┤
@@ -167,7 +166,7 @@ Every arrow in that box is a cited rule, not a wish:
 <!-- cmp:generated layer-file-inventory -->
 - `presentation/` — commonMain: `App.kt`, `components/AppBottomBar.kt`, `components/AppButton.kt`, `components/AppHeader.kt`, `components/BaseScreen.kt`, `components/ContentStateContainer.kt`, `components/ContentUiState.kt`, `components/EmptyState.kt`, `components/ErrorState.kt`, `components/ListItemCard.kt`, `components/ScreenColumn.kt`, `components/Shimmer.kt`, `components/TestTagAutomation.kt`, `home/DetailScreen.kt`, `home/HomeScreen.kt`, `home/HomeViewModel.kt`, `navigation/AppNavHost.kt`, `navigation/AppShell.kt`, `navigation/AppTab.kt`, `navigation/NavInspectionHook.kt`, `navigation/Screen.kt`, `profile/ProfileScreen.kt`, `theme/DesignToken.kt`, `theme/Shape.kt`, `theme/Theme.kt`, `theme/Tokens.kt`, `theme/Typography.kt`; androidMain: `components/TestTagAutomation.android.kt`; iosMain: `components/TestTagAutomation.ios.kt`; desktopMain: `components/TestTagAutomation.desktop.kt`
 - `domain/` — commonMain: `model/DomainError.kt`, `model/Item.kt`, `repository/ItemRepository.kt`, `result/AppResult.kt`, `usecase/GetItemsUseCase.kt`
-- `data/` — commonMain: `AppResultCatching.kt`, `local/AppDatabase.kt`, `local/DatabaseBuilder.kt`, `local/ItemDao.kt`, `remote/FirebaseConfig.kt`, `remote/ItemRepositoryImpl.kt`; androidMain: `local/DatabaseBuilder.android.kt`; iosMain: `local/DatabaseBuilder.ios.kt`; desktopMain: `local/DatabaseBuilder.desktop.kt`
+- `data/` — commonMain: `AppResultCatching.kt`, `local/AppDatabase.kt`, `local/DatabaseBuilder.kt`, `local/ItemDao.kt`, `remote/ItemRepositoryImpl.kt`; androidMain: `local/DatabaseBuilder.android.kt`; iosMain: `local/DatabaseBuilder.ios.kt`; desktopMain: `local/DatabaseBuilder.desktop.kt`
 - `core/` — commonMain: `connectivity/NetworkMonitor.kt`, `format/Format.kt`; androidMain: `connectivity/NetworkMonitor.kt`; iosMain: `connectivity/NetworkMonitor.kt`; desktopMain: `connectivity/NetworkMonitor.desktop.kt`
 - `di/` — commonMain: `AppModule.kt`; androidMain: `AndroidModule.kt`; desktopMain: `DesktopModule.kt`
 <!-- /cmp:generated -->
@@ -234,8 +233,9 @@ ships is main-safe under its own library's contract, so the template injects no 
 - **Room suspend DAO calls** (`data/local/ItemDao.kt` — all `suspend fun`s): Room executes
   suspending queries on its own background executor; calling them from `Dispatchers.Main` is
   safe by Room's documented contract.
-- **GitLive Firebase suspend APIs** (when you wire them into `data/remote/`): suspending
-  wrappers over the async native SDKs — main-safe by the SDK's contract.
+- **GitLive Firebase suspend APIs** (once `create-cmp add firebase` has added the SDK and you
+  call it from `data/remote/`): suspending wrappers over the async native SDKs — main-safe by
+  the SDK's contract.
 - **The example source** (`data/remote/ItemRepositoryImpl.kt`): only `delay()` (a suspension,
   not a block) and list construction.
 

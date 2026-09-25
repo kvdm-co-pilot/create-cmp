@@ -26,8 +26,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // GitLive Firebase KMP
-        maven("https://jitpack.io")
     }
 }
 
