@@ -3,7 +3,6 @@
 # ── isolation — Kotlin / KSP / Compose / Room / AGP move as ONE set or the build dies.
 kotlin = "2.2.20"
 agp = "8.7.3"
-google-services = "4.4.2"
 compose-multiplatform = "1.10.3"
 koin = "4.1.1"
 ktor = "3.1.0"
@@ -15,7 +14,6 @@ kotlinx-serialization = "1.7.3"
 kotlinx-datetime = "0.7.0"
 lifecycle = "2.10.0"
 navigation = "2.9.2"
-firebase-gitlive = "2.1.0"
 # Desktop dev-client. CHR 1.1.1 (latest stable) needs Kotlin >= 2.1.20 + CMP >= 1.8.2 — satisfied
 # by this set. The 1.2.x line (beta) additionally requires CMP 1.10+; safe to move to when stable.
 compose-hot-reload = "1.1.1"
@@ -58,14 +56,6 @@ ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
-
-# Firebase GitLive KMP SDK
-firebase-auth = { module = "dev.gitlive:firebase-auth", version.ref = "firebase-gitlive" }
-firebase-firestore = { module = "dev.gitlive:firebase-firestore", version.ref = "firebase-gitlive" }
-firebase-functions = { module = "dev.gitlive:firebase-functions", version.ref = "firebase-gitlive" }
-firebase-storage = { module = "dev.gitlive:firebase-storage", version.ref = "firebase-gitlive" }
-firebase-messaging = { module = "dev.gitlive:firebase-messaging", version.ref = "firebase-gitlive" }
-firebase-config = { module = "dev.gitlive:firebase-config", version.ref = "firebase-gitlive" }
 
 # Room KMP
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
@@ -111,7 +101,6 @@ compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-m
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 room = { id = "androidx.room", version.ref = "room" }
 compose-hot-reload = { id = "org.jetbrains.compose.hot-reload", version.ref = "compose-hot-reload" }

@@ -1,14 +1,6 @@
 package __PACKAGE__
 
 import android.app.Application
-// >>> cmp:feature firebase
-import __PACKAGE__.data.remote.FIREBASE_FUNCTIONS_REGION
-import dev.gitlive.firebase.Firebase
-import dev.gitlive.firebase.auth.auth
-import dev.gitlive.firebase.firestore.firestore
-import dev.gitlive.firebase.functions.functions
-import dev.gitlive.firebase.storage.storage
-// <<< cmp:feature firebase
 // >>> cmp:feature room
 import __PACKAGE__.data.local.AppDatabase
 import __PACKAGE__.data.local.appContext
@@ -36,9 +28,6 @@ class AppApplication : Application() {
         // >>> cmp:feature room
         appContext = this
         // <<< cmp:feature room
-        // >>> cmp:feature firebase
-        configureFirebaseEmulators()
-        // <<< cmp:feature firebase
         startKoin {
             androidLogger()
             androidContext(this@AppApplication)
@@ -55,42 +44,4 @@ class AppApplication : Application() {
         }
     }
 
-    // >>> cmp:feature firebase
-    // Debug builds talk to the local Firebase emulators (BuildConfig flags set in build.gradle.kts).
-    private fun configureFirebaseEmulators() {
-        if (!BuildConfig.USE_FIREBASE_EMULATORS) return
-        val host = BuildConfig.FIREBASE_EMULATOR_HOST
-        // NOT SWALLOWED. This was `runCatching { … }` with the Result discarded,
-        // and the failure it hid is the worst one this file can produce: a build
-        // that asked for emulators, did not get them, and carried on against the
-        // real project named by google-services.json. Reading, writing and
-        // authenticating against production from a debug build, silently.
-        //
-        // Worse, it hid PARTIAL failure — auth redirected and firestore not, so
-        // half the app talks to the emulator and half to production, which is the
-        // state hardest to notice and hardest to explain afterwards.
-        //
-        // So it throws. The flag above is a deliberate request for emulators; a
-        // debug build that cannot honour it has no safe way to continue.
-        try {
-            Firebase.auth.useEmulator(host, BuildConfig.FIREBASE_AUTH_PORT)
-            Firebase.firestore.useEmulator(host, BuildConfig.FIREBASE_FIRESTORE_PORT)
-            Firebase.functions(FIREBASE_FUNCTIONS_REGION)
-                .useEmulator(host, BuildConfig.FIREBASE_FUNCTIONS_PORT)
-            Firebase.storage.useEmulator(host, BuildConfig.FIREBASE_STORAGE_PORT)
-        } catch (cause: Throwable) {
-            // `throw IllegalStateException(msg, cause)`, never `error(msg)`: error()
-            // takes no cause, so the underlying stack — the only thing that says
-            // WHICH of the four calls failed and why — is dropped and the crash
-            // reads `Cause: null`.
-            throw IllegalStateException(
-                "Firebase emulator redirect to $host FAILED, and this build asked for emulators " +
-                    "(USE_FIREBASE_EMULATORS=true). Refusing to start: continuing would authenticate and " +
-                    "write against the real project in google-services.json. Usual cause: a Firebase client " +
-                    "was already used before this ran, so useEmulator can no longer take effect.",
-                cause,
-            )
-        }
-    }
-    // <<< cmp:feature firebase
 }

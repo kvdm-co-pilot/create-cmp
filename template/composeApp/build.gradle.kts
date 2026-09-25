@@ -8,9 +8,6 @@ plugins {
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.android.application)
-    // >>> cmp:feature firebase
-    alias(libs.plugins.google.services)
-    // <<< cmp:feature firebase
     // >>> cmp:feature room
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
@@ -88,15 +85,6 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
-
-            // >>> cmp:feature firebase
-            implementation(libs.firebase.auth)
-            implementation(libs.firebase.firestore)
-            implementation(libs.firebase.functions)
-            implementation(libs.firebase.storage)
-            implementation(libs.firebase.messaging)
-            implementation(libs.firebase.config)
-            // <<< cmp:feature firebase
 
             // >>> cmp:feature room
             implementation(libs.room.runtime)
@@ -222,42 +210,6 @@ android {
     }
 
     buildTypes {
-        // >>> cmp:feature firebase
-        getByName("debug") {
-            // Debug builds point GitLive Firebase at the local emulators (see Application/KoinHelper).
-            // 10.0.2.2 is the Android emulator's host-loopback alias.
-            buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "true")
-            buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"10.0.2.2\"")
-            buildConfigField("int", "FIREBASE_AUTH_PORT", "9099")
-            buildConfigField("int", "FIREBASE_FIRESTORE_PORT", "8080")
-            buildConfigField("int", "FIREBASE_FUNCTIONS_PORT", "5001")
-            buildConfigField("int", "FIREBASE_STORAGE_PORT", "9199")
-            manifestPlaceholders["usesCleartextTraffic"] = "true"
-        }
-        getByName("release") {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            // Every field debug declares, release must declare too. BuildConfig is generated
-            // PER BUILD TYPE, so a field only debug carries simply does not exist in release —
-            // and `if (!USE_FIREBASE_EMULATORS) return` is a RUNTIME guard that does nothing
-            // for a compile-time symbol. Declaring the flag alone made release the one build
-            // nobody could produce: the code reading the host and ports failed to resolve them.
-            // The values below are never used (the flag is false); they exist so the shape of
-            // BuildConfig is the same in both build types.
-            buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "false")
-            buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"\"")
-            buildConfigField("int", "FIREBASE_AUTH_PORT", "0")
-            buildConfigField("int", "FIREBASE_FIRESTORE_PORT", "0")
-            buildConfigField("int", "FIREBASE_FUNCTIONS_PORT", "0")
-            buildConfigField("int", "FIREBASE_STORAGE_PORT", "0")
-            manifestPlaceholders["usesCleartextTraffic"] = "false"
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-        // <<< cmp:feature firebase
-        // >>> cmp:feature !firebase
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -270,7 +222,6 @@ android {
         getByName("debug") {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
-        // <<< cmp:feature !firebase
     }
 
     lint {
