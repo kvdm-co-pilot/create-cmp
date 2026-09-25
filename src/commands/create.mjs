@@ -192,6 +192,8 @@ async function interactiveConfig(positional, flags = {}, preset = resolvePreset(
     process.exit(1);
   };
 
+  // The name is asked first, because the defaults below are derived from it. A line
+  // that states the name or the package never reaches the interview (runCreate).
   const base = await prompts(
     [
       { type: "text", name: "appName", message: "App display name", initial: "MyApp" },
@@ -201,75 +203,66 @@ async function interactiveConfig(positional, flags = {}, preset = resolvePreset(
         message: "Package (reverse-DNS)",
         initial: (prev) => `com.${slugFromName(prev)}.app`,
       },
-      { type: "confirm", name: "ios", message: "Enable iOS target?", initial: true },
     ],
     { onCancel }
   );
 
-  const extras = await prompts(
+  // ONE reader of the line. The flag path resolves every flag it knows — a stated
+  // flag, else the preset's default, else the stamp's — for the name just given, and
+  // the interview asks OVER that: each question's pre-answer is the line's value, and
+  // what no question asks (`--bundle-id`, `--theme-prefix`) is the line's value
+  // outright. So a flag the flag path learns later is honoured here without a second
+  // list to forget it in — the five this used to drop were exactly that.
+  const line = buildConfigFromFlags(
+    { ...flags, name: base.appName, package: base.package },
+    positional,
+    preset
+  );
+
+  const answers = await prompts(
     [
+      { type: "confirm", name: "ios", message: "Enable iOS target?", initial: line.platforms.ios },
       {
         type: "confirm",
         name: "harness",
         message: "Verification harness (verify lane, evidence receipts, machine-checked done)?",
-        initial: !flagBool(flags, "minimal", false), // --minimal pre-answers the interview question
+        initial: line.harness,
       },
-      // The toggles resolve here exactly as the flag path resolves them — a stated
-      // flag, else the preset's default, else on — and pre-answer the question, as
-      // `--minimal` does above. So `--preset lean --room` asks with Room already yes.
-      {
-        type: "confirm",
-        name: "room",
-        message: "Room local cache?",
-        initial: flagBool(flags, "room", presetDefault(preset, "room", true)),
-      },
-      {
-        type: "confirm",
-        name: "e2e",
-        message: "E2E test harness (Maestro)?",
-        initial: flagBoolWithAlias(flags, "e2e", "appium", presetDefault(preset, "e2e", true)),
-      },
+      { type: "confirm", name: "room", message: "Room local cache?", initial: line.room },
+      { type: "confirm", name: "e2e", message: "E2E test harness (Maestro)?", initial: line.e2e },
       {
         type: "confirm",
         name: "inspector",
         message: "Live on-device inspector (debug builds only)?",
-        initial: flagBool(flags, "inspector", presetDefault(preset, "inspector", true)),
+        initial: line.inspector,
       },
       {
         type: "confirm",
         name: "devClient",
         message: "Desktop dev-client (JVM window + Compose Hot Reload)?",
-        initial: flagBool(flags, "dev-client", presetDefault(preset, "devClient", true)),
+        initial: line.devClient,
       },
       {
         type: "text",
         name: "tabs",
         message: "Bottom-nav tabs (label:icon, comma-separated)",
-        initial: "Home:home,Profile:person",
+        initial: line.tabs.map((t) => `${t.label}:${t.icon}`).join(","),
       },
-      {
-        type: "text",
-        name: "targetDir",
-        message: "Target directory",
-        initial: positional || `./${slugFromName(base.appName)}`,
-      },
+      { type: "text", name: "targetDir", message: "Target directory", initial: line.targetDir },
     ],
     { onCancel }
   );
 
   return {
-    appName: base.appName,
-    package: base.package,
-    iosBundleId: base.package,
-    themePrefix: pascalFromName(base.appName),
-    harness: extras.harness,
-    platforms: { android: true, ios: base.ios },
-    room: extras.room,
-    e2e: extras.e2e,
-    inspector: extras.inspector,
-    devClient: extras.devClient,
-    tabs: parseTabs(extras.tabs) || [{ label: "Home", icon: "home" }],
-    targetDir: extras.targetDir,
+    ...line,
+    harness: answers.harness,
+    platforms: { android: true, ios: answers.ios },
+    room: answers.room,
+    e2e: answers.e2e,
+    inspector: answers.inspector,
+    devClient: answers.devClient,
+    tabs: parseTabs(answers.tabs) || [{ label: "Home", icon: "home" }],
+    targetDir: answers.targetDir,
   };
 }
 
