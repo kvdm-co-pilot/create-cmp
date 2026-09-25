@@ -58,6 +58,40 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-197 — the walk-wiring ADD heal re-serialises the whole settings file — **CLOSED 2026-09-25**
+
+`src/commands/doctor.mjs` (`applySafeFixes`, `f.id === "walk-wiring"`)
+
+The add heal writes `JSON.stringify(settings, null, 2)`, so an app whose `.claude/settings.json`
+carries `—` escapes (the template's own SessionStart and PreToolUse commands do), four-space
+indentation, tabs, or key order of its own gets all of that rewritten as a side effect of having a
+status line added. The rewrite heal added beside it deliberately does the opposite — it edits the
+command's string token in the raw text and leaves every other byte — and the two now sit in the same
+command.
+
+**Nobody is wrongly served by the CONTENT** (the settings mean the same thing), and the adopter did
+ask for a write. What they did not ask for is the diff. Bounded today: the add heal only runs when a
+surface is missing.
+
+**Fires when:** `doctor --fix` adds the walk wiring to a settings file the app has formatted its own
+way.
+*Logged 2026-09-22, found while writing the in-place rewrite next to it.*
+
+**CLOSED by editing the raw text, like the rewrite heal beside it, in the commit that moved it here.**
+The add heal now turns what it adds into edits — a member added to an object, groups appended to an
+array, or a `null` slot filled — and `editJsonInPlace` (`src/lib/json-in-place.mjs`) applies them to
+the app's own bytes. Every byte outside an insertion stays where it was. What is inserted follows the
+file's own layout: its indentation unit (spaces or tabs, read from the container), its line ending,
+its key separator, one-line when the container or the whole file is one line, and `\uXXXX` escapes
+when the file already uses them. The result is parsed and compared with the parsed original plus the
+additions before anything is written, and a text it cannot account for (not JSON, a duplicate key, a
+slot of the wrong kind) is left alone, like the unparseable file before it. A file that does not
+exist is still created in the template's two-space shape, since there are no bytes to keep.
+`test/the-walk-wiring-heal-rewrites-the-whole-settings-file.test.mjs` checks that every line of a
+four-space file with its own key order and a `—` escape survives, a one-line file stays one
+line, a tab-indented app hook keeps its bytes and gets the walk's group appended, and the editor's
+refusals.
+
 ### KD-231 — the shipped orchestrator's hand-off point is the maintainer's private file — **CLOSED 2026-09-25**
 
 `agents/cmp-orchestrator.md:220-222` (shipped through `.claude-plugin/plugin.json` `agents`), and

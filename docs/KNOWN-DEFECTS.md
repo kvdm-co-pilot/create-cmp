@@ -202,7 +202,6 @@ you the same list without opening anything.
 | **KD-193** | the oracle test's failure message says *"the shell runs it in: the payload's cwd"* whenever the GATE resolved the payload's cwd, whatever the shell did — it printed exactly that for `cd /here"/sub"`, which the shell runs in `/here/sub` | a diagnostic only, on a failing row, in `test/the-gate-resolves-a-directory-a-shell-would-not.test.mjs`; it misdescribes the oracle in the one moment a reader is trusting it |
 | **KD-194** | `create-cmp upgrade --harness` writes `.claude/settings.json` too — `decideFile` returns `applied` whenever the app's copy equals the base stamp — where KD-85 said `doctor --fix` was the one command that does | measured preserved-or-merged, never clobbered: an app's own hooks survive and the anchors land, and the one case the merge conflicts on is the case `doctor --fix` refuses. KD-85's sentence is corrected in its closure |
 | **KD-195** | the new `unanchored-hooks` finding reports every anchorable hook surface the detector faults, so KD-183's over-report can now be printed about a Stop, PreToolUse or SessionStart hook an app anchored by `cd` | the conservative direction, chosen on purpose: a `warn` that names the command and prints the anchored form, where the other direction is silence about a Stop gate that does not run; claiming health is impossible here by construction |
-| **KD-197** | the walk-wiring ADD heal writes `JSON.stringify(settings, null, 2)`, so an app's own indentation, escapes and key order are rewritten as a side effect of gaining a status line | the settings mean the same thing and the adopter asked for a write; what they did not ask for is the diff. Bounded: the add heal only runs when a surface is missing |
 | **KD-198** | the two new walk fields (`unconfirmed`, `healable`) keep KD-182's fail-open `?? []`, so an `ok` still requires the absence of three fields rather than the presence of evidence | no second producer exists — `gatherWalkInputs` sets all four on every return path and is the only caller — and the fix is the one KD-182 defers, now over four fields |
 | **KD-199** | two superseded commands in the shipped-hooks table are narration, and `healedForm` refuses to heal them because their successors describe a newer lane than the app may have | a decision, not an oversight: only a pair differing by the anchor alone is healed, which is identical at the project root whatever the lane version. Healing narration is two table fields plus lane-version detection |
 | **KD-200** | text a test prints shares the runner's message channel, and node's parser reads it as a frame length: a third byte ≥ `0x80` (`›` `✓` `→` `—`) makes the size negative and aborts the FILE with *"Unable to deserialize cloned data"*, attributed to whichever file's stream was being parsed | the `scaffold.test.mjs` instance is fixed and the helper is guarded, but the class is not closed: a static over-approximation says 70 of 274 declared test files can reach such a write, and closing it needs either a `package.json` preload (the suite gate's own definition) or a per-file measurement |
@@ -3080,25 +3079,6 @@ credits anything.
 **Fires when:** an app hand-anchors any hook by `cd`, or writes an absolute path into one, and runs
 `create-cmp doctor`.
 *Logged 2026-09-22 by the slice that widened the population, against its own change.*
-
-### KD-197 — the walk-wiring ADD heal re-serialises the whole settings file
-
-`src/commands/doctor.mjs` (`applySafeFixes`, `f.id === "walk-wiring"`)
-
-The add heal writes `JSON.stringify(settings, null, 2)`, so an app whose `.claude/settings.json`
-carries `—` escapes (the template's own SessionStart and PreToolUse commands do), four-space
-indentation, tabs, or key order of its own gets all of that rewritten as a side effect of having a
-status line added. The rewrite heal added beside it deliberately does the opposite — it edits the
-command's string token in the raw text and leaves every other byte — and the two now sit in the same
-command.
-
-**Nobody is wrongly served by the CONTENT** (the settings mean the same thing), and the adopter did
-ask for a write. What they did not ask for is the diff. Bounded today: the add heal only runs when a
-surface is missing.
-
-**Fires when:** `doctor --fix` adds the walk wiring to a settings file the app has formatted its own
-way.
-*Logged 2026-09-22, found while writing the in-place rewrite next to it.*
 
 ### KD-198 — the new walk fields keep KD-182's fail-open `?? []`
 
