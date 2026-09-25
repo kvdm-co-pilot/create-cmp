@@ -9,6 +9,21 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-238 — the architecture diagram names a third party's package — **CLOSED 2026-09-25**
+
+`docs/ARCHITECTURE.md:12`
+
+The diagram labels the CLI "`npx create-cmp` ← the CLI, usable by anyone". `create-cmp` on npm is not
+ours. ADR-0006 keeps the name `create-cmp-cli` because the bare name will never resolve to this
+project.
+
+**Why it does not block:** it is a label in a contributor-facing diagram, not an install step. The
+correction is one word.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** `docs/ARCHITECTURE.md:12` now labels the CLI `npx create-cmp-cli`, the name ADR-0006 keeps; the column width of the diagram is unchanged. The file is hand-written: it carries no generated region markers, no script in `scripts/` or `src/` writes it (the `docs/ARCHITECTURE.md` those name is the stamped app's), and its history is three hand commits. No test: it is a label in a contributor-facing diagram, and `test/an-adopter-is-told-to-npx-a-package-this-project-does-not-publish.test.mjs` walks `template`, `overlays` and `skills`, not `docs/`.
+
 ### KD-236 — the iOS-off ADR credits an interview that a command line never had — **CLOSED 2026-09-25**
 
 `src/lib/adr-seed.mjs:126`
