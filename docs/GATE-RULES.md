@@ -350,6 +350,12 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   wrong."* The path list that remains — `DEVICE_TIER_IRRELEVANT` — answers only whether anything
   this slice touched could reach a phone at all, which is the cheap question asked first and the
   one a machine with no device record can still answer.
+- **The Firebase L2 run is owed when the STAMPED-PLUS-ADDED app moves.** One stamp, two digests: the
+  default app, and the same app after `create-cmp add firebase --no-verify`
+  (`scripts/stamped-output.mjs`, `stampedApps`). Each tier is discharged only by the record of a run
+  over its own bytes: `qa-artifacts/fleet-latest.json`, and `qa-artifacts/fleet-firebase-latest.json`
+  written by `fleet-check --with-firebase`. A template edit moves both and an overlay edit moves one.
+  No calendar (`docs/proposals/LIBRARIES-IN-SERVICES-OUT.md`, Decision 1).
 - **The expensive tier is the LAST gate, and after it the slice is frozen.** A change to the stamped
   app after a discharge REOPENS the slice and is told so by name, with the count of files that moved
   and the first of them. A comment in a file that SHIPS and that the L2 run reads still reopens it:

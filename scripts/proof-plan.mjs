@@ -86,7 +86,8 @@ import {
   REVIEW_SKIP,
 } from "./observed-tree.mjs";
 import {
-  stampedOutput,
+  stampedApps,
+  FIREBASE_FLEET_RECORD,
   describeStampedDiff,
   stampScratchApp,
   hashStampedTree,
@@ -208,6 +209,19 @@ const TIERS = Object.freeze({
       "      HOW MANY ROUNDS, what blocks, where everything else goes, and how the last round records: the header of\n" +
       "      docs/KNOWN-DEFECTS.md. That is the rule's one statement. This line names it and stops.",
   },
+  // THE FIREBASE L2 RUN (GATE-RULES Rule 4, KD-206). The same lane, over the
+  // app `create-cmp add firebase --no-verify` leaves on the default stamp, with
+  // the Firebase Emulator Suite serving what that app declares. It has its own
+  // digest (`stampedApps`, scripts/stamped-output.mjs) and its own record
+  // (FIREBASE_FLEET_RECORD), so an overlay edit owes this run and not the
+  // default one, and a template edit owes both. Same bar as the default tier:
+  // one constant, so the two L2 runs can never be held to different levels.
+  firebase: {
+    when: "at-close",
+    cost: "~4.5min + an emulator + the Firebase Emulator Suite",
+    requires: DEVICE_TIER_LEVEL,
+    cmd: `CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level ${DEVICE_TIER_LEVEL} --with-firebase`,
+  },
 });
 
 function sh(cmd, args) {
@@ -313,8 +327,16 @@ function write(plan) {
  * are: a test that asserts what a fixture owes must not be answered by whatever
  * device run this particular laptop happens to have on disk. Pass `null` for
  * "no run is recorded here".
+ *
+ * `firebaseRecord` is the Firebase L2 run's record, handed in for the same
+ * reason. A caller that injects `fleetRecord` and says nothing about Firebase
+ * gets NO Firebase record, not this laptop's: the callers that inject one do
+ * it precisely so that no machine's disk answers them, and a second record
+ * read behind their back would undo that for the new tier.
  */
-export function obligation(plan = read(), paths = changedPaths(), branch = currentBranch(), { fleetRecord = readFleetRecord() } = {}) {
+export function obligation(plan = read(), paths = changedPaths(), branch = currentBranch(), opts = {}) {
+  const fleetRecord = opts.fleetRecord === undefined ? readFleetRecord() : opts.fleetRecord;
+  const firebaseRecord = opts.firebaseRecord !== undefined ? opts.firebaseRecord : opts.fleetRecord !== undefined ? null : readFirebaseRecord();
   const stale = plan && plan.branch !== branch ? plan : null;
   if (stale) plan = null;
   const base = { plan, stale, branch };
@@ -326,7 +348,9 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
     // place a device run is legitimate without a slice — a release proof.
     const reason = `nothing has changed since origin/main and the working tree is clean — this tree is trunk${where}, and whatever it owed was collected when its slice merged`;
     const none = { required: false, obliging: [], reason };
-    return { state: "none", trunk: true, ...base, need: none, review: { state: "none", trunk: true, need: none } };
+    // The Firebase block is carried here too, so a reader of `o.firebase` never
+    // meets an undefined tier on trunk — the one place a release proof runs.
+    return { state: "none", trunk: true, ...base, need: none, review: { state: "none", trunk: true, need: none }, firebase: { state: "none", trunk: true, need: none } };
   }
   // `deviceTierNeed`, not `deriveTierNeed` over the list directly: markdown
   // under `template/` ships into the stamped app, so it is asked about and the
@@ -340,17 +364,40 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
   // costs a read of the diff rather than an unreviewed change.
   const reviewNeed = deriveTierNeed(paths, { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" });
 
-  const dev = tierState(need.required, plan, plan?.discharged, readStamped, {
+  // The Firebase L2 run is owed on exactly the paths the L2 run is — the same
+  // function over the same list; only the sentence names the other run. What
+  // tells the two apart is the DIGEST each is keyed on, not the paths.
+  const firebaseNeed = deviceTierNeed(paths, { tierName: "the Firebase L2 run" });
+
+  // ONE STAMP FOR BOTH L2 TIERS. `stampedApps` stamps the scratch app once,
+  // hashes it, runs `add firebase --no-verify` on the same directory under the
+  // same cap, and hashes again (KD-208: no second stamp, no fifth bound). The
+  // thunk is shared and memoised, so whichever tier asks first pays for both
+  // digests and a tier that is not required never asks.
+  let apps = null;
+  const stamped = () => (apps ??= readStampedApps());
+  // A discharge with no rule was written before the digest had one: rule 1.
+  const sameRule = (d) => (Object.hasOwn(d, "stampedRule") ? d.stampedRule : 1) === STAMPED_OUTPUT_RULE;
+  const dev = tierState(need.required, plan, plan?.discharged, () => stamped().default, {
     key: "stampedHash",
     proves: (now) => recordMeetsTier(fleetRecord, TIERS.device, now),
     // A discharge is a record's copy, so it is judged as one — one rule, one
     // function, whichever file the bytes are sitting in.
     attests: (d, now) => recordMeetsTier(asRecord(d), TIERS.device, now),
-    // A discharge with no rule was written before the digest had one: rule 1.
-    sameRule: (d) => (Object.hasOwn(d, "stampedRule") ? d.stampedRule : 1) === STAMPED_OUTPUT_RULE,
+    sameRule,
+  });
+  // An unanswerable Firebase half (`{hash: null, unanswerable}`) reads OWED
+  // with its reason through `tierState`'s first branch — never DISCHARGED.
+  const fb = tierState(firebaseNeed.required, plan, plan?.firebaseDischarged, () => stamped().firebase, {
+    key: "stampedHash",
+    proves: (now) => firebaseRecordMeets(firebaseRecord, now),
+    // `rekey: null`: the rekey record re-derives the DEFAULT run only (KD-206's
+    // sibling, logged), so it never speaks for a Firebase record.
+    attests: (d, now) => recordMeetsTier(asRecord(d), TIERS.firebase, now, { rekey: null }),
+    sameRule,
   });
   const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => ({ hash: observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }) }));
-  return { ...dev, need, ...base, review: { ...rev, need: reviewNeed } };
+  return { ...dev, need, ...base, review: { ...rev, need: reviewNeed }, firebase: { ...fb, need: firebaseNeed } };
 }
 
 /**
@@ -364,11 +411,14 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
  * classifies. So it degrades to OWED and says what happened: more proof, never
  * less, which is the same direction `deriveTierNeed` fails in.
  */
-function readStamped(root = REPO_ROOT) {
+function readStampedApps(root = REPO_ROOT) {
   try {
-    return stampedOutput(root);
+    // A failed ADD is already a state inside `stampedApps` — only the Firebase
+    // half is unanswerable. A failed STAMP throws, and costs both halves.
+    return stampedApps(root);
   } catch (err) {
-    return { hash: null, files: null, unanswerable: err?.message ?? String(err) };
+    const unanswerable = err?.message ?? String(err);
+    return { default: { hash: null, files: null, unanswerable }, firebase: { hash: null, files: null, unanswerable } };
   }
 }
 
@@ -624,6 +674,34 @@ function asRecord(discharged) {
   };
 }
 
+/**
+ * WHETHER A RECORD PROVES THE FIREBASE L2 RUN: it must SAY it served the
+ * Firebase Emulator Suite (`coverage.firebase === true`, written by
+ * `fleet-check --with-firebase`), and then meet the tier exactly as any record
+ * meets its tier — digest, rule, verdict, rung — through `recordMeetsTier`.
+ * A record without that field is a default-shaped run sitting in the Firebase
+ * file, and says nothing about the emulator redirect this tier exists to prove.
+ * `rekey: null` because `--rekey` re-derives the default run's record only.
+ */
+export function firebaseRecordMeets(record, now) {
+  if (record && record.coverage?.firebase !== true) {
+    return {
+      ok: false,
+      exit: 2,
+      code: "no-coverage",
+      about: true,
+      reason: `the recorded Firebase run (${FIREBASE_FLEET_RECORD}) does not say it served the Firebase Emulator Suite — coverage.firebase is ${JSON.stringify(record.coverage?.firebase)}, not true — so it proves at most the default app. Run the tier once: ${TIERS.firebase.cmd}`,
+    };
+  }
+  const m = recordMeetsTier(record, TIERS.firebase, now, { rekey: null });
+  return m.ok ? { ...m, proof: { ...m.proof, from: FIREBASE_FLEET_RECORD } } : m;
+}
+
+/** The Firebase L2 run's record, or null. Never throws. */
+export function readFirebaseRecord(file = path.join(REPO_ROOT, FIREBASE_FLEET_RECORD)) {
+  return readFleetRecord(file);
+}
+
 /** The device run's record, or null. Never throws — an absent record is a state, not a crash. */
 export function readFleetRecord(file = path.join(REPO_ROOT, "qa-artifacts", "fleet-latest.json")) {
   try {
@@ -775,18 +853,21 @@ export function close(o = obligation(), { planPath = PLAN_PATH, historyFile = hi
   const isSettled = (s) => s === "none" || s === "discharged";
   // BOTH at-close tiers, or the plan stays: a slice that closed with a review
   // owed would be a slice whose next reader is told nothing is outstanding.
-  const settled = isSettled(o.state) && isSettled(o.review?.state ?? "none");
+  // And the Firebase L2 run, for the same reason: an obligation without the
+  // block (a caller's stub) reads as not owed, never as settled-by-omission of a
+  // tier that was computed.
+  const settled = isSettled(o.state) && isSettled(o.review?.state ?? "none") && isSettled(o.firebase?.state ?? "none");
   const ended = o.plan ?? o.stale ?? null;
   if (settled && ended) {
     const own = Boolean(o.plan);
     const event = own || !branchExists(ended.branch) ? "closed" : "cleared";
     appendHistory(
       historyFile,
-      planEvent(event, ended, { via, onBranch: o.branch ?? null, device: own ? o.state : null, review: own ? (o.review?.state ?? "none") : null, now }),
+      planEvent(event, ended, { via, onBranch: o.branch ?? null, device: own ? o.state : null, review: own ? (o.review?.state ?? "none") : null, firebase: own ? (o.firebase?.state ?? "none") : null, now }),
     );
     fs.rmSync(planPath, { force: true });
   }
-  return { closed: settled, removed: Boolean(settled && ended), state: o.state, reviewState: o.review?.state ?? "none" };
+  return { closed: settled, removed: Boolean(settled && ended), state: o.state, reviewState: o.review?.state ?? "none", firebaseState: o.firebase?.state ?? "none" };
 }
 
 /** Whether a local branch of this name exists. Unanswerable counts as existing, so a doubt records `cleared`, never a false `closed`. */
@@ -797,8 +878,8 @@ function localBranchExists(name) {
 }
 
 /** One history row about a plan: what happened to it, when, and the plan as it stood. */
-function planEvent(event, plan, { via = null, onBranch = null, device = null, review = null, now = new Date() } = {}) {
-  return { schema: PLAN_EVENT_SCHEMA, event, via, at: now.toISOString(), onBranch, device, review, plan: withoutManifest(plan) };
+function planEvent(event, plan, { via = null, onBranch = null, device = null, review = null, firebase = null, now = new Date() } = {}) {
+  return { schema: PLAN_EVENT_SCHEMA, event, via, at: now.toISOString(), onBranch, device, review, firebase, plan: withoutManifest(plan) };
 }
 
 /**
@@ -809,9 +890,13 @@ function planEvent(event, plan, { via = null, onBranch = null, device = null, re
  * survives, so two rows can still be compared.
  */
 function withoutManifest(plan) {
-  if (!plan?.discharged?.stampedFiles) return plan;
-  const { stampedFiles, ...rest } = plan.discharged;
-  return { ...plan, discharged: { ...rest, stampedFileCount: Object.keys(stampedFiles).length } };
+  if (!plan?.discharged?.stampedFiles && !plan?.firebaseDischarged?.stampedFiles) return plan;
+  const strip = (d) => {
+    if (!d?.stampedFiles) return d;
+    const { stampedFiles, ...rest } = d;
+    return { ...rest, stampedFileCount: Object.keys(stampedFiles).length };
+  };
+  return { ...plan, discharged: strip(plan.discharged), ...(Object.hasOwn(plan, "firebaseDischarged") ? { firebaseDischarged: strip(plan.firebaseDischarged) } : {}) };
 }
 
 /**
@@ -851,11 +936,12 @@ export function outstanding(o) {
   // still `device` — TIERS.device, a plan's `declared.device` — see KD-6.
   if (open(o.state)) out.push(`L2 run (${o.state.toUpperCase()})`);
   if (open(o.review?.state)) out.push(`review (${o.review.state.toUpperCase()})`);
+  if (open(o.firebase?.state)) out.push(`Firebase L2 run (${o.firebase.state.toUpperCase()})`);
   return out;
 }
 
 /** The tiers `render()` prints in a block of their own, and so skips in the cheap-tier loop. */
-const OWN_BLOCK = new Set(["device", "review"]);
+const OWN_BLOCK = new Set(["device", "review", "firebase"]);
 
 export function render(o) {
   const L = [];
@@ -950,6 +1036,7 @@ export function render(o) {
       break;
   }
   renderReview(o, L);
+  renderFirebase(o, L);
   return L.join("\n");
 }
 
@@ -999,6 +1086,120 @@ function renderReview(o, L) {
       );
       break;
   }
+}
+
+/**
+ * The Firebase L2 run's block, printed AFTER the review's. Its label is
+ * "Firebase L2 run" and deliberately not anything that starts with "L2 run ":
+ * readers of this output anchor the default tier's block on that label.
+ *
+ * Fewer sentences than the default tier's, on purpose: this tier has no
+ * pre-criterion history to explain and no rekey of its own (`--rekey`
+ * re-derives the default run's record only — logged, not built), so a record
+ * that does not carry it is named by `recordMeetsTier`'s or
+ * `firebaseRecordMeets`'s own reason and nothing is paraphrased over it.
+ */
+function renderFirebase(o, L) {
+  const f = o.firebase;
+  if (!f) return;
+  const t = TIERS.firebase;
+  const d = o.plan?.firebaseDischarged;
+  const line = (verdict, detail) => L.push(`  ${"Firebase L2 run".padEnd(16)} ${verdict}\n      ${detail}`);
+  switch (f.state) {
+    case "none":
+      line("NOT OWED", f.need.reason);
+      break;
+    case "undeclared":
+      line(
+        "OWED — but no slice is declared",
+        `${f.need.reason}.\n      ${isTrunk(o.branch) ? "You are on trunk — branch first (git switch -c <name>), then declare the slice" : "Declare the slice first"}: node scripts/proof-plan.mjs --open "<what you are building>".`,
+      );
+      break;
+    case "owed":
+      if (f.shortfall) {
+        line(`OWED — the run on record does not carry this tier (${f.shortfall.code})`, `${f.shortfall.reason}\n      ${f.need.reason}.`);
+      } else if (f.unanswerable) {
+        line(
+          "OWED — the app this tree stamps with Firebase added could not be produced",
+          `${f.need.reason}.\n      ${f.unanswerable}. Nothing here can say whether these bytes were proven, and a question that\n      cannot be put is owed rather than waved through. The default L2 run is judged on its own digest.`,
+        );
+      } else {
+        line(
+          "OWED — discharge at slice close, NOT NOW",
+          `${f.need.reason}.\n      What discharges it is the app this tree stamps with \`create-cmp add firebase --no-verify\` applied: a PASS run\n      recorded against those exact bytes in ${FIREBASE_FLEET_RECORD}, with coverage.firebase. Run it last — ${t.cost}:\n        ${t.cmd}\n      Then: node scripts/proof-plan.mjs --discharge`,
+        );
+      }
+      break;
+    case "discharged": {
+      const p = f.proof ?? d ?? {};
+      line(
+        "DISCHARGED",
+        `the app this tree stamps with Firebase added is byte-identical to the one proven at ${p.at ?? "an unstated time"} — verdict ${p.verdict ?? "unstated"}, rung ${p.rung ?? "none"} against the ${t.requires} this tier requires${p.from ? `, read from ${p.from}` : ""}.`,
+      );
+      break;
+    }
+    case "reopened":
+      line(
+        "REOPENED — the Firebase app moved after its L2 run",
+        `${describeStampedDiff(d?.stampedFiles, f.reading?.files)}.\n      The run at ${d?.at ?? "an unstated time"} describes an app that no longer exists (${String(d?.stampedHash).slice(0, 7)} → ${String(f.now).slice(0, 7)}).\n      Either revert what moved, or accept a second Firebase L2 run: ${t.cmd}`,
+      );
+      break;
+  }
+}
+
+/**
+ * `--discharge`, as a function of what it read: the plan, the two digests of
+ * ONE stamp (`stampedApps`), and each tier's own record. Nothing here takes a
+ * caller's word — every field it writes is copied from a record that met its
+ * tier.
+ *
+ * The DEFAULT tier keeps its semantics exactly: discharged from
+ * `qa-artifacts/fleet-latest.json`, and a record that does not meet it is the
+ * exit (`recordMeetsTier`'s 1 or 2). The FIREBASE tier, when it is required,
+ * is discharged only from FIREBASE_FLEET_RECORD meeting the Firebase digest
+ * (`firebaseRecordMeets`); when it does not meet, the reason is returned as a
+ * note and the exit is left as the default tier made it. Each tier is written
+ * from its own record whatever the other one did — one record never
+ * discharges both.
+ */
+export function discharge(plan, { apps, fleetRecord = null, firebaseRecord = null, firebaseRequired = false } = {}) {
+  const next = { ...plan };
+  const notes = [];
+  const now = apps.default.hash;
+  // ONE reading, the same one the schedule prints and the merge gate refuses
+  // on: digest, verdict AND rung. Reading the verdict without the rung is
+  // reading half a record — a fleet check is PASS at whatever level it was
+  // told to require, and `--min-level L1` attaches no device.
+  const m = recordMeetsTier(fleetRecord, TIERS.device, now);
+  if (m.ok) {
+    // `stampedRule` rides with the digest for the reason the record's does:
+    // a discharge is only comparable with a digest taken under its rule.
+    next.discharged = {
+      at: m.proof.at,
+      stampedHash: now,
+      stampedFiles: apps.default.files,
+      stampedRule: apps.default.rule,
+      verdict: m.proof.verdict,
+      rung: m.proof.rung,
+      ...(m.proof.rekeyedFrom ? { rekeyedFrom: m.proof.rekeyedFrom } : {}),
+    };
+  } else {
+    notes.push(`${m.reason}${m.code === "other-app" ? `\n${describeStampedDiff(m.files ?? fleetRecord.stampedOutputFiles, apps.default.files)}` : ""}`);
+  }
+  if (firebaseRequired) {
+    const fb = apps.firebase;
+    if (typeof fb?.hash !== "string") {
+      notes.push(`the Firebase L2 run is not discharged — ${fb?.unanswerable ?? "the Firebase app was not stamped"}`);
+    } else {
+      const f = firebaseRecordMeets(firebaseRecord, fb.hash);
+      if (f.ok) {
+        next.firebaseDischarged = { at: f.proof.at, stampedHash: fb.hash, stampedFiles: fb.files, stampedRule: fb.rule, verdict: f.proof.verdict, rung: f.proof.rung };
+      } else {
+        notes.push(`the Firebase L2 run is not discharged — ${f.reason}${f.code === "other-app" ? `\n${describeStampedDiff(f.files ?? firebaseRecord.stampedOutputFiles, fb.files)}` : ""}`);
+      }
+    }
+  }
+  return { ok: m.ok, exit: m.ok ? 0 : m.exit, plan: next, notes, wrote: m.ok || next.firebaseDischarged !== plan?.firebaseDischarged };
 }
 
 /**
@@ -1256,32 +1457,20 @@ function main() {
     }
     // Read the run rather than take the caller's word for it: a discharge that
     // trusts an argument is a claim, and this whole product exists to refuse
-    // exactly that shape. The record fleet-check writes is the evidence.
-    const rec = readFleetRecord();
-    const stamped = stampedOutput(REPO_ROOT);
-    const now = stamped.hash;
-    // ONE reading, the same one the schedule prints and the merge gate refuses
-    // on: digest, verdict AND rung. Reading the verdict without the rung is
-    // reading half a record — a fleet check is PASS at whatever level it was
-    // told to require, and `--min-level L1` attaches no device.
-    const m = recordMeetsTier(rec, TIERS.device, now);
-    if (!m.ok) {
-      process.stderr.write(`${m.reason}\n${m.code === "other-app" ? `${describeStampedDiff(m.files ?? rec.stampedOutputFiles, stamped.files)}\n` : ""}`);
-      process.exit(m.exit);
+    // exactly that shape. The records fleet-check writes are the evidence, and
+    // ONE stamp answers both digests — the one `obligation()` reads too.
+    const r = discharge(plan, {
+      apps: stampedApps(REPO_ROOT),
+      fleetRecord: readFleetRecord(),
+      firebaseRecord: readFirebaseRecord(),
+      firebaseRequired: deviceTierNeed(changedPaths(), { tierName: "the Firebase L2 run" }).required,
+    });
+    if (r.wrote) write(r.plan);
+    if (!r.ok) {
+      process.stderr.write(`${r.notes.join("\n")}\n`);
+      process.exit(r.exit);
     }
-    // `stampedRule` rides with the digest for the reason the record's does:
-    // a discharge is only comparable with a digest taken under its rule.
-    plan.discharged = {
-      at: m.proof.at,
-      stampedHash: now,
-      stampedFiles: stamped.files,
-      stampedRule: stamped.rule,
-      verdict: m.proof.verdict,
-      rung: m.proof.rung,
-      ...(m.proof.rekeyedFrom ? { rekeyedFrom: m.proof.rekeyedFrom } : {}),
-    };
-    write(plan);
-    process.stdout.write(`${render(obligation(plan))}\n`);
+    process.stdout.write(`${r.notes.map((n) => `${n}\n`).join("")}${render(obligation(r.plan))}\n`);
     process.exit(0);
   }
 
