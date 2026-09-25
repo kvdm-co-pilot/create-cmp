@@ -206,7 +206,7 @@ async function main() {
       }
       process.stderr.write(
         `create-cmp harness: unknown subcommand ${JSON.stringify(sub ?? "")}\n` +
-          `  usage: create-cmp harness init    [--profile <id>] [--target-dir <dir>] [--dry-run] [--no-interview]\n` +
+          `  usage: create-cmp harness init    [--profile <id>] [--target-dir <dir>] [--dry-run] [--new-profile] [--no-interview]\n` +
           `         create-cmp harness relock  [--target-dir <dir>] [--dry-run]\n` +
           `         create-cmp harness upgrade [--target-dir <dir>] [--dry-run]\n` +
           `         create-cmp harness upgrade --fleet <manifest> [--dry-run]\n`
@@ -263,6 +263,7 @@ function printHelp() {
       `                    --google-services <path> (your real config; without it a MOCK that says so is written)\n` +
       `                    --dry-run  --verify/--no-verify  --dry-run-verify\n` +
       `harness init flags:   --profile <id>  --target-dir <dir>  --dry-run\n` +
+      `                      --new-profile   (seed a generic profile even if another claims this tree)\n` +
       `                      --no-interview  (skip the ladder questions and record NO answers —\n` +
       `                      not the same as taking the defaults, which this command never does)\n` +
       `harness relock flags: --target-dir <dir>  --dry-run\n` +
