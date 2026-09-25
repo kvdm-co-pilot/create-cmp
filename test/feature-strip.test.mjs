@@ -220,6 +220,35 @@ test("--no-room with dev-client ON: desktop Room seam stripped but the dev-clien
   fs.rmSync(out, { recursive: true, force: true });
 });
 
+// grepSources above reads no .md, so the architecture doc every app is stamped with described
+// Room and data/local/ to an app stamped without them (--no-room, and --preset lean, which
+// resolves to room off). The archDoc lane step checks only the doc's cmp:generated sections, so
+// the hand-written prose could be wrong with the lane green. The prose now carries `room` /
+// `!room` marker blocks; this holds both renderings.
+test("--no-room: docs/ARCHITECTURE.md names no database the app lacks, and the default stamp still names it", async () => {
+  const off = await stamp({ room: false });
+  const on = await stamp({});
+  const docOff = fs.readFileSync(path.join(off, "docs", "ARCHITECTURE.md"), "utf8");
+  const docOn = fs.readFileSync(path.join(on, "docs", "ARCHITECTURE.md"), "utf8");
+
+  for (const re of [/data\/local/, /\bAppDatabase\b/, /\bItemDao\b/]) {
+    assert.doesNotMatch(docOff, re, `a room-off app's architecture doc must not describe ${re}`);
+    assert.match(docOn, re, `a room-on app's architecture doc must still describe ${re}`);
+  }
+
+  // The !room renderings reach the room-off doc and only it.
+  const roomOffSentence = /This app keeps no on-device database/;
+  assert.match(docOff, roomOffSentence, "the room-off Persistence policy is stamped");
+  assert.doesNotMatch(docOn, roomOffSentence, "the room-off Persistence policy never reaches a room-on app");
+
+  // Marker lines are removed whole, so a marker between table rows or inside a diagram's code
+  // fence leaves nothing behind in either rendering.
+  for (const doc of [docOff, docOn]) assert.ok(!doc.includes("cmp:feature"), "no marker noise");
+
+  fs.rmSync(off, { recursive: true, force: true });
+  fs.rmSync(on, { recursive: true, force: true });
+});
+
 test("default (inspector ON): debug module + release no-op twin stamped under the renamed package", async () => {
   const out = await stamp({});
 
