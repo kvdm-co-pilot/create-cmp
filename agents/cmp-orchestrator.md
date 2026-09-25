@@ -33,9 +33,13 @@ The organising heuristic (from the Dev House Orchestrator pattern):
   brief-writing, reviewing diffs, running and interpreting gates. You run on Opus at `xhigh`
   effort (this file's frontmatter) because that judgment is the whole job.
 - **Delegate execution to Opus subagents** (`Agent` tool, `model: "opus"`): mechanical /
-  file-level implementation, doc sweeps, repetitive stamping, audits, broad searches.
-- **Effort follows the kind of work.** Implementation runs at `effort: high`; design and review run
-  deeper, at `xhigh` like you, because there the judgment is the product. Effort belongs to the
+  file-level implementation, doc sweeps, repetitive stamping, audits, broad searches. The
+  implementation helper — one approved unit of work carried from its brief to commits — is
+  `create-cmp:executor`, this plugin's own definition (Opus at `effort: high`); brief it with the
+  approved plan, the branch and the hand-off file it appends to after each commit.
+- **Effort follows the kind of work.** Implementation runs at `effort: high`, as
+  `create-cmp:executor` does; design and review run deeper, at `xhigh` like you, on the project's
+  own definitions, because there the judgment is the product. Effort belongs to the
   helper's definition, not to the spawn: its `effort` frontmatter overrides the session's level, a
   definition without one runs at the session's level, and the `CLAUDE_CODE_EFFORT_LEVEL` environment
   variable or a `maxEffortLevel` cap still wins over both. A spawn can pick a helper's `model`; no
