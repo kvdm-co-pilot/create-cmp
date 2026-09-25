@@ -493,6 +493,18 @@ function scanInspectorSources(projectDir) {
  * exits 1. Only an error the operating system raised (one with a `syscall`) is caught:
  * anything else is a defect in this file and still crashes loudly.
  *
+ * A WRITE NEVER TRUNCATES THE FILE IT REPLACES (KD-241). `fs.writeFileSync(target)`
+ * truncates first, so a full disk or a kill part-way left a truncated settings.json where
+ * the app's own was, and KD-214's "could not write" was reported over bytes already gone.
+ * Now the content goes to a temporary file in the target's own directory (so the rename
+ * is atomic) and is renamed over it; on any failure the temporary file is unlinked, the
+ * original keeps its bytes, and the refusal is reported as above. What the truncating
+ * write did implicitly is kept explicitly: a symlinked target keeps its link (the file
+ * written is the one it points at), the file keeps its mode, and a file this user may
+ * not write is still refused (EACCES) rather than replaced, since a rename needs only
+ * the directory's permission. The atomic write is inline, not a helper, so every fs call
+ * that mutates the tree stays inside this body where the dry-run gate can see it.
+ *
  * @param {{dryRun?: boolean}} opts
  * @returns {((target:string, content:string, what:string) => boolean)
  *            & {wrote:number, applied:string[], failed:Array<{what:string,target:string,reason:string}>}}
@@ -512,7 +524,33 @@ export function healWriter({ dryRun = false } = {}) {
     }
     try {
       fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, content);
+      // Never truncate the target (KD-241): write a temporary file beside it, then rename
+      // it over. See "A WRITE NEVER TRUNCATES" above for what this keeps and why it is here.
+      let real = target;
+      let mode;
+      try {
+        real = fs.realpathSync(target);
+        mode = fs.statSync(real).mode & 0o7777;
+      } catch (err) {
+        if (err?.code !== "ENOENT") throw err;
+      }
+      if (mode !== undefined) fs.accessSync(real, fs.constants.W_OK);
+      const tmp = path.join(
+        path.dirname(real),
+        `.${path.basename(real)}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`
+      );
+      try {
+        fs.writeFileSync(tmp, content, { flag: "wx" });
+        if (mode !== undefined) fs.chmodSync(tmp, mode);
+        fs.renameSync(tmp, real);
+      } catch (err) {
+        try {
+          fs.unlinkSync(tmp);
+        } catch {
+          // The write's own refusal is the one to report; a temporary file that will not go is secondary.
+        }
+        throw err;
+      }
     } catch (err) {
       if (typeof err?.syscall !== "string") throw err;
       const reason = writeRefusalInWords(err);
