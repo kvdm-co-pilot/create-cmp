@@ -58,7 +58,7 @@ jobs:
         run: npm test
 
   stamp-android:
-    name: stamp + Android assembleDebug, then add firebase + assembleDebug
+    name: stamp + Android assembleDebug, then add firebase + assembleDebug, then the lean shape
     runs-on: ubuntu-latest # JDK + Android SDK preinstalled; licenses accepted
     needs: test # don't burn a Gradle build on a broken engine
     steps:
@@ -102,6 +102,21 @@ jobs:
           set -o pipefail
           cd "$RUNNER_TEMP/ci-smoke"
           ./gradlew :composeApp:assembleDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/android-firebase-build.log"
+      # The lean shape (`--preset lean`, docs/proposals/LIBRARIES-IN-SERVICES-OUT.md Decision 3) is
+      # the default with Room off: no Room sources, no KSP. Its proof is compile, here, on every
+      # PR — a fresh app, and no add step, because the shape is what is under proof. The L2 run
+      # stays on the default shape; this one never reaches it.
+      - name: Stamp the lean shape (verify off — the build below IS the verification)
+        run: >
+          node bin/create-cmp.mjs "$RUNNER_TEMP/ci-smoke-lean"
+          --name CiSmokeLean --package com.ci.smokelean
+          --preset lean --no-ios --no-verify --yes
+      - name: Build the lean shape (Android)
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/ci-smoke-lean"
+          ./gradlew :composeApp:assembleDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/android-lean-build.log"
       - name: Upload build logs
         if: failure()
         uses: actions/upload-artifact@v4
@@ -110,6 +125,7 @@ jobs:
           path: |
             ${{ runner.temp }}/android-build.log
             ${{ runner.temp }}/android-firebase-build.log
+            ${{ runner.temp }}/android-lean-build.log
           if-no-files-found: ignore
 
   stamp-ios:
