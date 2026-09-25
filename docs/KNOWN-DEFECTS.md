@@ -109,7 +109,7 @@ you the same list without opening anything.
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 | **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
-| **KD-45** | no gate in this repo executes the Firebase or iOS paths | Firebase: CI compiles the default stamp plus `add firebase` on every PR, and nothing runs it; iOS: the L2 run stamps `--no-ios` |
+| **KD-45** | no gate in this repo executes the Firebase or iOS paths | Firebase: CI compiles the default stamp plus `add firebase` on every PR, and nothing runs it; iOS: the L2 run stamps `--no-ios`; the iOS stamp compiled once on CI (run 36181162894, dispatch-only, 0.28.0 tree) and has never run |
 | **KD-46** | the iOS refusal names two causes its `catch` cannot see | half fixed in `79eafd3` (the cause is carried now); Obj-C raises abort before any Kotlin frame, and the app stops either way |
 | **KD-48** | `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin | the shipped Xcode project has only `Debug`/`Release`, which map correctly |
 | **KD-49** | a nested `node --test` exits 0 whatever its tests did, when `NODE_TEST_CONTEXT` is inherited | nothing in the suite spawns one except the harness that measured it, which scrubs the env |
@@ -591,6 +591,15 @@ modules, the google-services plugin over the mock config, the appended BuildConf
 commits behind, and KD-208 says the hook's budget is spent); that runtime proof is its own slice.
 The iOS half is unchanged: the add step applies it when `iosApp/` exists, says it is unproven, and
 nothing compiles it except the parked `stamp-ios` job.
+
+**2026-09-25 — the iOS half, amended: the iOS stamp has compiled on CI, once.** Run
+[36181162894](https://github.com/kvdm-co-pilot/create-cmp/actions/runs/36181162894) (`workflow_dispatch`
+on `dev-done` at `e6260cc`, the 0.28.0 tree) stamped the default with iOS on, ran `add firebase` on
+the same app, linked the KMP framework and built the Xcode project for the iOS simulator: job
+"stamp + iOS xcodebuild", success, 19:42–20:16Z. So the front door's "Android + iOS" is a claim an
+iOS compile has backed. What it is not: a gate (the job runs only on dispatch), a proof of this
+tree (its pods were the `~> 11.0` pin that KD-243 replaced in 0.28.1), or a run. Nothing executes
+the iOS app, so its runtime and the iOS side of the Firebase emulator redirect stay unproven.
 
 ### KD-46 — the iOS refusal names two causes its catch cannot see
 
