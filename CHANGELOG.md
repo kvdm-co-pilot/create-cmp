@@ -6,6 +6,88 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-09-25
+
+The default app carries libraries only: no service, no account, no credential file. This is a
+minor release because `--firebase` at stamp time is now refused.
+
+### Changed — breaking
+
+- **Firebase moves out of the stamp into `create-cmp add firebase`**
+  (`docs/proposals/LIBRARIES-IN-SERVICES-OUT.md`, Decision 2). The default stamp has no
+  google-services plugin, Firebase BOM, GitLive, Firebase R8 rules or `REPLACE_ME` config.
+  - A flag that asks for Firebase at stamp time (`--firebase`, `--region`, `--auth`,
+    `--firestore`, `--storage`, `--functions`, `--fcm`) is refused, exit 2, with nothing written.
+    The refusal names the add step.
+  - A flag that declines Firebase is honoured, with a note.
+- **`create-cmp add firebase [dir]`** makes additive edits, all or none, and a second run
+  writes nothing.
+  - It refuses by name when a file has a shape it does not recognise.
+  - It takes GitLive from the proven set that matches the app's Kotlin.
+  - It uses your real `google-services.json` (`--google-services <path>`), or writes a mock that
+    says it is a mock.
+  - It adds the iOS half only when `iosApp/` exists, and says that half is unproven.
+  - It ends with the verify lane unless you pass `--no-verify`.
+  - `cmp-firebase-connect` wraps it.
+- **`create-cmp upgrade --harness` keeps Firebase in an app that has it.** The app is compared
+  with the default stamp plus the add step, rather than a template that no longer carries
+  Firebase.
+- The Firebase emulator ports are declared once, as constants both platforms read (KD-47).
+- `add` is now a command, so `create-cmp add` no longer scaffolds into a folder called `./add`.
+
+### Added
+
+- **`--preset lean|full`** (default `full`). `lean` is a name for `--no-room`: no Room, so no
+  KSP, and a much shorter first build. A flag you state still wins (`--preset lean --room`). Both
+  shapes carry the full harness. The `cmp-new` fit check chooses the shape from the ask, and CI
+  builds both shapes on every PR.
+
+### Fixed
+
+- `doctor --fix`:
+  - A heal the system refuses to write (EACCES) is reported in words, the diagnosis still
+    prints, and the exit is 1 (KD-214).
+  - Adding the walk wiring edits `.claude/settings.json` in place, keeping your indentation,
+    escapes and key order (KD-197).
+  - Doctor's text no longer claims a by-hand run of the walk "always works" (KD-216).
+- The Stop hook's remedy resolves from the directory the session is in (KD-215).
+- The shipped orchestrator and skills no longer send you to files, programs or people only
+  create-cmp's maintainer has (KD-231).
+- The console:
+  - A request in flight during `stop()` no longer throws (KD-202).
+  - `port: 0` binds a port the OS picks, and the bound port is read back (KD-203).
+  - `stop()` sends `/shutdown` only to a daemon it started or confirmed (KD-204).
+- `cmp-inspector-mcp --help` says what it is (KD-188).
+- A secret-scanner hit on `qa/harness.lock.json` is documented as a sha256 file digest, with how
+  to allowlist it (KD-160).
+- Help and refusal text:
+  - `harness init`'s help names `--new-profile` (KD-4).
+  - A refusal no longer names a `--no-<value flag>` that does not exist (KD-218, wording).
+- Template comments describe the adopter's build, not create-cmp's history (KD-50).
+- The architecture doc stamped into a `lean`/`--no-room` app no longer describes a database the
+  app does not have.
+- A lean app's `docs/dev-client.md` and repository comment no longer name the files the lean
+  stamp removes. The room-off ADR is true for `--preset lean` and `--no-room` alike.
+- `create` in interactive mode takes every stated flag the way `--yes` does: `--target-dir`,
+  `--no-ios`, `--tabs`, `--bundle-id` and `--theme-prefix` used to be ignored by the interview.
+- `add firebase`:
+  - `create` refuses every flag only `add firebase` reads (e.g. `--google-services`).
+  - A value flag given with no value is refused rather than defaulted.
+  - A plain second run writes nothing.
+  - A 0.27 app keeps its region through `upgrade --harness` and can still run the add step.
+  - `--google-services` replaces a config it recorded as yours for the same app.
+  - Changing the region after the add is refused, with a message saying so.
+- The Stop hook: every command it names resolves from the session's directory, in every
+  reason, not only in its last line (KD-215).
+- `doctor`:
+  - It no longer crashes on a `settings.json` that parses into a shape it does not read.
+  - `doctor --fix` names every heal it declines, and heals two shapes it had stopped healing.
+- The console never sends `/shutdown` to a daemon it does not hold.
+- `--help` and the template README spell `npx create-cmp-cli`.
+
+Packages: `create-cmp-cli` 0.28.0, `prooflane-harness` 0.23.2, `@create-cmp/inspector` 0.9.1,
+`create-compose-multiplatform` 0.1.7, `create-kmp` 0.1.7, `create-mobile` 0.1.3.
+
 ## [0.27.2] - 2026-09-25
 
 ### Added
@@ -3688,6 +3770,7 @@ Initial release.
   marketplace manifest.
 
 [unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.2...HEAD
+[0.28.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.2...v0.28.0
 [0.27.2]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.5...v0.27.1
 [0.26.5]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...v0.26.5
