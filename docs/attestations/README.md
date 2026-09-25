@@ -8,9 +8,14 @@ that a human owns is the attestation, and it never writes that."* Criterion A is
 file. An agent filling those fields would manufacture exactly the evidence the criterion
 exists to demand.
 
-So the file is present, every derivable field is filled from a measurement, and the fields
-that carry a human's claim are **empty on purpose**. The gate reads it and still reports
-NOT MET. That refusal is the design working, not a defect.
+So the file was written with every derivable field filled from a measurement and the fields
+that carry a human's claim **empty on purpose**, and the gate read it and reported NOT MET.
+That refusal was the design working, not a defect.
+
+**Karel signed it on 2026-09-18** (21e723f): criterion A passes on the attestation, criterion B
+is reached and passes on `fuelled-api-receipt.json`, and Stage 2 exited. What follows is the
+brief he signed against, kept as it was written that morning (9728527); what his signature says about
+independence is in the attestation's own `authoredBy.relationship`, not here.
 
 ## What Karel is being asked to attest
 

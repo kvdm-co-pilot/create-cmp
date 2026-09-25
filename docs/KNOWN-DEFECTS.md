@@ -122,7 +122,6 @@ you the same list without opening anything.
 | **KD-64** | a sibling git worktree of this repository is described as ANOTHER project's lane | errs toward waiting, and the path it prints is true |
 | **KD-65** | the lane's project can still be a token the gate never verified — a `--flag=` value, or the first of two occurrences | no producer: every argv this repo and the harness spawn was verified correct |
 | **KD-66** | the lane probe's bound covers its subprocesses, not the `existsSync` the same fix added | unmeasurable here — no portable way to plant a wedged mount |
-| **KD-67** | §9 says the attestation is NOT MET "while none exists", and one now does, unsigned | the gate names the real reason; the row and the count are unchanged |
 | **KD-68** | criterion B omits `checkFreshness`, which needs no tree — the vendored receipt goes stale 2026-10-17 | B is behind an unsigned criterion A and reports "not reached" |
 | **KD-69** | three fields of the attestation shape the gate documents are read by nothing — `schema`, `artifact.kind`, and whether `receipt` is there at all | ADR-0007: nothing routes on `schema`; the other two fail loud in criterion B |
 | **KD-70** | a `file.mjs:NNN` citation goes stale the moment anything is inserted above it, and nothing checks one | 154 in the tree; three went stale in one slice; all of them are in comments and logs, none in a surface an adopter reads |
@@ -855,24 +854,6 @@ Second, smaller: `killSignal: "SIGKILL"` kills the `/bin/sh` that `execSync` spa
 under it. Observed after a trip — a `sleep 12` reparented to pid 1, outliving the gate that gave up
 on it. A stuck `lsof` would be stuck anyway and the gate no longer waits for it; it leaves one behind
 per trip. *Logged 2026-09-17, raised in review round 2 of `lane-refusal-names-project`.*
-
-### KD-67 — §9 says the attestation is reported NOT MET "while none exists", and one now does
-
-`docs/NORTH-STAR.md:418`
-
-The road's Stage 2 row describes the provenance half as "reported NOT MET **while none exists** and
-never derived". As of the `everything-but-the-signature` slice, `docs/attestations/stage2-external-profile.json`
-exists with its derivable fields measured and its four human-owned fields empty, so the gate's
-refusal is no longer "the file is absent" — it is "these four fields are". §9's sentence is still
-true as a conditional and its conclusion is unchanged (the row is red, the count is 8/10), but a
-reader of §9 alone would conclude no such file is in the tree.
-
-Not blocked, and not edited: NORTH-STAR is signed, a reviewer proposes rather than writes, and the
-instrument a reader is sent to — `node scripts/stage2-gate.mjs` — names the current reason exactly.
-Nobody is wrongly served by the doc being one state behind the program it points at.
-
-**Fires when:** someone reads §9's provenance sentence instead of running the gate.
-*Logged 2026-09-18, raised in review round 1 of `everything-but-the-signature-for-the-first-adoption`.*
 
 ### KD-68 — criterion B will keep accepting a vendored receipt the repo's own hosted policy calls stale
 
