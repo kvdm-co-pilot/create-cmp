@@ -250,6 +250,28 @@ export function walkSettingsShapeProblem(settings) {
 }
 
 /**
+ * Can doctor read this .claude/settings.json text as the walk's wiring, and if not, why.
+ * ONE judgement for every place that needs it (KD-237): the diagnosis (`gatherWalkInputs`,
+ * which hands it to the walk-wiring finding as `unparseable` / `unreadable`, so the finding
+ * offers `--fix` only over a file the heal will write) and the heal's decline
+ * (`applySafeFixes`). An offer judged apart from the decline is how `fix (--fix):` came to
+ * print one line above the refusal of that very fix.
+ * @param {string} raw
+ * @returns {{settings:unknown, parseError:(string|null), shape:(string|null)}} `parseError`
+ *          is the first line of JSON.parse's refusal; `shape` is `walkSettingsShapeProblem`'s
+ *          words for a file that parses into a shape doctor does not read.
+ */
+export function readWalkSettings(raw) {
+  let settings;
+  try {
+    settings = JSON.parse(raw);
+  } catch (err) {
+    return { settings: undefined, parseError: String(err?.message ?? err).split("\n")[0], shape: null };
+  }
+  return { settings, parseError: null, shape: walkSettingsShapeProblem(settings) };
+}
+
+/**
  * Is the walk installed, does .claude/settings.json invoke it, and will those
  * invocations RESOLVE? The machinery and the wiring live in separately-owned files
  * (lane vs app config), so they can and do come apart — see the walk-wiring
@@ -262,14 +284,17 @@ export function gatherWalkInputs(projectDir) {
   if (raw === null) {
     return { scriptPresent, settingsPresent: false, statusLine: false, promptHook: false, cwdRelative: [], anchored: [] };
   }
-  let settings;
-  try {
-    settings = JSON.parse(raw);
-  } catch {
-    // Unparseable settings invoke nothing, which is exactly what we report.
-    return { scriptPresent, settingsPresent: true, statusLine: false, promptHook: false, cwdRelative: [], anchored: [] };
+  const read = readWalkSettings(raw);
+  if (read.parseError !== null) {
+    // Unparseable settings invoke nothing, which is exactly what we report — and `--fix`
+    // will not write them, which the finding must not promise otherwise (KD-237).
+    return {
+      scriptPresent, settingsPresent: true, statusLine: false, promptHook: false, cwdRelative: [], anchored: [],
+      unparseable: read.parseError,
+    };
   }
-  const unreadable = walkSettingsShapeProblem(settings);
+  const settings = read.settings;
+  const unreadable = read.shape;
   if (unreadable !== null) {
     // A shape the readers below would throw on. What doctor cannot read counts as
     // invoking nothing — the status line still counts when the top level is an object
@@ -581,18 +606,18 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
       const raw = readIfExists(target);
       let settings = {};
       if (raw !== null) {
-        try {
-          settings = JSON.parse(raw);
-        } catch (err) {
+        // The same judgement the finding's offer was made from (KD-237).
+        const read = readWalkSettings(raw);
+        if (read.parseError !== null) {
           // Never overwrite settings we could not read — that is the app's file.
-          decline(target, what, `it is not JSON doctor can read (${String(err?.message ?? err).split("\n")[0]}), and a file doctor cannot read is never overwritten`);
+          decline(target, what, `it is not JSON doctor can read (${read.parseError}), and a file doctor cannot read is never overwritten`);
           continue;
         }
-        const unreadable = walkSettingsShapeProblem(settings);
-        if (unreadable !== null) {
-          decline(target, what, unreadable);
+        if (read.shape !== null) {
+          decline(target, what, read.shape);
           continue;
         }
+        settings = read.settings;
       }
       // What to ADD, as edits to the app's own text rather than a re-serialised copy of
       // it (KD-197): `JSON.stringify(settings, null, 2)` rewrote an app's indentation,

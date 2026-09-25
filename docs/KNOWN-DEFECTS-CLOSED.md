@@ -9,6 +9,33 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-237 — doctor offers `--fix` on a settings file `--fix` declines — **CLOSED 2026-09-25**
+
+`src/lib/project-doctor.mjs:481-498`, `src/commands/doctor.mjs:724,727` (the offer), `:588,593` (the decline)
+
+The "installed but not wired up" walk-wiring finding always carries `fix: { auto: true }`, so doctor
+prints `fix (--fix):` under it. When `.claude/settings.json` is not JSON doctor can read, or parses
+into a shape it does not read, `--fix` declines to write it. Since this batch the decline is printed
+with its reason. The offer above it is unchanged.
+
+**Why it does not block:** nothing is written and nothing is claimed healed. What is wrong is a
+promise one line above a refusal that names itself.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** The readable-or-not judgement is now one
+function, `readWalkSettings` (`src/commands/doctor.mjs:264`): JSON.parse plus
+`walkSettingsShapeProblem`. The heal's decline calls it (`:610`), and so does the diagnosis
+(`:287`), which now hands a parse failure to the finding as `walk.unparseable` next to the existing
+`walk.unreadable`. The walk-wiring "installed but not wired up" finding offers `fix (--fix):` only
+when neither is set; otherwise it is a plain `fix:` that says what to do by hand
+(`src/lib/project-doctor.mjs:498-520`). `test/doctor-offers-fix-only-where-fix-writes.test.mjs`
+runs `doctor` on an unparseable file, a `hooks` array and a top-level array (no `--fix` offered,
+the by-hand words printed) and on a readable file (still offered). It fails 3 of 4 on the tree
+before this commit. Not covered, because the judgement there is the in-place editor's, which
+runs only at write time: a readable file that `tryEditJsonInPlace` declines (a duplicate key, a
+first member on the bracket's line) is still offered `--fix` and then declined by name.
+
 ### KD-246 — the Stage 3 gate's header quotes a bar the road lowered — **CLOSED 2026-09-25**
 
 `scripts/stage3-gate.mjs:3-4`, `docs/NORTH-STAR.md:419`

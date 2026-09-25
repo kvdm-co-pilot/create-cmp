@@ -226,7 +226,6 @@ you the same list without opening anything.
 | **KD-232** | "this repository enables its own plugin" is stated in the hook, its test, the proposal and the CHANGELOG, and no file in this tree enables it — the maintainer's user and local settings do, so a fresh clone runs no `resume-price` | contributors, not adopters, and the hook is advisory; the proposal also still says "plugin `hooks/`" and "Not built." |
 | **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
-| **KD-237** | the walk-wiring "installed but not wired up" finding always carries `fix: { auto: true }`, so doctor prints `fix (--fix):` over a settings file that `--fix` then declines as unreadable or of a shape it does not read | since this batch the decline is printed with its reason, so nothing is written and nothing is claimed healed; what is wrong is the offer |
 | **KD-240** | `json-in-place.mjs` reads the file's escape style from `/\\u[0-9a-fA-F]{4}/`, which also matches a literal backslash-u and four hex digits in a string (`C:\\ucafe`); and in a one-line file an inserted value is `JSON.stringify(v)`, with no space after its own colons | neither changes what the JSON means; both are the file's style read slightly wrong, on a path whose whole point is to keep that style |
 | **KD-241** | doctor's `healWriter` writes straight onto the target with `fs.writeFileSync`, which truncates first, so a full disk or a kill mid-write can leave a truncated file where the app's own was | not observed; a thrown write is still reported as "could not write" (KD-214), but the original bytes are not restored. The atomic form is write-temp-then-rename |
 | **KD-242** | a `--minimal` app that runs `add firebase` and then `harden` may fail the architecture-doc freshness check: `add firebase` skips regenerating the doc when `qa/lib/arch-doc.mjs` is absent, and minimal subtraction removes machine-owned `qa/` scripts outside the preview keep-set | unmeasured in every part; if it fires, it is a red check the adopter can clear by regenerating, never a false green |
@@ -3685,20 +3684,6 @@ while the helper's transcript was written within the last few seconds. That need
 which is a new calibration question.
 
 *Logged 2026-09-25, review round 1 of the resume-price slice.*
-
-### KD-237 — doctor offers `--fix` on a settings file `--fix` declines
-
-`src/lib/project-doctor.mjs:481-498`, `src/commands/doctor.mjs:724,727` (the offer), `:588,593` (the decline)
-
-The "installed but not wired up" walk-wiring finding always carries `fix: { auto: true }`, so doctor
-prints `fix (--fix):` under it. When `.claude/settings.json` is not JSON doctor can read, or parses
-into a shape it does not read, `--fix` declines to write it. Since this batch the decline is printed
-with its reason. The offer above it is unchanged.
-
-**Why it does not block:** nothing is written and nothing is claimed healed. What is wrong is a
-promise one line above a refusal that names itself.
-
-*Logged 2026-09-25 (0.28.0 batch).*
 
 ### KD-240 — two style reads in `json-in-place` that are slightly wrong
 
