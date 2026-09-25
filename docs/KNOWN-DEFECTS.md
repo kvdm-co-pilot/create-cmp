@@ -234,6 +234,8 @@ you the same list without opening anything.
 | **KD-247** | `add firebase` writes the Podfile's Firebase pods and a comment naming the GitLive version the registry paired them with (KD-243), and `upgrade` moves `firebase-gitlive` in the catalog and never the Podfile | cannot fire yet: every shipped set pairs Firebase iOS 11.x, which `~> 11.1` still resolves; the comment goes stale on the first GitLive bump, and the pins break at the first set that pairs across a Firebase iOS major |
 | **KD-249** | `planShippedHookHeal` throws a `TypeError` on a settings file whose duplicated `hooks` key hides an old shipped Stop form, instead of returning a skip | guarded: its one caller, `shippedHookHealVerdict`, catches the throw and heals nothing, so doctor neither crashes nor offers a fix there; a new caller of the planner would inherit it |
 | **KD-253** | the KD-231 gate still exempts a paragraph on any token that contains `create-cmp`: KD-250 stripped `create-cmp:<name>` only, and `bin/create-cmp.mjs`, `create-cmp-cli@latest`, `create-cmp.json`, `create-cmp-scaffolded` and a `/path/to/create-cmp/…` path each exempt a paragraph that never says whose file it names — 19 paragraphs across `skills/cmp-new`, `cmp-doctor`, `cmp-upgrade`, `cmp-inspect`, `cmp-firebase-connect` | none of the 19 names a create-cmp-only pattern today (measured); the same hazard as KD-250, one spelling over |
+| **KD-255** | `DEVICE_TIER_IRRELEVANT`'s `*.md` would declare a markdown file under `overlays/` unable to oblige either L2 run, and `DEVICE_TIER_SHIPPED` puts back `template/` only — so an overlay `.md` that `add firebase` copies into the app would never make the Firebase L2 run required (the KD-207 shape, one root over) | no `.md` exists under `overlays/` today (measured), so nothing ships unscheduled; the repair is `overlays/` in `DEVICE_TIER_SHIPPED`, and the digest then judges it |
+| **KD-256** | `--rekey` re-derives `qa-artifacts/fleet-latest.json` only, so after the next `STAMPED_OUTPUT_RULE` bump the Firebase L2 run's record reads `other-rule` and costs a full Firebase L2 run — and its reason, `recordMeetsTier`'s, still says to run `--rekey` INSTEAD, which cannot help it | cannot fire until the rule is bumped (it is 2 today, and the Firebase record is new under 2); the cost when it fires is one ~4.5 min run, never a false DISCHARGED |
 
 ---
 
@@ -3797,3 +3799,46 @@ strip list: the exemption asks for `create-cmp` standing alone as a word, not in
 package or namespace name.
 
 *Logged 2026-09-26 (fix/kd-250-251-252, review round 1).*
+
+### KD-255 — a markdown file under `overlays/` would never oblige the Firebase L2 run
+
+`scripts/observed-tree.mjs` (`DEVICE_TIER_IRRELEVANT`, `DEVICE_TIER_SHIPPED`) with KD-207 and KD-206
+
+Found while wiring the Firebase L2 run into the schedule (`feat/firebase-runtime-proof`, plan R5).
+`deviceTierNeed` asks the cheap question first — can anything this slice touched reach an app at
+all — and `*.md` in `DEVICE_TIER_IRRELEVANT` answers "no" for every markdown path. KD-207 closed that
+for `template/`, where markdown ships into the stamped app, by putting `template/` back through
+`DEVICE_TIER_SHIPPED`. `overlays/` is not there. `add firebase` copies files out of
+`overlays/firebase/`, so an overlay `.md` it copied would ship into the app the Firebase L2 run is
+keyed on, and a slice that changed only that file would read NOT OWED for both tiers without either
+digest being asked. The two halves would disagree exactly as KD-207's did: a change that did reach
+the Firebase app, and was never scheduled.
+
+**Why it does not block:** measured 2026-09-26, `find overlays -name "*.md"` returns nothing, so no
+overlay markdown ships today. The repair is one entry — `overlays/` in `DEVICE_TIER_SHIPPED` — after
+which the Firebase digest judges such an edit for the price of one stamp. Not built: this slice
+logs it (plan R5).
+
+*Logged 2026-09-26 (feat/firebase-runtime-proof, U2).*
+
+### KD-256 — `--rekey` does not re-derive the Firebase L2 run's record
+
+`scripts/proof-plan.mjs` (`rekey`, `firebaseRecordMeets`) with KD-206
+
+Found while wiring the Firebase L2 run into the schedule (`feat/firebase-runtime-proof`, plan R6).
+A digest-rule bump (`STAMPED_OUTPUT_RULE` in `scripts/stamped-output.mjs`) makes every recorded
+digest incomparable, and `--rekey` exists so that costs a stamp instead of a run: it re-stamps the
+recorded commit, proves the old digest reproduces, and writes the new-rule digest beside the record.
+It reads `readFleetRecord()` and writes `qa-artifacts/fleet-rekey-latest.json` — the DEFAULT run
+only. The Firebase record (`qa-artifacts/fleet-firebase-latest.json`) has no rekey, and
+`firebaseRecordMeets` passes `rekey: null` so the default run's rekey can never speak for it. After a
+bump it therefore reads `other-rule`, and the tier is OWED until the Firebase L2 run runs again.
+Worse for the reader: that answer's sentence is `recordMeetsTier`'s, which says to run `--rekey`
+INSTEAD of the L2 run — for this tier, an instruction that changes nothing.
+
+**Why it does not block:** it cannot fire until the rule moves, and when it does the direction is
+safe — one ~4.5 min run, never a Firebase tier discharged by a digest nobody reproduced. The repair
+is `--rekey` taking the Firebase record as a second input (and its own rekey file), or the reason
+naming the tier it applies to. Not built: this slice logs it (plan R6).
+
+*Logged 2026-09-26 (feat/firebase-runtime-proof, U2).*
