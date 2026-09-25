@@ -186,7 +186,32 @@ export function registryVersionsFor(kotlin, keys, registry) {
     }
     out[key] = set.versions[key];
   }
-  return { setId: set.id, versions: out };
+  return { setId: set.id, versions: out, set };
+}
+
+/**
+ * The Firebase iOS pods the Podfile asks for (KD-243): the Firebase iOS SDK the set's GitLive
+ * release is built against, recorded next to it in the registry (`firebaseIos`) with GitLive's own
+ * version catalog at that tag as the source. The constraint floors at that version and stays in its
+ * major. A set with no pairing, or one recorded for a different GitLive version, is refused — a
+ * guessed pod pin fails at pod resolution or link time, far from here.
+ * @returns {{gitlive:string, version:string, constraint:string}}
+ */
+export function firebaseIosPodFor(set) {
+  const gitlive = set.versions?.["firebase-gitlive"];
+  const pair = set.firebaseIos;
+  const m = /^(\d+)\.(\d+)(?:\.\d+)?$/.exec(pair?.version ?? "");
+  if (!pair || pair.gitlive !== gitlive || !m) {
+    refuse(
+      `version set ${set.id} adds GitLive firebase ${gitlive}, and create-cmp's registry pairs ` +
+        (pair ? `GitLive ${pair.gitlive} with Firebase iOS "${pair.version}"` : "it with no Firebase iOS version") +
+        `, so the Podfile's Firebase pod version is unknown and this step will not guess it.\n` +
+        `  Record \`firebaseIos\` for set ${set.id} in src/versions/registry.json from \`firebase-cocoapods\` in ` +
+        `https://github.com/GitLiveApp/firebase-kotlin-sdk/blob/v${gitlive}/gradle/libs.versions.toml, ` +
+        `or run this on an app with no iosApp/.`,
+    );
+  }
+  return { gitlive, version: pair.version, constraint: `~> ${m[1]}.${m[2]}` };
 }
 
 // ── catalog ─────────────────────────────────────────────────────────────────
@@ -409,7 +434,15 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
 
   const kotlin = [...catalog.matchAll(/^\s*kotlin\s*=\s*"([^"]+)"/gm)].map((m) => m[1]);
   if (kotlin.length !== 1) refuse(`${CATALOG_REL} does not pin exactly one kotlin version in [versions].`);
-  const { setId, versions } = registryVersionsFor(kotlin[0], edits.catalog.versionsFromRegistry, opts.registry ?? loadRegistry());
+  const { setId, versions, set } = registryVersionsFor(kotlin[0], edits.catalog.versionsFromRegistry, opts.registry ?? loadRegistry());
+  const pod = ios ? firebaseIosPodFor(set) : null;
+  const podTokens = pod
+    ? [
+        ["__FIREBASE_IOS_POD__", pod.constraint],
+        ["__FIREBASE_IOS__", pod.version],
+        ["__FIREBASE_GITLIVE__", pod.gitlive],
+      ]
+    : [];
 
   /** rel → planned text; the original is read once, then every edit to it composes in memory. */
   const planned = new Map();
@@ -439,7 +472,8 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
   for (const insert of edits.inserts) {
     if (isIosPath(insert.file) && !ios) continue;
     const rel = toAppPath(insert.file, packagePath);
-    const next = planInsert(textOf(rel), rel, insert);
+    const lines = insert.lines.map((l) => podTokens.reduce((acc, [t, v]) => acc.replaceAll(t, v), l));
+    const next = planInsert(textOf(rel), rel, { ...insert, lines });
     if (next === null) present.push(`${rel} (${insert.present})`);
     else planned.set(rel, next);
   }
