@@ -783,9 +783,16 @@ export function createPreviewService(opts) {
   let lastSelfLedgerWriteAt = 0;
   let mode = "gradle"; // "gradle" (task per render) | "daemon" (resident hot JVM)
   let daemonChild = null;
-  // Did this console START a daemon, or CONFIRM one healthy and serving this project?
-  // Only then is `stop()`'s `GET /shutdown` addressed to anything of ours: the daemon
-  // port is machine-global, and anything at all may be listening on it (KD-204).
+  // Is the daemon on that port one this console HOLDS — a child it started that is
+  // still alive and answered /health, or one whose /health named this project? Only
+  // then is `stop()`'s `GET /shutdown` addressed to anything of ours: the daemon port
+  // is machine-global, and anything at all may be listening on it (KD-204).
+  //
+  // Set when /health answers, never at spawn: a child that cannot bind the port
+  // (another project's daemon holds it) is alive for a moment and then exits, and
+  // the port was never its. Cleared when our child exits, for the same reason. A
+  // daemon reused UNVERIFIED (its /health reports no previewsDir) may be anyone's,
+  // so it is rendered through but never shut down.
   let daemonOurs = false;
   let daemonBootDeadline = null;
   let pollTimer = null;
@@ -1397,6 +1404,9 @@ export function createPreviewService(opts) {
    * A daemon that doesn't report `previewsDir` predates that field; it is
    * adopted, because refusing would break reuse for every already-running
    * daemon, but the log says plainly that the project went unverified.
+   *
+   * @returns {Promise<"verified"|"unverified"|false>} truthy when usable; which
+   *   one decides whether a daemon we did not start is ours to shut down.
    */
   async function daemonHealthy() {
     let health;
@@ -1412,7 +1422,7 @@ export function createPreviewService(opts) {
     }
     if (!theirs) log(`daemon on ${daemonUrl} reports no previewsDir (older build) — reusing it unverified`);
     noteDaemonReload(health);
-    return true;
+    return theirs ? "verified" : "unverified";
   }
 
   /**
@@ -1478,7 +1488,7 @@ export function createPreviewService(opts) {
 
   /** Wire a spawned daemon child's streams/exit into the service (also for injected spawns). */
   function adoptDaemonChild(child) {
-    daemonOurs = true; // started by this console
+    // NOT `daemonOurs = true` here: spawned is not bound (see its declaration).
     // The daemon's `hotRunDesktop` client is itself a Gradle invocation that stays
     // "in flight" for as long as the process runs — not a single discrete task like
     // runRender/runCompileCheck — so it gets the marker for its whole lifetime,
@@ -1498,6 +1508,8 @@ export function createPreviewService(opts) {
         }
       }
       daemonChild = null;
+      // The daemon we held is gone; whatever answers on the port now is not ours.
+      daemonOurs = false;
     });
   }
 
@@ -1509,8 +1521,10 @@ export function createPreviewService(opts) {
    * classes are the "code landed" signal).
    */
   async function ensureDaemon() {
-    if (await daemonHealthy()) {
-      enterDaemonMode("reusing already-running daemon");
+    const found = await daemonHealthy();
+    if (found) {
+      // Reused, not started: ours to shut down only if its /health named this project.
+      enterDaemonMode("reusing already-running daemon", found === "verified");
       return;
     }
     try {
@@ -1524,16 +1538,19 @@ export function createPreviewService(opts) {
     while (Date.now() < daemonBootDeadline) {
       await new Promise((r) => setTimeout(r, 2000));
       if (!daemonChild) return; // exited during boot
-      if (await daemonHealthy()) {
-        enterDaemonMode("daemon booted");
+      const booted = await daemonHealthy();
+      if (booted) {
+        // Ours if the child we started is still alive now that the port answers —
+        // one that could not bind has exited — or if /health named this project.
+        enterDaemonMode("daemon booted", daemonChild !== null || booted === "verified");
         return;
       }
     }
     log("daemon did not become healthy in time — staying on the gradle path");
   }
 
-  function enterDaemonMode(why) {
-    daemonOurs = true; // confirmed healthy and serving this project (daemonHealthy)
+  function enterDaemonMode(why, ours) {
+    daemonOurs = ours; // held by this console (see the declaration) — the one gate on /shutdown
     mode = "daemon";
     log(`${why} — warm renders via ${daemonUrl}`);
     watchClasses();
@@ -2800,9 +2817,10 @@ export function createPreviewService(opts) {
       for (const w of selfWatchers) w.close();
       selfWatchers = [];
       // Best-effort daemon teardown: ask the JVM to exit, then kill the gradle client —
-      // and only a daemon this console started or confirmed. `hot: false`, or a boot
-      // that never happened, used to send the request anyway, to a fixed address
-      // anything may be listening on (KD-204).
+      // and only a daemon this console still holds (`daemonOurs`). `hot: false`, a boot
+      // that never happened, or a child that exited because another project's daemon
+      // held the port, used to send the request anyway, to a fixed address anything
+      // may be listening on (KD-204).
       if (daemonOurs) fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {});
       if (daemonChild) daemonChild.kill("SIGTERM");
       // Belt-and-braces: the exit event above clears this too, but that fires
