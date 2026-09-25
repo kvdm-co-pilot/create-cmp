@@ -14,10 +14,6 @@
 // people says "create-cmp" — and the maintainer's name and private file are named
 // nowhere. The unit is the paragraph because that is how the file marks it today
 // ("In create-cmp, `node scripts/…`").
-//
-// ONE SKILL IS NOT SCANNED, AND ON PURPOSE: `plugin-refresh` is a maintainer's
-// procedure throughout — every command in it is `node scripts/plugin-refresh.mjs` —
-// and whether it should ship at all is a decision for the owner, not a wording fix.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -25,7 +21,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const NOT_SCANNED = new Set(["skills/plugin-refresh/SKILL.md"]);
 
 /** What an adopter's agent reads: the plugin's agents and skills, and the template's skills. */
 function shipped() {
@@ -36,7 +31,7 @@ function shipped() {
   ];
   const templateSkills = path.join(ROOT, "template", ".claude", "skills");
   for (const d of fs.readdirSync(templateSkills)) files.push(path.join("template", ".claude", "skills", d, "SKILL.md"));
-  return files.map((f) => f.split(path.sep).join("/")).filter((f) => !NOT_SCANNED.has(f));
+  return files.map((f) => f.split(path.sep).join("/"));
 }
 
 /** Named nowhere an adopter's agent reads. */
