@@ -56,17 +56,20 @@ const STAGES = [
   {
     id: "1",
     name: "distribution",
+    exited: "2026-09-08",
     criteria: [{ what: "installs without create-cmp; a core fix reaches the tree by one command", cmd: ["scripts/stage1-gate.mjs"] }],
   },
   {
     id: "2",
     name: "profiles as artifacts",
+    exited: "2026-09-18",
     // The criterion names an AUTHOR this project does not control, so half of it
     // is not automatable and pretending otherwise would be the vacuous green.
     // The gate splits it: provenance is read from a human-written attestation
     // and reported NOT MET while none exists; acceptance — does the machinery
     // take a foreign profile end to end, and refuse what §8 says it must — is
-    // executed. It is red today, and seven of its ten rows are findings.
+    // executed. It exited 10/10 on 2026-09-18, when the first external profile's
+    // attestation was signed (21e723f) and acceptance passed on its receipt.
     criteria: [{ what: "a foreign profile is accepted end to end, and the badge floor refuses what it must", cmd: ["scripts/stage2-gate.mjs"] }],
   },
   {
