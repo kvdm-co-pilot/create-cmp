@@ -110,9 +110,8 @@ you the same list without opening anything.
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 | **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
-| **KD-45** | no gate in this repo executes the template's Firebase or iOS paths | the device tier stamps `--no-ios --no-firebase`; shape is scanned, runtime is not |
+| **KD-45** | no gate in this repo executes the Firebase or iOS paths | Firebase: CI compiles the default stamp plus `add firebase` on every PR, and nothing runs it; iOS: the L2 run stamps `--no-ios` |
 | **KD-46** | the iOS refusal names two causes its `catch` cannot see | half fixed in `79eafd3` (the cause is carried now); Obj-C raises abort before any Kotlin frame, and the app stops either way |
-| **KD-47** | the four emulator ports are spelled in `build.gradle.kts` and again in `KoinHelper.kt` | they agree today, and no `firebase.json` ships to be a third |
 | **KD-48** | `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin | the shipped Xcode project has only `Debug`/`Release`, which map correctly |
 | **KD-49** | a nested `node --test` exits 0 whatever its tests did, when `NODE_TEST_CONTEXT` is inherited | nothing in the suite spawns one except the harness that measured it, which scrubs the env |
 | **KD-50** | the template ships create-cmp's own changelog as source comments in the adopter's app | true prose, wrong repository |
@@ -215,7 +214,7 @@ you the same list without opening anything.
 | **KD-203** | `opts.port \|\| DEFAULT_PORT` reads `port: 0` — the standard way to ask the OS for a free port — as the console's well-known port, and the bound port is assumed rather than read back | an adopter starting a console gets the default either way and the only caller passing `0` is a test today; it becomes a defect the moment anything runs two consoles |
 | **KD-204** | `stop()` fires `GET /shutdown` at `http://127.0.0.1:9601` unconditionally, `hot: false` and no daemon included, so every console sends a request to a fixed address anything may be listening on | harmless where nothing listens (the refusal is swallowed) and a real daemon is the intended recipient; with KD-202 and KD-203 it is the complete path from "a suite ran" to "a passed test is recorded as FAILED" |
 | **KD-205** | `contains()` / `behindBy()` drop `gitAt`'s `why`, so one call site of the ordering check cannot say which of four causes killed a git call — a gate-timer kill, a crash and an OOM kill all read as "git could not compare this branch with origin/main" | the verdict is correct either way: the check still allows and still says it could not answer. It costs a reader one fact, in the file whose whole subject is that distinction |
-| **KD-206** | the fleet scratch app is stamped `--no-ios --no-firebase`, so an edit to iOS-only or Firebase-only template code moves no byte of the stamped app and the device tier reads DISCHARGED | no proof is lost — under the old input-path rule the same edit reopened a tier whose run compiled neither (KD-45) — so what changed is that KD-45's gap is visible in the schedule instead of masked by a run that proves nothing about those files; `template/` is still a review trigger |
+| **KD-206** | the fleet scratch app is stamped `--no-ios`, so an edit to iOS-only template code moves no byte of the stamped app and the device tier reads DISCHARGED; Firebase lives in `overlays/firebase/`, which no stamp copies, so an overlay edit moves none either | no proof is lost — the L2 run never compiled either (KD-45) — so KD-45's gap is visible in the schedule instead of masked by a run that proves nothing about those files; CI's stamp + `add firebase` + assembleDebug compiles every overlay edit on the PR; `template/` is still a review trigger |
 | **KD-208** | the hook's four bounds now sum to exactly its declared budget — `1000 + 3000 + 2500 + 3500 = 10000`, the 10 s `.claude/settings.json` declares — because answering a payload now includes a stamp | the arithmetic test asserts `sum <= budget` and passes, every bound has its own kill-timer so the sum is a worst case that needs all four to saturate, and the measured real answer is ~0.5 s; what is gone is the slack |
 | **KD-209** | `grep -r` here obeys the scanned tree's own `.gitignore`, so a scan of a stamped app silently omits `local.properties` — the file that carries this machine's SDK path | a fact about the tooling, not the tree, logged because it nearly cost a slice a defect: `find … -exec /usr/bin/grep -l …` lists both files, and that is how the three normalisers were shown complete |
 | **KD-210** | a Firebase run proves the template COMPILES, INITIALISES and REDIRECTS — no byte crosses the redirect | nothing in `commonMain` uses a Firebase client and the smoke walk is four screens, so the suite serves zero requests; the risk is a record read as "the redirect carried traffic" |
@@ -606,6 +605,19 @@ already built and pushed on branch `wave/firebase`, held out of this wave and to
 add step rather than at a schedule. The iOS half of this entry stays parked and is still open as
 written. The decision is recorded in `docs/proposals/LIBRARIES-IN-SERVICES-OUT.md`.
 
+**2026-09-25 — the Firebase half, amended to what is now true.** Firebase left stamp-time: the
+default stamp carries none, and `create-cmp add firebase` adds it from `overlays/firebase/`. CI's
+`stamp-android` job stamps the default, builds it, runs the add step on the SAME app and builds it
+again (`.github/workflows/ci.yml`), so the add step's output COMPILES on every PR — the GitLive
+modules, the google-services plugin over the mock config, the appended BuildConfig block and
+`FirebaseEmulators.kt`. Nothing RUNS it: no gate initialises Firebase or executes the four
+`useEmulator` calls, so the redirect is still held by the source scan alone
+(`test/the-emulator-redirect-cannot-fail-quietly.test.mjs`, now aimed at the overlay). The
+`wave/firebase` emulator-suite machinery was NOT repointed in this slice (it is path-keyed and 113
+commits behind, and KD-208 says the hook's budget is spent); that runtime proof is its own slice.
+The iOS half is unchanged: the add step applies it when `iosApp/` exists, says it is unproven, and
+nothing compiles it except the parked `stamp-ios` job.
+
 ### KD-46 — the iOS refusal names two causes its catch cannot see
 
 `template/composeApp/src/iosMain/kotlin/com/example/app/KoinHelper.kt`
@@ -628,17 +640,6 @@ the function, where a human reads it before the crash rather than in a string th
 when neither happened. Still not blocking: the app stops in every one of these cases, which is what
 the refusal is for. *Logged 2026-09-15 (review of `b549f3b`), re-placed 2026-09-15 after `79eafd3`
 closed the cause-dropping half.*
-
-### KD-47 — the emulator ports are spelled twice, and declared nowhere
-
-`template/composeApp/build.gradle.kts` (debug `buildConfigField`) · `.../iosMain/.../KoinHelper.kt`
-
-9099 / 8080 / 5001 / 9199 appear as Android BuildConfig fields and again as integer literals in the
-iOS redirect. There is no `firebase.json` in the template, so nothing declares them once and the
-Firebase CLI defaults are the only thing keeping the two copies honest. An adopter who moves a port
-moves it on one platform. Measured today: both copies agree, and the host legitimately differs
-(`10.0.2.2` is the Android emulator's host alias, `127.0.0.1` the simulator's), so this is one fact
-with two spellings and no drift yet. *Logged 2026-09-15, review of `b549f3b`.*
 
 ### KD-48 — `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin
 
@@ -3416,6 +3417,13 @@ covers those files with no further change.
 **Fires when:** someone reads "device DISCHARGED" on an iOS-only change as "iOS is proven".
 *Logged 2026-09-22, by the slice that bound the device tier to the stamped app.*
 
+**2026-09-25 — amended when Firebase left stamp-time.** The scratch app is now stamped `--no-ios`
+only, because the default stamp carries no Firebase. The Firebase code lives in
+`overlays/firebase/`, outside `template/`, so an overlay edit moves no byte of the default stamp and
+the tier reads DISCHARGED for it — the same shape as the iOS half, and just as honest, because the
+L2 run never compiled Firebase either. What covers an overlay edit instead is CI's stamp + `add
+firebase` + assembleDebug on the PR (KD-45): compile, not runtime.
+
 ### KD-208 — the four gate bounds now sum to exactly the hook's declared budget
 
 `scripts/hooks/proof-gate.mjs` (`ANSWER_RESERVE_MS`) with `.claude/settings.json`
@@ -3449,17 +3457,17 @@ normalisers in `scripts/stamped-output.mjs` were found to be complete.
 
 ### KD-210 — a Firebase run would prove compile, init and redirect; nothing in the template crosses the redirect
 
-`template/composeApp/src/androidMain/kotlin/com/example/app/AppApplication.kt`
+`overlays/firebase/files/composeApp/src/androidMain/kotlin/com/example/app/FirebaseEmulators.kt`
 (`configureFirebaseEmulators`) · `template/qa/e2e/smoke.yaml`
 
 What a covered run executes, exactly: the app is BUILT with the GitLive dependencies and the
 google-services plugin, `assembleRelease`/R8 runs over them, `FirebaseApp` initialises from the
 stamped placeholder `google-services.json`, and `configureFirebaseEmulators()` runs all four
 `useEmulator` calls — which is where both escaped redirect defects lived, and where the app now
-REFUSES to start if the redirect fails (`AppApplication.kt:86`, a thrown `IllegalStateException`
+REFUSES to start if the redirect fails (`FirebaseEmulators.kt`'s catch, a thrown `IllegalStateException`
 rather than the `runCatching` that once swallowed it). What it does NOT prove is that traffic
 reaches the emulators: nothing in `commonMain` uses a Firebase client — `dev.gitlive` appears only
-in `androidMain/AppApplication.kt` and `iosMain/KoinHelper.kt`, verified on this tree — and
+in the two `FirebaseEmulators.kt` files the add step writes (`androidMain`, `iosMain`) — and
 `qa/e2e/smoke.yaml` walks first frame, the item list and two tab switches, so the suite would serve
 zero requests and would serve zero if it were never started.
 
@@ -3474,7 +3482,7 @@ machinery.*
 
 ### KD-211 — the redirect host assumes the lane's device is an emulator
 
-`template/composeApp/build.gradle.kts:230` (`FIREBASE_EMULATOR_HOST`) ·
+`overlays/firebase/append/composeApp/build.gradle.kts` (`FIREBASE_EMULATOR_HOST`) ·
 `template/composeApp/src/androidDebug/res/xml/debug_network_security_config.xml`
 
 The stamped app redirects to `10.0.2.2`, the Android emulator's alias for the host's loopback, and a

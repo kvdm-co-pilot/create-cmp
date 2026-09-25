@@ -9,6 +9,27 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-47 — the emulator ports are spelled twice, and declared nowhere — **CLOSED 2026-09-25**
+
+`template/composeApp/build.gradle.kts` (debug `buildConfigField`) · `.../iosMain/.../KoinHelper.kt`
+
+9099 / 8080 / 5001 / 9199 appear as Android BuildConfig fields and again as integer literals in the
+iOS redirect. There is no `firebase.json` in the template, so nothing declares them once and the
+Firebase CLI defaults are the only thing keeping the two copies honest. An adopter who moves a port
+moves it on one platform. Measured today: both copies agree, and the host legitimately differs
+(`10.0.2.2` is the Android emulator's host alias, `127.0.0.1` the simulator's), so this is one fact
+with two spellings and no drift yet. *Logged 2026-09-15, review of `b549f3b`.*
+
+**CLOSED by `f809a1b`, which moved Firebase into `overlays/firebase/` for `create-cmp add firebase`,
+and moved here in the same slice.** The four ports are declared ONCE, as commonMain constants in
+`overlays/firebase/files/composeApp/src/commonMain/kotlin/com/example/app/data/remote/FirebaseConfig.kt`
+(`FIREBASE_AUTH_EMULATOR_PORT` and three siblings), and both platforms' `FirebaseEmulators.kt` read
+them; the Android `buildConfigField` port rows are gone, leaving only the flag and the host, which
+legitimately differ by platform. An adopter who moves a port now moves it in one file.
+`test/add-firebase.test.mjs` pins it on the tree the step leaves: each port appears once in
+`FirebaseConfig.kt`, and neither `FirebaseEmulators.kt` passes a literal port. Still no
+`firebase.json` ships — the constants match the Firebase CLI's defaults, and the file says so.
+
 ### KD-229 — the tier was renamed `L2 run`, and the cadence lint does not know the new name — **CLOSED 2026-09-24**
 
 `scripts/lib/cadence.mjs` (`CADENCE_PHRASES`), read by `test/policy-home.test.mjs` over every tracked
