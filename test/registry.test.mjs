@@ -40,11 +40,16 @@ test("shipped registry seeds the frozen 2026.06 set matching the golden template
 test("shipped registry's 2026.06 set mirrors the template's [versions] table exactly", () => {
   const tomlPath = path.join(__dirname, "..", "template", "gradle", "libs.versions.toml");
   const toml = fs.readFileSync(tomlPath, "utf8");
+  // A key the template no longer pins is still the registry's when an add step
+  // writes it into the app: `create-cmp add firebase` reads the keys its overlay
+  // names in versionsFromRegistry from the registry, not from the template.
+  const editsPath = path.join(__dirname, "..", "overlays", "firebase", "edits.json");
+  const fromRegistry = JSON.parse(fs.readFileSync(editsPath, "utf8")).catalog.versionsFromRegistry;
   const set = getSet(loadRegistry(), "2026.06");
   for (const [key, value] of Object.entries(set.versions)) {
     assert.ok(
-      toml.includes(`${key} = "${value}"`),
-      `template libs.versions.toml must pin ${key} = "${value}"`
+      toml.includes(`${key} = "${value}"`) || fromRegistry.includes(key),
+      `template libs.versions.toml must pin ${key} = "${value}", or overlays/firebase/edits.json must name ${key} in versionsFromRegistry`
     );
   }
 });
