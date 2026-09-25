@@ -58,6 +58,41 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-231 — the shipped orchestrator's hand-off point is the maintainer's private file — **CLOSED 2026-09-25**
+
+`agents/cmp-orchestrator.md:220-222` (shipped through `.claude-plugin/plugin.json` `agents`), and
+`.claude/agents/deep-worker.md:79-81`
+
+The rewrite tells the orchestrator to hand its own session off "at the budget point the user-level
+instructions set (`~/.claude/CLAUDE.md`)". It adds "This file names no number, so it cannot disagree
+with that one". That holds on the maintainer's machine, where `~/.claude/CLAUDE.md` has a "Session
+budget" section. An adopter who installs the plugin has no such section, so the line points at a
+number that does not exist. The same problem in `deep-worker.md` only affects contributors to this
+repository.
+
+**Why it does not block:** the line does nothing for an adopter. Without a budget point, their
+orchestrator hands off the way it did before this slice. Nobody is refused or given a wrong result.
+**Decision it asks for:** should the shipped orchestrator carry a default hand-off point of its own?
+If it should, it is the one statement an adopter has, so it is not a restatement. The other choice
+is to drop the pointer from the shipped definition.
+
+*Logged 2026-09-25, review round 1 of the resume-price slice.*
+
+**CLOSED by the second choice this entry named — the pointer is gone, and the rule carries no number —
+in the commit that moved it here.** The orchestrator now says: hand your own session off when a fresh
+orchestrator started from the hand-off costs less than your next steps; if your instructions set a
+budget point, use that. The `~/.claude/CLAUDE.md` pointer and the "cannot disagree" sentence are
+removed. The same commit swept every shipped agent and skill for the class: in the orchestrator,
+`docs/NORTH-STAR.md`, `docs/PRINCIPLES.md`, ADR-0015, the review-round paragraph (`change-price`,
+`proof-plan`, `KNOWN-DEFECTS`, `staff-reviewer`), the engine suite, the pointer at `KNOWN-DEFECTS`'s
+header and three dated measurements are marked "in create-cmp", and "Karel" is "the human you report
+to" in both places; in `cmp-qa-prep`, the attribution goes and `scripts/fleet-check.mjs` is marked;
+in `cmp-audit`, `docs/CHANGE-FLOW-DESIGN.md` is marked. `plugin-refresh` is not changed — it is a
+maintainer's procedure throughout, and whether it ships is the owner's decision.
+`.claude/agents/deep-worker.md` keeps its pointer: it is not shipped, and only a contributor to this
+repository reads it. `test/a-shipped-agent-points-at-a-file-only-create-cmp-has.test.mjs` scans the
+plugin's agents and skills and the template's skills, `plugin-refresh` excepted by name.
+
 ### KD-215 — the heal revives the Stop gate for foreign-cwd sessions, and its remedy is a path those sessions cannot resolve — **CLOSED 2026-09-25**
 
 `template/qa/receipt-check.mjs` (the `--hook` refusal text) · `src/lib/shipped-hooks.mjs`

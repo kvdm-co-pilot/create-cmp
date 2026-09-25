@@ -129,8 +129,9 @@ the proposed test:
 
 ## 4. Output — findings feed the change flow
 
-Findings enter the project's normal change flow — a feature brief / spec amendment per
-`docs/CHANGE-FLOW-DESIGN.md` — **never** direct unreviewed fixes to signed artifacts. The
+Findings enter the project's normal change flow — a feature brief / spec amendment (in
+create-cmp, `docs/CHANGE-FLOW-DESIGN.md` is its design of record) — **never** direct unreviewed
+fixes to signed artifacts. The
 audit's deliverable is the interrogation record: per finding, the category, the file:line,
 the scenario, CONFIRMED/PLAUSIBLE, and its convert-or-cut landing.
 
