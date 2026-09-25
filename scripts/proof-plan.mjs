@@ -1005,10 +1005,10 @@ function renderReview(o, L) {
  * THE TWO KINDS OF THING A REVIEW RECORD CAN BE, named, because a row that does
  * not say which is indistinguishable from the other.
  *
- * `round` is a reader that read a diff. `rerecord` is the same reader
- * confirming the same finding against bytes that moved under it — the case
- * docs/KNOWN-DEFECTS.md's header settles, and it is the header that settles it;
- * this is a vocabulary, not a second statement of the rule.
+ * `round` is a reader that read a diff. `rerecord` is a recorded round's
+ * finding confirmed against bytes that moved under it — who reads for it and
+ * when it is owed, docs/KNOWN-DEFECTS.md's header settles, and it is the header
+ * that settles it; this is a vocabulary, not a second statement of the rule.
  *
  * MEASURED IN THIS REPOSITORY'S OWN EVIDENCE, 2026-09-18: the 19:58 row of
  * `qa-artifacts/review-history.jsonl` carries the words "this is a re-record

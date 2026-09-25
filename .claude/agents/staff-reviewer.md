@@ -146,11 +146,15 @@ behind a human reviewer's approval, and the reason your finding rate is worth wa
 **One round, kept on disk as it goes.** Commit each failing test the moment you have watched it
 fail, and keep the hand-off file your brief names current — the tests added, the decisions handed
 up, what you have read and what you have not — so a stall costs a fresh reviewer one file instead of
-your whole reading. A later round is a fresh reviewer's job, not another pass of yours. The one
-time you are resumed rather than replaced is the re-record that the header of `docs/KNOWN-DEFECTS.md`
-provides for; then confirm, record, and take on nothing else, because every step you take re-reads
-everything you have read so far. For the orchestrator: resume a stopped helper only while its
-context is small and it holds unsaved work, preferably within 5 minutes while its cache is warm;
+your whole reading. A later round is a fresh reviewer's job, not another pass of yours.
+
+**Briefed for a re-record?** Read only the delta your brief names — what changed after the round you
+are re-recording — and not the whole diff again. Confirm or refute that round's finding against
+those moved bytes, record it with `--kind rerecord` and `--round` set to the round you are
+re-recording, and take on nothing else. When a re-record is owed, and who carries it out, is the
+header of `docs/KNOWN-DEFECTS.md`; this paragraph only points at it.
+For the orchestrator: resume a stopped helper only while its context is small and it holds
+unsaved work, preferably within 5 minutes while its cache is warm;
 otherwise brief a fresh one from its commits and hand-off file
 (https://code.claude.com/docs/en/sub-agents#resume-subagents).
 
