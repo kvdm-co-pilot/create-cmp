@@ -77,3 +77,25 @@ test("every check that can fail the fleet run happens before its record is writt
       "to close a slice; a record that is the same whether the check passed or failed attests nothing.",
   );
 });
+
+test("under --with-firebase, the emulator suite's failures and the e2eSmoke-by-name check are pushed before the record is written", () => {
+  // The general test above passes when a check is simply ABSENT. These two are
+  // the Firebase run's whole claim: a suite that never served, or an e2eSmoke
+  // that never ran the DEBUG build (where the redirect is), is a run that proved
+  // no Firebase startup — so each must exist, and must be able to turn the
+  // record FAIL.
+  const src = fs.readFileSync(SOURCE, "utf8");
+  const writes = offsets(src, /(?<!function\s)\bwriteFleetRecord\(\{/g);
+  assert.ok(writes.length, "fleet-check.mjs no longer calls writeFleetRecord — this test is aimed at nothing");
+  const lastWrite = writes[writes.length - 1];
+  const lineOf = (at) => src.slice(0, at).split("\n").length;
+
+  const suite = offsets(src, /\bfailures\.push\(\.\.\.\w+\.failures\)/g);
+  assert.ok(suite.length, "the failures runLaneUnderEmulators returns are never pushed into `failures` — a suite that never started could record PASS");
+  assert.ok(offsets(src, /\bawait runLaneUnderEmulators\(/g).length, "fleet-check.mjs does not run the lane under the suite");
+  const smoke = offsets(src, /\.name === "e2eSmoke"/g);
+  assert.ok(smoke.length, "no check requires e2eSmoke PASS by name — a run whose DEBUG build never started could record PASS");
+  for (const at of [...suite, ...smoke]) {
+    assert.ok(at < lastWrite, `line ${lineOf(at)} can fail the Firebase run AFTER the record is written (line ${lineOf(lastWrite)})`);
+  }
+});

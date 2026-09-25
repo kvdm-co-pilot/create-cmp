@@ -13,12 +13,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
 
 import { close, openPlan, recordReview } from "../scripts/proof-plan.mjs";
 import { writeFleetRecord } from "../scripts/fleet-check.mjs";
-import { appendHistory, historyPath, readHistory, summarize, renderHistory, PLAN_EVENT_SCHEMA } from "../scripts/lib/proof-history.mjs";
+import { appendHistory, historyPath, readHistory, summarize, renderHistory, PLAN_EVENT_SCHEMA, HISTORY_FILES } from "../scripts/lib/proof-history.mjs";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "proof-history-"));
 const rows = (root, kind) => readHistory(historyPath(root, kind)).rows;
@@ -229,6 +231,45 @@ test("KD-60: every row lands in exactly one bucket — closed slices, slices tha
   assert.equal(t.deviceRuns, 1);
   assert.equal(t.deviceRunsInOtherSlices, 2);
   assert.equal(t.closed, 1);
+});
+
+test("a Firebase L2 run is kept as its OWN kind and counted as its own kind — never folded into the device runs", () => {
+  assert.equal(HISTORY_FILES["fleet-firebase"], "fleet-firebase-history.jsonl");
+  const ev = (event, slice, openedAt, at) => ({ schema: PLAN_EVENT_SCHEMA, event, at, plan: { slice, branch: "b", openedAt } });
+  const summary = summarize({
+    plans: [ev("closed", "one", "2026-09-26T10:00:00Z", "2026-09-26T11:00:00Z"), ev("replaced", "two", "2026-09-26T11:00:01Z", "2026-09-26T12:00:00Z")],
+    fleet: [{ branch: "b", verdict: "PASS", rung: "L2", startedAt: "2026-09-26T10:10:00Z", ranAt: "2026-09-26T10:13:00Z" }],
+    firebase: [
+      { branch: "b", verdict: "PASS", rung: "L2", startedAt: "2026-09-26T10:20:00Z", ranAt: "2026-09-26T10:25:00Z" },
+      { branch: "b", verdict: "FAIL", rung: null, startedAt: "2026-09-26T11:10:00Z", ranAt: "2026-09-26T11:12:00Z" },
+      { branch: "main", verdict: "PASS", rung: "L2", startedAt: "2026-09-26T10:30:00Z", ranAt: "2026-09-26T10:35:00Z" },
+    ],
+  });
+  const [one] = summary.slices;
+  assert.deepEqual(one.device.map((r) => r.verdict), ["PASS"], "a Firebase run is not a default device run");
+  assert.deepEqual(one.firebase.map((r) => r.verdict), ["PASS"]);
+  assert.equal(one.firebase[0].durationMs, 5 * 60000);
+  const t = summary.totals;
+  assert.equal(t.deviceRuns + t.deviceRunsInOtherSlices + t.unattributedDeviceRuns, 1, "device runs count only the default kind");
+  assert.equal(t.unattributedDeviceRuns, 0);
+  assert.equal(t.unattributedFirebaseRuns, 1, "the trunk Firebase run is counted beside the unattributed device runs, not in them");
+  assert.equal(t.firebaseRuns + t.firebaseRunsInOtherSlices + t.unattributedFirebaseRuns, 3, "Firebase runs must add up to their history (KD-60)");
+  assert.match(renderHistory(summary), /1 Firebase L2 run\(s\)/);
+});
+
+test("proof-plan --history reads the fleet-firebase history and passes it to the summary", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "proof-history-firebase-"));
+  try {
+    fs.writeFileSync(path.join(dir, HISTORY_FILES["fleet-firebase"]), `${JSON.stringify({ branch: "main", verdict: "PASS", rung: "L2", ranAt: "2026-09-26T10:35:00Z" })}\n`);
+    const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "proof-plan.mjs");
+    const res = spawnSync(process.execPath, [script, "--history", "--json"], { encoding: "utf8", env: { ...process.env, PROOFLANE_HISTORY_DIR: dir } });
+    assert.equal(res.status, 0, res.stderr);
+    const out = JSON.parse(res.stdout);
+    assert.equal(out.totals.unattributedFirebaseRuns, 1, "the kept Firebase run is invisible to --history");
+    assert.equal(out.totals.unattributedDeviceRuns, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("bookkeeping never fails a gate: an append that cannot be written returns false and does not throw", () => {
