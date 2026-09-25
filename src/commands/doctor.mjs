@@ -38,6 +38,7 @@ import {
   worksFromAnyDirectory,
 } from "../lib/shipped-hooks.mjs";
 import { diagnoseProject } from "../lib/project-doctor.mjs";
+import { editJsonInPlace } from "../lib/json-in-place.mjs";
 import { parseProperties, upsertProperty, parseVersions } from "../lib/toml.mjs";
 import { loadRegistry } from "../lib/registry.mjs";
 import { listFiles } from "../lib/fsutil.mjs";
@@ -529,30 +530,43 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
           // Never overwrite settings we could not read — that is the app's file.
           continue;
         }
+        if (settings === null || typeof settings !== "object" || Array.isArray(settings)) continue;
       }
-      let changed = false;
-      if (statusLine && !invokesWalk(settings.statusLine)) {
-        // Only claim an unclaimed slot: an app that set its OWN status line keeps it.
-        if (!settings.statusLine) {
-          settings.statusLine = statusLine;
-          changed = true;
-        }
+      // What to ADD, as edits to the app's own text rather than a re-serialised copy of
+      // it (KD-197): `JSON.stringify(settings, null, 2)` rewrote an app's indentation,
+      // key order and `\u2014` escapes as a side effect of gaining a status line.
+      const edits = [];
+      // Only claim an unclaimed slot: an app that set its OWN status line keeps it.
+      if (statusLine && !invokesWalk(settings.statusLine) && !settings.statusLine) {
+        edits.push(
+          Object.hasOwn(settings, "statusLine")
+            ? { at: ["statusLine"], set: statusLine }
+            : { at: [], add: "statusLine", value: statusLine }
+        );
       }
       if (promptSubmit) {
-        settings.hooks = settings.hooks ?? {};
-        const existing = settings.hooks.UserPromptSubmit ?? [];
-        if (!existing.some((g) => (g?.hooks ?? []).some(invokesWalk))) {
-          settings.hooks.UserPromptSubmit = [...existing, ...promptSubmit];
-          changed = true;
+        const hooks = settings.hooks;
+        const existing = hooks?.UserPromptSubmit;
+        if (!(Array.isArray(existing) && existing.some((g) => (g?.hooks ?? []).some(invokesWalk)))) {
+          if (hooks === undefined) edits.push({ at: [], add: "hooks", value: { UserPromptSubmit: promptSubmit } });
+          else if (hooks === null) edits.push({ at: ["hooks"], set: { UserPromptSubmit: promptSubmit } });
+          else if (typeof hooks !== "object" || Array.isArray(hooks)) continue; // not a shape we can account for
+          else if (existing === undefined) edits.push({ at: ["hooks"], add: "UserPromptSubmit", value: promptSubmit });
+          else if (existing === null) edits.push({ at: ["hooks", "UserPromptSubmit"], set: promptSubmit });
+          else if (Array.isArray(existing)) edits.push({ at: ["hooks", "UserPromptSubmit"], push: promptSubmit });
+          else continue;
         }
       }
-      if (changed) {
-        heal(
-          f.id,
-          target,
-          `${JSON.stringify(settings, null, 2)}\n`,
-          "the walk into .claude/settings.json (statusLine + UserPromptSubmit)"
-        );
+      if (edits.length > 0) {
+        // A file that is not there has no bytes to keep, so it is written in the
+        // template's own shape; one that is there is edited where it stands, and an
+        // edit that cannot be accounted for against JSON.parse writes nothing.
+        const content =
+          raw === null
+            ? `${JSON.stringify({ ...(statusLine ? { statusLine } : {}), ...(promptSubmit ? { hooks: { UserPromptSubmit: promptSubmit } } : {}) }, null, 2)}\n`
+            : editJsonInPlace(raw, edits);
+        if (content === null) continue;
+        heal(f.id, target, content, "the walk into .claude/settings.json (statusLine + UserPromptSubmit)");
       }
     }
 
