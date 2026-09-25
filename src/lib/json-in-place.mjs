@@ -138,6 +138,29 @@ export function editJsonInPlace(raw, edits) {
   return tryEditJsonInPlace(raw, edits).content ?? null;
 }
 
+/**
+ * `JSON.stringify(v)` output with each key's colon spelled `sep`. In that output the only
+ * colons outside strings are key separators, so a scan that skips strings (and the
+ * character after each backslash inside them) finds exactly those.
+ */
+function withKeySep(json, sep) {
+  if (sep === ":" || json === undefined) return json;
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < json.length; i += 1) {
+    const c = json[i];
+    if (inString) {
+      out += c;
+      if (c === "\\") out += json[++i];
+      else if (c === '"') inString = false;
+    } else if (c === '"') {
+      inString = true;
+      out += c;
+    } else out += c === ":" ? sep : c;
+  }
+  return out;
+}
+
 /** A key path as a reader would name it. */
 function where(p) {
   return p.length === 0 ? "the top level" : JSON.stringify(p.join("."));
@@ -168,7 +191,10 @@ export function tryEditJsonInPlace(raw, edits) {
   // The file's own style, read rather than assumed.
   const eol = raw.includes("\r\n") ? "\r\n" : "\n";
   const multiline = raw.includes("\n");
-  const escapes = /\\u[0-9a-fA-F]{4}/.test(raw);
+  // A real `\uXXXX` escape only: its backslash is preceded by an even run of backslashes
+  // (zero included). `"C:\\ucafe"` is an escaped backslash followed by `ucafe`, and a
+  // file holding it escapes nothing (KD-240).
+  const escapes = /(?<!\\)(?:\\\\)*\\u[0-9a-fA-F]{4}/.test(raw);
   const lineIndent = (pos) => {
     const from = raw.lastIndexOf("\n", pos - 1) + 1;
     return /^[ \t]*/.exec(raw.slice(from))[0];
@@ -193,7 +219,8 @@ export function tryEditJsonInPlace(raw, edits) {
   };
   /** A value as the file would spell it: laid out at `indent` in `unit` steps, or on one line. */
   const text = (v, { indent = "", unit = unitOfFile, compact = false } = {}) => {
-    let s = multiline && !compact ? JSON.stringify(v, null, unit).split("\n").join(eol + indent) : JSON.stringify(v);
+    // On one line, the colons inside the value are spelled like the file's own (KD-240).
+    let s = multiline && !compact ? JSON.stringify(v, null, unit).split("\n").join(eol + indent) : withKeySep(JSON.stringify(v), keySep);
     if (escapes) s = s.replace(/[\u007f-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
     return s;
   };

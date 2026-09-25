@@ -9,6 +9,33 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-240 — two style reads in `json-in-place` that are slightly wrong — **CLOSED 2026-09-25**
+
+`src/lib/json-in-place.mjs:171`, `:196`, `:245-246`
+
+The file's escape style is read from `/\\u[0-9a-fA-F]{4}/` over the raw text. That also matches a
+string holding a literal backslash-u and four hex digits (`"C:\\ucafe"`), so such a file gets its
+inserted non-ASCII escaped. Separately, in a one-line file an inserted value is written as
+`JSON.stringify(v)`. The key separator follows the file, but the colons inside the inserted value
+have no space after them, whatever the file uses.
+
+**Why it does not block:** neither changes what the JSON means. Both are the file's own style read
+slightly wrong, on a path whose purpose is keeping that style (KD-197).
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** (a) The escape style now counts only a real
+`\uXXXX` escape, whose backslash follows an even run of backslashes, zero included:
+`/(?<!\\)(?:\\\\)*\\u[0-9a-fA-F]{4}/` (`src/lib/json-in-place.mjs:197`). (b) A value rendered on
+one line goes through `withKeySep` (`:146`), which spells each key colon in `JSON.stringify`'s output
+as the file's own key separator. It skips strings, so a colon inside a string value is left alone
+(`:223`). That covers a one-line file and a member added on the bracket's line in a multi-line file.
+`test/json-in-place-reads-the-files-style.test.mjs` checks both, and JSON.parse of every result
+deep-equals the edit's value. Its two defect tests fail on the tree before this commit. Its two
+controls pass on both trees: a real escape, and an escaped backslash before a real escape. Not
+changed, because the entry names only the colon: the comma inside an inserted one-line value is
+still `JSON.stringify`'s `,`, even in a file that writes `, `.
+
 ### KD-237 — doctor offers `--fix` on a settings file `--fix` declines — **CLOSED 2026-09-25**
 
 `src/lib/project-doctor.mjs:481-498`, `src/commands/doctor.mjs:724,727` (the offer), `:588,593` (the decline)
