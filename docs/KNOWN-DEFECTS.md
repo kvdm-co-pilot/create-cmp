@@ -3306,7 +3306,9 @@ machinery.*
 
 **2026-09-26 — the record says it.** The Firebase L2 run now exists (KD-45). Its record carries
 `coverage.trafficThroughRedirect: false` with this entry's reason, so a PASS is not readable as
-traffic. Still open as written. Proving traffic would take a Firebase call on a path the lane walks,
+traffic. `--ladder-plant` under `--with-firebase` makes `configureFirebaseEmulators()` throw and
+requires `e2eSmoke` red with the build green, so a green run's claim that the redirect ran is
+derived and not argued. Still open as written. Proving traffic would take a Firebase call on a path the lane walks,
 for example an anonymous sign-in or one document read in the debug build, or an instrumented test.
 That is an overlay change every adopter's debug build would carry, roughly one more lane step
 (~30–60 s, estimated), and a product decision. It is not in this slice.
