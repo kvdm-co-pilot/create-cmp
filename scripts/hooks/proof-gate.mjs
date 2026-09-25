@@ -542,6 +542,10 @@ export const STARTED_MS = Date.now();
  * tree stamps, so answering includes one stamp — 0.27 / 0.26 / 0.30s measured,
  * bounded at `STAMP_CAP_MS` (3000ms) by scripts/stamped-output.mjs, which is
  * the term this number had to grow to cover. Worst case: 3000 + ~200ms.
+ * Since 2026-09-26 that one stamp also answers the Firebase tier's digest:
+ * `stampedApps` runs `add firebase` on the same scratch app under the SAME
+ * `STAMP_CAP_MS` deadline (stamp + add 0.25–0.34s measured, both hashes
+ * included), so this term still covers it and no bound was added (KD-208).
  *
  * THE FOUR BOUNDS NOW SUM TO EXACTLY THE DECLARED BUDGET (1000 + 3000 + 2500 +
  * 3500 = 10000), which the arithmetic test in
