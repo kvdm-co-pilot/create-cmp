@@ -95,7 +95,6 @@ you the same list without opening anything.
 | | | |
 |---|---|---|
 | **KD-3** | `executionHint` reads menu paths without its sibling's prefix filter | cannot fire — one CONTRACT declaration |
-| **KD-4** | `create-cmp`'s `harness init` flag line omits `--new-profile` | the two help surfaces have drifted |
 | **KD-5** | `tokenDrift` SKIPs whenever the debug app is not running | environmental, indistinguishable from broken |
 | **KD-6** | `device` is not among the agnostic lint's runtime nouns | adding it fails ten core modules today |
 | **KD-8** | the dangling-citation lint reads `ADR-NNNN`, not `§` | nothing dangles; a checker risks false positives |
@@ -254,19 +253,6 @@ breaks silently rather than loudly.
 
 **Fires when:** a second CONTRACT declaration gains a field with `options`.
 *Logged 2026-09-11, raised in review round 3.*
-
-### KD-4 — `create-cmp`'s `harness init` flag line omits `--new-profile`
-
-`bin/create-cmp.mjs:133`
-
-Pre-existing. The two help surfaces have drifted from each other, and `prooflane --help` is the
-fuller one — it names `--new-profile`, `create-cmp`'s `harness init flags:` line does not.
-
-*Logged 2026-09-11, noticed in review round 1. Reason corrected 2026-09-11 after review round 4:
-this entry first said `--new-profile` was "parsed at the front door rather than there" and so out
-of the new lint's reach. It is branched on at `packages/harness/install/init.mjs:950`, and the
-lint does cover it — against `prooflane --help`, which names it. Only create-cmp's help omits it.
-The conclusion held; the reason was wrong.*
 
 ### KD-5 — `tokenDrift` SKIPs whenever the debug app is not already running
 

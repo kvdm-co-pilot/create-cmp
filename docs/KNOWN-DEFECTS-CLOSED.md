@@ -58,6 +58,26 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-4 — `create-cmp`'s `harness init` flag line omits `--new-profile` — **CLOSED 2026-09-25**
+
+`bin/create-cmp.mjs:133`
+
+Pre-existing. The two help surfaces have drifted from each other, and `prooflane --help` is the
+fuller one — it names `--new-profile`, `create-cmp`'s `harness init flags:` line does not.
+
+*Logged 2026-09-11, noticed in review round 1. Reason corrected 2026-09-11 after review round 4:
+this entry first said `--new-profile` was "parsed at the front door rather than there" and so out
+of the new lint's reach. It is branched on at `packages/harness/install/init.mjs:950`, and the
+lint does cover it — against `prooflane --help`, which names it. Only create-cmp's help omits it.
+The conclusion held; the reason was wrong.*
+
+**CLOSED by naming the flag, in the commit that moved it here.** `create-cmp --help`'s `harness init
+flags:` block gains a `--new-profile` line in `prooflane --help`'s words, and the usage line the
+`harness` door prints for an unknown subcommand gains `[--new-profile]` — the same list in its second
+spelling. `test/create-cmp-harness-init-help-omits-a-flag-init-branches-on.test.mjs` reads every flag
+`packages/harness/install/init.mjs` branches on and asserts each is printed in both places, so the
+next flag init learns cannot drift the same way.
+
 ### KD-216 — "always works", in the paragraph explaining why it does not — **CLOSED 2026-09-25**
 
 `src/lib/project-doctor.mjs` (walk-wiring warn branch, the `working.length > 0` detail) · KD-126 ·
