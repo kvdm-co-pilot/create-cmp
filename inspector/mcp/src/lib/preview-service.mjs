@@ -783,6 +783,10 @@ export function createPreviewService(opts) {
   let lastSelfLedgerWriteAt = 0;
   let mode = "gradle"; // "gradle" (task per render) | "daemon" (resident hot JVM)
   let daemonChild = null;
+  // Did this console START a daemon, or CONFIRM one healthy and serving this project?
+  // Only then is `stop()`'s `GET /shutdown` addressed to anything of ours: the daemon
+  // port is machine-global, and anything at all may be listening on it (KD-204).
+  let daemonOurs = false;
   let daemonBootDeadline = null;
   let pollTimer = null;
   let debounceTimer = null;
@@ -1474,6 +1478,7 @@ export function createPreviewService(opts) {
 
   /** Wire a spawned daemon child's streams/exit into the service (also for injected spawns). */
   function adoptDaemonChild(child) {
+    daemonOurs = true; // started by this console
     // The daemon's `hotRunDesktop` client is itself a Gradle invocation that stays
     // "in flight" for as long as the process runs — not a single discrete task like
     // runRender/runCompileCheck — so it gets the marker for its whole lifetime,
@@ -1528,6 +1533,7 @@ export function createPreviewService(opts) {
   }
 
   function enterDaemonMode(why) {
+    daemonOurs = true; // confirmed healthy and serving this project (daemonHealthy)
     mode = "daemon";
     log(`${why} — warm renders via ${daemonUrl}`);
     watchClasses();
@@ -2793,8 +2799,11 @@ export function createPreviewService(opts) {
       clearTimeout(renewQuiesceTimer);
       for (const w of selfWatchers) w.close();
       selfWatchers = [];
-      // Best-effort daemon teardown: ask the JVM to exit, then kill the gradle client.
-      fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {});
+      // Best-effort daemon teardown: ask the JVM to exit, then kill the gradle client —
+      // and only a daemon this console started or confirmed. `hot: false`, or a boot
+      // that never happened, used to send the request anyway, to a fixed address
+      // anything may be listening on (KD-204).
+      if (daemonOurs) fetch(`${daemonUrl}/shutdown`, { signal: AbortSignal.timeout(1500) }).catch(() => {});
       if (daemonChild) daemonChild.kill("SIGTERM");
       // Belt-and-braces: the exit event above clears this too, but that fires
       // asynchronously once the killed process actually exits — clear synchronously

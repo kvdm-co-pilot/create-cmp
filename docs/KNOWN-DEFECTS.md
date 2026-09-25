@@ -204,7 +204,6 @@ you the same list without opening anything.
 | **KD-199** | two superseded commands in the shipped-hooks table are narration, and `healedForm` refuses to heal them because their successors describe a newer lane than the app may have | a decision, not an oversight: only a pair differing by the anchor alone is healed, which is identical at the project root whatever the lane version. Healing narration is two table fields plus lane-version detection |
 | **KD-200** | text a test prints shares the runner's message channel, and node's parser reads it as a frame length: a third byte ≥ `0x80` (`›` `✓` `→` `—`) makes the size negative and aborts the FILE with *"Unable to deserialize cloned data"*, attributed to whichever file's stream was being parsed | the `scaffold.test.mjs` instance is fixed and the helper is guarded, but the class is not closed: a static over-approximation says 70 of 274 declared test files can reach such a write, and closing it needs either a `package.json` preload (the suite gate's own definition) or a per-file measurement |
 | **KD-201** | four test files silence a CLI call by replacing `process.stdout.write`, which is the channel the reporter writes its FRAMES to — a frame flushed inside that window is swallowed, the file exits 0, and the run reports fewer tests than it ran | measured: 4 tests run, 3 reported, nothing red. Not fixed because those four files were not that slice's subject and the wave allowed running only the files it named |
-| **KD-204** | `stop()` fires `GET /shutdown` at `http://127.0.0.1:9601` unconditionally, `hot: false` and no daemon included, so every console sends a request to a fixed address anything may be listening on | harmless where nothing listens (the refusal is swallowed) and a real daemon is the intended recipient; with KD-202 and KD-203 it is the complete path from "a suite ran" to "a passed test is recorded as FAILED" |
 | **KD-205** | `contains()` / `behindBy()` drop `gitAt`'s `why`, so one call site of the ordering check cannot say which of four causes killed a git call — a gate-timer kill, a crash and an OOM kill all read as "git could not compare this branch with origin/main" | the verdict is correct either way: the check still allows and still says it could not answer. It costs a reader one fact, in the file whose whole subject is that distinction |
 | **KD-206** | the fleet scratch app is stamped `--no-ios`, so an edit to iOS-only template code moves no byte of the stamped app and the device tier reads DISCHARGED; Firebase lives in `overlays/firebase/`, which no stamp copies, so an overlay edit moves none either | no proof is lost — the L2 run never compiled either (KD-45) — so KD-45's gap is visible in the schedule instead of masked by a run that proves nothing about those files; CI's stamp + `add firebase` + assembleDebug compiles every overlay edit on the PR; `template/` is still a review trigger |
 | **KD-208** | the hook's four bounds now sum to exactly its declared budget — `1000 + 3000 + 2500 + 3500 = 10000`, the 10 s `.claude/settings.json` declares — because answering a payload now includes a stamp | the arithmetic test asserts `sum <= budget` and passes, every bound has its own kill-timer so the sum is a worst case that needs all four to saturate, and the measured real answer is ~0.5 s; what is gone is the slack |
@@ -3169,25 +3168,6 @@ change there could not be verified by running it.
 **Fires when:** a reporter event is flushed inside one of those four windows — which is a matter of
 timing, so the loss is silent and intermittent.
 *Logged 2026-09-22, found while building the helper that slice uses.*
-
-### KD-204 — every `stop()` sends `GET /shutdown` to the daemon port, daemon or no daemon
-
-`inspector/mcp/src/lib/preview-service.mjs` (`stop()`), `daemonUrl` from `:715`
-
-`stop()` fires ``fetch(`${daemonUrl}/shutdown`)`` unconditionally — `hot: false`, no daemon ever
-started, still sent. Measured 2026-09-22 with a bystander HTTP server on the daemon port: it receives
-`GET /shutdown` from a `hot: false` console's stop. Since `daemonUrl` defaults to
-`http://127.0.0.1:9601`, every console in every process sends a request to a fixed address that
-anything may be listening on — the console of another test process, or a developer's own console.
-Combined with KD-202 and KD-203 this is the complete path from "a suite ran" to "a passed test is
-recorded as FAILED".
-
-**Why it does not block.** Harmless where nothing listens (the `.catch(() => {})` swallows the
-refusal), and a real daemon is the intended recipient. The guard is cheap: send it only when a daemon
-was actually started (`mode === "daemon"` / `daemonChild`).
-
-**Fires when:** any console stops while anything at all is listening on `127.0.0.1:9601`.
-*Logged 2026-09-22, measured while proving KD-56's mechanism.*
 
 ### KD-205 — one call site of the ordering check cannot say which of its four causes happened
 
