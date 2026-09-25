@@ -500,8 +500,8 @@ function scanInspectorSources(projectDir) {
  * Now the content goes to a temporary file in the target's own directory (so the rename
  * is atomic) and is renamed over it; on any failure the temporary file is unlinked, the
  * original keeps its bytes, and the refusal is reported as above. What the truncating
- * write did implicitly is kept explicitly: a symlinked target keeps its link (the file
- * written is the one it points at), the file keeps its mode, and a file this user may
+ * write did implicitly is kept explicitly: a symlinked target keeps its link, live or
+ * dangling (the file written is the one it points at), the file keeps its mode, and a file this user may
  * not write is still refused (EACCES) rather than replaced, since a rename needs only
  * the directory's permission. The atomic write is inline, not a helper, so every fs call
  * that mutates the tree stays inside this body where the dry-run gate can see it.
@@ -534,6 +534,15 @@ export function healWriter({ dryRun = false } = {}) {
         mode = fs.statSync(real).mode & 0o7777;
       } catch (err) {
         if (err?.code !== "ENOENT") throw err;
+        // No file yet, or a link whose chain ends where nothing is (a dangling link), which
+        // realpathSync refuses. Follow the chain by hand, each hop against its link's real
+        // directory, so the write lands where the last link points and every link stays one.
+        // A destination directory that is missing is not made: the write below is refused
+        // and reported (KD-214). Past 40 hops the system names the refusal (ELOOP).
+        for (let hops = 0; fs.lstatSync(real, { throwIfNoEntry: false })?.isSymbolicLink(); hops += 1) {
+          if (hops === 40) fs.statSync(real);
+          real = path.resolve(fs.realpathSync(path.dirname(real)), fs.readlinkSync(real));
+        }
       }
       if (mode !== undefined) fs.accessSync(real, fs.constants.W_OK);
       const tmp = path.join(
