@@ -2,7 +2,8 @@
 
 **Status:** decided by the owner 2026-09-22, in conversation, and its open questions answered
 2026-09-24. Decision 2 built 2026-09-25 on branch `firebase-out`, with the corrections and the one
-deviation recorded under it; Decision 3 not yet built. Three slices, in this
+deviation recorded under it; Decision 3 built 2026-09-25 on branch `minimal-preset`, as
+`--preset lean`, with the name correction recorded under it. Three slices, in this
 order, each one thing. This document records the decisions and their reasons so the slices are
 briefed from settled ground rather than from a chat transcript.
 
@@ -133,12 +134,29 @@ not build today that is a template defect an adopter could already hit through t
 at the compile tier every slice (CI's "stamp + Android assembleDebug" job stamps both shapes); the
 device badge stays on the default and the front door says so.
 
+**Built 2026-09-25 (branch `minimal-preset`) — one name correction, and what "lean" resolved to.**
+
+- *Correction: the preset is not called "minimal".* `--minimal` already names the harness mode
+  (`src/commands/create.mjs`), a different axis, and the harness is full in both shapes — so the
+  flag is `--preset lean|full`, default `full`, and the prose calls it the lean preset.
+- *Lean turns `room` off, and nothing else.* Of the toggles listed above, `harness` is ruled out
+  by the full-harness decision; `e2e`, `inspector` and `devClient` are the eyes, which stay on;
+  `tabs` and `platforms` are the app's content and scope, not its build weight. Room is the one
+  lever this section names. A stated flag still wins (`--preset lean --room` is the default app).
+- *No new record field.* `create-cmp.json` already records `"room": false`, which is what
+  `upgrade --harness` and `harden` rebuild from.
+- *What lean costs:* no on-device database, so what a lean app stores lives in memory until it
+  adds persistence; `cmp-new` says so in its report, and the stamp seeds the no-Room ADR.
+- *Proof so far:* compile, on every PR — CI's stamp-android job stamps `--preset lean` and builds
+  it. The measure-once (both shapes to first frame) is not yet taken.
+
 ## Sequence
 
 1. **The wave** (this branch) — live adopter harms; ships as 0.27.1.
 2. **Firebase out** — `create-cmp add firebase`. Built with a compile-tier proof in CI; the
    repointed runtime proof that closes KD-45's Firebase half is its own slice (see Decision 2).
-3. **Minimal preset** — over a template that by then has only libraries in it.
+3. **Minimal preset** — over a template that by then has only libraries in it. Built as
+   `--preset lean` (see Decision 3).
 
 Two front-door changes under one review would be two things in one slice; kept apart, each stays
 refutable on its own.
