@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.27.2] - 2026-09-25
+
 ### Added
 
 - **Resuming a helper is priced at the moment you send to it** (`docs/proposals/RESUME-COSTS-MORE-THAN-RESTART.md`).
@@ -3685,7 +3687,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.1...HEAD
+[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.2...HEAD
+[0.27.2]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.5...v0.27.1
 [0.26.5]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.26.0...v0.26.5
 [0.26.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.25.0...v0.26.0
