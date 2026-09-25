@@ -9,7 +9,7 @@ reproducible — the property ad-hoc CMP setups lack.
 
 ```
 ┌─ Front doors ────────────────────────────────────────────────────────┐
-│   (a) npx create-cmp        ← the CLI, usable by anyone               │
+│   (a) npx create-cmp-cli    ← the CLI, usable by anyone               │
 │   (b) Claude Code plugin    ← conversational interview + screen-gen,  │
 │        (cmp-new/-doctor/-qa-prep)  shells out to the SAME engine      │
 ├─ Engine (Node, deterministic — no LLM in the hot path) ──────────────┤

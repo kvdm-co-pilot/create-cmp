@@ -227,7 +227,6 @@ you the same list without opening anything.
 | **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
 | **KD-237** | the walk-wiring "installed but not wired up" finding always carries `fix: { auto: true }`, so doctor prints `fix (--fix):` over a settings file that `--fix` then declines as unreadable or of a shape it does not read | since this batch the decline is printed with its reason, so nothing is written and nothing is claimed healed; what is wrong is the offer |
-| **KD-238** | `docs/ARCHITECTURE.md:12` labels the CLI `npx create-cmp`, a third party's npm name (ADR-0006); ours is `create-cmp-cli` | a label in a contributor-facing diagram, not an install step; the correction is one word |
 | **KD-239** | `skills/cmp-new/SKILL.md:162` says "Build exactly the shape from `docs/CONTRACT.md`", and no `CONTRACT.md` exists anywhere in this tree | the same sentence names `options.schema.json`, which exists and validates the shape; the dangling pointer costs the agent one failed read |
 | **KD-240** | `json-in-place.mjs` reads the file's escape style from `/\\u[0-9a-fA-F]{4}/`, which also matches a literal backslash-u and four hex digits in a string (`C:\\ucafe`); and in a one-line file an inserted value is `JSON.stringify(v)`, with no space after its own colons | neither changes what the JSON means; both are the file's style read slightly wrong, on a path whose whole point is to keep that style |
 | **KD-241** | doctor's `healWriter` writes straight onto the target with `fs.writeFileSync`, which truncates first, so a full disk or a kill mid-write can leave a truncated file where the app's own was | not observed; a thrown write is still reported as "could not write" (KD-214), but the original bytes are not restored. The atomic form is write-temp-then-rename |
@@ -3700,19 +3699,6 @@ with its reason. The offer above it is unchanged.
 
 **Why it does not block:** nothing is written and nothing is claimed healed. What is wrong is a
 promise one line above a refusal that names itself.
-
-*Logged 2026-09-25 (0.28.0 batch).*
-
-### KD-238 — the architecture diagram names a third party's package
-
-`docs/ARCHITECTURE.md:12`
-
-The diagram labels the CLI "`npx create-cmp` ← the CLI, usable by anyone". `create-cmp` on npm is not
-ours. ADR-0006 keeps the name `create-cmp-cli` because the bare name will never resolve to this
-project.
-
-**Why it does not block:** it is a label in a contributor-facing diagram, not an install step. The
-correction is one word.
 
 *Logged 2026-09-25 (0.28.0 batch).*
 
