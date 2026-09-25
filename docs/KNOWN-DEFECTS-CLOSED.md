@@ -9,6 +9,23 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-245 — "KD-67" names two defects — **CLOSED 2026-09-25**
+
+`docs/KNOWN-DEFECTS.md` (KD-223's entry and row), `test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs:107`,
+`docs/KNOWN-DEFECTS-CLOSED.md:58`
+
+KD-223 and the test comment cite KD-67 for the three-hash defect: `fleet-check` recorded one hash,
+`proof-plan` compared a second and the publish gate computed a third. KD-67 in the closed log is a
+different defect, "§9 says the attestation is reported NOT MET". The number collides in the log
+that `kd-next` exists to keep collision-free (KD-119).
+
+**Why it does not block:** only a person reads the number. The three-hash defect's own number was
+not found in either file, so the correction needs that looked up first.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** The three-hash defect never had a number. It was found and fixed in one commit, `a6c303c` (2026-09-17, "fix(gate): the release gate hashes the tree the way the release proof records it"), whose message records the incident — a proof that PASSED at L2 on main, recorded `3ed5e09`, refused twice by a gate that computed `eb734f5`, and 0.26.0 published by hand — and which logged only KD-58, a different defect. Neither KNOWN-DEFECTS file nor CHANGELOG.md names it under any number, and `git log -S "KD-67"` over both logs reaches back only to `9728527`, the attestation commit that KD-67 belongs to. So no number was allocated: the three citations now describe the defect and name `a6c303c` — KD-223's row and entry in `docs/KNOWN-DEFECTS.md`, and the comment at `test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs:107-109`. The line this entry cited in `KNOWN-DEFECTS-CLOSED.md` is KD-67's own heading, which is right and did not change.
+
 ### KD-239 — `cmp-new` points at a `docs/CONTRACT.md` that does not exist — **CLOSED 2026-09-25**
 
 `skills/cmp-new/SKILL.md:162`

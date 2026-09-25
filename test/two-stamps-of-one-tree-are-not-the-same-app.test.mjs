@@ -104,8 +104,9 @@ test("ONE spelling of what fleet-check stamps: the oracle's flags are the flags 
   // The tier's whole criterion is that the app hashed here is the app the
   // device run proved. Two flag lists that agree today and drift tomorrow
   // would make the record and the oracle describe different apps while both
-  // looked right — the shape of KD-67, where `fleet-check` recorded one hash,
-  // `proof-plan` compared a second and the publish gate computed a third.
+  // looked right — the shape of the three-hash defect `a6c303c` fixed (it never
+  // had a KD number), where `fleet-check` recorded one hash, `proof-plan`
+  // compared a second and the publish gate computed a third.
   const src = fs.readFileSync(path.join(ROOT, "scripts", "fleet-check.mjs"), "utf8");
   for (const flag of FLEET_SCRATCH_APP.flags) {
     assert.ok(

@@ -216,7 +216,7 @@ you the same list without opening anything.
 | **KD-220** | a `npm publish` payload stamps the app TWICE — `obligation()` stamps when the device tier is required and `releaseContext()` stamps again — where `ANSWER_RESERVE_MS` is documented as covering one | measured 1.92 s against a 10 s budget (merge, one stamp: 1.09 s), and 1.1–1.8 s per stamp under 16 burners; the overrun direction is fail-open but has no producer today |
 | **KD-221** | the `local.properties` normaliser replaces the WHOLE file, so any byte of it beyond this machine's `sdk.dir` pointer is unwatched by the device digest | measured — appending `org.gradle.java.home=/nope` moves no digest — but `writeLocalProperties` writes only `sdk.dir` and `template/` ships no `local.properties`, so there is no producer; the narrower spelling costs one regex |
 | **KD-222** | `hashStampedTree` records files and symlinks, so an EMPTY DIRECTORY is invisible to the device digest | measured; git cannot ship an empty directory in `template/`, so a stamp cannot produce one as a difference today |
-| **KD-223** | "the gate hashes THIS tree exactly as the release proof records it" now compares `stampedOutput` with itself, and its comment calls that "an INDEPENDENT stamp" | KD-67's three spellings really are gone, so there is nothing left for that test to catch; what is wrong is the sentence, and the pair that IS unguarded is a test nobody has written |
+| **KD-223** | "the gate hashes THIS tree exactly as the release proof records it" now compares `stampedOutput` with itself, and its comment calls that "an INDEPENDENT stamp" | the device tree hash's three spellings (fixed by `a6c303c`, never given a number) really are gone, so there is nothing left for that test to catch; what is wrong is the sentence, and the pair that IS unguarded is a test nobody has written |
 | **KD-224** | the console's freshness test turned "a completed render cycle IS fresh on return" into "is fresh within 5 s", and widened its boot wait from `idle` to `idle \|\| unrefreshed` | `waitFor` throws on timeout so the assertion still refuses; it is a gate relaxed on the way past, in a change whose stated subject was elsewhere |
 | **KD-225** | two projects' lanes shared one emulator mid-run: create-cmp's fleet check (started 21:12 after the gate saw the other lane exit) lost its e2eSmoke at 21:14 — Maestro logged "Created execution plan" and nothing after, no per-flow report — while payment-blueprint's lane started a new Maestro run on the same `emulator-5554` at 21:14:29; the gate checks for a foreign lane only at START, and the per-serial device lease did not hold across the two projects | the run was FAIL, not a false PASS — fail-closed; the re-run in a quiet window is the remedy the gate itself names |
 | **KD-226** | the fleet-check reader ends a shell word at a quote and the `cd` reader refuses one, so `node /A/scripts/fleet-check.mjs"x"` resolves tree `/A` while the shell runs `/A/scripts/fleet-check.mjsx` | the word the shell builds is not a file in any tree, so the classified run cannot execute whatever the gate decided; `scripts/` is not published |
@@ -232,7 +232,6 @@ you the same list without opening anything.
 | **KD-242** | a `--minimal` app that runs `add firebase` and then `harden` may fail the architecture-doc freshness check: `add firebase` skips regenerating the doc when `qa/lib/arch-doc.mjs` is absent, and minimal subtraction removes machine-owned `qa/` scripts outside the preview keep-set | unmeasured in every part; if it fires, it is a red check the adopter can clear by regenerating, never a false green |
 | **KD-243** | the Firebase overlay's Podfile lines pin `FirebaseCore`, `FirebaseAuth` and `FirebaseFirestore` at `~> 11.0`, while the GitLive Kotlin version is taken from the registry at add time | only an iOS build reads the pods, and no L2 run compiles one (KD-206); a GitLive release that needs a newer Firebase iOS fails at pod resolution, loudly |
 | **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | judged harmless by reading in the batch that found it; no test stamps that history |
-| **KD-245** | KD-223 (entry and row) and `test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs:107` cite "KD-67" for the three-hash defect; KD-67 in `KNOWN-DEFECTS-CLOSED.md` is the §9 attestation sentence | a number collision in the log itself, KD-119's class; only a person reads the number, and the three-hash defect's own number was not found in either file |
 | **KD-246** | `scripts/stage3-gate.mjs:3-4` quotes §9 as "10 repos upgraded by one command"; the road has said 2 since 2026-09-09 | a comment in an unpublished script whose predicate reads the live figure out of NORTH-STAR; `stage-gate.mjs`'s "seven of its ten rows" is already gone |
 
 ---
@@ -3454,8 +3453,9 @@ for a directory the walk found empty.
 
 `test/proof-gate-hook.test.mjs` ("npm publish: the gate hashes THIS tree exactly as the release proof records it")
 
-The test exists because of KD-67: `fleet-check` recorded one hash, `proof-plan` compared a second and
-the publish gate computed a third, and a release proof that PASSED on main was refused twice by a
+The test exists because of the three-hash defect, fixed by `a6c303c` on 2026-09-17 and never given a
+number: `fleet-check` recorded one hash, `proof-plan` compared a second and the publish gate computed
+a third, and a release proof that PASSED on main was refused twice by a
 gate no passing run could satisfy. Under the stamped-app criterion it now asserts
 `releaseContext().now === stampedOutput(ROOT).hash` — and `releaseContext` *is*
 `stampedOutputHash(root)`, imported from the same module, so both sides are one function called
@@ -3768,21 +3768,6 @@ Firebase, so its base is the old template with Firebase ON, which that app never
 
 **Why it does not block:** judged harmless by reading, in the batch that found it. No test stamps
 that history, so the judgement is unmeasured.
-
-*Logged 2026-09-25 (0.28.0 batch).*
-
-### KD-245 — "KD-67" names two defects
-
-`docs/KNOWN-DEFECTS.md` (KD-223's entry and row), `test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs:107`,
-`docs/KNOWN-DEFECTS-CLOSED.md:58`
-
-KD-223 and the test comment cite KD-67 for the three-hash defect: `fleet-check` recorded one hash,
-`proof-plan` compared a second and the publish gate computed a third. KD-67 in the closed log is a
-different defect, "§9 says the attestation is reported NOT MET". The number collides in the log
-that `kd-next` exists to keep collision-free (KD-119).
-
-**Why it does not block:** only a person reads the number. The three-hash defect's own number was
-not found in either file, so the correction needs that looked up first.
 
 *Logged 2026-09-25 (0.28.0 batch).*
 
