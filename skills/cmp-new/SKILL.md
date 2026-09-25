@@ -19,7 +19,7 @@ description: >-
   trade-offs against React Native/Flutter, and let the user genuinely choose. If the working
   directory already contains an app matching the request, confirm new-vs-existing before
   scaffolding. Once CMP is the choice: runs a short interview (platforms, app name, package,
-  Firebase/auth, Room, E2E tests (Maestro), bottom-nav tabs), then stamps a frozen
+  Room, E2E tests (Maestro), bottom-nav tabs), then stamps a frozen
   version-locked template via the deterministic create-cmp engine (navigation/insets
   pre-solved, Clean Architecture wired) and generates the requested tab screens. Proves a
   GREEN build before reporting success, then hands over the device-free live preview loop for
@@ -99,10 +99,6 @@ Then: one compact round of config questions; don't interrogate. Accept sensible 
 | `package` | Reverse-DNS package id (e.g. `com.acme.app`)? | derived from appName |
 | `iosBundleId` | iOS bundle id? | same as `package` |
 | `platforms.ios` | Include iOS (Android is always on)? | `true` |
-| `region` | Firebase region? | `us-central1` |
-| `firebase.enabled` | Use Firebase (GitLive KMP)? | `true` |
-| `firebase.auth` | Auth: `email` / `phone` / `both` / `none`? | `both` |
-| `firebase.firestore/storage/functions/fcm` | Which Firebase services? | all on if Firebase on |
 | `room` | Room local cache? | `true` |
 | `e2e` | E2E test harness (Maestro flows in `qa/e2e/`; key renamed from `appium` in 0.3.0)? | `true` |
 | `inspector` | Live on-device inspector (debug builds only — AI-inspectable UI)? | `true` |
@@ -112,6 +108,13 @@ Then: one compact round of config questions; don't interrogate. Accept sensible 
 
 `themePrefix` is the PascalCase form of the app name (the prefix in `<Prefix>Theme` etc.) —
 derive it, don't ask.
+
+**Firebase is not a stamp option** — don't ask about it here. The stamp carries libraries and no
+service, so it builds with no account and no config file. If the app needs Firebase, it is added
+AFTER the green stamp with `create-cmp add firebase` (region, auth and the services are its
+flags); the **cmp-firebase-connect** skill runs that step and the console work. The engine
+refuses `--firebase`, `--region`, `--auth` and the service flags, and a config carrying
+`firebase` or `region`, and names that command.
 
 ### Intent — the root brief (feeds `specs/intent.md` and two of the flags above)
 
@@ -138,9 +141,8 @@ Build exactly the shape from `docs/CONTRACT.md` (validated by `options.schema.js
 ```json
 {
   "appName": "Acme", "package": "com.acme.app", "iosBundleId": "com.acme.app",
-  "region": "us-central1", "themePrefix": "Acme",
+  "themePrefix": "Acme",
   "platforms": { "android": true, "ios": true },
-  "firebase": { "enabled": true, "auth": "both", "firestore": true, "storage": true, "functions": true, "fcm": true },
   "room": true, "e2e": true, "inspector": true, "devClient": true,
   "tabs": [{ "label": "Home", "icon": "home" }, { "label": "Profile", "icon": "person" }],
   "targetDir": "./acme"
@@ -158,9 +160,8 @@ node <repo>/bin/create-cmp.mjs \
   --name "Acme" \
   --package com.acme.app \
   --bundle-id com.acme.app \
-  --region us-central1 \
   --theme-prefix Acme \
-  --ios --firebase --auth both --room --e2e --inspector --dev-client \
+  --ios --room --e2e --inspector --dev-client \
   --tabs "Home:home,Profile:person" \
   --target-dir ./acme \
   --verify \
@@ -176,8 +177,8 @@ Notes:
 - Pass `--verify` so the engine runs its north-star gate: the first Gradle build
   (`./gradlew :composeApp:assembleDebug`, plus the iOS build on macOS when iOS is enabled)
   with a **GREEN/FAIL** verdict. Do not claim success without it.
-- For toggles that are off, pass the negative flag (`--no-ios`, `--no-firebase`,
-  `--no-room`, `--no-e2e`, `--no-inspector`, `--no-dev-client`) or `--auth none`.
+- For toggles that are off, pass the negative flag (`--no-ios`, `--no-room`, `--no-e2e`,
+  `--no-inspector`, `--no-dev-client`).
 - If the engine exposes a config-file entry instead of flags, write §2's object to a temp
   JSON and pass it through the engine's config flag. Reconcile exact flag spellings with
   the engine's `--help` / `options.schema.json` before depending on one — the config-object
@@ -294,9 +295,9 @@ narrating a diagram:
 3. **System context (§3) — the integration questions.** "What does this app talk to?" gets
    answered here for real, using the interview's choices, not re-litigating them. *Local
    DB?* — Room is wired (on-device SSOT), or absent if `--no-room` was chosen; point at the
-   seeded `docs/adr/NNNN-no-local-room-persistence.md` (see point 7) as the record. *Auth?*
-   — same pattern for a non-default `firebase.auth` choice and its seeded ADR.
-   *Backend and other integrations?* — the Firebase services that are on, and the debug
+   seeded `docs/adr/NNNN-no-local-room-persistence.md` (see point 7) as the record.
+   *Backend and other integrations?* — none is stamped; if the app needs Firebase, say that
+   `create-cmp add firebase` (via **cmp-firebase-connect**) adds it next. And the debug
    inspector server (dev-only, never in a release build). Read §3's table together so
    nothing the app talks to is a surprise later.
 4. **Shell — which tabs (feeds §5/§6).** The interview's tab list is already live in the
@@ -315,8 +316,8 @@ narrating a diagram:
    reachability, insets). Each already carries its `[enforced: ...]` / `[advisory]` tag;
    read a few aloud so "which promises are mechanical and which are manners" is explicit.
 7. **Decisions & glossary (§8) — point, don't re-decide.** The ADR index is a generated
-   table: every configuration choice that deviated from the interview default (Room off,
-   iOS off, a non-`both` auth scope) already has its own numbered ADR, auto-seeded by the
+   table: every configuration choice that deviated from the interview default (minimal
+   mode, Room off, iOS off) already has its own numbered ADR, auto-seeded by the
    engine at stamp time (`src/lib/adr-seed.mjs` — deterministic wording and numbering for a
    given config). Point at them as the record of *why* rather than asking the human to
    justify the choice again. A decision not covered by a seeded ADR — something they

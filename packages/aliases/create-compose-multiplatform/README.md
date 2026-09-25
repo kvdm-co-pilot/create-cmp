@@ -27,8 +27,9 @@ LLM-freehanded project code:
   example feature, Koin DI, bottom navigation with insets solved.
 - A **proven-green version set** (Kotlin/KSP/Compose/Room/AGP pinned to a combination that
   actually builds together — including the iOS/KSP2 path).
-- Optional features by flag: Firebase (GitLive) with auth, Room, Maestro on-device E2E, a live
-  UI inspector, a desktop hot-reload dev client. `--verify` builds the app before reporting
+- Optional features by flag: Room, Maestro on-device E2E, a live UI inspector, a desktop
+  hot-reload dev client — and Firebase (GitLive), added after the stamp with
+  `create-cmp add firebase`. `--verify` builds the app before reporting
   success; the CLI exits non-zero on failure.
 - The **delivery harness** in every generated project: specs with stable clause ids, a spec-driven
   verify lane (`node qa/verify.mjs`), evidence receipts bound to a content hash, and CI that

@@ -1,23 +1,29 @@
 ---
 name: cmp-firebase-connect
 description: >-
-  Wire a freshly scaffolded CMP/KMP app to its OWN real Firebase project — the #1 post-scaffold
-  manual step. Use this when the user wants to connect their app to Firebase, or asks "connect my
-  app to firebase", "set up google-services.json", "wire firebase", "create a firebase project for
-  this app", "replace the placeholder firebase config", "get a real GoogleService-Info.plist",
-  "my app still has the REPLACE_ME firebase config", or right after cmp-new as post-scaffold
-  onboarding. Drives the Firebase CLI end-to-end — login, project create/reuse, Android app
-  registration, real google-services.json in place of the placeholder — every cloud-mutating
-  command consent-gated, then proves it with a green assembleDebug. Android-first; iOS branch
+  Add Firebase to a create-cmp app and wire it to its OWN real Firebase project. Use this when the
+  user wants Firebase in their app, or asks "add firebase", "connect my app to firebase", "set up
+  google-services.json", "wire firebase", "create a firebase project for this app", "replace the
+  mock firebase config", "get a real GoogleService-Info.plist", "my app still has the REPLACE_ME
+  firebase config". The stamp carries no Firebase: this runs `create-cmp add firebase` (the
+  deterministic step that adds the GitLive SDK, the emulator wiring and a mock config that says it
+  is one), then drives the Firebase CLI end-to-end — login, project create/reuse, Android app
+  registration, the real google-services.json in place of the mock — every cloud-mutating command
+  consent-gated, then proves it with a green assembleDebug. Android-first; iOS branch
   optional/deferred.
 ---
 
-# cmp-firebase-connect — wire a stamped CMP app to its own Firebase project
+# cmp-firebase-connect — add Firebase to a stamped CMP app and wire it to its own project
 
-Your job: take a CMP app that `create-cmp` stamped with a **placeholder** `google-services.json`
-(`REPLACE_ME_PROJECT_ID`, zeroed app id) and connect it to a **real Firebase project on the user's
-account**, using the Firebase CLI — no console clicking for anything the CLI can do. You finish by
-proving the wiring with a green build.
+Your job: take a CMP app `create-cmp` stamped — which carries **no Firebase** — add Firebase with
+`create-cmp add firebase`, and connect it to a **real Firebase project on the user's account**,
+using the Firebase CLI — no console clicking for anything the CLI can do. You finish by proving
+the wiring with a green build.
+
+> **The code edits are a program's, not yours.** `create-cmp add firebase` adds the GitLive SDK,
+> the google-services plugin, the debug-build emulator redirect and the config file, and refuses
+> by name when the app's shape is one it does not recognise. Never hand-edit Gradle, the catalog or
+> the entry points to wire Firebase; if the step refuses, report its message to the user.
 
 > **Consent rule.** Every command that creates or mutates a cloud resource on the user's Google
 > account (`projects:create`, `apps:create`, `firestore:databases:create`, `apps:android:sha:create`)
@@ -47,10 +53,23 @@ Run these checks before touching anything; fix in order.
    - iOS bundle id — from `iosApp/project.yml` (`PRODUCT_BUNDLE_IDENTIFIER` /
      `bundleIdPrefix`). **iOS is optional and currently deferred product-wide** — do the
      Android wiring first and only take the iOS branch (§5) if the user explicitly wants it now.
-4. **Confirm this is a placeholder situation** — open `composeApp/google-services.json`. If
-   `project_id` is `REPLACE_ME_PROJECT_ID` (or `mobilesdk_app_id` is all zeros), proceed. If it
-   already looks real, stop and ask whether they want to **re-point** the app at a different
-   project (same flow, but be explicit that you're replacing a live config).
+4. **Add Firebase, if the app has none yet** — read `create-cmp.json`'s `firebase` record.
+   - **Absent:** run the add step. It edits only this repo's files, writes nothing until its whole
+     plan is made, and changes nothing on a second run — tell the user what it does, then:
+
+     ```bash
+     npx create-cmp-cli add firebase --no-verify [--region <r>] [--auth <email|phone|both|none>]
+     ```
+
+     `--region` is the Cloud Functions region (default `us-central1`); `--auth` and
+     `--no-firestore/--no-storage/--no-functions/--no-fcm` are recorded in `create-cmp.json` for
+     §4 below — every GitLive module is wired either way. It writes a **mock** config (project
+     `demo-mock-not-real`, a key that says it is not one) so the app builds before any cloud work.
+     When `iosApp/` exists it applies the iOS half too and says it is **unproven**.
+   - **`"config": "mock"`**, or a `REPLACE_ME_PROJECT_ID` placeholder (an app stamped with
+     Firebase by create-cmp 0.27 or earlier): proceed to §2.
+   - **A config that already looks real:** stop and ask whether they want to **re-point** the app
+     at a different project (same flow, but be explicit that you're replacing a live config).
 
 ## 2. Choose or create the Firebase project
 
@@ -94,8 +113,17 @@ firebase apps:create ANDROID "<App Name>" --package-name <applicationId> --proje
 - The output prints the new **App ID** (`1:<number>:android:<hex>`). Capture it; you need it next.
   If the output scrolled away: `firebase apps:list ANDROID --project <project-id>` re-shows it.
 
-**3b. Pull the real config** (read-only). Back up the placeholder first, then write straight to
-the Gradle location with `--out`:
+**3b. Pull the real config** (read-only) to a temp file, and hand it to the add step, which checks
+its `package_name` against the app's `applicationId` and replaces its own mock with it (it refuses,
+and writes nothing, if the file there is not its mock):
+
+```bash
+firebase apps:sdkconfig ANDROID <appId> --project <project-id> --out /tmp/google-services.json
+npx create-cmp-cli add firebase --google-services /tmp/google-services.json --no-verify
+```
+
+For an app stamped with Firebase by create-cmp 0.27 or earlier (a `REPLACE_ME` placeholder, not
+the mock), back up the placeholder and write straight to the Gradle location instead:
 
 ```bash
 cp composeApp/google-services.json composeApp/google-services.json.placeholder.bak
@@ -113,7 +141,7 @@ firebase apps:sdkconfig ANDROID <appId> --project <project-id> --out composeApp/
 python3 -c "import json;d=json.load(open('composeApp/google-services.json'));print(d['project_info']['project_id']);print(d['client'][0]['client_info']['android_client_info']['package_name'])"
 ```
 
-Assert: JSON parses, `project_id` is the real project (not `REPLACE_ME…`), and `package_name`
+Assert: JSON parses, `project_id` is the real project (not `REPLACE_ME…` or `demo-mock…`), and `package_name`
 equals the `applicationId` from preflight. Fix mismatches now (see troubleshooting), not at
 build time.
 
@@ -125,13 +153,13 @@ exactly which switches still need a human in the [Firebase console](https://cons
 | Service | CLI? | What to do |
 |---|---|---|
 | **Auth sign-in providers** (email/password, phone, Google, …) | **No** — `auth:*` only exports/imports users | Console → Authentication → Sign-in method → enable each provider. Auth calls fail with `CONFIGURATION_NOT_FOUND` / `OPERATION_NOT_ALLOWED` until done. |
-| **Firestore database** | **Yes** (CLI ≥ v13-ish; verified on 15.18.0) | `firebase firestore:databases:create "(default)" --location <loc> --project <project-id>` — consent-gated. Run `firebase firestore:locations` first to pick `<loc>` (e.g. `nam5`, `eur3`, or the region matching the app's `region` option from cmp-new). Console fallback: Firestore → Create database. |
+| **Firestore database** | **Yes** (CLI ≥ v13-ish; verified on 15.18.0) | `firebase firestore:databases:create "(default)" --location <loc> --project <project-id>` — consent-gated. Run `firebase firestore:locations` first to pick `<loc>` (e.g. `nam5`, `eur3`, or the region matching `firebase.region` in the app's `create-cmp.json`). Console fallback: Firestore → Create database. |
 | **Storage default bucket** | **No** — no provisioning command in the CLI | Console → Storage → Get started. (Deploying `storage.rules` via `firebase deploy` also requires the bucket to exist first.) |
 | **FCM** | Auto | Enabled by app registration; nothing to toggle for basic push. |
 | **SHA-1/SHA-256 fingerprints** (needed for phone auth & Google Sign-In on Android) | **Yes** | `./gradlew :composeApp:signingReport` → copy the debug SHA-1 → consent-gated: `firebase apps:android:sha:create <appId> <shaHash>`. Then **re-download** the config (§3b) — adding a SHA changes `google-services.json` (`oauth_client` / `certificate_hash`). |
 
-If the scaffold enabled phone auth (`--auth phone`/`both`), flag the SHA row as **required, not
-optional**, and point at the **cmp-firebase-auth** knowledge if the plugin/user has it — iOS phone
+If `create-cmp.json` records phone auth (`firebase.auth` is `phone` or `both`), flag the SHA row as
+**required, not optional**, and point at the **cmp-firebase-auth** knowledge if the plugin/user has it — iOS phone
 auth especially is a minefield.
 
 ## 5. Optional iOS branch (deferred by default)
@@ -145,8 +173,9 @@ firebase apps:sdkconfig IOS <iosAppId> --project <project-id> --out iosApp/iosAp
 
 - `--bundle-id` (alias `-b`) is the required flag for IOS (verified in `apps:create --help`);
   `--app-store-id` exists but is optional.
-- Back up the placeholder plist first, same as Android
-  (`iosApp/iosApp/GoogleService-Info.plist.placeholder.bak`).
+- `create-cmp add firebase` wrote a **mock** plist there when `iosApp/` existed; back it up (or the
+  0.27-era placeholder) first, same as Android (`iosApp/iosApp/GoogleService-Info.plist.mock.bak`).
+  The iOS half of the add step is unproven — say so when reporting.
 - Verify: `plutil -lint iosApp/iosApp/GoogleService-Info.plist` and check `BUNDLE_ID` matches.
 - Remind the user: iOS phone auth additionally needs the `REVERSED_CLIENT_ID` URL scheme and
   APNs setup — out of scope here; that's **cmp-firebase-auth** territory.
@@ -184,11 +213,13 @@ than debugging the environment here.
 | Firestore runtime `NOT_FOUND` / permission error | No database created yet, or default locked-mode rules | `firestore:databases:create` (§4), then deploy/adjust rules. |
 | Phone auth fails on a real Android device | Missing SHA fingerprint | §4 SHA row: `signingReport` → `apps:android:sha:create` → **re-download** the config. |
 
-**Rollback** (undo the local change any time):
+**Rollback** (undo the local change any time): the add step's edits are ordinary file changes —
+`git diff` shows them and `git checkout -- .` (plus deleting the files it created, which it listed)
+reverts them. A config you backed up by hand goes back the same way it came:
 
 ```bash
 mv composeApp/google-services.json.placeholder.bak composeApp/google-services.json
-# iOS, if taken: mv iosApp/iosApp/GoogleService-Info.plist.placeholder.bak iosApp/iosApp/GoogleService-Info.plist
+# iOS, if taken: mv iosApp/iosApp/GoogleService-Info.plist.mock.bak iosApp/iosApp/GoogleService-Info.plist
 ```
 
 The cloud side needs no rollback for a mistake here — an unused Firebase project/app record on
@@ -196,7 +227,8 @@ Spark costs nothing; the user can delete it in console → Project settings if t
 
 ## 8. Report
 
-Tell the user: the project id (created or reused), the Android App ID registered, that the
-placeholder was backed up and replaced, the **GREEN/FAIL** build verdict, which console toggles
+Tell the user: whether `create-cmp add firebase` ran (and that its iOS half is unproven, if it
+applied one), the project id (created or reused), the Android App ID registered, that the mock
+(or placeholder) was replaced, the **GREEN/FAIL** build verdict, which console toggles
 remain (§4 list, tailored to the services their scaffold enabled), and — if they're heading to a
 device run — point them at **cmp-qa-prep** (or **cmp-doctor** if the toolchain is suspect).
