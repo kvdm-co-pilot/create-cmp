@@ -226,6 +226,18 @@ you the same list without opening anything.
 | **KD-232** | "this repository enables its own plugin" is stated in the hook, its test, the proposal and the CHANGELOG, and no file in this tree enables it — the maintainer's user and local settings do, so a fresh clone runs no `resume-price` | contributors, not adopters, and the hook is advisory; the proposal also still says "plugin `hooks/`" and "Not built." |
 | **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
+| **KD-235** | `agent-hold.mjs`'s "held" message names `node qa/plan.mjs --release`, a path relative to the project root, so a session whose cwd is elsewhere is handed a remedy it cannot run — KD-215's class, missed in this file | the hold itself is right, and the remedy fails loud (node cannot find the module); only the next step is wrong, and only from a foreign cwd |
+| **KD-236** | the iOS-off ADR says iOS was switched off "during the cmp-new interview", which is false for `--no-ios` on the command line; the room-off ADR's sentence was corrected in the 0.28.0 batch and this one was not | the decision the ADR records is right; only its provenance clause is wrong, in a file the app owns and edits |
+| **KD-237** | the walk-wiring "installed but not wired up" finding always carries `fix: { auto: true }`, so doctor prints `fix (--fix):` over a settings file that `--fix` then declines as unreadable or of a shape it does not read | since this batch the decline is printed with its reason, so nothing is written and nothing is claimed healed; what is wrong is the offer |
+| **KD-238** | `docs/ARCHITECTURE.md:12` labels the CLI `npx create-cmp`, a third party's npm name (ADR-0006); ours is `create-cmp-cli` | a label in a contributor-facing diagram, not an install step; the correction is one word |
+| **KD-239** | `skills/cmp-new/SKILL.md:162` says "Build exactly the shape from `docs/CONTRACT.md`", and no `CONTRACT.md` exists anywhere in this tree | the same sentence names `options.schema.json`, which exists and validates the shape; the dangling pointer costs the agent one failed read |
+| **KD-240** | `json-in-place.mjs` reads the file's escape style from `/\\u[0-9a-fA-F]{4}/`, which also matches a literal backslash-u and four hex digits in a string (`C:\\ucafe`); and in a one-line file an inserted value is `JSON.stringify(v)`, with no space after its own colons | neither changes what the JSON means; both are the file's style read slightly wrong, on a path whose whole point is to keep that style |
+| **KD-241** | doctor's `healWriter` writes straight onto the target with `fs.writeFileSync`, which truncates first, so a full disk or a kill mid-write can leave a truncated file where the app's own was | not observed; a thrown write is still reported as "could not write" (KD-214), but the original bytes are not restored. The atomic form is write-temp-then-rename |
+| **KD-242** | a `--minimal` app that runs `add firebase` and then `harden` may fail the architecture-doc freshness check: `add firebase` skips regenerating the doc when `qa/lib/arch-doc.mjs` is absent, and minimal subtraction removes machine-owned `qa/` scripts outside the preview keep-set | unmeasured in every part; if it fires, it is a red check the adopter can clear by regenerating, never a false green |
+| **KD-243** | the Firebase overlay's Podfile lines pin `FirebaseCore`, `FirebaseAuth` and `FirebaseFirestore` at `~> 11.0`, while the GitLive Kotlin version is taken from the registry at add time | only an iOS build reads the pods, and no L2 run compiles one (KD-206); a GitLive release that needs a newer Firebase iOS fails at pod resolution, loudly |
+| **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | judged harmless by reading in the batch that found it; no test stamps that history |
+| **KD-245** | KD-223 (entry and row) and `test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs:107` cite "KD-67" for the three-hash defect; KD-67 in `KNOWN-DEFECTS-CLOSED.md` is the §9 attestation sentence | a number collision in the log itself, KD-119's class; only a person reads the number, and the three-hash defect's own number was not found in either file |
+| **KD-246** | `scripts/stage3-gate.mjs:3-4` quotes §9 as "10 repos upgraded by one command"; the road has said 2 since 2026-09-09 | a comment in an unpublished script whose predicate reads the live figure out of NORTH-STAR; `stage-gate.mjs`'s "seven of its ten rows" is already gone |
 
 ---
 
@@ -3678,3 +3690,167 @@ while the helper's transcript was written within the last few seconds. That need
 which is a new calibration question.
 
 *Logged 2026-09-25, review round 1 of the resume-price slice.*
+
+### KD-235 — the hold names a remedy a foreign-cwd session cannot run
+
+`template/qa/lib/agent-hold.mjs:196`
+
+The "held" message ends: "`node qa/plan.mjs --release` if it is gone." The path is relative to the
+project root. A session whose cwd is elsewhere, which is the case KD-215 fixed for the Stop gate's
+remedy, runs it and gets "Cannot find module". This is KD-215's class, and this file was missed.
+
+**Why it does not block:** the hold is right, and the remedy fails loud rather than doing something
+else. The fix is KD-215's: a path that resolves from any cwd.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-236 — the iOS-off ADR credits an interview that a command line never had
+
+`src/lib/adr-seed.mjs:126`
+
+The seeded ADR says iOS was switched off "(`platforms.ios: false`) during the cmp-new interview".
+An app stamped with `--no-ios` on the command line had no interview. The room-off ADR had the same
+sentence and was corrected in this batch (`:99` now says "answered at the stamp's interview or stated
+on its command line"). This one was not.
+
+**Why it does not block:** the decision the ADR records is right. Only the clause about where it was
+made is wrong, and the file belongs to the app.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-237 — doctor offers `--fix` on a settings file `--fix` declines
+
+`src/lib/project-doctor.mjs:481-498`, `src/commands/doctor.mjs:724,727` (the offer), `:588,593` (the decline)
+
+The "installed but not wired up" walk-wiring finding always carries `fix: { auto: true }`, so doctor
+prints `fix (--fix):` under it. When `.claude/settings.json` is not JSON doctor can read, or parses
+into a shape it does not read, `--fix` declines to write it. Since this batch the decline is printed
+with its reason. The offer above it is unchanged.
+
+**Why it does not block:** nothing is written and nothing is claimed healed. What is wrong is a
+promise one line above a refusal that names itself.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-238 — the architecture diagram names a third party's package
+
+`docs/ARCHITECTURE.md:12`
+
+The diagram labels the CLI "`npx create-cmp` ← the CLI, usable by anyone". `create-cmp` on npm is not
+ours. ADR-0006 keeps the name `create-cmp-cli` because the bare name will never resolve to this
+project.
+
+**Why it does not block:** it is a label in a contributor-facing diagram, not an install step. The
+correction is one word.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-239 — `cmp-new` points at a `docs/CONTRACT.md` that does not exist
+
+`skills/cmp-new/SKILL.md:162`
+
+"Build exactly the shape from `docs/CONTRACT.md` (validated by `options.schema.json`)". No
+`CONTRACT.md` is tracked anywhere in this tree, in `docs/` or in `template/`.
+
+**Why it does not block:** the same sentence names `options.schema.json`, which exists and is what
+validates the shape. The dangling pointer costs the agent one failed read.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-240 — two style reads in `json-in-place` that are slightly wrong
+
+`src/lib/json-in-place.mjs:171`, `:196`, `:245-246`
+
+The file's escape style is read from `/\\u[0-9a-fA-F]{4}/` over the raw text. That also matches a
+string holding a literal backslash-u and four hex digits (`"C:\\ucafe"`), so such a file gets its
+inserted non-ASCII escaped. Separately, in a one-line file an inserted value is written as
+`JSON.stringify(v)`. The key separator follows the file, but the colons inside the inserted value
+have no space after them, whatever the file uses.
+
+**Why it does not block:** neither changes what the JSON means. Both are the file's own style read
+slightly wrong, on a path whose purpose is keeping that style (KD-197).
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-241 — a heal write is not atomic
+
+`src/commands/doctor.mjs:482-491` (`healWriter`)
+
+`healWriter` writes with `fs.writeFileSync(target, content)`. That truncates the target before it
+writes. A full disk or a kill mid-write can leave a truncated `.claude/settings.json` where the app's
+own file was.
+
+**Why it does not block:** it has not been observed, and it needs a failure inside one small write.
+A write that throws is still reported as "could not write" (KD-214), but the original bytes are not
+restored. The atomic form is to write a temporary file beside the target and rename it.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-242 — `--minimal`, then `add firebase`, then `harden` may leave the architecture doc stale
+
+`src/lib/add-firebase.mjs:591-593`, `src/lib/minimal.mjs:14-16,23-24`
+
+`add firebase` regenerates `docs/ARCHITECTURE.md` with the app's own `qa/lib/arch-doc.mjs`, and
+skips when that file is absent. Minimal subtraction deletes machine-owned `qa/` scripts outside the
+preview entry points' keep-set, and `harden` installs them back. If the generator is outside the
+keep-set, the doc misses the Firebase change and the freshness check fails after `harden`.
+
+**Why it does not block:** no part of this has been measured, including whether the generator is
+outside the keep-set. If it fires, it is a red check the adopter clears by regenerating the doc,
+never a false green.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-243 — Firebase iOS is pinned while GitLive floats
+
+`overlays/firebase/edits.json:69-71` (the Podfile lines), `:4` (`versionsFromRegistry`)
+
+The overlay writes `pod 'FirebaseCore'`, `'FirebaseAuth'` and `'FirebaseFirestore'` at `'~> 11.0'`.
+The GitLive Kotlin version (`firebase-gitlive`) is taken from the registry at add time. A GitLive
+release built against a newer Firebase iOS would get pods one major version behind it.
+
+**Why it does not block:** only an iOS build reads the pods, and no L2 run compiles one (KD-206). A
+mismatch fails at pod resolution or link time, loudly.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-244 — the upgrade base for a late-Firebase app is a tree it never was
+
+`src/commands/upgrade.mjs:381-385`
+
+When the base engine carries stamp-time Firebase (0.27 and earlier), the base is stamped with
+`legacyFirebaseKeys(record)`. An app stamped `--no-firebase` that later ran `add firebase` records
+Firebase, so its base is the old template with Firebase ON, which that app never was.
+
+**Why it does not block:** judged harmless by reading, in the batch that found it. No test stamps
+that history, so the judgement is unmeasured.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-245 — "KD-67" names two defects
+
+`docs/KNOWN-DEFECTS.md` (KD-223's entry and row), `test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs:107`,
+`docs/KNOWN-DEFECTS-CLOSED.md:58`
+
+KD-223 and the test comment cite KD-67 for the three-hash defect: `fleet-check` recorded one hash,
+`proof-plan` compared a second and the publish gate computed a third. KD-67 in the closed log is a
+different defect, "§9 says the attestation is reported NOT MET". The number collides in the log
+that `kd-next` exists to keep collision-free (KD-119).
+
+**Why it does not block:** only a person reads the number. The three-hash defect's own number was
+not found in either file, so the correction needs that looked up first.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+### KD-246 — the Stage 3 gate's header quotes a bar the road lowered
+
+`scripts/stage3-gate.mjs:3-4`, `docs/NORTH-STAR.md:419`
+
+The header quotes §9 as "10 repos upgraded by one command". The road dropped the bar to 2 on
+2026-09-09, and the gate reads the figure out of NORTH-STAR rather than holding it. The sibling
+comment in `scripts/stage-gate.mjs` ("seven of its ten rows") is already gone.
+
+**Why it does not block:** it is a comment in an unpublished script, and the predicate reads the live
+figure.
+
+*Logged 2026-09-25 (0.28.0 batch).*
