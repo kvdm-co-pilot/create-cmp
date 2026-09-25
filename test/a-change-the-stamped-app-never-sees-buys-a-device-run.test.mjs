@@ -31,13 +31,17 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
+import { stampedOutput, stampedApps, FIREBASE_FLEET_RECORD, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BRANCH = "slice/under-test";
 
-/** Everything `bin/create-cmp.mjs` and `scripts/proof-plan.mjs` read. Not `test/`: nothing here runs this repo's suite. */
-const COPIED = ["bin", "src", "template", "packages", "scripts", "options.schema.json", "package.json"];
+/**
+ * Everything `bin/create-cmp.mjs` and `scripts/proof-plan.mjs` read. Not `test/`: nothing here runs this repo's suite.
+ * `overlays/` is what `create-cmp add firebase` copies from, so without it the Firebase half of the schedule
+ * would be unanswerable in every copy and no case below could tell an overlay edit from a missing overlay.
+ */
+const COPIED = ["bin", "src", "template", "overlays", "packages", "scripts", "options.schema.json", "package.json"];
 
 /**
  * A copy of this repository with a declared slice, a PASS device record, and
@@ -111,6 +115,35 @@ function planOutput(repo, args = []) {
 function deviceBlock(out) {
   const m = out.match(/\n {2}L2 run +([\s\S]*?)(?=\n {2}review +|$)/);
   assert.ok(m, `no device block in:\n${out}`);
+  return m[1];
+}
+
+/**
+ * The record `fleet-check --with-firebase` writes, and the plan's `firebaseDischarged` copied from it, for
+ * the app this tree stamps AND ADDS Firebase to right now. `coverage.firebase` is what says the run served
+ * the Firebase Emulator Suite; `{ coverage: {} }` writes a record that does not say it.
+ */
+function proveFirebase(repo, { at = "2026-09-22T09:10:00.000Z", coverage = { firebase: true }, discharge = true } = {}) {
+  const fb = stampedApps(repo.dir).firebase;
+  assert.equal(typeof fb.hash, "string", `the premise: this tree's Firebase app can be stamped — ${fb.unanswerable}`);
+  fs.mkdirSync(path.join(repo.dir, "qa-artifacts"), { recursive: true });
+  fs.writeFileSync(
+    path.join(repo.dir, FIREBASE_FLEET_RECORD),
+    `${JSON.stringify({ schema: "cmp-fleet-check/1", ranAt: at, verdict: "PASS", rung: "L2", pack: "cmp", requiredLevel: "L2", failures: [], avd: "Medium_Phone_API_35", coverage, stampedOutputHash: fb.hash, stampedOutputRule: STAMPED_OUTPUT_RULE, stampedOutputFiles: fb.files, commit: null, treeWasDirty: false, laneVerdict: "PASS" }, null, 2)}\n`,
+  );
+  if (discharge) {
+    const p = path.join(repo.dir, "qa-artifacts", "proof-plan.json");
+    const plan = JSON.parse(fs.readFileSync(p, "utf8"));
+    plan.firebaseDischarged = { at, stampedHash: fb.hash, stampedFiles: fb.files, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" };
+    fs.writeFileSync(p, `${JSON.stringify(plan, null, 2)}\n`);
+  }
+  return fb;
+}
+
+/** The `Firebase L2 run` block — printed after the review block, and the last one. */
+function firebaseBlock(out) {
+  const m = out.match(/\n {2}Firebase L2 run +([\s\S]*?)(?=\n {2}\S|$)/);
+  assert.ok(m, `no Firebase block in:\n${out}`);
   return m[1];
 }
 
@@ -286,6 +319,146 @@ test("THE RECORD SURVIVES THE COMMIT THAT CARRIES IT — a commit changes no byt
 
     assert.equal(stampedOutput(repo.dir).hash, proven.hash, "committing changes no bytes of the stamped app");
     assert.match(deviceBlock(planOutput(repo).out), /^DISCHARGED/);
+  } finally {
+    repo.dispose();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// THE FIREBASE L2 RUN — one stamp, two digests (KD-206, GATE-RULES Rule 4).
+//
+// The default app never carries Firebase: `add firebase` writes it afterwards.
+// So an overlay edit moved nothing the L2 run's digest can see, and until this
+// tier existed it was scheduled by nothing at all. The schedule now hashes the
+// same scratch app twice — before and after `add firebase --no-verify` — and
+// each tier is discharged only by a run over its own bytes.
+// ---------------------------------------------------------------------------
+
+const OVERLAY_EMULATORS = "overlays/firebase/files/composeApp/src/androidMain/kotlin/com/example/app/FirebaseEmulators.kt";
+const STAMPED_EMULATORS = "composeApp/src/androidMain/kotlin/com/fleet/check/FirebaseEmulators.kt";
+
+test("AN OVERLAY EDIT BUYS THE FIREBASE L2 RUN AND ONLY IT — the default app did not move", () => {
+  const repo = repoCopy();
+  try {
+    const proven = proveIt(repo);
+    const fb = proveFirebase(repo);
+    append(repo, OVERLAY_EMULATORS, "\n// an overlay line this slice added\n");
+
+    const apps = stampedApps(repo.dir);
+    assert.equal(apps.default.hash, proven.hash, "the premise: an overlay edit cannot reach the default app, which never runs the add");
+    assert.notEqual(apps.firebase.hash, fb.hash, "the premise: it does reach the app the add writes");
+
+    const { out } = planOutput(repo);
+    assert.match(deviceBlock(out), /^DISCHARGED/, `the default app is byte-identical to the one proven; an overlay edit must not buy its run\n${out}`);
+    const block = firebaseBlock(out);
+    assert.match(block, /^REOPENED/, `the Firebase app moved after its run\n${out}`);
+    assert.ok(block.includes(STAMPED_EMULATORS), `and the line names the stamped file that moved, not the overlay path\n${block}`);
+  } finally {
+    repo.dispose();
+  }
+});
+
+test("A TEMPLATE EDIT REOPENS BOTH — the Firebase app is the default app plus the add", () => {
+  const repo = repoCopy();
+  try {
+    const proven = proveIt(repo);
+    const fb = proveFirebase(repo);
+    append(repo, "template/composeApp/src/commonMain/kotlin/com/example/app/App.kt", "\n// a line that ships\n");
+
+    const apps = stampedApps(repo.dir);
+    assert.notEqual(apps.default.hash, proven.hash, "the premise: App.kt ships into the default app");
+    assert.notEqual(apps.firebase.hash, fb.hash, "and so into the app the add is run on");
+
+    const { out } = planOutput(repo);
+    assert.match(deviceBlock(out), /^REOPENED/, out);
+    assert.match(firebaseBlock(out), /^REOPENED/, out);
+  } finally {
+    repo.dispose();
+  }
+});
+
+test("A CHANGE NEITHER APP SEES BUYS NEITHER RUN", () => {
+  const repo = repoCopy();
+  try {
+    const proven = proveIt(repo);
+    const fb = proveFirebase(repo);
+    append(repo, "src/lib/args.mjs", "\n// a comment this slice added\n");
+
+    const apps = stampedApps(repo.dir);
+    assert.equal(apps.default.hash, proven.hash, "the premise: engine source does not land in the default app");
+    assert.equal(apps.firebase.hash, fb.hash, "nor in the app the add writes");
+
+    const { out } = planOutput(repo);
+    assert.match(deviceBlock(out), /^DISCHARGED/, out);
+    assert.match(firebaseBlock(out), /^DISCHARGED/, out);
+  } finally {
+    repo.dispose();
+  }
+});
+
+test("AN ADD THAT CANNOT RUN MAKES ONLY THE FIREBASE TIER OWED, NAMING WHY — never discharged, and the default untouched", () => {
+  const repo = repoCopy();
+  try {
+    const proven = proveIt(repo);
+    proveFirebase(repo);
+    fs.rmSync(path.join(repo.dir, "overlays/firebase/edits.json"));
+
+    const apps = stampedApps(repo.dir);
+    assert.equal(apps.default.hash, proven.hash, "the premise: the default app does not read the overlay");
+    assert.equal(apps.firebase.hash, null, "the premise: without edits.json the add cannot run");
+
+    const { out } = planOutput(repo);
+    assert.match(deviceBlock(out), /^DISCHARGED/, out);
+    const block = firebaseBlock(out);
+    assert.match(block, /^OWED/, `a question that cannot be put is owed, whatever the plan says\n${out}`);
+    assert.match(block, /could not be stamped/, "and the line carries the reason the stamp gave");
+    assert.ok(!/DISCHARGED/.test(block), block);
+  } finally {
+    repo.dispose();
+  }
+});
+
+test("A RUN THAT DOES NOT SAY IT SERVED FIREBASE NEVER DISCHARGES THE FIREBASE TIER", () => {
+  const repo = repoCopy();
+  try {
+    proveIt(repo);
+    proveFirebase(repo, { coverage: {}, discharge: false });
+    append(repo, "src/lib/args.mjs", "\n// a comment this slice added\n");
+
+    const block = firebaseBlock(planOutput(repo).out);
+    assert.match(block, /^OWED/, `a record over these exact bytes without coverage.firebase is a default-shaped run\n${block}`);
+    assert.match(block, /coverage\.firebase/, "and the line says which field it read");
+
+    const d = planOutput(repo, ["--discharge"]);
+    assert.equal(d.status, 0, `the default tier still discharges from its own record\n${d.out}`);
+    const plan = JSON.parse(fs.readFileSync(path.join(repo.dir, "qa-artifacts", "proof-plan.json"), "utf8"));
+    assert.ok(!plan.firebaseDischarged, "and --discharge writes no Firebase discharge from a record that cannot carry it");
+    assert.match(firebaseBlock(d.out), /^OWED/, d.out);
+  } finally {
+    repo.dispose();
+  }
+});
+
+test("A CALLER THAT INJECTS ITS FLEET RECORD IS NOT ANSWERED BY THIS LAPTOP'S FIREBASE RECORD", () => {
+  // The unit tests hand `fleetRecord` in so that no machine's disk answers
+  // them. A Firebase record read from disk behind their back would undo that
+  // for the new tier, so an injected fleet record means "no Firebase record"
+  // unless one is injected too.
+  const repo = repoCopy();
+  try {
+    proveIt(repo);
+    proveFirebase(repo, { discharge: false });
+    append(repo, "src/lib/args.mjs", "\n// a comment this slice added\n");
+    assert.match(firebaseBlock(planOutput(repo).out), /^DISCHARGED/, "the premise: the record on disk discharges the tier when nothing is injected");
+
+    const probe = `const m = await import(${JSON.stringify(path.join(repo.dir, "scripts", "proof-plan.mjs"))});
+      const plan = m.read();
+      const paths = m.changedPaths();
+      const branch = m.currentBranch();
+      console.log(JSON.stringify([m.obligation(plan, paths, branch, { fleetRecord: null }).firebase.state, m.obligation(plan, paths, branch).firebase.state]));`;
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", probe], { cwd: repo.dir, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout.trim()), ["owed", "discharged"], "injected: no record; defaulted: the one on disk");
   } finally {
     repo.dispose();
   }
