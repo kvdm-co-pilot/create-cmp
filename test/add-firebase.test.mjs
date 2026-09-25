@@ -270,6 +270,49 @@ test("--google-services replaces the config an earlier run was given, for the sa
   }
 });
 
+test("the region cannot move once Firebase is added — refused plainly, and the step's own file is not called a leftover", async () => {
+  // The owner's decision (2026-09-25): changing the region after the add is not supported. Asked by
+  // flag, or by a record that no longer names the region the step wrote, the refusal says so — it
+  // never tells the adopter to delete FirebaseConfig.kt, which is the step's own file.
+  const app = await stampApp({ ios: false });
+  const CONFIG_KT = `composeApp/src/commonMain/kotlin/${PKG_DIR}/data/remote/FirebaseConfig.kt`;
+  const FIXED = /The region is set when Firebase is added; changing it is not supported by this step\./;
+  try {
+    const first = cli("add", "firebase", app, "--no-verify");
+    assert.equal(first.status, 0, first.stderr + first.stdout);
+    assert.match(read(app, CONFIG_KT), /FIREBASE_FUNCTIONS_REGION = "us-central1"/);
+
+    const same = snapshot(app);
+    const again = cli("add", "firebase", app, "--no-verify", "--region", "us-central1");
+    assert.equal(again.status, 0, "asking for the region it already has is a re-run");
+    assert.deepEqual(snapshot(app), same);
+
+    const byFlag = cli("add", "firebase", app, "--no-verify", "--region", "europe-west1");
+    assert.equal(byFlag.status, 1, `expected a refusal:\n${byFlag.stdout}${byFlag.stderr}`);
+    assert.match(byFlag.stderr, FIXED);
+    assert.match(byFlag.stderr, /us-central1/);
+    assert.doesNotMatch(byFlag.stderr, /delete|left over|Move it aside/);
+    assert.match(byFlag.stderr, /Nothing was written/);
+    assert.deepEqual(snapshot(app), same);
+
+    const record = JSON.parse(read(app, "create-cmp.json"));
+    fs.writeFileSync(
+      path.join(app, "create-cmp.json"),
+      `${JSON.stringify({ ...record, firebase: { ...record.firebase, region: "europe-west1" } }, null, 2)}\n`,
+    );
+    const edited = snapshot(app);
+    const byRecord = cli("add", "firebase", app, "--no-verify");
+    assert.equal(byRecord.status, 1, `expected a refusal:\n${byRecord.stdout}${byRecord.stderr}`);
+    assert.match(byRecord.stderr, FIXED);
+    assert.match(byRecord.stderr, /FirebaseConfig\.kt is the file this step wrote for region us-central1/);
+    assert.doesNotMatch(byRecord.stderr, /delete|left over|Move it aside/);
+    assert.match(byRecord.stderr, /Nothing was written/);
+    assert.deepEqual(snapshot(app), edited);
+  } finally {
+    cleanup(app);
+  }
+});
+
 /**
  * Each unrecognised shape the step must refuse rather than guess at. `plant` makes the shape in a
  * fresh stamp; the refusal must name `says`, exit 1, and leave every byte where the plant left it.
