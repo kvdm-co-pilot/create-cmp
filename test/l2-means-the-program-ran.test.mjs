@@ -16,16 +16,21 @@
 // judgement is the part that must be right and it is pure. Feeding it two REAL
 // receipts costs an emulator and belongs to the device tier; nothing here
 // pretends to be that run.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { assessLadderPlant, describeLadderPlant } from "../packages/harness/src/lib/ladder-plant.mjs";
 import { startupPlant } from "../packages/harness/src/lib/profiles/cmp/plants.mjs";
 import { CMP_LADDER } from "../packages/harness/src/lib/profiles/cmp/ladder.mjs";
+// A namespace import, so a missing export fails its own tests and not the file.
+import * as fleetFirebase from "../scripts/lib/fleet-firebase.mjs";
+import { stampArgv, addFirebaseArgv, FLEET_SCRATCH_APP } from "../scripts/stamped-output.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -207,4 +212,139 @@ test("STAGE 0: the same logical run gets the same verdict under cmp and under a 
         `  cmp:      ${describeLadderPlant(a)}\n  py-alien: ${describeLadderPlant(b)}`,
     );
   }
+});
+
+// ── THE FIREBASE TIER'S OWN PLANT (U7, KD-210) ─────────────────────────────────
+//
+// `fleet-check --with-firebase` claims more than "the program started": that the
+// DEBUG build started WITH the emulator redirect run, because `e2eSmoke` is the
+// step that installs that build. Without a plant that claim is argued from
+// `AppApplication.kt`. With one it is derived: make `configureFirebaseEmulators()`
+// throw, run the lane again inside the suite, and require `e2eSmoke` red while
+// the build steps stay green. Green builds are what make the red mean "the
+// redirect ran", not "the plant did not compile".
+
+const EMULATORS_KT = path.join("composeApp", "src", "androidMain", "kotlin", ...FLEET_SCRATCH_APP.package.split("."), "FirebaseEmulators.kt");
+
+/** The fleet scratch app, stamped with the one stamp argv and then `add firebase --no-verify`: generation only, no build. */
+let firebaseApp = null;
+function stampedFirebaseApp() {
+  if (firebaseApp) return firebaseApp;
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "redirect-plant-"));
+  const dir = path.join(base, FLEET_SCRATCH_APP.name);
+  for (const [argv, what] of [[stampArgv(ROOT, dir), "stamp"], [addFirebaseArgv(ROOT, dir), "add firebase"]]) {
+    const r = spawnSync(process.execPath, argv, { cwd: ROOT, encoding: "utf8", timeout: 90_000 });
+    if (r.status !== 0) {
+      fs.rmSync(base, { recursive: true, force: true });
+      throw new Error(`${what} failed (${r.status ?? r.signal}): ${r.stdout}${r.stderr}`);
+    }
+  }
+  firebaseApp = { base, dir, pristine: fs.readFileSync(path.join(dir, EMULATORS_KT), "utf8") };
+  return firebaseApp;
+}
+after(() => {
+  if (firebaseApp) fs.rmSync(firebaseApp.base, { recursive: true, force: true });
+});
+/** Each test starts from the file `add firebase` wrote. */
+function pristineFirebaseApp() {
+  const app = stampedFirebaseApp();
+  fs.writeFileSync(path.join(app.dir, EMULATORS_KT), app.pristine);
+  return app;
+}
+
+test("breakRedirect makes the redirect's first statement a throw, inside the try and before any useEmulator", () => {
+  assert.equal(typeof fleetFirebase.breakRedirect, "function", "fleet-firebase.mjs exports no breakRedirect");
+  const { dir, pristine } = pristineFirebaseApp();
+  const planted = fleetFirebase.breakRedirect(dir);
+  const broken = fs.readFileSync(path.join(dir, EMULATORS_KT), "utf8");
+
+  assert.notEqual(broken, pristine, "the file on disk is unchanged");
+  assert.equal(planted.file, EMULATORS_KT.split(path.sep).join("/"), "it names the file it planted in, relative to the app");
+  assert.equal(planted.statement, 'check(false) { "redirect plant" }', "the plant is the deterministic statement U7 names");
+  assert.equal(broken.split(planted.statement).length - 1, 1, "planted exactly once");
+
+  const fn = broken.indexOf("fun configureFirebaseEmulators(");
+  const tryAt = broken.indexOf("try {", fn);
+  const plantAt = broken.indexOf(planted.statement);
+  const firstUse = broken.indexOf(".useEmulator(", fn);
+  assert.ok(fn >= 0 && tryAt > fn, "the function and its try are still there");
+  assert.ok(plantAt > tryAt, "the throw is inside the try, so it takes the app's own refuse-to-start path");
+  assert.ok(firstUse > plantAt, "the throw comes before the first useEmulator call, so no redirect is made before it");
+  assert.match(
+    broken.slice(tryAt),
+    /^try \{\n[ \t]+check\(false\) \{ "redirect plant" \}\n[ \t]+Firebase\./,
+    "the throw is the try's FIRST statement, on its own line, indented like the calls it precedes",
+  );
+  assert.equal(broken.replace(/\n[ \t]+check\(false\) \{ "redirect plant" \}/, ""), pristine, "nothing but the one statement moved");
+});
+
+test("breakRedirect refuses an app with no configureFirebaseEmulators()", () => {
+  assert.equal(typeof fleetFirebase.breakRedirect, "function", "fleet-firebase.mjs exports no breakRedirect");
+  const { dir, pristine } = pristineFirebaseApp();
+  const file = path.join(dir, EMULATORS_KT);
+
+  fs.writeFileSync(file, pristine.replace("fun configureFirebaseEmulators(", "fun configureSomethingElse("));
+  const renamed = fs.readFileSync(file, "utf8");
+  assert.throws(() => fleetFirebase.breakRedirect(dir), /configureFirebaseEmulators/);
+  assert.equal(fs.readFileSync(file, "utf8"), renamed, "a refusal writes nothing");
+
+  fs.rmSync(file);
+  assert.throws(() => fleetFirebase.breakRedirect(dir), /FirebaseEmulators\.kt/, "no file at all is refused by name");
+});
+
+test("breakRedirect refuses when the file is unchanged afterwards — a green lane would read as the redirect broken", () => {
+  assert.equal(typeof fleetFirebase.breakRedirect, "function", "fleet-firebase.mjs exports no breakRedirect");
+  const { dir, pristine } = pristineFirebaseApp();
+  assert.throws(() => fleetFirebase.breakRedirect(dir, { edit: (src) => src }), /unchanged/);
+  assert.equal(fs.readFileSync(path.join(dir, EMULATORS_KT), "utf8"), pristine);
+});
+
+// The verdict over the two receipts, driven by hand like assessLadderPlant's
+// above: the judgement is pure, and the real receipts cost the runtime tier.
+const FB_GREEN = receipt({ build: "PASS", releaseBuild: "PASS", conformance: "PASS", e2eSmoke: "PASS", androidChecks: "PASS" });
+const plantVerdict = (after, before = FB_GREEN) => {
+  assert.equal(typeof fleetFirebase.assessRedirectPlant, "function", "fleet-firebase.mjs exports no assessRedirectPlant");
+  return fleetFirebase.assessRedirectPlant({ before, after });
+};
+
+test("the redirect plant PASSes only with e2eSmoke red and the build steps green", () => {
+  const r = plantVerdict(receipt({ build: "PASS", releaseBuild: "PASS", conformance: "PASS", e2eSmoke: "FAIL", androidChecks: "PASS" }));
+  assert.equal(r.ok, true, r.reason ?? "");
+  assert.equal(r.verdict, "PASS");
+  assert.deepEqual(r.steps, { build: "PASS", releaseBuild: "PASS", e2eSmoke: "FAIL" });
+});
+
+test("THE OVERCLAIM: the redirect throws and e2eSmoke is still green", () => {
+  const r = plantVerdict(FB_GREEN);
+  assert.equal(r.ok, false);
+  assert.equal(r.verdict, "FAIL");
+  assert.match(r.reason, /e2eSmoke/);
+  assert.match(r.reason, /PASS/);
+});
+
+test("a red e2eSmoke is not evidence when the plant broke a build step", () => {
+  for (const broke of ["build", "releaseBuild"]) {
+    const after = receipt({ build: "PASS", releaseBuild: "PASS", e2eSmoke: "FAIL", [broke]: "FAIL" });
+    const r = plantVerdict(after);
+    assert.equal(r.ok, false, `${broke} red must void the plant`);
+    assert.match(r.reason, new RegExp(broke));
+  }
+  const r = plantVerdict(receipt({ build: "PASS", e2eSmoke: "FAIL" }));
+  assert.equal(r.ok, false, "a build step absent from the planted receipt is not green");
+  assert.match(r.reason, /releaseBuild/);
+});
+
+test("e2eSmoke must be red, not skipped or missing, after the plant — and green before it", () => {
+  for (const e2e of ["SKIP", undefined]) {
+    const steps = { build: "PASS", releaseBuild: "PASS" };
+    if (e2e) steps.e2eSmoke = e2e;
+    const r = plantVerdict(receipt(steps));
+    assert.equal(r.ok, false, `e2eSmoke ${e2e ?? "absent"} is not red`);
+    assert.match(r.reason, /e2eSmoke/);
+  }
+  const redBefore = receipt({ build: "PASS", releaseBuild: "PASS", e2eSmoke: "FAIL" });
+  const r = plantVerdict(redBefore, redBefore);
+  assert.equal(r.ok, false, "a step red before the plant cannot be evidence after it");
+  assert.match(r.reason, /before/);
+  assert.equal(plantVerdict(null).ok, false, "no planted receipt is no evidence");
 });
