@@ -424,10 +424,21 @@ function scanInspectorSources(projectDir) {
  * `test/a-dry-run-writes-the-tree-it-is-previewing.test.mjs` refuses a heal in this file
  * that reaches around this function.
  *
+ * A WRITE THE SYSTEM REFUSES IS REPORTED, NOT THROWN (KD-214). An unwritable target
+ * — a `.claude/` checked out read-only, a read-only mount, a full disk — used to throw
+ * out of here, through every heal and past `printFindings`, so one optional heal took
+ * the whole project diagnosis down with a raw stack. Now the refusal is printed in
+ * words, recorded on `.failed`, and the heal returns false like one that changed
+ * nothing; `runDoctor` still prints the diagnosis, names what was already applied, and
+ * exits 1. Only an error the operating system raised (one with a `syscall`) is caught:
+ * anything else is a defect in this file and still crashes loudly.
+ *
  * @param {{dryRun?: boolean}} opts
- * @returns {((target:string, content:string, what:string) => boolean) & {wrote:number}}
+ * @returns {((target:string, content:string, what:string) => boolean)
+ *            & {wrote:number, applied:string[], failed:Array<{what:string,target:string,reason:string}>}}
  *          `what` is a noun phrase completing "wrote …" / "would write …". The return
- *          says whether the tree actually changed; `.wrote` counts the times it did.
+ *          says whether the tree actually changed; `.wrote` counts the times it did,
+ *          `.applied` names them, and `.failed` holds every write the system refused.
  */
 export function healWriter({ dryRun = false } = {}) {
   const write = (target, content, what) => {
@@ -435,14 +446,45 @@ export function healWriter({ dryRun = false } = {}) {
       process.stdout.write(`${colors.dim(`[dry-run] --fix: would write ${what}`)}\n`);
       return false;
     }
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, content);
+    try {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, content);
+    } catch (err) {
+      if (typeof err?.syscall !== "string") throw err;
+      const reason = writeRefusalInWords(err);
+      write.failed.push({ what, target, reason });
+      process.stdout.write(
+        `${colors.red("✗")} --fix: could not write ${what} — ${reason}\n    ${colors.dim(target)}\n`
+      );
+      return false;
+    }
     write.wrote += 1;
+    write.applied.push(what);
     ok(`--fix: wrote ${what}`);
     return true;
   };
   write.wrote = 0;
+  write.applied = [];
+  write.failed = [];
   return write;
+}
+
+/** What the system said when it refused a write, in words; the code stays as the handle to search. */
+const WRITE_REFUSALS = {
+  EACCES: "permission denied: this user cannot write the file, or cannot create it in its directory",
+  EPERM: "the operating system does not permit this write",
+  EROFS: "the file system it is on is mounted read-only",
+  ENOSPC: "the disk is full",
+  EISDIR: "that path is a directory, not a file",
+  ENOTDIR: "part of that path is a file where a directory should be",
+};
+
+export function writeRefusalInWords(err) {
+  const code = typeof err?.code === "string" ? err.code : null;
+  if (code && WRITE_REFUSALS[code]) return `${WRITE_REFUSALS[code]} (${code})`;
+  // Never the stack: the first line of the system's own message, which names the call.
+  const first = String(err?.message ?? err).split("\n")[0];
+  return code && !first.includes(code) ? `${first} (${code})` : first;
 }
 
 /**
@@ -454,6 +496,15 @@ export function healWriter({ dryRun = false } = {}) {
  */
 export function applySafeFixes(projectDir, findings, inputs, write = healWriter()) {
   const fixed = [];
+  // A write the system refused is not a heal (KD-214): `healWriter` records it on
+  // `.failed` and returns false — which a dry run also returns, so the count is what
+  // tells the two apart. A writer that keeps no `.failed` is one that never refuses.
+  const refusals = () => write.failed?.length ?? 0;
+  const heal = (id, target, content, what) => {
+    const before = refusals();
+    write(target, content, what);
+    if (refusals() === before) fixed.push(id);
+  };
   for (const f of findings) {
     if (!f.fix || !f.fix.auto || f.level === "ok") continue;
 
@@ -463,10 +514,7 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
       const target = path.join(projectDir, "local.properties");
       const existing = readIfExists(target) ?? "";
       const { content, changed } = upsertProperty(existing, "sdk.dir", sdk);
-      if (changed) {
-        write(target, content, `sdk.dir=${sdk} to local.properties`);
-        fixed.push(f.id);
-      }
+      if (changed) heal(f.id, target, content, `sdk.dir=${sdk} to local.properties`);
     }
 
     if (f.id === "walk-wiring") {
@@ -499,12 +547,12 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
         }
       }
       if (changed) {
-        write(
+        heal(
+          f.id,
           target,
           `${JSON.stringify(settings, null, 2)}\n`,
           "the walk into .claude/settings.json (statusLine + UserPromptSubmit)"
         );
-        fixed.push(f.id);
       }
     }
 
@@ -512,10 +560,7 @@ export function applySafeFixes(projectDir, findings, inputs, write = healWriter(
       const target = path.join(projectDir, "gradle.properties");
       const existing = inputs.gradleProperties ?? "";
       const { content, changed } = upsertProperty(existing, "ksp.useKSP2", "true");
-      if (changed) {
-        write(target, content, "ksp.useKSP2=true into gradle.properties");
-        fixed.push(f.id);
-      }
+      if (changed) heal(f.id, target, content, "ksp.useKSP2=true into gradle.properties");
     }
   }
   return fixed;
@@ -617,6 +662,10 @@ export async function runDoctor(flags, positional) {
   const projectDir = path.resolve(targetDir);
 
   let projectGreen = true;
+  // What --fix applied and what the system refused to let it write (KD-214), kept past
+  // the heal block so the verdict at the bottom can say both.
+  let healsApplied = [];
+  let healsRefused = [];
   if (isGradleProjectDir(projectDir)) {
     process.stdout.write(
       `\n${colors.bold("Project diagnosis")} — ${colors.cyan(projectDir)}\n` +
@@ -638,11 +687,18 @@ export async function runDoctor(flags, positional) {
         dryRun: flagBool(flags, "dry-run", false),
         write,
       });
+      healsApplied = write.applied;
+      healsRefused = write.failed;
       if (write.wrote > 0) {
         // Re-diagnose so the report reflects the healed state.
         inputs = gatherProjectInputs(projectDir);
         findings = diagnoseProject(inputs);
-      } else if (fixed.length === 0 && !rewrote && !findings.some((f) => f.id === "shipped-hooks")) {
+      } else if (
+        fixed.length === 0 &&
+        !rewrote &&
+        healsRefused.length === 0 &&
+        !findings.some((f) => f.id === "shipped-hooks")
+      ) {
         // A heal that was offered and declined (or previewed) is not "nothing
         // auto-fixable" — saying so would contradict the lines just printed.
         process.stdout.write(`${colors.dim("--fix: nothing auto-fixable found.")}\n`);
@@ -668,7 +724,22 @@ export async function runDoctor(flags, positional) {
         ? `\n${colors.green("Project diagnosis: no blocking issues.")}\n`
         : `\n${colors.red("Project diagnosis: blocking issues found (see ✗ above).")}\n`
     );
+    if (healsRefused.length > 0) {
+      // The diagnosis above still printed — that is the fix. What is owed on top of it
+      // is the state --fix left the tree in, because a run that half-applied must say
+      // which half (KD-214).
+      const n = healsRefused.length;
+      process.stdout.write(
+        `\n${colors.red(`--fix: ${n} heal${n === 1 ? "" : "s"} could not be written, so doctor exits 1.`)}\n` +
+          healsRefused.map((r) => `  ${colors.red("✗")} ${r.what} — ${r.reason}\n    ${colors.dim(r.target)}\n`).join("") +
+          (healsApplied.length > 0
+            ? `  Already applied in this run, and left in place (the diagnosis above is of the tree with them):\n` +
+              healsApplied.map((w) => `  ${colors.green("✓")} ${w}\n`).join("")
+            : `  No heal was applied in this run.\n`) +
+          `  Clear what stopped ${n === 1 ? "it" : "them"}, then re-run ${colors.bold("doctor --fix")}.\n`
+      );
+    }
   }
 
-  process.exit(toolchain.green && projectGreen ? 0 : 1);
+  process.exit(toolchain.green && projectGreen && healsRefused.length === 0 ? 0 : 1);
 }
