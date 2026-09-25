@@ -231,6 +231,7 @@ you the same list without opening anything.
 | **KD-249** | `planShippedHookHeal` throws a `TypeError` on a settings file whose duplicated `hooks` key hides an old shipped Stop form, instead of returning a skip | guarded: its one caller, `shippedHookHealVerdict`, catches the throw and heals nothing, so doctor neither crashes nor offers a fix there; a new caller of the planner would inherit it |
 | **KD-250** | the KD-231 gate (`test/a-shipped-agent-points-at-a-file-only-create-cmp-has.test.mjs`) exempts any paragraph containing the string `create-cmp`, and the plugin's agent name `create-cmp:executor` now satisfies it: the orchestrator's model-tiering paragraph, the file's longest, is exempt only because it names that agent | no paragraph names a create-cmp-only file unmarked today (measured); a hazard that fires when one is added there |
 | **KD-251** | the amended resume rule (resume only while the cache is warm, ~5 minutes) and create-cmp's re-record rule ("resume that reviewer, do not start a cold one") point opposite ways for a re-record, which follows a fix and a suite run | create-cmp's own process, not an adopter's; a decision, handed up |
+| **KD-252** | `test/a-run-whose-stamp-failed-is-refused-for-a-reason-that-is-not-true.test.mjs` cleans its scratch git repos with `fs.rmSync(dir, { recursive: true, force: true })`, which threw `ENOTEMPTY` on `.git/objects` on CI (Node 22, run 36197000996) | a flake in test cleanup, not in the product: the re-run passed on Node 20/22/24 and it passes locally; it costs a CI re-run when it fires |
 
 ---
 
@@ -3790,3 +3791,19 @@ started fresh.
 served wrongly by it. **Decision asked:** does the re-record exception survive a cold cache (the
 reviewer's reading is worth its uncached re-read), or does a re-record become a fresh reader
 confirming one finding against the moved bytes? Either way, one of the two texts changes.
+
+### KD-252 — a stamp-failed test's scratch cleanup races git on CI
+
+`test/a-run-whose-stamp-failed-is-refused-for-a-reason-that-is-not-true.test.mjs` (its `fs.rmSync`
+cleanups)
+
+Found on PR #175's CI, 2026-09-26: "and the program says the same thing: --discharge on a
+stamp-failed record names the stamp" failed with `ENOTEMPTY: directory not empty, rmdir
+'/tmp/stamp-failed-…/.git/objects'`, so Node 20 and 24 were cancelled with it. The re-run passed on
+all three, and the file passes locally. A recursive remove that meets a directory still being
+written — most likely a git process the test spawned, finishing after the test returned — fails
+this way.
+
+**Why it does not block:** no product path is involved and nobody is served wrongly; it costs a CI
+re-run when it fires. The likely repair is `maxRetries` on those `rmSync` calls, or waiting for the
+spawned git to exit before cleanup.
