@@ -42,6 +42,7 @@ import { spawnSync } from "node:child_process";
 import { listFiles } from "./fsutil.mjs";
 import { isBinaryPath, replaceTokens } from "./tokens.mjs";
 import { BACKUP_SUFFIX } from "./upgrade.mjs";
+import { firebaseFromSpecRecord, recordedFirebaseRegion } from "./add-firebase.mjs";
 import { isHarnessFile } from "../../packages/harness/src/lib/harness-region.mjs";
 
 /** Sidecar suffix for the new engine content beside a conflicted file. */
@@ -559,28 +560,9 @@ export function configFromSpecRecord(record, targetDir) {
   };
 }
 
-/**
- * The `create-cmp add firebase` choices that reproduce this app's Firebase, or
- * `null` when its record says it has none.
- *
- * Both kinds of app answer here: one stamped with Firebase by create-cmp 0.27
- * or earlier (its record keeps `region` at the top level) and one that ran the
- * add step (which records it under `firebase`). Either way the CURRENT engine
- * gives that app its Firebase through the add step, so that is what an upgrade
- * must compare the app against — the default stamp alone would read every
- * Firebase line the adopter never touched as something the engine deleted.
- * @param {object} record parsed create-cmp.json
- * @returns {object|null}
- */
-export function firebaseFromSpecRecord(record) {
-  const fb = record?.firebase;
-  if (!fb || fb.enabled !== true) return null;
-  const out = { region: fb.region ?? record.region ?? "us-central1" };
-  for (const k of ["auth", "firestore", "storage", "functions", "fcm"]) {
-    if (fb[k] !== undefined) out[k] = fb[k];
-  }
-  return out;
-}
+// The ONE reader of an app's recorded Firebase choices lives beside the step that writes them:
+// upgrade reproduces an app's Firebase from its record with the reading the step itself re-reads.
+export { firebaseFromSpecRecord };
 
 /**
  * The two keys a template from BEFORE Firebase left stamp-time needs to be
@@ -592,7 +574,7 @@ export function firebaseFromSpecRecord(record) {
 export function legacyFirebaseKeys(record) {
   return {
     firebase: { enabled: record?.firebase?.enabled === true },
-    region: record?.firebase?.region ?? record?.region ?? "us-central1",
+    region: recordedFirebaseRegion(record),
   };
 }
 
