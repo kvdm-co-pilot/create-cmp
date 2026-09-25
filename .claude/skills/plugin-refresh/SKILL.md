@@ -1,6 +1,8 @@
 ---
 name: plugin-refresh
 description: >-
+  create-cmp's own maintainer-only release-loop skill, local to this repository and not
+  shipped in the plugin: it drives `scripts/plugin-refresh.mjs`, which exists only here.
   Refresh the installed Claude Code plugin from its marketplace and PROVE the result by
   content — and answer the question a version number cannot: which running sessions have
   actually loaded which bytes. Use this when a skill behaves like an older version, after

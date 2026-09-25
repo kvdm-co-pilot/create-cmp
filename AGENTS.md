@@ -34,7 +34,7 @@ npx create-cmp-cli@latest my-app --name Acme --package com.acme.app --yes --veri
   `npm create compose-multiplatform@latest`.
 - All flags: [options.schema.json](./options.schema.json) or `npx create-cmp-cli --help`.
 - Claude Code: `/plugin marketplace add kvdm-co-pilot/create-cmp` →
-  `/plugin install create-cmp` (12 skills, cmp-inspector MCP server). The `cmp-new`
+  `/plugin install create-cmp` (11 skills, cmp-inspector MCP server). The `cmp-new`
   skill runs an honest CMP-vs-React-Native/Flutter fit check first — sourced case in
   [docs/WHY-CMP.md](./docs/WHY-CMP.md).
 - Existing KMP repo (not scaffolded by this tool): `npx create-cmp-cli attach` wires the

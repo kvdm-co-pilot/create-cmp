@@ -25,7 +25,7 @@
 // next lane step cannot ship documented only by an incremented digit.
 //
 // Scope: docs/USAGE.md only, and deliberately. It is the surface
-// docs/DOCUMENTATION.md calls "**the deep reference** — ... the 12 skills, the
+// docs/DOCUMENTATION.md calls "**the deep reference** — ... the 11 skills, the
 // profile-tiered verify lane", so it is the one document that promises the
 // enumeration. README.md and llms.txt state the same counts as summaries and
 // promise no list; requiring the enumeration of them would be a false positive

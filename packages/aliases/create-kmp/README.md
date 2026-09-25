@@ -9,7 +9,7 @@ npm create kmp@latest my-app
 ```
 
 **Claude Code users:** the same engine ships as a plugin — `/plugin marketplace add
-kvdm-co-pilot/create-cmp` then `/plugin install create-cmp` (12 skills, incl. an honest
+kvdm-co-pilot/create-cmp` then `/plugin install create-cmp` (11 skills, incl. an honest
 CMP-vs-React-Native/Flutter fit check, plus the cmp-inspector MCP server).
 
 Fully non-interactive (for scripts and AI agents):

@@ -76,7 +76,7 @@ here:
 |---|---|---|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | How create-cmp itself works — template / engine / front doors, tokens, feature toggles. | living |
 | [TESTING-ARCHITECTURE.md](./TESTING-ARCHITECTURE.md) | **Normative** test-pyramid specification every generated project implements (frameworks, patterns, evidence packs, spec-driven workflow). Sister of `template/docs/TESTING.md`. | living |
-| [USAGE.md](./USAGE.md) | **The deep reference** — setup, the engine CLI (every command, including the `--minimal`/`harden` mode split and `attach`), the 12 skills, the profile-tiered verify lane, the `cmp-inspector` MCP (15 tools), approvals, comments, what a generated project carries, and the workflows that tie it together. | living |
+| [USAGE.md](./USAGE.md) | **The deep reference** — setup, the engine CLI (every command, including the `--minimal`/`harden` mode split and `attach`), the 11 skills, the profile-tiered verify lane, the `cmp-inspector` MCP (15 tools), approvals, comments, what a generated project carries, and the workflows that tie it together. | living |
 | **DOCUMENTATION.md** (this file) | The charter — doc map, standards ledger, extension rules. | living |
 | [AUTONOMY-GAPS.md](./AUTONOMY-GAPS.md) | Findings from real end-to-end governed-change-flow runs — where the agent needed a human that the flow didn't yet ask for. | living log |
 | [DOGFOODING-FINDINGS.md](./DOGFOODING-FINDINGS.md) | The harness/plugin fix backlog surfaced by building real apps on top of create-cmp — **not** showcase-app work. | living log |
