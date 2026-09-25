@@ -9,6 +9,31 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-50 — the template ships create-cmp's changelog as the adopter's source comments — **CLOSED 2026-09-25**
+
+`.../iosMain/.../KoinHelper.kt` · `.../androidMain/.../AppApplication.kt`
+
+"TWO DEFECTS LIVED HERE, and the comment above described neither" and "This was `runCatching { … }`
+with the Result discarded" are stamped verbatim into every `--firebase` scaffold. They are true, and
+they are about create-cmp's history, not the adopter's app — a reader of their own repo is told about
+a bug that was never in it. The invariant the comments are protecting (do not re-wrap this in
+something that discards the failure) is worth stating; the archaeology belongs in create-cmp's
+CHANGELOG. Taste call, nobody wrongly served.
+
+**MEASURED, because the question asked was whether it belongs in this slice: it is five sites, and
+three of them predate this slice.** The two above, plus `template/composeApp/build.gradle.kts` at
+lines 209 ("dead files that look live: the debug network-security config never applied"), 243
+("Declaring the flag alone made release the one build…") and 280 ("AGP's bug, **not ours**" — where
+*ours* is create-cmp, in a file that is the adopter's). So fixing it here edits two of five and
+leaves three, which is the instance-over-class pattern this log's header was written about. **It is
+its own slice**, and what that slice produces is not two rewritten comments but a rule — a template
+comment is addressed to the adopter, in the present tense, about their code — and something that
+can hold it, which is buildable: the tell is first-person and past-tense prose in a shipped template
+comment, and it greps. *Logged 2026-09-15 (review of `b549f3b`), scoped 2026-09-15 in review of
+`79eafd3`.*
+
+**Closed 2026-09-25, on the dev-done branch.** All five sites are gone from what an adopter receives. Moving Firebase into `overlays/firebase/` retired three of them: the two `--firebase` comments, and the release-flag comment that went out with the Firebase R8 rules. The remaining two in `template/composeApp/build.gradle.kts` now describe the adopter's build in the present tense (the debug source-set wiring, and "an AGP bug"). The rule-plus-grep this entry proposed is not built; that is a new gate, and the mechanism is frozen for 1.0.
+
 ### KD-47 — the emulator ports are spelled twice, and declared nowhere — **CLOSED 2026-09-25**
 
 `template/composeApp/build.gradle.kts` (debug `buildConfigField`) · `.../iosMain/.../KoinHelper.kt`

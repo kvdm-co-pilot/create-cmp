@@ -193,11 +193,9 @@ android {
 
     // AGP resolves BUILD-TYPE source sets at src/<buildType>/, while the Kotlin
     // Multiplatform plugin only remaps the `main` one to src/androidMain/. Without this
-    // wiring, src/androidDebug/'s manifest and resources are silently never merged —
-    // dead files that look live: the debug network-security config never applied, and a
-    // permission declared there never reached the APK. Point the debug build type at them
-    // explicitly. Caught when an instrumented test asserted canScheduleExactAlarms() and
-    // found the grant it had declared was absent on the device.
+    // wiring, src/androidDebug/'s manifest and resources are silently never merged: the
+    // debug network-security config would not apply, and a permission declared there would
+    // not reach the APK. Point the debug build type at them explicitly.
     sourceSets {
         getByName("debug") {
             manifest.srcFile("src/androidDebug/AndroidManifest.xml")
@@ -228,7 +226,7 @@ android {
         // ONE disabled check, not the gate. `lintVitalRelease` runs on every release build and
         // it is worth keeping; what is not worth keeping is a detector that CRASHES on it.
         // NullSafeMutableLiveData's detector throws IncompatibleClassChangeError against this
-        // Kotlin version (AGP's bug, not ours) and takes the whole release build with it.
+        // Kotlin version (an AGP bug) and takes the whole release build with it.
         //
         // Disabling it costs nothing beyond the crash: an app on this template has no LiveData —
         // state is Compose + Flow throughout — so the check has nothing to inspect. The blunt

@@ -113,7 +113,6 @@ you the same list without opening anything.
 | **KD-46** | the iOS refusal names two causes its `catch` cannot see | half fixed in `79eafd3` (the cause is carried now); Obj-C raises abort before any Kotlin frame, and the app stops either way |
 | **KD-48** | `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin | the shipped Xcode project has only `Debug`/`Release`, which map correctly |
 | **KD-49** | a nested `node --test` exits 0 whatever its tests did, when `NODE_TEST_CONTEXT` is inherited | nothing in the suite spawns one except the harness that measured it, which scrubs the env |
-| **KD-50** | the template ships create-cmp's own changelog as source comments in the adopter's app | true prose, wrong repository |
 | **KD-51** | a JS masker reads the template's Kotlin; a raw string mis-parses and truncates the scanned body | it reds, not greens — the `useEmulator` tripwire catches the stub — and neither file has a raw string |
 | **KD-52** | what the emulator scan's two token-level assertions do NOT decide | the inert clause is gone (`f474f17`); the rest is the floor of a shape scan, and no shape reaches it |
 | **KD-58** | the proof gate reads the publish command's words inside a quoted pattern or a heredoc as the act, and refuses | refuses, never allows — and only the agent is refused |
@@ -638,30 +637,6 @@ defects refused. Nothing else in the suite spawns a nested runner today, and tha
 the env and reads TAP counts instead of the exit code — but the trap is invisible, the symptom is a
 gate that is always green, and the next person to reach for `execFileSync(node, ["--test", …])`
 inside a test will hit it. *Logged 2026-09-15, review of `b549f3b`.*
-
-### KD-50 — the template ships create-cmp's changelog as the adopter's source comments
-
-`.../iosMain/.../KoinHelper.kt` · `.../androidMain/.../AppApplication.kt`
-
-"TWO DEFECTS LIVED HERE, and the comment above described neither" and "This was `runCatching { … }`
-with the Result discarded" are stamped verbatim into every `--firebase` scaffold. They are true, and
-they are about create-cmp's history, not the adopter's app — a reader of their own repo is told about
-a bug that was never in it. The invariant the comments are protecting (do not re-wrap this in
-something that discards the failure) is worth stating; the archaeology belongs in create-cmp's
-CHANGELOG. Taste call, nobody wrongly served.
-
-**MEASURED, because the question asked was whether it belongs in this slice: it is five sites, and
-three of them predate this slice.** The two above, plus `template/composeApp/build.gradle.kts` at
-lines 209 ("dead files that look live: the debug network-security config never applied"), 243
-("Declaring the flag alone made release the one build…") and 280 ("AGP's bug, **not ours**" — where
-*ours* is create-cmp, in a file that is the adopter's). So fixing it here edits two of five and
-leaves three, which is the instance-over-class pattern this log's header was written about. **It is
-its own slice**, and what that slice produces is not two rewritten comments but a rule — a template
-comment is addressed to the adopter, in the present tense, about their code — and something that
-can hold it, which is buildable: the tell is first-person and past-tense prose in a shipped template
-comment, and it greps. *Logged 2026-09-15 (review of `b549f3b`), scoped 2026-09-15 in review of
-`79eafd3`.*
-
 
 ### KD-51 — the emulator scan masks Kotlin with a masker written for `.mjs`
 
