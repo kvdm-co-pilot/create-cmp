@@ -391,8 +391,8 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
   const fb = tierState(firebaseNeed.required, plan, plan?.firebaseDischarged, () => stamped().firebase, {
     key: "stampedHash",
     proves: (now) => firebaseRecordMeets(firebaseRecord, now),
-    // `rekey: null`: the rekey record re-derives the DEFAULT run only (KD-206's
-    // sibling, logged), so it never speaks for a Firebase record.
+    // `rekey: null`: the rekey record re-derives the DEFAULT run only (KD-256),
+    // so it never speaks for a Firebase record.
     attests: (d, now) => recordMeetsTier(asRecord(d), TIERS.firebase, now, { rekey: null }),
     sameRule,
   });
@@ -681,7 +681,7 @@ function asRecord(discharged) {
  * meets its tier — digest, rule, verdict, rung — through `recordMeetsTier`.
  * A record without that field is a default-shaped run sitting in the Firebase
  * file, and says nothing about the emulator redirect this tier exists to prove.
- * `rekey: null` because `--rekey` re-derives the default run's record only.
+ * `rekey: null` because `--rekey` re-derives the default run's record only (KD-256).
  */
 export function firebaseRecordMeets(record, now) {
   if (record && record.coverage?.firebase !== true) {
@@ -1095,7 +1095,7 @@ function renderReview(o, L) {
  *
  * Fewer sentences than the default tier's, on purpose: this tier has no
  * pre-criterion history to explain and no rekey of its own (`--rekey`
- * re-derives the default run's record only — logged, not built), so a record
+ * re-derives the default run's record only — KD-256), so a record
  * that does not carry it is named by `recordMeetsTier`'s or
  * `firebaseRecordMeets`'s own reason and nothing is paraphrased over it.
  */
