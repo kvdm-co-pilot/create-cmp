@@ -1,6 +1,8 @@
 // A DEBUG BUILD THAT ASKED FOR EMULATORS AND DID NOT GET THEM MUST NOT CONTINUE.
 //
-// The template wires GitLive Firebase at the local emulators on both platforms.
+// `create-cmp add firebase` wires GitLive Firebase at the local emulators on
+// both platforms (overlays/firebase/; until 2026-09-25 it was the template's
+// default).
 // Until 2026-09-15 both sites wrapped that redirect in `runCatching { }` and
 // discarded the Result, so every way it could fail was invisible — and what it
 // falls back to is not "no Firebase", it is the REAL project named by
@@ -18,9 +20,10 @@
 // `initKoin()` — called from iOSApp.swift's AppDelegate on every launch —
 // redirected release builds too.
 //
-// WHY THIS IS A SOURCE SCAN AND NOT A RUN. `scripts/fleet-check.mjs` stamps its
-// scratch app `--no-ios --no-firebase`, so no gate in this repo executes either
-// path: not the device tier, not the framework check, not the suite. That gap is
+// WHY THIS IS A SOURCE SCAN AND NOT A RUN. The fleet's scratch app is the
+// default stamp, which carries no Firebase, and is stamped `--no-ios`; CI's
+// stamp + add firebase job COMPILES the Android redirect but nothing executes
+// it — not the L2 run, not the framework check, not the suite. That gap is
 // KD-45, and it is why an adopter found this defect and we did not.
 //
 // THE ONE QUESTION A SCAN COULD NOT ANSWER WAS MEASURED ONCE, BY HAND. Review
@@ -54,15 +57,28 @@ import { maskSource } from "./helpers/js-source-scan.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** The two sites that redirect Firebase, and how each one knows it is a debug build. */
+/**
+ * The add step's edit list. The redirect is DECLARED in the overlay's
+ * FirebaseEmulators.kt and CALLED from a line this file inserts into the app's
+ * own entry point — so whether the refusal runs is a fact about this file.
+ */
+const EDITS = "overlays/firebase/edits.json";
+
+/**
+ * The two sites that redirect Firebase, how each one knows it is a debug build,
+ * and the entry point the add step makes call it (a template file, anchored by
+ * EDITS).
+ */
 const SITES = [
   {
-    rel: "template/composeApp/src/androidMain/kotlin/com/example/app/AppApplication.kt",
+    rel: "overlays/firebase/files/composeApp/src/androidMain/kotlin/com/example/app/FirebaseEmulators.kt",
+    caller: "composeApp/src/androidMain/kotlin/com/example/app/AppApplication.kt",
     gate: /if\s*\(!BuildConfig\.USE_FIREBASE_EMULATORS\)\s*return/,
     gateDescription: "if (!BuildConfig.USE_FIREBASE_EMULATORS) return",
   },
   {
-    rel: "template/composeApp/src/iosMain/kotlin/com/example/app/KoinHelper.kt",
+    rel: "overlays/firebase/files/composeApp/src/iosMain/kotlin/com/example/app/FirebaseEmulators.kt",
+    caller: "composeApp/src/iosMain/kotlin/com/example/app/KoinHelper.kt",
     // Kotlin/Native has no BuildConfig; this is its equivalent, and its absence
     // is what made every release build redirect to 127.0.0.1.
     gate: /if\s*\(!Platform\.isDebugBinary\)\s*return/,
@@ -88,6 +104,25 @@ function redirectBody(raw, rel) {
   const at = src.indexOf("fun configureFirebaseEmulators()");
   assert.notEqual(at, -1, `${rel} no longer declares configureFirebaseEmulators() — this test is aimed at nothing`);
   return braceBody(src, src.indexOf("{", at), rel);
+}
+
+/**
+ * The site's entry point as `create-cmp add firebase` leaves it: the template's
+ * file, with every insertion EDITS makes into it applied at its anchor — the
+ * same whole-line, trimmed, exactly-once rule the add step refuses on.
+ */
+function callerAfterAdd(site) {
+  const edits = JSON.parse(fs.readFileSync(path.join(ROOT, EDITS), "utf8"));
+  let lines = fs.readFileSync(path.join(ROOT, "template", site.caller), "utf8").split("\n");
+  for (const insert of edits.inserts.filter((i) => i.file === site.caller)) {
+    const anchor = insert.after ?? insert.before;
+    const hits = lines.flatMap((l, i) => (l.trim() === anchor ? [i] : []));
+    assert.equal(hits.length, 1, `${EDITS}: the anchor \`${anchor}\` must occur once in template/${site.caller}, and occurs ${hits.length} times`);
+    const indent = /^[ \t]*/.exec(lines[hits[0]])[0];
+    const at = insert.after ? hits[0] + 1 : hits[0];
+    lines = [...lines.slice(0, at), ...insert.lines.map((l) => indent + l), ...lines.slice(at)];
+  }
+  return lines.join("\n");
 }
 
 /** The `{ … }` starting at `open`, brace-matched. */
@@ -174,8 +209,10 @@ for (const site of SITES) {
   test(`${platform}: the refusal is actually CALLED`, () => {
     // A refusal nothing invokes is not a refusal. Review deleted the one-line
     // call site on each platform and every other assertion here still passed —
-    // a guard blessing a gate that never runs.
-    const src = maskSource(fs.readFileSync(path.join(ROOT, site.rel), "utf8"));
+    // a guard blessing a gate that never runs. The call is now a line the add
+    // step inserts into the app's entry point, so it is read from there: the
+    // template's file with EDITS applied.
+    const src = maskSource(callerAfterAdd(site));
     const calls = [...src.matchAll(/\bconfigureFirebaseEmulators\(\)/g)].map((m) => m.index);
     // The lookbehind is the whole test. `at !== declaration` was also here and
     // can never be false — `declaration` indexes `fun`, every match indexes that
@@ -185,7 +222,8 @@ for (const site of SITES) {
       calls.some((at) => !src.slice(Math.max(0, at - 4), at).includes("fun ")),
       `${site.rel}: configureFirebaseEmulators() is declared and never called. Everything else this file ` +
         `asserts is true of code that does not run — the redirect never happens, and the build talks to ` +
-        `whatever google-services.json / GoogleService-Info.plist names.`,
+        `whatever google-services.json / GoogleService-Info.plist names. (The call is inserted by ` +
+        `${EDITS} into template/${site.caller}.)`,
     );
   });
 }
@@ -197,5 +235,6 @@ test("both platforms answer the same question, and neither is the only one fixed
   assert.equal(SITES.length, 2, "a third redirect site exists and is not covered here");
   for (const site of SITES) {
     assert.ok(fs.existsSync(path.join(ROOT, site.rel)), `${site.rel} has moved — the scan covers a file that is gone`);
+    assert.ok(fs.existsSync(path.join(ROOT, "template", site.caller)), `template/${site.caller} has moved — the call is inserted into a file that is gone`);
   }
 });
