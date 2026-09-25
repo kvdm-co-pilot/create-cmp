@@ -14,7 +14,7 @@
  *
  * Value flags stay absent and are checked at their call sites with `typeof ===
  * "string"`: profile, target-dir, base-dir, set, specs, receipt, citation-roots,
- * name, package, bundle-id, region, theme-prefix, auth, tabs.
+ * name, package, bundle-id, region, theme-prefix, auth, tabs, google-services.
  */
 export const BOOLEAN_FLAGS = new Set([
   "help", "h", "version", "v",
@@ -57,6 +57,10 @@ export const KNOWN_FLAGS = new Set([
   // are known by construction, not by being listed twice)
   "ios", "firebase", "firestore", "storage", "functions", "fcm", "room",
   "e2e", "appium", "inspector", "dev-client",
+  // `add firebase` — the path to the adopter's real config. `--firebase`, `--region`,
+  // `--auth` and the four service flags STAY KNOWN after Firebase left stamp-time: the
+  // stamp refuses them by name, and an unknown `--firebase` would eat the directory after it.
+  "google-services",
   // the harness subcommand, which shares an installer with prooflane
   "harness", "profile", "dry-run", "dry-run-verify", "new-profile", "no-interview",
   // takes a VALUE (the manifest path) — never a boolean, see args.mjs in the
