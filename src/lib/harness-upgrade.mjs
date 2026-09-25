@@ -526,6 +526,12 @@ export function applyHarnessPlan(projectDir, entries) {
  * "feature absent" — a record written before a toggle existed describes an
  * app whose tree does NOT carry that feature, so stamping without it mirrors
  * the app best.
+ *
+ * `firebase` and `region` are NOT carried over: they left the schema with
+ * Firebase itself, and the engine refuses a config that holds them. An app
+ * whose record says Firebase is on is reproduced by `firebaseFromSpecRecord`
+ * (the add step's edits over this config) or, for a template from before the
+ * move, by `legacyFirebaseKeys`.
  * @param {object} record parsed create-cmp.json
  * @param {string} targetDir where the reconstructed stamp should land
  * @returns {object} engine config (options.schema.json shape)
@@ -535,14 +541,12 @@ export function configFromSpecRecord(record, targetDir) {
     appName: record.name,
     package: record.package,
     iosBundleId: record.bundleId,
-    region: record.region ?? "us-central1",
     themePrefix: record.themePrefix,
     // Deliberately the OPPOSITE default from the feature toggles below: every
     // app stamped before the mode split carries the full harness, so an
     // absent `harness` key means full, not absent.
     harness: record.harness ?? true,
     platforms: record.platforms ?? { android: true, ios: true },
-    firebase: record.firebase ?? { enabled: false },
     room: record.room ?? false,
     e2e: record.e2e ?? false,
     inspector: record.inspector ?? false,
@@ -553,4 +557,56 @@ export function configFromSpecRecord(record, targetDir) {
     ],
     targetDir,
   };
+}
+
+/**
+ * The `create-cmp add firebase` choices that reproduce this app's Firebase, or
+ * `null` when its record says it has none.
+ *
+ * Both kinds of app answer here: one stamped with Firebase by create-cmp 0.27
+ * or earlier (its record keeps `region` at the top level) and one that ran the
+ * add step (which records it under `firebase`). Either way the CURRENT engine
+ * gives that app its Firebase through the add step, so that is what an upgrade
+ * must compare the app against — the default stamp alone would read every
+ * Firebase line the adopter never touched as something the engine deleted.
+ * @param {object} record parsed create-cmp.json
+ * @returns {object|null}
+ */
+export function firebaseFromSpecRecord(record) {
+  const fb = record?.firebase;
+  if (!fb || fb.enabled !== true) return null;
+  const out = { region: fb.region ?? record.region ?? "us-central1" };
+  for (const k of ["auth", "firestore", "storage", "functions", "fcm"]) {
+    if (fb[k] !== undefined) out[k] = fb[k];
+  }
+  return out;
+}
+
+/**
+ * The two keys a template from BEFORE Firebase left stamp-time needs to be
+ * stamped as it was: the record's Firebase switch (its markers keep or strip on
+ * it) and a region (its FirebaseConfig.kt carries `__REGION__`). Handed to the
+ * scaffold with `legacyFirebase`, the only door that accepts them.
+ * @param {object} record parsed create-cmp.json
+ */
+export function legacyFirebaseKeys(record) {
+  return {
+    firebase: { enabled: record?.firebase?.enabled === true },
+    region: record?.firebase?.region ?? record?.region ?? "us-central1",
+  };
+}
+
+/**
+ * Does this template still carry Firebase as a stamp option? Read from its own
+ * manifest — every template create-cmp shipped through 0.27 declared a
+ * `firebase` feature, and none since does.
+ * @param {string} templateDir
+ */
+export function templateCarriesStampTimeFirebase(templateDir) {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(templateDir, "manifest.json"), "utf8"));
+    return Boolean(manifest?.features?.firebase);
+  } catch {
+    return false;
+  }
 }

@@ -50,8 +50,18 @@ import {
   planHarnessUpgrade,
   applyHarnessPlan,
   configFromSpecRecord,
+  firebaseFromSpecRecord,
+  legacyFirebaseKeys,
+  templateCarriesStampTimeFirebase,
   SIDECAR_SUFFIX,
 } from "../lib/harness-upgrade.mjs";
+import {
+  OVERLAY_DIR,
+  overlayBesideTemplate,
+  planAddFirebase,
+  applyAddFirebasePlan,
+  regenerateArchDoc,
+} from "../lib/add-firebase.mjs";
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -308,6 +318,24 @@ async function runHarnessUpgrade(flags, positional) {
 }
 
 /**
+ * Apply `add firebase` to a temp stamp, as the engine at `overlayDir` would.
+ * No config file is given, so the mock is written — google-services.json and
+ * GoogleService-Info.plist are on the sweep's exclusion list, so the adopter's
+ * own are never compared with it, read or touched.
+ */
+async function addFirebaseInto(dir, input, overlayDir, which) {
+  if (!fs.existsSync(path.join(overlayDir, "edits.json"))) {
+    throw new Error(
+      `this app records Firebase, and the ${which} engine's Firebase overlay is not at ${overlayDir}. ` +
+        `Pass --base-dir <path> to an extracted create-cmp package's template/ whose package also carries overlays/firebase/.`
+    );
+  }
+  step(`Adding Firebase to the ${which} stamp, as \`create-cmp add firebase\` would…`);
+  applyAddFirebasePlan(dir, planAddFirebase(dir, input, { overlayDir }));
+  await regenerateArchDoc(dir);
+}
+
+/**
  * The harness mode's plan/report/apply body. Returns the process exit code
  * (0 = clean apply or dry run, 1 = conflicts produced) and throws on
  * environment failures — it never calls process.exit itself, so the caller's
@@ -333,16 +361,35 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
   // Stamp both sides with the app's OWN recorded config, so tokens resolve
   // identically and base→new diffs are pure engine change. `verify:false`
   // keeps this filesystem-only — no Gradle, no device.
+  //
+  // FIREBASE IS REPRODUCED, NOT DROPPED. An app whose record says Firebase is on
+  // got it from the stamp (create-cmp 0.27 and earlier) or from `add firebase`.
+  // The current engine gives it through the add step, so NEW is the default
+  // stamp plus that step's edits; BASE is the old template stamped with Firebase
+  // on when that template still had the option, and the same stamp-plus-add
+  // otherwise. Comparing against the default stamp alone would read every
+  // Firebase line the adopter never touched as an engine deletion — stripping
+  // them, and deleting FirebaseConfig.kt out from under code that imports it.
   const { scaffold } = await import("../scaffold.mjs");
   const newDir = path.join(tmpRoot, "new");
   const baseDir = path.join(tmpRoot, "base");
+  const firebase = firebaseFromSpecRecord(record);
   step("Stamping the CURRENT engine with the app's recorded config…");
   await scaffold(configFromSpecRecord(record, newDir), { verify: false });
+  if (firebase) await addFirebaseInto(newDir, firebase, OVERLAY_DIR, "CURRENT");
   step(`Stamping the BASE engine (${baseVersion}) with the same config…`);
-  await scaffold(configFromSpecRecord(record, baseDir), {
-    templateDir: baseTemplateDir,
-    verify: false,
-  });
+  if (templateCarriesStampTimeFirebase(baseTemplateDir)) {
+    await scaffold(
+      { ...configFromSpecRecord(record, baseDir), ...legacyFirebaseKeys(record) },
+      { templateDir: baseTemplateDir, verify: false, legacyFirebase: true }
+    );
+  } else {
+    await scaffold(configFromSpecRecord(record, baseDir), {
+      templateDir: baseTemplateDir,
+      verify: false,
+    });
+    if (firebase) await addFirebaseInto(baseDir, firebase, overlayBesideTemplate(baseTemplateDir), `BASE (${baseVersion})`);
+  }
   // Engines before 0.14.0 ran lane code through the token stamper, so an app
   // stamped by one carries `Fuelled` where the base template says
   // `__APP_NAME__`. Without this the migration would report the engine's own
