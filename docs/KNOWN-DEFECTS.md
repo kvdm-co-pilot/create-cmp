@@ -233,6 +233,8 @@ you the same list without opening anything.
 | **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | measured 2026-09-25: not harmless, but loud: one spurious conflict sidecar (`composeApp/build.gradle.kts`) and exit 1, nothing removed or duplicated; a second sidecar (`libs.versions.toml`) seen in the test comes from its synthesised 0.27 catalog and does not occur with the real 0.27.2 one |
 | **KD-247** | `add firebase` writes the Podfile's Firebase pods and a comment naming the GitLive version the registry paired them with (KD-243), and `upgrade` moves `firebase-gitlive` in the catalog and never the Podfile | cannot fire yet: every shipped set pairs Firebase iOS 11.x, which `~> 11.1` still resolves; the comment goes stale on the first GitLive bump, and the pins break at the first set that pairs across a Firebase iOS major |
 | **KD-249** | `planShippedHookHeal` throws a `TypeError` on a settings file whose duplicated `hooks` key hides an old shipped Stop form, instead of returning a skip | guarded: its one caller, `shippedHookHealVerdict`, catches the throw and heals nothing, so doctor neither crashes nor offers a fix there; a new caller of the planner would inherit it |
+| **KD-253** | the KD-231 gate still exempts a paragraph on any token that contains `create-cmp`: KD-250 stripped `create-cmp:<name>` only, and `bin/create-cmp.mjs`, `create-cmp-cli@latest`, `create-cmp.json`, `create-cmp-scaffolded` and a `/path/to/create-cmp/…` path each exempt a paragraph that never says whose file it names — 19 paragraphs across `skills/cmp-new`, `cmp-doctor`, `cmp-upgrade`, `cmp-inspect`, `cmp-firebase-connect` | none of the 19 names a create-cmp-only pattern today (measured); the same hazard as KD-250, one spelling over |
+| **KD-254** | KD-251's closing record in `docs/KNOWN-DEFECTS-CLOSED.md` ends "Not changed …: `test/an-agent-definition-names-a-tool-it-was-not-given.test.mjs:7-9`'s comment still says the header forbids a cold substitute", and 2744188 on the same branch changed exactly that comment | a false sentence in create-cmp's own closed log; nobody acts on it; the repair is deleting the sentence (or saying 2744188 changed it) |
 
 ---
 
@@ -3760,3 +3762,39 @@ that only `JSON.parse`’s last-key-wins reading makes sense of. The planner its
 a new caller would inherit it; the repair is the planner returning a skip for that shape.
 
 *Logged 2026-09-25 (0.28.1 batch, round 1 fix).*
+
+### KD-253 — the KD-231 gate's create-cmp exemption still matches file and package names
+
+`test/a-shipped-agent-points-at-a-file-only-create-cmp-has.test.mjs:65` (the exemption after KD-250)
+
+Found in review round 1 of `fix/kd-250-251-252`. KD-250 was one instance of a class — *a token
+that contains `create-cmp` is not a statement of whose file a thing is* — and its repair strips one
+spelling, `create-cmp:[\w-]+`. Measured by testing each shipped paragraph against a standalone
+`(?<![\w./-])create-cmp(?![\w.:@/-])` instead: 19 paragraphs are exempt today ONLY by
+`bin/create-cmp.mjs` / `<repo>/bin/create-cmp.mjs` (cmp-new, cmp-doctor, cmp-upgrade),
+`create-cmp-cli@latest` / `create-cmp-cli` (the adopter's own npm command), `create-cmp.json` (the
+adopter's own config file, cmp-firebase-connect), `create-cmp-scaffolded` (frontmatter) and
+`/absolute/path/to/create-cmp/inspector/…` (cmp-inspect). None names a create-cmp-only pattern, so
+nothing false ships; the gate is blind over those paragraphs for the next edit.
+
+**Why it does not block:** a hazard that cannot fire yet. The repair is the class, not a longer
+strip list: the exemption asks for `create-cmp` standing alone as a word, not inside a path, file,
+package or namespace name.
+
+*Logged 2026-09-26 (fix/kd-250-251-252, review round 1).*
+
+### KD-254 — KD-251's closing record says a comment was not changed that its own branch changed
+
+`docs/KNOWN-DEFECTS-CLOSED.md` (KD-251's closing paragraph, last sentence)
+
+Found in review round 1 of `fix/kd-250-251-252`. The record ends: "Not changed, and not in this
+entry's texts: `test/an-agent-definition-names-a-tool-it-was-not-given.test.mjs:7-9`'s comment still
+says the header forbids a cold substitute for a re-record." 2744188, on the same branch, rewrote
+those lines to "Who carries out a re-record is docs/KNOWN-DEFECTS.md's header; this comment only
+points at it." The record also omits that 2744188 changed the orchestrator sentence in
+`.claude/agents/staff-reviewer.md`. Written before the last commit and not moved with it.
+
+**Why it does not block:** create-cmp's own closed log; no adopter reads it and nothing routes on
+it. The repair is one sentence.
+
+*Logged 2026-09-26 (fix/kd-250-251-252, review round 1).*
