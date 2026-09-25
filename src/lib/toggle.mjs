@@ -1,7 +1,7 @@
 // Feature toggling: strip `cmp:feature <name>` marker blocks for DISABLED
 // features from file contents, and delete the feature's manifest `paths`.
 //
-// Marker syntax (CONTRACT.md):
+// Marker syntax:
 //   // >>> cmp:feature ios
 //   ...lines to remove when `ios` is disabled...
 //   // <<< cmp:feature ios

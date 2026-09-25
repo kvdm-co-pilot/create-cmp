@@ -226,7 +226,7 @@ you the same list without opening anything.
 | **KD-232** | "this repository enables its own plugin" is stated in the hook, its test, the proposal and the CHANGELOG, and no file in this tree enables it — the maintainer's user and local settings do, so a fresh clone runs no `resume-price` | contributors, not adopters, and the hook is advisory; the proposal also still says "plugin `hooks/`" and "Not built." |
 | **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
-| **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | measured 2026-09-25: not harmless, but loud: one spurious conflict sidecar (`composeApp/build.gradle.kts`) and exit 1, nothing removed or duplicated; a second conflict (`libs.versions.toml`) happens with either base, so it is not this defect's |
+| **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | measured 2026-09-25: not harmless, but loud: one spurious conflict sidecar (`composeApp/build.gradle.kts`) and exit 1, nothing removed or duplicated; a second sidecar (`libs.versions.toml`) seen in the test comes from its synthesised 0.27 catalog and does not occur with the real 0.27.2 one |
 
 ---
 
@@ -3698,9 +3698,12 @@ untouched, no Firebase file removed or duplicated. Re-planned against both bases
 `planHarnessUpgrade`: the Firebase-ON base conflicts on both files, the Firebase-OFF base (the tree
 the app was) on `libs.versions.toml` only. So `build.gradle.kts` is this defect: the ON base's
 Firebase block sits after a blank line that the `--no-firebase` stamp keeps and the current template
-lacks. `libs.versions.toml` is not: 0.27.2's catalog carries the Firebase entries unmarked
-(`git show v0.27.2:template/gradle/libs.versions.toml`, lines 6, 18, 63, 114), so the app keeps them
-where 0.27 put them, and NEW has them where the add step puts them, whichever base is used.
+lacks. The `libs.versions.toml` sidecar is the test fixture’s, not an app’s: the synthesised 0.27 catalog
+carries one of 0.27.2’s six GitLive libraries. Re-run with the real catalog (`git show
+v0.27.2:template/gradle/libs.versions.toml`, all six unmarked, so a `--no-firebase` 0.27.2 app kept
+them), `add firebase` leaves the catalog alone and the upgrade writes it cleanly; the one sidecar
+left is `build.gradle.kts`. A test for this defect needs the real 0.27.2 catalog in its base, or it
+fails for a reason no app has.
 
 **Why it does not block:** unchanged in kind: the harm is loud. `upgrade --harness` exits 1 and
 writes a `*.cmp-new` sidecar for a human, and changes nothing in the app. It is never a silent strip.
