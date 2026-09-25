@@ -230,7 +230,6 @@ you the same list without opening anything.
 | **KD-227** | `docs/GATE-RULES.md` says the KD-95 slice added "Four more" oracle shapes; the table went from 24 rows to 31 | a count in a contributor-facing doc, in the same paragraph KD-104's note already asks to be re-read; the invariant the sentence describes is the one the harness holds |
 | **KD-228** | `formatSpine()` marks lagging fields with `spine.lagging.includes(s)` — object identity — so a spine that has been through `--json` prints no `✗` at all | nothing calls it on a parsed spine today, and the summary line still reads `NOT IN STEP`, so the surface cannot claim health it does not have |
 | **KD-230** | rule 2 hides the CONTENT of `AGENTS.md`, `CLAUDE.md` and `.claude/**/*.md` from the digest because of a one-time grep (the not-read proof in `UNOBSERVED_BY_PROFILE`'s comment), and no test repeats that grep. A later lane step that opens one of them would make edits to it invisible to the digest after the one run its own code change buys | cannot fire today: re-measured this round, no non-comment reference to any of the three in `template/qa/**/*.mjs`, `*.json`, `*.kts` or `*.sh` |
-| **KD-231** | the shipped orchestrator tells an adopter to hand its session off "at the budget point the user-level instructions set (`~/.claude/CLAUDE.md`)", and the only such file that sets one is the maintainer's | inert, not false in effect: an adopter with no budget point hands off as before this slice. Whether the shipped definition should carry a number of its own is a product decision |
 | **KD-232** | "this repository enables its own plugin" is stated in the hook, its test, the proposal and the CHANGELOG, and no file in this tree enables it — the maintainer's user and local settings do, so a fresh clone runs no `resume-price` | contributors, not adopters, and the hook is advisory; the proposal also still says "plugin `hooks/`" and "Not built." |
 | **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
@@ -3773,26 +3772,6 @@ that repeats the proof: stamp the app, and fail if any file NOT on the unobserve
 unobserved path outside a comment. That test stops the list and the lane from drifting apart.
 
 *Logged 2026-09-24, review round 1 of the first-job slice (L2 digest rule 2 + --rekey + cadence).*
-
-### KD-231 — the shipped orchestrator's hand-off point is the maintainer's private file
-
-`agents/cmp-orchestrator.md:220-222` (shipped through `.claude-plugin/plugin.json` `agents`), and
-`.claude/agents/deep-worker.md:79-81`
-
-The rewrite tells the orchestrator to hand its own session off "at the budget point the user-level
-instructions set (`~/.claude/CLAUDE.md`)". It adds "This file names no number, so it cannot disagree
-with that one". That holds on the maintainer's machine, where `~/.claude/CLAUDE.md` has a "Session
-budget" section. An adopter who installs the plugin has no such section, so the line points at a
-number that does not exist. The same problem in `deep-worker.md` only affects contributors to this
-repository.
-
-**Why it does not block:** the line does nothing for an adopter. Without a budget point, their
-orchestrator hands off the way it did before this slice. Nobody is refused or given a wrong result.
-**Decision it asks for:** should the shipped orchestrator carry a default hand-off point of its own?
-If it should, it is the one statement an adopter has, so it is not a restatement. The other choice
-is to drop the pointer from the shipped definition.
-
-*Logged 2026-09-25, review round 1 of the resume-price slice.*
 
 ### KD-232 — "this repository enables its own plugin", and no file in this repository does
 

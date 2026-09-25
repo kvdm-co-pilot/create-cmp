@@ -29,14 +29,14 @@ first is almost always the one you want:
    (CLI: `curl -fsSL https://get.maestro.mobile.dev | bash`).
    Device proof is a checkpoint, never an inner loop — the project's PreToolUse hook reminds you.
 
-**Headless is the rule, not a preference** (Karel, 2026-09-09: *"always run device tests in headless
-mode"*). Those flags are `HEADLESS_ARGS` in the cmp profile's `device-provider.mjs`, and they are
-what path 1 already uses — so **do not hand-boot a windowed emulator in front of a lane that would
-have booted its own**. A window costs GPU and RAM the build wants, makes the run depend on a
-desktop session, and differs from what CI does; `-no-snapshot` is there so every lane boots the same
-cold device rather than inheriting yesterday's state. If a device is already attached the lane uses
-it as-is, which is exactly how a windowed emulator quietly becomes the thing your proof ran on —
-`node scripts/fleet-check.mjs` now says so when it finds one.
+**Headless is the rule, not a preference.** Those flags are `HEADLESS_ARGS` in the cmp profile's
+`device-provider.mjs`, and they are what path 1 already uses — so **do not hand-boot a windowed
+emulator in front of a lane that would have booted its own**. A window costs GPU and RAM the build
+wants, makes the run depend on a desktop session, and differs from what CI does; `-no-snapshot` is
+there so every lane boots the same cold device rather than inheriting yesterday's state. If a device
+is already attached the lane uses it as-is, which is exactly how a windowed emulator quietly becomes
+the thing your proof ran on (in create-cmp, `node scripts/fleet-check.mjs` says so when it finds
+one).
 
 Preconditions: toolchain present (JDK, Android SDK + AVD — **cmp-doctor** heals it); a project
 scaffolded with the `e2e` toggle on (otherwise say so — there is no harness to bring up).
