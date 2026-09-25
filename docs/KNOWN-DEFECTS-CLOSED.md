@@ -9,6 +9,28 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-248 — `harden --dry-run` does not list the architecture doc the apply regenerates — **CLOSED 2026-09-25**
+
+`src/commands/harden.mjs` (`runHarden`'s dry-run listing vs `hardenProject`'s `regenerateArchDoc`)
+
+Found in round 1 of the 0.28.1 slice. KD-242 added `regenerateArchDoc(projectDir)` to the apply
+path; the dry-run listing is built from the merge plan and the seed plan only, so it prints every
+file the apply writes except `docs/ARCHITECTURE.md`, and the apply then reports
+"regenerated docs/ARCHITECTURE.md". The write touches only the `cmp:generated` sections, which the
+lane's archDoc step owns and would fail on anyway — so the adopter is not handed a change to text
+they own. Logged, not blocked: the preview is one line short, not wrong.
+
+**Closed 2026-09-25, on the release-0.28.1 branch: not a defect, measured.** The premise was that
+the dry-run listing, built from the merge plan, lacks the doc. On the KD-242 fixture (`--minimal`,
+`add firebase`, then `harden --dry-run`) the merge plan already carries `docs/ARCHITECTURE.md` as a
+write, and the listing prints every planned write (`src/commands/harden.mjs:233-236`), so the
+preview names it; the apply's regeneration then rewrites the `cmp:generated` sections of a file the
+plan was writing anyway. On a plain `--minimal` app the plan writes the doc too, and the apply does
+not regenerate it. Measured by an in-process run of the plan and the apply on both fixtures, and by
+the CLI's `--dry-run` output. Unmeasured, and reasoned only: the doc would be missing from the
+preview if the merge left it byte-identical while the generator still rewrote a section; the dry
+run also never says WHICH sections it regenerates.
+
 ### KD-241 — a heal write is not atomic — **CLOSED 2026-09-25**
 
 `src/commands/doctor.mjs:482-491` (`healWriter`)
