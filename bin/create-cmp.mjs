@@ -263,6 +263,8 @@ function printHelp() {
       `  --name --package --bundle-id --theme-prefix\n` +
       `  --minimal   (light scaffold: app + tests + previews, no verify lane/receipts —\n` +
       `               \`harden\` installs the full harness later, idempotently)\n` +
+      `  --preset full|lean   (the app's shape, default full. lean = no Room, so no KSP step in\n` +
+      `               the first build; the harness is full in both, and a stated --room wins)\n` +
       `  --ios/--no-ios  --room/--no-room  --e2e/--no-e2e  --inspector/--no-inspector\n` +
       `  --dev-client/--no-dev-client   (desktop JVM window + Compose Hot Reload)\n` +
       `  (--appium/--no-appium accepted as deprecated aliases for --e2e/--no-e2e)\n` +
