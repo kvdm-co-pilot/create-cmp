@@ -9,6 +9,22 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-236 — the iOS-off ADR credits an interview that a command line never had — **CLOSED 2026-09-25**
+
+`src/lib/adr-seed.mjs:126`
+
+The seeded ADR says iOS was switched off "(`platforms.ios: false`) during the cmp-new interview".
+An app stamped with `--no-ios` on the command line had no interview. The room-off ADR had the same
+sentence and was corrected in this batch (`:99` now says "answered at the stamp's interview or stated
+on its command line"). This one was not.
+
+**Why it does not block:** the decision the ADR records is right. Only the clause about where it was
+made is wrong, and the file belongs to the app.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** The iOS-off ADR's context (`src/lib/adr-seed.mjs:126-128`) now reads "`platforms.ios: false` in `create-cmp.json`, answered at the stamp's interview or stated on its command line as `--no-ios`", the room-off ADR's wording at `:99`; the lean preset is not named because it turns off Room only (`src/commands/create.mjs:90`). `test/adr-seed.test.mjs:97` reads the seeded ADR and asserts the old clause is gone and the new one is present; it failed before the fix.
+
 ### KD-235 — the hold names a remedy a foreign-cwd session cannot run — **CLOSED 2026-09-25**
 
 `template/qa/lib/agent-hold.mjs:196`

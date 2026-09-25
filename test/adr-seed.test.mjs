@@ -94,6 +94,11 @@ test("adr-seed: --no-ios seeds the platform ADR, and an auth choice seeds nothin
   try {
     const seeded = adrFiles(out).filter((f) => /^000[5-9]/.test(f));
     assert.deepEqual(seeded, ["0005-android-only-launch-scope-ios-deferred.md"]);
+    // KD-236 — an app stamped with `--no-ios` on the command line had no
+    // interview; the ADR credited one. It now says what the room-off ADR says.
+    const content = fs.readFileSync(path.join(out, "docs/adr", seeded[0]), "utf8").replace(/\s+/g, " ");
+    assert.doesNotMatch(content, /during the cmp-new interview/);
+    assert.match(content, /answered at the stamp's interview or stated on its command line as `--no-ios`/);
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }

@@ -226,7 +226,6 @@ you the same list without opening anything.
 | **KD-232** | "this repository enables its own plugin" is stated in the hook, its test, the proposal and the CHANGELOG, and no file in this tree enables it — the maintainer's user and local settings do, so a fresh clone runs no `resume-price` | contributors, not adopters, and the hook is advisory; the proposal also still says "plugin `hooks/`" and "Not built." |
 | **KD-233** | `FRESH_HELPER_TOKENS` (37,019) is called "a floor", and measured first turns here are 8–18k for `deep-worker` and `staff-reviewer` and 18–62k for `general-purpose` | not a floor in either direction. The figure is inside the range for `general-purpose`, the type an adopter restarts, and the advice points the same way |
 | **KD-234** | a `SendMessage` to a helper that is still RUNNING would be priced as "this resume", because nothing in the payload or the transcript tells a running helper from a stopped one | unobserved: every send result on record reads "Resuming agent …". Whether a running helper can be sent to at all is a tool-schema fact that cannot be kept in this tree (KD-128) |
-| **KD-236** | the iOS-off ADR says iOS was switched off "during the cmp-new interview", which is false for `--no-ios` on the command line; the room-off ADR's sentence was corrected in the 0.28.0 batch and this one was not | the decision the ADR records is right; only its provenance clause is wrong, in a file the app owns and edits |
 | **KD-237** | the walk-wiring "installed but not wired up" finding always carries `fix: { auto: true }`, so doctor prints `fix (--fix):` over a settings file that `--fix` then declines as unreadable or of a shape it does not read | since this batch the decline is printed with its reason, so nothing is written and nothing is claimed healed; what is wrong is the offer |
 | **KD-238** | `docs/ARCHITECTURE.md:12` labels the CLI `npx create-cmp`, a third party's npm name (ADR-0006); ours is `create-cmp-cli` | a label in a contributor-facing diagram, not an install step; the correction is one word |
 | **KD-239** | `skills/cmp-new/SKILL.md:162` says "Build exactly the shape from `docs/CONTRACT.md`", and no `CONTRACT.md` exists anywhere in this tree | the same sentence names `options.schema.json`, which exists and validates the shape; the dangling pointer costs the agent one failed read |
@@ -3689,20 +3688,6 @@ while the helper's transcript was written within the last few seconds. That need
 which is a new calibration question.
 
 *Logged 2026-09-25, review round 1 of the resume-price slice.*
-
-### KD-236 — the iOS-off ADR credits an interview that a command line never had
-
-`src/lib/adr-seed.mjs:126`
-
-The seeded ADR says iOS was switched off "(`platforms.ios: false`) during the cmp-new interview".
-An app stamped with `--no-ios` on the command line had no interview. The room-off ADR had the same
-sentence and was corrected in this batch (`:99` now says "answered at the stamp's interview or stated
-on its command line"). This one was not.
-
-**Why it does not block:** the decision the ADR records is right. Only the clause about where it was
-made is wrong, and the file belongs to the app.
-
-*Logged 2026-09-25 (0.28.0 batch).*
 
 ### KD-237 — doctor offers `--fix` on a settings file `--fix` declines
 

@@ -123,8 +123,9 @@ const DECISION_RULES = [
       context:
         "create-cmp scaffolds Android and iOS from one Kotlin Multiplatform codebase by " +
         "default (`platforms.ios: true`). This app's scaffold config turned iOS off " +
-        "(`platforms.ios: false`) during the cmp-new interview — a deliberate scope decision " +
-        "for launch, not a technical limitation of the template.",
+        "(`platforms.ios: false` in `create-cmp.json`, answered at the stamp's interview or " +
+        "stated on its command line as `--no-ios`) — a deliberate scope decision for launch, " +
+        "not a technical limitation of the template.",
       decision:
         "We will launch Android-only. The `iosApp` shell, the `iosMain` source set, and every " +
         "iOS-only `actual` are excluded from the stamped tree; `composeApp` builds and ships " +
