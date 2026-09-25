@@ -229,6 +229,8 @@ you the same list without opening anything.
 | **KD-244** | `upgrade`'s merge base for a `--no-firebase` app stamped by 0.27 or earlier that later ran `add firebase` is the old template stamped with Firebase ON (`legacyFirebaseKeys`), a tree that app never was | measured 2026-09-25: not harmless, but loud: one spurious conflict sidecar (`composeApp/build.gradle.kts`) and exit 1, nothing removed or duplicated; a second sidecar (`libs.versions.toml`) seen in the test comes from its synthesised 0.27 catalog and does not occur with the real 0.27.2 one |
 | **KD-247** | `add firebase` writes the Podfile's Firebase pods and a comment naming the GitLive version the registry paired them with (KD-243), and `upgrade` moves `firebase-gitlive` in the catalog and never the Podfile | cannot fire yet: every shipped set pairs Firebase iOS 11.x, which `~> 11.1` still resolves; the comment goes stale on the first GitLive bump, and the pins break at the first set that pairs across a Firebase iOS major |
 | **KD-249** | `planShippedHookHeal` throws a `TypeError` on a settings file whose duplicated `hooks` key hides an old shipped Stop form, instead of returning a skip | guarded: its one caller, `shippedHookHealVerdict`, catches the throw and heals nothing, so doctor neither crashes nor offers a fix there; a new caller of the planner would inherit it |
+| **KD-250** | the KD-231 gate (`test/a-shipped-agent-points-at-a-file-only-create-cmp-has.test.mjs`) exempts any paragraph containing the string `create-cmp`, and the plugin's agent name `create-cmp:executor` now satisfies it: the orchestrator's model-tiering paragraph, the file's longest, is exempt only because it names that agent | no paragraph names a create-cmp-only file unmarked today (measured); a hazard that fires when one is added there |
+| **KD-251** | the amended resume rule (resume only while the cache is warm, ~5 minutes) and create-cmp's re-record rule ("resume that reviewer, do not start a cold one") point opposite ways for a re-record, which follows a fix and a suite run | create-cmp's own process, not an adopter's; a decision, handed up |
 
 ---
 
@@ -3756,3 +3758,35 @@ that only `JSON.parse`’s last-key-wins reading makes sense of. The planner its
 a new caller would inherit it; the repair is the planner returning a skip for that shape.
 
 *Logged 2026-09-25 (0.28.1 batch, round 1 fix).*
+
+### KD-250 — the plugin's agent name satisfies the create-cmp-only marking
+
+`test/a-shipped-agent-points-at-a-file-only-create-cmp-has.test.mjs` (the `/create-cmp/.test(para)` skip)
+
+Found reading 24474f7..51ad59e (the 0.28.1 additions). The KD-231 gate lets a paragraph name
+create-cmp's own files when the paragraph "says create-cmp", and tests that with a bare substring.
+`create-cmp:executor` is the plugin's namespace, not a statement of whose file something is, yet it
+matches. Measured by stripping `create-cmp:<name>` and re-running the paragraph split over both
+shipped agents: exactly one paragraph loses its exemption — `agents/cmp-orchestrator.md`'s
+"Model tiering" block, a single paragraph because its bullets have no blank lines between them —
+and it names none of the create-cmp-only patterns today.
+
+**Why it does not block:** nothing false ships now; the gate is blind over that paragraph for the
+next edit. The repair is one line: test the paragraph with `create-cmp:[\w-]+` removed.
+
+### KD-251 — a warm-cache resume rule and a resume-the-reviewer re-record rule
+
+`agents/cmp-orchestrator.md` ("Resume or fresh" and the `resume-price` paragraph after it);
+this file's header ("the LAST round re-records after its own fix — resume that reviewer")
+
+Found reading 24474f7..51ad59e. 47ad12e made a resume require a warm cache, "within about five
+minutes of its last step". The orchestrator's next paragraph still says a reviewer asked to
+re-record "holds the kind of state that rule means", and this file's header says to resume that
+reviewer rather than start a cold one. A re-record comes after the author's fix commit and usually
+a suite run, so the reviewer's cache is past five minutes by then, and under the amended rule it is
+started fresh.
+
+**Why it does not block:** the re-record sentence is create-cmp's own process and no adopter is
+served wrongly by it. **Decision asked:** does the re-record exception survive a cold cache (the
+reviewer's reading is worth its uncached re-read), or does a re-record become a fresh reader
+confirming one finding against the moved bytes? Either way, one of the two texts changes.
