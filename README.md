@@ -87,7 +87,15 @@ npx create-cmp-cli harden
 
 Nothing is forked: minimal is a filter over the one template, and `harden` installs exactly
 the subtraction back (existing files are merged or preserved beside a sidecar, never
-clobbered). For an app that already exists and was never scaffolded by this tool,
+clobbered).
+
+**Two app shapes, the same harness.** `--preset lean` stamps the app without Room, so the first
+build has no KSP step; everything else — Ktor, Koin, Navigation, the harness, previews, the
+inspector — is the same, and a stated `--room` still wins. The `cmp-new` skill picks the shape
+from what you asked for; the default is `full`. CI builds both shapes on every PR; the L2 run,
+which runs the stamped app, proves the default shape only.
+
+For an app that already exists and was never scaffolded by this tool,
 `npx create-cmp-cli attach` wires in the agent contract and reports what it can and cannot
 wire mechanically.
 

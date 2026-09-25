@@ -135,7 +135,7 @@ a Compose/KMP repo create-cmp never touched.
 
 | Command | Purpose | Key flags |
 |---|---|---|
-| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --theme-prefix --target-dir <dir>` · `--minimal` (light mode — see "The two modes" below) · `--ios/--no-ios` · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
+| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --theme-prefix --target-dir <dir>` · `--minimal` (light mode — see "The two modes" below) · `--preset full\|lean` (the app's shape — see "The two app shapes" below) · `--ios/--no-ios` · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
 | `doctor` | Toolchain preflight **+** project diagnosis (kotlin↔ksp lockstep, drift vs the proven set, the KSP2/iOS catch-22, `sdk.dir`, `~/.konan` bloat, disk, an inspector-stays-debug-only check, the walk's wiring, and hook commands that resolve only from the project root — including the two every app stamped through 0.26.2 carries, which `--fix` rewrites to the form the current template ships after asking). See also [docs/errors/](errors/README.md) — one page per build failure `doctor` diagnoses, with the exact error text and the manual fix. | `--fix` (safe heals) · `--yes --no-install --no-ios --target-dir <dir>` |
 | `upgrade` | Migrate `gradle/libs.versions.toml` to the next **proven-green** version set: diff table → surgical in-place edits (comments/format preserved) with `.bak-upgrade` backups → optional verify. Lockstep guardrail refuses a broken kotlin↔ksp pairing. | `--target-dir <dir> --set <id> --dry-run --yes --verify` |
 | `clean` | Cache & build-output hygiene: stale `~/.konan` toolchains + project `build/`/`.gradle/` (sizes shown, consent-gated); global Gradle caches are size-reported only. | `--target-dir <dir> --dry-run --yes` |
@@ -152,6 +152,18 @@ enforcement. One template, one version matrix, one test suite; the mode is recor
 `create-cmp.json` (`"harness": false`) and an auto-seeded ADR, and `harden` is the
 climb back, in a single step. This is the TRY→WORK→TRUST ladder: choose in five seconds, feel
 the tool work, then opt into constraint when the work should become trustworthy.
+
+**The two app shapes.** The mode above is the harness; the preset is the app, and the two are
+independent. `--preset full` (the default) stamps every library, Room's offline cache included.
+`--preset lean` stamps the same template with Room off and nothing else: no Room, so no KSP step
+in the first build and no Kotlin↔KSP pairing to keep. Ktor, Koin, Navigation and Compose are in
+both, the harness is full in both, and so are the inspector, the dev client, the preview loop and
+E2E. A preset is only a name for toggle values: `--preset lean` is `--no-room`, a stated
+`--room` still wins, and `create-cmp.json` records `"room": false` like any other choice, so
+`upgrade` rebuilds the same shape. The **cmp-new** skill picks it from the ask — an app with no
+backend sync and no offline storage (a todo list) gets `lean`; one that syncs or works offline
+gets `full` — and does not put it to the user as a question. CI builds both shapes on every PR;
+the L2 run, which runs the stamped app, proves the default (`full`) shape only.
 
 **Determinism rule for agents:** never hand-author Gradle files / the iOS shell / navigation / DI —
 that's exactly what makes CMP flaky. Stamp with the engine, then author only per-app screens.

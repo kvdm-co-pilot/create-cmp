@@ -14,7 +14,8 @@
  *
  * Value flags stay absent and are checked at their call sites with `typeof ===
  * "string"`: profile, target-dir, base-dir, set, specs, receipt, citation-roots,
- * name, package, bundle-id, region, theme-prefix, auth, tabs, google-services.
+ * name, package, bundle-id, region, theme-prefix, auth, tabs, google-services,
+ * preset.
  */
 export const BOOLEAN_FLAGS = new Set([
   "help", "h", "version", "v",
@@ -53,6 +54,9 @@ export const KNOWN_FLAGS = new Set([
   "name", "package", "bundle-id", "base-dir", "target-dir", "theme-prefix",
   "set", "specs", "receipt", "citation-roots", "region", "auth", "tabs",
   "minimal", "yes", "y", "force", "fix", "verify", "no-install",
+  // the app shape — a VALUE (`lean` or `full`), never a boolean: it names a set of
+  // toggle defaults (src/commands/create.mjs, PRESETS), and `--minimal` is the harness mode
+  "preset",
   // the feature toggles `flagBool`/`flagBoolWithAlias` read (their `no-` twins
   // are known by construction, not by being listed twice)
   "ios", "firebase", "firestore", "storage", "functions", "fcm", "room",

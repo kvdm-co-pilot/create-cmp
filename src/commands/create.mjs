@@ -65,6 +65,54 @@ export function firebaseStampFlags(flags) {
   return { requested, declined };
 }
 
+// --- presets -----------------------------------------------------------------
+
+/**
+ * The app shapes a stamp can take, each a NAME for values of toggles that already
+ * exist (docs/proposals/LIBRARIES-IN-SERVICES-OUT.md, Decision 3). A preset adds no
+ * template branch and never reaches a library that has no toggle — Ktor, Koin and
+ * Navigation are in both. All it moves is a toggle's DEFAULT, so a flag the line
+ * states still wins: `--preset lean --room` keeps Room.
+ *
+ * `lean` turns Room off, and nothing else. Room is the lever: it brings KSP, which
+ * is most of the first build and the Kotlin↔KSP lockstep `doctor` polices. The
+ * harness is full in both (the owner's call, 2026-09-24), and the inspector, the
+ * dev client, the preview loop and E2E are what an agent should notice, so they
+ * stay on. The harness MODE is a different axis with its own flag, `--minimal`,
+ * which is why this one is not called that.
+ *
+ * What a preset resolved to is recorded the way every option is — `create-cmp.json`
+ * says `"room": false` — so `upgrade` and `harden` rebuild the same shape from the
+ * record, with no preset name for them to interpret.
+ */
+export const PRESETS = Object.freeze({
+  full: Object.freeze({}),
+  lean: Object.freeze({ room: false }),
+});
+
+export const DEFAULT_PRESET = "full";
+
+/**
+ * The preset this line asks for, or the sentence that refuses it. Read before
+ * anything is asked or written, like the Firebase flags above.
+ * @returns {{name: string, defaults: object} | {refusal: string}}
+ */
+export function resolvePreset(flags) {
+  const raw = flags.preset;
+  const names = Object.keys(PRESETS).join(", ");
+  if (raw === undefined) return { name: DEFAULT_PRESET, defaults: PRESETS[DEFAULT_PRESET] };
+  // Bare `--preset` at the end of a line arrives as `true`; an empty value is
+  // refused at the bin (`emptyValues`) before this runs.
+  if (typeof raw !== "string") return { refusal: `--preset needs a value: one of ${names}.` };
+  if (!Object.hasOwn(PRESETS, raw)) return { refusal: `--preset ${raw} is not a preset — the presets are ${names}.` };
+  return { name: raw, defaults: PRESETS[raw] };
+}
+
+/** A toggle's default under this preset: the preset's value if it names one, else the stamp's. */
+function presetDefault(preset, key, dflt) {
+  return Object.hasOwn(preset.defaults, key) ? preset.defaults[key] : dflt;
+}
+
 // --- name helpers ------------------------------------------------------------
 
 function parseTabs(str) {
@@ -95,7 +143,7 @@ function slugFromName(name) {
 
 // --- config builders -------------------------------------------------------
 
-function buildConfigFromFlags(flags, positional) {
+function buildConfigFromFlags(flags, positional, preset) {
   const name = typeof flags.name === "string" ? flags.name : "MyApp";
   const pkg = typeof flags.package === "string" ? flags.package : `com.${slugFromName(name)}.app`;
   const ios = flagBool(flags, "ios", true);
@@ -115,10 +163,11 @@ function buildConfigFromFlags(flags, positional) {
     // `create-cmp harden` installs the subtraction back.
     harness: !flagBool(flags, "minimal", false),
     platforms: { android: true, ios },
-    room: flagBool(flags, "room", true),
-    e2e: flagBoolWithAlias(flags, "e2e", "appium", true),
-    inspector: flagBool(flags, "inspector", true),
-    devClient: flagBool(flags, "dev-client", true),
+    // The preset moves a default; a flag the line states still answers first.
+    room: flagBool(flags, "room", presetDefault(preset, "room", true)),
+    e2e: flagBoolWithAlias(flags, "e2e", "appium", presetDefault(preset, "e2e", true)),
+    inspector: flagBool(flags, "inspector", presetDefault(preset, "inspector", true)),
+    devClient: flagBool(flags, "dev-client", presetDefault(preset, "devClient", true)),
     tabs: parseTabs(flags.tabs) || [
       { label: "Home", icon: "home" },
       { label: "Profile", icon: "person" },
@@ -127,7 +176,7 @@ function buildConfigFromFlags(flags, positional) {
   };
 }
 
-async function interactiveConfig(positional, flags = {}) {
+async function interactiveConfig(positional, flags = {}, preset = resolvePreset({})) {
   let prompts;
   try {
     prompts = (await import("prompts")).default;
@@ -165,19 +214,32 @@ async function interactiveConfig(positional, flags = {}) {
         message: "Verification harness (verify lane, evidence receipts, machine-checked done)?",
         initial: !flagBool(flags, "minimal", false), // --minimal pre-answers the interview question
       },
-      { type: "confirm", name: "room", message: "Room local cache?", initial: true },
-      { type: "confirm", name: "e2e", message: "E2E test harness (Maestro)?", initial: true },
+      // The toggles resolve here exactly as the flag path resolves them — a stated
+      // flag, else the preset's default, else on — and pre-answer the question, as
+      // `--minimal` does above. So `--preset lean --room` asks with Room already yes.
+      {
+        type: "confirm",
+        name: "room",
+        message: "Room local cache?",
+        initial: flagBool(flags, "room", presetDefault(preset, "room", true)),
+      },
+      {
+        type: "confirm",
+        name: "e2e",
+        message: "E2E test harness (Maestro)?",
+        initial: flagBoolWithAlias(flags, "e2e", "appium", presetDefault(preset, "e2e", true)),
+      },
       {
         type: "confirm",
         name: "inspector",
         message: "Live on-device inspector (debug builds only)?",
-        initial: true,
+        initial: flagBool(flags, "inspector", presetDefault(preset, "inspector", true)),
       },
       {
         type: "confirm",
         name: "devClient",
         message: "Desktop dev-client (JVM window + Compose Hot Reload)?",
-        initial: true,
+        initial: flagBool(flags, "dev-client", presetDefault(preset, "devClient", true)),
       },
       {
         type: "text",
@@ -237,6 +299,15 @@ export async function runCreate(flags, positional) {
     );
   }
 
+  // A preset this command does not have is refused before anything is written, like
+  // a Firebase flag: guessing `full` for `--preset tiny` would stamp the shape the
+  // line did not ask for and say nothing.
+  const preset = resolvePreset(flags);
+  if (preset.refusal) {
+    process.stderr.write(`create-cmp: ${preset.refusal}\n  Nothing was written.\n`);
+    process.exit(2);
+  }
+
   const { scaffold } = await import("../scaffold.mjs");
 
   const nonInteractive =
@@ -246,8 +317,8 @@ export async function runCreate(flags, positional) {
     !process.stdin.isTTY;
 
   const config = nonInteractive
-    ? buildConfigFromFlags(flags, positional)
-    : await interactiveConfig(positional, flags);
+    ? buildConfigFromFlags(flags, positional, preset)
+    : await interactiveConfig(positional, flags, preset);
 
   const verify = flagBool(flags, "verify", true);
 
