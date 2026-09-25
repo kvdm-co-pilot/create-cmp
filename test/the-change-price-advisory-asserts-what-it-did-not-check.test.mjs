@@ -15,13 +15,16 @@
 //      of, and the count is still presented as what the records show;
 //   3. a tier that owed nothing and recorded a run is called "within" on one row
 //      and "OVER" on another, from the same table, on the same shape of input.
+//
+// And one place it stated LESS than it derived: an open Firebase L2 run, owed by
+// proof-plan as its own tier, was priced nowhere and its runs counted nowhere.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { laneOf, classifyPath, spendOf } from "../scripts/change-price.mjs";
+import { laneOf, classifyPath, spendOf, price, render as renderPrice, SPEND_KINDS } from "../scripts/change-price.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -162,4 +165,45 @@ test("a tier that owed no run and recorded one is called OVER on the device row 
       `the ${r.what} row prints "${r.recorded} record(s) / ${r.owed} owed" and calls it "within" — its verdict is computed against a number it does not show${r.note ? `, and its note pleads an allowance nothing was owed for: "${r.note}"` : ""}`,
     );
   }
+});
+
+// AN OPEN FIREBASE L2 RUN IS PRICED. proof-plan owes it as its own tier
+// (`o.firebase`, TIERS.firebase) with its own record and its own history kind
+// (`fleet-firebase`, scripts/lib/proof-history.mjs), so an advisory that read
+// only `o.state` and `o.review.state` priced a slice owing a Firebase run as if
+// it owed nothing there, and counted none of the runs it bought. Read beside
+// the other two, and counted by the one attribution rule.
+const FB_NEED = { required: true, obliging: ["template/firebase/x.kt"], reason: "1 changed path(s) feed the Firebase L2 run" };
+const allHistories = (fb) => ({ suite: hist([]), fleet: hist([]), reviews: hist([]), "fleet-firebase": fb });
+const priceWith = (firebase, fb = hist([])) =>
+  price({
+    branch: BRANCH,
+    paths: ["scripts/a-module.mjs"],
+    subjects: ["fix(a): a line"],
+    dirty: false,
+    o: { state: "none", plan: PLAN, review: { state: "none", need: { reason: "r" } }, firebase: { state: firebase, need: FB_NEED } },
+    histories: allHistories(fb),
+  });
+
+test("an open Firebase L2 run appears in the priced obligations — the proof-tiers note and its own spent row", () => {
+  const m = priceWith("owed");
+  const tiers = m.owes.find((r) => r.item === "proof tiers");
+  assert.match(tiers.note, /Firebase L2 run OWED/, `the proof-tiers note reads o.state and o.review.state and not o.firebase.state: "${tiers.note}"`);
+  const fb = m.spent.find((r) => r.what === "firebase");
+  assert.ok(fb, `the spent block has no Firebase row: ${JSON.stringify(m.spent.map((r) => r.what))}`);
+  assert.equal(fb.owed, 1);
+  assert.equal(fb.verdict, "within");
+  assert.match(renderPrice(m), /^ {6}Firebase L2 run +0 record\(s\) \/ 1 owed +within$/m, "the printed line has the L2 run line's shape");
+  assert.ok(SPEND_KINDS.includes("fleet-firebase"), "observe() reads the fleet-firebase history the row is counted from");
+});
+
+test("the Firebase row takes the one verdict rule: a run no tier owed is OVER, a moved app is REOPENED", () => {
+  const over = priceWith("none", hist([ran("2026-09-18T11:00:00.000Z")])).spent.find((r) => r.what === "firebase");
+  assert.equal(over.owed, 0);
+  assert.match(over.verdict, /^OVER by 1/);
+  const reopened = priceWith("reopened", hist([ran("2026-09-18T11:00:00.000Z")])).spent.find((r) => r.what === "firebase");
+  assert.match(reopened.verdict, /^REOPENED/);
+  // Advisory still: a pure caller that hands no Firebase history gets the rows it
+  // handed, not a throw — every other caller in this suite predates the kind.
+  assert.doesNotThrow(() => spendOf({ branch: BRANCH, plan: PLAN, device: "owed", review: "owed", firebase: "owed", histories: { suite: hist([]), fleet: hist([]), reviews: hist([]) } }));
 });

@@ -191,3 +191,44 @@ test("the recorder writes reasons for anything that did not pass, where generate
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// THE FIREBASE L2 RUN HAS ITS OWN ROW, READ FROM THE SCHEDULE. It is its own
+// tier with its own digest and its own record (KD-206, scripts/proof-plan.mjs
+// TIERS.firebase), so a Q6 block that printed only the default `fleet L2` row
+// would paste into a PR as if the default run were the whole of L2. The row is
+// `o.firebase` from `obligation()`, printed — never re-derived here — with the
+// record's ranAt and verdict wherever there is one.
+const Q6 = { suite: null, frameworkCheck: null, device: { required: false, reason: "no changed path feeds fleet L2" }, fleet: { present: false } };
+const FB_NEED = { required: true, obliging: ["template/firebase/x.kt"], reason: "1 changed path(s) feed the Firebase L2 run" };
+const fbRow = (out) => {
+  const lines = out.split("\n");
+  const i = lines.findIndex((l) => /^ {3}fleet L2 \+ firebase /.test(l));
+  return i < 0 ? null : lines.slice(i, i + 2).join("\n");
+};
+
+test("an owed Firebase L2 run is its own Q6 row, saying OWED with the schedule's reason", () => {
+  const row = fbRow(render({ ...Q6, owed: { state: "none", firebase: { state: "owed", now: "a".repeat(64), reading: {}, need: FB_NEED } } }));
+  assert.ok(row, "Q6 has no `fleet L2 + firebase` row, so the Firebase tier is silent in the block pasted into a PR");
+  assert.match(row, /OWED — at slice close, NOT NOW/);
+  assert.ok(row.includes(FB_NEED.reason), `the row does not quote o.firebase.need.reason: ${row}`);
+});
+
+test("the Firebase row reads discharged, reopened and none from o.firebase, and quotes the record's ranAt and verdict", () => {
+  const proof = { at: "2026-09-26T09:15:00.000Z", verdict: "PASS", rung: "L2", from: "qa-artifacts/fleet-firebase-latest.json" };
+  const discharged = fbRow(render({ ...Q6, owed: { state: "none", firebase: { state: "discharged", now: "b".repeat(64), proof, need: FB_NEED } } }));
+  assert.match(discharged, /DISCHARGED/);
+  assert.match(discharged, /PASS/);
+  assert.ok(discharged.includes(proof.at), `the discharged row does not say when its run ran: ${discharged}`);
+
+  const onDisk = { ranAt: "2026-09-25T08:00:00.000Z", verdict: "FAIL", rung: "L2", coverage: { firebase: true } };
+  const reopened = fbRow(render({ ...Q6, firebaseFleet: onDisk, owed: { state: "none", firebase: { state: "reopened", now: "c".repeat(64), need: FB_NEED } } }));
+  assert.match(reopened, /REOPENED/);
+  assert.ok(reopened.includes(onDisk.ranAt) && /FAIL/.test(reopened), `the reopened row does not quote the record on disk: ${reopened}`);
+  assert.match(reopened, /does not carry/, "a record beside a non-discharged state is said not to carry the tier, never ticked");
+
+  const trunk = fbRow(render({ ...Q6, owed: { state: "none", trunk: true, firebase: { state: "none", trunk: true, need: { required: false, reason: "this tree is trunk" } } } }));
+  assert.match(trunk, /not required — this tree is trunk/);
+
+  const unread = fbRow(render(Q6));
+  assert.match(unread ?? "", /not read/, "with no schedule handed over, the row says it was not read rather than vanishing");
+});
