@@ -1,9 +1,10 @@
 // THE SCAN THAT SAYS "NOT SWALLOWED" ACCEPTS A SWALLOWED FAILURE.
 //
 // `test/the-emulator-redirect-cannot-fail-quietly.test.mjs` is the only gate in
-// this repository that holds the template's Firebase emulator redirect — KD-45
-// records that nothing here EXECUTES that code, so a scan of its shape is the
-// whole of what is held. A gate that is the only gate has to refuse the DEFECT,
+// this repository that holds the Firebase emulator redirect `create-cmp add
+// firebase` writes — KD-45 records that nothing here EXECUTES that code (CI's
+// stamp + add job compiles it), so a scan of its shape is the whole of what is
+// held. A gate that is the only gate has to refuse the DEFECT,
 // not one spelling of it.
 //
 // It refuses the spellings it has been shown. Measured by this file, twice:
@@ -36,8 +37,9 @@
 // a lane that only ever returns PASS has not been shown to return.
 //
 // IT MUTATES NOTHING IN THIS TREE. Each case assembles a throwaway root in a
-// temp dir — the gate's own bytes, its helper's own bytes, and the two Kotlin
-// files with one defect planted — and runs the gate there. Concurrent runs,
+// temp dir — the gate's own bytes, its helper's own bytes, the two Kotlin
+// files, the add step's edit list and the two entry points it edits, with one
+// defect planted — and runs the gate there. Concurrent runs,
 // a dirty working tree and an interrupted run are all harmless, because the
 // repository is only ever read.
 import { test } from "node:test";
@@ -55,8 +57,14 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const GATE = "test/the-emulator-redirect-cannot-fail-quietly.test.mjs";
 const HELPER = "test/helpers/js-source-scan.mjs";
-const ANDROID = "template/composeApp/src/androidMain/kotlin/com/example/app/AppApplication.kt";
-const IOS = "template/composeApp/src/iosMain/kotlin/com/example/app/KoinHelper.kt";
+const ANDROID = "overlays/firebase/files/composeApp/src/androidMain/kotlin/com/example/app/FirebaseEmulators.kt";
+const IOS = "overlays/firebase/files/composeApp/src/iosMain/kotlin/com/example/app/FirebaseEmulators.kt";
+/** Where the CALL lives since Firebase became an add step: a line this list inserts into each entry point. */
+const EDITS = "overlays/firebase/edits.json";
+const CALLERS = {
+  android: "composeApp/src/androidMain/kotlin/com/example/app/AppApplication.kt",
+  ios: "composeApp/src/iosMain/kotlin/com/example/app/KoinHelper.kt",
+};
 
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
@@ -112,9 +120,22 @@ function withSwallowingSecondCatch(raw) {
   );
 }
 
-/** The CALL, never the declaration: a call sits alone on its line, a declaration does not. */
-function withoutTheCall(raw) {
-  return raw.replace(/^[ \t]*configureFirebaseEmulators\(\)[ \t]*\n/m, "");
+/**
+ * The CALL taken out of the add step's insertion into one platform's entry point
+ * — the declaration in FirebaseEmulators.kt untouched, so the function exists
+ * and nothing invokes it.
+ */
+function withoutTheCall(platform) {
+  return (raw) => {
+    const edits = JSON.parse(raw);
+    const count = (e) => e.inserts.reduce((n, i) => n + i.lines.length, 0);
+    const before = count(edits);
+    edits.inserts = edits.inserts
+      .map((i) => (i.file === CALLERS[platform] ? { ...i, lines: i.lines.filter((l) => !l.includes("configureFirebaseEmulators()")) } : i))
+      .filter((i) => i.lines.length > 0);
+    // Unchanged bytes when nothing was removed, so the "mutation still applies" guard can see it.
+    return count(edits) === before ? raw : JSON.stringify(edits, null, 2);
+  };
 }
 
 const unchanged = (s) => s;
@@ -134,7 +155,7 @@ const unchanged = (s) => s;
  *
  * @returns {"GREEN"|"RED"}
  */
-function gateVerdictOn(androidSrc, iosSrc) {
+function gateVerdictOn(androidSrc, iosSrc, editsSrc) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-emulator-scan-"));
   try {
     for (const [rel, body] of [
@@ -142,6 +163,8 @@ function gateVerdictOn(androidSrc, iosSrc) {
       [HELPER, read(HELPER)],
       [ANDROID, androidSrc],
       [IOS, iosSrc],
+      [EDITS, editsSrc],
+      ...Object.values(CALLERS).map((c) => [`template/${c}`, read(`template/${c}`)]),
     ]) {
       const abs = path.join(dir, rel);
       fs.mkdirSync(path.dirname(abs), { recursive: true });
@@ -179,7 +202,7 @@ function gateVerdictOn(androidSrc, iosSrc) {
  */
 const CASES = [
   {
-    what: "the template as it stands, unmutated",
+    what: "the overlay and the template as they stand, unmutated",
     expect: "GREEN",
     android: unchanged,
     ios: unchanged,
@@ -222,16 +245,18 @@ const CASES = [
   {
     what: "android: nothing calls configureFirebaseEmulators()",
     expect: "RED",
-    android: withoutTheCall,
+    android: unchanged,
     ios: unchanged,
+    edits: withoutTheCall("android"),
     why: "a refusal nothing performs. The gate reads the function and never asks whether it has a caller",
   },
   {
     what: "ios: nothing calls configureFirebaseEmulators()",
     expect: "RED",
     android: unchanged,
-    ios: withoutTheCall,
-    why: "same, on the platform whose call site is a single line in initKoin()",
+    ios: unchanged,
+    edits: withoutTheCall("ios"),
+    why: "same, on the platform whose call site is a single line the add step puts in initKoin()",
   },
   {
     what: "android: a second catch, behind one that rethrows, discards everything else",
@@ -257,20 +282,21 @@ for (const c of CASES) {
   test(`the emulator scan must be ${c.expect} when: ${c.what}`, () => {
     const android = c.android(read(ANDROID));
     const ios = c.ios(read(IOS));
+    const edits = (c.edits ?? unchanged)(read(EDITS));
     if (c.expect === "RED") {
       assert.ok(
-        android !== read(ANDROID) || ios !== read(IOS),
+        android !== read(ANDROID) || ios !== read(IOS) || edits !== read(EDITS),
         `the mutation "${c.what}" no longer applies to the template — it is planting nothing, so its red proves nothing. ` +
           `Re-aim it at the code as it now stands, or delete the row.`,
       );
     }
     assert.equal(
-      gateVerdictOn(android, ios),
+      gateVerdictOn(android, ios, edits),
       c.expect,
       `${GATE} answered the wrong way for a planted defect.\n` +
         `  planted: ${c.what}\n` +
         `  why it must be refused: ${c.why}\n` +
-        `  That gate is the ONLY thing holding the template's emulator redirect — KD-45: nothing in this ` +
+        `  That gate is the ONLY thing holding the add step's emulator redirect — KD-45: nothing in this ` +
         `repository executes that code. A scan that refuses one spelling of a defect refuses the defect the ` +
         `next author happens not to write.`,
     );
