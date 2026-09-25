@@ -159,7 +159,8 @@ answer is what the shape above is read from.
 
 ## 2. Assemble the engine config object
 
-Build exactly the shape from `docs/CONTRACT.md` (validated by `options.schema.json`):
+Build exactly the shape the engine's `options.schema.json` defines — it is the options reference,
+and the schema the engine validates this object against:
 
 ```json
 {
