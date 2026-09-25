@@ -1,7 +1,9 @@
 // Token derivation + replacement for file CONTENTS and PATHS.
 //
 // Per CONTRACT.md, the engine replaces these placeholder tokens:
-//   __APP_NAME__ · __PACKAGE__ · __PACKAGE_PATH__ · __IOS_BUNDLE_ID__ · __REGION__ · __THEME_PREFIX__
+//   __APP_NAME__ · __PACKAGE__ · __PACKAGE_PATH__ · __IOS_BUNDLE_ID__ · __THEME_PREFIX__
+// and __REGION__ only for a config that carries `region` — a template from before
+// Firebase left stamp-time, stamped by `upgrade --harness` as an app's merge base.
 //
 // The replacement is applied to both the bytes of every text file and to path
 // segments. Path replacement deliberately handles __PACKAGE_PATH__ even though
@@ -21,7 +23,9 @@ export function buildTokenMap(config) {
     ["__PACKAGE_PATH__", packagePath],
     ["__PACKAGE__", config.package],
     ["__IOS_BUNDLE_ID__", config.iosBundleId],
-    ["__REGION__", config.region],
+    // Absent, not "undefined": the current template carries no __REGION__, and an
+    // older one stamped as a merge base is handed the app's recorded region.
+    ...(typeof config.region === "string" ? [["__REGION__", config.region]] : []),
     ["__THEME_PREFIX__", config.themePrefix],
   ];
 }

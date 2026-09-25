@@ -86,9 +86,14 @@ export function stripFeatureBlocks(content, disabledFeatures) {
 
 /**
  * Map an engine config object to the set of DISABLED feature names that the
- * manifest understands: harness, ios, firebase, room, e2e, inspector,
- * dev-client. `harness` is the mode split (LADDER §R3): absent means full —
- * only an explicit `harness: false` (`--minimal`) subtracts it.
+ * manifest understands: harness, ios, room, e2e, inspector, dev-client.
+ * `harness` is the mode split (LADDER §R3): absent means full — only an
+ * explicit `harness: false` (`--minimal`) subtracts it.
+ *
+ * `firebase` is disabled only when a config SAYS so. The current template has
+ * no firebase feature and a current config has no `firebase` key; the one
+ * config that does is `upgrade --harness` stamping an older template, which
+ * carried the feature, as an app's merge base — and there the record decides.
  * @param {object} config
  * @returns {Set<string>}
  */
@@ -96,7 +101,7 @@ export function disabledFeaturesFromConfig(config) {
   const disabled = new Set();
   if (config.harness === false) disabled.add("harness");
   if (!config.platforms?.ios) disabled.add("ios");
-  if (!config.firebase?.enabled) disabled.add("firebase");
+  if (config.firebase && !config.firebase.enabled) disabled.add("firebase");
   if (!config.room) disabled.add("room");
   if (!config.e2e) disabled.add("e2e");
   if (!config.inspector) disabled.add("inspector");

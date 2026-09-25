@@ -5,8 +5,8 @@
 // made, in Nygard form, by the agent.").
 //
 // WHERE THE MECHANICS BELONG — an engine hook, not a SKILL.md instruction:
-// by the time `scaffold()` runs, every decision this module records (room,
-// platforms.ios, firebase.auth) is already FIXED in the validated config —
+// by the time `scaffold()` runs, every decision this module records (mode,
+// room, platforms.ios) is already FIXED in the validated config —
 // the cmp-new interview (skills/cmp-new/SKILL.md §1) collects them BEFORE
 // the engine is shelled out to (§2/§3), exactly like `config.tabs` is fixed
 // before `rewriteTabSurfaces` (src/lib/tabs.mjs) runs. That precedent is the
@@ -51,11 +51,13 @@ function renderAdr(number, title, body, dateIso) {
 }
 
 // Decisions considered, IN THIS ORDER — fixes the numbering deterministically
-// for a given config (persistence, then platform scope, then auth, matching
+// for a given config (mode, then persistence, then platform scope, matching
 // the order named in the Wave D brief). Each rule fires only when the config
-// DEVIATES from the interview's documented default (SKILL.md §1: platforms.ios
-// true, room true, firebase.auth "both") — matching every default seeds
-// nothing beyond the shipped four; only a genuine choice gets a record.
+// DEVIATES from the interview's documented default (SKILL.md §1: full harness,
+// platforms.ios true, room true) — matching every default seeds nothing beyond
+// the shipped four; only a genuine choice gets a record. The auth-scope rule
+// that stood third left with Firebase: auth is chosen at `create-cmp add
+// firebase`, after the stamp, where this hook does not run.
 const DECISION_RULES = [
   {
     id: "mode",
@@ -136,29 +138,6 @@ const DECISION_RULES = [
         "- The verify lane's iOS build step never runs for this app until this ADR is " +
           "superseded.",
     }),
-  },
-  {
-    id: "auth-scope",
-    applies: (config) => config.firebase?.enabled === true && !!config.firebase?.auth && config.firebase.auth !== "both",
-    title: (config) => `Auth scope: ${config.firebase.auth}`,
-    render: (config) => {
-      const auth = config.firebase.auth;
-      const chosen = auth === "none" ? "no Firebase Auth wiring at all" : `Firebase Auth's **${auth}** sign-in method only`;
-      return {
-        context:
-          "The interview default wires both Firebase Auth sign-in methods (email + phone) " +
-          `behind the GitLive KMP SDK (\`firebase.auth: "both"\`). This app's scaffold config ` +
-          `chose \`firebase.auth: "${auth}"\` during the cmp-new interview — a deliberate scope ` +
-          "decision for this app's actual auth needs, not the interview's default.",
-        decision: `We will wire ${chosen}. Auth call sites and DI registration reflect this scope; the other sign-in method's wiring is not stamped.`,
-        consequences:
-          "- Auth-related code stays scoped to what this app actually needs — no dead sign-in " +
-            "path to maintain or test.\n" +
-          "- Adding another sign-in method later needs its own genesis-equivalent work " +
-            "(Firebase console configuration + the GitLive SDK call sites for that method) — " +
-            "this ADR is the record of why it wasn't there from day one.",
-      };
-    },
   },
 ];
 
