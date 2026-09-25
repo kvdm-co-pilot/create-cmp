@@ -9,6 +9,33 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-242 — `--minimal`, then `add firebase`, then `harden` may leave the architecture doc stale — **CLOSED 2026-09-25**
+
+`src/lib/add-firebase.mjs:591-593`, `src/lib/minimal.mjs:14-16,23-24`
+
+`add firebase` regenerates `docs/ARCHITECTURE.md` with the app's own `qa/lib/arch-doc.mjs`, and
+skips when that file is absent. Minimal subtraction deletes machine-owned `qa/` scripts outside the
+preview entry points' keep-set, and `harden` installs them back. If the generator is outside the
+keep-set, the doc misses the Firebase change and the freshness check fails after `harden`.
+
+**Why it does not block:** no part of this has been measured, including whether the generator is
+outside the keep-set. If it fires, it is a red check the adopter clears by regenerating the doc,
+never a false green.
+
+*Logged 2026-09-25 (0.28.0 batch).*
+
+**Closed 2026-09-25, on the release-0.28.1 branch.** Measured first, and it fired. A CLI stamp with
+`--minimal --no-verify` kept only `qa/preview-gallery.mjs` and its imports, so `qa/lib/arch-doc.mjs`
+was gone; `add firebase --no-verify` left `docs/ARCHITECTURE.md` byte-identical; after `harden`,
+`node qa/arch-doc.mjs --check` exited 1 on `[layer-file-inventory]`, which lacked
+`remote/FirebaseConfig.kt`. The same stamp and `harden` without `add firebase` checked fresh. By
+reading, not measured: anything else a minimal app gains while it has no walker is missed the same
+way. `harden` now regenerates the generated sections with the
+walker it has just installed, before the lock is taken (`src/commands/harden.mjs:156-162`, the
+app's own generator, no second copy), and says which sections it rewrote. Re-measured through the
+CLI: `--check` exits 0. `test/a-minimal-app-that-added-firebase-hardens-to-a-fresh-arch-doc.test.mjs`
+fails without the change and passes with it, with no Gradle run.
+
 ### KD-240 — two style reads in `json-in-place` that are slightly wrong — **CLOSED 2026-09-25**
 
 `src/lib/json-in-place.mjs:171`, `:196`, `:245-246`

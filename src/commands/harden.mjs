@@ -48,6 +48,7 @@ import {
   SIDECAR_SUFFIX,
 } from "../lib/harness-upgrade.mjs";
 import { listFiles } from "../lib/fsutil.mjs";
+import { regenerateArchDoc } from "../lib/add-firebase.mjs";
 import {
   writeHarnessLock,
   checkHarnessIntegrity,
@@ -153,6 +154,13 @@ export async function hardenProject({ projectDir, templateDir, apply = false, lo
       seeded.push(rel);
     }
 
+    // KD-242: minimal subtraction removed the app's own walker (qa/lib/arch-doc.mjs), so nothing
+    // the tree gained while it was absent — `add firebase`'s data/remote/FirebaseConfig.kt, a
+    // screen the adopter wrote — reached the doc's generated sections, and the merge above only
+    // carries the stamps' view of them. The walker is installed now: regenerate with it, the one
+    // the lane's archDoc step checks against, before the lock is taken.
+    const archDoc = await regenerateArchDoc(projectDir);
+
     const harnessVersion = shippedHarnessVersion();
     if (harnessVersion) {
       // Same ordering as the stamp: the record is inside the region the lock
@@ -164,7 +172,7 @@ export async function hardenProject({ projectDir, templateDir, apply = false, lo
     const updated = { ...record, harness: true, engineVersion: currentEngineVersion() };
     fs.writeFileSync(specPath, JSON.stringify(updated, null, 2) + "\n");
 
-    return { alreadyFull: false, plan, seedPlan, result, seeded, record: updated };
+    return { alreadyFull: false, plan, seedPlan, result, seeded, archDoc, record: updated };
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
@@ -252,6 +260,7 @@ export async function runHarden(flags, positional) {
   for (const f of r.created) ok(`installed ${f}`);
   for (const f of r.written) ok(`refreshed ${f}`);
   for (const f of applied.seeded) ok(`seeded ${f}`);
+  if (applied.archDoc?.wrote) ok(`regenerated docs/ARCHITECTURE.md → ${applied.archDoc.changedSections.join(", ")}`);
   for (const f of r.sidecars) warn(`conflict sidecar ${f} — resolve by hand, then delete it`);
   ok(`create-cmp.json → harness: true · ${describeIntegrity(checkHarnessIntegrity(projectDir))}`);
 
