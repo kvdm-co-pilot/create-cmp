@@ -218,7 +218,6 @@ you the same list without opening anything.
 | **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production |
 | **KD-212** | the shipped-hooks table is derived from the template FILE's history, but minimal mode writes a SessionStart command that file never carried | no claim rests on it — a minimal stamp's command is fully single-quoted, so it is neither healable nor a violation, and doctor says nothing about it in either direction |
 | **KD-213** | the `--dry-run` gate counts four `fs` spellings where its own header names the class — `copyFileSync`, `renameSync`, `cpSync`, `fs.promises.*` and a destructured import all pass it | zero producers in the tree, and it cannot be written as a failing test: a widened gate is green on these bytes |
-| **KD-214** | `doctor --fix` dies with a raw EACCES stack and prints NO project diagnosis when a heal cannot write, discarding the report and leaving earlier heals half-applied | the refusal is honest and names its cause and its path, the file is left byte-for-byte unchanged, and the unwritable file is a state the adopter created |
 | **KD-215** | the heal makes the Stop gate fire from a foreign cwd, and the remedy it then prints names `node qa/verify.mjs` — a path that does not resolve from where that session stands | the verdict and the exit code are right from both directories; only the remedy's path is relative, and the text is pre-existing and unchanged |
 | **KD-218** | the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false`, and there is no such flag | refused, exit 2, nothing written; the sentence names something the CLI does not have (KD-184's shape) |
 | **KD-219** | `attach.mjs`'s new comment says the empty `--citation-roots` value "never arrives any more", and this tree's own suite passes it in | the guard it weakens the reason for is still there and still correct; only the reason is false |
@@ -3498,41 +3497,6 @@ import from `node:fs` at all, which is a change to the module, not to the gate.
 
 **Fires when:** the next project heal is written with any `fs` call other than the four, under
 `--fix --dry-run`.
-*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
-
-### KD-214 — a heal that cannot write takes the whole project diagnosis down with it
-
-`src/commands/doctor.mjs` (`healWriter`, `healShippedHookCommands`, `runDoctor` — no `try` around the
-heals) · KD-194 · KD-196 · KD-197
-
-Measured on this tree, with `.claude/settings.json` at mode `0444` and 0.26.2 content:
-`create-cmp doctor --fix --yes --no-install --no-ios --target-dir <tmp>` prints the rewrite preview,
-then
-
-```
-Fatal: Error: EACCES: permission denied, open '…/.claude/settings.json'
-    at write (…/src/commands/doctor.mjs:439:8)
-    at healShippedHookCommands (…/src/commands/doctor.mjs:577:10)
-    at async runDoctor (…/src/commands/doctor.mjs:633:23)
-```
-
-and exits 1. `printFindings` never runs, so every finding the adopter invoked doctor to read — the
-version-catalog checks, `local.properties`, disk headroom, the walk wiring, the unanchored hooks — is
-discarded by a failure in one optional heal. Any heal that already succeeded earlier in the same run
-(`local.properties`, `ksp.useKSP2`) stays applied, with the `✓ --fix: wrote …` line as the only record
-of it, and no re-diagnosis. The shape is pre-existing: `applySafeFixes` has always called the writer
-with no `try`. What this slice adds is a second, later writer on the same unguarded path, so the
-window in which a failed write throws away the report is wider than it was, and it now covers the one
-file the adopter is most likely to have made read-only.
-
-**Nobody is wrongly served by what is SAID.** The failure is loud, names its cause and its exact path,
-the settings file is left byte-for-byte unchanged, and nothing false is printed — the crash happens
-before the `✓ --fix: wrote …` line, not after it. An unwritable `.claude/settings.json` is also a state
-the adopter created. The cost is a diagnosis they have to re-run without `--fix` to get, which is a
-degraded result rather than a wrong one.
-
-**Fires when:** any project heal's target is read-only, on a read-only mount, or otherwise unwritable —
-most plausibly a `.claude/` checked out read-only or owned by another user.
 *Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
 
 ### KD-215 — the heal revives the Stop gate for foreign-cwd sessions, and its remedy is a path those sessions cannot resolve

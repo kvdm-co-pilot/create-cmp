@@ -58,6 +58,57 @@ it keeps each stage's exit date and why, and each cell sends the reader to
 "NORTH-STAR is signed", names no record this tree holds: NORTH-STAR carries no signature line and
 no digest, and nothing in `scripts/` or `packages/` reads one.
 
+### KD-214 — a heal that cannot write takes the whole project diagnosis down with it — **CLOSED 2026-09-25**
+
+`src/commands/doctor.mjs` (`healWriter`, `healShippedHookCommands`, `runDoctor` — no `try` around the
+heals) · KD-194 · KD-196 · KD-197
+
+Measured on this tree, with `.claude/settings.json` at mode `0444` and 0.26.2 content:
+`create-cmp doctor --fix --yes --no-install --no-ios --target-dir <tmp>` prints the rewrite preview,
+then
+
+```
+Fatal: Error: EACCES: permission denied, open '…/.claude/settings.json'
+    at write (…/src/commands/doctor.mjs:439:8)
+    at healShippedHookCommands (…/src/commands/doctor.mjs:577:10)
+    at async runDoctor (…/src/commands/doctor.mjs:633:23)
+```
+
+and exits 1. `printFindings` never runs, so every finding the adopter invoked doctor to read — the
+version-catalog checks, `local.properties`, disk headroom, the walk wiring, the unanchored hooks — is
+discarded by a failure in one optional heal. Any heal that already succeeded earlier in the same run
+(`local.properties`, `ksp.useKSP2`) stays applied, with the `✓ --fix: wrote …` line as the only record
+of it, and no re-diagnosis. The shape is pre-existing: `applySafeFixes` has always called the writer
+with no `try`. What this slice adds is a second, later writer on the same unguarded path, so the
+window in which a failed write throws away the report is wider than it was, and it now covers the one
+file the adopter is most likely to have made read-only.
+
+**Nobody is wrongly served by what is SAID.** The failure is loud, names its cause and its exact path,
+the settings file is left byte-for-byte unchanged, and nothing false is printed — the crash happens
+before the `✓ --fix: wrote …` line, not after it. An unwritable `.claude/settings.json` is also a state
+the adopter created. The cost is a diagnosis they have to re-run without `--fix` to get, which is a
+degraded result rather than a wrong one.
+
+**Fires when:** any project heal's target is read-only, on a read-only mount, or otherwise unwritable —
+most plausibly a `.claude/` checked out read-only or owned by another user.
+*Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
+
+**CLOSED by catching the refusal at the writer, in the commit that moved it here.** `healWriter` now
+catches an error the operating system raised (one carrying a `syscall`) around its `mkdirSync` and
+`writeFileSync`, prints `✗ --fix: could not write <what> — <reason>` with the reason in words and the
+code in brackets (`permission denied: … (EACCES)`, read-only file system, disk full, …) and the path
+beneath it, records it on `.failed`, and returns false. Any other error is still thrown: a defect in a
+heal is not a full disk. `applySafeFixes` no longer counts a refused write as a healed finding.
+`runDoctor` re-diagnoses if anything was written, prints the findings and the verdict line as before,
+then says how many heals could not be written, lists each with its reason, names every heal already
+applied in the run (or says none was), and exits 1. `test/a-heal-that-cannot-write-takes-the-diagnosis-down.test.mjs`
+pins the writer's contract, the non-system error that must still crash, the uncounted heal, and the
+measured case end to end — `.claude/settings.json` at `0444`: the diagnosis and its verdict print, the
+settings refusal is named in words, the `local.properties` and `ksp.useKSP2` heals are listed as
+applied, the run exits 1, and the settings file is byte-for-byte unchanged. Its permission cases skip
+under root, where mode bits refuse nothing. *Written without running it — the batch is verified once,
+at its end; that run is what confirms this paragraph.*
+
 ### KD-4 — `create-cmp`'s `harness init` flag line omits `--new-profile` — **CLOSED 2026-09-25**
 
 `bin/create-cmp.mjs:133`
