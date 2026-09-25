@@ -78,3 +78,30 @@ test("a request in flight when stop() runs never becomes an unhandled rejection 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("`port: 0` binds a port the OS picked, and the console reports the port it bound (KD-203)", async () => {
+  // `0 || 9600` was 9600: a caller asking for an ephemeral port got the console's
+  // well-known one, probing upward — measured binding 9601, the daemon's port. And
+  // the bound port was assumed from the argument, so with `0` it would have been 0.
+  const root = makeProject();
+  const service = createPreviewService({ projectDir: root, port: 0, hot: false, runRender: async () => {} });
+  try {
+    const st = await service.start();
+    const bound = Number(new URL(st.url).port);
+    assert.ok(Number.isInteger(bound) && bound > 0, `the console reports port ${JSON.stringify(new URL(st.url).port)}`);
+    assert.ok(bound !== 9600 && bound !== 9601, `asked for an OS-picked port, bound the well-known ${bound}`);
+    // The reported port is the one that answers. node:http with `agent: false`, not
+    // fetch: a pooled socket outliving the service would be the noise KD-202 was.
+    const code = await new Promise((resolve, reject) => {
+      const req = http.get({ host: "127.0.0.1", port: bound, path: "/status", agent: false }, (res) => {
+        res.resume();
+        res.on("end", () => resolve(res.statusCode));
+      });
+      req.on("error", reject);
+    });
+    assert.equal(code, 200, "the port the console reports is not the one it listens on");
+  } finally {
+    service.stop();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
