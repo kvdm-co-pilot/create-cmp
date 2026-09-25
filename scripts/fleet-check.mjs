@@ -51,6 +51,8 @@ import {
   coverageFor,
   defaultCoverage,
   runLaneUnderEmulators,
+  breakRedirect,
+  assessRedirectPlant,
 } from "./lib/fleet-firebase.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -182,7 +184,11 @@ skill (.claude/skills/npm-publish/SKILL.md).
                            again. Requires an l2Execution step to go RED and every
                            l1Required step to stay GREEN — the proof that "L2" means
                            the program ran, and not that a suite imported it.
-  --with-firebase          the Firebase L2 run (KD-45): after the stamp, run
+                           With --with-firebase it breaks the REDIRECT instead
+                           (configureFirebaseEmulators() throws), runs the lane again
+                           inside the suite, and requires e2eSmoke RED with build /
+                           releaseBuild GREEN; recorded as coverage.redirect.plant.
+  --with-firebase         the Firebase L2 run (KD-45): after the stamp, run
                            \`create-cmp add firebase --no-verify\` on the scratch app
                            and run its lane inside the Firebase Emulator Suite, on
                            the app's own demo- project (no real project, no login),
@@ -330,6 +336,63 @@ async function runLadderPlant({ appDir, args, before }) {
   const ladder = readLadder(evidenceLadderFor(await loadScratchProfile(appDir), null).ladder);
   const result = assessLadderPlant({ before, after, ladder });
   return { ok: result.ok, line: describeLadderPlant(result), reason: result.reason };
+}
+
+/**
+ * THE REDIRECT PLANT — the ladder plant of a `--with-firebase` run (U7, KD-210).
+ *
+ * This tier claims more than "the program started": that the DEBUG build started
+ * with the emulator redirect run. So the plant is aimed at the redirect, not at
+ * startup in general: `configureFirebaseEmulators()` is made to throw, and the
+ * lane runs again INSIDE THE SUITE, so the plant is the only thing that differs
+ * from the green run. It passes only with `build` / `releaseBuild` PASS and
+ * `e2eSmoke` FAIL. The generic startup plant is not run in this mode.
+ *
+ * `record` is what the record keeps as `coverage.redirect.plant`.
+ */
+async function runRedirectPlant({ appDir, before, emulators, laneArgv }) {
+  const fail = (reason, extra = {}) => ({
+    ok: false,
+    line: `redirect plant: FAIL — ${reason}`,
+    reason: `redirect plant: ${reason}`,
+    record: { verdict: "FAIL", reason, ...extra },
+  });
+  let planted;
+  try {
+    planted = breakRedirect(appDir);
+  } catch (err) {
+    return fail(err.message);
+  }
+  const where = { file: planted.file, statement: planted.statement };
+  process.stdout.write(
+    `\n── the Firebase redirect broken in ${planted.file} (${planted.statement}) — running the lane again inside the Emulator Suite\n`,
+  );
+
+  // The green run's receipt is already read. Removing it means a planted run
+  // that writes none is seen as that, and never judged on the green receipt.
+  const receiptPath = path.join(appDir, "qa", "evidence", "latest.json");
+  fs.rmSync(receiptPath, { force: true });
+  const lane = await runLaneUnderEmulators({
+    plan: emulators.plan,
+    workDir: emulators.workDir,
+    appDir,
+    laneArgv: [process.execPath, ...laneArgv],
+    registry: suites,
+  });
+  if (lane.failures.length) return fail(`the planted run did not run cleanly: ${lane.failures.join("; ")}`, where);
+  const after = fs.existsSync(receiptPath) ? JSON.parse(fs.readFileSync(receiptPath, "utf8")) : null;
+
+  const result = assessRedirectPlant({ before, after });
+  const record = { verdict: result.verdict, ...where, steps: result.steps, reason: result.reason };
+  if (!result.ok) return { ok: false, line: `redirect plant: FAIL — ${result.reason}`, reason: `redirect plant: ${result.reason}`, record };
+  return {
+    ok: true,
+    line:
+      `redirect plant: PASS — with configureFirebaseEmulators() throwing, e2eSmoke went red and build / releaseBuild stayed green, ` +
+      "so the green run's e2eSmoke ran the redirect",
+    reason: null,
+    record,
+  };
 }
 
 /** The entry point the profile named, under this app's sources, that it also recognises. */
@@ -592,8 +655,15 @@ async function main() {
   //    It runs after the verdict, never instead of it: a fleet check that failed
   //    has nothing to plant against, and the baseline receipt is what makes a
   //    second red meaningful rather than merely red.
+  //
+  //    Under --with-firebase the plant is the REDIRECT plant instead: this tier's
+  //    claim is that the redirect ran, and it is the one plant run in this mode.
+  let redirectPlant = null;
   if (args.ladderPlant && !failures.length) {
-    const plantResult = await runLadderPlant({ appDir, args, before: receipt });
+    const plantResult = emulators
+      ? await runRedirectPlant({ appDir, before: receipt, emulators, laneArgv })
+      : await runLadderPlant({ appDir, args, before: receipt });
+    if (emulators) redirectPlant = plantResult.record;
     process.stdout.write(`\n  ${plantResult.line}\n`);
     if (!plantResult.ok) failures.push(plantResult.reason);
   }
@@ -610,7 +680,7 @@ async function main() {
   // earlier `failures.push` sat above it), and it is the worst one to get wrong
   // this way: it fails precisely when the shipped l2Execution claim is an
   // overclaim, which is the thing that should stop a release hardest.
-  const coverage = emulators ? coverageFor({ plan: emulators.plan, e2eSmoke }) : defaultCoverage();
+  const coverage = emulators ? coverageFor({ plan: emulators.plan, e2eSmoke, plant: redirectPlant }) : defaultCoverage();
   writeFleetRecord({
     receipt, rung, pack: packId, minLevel, failures, avd: process.env.CMP_AVD ?? null, startedAt, stamped, stampedError,
     coverage, file: args.withFirebase ? FIREBASE_FLEET_RECORD : FLEET_RECORD,

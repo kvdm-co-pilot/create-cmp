@@ -21,6 +21,8 @@
 //                         and the suite is stopped on every exit path
 //   coverageFor           the record says what the run covered, and what it did
 //   defaultCoverage       not, so a run without the flag is never read as Firebase
+//   breakRedirect         the kept plant (KD-210): the redirect made to throw, and
+//   assessRedirectPlant   the planted run judged — e2eSmoke red, the build green
 //
 // iOS stays out of every run: parked by the owner (see IOS_REASON).
 
@@ -323,7 +325,7 @@ const TRAFFIC_REASON =
  *
  * @param {{ plan: object, e2eSmoke?: { name?: string, verdict?: string } | null }} args
  */
-export function coverageFor({ plan, e2eSmoke }) {
+export function coverageFor({ plan, e2eSmoke, plant = null }) {
   return {
     firebase: true,
     add: "create-cmp add firebase --no-verify",
@@ -335,7 +337,8 @@ export function coverageFor({ plan, e2eSmoke }) {
       served: Object.fromEntries(plan.served.map((s) => [s.service, s.port])),
       unserved: plan.unserved,
     },
-    redirect: { buildType: "debug", provenBy: "e2eSmoke", verdict: e2eSmoke?.verdict ?? null },
+    // `plant` is the redirect plant's result under --ladder-plant, and null when it was not run.
+    redirect: { buildType: "debug", provenBy: "e2eSmoke", verdict: e2eSmoke?.verdict ?? null, plant },
     trafficThroughRedirect: false,
     trafficReason: TRAFFIC_REASON,
     ios: false,
@@ -524,4 +527,148 @@ export async function runLaneUnderEmulators({
     );
   }
   return { status: outcome.code, laneStarted, failures };
+}
+
+// ── The redirect plant (U7, KD-210) ─────────────────────────────────────────
+//
+// `e2eSmoke` PASS is this run's claim that the DEBUG build started WITH the
+// redirect run, because that step installs the build where
+// USE_FIREBASE_EMULATORS is true. Read from `AppApplication.kt`, that is an
+// argument. The plant makes it derived: `configureFirebaseEmulators()` is made to
+// throw, the lane runs again inside the suite, and `e2eSmoke` must go red while
+// the build steps stay green. A green e2eSmoke then says the step never reached
+// the redirect; a red build says the plant did not compile, and the red proves
+// nothing about the redirect.
+
+/** The deterministic statement the plant inserts. `check(false)` throws IllegalStateException. */
+export const REDIRECT_PLANT = 'check(false) { "redirect plant" }';
+
+/** The steps that must stay green under the plant: `assembleDebug` and `assembleRelease` (profiles/cmp/steps-cmp.mjs). */
+export const REDIRECT_PLANT_BUILD_STEPS = ["build", "releaseBuild"];
+
+/** `src` with comments AND string contents blanked, same length: braces and names in prose are not code. */
+function maskCode(src) {
+  const out = maskComments(src).split("");
+  let i = 0;
+  while (i < out.length) {
+    if (out[i] !== '"') {
+      i++;
+      continue;
+    }
+    i++;
+    while (i < out.length && out[i] !== '"' && out[i] !== "\n") {
+      const step = out[i] === "\\" ? 2 : 1;
+      for (let k = 0; k < step && i < out.length; k++) out[i++] = " ";
+    }
+    i++;
+  }
+  return out.join("");
+}
+
+/** The index of the `}` that closes the `{` at `open`, in masked code; -1 when it never closes. */
+function closingBrace(code, open) {
+  let depth = 0;
+  for (let i = open; i < code.length; i++) {
+    if (code[i] === "{") depth++;
+    else if (code[i] === "}" && --depth === 0) return i;
+  }
+  return -1;
+}
+
+/**
+ * `src` (FirebaseEmulators.kt) with REDIRECT_PLANT as the first statement inside
+ * `configureFirebaseEmulators()`'s `try`, so it takes the app's own
+ * refuse-to-start path before any `useEmulator` call. Throws when the file has
+ * no such function, no `try` in it, or no `useEmulator` call inside the `try`.
+ */
+export function plantRedirect(src) {
+  const code = maskCode(src);
+  const fn = /\bfun\s+configureFirebaseEmulators\s*\(\s*\)\s*(?::\s*Unit\s*)?\{/.exec(code);
+  if (!fn) throw new Error("it declares no `fun configureFirebaseEmulators()`, so there is no redirect here to break");
+  const bodyOpen = fn.index + fn[0].length - 1;
+  const bodyClose = closingBrace(code, bodyOpen);
+  const tryRe = /\btry\s*\{/g;
+  tryRe.lastIndex = bodyOpen + 1;
+  const tried = tryRe.exec(code);
+  if (!tried || bodyClose === -1 || tried.index > bodyClose) {
+    throw new Error("`configureFirebaseEmulators()` has no `try` block, so a throw there would not take the redirect's own refuse-to-start path");
+  }
+  const tryOpen = tried.index + tried[0].length - 1;
+  const tryClose = closingBrace(code, tryOpen);
+  const use = code.indexOf("useEmulator", tryOpen);
+  if (use === -1 || tryClose === -1 || use > tryClose) {
+    throw new Error("the `try` in `configureFirebaseEmulators()` makes no `useEmulator` call, so there is no redirect in it to break");
+  }
+  const next = /\S/.exec(src.slice(tryOpen + 1));
+  const lineStart = src.lastIndexOf("\n", tryOpen + 1 + next.index) + 1;
+  const indent = /^[ \t]*/.exec(src.slice(lineStart))[0];
+  return `${src.slice(0, tryOpen + 1)}\n${indent}${REDIRECT_PLANT}${src.slice(tryOpen + 1)}`;
+}
+
+/**
+ * Plant REDIRECT_PLANT in the app's `FirebaseEmulators.kt`. The file is found
+ * from the package `create-cmp.json` records, as `readDeclaredRedirect` finds
+ * the ports. Refuses (throws, writing nothing) when there is no such file or
+ * function, and when the edit leaves the file unchanged: a green lane would
+ * then read as the redirect broken, as `runLadderPlant` refuses too. The app is
+ * disposable, so the plant is never reverted.
+ *
+ * @returns {{ file: string, statement: string }} the planted file, relative to the app, and what was planted
+ */
+export function breakRedirect(appDir, { edit = plantRedirect } = {}) {
+  const pkg = readJson(appDir, CREATE_CMP_JSON, "the app's package, where FirebaseEmulators.kt is").package;
+  if (typeof pkg !== "string" || !/^[A-Za-z_][\w]*(\.[A-Za-z_][\w]*)*$/.test(pkg)) {
+    throw new Error(`${CREATE_CMP_JSON} records no usable package (${JSON.stringify(pkg ?? null)}) — FirebaseEmulators.kt cannot be found`);
+  }
+  const file = ["composeApp", "src", "androidMain", "kotlin", ...pkg.split("."), "FirebaseEmulators.kt"].join("/");
+  const original = readText(appDir, file, "the Firebase redirect");
+  let broken;
+  try {
+    broken = edit(original);
+  } catch (err) {
+    throw new Error(`redirect plant: ${file} — ${err.message}`);
+  }
+  if (typeof broken !== "string" || broken === original) {
+    throw new Error(`redirect plant: the edit left ${file} unchanged, so a green lane would read as proof that the redirect was broken`);
+  }
+  const abs = path.join(appDir, file);
+  fs.writeFileSync(abs, broken);
+  if (fs.readFileSync(abs, "utf8") === original) {
+    throw new Error(`redirect plant: ${file} is unchanged on disk after the write`);
+  }
+  return { file, statement: REDIRECT_PLANT };
+}
+
+const stepVerdict = (receipt, name) => (receipt?.steps ?? []).find((s) => s.name === name)?.verdict ?? null;
+
+/**
+ * The planted run's verdict, over the two receipts' steps. PASS only when
+ * `e2eSmoke` was green before the plant and is red (FAIL) after it, and every
+ * REDIRECT_PLANT_BUILD_STEPS step is PASS after it. A SKIPped or missing step is
+ * neither red nor green.
+ *
+ * @returns {{ ok: boolean, verdict: "PASS"|"FAIL", reason: string|null, steps: Record<string, string|null> }}
+ */
+export function assessRedirectPlant({ before, after }) {
+  const steps = Object.fromEntries([...REDIRECT_PLANT_BUILD_STEPS, "e2eSmoke"].map((n) => [n, stepVerdict(after, n)]));
+  const refuse = (reason) => ({ ok: false, verdict: "FAIL", reason, steps });
+  if (!after) return refuse("the planted run left no receipt, so nothing says what the redirect plant did");
+  const e2eBefore = stepVerdict(before, "e2eSmoke");
+  if (e2eBefore !== "PASS") {
+    return refuse(`e2eSmoke was ${e2eBefore ?? "absent"} before the plant, not PASS, so its red after it is not evidence that the redirect ran`);
+  }
+  const broke = REDIRECT_PLANT_BUILD_STEPS.filter((n) => steps[n] !== "PASS");
+  if (broke.length) {
+    return refuse(
+      `the redirect plant left ${broke.map((n) => `${n} ${steps[n] ?? "absent"}`).join(", ")}, not PASS: it broke the BUILD, ` +
+        "so e2eSmoke's verdict says nothing about the redirect",
+    );
+  }
+  if (steps.e2eSmoke !== "FAIL") {
+    return refuse(
+      `e2eSmoke is ${steps.e2eSmoke ?? "absent"} with configureFirebaseEmulators() throwing, not FAIL: the step never reached ` +
+        "the redirect, so a green e2eSmoke is no evidence that the redirect ran",
+    );
+  }
+  return { ok: true, verdict: "PASS", reason: null, steps };
 }
