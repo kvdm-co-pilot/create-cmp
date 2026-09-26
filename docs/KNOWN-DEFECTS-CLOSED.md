@@ -9,6 +9,91 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-264 — the Firebase L2 run's printed cost is under half what its first PASS measured — **CLOSED 2026-09-27**
+
+`scripts/proof-plan.mjs` `TIERS.firebase.cost`
+
+Measured by the run KD-45 closes on (trunk 8f41f21, ranAt 2026-09-26T01:30:37Z): build 16.9 s,
+releaseBuild 482.6 s, e2eSmoke 39.5 s, androidChecks 60.6 s — ~11.6 min of steps for one lane, ~22 min
+for both lanes of `--with-firebase --ladder-plant`. `TIERS.firebase.cost` prints "~4.5min", which is
+what proof-plan tells whoever it says the run is owed to, and KD-256's row prices its own hazard at "one
+~4.5 min run". The cold R8 pass over the BoM's dependency graph is most of the difference; a warm cache
+may bring it down, and no second run has measured that.
+
+**Why it does not block:** the only reader is the maintainer deciding when to run the tier; no
+adopter is told it and nothing schedules on it. Repair: the measured number, and a second run's to
+say whether the cold R8 figure is the typical one.
+
+*Logged 2026-09-26 (fix/stamp-cap-under-suite-load, review round 1).*
+
+*Closed 2026-09-27 by slice `kd-266-267`: the printed cost is now ~12 min of steps per lane and ~22 min wall-clock, the first PASS's own measurement.*
+
+### KD-266 — the notary validates receipts the harness refuses as proof of done — **CLOSED 2026-09-27**
+
+`packages/receipts/src/receipt-validate.mjs` · `template/qa/receipt-check.mjs` · gatekeeper `src/validate.mjs`
+
+Found by the post-merge review of gatekeeper#2 (prooflane-receipts 0.1.3). The harness's done-check
+refuses a receipt written in fast mode, by the nightly or smoke stage or profile, or with a step
+SKIPped for an environmental reason — each with a named reason — and does so before it ever calls
+`validateReceiptForTree`. The library itself carries none of those refusals. Gatekeeper, whose rule
+is to hold no validation logic of its own, calls only the library, so all six planted receipts come
+back `status: "valid"` from `validateCommit`. The old cmp-receipts 0.1.0 accepted them too: the swap
+did not introduce this, and did not fix it. Gatekeeper's own synthetic "valid" fixture
+(`test/helpers.mjs`) carries an `e2eSmoke` SKIP reading "no Android device/emulator attached", which
+the harness's legacy reason fallback treats as environmental — the fix changes that fixture as well.
+
+The failing test compares the two readers rather than restating the rules: for each planted receipt
+it runs the fixture's own `qa/receipt-check.mjs --json` beside `validateCommit`, and fails whenever
+the harness says invalid and Gatekeeper says valid; a control row proves the harness reader ran.
+It sits on gatekeeper branch `f4-review` (35e27bb), unmerged so gatekeeper's main stays green.
+
+**Why it does not block.** No notary is running — the Gatekeeper host is deferred — and every adopter's
+Stop hook refuses all six, so no "done" crosses on them today.
+
+**Why logged and not fixed here.** The stamped app carries a byte-identical copy of the library, so
+the fix moves the stamped digest and owes both L2 runs; and the legacy environmental-SKIP fallback
+reads the project's profile, which the library does not hold. It is its own slice: move the refusals
+into `packages/receipts` (the done-check then calls them rather than stating them), republish, and
+re-vendor Gatekeeper. It must land before any Gatekeeper go-live (G0).
+
+*Logged 2026-09-26 (finish-1.0-adopter-truth, gatekeeper post-merge review).*
+
+*Closed 2026-09-27 by slice `kd-266-267`: the four done-evidence refusals live in `prooflane-receipts` (`checkDoneEvidence`, run inside `validateReceiptForTree` as `done-evidence`); the harness's done-check calls them instead of stating them, and Gatekeeper's `f4-review` differential passes against the library (27/27, local). One exception is stated rather than fixed: a pre-`skipKind` receipt's environmental SKIP needs the profile's `legacySkips`, which a notary does not hold. Gatekeeper still has to move onto the new library in its own repository.*
+
+### KD-267 — the shipped refusal demo fails to inject two of its four violations — **CLOSED 2026-09-27**
+
+`packages/harness/src/refusal-demo.mjs` (`findDataLayerImport`, the structural-regression injector) · `template/qa/refusal-demo.mjs`
+
+Found on 2026-09-26 by re-recording the launch demo against the published create-cmp-cli 0.28.3
+(`docs/research/launch/demo/scene.sh --record`). Every earlier beat of that take held — stamp, green
+scaffold receipt, the Stop hook refusing `done` with ARCH-05 named, the revert to VALID — and the last
+beat, `node qa/refusal-demo.mjs`, printed `2/4 assertions PASS`:
+
+- **#2 UI→data import.** `findDataLayerImport` sorts the `.kt` files under a `data/` package and takes
+  the first, then requires `\bclass\s+(\w+)` in it. The first is now `AppResultCatching.kt`, a file of
+  top-level functions (`suspend fun <T> suspendRunCatching(`), so the injector throws "Could not
+  determine package/class name".
+- **#4 Undeclared structural regression.** The injector anchors on `text = "Home"` to splice a sibling
+  node after the Home title. The component-vocabulary rework (6c93218) no longer writes that literal
+  in `HomeScreen.kt`, so it throws "Could not find the Home title Text() node".
+
+In both cases the violation is never planted, so no gate is asked; the demo then reports "a gate did
+NOT catch its violation as expected", which is untrue of the gates and is what an adopter reads.
+
+**Why it does not block.** The gates themselves hold — ARCH-05 and specCoverage refused in the same run
+with named reasons — and no adopter's "done" depends on the demo. It blocks F8 (a refusal demo
+recorded on the current release), and it must be fixed before the demo is shown to anyone.
+
+**Why logged and not fixed here.** The fix moves `template/qa/` and therefore the stamped digest, which
+owes both L2 runs and a release; it is the next slice, with KD-266. The repair is two anchors that
+read the tree rather than a literal (a `data/` file that declares a class or interface; the title
+node found through the golden test's own selector), plus the missing guard: a suite test that stamps
+an app and runs the demo, so the next template change that breaks an injector reds here first.
+
+*Logged 2026-09-26 (session dd13de12, the 0.28.3 demo re-record).*
+
+*Closed 2026-09-27 by slice `kd-266-267`: #2 imports a type a `data/` file really declares, #4 splices after the screen's `AppHeader(` call, and both fail by name when the tree has no candidate; a suite test plants all four in a stamped app, and the demo run against this tree printed 4/4 (ARCH-05, ARCH-01, HOME-01, HOME-06).*
+
 ### KD-3 — `executionHint` reads menu paths without the prefix filter its sibling applies — **RETIRED 2026-09-26**
 
 `packages/harness/install/init.mjs` (`executionHint`) vs `packages/harness/install/interview.mjs`

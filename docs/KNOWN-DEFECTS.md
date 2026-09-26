@@ -117,10 +117,9 @@ you the same list without opening anything.
 | **KD-255** | `DEVICE_TIER_IRRELEVANT`'s `*.md` would declare a markdown file under `overlays/` unable to oblige either L2 run, and `DEVICE_TIER_SHIPPED` puts back `template/` only — so an overlay `.md` that `add firebase` copies into the app would never make the Firebase L2 run required (the KD-207 shape, one root over) | no `.md` exists under `overlays/` today (measured), so nothing ships unscheduled; the repair is `overlays/` in `DEVICE_TIER_SHIPPED`, and the digest then judges it |
 | **KD-257** | a change to an L2 tier's own RUNNER (`scripts/fleet-check.mjs`, `scripts/lib/fleet-firebase.mjs`) owes no run of that tier, so the gate refuses the only run that would exercise the new runner on its branch — the Firebase L2 run merged unexercised and ran first on trunk | a decision, handed up: the tiers are keyed on output bytes (settled), and a runner is not an output; the runner's first real run is a trunk release proof, fixed forward if red |
 | **KD-263** | nothing before the suite refuses a registry set whose `firebase-bom` is missing or was not measured for its own `firebase-gitlive`: `promotedSet` accepts a candidate with no `firebase-bom` (on which `add firebase` then refuses every app) and one that moves GitLive to 2.5.0 while carrying 33.15.0; the KD-260 table test passes when both the GitLive version and the BoM are unknown (`undefined === undefined`) | maintainer path only, and no candidate pins `firebase-gitlive` today; a promoted set with no BoM is still refused by the scaffold-based `add firebase` tests once the template moves onto it. The repair is the KD-243 shape: promotion refuses a candidate `add firebase` would refuse, and the table test requires a measured row for every GitLive version |
-| **KD-264** | `TIERS.firebase.cost` prints "~4.5min + an emulator + the Firebase Emulator Suite", and the first PASS (KD-45, 2026-09-26) measured ~11.6 min of steps for one lane and ~22 min wall-clock for the run; KD-256's row repeats the 4.5 | a maintainer's estimate, not an adopter's answer, and nothing schedules on it; the repair is the number the run measured, or the cost read off the last record |
 | **KD-265** | nothing now refuses a stamp + `add firebase` that outgrows the hook's `STAMP_CAP_MS` (3000 ms): the one measured assertion (`ms < STAMP_CAP_MS` in `two-stamps-of-one-tree-are-not-the-same-app`) became `ms < CEILING_MS` (60 s) with the suite's own cap, and `ANSWER_RESERVE_MS`'s "0.25–0.34s measured" is now prose no test holds | cannot fire today (279 ms measured on this tree, 2026-09-26) and fails safe when it does: the Firebase half reads unanswerable and the tier OWED, naming the cap, never DISCHARGED. Whether a wall-clock guard belongs in a suite that runs under `prepublishOnly` load is Karel's call |
-| **KD-266** | the notary validates six receipts the harness's own done-check refuses — `mode:"fast"`, `stage`/`profile` `nightly`, `stage`/`profile` `smoke`, and a step SKIPped with `skipKind:"environment"`: `template/qa/receipt-check.mjs` refuses them BEFORE it calls `validateReceiptForTree`, and `packages/receipts` carries none of those refusals, so Gatekeeper (which calls only the library) says `valid` | no notary is running (the host is deferred) and the harness's own Stop hook refuses all six, so no adopter's "done" gets through; it predates prooflane-receipts 0.1.3. The failing test is gatekeeper branch `f4-review` (`test/harness-refusals.test.mjs`); the fix moves the refusals into `packages/receipts` and re-vendors — it must land before any Gatekeeper go-live |
-| **KD-267** | the refusal demo every stamped app ships (`qa/refusal-demo.mjs`, from `packages/harness/src/refusal-demo.mjs`) catches 2 of its 4 violations on 0.28.3: #2's injector imports the alphabetically first file under `data/`, now `AppResultCatching.kt`, which declares no class (`\bclass\s+(\w+)` finds nothing), and #4's looks for `text = "Home"`, which the component-vocabulary rework (6c93218) removed from `HomeScreen.kt` — both fail to INJECT, so the demo exits 1 without any gate being asked | the gates are not at fault: in the same run ARCH-05 and specCoverage refused with named reasons, and the Stop hook refused `done`. What is broken is the demonstration (1.0 criterion F8) and an adopter who runs it is told "a gate did NOT catch its violation", which is false. Nothing in the suite runs the demo against a fresh stamp, which is why it drifted silently |
+| **KD-268** | the demo's plant test stamps from its own config, not the demo's `--no-ios --yes` | not today — the injectors plant on the demo's own stamp |
+| **KD-269** | injector #4 adds its import only when the file starts with `package` | every template screen does |
 
 ---
 
@@ -137,6 +136,13 @@ indistinguishable at a glance from a step that was skipped because it was broken
 
 **Worth deciding:** classify it as environmental so a reader can tell the two apart.
 *Logged 2026-09-11.*
+
+**2026-09-27 — decided (Karel), and now pinned.** A SKIP with no `skipKind` in a current receipt is
+not refused, by the harness or by the library KD-266 moved the refusals into — tokenDrift's
+`unreachable()` SKIP (`steps-cmp.mjs`) is the one current emitter, on every headless L2 run, and
+labelling it `environment` would refuse every such receipt. `packages/receipts/test/done-evidence.test.mjs`
+pins it. What stays open is the cause: the step launches the debug app and polls ~10 s, and the
+inspector on :9500 still never answers. That is a diagnosis, not a label.
 
 ### KD-45 — the device tier has never run the template's Firebase or iOS code
 
@@ -693,23 +699,6 @@ template moves onto it. Repair: `firebaseIosPairingProblem`'s rule generalised t
 
 *Logged 2026-09-26 (fix/add-firebase-android-test-compile, review round 1).*
 
-### KD-264 — the Firebase L2 run's printed cost is under half what its first PASS measured
-
-`scripts/proof-plan.mjs` `TIERS.firebase.cost`
-
-Measured by the run KD-45 closes on (trunk 8f41f21, ranAt 2026-09-26T01:30:37Z): build 16.9 s,
-releaseBuild 482.6 s, e2eSmoke 39.5 s, androidChecks 60.6 s — ~11.6 min of steps for one lane, ~22 min
-for both lanes of `--with-firebase --ladder-plant`. `TIERS.firebase.cost` prints "~4.5min", which is
-what proof-plan tells whoever it says the run is owed to, and KD-256's row prices its own hazard at "one
-~4.5 min run". The cold R8 pass over the BoM's dependency graph is most of the difference; a warm cache
-may bring it down, and no second run has measured that.
-
-**Why it does not block:** the only reader is the maintainer deciding when to run the tier; no
-adopter is told it and nothing schedules on it. Repair: the measured number, and a second run's to
-say whether the cold R8 figure is the typical one.
-
-*Logged 2026-09-26 (fix/stamp-cap-under-suite-load, review round 1).*
-
 ### KD-265 — the stamp + add's fit inside the hook's cap is prose no test holds
 
 `test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs` ("ONE STAMP, TWO DIGESTS"),
@@ -730,64 +719,27 @@ every discharge, say), or accept that the first sign is an OWED that names the c
 
 *Logged 2026-09-26 (fix/stamp-cap-under-suite-load, review round 1).*
 
-### KD-266 — the notary validates receipts the harness refuses as proof of done
+### KD-268 — the demo's plant test stamps a different app from the one the demo stamps
 
-`packages/receipts/src/receipt-validate.mjs` · `template/qa/receipt-check.mjs` · gatekeeper `src/validate.mjs`
+`test/the-refusal-demo-plants-fewer-violations-than-it-reports.test.mjs` (its stamp config) · `qa/refusal-demo.mjs` (`--no-ios --yes`)
 
-Found by the post-merge review of gatekeeper#2 (prooflane-receipts 0.1.3). The harness's done-check
-refuses a receipt written in fast mode, by the nightly or smoke stage or profile, or with a step
-SKIPped for an environmental reason — each with a named reason — and does so before it ever calls
-`validateReceiptForTree`. The library itself carries none of those refusals. Gatekeeper, whose rule
-is to hold no validation logic of its own, calls only the library, so all six planted receipts come
-back `status: "valid"` from `validateCommit`. The old cmp-receipts 0.1.0 accepted them too: the swap
-did not introduce this, and did not fix it. Gatekeeper's own synthetic "valid" fixture
-(`test/helpers.mjs`) carries an `e2eSmoke` SKIP reading "no Android device/emulator attached", which
-the harness's legacy reason fallback treats as environmental — the fix changes that fixture as well.
+The test builds its app from a hand-written config (room, e2e, inspector, Home/Profile tabs); the demo
+stamps its own with `--no-ios --yes`. If the `--yes` defaults move away from that config, the test can
+stay green while the demo fails to plant — the KD-267 shape again. Not today: round 1 ran the four
+injectors on the demo's own stamp and all four planted.
 
-The failing test compares the two readers rather than restating the rules: for each planted receipt
-it runs the fixture's own `qa/receipt-check.mjs --json` beside `validateCommit`, and fails whenever
-the harness says invalid and Gatekeeper says valid; a control row proves the harness reader ran.
-It sits on gatekeeper branch `f4-review` (35e27bb), unmerged so gatekeeper's main stays green.
+**Fires when:** the `--yes` defaults change what a stamp carries.
+*Logged 2026-09-27, round 1 of slice `kd-266-267`.*
 
-**Why it does not block.** No notary is running — the Gatekeeper host is deferred — and every adopter's
-Stop hook refuses all six, so no "done" crosses on them today.
+### KD-269 — injector #4 adds its `Text` import only to a screen file that starts with `package`
 
-**Why logged and not fixed here.** The stamped app carries a byte-identical copy of the library, so
-the fix moves the stamped digest and owes both L2 runs; and the legacy environmental-SKIP fallback
-reads the project's profile, which the library does not hold. It is its own slice: move the refusals
-into `packages/receipts` (the done-check then calls them rather than stating them), republish, and
-re-vendor Gatekeeper. It must land before any Gatekeeper go-live (G0).
+`qa/refusal-demo.mjs` (the #4 injector, `text.replace(/^(package .+\n)/, …)`)
 
-*Logged 2026-09-26 (finish-1.0-adopter-truth, gatekeeper post-merge review).*
+No multiline flag, so a screen file opening with a licence header or an `@file:` annotation gets no
+import; the planted node then fails to compile and the compiler, not the golden gate, refuses it —
+the demo would still report a refusal, by the wrong gate. Every template screen starts with
+`package` today.
 
-### KD-267 — the shipped refusal demo fails to inject two of its four violations
+**Fires when:** a template screen gains a header above its `package` line.
+*Logged 2026-09-27, round 1 of slice `kd-266-267`.*
 
-`packages/harness/src/refusal-demo.mjs` (`findDataLayerImport`, the structural-regression injector) · `template/qa/refusal-demo.mjs`
-
-Found on 2026-09-26 by re-recording the launch demo against the published create-cmp-cli 0.28.3
-(`docs/research/launch/demo/scene.sh --record`). Every earlier beat of that take held — stamp, green
-scaffold receipt, the Stop hook refusing `done` with ARCH-05 named, the revert to VALID — and the last
-beat, `node qa/refusal-demo.mjs`, printed `2/4 assertions PASS`:
-
-- **#2 UI→data import.** `findDataLayerImport` sorts the `.kt` files under a `data/` package and takes
-  the first, then requires `\bclass\s+(\w+)` in it. The first is now `AppResultCatching.kt`, a file of
-  top-level functions (`suspend fun <T> suspendRunCatching(`), so the injector throws "Could not
-  determine package/class name".
-- **#4 Undeclared structural regression.** The injector anchors on `text = "Home"` to splice a sibling
-  node after the Home title. The component-vocabulary rework (6c93218) no longer writes that literal
-  in `HomeScreen.kt`, so it throws "Could not find the Home title Text() node".
-
-In both cases the violation is never planted, so no gate is asked; the demo then reports "a gate did
-NOT catch its violation as expected", which is untrue of the gates and is what an adopter reads.
-
-**Why it does not block.** The gates themselves hold — ARCH-05 and specCoverage refused in the same run
-with named reasons — and no adopter's "done" depends on the demo. It blocks F8 (a refusal demo
-recorded on the current release), and it must be fixed before the demo is shown to anyone.
-
-**Why logged and not fixed here.** The fix moves `template/qa/` and therefore the stamped digest, which
-owes both L2 runs and a release; it is the next slice, with KD-266. The repair is two anchors that
-read the tree rather than a literal (a `data/` file that declares a class or interface; the title
-node found through the golden test's own selector), plus the missing guard: a suite test that stamps
-an app and runs the demo, so the next template change that breaks an injector reds here first.
-
-*Logged 2026-09-26 (session dd13de12, the 0.28.3 demo re-record).*

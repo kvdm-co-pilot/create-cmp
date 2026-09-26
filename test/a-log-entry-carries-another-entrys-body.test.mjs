@@ -41,7 +41,9 @@ function entries(rel) {
   const parts = read(rel).split(/^(### KD-\d+[^\n]*)$/m);
   const out = [];
   for (let i = 1; i < parts.length; i += 2) out.push({ heading: parts[i], body: parts[i + 1] });
-  assert.ok(out.length > 20, `${rel}: only ${out.length} entries found — this scan has lost its subject`);
+  // The floor catches a split that stopped matching headings, not a short log: the open log was cut
+  // to ~20 entries on 2026-09-26 by design, and a broken split finds 0 or 1.
+  assert.ok(out.length > 5, `${rel}: only ${out.length} entries found — this scan has lost its subject`);
   return out;
 }
 
