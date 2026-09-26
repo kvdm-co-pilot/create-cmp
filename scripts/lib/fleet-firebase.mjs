@@ -460,8 +460,19 @@ export async function runLaneUnderEmulators({
       /* already gone */
     }
   };
-  const within = (ms) =>
-    Promise.race([exited.then(() => true), new Promise((r) => setTimeout(() => r(false), ms).unref?.())]);
+  // The budget timer is REF'd and cleared when the race settles. Unref'd, it
+  // held nothing: the wait for a group that ignores its signal stayed alive only
+  // while something else did (a real child's handle), and with nothing else the
+  // loop drained mid-teardown and the await never returned — which is how CI's
+  // Node 22 on Linux failed it. Cleared, the losing timer still never holds an
+  // exit open for the rest of its budget.
+  const within = (ms) => {
+    let timer;
+    const budget = new Promise((r) => {
+      timer = setTimeout(() => r(false), ms);
+    });
+    return Promise.race([exited.then(() => true), budget]).finally(() => clearTimeout(timer));
+  };
   const releasedOrHeld = async () => {
     const tries = Math.max(1, Math.ceil(graceMs / 250));
     let still = [];

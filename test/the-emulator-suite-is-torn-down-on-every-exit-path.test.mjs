@@ -33,6 +33,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { spawnSync } from "node:child_process";
 import { runLaneUnderEmulators, firebaseJsonFor, LANE_STARTED_MARKER } from "../scripts/lib/fleet-firebase.mjs";
 
 const PLAN = {
@@ -214,4 +215,36 @@ test("a parent that exits with the suite still up asks the group to shut down on
   } finally {
     h.cleanup();
   }
+});
+
+// THE BUDGET HOLDS THE PROCESS OPEN, not whatever else happens to. The budget
+// timer was unref'd, so a group that ignored its signal was waited on only
+// while another handle kept the loop alive: on CI (Node 22, Linux) nothing did,
+// the loop drained mid-teardown, and the two cases above failed with "Promise
+// resolution is still pending but the event loop has already resolved". Here
+// the runner is not there to hold it: a bare process with a fake child, which
+// has no handle of its own, must still reach the SIGKILL and settle.
+test("the wait for a group that ignores its signal is held open by its own budget, not by the runner", () => {
+  const mod = new URL("../scripts/lib/fleet-firebase.mjs", import.meta.url).href;
+  const probe = `
+    import { EventEmitter } from "node:events";
+    import fs from "node:fs"; import os from "node:os"; import path from "node:path";
+    const { runLaneUnderEmulators } = await import(${JSON.stringify(mod)});
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "fleet-emu-bare-"));
+    const registry = new Set(); const signals = []; let child;
+    const running = runLaneUnderEmulators({
+      plan: { project: "demo-x", host: "127.0.0.1", served: [{ service: "firestore", port: 18080 }] },
+      workDir, appDir: workDir, laneArgv: ["true"], registry, graceMs: 50, budgetMs: 50, log: () => {}, sleep: async () => {},
+      spawnImpl: () => { child = new EventEmitter(); child.pid = 4242; return child; },
+      probePort: async () => false,
+      killGroup: (pid, sig) => { signals.push(sig); if (sig === "SIGKILL") setImmediate(() => child.emit("exit", null, sig)); },
+    });
+    await new Promise((r) => setImmediate(r));
+    await [...registry][0].interrupt("SIGTERM");
+    await running;
+    fs.rmSync(workDir, { recursive: true, force: true });
+    console.log(signals.join(","));`;
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", probe], { encoding: "utf8" });
+  assert.equal(r.status, 0, `the teardown's await never returned — exit 13 is an unsettled top-level await:\n${r.stderr}`);
+  assert.equal(r.stdout.trim(), "SIGTERM,SIGKILL");
 });
