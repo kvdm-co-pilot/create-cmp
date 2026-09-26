@@ -86,3 +86,42 @@ test("a GitLive version the registry pairs with nothing is refused, never given 
     );
   }
 });
+
+// KD-260 — the Android half of the same pairing. GitLive's android artifacts require the Firebase
+// BoM only on their runtime variant and leave their com.google.firebase versions EMPTY on the API
+// one, so a classpath that sees only the API variant (debugAndroidTestCompileClasspath) cannot
+// resolve them. The BoM goes on the android side as a platform, at the version the SAME registry
+// row names next to `firebase-gitlive` — never a second, independent pin.
+
+/** The BoM each GitLive version's android artifacts require, read from its published .module. */
+const GITLIVE_BOM = {
+  "2.1.0": "33.2.0", // dev.gitlive:firebase-app-android-debug:2.1.0, debugRuntimeElements-published
+  "2.4.0": "33.15.0", // dev.gitlive:firebase-app-android:2.4.0, runtime variant
+};
+
+test("every registry set names the Firebase BoM its own GitLive version requires (KD-260)", () => {
+  for (const set of loadRegistry().sets) {
+    const gitlive = set.versions["firebase-gitlive"];
+    assert.equal(set.versions["firebase-bom"], GITLIVE_BOM[gitlive], `${set.id}: firebase-bom follows GitLive ${gitlive}`);
+  }
+});
+
+test("the post-add Gradle puts the Firebase BoM on every android classpath, at the registry row's version (KD-260)", () => {
+  const registry = structuredClone(loadRegistry());
+  for (const set of registry.sets) set.versions["firebase-bom"] = "99.8.7";
+  const plan = planAddFirebase(app, {}, { registry });
+  const catalog = plan.writes.find((w) => w.rel === "gradle/libs.versions.toml")?.content ?? "";
+  assert.match(catalog, /^firebase-bom = "99\.8\.7"$/m, "the BoM version is the registry row's");
+  assert.match(
+    catalog,
+    /^firebase-bom = \{ module = "com\.google\.firebase:firebase-bom", version\.ref = "firebase-bom" \}$/m,
+    "the BoM library takes its version from that key",
+  );
+  const build = plan.writes.find((w) => w.rel === "composeApp/build.gradle.kts")?.content ?? "";
+  const block = build.slice(build.indexOf("// >>> create-cmp add firebase"), build.indexOf("// <<< create-cmp add firebase"));
+  assert.match(
+    block,
+    /androidMain\.dependencies \{\s*implementation\(project\.dependencies\.platform\(libs\.firebase\.bom\)\)\s*\}/,
+    "androidMain (debug, release and androidTest classpaths alike) takes the BoM as a platform, inside the step's block",
+  );
+});
