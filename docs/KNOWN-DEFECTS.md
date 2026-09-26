@@ -113,7 +113,7 @@ you the same list without opening anything.
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 | **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
-| **KD-45** | no gate in this repo executes the Firebase or iOS paths | Firebase: an L2 run executes the add step's output at startup, owed when its bytes move (`--with-firebase`); the first run (trunk, 2026-09-26) compiled, initialised and redirected, and failed on KD-260; no traffic crosses the redirect (KD-210); iOS: the L2 run stamps `--no-ios`; the iOS stamp compiled once on CI (run 36181162894, dispatch-only, 0.28.0 tree) and has never run |
+| **KD-45** | no gate in this repo executes the Firebase or iOS paths | Firebase: CLOSED 2026-09-26 — the Firebase L2 run (`--with-firebase`, owed when the add step's output moves) PASSED at L2 on 0.28.2, androidChecks and its redirect plant included; no traffic crosses the redirect (KD-210); iOS: the L2 run stamps `--no-ios`; the iOS stamp compiled once on CI (run 36181162894, dispatch-only, 0.28.0 tree) and has never run |
 | **KD-46** | the iOS refusal names two causes its `catch` cannot see | half fixed in `79eafd3` (the cause is carried now); Obj-C raises abort before any Kotlin frame, and the app stops either way |
 | **KD-48** | `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin | the shipped Xcode project has only `Debug`/`Release`, which map correctly |
 | **KD-49** | a nested `node --test` exits 0 whatever its tests did, when `NODE_TEST_CONTEXT` is inherited | nothing in the suite spawns one except the harness that measured it, which scrubs the env |
@@ -637,6 +637,18 @@ its four redirects; androidChecks then failed at `compileDebugAndroidTestKotlinA
 nothing put the Firebase BoM on the instrumented tests' classpath (KD-260, fixed in 0.28.2). The
 redirect plant did not run: it runs only after a green lane. This Firebase half closes only on a PASS
 record; until then it stays open.
+
+**2026-09-26 — the Firebase half CLOSES on its first PASS.** Trunk 8f41f21 (0.28.2),
+`--with-firebase --ladder-plant`: PASS at rung L2 (`qa-artifacts/fleet-firebase-latest.json`, ranAt
+2026-09-26T01:30:37Z, post-add digest `2cfddaf5e6ea…`). Under the suite (auth 9099, firestore 8080,
+storage 9199; functions unserved, with its reason) build (16.9 s), releaseBuild/R8 (482.6 s, cold
+over the BoM's dependency graph), e2eSmoke (39.5 s) and androidChecks (60.6 s) all PASSED, so KD-260's
+fix holds at runtime as well as at compile. The redirect plant PASSED: with
+`configureFirebaseEmulators()` throwing, e2eSmoke went red while build and releaseBuild stayed green,
+so the green run's e2eSmoke ran the redirect. Wall-clock: ~22 min for both lanes (started
+01:08:29Z); one lane is ~11.6 min of steps, where `TIERS.firebase.cost` still prints "~4.5min". What
+stays open in this entry is the iOS half; KD-210 (no request crosses the redirect) and KD-211 (the
+host assumes an emulator) stand as written.
 
 ### KD-46 — the iOS refusal names two causes its catch cannot see
 
