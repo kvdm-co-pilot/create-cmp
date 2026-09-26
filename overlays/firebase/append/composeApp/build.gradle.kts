@@ -12,6 +12,13 @@ kotlin {
             implementation(libs.firebase.messaging)
             implementation(libs.firebase.config)
         }
+        // GitLive's android artifacts leave their com.google.firebase versions to the Firebase BoM, and
+        // publish it on their runtime variant only: a classpath that sees just their API variant (the
+        // instrumented tests' compile classpath) finds those versions empty. The BoM on androidMain
+        // reaches every android classpath, at the version the registry pairs with firebase-gitlive.
+        androidMain.dependencies {
+            implementation(project.dependencies.platform(libs.firebase.bom))
+        }
     }
 }
 

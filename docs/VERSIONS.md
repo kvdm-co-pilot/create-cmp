@@ -44,6 +44,7 @@ Every version is the newest that is **mutually compatible** — not merely the n
 | google-services | 4.5.0 | | firebase-gitlive | 2.4.0 |
 | androidx-core | 1.15.0 | | lifecycle | 2.10.0 |
 | androidx-activity | 1.10.1 | | navigation | 2.9.2 |
+| firebase-bom (`add firebase`) | 33.15.0 | | | |
 
 ### Why some libraries are *held*, not bumped
 

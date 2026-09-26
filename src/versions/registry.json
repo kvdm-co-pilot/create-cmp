@@ -20,6 +20,7 @@
         "lifecycle": "2.10.0",
         "navigation": "2.9.2",
         "firebase-gitlive": "2.1.0",
+        "firebase-bom": "33.2.0",
         "coil": "3.1.0",
         "androidx-core": "1.15.0",
         "androidx-activity": "1.10.1"
@@ -66,6 +67,7 @@
         "lifecycle": "2.10.0",
         "navigation": "2.9.2",
         "firebase-gitlive": "2.1.0",
+        "firebase-bom": "33.2.0",
         "coil": "3.2.0",
         "androidx-core": "1.15.0",
         "androidx-activity": "1.10.1"
@@ -112,6 +114,7 @@
         "lifecycle": "2.10.0",
         "navigation": "2.9.2",
         "firebase-gitlive": "2.4.0",
+        "firebase-bom": "33.15.0",
         "coil": "3.2.0",
         "androidx-core": "1.15.0",
         "androidx-activity": "1.10.1"

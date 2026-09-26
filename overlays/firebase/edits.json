@@ -1,7 +1,7 @@
 {
   "description": "The edits `create-cmp add firebase` makes to a stamped app, beyond the whole files under files/ and the blocks under append/ (an `appends` entry names a line whose presence means the block is already there — the stamp of create-cmp 0.27 and earlier carried two of them unmarked). Read by src/lib/add-firebase.mjs, and by test/the-emulator-redirect-cannot-fail-quietly.test.mjs for the two lines that call the emulator redirect. Paths use the template's literal com/example/app segment; the step maps it to the app's package. An anchor is one whole line, compared trimmed, and must occur exactly once; `present` is the text whose presence means the edit is already made.",
   "catalog": {
-    "versionsFromRegistry": ["google-services", "firebase-gitlive"],
+    "versionsFromRegistry": ["google-services", "firebase-gitlive", "firebase-bom"],
     "comment": "# Firebase GitLive KMP SDK (added by `create-cmp add firebase`)",
     "libraries": {
       "firebase-auth": "{ module = \"dev.gitlive:firebase-auth\", version.ref = \"firebase-gitlive\" }",
@@ -9,7 +9,8 @@
       "firebase-functions": "{ module = \"dev.gitlive:firebase-functions\", version.ref = \"firebase-gitlive\" }",
       "firebase-storage": "{ module = \"dev.gitlive:firebase-storage\", version.ref = \"firebase-gitlive\" }",
       "firebase-messaging": "{ module = \"dev.gitlive:firebase-messaging\", version.ref = \"firebase-gitlive\" }",
-      "firebase-config": "{ module = \"dev.gitlive:firebase-config\", version.ref = \"firebase-gitlive\" }"
+      "firebase-config": "{ module = \"dev.gitlive:firebase-config\", version.ref = \"firebase-gitlive\" }",
+      "firebase-bom": "{ module = \"com.google.firebase:firebase-bom\", version.ref = \"firebase-bom\" }"
     },
     "plugins": {
       "google-services": "{ id = \"com.google.gms.google-services\", version.ref = \"google-services\" }"

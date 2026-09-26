@@ -9,6 +9,55 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-260 — after `add firebase` the instrumented tests do not compile: no Firebase BOM on the androidTest classpath — **CLOSED 2026-09-26**
+
+`overlays/firebase/append/composeApp/build.gradle.kts` (the step's Gradle block), `overlays/firebase/edits.json:4`,
+`src/versions/registry.json`
+
+Found by the first Firebase L2 run (trunk, d2162b8, 2026-09-26). The fleet scratch app, after
+`create-cmp add firebase --no-verify`, passed build, releaseBuild (R8) and e2eSmoke; `androidChecks`
+then failed at `:composeApp:compileDebugAndroidTestKotlinAndroid` resolving
+`:composeApp:debugAndroidTestCompileClasspath`: `Could not find com.google.firebase:firebase-auth-ktx:.`,
+and the same EMPTY version for firebase-firestore, -functions, -storage, -messaging, -config-ktx and
+-common-ktx. An adopter who adds Firebase and then runs their own lane goes red there.
+
+**Cause, measured.** GitLive's android artifacts publish their `com.google.firebase` dependencies
+with no version and leave it to the Firebase BoM, which they require on their RUNTIME variant only.
+`dev.gitlive:firebase-app-android-debug:2.1.0`'s `.module` on Maven Central lists
+`firebase-common-ktx` without a version on both `debugApiElements-published` and
+`debugRuntimeElements-published`, and `firebase-bom` (`requires 33.2.0`, category `platform`) on the
+runtime one alone; `firebase-auth-android-debug:2.1.0` has the same shape, and
+`firebase-app-android:2.4.0` requires `firebase-bom` 33.15.0 the same way. The debug and release
+classpaths resolved (CI's `assembleDebug`); the instrumented tests' compile classpath, which sees the
+API variant only, had no BoM, and the post-add `composeApp/build.gradle.kts` named none.
+
+**Closed 2026-09-26, on `fix/add-firebase-android-test-compile`.** The BoM version sits in the same
+registry row as `firebase-gitlive`, as `versions["firebase-bom"]` (`src/versions/registry.json:23`
+and `:70`, 33.2.0 beside GitLive 2.1.0; `:117`, 33.15.0 beside 2.4.0), so `upgrade` moves it with
+`firebase-gitlive` and promotion carries it with the set's `versions`. `add firebase` reads it through
+`versionsFromRegistry` (`overlays/firebase/edits.json:4`) into the catalog, with a `firebase-bom`
+library (`:13`), and the step's Gradle block adds
+`androidMain.dependencies { implementation(project.dependencies.platform(libs.firebase.bom)) }`
+(`overlays/firebase/append/composeApp/build.gradle.kts:19-21`): androidMain reaches the debug,
+release and instrumented-test classpaths alike. The default stamp does not change.
+`test/fixtures/libs.versions.toml` gains the key, because `test/upgrade.test.mjs` asserts that fixture
+declares every key of set `2026.06`.
+
+**Proof.** On the kept failing app, `compileDebugAndroidTestKotlinAndroid` FAILED in 1 s before the
+hand edit; after it, that task plus `assembleDebug` were BUILD SUCCESSFUL in 1m42s (57 tasks
+executed). On a fresh fleet stamp (`--yes --name FleetCheck --package com.fleet.check --no-ios
+--no-verify`) plus `add firebase --no-verify` from this branch, the same two tasks were BUILD
+SUCCESSFUL, and again with `--rerun-tasks --no-build-cache` in 19 s (58 executed), so the green was
+not replayed from the kept app's build cache. `test/the-firebase-ios-pods-follow-the-gitlive-version.test.mjs`
+fails 2 of its 5 tests without the change (3beac39) and passes 5/5 with it. Not run: the
+instrumented tests themselves (compile-only proof).
+
+**Still open, logged not built.** An app that ran `add firebase` before this fix already carries the
+step's block, and `planAppend` writes nothing when `BLOCK_OPEN` is present
+(`src/lib/add-firebase.mjs:313`, read, not run), so a second run does not add the BoM line; the
+adopter adds it by hand. And a candidate set that moves `firebase-gitlive` without `firebase-bom` is
+refused by nothing except the KD-260 test's table of measured pairs.
+
 ### KD-254 — KD-251's closing record said a comment was not changed that its own branch changed — **CLOSED 2026-09-26**
 
 `docs/KNOWN-DEFECTS-CLOSED.md` (KD-251's closing paragraph, last sentence)
