@@ -202,3 +202,39 @@ test("the hosted predicate returns the same verdict for the same logical receipt
   }
   assert.deepEqual(verdicts[0], verdicts[1], "the same logical input must produce the same verdict in both ecosystems");
 });
+
+// KD-266 moved the done-evidence refusals into the library as checkDoneEvidence. Its one
+// profile input is legacySkips, derived exactly as receipt-check derives it: the ladder's
+// execution tier plus the profile's own legacySkipReasons. Every LABELLED shape must get the
+// same verdict under both profiles; the pre-skipKind fallback is the one honest difference —
+// cmp declares reasons it once wrote, py-alien never wrote such a receipt and declares none.
+test("checkDoneEvidence: labelled receipts refuse alike under cmp and py-alien; only cmp reads its own legacy reasons", async () => {
+  const { checkDoneEvidence } = await import("../packages/harness/src/lib/receipt-validate.mjs");
+  const { evidenceLadderFor } = await import("../packages/harness/src/lib/evidence-ladder.mjs");
+  const { readLadder } = await import("../packages/harness/src/lib/evidence-level.mjs");
+  const legacyFor = (profile) => {
+    const resolved = evidenceLadderFor(profile);
+    const declared = profile?.legacySkipReasons;
+    return resolved.ok && Array.isArray(declared) && declared.length
+      ? { names: readLadder(resolved.ladder).l2Execution, reasons: declared }
+      : null;
+  };
+  const skips = { cmp: legacyFor(cmp), alien: legacyFor(alien) };
+  assert.ok(skips.cmp, "cmp declares a legacy fallback — without it this differential proves nothing");
+  assert.equal(skips.alien, null, "py-alien declares none");
+
+  const step = (extra) => ({ steps: [{ name: "anything", verdict: "SKIP", reason: "x", ...extra }] });
+  const labelled = [
+    { mode: "fast" }, { stage: "nightly" }, { profile: "nightly" }, { stage: "smoke" }, { profile: "smoke" },
+    step({ skipKind: "environment" }), step({ skipKind: "structure" }), step({}),
+  ];
+  for (const r of labelled) {
+    const a = checkDoneEvidence(r, { legacySkips: skips.cmp });
+    const b = checkDoneEvidence(r, { legacySkips: skips.alien });
+    assert.deepEqual([a.ok, a.refusal], [b.ok, b.refusal], `same verdict in both ecosystems for ${JSON.stringify(r)}`);
+  }
+
+  const legacy = { steps: [{ name: skips.cmp.names[0], verdict: "SKIP", reason: `… ${skips.cmp.reasons[0]} …` }] };
+  assert.equal(checkDoneEvidence(legacy, { legacySkips: skips.cmp }).refusal, "environment-skip", "cmp reads its own pre-skipKind receipt");
+  assert.equal(checkDoneEvidence(legacy, { legacySkips: skips.alien }).ok, true, "py-alien, declaring no legacy reasons, does not guess");
+});
