@@ -68,6 +68,21 @@ export function unknownFlags(flags, known = KNOWN_FLAGS) {
   });
 }
 
+/**
+ * `--no-<value flag>` names this door accepts only because `no-` reads as boolean by
+ * construction and `unknownFlags` knows `no-x` whenever it knows `x`. Nothing reads
+ * them, and the bare form leaves the next word a positional — `--no-profile svc`
+ * installed into `./svc` (KD-218). `honoured` are value flags whose `--no-` form a
+ * command does read (create's declines of `add firebase`'s value flags).
+ */
+export function negatedValueFlags(flags, { known = KNOWN_FLAGS, booleans = BOOLEAN_FLAGS, honoured = [] } = {}) {
+  return Object.keys(flags).filter((k) => {
+    if (!k.startsWith("no-") || booleans.has(k)) return false;
+    const base = k.slice(3);
+    return known.has(base) && !booleans.has(base) && !honoured.includes(base);
+  });
+}
+
 /** Is this flag one that takes no value? `no-` is boolean by construction. */
 export function takesNoValue(key, booleans = BOOLEAN_FLAGS) {
   return booleans.has(key) || key.startsWith("no-");

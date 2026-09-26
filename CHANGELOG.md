@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **`--no-<flag>` for a flag that takes a value is refused, not accepted.** `prooflane init
+  --no-profile svc` stored a flag nothing reads and installed into `./svc`. Both doors now say there
+  is no such flag and write nothing (KD-218).
 - **A word after a boolean flag can no longer push the directory you named out of the command.**
   `prooflane init --dry-run maybe ../app` installed into `./maybe`, and `create-cmp --no-firebase no
   my-app` scaffolded into `./no`. Both doors now refuse a line that names more directories than the
