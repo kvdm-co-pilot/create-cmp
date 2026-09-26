@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs e7d92e97bb403eaf53b140bebd3130643a4c0c945f18de8529518ce7238483aa
+// cmp:bundle-inputs d34ca7b1f9d71d8ae0db81960ee88c66a55d29635b5bfba5d2d0e9b87a64c5a4
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
