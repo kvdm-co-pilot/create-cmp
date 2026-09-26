@@ -9,6 +9,38 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-150 — a boolean's space form still takes the directory when the word is not `true` or `false` — **CLOSED 2026-09-26**
+
+`src/lib/args.mjs`, `packages/harness/install/args.mjs` (`consumesNext`)
+
+KD-16's fix normalizes `--x true` / `--x false` into real booleans. It deliberately stops there:
+anything else after a declared boolean stays the user's positional, so both of these do what they
+did before, measured 2026-09-19 —
+
+```
+$ prooflane init --dry-run maybe ../app     project: …/maybe   (not ../app)
+$ create-cmp --no-firebase no my-app        scaffolds into ./no
+```
+
+Refusing the space form is the fix that re-creates KD-7: `create-cmp --minimal my-app` would
+become an error, and an adopter may have a directory called `no`. Only the `=` form, which has no
+positional to lose, is refused (KD-153). What is logged is that the space form remains a way to
+lose the directory you named — `--flag <dir>` for a boolean `--flag` puts `<dir>` first in the
+positionals, and for `prooflane init` the first positional is the tree to install into.
+
+**Fires when:** anyone writes a word that is not `true`/`false` after a declared boolean.
+*Logged 2026-09-19, by the slice that closed KD-16.*
+
+**CLOSED 2026-09-26 — two directories are refused; the one-directory space form still works.** The
+directory was lost because every command read a fixed number of positionals and silently dropped the
+rest, not because the boolean took the word. Both doors now refuse a surplus positional (exit 2,
+nothing written): `prooflane init|relock|upgrade` take one directory, `create-cmp` one (two for
+`add` and `harness`, whose first is the subcommand). `create-cmp --minimal my-app` and
+`prooflane init --dry-run maybe` are unchanged — the word is still the directory, and says so in
+`project:`. Test: `test/a-word-after-a-boolean-cannot-push-the-named-directory-out.test.mjs`; the
+control in `test/a-declared-booleans-value-arrives-as-a-string.test.mjs` now pins the one-directory
+form and that the two-directory form is not refused as an unreadable value.
+
 ### KD-260 — after `add firebase` the instrumented tests do not compile: no Firebase BOM on the androidTest classpath — **CLOSED 2026-09-26**
 
 `overlays/firebase/append/composeApp/build.gradle.kts` (the step's Gradle block), `overlays/firebase/edits.json:4`,

@@ -173,6 +173,18 @@ async function main() {
     process.stdout.write(`  run ${colors.cyan("prooflane --help")} for the flags it does know. Nothing was written.\n\n`);
     return 2;
   }
+  // MORE THAN ONE DIRECTORY. `init`, `relock` and `upgrade` each read ONE
+  // positional after the command and dropped the rest, so a word after a
+  // boolean — `--dry-run maybe ../app`, which stays a positional on purpose
+  // (refusing it is KD-7) — pushed the directory the user named out of the
+  // command: the lane went to `./maybe` (KD-150). Two directories is a question
+  // this door cannot answer, so it is refused rather than guessed.
+  if (!askedForHelp && ["init", "relock", "upgrade"].includes(command) && positionals.length > 2) {
+    const named = positionals.slice(1);
+    fail(`prooflane: ${named.join(", ")} — \`${command}\` takes one directory, and was given ${named.length}`);
+    process.stdout.write(`  a word after a flag like \`--dry-run\` is read as a directory unless it is \`true\` or \`false\`. Nothing was written.\n\n`);
+    return 2;
+  }
   if (askedForHelp || !command) {
     process.stdout.write(usage());
     // Asked for: success. Nothing asked for at all: usage is the answer to a
