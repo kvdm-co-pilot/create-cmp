@@ -23,6 +23,7 @@ import {
   parseArgs,
   unknownFlags,
   unreadableBooleanValues,
+  negatedValueFlags,
   emptyValues,
   takesNoValue,
 } from "../src/lib/args.mjs";
@@ -89,7 +90,16 @@ async function main() {
   // `maybe` a positional on purpose, because an adopter may have a directory
   // called `maybe` and KD-7 is what refusing it would re-create.
   const unreadable = unreadableBooleanValues(flags);
-  if (unreadable.length) {
+  // The BARE `--no-<value flag>` holds a boolean, so the line above cannot see it,
+  // and it left the next word the directory (KD-218): refused in the same words.
+  // `create` alone reads `--no-region`/`--no-auth`/`--no-google-services`, as a
+  // decline of what the stamp already is (firebaseStampFlags), so they stay there.
+  let negatedBare = negatedValueFlags(flags).filter((f) => typeof flags[f] !== "string");
+  if (negatedBare.length && command === "create") {
+    const { FIREBASE_VALUE_FLAGS } = await import("../src/commands/add.mjs");
+    negatedBare = negatedBare.filter((f) => !FIREBASE_VALUE_FLAGS.includes(f.slice(3)));
+  }
+  if (unreadable.length || negatedBare.length) {
     // `--no-<value flag>` lands here too, because `no-` reads as boolean by
     // construction — and it is not a flag that takes `true` or `false`. It is no
     // flag at all, so it is refused as that, by name (KD-218). Only the WORDS
@@ -103,6 +113,9 @@ async function main() {
     }
     for (const f of negatedValue) {
       lines.push(`--${f}=${flags[f]} — there is no \`--${f}\`: \`--${f.slice(3)}\` takes a value, and has no \`--no-\` form.`);
+    }
+    for (const f of negatedBare) {
+      lines.push(`--${f} — there is no \`--${f}\`: \`--${f.slice(3)}\` takes a value, and has no \`--no-\` form.`);
     }
     process.stderr.write(
       lines.map((l) => `create-cmp: ${l}\n`).join("") +

@@ -9,6 +9,51 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-218 — the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false` — **CLOSED 2026-09-26**
+
+`bin/create-cmp.mjs`, `packages/harness/bin/prooflane.mjs` (the `unreadableBooleanValues` refusal);
+`takesNoValue` in both `args.mjs`
+
+`takesNoValue` returns true for **any** name beginning `no-`, and `unknownFlags` treats `no-x` as
+known whenever `x` is — a rule written for `flagBool`'s boolean twins. Together they make
+`--no-<value-flag>` a name both doors accept and then describe:
+
+```
+$ create-cmp harness init --no-target-dir=x
+  create-cmp: --no-target-dir=x — that flag takes `true` or `false`, or no value at all.
+$ prooflane init --no-profile=svc
+  ✗ prooflane: --no-profile=svc — that flag takes `true` or `false`, or no value at all
+```
+
+There is no `--no-target-dir` and no `--no-profile`; the refusal tells the user those flags exist
+and would take `true`. The bare form is worse but quieter: `prooflane init --no-profile svc` stores
+`no-profile: true`, leaves `svc` a positional, and installs the lane into `./svc`. Refused or
+accepted, nothing is written to a tree the user did not name — the sentence is wrong, the same
+shape as KD-184.
+
+**Fires when:** anyone writes `--no-` in front of a value flag.
+*Logged 2026-09-22, round 1 of the doors review.*
+
+**AMENDED 2026-09-25 — the words are fixed; the name is still accepted.** Both refusals now split
+`--no-<value flag>` out of the booleans and say so: *"--no-target-dir=x — there is no
+`--no-target-dir`: `--target-dir` takes a value, and has no `--no-` form."* A declared boolean's
+refusal keeps its words byte for byte, and a line carrying both gets both sentences
+(`test/a-refusal-names-a-no-form-a-value-flag-does-not-have.test.mjs`). What is left is the other
+half of this entry, and it is not a wording fix: `takesNoValue` still reads every `no-` name as
+boolean and `unknownFlags` still knows `no-x` whenever it knows `x`, so the bare form
+`--no-profile svc` is accepted and `svc` becomes the project. Refusing it changes what both parsers
+accept — KD-7's territory, where refusing a space-form token is how a user's directory gets eaten —
+so it stays open for that decision.
+
+**CLOSED 2026-09-26 — the bare form is refused too, in the same words.** `negatedValueFlags` (both
+`args.mjs`) names every `--no-x` whose `x` is a known value flag, and both doors refuse the bare form
+alongside the `=` form: *"--no-profile — there is no `--no-profile`: `--profile` takes a value, and has
+no `--no-` form"*, exit 2, nothing written. A declared boolean's `--no-` form is untouched, and at
+`create` the three declines `firebaseStampFlags` honours (`--no-region`, `--no-auth`,
+`--no-google-services`) stay accepted. Refusing a name nothing reads is not KD-7's refusal of a space
+form: no directory is eaten, the line is refused whole. Test:
+`test/a-bare-no-form-of-a-value-flag-cannot-install-into-the-next-word.test.mjs`.
+
 ### KD-150 — a boolean's space form still takes the directory when the word is not `true` or `false` — **CLOSED 2026-09-26**
 
 `src/lib/args.mjs`, `packages/harness/install/args.mjs` (`consumesNext`)

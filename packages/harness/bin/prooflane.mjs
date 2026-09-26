@@ -34,6 +34,7 @@ import {
   unreadableBooleanValues,
   emptyValues,
   takesNoValue,
+  negatedValueFlags,
 } from "../install/args.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -105,7 +106,10 @@ async function main() {
   // `--dry-run maybe ../app` leaves `maybe` a positional on purpose, because
   // refusing THAT is how KD-7 comes back.
   const unreadable = unreadableBooleanValues(flags);
-  if (!askedForHelp && unreadable.length) {
+  // The BARE `--no-<value flag>` holds a boolean, so the line above cannot see it,
+  // and it left the next word the project (KD-218): refused in the same words.
+  const negatedBare = negatedValueFlags(flags).filter((f) => typeof flags[f] !== "string");
+  if (!askedForHelp && (unreadable.length || negatedBare.length)) {
     // `--no-<value flag>` lands here too — `no-` reads as boolean by construction —
     // and it is no flag at all, so it is refused as that, by name (KD-218). Only the
     // WORDS differ: what the parser accepts, and that this refuses, are unchanged.
@@ -119,6 +123,9 @@ async function main() {
     }
     for (const f of negatedValue) {
       fail(`prooflane: --${f}=${flags[f]} — there is no \`--${f}\`: \`--${f.slice(3)}\` takes a value, and has no \`--no-\` form`);
+    }
+    for (const f of negatedBare) {
+      fail(`prooflane: --${f} — there is no \`--${f}\`: \`--${f.slice(3)}\` takes a value, and has no \`--no-\` form`);
     }
     process.stdout.write(`  run ${colors.cyan("prooflane --help")} for what each one means. Nothing was written.\n\n`);
     return 2;
