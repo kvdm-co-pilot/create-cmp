@@ -182,7 +182,6 @@ you the same list without opening anything.
 | **KD-162** | the sweep proving the lock is a "class of one" allow-lists `qa/e2e/` and `qa/golden/` by PREFIX, so a machine-written file added under either is invisible to it | measured: today's three survivors under those prefixes really are app content and the lock really is the only other one, so the claim holds — what is unpinned is tomorrow's addition, not today's answer |
 | **KD-132** | the review-round measurement *"round 1 took 6.9 minutes and round 2 took 3.6"* is stated in three places — `scripts/change-price.mjs`'s PART 4 header, the new round test's header and `docs/features/price-the-next-review-round.md` — and none of them says what was timed; the instrument was an agent's wall clock from spawn to report, which is outside this tree | nothing routes on the numbers and the design they support rests on the rule of record, not on them. What a reader CAN compute here is the gap between that slice's two review-history rows (20:16:05.182Z → 20:21:21.355Z, 5.3 min), which is a different quantity and matches neither figure — so the claim can be believed but never checked. KD-128 one file over |
 | **KD-133** | `nextRound`'s CAP SPENT arm returns `read: null` and `settles: []` even when proof-plan reports the review tier REOPENED — the moment the rule of record's header makes the last round owe a re-record, which is what this slice's own `--kind rerecord` is for; its NOT-OWED sibling names that obligation in the same state | driven and read back rather than argued: the same screen's `spent` review row already prints *"REOPENED … a fresh record is owed for the SAME round"*, so no reader of the program's output is misled. What is missing is the block's own answer at the moment that block is the thing being read |
-| **KD-150** | a declared boolean's SPACE form holding anything but `true`/`false` still hands the token to the positionals, so `prooflane init --dry-run maybe ../app` installs into `./maybe` and `create-cmp --no-firebase no my-app` scaffolds into `./no` | deliberate, and the alternative is worse: refusing it makes `create-cmp --minimal my-app` an error and re-creates KD-7, the defect class this repo cares most about. An adopter may legitimately have a directory called `no` |
 | **KD-151** | a contradictory line (`--ios false --no-ios false`, `--x --no-x`) is resolved by precedence and refused by nothing — the affirmative name answers and its `no-` twin is never consulted | no answer is right, so the honest act is to pin the one that has always been given rather than invent a refusal for a line nobody types; pinned by test, so a later change to `flagBool` has to mean it |
 | **KD-152** | `--version` and `--help` are the only declared booleans read by PRESENCE, so `--version false` still prints the version instead of meaning "not the version" | required by KD-15: at create-cmp's door the something-else is `create`, which writes — normalizing their value form made `create-cmp --version false --yes` scaffold an app while the user waited for a version string. A question is answered in whatever form it is asked |
 | **KD-163** | the KD-15 guard's new value-form test drives `bin/create-cmp.mjs` with the REPOSITORY as its working directory, asserts only exit code and stdout, and sets no `timeout` — where the sibling test for the same defect class sandboxes the cwd, asserts it is still empty, and times out at 60s | cannot fire while the guard holds, and `myapp/` is gitignored so no gate reads what it would write. What is logged is a gate whose failure mode is a multi-minute untimed Gradle build inside `npm test` rather than an assertion |
@@ -2332,28 +2331,6 @@ open would be a change bolted onto a seam this repository has already logged as 
 its own.
 
 *Logged 2026-09-19 by the slice that created the gap, before any review round.*
-
-### KD-150 — a boolean's space form still takes the directory when the word is not `true` or `false`
-
-`src/lib/args.mjs`, `packages/harness/install/args.mjs` (`consumesNext`)
-
-KD-16's fix normalizes `--x true` / `--x false` into real booleans. It deliberately stops there:
-anything else after a declared boolean stays the user's positional, so both of these do what they
-did before, measured 2026-09-19 —
-
-```
-$ prooflane init --dry-run maybe ../app     project: …/maybe   (not ../app)
-$ create-cmp --no-firebase no my-app        scaffolds into ./no
-```
-
-Refusing the space form is the fix that re-creates KD-7: `create-cmp --minimal my-app` would
-become an error, and an adopter may have a directory called `no`. Only the `=` form, which has no
-positional to lose, is refused (KD-153). What is logged is that the space form remains a way to
-lose the directory you named — `--flag <dir>` for a boolean `--flag` puts `<dir>` first in the
-positionals, and for `prooflane init` the first positional is the tree to install into.
-
-**Fires when:** anyone writes a word that is not `true`/`false` after a declared boolean.
-*Logged 2026-09-19, by the slice that closed KD-16.*
 
 ### KD-151 — a contradiction is resolved by precedence and refused by nothing
 

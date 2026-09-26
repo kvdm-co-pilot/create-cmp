@@ -154,6 +154,21 @@ async function main() {
     process.exit(2);
   }
 
+  // MORE THAN ONE DIRECTORY. Every command reads a fixed number of positionals
+  // and used to drop the rest, so a word after a boolean — `--no-firebase no
+  // my-app`, where `no` stays a positional on purpose (refusing it is KD-7) —
+  // pushed the directory the user named out of the command and scaffolded into
+  // `./no` (KD-150). Two directories is a question this door cannot answer.
+  const takes = command === "add" || command === "harness" ? 2 : 1;
+  if (rest.length > takes) {
+    const named = rest.slice(takes - 1);
+    process.stderr.write(
+      `create-cmp: ${named.join(", ")} — \`${command}\` takes one directory, and was given ${named.length}.\n` +
+        `  a word after a flag like \`--no-firebase\` is read as a directory unless it is \`true\` or \`false\`. Nothing was written.\n`
+    );
+    process.exit(2);
+  }
+
   switch (command) {
     case "doctor": {
       const { runDoctor } = await import("../src/commands/doctor.mjs");

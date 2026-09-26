@@ -391,15 +391,19 @@ test("a declared boolean carrying `=maybe` is refused by name, and writes nothin
 });
 
 test("the SPACE form holding something else is NOT refused — it is the user's directory (KD-7)", () => {
-  // The refusal above must not grow into this one. `--dry-run maybe ../app`
-  // resolves the project to `./maybe` and says so; that is logged as KD-150 and
-  // deliberately left, because the alternative refuses `create-cmp --minimal
-  // my-app` and an adopter may have a directory called `no`.
+  // The refusal above must not grow into this one: refusing the space form
+  // refuses `create-cmp --minimal my-app`, and an adopter may have a directory
+  // called `no`. `--dry-run maybe` resolves the project to `./maybe` and says so.
+  // With a SECOND directory after it the line names two, and that is refused as
+  // two directories, never as an unreadable value (KD-150, closed:
+  // test/a-word-after-a-boolean-cannot-push-the-named-directory-out.test.mjs).
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "boolean-space-")));
   try {
-    const r = run("prooflane", ["init", "--dry-run", "maybe", "./app"], dir);
+    const r = run("prooflane", ["init", "--dry-run", "maybe"], dir);
     assert.doesNotMatch(r.out, /that flag takes/, `the space form was refused as an unreadable value:\n${r.out}`);
     assert.match(r.out, /project:.*maybe/, `the token after the flag is the positional, and the project is it:\n${r.out}`);
+    const two = run("prooflane", ["init", "--dry-run", "maybe", "./app"], dir);
+    assert.doesNotMatch(two.out, /that flag takes/, `the space form was refused as an unreadable value:\n${two.out}`);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
