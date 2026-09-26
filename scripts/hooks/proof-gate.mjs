@@ -333,6 +333,23 @@ function openRuns(o) {
 }
 
 /**
+ * The at-close L2 run that reads UNDECLARED — required, no slice declared, and
+ * no record describing these bytes — or null: the default run first, else the
+ * Firebase run (KD-45). ONE rule for both tiers, asked in one place, because the
+ * Firebase tier was first wired by LISTING the states it refused on (OWED,
+ * REOPENED) and so let an undeclared slice merge on the default record alone.
+ * Whatever the default L2 run does in this state — hold the merge, remind at
+ * PR creation, refuse a run and say to declare a slice — the Firebase run does
+ * too, and a tier added later is added here, to a rule, not to a list. One
+ * answer covers both: declaring a slice opens every tier at once.
+ */
+function undeclaredRun(o) {
+  if (o?.state === "undeclared") return { need: o.need, reaches: "what the stamped tree executes", app: "the app this tree stamps" };
+  if (o?.firebase?.state === "undeclared") return { need: o.firebase.need, reaches: "the template's Firebase code", app: "the app this tree stamps with Firebase compiled in" };
+  return null;
+}
+
+/**
  * The decision, pure: a watched command kind and what the slice owes
  * (`obligation()` from scripts/proof-plan.mjs) in, a verdict out.
  *
@@ -372,6 +389,8 @@ export function decide(kind, o, tiers, ctx) {
       const d = orderedRun(o, runs, { cmd, fbCmd }, ctx?.base);
       return runs.device && rekeyFirst(o) ? { ...d, reason: `${REKEY_INSTEAD}.\n\n${d.reason}` } : d;
     }
+    const undeclared = undeclaredRun(o);
+    if (undeclared) return deny(`no slice is declared, so this run could discharge nothing — ${undeclared.need.reason}. Declare first: ${DECLARE}. Then run the tier once, at close.`);
     switch (o.state) {
       case "none":
         if (o.trunk) return allow(`nothing is owed per slice — this is trunk — so this can only be a RELEASE proof (npm-publish skill step 2): allowed. Then npm publish reads its record.`);
@@ -384,8 +403,6 @@ export function decide(kind, o, tiers, ctx) {
         const p = o.proof ?? o.plan?.discharged ?? {};
         return deny(`already discharged for the app this tree stamps, at ${p.at ?? "an unstated time"} (verdict ${p.verdict ?? "unstated"}, rung ${p.rung ?? "none"}${p.from ? `, read from ${p.from}` : ""}). A second run over the same stamped bytes is the 2026-09-08 defect; had the stamped app moved, the state would read REOPENED.`);
       }
-      case "undeclared":
-        return deny(`no slice is declared, so this run could discharge nothing — ${o.need.reason}. Declare first: ${DECLARE}. Then run the tier once, at close.`);
       default:
         return deny(`the proof plan is in an unknown state (${o.state}) — refusing rather than guessing`);
     }
@@ -405,12 +422,11 @@ export function decide(kind, o, tiers, ctx) {
             : `the L2 run is ${o.state.toUpperCase()} for this slice and the slice closes at merge — this is where it is collected. Run it once: ${cmd} — then node scripts/proof-plan.mjs --discharge, then merge.`,
         );
         break;
-      case "undeclared":
-        blocked.push(`paths that could reach what the stamped tree executes changed with no slice declared, and no recorded run describes the app this tree stamps — ${o.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
-        break;
       default:
         break;
     }
+    const undeclared = undeclaredRun(o);
+    if (undeclared) blocked.push(`paths that could reach ${undeclared.reaches} changed with no slice declared, and no recorded run describes ${undeclared.app} — ${undeclared.need.reason}. Declare (${DECLARE}), discharge, then merge.`);
     if (isOpen(fb?.state)) {
       blocked.push(
         `the Firebase L2 run is ${fb.state.toUpperCase()} for this slice and the slice closes at merge — ${fb.need.reason}. The template's Firebase code executes nowhere else in this repository (KD-45), and the ordinary L2 run stamps it out. Run it once: ${fbCmd} — then node scripts/proof-plan.mjs --discharge, then merge.`,
@@ -429,7 +445,7 @@ export function decide(kind, o, tiers, ctx) {
         );
         break;
       case "undeclared":
-        if (o.state !== "undeclared") blocked.push(`paths that oblige a review changed with no slice declared — ${r.need.reason}. Declare (${DECLARE}), then have the diff read.`);
+        if (!undeclared) blocked.push(`paths that oblige a review changed with no slice declared — ${r.need.reason}. Declare (${DECLARE}), then have the diff read.`);
         break;
       default:
         break;
@@ -463,9 +479,11 @@ export function decide(kind, o, tiers, ctx) {
     const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
     const notes = [];
     if (open(o.state)) notes.push(`the L2 run is ${o.state.toUpperCase()} for this slice; gh pr merge will refuse until it is discharged (${rekeyFirst(o) ? `${REKEY_INSTEAD}; else ` : ""}${cmd}, then node scripts/proof-plan.mjs --discharge)`);
-    // Owed or reopened only: the merge holds for nothing else on this tier, and
-    // a reminder that promised a refusal the merge does not make would be a lie.
-    if (isOpen(fb?.state)) notes.push(`the Firebase L2 run is ${fb.state.toUpperCase()}; gh pr merge will refuse until a run with Firebase compiled in is recorded against these bytes (${fbCmd}, then node scripts/proof-plan.mjs --discharge)`);
+    // The states the merge holds on for this tier — the default's own, UNDECLARED
+    // included (undeclaredRun) — and no others: a reminder that promised a
+    // refusal the merge does not make would be a lie, and one that stayed silent
+    // before a refusal the merge does make is the same lie the other way.
+    if (open(fb?.state)) notes.push(`the Firebase L2 run is ${fb.state.toUpperCase()}; gh pr merge will refuse until a run with Firebase compiled in is recorded against these bytes (${fbCmd}, then node scripts/proof-plan.mjs --discharge)`);
     if (open(o.review?.state)) notes.push(`a review is ${o.review.state.toUpperCase()}; gh pr merge will refuse until a review of these bytes is recorded (${tiers?.review?.cmd ?? "node scripts/proof-plan.mjs --discharge-review"})`);
     return notes.length ? allow(`reminder: ${notes.join(" — and ")}. Open the PR, finish everything else, run the at-close tiers last.`) : SILENT;
   }
