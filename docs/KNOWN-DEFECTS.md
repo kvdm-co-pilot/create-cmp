@@ -242,6 +242,8 @@ you the same list without opening anything.
 | **KD-261** | `androidChecks` reports a failed compile of the instrumented-test sources as "connectedDebugAndroidTest DID NOT EXECUTE … has observed nothing about your change and is not accusing it. Usual cause: another adb/Gradle session …" (`packages/harness/src/lib/profiles/cmp/android-checks.mjs:51`, mirrored in `template/qa/lib/profiles/cmp/android-checks.mjs`), sending an adopter whose build is broken to look at the environment | the step is red (ERROR; the lane fails), never green, and the Gradle tail printed under the text carries `compileDebugAndroidTestKotlinAndroid FAILED` |
 | **KD-262** | an app that ran `add firebase` before KD-260's fix stays without the Firebase BoM on a re-run: `planAppend` sees `BLOCK_OPEN` and skips the Gradle block, so the re-run writes only the catalog's `firebase-bom` entries and prints `already there: composeApp/build.gradle.kts (the add-firebase block)` — the instrumented tests still do not compile, and `upgrade` adds no key either (`notInProject`) | a decision, handed up: how an earlier block is brought forward (rewrite a block this step recognises as its own older bytes, or name the missing line) is a product call; the CHANGELOG's Fixed entry gives the by-hand remedy, and the step existed for days before the fix |
 | **KD-263** | nothing before the suite refuses a registry set whose `firebase-bom` is missing or was not measured for its own `firebase-gitlive`: `promotedSet` accepts a candidate with no `firebase-bom` (on which `add firebase` then refuses every app) and one that moves GitLive to 2.5.0 while carrying 33.15.0; the KD-260 table test passes when both the GitLive version and the BoM are unknown (`undefined === undefined`) | maintainer path only, and no candidate pins `firebase-gitlive` today; a promoted set with no BoM is still refused by the scaffold-based `add firebase` tests once the template moves onto it. The repair is the KD-243 shape: promotion refuses a candidate `add firebase` would refuse, and the table test requires a measured row for every GitLive version |
+| **KD-264** | `TIERS.firebase.cost` prints "~4.5min + an emulator + the Firebase Emulator Suite", and the first PASS (KD-45, 2026-09-26) measured ~11.6 min of steps for one lane and ~22 min wall-clock for the run; KD-256's row repeats the 4.5 | a maintainer's estimate, not an adopter's answer, and nothing schedules on it; the repair is the number the run measured, or the cost read off the last record |
+| **KD-265** | nothing now refuses a stamp + `add firebase` that outgrows the hook's `STAMP_CAP_MS` (3000 ms): the one measured assertion (`ms < STAMP_CAP_MS` in `two-stamps-of-one-tree-are-not-the-same-app`) became `ms < CEILING_MS` (60 s) with the suite's own cap, and `ANSWER_RESERVE_MS`'s "0.25–0.34s measured" is now prose no test holds | cannot fire today (279 ms measured on this tree, 2026-09-26) and fails safe when it does: the Firebase half reads unanswerable and the tier OWED, naming the cap, never DISCHARGED. Whether a wall-clock guard belongs in a suite that runs under `prepublishOnly` load is Karel's call |
 
 ---
 
@@ -4034,3 +4036,40 @@ template moves onto it. Repair: `firebaseIosPairingProblem`'s rule generalised t
 `firebaseIos` is), and the table test asserting a measured row exists for each GitLive version.
 
 *Logged 2026-09-26 (fix/add-firebase-android-test-compile, review round 1).*
+
+### KD-264 — the Firebase L2 run's printed cost is under half what its first PASS measured
+
+`scripts/proof-plan.mjs` `TIERS.firebase.cost`
+
+Measured by the run KD-45 closes on (trunk 8f41f21, ranAt 2026-09-26T01:30:37Z): build 16.9 s,
+releaseBuild 482.6 s, e2eSmoke 39.5 s, androidChecks 60.6 s — ~11.6 min of steps for one lane, ~22 min
+for both lanes of `--with-firebase --ladder-plant`. `TIERS.firebase.cost` prints "~4.5min", which is
+what proof-plan tells whoever it says the run is owed to, and KD-256's row prices its own hazard at "one
+~4.5 min run". The cold R8 pass over the BoM's dependency graph is most of the difference; a warm cache
+may bring it down, and no second run has measured that.
+
+**Why it does not block:** the only reader is the maintainer deciding when to run the tier; no
+adopter is told it and nothing schedules on it. Repair: the measured number, and a second run's to
+say whether the cold R8 figure is the typical one.
+
+*Logged 2026-09-26 (fix/stamp-cap-under-suite-load, review round 1).*
+
+### KD-265 — the stamp + add's fit inside the hook's cap is prose no test holds
+
+`test/two-stamps-of-one-tree-are-not-the-same-app.test.mjs` ("ONE STAMP, TWO DIGESTS"),
+`scripts/hooks/proof-gate.mjs` `ANSWER_RESERVE_MS`, `scripts/stamped-output.mjs` `defaultStampCapMs`
+
+Until 659929c the measured test asserted `stampedApps(ROOT).ms < STAMP_CAP_MS`: the only assertion
+that stamp + hash + add + hash fits the 3000 ms the hook's budget sums over. It now asserts
+`ms < CEILING_MS` (60 s), and the suite stamps under `TEST_STAMP_CAP_MS`, so an `add firebase` that
+grew to 5 s would pass every test while every production call — the hook and `proof-plan
+--discharge` alike, both outside the runner — reads the Firebase half unanswerable. The relaxation
+was for a real cause (13 of 112 red under 96 CPU burners, green idle), and a wall-clock bound in a
+suite that runs under `prepublishOnly` load is flaky by construction.
+
+**Why it does not block:** cannot fire today (`stampedApps` 279 ms on this tree, idle,
+2026-09-26), and fails safe: the tier reads OWED and names the cap, never DISCHARGED. Decision asked
+of Karel: a guard measured where the machine is idle (proof-plan printing `ms` against the cap on
+every discharge, say), or accept that the first sign is an OWED that names the cap.
+
+*Logged 2026-09-26 (fix/stamp-cap-under-suite-load, review round 1).*
