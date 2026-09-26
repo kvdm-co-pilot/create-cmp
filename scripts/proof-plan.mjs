@@ -218,7 +218,9 @@ const TIERS = Object.freeze({
   // one constant, so the two L2 runs can never be held to different levels.
   firebase: {
     when: "at-close",
-    cost: "~4.5min + an emulator + the Firebase Emulator Suite",
+    // Measured on its first PASS (KD-264, 2026-09-26, cold R8): ~11.6 min of steps
+    // for one lane, ~22 min wall-clock for both lanes of the run.
+    cost: "~12min of steps per lane, ~22min wall-clock + an emulator + the Firebase Emulator Suite",
     requires: DEVICE_TIER_LEVEL,
     cmd: `CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level ${DEVICE_TIER_LEVEL} --with-firebase`,
   },
