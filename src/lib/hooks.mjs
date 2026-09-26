@@ -237,8 +237,11 @@ export const ANCHORABLE_SURFACES = Object.freeze({
  * directory segment, ending in an executable script extension. `settings.json`
  * does not match (the `\b` after `js` fails against the `o`), and neither does a
  * bare `verify.mjs` — a single-segment name is not a path this gate can judge.
+ * Every common interpreter's extension, not only node's and sh's: an adopter's
+ * `python3 qa/report.py` hook is exactly as cwd-relative, and read clean while the
+ * list was four long (KD-86). An extensionless `qa/tool` is still not judged.
  */
-const SCRIPT_PATH = /(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+\.(?:mjs|cjs|js|sh)\b/g;
+const SCRIPT_PATH = /(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+\.(?:mjs|cjs|js|mts|cts|ts|sh|bash|zsh|py|rb|pl|kts)\b/g;
 
 /**
  * Replace every single-quoted span with spaces of the same length, so what is
