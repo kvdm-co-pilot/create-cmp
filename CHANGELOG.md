@@ -14,6 +14,16 @@ All notable changes to this project are documented here. The format is based on
   never on a calendar. It proves compile, init and the four `useEmulator` redirects at startup. No
   request crosses the redirect (KD-210).
 
+### Fixed
+
+- **After `create-cmp add firebase`, the app's instrumented tests compile (KD-260).** GitLive's
+  android artifacts leave their Firebase versions to the Firebase BoM, which they publish on their
+  runtime variant only, so `compileDebugAndroidTestKotlinAndroid` could not resolve them. `add
+  firebase` now puts the BoM on `androidMain` as a platform, at the version the registry row pairs
+  with the GitLive version it adds (33.2.0 beside GitLive 2.1.0). An app that added Firebase before
+  this keeps its old block: add the `firebase-bom` catalog entries and the `androidMain` platform
+  line by hand.
+
 ## [0.28.1] - 2026-09-26
 
 Doctor offers only the fixes it performs, the Firebase add step pairs its iOS pods with the
