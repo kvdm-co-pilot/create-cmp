@@ -238,6 +238,7 @@ you the same list without opening anything.
 | **KD-256** | `--rekey` re-derives `qa-artifacts/fleet-latest.json` only, so after the next `STAMPED_OUTPUT_RULE` bump the Firebase L2 run's record reads `other-rule` and costs a full Firebase L2 run — and its reason, `recordMeetsTier`'s, still says to run `--rekey` INSTEAD, which cannot help it | cannot fire until the rule is bumped (it is 2 today, and the Firebase record is new under 2); the cost when it fires is one ~4.5 min run, never a false DISCHARGED |
 | **KD-257** | a change to an L2 tier's own RUNNER (`scripts/fleet-check.mjs`, `scripts/lib/fleet-firebase.mjs`) owes no run of that tier, so the gate refuses the only run that would exercise the new runner on its branch — the Firebase L2 run merged unexercised and ran first on trunk | a decision, handed up: the tiers are keyed on output bytes (settled), and a runner is not an output; the runner's first real run is a trunk release proof, fixed forward if red |
 | **KD-258** | `test/the-change-price-advisory-asserts-what-it-did-not-check.test.mjs`'s "a history line that did not parse" assertion passes for every row: `/malformed/i.test(JSON.stringify(r))` matches the row's own `malformed` KEY, so a row that drops the count still passes | a vacuous assertion in a test, not a product path; the repair is asserting `r.malformed > 0` alone, which may then expose the drop the test was written to catch |
+| **KD-259** | an UNDECLARED answer from `proof-gate` names less than the next step needs: the `gh pr create` reminder never says to declare a slice (61 of 125 tier-state combinations, every tier) and names an L2 command the device gate then refuses with "declare first"; the merge refusal's one "Declare, discharge, then merge" line suppresses the review line and, with both L2 tiers UNDECLARED, the Firebase line — so followed literally it meets a second refusal | this repo's own gate, not an adopter path; every refusal it leads to names the right remedy (`--open`), and declaring opens every tier at once so `proof-plan.mjs` then lists them all. Round 2 of the Firebase slice extended both shapes to the Firebase tier by parity, which is the settled fix |
 
 ---
 
@@ -3916,3 +3917,32 @@ the reader it guards is advisory (`change-price` refuses nothing). The repair is
 `r.malformed > 0` (or matching the rendered text, not the JSON), which may then expose the drop.
 
 *Logged 2026-09-26 (feat/firebase-runtime-proof, U6).*
+
+### KD-259 — an UNDECLARED gate answer names less than the next step needs
+
+`scripts/hooks/proof-gate.mjs`, `decide("create")` and `decide("merge")`.
+
+Found by review round 2 of `feat/firebase-runtime-proof`, measured over all 125 combinations of
+the three at-close tiers' states. Two members of one class:
+
+- The `gh pr create` reminder, in every combination where any tier reads UNDECLARED (61 of 125),
+  never names `proof-plan.mjs --open`. It names the L2 command (`fleet-check`, or with
+  `--with-firebase`) and `--discharge` — and the device gate refuses that command in that state
+  with "no slice is declared … Declare first". The default tier and the review have done this
+  since the reminder existed; the round-1 fix (`b6fffe4`) added the Firebase tier to it by parity.
+- The merge refusal, when an L2 tier reads UNDECLARED, pushes one "Declare (…), discharge, then
+  merge" line and suppresses the review's UNDECLARED line — and when both L2 tiers are UNDECLARED
+  the Firebase one is suppressed too (`undeclaredRun` answers the default first). Declaring opens
+  every tier, so an agent that follows the line literally — declare, run one L2 run, discharge,
+  merge — is refused again for the tier the first answer already knew about.
+
+What holds, measured in the same sweep: the reminder is issued in exactly the combinations the
+merge refuses, and every merge refusal with a tier UNDECLARED names `--open`.
+
+**Why it does not block:** this is create-cmp's own gate (`.claude/settings.json`), not an adopter
+path; no answer is false, every refusal the instructions lead to names the right remedy, and after
+`--open` `proof-plan.mjs` lists every owed tier. The repair is appending the declare step to an
+UNDECLARED reminder note, and "then read node scripts/proof-plan.mjs" in place of "discharge, then
+merge" on the undeclared merge line.
+
+*Logged 2026-09-26 (feat/firebase-runtime-proof, review round 2).*

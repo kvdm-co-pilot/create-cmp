@@ -77,3 +77,25 @@ test("an undeclared slice with no Firebase record on disk cannot merge on the de
   const d = decide("merge", o, TIERS, {});
   assert.equal(d.action, "deny", `gh pr merge went through with the Firebase app proven by no record and no slice declared (${d.action})`);
 });
+
+// THE COMBINATIONS, not only each tier alone. The tests above hold one tier
+// open at a time; the round-1 fix answers UNDECLARED through one helper that
+// picks the default tier first, so a precedence mistake shows only where two
+// tiers are open together. Over every combination of the three at-close tiers'
+// states: the gh pr create reminder is issued exactly where gh pr merge refuses
+// (a reminder that promises a refusal the merge does not make is a lie, and one
+// that is silent before a refusal it does make is the same lie the other way),
+// and a merge refused while any tier is UNDECLARED says to declare a slice.
+// KD-259 logs what this does not yet hold: the REMINDER's own declare step.
+test("the create reminder and the merge refusal agree in every combination of the at-close tiers' states", () => {
+  const wrong = [];
+  for (const d of STATES) for (const f of STATES) for (const r of STATES) {
+    const o = { ...tier(d), branch: "feat/x", proof: d === "discharged" ? proof : undefined, review: tier(r), firebase: tier(f) };
+    const at = `L2 ${d.toUpperCase()}, Firebase ${f.toUpperCase()}, review ${r.toUpperCase()}`;
+    const create = decide("create", o, TIERS, {});
+    const merge = decide("merge", o, TIERS, {});
+    if ((create.action !== "silent") !== (merge.action === "deny")) wrong.push(`${at}: create ${create.action}, merge ${merge.action}`);
+    if ([d, f, r].includes("undeclared") && !(merge.action === "deny" && DECLARES.test(merge.reason))) wrong.push(`${at}: merge ${merge.action} without saying to declare a slice`);
+  }
+  assert.deepEqual(wrong, [], `the reminder and the refusal disagree about the same state:\n  ${wrong.join("\n  ")}`);
+});
