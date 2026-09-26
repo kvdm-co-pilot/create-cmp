@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.3] - 2026-09-26
+
+The adopter-facing defects found before launch: two ways a command line could install into a
+directory you did not name, a re-run of `add firebase` that left the instrumented tests broken, a
+hook check that read clean for non-Node hooks, and a device-step message that blamed the device for
+a broken build. Ships with `prooflane-harness` 0.23.4, which carries the argument and `androidChecks`
+fixes for `prooflane init`. The Gatekeeper notary moved to `prooflane-receipts` 0.1.3 in its own
+repository; what it still accepts that the harness refuses is logged as KD-266.
+
 ### Fixed
 
 - **`androidChecks` names a failed build of the instrumented tests as the build.** It used to say
@@ -3885,7 +3894,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.2...HEAD
+[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.3...HEAD
+[0.28.3]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.2...v0.28.3
 [0.28.2]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.1...v0.28.2
 [0.28.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.2...v0.28.0
