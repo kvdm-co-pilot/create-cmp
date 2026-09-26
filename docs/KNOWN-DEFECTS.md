@@ -113,7 +113,7 @@ you the same list without opening anything.
 | **KD-39** | a harness nested under an unrelated `node_modules` borrows that project's provenance | unreachable in every layout npm/pnpm/npx produce |
 | **KD-43** | the guard that says the suite is complete is collected BY the suite | no fix that keeps one decider; the declaration is a reviewed trigger path |
 | **KD-44** | the matcher covers dotfiles and dot-dirs the runner skips — with the declared pattern, no exotic construct | no tracked test file is dotted; the refusal list cannot reach this |
-| **KD-45** | no gate in this repo executes the Firebase or iOS paths | Firebase: an L2 run executes the add step's output at startup, owed when its bytes move (`--with-firebase`), none recorded yet; no traffic crosses the redirect (KD-210); iOS: the L2 run stamps `--no-ios`; the iOS stamp compiled once on CI (run 36181162894, dispatch-only, 0.28.0 tree) and has never run |
+| **KD-45** | no gate in this repo executes the Firebase or iOS paths | Firebase: an L2 run executes the add step's output at startup, owed when its bytes move (`--with-firebase`); the first run (trunk, 2026-09-26) compiled, initialised and redirected, and failed on KD-260; no traffic crosses the redirect (KD-210); iOS: the L2 run stamps `--no-ios`; the iOS stamp compiled once on CI (run 36181162894, dispatch-only, 0.28.0 tree) and has never run |
 | **KD-46** | the iOS refusal names two causes its `catch` cannot see | half fixed in `79eafd3` (the cause is carried now); Obj-C raises abort before any Kotlin frame, and the app stops either way |
 | **KD-48** | `Platform.isDebugBinary` is a build-type reading, not the Android flag's twin | the shipped Xcode project has only `Debug`/`Release`, which map correctly |
 | **KD-49** | a nested `node --test` exits 0 whatever its tests did, when `NODE_TEST_CONTEXT` is inherited | nothing in the suite spawns one except the harness that measured it, which scrubs the env |
@@ -630,9 +630,13 @@ owes it as the "Firebase L2 run" exactly when the stamp-plus-add digest moves. T
 kind of their own (`fleet-firebase`), which `proof-plan --history` counts apart from the default
 device runs. Proven, once a run is recorded: compile (debug and release/R8), init, and the four
 redirects at startup, on an Android emulator. Not proven: traffic (KD-210), a physical device
-(KD-211), iOS (above). First recorded run: **none yet** — it runs on trunk once this slice merges,
-and a docs-only follow-up fills this line. This Firebase half closes only on a PASS record; until
-then it stays open.
+(KD-211), iOS (above). First recorded run: **2026-09-26, trunk d2162b8, FAIL** (~10 min wall-clock,
+`--with-firebase --ladder-plant`). The emulator suite served `demo-mock-not-real`; build (33.8 s),
+releaseBuild/R8 (220 s) and e2eSmoke (35 s) PASSED, so the debug app compiled, initialised and ran
+its four redirects; androidChecks then failed at `compileDebugAndroidTestKotlinAndroid`, because
+nothing put the Firebase BoM on the instrumented tests' classpath (KD-260, fixed in 0.28.2). The
+redirect plant did not run: it runs only after a green lane. This Firebase half closes only on a PASS
+record; until then it stays open.
 
 ### KD-46 — the iOS refusal names two causes its catch cannot see
 
