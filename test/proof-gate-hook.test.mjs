@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 
 import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
 import { observedTreeHash, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
-import { stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
+import { stampedApps, stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 import { TIERS, currentBranch, obligation, recordMeetsTier } from "../scripts/proof-plan.mjs";
 
 const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/hooks/proof-gate.mjs");
@@ -358,7 +358,7 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
   const planPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../qa-artifacts/proof-plan.json");
   const saved = fs.existsSync(planPath) ? fs.readFileSync(planPath) : null;
   try {
-    // A settled plan on this branch: both tiers discharged against the live tree's
+    // A settled plan on this branch: every tier discharged against the live tree's
     // own hashes, so close() settles it wherever the suite runs — trunk, a docs
     // branch, or a slice mid-flight. (It used to carry `treeHash: "n/a"`, which
     // settled only on trunk; that is the state KD-59 was measured in.)
@@ -379,6 +379,9 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
         openedAt: at,
         declared: { device: "at-close", review: "at-close" },
         discharged: { at, stampedHash: stampedOutput(repoRoot).hash, stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" },
+        // The Firebase L2 run too: on a branch whose change moves what `add firebase` writes, that
+        // tier is required, and a plan that discharged only the other two never settles there.
+        firebaseDischarged: { at, stampedHash: stampedApps(repoRoot, { timeoutMs: 60_000 }).firebase.hash, stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" },
         reviewDischarged: { at, treeHash: observedTreeHash(repoRoot, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }), tests: [], decisions: [], nothingFound: true },
       }, null, 2)}\n`,
     );
