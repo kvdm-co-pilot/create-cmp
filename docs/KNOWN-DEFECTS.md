@@ -3288,6 +3288,13 @@ deadline (`STAMP_CAP_MS` minus what the stamp spent), so `ANSWER_RESERVE_MS` sti
 bounds still sum to 10000. If the cap is spent first, the Firebase half is unanswerable and its tier
 reads OWED, naming why. It is never DISCHARGED, and the default half is unaffected.
 
+**2026-09-26 — the suite stamps under its own bound; the hook keeps this one.** Under full-suite load
+(`npm publish`'s `prepublishOnly`) a stamp plus its add outran 3000 ms, so tests whose claim is about
+bytes failed on the clock: reproduced as 13 of 112 cases red under 96 CPU burners, green idle. A stamp
+with no `timeoutMs` now takes `defaultStampCapMs()`: `STAMP_CAP_MS` everywhere, and `TEST_STAMP_CAP_MS`
+(60 s) only under node's test runner (`NODE_TEST_CONTEXT`). The tests that are about the cap pass
+`timeoutMs` and inject `now`. The hook's bound and this sum are unchanged, and a test pins that.
+
 ### KD-209 — `grep -r` in this environment obeys .gitignore, so a scan of a stamped app can miss the file that matters
 
 no source file — a fact about the tooling, recorded because it nearly cost a slice a defect
