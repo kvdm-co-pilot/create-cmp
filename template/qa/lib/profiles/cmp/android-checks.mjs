@@ -40,6 +40,26 @@ export function androidChecksOutcome(res, summary, { gradlew = "./gradlew" } = {
         `an on-device behavior claim is broken. Fix the behavior, not the test:\n${tail}`,
     };
   }
+  // THE BUILD, NOT THE DEVICE. A compile failure of the instrumented-test sources
+  // writes no JUnit results either, and the text below sent an adopter whose build
+  // was broken to look at adb sessions (KD-261). A `compile…AndroidTest…` task that
+  // FAILED is named as that, with the compiler's own lines. Still ERROR: no
+  // behaviour was observed, but nothing here says to suspect the environment.
+  const compile = /> Task (\S*compile\S*AndroidTest\S*) FAILED/.exec(String(res.out ?? ""));
+  if (compile) {
+    const errors = String(res.out ?? "")
+      .split("\n")
+      .filter((l) => /FAILED|error:|failed|^e: /i.test(l))
+      .slice(0, 12)
+      .join("\n");
+    return {
+      verdict: "ERROR",
+      executed,
+      reason:
+        `the instrumented tests did not compile — ${compile[1]} FAILED, so connectedDebugAndroidTest never ran. ` +
+        `This is the build, not the device: fix the compile error below, then re-run:\n  ${gradlew} :composeApp:connectedDebugAndroidTest --rerun\n${errors}`,
+    };
+  }
   // ERROR, not FAIL: the step could not execute. A device tier that could not
   // run is not evidence (the lane still FAILs), and going green would be the
   // worse lie — but "your behaviour is broken" is withdrawn, and the receipt

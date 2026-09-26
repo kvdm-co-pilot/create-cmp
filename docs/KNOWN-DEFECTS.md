@@ -237,7 +237,6 @@ you the same list without opening anything.
 | **KD-257** | a change to an L2 tier's own RUNNER (`scripts/fleet-check.mjs`, `scripts/lib/fleet-firebase.mjs`) owes no run of that tier, so the gate refuses the only run that would exercise the new runner on its branch — the Firebase L2 run merged unexercised and ran first on trunk | a decision, handed up: the tiers are keyed on output bytes (settled), and a runner is not an output; the runner's first real run is a trunk release proof, fixed forward if red |
 | **KD-258** | `test/the-change-price-advisory-asserts-what-it-did-not-check.test.mjs`'s "a history line that did not parse" assertion passes for every row: `/malformed/i.test(JSON.stringify(r))` matches the row's own `malformed` KEY, so a row that drops the count still passes | a vacuous assertion in a test, not a product path; the repair is asserting `r.malformed > 0` alone, which may then expose the drop the test was written to catch |
 | **KD-259** | an UNDECLARED answer from `proof-gate` names less than the next step needs: the `gh pr create` reminder never says to declare a slice (61 of 125 tier-state combinations, every tier) and names an L2 command the device gate then refuses with "declare first"; the merge refusal's one "Declare, discharge, then merge" line suppresses the review line and, with both L2 tiers UNDECLARED, the Firebase line — so followed literally it meets a second refusal | this repo's own gate, not an adopter path; every refusal it leads to names the right remedy (`--open`), and declaring opens every tier at once so `proof-plan.mjs` then lists them all. Round 2 of the Firebase slice extended both shapes to the Firebase tier by parity, which is the settled fix |
-| **KD-261** | `androidChecks` reports a failed compile of the instrumented-test sources as "connectedDebugAndroidTest DID NOT EXECUTE … has observed nothing about your change and is not accusing it. Usual cause: another adb/Gradle session …" (`packages/harness/src/lib/profiles/cmp/android-checks.mjs:51`, mirrored in `template/qa/lib/profiles/cmp/android-checks.mjs`), sending an adopter whose build is broken to look at the environment | the step is red (ERROR; the lane fails), never green, and the Gradle tail printed under the text carries `compileDebugAndroidTestKotlinAndroid FAILED` |
 | **KD-263** | nothing before the suite refuses a registry set whose `firebase-bom` is missing or was not measured for its own `firebase-gitlive`: `promotedSet` accepts a candidate with no `firebase-bom` (on which `add firebase` then refuses every app) and one that moves GitLive to 2.5.0 while carrying 33.15.0; the KD-260 table test passes when both the GitLive version and the BoM are unknown (`undefined === undefined`) | maintainer path only, and no candidate pins `firebase-gitlive` today; a promoted set with no BoM is still refused by the scaffold-based `add firebase` tests once the template moves onto it. The repair is the KD-243 shape: promotion refuses a candidate `add firebase` would refuse, and the table test requires a measured row for every GitLive version |
 | **KD-264** | `TIERS.firebase.cost` prints "~4.5min + an emulator + the Firebase Emulator Suite", and the first PASS (KD-45, 2026-09-26) measured ~11.6 min of steps for one lane and ~22 min wall-clock for the run; KD-256's row repeats the 4.5 | a maintainer's estimate, not an adopter's answer, and nothing schedules on it; the repair is the number the run measured, or the cost read off the last record |
 | **KD-265** | nothing now refuses a stamp + `add firebase` that outgrows the hook's `STAMP_CAP_MS` (3000 ms): the one measured assertion (`ms < STAMP_CAP_MS` in `two-stamps-of-one-tree-are-not-the-same-app`) became `ms < CEILING_MS` (60 s) with the suite's own cap, and `ANSWER_RESERVE_MS`'s "0.25–0.34s measured" is now prose no test holds | cannot fire today (279 ms measured on this tree, 2026-09-26) and fails safe when it does: the Firebase half reads unanswerable and the tier OWED, naming the cap, never DISCHARGED. Whether a wall-clock guard belongs in a suite that runs under `prepublishOnly` load is Karel's call |
@@ -3919,25 +3918,6 @@ UNDECLARED reminder note, and "then read node scripts/proof-plan.mjs" in place o
 merge" on the undeclared merge line.
 
 *Logged 2026-09-26 (feat/firebase-runtime-proof, review round 2).*
-
-### KD-261 — a failed compile of the instrumented tests is reported as a run that never started
-
-`packages/harness/src/lib/profiles/cmp/android-checks.mjs:51-54`, `androidChecksOutcome`; mirrored at
-`template/qa/lib/profiles/cmp/android-checks.mjs:51-54`.
-
-Found with KD-260. `androidChecksOutcome` answers every red Gradle run that wrote no JUnit results
-the same way: "connectedDebugAndroidTest DID NOT EXECUTE — the run reported no tests at all, so this
-step has observed nothing about your change and is not accusing it. Usual cause: another adb/Gradle
-session touching the same device … Re-run this step alone with nothing else on the device before
-suspecting the code". A compile failure of `src/androidInstrumentedTest` writes no results either, so
-it gets that text, and an adopter whose build is broken is sent to look at the environment.
-
-**Why it does not block:** the step is red (verdict ERROR, and the lane fails), never green; and the
-Gradle tail printed under the text (the output lines matching `FAILED|error:|failed`) carries
-`> Task :composeApp:compileDebugAndroidTestKotlinAndroid FAILED`. The repair is telling the two
-apart: a `compile…AndroidTest…` task FAILED in the output is the build, not the device.
-
-*Logged 2026-09-26 (fix/add-firebase-android-test-compile).*
 
 ### KD-263 — promotion admits a set whose Firebase BoM `add firebase` refuses or never measured
 
