@@ -21,6 +21,7 @@ import { decide } from "../scripts/hooks/proof-gate.mjs";
 import { TIERS, obligation } from "../scripts/proof-plan.mjs";
 import { stampedApps, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 
+const DECLARES = /proof-plan\.mjs --open/;
 const STATES = ["none", "undeclared", "owed", "discharged", "reopened"];
 const need = (state) => ({ required: state !== "none", reason: "1 changed path(s) are not declared irrelevant: template/x.kt", obliging: [] });
 const tier = (state) => ({ state, need: need(state) });
@@ -41,9 +42,14 @@ for (const [name, kinds] of Object.entries(KINDS)) {
     const wrong = [];
     for (const kind of kinds) {
       for (const state of STATES) {
-        const want = decide(kind, defaultAlone(state), TIERS, {}).action;
-        const got = decide(kind, alone(name, state), TIERS, {}).action;
-        if (got !== want) wrong.push(`${kind} with ${name} ${state.toUpperCase()}: ${got}, where the default L2 run ${state.toUpperCase()} gets ${want}`);
+        const want = decide(kind, defaultAlone(state), TIERS, {});
+        const got = decide(kind, alone(name, state), TIERS, {});
+        if (got.action !== want.action) wrong.push(`${kind} with ${name} ${state.toUpperCase()}: ${got.action}, where the default L2 run ${state.toUpperCase()} gets ${want.action}`);
+        // And the answer names the act that unblocks it: where the default tier
+        // is told to declare a slice, so is this one — never "already discharged".
+        else if (DECLARES.test(want.reason ?? "") && !DECLARES.test(got.reason ?? "")) {
+          wrong.push(`${kind} with ${name} ${state.toUpperCase()}: never says to declare a slice, where the default L2 run's answer does — it says: ${String(got.reason).slice(0, 120)}…`);
+        }
       }
     }
     assert.deepEqual(wrong, [], `a tier that is held in fewer states than the default L2 run lets a slice through that the default would stop:\n  ${wrong.join("\n  ")}`);
