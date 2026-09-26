@@ -8,10 +8,11 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
-- **`androidChecks` names a failed compile of the instrumented tests as the build.** It used to say
+- **`androidChecks` names a failed build of the instrumented tests as the build.** It used to say
   the run "DID NOT EXECUTE" and point at another adb/Gradle session, sending you to the device when
-  the code did not compile. It now names the failed compile task and prints the compiler's errors
-  (KD-261).
+  the build was broken. Any task that fails before `connectedDebugAndroidTest` runs (a compile, KSP,
+  a META-INF clash, a duplicate class, a manifest merge) is now named, with Gradle's own lines; only
+  the device task itself failing keeps the device advice (KD-261).
 - **Re-running `create-cmp add firebase` on an app that ran it before 0.28.2 now adds the Firebase
   BoM.** It used to answer `already there: composeApp/build.gradle.kts (the add-firebase block)` and
   leave the instrumented tests uncompilable. The step recognises its own earlier block and rewrites
