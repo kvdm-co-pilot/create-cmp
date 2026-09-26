@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-09-26
+
+An app that ran `create-cmp add firebase` compiles its instrumented tests again. The fault was
+found by the first run of the new Firebase L2 run, which executes that app under the Firebase
+Emulator Suite. The shipped orchestrator now points at create-cmp's re-record rule instead of
+restating it.
+
+### Changed
+
+- **The shipped `agents/cmp-orchestrator.md` no longer says a reviewer asked to re-record should be
+  resumed.** Whether that reviewer is resumed or replaced is create-cmp's own rule, which is
+  stated once, in `docs/KNOWN-DEFECTS.md`. The orchestrator's line now only points at it (KD-251).
+
 ### Added
 
 - **The Firebase L2 run.** `node scripts/fleet-check.mjs --with-firebase` runs the fleet scratch app
@@ -3849,7 +3862,8 @@ Initial release.
 - **Claude Code plugin** — `cmp-new`, `cmp-doctor`, `cmp-qa-prep` skills over the same engine, plus a
   marketplace manifest.
 
-[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.1...HEAD
+[unreleased]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.2...HEAD
+[0.28.2]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.1...v0.28.2
 [0.28.1]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.2...v0.28.0
 [0.27.2]: https://github.com/kvdm-co-pilot/create-cmp/compare/v0.27.1...v0.27.2
