@@ -9,6 +9,33 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-261 — a failed compile of the instrumented tests is reported as a run that never started — **CLOSED 2026-09-26**
+
+`packages/harness/src/lib/profiles/cmp/android-checks.mjs:51-54`, `androidChecksOutcome`; mirrored at
+`template/qa/lib/profiles/cmp/android-checks.mjs:51-54`.
+
+Found with KD-260. `androidChecksOutcome` answers every red Gradle run that wrote no JUnit results
+the same way: "connectedDebugAndroidTest DID NOT EXECUTE — the run reported no tests at all, so this
+step has observed nothing about your change and is not accusing it. Usual cause: another adb/Gradle
+session touching the same device … Re-run this step alone with nothing else on the device before
+suspecting the code". A compile failure of `src/androidInstrumentedTest` writes no results either, so
+it gets that text, and an adopter whose build is broken is sent to look at the environment.
+
+**Why it does not block:** the step is red (verdict ERROR, and the lane fails), never green; and the
+Gradle tail printed under the text (the output lines matching `FAILED|error:|failed`) carries
+`> Task :composeApp:compileDebugAndroidTestKotlinAndroid FAILED`. The repair is telling the two
+apart: a `compile…AndroidTest…` task FAILED in the output is the build, not the device.
+
+*Logged 2026-09-26 (fix/add-firebase-android-test-compile).*
+
+**CLOSED 2026-09-26 — the build is named as the build.** `androidChecksOutcome` (both copies) now
+tells the two apart the way the repair above says: a `> Task …compile…AndroidTest… FAILED` line in
+Gradle's output answers *"the instrumented tests did not compile — <task> FAILED, so
+connectedDebugAndroidTest never ran. This is the build, not the device"*, with the compiler's own
+`e:` lines in the tail. The verdict stays ERROR (no behaviour was observed); a run that never started
+keeps the environment advice. Test:
+`test/a-failed-compile-of-the-instrumented-tests-is-named-as-the-build.test.mjs`.
+
 ### KD-262 — an earlier adopter's re-run of `add firebase` says the block is there and leaves the BoM out — **CLOSED 2026-09-26**
 
 `src/lib/add-firebase.mjs` `planAppend` (`text.includes(BLOCK_OPEN)` returns null), `src/lib/upgrade.mjs`
