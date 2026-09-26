@@ -240,6 +240,7 @@ you the same list without opening anything.
 | **KD-264** | `TIERS.firebase.cost` prints "~4.5min + an emulator + the Firebase Emulator Suite", and the first PASS (KD-45, 2026-09-26) measured ~11.6 min of steps for one lane and ~22 min wall-clock for the run; KD-256's row repeats the 4.5 | a maintainer's estimate, not an adopter's answer, and nothing schedules on it; the repair is the number the run measured, or the cost read off the last record |
 | **KD-265** | nothing now refuses a stamp + `add firebase` that outgrows the hook's `STAMP_CAP_MS` (3000 ms): the one measured assertion (`ms < STAMP_CAP_MS` in `two-stamps-of-one-tree-are-not-the-same-app`) became `ms < CEILING_MS` (60 s) with the suite's own cap, and `ANSWER_RESERVE_MS`'s "0.25–0.34s measured" is now prose no test holds | cannot fire today (279 ms measured on this tree, 2026-09-26) and fails safe when it does: the Firebase half reads unanswerable and the tier OWED, naming the cap, never DISCHARGED. Whether a wall-clock guard belongs in a suite that runs under `prepublishOnly` load is Karel's call |
 | **KD-266** | the notary validates six receipts the harness's own done-check refuses — `mode:"fast"`, `stage`/`profile` `nightly`, `stage`/`profile` `smoke`, and a step SKIPped with `skipKind:"environment"`: `template/qa/receipt-check.mjs` refuses them BEFORE it calls `validateReceiptForTree`, and `packages/receipts` carries none of those refusals, so Gatekeeper (which calls only the library) says `valid` | no notary is running (the host is deferred) and the harness's own Stop hook refuses all six, so no adopter's "done" gets through; it predates prooflane-receipts 0.1.3. The failing test is gatekeeper branch `f4-review` (`test/harness-refusals.test.mjs`); the fix moves the refusals into `packages/receipts` and re-vendors — it must land before any Gatekeeper go-live |
+| **KD-267** | the refusal demo every stamped app ships (`qa/refusal-demo.mjs`, from `packages/harness/src/refusal-demo.mjs`) catches 2 of its 4 violations on 0.28.3: #2's injector imports the alphabetically first file under `data/`, now `AppResultCatching.kt`, which declares no class (`\bclass\s+(\w+)` finds nothing), and #4's looks for `text = "Home"`, which the component-vocabulary rework (6c93218) removed from `HomeScreen.kt` — both fail to INJECT, so the demo exits 1 without any gate being asked | the gates are not at fault: in the same run ARCH-05 and specCoverage refused with named reasons, and the Stop hook refused `done`. What is broken is the demonstration (1.0 criterion F8) and an adopter who runs it is told "a gate did NOT catch its violation", which is false. Nothing in the suite runs the demo against a fresh stamp, which is why it drifted silently |
 
 ---
 
@@ -3993,3 +3994,35 @@ into `packages/receipts` (the done-check then calls them rather than stating the
 re-vendor Gatekeeper. It must land before any Gatekeeper go-live (G0).
 
 *Logged 2026-09-26 (finish-1.0-adopter-truth, gatekeeper post-merge review).*
+
+### KD-267 — the shipped refusal demo fails to inject two of its four violations
+
+`packages/harness/src/refusal-demo.mjs` (`findDataLayerImport`, the structural-regression injector) · `template/qa/refusal-demo.mjs`
+
+Found on 2026-09-26 by re-recording the launch demo against the published create-cmp-cli 0.28.3
+(`docs/research/launch/demo/scene.sh --record`). Every earlier beat of that take held — stamp, green
+scaffold receipt, the Stop hook refusing `done` with ARCH-05 named, the revert to VALID — and the last
+beat, `node qa/refusal-demo.mjs`, printed `2/4 assertions PASS`:
+
+- **#2 UI→data import.** `findDataLayerImport` sorts the `.kt` files under a `data/` package and takes
+  the first, then requires `\bclass\s+(\w+)` in it. The first is now `AppResultCatching.kt`, a file of
+  top-level functions (`suspend fun <T> suspendRunCatching(`), so the injector throws "Could not
+  determine package/class name".
+- **#4 Undeclared structural regression.** The injector anchors on `text = "Home"` to splice a sibling
+  node after the Home title. The component-vocabulary rework (6c93218) no longer writes that literal
+  in `HomeScreen.kt`, so it throws "Could not find the Home title Text() node".
+
+In both cases the violation is never planted, so no gate is asked; the demo then reports "a gate did
+NOT catch its violation as expected", which is untrue of the gates and is what an adopter reads.
+
+**Why it does not block.** The gates themselves hold — ARCH-05 and specCoverage refused in the same run
+with named reasons — and no adopter's "done" depends on the demo. It blocks F8 (a refusal demo
+recorded on the current release), and it must be fixed before the demo is shown to anyone.
+
+**Why logged and not fixed here.** The fix moves `template/qa/` and therefore the stamped digest, which
+owes both L2 runs and a release; it is the next slice, with KD-266. The repair is two anchors that
+read the tree rather than a literal (a `data/` file that declares a class or interface; the title
+node found through the golden test's own selector), plus the missing guard: a suite test that stamps
+an app and runs the demo, so the next template change that breaks an injector reds here first.
+
+*Logged 2026-09-26 (session dd13de12, the 0.28.3 demo re-record).*
