@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **`doctor` no longer credits a hook in another script language as anchored.** A hook written
+  `python3 qa/report.py` (or `.rb`, `.pl`, `.ts`, `.bash`, `.zsh`, `.kts`) resolves against the
+  session's directory exactly like `node qa/x.mjs`, and read clean because only four extensions were
+  judged (KD-86).
 - **`--no-<flag>` for a flag that takes a value is refused, not accepted.** `prooflane init
   --no-profile svc` stored a flag nothing reads and installed into `./svc`. Both doors now say there
   is no such flag and write nothing (KD-218).

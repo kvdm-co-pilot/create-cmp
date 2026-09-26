@@ -139,7 +139,7 @@ you the same list without opening anything.
 | **KD-82** | the ordering verdict is commit-graph ancestry where every other obligation here is trigger-path bytes | the refusal's remedy is the rebase you owe the merge anyway; it costs a rebase, never a run |
 | **KD-83** | "the ordinary owed-allow is byte-identical to before the ordering check" is verified by nothing | the cross-path comparison beside it is real; only the historical claim is unpinned |
 | **KD-84** | `declaredBudgetMs` has two implementations and the declared 10s has three spellings | all three agree today, and the unreadable-settings fallback errs small |
-| **KD-86** | the anchoring detector judges `.mjs/.cjs/.js/.sh` only, so a hook invoking `python qa/x.py` or a bare `qa/tool` reads clean | measured against the template: every command it ships is `node` or `test -f`, so the allow-list refuses nothing that exists today |
+| **KD-86** | the anchoring detector judges a path only by its extension, so a hook invoking an extensionless `qa/tool` reads clean (the other-language half — `python3 qa/x.py` — is fixed, 2026-09-26) | a multi-segment word with no extension is not distinguishable from `origin/main` or `dev/null` without guessing; nothing the template ships is extensionless |
 | **KD-87** | the anchoring detector equates *single-quoted* with *not executed*, so `sh -c '…'` / `eval '…'` read clean; and it reads each match's prefix from the UNMASKED command, so a shell-inert `'${CLAUDE_PROJECT_DIR:-.}/…'` counts as anchored | both measured by execution and bounded by `test/hook-anchoring-differential.test.mjs`; no command in either shipped settings file is in the blind spot, and the gate reds the day one is |
 | **KD-88** | "every surface that carries a command" is spelled as a two-item list (`hooks[*][*].hooks[*].command` + `statusLine.command`) in both readers, and `settings.json` executes more than that — `apiKeyHelper`, `awsAuthRefresh`, `awsCredentialExport` | measured: a fourth hook EVENT and a second hook in an existing group are both caught BY NAME; only a non-`hooks`, non-`statusLine` key is invisible, and neither settings file has one |
 | **KD-90** | the `statusLine` third of the hook-anchoring fix is NOT fixed — `CLAUDE_PROJECT_DIR` is not exported to a statusLine command, so the anchor would be inert | **re-placed 2026-09-19**: the old reason (*nothing regressed*) is age, which the header abolished. The surface IS inert and an adopter IS affected — what moves it to row 2 is that they are now TOLD, by `doctor`, in the one place that could tell them. The remedy needs a different mechanism (stdin `workspace.project_dir`, KD-181), not a different spelling |
@@ -1256,6 +1256,12 @@ allow-list refuses nothing that exists. The gate is narrower than its name sugge
 and the shape it would miss is one nothing in this repo writes. Found while writing the detector,
 and left narrow on purpose: widening it costs false positives on narration, which is the failure
 mode that would make the gate un-adoptable.
+
+**AMENDED 2026-09-26 — the other-language half is fixed; the extensionless half stays.** `SCRIPT_PATH`
+now reads `.py .rb .pl .ts .mts .cts .bash .zsh .kts` beside node's and sh's, so an adopter's
+`python3 qa/report.py` hook is reported unanchored and its `${CLAUDE_PROJECT_DIR:-.}/…` form reads
+clean (`test/a-hook-in-another-script-language-reads-as-unanchored.test.mjs`). An extensionless
+`qa/tool` is still not judged, for the reason above: without an extension a path is a guess.
 
 ### KD-87 — "inside single quotes" is not "not executed", and an inert anchor still counts as anchoring
 
