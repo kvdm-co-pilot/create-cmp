@@ -239,6 +239,7 @@ you the same list without opening anything.
 | **KD-263** | nothing before the suite refuses a registry set whose `firebase-bom` is missing or was not measured for its own `firebase-gitlive`: `promotedSet` accepts a candidate with no `firebase-bom` (on which `add firebase` then refuses every app) and one that moves GitLive to 2.5.0 while carrying 33.15.0; the KD-260 table test passes when both the GitLive version and the BoM are unknown (`undefined === undefined`) | maintainer path only, and no candidate pins `firebase-gitlive` today; a promoted set with no BoM is still refused by the scaffold-based `add firebase` tests once the template moves onto it. The repair is the KD-243 shape: promotion refuses a candidate `add firebase` would refuse, and the table test requires a measured row for every GitLive version |
 | **KD-264** | `TIERS.firebase.cost` prints "~4.5min + an emulator + the Firebase Emulator Suite", and the first PASS (KD-45, 2026-09-26) measured ~11.6 min of steps for one lane and ~22 min wall-clock for the run; KD-256's row repeats the 4.5 | a maintainer's estimate, not an adopter's answer, and nothing schedules on it; the repair is the number the run measured, or the cost read off the last record |
 | **KD-265** | nothing now refuses a stamp + `add firebase` that outgrows the hook's `STAMP_CAP_MS` (3000 ms): the one measured assertion (`ms < STAMP_CAP_MS` in `two-stamps-of-one-tree-are-not-the-same-app`) became `ms < CEILING_MS` (60 s) with the suite's own cap, and `ANSWER_RESERVE_MS`'s "0.25–0.34s measured" is now prose no test holds | cannot fire today (279 ms measured on this tree, 2026-09-26) and fails safe when it does: the Firebase half reads unanswerable and the tier OWED, naming the cap, never DISCHARGED. Whether a wall-clock guard belongs in a suite that runs under `prepublishOnly` load is Karel's call |
+| **KD-266** | the notary validates six receipts the harness's own done-check refuses — `mode:"fast"`, `stage`/`profile` `nightly`, `stage`/`profile` `smoke`, and a step SKIPped with `skipKind:"environment"`: `template/qa/receipt-check.mjs` refuses them BEFORE it calls `validateReceiptForTree`, and `packages/receipts` carries none of those refusals, so Gatekeeper (which calls only the library) says `valid` | no notary is running (the host is deferred) and the harness's own Stop hook refuses all six, so no adopter's "done" gets through; it predates prooflane-receipts 0.1.3. The failing test is gatekeeper branch `f4-review` (`test/harness-refusals.test.mjs`); the fix moves the refusals into `packages/receipts` and re-vendors — it must land before any Gatekeeper go-live |
 
 ---
 
@@ -3962,3 +3963,33 @@ of Karel: a guard measured where the machine is idle (proof-plan printing `ms` a
 every discharge, say), or accept that the first sign is an OWED that names the cap.
 
 *Logged 2026-09-26 (fix/stamp-cap-under-suite-load, review round 1).*
+
+### KD-266 — the notary validates receipts the harness refuses as proof of done
+
+`packages/receipts/src/receipt-validate.mjs` · `template/qa/receipt-check.mjs` · gatekeeper `src/validate.mjs`
+
+Found by the post-merge review of gatekeeper#2 (prooflane-receipts 0.1.3). The harness's done-check
+refuses a receipt written in fast mode, by the nightly or smoke stage or profile, or with a step
+SKIPped for an environmental reason — each with a named reason — and does so before it ever calls
+`validateReceiptForTree`. The library itself carries none of those refusals. Gatekeeper, whose rule
+is to hold no validation logic of its own, calls only the library, so all six planted receipts come
+back `status: "valid"` from `validateCommit`. The old cmp-receipts 0.1.0 accepted them too: the swap
+did not introduce this, and did not fix it. Gatekeeper's own synthetic "valid" fixture
+(`test/helpers.mjs`) carries an `e2eSmoke` SKIP reading "no Android device/emulator attached", which
+the harness's legacy reason fallback treats as environmental — the fix changes that fixture as well.
+
+The failing test compares the two readers rather than restating the rules: for each planted receipt
+it runs the fixture's own `qa/receipt-check.mjs --json` beside `validateCommit`, and fails whenever
+the harness says invalid and Gatekeeper says valid; a control row proves the harness reader ran.
+It sits on gatekeeper branch `f4-review` (35e27bb), unmerged so gatekeeper's main stays green.
+
+**Why it does not block.** No notary is running — the Gatekeeper host is deferred — and every adopter's
+Stop hook refuses all six, so no "done" crosses on them today.
+
+**Why logged and not fixed here.** The stamped app carries a byte-identical copy of the library, so
+the fix moves the stamped digest and owes both L2 runs; and the legacy environmental-SKIP fallback
+reads the project's profile, which the library does not hold. It is its own slice: move the refusals
+into `packages/receipts` (the done-check then calls them rather than stating them), republish, and
+re-vendor Gatekeeper. It must land before any Gatekeeper go-live (G0).
+
+*Logged 2026-09-26 (finish-1.0-adopter-truth, gatekeeper post-merge review).*
