@@ -108,22 +108,27 @@ function findScreenComposable(projectDir) {
   return candidates[0];
 }
 
-// A real class under data/ so the injected import resolves to something that exists.
+// A type a data/ file really declares, so the injected import resolves to
+// something that exists. Read the tree: the first data/ .kt file (sorted) that
+// declares a non-private class, interface or object at the start of a line —
+// not the first file, which may hold only top-level functions (KD-267).
+const DECLARATION_RE =
+  /^[ \t]*(?:(?:public|internal|abstract|sealed|data|open|expect|actual|enum|annotation|value|inline|fun)\s+)*(?:class|interface|object)\s+(\w+)/m;
+
 function findDataLayerImport(projectDir) {
   const dataDir = path.join(projectDir, "composeApp/src/commonMain/kotlin");
   const candidates = walk(dataDir).filter((p) => p.replace(/\\/g, "/").includes("/data/") && p.endsWith(".kt"));
-  if (candidates.length === 0) {
-    throw new Error(`No file found under a data/ package in ${dataDir} — cannot inject the UI-to-data-import violation.`);
-  }
   candidates.sort();
-  const target = candidates[0];
-  const text = fs.readFileSync(target, "utf8");
-  const pkgMatch = text.match(/^package\s+([\w.]+)/m);
-  const classMatch = text.match(/\bclass\s+(\w+)/);
-  if (!pkgMatch || !classMatch) {
-    throw new Error(`Could not determine package/class name from ${target} to build a realistic data-layer import.`);
+  for (const target of candidates) {
+    const text = fs.readFileSync(target, "utf8");
+    const pkgMatch = text.match(/^package\s+([\w.]+)/m);
+    const declMatch = text.match(DECLARATION_RE);
+    if (pkgMatch && declMatch) return `import ${pkgMatch[1]}.${declMatch[1]}`;
   }
-  return `import ${pkgMatch[1]}.${classMatch[1]}`;
+  throw new Error(
+    `No .kt file under a data/ package in ${dataDir} declares a class, interface or object (with a package line) — ` +
+      `looked in ${candidates.length} file(s); cannot inject the UI-to-data-import violation.`,
+  );
 }
 
 // A `// SPEC: <ID>`-tagged test in commonTest bound to exactly one clause, so
@@ -261,6 +266,9 @@ function findHomeGoldenTest(projectDir) {
   return candidates[0];
 }
 
+// The shared header component every screen renders its title through.
+const HEADER_CALL = "AppHeader";
+
 export function injectStructuralRegression(projectDir) {
   const goldenTest = findHomeGoldenTest(projectDir);
   const testText = fs.readFileSync(goldenTest, "utf8");
@@ -277,17 +285,19 @@ export function injectStructuralRegression(projectDir) {
 
   let text = fs.readFileSync(screenFile, "utf8");
   // Mutate the structure without touching UPDATE_GOLDEN: add an extra text
-  // node right after the title's Text(...) call closes, so the semantics
-  // tree gains a sibling child the committed baseline does not have. Find
-  // the *matching* closing paren of that call (brace/paren-depth walk) —
-  // a lazy regex would splice mid-call and produce invalid Kotlin.
-  const titleCallStart = text.indexOf('text = "Home"');
-  if (titleCallStart === -1) {
-    throw new Error(`Could not find the Home title Text() node in ${screenFile} to mutate structurally.`);
-  }
-  const callOpenParen = text.lastIndexOf("Text(", titleCallStart);
+  // node right after the screen's header call closes, so the semantics tree
+  // gains a sibling child the committed baseline does not have. The anchor is
+  // the first `AppHeader(` call in the composable's body — the component the
+  // screen renders its title through — never a title literal (KD-267). Find
+  // the *matching* closing paren of that call (paren-depth walk) — a lazy
+  // regex would splice mid-call and produce invalid Kotlin.
+  const bodyStart = firstComposableBodyBraceEnd(text);
+  const callOpenParen = bodyStart === -1 ? -1 : text.indexOf(`${HEADER_CALL}(`, bodyStart);
   if (callOpenParen === -1) {
-    throw new Error(`Could not find the opening Text( for the Home title in ${screenFile}.`);
+    throw new Error(
+      `Could not find a \`${HEADER_CALL}(\` call in the @Composable body of ${screenFile} — the header node the ` +
+        `structural-regression violation is spliced after.`,
+    );
   }
   let depth = 0;
   let callCloseParen = -1;
@@ -302,10 +312,17 @@ export function injectStructuralRegression(projectDir) {
     }
   }
   if (callCloseParen === -1) {
-    throw new Error(`Could not find the matching close paren for the Home title Text() in ${screenFile}.`);
+    throw new Error(`Could not find the matching close paren of the \`${HEADER_CALL}(\` call in ${screenFile}.`);
   }
   const insertAt = callCloseParen + 1;
-  text = `${text.slice(0, insertAt)}\n        Text(text = "Injected structural regression")${text.slice(insertAt)}`;
+  const lineStart = text.lastIndexOf("\n", callOpenParen) + 1;
+  const indent = text.slice(lineStart, callOpenParen).match(/^\s*/)[0];
+  text = `${text.slice(0, insertAt)}\n${indent}Text(text = "Injected structural regression")${text.slice(insertAt)}`;
+  // The screen calls Text only through components; import it so the planted
+  // node compiles and the golden gate — not the compiler — is what refuses it.
+  if (!/^import androidx\.compose\.material3\.Text$/m.test(text)) {
+    text = text.replace(/^(package .+\n)/, `$1\nimport androidx.compose.material3.Text`);
+  }
   fs.writeFileSync(screenFile, text);
   return { file: path.relative(projectDir, screenFile), screen: screenName };
 }
