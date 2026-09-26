@@ -64,8 +64,9 @@ What each layer checks:
 
 - **`evaluateReceipt`** — binding present, verdict not FAIL, recomputed hash
   matches, verdict is PASS. Its `reason` strings are the exact refusals a
-  generated project prints. This is deliberately all a project checks against
-  itself: a receipt you just generated is definitionally fresh.
+  generated project prints. A project checks this and `checkDoneEvidence`
+  against itself, never the hosted-only checks below: a receipt you just
+  generated is definitionally fresh.
 - **`checkDoneEvidence(receipt, { laneCommand?, legacySkips? })`** — the
   receipts a project's own done-check refuses as proof of done, each by a named
   reason: `mode: "fast"`; `stage` or `profile` `nightly`; `stage` or `profile`
@@ -76,7 +77,9 @@ What each layer checks:
   without a profile gets no legacy fallback.
 - **`validateReceiptForTree`** runs `checkDoneEvidence` (check id
   `done-evidence`; pass `legacySkips` through if you hold them), so a hosted
-  validator never calls valid what the Stop hook refuses, and adds the
+  validator refuses what the Stop hook refuses — except a pre-`skipKind`
+  receipt's (0.19.0 and earlier) environmental SKIP, which only a caller
+  holding the profile's `legacySkips` can recognise — and adds the
   hosted-only checks:
   - **freshness** — `generatedAt` within a window (default 30 days;
     `checkFreshness`);

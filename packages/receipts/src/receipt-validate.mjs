@@ -410,8 +410,10 @@ export function validateReceiptForTree({ root, now = Date.now(), policy = {}, le
   const checks = [{ id: "receipt-present", ok: true, detail: RECEIPT_REL_PATH }];
   const skips = listSkippedSteps(receipt);
 
-  // The done-evidence refusals the harness's own done-check applies (KD-266):
-  // a notary must never call valid what the Stop hook refuses as proof of done.
+  // The done-evidence refusals the harness's own done-check applies (KD-266),
+  // so a notary refuses what the Stop hook refuses — with one stated exception:
+  // a pre-`skipKind` receipt's environmental SKIP is judged by the profile's
+  // reason text, and a caller that passes no `legacySkips` cannot judge it.
   const done = checkDoneEvidence(receipt, { legacySkips });
   checks.push({ id: "done-evidence", ok: done.ok, detail: done.detail });
 
