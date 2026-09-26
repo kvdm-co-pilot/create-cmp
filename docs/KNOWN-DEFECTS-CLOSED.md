@@ -9,6 +9,25 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-219 — `attach.mjs`'s new comment says the empty value "never arrives any more", and the suite passes it in — **CLOSED 2026-09-26**
+
+`src/commands/attach.mjs` (`manifestFromFlags`, the `citation-roots` comment)
+
+The comment the change put there reads *"the EMPTY value never arrives any more, because the door
+refuses a value flag given none before any command runs (`emptyValues`, bin/create-cmp.mjs)"*. True
+of argv through the bin; false of the function, which is exported and called with
+`{ profile: "Bad Id", "citation-roots": "" }` by `test/attach-manifest.test.mjs:83` in this same
+tree. The `roots.length` guard the comment was weakened around is still load-bearing and still
+correct — only the reason given for keeping it is false.
+
+**Fires when:** anyone reads the comment to decide whether the guard can go.
+*Logged 2026-09-22, round 1 of the doors review.*
+
+**CLOSED 2026-09-26 — the comment says both.** It now states that through the bin only `","` and its
+like arrive, that the function is exported and called directly with `""`
+(`test/attach-manifest.test.mjs`), and that the `roots.length` guard therefore cannot go. Comment
+only; no behaviour moved, so no test was written for it.
+
 ### KD-261 — a failed compile of the instrumented tests is reported as a run that never started — **CLOSED 2026-09-26**
 
 `packages/harness/src/lib/profiles/cmp/android-checks.mjs:51-54`, `androidChecksOutcome`; mirrored at
