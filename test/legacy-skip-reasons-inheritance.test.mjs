@@ -4,16 +4,17 @@
 // literal regex in the core — into a new profile export, `legacySkipReasons`.
 // The Stop hook now reads them off the loaded profile by name:
 //
-//   const declared = profile?.legacySkipReasons;   // receipt-check.mjs:162
-//   ... legacyNames && legacyPatterns && ...        // receipt-check.mjs:173
+//   const declared = profile?.legacySkipReasons;
+//   legacySkips = { names: readLadder(ladder).l2Execution, reasons: declared };
 //
-// `legacyNames` is the ladder's `l2Execution`, and `ladder` IS in
+// (and hands `legacySkips` to the library's checkDoneEvidence since KD-266).
+// `legacySkips.names` is the ladder's `l2Execution`, and `ladder` IS in
 // profile-loader.mjs's INHERITABLE list. `legacySkipReasons` is not. So an heir
 // of cmp — `export const extendsProfile = "cmp"`, the shape differential-
 // conformance.test.mjs already exercises — inherits the step NAMES that gate
 // the legacy fallback and loses the reason texts the same fallback needs, and
-// the two halves of one decision come apart silently: `legacyPatterns` stays
-// null, `envSkipped` comes back empty, and the one gate that refuses "done"
+// the two halves of one decision come apart silently: `legacySkips` stays
+// null, no unlabelled SKIP reads as environmental, and the one gate that refuses "done"
 // over a tier that never ran stops refusing for that profile's older receipts.
 //
 // Before the move the patterns were the core's, so an heir got them for free.
@@ -42,14 +43,14 @@ test("an heir inherits the ladder that gates the legacy skip fallback but not th
   const r = resolveInheritance(heir, "heir", () => ({ ok: true, profile: base }));
   assert.equal(r.ok, true, r.reason ?? "");
 
-  // The half that IS inherited — receipt-check's `legacyNames`.
+  // The half that IS inherited — receipt-check's `legacySkips.names`.
   assert.deepEqual(
     r.profile.ladder?.l2Execution,
     CMP_LADDER.l2Execution,
     "the ladder is inheritable, so the heir's Stop hook knows which steps the legacy fallback covers",
   );
 
-  // The half that is not — receipt-check's `legacyPatterns`. Without it the
+  // The half that is not — receipt-check's `legacySkips.reasons`. Without it the
   // fallback above is unreachable for every receipt this heir inherited the
   // ladder to grade.
   assert.deepEqual(

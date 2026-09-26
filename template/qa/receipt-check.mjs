@@ -20,7 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
-import { evaluateReceipt, readReceipt } from "./lib/receipt-validate.mjs";
+import { checkDoneEvidence, evaluateReceipt, readReceipt } from "./lib/receipt-validate.mjs";
 import { readHold, assessHold, describeHold, holdExplains } from "./lib/agent-hold.mjs";
 import { LANE_MARKER_STALE_MS, laneMarkerPath } from "./lib/lane-markers.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
@@ -111,35 +111,15 @@ function evaluate() {
   if (receipt === null) {
     return { valid: false, reason: `no receipt — run \`${LANE_COMMAND}\``, profile: undefined };
   }
-  // A fast-mode receipt (verify --fast) is an inner-loop signal, never done
-  // evidence — refused here before the hash is even recomputed, so a session
-  // can never end on "done" while its evidence trail's last run was --fast.
-  if (receipt.mode === "fast") {
-    return {
-      valid: false,
-      reason: `the last verify run was --fast (inner-loop only); run the full lane (\`${LANE_COMMAND}\`) before finishing`,
-      profile: receipt.profile,
-    };
-  }
-  // A nightly receipt proves the HARNESS and the tree's invariants under a
-  // forced double-run — never a change. Refused as done-evidence for the same
-  // reason --fast is: the receipt's own stage says what it is allowed to mean.
-  if (receipt.stage === "nightly" || receipt.profile === "nightly") {
-    return {
-      valid: false,
-      reason: `the last verify run was the nightly stage (it proves the harness, not this change); run the change-stage lane (\`${LANE_COMMAND}\`) before finishing`,
-      profile: receipt.profile,
-    };
-  }
-  // smoke (GATE-RULES Rule 0) runs no Gradle: it proves the framework returns,
-  // never that the change is good. Refused like --fast, for the same reason.
-  if (receipt.stage === "smoke" || receipt.profile === "smoke") {
-    return {
-      valid: false,
-      reason: `the last verify run was the smoke profile (the framework check — no build, no tests; it proves the instrument, not this change); run the change-stage lane (\`${LANE_COMMAND}\`) before finishing`,
-      profile: receipt.profile,
-    };
-  }
+  // THE DONE-EVIDENCE REFUSALS ARE THE LIBRARY'S (KD-266). A receipt written
+  // by verify --fast, by the nightly or smoke stage or profile, or with a step
+  // SKIPped for an environmental reason is no proof that a change is done —
+  // refused before the hash is even recomputed. The rules and their named
+  // reasons live in qa/lib/receipt-validate.mjs (checkDoneEvidence), so the
+  // hosted receipt check, which calls only that library, refuses exactly what
+  // this Stop hook refuses. They used to be stated here, and the notary said
+  // "valid" to all six shapes.
+  //
   // A step that COULD have run and did not is a gap a human can close, and a
   // change is not done while it stands (2026-09-03). The lane boots its own
   // device, so an environment SKIP — no device, a tool not installed, a lease
@@ -149,14 +129,23 @@ function evaluate() {
   // Stage 0 PR 6c: this used to test `["e2eSmoke", "androidChecks"]` by name
   // and match Android reason text. On any other stack it therefore checked
   // nothing — the one gate that refuses "done" over a tier that never ran,
-  // silently inert. `skipKind` is the stack-free signal and every current
-  // receipt carries it, so the rule is now: ANY step that skipped for an
-  // environmental reason blocks done, whatever it is called.
+  // silently inert. `skipKind` is the stack-free signal, so the rule is: ANY
+  // step that skipped with `skipKind: "environment"` blocks done, whatever it
+  // is called.
   //
-  // Receipts predating `skipKind` (0.19.0 and earlier) are still read by their
+  // NOT EVERY CURRENT RECEIPT CARRIES `skipKind`. A step that emits a SKIP with
+  // none — the cmp profile's tokenDrift "inspector endpoint not reachable" SKIP,
+  // on every headless L2 run (KD-5) — is judged as a legacy receipt would be:
+  // by its reason text, which that SKIP's text does not match. So it is not
+  // refused, and test/the-notary-refuses-what-the-done-check-refuses.test.mjs
+  // pins that.
+  //
+  // Receipts predating `skipKind` (0.19.0 and earlier) are read by their
   // reason text, and THAT list is the profile's — read from the ladder's
   // execution tier when the profile is loadable, and simply not applied when
-  // it is not. A legacy fallback that guessed would be worse than none.
+  // it is not. A legacy fallback that guessed would be worse than none. The
+  // library is stack-agnostic and holds no such text: this reader hands it
+  // the profile's lists; a caller that holds none gets no fallback.
   //
   // THE LADDER IS RESOLVED, NOT SPELLED. This used to read `profile.ladder`
   // directly, which is one of the two places a profile may declare its rungs;
@@ -177,8 +166,7 @@ function evaluate() {
   // stack's vocabulary to read one stack's old receipts. A profile that never
   // emitted a pre-`skipKind` receipt declares none and gets no legacy fallback,
   // which is the honest silence this block already chose over a guess.
-  let legacyNames = null;
-  let legacyPatterns = null;
+  let legacySkips = null;
   try {
     const manifest = resolveHarnessManifest(ROOT);
     if (manifest.ok) {
@@ -186,28 +174,17 @@ function evaluate() {
       const profile = loaded.ok ? loaded.profile : null;
       const resolved = evidenceLadderFor(profile);
       const ladder = resolved.ok ? resolved.ladder : null;
-      if (ladder) legacyNames = readLadder(ladder).l2Execution;
       const declared = profile?.legacySkipReasons;
-      if (Array.isArray(declared) && declared.length) {
-        legacyPatterns = new RegExp(declared.map((r) => String(r).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));
+      if (ladder && Array.isArray(declared) && declared.length) {
+        legacySkips = { names: readLadder(ladder).l2Execution, reasons: declared };
       }
     }
   } catch {
     // The Stop hook never crashes over a legacy-compat lookup.
   }
-  const envSkipped = (Array.isArray(receipt.steps) ? receipt.steps : []).filter((s) => {
-    if (!s || s.verdict !== "SKIP") return false;
-    if (s.skipKind) return s.skipKind === "environment";
-    return Boolean(legacyNames && legacyPatterns && legacyNames.includes(s.name) && legacyPatterns.test(String(s.reason ?? "")));
-  });
-  if (envSkipped.length) {
-    return {
-      valid: false,
-      reason:
-        `a tier did not run — ${envSkipped.map((s) => `${s.name}: ${String(s.reason ?? "").split("\n")[0]}`).join("; ")}. ` +
-        `Those steps skipped for an environmental reason, not because this project lacks them; fix the cause and run \`${LANE_COMMAND}\` again before finishing`,
-      profile: receipt.profile,
-    };
+  const done = checkDoneEvidence(receipt, { laneCommand: LANE_COMMAND, legacySkips });
+  if (!done.ok) {
+    return { valid: false, reason: done.detail, profile: receipt.profile };
   }
   // A surface this project cannot resolve is a REFUSAL with an explanation,
   // never an unhandled stack trace: this runs as the Stop hook on every turn
