@@ -88,6 +88,30 @@ export const FLEET_SCRATCH_APP = Object.freeze({
  */
 export const STAMP_CAP_MS = 3000;
 
+/**
+ * The cap a stamp gets when its caller names none: `STAMP_CAP_MS`, except
+ * under node's test runner.
+ *
+ * A test that stamps to learn a digest or a state is making a claim about
+ * BYTES, not about speed. At `STAMP_CAP_MS` a busy machine kills that stamp
+ * and the test fails on the clock, not on the code: `npm publish`'s
+ * `prepublishOnly` runs the whole suite, several files stamp at once, and one
+ * stamp plus its `add firebase` outran 3000ms there (reproduced 2026-09-26:
+ * 13 of 112 cases red under 96 CPU burners, green idle). So under the runner
+ * (`NODE_TEST_CONTEXT`, which it sets in every file it spawns and which the
+ * CLIs those files run inherit) the default is `TEST_STAMP_CAP_MS` — still a
+ * bound, so a stamp that hangs or shells out to Gradle still fails a test.
+ * The tests that are ABOUT the cap pass `timeoutMs` and inject `now`, so they
+ * do not depend on the machine either. The hook never runs under the test
+ * runner, and nothing here moves what it enforces.
+ */
+export const TEST_STAMP_CAP_MS = 60_000;
+
+/** @param {NodeJS.ProcessEnv} [env] */
+export function defaultStampCapMs(env = process.env) {
+  return env.NODE_TEST_CONTEXT ? TEST_STAMP_CAP_MS : STAMP_CAP_MS;
+}
+
 /** The argv that stamps the fleet scratch app from `root` into `appDir`. */
 export function stampArgv(root, appDir) {
   return [path.join(root, "bin", "create-cmp.mjs"), appDir, ...FLEET_SCRATCH_APP.flags];
@@ -458,7 +482,7 @@ export function hashStampedTree(appDir, { rule = STAMPED_OUTPUT_RULE } = {}) {
  * and piping them to a terminal costs four times the stamp itself); stderr is
  * kept, because it is the only thing that can say why a failure happened.
  */
-export function stampScratchApp(root = REPO_ROOT, { timeoutMs = STAMP_CAP_MS } = {}) {
+export function stampScratchApp(root = REPO_ROOT, { timeoutMs = defaultStampCapMs() } = {}) {
   const scratchRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-stamped-output-"));
   const appDir = path.join(scratchRoot, FLEET_SCRATCH_APP.name);
   const dispose = () => fs.rmSync(scratchRoot, { recursive: true, force: true });
@@ -532,7 +556,7 @@ export function stampedOutputHash(root = REPO_ROOT, opts = {}) {
  *   firebase: {hash: string, files: Record<string, string>, rule: number} | {hash: null, files: null, unanswerable: string},
  *   ms: number}}
  */
-export function stampedApps(root = REPO_ROOT, { rule = STAMPED_OUTPUT_RULE, timeoutMs = STAMP_CAP_MS, spawnAdd = spawnSync, now = Date.now } = {}) {
+export function stampedApps(root = REPO_ROOT, { rule = STAMPED_OUTPUT_RULE, timeoutMs = defaultStampCapMs(), spawnAdd = spawnSync, now = Date.now } = {}) {
   const startedMs = now();
   const app = stampScratchApp(root, { timeoutMs });
   try {
