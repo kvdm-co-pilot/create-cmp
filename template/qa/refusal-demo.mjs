@@ -192,7 +192,7 @@ function firstComposableBodyBraceEnd(text) {
   return braceIdx + 1;
 }
 
-function injectColorLiteral(projectDir) {
+export function injectColorLiteral(projectDir) {
   const target = findScreenComposable(projectDir);
   let text = fs.readFileSync(target, "utf8");
   if (!/import androidx\.compose\.ui\.graphics\.Color/.test(text)) {
@@ -209,7 +209,7 @@ function injectColorLiteral(projectDir) {
   return { file: path.relative(projectDir, target) };
 }
 
-function injectUiToDataImport(projectDir) {
+export function injectUiToDataImport(projectDir) {
   const target = findScreenComposable(projectDir);
   const importLine = findDataLayerImport(projectDir);
   let text = fs.readFileSync(target, "utf8");
@@ -218,7 +218,7 @@ function injectUiToDataImport(projectDir) {
   return { file: path.relative(projectDir, target), importLine };
 }
 
-function injectDeletedSpecTest(projectDir) {
+export function injectDeletedSpecTest(projectDir) {
   const found = findOrphanableSpecTest(projectDir);
   const lines = fs.readFileSync(found.file, "utf8").split("\n");
 
@@ -261,7 +261,7 @@ function findHomeGoldenTest(projectDir) {
   return candidates[0];
 }
 
-function injectStructuralRegression(projectDir) {
+export function injectStructuralRegression(projectDir) {
   const goldenTest = findHomeGoldenTest(projectDir);
   const testText = fs.readFileSync(goldenTest, "utf8");
   const screenMatch = testText.match(/setContent\s*\{\s*MaterialTheme\s*\{\s*(\w+)\(/);
@@ -490,9 +490,26 @@ function extractRelevantLines(out, clause) {
   return lines.slice(Math.max(0, idx - 2), idx + 10).join("\n");
 }
 
-try {
-  main();
-} catch (err) {
-  process.stderr.write(`\nrefusal-demo aborted: ${err.message}\n`);
-  process.exit(1);
+// Import-safe: the suite imports the four injectors above against a stamped
+// tree (test/the-refusal-demo-plants-fewer-violations-than-it-reports.test.mjs)
+// without scaffolding or running Gradle. Realpath BOTH sides: the entry path may
+// reach this file through a symlink (macOS's /var/folders → /private/var, npm
+// links), and a guard that compared raw paths once made an installed entry point
+// a silent no-op.
+const invokedDirectly = (() => {
+  try {
+    if (!process.argv[1]) return false;
+    return fs.realpathSync(path.resolve(process.argv[1])) === fs.realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+
+if (invokedDirectly) {
+  try {
+    main();
+  } catch (err) {
+    process.stderr.write(`\nrefusal-demo aborted: ${err.message}\n`);
+    process.exit(1);
+  }
 }
