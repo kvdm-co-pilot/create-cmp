@@ -308,8 +308,18 @@ export function planInsert(text, rel, insert) {
  * `text` with `block` appended, or `null` when it is already there — this step's block, or the
  * `probe` line an older stamp carried unmarked (create-cmp 0.27 and earlier shipped the Firebase R8
  * rules and the jitpack repository in every stamp, so appending them again would duplicate them).
+ *
+ * `earlier` is this step's own earlier block for the file, when it has one: found in `text` byte for
+ * byte, it is rewritten to `block`. Before KD-260's fix the Gradle block carried no Firebase BoM, and a
+ * re-run answered "already there" over an app whose instrumented tests do not compile (KD-262). A block
+ * that matches neither is the adopter's, edited, and is left alone.
  */
-export function planAppend(text, block, probe) {
+export function planAppend(text, block, probe, earlier = null) {
+  if (earlier && text.includes(BLOCK_OPEN)) {
+    const was = earlier.replace(/\n$/, "");
+    const now = block.replace(/\n$/, "");
+    if (was !== now && text.includes(was)) return text.replace(was, now);
+  }
   if (text.includes(BLOCK_OPEN) || (probe && text.includes(probe))) return null;
   const sep = text.endsWith("\n") ? "\n" : "\n\n";
   return `${text}${sep}${block.endsWith("\n") ? block : `${block}\n`}`;
@@ -483,7 +493,9 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
   for (const rel of listOverlayFiles(appendDir)) {
     if (isIosPath(rel) && !ios) continue;
     const probe = edits.appends?.[rel]?.present;
-    const next = planAppend(textOf(rel), fs.readFileSync(path.join(appendDir, rel), "utf8"), probe);
+    const earlierPath = path.join(overlayDir, "append-earlier", rel);
+    const earlier = fs.existsSync(earlierPath) ? fs.readFileSync(earlierPath, "utf8") : null;
+    const next = planAppend(textOf(rel), fs.readFileSync(path.join(appendDir, rel), "utf8"), probe, earlier);
     if (next === null) present.push(`${rel} (${probe ?? "the add-firebase block"})`);
     else planned.set(rel, next);
   }

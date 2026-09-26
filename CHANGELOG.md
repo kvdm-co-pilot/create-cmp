@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **Re-running `create-cmp add firebase` on an app that ran it before 0.28.2 now adds the Firebase
+  BoM.** It used to answer `already there: composeApp/build.gradle.kts (the add-firebase block)` and
+  leave the instrumented tests uncompilable. The step recognises its own earlier block and rewrites
+  it; a block you edited is left alone (KD-262).
 - **`doctor` no longer credits a hook in another script language as anchored.** A hook written
   `python3 qa/report.py` (or `.rb`, `.pl`, `.ts`, `.bash`, `.zsh`, `.kts`) resolves against the
   session's directory exactly like `node qa/x.mjs`, and read clean because only four extensions were
