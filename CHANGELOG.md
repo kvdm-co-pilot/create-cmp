@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **The refusal demo plants all four of its violations again.** On 0.28.3 `node qa/refusal-demo.mjs`
+  printed 2/4 and said a gate had not caught its violation, which was untrue of the gates: two
+  injectors looked for text the template no longer has, so nothing was planted. They now read the
+  app's own files, and fail by name when there is nothing to plant into (KD-267).
+- **The notary refuses what your Stop hook refuses.** `prooflane-receipts` now carries the
+  done-evidence refusals — fast mode, a nightly or smoke run, a step skipped for an environmental
+  reason — as `checkDoneEvidence`, and `validateReceiptForTree` runs it, so a hosted validator no
+  longer calls those receipts valid. The one exception, a pre-0.19 receipt with no skip label, is
+  stated in the README (KD-266).
+- The Firebase L2 run prints the cost it measured: ~12 min of steps per lane, ~22 min wall-clock (KD-264).
+
 ## [0.28.3] - 2026-09-26
 
 The adopter-facing defects found before launch: two ways a command line could install into a
