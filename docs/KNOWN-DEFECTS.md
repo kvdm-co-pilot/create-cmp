@@ -240,6 +240,8 @@ you the same list without opening anything.
 | **KD-258** | `test/the-change-price-advisory-asserts-what-it-did-not-check.test.mjs`'s "a history line that did not parse" assertion passes for every row: `/malformed/i.test(JSON.stringify(r))` matches the row's own `malformed` KEY, so a row that drops the count still passes | a vacuous assertion in a test, not a product path; the repair is asserting `r.malformed > 0` alone, which may then expose the drop the test was written to catch |
 | **KD-259** | an UNDECLARED answer from `proof-gate` names less than the next step needs: the `gh pr create` reminder never says to declare a slice (61 of 125 tier-state combinations, every tier) and names an L2 command the device gate then refuses with "declare first"; the merge refusal's one "Declare, discharge, then merge" line suppresses the review line and, with both L2 tiers UNDECLARED, the Firebase line — so followed literally it meets a second refusal | this repo's own gate, not an adopter path; every refusal it leads to names the right remedy (`--open`), and declaring opens every tier at once so `proof-plan.mjs` then lists them all. Round 2 of the Firebase slice extended both shapes to the Firebase tier by parity, which is the settled fix |
 | **KD-261** | `androidChecks` reports a failed compile of the instrumented-test sources as "connectedDebugAndroidTest DID NOT EXECUTE … has observed nothing about your change and is not accusing it. Usual cause: another adb/Gradle session …" (`packages/harness/src/lib/profiles/cmp/android-checks.mjs:51`, mirrored in `template/qa/lib/profiles/cmp/android-checks.mjs`), sending an adopter whose build is broken to look at the environment | the step is red (ERROR; the lane fails), never green, and the Gradle tail printed under the text carries `compileDebugAndroidTestKotlinAndroid FAILED` |
+| **KD-262** | an app that ran `add firebase` before KD-260's fix stays without the Firebase BoM on a re-run: `planAppend` sees `BLOCK_OPEN` and skips the Gradle block, so the re-run writes only the catalog's `firebase-bom` entries and prints `already there: composeApp/build.gradle.kts (the add-firebase block)` — the instrumented tests still do not compile, and `upgrade` adds no key either (`notInProject`) | a decision, handed up: how an earlier block is brought forward (rewrite a block this step recognises as its own older bytes, or name the missing line) is a product call; the CHANGELOG's Fixed entry gives the by-hand remedy, and the step existed for days before the fix |
+| **KD-263** | nothing before the suite refuses a registry set whose `firebase-bom` is missing or was not measured for its own `firebase-gitlive`: `promotedSet` accepts a candidate with no `firebase-bom` (on which `add firebase` then refuses every app) and one that moves GitLive to 2.5.0 while carrying 33.15.0; the KD-260 table test passes when both the GitLive version and the BoM are unknown (`undefined === undefined`) | maintainer path only, and no candidate pins `firebase-gitlive` today; a promoted set with no BoM is still refused by the scaffold-based `add firebase` tests once the template moves onto it. The repair is the KD-243 shape: promotion refuses a candidate `add firebase` would refuse, and the table test requires a measured row for every GitLive version |
 
 ---
 
@@ -3966,3 +3968,46 @@ Gradle tail printed under the text (the output lines matching `FAILED|error:|fai
 apart: a `compile…AndroidTest…` task FAILED in the output is the build, not the device.
 
 *Logged 2026-09-26 (fix/add-firebase-android-test-compile).*
+
+### KD-262 — an earlier adopter's re-run of `add firebase` says the block is there and leaves the BoM out
+
+`src/lib/add-firebase.mjs` `planAppend` (`text.includes(BLOCK_OPEN)` returns null), `src/lib/upgrade.mjs`
+`diffAgainstSet` (`notInProject` — "nothing is added")
+
+Measured in-process on this branch: scaffold, plan and write `add firebase`, strip the `firebase-bom`
+catalog lines and the `androidMain` platform line (the shape an app has after `add firebase` before
+KD-260's fix), plan again. The re-run writes only `gradle/libs.versions.toml` (the `firebase-bom`
+version and library come back) and lists `composeApp/build.gradle.kts (the add-firebase block)` under
+`present`, which `create-cmp add` prints as `already there: …`. The platform line is never added, so
+`compileDebugAndroidTestKotlinAndroid` still fails on that app. `create-cmp upgrade` does not add the
+key either: a set key the app's catalog does not declare is `notInProject` and left out.
+
+**Why it does not block, and the decision:** this slice does not make that app worse, and the
+CHANGELOG's Fixed entry names the by-hand remedy. Whether `add firebase` should bring an older block
+of its own forward (recognise its earlier bytes and rewrite them, as it already does for the legacy
+`FirebaseConfig.kt`) or at least name the missing line instead of "already there" is a product
+decision. KD-260's closed record carried this as "still open"; it lives here so it is read.
+
+*Logged 2026-09-26 (fix/add-firebase-android-test-compile, review round 1).*
+
+### KD-263 — promotion admits a set whose Firebase BoM `add firebase` refuses or never measured
+
+`scripts/lib/promoted-set.mjs` `firebaseIosPairingProblem`/`promotedSet`,
+`test/the-firebase-ios-pods-follow-the-gitlive-version.test.mjs` (`GITLIVE_BOM` table test)
+
+Measured: `promotedSet` over a clone of set `2026.07r` with `firebase-bom` deleted returns a set, and
+`registryVersionsFor(kotlin, versionsFromRegistry, {sets:[it]})` then refuses with `names no
+"firebase-bom" version` — every app on that set. A clone with `firebase-gitlive` 2.5.0 (and a matching
+`firebaseIos`) carrying `firebase-bom` 33.15.0 is also promoted. The promotion check exists for the
+iOS half (KD-243: the set must be one `add firebase` accepts) and not for the catalog keys. The KD-260
+table test catches the split once the registry is written, but passes vacuously for a GitLive version
+it has no row for when the set also names no BoM, so KD-260's closed record ("refused by nothing
+except the KD-260 test's table") overstates it.
+
+**Why it does not block:** no adopter path; `candidates.json` pins no `firebase-gitlive` today, and a
+promoted set without a BoM would still be refused by the scaffold-based `add firebase` tests when the
+template moves onto it. Repair: `firebaseIosPairingProblem`'s rule generalised to every
+`versionsFromRegistry` key, the BoM recorded with the GitLive version it was read for (as
+`firebaseIos` is), and the table test asserting a measured row exists for each GitLive version.
+
+*Logged 2026-09-26 (fix/add-firebase-android-test-compile, review round 1).*
