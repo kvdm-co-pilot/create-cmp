@@ -236,6 +236,8 @@ you the same list without opening anything.
 | **KD-253** | the KD-231 gate still exempts a paragraph on any token that contains `create-cmp`: KD-250 stripped `create-cmp:<name>` only, and `bin/create-cmp.mjs`, `create-cmp-cli@latest`, `create-cmp.json`, `create-cmp-scaffolded` and a `/path/to/create-cmp/…` path each exempt a paragraph that never says whose file it names — 19 paragraphs across `skills/cmp-new`, `cmp-doctor`, `cmp-upgrade`, `cmp-inspect`, `cmp-firebase-connect` | none of the 19 names a create-cmp-only pattern today (measured); the same hazard as KD-250, one spelling over |
 | **KD-255** | `DEVICE_TIER_IRRELEVANT`'s `*.md` would declare a markdown file under `overlays/` unable to oblige either L2 run, and `DEVICE_TIER_SHIPPED` puts back `template/` only — so an overlay `.md` that `add firebase` copies into the app would never make the Firebase L2 run required (the KD-207 shape, one root over) | no `.md` exists under `overlays/` today (measured), so nothing ships unscheduled; the repair is `overlays/` in `DEVICE_TIER_SHIPPED`, and the digest then judges it |
 | **KD-256** | `--rekey` re-derives `qa-artifacts/fleet-latest.json` only, so after the next `STAMPED_OUTPUT_RULE` bump the Firebase L2 run's record reads `other-rule` and costs a full Firebase L2 run — and its reason, `recordMeetsTier`'s, still says to run `--rekey` INSTEAD, which cannot help it | cannot fire until the rule is bumped (it is 2 today, and the Firebase record is new under 2); the cost when it fires is one ~4.5 min run, never a false DISCHARGED |
+| **KD-257** | a change to an L2 tier's own RUNNER (`scripts/fleet-check.mjs`, `scripts/lib/fleet-firebase.mjs`) owes no run of that tier, so the gate refuses the only run that would exercise the new runner on its branch — the Firebase L2 run merged unexercised and ran first on trunk | a decision, handed up: the tiers are keyed on output bytes (settled), and a runner is not an output; the runner's first real run is a trunk release proof, fixed forward if red |
+| **KD-258** | `test/the-change-price-advisory-asserts-what-it-did-not-check.test.mjs`'s "a history line that did not parse" assertion passes for every row: `/malformed/i.test(JSON.stringify(r))` matches the row's own `malformed` KEY, so a row that drops the count still passes | a vacuous assertion in a test, not a product path; the repair is asserting `r.malformed > 0` alone, which may then expose the drop the test was written to catch |
 
 ---
 
@@ -3876,3 +3878,41 @@ is `--rekey` taking the Firebase record as a second input (and its own rekey fil
 naming the tier it applies to. Not built: this slice logs it (plan R6).
 
 *Logged 2026-09-26 (feat/firebase-runtime-proof, U2).*
+
+### KD-257 — a change to an L2 tier's runner owes no run of that tier
+
+`scripts/proof-plan.mjs` (`DEVICE_TIER_IRRELEVANT` declares `scripts/` unable to affect the L2
+run) with `scripts/hooks/proof-gate.mjs` (`decide("device")` denies a run when nothing is owed)
+
+Found planning the Firebase L2 run (`feat/firebase-runtime-proof`, plan D1). Both L2 tiers are
+keyed on the stamped app's OUTPUT bytes (settled: `docs/proposals/LIBRARIES-IN-SERVICES-OUT.md`
+Decision 1 and the slice's owed-trigger decision), and a runner's source is not an output. So a
+slice that only builds or changes `fleet-check.mjs` and `scripts/lib/fleet-firebase.mjs` owes
+neither run, and the hook refuses `fleet-check` on that branch with "nothing is owed". The slice
+that built `--with-firebase` therefore merged with its runner exercised only by unit tests over
+stubs and real stamps, and its first real run was a release proof on trunk after merge, which the
+hook allows.
+
+**Why it does not block:** the direction is safe — a runner that is wrong fails its own first run
+loud on trunk and is fixed forward; it cannot write a PASS record for bytes it did not run, and no
+adopter ships `scripts/`. **Decision asked:** should a change to a tier's runner owe that tier once
+(an input-path trigger, which the owed-trigger decision rules out for the app's bytes but not
+obviously for the runner's), or is "first run on trunk, fixed forward" the rule?
+
+*Logged 2026-09-26 (feat/firebase-runtime-proof, orchestrator, from plan D1).*
+
+### KD-258 — a change-price assertion about unparsed history lines cannot fail
+
+`test/the-change-price-advisory-asserts-what-it-did-not-check.test.mjs` ("a history line that did
+not parse leaves the count …")
+
+Found by U6 of `feat/firebase-runtime-proof`. The loop asserts `r.malformed > 0 ||
+/did not parse|malformed|unreadable/i.test(JSON.stringify(r))`. Every row `spendOf` returns carries
+a `malformed` key, so the serialised row always contains the word and the assertion holds whatever
+the count is. The test was written to catch a reader that drops the count; it would not.
+
+**Why it does not block:** it is a test that cannot fail, not a product path that is wrong, and
+the reader it guards is advisory (`change-price` refuses nothing). The repair is asserting
+`r.malformed > 0` (or matching the rendered text, not the JSON), which may then expose the drop.
+
+*Logged 2026-09-26 (feat/firebase-runtime-proof, U6).*
