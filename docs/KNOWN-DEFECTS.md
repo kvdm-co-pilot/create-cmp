@@ -214,7 +214,6 @@ you the same list without opening anything.
 | **KD-211** | the stamped app redirects to `10.0.2.2`, the Android emulator's host alias, so the run assumes the lane's device is an emulator | loud, never silent: a physical device fails the startup redirect and the lane goes red at `e2eSmoke`, because the template refuses to start rather than fall through to production; `fleet-check --with-firebase` refuses a non-emulator host or an unset `CMP_AVD` before starting |
 | **KD-212** | the shipped-hooks table is derived from the template FILE's history, but minimal mode writes a SessionStart command that file never carried | no claim rests on it — a minimal stamp's command is fully single-quoted, so it is neither healable nor a violation, and doctor says nothing about it in either direction |
 | **KD-213** | the `--dry-run` gate counts four `fs` spellings where its own header names the class — `copyFileSync`, `renameSync`, `cpSync`, `fs.promises.*` and a destructured import all pass it | zero producers in the tree, and it cannot be written as a failing test: a widened gate is green on these bytes |
-| **KD-219** | `attach.mjs`'s new comment says the empty `--citation-roots` value "never arrives any more", and this tree's own suite passes it in | the guard it weakens the reason for is still there and still correct; only the reason is false |
 | **KD-220** | a `npm publish` payload stamps the app TWICE — `obligation()` stamps when the device tier is required and `releaseContext()` stamps again — where `ANSWER_RESERVE_MS` is documented as covering one | measured 1.92 s against a 10 s budget (merge, one stamp: 1.09 s), and 1.1–1.8 s per stamp under 16 burners; the overrun direction is fail-open but has no producer today |
 | **KD-221** | the `local.properties` normaliser replaces the WHOLE file, so any byte of it beyond this machine's `sdk.dir` pointer is unwatched by the device digest | measured — appending `org.gradle.java.home=/nope` moves no digest — but `writeLocalProperties` writes only `sdk.dir` and `template/` ships no `local.properties`, so there is no producer; the narrower spelling costs one regex |
 | **KD-222** | `hashStampedTree` records files and symlinks, so an EMPTY DIRECTORY is invisible to the device digest | measured; git cannot ship an empty directory in `template/`, so a stamp cannot produce one as a difference today |
@@ -3405,20 +3404,6 @@ import from `node:fs` at all, which is a change to the module, not to the gate.
 **Fires when:** the next project heal is written with any `fs` call other than the four, under
 `--fix --dry-run`.
 *Logged 2026-09-22, review round 1 of the wave (doctor hooks area).*
-
-### KD-219 — `attach.mjs`'s new comment says the empty value "never arrives any more", and the suite passes it in
-
-`src/commands/attach.mjs` (`manifestFromFlags`, the `citation-roots` comment)
-
-The comment the change put there reads *"the EMPTY value never arrives any more, because the door
-refuses a value flag given none before any command runs (`emptyValues`, bin/create-cmp.mjs)"*. True
-of argv through the bin; false of the function, which is exported and called with
-`{ profile: "Bad Id", "citation-roots": "" }` by `test/attach-manifest.test.mjs:83` in this same
-tree. The `roots.length` guard the comment was weakened around is still load-bearing and still
-correct — only the reason given for keeping it is false.
-
-**Fires when:** anyone reads the comment to decide whether the guard can go.
-*Logged 2026-09-22, round 1 of the doors review.*
 
 ### KD-220 — the publish payload stamps the app twice, and the reserve is sized for one
 
