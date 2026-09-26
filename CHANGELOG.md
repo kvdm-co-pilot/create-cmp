@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.4] - 2026-09-27
+
+The notary and the refusal demo tell the truth. Ships with `prooflane-harness` 0.23.5 and
+`prooflane-receipts` 0.1.4, which carries the done-evidence refusals; the Gatekeeper notary moves
+onto 0.1.4 in its own repository.
+
 ### Fixed
 
 - **The refusal demo plants all four of its violations again.** On 0.28.3 `node qa/refusal-demo.mjs`
