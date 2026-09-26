@@ -66,7 +66,18 @@ What each layer checks:
   matches, verdict is PASS. Its `reason` strings are the exact refusals a
   generated project prints. This is deliberately all a project checks against
   itself: a receipt you just generated is definitionally fresh.
-- **`validateReceiptForTree`** adds the hosted-only checks:
+- **`checkDoneEvidence(receipt, { laneCommand?, legacySkips? })`** — the
+  receipts a project's own done-check refuses as proof of done, each by a named
+  reason: `mode: "fast"`; `stage` or `profile` `nightly`; `stage` or `profile`
+  `smoke`; any step SKIPped with `skipKind: "environment"`. A `structure` SKIP
+  is allowed, and so is a SKIP with no `skipKind` — unless the caller passes a
+  profile's pre-`skipKind` fallback, `legacySkips: { names, reasons }` (step
+  names, reason substrings). This library holds no stack's vocabulary: a caller
+  without a profile gets no legacy fallback.
+- **`validateReceiptForTree`** runs `checkDoneEvidence` (check id
+  `done-evidence`; pass `legacySkips` through if you hold them), so a hosted
+  validator never calls valid what the Stop hook refuses, and adds the
+  hosted-only checks:
   - **freshness** — `generatedAt` within a window (default 30 days;
     `checkFreshness`);
   - **execution plausibility** — executed steps must report real durations
@@ -85,7 +96,8 @@ Full export list (also importable from the two submodules,
 `prooflane-receipts/inputs-hash` and `prooflane-receipts/receipt-validate`):
 `computeInputsHash`, `VERIFIED_SURFACE`, `RECEIPT_REL_PATH`, `readReceipt`,
 `evaluateReceipt`, `DEFAULT_POLICY`, `checkFreshness`,
-`checkExecutionPlausibility`, `listSkippedSteps`, `validateReceiptForTree`.
+`checkExecutionPlausibility`, `listSkippedSteps`, `checkDoneEvidence`,
+`DEFAULT_LANE_COMMAND`, `validateReceiptForTree`.
 
 ## What this does NOT do
 

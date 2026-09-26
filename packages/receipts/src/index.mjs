@@ -14,4 +14,6 @@ export {
   listSkippedSteps,
   validateReceiptForTree,
   checkLaneVouching,
+  checkDoneEvidence,
+  DEFAULT_LANE_COMMAND,
 } from "./receipt-validate.mjs";

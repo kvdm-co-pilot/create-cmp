@@ -292,6 +292,90 @@ export function listSkippedSteps(receipt) {
     .map((s) => ({ name: s.name ?? "?", reason: s.reason ?? "no reason recorded" }));
 }
 
+/** How a refusal names the lane when its caller does not spell it. */
+export const DEFAULT_LANE_COMMAND = "node qa/verify.mjs";
+
+/**
+ * THE DONE-EVIDENCE REFUSALS — a receipt that binds to its tree and says PASS
+ * can still be no proof that a change is done, and says so about itself. Four
+ * shapes, each refused with a named reason:
+ *
+ *   - `mode: "fast"` — verify --fast is an inner-loop signal, never done evidence;
+ *   - `stage` or `profile` `nightly` — it proves the harness under a forced
+ *     double-run, never a change;
+ *   - `stage` or `profile` `smoke` — the framework check (GATE-RULES Rule 0)
+ *     runs no build and no tests: it proves the instrument, not the change;
+ *   - any step SKIPped with `skipKind: "environment"` — a tier that COULD have
+ *     run and did not is a gap a human can close (2026-09-03). A `structure`
+ *     SKIP — this project has no such tier at all — is honest and allowed.
+ *
+ * ONE SOURCE OF TRUTH (KD-266). These lived only in the harness's
+ * qa/receipt-check.mjs, before it called this library, so a hosted validator
+ * calling only the library (validateReceiptForTree) said "valid" to all six
+ * shapes. The done-check now calls this; the reasons are its words.
+ *
+ * A SKIP WITH NO `skipKind` IS NOT REFUSED BY DEFAULT. Not every current SKIP
+ * carries one — the cmp profile's tokenDrift "inspector endpoint not reachable"
+ * SKIP, emitted on every headless L2 run, does not (KD-5) — and refusing the
+ * unlabelled would refuse every such receipt. Receipts predating `skipKind`
+ * (0.19.0 and earlier) were judged by reason text, and those texts and step
+ * names are a PROFILE's, never this stack-agnostic library's: a caller that
+ * holds the profile passes them as `legacySkips`; a caller that does not
+ * (a hosted validator) gets no legacy fallback. A fallback that guessed would
+ * be worse than none.
+ *
+ * @param {object} receipt the parsed receipt
+ * @param {object} [opts]
+ * @param {string} [opts.laneCommand] how the refusal names the lane (default `node qa/verify.mjs`)
+ * @param {{names?: string[], reasons?: string[]}|null} [opts.legacySkips] a profile's pre-`skipKind`
+ *   fallback: an unlabelled SKIP of a step in `names` whose reason contains any of `reasons` is
+ *   environmental. Applied only when both are non-empty.
+ * @returns {{ok: boolean, refusal: (null|"fast-mode"|"nightly"|"smoke"|"environment-skip"), detail: string}}
+ */
+export function checkDoneEvidence(receipt, { laneCommand = DEFAULT_LANE_COMMAND, legacySkips = null } = {}) {
+  const lane = `\`${laneCommand}\``;
+  if (receipt?.mode === "fast") {
+    return {
+      ok: false,
+      refusal: "fast-mode",
+      detail: `the last verify run was --fast (inner-loop only); run the full lane (${lane}) before finishing`,
+    };
+  }
+  if (receipt?.stage === "nightly" || receipt?.profile === "nightly") {
+    return {
+      ok: false,
+      refusal: "nightly",
+      detail: `the last verify run was the nightly stage (it proves the harness, not this change); run the change-stage lane (${lane}) before finishing`,
+    };
+  }
+  if (receipt?.stage === "smoke" || receipt?.profile === "smoke") {
+    return {
+      ok: false,
+      refusal: "smoke",
+      detail: `the last verify run was the smoke profile (the framework check — no build, no tests; it proves the instrument, not this change); run the change-stage lane (${lane}) before finishing`,
+    };
+  }
+  const names = Array.isArray(legacySkips?.names) ? legacySkips.names : [];
+  const reasons = Array.isArray(legacySkips?.reasons) ? legacySkips.reasons.map(String) : [];
+  const legacyEnvironmental = (s) =>
+    names.length > 0 && reasons.length > 0 && names.includes(s.name) && reasons.some((r) => String(s.reason ?? "").includes(r));
+  const envSkipped = (Array.isArray(receipt?.steps) ? receipt.steps : []).filter((s) => {
+    if (!s || s.verdict !== "SKIP") return false;
+    if (s.skipKind) return s.skipKind === "environment";
+    return legacyEnvironmental(s);
+  });
+  if (envSkipped.length) {
+    return {
+      ok: false,
+      refusal: "environment-skip",
+      detail:
+        `a tier did not run — ${envSkipped.map((s) => `${s.name}: ${String(s.reason ?? "").split("\n")[0]}`).join("; ")}. ` +
+        `Those steps skipped for an environmental reason, not because this project lacks them; fix the cause and run ${lane} again before finishing`,
+    };
+  }
+  return { ok: true, refusal: null, detail: "done evidence — a full change-stage run with no environment SKIP" };
+}
+
 /**
  * The hosted composite: validate the receipt found in an extracted repo tree
  * (e.g. a tarball at a PR's head SHA) with the full service-grade policy.
@@ -300,6 +384,8 @@ export function listSkippedSteps(receipt) {
  * @param {string} args.root absolute path to the extracted tree's project root
  * @param {number} [args.now] epoch ms, for freshness (defaults to Date.now())
  * @param {object} [args.policy] overrides for DEFAULT_POLICY
+ * @param {{names?: string[], reasons?: string[]}|null} [args.legacySkips] a profile's pre-`skipKind`
+ *   SKIP fallback, handed to checkDoneEvidence; omitted, no legacy fallback applies
  * @returns {{
  *   status: "missing"|"valid"|"invalid",
  *   reason: string,
@@ -308,7 +394,7 @@ export function listSkippedSteps(receipt) {
  *   skips: Array<{name: string, reason: string}>,
  * }}
  */
-export function validateReceiptForTree({ root, now = Date.now(), policy = {} } = {}) {
+export function validateReceiptForTree({ root, now = Date.now(), policy = {}, legacySkips = null } = {}) {
   const effective = { ...DEFAULT_POLICY, ...policy };
   const receipt = readReceipt(root);
 
@@ -323,6 +409,11 @@ export function validateReceiptForTree({ root, now = Date.now(), policy = {} } =
 
   const checks = [{ id: "receipt-present", ok: true, detail: RECEIPT_REL_PATH }];
   const skips = listSkippedSteps(receipt);
+
+  // The done-evidence refusals the harness's own done-check applies (KD-266):
+  // a notary must never call valid what the Stop hook refuses as proof of done.
+  const done = checkDoneEvidence(receipt, { legacySkips });
+  checks.push({ id: "done-evidence", ok: done.ok, detail: done.detail });
 
   // The core predicate (binding + verdict + hash), verbatim local semantics.
   const core = evaluateReceipt(receipt, () => computeInputsHash(root));
