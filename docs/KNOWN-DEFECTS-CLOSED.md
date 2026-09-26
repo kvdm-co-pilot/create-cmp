@@ -9,6 +9,36 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-262 — an earlier adopter's re-run of `add firebase` says the block is there and leaves the BoM out — **CLOSED 2026-09-26**
+
+`src/lib/add-firebase.mjs` `planAppend` (`text.includes(BLOCK_OPEN)` returns null), `src/lib/upgrade.mjs`
+`diffAgainstSet` (`notInProject` — "nothing is added")
+
+Measured in-process on this branch: scaffold, plan and write `add firebase`, strip the `firebase-bom`
+catalog lines and the `androidMain` platform line (the shape an app has after `add firebase` before
+KD-260's fix), plan again. The re-run writes only `gradle/libs.versions.toml` (the `firebase-bom`
+version and library come back) and lists `composeApp/build.gradle.kts (the add-firebase block)` under
+`present`, which `create-cmp add` prints as `already there: …`. The platform line is never added, so
+`compileDebugAndroidTestKotlinAndroid` still fails on that app. `create-cmp upgrade` does not add the
+key either: a set key the app's catalog does not declare is `notInProject` and left out.
+
+**Why it does not block, and the decision:** this slice does not make that app worse, and the
+CHANGELOG's Fixed entry names the by-hand remedy. Whether `add firebase` should bring an older block
+of its own forward (recognise its earlier bytes and rewrite them, as it already does for the legacy
+`FirebaseConfig.kt`) or at least name the missing line instead of "already there" is a product
+decision. KD-260's closed record carried this as "still open"; it lives here so it is read.
+
+*Logged 2026-09-26 (fix/add-firebase-android-test-compile, review round 1).*
+
+**CLOSED 2026-09-26 — the step brings its own earlier block forward.** The decision taken is the first
+option above, the one the step already applies to the legacy `FirebaseConfig.kt`: `planAppend` reads
+this step's earlier block for a file from `overlays/firebase/append-earlier/<rel>` (today one file:
+the pre-KD-260 Gradle block, `git show a2accc1^:overlays/firebase/append/composeApp/build.gradle.kts`),
+and when the app carries it byte for byte, rewrites it to the current block — the `androidMain` BoM
+line lands, the marker appears once. A block that matches neither is the adopter's, edited, and is
+still answered `already there`; that residue is narrower than this entry and is not re-logged. Test:
+`test/a-re-run-of-add-firebase-brings-its-earlier-block-forward.test.mjs`.
+
 ### KD-218 — the unreadable-boolean refusal names `--no-<value-flag>` as a flag that takes `true` or `false` — **CLOSED 2026-09-26**
 
 `bin/create-cmp.mjs`, `packages/harness/bin/prooflane.mjs` (the `unreadableBooleanValues` refusal);
