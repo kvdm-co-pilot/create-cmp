@@ -743,3 +743,18 @@ the demo would still report a refusal, by the wrong gate. Every template screen 
 **Fires when:** a template screen gains a header above its `package` line.
 *Logged 2026-09-27, round 1 of slice `kd-266-267`.*
 
+
+### KD-270 — an uncommitted path with a space in it is unclassified, and falsely owes a review
+
+`scripts/proof-plan.mjs` (`dirty = sh("git", ["status", "--porcelain"])`, beside `git diff --name-only`)
+
+`git status --porcelain` wraps a pathname containing a space in double quotes; `git diff --name-only`
+does not. The classifier then sees `"docs/reference/…/Anthropic agentic engineering practices.md`, whose
+first byte is `"` and last is `"`, so neither the `docs/` root nor the `*.md` suffix in
+`REVIEW_TIER_IRRELEVANT` matches, and a doc-only slice is told it owes a review and a Firebase L2 run
+"but no slice is declared". Committing the same file makes the owing vanish, because the diff side
+prints the path bare. The error runs in the safe direction — an unclassified path costs a read, never a
+missed defect — and the slice that met it renamed its paths space-free instead of touching the program.
+
+**Fires when:** a tracked path with whitespace is added or edited and `proof-plan` runs before it is committed.
+*Logged 2026-09-27, slice `docs/anthropic-agentic-engineering-base` (doc-only, no review round).*
