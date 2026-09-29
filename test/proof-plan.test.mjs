@@ -27,7 +27,7 @@ import { obligation, TIERS, isTrunk, close, outstanding, reviewDischarge, REVIEW
 // The Firebase tier's names through the namespace, so a missing export fails ITS tests and not the whole file.
 import * as PP from "../scripts/proof-plan.mjs";
 import { render } from "../scripts/fit-test.mjs";
-import { filesFor, REVIEW_TIER_TRIGGERS, REVIEW_TIER_IRRELEVANT, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
+import { filesFor, reviewBytes, reviewTreeHash, versionOnly, REVIEW_TIER_TRIGGERS, REVIEW_TIER_IRRELEVANT, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
 import { deriveTierNeed, deriveAffectedFilter } from "../packages/harness/src/lib/affected-tests.mjs";
 import { STAMPED_OUTPUT_RULE, FIREBASE_FLEET_RECORD } from "../scripts/stamped-output.mjs";
 
@@ -480,4 +480,101 @@ test("--discharge writes firebaseDischarged ONLY from a record that meets the Fi
   assert.equal(noDefault.exit, 2, "no default record: exit 2, as before");
   assert.equal(noDefault.plan.discharged, null);
   assert.equal(noDefault.plan.firebaseDischarged?.stampedHash, F);
+});
+
+// ---------------------------------------------------------------------------
+// FAILURES SEEM FAIR (D-3, KD-270). A release number owes no reader, a bump
+// never reopens a discharged review, and a path with a space in it is
+// classified by its own name rather than by its quoted spelling.
+// ---------------------------------------------------------------------------
+
+/** A throwaway repo with an `origin/main`, so `changedPaths()`'s merge-base resolves in it. */
+function scratchRepo(files) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "proof-plan-fair-"));
+  const git = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+  git("init", "-q", "-b", "main");
+  git("config", "user.email", "t@example.invalid");
+  git("config", "user.name", "t");
+  for (const [rel, text] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+    fs.writeFileSync(path.join(dir, rel), text);
+  }
+  git("add", "-A");
+  git("commit", "-q", "-m", "base");
+  git("update-ref", "refs/remotes/origin/main", "HEAD");
+  git("checkout", "-q", "-b", BRANCH);
+  return { dir, git, write: (rel, text) => fs.writeFileSync(path.join(dir, rel), text), dispose: () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+const LOCK = (own, harness, dep) => `${JSON.stringify({
+  name: "x", version: own, lockfileVersion: 3, requires: true,
+  packages: {
+    "": { name: "x", version: own, workspaces: ["packages/harness"] },
+    "node_modules/dep": { version: dep, resolved: "https://example.invalid/dep.tgz" },
+    "packages/harness": { name: "h", version: harness },
+  },
+}, null, 2)}\n`;
+const PKG = (v, extra = {}) => `${JSON.stringify({ name: "x", version: v, ...extra }, null, 2)}\n`;
+
+test("KD-270: an uncommitted docs path with a space in it is read by its own name, and owes no review", () => {
+  const r = scratchRepo({ "docs/plain.md": "a\n", "docs/old name.md": "b\n" });
+  try {
+    r.write("docs/a b.md", "prose\n");
+    r.git("add", "docs/a b.md");
+    r.git("mv", "docs/old name.md", "docs/new name.md");
+    const paths = PP.changedPaths(null, { root: r.dir });
+    assert.deepEqual([...paths].sort(), ["docs/a b.md", "docs/new name.md", "docs/old name.md"], "bare paths, both halves of the rename, no quotes");
+    const o = obligation(slice(), paths, BRANCH, { ...NO_RUN, versionOnly: [] });
+    assert.equal(o.review.need.required, false, o.review.need.reason);
+    assert.equal(o.need.required, false, o.need.reason);
+  } finally {
+    r.dispose();
+  }
+});
+
+test("A RELEASE NUMBER IS HELD IN THE REVIEW HASH — whole version lines of this repo's own packages, nothing else", () => {
+  assert.ok(reviewBytes("package.json", Buffer.from(PKG("1.0.0"))).equals(reviewBytes("package.json", Buffer.from(PKG("1.0.1")))));
+  assert.ok(versionOnly("packages/harness/package.json", Buffer.from(PKG("0.1.0")), Buffer.from(PKG("0.2.0"))));
+  assert.ok(versionOnly("package-lock.json", Buffer.from(LOCK("1.0.0", "0.1.0", "3.0.0")), Buffer.from(LOCK("1.0.1", "0.1.1", "3.0.0"))), "top-level, root and workspace entries are this repo's numbers");
+  assert.ok(!versionOnly("package-lock.json", Buffer.from(LOCK("1.0.0", "0.1.0", "3.0.0")), Buffer.from(LOCK("1.0.0", "0.1.0", "3.0.1"))), "a dependency's version is someone else's code and still moves the hash");
+  const plugin = (v) => Buffer.from(`{\n  "name": "p",\n  "version": "${v}",\n  "description": "d"\n}\n`);
+  assert.ok(versionOnly(".claude-plugin/plugin.json", plugin("1.0.0"), plugin("2.0.0")));
+  const market = (v) => Buffer.from(`{\n  "metadata": {\n    "version": "${v}"\n  },\n  "plugins": [\n    {\n      "name": "p",\n      "version": "${v}",\n      "source": "./"\n    }\n  ]\n}\n`);
+  assert.ok(versionOnly(".claude-plugin/marketplace.json", market("1.0.0"), market("2.0.0")));
+  // Only whole lines, and only the number: anything else on a changed line still moves.
+  assert.ok(!versionOnly("package.json", Buffer.from(PKG("1.0.0")), Buffer.from(PKG("1.0.0", { main: "x.mjs" }))));
+  assert.ok(!versionOnly("package.json", Buffer.from(PKG("1.0.0")), Buffer.from(`${JSON.stringify({ name: "x" }, null, 2)}\n`)), "a version REMOVED is a change");
+  assert.ok(!versionOnly("package.json", Buffer.from(PKG("1.0.0", { dependencies: { a: "1.0.0" } })), Buffer.from(PKG("1.0.0", { dependencies: { a: "2.0.0" } }))));
+  assert.ok(!versionOnly("scripts/x.json", Buffer.from(PKG("1.0.0")), Buffer.from(PKG("2.0.0"))), "no other file's version line is held");
+});
+
+test("A BUMP OWES NO REVIEW AND NEVER REOPENS ONE — the diff side and the hash agree, over a real checkout", () => {
+  const r = scratchRepo({ "package.json": PKG("1.0.0"), "package-lock.json": LOCK("1.0.0", "0.1.0", "3.0.0"), "src/a.mjs": "export {};\n" });
+  try {
+    const discharged = reviewTreeHash(r.dir);
+    r.write("package.json", PKG("1.0.1"));
+    r.write("package-lock.json", LOCK("1.0.1", "0.1.1", "3.0.0"));
+    assert.equal(reviewTreeHash(r.dir), discharged, "a bump after a discharged review does not move the hash");
+    const paths = PP.changedPaths(null, { root: r.dir });
+    const bumped = PP.versionOnlyPaths(paths, { root: r.dir });
+    assert.deepEqual([...bumped].sort(), ["package-lock.json", "package.json"]);
+    const o = obligation(slice(), paths, BRANCH, { ...NO_RUN, versionOnly: bumped });
+    assert.equal(o.review.need.required, false, o.review.need.reason);
+
+    // A real change beside the bump still owes, and still moves the hash.
+    r.write("src/a.mjs", "export const a = 1;\n");
+    assert.notEqual(reviewTreeHash(r.dir), discharged);
+    const both = PP.changedPaths(null, { root: r.dir });
+    const owed = obligation(slice(), both, BRANCH, { ...NO_RUN, versionOnly: PP.versionOnlyPaths(both, { root: r.dir }) });
+    assert.equal(owed.review.need.required, true);
+    assert.deepEqual(owed.review.need.obliging, ["src/a.mjs"]);
+
+    // And a dependency bump is not a release number.
+    r.write("src/a.mjs", "export {};\n");
+    r.write("package-lock.json", LOCK("1.0.1", "0.1.1", "3.0.1"));
+    assert.notEqual(reviewTreeHash(r.dir), discharged);
+    assert.deepEqual(PP.versionOnlyPaths(PP.changedPaths(null, { root: r.dir }), { root: r.dir }), ["package.json"]);
+  } finally {
+    r.dispose();
+  }
 });

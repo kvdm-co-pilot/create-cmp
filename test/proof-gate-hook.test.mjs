@@ -19,7 +19,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
-import { observedTreeHash, REVIEW_TIER_TRIGGERS, REVIEW_SKIP } from "../scripts/observed-tree.mjs";
+import { reviewTreeHash } from "../scripts/observed-tree.mjs";
 import { stampedApps, stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 import { TIERS, currentBranch, obligation, recordMeetsTier } from "../scripts/proof-plan.mjs";
 
@@ -382,7 +382,7 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
         // The Firebase L2 run too: on a branch whose change moves what `add firebase` writes, that
         // tier is required, and a plan that discharged only the other two never settles there.
         firebaseDischarged: { at, stampedHash: stampedApps(repoRoot, { timeoutMs: 60_000 }).firebase.hash, stampedFiles: {}, stampedRule: STAMPED_OUTPUT_RULE, verdict: "PASS", rung: "L2" },
-        reviewDischarged: { at, treeHash: observedTreeHash(repoRoot, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }), tests: [], decisions: [], nothingFound: true },
+        reviewDischarged: { at, treeHash: reviewTreeHash(repoRoot), tests: [], decisions: [], nothingFound: true },
       }, null, 2)}\n`,
     );
 

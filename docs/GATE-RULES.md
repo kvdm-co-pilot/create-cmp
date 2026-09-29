@@ -384,7 +384,9 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   `scripts/` and `test/` cannot reach a phone and are irrelevant to the device tier, and they are
   where this repo's refusals live, so they oblige a reader. Both are declared in
   `scripts/observed-tree.mjs`, and a test refuses any path that could oblige a review without
-  being able to reopen one.
+  being able to reopen one. A release number is not a change a reader reads: the review hash holds
+  this repo's own whole `"version"` lines (`reviewBytes`), so a bump neither owes a review nor
+  reopens a discharged one.
 - **Enforced at the decision point, never by reading.** `.claude/settings.json` runs
   `scripts/hooks/proof-gate.mjs` on every Bash call. An invocation of `fleet-check.mjs` is
   refused when nothing is owed, when the tier is already discharged for this exact tree, or when

@@ -79,11 +79,11 @@ import { fileURLToPath } from "node:url";
 
 import { deriveTierNeed } from "../packages/harness/src/lib/affected-tests.mjs";
 import {
-  observedTreeHash,
+  reviewTreeHash,
+  versionOnly,
+  holdsVersionLines,
   deviceTierNeed,
-  REVIEW_TIER_TRIGGERS,
   REVIEW_TIER_IRRELEVANT,
-  REVIEW_SKIP,
 } from "./observed-tree.mjs";
 import {
   stampedApps,
@@ -226,8 +226,8 @@ const TIERS = Object.freeze({
   },
 });
 
-function sh(cmd, args) {
-  return spawnSync(cmd, args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+function sh(cmd, args, cwd = REPO_ROOT) {
+  return spawnSync(cmd, args, { cwd, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
 }
 
 /**
@@ -257,28 +257,82 @@ function sh(cmd, args) {
  * record across — two dots report that commit's content as changed too, which
  * overstates the delta. Overstating it says OWED, and that is the direction
  * this is allowed to be wrong in.
+ *
+ * BOTH COMMANDS ARE READ WITH `-z` (KD-270). Without it `git status
+ * --porcelain` wraps a path holding a space in double quotes and C-escapes
+ * other bytes, while `git diff --name-only` prints the same space bare — so an
+ * uncommitted `docs/a b.md` reached the classifier as `"docs/a b.md"`, matched
+ * neither `docs/` nor `*.md`, and owed a review that committing it made vanish.
+ * NUL-separated output is the bare path on both sides, and a rename is two NUL
+ * fields (destination, then source) rather than an ` -> ` inside one line.
+ *
+ * @param {string|null} [since] the floor; null → the merge-base with origin/main
+ * @param {{root?: string}} [opts] the checkout to ask — this repo unless a test names its own
+ * @returns {string[]|null}
  */
-function changedPaths(since = null) {
+function changedPaths(since = null, { root = REPO_ROOT } = {}) {
   let range;
   if (since === null) {
-    const base = sh("git", ["merge-base", "HEAD", "origin/main"]);
+    const base = sh("git", ["merge-base", "HEAD", "origin/main"], root);
     if (base.status !== 0) return null;
     range = `${base.stdout.trim()}...HEAD`;
   } else {
     range = `${since}..HEAD`;
   }
-  const diff = sh("git", ["diff", "--name-only", range]);
+  const diff = sh("git", ["diff", "--name-only", "-z", range], root);
   if (diff.status !== 0) return null;
-  const dirty = sh("git", ["status", "--porcelain"]);
+  const dirty = sh("git", ["status", "--porcelain", "-z"], root);
   if (dirty.status !== 0) return null;
   const out = new Set();
-  for (const l of diff.stdout.split("\n")) if (l.trim()) out.add(l.trim());
-  for (const l of dirty.stdout.split("\n")) {
-    if (!l.trim()) continue;
-    // A rename is two changed paths: the trigger that vanished and wherever it went.
-    for (const p of l.slice(3).trim().split(" -> ")) out.add(p);
+  for (const p of diff.stdout.split("\0")) if (p) out.add(p);
+  const fields = dirty.stdout.split("\0");
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
+    if (f.length < 4) continue;
+    out.add(f.slice(3));
+    // A rename or copy is two changed paths: the trigger that vanished and wherever it went.
+    if (/[RC]/.test(f.slice(0, 2)) && fields[i + 1]) out.add(fields[++i]);
   }
   return [...out];
+}
+
+/**
+ * The changed paths whose change is NOTHING BUT the release numbers the review
+ * hash holds (scripts/observed-tree.mjs `reviewBytes`) — a bump, measured from
+ * the merge-base with origin/main to the working tree, the same span
+ * `changedPaths()` reads. Such a path obliges no review, because the hash that
+ * would have to reopen one cannot see it: the two halves agree by
+ * construction, since `versionOnly` compares through the hash's own function.
+ *
+ * Only files `reviewBytes` holds a line in are ever read. A path git cannot
+ * show at the base (added in this slice) or that is gone from disk (deleted)
+ * is not version-only. When the base cannot be found the answer is EMPTY —
+ * every path keeps obliging, which is the direction this may be wrong in.
+ *
+ * @param {string[]|null} paths changed relpaths
+ * @param {{root?: string}} [opts]
+ * @returns {string[]}
+ */
+function versionOnlyPaths(paths, { root = REPO_ROOT } = {}) {
+  if (!Array.isArray(paths)) return [];
+  const candidates = paths.filter(holdsVersionLines);
+  if (!candidates.length) return [];
+  const base = sh("git", ["merge-base", "HEAD", "origin/main"], root);
+  if (base.status !== 0) return [];
+  const at = base.stdout.trim();
+  const out = [];
+  for (const p of candidates) {
+    const before = spawnSync("git", ["show", `${at}:${p}`], { cwd: root, maxBuffer: 32 * 1024 * 1024 });
+    if (before.status !== 0) continue;
+    let after;
+    try {
+      after = fs.readFileSync(path.join(root, p));
+    } catch {
+      continue;
+    }
+    if (versionOnly(p, before.stdout, after)) out.push(p);
+  }
+  return out;
 }
 
 /** The branch this tree is on; "" when detached, null when git cannot say. */
@@ -364,7 +418,18 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
   // what wants a second reader (see REVIEW_TIER_IRRELEVANT for the whole
   // reasoning). Derived by the same fail-open function, so an unclassified path
   // costs a read of the diff rather than an unreviewed change.
-  const reviewNeed = deriveTierNeed(paths, { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" });
+  //
+  // A path whose change is only a release number obliges no review (D-3): the
+  // review hash holds those lines, so it could never reopen one either.
+  // `opts.versionOnly` is handed in by a reader that has already asked;
+  // otherwise it is asked of git here, for the version files alone.
+  const bumped = new Set(opts.versionOnly ?? versionOnlyPaths(paths));
+  const reviewPaths = Array.isArray(paths) ? paths.filter((p) => !bumped.has(p)) : paths;
+  // Every path a bump: nothing is left to ask about, and an empty list would read
+  // to `deriveTierNeed` as "no change to reason about" — which owes.
+  const reviewNeed = Array.isArray(paths) && paths.length > 0 && reviewPaths.length === 0
+    ? { required: false, reason: `every changed path changed only a release number, which the review hash holds (scripts/observed-tree.mjs reviewBytes): ${paths.slice(0, 3).join(", ")}${paths.length > 3 ? ", …" : ""}`, obliging: [] }
+    : deriveTierNeed(reviewPaths, { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" });
 
   // The Firebase L2 run is owed on exactly the paths the L2 run is — the same
   // function over the same list; only the sentence names the other run. What
@@ -398,7 +463,7 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
     attests: (d, now) => recordMeetsTier(asRecord(d), TIERS.firebase, now, { rekey: null }),
     sameRule,
   });
-  const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => ({ hash: observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }) }));
+  const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => ({ hash: reviewTreeHash(REPO_ROOT) }));
   return { ...dev, need, ...base, review: { ...rev, need: reviewNeed }, firebase: { ...fb, need: firebaseNeed } };
 }
 
@@ -1257,7 +1322,7 @@ export function recordReview({ tests = [], decisions = [], nothingFound = false,
     // uses and for the same reason: a review predates the commit that carries
     // it, so a commit-keyed record reads stale the moment it lands. The commit
     // is kept beside it as provenance a human can read, never as the key.
-    observedHash: observedTreeHash(root, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }),
+    observedHash: reviewTreeHash(root),
     commit: head.status === 0 ? head.stdout.trim() : null,
     tests,
     decisions,
@@ -1424,7 +1489,7 @@ function main() {
         : 'no slice is declared — node scripts/proof-plan.mjs --open "<what you are building>"\n');
       process.exit(2);
     }
-    const r = reviewDischarge(readReviewRecord(), observedTreeHash(REPO_ROOT, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP }));
+    const r = reviewDischarge(readReviewRecord(), reviewTreeHash(REPO_ROOT));
     if (!r.ok) {
       process.stderr.write(r.message);
       process.exit(r.exit);
@@ -1492,4 +1557,4 @@ function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
-export { TIERS, CHEAP_TIER_DUE, read, changedPaths, currentBranch, isTrunk, REVIEW_SCHEMA, REVIEW_PATH, REKEY_SCHEMA, REKEY_PATH };
+export { TIERS, CHEAP_TIER_DUE, read, changedPaths, versionOnlyPaths, currentBranch, isTrunk, REVIEW_SCHEMA, REVIEW_PATH, REKEY_SCHEMA, REKEY_PATH };
